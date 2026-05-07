@@ -1,8 +1,6 @@
 {
   "data": {
-    "id": "rule123",
     "zoneId": "zone123",
-    "ruleId": "rule123",
     "rule": {
       "id": "rule123",
       "action": "route",

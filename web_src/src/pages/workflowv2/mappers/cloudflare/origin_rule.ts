@@ -48,9 +48,7 @@ interface OriginRuleActionParameters {
 }
 
 interface OriginRuleOutput {
-  id?: string;
   zoneId?: string;
-  ruleId?: string;
   rule?: {
     id?: string;
     expression?: string;
@@ -280,7 +278,7 @@ function originRuleRewriteLabels(
 }
 
 function originRuleIdLabel(configuration?: OriginRuleConfiguration, output?: OriginRuleOutput): string {
-  return stringOrDash(output?.ruleId || output?.id || output?.rule?.id || configuration?.rule);
+  return stringOrDash(output?.rule?.id || configuration?.rule);
 }
 
 function addOriginRewriteDetails(

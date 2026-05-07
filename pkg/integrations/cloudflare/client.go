@@ -3,6 +3,7 @@ package cloudflare
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,6 +32,11 @@ type CloudflareAPIError struct {
 
 func (e *CloudflareAPIError) Error() string {
 	return fmt.Sprintf("request got %d code: %s", e.StatusCode, string(e.Body))
+}
+
+func isCloudflareNotFound(err error) bool {
+	apiErr := (*CloudflareAPIError)(nil)
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {

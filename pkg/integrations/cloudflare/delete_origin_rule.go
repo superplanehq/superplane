@@ -75,7 +75,7 @@ func (c *DeleteOriginRule) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The origin rule to delete",
-			Placeholder: "{{ $['cloudflare.createOriginRule'].data.id }}",
+			Placeholder: "Select origin rule",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "origin_rule",

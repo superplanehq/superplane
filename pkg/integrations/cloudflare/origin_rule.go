@@ -3,7 +3,6 @@ package cloudflare
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -608,17 +607,10 @@ func findOriginRule(rules []OriginRule, ruleID string) *OriginRule {
 	return nil
 }
 
-func isCloudflareNotFound(err error) bool {
-	apiErr := (*CloudflareAPIError)(nil)
-	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
-}
-
 func emitOriginRule(ctx core.ExecutionContext, payloadType, zoneID string, rule *OriginRule) error {
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, payloadType, []any{
 		map[string]any{
-			"id":     rule.ID,
 			"zoneId": zoneID,
-			"ruleId": rule.ID,
 			"rule":   rule,
 		},
 	})

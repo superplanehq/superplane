@@ -114,9 +114,7 @@ describe("cloudflare origin rule mapper", () => {
             default: [
               buildOutput(
                 {
-                  id: "rule123",
                   zoneId: "zone123",
-                  ruleId: "rule123",
                   rule: {
                     id: "rule123",
                     expression: "true",
@@ -159,8 +157,7 @@ describe("cloudflare origin rule mapper", () => {
             default: [
               buildOutput(
                 {
-                  id: "rule123",
-                  ruleId: "rule123",
+                  zoneId: "zone123",
                   rule: {
                     id: "rule123",
                     expression: `starts_with(http.request.uri.path, "/api/")`,
