@@ -259,33 +259,40 @@ func findOpenCanvasRunWorkInTransaction(tx *gorm.DB, runID uuid.UUID) (*openCanv
 }
 
 func calculateCanvasRunResultInTransaction(tx *gorm.DB, runID uuid.UUID) (string, error) {
-	var failedCount int64
-	err := tx.
-		Model(&CanvasNodeExecution{}).
-		Where("run_id = ?", runID).
-		Where("result = ?", CanvasNodeExecutionResultFailed).
-		Count(&failedCount).
-		Error
+	var result struct {
+		HasFailed    bool
+		HasCancelled bool
+	}
+
+	err := tx.Raw(`
+		SELECT
+			EXISTS (
+				SELECT 1
+				FROM workflow_node_executions
+				WHERE run_id = ?
+				AND result = ?
+			) AS has_failed,
+			EXISTS (
+				SELECT 1
+				FROM workflow_node_executions
+				WHERE run_id = ?
+				AND result = ?
+			) AS has_cancelled
+	`,
+		runID,
+		CanvasNodeExecutionResultFailed,
+		runID,
+		CanvasNodeExecutionResultCancelled,
+	).Scan(&result).Error
 	if err != nil {
 		return "", err
 	}
 
-	if failedCount > 0 {
+	if result.HasFailed {
 		return CanvasRunResultFailed, nil
 	}
 
-	var cancelledCount int64
-	err = tx.
-		Model(&CanvasNodeExecution{}).
-		Where("run_id = ?", runID).
-		Where("result = ?", CanvasNodeExecutionResultCancelled).
-		Count(&cancelledCount).
-		Error
-	if err != nil {
-		return "", err
-	}
-
-	if cancelledCount > 0 {
+	if result.HasCancelled {
 		return CanvasRunResultCancelled, nil
 	}
 
