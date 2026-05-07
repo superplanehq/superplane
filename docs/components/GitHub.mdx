@@ -1064,7 +1064,7 @@ The On Push trigger starts a workflow execution when code is pushed to a GitHub 
 
 - **Repository**: Select the GitHub repository to monitor
 - **Refs**: Configure which branches/tags to monitor (e.g., `refs/heads/main`, `refs/tags/*`)
-- **Paths** *(optional)*: GitHub Actions–style glob patterns against added, modified, and removed files. Use `!` as a prefix to exclude a path pattern (for example include `billing/**` and exclude `!billing/**/*.md`). If every pattern is an exclude, an implicit include of `**` is used so negation-only lists still work. Older workflows may still store paths as predicate objects: `equals` entries are interpreted as globs; `matches` (regex) entries must be recreated as globs (they are skipped until updated). If the push payload has no usable per-commit file paths, a path filter cannot match and the trigger will not fire. Leave empty to fire on all pushes regardless of paths.
+- **Paths** *(optional)*: Glob patterns (GitHub Actions–style) for added, modified, and removed files. Use `!` prefix to exclude (for example `billing/**` with `!billing/**/*.md`). Patterns starting only with `!` assume an include of `**`. Lists stored as legacy ref-style predicates still honor `equals` values as globs; `matches` must be replaced with glob patterns. If the webhook has no per-commit file lists (empty `commits` or missing `added`/`modified`/`removed` arrays), a configured path filter cannot match and the trigger will not fire. Leave empty to fire on all pushes.
 
 ### Event Data
 
