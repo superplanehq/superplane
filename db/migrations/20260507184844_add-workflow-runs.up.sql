@@ -17,6 +17,15 @@ ALTER TABLE workflow_events ADD COLUMN run_id uuid;
 ALTER TABLE workflow_node_queue_items ADD COLUMN run_id uuid;
 ALTER TABLE workflow_node_executions ADD COLUMN run_id uuid;
 
+-- Historical retention/cascade behavior can leave runtime rows without a
+-- root event. Those rows cannot be associated with a workflow run, so remove
+-- them before enforcing run_id as NOT NULL.
+DELETE FROM workflow_node_queue_items
+WHERE root_event_id IS NULL;
+
+DELETE FROM workflow_node_executions
+WHERE root_event_id IS NULL;
+
 CREATE TEMP TABLE workflow_run_backfill (
   root_event_id uuid PRIMARY KEY,
   run_id        uuid NOT NULL
