@@ -1813,10 +1813,18 @@ export function WorkflowPageV2() {
   }, [integrations]);
   const canvasMode = hasEditableVersion ? "edit" : "live";
   const triggerModalHostRef = useRef<((modal: TriggerActionModal) => void) | undefined>(undefined);
+  const runDisabledRef = useRef(false);
+  const runDisabledTooltipRef = useRef<string | undefined>(undefined);
   const registerTriggerModalHost = useCallback((openModal: (modal: TriggerActionModal) => void) => {
     triggerModalHostRef.current = openModal;
   }, []);
   const openTriggerModal = useCallback((modal: TriggerActionModal) => {
+    if (runDisabledRef.current) {
+      if (runDisabledTooltipRef.current) {
+        showErrorToast(runDisabledTooltipRef.current);
+      }
+      return;
+    }
     triggerModalHostRef.current?.(modal);
   }, []);
 
@@ -5339,6 +5347,8 @@ export function WorkflowPageV2() {
             : hasRunBlockingChanges
               ? "Save canvas changes before running"
               : undefined;
+  runDisabledRef.current = runDisabled;
+  runDisabledTooltipRef.current = runDisabledTooltip;
 
   return (
     <>

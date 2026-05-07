@@ -333,7 +333,8 @@ function buildTriggerActionContext(
           }),
         );
         await queryClient.invalidateQueries({ queryKey: [...canvasKeys.events(), canvasId] });
-        await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeEvent(canvasId, nodeId) });
+        await queryClient.invalidateQueries({ queryKey: [...canvasKeys.nodeEvents(), canvasId, nodeId] });
+        await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeEventHistory(canvasId, nodeId) });
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "failed to invoke hook"));
         throw error;
