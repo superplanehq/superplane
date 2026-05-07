@@ -1,6 +1,9 @@
 package configuration
 
-import "regexp"
+import (
+	"regexp"
+	"sync"
+)
 
 const (
 	PredicateTypeEquals    = "equals"
@@ -37,16 +40,37 @@ func (p *Predicate) Matches(value string) bool {
 		return p.Value != value
 
 	case PredicateTypeMatches:
-		matches, err := regexp.MatchString(p.Value, value)
+		re, err := compileMatchPattern(p.Value)
 		if err != nil {
 			return false
 		}
 
-		return matches
+		return re.MatchString(value)
 
 	default:
 		return false
 	}
+}
+
+// compileMatchPattern returns a compiled regex for the given pattern, caching
+// successes and failures so repeated calls — common when a single set of
+// predicates is evaluated against many incoming values — don't recompile.
+var matchPatternCache sync.Map // map[string]matchPatternEntry
+
+type matchPatternEntry struct {
+	re  *regexp.Regexp
+	err error
+}
+
+func compileMatchPattern(pattern string) (*regexp.Regexp, error) {
+	if v, ok := matchPatternCache.Load(pattern); ok {
+		entry := v.(matchPatternEntry)
+		return entry.re, entry.err
+	}
+
+	re, err := regexp.Compile(pattern)
+	matchPatternCache.Store(pattern, matchPatternEntry{re: re, err: err})
+	return re, err
 }
 
 type AnyPredicateListTypeOptions struct {
