@@ -12,7 +12,6 @@ export function renderCanvasNodeCustomField({
   node: ComponentsNode;
   configuration?: Record<string, unknown>;
   context?: {
-    onRun?: (initialData?: string) => void;
     integration?: OrganizationsIntegration;
   };
 }) {
