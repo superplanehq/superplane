@@ -21,6 +21,7 @@ type Canvas struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
 	LiveVersionID  *uuid.UUID
+	CanvasGroupID  *uuid.UUID
 	IsTemplate     bool
 	Name           string
 	// The `->` tag marks fields as read-only in GORM. These values are projected

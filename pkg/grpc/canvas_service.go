@@ -53,6 +53,42 @@ func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRe
 	return canvases.UpdateCanvas(ctx, s.authService, organizationID, req.Id, req.Name, req.Description, req.ChangeManagement)
 }
 
+func (s *CanvasService) ListCanvasGroups(ctx context.Context, req *pb.ListCanvasGroupsRequest) (*pb.ListCanvasGroupsResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListCanvasGroups(ctx, organizationID)
+}
+
+func (s *CanvasService) CreateCanvasGroup(ctx context.Context, req *pb.CreateCanvasGroupRequest) (*pb.CreateCanvasGroupResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CreateCanvasGroup(ctx, organizationID, req.Group)
+}
+
+func (s *CanvasService) UpdateCanvasGroup(ctx context.Context, req *pb.UpdateCanvasGroupRequest) (*pb.UpdateCanvasGroupResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvasGroup(ctx, organizationID, req.Id, req.Group)
+}
+
+func (s *CanvasService) DeleteCanvasGroup(ctx context.Context, req *pb.DeleteCanvasGroupRequest) (*pb.DeleteCanvasGroupResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.DeleteCanvasGroup(ctx, organizationID, req.Id)
+}
+
+func (s *CanvasService) UpdateCanvasGroupPosition(
+	ctx context.Context,
+	req *pb.UpdateCanvasGroupPositionRequest,
+) (*pb.UpdateCanvasGroupPositionResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvasGroupPosition(ctx, organizationID, req.Id, req.Direction)
+}
+
+func (s *CanvasService) UpdateCanvasGroupMembership(
+	ctx context.Context,
+	req *pb.UpdateCanvasGroupMembershipRequest,
+) (*pb.UpdateCanvasGroupMembershipResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvasGroupMembership(ctx, organizationID, req.CanvasId, req.GroupId)
+}
+
 func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {
 	if req.Canvas == nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas is required")

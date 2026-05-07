@@ -261,6 +261,37 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: defaultResourceResolver,
 		},
+		pbCanvases.Canvases_ListCanvasGroups_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		pbCanvases.Canvases_CreateCanvasGroup_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		pbCanvases.Canvases_UpdateCanvasGroup_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		pbCanvases.Canvases_DeleteCanvasGroup_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		pbCanvases.Canvases_UpdateCanvasGroupPosition_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		pbCanvases.Canvases_UpdateCanvasGroupMembership_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
 		pbCanvases.Canvases_ListNodeExecutions_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "read",
