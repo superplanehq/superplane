@@ -47,14 +47,14 @@ type Config struct {
 var ErrDisabled = errors.New("ec2 provisioning disabled: EC2_PROVISION_HOT_INSTANCE_COUNT is not set")
 
 const (
-	envAMI             = "EC2_PROVISION_AMI_ID"
-	envInstanceType    = "EC2_PROVISION_INSTANCE_TYPE"
-	envSubnet          = "EC2_PROVISION_SUBNET_ID"
-	envSecurityGroups  = "EC2_PROVISION_SECURITY_GROUP_IDS"
-	envRunnerImage     = "EC2_PROVISION_RUNNER_IMAGE"
-	envFleetManagerURL = "EC2_PROVISION_FLEET_MANAGER_URL"
-	envRunnersAuth     = "EC2_PROVISION_RUNNER_AUTH_TOKEN"
-	envKeyName         = "EC2_PROVISION_KEY_NAME"
+	envAMI                 = "EC2_PROVISION_AMI_ID"
+	envInstanceType        = "EC2_PROVISION_INSTANCE_TYPE"
+	envSubnet              = "EC2_PROVISION_SUBNET_ID"
+	envSecurityGroups      = "EC2_PROVISION_SECURITY_GROUP_IDS"
+	envRunnerImage         = "EC2_PROVISION_RUNNER_IMAGE"
+	envFleetManagerURL     = "EC2_PROVISION_FLEET_MANAGER_URL"
+	envRunnersAuth         = "EC2_PROVISION_RUNNER_AUTH_TOKEN"
+	envKeyName             = "EC2_PROVISION_KEY_NAME"
 	envRunnerIAMProf       = "EC2_PROVISION_RUNNER_INSTANCE_PROFILE"
 	envRunnerTerminateTask = "EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK"
 	envHotCount            = "EC2_PROVISION_HOT_INSTANCE_COUNT"
@@ -110,16 +110,16 @@ func ConfigFromEnv() (Config, error) {
 		terminateAfterTask = false
 	}
 	return Config{
-		AMI:                ami,
-		InstanceType:       itype,
-		SubnetID:           sub,
-		SecurityGroupIDs:   sgIDs,
-		RunnerImage:        rimg,
-		FleetManagerURL:    url,
-		RunnersAuthToken:   strings.TrimSpace(os.Getenv(envRunnersAuth)),
-		KeyName:            strings.TrimSpace(os.Getenv(envKeyName)),
-		RunnersIAMProfName: strings.TrimSpace(os.Getenv(envRunnerIAMProf)),
-		HotInstanceCount:   hot,
+		AMI:                          ami,
+		InstanceType:                 itype,
+		SubnetID:                     sub,
+		SecurityGroupIDs:             sgIDs,
+		RunnerImage:                  rimg,
+		FleetManagerURL:              url,
+		RunnersAuthToken:             strings.TrimSpace(os.Getenv(envRunnersAuth)),
+		KeyName:                      strings.TrimSpace(os.Getenv(envKeyName)),
+		RunnersIAMProfName:           strings.TrimSpace(os.Getenv(envRunnerIAMProf)),
+		HotInstanceCount:             hot,
 		RunnerTerminateAfterEachTask: terminateAfterTask,
 	}, nil
 }
@@ -227,4 +227,3 @@ func userDataScript(c Config) string {
 	fmt.Fprintf(&b, "  %s\n", strconv.Quote(c.RunnerImage))
 	return b.String()
 }
-
