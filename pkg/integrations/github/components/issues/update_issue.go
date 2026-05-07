@@ -176,6 +176,7 @@ func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
 	return common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 }
@@ -191,12 +192,7 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("issue number is not a number: %v", err)
 	}
 
-	var appMetadata common.Metadata
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode integration metadata: %w", err)
-	}
-
-	client, err := common.NewClient(ctx.Integration, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("failed to initialize GitHub client: %w", err)
 	}
@@ -227,14 +223,7 @@ func (c *UpdateIssue) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Update the issue
-	issue, _, err := client.Issues.Edit(
-		context.Background(),
-		appMetadata.Owner,
-		config.Repository,
-		issueNumber,
-		issueRequest,
-	)
-
+	issue, _, err := client.EditIssue(context.Background(), config.Repository, issueNumber, issueRequest)
 	if err != nil {
 		return fmt.Errorf("failed to update issue: %w", err)
 	}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -818,6 +819,76 @@ func Test__CanvasPatcher(t *testing.T) {
 		})
 		steps.assertHasNodeBlock("node-a", "github.getIssue")
 		steps.assertHasNodeIntegrationID("node-a", integration.ID.String())
+	})
+
+	t.Run("accepts integration component when capability is enabled", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps.givenCanvasVersion(nil, nil)
+
+		integration := support.CreateIntegrationWithCapabilities(t, r.Organization.ID, []models.CapabilityState{
+			{Name: "github.getIssue", State: core.IntegrationCapabilityStateEnabled},
+		})
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:            "node-a",
+						Name:          "Node A",
+						Block:         "github.getIssue",
+						IntegrationId: integration.ID.String(),
+						Configuration: structFromMap(t, map[string]any{
+							"repository":  "superplanehq/superplane",
+							"issueNumber": "1",
+						}),
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertNoError()
+		steps.assertNodeCount(1)
+		steps.assertHasNode("node-a", "Node A", map[string]any{
+			"repository":  "superplanehq/superplane",
+			"issueNumber": "1",
+		})
+		steps.assertHasNodeBlock("node-a", "github.getIssue")
+		steps.assertHasNodeIntegrationID("node-a", integration.ID.String())
+	})
+
+	t.Run("integration component with disabled capability -> sets node error without returning error", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
+		steps.givenCanvasVersion(nil, nil)
+
+		integration := support.CreateIntegrationWithCapabilities(t, r.Organization.ID, []models.CapabilityState{
+			{Name: "github.getIssue", State: core.IntegrationCapabilityStateDisabled},
+		})
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:            "node-a",
+						Name:          "Node A",
+						Block:         "github.getIssue",
+						IntegrationId: integration.ID.String(),
+						Configuration: structFromMap(t, map[string]any{
+							"repository":  "superplanehq/superplane",
+							"issueNumber": "1",
+						}),
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertNoError()
+		steps.assertNodeCount(1)
+		steps.assertHasNodeBlock("node-a", "github.getIssue")
+		steps.assertHasNoNodeIntegrationID("node-a")
+		steps.assertNodeErrorContains("node-a", "github.getIssue is not enabled")
+		steps.assertNodeErrorContains("node-a", integration.InstallationName)
 	})
 }
 

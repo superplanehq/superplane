@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,20 @@ type Client struct {
 	OrgURL   string
 	APIToken string
 	http     core.HTTPContext
+}
+
+type HTTPError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e *HTTPError) Error() string {
+	return fmt.Sprintf("request got %d code: %s", e.StatusCode, e.Body)
+}
+
+func IsNotFoundError(err error) bool {
+	var httpErr *HTTPError
+	return errors.As(err, &httpErr) && httpErr.StatusCode == http.StatusNotFound
 }
 
 func NewClientWithAPIToken(http core.HTTPContext, parameters core.IntegrationPropertyStorageReader, apiToken string) (*Client, error) {
@@ -157,7 +172,7 @@ func (c *Client) execRequest(method, URL string, body io.Reader) ([]byte, error)
 	}
 
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusNoContent {
-		return nil, fmt.Errorf("request got %d code: %s", res.StatusCode, string(responseBody))
+		return nil, &HTTPError{StatusCode: res.StatusCode, Body: string(responseBody)}
 	}
 
 	return responseBody, nil
@@ -345,7 +360,7 @@ func (c *Client) DeleteNotification(id string) error {
 	notificationURL := fmt.Sprintf("%s/api/v1alpha/notifications/%s", c.OrgURL, id)
 	_, err := c.execRequest(http.MethodDelete, notificationURL, nil)
 	if err != nil {
-		return fmt.Errorf("error deleting notification: %v", err)
+		return fmt.Errorf("error deleting notification: %w", err)
 	}
 
 	return nil
@@ -392,7 +407,7 @@ func (c *Client) DeleteSecret(name string) error {
 	secretURL := fmt.Sprintf("%s/api/v1beta/secrets/%s", c.OrgURL, name)
 	_, err := c.execRequest(http.MethodDelete, secretURL, nil)
 	if err != nil {
-		return fmt.Errorf("error deleting secret: %v", err)
+		return fmt.Errorf("error deleting secret: %w", err)
 	}
 
 	return nil

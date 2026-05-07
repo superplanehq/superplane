@@ -20,7 +20,10 @@ func newActionsCommand(options core.BindOptions) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "actions",
 		Short: "List or describe available actions",
-		Args:  cobra.NoArgs,
+		Long: `List or describe available actions.
+
+Use -o json or -o yaml with --name to inspect nested schema fields, enum options, defaults, and conditions.`,
+		Args: cobra.NoArgs,
 	}
 	cmd.Flags().StringVar(&from, "from", "", "integration definition name")
 	cmd.Flags().StringVar(&name, "name", "", "action name")

@@ -767,6 +767,7 @@ message Integration {
     string canvas_name = 2;
     string node_id = 3;
     string node_name = 4;
+    string component = 5;
   }
 
   Metadata metadata = 1;
