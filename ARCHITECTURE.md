@@ -73,6 +73,6 @@ Provisioning is **orthogonal** to task claiming:
 | `runner/` | Worker agent (`internal/agent`), `cmd/runner` |
 | `shared/api`, `shared/models`, `shared/webhook` | Shared types and webhook retry client used by fleet-manager and task-broker |
 
-**EC2 hot pool** (optional): when `EC2_PROVISION_HOT_INSTANCE_COUNT`, `EC2_PROVISION_*` network/AMI settings, and `AWS_REGION` are set, fleet-manager **reconciles on a timer** toward that many `pending`+`running` instances tagged `superplane_managed_runner`; user-data installs Docker and starts the runner image against `EC2_PROVISION_FLEET_MANAGER_URL`. There is **no HTTP API** for provisioning—capacity is entirely **environment-driven**.
+**EC2 hot pool** (optional): when `EC2_PROVISION_HOT_INSTANCE_COUNT`, `EC2_PROVISION_*` network/AMI settings, **`EC2_PROVISION_RUNNER_S3_URI`** ( **`aws s3 cp`**) **or** **`EC2_PROVISION_RUNNER_BINARY_URL`** (**`curl`**), **`AWS_REGION`**, and (for S3) **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`**, fleet-manager **reconciles on a timer** toward that many `pending`+`running` instances tagged `superplane_managed_runner`; user-data installs Docker, installs the **`runner`** binary on the Ubuntu host, and runs **systemd** against `EC2_PROVISION_FLEET_MANAGER_URL`. There is **no HTTP API** for provisioning—capacity is entirely **environment-driven**.
 
 This separation keeps **orchestration and callbacks** in fleet-manager, **execution** in runners, and **infrastructure scaling** as an optional plug-in.

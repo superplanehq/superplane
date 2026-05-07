@@ -84,9 +84,28 @@ export BROKER_PUBLIC_URL=http://127.0.0.1:8081   # fleet-manager must reach this
 | `AUTH_TOKEN`         | (empty)      | If set, requires `Authorization: Bearer <token>` for `/v1/*` |
 | `REAP_INTERVAL_SEC`  | `15`         | How often to return expired leases to the queue              |
 
-Optional **EC2 hot runner pool** — set **`AWS_REGION`**, **`EC2_PROVISION_HOT_INSTANCE_COUNT`** (non-negative target for `pending`+`running` instances tagged `superplane_managed_runner`), plus **`EC2_PROVISION_AMI_ID`**, **`EC2_PROVISION_SUBNET_ID`**, **`EC2_PROVISION_SECURITY_GROUP_IDS`** (comma-separated), and **`EC2_PROVISION_FLEET_MANAGER_URL`** (base URL runners use to reach fleet-manager, often a **private** VPC URL). Fleet-manager **reconciles in the background** (default every **60** s, override with **`EC2_PROVISION_RECONCILE_INTERVAL_SEC`**, minimum **15**) via **`ec2:RunInstances`** / **`ec2:TerminateInstances`**. Omit **`EC2_PROVISION_HOT_INSTANCE_COUNT`** to disable EC2 logic entirely. Optional: **`EC2_PROVISION_INSTANCE_TYPE`** (default `t3.micro`), **`EC2_PROVISION_RUNNER_IMAGE`**, **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**, **`EC2_PROVISION_KEY_NAME`**, **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`**.
+Optional **EC2 hot runner pool** — set **`AWS_REGION`** (also used as **`AWS_DEFAULT_REGION`** inside user-data for **`aws s3 cp`**), **`EC2_PROVISION_HOT_INSTANCE_COUNT`**, **`EC2_PROVISION_AMI_ID`**, **`EC2_PROVISION_SUBNET_ID`**, **`EC2_PROVISION_SECURITY_GROUP_IDS`**, **`EC2_PROVISION_FLEET_MANAGER_URL`**, plus **either**:
 
-By default **`EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK`** is **on** (`true`): each runner sends **`runner_id`** equal to its **EC2 instance id** (set from IMDS in user-data); after **one** successful task, **fleet-manager** calls **`TerminateInstances`** for that id and the runner process exits (**`--restart no`** on the container so Docker does not immediately loop). Set **`EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK=false`** for long-lived runners. Runner VMs do **not** need **`ec2:TerminateInstances`**; **fleet-manager’s** IAM must already include **`TerminateInstances`** (used for reconcile and disposable runners).
+- **`EC2_PROVISION_RUNNER_S3_URI`** — `s3://bucket/key` to a **linux/amd64** static **`runner`** binary (**recommended with private repos**). Requires **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`** on runners with **`s3:GetObject`** on that object; user-data runs **`aws s3 cp`**.
+- **`EC2_PROVISION_RUNNER_BINARY_URL`** — public **http(s)** URL (**curl**).
+
+Do **not** set both.
+
+Fleet-manager **reconciles in the background** (default **60** s, **`EC2_PROVISION_RECONCILE_INTERVAL_SEC`**, minimum **15**). Optional: **`EC2_PROVISION_INSTANCE_TYPE`**, **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**, **`EC2_PROVISION_KEY_NAME`**, **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`**.
+
+Provisioner **user-data** installs **`/usr/local/bin/runner`** and starts **`superplane-runner.service`** on **Ubuntu** (**`docker.io`** remains for **`execution_mode: docker`**).
+
+#### Runner binary via S3 (typical setup)
+
+1. **Bucket** (same account/region as runners is simplest). Upload the static binary, e.g. **`runner-linux-amd64`** at **`s3://my-runner-binaries/release/runner-linux-amd64`** (`aws s3 cp bin/runner …` after **`CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/runner ./runner/cmd/runner`**).
+
+2. **IAM role for runners** (**instance profile** name = **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`**): attach an inline policy allowing **`s3:GetObject`** on **`arn:aws:s3:::my-runner-binaries/release/*`** (tighten to the exact key).
+
+3. **Fleet-manager env**: **`EC2_PROVISION_RUNNER_S3_URI=s3://my-runner-binaries/release/runner-linux-amd64`**, **`AWS_REGION=us-east-1`** (or your region), **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE=…`**.
+
+4. **CI**: on each release, **`aws s3 cp`** / sync the built **`runner`** to that key (OIDC **`aws-actions/configure-aws-credentials`** or long-lived IAM user with **`s3:PutObject`** on that prefix).
+
+By default **`EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK`** is **on** (`true`): **`runner_id`** is the EC2 instance id from IMDS; after **one** successful task, **fleet-manager** calls **`TerminateInstances`** and the systemd unit **`Restart=no`** stops respawn before shutdown. Set **`false`** for long-lived workers (**`Restart=always`**). Runner VMs do **not** need **`TerminateInstances`** on their profile for that flow; **fleet-manager’s** role must **`TerminateInstances`** (reconcile + disposable runners).
 
 Fleet-manager still needs **`ec2:RunInstances`**, **`ec2:DescribeInstances`**, **`ec2:CreateTags`**, **`ec2:TerminateInstances`**, and **`iam:PassRole`** when using an instance profile on runners.
 
@@ -185,6 +204,10 @@ Publishing runs from [.semaphore/docker-publish.yml](.semaphore/docker-publish.y
 2. In Semaphore: **Secrets** → create a secret named exactly **`ghcr`** with **`GHCR_TOKEN`** (a PAT with **`read:packages`** and **`write:packages`**). Non-interactive `docker login --password-stdin` still requires a username, so the workflow uses the **`owner`** segment of **`owner/repo`** from `SEMAPHORE_GIT_REPO_SLUG` as **`-u`**, matching your **`ghcr.io/owner/...`** image paths. Ensure the PAT is for an account allowed to push to that namespace (often the same **`owner`** or a **`write:packages`** bot).
 
 After the first successful push, configure each package under **GitHub → Packages** → package → **Package settings**. **Public** packages can be **pulled** without `docker login` ([visibility](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility)); that avoids **ECS/Fargate `repositoryCredentials`** for pulls. Publishing from CI still needs the PAT above.
+
+### Runner binary → S3 (EC2 host workers)
+
+When **main** is green, [.semaphore/runner-binary-s3.yml](.semaphore/runner-binary-s3.yml) builds a static **linux/amd64** `runner` and uploads it with the AWS CLI. Create a Semaphore secret named **`runner-s3`** with **`AWS_ACCESS_KEY_ID`**, **`AWS_SECRET_ACCESS_KEY`**, **`AWS_DEFAULT_REGION`**, and **`EC2_PROVISION_RUNNER_S3_URI`** (the same `s3://bucket/key` as **fleet-manager** — see **`EC2_PROVISION_RUNNER_S3_URI`** above). Optional: **`AWS_SESSION_TOKEN`**.
 
 ## License
 

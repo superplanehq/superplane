@@ -1,4 +1,5 @@
-// Package ec2provision maintains a pool of Ubuntu EC2 runners (user-data starts the Docker agent).
+// Package ec2provision maintains a pool of Ubuntu EC2 runners: cloud-init installs the statically linked
+// runner binary (S3 via aws s3 cp, or HTTPS curl) and runs it under systemd so host-mode tasks run on Ubuntu.
 //
 // Enabled when EC2_PROVISION_HOT_INSTANCE_COUNT is set together with AMI, subnet, security groups,
 // and fleet-manager URL; see ConfigFromEnv and ErrDisabled.
@@ -29,17 +30,22 @@ type Launcher struct {
 
 // Config is filled from EC2_PROVISION_* environment variables.
 type Config struct {
-	AMI                string
-	InstanceType       string
-	SubnetID           string
-	SecurityGroupIDs   []string
-	RunnerImage        string
-	FleetManagerURL    string // FLEET_MANAGER_URL for new runner containers (reachable from VPC)
-	RunnersAuthToken   string // optional, passed into runner AUTH_TOKEN (-e)
-	KeyName            string // optional EC2 key pair name
-	RunnersIAMProfName string // optional IAM instance profile name for runners
-	HotInstanceCount   int    // target pending+running managed instances (from EC2_PROVISION_HOT_INSTANCE_COUNT)
-	// RunnerTerminateAfterEachTask sets RUNNER_TERMINATE_AFTER_EACH_TASK on new runner containers (EC2 terminate after one task).
+	AMI              string
+	InstanceType     string
+	SubnetID         string
+	SecurityGroupIDs []string
+	// RunnerS3URI installs from s3://bucket/key (requires instance profile with s3:GetObject); mutually exclusive with RunnerBinaryURL.
+	RunnerS3URI string
+	// RunnerBinaryURL is an http(s) URL to curl when RunnerS3URI is empty.
+	RunnerBinaryURL string
+	// RunnerInstallAWSRegion is AWS_DEFAULT_REGION in user-data for aws s3 cp (same region as fleet-manager / bucket).
+	RunnerInstallAWSRegion string
+	FleetManagerURL        string // FLEET_MANAGER_URL for runners (reachable from VPC)
+	RunnersAuthToken       string // optional runner AUTH_TOKEN
+	KeyName                string // optional EC2 key pair name
+	RunnersIAMProfName     string // optional IAM instance profile name for runners
+	HotInstanceCount       int    // target pending+running managed instances (from EC2_PROVISION_HOT_INSTANCE_COUNT)
+	// RunnerTerminateAfterEachTask sets RUNNER_TERMINATE_AFTER_EACH_TASK; fleet-manager terminates the EC2 instance after one task.
 	RunnerTerminateAfterEachTask bool
 }
 
@@ -51,7 +57,8 @@ const (
 	envInstanceType        = "EC2_PROVISION_INSTANCE_TYPE"
 	envSubnet              = "EC2_PROVISION_SUBNET_ID"
 	envSecurityGroups      = "EC2_PROVISION_SECURITY_GROUP_IDS"
-	envRunnerImage         = "EC2_PROVISION_RUNNER_IMAGE"
+	envRunnerS3URI         = "EC2_PROVISION_RUNNER_S3_URI"
+	envRunnerBinaryURL     = "EC2_PROVISION_RUNNER_BINARY_URL"
 	envFleetManagerURL     = "EC2_PROVISION_FLEET_MANAGER_URL"
 	envRunnersAuth         = "EC2_PROVISION_RUNNER_AUTH_TOKEN"
 	envKeyName             = "EC2_PROVISION_KEY_NAME"
@@ -60,7 +67,6 @@ const (
 	envHotCount            = "EC2_PROVISION_HOT_INSTANCE_COUNT"
 
 	defaultInstanceType = "t3.micro"
-	defaultRunnerImage  = "ghcr.io/superplanehq/runner/runner:latest"
 
 	// TagKeyManaged is applied to fleet-manager-managed runner instances for Describe/Reconcile filtering.
 	TagKeyManaged = "superplane_managed_runner"
@@ -96,13 +102,36 @@ func ConfigFromEnv() (Config, error) {
 	if len(sgIDs) == 0 {
 		return Config{}, fmt.Errorf("%s must list at least one security group id", envSecurityGroups)
 	}
+	region := strings.TrimSpace(os.Getenv("AWS_REGION"))
+	if region == "" {
+		region = strings.TrimSpace(os.Getenv("AWS_DEFAULT_REGION"))
+	}
+	if region == "" {
+		return Config{}, fmt.Errorf("set AWS_REGION (or AWS_DEFAULT_REGION) for EC2 provisioning")
+	}
+	runnerS3 := strings.TrimSpace(os.Getenv(envRunnerS3URI))
+	runnerBinURL := strings.TrimSpace(os.Getenv(envRunnerBinaryURL))
+	switch {
+	case runnerS3 != "" && runnerBinURL != "":
+		return Config{}, fmt.Errorf("set only one of %s or %s", envRunnerS3URI, envRunnerBinaryURL)
+	case runnerS3 != "":
+		if err := validateRunnerS3URI(runnerS3); err != nil {
+			return Config{}, err
+		}
+		prof := strings.TrimSpace(os.Getenv(envRunnerIAMProf))
+		if prof == "" {
+			return Config{}, fmt.Errorf("set %s when using %s (runners need IAM credentials to read S3)", envRunnerIAMProf, envRunnerS3URI)
+		}
+	case runnerBinURL != "":
+		if !strings.HasPrefix(runnerBinURL, "http://") && !strings.HasPrefix(runnerBinURL, "https://") {
+			return Config{}, fmt.Errorf("%s must start with http:// or https://", envRunnerBinaryURL)
+		}
+	default:
+		return Config{}, fmt.Errorf("set %s (recommended for private builds) or %s (public http(s) URL)", envRunnerS3URI, envRunnerBinaryURL)
+	}
 	itype := strings.TrimSpace(os.Getenv(envInstanceType))
 	if itype == "" {
 		itype = defaultInstanceType
-	}
-	rimg := strings.TrimSpace(os.Getenv(envRunnerImage))
-	if rimg == "" {
-		rimg = defaultRunnerImage
 	}
 	terminateAfterTask := true
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(envRunnerTerminateTask))) {
@@ -114,7 +143,9 @@ func ConfigFromEnv() (Config, error) {
 		InstanceType:                 itype,
 		SubnetID:                     sub,
 		SecurityGroupIDs:             sgIDs,
-		RunnerImage:                  rimg,
+		RunnerS3URI:                  runnerS3,
+		RunnerBinaryURL:              runnerBinURL,
+		RunnerInstallAWSRegion:       region,
 		FleetManagerURL:              url,
 		RunnersAuthToken:             strings.TrimSpace(os.Getenv(envRunnersAuth)),
 		KeyName:                      strings.TrimSpace(os.Getenv(envKeyName)),
@@ -124,14 +155,23 @@ func ConfigFromEnv() (Config, error) {
 	}, nil
 }
 
+func validateRunnerS3URI(s string) error {
+	s = strings.TrimSpace(s)
+	if !strings.HasPrefix(s, "s3://") {
+		return fmt.Errorf("%s must start with s3://", envRunnerS3URI)
+	}
+	key := strings.TrimPrefix(s, "s3://")
+	if key == "" || !strings.Contains(key, "/") {
+		return fmt.Errorf("%s must be s3://bucket/key (object path required)", envRunnerS3URI)
+	}
+	return nil
+}
+
 // New returns an EC2 client + config (uses AWS default credential chain + region).
 func New(ctx context.Context, cfg Config, log *slog.Logger) (*Launcher, error) {
-	region := strings.TrimSpace(os.Getenv("AWS_REGION"))
+	region := strings.TrimSpace(cfg.RunnerInstallAWSRegion)
 	if region == "" {
-		region = strings.TrimSpace(os.Getenv("AWS_DEFAULT_REGION"))
-	}
-	if region == "" {
-		return nil, fmt.Errorf("set AWS_REGION (or AWS_DEFAULT_REGION)")
+		return nil, fmt.Errorf("runner install region is empty")
 	}
 	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
@@ -144,7 +184,7 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Launcher, error) {
 	return &Launcher{Client: cli, Config: cfg, Log: log}, nil
 }
 
-// Launch creates `count` on-demand Ubuntu hosts that pull the runner image and connect to FleetManagerURL.
+// Launch creates `count` on-demand Ubuntu hosts that install the runner from S3 or RunnerBinaryURL and connect to FleetManagerURL.
 func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 	if count < 1 {
 		return nil, fmt.Errorf("count must be at least 1")
@@ -206,24 +246,53 @@ func userDataScript(c Config) string {
 	b.WriteString("if [ -n \"$TOKEN\" ]; then IID=$(curl -sf --max-time 3 -H \"X-aws-ec2-metadata-token: $TOKEN\" \"$IMDS/latest/meta-data/instance-id\") || IID=\"\"; fi\n")
 	b.WriteString("if [ -z \"$IID\" ]; then IID=$(curl -sf --max-time 3 \"$IMDS/latest/meta-data/instance-id\") || IID=\"unknown-host\"; fi\n")
 	b.WriteString("apt-get update -qy\n")
-	b.WriteString("apt-get install -qy docker.io\n")
+	if strings.TrimSpace(c.RunnerS3URI) != "" {
+		b.WriteString("apt-get install -qy ca-certificates curl docker.io awscli\n")
+	} else {
+		b.WriteString("apt-get install -qy ca-certificates curl docker.io\n")
+	}
 	b.WriteString("systemctl enable --now docker\n")
-	fmt.Fprintf(&b, "docker pull %s\n", strconv.Quote(c.RunnerImage))
-	b.WriteString("docker rm -f superplane-runner 2>/dev/null || true\n")
-	restart := "unless-stopped"
+	if strings.TrimSpace(c.RunnerS3URI) != "" {
+		fmt.Fprintf(&b, "export AWS_DEFAULT_REGION=%s\n", strconv.Quote(strings.TrimSpace(c.RunnerInstallAWSRegion)))
+		fmt.Fprintf(&b, "RUNNER_S3=%s\n", strconv.Quote(strings.TrimSpace(c.RunnerS3URI)))
+		b.WriteString("aws s3 cp \"$RUNNER_S3\" /usr/local/bin/runner\n")
+	} else {
+		fmt.Fprintf(&b, "BINURL=%s\n", strconv.Quote(strings.TrimSpace(c.RunnerBinaryURL)))
+		b.WriteString("curl -fsSL \"$BINURL\" -o /usr/local/bin/runner\n")
+	}
+	b.WriteString("chmod 755 /usr/local/bin/runner\n")
+	fmt.Fprintf(&b, "FMTMP=%s\n", strconv.Quote(c.FleetManagerURL))
+	fmt.Fprintf(&b, "RUNTOK=%s\n", strconv.Quote(c.RunnersAuthToken))
+	b.WriteString("umask 022\n")
+	b.WriteString("{\n")
+	b.WriteString("  printf 'FLEET_MANAGER_URL=%s\\n' \"$FMTMP\"\n")
+	b.WriteString("  printf 'RUNNER_ID=%s\\n' \"$IID\"\n")
+	b.WriteString("  if [ -n \"$RUNTOK\" ]; then printf 'AUTH_TOKEN=%s\\n' \"$RUNTOK\"; fi\n")
 	if c.RunnerTerminateAfterEachTask {
-		// Disposable worker: exits after RUNNER_TERMINATE_AFTER_EACH_TASK; avoid restart loops before fleet-manager terminates the VM.
-		restart = "no"
+		b.WriteString("  printf 'RUNNER_TERMINATE_AFTER_EACH_TASK=true\\n'\n")
 	}
-	fmt.Fprintf(&b, "docker run -d --name superplane-runner --restart %s \\\n", restart)
-	fmt.Fprintf(&b, "  -e FLEET_MANAGER_URL=%s \\\n", strconv.Quote(c.FleetManagerURL))
-	if c.RunnersAuthToken != "" {
-		fmt.Fprintf(&b, "  -e AUTH_TOKEN=%s \\\n", strconv.Quote(c.RunnersAuthToken))
-	}
-	b.WriteString("  -e RUNNER_ID=\"$IID\" \\\n")
+	b.WriteString("} > /etc/default/superplane-runner\n")
+	b.WriteString("chmod 644 /etc/default/superplane-runner\n")
+	restartPolicy := "always"
 	if c.RunnerTerminateAfterEachTask {
-		b.WriteString("  -e RUNNER_TERMINATE_AFTER_EACH_TASK=true \\\n")
+		restartPolicy = "no"
 	}
-	fmt.Fprintf(&b, "  %s\n", strconv.Quote(c.RunnerImage))
+	b.WriteString("cat > /etc/systemd/system/superplane-runner.service <<'UNITEOF'\n")
+	b.WriteString("[Unit]\n")
+	b.WriteString("Description=Superplane runner (host process; host-mode tasks run on Ubuntu)\n")
+	b.WriteString("After=network-online.target docker.service\n")
+	b.WriteString("Wants=docker.service\n")
+	b.WriteString("\n")
+	b.WriteString("[Service]\n")
+	b.WriteString("Type=simple\n")
+	b.WriteString("EnvironmentFile=/etc/default/superplane-runner\n")
+	fmt.Fprintf(&b, "Restart=%s\n", restartPolicy)
+	b.WriteString("ExecStart=/usr/local/bin/runner\n")
+	b.WriteString("\n")
+	b.WriteString("[Install]\n")
+	b.WriteString("WantedBy=multi-user.target\n")
+	b.WriteString("UNITEOF\n")
+	b.WriteString("systemctl daemon-reload\n")
+	b.WriteString("systemctl enable --now superplane-runner.service\n")
 	return b.String()
 }

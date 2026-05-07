@@ -15,7 +15,8 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/runner ./runner/cmd/runner
 
 FROM alpine:3.20
-RUN apk add --no-cache ca-certificates docker-cli
+# Host-mode `commands` (multi-line shell) run via interactive bash — required on PATH even when tasks use Docker mode.
+RUN apk add --no-cache bash ca-certificates docker-cli
 
 COPY --from=build /out/runner /usr/local/bin/runner
 
