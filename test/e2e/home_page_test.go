@@ -7,6 +7,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
+	"github.com/superplanehq/superplane/test/e2e/shared"
 )
 
 func TestHomePage(t *testing.T) {
@@ -19,6 +20,12 @@ func TestHomePage(t *testing.T) {
 		steps.AssertCanvasSavedInDB("Example Canvas")
 	})
 
+	t.Run("showing canvases in folders", func(t *testing.T) {
+		steps.Start()
+		steps.GivenCanvasInFolder("Foldered Canvas", "Deployments")
+		steps.VisitHomePage()
+		steps.AssertCanvasFolderVisible("Deployments", "Foldered Canvas")
+	})
 }
 
 type TestHomePageSteps struct {
@@ -41,6 +48,22 @@ func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
 
 	assert.NoError(steps.t, err)
 	assert.Equal(steps.t, canvasName, canvas.Name)
+}
+
+func (steps *TestHomePageSteps) GivenCanvasInFolder(canvasName, folderTitle string) {
+	canvas := shared.NewCanvasSteps(canvasName, steps.t, steps.session)
+	canvas.Create()
+
+	folder, err := models.CreateCanvasFolder(steps.session.OrgID, folderTitle, models.CanvasFolderColorBlue)
+	assert.NoError(steps.t, err)
+
+	_, err = models.UpdateCanvasFolderMembership(steps.session.OrgID, canvas.WorkflowID, &folder.ID)
+	assert.NoError(steps.t, err)
+}
+
+func (steps *TestHomePageSteps) AssertCanvasFolderVisible(folderTitle, canvasName string) {
+	steps.session.AssertText(folderTitle)
+	steps.session.AssertText(canvasName)
 }
 
 func (steps *TestHomePageSteps) FillInNewCanvasForm(canvasName string) {
