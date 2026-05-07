@@ -525,7 +525,7 @@ CREATE TABLE public.workflow_events (
     execution_id uuid,
     created_at timestamp without time zone NOT NULL,
     custom_name text,
-    run_id uuid
+    run_id uuid NOT NULL
 );
 
 
@@ -565,7 +565,7 @@ CREATE TABLE public.workflow_node_executions (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     cancelled_by uuid,
-    run_id uuid
+    run_id uuid NOT NULL
 );
 
 
@@ -580,7 +580,7 @@ CREATE TABLE public.workflow_node_queue_items (
     root_event_id uuid,
     event_id uuid,
     created_at timestamp without time zone NOT NULL,
-    run_id uuid
+    run_id uuid NOT NULL
 );
 
 
@@ -1880,7 +1880,7 @@ ALTER TABLE ONLY public.workflow_events
 --
 
 ALTER TABLE ONLY public.workflow_events
-    ADD CONSTRAINT workflow_events_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE SET NULL;
+    ADD CONSTRAINT workflow_events_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id);
 
 
 --
@@ -1936,7 +1936,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
-    ADD CONSTRAINT workflow_node_executions_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE SET NULL;
+    ADD CONSTRAINT workflow_node_executions_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id);
 
 
 --
@@ -1968,7 +1968,7 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
-    ADD CONSTRAINT workflow_node_queue_items_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id) ON DELETE SET NULL;
+    ADD CONSTRAINT workflow_node_queue_items_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id);
 
 
 --
@@ -2024,7 +2024,7 @@ ALTER TABLE ONLY public.workflow_nodes
 --
 
 ALTER TABLE ONLY public.workflow_runs
-    ADD CONSTRAINT workflow_runs_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
+    ADD CONSTRAINT workflow_runs_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
 
 
 --
@@ -2136,4 +2136,3 @@ COPY public.data_migrations (version, dirty) FROM stdin;
 --
 
 \unrestrict abcdef123
-

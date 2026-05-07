@@ -41,7 +41,7 @@ type CanvasNodeExecution struct {
 	// for that event with a simple query.
 	//
 	RootEventID uuid.UUID
-	RunID       *uuid.UUID
+	RunID       uuid.UUID
 
 	//
 	// Reference to the previous execution.
@@ -89,6 +89,20 @@ type CanvasNodeExecution struct {
 
 func (e *CanvasNodeExecution) TableName() string {
 	return "workflow_node_executions"
+}
+
+func (e *CanvasNodeExecution) BeforeCreate(tx *gorm.DB) error {
+	if e.RunID != uuid.Nil {
+		return nil
+	}
+
+	run, err := FindCanvasRunByRootEventInTransaction(tx, e.RootEventID)
+	if err != nil {
+		return err
+	}
+
+	e.RunID = run.ID
+	return nil
 }
 
 func LockCanvasNodeExecution(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
@@ -493,11 +507,9 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 		return nil, err
 	}
 
-	if e.RunID != nil {
-		_, err = MaybeFinalizeRunInTransaction(tx, *e.RunID)
-		if err != nil {
-			return nil, err
-		}
+	_, err = MaybeFinalizeRunInTransaction(tx, e.RunID)
+	if err != nil {
+		return nil, err
 	}
 
 	return events, nil
@@ -562,11 +574,9 @@ func (e *CanvasNodeExecution) FailInTransaction(tx *gorm.DB, reason, message str
 		return parent.FailInTransaction(tx, reason, message)
 	}
 
-	if e.RunID != nil {
-		_, err = MaybeFinalizeRunInTransaction(tx, *e.RunID)
-		if err != nil {
-			return err
-		}
+	_, err = MaybeFinalizeRunInTransaction(tx, e.RunID)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -610,11 +620,9 @@ func (e *CanvasNodeExecution) CancelInTransaction(tx *gorm.DB, cancelledBy *uuid
 		}
 	}
 
-	if e.RunID != nil {
-		_, err = MaybeFinalizeRunInTransaction(tx, *e.RunID)
-		if err != nil {
-			return err
-		}
+	_, err = MaybeFinalizeRunInTransaction(tx, e.RunID)
+	if err != nil {
+		return err
 	}
 
 	return nil

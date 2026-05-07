@@ -246,7 +246,7 @@ func (w *EventRouter) processRootEvent(tx *gorm.DB, canvas *models.Canvas, edges
 			WorkflowID:  canvas.ID,
 			NodeID:      targetNode.NodeID,
 			RootEventID: event.ID,
-			RunID:       &run.ID,
+			RunID:       run.ID,
 			EventID:     event.ID,
 			CreatedAt:   &now,
 		}
@@ -316,11 +316,9 @@ func (w *EventRouter) processExecutionEvent(
 		return nil, err
 	}
 
-	if execution.RunID != nil {
-		_, err := models.MaybeFinalizeRunInTransaction(tx, *execution.RunID)
-		if err != nil {
-			return nil, err
-		}
+	_, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID)
+	if err != nil {
+		return nil, err
 	}
 
 	return createdQueueItems, nil
@@ -421,11 +419,9 @@ func (w *EventRouter) processChildExecutionEvent(tx *gorm.DB, logger *log.Entry,
 		return nil, nil, err
 	}
 
-	if execution.RunID != nil {
-		_, err := models.MaybeFinalizeRunInTransaction(tx, *execution.RunID)
-		if err != nil {
-			return nil, nil, err
-		}
+	_, err = models.MaybeFinalizeRunInTransaction(tx, execution.RunID)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	return createdQueueItems, nil, nil
@@ -450,12 +446,8 @@ func (w *EventRouter) completeParentExecutionIfNeeded(
 			return err
 		}
 
-		if parentExecution.RunID != nil {
-			_, err := models.MaybeFinalizeRunInTransaction(tx, *parentExecution.RunID)
-			return err
-		}
-
-		return nil
+		_, err := models.MaybeFinalizeRunInTransaction(tx, parentExecution.RunID)
+		return err
 	}
 
 	//
@@ -526,12 +518,8 @@ func (w *EventRouter) completeParentExecutionIfNeeded(
 		return err
 	}
 
-	if parentExecution.RunID != nil {
-		_, err := models.MaybeFinalizeRunInTransaction(tx, *parentExecution.RunID)
-		return err
-	}
-
-	return nil
+	_, err = models.MaybeFinalizeRunInTransaction(tx, parentExecution.RunID)
+	return err
 }
 
 func (w *EventRouter) findChildrenForNode(allChildren []models.CanvasNodeExecution, nodeID string) []models.CanvasNodeExecution {
