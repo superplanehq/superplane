@@ -23,6 +23,7 @@ type CanvasEvent struct {
 	CustomName  *string
 	Data        datatypes.JSONType[any]
 	ExecutionID *uuid.UUID
+	RunID       *uuid.UUID
 	State       string
 	CreatedAt   *time.Time
 }
