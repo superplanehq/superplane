@@ -107,7 +107,7 @@ Each scheduled execution includes calendar information:
 
 ## Manual Run
 
-The Manual Run trigger allows you to start workflow executions manually from the SuperPlane UI.
+The Manual Run trigger allows you to start workflow executions manually from the SuperPlane UI or CLI.
 
 ### Use Cases
 
@@ -119,22 +119,30 @@ The Manual Run trigger allows you to start workflow executions manually from the
 ### How It Works
 
 1. Add the Manual Run trigger as the starting node of your workflow
-2. Click the "Run" button in the workflow UI to start an execution
-3. The workflow begins immediately with empty event data
+2. Configure one or more templates, each with a name and a default payload
+3. Click the "Run" button in the workflow UI, or invoke the `run` hook via the API/CLI to start an execution
+4. The workflow begins immediately with either the configured payload or an override supplied at run time
 
 ### Configuration
 
-The Manual Run trigger requires no configuration. It's ready to use immediately after being added to a workflow.
+Each Manual Run trigger exposes a list of templates. A template has:
+
+- `name` (required): a label used as the run target (and the event channel)
+- `payload` (required): a default JSON object emitted when the template is used
 
 ### Event Data
 
-Manual runs start with an empty event payload. You can use this as a starting point and add data through subsequent components.
+Manual runs emit an event with type `manual.run`. The data is either the template's saved payload or the override passed in the run request.
 
 ### Example Data
 
 ```json
 {
-  "foo": "bar"
+  "data": {
+    "message": "Hello, World!"
+  },
+  "timestamp": "2024-01-01T00:00:00Z",
+  "type": "manual.run"
 }
 ```
 

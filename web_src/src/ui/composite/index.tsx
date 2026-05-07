@@ -79,7 +79,7 @@ export const Composite: React.FC<CompositeProps> = ({
   lastRunItem,
   lastRunItems,
   maxVisibleEvents = 5,
-  nextInQueue,
+  nextInQueue: _nextInQueue,
   collapsed = false,
   collapsedBackground,
   onViewMoreEvents,
@@ -88,7 +88,6 @@ export const Composite: React.FC<CompositeProps> = ({
   error,
   warning,
   paused,
-  onRun,
   runDisabled,
   runDisabledTooltip,
   onEdit,
@@ -151,7 +150,7 @@ export const Composite: React.FC<CompositeProps> = ({
     }
 
     return sections;
-  }, [visibleEvents, hiddenEventsCount, nextInQueue, onViewMoreEvents]);
+  }, [visibleEvents, hiddenEventsCount, onViewMoreEvents]);
 
   // Convert parameters to specs format
   const specs = React.useMemo(() => {
@@ -205,7 +204,6 @@ export const Composite: React.FC<CompositeProps> = ({
       collapsed={collapsed}
       collapsedBackground={collapsedBackground}
       selected={selected}
-      onRun={onRun}
       runDisabled={runDisabled}
       runDisabledTooltip={runDisabledTooltip}
       onEdit={onEdit}
