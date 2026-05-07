@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 var DefaultBlockedHTTPHosts = []string{
@@ -44,7 +45,18 @@ type HTTPPolicy struct {
 }
 
 func ResolveHTTPPolicy() (*HTTPPolicy, error) {
-	metadata, err := models.GetInstallationMetadata()
+	return ResolveHTTPPolicyInTransaction(nil)
+}
+
+func ResolveHTTPPolicyInTransaction(tx *gorm.DB) (*HTTPPolicy, error) {
+	var metadata *models.InstallationMetadata
+	var err error
+	if tx == nil {
+		metadata, err = models.GetInstallationMetadata()
+	} else {
+		metadata, err = models.GetInstallationMetadataInTransaction(tx)
+	}
+
 	if err != nil {
 		return nil, err
 	}
