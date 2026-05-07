@@ -13,20 +13,29 @@ import (
 )
 
 type Organization struct {
-	ID                       uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
-	Name                     string    `gorm:"uniqueIndex"`
-	Description              string
-	AllowedProviders         datatypes.JSONSlice[string]
-	ChangeManagementEnabled  bool
-	UsageSyncedAt            *time.Time
-	UsageRetentionWindowDays *int32
-	UsageLimitsSyncedAt      *time.Time
-	CreatedAt                *time.Time
-	UpdatedAt                *time.Time
-	DeletedAt                gorm.DeletedAt `gorm:"index"`
+	ID          uuid.UUID `gorm:"primary_key;default:uuid_generate_v4()"`
+	Name        string    `gorm:"uniqueIndex"`
+	Description string
+	// OAuth provider IDs (e.g. github, google) allowed when completing pending *email* invitations
+	// after an OAuth login. Empty or nil means unrestricted for that path. Does not apply to
+	// shareable invite-link acceptance.
+	AllowedProviders datatypes.JSONSlice[string]
+	// When false, pending email invitations are not auto-accepted after magic-link, password,
+	// or other non-OAuth sign-in (see authentication.Handler.acceptInvitation).
+	AllowDirectEmailInviteCompletion bool `gorm:"column:allow_direct_email_invite_completion;not null;default:true"`
+	ChangeManagementEnabled          bool
+	UsageSyncedAt                    *time.Time
+	UsageRetentionWindowDays         *int32
+	UsageLimitsSyncedAt              *time.Time
+	CreatedAt                        *time.Time
+	UpdatedAt                        *time.Time
+	DeletedAt                        gorm.DeletedAt `gorm:"index"`
 }
 
 func (o *Organization) IsProviderAllowed(provider string) bool {
+	if len(o.AllowedProviders) == 0 {
+		return true
+	}
 	return slices.Contains(o.AllowedProviders, provider)
 }
 
@@ -166,12 +175,13 @@ func CreateOrganization(name, description string) (*Organization, error) {
 func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Organization, error) {
 	now := time.Now()
 	organization := Organization{
-		Name:                    name,
-		Description:             description,
-		AllowedProviders:        datatypes.JSONSlice[string]{ProviderGitHub},
-		ChangeManagementEnabled: false,
-		CreatedAt:               &now,
-		UpdatedAt:               &now,
+		Name:                             name,
+		Description:                      description,
+		AllowedProviders:                 datatypes.JSONSlice[string]{ProviderGitHub, ProviderGoogle},
+		AllowDirectEmailInviteCompletion: true,
+		ChangeManagementEnabled:          false,
+		CreatedAt:                        &now,
+		UpdatedAt:                        &now,
 	}
 
 	err := tx.
