@@ -345,10 +345,10 @@ func (s *SetupProvider) onEnterLaunchKeySubmit(input any, ctx core.SetupStepCont
 		return s.enterAdminKeyStep(), nil
 	}
 
-	launchKey, _ := ctx.Secrets.Get(SecretLaunchAgentKey)
 	adminKey, _ := ctx.Secrets.Get(SecretAdminKey)
 
-	if err := verifyCursorCredentials(ctx.HTTP, launchKey, adminKey, needLaunch, needAdmin); err != nil {
+	// Launch key was already verified above; verify only the admin key here to avoid an extra external call.
+	if err := verifyCursorCredentials(ctx.HTTP, "", adminKey, false, true); err != nil {
 		return nil, err
 	}
 
