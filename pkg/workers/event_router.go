@@ -178,7 +178,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		).Publish()
 	}
 
-	if runID != nil {
+	if runID != nil && execution == nil {
 		messages.NewCanvasRunMessage(event.WorkflowID.String(), runID.String()).Publish()
 	}
 

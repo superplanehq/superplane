@@ -63,9 +63,6 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 	}
 
 	messages.NewCanvasExecutionMessage(workflowID.String(), execution.ID.String(), execution.NodeID).Publish()
-	if execution.RunID != nil {
-		messages.NewCanvasRunMessage(workflowID.String(), execution.RunID.String()).Publish()
-	}
 
 	return &pb.CancelExecutionResponse{}, nil
 }
