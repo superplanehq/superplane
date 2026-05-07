@@ -71,7 +71,9 @@ func (i *Cursor) Sync(ctx core.SyncContext) error {
 			return fmt.Errorf("failed to decode configuration: %v", err)
 		}
 
-		if config.LaunchAgentKey == "" && config.AdminKey == "" {
+		launchKey := strings.TrimSpace(config.LaunchAgentKey)
+		adminKey := strings.TrimSpace(config.AdminKey)
+		if launchKey == "" && adminKey == "" {
 			return fmt.Errorf("one of the keys is required")
 		}
 
@@ -80,8 +82,8 @@ func (i *Cursor) Sync(ctx core.SyncContext) error {
 			return err
 		}
 
-		verifyLaunch := strings.TrimSpace(config.LaunchAgentKey) != ""
-		verifyAdmin := strings.TrimSpace(config.AdminKey) != ""
+		verifyLaunch := launchKey != ""
+		verifyAdmin := adminKey != ""
 		if err := verifyCursorCredentials(ctx.HTTP, client.LaunchAgentKey, client.AdminKey, verifyLaunch, verifyAdmin); err != nil {
 			return err
 		}

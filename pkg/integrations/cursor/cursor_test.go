@@ -120,6 +120,26 @@ func Test__Cursor__Sync(t *testing.T) {
 		assert.Contains(t, err.Error(), "one of the keys is required")
 	})
 
+	t.Run("whitespace-only keys provided -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"launchAgentKey": "   ",
+				"adminKey":       "  ",
+			},
+		}
+
+		err := c.Sync(core.SyncContext{
+			Configuration: integrationCtx.Configuration,
+			HTTP:          httpContext,
+			Integration:   integrationCtx,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "one of the keys is required")
+	})
+
 	t.Run("invalid cloud agent key -> error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
