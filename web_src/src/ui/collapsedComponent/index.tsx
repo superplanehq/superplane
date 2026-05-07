@@ -22,7 +22,6 @@ export const CollapsedComponent: React.FC<CollapsedComponentProps> = ({
   shape = "rounded",
   children,
   onDoubleClick,
-  onRun: _onRun,
   runDisabled: _runDisabled,
   runDisabledTooltip: _runDisabledTooltip,
   onDuplicate: _onDuplicate,
