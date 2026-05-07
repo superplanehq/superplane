@@ -176,10 +176,12 @@ function StartRunModal({
       return;
     }
 
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
       await onRun(parsedData);
       onClose();
+    } catch {
+      // Keep the modal open so users can retry with the same payload.
     } finally {
       setIsSubmitting(false);
     }
@@ -206,7 +208,12 @@ function StartRunModal({
         <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
           Cancel
         </Button>
-        <LoadingButton loading={isSubmitting} loadingText="Running..." onClick={handleSubmit}>
+        <LoadingButton
+          data-testid="emit-event-submit-button"
+          loading={isSubmitting}
+          loadingText="Running..."
+          onClick={handleSubmit}
+        >
           Run
         </LoadingButton>
       </div>

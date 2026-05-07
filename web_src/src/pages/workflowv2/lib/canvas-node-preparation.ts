@@ -336,6 +336,7 @@ function buildTriggerActionContext(
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeEvent(canvasId, nodeId) });
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "failed to invoke hook"));
+        throw error;
       }
     },
     openModal,
