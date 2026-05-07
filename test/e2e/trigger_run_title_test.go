@@ -19,11 +19,11 @@ func TestTriggerRunTitle(t *testing.T) {
 		steps.givenACanvasWithManualTrigger("RunTitle Resolve", "Start")
 
 		// Set a run title that references the trigger payload.
-		// The default manual trigger template sends {"message": "Hello, World!"}
+		// The manual trigger emits a structured event: {"type": "manual.run", "data": {"message": "Hello, World!"}, "timestamp": "..."}
 		steps.whenRunTitleToggleIsEnabled()
-		steps.whenRunTitleIsSetTo("Run: {{ root().message }}")
+		steps.whenRunTitleIsSetTo("Run: {{ root().data.message }}")
 		steps.waitForAutoSave()
-		steps.thenRunTitleInDBEquals("Run: {{ root().message }}")
+		steps.thenRunTitleInDBEquals("Run: {{ root().data.message }}")
 
 		// Publish and trigger an event
 		steps.saveAndPublish()

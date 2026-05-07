@@ -275,6 +275,7 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 			CanvasName: nodeRef.CanvasName,
 			NodeId:     nodeRef.NodeID,
 			NodeName:   nodeRef.NodeName,
+			Component:  nodeRef.ComponentName(),
 		})
 	}
 

@@ -1,12 +1,16 @@
 package manual
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
+
+const HookRun = "run"
 
 func init() {
 	registry.RegisterTrigger("start", &Start{})
@@ -27,7 +31,7 @@ func (s *Start) Description() string {
 }
 
 func (s *Start) Documentation() string {
-	return `The Manual Run trigger allows you to start workflow executions manually from the SuperPlane UI.
+	return `The Manual Run trigger allows you to start workflow executions manually from the SuperPlane UI or CLI.
 
 ## Use Cases
 
@@ -39,16 +43,20 @@ func (s *Start) Documentation() string {
 ## How It Works
 
 1. Add the Manual Run trigger as the starting node of your workflow
-2. Click the "Run" button in the workflow UI to start an execution
-3. The workflow begins immediately with empty event data
+2. Configure one or more templates, each with a name and a default payload
+3. Click the "Run" button in the workflow UI, or invoke the ` + "`run`" + ` hook via the API/CLI to start an execution
+4. The workflow begins immediately with either the configured payload or an override supplied at run time
 
 ## Configuration
 
-The Manual Run trigger requires no configuration. It's ready to use immediately after being added to a workflow.
+Each Manual Run trigger exposes a list of templates. A template has:
+
+- ` + "`name`" + ` (required): a label used as the run target (and the event channel)
+- ` + "`payload`" + ` (required): a default JSON object emitted when the template is used
 
 ## Event Data
 
-Manual runs start with an empty event payload. You can use this as a starting point and add data through subsequent components.`
+Manual runs emit an event with type ` + "`manual.run`" + `. The data is either the template's saved payload or the override passed in the run request.`
 }
 
 func (s *Start) Icon() string {
@@ -110,11 +118,82 @@ func (s *Start) Setup(ctx core.TriggerContext) error {
 }
 
 func (s *Start) Hooks() []core.Hook {
-	return []core.Hook{}
+	return []core.Hook{
+		{
+			Type: core.HookTypeUser,
+			Name: HookRun,
+			Parameters: []configuration.Field{
+				{
+					Name:     "template",
+					Label:    "Template",
+					Type:     configuration.FieldTypeString,
+					Required: true,
+				},
+				{
+					Name:  "payload",
+					Label: "Payload Override",
+					Type:  configuration.FieldTypeObject,
+				},
+			},
+		},
+	}
 }
 
 func (s *Start) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
-	return nil, nil
+	switch ctx.Name {
+	case HookRun:
+		return s.run(ctx)
+	default:
+		return nil, fmt.Errorf("hook %s not supported", ctx.Name)
+	}
+}
+
+func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
+	templateName, _ := ctx.Parameters["template"].(string)
+	if templateName == "" {
+		return nil, fmt.Errorf("template parameter is required")
+	}
+
+	config, _ := ctx.Configuration.(map[string]any)
+	rawTemplates, _ := config["templates"].([]any)
+	if len(rawTemplates) == 0 {
+		return nil, fmt.Errorf("no templates configured")
+	}
+
+	var names []string
+	var payload map[string]any
+	found := false
+
+	for _, raw := range rawTemplates {
+		tmpl, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := tmpl["name"].(string)
+		names = append(names, name)
+		if name == templateName {
+			payload, _ = tmpl["payload"].(map[string]any)
+			found = true
+		}
+	}
+
+	if !found {
+		return nil, fmt.Errorf("template %q not found; available: %s", templateName, strings.Join(names, ", "))
+	}
+
+	if override, ok := ctx.Parameters["payload"].(map[string]any); ok {
+		payload = override
+	}
+
+	if payload == nil {
+		return nil, fmt.Errorf("template %q has no payload and no override was provided", templateName)
+	}
+
+	if err := ctx.Events.Emit("manual.run", payload); err != nil {
+		return nil, fmt.Errorf("failed to emit event: %w", err)
+	}
+
+	return map[string]any{"template": templateName}, nil
 }
 
 func (s *Start) Cleanup(ctx core.TriggerContext) error {

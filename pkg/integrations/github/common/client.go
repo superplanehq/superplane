@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -31,6 +32,18 @@ type Client struct {
 	ownerType  string
 	owner      string
 	underlying *github.Client
+}
+
+func IsNotFoundError(err error) bool {
+	var githubErr *github.ErrorResponse
+	if errors.As(err, &githubErr) && githubErr.Response != nil && githubErr.Response.StatusCode == http.StatusNotFound {
+		return true
+	}
+
+	var installationErr *ghinstallation.HTTPError
+	return errors.As(err, &installationErr) &&
+		installationErr.Response != nil &&
+		installationErr.Response.StatusCode == http.StatusNotFound
 }
 
 func (c *Client) FindRepository(repository string) (*github.Repository, error) {
