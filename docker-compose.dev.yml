@@ -71,6 +71,8 @@ services:
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       BASE_URL: ${BASE_URL:-http://localhost:8000}
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
+      # Bearer for task-broker /v1 (Runner component); must match broker AUTH_TOKEN when auth is enabled
+      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-}
       ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
       AGENT_ENABLED: ${AGENT_ENABLED:-yes}
       AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://localhost:8090}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -25,6 +26,20 @@ const (
 	channelFailure = "failure"
 
 	brokerPollInterval = time.Minute
+	brokerHTTPTimeout  = 30 * time.Second
+
+	// defaultBrokerBaseURL is the task-broker HTTP base URL (no trailing slash).
+	// Keep in sync with BROKER_PUBLIC_URL in the runner repo: ../runner/scripts/deploy/task-broker.env
+	defaultBrokerBaseURL = "http://98.91.210.215:8081"
+
+	// defaultFleetID is the task-broker fleet id for POST /v1/tasks.
+	// Keep in sync with TASK_BROKER_FLEET_ID in the runner repo: ../runner/scripts/deploy/task-broker.env
+	defaultFleetID = "aws-standard-1"
+
+	// defaultBrokerAuthToken is an optional bearer token for task-broker /v1 when TASK_BROKER_AUTH_TOKEN is unset.
+	// Prefer env TASK_BROKER_AUTH_TOKEN (same value as AUTH_TOKEN on the task-broker; see runner/scripts/deploy/task-broker.env).
+	// When neither is set, no Authorization header is sent.
+	defaultBrokerAuthToken = ""
 )
 
 func init() {
@@ -34,20 +49,9 @@ func init() {
 type RunCommands struct{}
 
 type Spec struct {
-	BrokerURL      string                      `json:"brokerUrl" mapstructure:"brokerUrl"`
-	FleetID        string                      `json:"fleetId" mapstructure:"fleetId"`
-	Commands       string                      `json:"commands" mapstructure:"commands"`
-	ExecutionMode  string                      `json:"executionMode,omitempty" mapstructure:"executionMode"`
-	DockerImage    *string                     `json:"dockerImage,omitempty" mapstructure:"dockerImage"`
-	BrokerAuth     *configuration.SecretKeyRef `json:"brokerAuth,omitempty" mapstructure:"brokerAuth"`
-	TimeoutSeconds *int                        `json:"timeoutSeconds,omitempty" mapstructure:"timeoutSeconds"`
-}
-
-func (s Spec) timeout() time.Duration {
-	if s.TimeoutSeconds == nil || *s.TimeoutSeconds <= 0 {
-		return 30 * time.Second
-	}
-	return time.Duration(*s.TimeoutSeconds) * time.Second
+	Commands      string  `json:"commands" mapstructure:"commands"`
+	ExecutionMode string  `json:"executionMode,omitempty" mapstructure:"executionMode"`
+	DockerImage   *string `json:"dockerImage,omitempty" mapstructure:"dockerImage"`
 }
 
 func (c *RunCommands) Name() string  { return ComponentName }
@@ -73,8 +77,6 @@ func (c *RunCommands) Documentation() string {
 	return `Creates a task in **task-broker** and resolves when either the completion **webhook** runs or a **polling fallback** observes a terminal status (polling uses **task-broker** ` + "`GET /v1/tasks/{broker_task_id}`" + ` every minute until ` + "`succeeded`" + ` or ` + "`failed`" + `).
 
 ## Required configuration
-- **Broker URL**: Base URL of task-broker (e.g. http://broker.internal:8081)
-- **Fleet ID**: Which fleet to run on (must be registered in the broker)
 - **Commands**: One command per line
 
 ## Output
@@ -83,22 +85,6 @@ Emits on **Success** (exit code 0) or **Failure** (non-zero) with ` + "`status`"
 
 func (c *RunCommands) Configuration() []configuration.Field {
 	return []configuration.Field{
-		{
-			Name:        "brokerUrl",
-			Label:       "Broker URL",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Placeholder: "http://task-broker.internal:8081",
-			Description: "Base URL of task-broker",
-		},
-		{
-			Name:        "fleetId",
-			Label:       "Fleet ID",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Placeholder: "aws-standard-1",
-			Description: "Fleet ID registered with task-broker",
-		},
 		{
 			Name:        "commands",
 			Label:       "Commands",
@@ -131,22 +117,6 @@ func (c *RunCommands) Configuration() []configuration.Field {
 			VisibilityConditions: []configuration.VisibilityCondition{{Field: "executionMode", Values: []string{"docker"}}},
 			RequiredConditions:   []configuration.RequiredCondition{{Field: "executionMode", Values: []string{"docker"}}},
 		},
-		{
-			Name:        "brokerAuth",
-			Label:       "Broker auth token",
-			Type:        configuration.FieldTypeSecretKey,
-			Required:    false,
-			Togglable:   true,
-			Description: "Optional bearer token for task-broker AUTH_TOKEN",
-		},
-		{
-			Name:        "timeoutSeconds",
-			Label:       "HTTP timeout (seconds)",
-			Type:        configuration.FieldTypeNumber,
-			Required:    false,
-			Default:     30,
-			Description: "Timeout for creating the task in task-broker (not the task runtime)",
-		},
 	}
 }
 
@@ -154,12 +124,6 @@ func (c *RunCommands) Setup(ctx core.SetupContext) error {
 	spec := Spec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("decode configuration: %w", err)
-	}
-	if strings.TrimSpace(spec.BrokerURL) == "" {
-		return errors.New("brokerUrl is required")
-	}
-	if strings.TrimSpace(spec.FleetID) == "" {
-		return errors.New("fleetId is required")
 	}
 	if strings.TrimSpace(spec.Commands) == "" {
 		return errors.New("commands is required")
@@ -251,10 +215,7 @@ func (c *RunCommands) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	brokerBase := strings.TrimRight(strings.TrimSpace(spec.BrokerURL), "/")
-	if brokerBase == "" {
-		return errors.New("brokerUrl is required")
-	}
+	brokerBase := strings.TrimRight(strings.TrimSpace(defaultBrokerBaseURL), "/")
 
 	cmds := normalizeLines(spec.Commands)
 	if len(cmds) == 0 {
@@ -274,7 +235,7 @@ func (c *RunCommands) Execute(ctx core.ExecutionContext) error {
 	}
 
 	reqBody := brokerCreateTaskRequest{
-		FleetID:       strings.TrimSpace(spec.FleetID),
+		FleetID:       strings.TrimSpace(defaultFleetID),
 		Commands:      cmds,
 		WebhookURL:    webhookURL,
 		ExecutionMode: exMode,
@@ -285,7 +246,7 @@ func (c *RunCommands) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("marshal request: %w", err)
 	}
 
-	httpCtx, cancel := context.WithTimeout(context.Background(), spec.timeout())
+	httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(httpCtx, http.MethodPost, brokerBase+"/v1/tasks", bytes.NewReader(bodyBytes))
@@ -293,17 +254,7 @@ func (c *RunCommands) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-
-	if spec.BrokerAuth != nil && spec.BrokerAuth.IsSet() {
-		if ctx.Secrets == nil {
-			return fmt.Errorf("brokerAuth: secrets context is not available")
-		}
-		tok, err := ctx.Secrets.GetKey(spec.BrokerAuth.Secret, spec.BrokerAuth.Key)
-		if err != nil {
-			return fmt.Errorf("brokerAuth: resolve secret: %w", err)
-		}
-		req.Header.Set("Authorization", "Bearer "+string(tok))
-	}
+	setBrokerAuthHeader(req)
 
 	resp, err := ctx.HTTP.Do(req)
 	if err != nil {
@@ -328,10 +279,10 @@ func (c *RunCommands) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	return c.pollBrokerTaskUntilTerminal(ctx, spec, brokerBase, out.ID)
+	return c.pollBrokerTaskUntilTerminal(ctx, brokerBase, out.ID)
 }
 
-func (c *RunCommands) pollBrokerTaskUntilTerminal(ctx core.ExecutionContext, spec Spec, brokerBase, brokerTaskID string) error {
+func (c *RunCommands) pollBrokerTaskUntilTerminal(ctx core.ExecutionContext, brokerBase, brokerTaskID string) error {
 	for attempt := 0; ; attempt++ {
 		if ctx.ExecutionState.IsFinished() {
 			return nil
@@ -343,7 +294,7 @@ func (c *RunCommands) pollBrokerTaskUntilTerminal(ctx core.ExecutionContext, spe
 			}
 		}
 
-		poll, err := c.fetchBrokerTaskStatus(ctx, spec, brokerBase, brokerTaskID)
+		poll, err := c.fetchBrokerTaskStatus(ctx, brokerBase, brokerTaskID)
 		if err != nil {
 			if ctx.Logger != nil {
 				ctx.Logger.WithError(err).Warn("runner: broker poll failed, will retry")
@@ -375,8 +326,8 @@ func (c *RunCommands) pollBrokerTaskUntilTerminal(ctx core.ExecutionContext, spe
 	}
 }
 
-func (c *RunCommands) fetchBrokerTaskStatus(ctx core.ExecutionContext, spec Spec, brokerBase, brokerTaskID string) (*brokerTaskPollJSON, error) {
-	httpCtx, cancel := context.WithTimeout(context.Background(), spec.timeout())
+func (c *RunCommands) fetchBrokerTaskStatus(ctx core.ExecutionContext, brokerBase, brokerTaskID string) (*brokerTaskPollJSON, error) {
+	httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
 	defer cancel()
 
 	url := brokerBase + "/v1/tasks/" + brokerTaskID
@@ -384,16 +335,7 @@ func (c *RunCommands) fetchBrokerTaskStatus(ctx core.ExecutionContext, spec Spec
 	if err != nil {
 		return nil, fmt.Errorf("new poll request: %w", err)
 	}
-	if spec.BrokerAuth != nil && spec.BrokerAuth.IsSet() {
-		if ctx.Secrets == nil {
-			return nil, fmt.Errorf("brokerAuth: secrets context is not available")
-		}
-		tok, err := ctx.Secrets.GetKey(spec.BrokerAuth.Secret, spec.BrokerAuth.Key)
-		if err != nil {
-			return nil, fmt.Errorf("brokerAuth: resolve secret: %w", err)
-		}
-		req.Header.Set("Authorization", "Bearer "+string(tok))
-	}
+	setBrokerAuthHeader(req)
 
 	resp, err := ctx.HTTP.Do(req)
 	if err != nil {
@@ -448,6 +390,21 @@ func (c *RunCommands) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 func (c *RunCommands) Cancel(ctx core.ExecutionContext) error { return nil }
 func (c *RunCommands) Cleanup(ctx core.SetupContext) error    { return nil }
 
+func effectiveBrokerAuthToken() string {
+	if t := strings.TrimSpace(os.Getenv("TASK_BROKER_AUTH_TOKEN")); t != "" {
+		return t
+	}
+	return strings.TrimSpace(defaultBrokerAuthToken)
+}
+
+func setBrokerAuthHeader(req *http.Request) {
+	tok := effectiveBrokerAuthToken()
+	if tok == "" {
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+tok)
+}
+
 func normalizeLines(s string) []string {
 	lines := strings.Split(s, "\n")
 	out := make([]string, 0, len(lines))
@@ -460,4 +417,3 @@ func normalizeLines(s string) []string {
 	}
 	return out
 }
-
