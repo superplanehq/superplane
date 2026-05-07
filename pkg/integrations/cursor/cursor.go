@@ -77,14 +77,9 @@ func (i *Cursor) Sync(ctx core.SyncContext) error {
 			return fmt.Errorf("one of the keys is required")
 		}
 
-		client, err := NewClient(ctx.HTTP, ctx.Integration)
-		if err != nil {
-			return err
-		}
-
 		verifyLaunch := launchKey != ""
 		verifyAdmin := adminKey != ""
-		if err := verifyCursorCredentials(ctx.HTTP, client.LaunchAgentKey, client.AdminKey, verifyLaunch, verifyAdmin); err != nil {
+		if err := verifyCursorCredentials(ctx.HTTP, launchKey, adminKey, verifyLaunch, verifyAdmin); err != nil {
 			return err
 		}
 
