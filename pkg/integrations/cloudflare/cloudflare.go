@@ -95,6 +95,13 @@ func (c *Cloudflare) Instructions() string {
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
 
+## Account ID (optional)
+
+The Account ID is required for KV storage components.
+
+1. On the account overview page, click on the **ellipsis (...)** next to the **Add** button and select **Copy Account ID**
+2. Paste the Account ID below
+
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.`
 }
 
@@ -113,7 +120,7 @@ func (c *Cloudflare) Configuration() []configuration.Field {
 			Label:       "Account ID",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Cloudflare account ID. Required for workers, pool and monitor components. Find it in the Cloudflare home page under actions for the account.",
+			Description: "Cloudflare account ID.",
 			Placeholder: "e.g. 01a7362d577a6c3019a474fd6f485823",
 		},
 	}
