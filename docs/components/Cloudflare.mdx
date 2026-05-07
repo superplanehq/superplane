@@ -11,8 +11,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record in a Cloudflare zone" />
   <LinkCard title="Create Origin Rule" href="#create-origin-rule" description="Create a rule to override the origin server for matching requests" />
+  <LinkCard title="Create KV Namespace" href="#create-kv-namespace" description="Create a Cloudflare Workers KV namespace" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a Cloudflare zone" />
   <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
+  <LinkCard title="Delete KV Namespace" href="#delete-kv-namespace" description="Delete a Cloudflare Workers KV namespace" />
+  <LinkCard title="Delete KV Value" href="#delete-kv-value" description="Delete a key from a Cloudflare Workers KV namespace" />
+  <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
+  <LinkCard title="Put KV Value" href="#put-kv-value" description="Write a key-value pair to a Cloudflare Workers KV namespace" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
   <LinkCard title="Update Origin Rule" href="#update-origin-rule" description="Update an existing origin rule" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
@@ -29,9 +34,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - **Token name**: SuperPlane Integration
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
-     - Zone / DNS / Edit
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
+	 - Account / Workers KV Storage / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
@@ -128,6 +133,43 @@ Emits the created origin rule on the default channel.
 }
 ```
 
+<a id="create-kv-namespace"></a>
+
+## Create KV Namespace
+
+The Create KV Namespace component creates a new Cloudflare Workers KV namespace.
+
+### Use Cases
+
+- **Feature flags**: Provision a dedicated namespace to store feature flag state
+- **Session storage**: Create a namespace for application session data
+- **Configuration store**: Set up a namespace for dynamic configuration values
+
+### Configuration
+
+- **Title**: A human-readable name for the namespace (must be unique per account)
+
+### Output
+
+Returns the created namespace with its assigned ID and title.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "namespace": {
+      "id": "0f2ac74b498b48028cb68387c421e279",
+      "supports_url_encoding": true,
+      "title": "my-kv-namespace"
+    }
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.kv.namespace.created"
+}
+```
+
 <a id="delete-dns-record"></a>
 
 ## Delete DNS Record
@@ -204,6 +246,155 @@ Emits the deleted origin rule on the default channel.
   },
   "timestamp": "2026-05-06T12:00:00Z",
   "type": "cloudflare.deleteOriginRule"
+}
+```
+
+<a id="delete-kv-namespace"></a>
+
+## Delete KV Namespace
+
+The Delete KV Namespace component permanently removes a Cloudflare Workers KV namespace and all of its key-value pairs.
+
+### Use Cases
+
+- **Environment teardown**: Remove namespaces as part of infrastructure cleanup
+- **Pipeline cleanup**: Delete temporary namespaces created during a workflow
+
+### Configuration
+
+- **Namespace**: The KV namespace to delete
+
+### Output
+
+Emits a confirmation with the account ID, namespace ID, and a deleted flag.
+
+> **Warning**: This operation is irreversible. All keys stored in the namespace will be permanently deleted.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "namespace": {
+      "id": "8cc7c421092f456389b23bac8c6b609c"
+    }
+  },
+  "timestamp": "2026-05-07T05:56:34.511115884Z",
+  "type": "cloudflare.kv.namespace.deleted"
+}
+```
+
+<a id="delete-kv-value"></a>
+
+## Delete KV Value
+
+The Delete KV Value component removes a key-value pair from a Cloudflare Workers KV namespace.
+
+### Use Cases
+
+- **Cleanup**: Remove stale keys as part of a teardown workflow
+- **Feature flag rollback**: Delete a flag to revert to default behaviour
+- **Session invalidation**: Remove session keys to force re-authentication
+
+### Configuration
+
+- **Namespace**: The ID of the KV namespace to delete from
+- **Key**: The key to delete
+
+### Output
+
+Emits a confirmation with the account ID, namespace ID, and key that was deleted.
+
+> **Warning**: This operation is irreversible. The key and its value will be permanently removed.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "key": "my-key",
+    "namespaceId": "0f2ac74b498b48028cb68387c421e279"
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.kv.value.deleted"
+}
+```
+
+<a id="get-kv-value"></a>
+
+## Get KV Value
+
+The Get KV Value component reads a value by key from a Cloudflare Workers KV namespace.
+
+### Use Cases
+
+- **Feature flag checks**: Read a feature flag value before proceeding
+- **Configuration lookup**: Retrieve dynamic configuration at workflow runtime
+- **Audit**: Capture the current value of a key as part of a pipeline snapshot
+
+### Configuration
+
+- **Namespace**: The ID of the KV namespace to read from
+- **Key**: The key to retrieve
+
+### Output
+
+Returns the account ID, namespace ID, key, and the retrieved value string.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "key": "my-key",
+    "namespaceId": "0f2ac74b498b48028cb68387c421e279",
+    "value": "my-value"
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.kv.value.fetched"
+}
+```
+
+<a id="put-kv-value"></a>
+
+## Put KV Value
+
+The Put KV Value component writes a key-value pair to a Cloudflare Workers KV namespace.
+
+### Use Cases
+
+- **Feature flags**: Toggle features by writing flag values into KV storage
+- **Cache invalidation**: Store cache keys or version stamps
+- **Dynamic configuration**: Update runtime configuration values from a workflow
+
+### Configuration
+
+- **Namespace**: The ID of the KV namespace to write to
+- **Key**: The key name (up to 512 bytes, printable non-whitespace characters)
+- **Value**: The value to store (up to 25 MiB)
+- **Expiration TTL**: (Optional) Number of seconds until the key expires (minimum 60)
+
+### Output
+
+Emits a confirmation with the account ID, namespace ID, and key that was written.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "key": "my-key",
+    "namespaceId": "0f2ac74b498b48028cb68387c421e279",
+    "written": true
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.kv.value.put"
 }
 ```
 

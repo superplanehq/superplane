@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -670,4 +671,218 @@ func (c *Client) CreateDNSRecord(zoneID string, req CreateDNSRecordRequest) (*DN
 	}
 
 	return &response.Result, nil
+}
+
+// ---- Workers KV types ----
+
+// KVNamespace represents a Cloudflare Workers KV namespace
+type KVNamespace struct {
+	ID                  string `json:"id"`
+	Title               string `json:"title"`
+	SupportsURLEncoding *bool  `json:"supports_url_encoding,omitempty"`
+}
+
+// CreateKVNamespaceRequest is the payload for creating a KV namespace
+type CreateKVNamespaceRequest struct {
+	Title string `json:"title"`
+}
+
+// CreateKVNamespace creates a new Workers KV namespace under a Cloudflare account
+func (c *Client) CreateKVNamespace(accountID string, req CreateKVNamespaceRequest) (*KVNamespace, error) {
+	kvURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces", c.BaseURL, accountID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, kvURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var kvResponse struct {
+		Success bool        `json:"success"`
+		Result  KVNamespace `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &kvResponse); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !kvResponse.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &kvResponse.Result, nil
+}
+
+// GetKVNamespace retrieves a single Workers KV namespace by ID
+func (c *Client) GetKVNamespace(accountID, namespaceID string) (*KVNamespace, error) {
+	url := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s", c.BaseURL, accountID, namespaceID)
+
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Result KVNamespace `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return &response.Result, nil
+}
+
+// PutKVValue writes a key-value pair to a Workers KV namespace using multipart/form-data
+func (c *Client) PutKVValue(accountID, namespaceID, key, value string, expirationTTL *int) error {
+	rawURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/values/%s", c.BaseURL, accountID, namespaceID, key)
+
+	buf := &bytes.Buffer{}
+	writer := multipart.NewWriter(buf)
+	if err := writer.WriteField("value", value); err != nil {
+		return fmt.Errorf("error writing value field: %v", err)
+	}
+	writer.Close()
+
+	req, err := http.NewRequest(http.MethodPut, rawURL, buf)
+	if err != nil {
+		return fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
+
+	if expirationTTL != nil {
+		q := req.URL.Query()
+		q.Set("expiration_ttl", fmt.Sprintf("%d", *expirationTTL))
+		req.URL.RawQuery = q.Encode()
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("error executing request: %v", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return newCloudflareAPIError(res.StatusCode, responseBody)
+	}
+
+	return nil
+}
+
+// GetKVValue retrieves the value for a key from a Workers KV namespace.
+// The Cloudflare API returns the raw value as the response body (not a JSON envelope).
+func (c *Client) GetKVValue(accountID, namespaceID, key string) (string, error) {
+	rawURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/values/%s", c.BaseURL, accountID, namespaceID, key)
+
+	req, err := http.NewRequest(http.MethodGet, rawURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error executing request: %v", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading body: %v", err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return "", newCloudflareAPIError(res.StatusCode, responseBody)
+	}
+
+	return string(responseBody), nil
+}
+
+// DeleteKVValue deletes a key-value pair from a Workers KV namespace
+func (c *Client) DeleteKVValue(accountID, namespaceID, key string) error {
+	kvURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/values/%s", c.BaseURL, accountID, namespaceID, key)
+
+	responseBody, err := c.execRequest(http.MethodDelete, kvURL, nil)
+	if err != nil {
+		return err
+	}
+
+	var deleteResponse struct {
+		Success bool `json:"success"`
+	}
+
+	if err := json.Unmarshal(responseBody, &deleteResponse); err != nil {
+		return fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !deleteResponse.Success {
+		return fmt.Errorf("API returned success=false")
+	}
+
+	return nil
+}
+
+// KVKey represents a single key in a Workers KV namespace
+type KVKey struct {
+	Name string `json:"name"`
+}
+
+// ListKVNamespaces returns all Workers KV namespaces for an account
+func (c *Client) ListKVNamespaces(accountID string) ([]KVNamespace, error) {
+	url := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces?per_page=100", c.BaseURL, accountID)
+
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Result []KVNamespace `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Result, nil
+}
+
+// ListKVKeys returns all keys in a Workers KV namespace
+func (c *Client) ListKVKeys(accountID, namespaceID string) ([]KVKey, error) {
+	url := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/keys?limit=1000", c.BaseURL, accountID, namespaceID)
+
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Result []KVKey `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Result, nil
+}
+
+// DeleteKVNamespace deletes a Workers KV namespace
+func (c *Client) DeleteKVNamespace(accountID, namespaceID string) error {
+	url := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s", c.BaseURL, accountID, namespaceID)
+
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
 }
