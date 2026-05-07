@@ -106,7 +106,7 @@ describe("workflow v2 edit-mode action affordances", () => {
       canvasMode: "edit",
     });
 
-    render(<Trigger {...props} canvasMode="edit" onRun={vi.fn()} />);
+    render(<Trigger {...props} canvasMode="edit" />);
 
     expect(screen.queryByTestId("start-template-run")).not.toBeInTheDocument();
     expect(screen.getByText("Example")).toBeInTheDocument();
@@ -116,10 +116,10 @@ describe("workflow v2 edit-mode action affordances", () => {
     const props = startTriggerRenderer.getTriggerProps({
       ...makeTriggerContext(),
       canvasMode: "live",
-      actions: { invokeNodeTriggerHook: vi.fn().mockResolvedValue(undefined) },
+      actions: { invokeNodeTriggerHook: vi.fn().mockResolvedValue(undefined), openModal: vi.fn() },
     });
 
-    render(<Trigger {...props} canvasMode="live" onRun={vi.fn()} />);
+    render(<Trigger {...props} canvasMode="live" />);
 
     expect(screen.getByTestId("start-template-run")).toBeInTheDocument();
   });
