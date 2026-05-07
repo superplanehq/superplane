@@ -179,7 +179,14 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 	}
 
 	if execution == nil {
-		messages.NewCanvasRunMessage(event.WorkflowID.String(), runID.String()).Publish()
+		err := messages.NewCanvasRunMessage(event.WorkflowID.String(), runID.String()).Publish()
+		if err != nil {
+			logger.WithError(err).Warnf(
+				"Failed to publish run state message for run %s in workflow %s",
+				runID,
+				event.WorkflowID,
+			)
+		}
 	}
 
 	return nil

@@ -97,7 +97,11 @@ func handleExecutionState(workflowID string, executionID string, wsHub *ws.Hub) 
 	log.Debugf("Broadcasted %s event to workflow %s", eventName, workflowID)
 
 	if err := handleRunState(workflowID, execution.RunID.String(), wsHub); err != nil {
-		return fmt.Errorf("failed to broadcast run state: %w", err)
+		log.WithError(err).Warnf(
+			"Failed to broadcast run state for execution %s in workflow %s",
+			execution.ID,
+			workflowID,
+		)
 	}
 
 	return nil
