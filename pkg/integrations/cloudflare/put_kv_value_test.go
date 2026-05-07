@@ -177,6 +177,44 @@ func Test__PutKVValue__Execute(t *testing.T) {
 		assert.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
 	})
 
+	t.Run("success=false returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"success": false, "errors": [{"message": "write failed"}]}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+			},
+		}
+
+		execState := &contexts.ExecutionStateContext{
+			KVs: make(map[string]string),
+		}
+
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"accountId": "acc123",
+				"namespace": "ns123",
+				"key":       "my-key",
+				"value":     "my-value",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: execState,
+		}
+
+		err := component.Execute(ctx)
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to put KV value")
+	})
+
 	t.Run("API error returns error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{

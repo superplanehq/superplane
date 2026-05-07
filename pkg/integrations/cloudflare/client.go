@@ -783,6 +783,18 @@ func (c *Client) PutKVValue(accountID, namespaceID, key, value string, expiratio
 		return newCloudflareAPIError(res.StatusCode, responseBody)
 	}
 
+	var response struct {
+		Success bool `json:"success"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return fmt.Errorf("API returned success=false")
+	}
+
 	return nil
 }
 
