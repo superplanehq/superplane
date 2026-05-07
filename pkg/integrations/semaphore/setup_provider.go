@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"text/template"
 
@@ -38,54 +37,11 @@ var setupCompleteTemplate []byte
 
 type SetupProvider struct{}
 
-func (s *SetupProvider) genCapabilities(actions []core.Action, triggers []core.Trigger) []core.Capability {
-	capabilities := []core.Capability{}
-	for _, action := range actions {
-		capabilities = append(capabilities, core.Capability{
-			Type:           core.IntegrationCapabilityTypeAction,
-			Name:           action.Name(),
-			Label:          action.Label(),
-			Description:    action.Description(),
-			Configuration:  action.Configuration(),
-			OutputChannels: action.OutputChannels(nil),
-		})
-	}
-	for _, trigger := range triggers {
-		capabilities = append(capabilities, core.Capability{
-			Type:          core.IntegrationCapabilityTypeTrigger,
-			Name:          trigger.Name(),
-			Label:         trigger.Label(),
-			Description:   trigger.Description(),
-			Configuration: trigger.Configuration(),
-		})
-	}
-
-	return capabilities
-}
-
-/*
- * Returns all the capabilities, minus the ones being passed in.
- */
-func (s *SetupProvider) capabilityDiff(capabilities []string) []string {
-	groups := s.CapabilityGroups()
-
-	diff := []string{}
-	for _, group := range groups {
-		for _, capability := range group.Capabilities {
-			if !slices.Contains(capabilities, capability.Name) {
-				diff = append(diff, capability.Name)
-			}
-		}
-	}
-
-	return diff
-}
-
 func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 	return []core.CapabilityGroup{
 		{
 			Label: "Workflows",
-			Capabilities: s.genCapabilities(
+			Capabilities: core.BuildCapabilities(
 				[]core.Action{
 					&components.RunWorkflow{},
 					&components.GetPipeline{},
@@ -149,7 +105,7 @@ func (s *SetupProvider) onCapabilitySelectionSubmit(ctx core.SetupStepContext) (
 	// since they were not requested yet, but they could be later on.
 	//
 	ctx.Capabilities.Request(ctx.Step.Capabilities...)
-	ctx.Capabilities.Available(s.capabilityDiff(ctx.Step.Capabilities)...)
+	ctx.Capabilities.Available(core.CapabilityNamesNotRequested(s.CapabilityGroups(), ctx.Step.Capabilities)...)
 
 	return &core.SetupStep{
 		Type:  core.SetupStepTypeInputs,
