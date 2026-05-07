@@ -18,11 +18,30 @@ interface EmitEventModalProps {
   workflowId: string;
   organizationId: string;
   channels: string[];
-  onEmit: (channel: string, data: any) => Promise<void>;
+  /**
+   * The first argument is the channel for generic emits, or the template name
+   * when running a Manual Run trigger (controlled by the `templateName` prop).
+   */
+  onEmit: (channelOrTemplate: string, data: any) => Promise<void>;
   initialData?: string;
+  /**
+   * When set, the modal runs a specific Manual Run trigger template instead of
+   * exposing the generic channel selector. Submitting calls
+   * `onEmit(templateName, data)` so the parent can invoke the trigger's `run`
+   * hook with the correct template.
+   */
+  templateName?: string;
 }
 
-export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, initialData }: EmitEventModalProps) => {
+export const EmitEventModal = ({
+  isOpen,
+  onClose,
+  nodeName,
+  channels,
+  onEmit,
+  initialData,
+  templateName,
+}: EmitEventModalProps) => {
   const [selectedChannel, setSelectedChannel] = useState<string>(channels[0] || "default");
   const [eventData, setEventData] = useState<string>(() => {
     if (initialData) {
@@ -90,8 +109,8 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, in
         return;
       }
 
-      await onEmit(selectedChannel, parsedData);
-      showSuccessToast("Event emitted successfully");
+      await onEmit(templateName ?? selectedChannel, parsedData);
+      showSuccessToast(templateName ? "Run started" : "Event emitted successfully");
       handleClose();
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to emit event"));
@@ -105,29 +124,40 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, in
         <div className="space-y-4">
           <DialogTitle className="flex items-center gap-3">
             <Play className="text-blue-600 dark:text-blue-400" size={24} />
-            Emit Event
+            {templateName ? "Run trigger" : "Emit Event"}
           </DialogTitle>
 
           <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
-            Manually emit an output event for node: <strong>{nodeName}</strong>
+            {templateName ? (
+              <>
+                Run template <strong>{templateName}</strong> on node <strong>{nodeName}</strong>. Edit the payload below
+                to override the template default.
+              </>
+            ) : (
+              <>
+                Manually emit an output event for node: <strong>{nodeName}</strong>
+              </>
+            )}
           </DialogDescription>
 
           <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Label className="min-w-[120px]">Output Channel</Label>
-              <Select value={selectedChannel} onValueChange={setSelectedChannel}>
-                <SelectTrigger className="flex-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {channels.map((channel) => (
-                    <SelectItem key={channel} value={channel}>
-                      {channel}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!templateName && (
+              <div className="flex items-center gap-3">
+                <Label className="min-w-[120px]">Output Channel</Label>
+                <Select value={selectedChannel} onValueChange={setSelectedChannel}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {channels.map((channel) => (
+                      <SelectItem key={channel} value={channel}>
+                        {channel}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
               <Editor
@@ -162,10 +192,10 @@ export const EmitEventModal = ({ isOpen, onClose, nodeName, channels, onEmit, in
               data-testid="emit-event-submit-button"
               onClick={handleSubmit}
               loading={isSubmitting}
-              loadingText="Emitting..."
+              loadingText={templateName ? "Running..." : "Emitting..."}
             >
               <Play size={16} />
-              Emit Event
+              {templateName ? "Run" : "Emit Event"}
             </LoadingButton>
           </DialogFooter>
         </div>
