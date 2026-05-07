@@ -108,6 +108,11 @@ func (c *PutKVValue) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeNumber,
 			Required:    false,
 			Description: "Number of seconds until the key expires. Must be at least 60. Leave empty for no expiration.",
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { min := 60; return &min }(),
+				},
+			},
 		},
 	}
 }

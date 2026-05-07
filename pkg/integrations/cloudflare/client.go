@@ -859,52 +859,90 @@ type KVKey struct {
 
 // ListKVNamespaces returns all Workers KV namespaces for an account
 func (c *Client) ListKVNamespaces(accountID string) ([]KVNamespace, error) {
-	url := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces?per_page=100", c.BaseURL, accountID)
+	var all []KVNamespace
+	cursor := ""
 
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+	for {
+		pageURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces?per_page=100", c.BaseURL, accountID)
+		if cursor != "" {
+			pageURL += "&cursor=" + cursor
+		}
+
+		responseBody, err := c.execRequest(http.MethodGet, pageURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response struct {
+			Success    bool          `json:"success"`
+			Result     []KVNamespace `json:"result"`
+			ResultInfo struct {
+				Cursor string `json:"cursor"`
+			} `json:"result_info"`
+		}
+
+		if err := json.Unmarshal(responseBody, &response); err != nil {
+			return nil, fmt.Errorf("error parsing response: %v", err)
+		}
+
+		if !response.Success {
+			return nil, newCloudflareAPIError(http.StatusOK, responseBody)
+		}
+
+		all = append(all, response.Result...)
+
+		if response.ResultInfo.Cursor == "" {
+			break
+		}
+
+		cursor = response.ResultInfo.Cursor
 	}
 
-	var response struct {
-		Success bool          `json:"success"`
-		Result  []KVNamespace `json:"result"`
-	}
-
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	if !response.Success {
-		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
-	}
-
-	return response.Result, nil
+	return all, nil
 }
 
 // ListKVKeys returns all keys in a Workers KV namespace
 func (c *Client) ListKVKeys(accountID, namespaceID string) ([]KVKey, error) {
-	url := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/keys?limit=1000", c.BaseURL, accountID, namespaceID)
+	var all []KVKey
+	cursor := ""
 
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
+	for {
+		pageURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/keys?limit=1000", c.BaseURL, accountID, namespaceID)
+		if cursor != "" {
+			pageURL += "&cursor=" + cursor
+		}
+
+		responseBody, err := c.execRequest(http.MethodGet, pageURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var response struct {
+			Success    bool    `json:"success"`
+			Result     []KVKey `json:"result"`
+			ResultInfo struct {
+				Cursor string `json:"cursor"`
+			} `json:"result_info"`
+		}
+
+		if err := json.Unmarshal(responseBody, &response); err != nil {
+			return nil, fmt.Errorf("error parsing response: %v", err)
+		}
+
+		if !response.Success {
+			return nil, newCloudflareAPIError(http.StatusOK, responseBody)
+		}
+
+		all = append(all, response.Result...)
+
+		if response.ResultInfo.Cursor == "" {
+			break
+		}
+
+		cursor = response.ResultInfo.Cursor
 	}
 
-	var response struct {
-		Success bool    `json:"success"`
-		Result  []KVKey `json:"result"`
-	}
-
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	if !response.Success {
-		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
-	}
-
-	return response.Result, nil
+	return all, nil
 }
 
 // DeleteKVNamespace deletes a Workers KV namespace
