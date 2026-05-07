@@ -35,7 +35,7 @@ func UpdateCanvasFolder(
 
 	updatedFolder, err := updateCanvasFolder(organizationUUID, folderID, folder, replaceMembership)
 	if err != nil {
-		return nil, canvasFolderErrorToStatus(err)
+		return nil, canvasFolderErrorToStatus(err, "failed to update canvas folder")
 	}
 
 	return &pb.UpdateCanvasFolderResponse{

@@ -16,7 +16,6 @@ import {
   CANVAS_FOLDER_COLORS,
   useDeleteCanvasFolder,
   useMoveCanvasFolder,
-  useUpdateCanvasFolder,
   type CanvasFolderColor,
 } from "@/hooks/useCanvasData";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -34,7 +33,13 @@ interface CanvasFolderActionsMenuProps {
   permissionsLoading: boolean;
   canMoveUp: boolean;
   canMoveDown: boolean;
+  updateCanvasFolderMutation: UpdateCanvasFolderMutation;
   onRenameRequest: () => void;
+}
+
+interface UpdateCanvasFolderMutation {
+  isPending: boolean;
+  mutateAsync: (data: { folderId: string; title: string; backgroundColor: CanvasFolderColor }) => Promise<unknown>;
 }
 
 interface CanvasFolderMenuContentProps {
@@ -208,13 +213,13 @@ export function CanvasFolderActionsMenu({
   permissionsLoading,
   canMoveUp,
   canMoveDown,
+  updateCanvasFolderMutation,
   onRenameRequest,
 }: CanvasFolderActionsMenuProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [shouldStartRename, setShouldStartRename] = useState(false);
   const [shouldOpenDeleteDialog, setShouldOpenDeleteDialog] = useState(false);
-  const updateCanvasFolderMutation = useUpdateCanvasFolder(organizationId);
   const moveCanvasFolderMutation = useMoveCanvasFolder(organizationId);
   const deleteCanvasFolderMutation = useDeleteCanvasFolder(organizationId);
   const allowed = canUpdateCanvases || permissionsLoading;
@@ -234,7 +239,8 @@ export function CanvasFolderActionsMenu({
   }, [isMenuOpen, shouldOpenDeleteDialog]);
 
   const handleColorChange = async (backgroundColor: CanvasFolderColor) => {
-    if (!canUpdateCanvases || backgroundColor === folder.backgroundColor) return;
+    if (!canUpdateCanvases || updateCanvasFolderMutation.isPending || backgroundColor === folder.backgroundColor)
+      return;
 
     try {
       await updateCanvasFolderMutation.mutateAsync({

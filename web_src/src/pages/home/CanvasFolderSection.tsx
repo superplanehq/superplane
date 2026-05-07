@@ -238,6 +238,7 @@ export function CanvasFolderSection({
           permissionsLoading={permissionsLoading}
           canMoveUp={canMoveUp}
           canMoveDown={canMoveDown}
+          updateCanvasFolderMutation={updateCanvasFolderMutation}
           onRenameRequest={startRenamingPreservingFocus}
         />
       </div>

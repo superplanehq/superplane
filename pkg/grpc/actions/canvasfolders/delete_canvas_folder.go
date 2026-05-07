@@ -22,7 +22,7 @@ func DeleteCanvasFolder(_ context.Context, organizationID, id string) (*pb.Delet
 	}
 
 	if err := models.DeleteCanvasFolder(organizationUUID, folderID); err != nil {
-		return nil, canvasFolderErrorToStatus(err)
+		return nil, canvasFolderErrorToStatus(err, "failed to delete canvas folder")
 	}
 
 	return &pb.DeleteCanvasFolderResponse{}, nil

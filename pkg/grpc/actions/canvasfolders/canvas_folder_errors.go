@@ -9,7 +9,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func canvasFolderErrorToStatus(err error) error {
+func canvasFolderErrorToStatus(err error, internalMessage string) error {
 	switch {
 	case errors.Is(err, models.ErrCanvasFolderTitleRequired):
 		return status.Error(codes.InvalidArgument, "canvas folder title is required")
@@ -26,6 +26,6 @@ func canvasFolderErrorToStatus(err error) error {
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		return status.Error(codes.NotFound, "canvas folder not found")
 	default:
-		return status.Error(codes.Internal, "failed to update canvas folder")
+		return status.Error(codes.Internal, internalMessage)
 	}
 }

@@ -32,7 +32,7 @@ func UpdateCanvasFolderPosition(
 
 	folders, err := models.MoveCanvasFolder(organizationUUID, folderID, direction.String())
 	if err != nil {
-		return nil, canvasFolderErrorToStatus(err)
+		return nil, canvasFolderErrorToStatus(err, "failed to move canvas folder")
 	}
 
 	return &pb.UpdateCanvasFolderPositionResponse{

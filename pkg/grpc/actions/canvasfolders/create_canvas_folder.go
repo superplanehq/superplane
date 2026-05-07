@@ -22,7 +22,7 @@ func CreateCanvasFolder(_ context.Context, organizationID string, folder *pb.Can
 
 	createdFolder, err := models.CreateCanvasFolder(organizationUUID, folder.Spec.Title, folder.Spec.BackgroundColor)
 	if err != nil {
-		return nil, canvasFolderErrorToStatus(err)
+		return nil, canvasFolderErrorToStatus(err, "failed to create canvas folder")
 	}
 
 	return &pb.CreateCanvasFolderResponse{
