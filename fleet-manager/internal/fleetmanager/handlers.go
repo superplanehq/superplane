@@ -22,6 +22,11 @@ type Server struct {
 	Store   store.Store
 	Webhook *webhook.Sender
 	Log     *slog.Logger
+
+	// When EC2 provisioning is enabled with terminate-after-task, fleet-manager calls this after each
+	// successful complete (runner_id must be the EC2 instance id from IMDS in user-data).
+	TerminateRunnerAfterTaskEnabled bool
+	TerminateRunnerInstance         func(ctx context.Context, instanceID string) error
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
@@ -187,6 +192,19 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go s.deliverWebhook(task)
+
+	if s.TerminateRunnerAfterTaskEnabled && s.TerminateRunnerInstance != nil && isEC2InstanceID(runnerID) {
+		go func(instanceID string) {
+			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			defer cancel()
+			if err := s.TerminateRunnerInstance(ctx, instanceID); err != nil && s.Log != nil {
+				s.Log.Warn("terminate runner instance after task failed",
+					slog.String("instance_id", instanceID), slog.Any("err", err))
+			} else if s.Log != nil {
+				s.Log.Info("terminate runner instance after task scheduled", slog.String("instance_id", instanceID))
+			}
+		}(runnerID)
+	}
 
 	w.WriteHeader(http.StatusNoContent)
 }

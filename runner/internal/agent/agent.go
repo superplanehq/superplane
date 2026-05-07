@@ -24,6 +24,9 @@ type Config struct {
 	PollEmpty time.Duration
 	// MaxOutputBytes caps combined stdout+stderr stored and sent back.
 	MaxOutputBytes int
+	// ExitAfterEachTask stops the runner process after one successful CompleteTask once fleet-manager accepts the result.
+	// Fleet-manager terminates the EC2 instance when runner_id is the instance id (see cloud-init user-data). Local env: RUNNER_TERMINATE_AFTER_EACH_TASK.
+	ExitAfterEachTask bool
 }
 
 // DefaultConfig returns safe defaults.
@@ -75,6 +78,9 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 		if err := a.complete(ctx, base, task.ID, exit, out, errMsg); err != nil {
 			return err
+		}
+		if a.Config.ExitAfterEachTask {
+			return nil
 		}
 	}
 }

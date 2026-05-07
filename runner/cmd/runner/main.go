@@ -43,6 +43,7 @@ func main() {
 			cfg.PollEmpty = time.Duration(ms) * time.Millisecond
 		}
 	}
+	cfg.ExitAfterEachTask = envTruthy("RUNNER_TERMINATE_AFTER_EACH_TASK")
 
 	a := &agent.Agent{Config: cfg}
 
@@ -69,4 +70,9 @@ func main() {
 		os.Exit(1)
 	}
 	log.Info("runner stopped")
+}
+
+func envTruthy(key string) bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	return v == "1" || v == "true" || v == "yes"
 }

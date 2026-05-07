@@ -39,6 +39,8 @@ type Config struct {
 	KeyName            string // optional EC2 key pair name
 	RunnersIAMProfName string // optional IAM instance profile name for runners
 	HotInstanceCount   int    // target pending+running managed instances (from EC2_PROVISION_HOT_INSTANCE_COUNT)
+	// RunnerTerminateAfterEachTask sets RUNNER_TERMINATE_AFTER_EACH_TASK on new runner containers (EC2 terminate after one task).
+	RunnerTerminateAfterEachTask bool
 }
 
 // ErrDisabled means EC2 pool management is off (hot instance count env not set).
@@ -53,8 +55,9 @@ const (
 	envFleetManagerURL = "EC2_PROVISION_FLEET_MANAGER_URL"
 	envRunnersAuth     = "EC2_PROVISION_RUNNER_AUTH_TOKEN"
 	envKeyName         = "EC2_PROVISION_KEY_NAME"
-	envRunnerIAMProf   = "EC2_PROVISION_RUNNER_INSTANCE_PROFILE"
-	envHotCount        = "EC2_PROVISION_HOT_INSTANCE_COUNT"
+	envRunnerIAMProf       = "EC2_PROVISION_RUNNER_INSTANCE_PROFILE"
+	envRunnerTerminateTask = "EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK"
+	envHotCount            = "EC2_PROVISION_HOT_INSTANCE_COUNT"
 
 	defaultInstanceType = "t3.micro"
 	defaultRunnerImage  = "ghcr.io/superplanehq/runner/runner:latest"
@@ -101,6 +104,11 @@ func ConfigFromEnv() (Config, error) {
 	if rimg == "" {
 		rimg = defaultRunnerImage
 	}
+	terminateAfterTask := true
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(envRunnerTerminateTask))) {
+	case "0", "false", "no", "off":
+		terminateAfterTask = false
+	}
 	return Config{
 		AMI:                ami,
 		InstanceType:       itype,
@@ -112,6 +120,7 @@ func ConfigFromEnv() (Config, error) {
 		KeyName:            strings.TrimSpace(os.Getenv(envKeyName)),
 		RunnersIAMProfName: strings.TrimSpace(os.Getenv(envRunnerIAMProf)),
 		HotInstanceCount:   hot,
+		RunnerTerminateAfterEachTask: terminateAfterTask,
 	}, nil
 }
 
@@ -190,15 +199,32 @@ func userDataScript(c Config) string {
 	b.WriteString("#!/bin/bash\n")
 	b.WriteString("set -euxo pipefail\n")
 	b.WriteString("export DEBIAN_FRONTEND=noninteractive\n")
+	b.WriteString("# Instance id for fleet-manager to terminate after each task\n")
+	b.WriteString("IMDS=http://169.254.169.254\n")
+	b.WriteString("TOKEN=$(curl -sf --max-time 3 \"$IMDS/latest/api/token\" -X PUT -H \"X-aws-ec2-metadata-token-ttl-seconds: 21600\" || true)\n")
+	b.WriteString("IID=\"\"\n")
+	b.WriteString("if [ -n \"$TOKEN\" ]; then IID=$(curl -sf --max-time 3 -H \"X-aws-ec2-metadata-token: $TOKEN\" \"$IMDS/latest/meta-data/instance-id\") || IID=\"\"; fi\n")
+	b.WriteString("if [ -z \"$IID\" ]; then IID=$(curl -sf --max-time 3 \"$IMDS/latest/meta-data/instance-id\") || IID=\"unknown-host\"; fi\n")
 	b.WriteString("apt-get update -qy\n")
 	b.WriteString("apt-get install -qy docker.io\n")
 	b.WriteString("systemctl enable --now docker\n")
 	fmt.Fprintf(&b, "docker pull %s\n", strconv.Quote(c.RunnerImage))
 	b.WriteString("docker rm -f superplane-runner 2>/dev/null || true\n")
-	fmt.Fprintf(&b, "docker run -d --name superplane-runner --restart unless-stopped \\\n  -e FLEET_MANAGER_URL=%s", strconv.Quote(c.FleetManagerURL))
-	if c.RunnersAuthToken != "" {
-		fmt.Fprintf(&b, " \\\n  -e AUTH_TOKEN=%s", strconv.Quote(c.RunnersAuthToken))
+	restart := "unless-stopped"
+	if c.RunnerTerminateAfterEachTask {
+		// Disposable worker: exits after RUNNER_TERMINATE_AFTER_EACH_TASK; avoid restart loops before fleet-manager terminates the VM.
+		restart = "no"
 	}
-	fmt.Fprintf(&b, " \\\n  %s\n", strconv.Quote(c.RunnerImage))
+	fmt.Fprintf(&b, "docker run -d --name superplane-runner --restart %s \\\n", restart)
+	fmt.Fprintf(&b, "  -e FLEET_MANAGER_URL=%s \\\n", strconv.Quote(c.FleetManagerURL))
+	if c.RunnersAuthToken != "" {
+		fmt.Fprintf(&b, "  -e AUTH_TOKEN=%s \\\n", strconv.Quote(c.RunnersAuthToken))
+	}
+	b.WriteString("  -e RUNNER_ID=\"$IID\" \\\n")
+	if c.RunnerTerminateAfterEachTask {
+		b.WriteString("  -e RUNNER_TERMINATE_AFTER_EACH_TASK=true \\\n")
+	}
+	fmt.Fprintf(&b, "  %s\n", strconv.Quote(c.RunnerImage))
 	return b.String()
 }
+

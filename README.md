@@ -84,7 +84,11 @@ export BROKER_PUBLIC_URL=http://127.0.0.1:8081   # fleet-manager must reach this
 | `AUTH_TOKEN`         | (empty)      | If set, requires `Authorization: Bearer <token>` for `/v1/*` |
 | `REAP_INTERVAL_SEC`  | `15`         | How often to return expired leases to the queue              |
 
-Optional **EC2 hot runner pool** — set **`AWS_REGION`**, **`EC2_PROVISION_HOT_INSTANCE_COUNT`** (non-negative target for `pending`+`running` instances tagged `superplane_managed_runner`), plus **`EC2_PROVISION_AMI_ID`**, **`EC2_PROVISION_SUBNET_ID`**, **`EC2_PROVISION_SECURITY_GROUP_IDS`** (comma-separated), and **`EC2_PROVISION_FLEET_MANAGER_URL`** (base URL runners use to reach fleet-manager, often a **private** VPC URL). Fleet-manager **reconciles in the background** (default every **60** s, override with **`EC2_PROVISION_RECONCILE_INTERVAL_SEC`**, minimum **15**) via **`ec2:RunInstances`** / **`ec2:TerminateInstances`**. Omit **`EC2_PROVISION_HOT_INSTANCE_COUNT`** to disable EC2 logic entirely. Optional: **`EC2_PROVISION_INSTANCE_TYPE`** (default `t3.micro`), **`EC2_PROVISION_RUNNER_IMAGE`**, **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**, **`EC2_PROVISION_KEY_NAME`**, **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`**. IAM needs **`ec2:RunInstances`**, **`ec2:DescribeInstances`**, **`ec2:CreateTags`**, **`ec2:TerminateInstances`**, and **`iam:PassRole`** when using an instance profile.
+Optional **EC2 hot runner pool** — set **`AWS_REGION`**, **`EC2_PROVISION_HOT_INSTANCE_COUNT`** (non-negative target for `pending`+`running` instances tagged `superplane_managed_runner`), plus **`EC2_PROVISION_AMI_ID`**, **`EC2_PROVISION_SUBNET_ID`**, **`EC2_PROVISION_SECURITY_GROUP_IDS`** (comma-separated), and **`EC2_PROVISION_FLEET_MANAGER_URL`** (base URL runners use to reach fleet-manager, often a **private** VPC URL). Fleet-manager **reconciles in the background** (default every **60** s, override with **`EC2_PROVISION_RECONCILE_INTERVAL_SEC`**, minimum **15**) via **`ec2:RunInstances`** / **`ec2:TerminateInstances`**. Omit **`EC2_PROVISION_HOT_INSTANCE_COUNT`** to disable EC2 logic entirely. Optional: **`EC2_PROVISION_INSTANCE_TYPE`** (default `t3.micro`), **`EC2_PROVISION_RUNNER_IMAGE`**, **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**, **`EC2_PROVISION_KEY_NAME`**, **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`**.
+
+By default **`EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK`** is **on** (`true`): each runner sends **`runner_id`** equal to its **EC2 instance id** (set from IMDS in user-data); after **one** successful task, **fleet-manager** calls **`TerminateInstances`** for that id and the runner process exits (**`--restart no`** on the container so Docker does not immediately loop). Set **`EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK=false`** for long-lived runners. Runner VMs do **not** need **`ec2:TerminateInstances`**; **fleet-manager’s** IAM must already include **`TerminateInstances`** (used for reconcile and disposable runners).
+
+Fleet-manager still needs **`ec2:RunInstances`**, **`ec2:DescribeInstances`**, **`ec2:CreateTags`**, **`ec2:TerminateInstances`**, and **`iam:PassRole`** when using an instance profile on runners.
 
 ```bash
 export DATABASE_PATH=./fleet.db
@@ -99,6 +103,7 @@ export DATABASE_PATH=./fleet.db
 | `RUNNER_ID`          | Optional; defaults to host name or a random id                                                         |
 | `AUTH_TOKEN`         | Optional; must match fleet-manager if set                                                              |
 | `POLL_EMPTY_MS`      | Sleep when no work (default ~1000 ms)                                                                  |
+| `RUNNER_TERMINATE_AFTER_EACH_TASK` | If `true`/`1`/`yes`, exit the runner process after **one** successful task (off by default locally; **on** for fleet-manager EC2 user-data unless disabled). **`runner_id`** must be the EC2 instance id (`i-…`) for **fleet-manager** to terminate the VM; termination is done by fleet-manager, not the runner binary. |
 
 ```bash
 export FLEET_MANAGER_URL=http://127.0.0.1:8080

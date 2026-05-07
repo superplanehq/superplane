@@ -52,6 +52,10 @@ func main() {
 			log.Error("ec2 provision init", slog.Any("err", err))
 			os.Exit(1)
 		}
+		srv.TerminateRunnerAfterTaskEnabled = ecCfg.RunnerTerminateAfterEachTask
+		if ecCfg.RunnerTerminateAfterEachTask {
+			srv.TerminateRunnerInstance = launcher.TerminateInstance
+		}
 		reconcileEvery := 60 * time.Second
 		if v := getenv("EC2_PROVISION_RECONCILE_INTERVAL_SEC", ""); v != "" {
 			if n, err := strconv.Atoi(v); err == nil && n >= 15 {
