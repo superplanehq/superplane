@@ -25,6 +25,11 @@ interface GetServiceOutput {
   dashboardUrl?: string;
   createdAt?: string;
   updatedAt?: string;
+  customDomains?: Array<{
+    id?: string;
+    name?: string;
+    verificationStatus?: string;
+  }>;
 }
 
 function metadataList(node: NodeInfo): MetadataItem[] {
@@ -60,8 +65,22 @@ export const getServiceMapper: ComponentBaseMapper = {
       Type: stringOrDash(result?.type),
       Suspended: result?.suspended === undefined ? "-" : result.suspended === "suspended" ? "Yes" : "No",
       "Dashboard URL": stringOrDash(result?.dashboardUrl),
+      "Custom Domains": formatCustomDomains(result?.customDomains),
       "Created At": formatTimestamp(result?.createdAt),
       "Updated At": formatTimestamp(result?.updatedAt),
     };
   },
 };
+
+function formatCustomDomains(domains?: GetServiceOutput["customDomains"]): string {
+  if (!domains?.length) {
+    return "-";
+  }
+
+  return domains
+    .map((domain) => {
+      const status = domain.verificationStatus ? ` (${domain.verificationStatus})` : "";
+      return `${domain.name || domain.id || "-"}${status}`;
+    })
+    .join(", ");
+}

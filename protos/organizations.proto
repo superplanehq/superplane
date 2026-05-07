@@ -549,7 +549,6 @@ message CreateIntegrationRequest {
   string name = 2;
   string integration_name = 3;
   google.protobuf.Struct configuration = 4;
-  repeated string capabilities = 5;
 }
 
 message CreateIntegrationResponse {
@@ -603,6 +602,7 @@ message NextIntegrationSetupStepRequest {
   string id = 1;
   string integration_id = 2;
   google.protobuf.Struct inputs = 3;
+  repeated string capabilities = 4;
 }
 
 message NextIntegrationSetupStepResponse {
@@ -703,7 +703,8 @@ message Integration {
       UNKNOWN = 0;
       INPUTS = 1;
       REDIRECT_PROMPT = 2;
-      DONE = 3;
+      CAPABILITY_SELECTION = 3;
+      DONE = 4;
     }
 
     message RedirectPrompt {
@@ -718,36 +719,47 @@ message Integration {
     string instructions = 4;
     repeated Configuration.Field inputs = 5;
     RedirectPrompt redirect_prompt = 6;
+    repeated string capabilities = 7;
   }
 
   message CapabilityState {
     enum State {
+
       //
-      // The integration itself has the capability available,
-      // but the capability was not requested as part of the setup flow.
+      // The integration has the capability available,
+      // but the integration setup did not expose it,
+      // and the user cannot request it anymore.
       //
       STATE_UNAVAILABLE = 0;
+
+      //
+      // THe integration has the capability available,
+      // but the integration setup did not expose it yet.
+      // The user can still request it, though.
+      //
+      STATE_AVAILABLE = 1;
 
       //
       // The capability was requested,
       // but the setup flow did not yet exposed the capability requested.
       //
-      STATE_REQUESTED = 1;
+      STATE_REQUESTED = 2;
 
       //
       // The capability is fully available for use.
       //
-      STATE_ENABLED = 2;
+      STATE_ENABLED = 3;
 
       //
       // The capability was made available during the setup flow,
       // but has been manually disabled by the user.
       //
-      STATE_DISABLED = 3;
+      STATE_DISABLED = 4;
     }
 
     string name = 1;
     State state = 2;
+    optional string reason = 3;
   }
 
   message NodeRef {
@@ -755,6 +767,7 @@ message Integration {
     string canvas_name = 2;
     string node_id = 3;
     string node_name = 4;
+    string component = 5;
   }
 
   Metadata metadata = 1;

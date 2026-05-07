@@ -4,6 +4,7 @@ import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } fro
 import type { TriggerProps } from "@/ui/trigger";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import ociIcon from "@/assets/icons/integrations/oci.svg";
+import { compactDetails } from "./base";
 
 interface OciComputeLaunchEvent {
   eventType?: string;
@@ -42,19 +43,15 @@ export const onComputeInstanceCreatedTriggerRenderer: TriggerRenderer = {
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
     const envelope = getEventEnvelope(context.event);
     const data = envelope?.data;
-
-    const triggeredAtRaw = context.event?.createdAt ?? envelope?.eventTime;
-    const triggeredAt = triggeredAtRaw ? new Date(triggeredAtRaw).toLocaleString() : undefined;
-
-    const rawEntries: [string, string | undefined][] = [
-      ["Triggered At", triggeredAt],
+    return compactDetails([
+      getTimeDetail(context.event, envelope),
       ["Instance Name", data?.resourceName],
+      ["Instance ID", data?.resourceId],
       ["Shape", data?.additionalDetails?.shape],
       ["Availability Domain", data?.availabilityDomain],
+      ["Compartment ID", data?.compartmentId],
       ["Compartment", data?.compartmentName],
-    ];
-
-    return Object.fromEntries(rawEntries.filter((e): e is [string, string] => e[1] != null));
+    ]);
   },
 
   getTriggerProps: (context: TriggerRendererContext): TriggerProps => {
@@ -80,3 +77,18 @@ export const onComputeInstanceCreatedTriggerRenderer: TriggerRenderer = {
     };
   },
 };
+
+function getTimeDetail(
+  event: TriggerEventContext["event"],
+  envelope: OciComputeLaunchEvent | undefined,
+): [string, string | undefined] {
+  if (event?.createdAt) {
+    return ["Triggered At", new Date(event.createdAt).toLocaleString()];
+  }
+
+  if (envelope?.eventTime) {
+    return ["Triggered At", new Date(envelope.eventTime).toLocaleString()];
+  }
+
+  return ["Triggered At", undefined];
+}

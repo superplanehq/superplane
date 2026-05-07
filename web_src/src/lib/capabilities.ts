@@ -35,6 +35,20 @@ export type CapabilityGroupSection = {
 };
 
 /**
+ * Returns capability definitions offered by a setup step (by name), preserving {@link defsSorted} order.
+ */
+export function capabilityDefinitionsForStepOffer(
+  defsSorted: IntegrationsCapabilityDefinition[],
+  offeredNames: string[] | undefined,
+): IntegrationsCapabilityDefinition[] {
+  const allowed = new Set((offeredNames ?? []).filter(Boolean));
+  if (allowed.size === 0) {
+    return [];
+  }
+  return defsSorted.filter((def) => Boolean(def.name) && allowed.has(def.name!));
+}
+
+/**
  * Groups capability names using {@link IntegrationsIntegrationDefinition.capabilityGroups} when present.
  * Otherwise returns a single section with label "" and every defined capability name.
  */
@@ -89,5 +103,5 @@ export function buildIntegrationCapabilityGroupSections(
     });
   }
 
-  return sections;
+  return [...sections].sort((left, right) => left.label.localeCompare(right.label));
 }

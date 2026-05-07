@@ -83,6 +83,11 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		createdBy = &pb.UserRef{Id: user.ID.String(), Name: user.Name}
 	}
 
+	canvasFolderID := ""
+	if canvas.CanvasFolderID != nil {
+		canvasFolderID = canvas.CanvasFolderID.String()
+	}
+
 	if !includeStatus {
 		return &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
@@ -94,6 +99,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 				CreatedBy:      createdBy,
 				IsTemplate:     canvas.IsTemplate,
+				FolderId:       canvasFolderID,
 			},
 			Spec: &pb.Canvas_Spec{
 				Nodes:            serializedNodes,
@@ -146,6 +152,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:      createdBy,
 			IsTemplate:     canvas.IsTemplate,
+			FolderId:       canvasFolderID,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes:            serializedNodes,
@@ -352,7 +359,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 	}
 
 	if len(parts) > 1 {
-		err := validateIntegration(organizationID, node.Integration)
+		err := validateIntegration(organizationID, node.Integration, node.Component)
 		if err != nil {
 			return err
 		}
@@ -361,7 +368,7 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 	return configuration.ValidateConfiguration(configurable.Configuration(), node.Configuration.AsMap())
 }
 
-func validateIntegration(organizationID string, ref *componentpb.IntegrationRef) error {
+func validateIntegration(organizationID string, ref *componentpb.IntegrationRef, component string) error {
 	if ref == nil || ref.Id == nil {
 		return fmt.Errorf("integration is required")
 	}
@@ -376,9 +383,13 @@ func validateIntegration(organizationID string, ref *componentpb.IntegrationRef)
 		return fmt.Errorf("invalid organization ID: %v", err)
 	}
 
-	_, err = models.FindIntegration(orgID, integrationID)
+	integration, err := models.FindIntegration(orgID, integrationID)
 	if err != nil {
 		return fmt.Errorf("integration not found or does not belong to this organization")
+	}
+
+	if !integration.HasCapabilityEnabled(component) {
+		return fmt.Errorf("%s is not enabled for integration %s", component, integration.InstallationName)
 	}
 
 	return nil

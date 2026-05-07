@@ -106,6 +106,8 @@ func (r *Render) Actions() []core.Action {
 		&RollbackDeploy{},
 		&PurgeCache{},
 		&UpdateEnvVar{},
+		&AddCustomDomain{},
+		&RemoveCustomDomain{},
 	}
 }
 
@@ -154,10 +156,17 @@ func (r *Render) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (r *Render) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "service" {
+	switch resourceType {
+	case "service":
+		return listServices(ctx)
+	case "custom_domain":
+		return listCustomDomains(ctx)
+	default:
 		return []core.IntegrationResource{}, nil
 	}
+}
 
+func listServices(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, err
@@ -179,7 +188,39 @@ func (r *Render) ListResources(resourceType string, ctx core.ListResourcesContex
 			continue
 		}
 
-		resources = append(resources, core.IntegrationResource{Type: resourceType, Name: service.Name, ID: service.ID})
+		resources = append(resources, core.IntegrationResource{Type: "service", Name: service.Name, ID: service.ID})
+	}
+
+	return resources, nil
+}
+
+func listCustomDomains(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	serviceID := ctx.Parameters["service"]
+	if serviceID == "" {
+		return []core.IntegrationResource{}, nil
+	}
+
+	if strings.Contains(serviceID, "{{") {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, err
+	}
+
+	domains, err := client.ListCustomDomains(serviceID)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(domains))
+	for _, domain := range domains {
+		if domain.Name == "" {
+			continue
+		}
+
+		resources = append(resources, core.IntegrationResource{Type: "custom_domain", Name: domain.Name, ID: domain.ID})
 	}
 
 	return resources, nil

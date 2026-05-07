@@ -307,6 +307,7 @@ func (c *IntegrationContext) GetState() string {
 }
 
 func (c *IntegrationContext) Ready() {
+	c.integration.SetupState = nil
 	c.integration.State = models.IntegrationStateReady
 	c.integration.StateDescription = ""
 }
@@ -462,7 +463,7 @@ func (c *IntegrationContext) FindSubscription(predicate func(core.IntegrationSub
 }
 
 func (c *IntegrationContext) LegacySetup() bool {
-	return len(c.integration.Capabilities) == 0
+	return c.integration.IsLegacy()
 }
 
 func (c *IntegrationContext) Properties() core.IntegrationPropertyStorage {

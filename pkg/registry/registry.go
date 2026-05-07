@@ -9,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/gorm"
 )
 
 var (
@@ -180,6 +181,13 @@ func (r *Registry) Init() {
 
 func (r *Registry) HTTPContext() *HTTPContext {
 	return r.httpCtx
+}
+
+func (r *Registry) HTTPContextInTransaction(tx *gorm.DB) *HTTPContextInTransaction {
+	return &HTTPContextInTransaction{
+		httpCtx: r.httpCtx,
+		tx:      tx,
+	}
 }
 
 func (r *Registry) FindConfigurableComponent(name string) (core.Configurable, error) {
@@ -427,4 +435,18 @@ func (r *Registry) FindIntegrationHook(integrationName, hookName string) (core.I
 	}
 
 	return nil, nil, fmt.Errorf("hook %s not found for integration %s", hookName, integrationName)
+}
+
+func (r *Registry) AllCapabilities(name string) []core.Capability {
+	setupProvider, err := r.GetSetupProvider(name)
+	if err != nil {
+		return []core.Capability{}
+	}
+
+	capabilities := []core.Capability{}
+	for _, group := range setupProvider.CapabilityGroups() {
+		capabilities = append(capabilities, group.Capabilities...)
+	}
+
+	return capabilities
 }

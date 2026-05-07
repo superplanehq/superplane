@@ -64,10 +64,15 @@ export interface PullRequest {
   title?: string;
   id?: string;
   number?: number;
+  state?: string;
+  draft?: boolean;
   url?: string;
   html_url?: string;
   head?: {
     sha: string;
+    ref: string;
+  };
+  base?: {
     ref: string;
   };
   user?: {
@@ -107,6 +112,7 @@ export interface GitRef {
 
 export interface Comment {
   id?: number;
+  node_id?: string;
   body?: string;
   html_url?: string;
   path?: string;

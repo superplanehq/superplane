@@ -151,6 +151,29 @@ func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]strin
 	return secret, nil
 }
 
+func CreateIntegrationWithCapabilities(
+	t require.TestingT,
+	organizationID uuid.UUID,
+	capabilities []models.CapabilityState,
+) *models.Integration {
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		organizationID,
+		"github",
+		RandomName("integration"),
+		nil,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, database.Conn().
+		Model(integration).
+		Update("capabilities", datatypes.NewJSONSlice(capabilities)).
+		Error)
+
+	integration.Capabilities = datatypes.NewJSONSlice(capabilities)
+	return integration
+}
+
 func RandomName(prefix string) string {
 	return prefix + "-" + uuid.New().String()
 }

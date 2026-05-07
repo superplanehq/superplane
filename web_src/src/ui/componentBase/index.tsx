@@ -137,6 +137,7 @@ export interface EventStateStyle {
 
 export type EventStateMap = Record<EventState, EventStateStyle>;
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
   triggered: {
     icon: "circle",
@@ -214,7 +215,7 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   selected?: boolean;
   metadata?: MetadataItem[];
   /** Custom content rendered on the node */
-  customField?: React.ReactNode | ((onRun?: () => void, nodeId?: string) => React.ReactNode);
+  customField?: React.ReactNode | (() => React.ReactNode);
   /** Where to render customField: "before" (before events) or "after" (after events, default) */
   customFieldPosition?: "before" | "after";
   /** Whether the custom field should only be shown in live mode */
@@ -244,8 +245,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   collapsedBackground: _collapsedBackground,
   eventSections,
   selected = false,
-  onRun,
-  runDisabled,
+  runDisabled: _runDisabled,
   runDisabledTooltip: _runDisabledTooltip,
   onTogglePause,
   onEdit: _onEdit,
@@ -277,9 +277,9 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   const safeCustomFieldVisibility = customFieldVisibility === "live-only" ? "live-only" : "always";
   const safeCustomField = React.useMemo(() => {
     if (typeof customField === "function") {
-      return (onRunHandler?: () => void, nodeId?: string) => {
+      return () => {
         try {
-          return customField(onRunHandler, nodeId) ?? null;
+          return customField() ?? null;
         } catch (renderError) {
           console.error("[ComponentBase] customField threw during render:", renderError);
           return null;
@@ -322,12 +322,11 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
     safeEventSections && safeEventSections.length > 0
       ? (resolvedEventStateMap[compactEventState] || resolvedEventStateMap.neutral).badgeColor
       : undefined;
-  const customFieldOnRun = canvasMode === "edit" || runDisabled ? undefined : onRun;
   const renderedCustomField =
     safeCustomFieldVisibility === "live-only" && canvasMode === "edit"
       ? null
       : typeof safeCustomField === "function"
-        ? safeCustomField(customFieldOnRun)
+        ? safeCustomField()
         : safeCustomField || null;
 
   return (
