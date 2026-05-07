@@ -712,7 +712,7 @@ func (c *Client) CreateKVNamespace(accountID string, req CreateKVNamespaceReques
 	}
 
 	if !kvResponse.Success {
-		return nil, fmt.Errorf("API returned success=false")
+		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
 	}
 
 	return &kvResponse.Result, nil
@@ -737,7 +737,7 @@ func (c *Client) GetKVNamespace(accountID, namespaceID string) (*KVNamespace, er
 	}
 
 	if !response.Success {
-		return nil, fmt.Errorf("API returned success=false")
+		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
 	}
 
 	return &response.Result, nil
@@ -792,7 +792,7 @@ func (c *Client) PutKVValue(accountID, namespaceID, key, value string, expiratio
 	}
 
 	if !response.Success {
-		return fmt.Errorf("API returned success=false")
+		return newCloudflareAPIError(res.StatusCode, responseBody)
 	}
 
 	return nil
@@ -846,7 +846,7 @@ func (c *Client) DeleteKVValue(accountID, namespaceID, key string) error {
 	}
 
 	if !deleteResponse.Success {
-		return fmt.Errorf("API returned success=false")
+		return newCloudflareAPIError(http.StatusOK, responseBody)
 	}
 
 	return nil
@@ -876,7 +876,7 @@ func (c *Client) ListKVNamespaces(accountID string) ([]KVNamespace, error) {
 	}
 
 	if !response.Success {
-		return nil, fmt.Errorf("API returned success=false")
+		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
 	}
 
 	return response.Result, nil
@@ -901,7 +901,7 @@ func (c *Client) ListKVKeys(accountID, namespaceID string) ([]KVKey, error) {
 	}
 
 	if !response.Success {
-		return nil, fmt.Errorf("API returned success=false")
+		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
 	}
 
 	return response.Result, nil
@@ -925,7 +925,7 @@ func (c *Client) DeleteKVNamespace(accountID, namespaceID string) error {
 	}
 
 	if !response.Success {
-		return fmt.Errorf("API returned success=false")
+		return newCloudflareAPIError(http.StatusOK, responseBody)
 	}
 
 	return nil
