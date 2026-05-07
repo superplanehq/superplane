@@ -277,18 +277,19 @@ func (s *SetupProvider) onEnterLaunchKeySubmit(input any, ctx core.SetupStepCont
 		return nil, errors.New("cloud agent API key is required")
 	}
 
-	if err := verifyCursorCredentials(ctx.HTTP, launchVal, "", true, false); err != nil {
-		return nil, err
-	}
-
-	if err := persistSecret(ctx, core.IntegrationSecretDefinition{
-		Name:        SecretLaunchAgentKey,
-		Label:       "Cloud Agent API Key",
-		Description: "API key for Cursor Cloud Agents",
-		Value:       launchVal,
-		Editable:    true,
-	}); err != nil {
-		return nil, err
+	if needLaunch {
+		if err := verifyCursorCredentials(ctx.HTTP, launchVal, "", true, false); err != nil {
+			return nil, err
+		}
+		if err := persistSecret(ctx, core.IntegrationSecretDefinition{
+			Name:        SecretLaunchAgentKey,
+			Label:       "Cloud Agent API Key",
+			Description: "API key for Cursor Cloud Agents",
+			Value:       launchVal,
+			Editable:    true,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	// If only the launch key is required, we already verified it above.
@@ -305,11 +306,12 @@ func (s *SetupProvider) onEnterLaunchKeySubmit(input any, ctx core.SetupStepCont
 		return s.enterAdminKeyStep(), nil
 	}
 
-	adminKey, _ := ctx.Secrets.Get(SecretAdminKey)
-
-	// Launch key was already verified above; verify only the admin key here to avoid an extra external call.
-	if err := verifyCursorCredentials(ctx.HTTP, "", adminKey, false, true); err != nil {
-		return nil, err
+	if needAdmin {
+		adminKey, _ := ctx.Secrets.Get(SecretAdminKey)
+		// Launch key was already verified above when needLaunch; verify only the admin key here.
+		if err := verifyCursorCredentials(ctx.HTTP, "", adminKey, false, true); err != nil {
+			return nil, err
+		}
 	}
 
 	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
