@@ -12,6 +12,8 @@ import (
 type RouterOptions struct {
 	// AuthToken when non-empty requires Authorization: Bearer <token> for /v1.
 	AuthToken string
+	// DiagnosticsToken when non-empty enables /v1/admin/* (Bearer auth). Requires EC2Launcher on Server.
+	DiagnosticsToken string
 }
 
 // NewRouter builds chi routes for fleet-manager.
@@ -22,6 +24,14 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 	r.Use(middleware.Recoverer)
 
 	r.Get("/healthz", s.health)
+
+	if strings.TrimSpace(opt.DiagnosticsToken) != "" && s.EC2Launcher != nil {
+		r.Route("/v1/admin", func(r chi.Router) {
+			r.Use(bearerAuth(opt.DiagnosticsToken))
+			r.Get("/managed-runners", s.adminManagedRunners)
+			r.Get("/ec2-console-output", s.adminEc2Console)
+		})
+	}
 
 	r.Route("/v1", func(r chi.Router) {
 		if strings.TrimSpace(opt.AuthToken) != "" {

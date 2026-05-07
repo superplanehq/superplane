@@ -44,14 +44,17 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	var launcher *ec2provision.Launcher
 	ecCfg, ecErr := ec2provision.ConfigFromEnv()
 	switch {
 	case ecErr == nil:
-		launcher, err := ec2provision.New(context.Background(), ecCfg, log)
+		var err error
+		launcher, err = ec2provision.New(context.Background(), ecCfg, log)
 		if err != nil {
 			log.Error("ec2 provision init", slog.Any("err", err))
 			os.Exit(1)
 		}
+		srv.EC2Launcher = launcher
 		srv.TerminateRunnerAfterTaskEnabled = ecCfg.RunnerTerminateAfterEachTask
 		if ecCfg.RunnerTerminateAfterEachTask {
 			srv.TerminateRunnerInstance = launcher.TerminateInstance
@@ -73,7 +76,11 @@ func main() {
 		os.Exit(1)
 	}
 	auth := getenv("AUTH_TOKEN", "")
-	handler := fleetmanager.NewRouter(srv, fleetmanager.RouterOptions{AuthToken: auth})
+	diagTok := getenv("FLEET_DIAGNOSTICS_TOKEN", "")
+	handler := fleetmanager.NewRouter(srv, fleetmanager.RouterOptions{
+		AuthToken:          auth,
+		DiagnosticsToken: diagTok,
+	})
 
 	addr := getenv("LISTEN_ADDR", ":8080")
 	httpSrv := &http.Server{
