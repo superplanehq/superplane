@@ -108,7 +108,7 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 	}
 
 	runnerCmd := exec.Command(runnerBin)
-	runnerCmd.Env = subprocessEnv(
+	runnerCmd.Env = runnerSubprocessEnv(
 		"FLEET_MANAGER_URL="+fleetBase,
 		"RUNNER_ID=e2e-broker-runner-1",
 		"POLL_EMPTY_MS=20",

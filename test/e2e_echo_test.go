@@ -174,7 +174,7 @@ func runFleetWebhookE2E(t *testing.T, makeReq func(webhookURL string) api.Create
 	t.Cleanup(whSrv.Close)
 
 	runnerCmd := exec.Command(runnerPath)
-	runnerCmd.Env = subprocessEnv(
+	runnerCmd.Env = runnerSubprocessEnv(
 		"FLEET_MANAGER_URL="+baseURL,
 		"RUNNER_ID=e2e-runner-1",
 		"POLL_EMPTY_MS=20",

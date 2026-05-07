@@ -24,6 +24,17 @@ func subprocessEnv(extra ...string) []string {
 	return append(out, extra...)
 }
 
+// runnerSubprocessEnv is like subprocessEnv but adjusts the worker for CI builders where
+// pty.Start() succeeds yet reads on /dev/ptmx fail later (EIO), so tasks never finish and
+// webhooks time out. The pipe bundle path avoids a PTY while still exercising bash directives.
+func runnerSubprocessEnv(extra ...string) []string {
+	env := subprocessEnv(extra...)
+	if os.Getenv("CI") != "" {
+		env = append(env, "RUNNER_SHELL_USE_PIPE=1")
+	}
+	return env
+}
+
 // skipIfPTYUnavailable skips the test when Bash+PTY cannot run (e.g. hardened
 // sandboxes). Production runners require PTY; this only relaxes local/CI preflight.
 func skipIfPTYUnavailable(t *testing.T) {
