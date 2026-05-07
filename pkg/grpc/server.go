@@ -17,6 +17,7 @@ import (
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
+	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -145,6 +146,9 @@ func RunServer(
 
 	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL, usageService)
 	pbCanvases.RegisterCanvasesServer(grpcServer, canvasService)
+
+	canvasFolderService := NewCanvasFolderService()
+	pbCanvasFolders.RegisterCanvasFoldersServer(grpcServer, canvasFolderService)
 
 	integrationService := NewIntegrationService(encryptor, registry)
 	integrationpb.RegisterIntegrationsServer(grpcServer, integrationService)
