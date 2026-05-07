@@ -40,6 +40,20 @@ func TestOwnerSetupFlow(t *testing.T) {
 		steps.assertOwnerSetupIsNoLongerRequired()
 	})
 
+	t.Run("can skip SMTP after opening SMTP configuration", func(t *testing.T) {
+		steps := &ownerSetupSteps{t: t}
+		steps.start()
+		steps.visitRootPage()
+		steps.assertRedirectedToSetup()
+		steps.visitSetupPage()
+		steps.fillInOwnerDetails("smtp-skip@example.com", "SMTP", "Skip", "Password1")
+		steps.chooseSMTPSetup()
+		steps.finishOwnerSetupWithoutSMTPFromSMTPConfig()
+		steps.assertOwnerAndOrganizationCreated()
+		steps.assertRedirectedToOrganizationHome()
+		steps.assertOwnerSetupIsNoLongerRequired()
+	})
+
 	t.Run("can enable private network access during owner setup", func(t *testing.T) {
 		steps := &ownerSetupSteps{t: t}
 		steps.start()
@@ -145,6 +159,11 @@ func (s *ownerSetupSteps) chooseSMTPSetup() {
 	s.goToPrivateNetworkSettings()
 	s.goToSetupOptions()
 	s.session.Click(q.Text("Set up SMTP"))
+}
+
+func (s *ownerSetupSteps) finishOwnerSetupWithoutSMTPFromSMTPConfig() {
+	s.session.Click(q.Text("Do this later"))
+	s.waitForSetupToComplete()
 }
 
 func (s *ownerSetupSteps) enablePrivateNetworkAccess() {
