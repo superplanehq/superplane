@@ -363,10 +363,8 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.
 	}
 
 	if parentExecutionID == nil {
-		if execution.RunID != nil {
-			if _, err := models.MaybeFinalizeRunInTransaction(tx, *execution.RunID); err != nil {
-				return nil, err
-			}
+		if _, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID); err != nil {
+			return nil, err
 		}
 
 		return []*uuid.UUID{&execution.ID}, nil

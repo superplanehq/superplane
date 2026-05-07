@@ -3,6 +3,7 @@ package workers
 import (
 	"testing"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -62,7 +63,7 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	updatedEvent, err := models.FindCanvasEvent(event.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.CanvasEventStateRouted, updatedEvent.State)
-	require.NotNil(t, updatedEvent.RunID)
+	assert.NotEqual(t, uuid.Nil, updatedEvent.RunID)
 
 	run, err := models.FindCanvasRunByRootEventInTransaction(database.Conn(), event.ID)
 	require.NoError(t, err)
@@ -73,8 +74,7 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	require.Len(t, queueItems, 1)
 	assert.Equal(t, node2, queueItems[0].NodeID)
 	assert.Equal(t, event.ID, queueItems[0].EventID)
-	require.NotNil(t, queueItems[0].RunID)
-	assert.Equal(t, run.ID, *queueItems[0].RunID)
+	assert.Equal(t, run.ID, queueItems[0].RunID)
 
 	assert.True(t, queueConsumer.HasReceivedMessage())
 	assert.True(t, runConsumer.HasReceivedMessage())
@@ -122,7 +122,7 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, triggerEvent.Routed())
 	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node1, triggerEvent.ID, triggerEvent.ID, nil)
-	execution.RunID = &run.ID
+	execution.RunID = run.ID
 	require.NoError(t, database.Conn().Save(execution).Error)
 	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
 	require.NoError(t, err)
@@ -179,7 +179,7 @@ func Test__EventRouter_ProcessTerminalExecutionEventFinishesRun(t *testing.T) {
 	require.NoError(t, triggerEvent.Routed())
 
 	execution := support.CreateCanvasNodeExecution(t, canvas.ID, node, triggerEvent.ID, triggerEvent.ID, nil)
-	execution.RunID = &run.ID
+	execution.RunID = run.ID
 	require.NoError(t, database.Conn().Save(execution).Error)
 	_, err = execution.Pass(map[string][]any{"default": {map[string]any{}}})
 	require.NoError(t, err)

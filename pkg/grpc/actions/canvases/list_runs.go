@@ -43,10 +43,6 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 
 	executionsByRunID := make(map[string][]models.CanvasNodeExecution, len(runIDs))
 	for _, execution := range executions {
-		if execution.RunID == nil {
-			continue
-		}
-
 		executionsByRunID[execution.RunID.String()] = append(executionsByRunID[execution.RunID.String()], execution)
 	}
 
@@ -81,10 +77,6 @@ func listRootEventsForRuns(canvasID uuid.UUID, runIDs []uuid.UUID) (map[string]m
 	}
 
 	for _, event := range events {
-		if event.RunID == nil {
-			continue
-		}
-
 		eventsByRunID[event.RunID.String()] = event
 	}
 

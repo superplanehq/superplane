@@ -98,7 +98,7 @@ func createRunExecution(t *testing.T, run *models.CanvasRun, rootEventID uuid.UU
 		WorkflowID:    run.WorkflowID,
 		NodeID:        nodeID,
 		RootEventID:   rootEventID,
-		RunID:         &run.ID,
+		RunID:         run.ID,
 		EventID:       rootEventID,
 		State:         models.CanvasNodeExecutionStateFinished,
 		Result:        result,

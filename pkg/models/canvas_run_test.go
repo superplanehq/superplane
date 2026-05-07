@@ -32,8 +32,7 @@ func Test__CanvasRun__PendingOutputEventKeepsRunStarted(t *testing.T) {
 		Where("execution_id = ?", execution.ID).
 		First(&outputEvent).
 		Error)
-	require.NotNil(t, outputEvent.RunID)
-	assert.Equal(t, run.ID, *outputEvent.RunID)
+	assert.Equal(t, run.ID, outputEvent.RunID)
 
 	require.NoError(t, outputEvent.Routed())
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -56,7 +55,7 @@ func Test__CanvasRun__QueueItemKeepsRunStarted(t *testing.T) {
 	}).Error)
 
 	queueItem := support.CreateQueueItem(t, run.WorkflowID, "node-1", execution.RootEventID, execution.RootEventID)
-	queueItem.RunID = &run.ID
+	queueItem.RunID = run.ID
 	require.NoError(t, database.Conn().Save(queueItem).Error)
 
 	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -145,7 +144,7 @@ func createExecutionForRun(t *testing.T, run *models.CanvasRun, rootEventID uuid
 		WorkflowID:    run.WorkflowID,
 		NodeID:        nodeID,
 		RootEventID:   rootEventID,
-		RunID:         &run.ID,
+		RunID:         run.ID,
 		EventID:       rootEventID,
 		State:         models.CanvasNodeExecutionStatePending,
 		Configuration: datatypes.NewJSONType(map[string]any{}),

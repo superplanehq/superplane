@@ -23,13 +23,42 @@ type CanvasEvent struct {
 	CustomName  *string
 	Data        datatypes.JSONType[any]
 	ExecutionID *uuid.UUID
-	RunID       *uuid.UUID
+	RunID       uuid.UUID
 	State       string
 	CreatedAt   *time.Time
 }
 
 func (e *CanvasEvent) TableName() string {
 	return "workflow_events"
+}
+
+func (e *CanvasEvent) BeforeCreate(tx *gorm.DB) error {
+	if e.RunID != uuid.Nil {
+		return nil
+	}
+
+	if e.ExecutionID != nil {
+		var execution CanvasNodeExecution
+		err := tx.
+			Select("run_id").
+			Where("id = ?", *e.ExecutionID).
+			First(&execution).
+			Error
+		if err != nil {
+			return err
+		}
+
+		e.RunID = execution.RunID
+		return nil
+	}
+
+	run, err := CreateCanvasRunInTransaction(tx, e.WorkflowID)
+	if err != nil {
+		return err
+	}
+
+	e.RunID = run.ID
+	return nil
 }
 
 func FindCanvasEvents(ids []string) ([]CanvasEvent, error) {

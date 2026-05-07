@@ -62,8 +62,8 @@ func FindCanvasRunByRootEventInTransaction(tx *gorm.DB, rootEventID uuid.UUID) (
 }
 
 func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *CanvasEvent) (*CanvasRun, error) {
-	if rootEvent.RunID != nil {
-		return FindCanvasRunInTransaction(tx, rootEvent.WorkflowID, *rootEvent.RunID)
+	if rootEvent.RunID != uuid.Nil {
+		return FindCanvasRunInTransaction(tx, rootEvent.WorkflowID, rootEvent.RunID)
 	}
 
 	run, err := FindCanvasRunByRootEventInTransaction(tx, rootEvent.ID)
@@ -75,20 +75,29 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 		return nil, err
 	}
 
+	run, err = CreateCanvasRunInTransaction(tx, rootEvent.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	rootEvent.RunID = run.ID
+	if err := tx.Model(rootEvent).Update("run_id", run.ID).Error; err != nil {
+		return nil, err
+	}
+
+	return run, nil
+}
+
+func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*CanvasRun, error) {
 	now := time.Now()
-	run = &CanvasRun{
-		WorkflowID: rootEvent.WorkflowID,
+	run := &CanvasRun{
+		WorkflowID: workflowID,
 		State:      CanvasRunStateStarted,
 		CreatedAt:  &now,
 		UpdatedAt:  &now,
 	}
 
 	if err := tx.Create(run).Error; err != nil {
-		return nil, err
-	}
-
-	rootEvent.RunID = &run.ID
-	if err := tx.Model(rootEvent).Update("run_id", run.ID).Error; err != nil {
 		return nil, err
 	}
 
