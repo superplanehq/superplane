@@ -16,7 +16,13 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { CanvasNode } from "@/ui/CanvasPage";
-import type { ActionContext, ComponentBaseMapper, TriggerActionContext, User } from "../mappers/types";
+import type {
+  ActionContext,
+  ComponentBaseMapper,
+  TriggerActionContext,
+  TriggerActionModal,
+  User,
+} from "../mappers/types";
 import { getComponentBaseMapper, getTriggerRenderer } from "../mappers";
 import { buildComponentFallbackCanvasNode, buildTriggerFallbackCanvasNode } from "./canvas-node-fallback";
 
@@ -83,6 +89,7 @@ function buildPreparedTriggerCanvasNode(args: {
   canvasMode?: "live" | "edit";
   canvasId: string;
   queryClient: QueryClient;
+  openModal: (modal: TriggerActionModal) => void;
 }): CanvasNode {
   const {
     node,
@@ -93,6 +100,7 @@ function buildPreparedTriggerCanvasNode(args: {
     canvasMode = "live",
     canvasId,
     queryClient,
+    openModal,
   } = args;
   const renderer = getTriggerRenderer(node.component || "");
   const lastEvent = nodeEventsMap[node.id!]?.[0];
@@ -101,7 +109,7 @@ function buildPreparedTriggerCanvasNode(args: {
     definition: buildComponentDefinition(triggerMetadata),
     lastEvent: buildEventInfo(lastEvent),
     canvasMode,
-    actions: buildTriggerActionContext(queryClient, canvasId, node.id!),
+    actions: buildTriggerActionContext(queryClient, canvasId, node.id!, openModal),
   });
 
   return {
@@ -174,7 +182,7 @@ export function prepareTriggerNode(
   triggers: TriggersTrigger[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   canvasMode: "live" | "edit" = "live",
-  options: { canvasId: string; queryClient: QueryClient },
+  options: { canvasId: string; queryClient: QueryClient; openModal: (modal: TriggerActionModal) => void },
 ): CanvasNode {
   const triggerMetadata = triggers.find((t) => t.name === node.component);
   const displayLabel = getTriggerDisplayLabel(node, triggerMetadata);
@@ -190,6 +198,7 @@ export function prepareTriggerNode(
       canvasMode,
       canvasId: options.canvasId,
       queryClient: options.queryClient,
+      openModal: options.openModal,
     });
   } catch (error) {
     console.error(`[CanvasPage] Failed to prepare trigger node "${node.id}":`, error);
@@ -302,7 +311,12 @@ function buildActionContext(queryClient: QueryClient, canvasId: string, nodeId: 
   };
 }
 
-function buildTriggerActionContext(queryClient: QueryClient, canvasId: string, nodeId: string): TriggerActionContext {
+function buildTriggerActionContext(
+  queryClient: QueryClient,
+  canvasId: string,
+  nodeId: string,
+  openModal: (modal: TriggerActionModal) => void,
+): TriggerActionContext {
   return {
     invokeNodeTriggerHook: async (hookName: string, parameters: unknown) => {
       try {
@@ -324,5 +338,6 @@ function buildTriggerActionContext(queryClient: QueryClient, canvasId: string, n
         showErrorToast(getApiErrorMessage(error, "failed to invoke hook"));
       }
     },
+    openModal,
   };
 }

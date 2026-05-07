@@ -131,8 +131,15 @@ export type ActionContext = {
   invokeNodeExecutionHook: (executionId: string, hook: string, parameters: unknown) => Promise<void>;
 };
 
+export type TriggerActionModal = {
+  title?: ReactNode;
+  description?: ReactNode;
+  content: (ctx: { close: () => void }) => ReactNode;
+};
+
 export type TriggerActionContext = {
   invokeNodeTriggerHook: (hookName: string, parameters: unknown) => Promise<void>;
+  openModal: (modal: TriggerActionModal) => void;
 };
 
 export type SubtitleContext = {
@@ -183,14 +190,6 @@ export interface EventStateRegistry {
  * (via getCustomFieldRenderer) and canvas nodes (via customField prop).
  */
 export interface CustomFieldRendererContext {
-  /**
-   * Open the run/emit-event modal for this node.
-   *
-   * @param initialData Optional JSON string to prefill the payload editor.
-   * @param templateName Reserved for legacy callers; start-trigger template runs use
-   *  {@link TriggerRendererContext.actions} instead.
-   */
-  onRun?: (initialData?: string, templateName?: string) => void;
   /** Full integration object when editing an app trigger/component (e.g. for incident webhook status) */
   integration?: OrganizationsIntegration;
   /** Set when rendering the start trigger manual-run templates on the canvas. */
@@ -203,7 +202,7 @@ export interface CustomFieldRenderer {
   /**
    * Render custom UI for the given node configuration
    * @param node The node from the backend
-   * @param context Optional context (e.g., onRun, integration for app nodes)
+   * @param context Optional context (e.g., actions, integration for app nodes)
    * @returns React node to render
    */
   render(node: NodeInfo, context?: CustomFieldRendererContext): ReactNode;

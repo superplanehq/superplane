@@ -135,7 +135,7 @@ describe("canvas node preparation resilience", () => {
       [{ name: "webhook", label: "Webhook", icon: "bolt" }] as never,
       {},
       "live",
-      { canvasId: "canvas-1", queryClient: new QueryClient() },
+      { canvasId: "canvas-1", queryClient: new QueryClient(), openModal: () => {} },
     );
 
     const triggerData = result.data as { trigger: { error?: string; warning?: string } };

@@ -17,6 +17,7 @@ import {
 
 import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { cn } from "@/lib/utils";
@@ -62,7 +63,6 @@ import type { EventState, EventStateMap } from "../componentBase";
 import { ComponentSidebar } from "../componentSidebar";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
-import { EmitEventModal } from "../EmitEventModal";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
 import "./canvas-reset.css";
@@ -72,6 +72,7 @@ import { RightSideControls } from "./RightSideControls";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
+import type { TriggerActionModal } from "@/pages/workflowv2/mappers/types";
 
 export interface SidebarData {
   latestEvents: SidebarEvent[];
@@ -209,11 +210,7 @@ export interface CanvasPageProps {
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
-  getCustomField?: (
-    nodeId: string,
-    onRun?: (initialData?: string, templateName?: string) => void,
-    integration?: OrganizationsIntegration,
-  ) => (() => React.ReactNode) | null;
+  getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
   onSave?: (nodes: CanvasNode[]) => void;
   integrations?: OrganizationsIntegration[];
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
@@ -243,7 +240,6 @@ export interface CanvasPageProps {
   onCancelQueueItem?: (nodeId: string, queueItemId: string) => void;
   onCancelExecution?: (nodeId: string, executionId: string) => void;
 
-  onRun?: (nodeId: string, channelOrTemplate: string, data: unknown, templateName?: string) => void | Promise<void>;
   onDuplicate?: (nodeId: string) => void;
   onEdit?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
@@ -282,6 +278,7 @@ export interface CanvasPageProps {
 
   // Optional: control and observe component sidebar state
   onSidebarChange?: (isOpen: boolean, selectedNodeId: string | null) => void;
+  onTriggerModalHostReady?: (openModal: (modal: TriggerActionModal) => void) => void;
   initialSidebar?: { isOpen?: boolean; nodeId?: string | null };
   initialFocusNodeId?: string | null;
 
@@ -367,12 +364,13 @@ type CanvasAnnotationUpdate = {
   y?: number;
 };
 
+type CanvasModalRequest = TriggerActionModal;
+
 type CanvasNodeRendererCallbacks = {
   handleNodeClick: (nodeId: string, event?: React.MouseEvent) => void;
   onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
   onNodeEdit: React.MutableRefObject<CanvasPageProps["onEdit"] | undefined>;
   onNodeDelete: React.MutableRefObject<CanvasPageProps["onNodeDelete"] | undefined>;
-  onRun: React.MutableRefObject<((nodeId: string) => void) | undefined>;
   onDuplicate: React.MutableRefObject<CanvasPageProps["onDuplicate"] | undefined>;
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
@@ -523,7 +521,6 @@ function buildInteractiveNodeBlockProps(
     onClick: (event) => callbacks.handleNodeClick(nodeId, event),
     onEdit: getNodeAction(callbacks.onNodeEdit, nodeId),
     onDelete: getNodeAction(callbacks.onNodeDelete, nodeId),
-    onRun: getNodeAction(callbacks.onRun, nodeId),
     onDuplicate: getNodeAction(callbacks.onDuplicate, nodeId),
     onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
     onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
@@ -697,13 +694,16 @@ function CanvasPage(props: CanvasPageProps) {
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
-  const [emitModalData, setEmitModalData] = useState<{
-    nodeId: string;
-    nodeName: string;
-    channels: string[];
-    initialData?: string;
-    templateName?: string;
-  } | null>(null);
+  const [canvasModalRequest, setCanvasModalRequest] = useState<CanvasModalRequest | null>(null);
+  const openCanvasModal = useCallback((modal: CanvasModalRequest) => {
+    setCanvasModalRequest(modal);
+  }, []);
+  const closeCanvasModal = useCallback(() => {
+    setCanvasModalRequest(null);
+  }, []);
+  useEffect(() => {
+    props.onTriggerModalHostReady?.(openCanvasModal);
+  }, [props.onTriggerModalHostReady, openCanvasModal]);
   useEffect(() => {
     if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
       return;
@@ -771,40 +771,6 @@ function CanvasPage(props: CanvasPageProps) {
       }
     },
     [props.onNodeDelete],
-  );
-
-  const handleNodeRun = useCallback(
-    (nodeId?: string, initialData?: string) => {
-      // Hard guard: if running is disabled (e.g., unsaved changes), do nothing
-      if (props.runDisabled) return;
-
-      if (!nodeId) return;
-
-      // Find the node to get its name and channels
-      const node = state.nodes.find((n) => n.id === nodeId);
-      if (!node) return;
-
-      const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
-      const nodeName = nodeData?.label || nodeId;
-      const channels = nodeData?.outputChannels || ["default"];
-
-      setEmitModalData({
-        nodeId,
-        nodeName,
-        channels,
-        initialData,
-      });
-    },
-    [state.nodes, props.runDisabled],
-  );
-
-  const handleEmit = useCallback(
-    async (channel: string, data: unknown) => {
-      if (!emitModalData || !props.onRun) return;
-
-      await props.onRun(emitModalData.nodeId, channel, data, emitModalData.templateName);
-    },
-    [emitModalData, props],
   );
 
   const handleConnectionDropInEmptySpace = useCallback(
@@ -1233,7 +1199,6 @@ function CanvasPage(props: CanvasPageProps) {
               onAutoLayoutNodes={props.onAutoLayoutNodes}
               onEdgeCreate={props.onEdgeCreate}
               onToggleView={handleToggleView}
-              onRun={(nodeId) => handleNodeRun(nodeId)}
               onDuplicate={props.onDuplicate}
               onDeactivate={props.onDeactivate}
               onAnnotationUpdate={props.onAnnotationUpdate}
@@ -1325,21 +1290,15 @@ function CanvasPage(props: CanvasPageProps) {
 
       {/* Edit existing node modal - now handled by settings sidebar */}
 
-      {/* Emit Event Modal */}
-      {emitModalData && (
-        <EmitEventModal
-          isOpen={true}
-          onClose={() => setEmitModalData(null)}
-          nodeId={emitModalData.nodeId}
-          nodeName={emitModalData.nodeName}
-          workflowId={props.organizationId || ""}
-          organizationId={props.organizationId || ""}
-          channels={emitModalData.channels}
-          onEmit={handleEmit}
-          initialData={emitModalData.initialData}
-          templateName={emitModalData.templateName}
-        />
-      )}
+      <Dialog open={!!canvasModalRequest} onOpenChange={(isOpen) => !isOpen && closeCanvasModal()}>
+        <DialogContent className="max-w-3xl max-h-[80vh]">
+          {canvasModalRequest?.title ? <DialogTitle>{canvasModalRequest.title}</DialogTitle> : null}
+          {canvasModalRequest?.description ? (
+            <DialogDescription>{canvasModalRequest.description}</DialogDescription>
+          ) : null}
+          {canvasModalRequest ? canvasModalRequest.content({ close: closeCanvasModal }) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1419,11 +1378,7 @@ function Sidebar({
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
   canvasMode: "live" | "edit";
   organizationId?: string;
-  getCustomField?: (
-    nodeId: string,
-    onRun?: (initialData?: string, templateName?: string) => void,
-    integration?: OrganizationsIntegration,
-  ) => (() => React.ReactNode) | null;
+  getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
   integrations?: OrganizationsIntegration[];
   workflowNodes?: ComponentsNode[];
   components?: SuperplaneActionsAction[];
@@ -1591,7 +1546,6 @@ function Sidebar({
         getCustomField && state.componentSidebar.selectedNodeId
           ? getCustomField(
               state.componentSidebar.selectedNodeId,
-              undefined,
               integrations?.find((i) => i.metadata?.id === editingNodeData?.integrationRef?.id),
             ) || undefined
           : undefined
@@ -1772,7 +1726,6 @@ function CanvasContent({
   onDuplicateNodes,
   onAutoLayoutNodes,
   onEdgeCreate,
-  onRun,
   onDuplicate,
   onDeactivate,
   onTogglePause,
@@ -1824,7 +1777,6 @@ function CanvasContent({
   onDuplicateNodes?: (nodeIds: string[]) => void;
   onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeCreate?: (sourceId: string, targetId: string, sourceHandle?: string | null) => void;
-  onRun?: (nodeId: string) => void;
   onDuplicate?: (nodeId: string) => void;
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
@@ -2075,9 +2027,6 @@ function CanvasContent({
     },
     [workflowNodes, onBuildingBlocksSidebarToggle, onPendingConnectionNodeClick, setCurrentTab, isEditMode],
   );
-
-  const onRunRef = useRef(onRun);
-  onRunRef.current = onRun;
 
   const onNodeEditRef = useRef(onNodeEdit);
   onNodeEditRef.current = onNodeEdit;
@@ -2346,7 +2295,6 @@ function CanvasContent({
     onAppendFromNode: handleAppendFromNode,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
-    onRun: onRunRef,
     onDuplicate: onDuplicateRef,
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
@@ -2364,7 +2312,6 @@ function CanvasContent({
     onAppendFromNode: handleAppendFromNode,
     onNodeEdit: onNodeEditRef,
     onNodeDelete: onNodeDeleteRef,
-    onRun: onRunRef,
     onDuplicate: onDuplicateRef,
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,

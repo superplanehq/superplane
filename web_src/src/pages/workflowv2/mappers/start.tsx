@@ -9,9 +9,12 @@ import type {
 } from "./types";
 import type { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
+import { showErrorToast } from "@/lib/toast";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
+import Editor from "@monaco-editor/react";
 import { Play } from "lucide-react";
 
 interface StartTemplate {
@@ -45,13 +48,10 @@ export const startTriggerRenderer: TriggerRenderer = {
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent, canvasMode, actions } = context;
-
-    const customField = (_onRunBase?: () => void) => {
-      return startCustomFieldRenderer.render(node, {
-        canvasMode: canvasMode ?? "live",
-        actions,
-      });
-    };
+    const customField = startCustomFieldRenderer.render(node, {
+      canvasMode: canvasMode ?? "live",
+      actions,
+    });
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
@@ -111,9 +111,27 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  void actions.invokeNodeTriggerHook("run", {
-                    template: template.name,
-                    payload: payloadForTemplateRun(template),
+                  actions.openModal({
+                    title: "Run trigger",
+                    description: (
+                      <>
+                        Run template <strong>{template.name}</strong> on node{" "}
+                        <strong>{node.name || definitionLabel(node)}</strong>. Edit the payload below to override the
+                        template default.
+                      </>
+                    ),
+                    content: ({ close }) => (
+                      <StartRunModal
+                        initialPayload={payloadForTemplateRun(template)}
+                        onClose={close}
+                        onRun={async (payload) => {
+                          await actions.invokeNodeTriggerHook("run", {
+                            template: template.name,
+                            payload,
+                          });
+                        }}
+                      />
+                    ),
                   });
                 }}
                 className="flex-shrink-0 h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
@@ -127,3 +145,71 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
     );
   },
 };
+
+function definitionLabel(node: NodeInfo): string {
+  return node.name || "Unnamed trigger";
+}
+
+function StartRunModal({
+  initialPayload,
+  onRun,
+  onClose,
+}: {
+  initialPayload: Record<string, unknown>;
+  onRun: (payload: Record<string, unknown>) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [eventData, setEventData] = React.useState<string>(() => JSON.stringify(initialPayload, null, 2));
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const handleSubmit = async () => {
+    let parsedData: Record<string, unknown>;
+    try {
+      const candidate = JSON.parse(eventData) as unknown;
+      if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+        showErrorToast("Payload must be a JSON object");
+        return;
+      }
+      parsedData = candidate as Record<string, unknown>;
+    } catch {
+      showErrorToast("Invalid JSON format");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await onRun(parsedData);
+      onClose();
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="border border-gray-200 dark:border-gray-700 rounded-md overflow-hidden">
+        <Editor
+          height="300px"
+          defaultLanguage="json"
+          value={eventData}
+          onChange={(value) => setEventData(value || "{}")}
+          options={{
+            minimap: { enabled: false },
+            fontSize: 13,
+            lineNumbers: "on",
+            scrollBeyondLastLine: false,
+            automaticLayout: true,
+          }}
+        />
+      </div>
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+          Cancel
+        </Button>
+        <LoadingButton loading={isSubmitting} loadingText="Running..." onClick={handleSubmit}>
+          Run
+        </LoadingButton>
+      </div>
+    </div>
+  );
+}
