@@ -78,7 +78,7 @@ func main() {
 	auth := getenv("AUTH_TOKEN", "")
 	diagTok := getenv("FLEET_DIAGNOSTICS_TOKEN", "")
 	handler := fleetmanager.NewRouter(srv, fleetmanager.RouterOptions{
-		AuthToken:          auth,
+		AuthToken:        auth,
 		DiagnosticsToken: diagTok,
 	})
 
