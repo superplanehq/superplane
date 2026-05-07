@@ -314,6 +314,7 @@ type CanvasNodeQueueItem struct {
 	//
 	RootEventID uuid.UUID
 	RootEvent   *CanvasEvent `gorm:"foreignKey:RootEventID"`
+	RunID       *uuid.UUID
 
 	//
 	// The reference to a CanvasEvent record,
