@@ -1064,13 +1064,14 @@ The On Push trigger starts a workflow execution when code is pushed to a GitHub 
 
 - **Repository**: Select the GitHub repository to monitor
 - **Refs**: Configure which branches/tags to monitor (e.g., `refs/heads/main`, `refs/tags/*`)
+- **Paths** *(optional)*: GitHub Actions–style glob patterns against added, modified, and removed files. Use `!` as a prefix to exclude a path pattern (for example include `billing/**` and exclude `!billing/**/*.md`). If every pattern is an exclude, an implicit include of `**` is used so negation-only lists still work. Older workflows may still store paths as predicate objects: `equals` entries are interpreted as globs; `matches` (regex) entries must be recreated as globs (they are skipped until updated). If the push payload has no usable per-commit file paths, a path filter cannot match and the trigger will not fire. Leave empty to fire on all pushes regardless of paths.
 
 ### Event Data
 
 Each push event includes:
 - **repository**: Repository information
 - **ref**: The branch or tag that was pushed to
-- **commits**: Array of commit information
+- **commits**: Array of commit information (each with `added`, `modified`, `removed` file arrays)
 - **pusher**: Information about who pushed
 - **before/after**: Commit SHAs before and after the push
 
