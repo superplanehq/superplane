@@ -314,6 +314,7 @@ type CanvasNodeQueueItem struct {
 	//
 	RootEventID uuid.UUID
 	RootEvent   *CanvasEvent `gorm:"foreignKey:RootEventID"`
+	RunID       *uuid.UUID
 
 	//
 	// The reference to a CanvasEvent record,
@@ -371,6 +372,21 @@ func CountNodeQueueItemsForRootEventInTransaction(tx *gorm.DB, rootEventID uuid.
 	err := tx.
 		Model(&CanvasNodeQueueItem{}).
 		Where("root_event_id = ?", rootEventID).
+		Count(&count).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func CountNodeQueueItemsForRunInTransaction(tx *gorm.DB, runID uuid.UUID) (int64, error) {
+	var count int64
+
+	err := tx.
+		Model(&CanvasNodeQueueItem{}).
+		Where("run_id = ?", runID).
 		Count(&count).
 		Error
 	if err != nil {
