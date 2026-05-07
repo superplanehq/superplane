@@ -865,7 +865,7 @@ func (c *Client) ListKVNamespaces(accountID string) ([]KVNamespace, error) {
 	for {
 		pageURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces?per_page=100", c.BaseURL, accountID)
 		if cursor != "" {
-			pageURL += "&cursor=" + cursor
+			pageURL += "&cursor=" + url.QueryEscape(cursor)
 		}
 
 		responseBody, err := c.execRequest(http.MethodGet, pageURL, nil)
@@ -909,7 +909,7 @@ func (c *Client) ListKVKeys(accountID, namespaceID string) ([]KVKey, error) {
 	for {
 		pageURL := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s/keys?limit=1000", c.BaseURL, accountID, namespaceID)
 		if cursor != "" {
-			pageURL += "&cursor=" + cursor
+			pageURL += "&cursor=" + url.QueryEscape(cursor)
 		}
 
 		responseBody, err := c.execRequest(http.MethodGet, pageURL, nil)

@@ -32,7 +32,7 @@ type KVNodeMetadata struct {
 }
 
 func resolveKVNamespaceMetadata(ctx core.SetupContext, accountID, namespaceID string) (string, error) {
-	if strings.Contains(namespaceID, "{{") {
+	if strings.Contains(namespaceID, "{{") || strings.Contains(accountID, "{{") {
 		return namespaceID, nil
 	}
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
