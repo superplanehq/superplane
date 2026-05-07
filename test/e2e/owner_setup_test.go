@@ -185,7 +185,7 @@ func (s *ownerSetupSteps) fillInSMTPDetails(host, port, username, password, from
 	s.session.FillIn(q.Locator(`input[placeholder="noreply@example.com"]`), fromEmail)
 
 	if !useTLS {
-		s.session.Click(q.Locator(`input[type="checkbox"]`))
+		s.session.Click(q.Locator(`#owner-setup-smtp-use-tls`))
 	}
 }
 
