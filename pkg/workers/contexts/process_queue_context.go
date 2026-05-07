@@ -98,6 +98,7 @@ func BuildProcessQueueContext(
 			WorkflowID:          queueItem.WorkflowID,
 			NodeID:              node.NodeID,
 			RootEventID:         queueItem.RootEventID,
+			RunID:               queueItem.RunID,
 			EventID:             event.ID,
 			PreviousExecutionID: event.ExecutionID,
 			State:               models.CanvasNodeExecutionStatePending,
