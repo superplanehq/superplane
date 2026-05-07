@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/pkg/pathfilter"
 )
 
 type OnPush struct{}
@@ -16,7 +16,7 @@ type OnPush struct{}
 type OnPushConfiguration struct {
 	Repository string                    `json:"repository" mapstructure:"repository"`
 	Refs       []configuration.Predicate `json:"refs" mapstructure:"refs"`
-	Paths      []configuration.Predicate `json:"paths" mapstructure:"paths"`
+	Paths      []string                  `json:"paths" mapstructure:"paths"`
 }
 
 func (p *OnPush) Name() string {
@@ -45,7 +45,7 @@ func (p *OnPush) Documentation() string {
 
 - **Repository**: Select the GitHub repository to monitor
 - **Refs**: Configure which branches/tags to monitor (e.g., ` + "`refs/heads/main`" + `, ` + "`refs/tags/*`" + `)
-- **Paths** *(optional)*: When set, only fires if at least one added, modified, or removed file matches any configured predicate. Leave empty to fire on all pushes.
+- **Paths** *(optional)*: Glob patterns (GitHub Actions–style) for added, modified, and removed files. Use ` + "`!`" + ` prefix to exclude (for example ` + "`billing/**`" + ` with ` + "`!billing/**/*.md`" + `). Patterns starting only with ` + "`!`" + ` assume an include of ` + "`**`" + `. Lists stored as legacy ref-style predicates still honor ` + "`equals`" + ` values as globs; ` + "`matches`" + ` must be replaced with glob patterns. If the webhook has no per-commit file lists (empty ` + "`commits`" + ` or missing ` + "`added`" + `/` + "`modified`" + `/` + "`removed`" + ` arrays), a configured path filter cannot match and the trigger will not fire. Leave empty to fire on all pushes.
 
 ## Event Data
 
@@ -103,13 +103,16 @@ func (p *OnPush) Configuration() []configuration.Field {
 		{
 			Name:        "paths",
 			Label:       "Paths",
-			Description: "Optional. When set, only fires if at least one added, modified, or removed file matches any predicate. Leave empty to fire on all pushes.",
-			Type:        configuration.FieldTypeAnyPredicateList,
+			Description: "Optional. GitHub Actions–style globs for changed files. Prefix with ! to exclude. Exclude-only lists assume ** (all paths). Leave empty to fire on all pushes.",
+			Type:        configuration.FieldTypeList,
 			Required:    false,
 			Togglable:   true,
 			TypeOptions: &configuration.TypeOptions{
-				AnyPredicateList: &configuration.AnyPredicateListTypeOptions{
-					Operators: configuration.EqualsAndMatchesPredicateOperators,
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Pattern",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
 				},
 			},
 		},
@@ -127,8 +130,8 @@ func (p *OnPush) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	var config OnPushConfiguration
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+	config, err := decodeOnPushConfigurationForStruct(ctx.Configuration)
+	if err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
@@ -150,8 +153,7 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 	ctx = common.WithWebhookLogger(ctx, p.Name())
 	ctx.Logger.Infof("Received GitHub webhook")
 
-	config := OnPushConfiguration{}
-	err := mapstructure.Decode(ctx.Configuration, &config)
+	config, err := decodeOnPushConfigurationForStruct(ctx.Configuration)
 	if err != nil {
 		ctx.Logger.Errorf("Failed to decode configuration: %v", err)
 		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode configuration: %w", err)
@@ -206,13 +208,28 @@ func (p *OnPush) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusOK, nil, nil
 	}
 
-	if len(config.Paths) > 0 {
+	pathPatterns := onPushPathsFromConfiguration(ctx.Configuration, config.Paths, ctx.Logger)
+	pathPatterns = pathfilter.TrimNonEmptyStrings(pathPatterns)
+	if len(pathPatterns) > 0 {
 		changedFiles := extractChangedFiles(data)
-		if !configuration.MatchesAnyPredicateInList(config.Paths, changedFiles) {
+		if !pathfilter.EvaluatePushPathGlobFilter(
+			pathPatterns,
+			changedFiles,
+			func(pat string) {
+				ctx.Logger.Warnf("Invalid path glob syntax (skipping pattern) %q", pat)
+			},
+			func(pat string, err error) {
+				ctx.Logger.Warnf("Path glob match error for pattern %q: %v", pat, err)
+			},
+			func(reason string) {
+				ctx.Logger.Warnf("github.onPush paths: %s", reason)
+			},
+		) {
 			if len(changedFiles) == 0 {
 				ctx.Logger.Infof("Ignoring event - path filter active but no changed files found in payload")
 			} else {
-				ctx.Logger.Infof("Ignoring event - none of %d changed file(s) matched configured path filters", len(changedFiles))
+				ctx.Logger.Infof("Ignoring event - no changed file matched path globs (%d patterns, %d file(s))",
+					len(pathPatterns), len(changedFiles))
 			}
 			return http.StatusOK, nil, nil
 		}

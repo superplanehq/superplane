@@ -23,19 +23,6 @@ var AllPredicateOperators = []FieldOption{
 	},
 }
 
-// EqualsAndMatchesPredicateOperators is for any-predicate-list fields where
-// notEquals is intentionally unsupported (see field TypeOptions).
-var EqualsAndMatchesPredicateOperators = []FieldOption{
-	{
-		Label: "Equals",
-		Value: PredicateTypeEquals,
-	},
-	{
-		Label: "Matches",
-		Value: PredicateTypeMatches,
-	},
-}
-
 type Predicate struct {
 	Type  string `json:"type"`
 	Value string `json:"value"`
