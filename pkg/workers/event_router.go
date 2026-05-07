@@ -178,7 +178,7 @@ func (w *EventRouter) LockAndProcessEvent(logger *log.Entry, event models.Canvas
 		).Publish()
 	}
 
-	if execution == nil {
+	if execution == nil && runID != uuid.Nil {
 		err := messages.NewCanvasRunMessage(event.WorkflowID.String(), runID.String()).Publish()
 		if err != nil {
 			logger.WithError(err).Warnf(
