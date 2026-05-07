@@ -158,6 +158,41 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		assert.Equal(t, draftVersionID, canvas.LiveVersionID.String())
 	})
 
+	t.Run("draft version -> preserves canvas folder assignment", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-draft-in-folder")
+		disableChangeManagementForCanvas(t, r, canvasID)
+
+		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
+		require.NoError(t, err)
+		draftVersionID := createVersionResponse.Version.Metadata.Id
+
+		require.NoError(t, database.Conn().
+			Model(&models.CanvasVersion{}).
+			Where("id = ?", uuid.MustParse(draftVersionID)).
+			Update("name", "publish-draft-in-folder-renamed").
+			Error)
+
+		folder, err := models.CreateCanvasFolder(r.Organization.ID, "Publish Folder", models.CanvasFolderColorBlue)
+		require.NoError(t, err)
+
+		_, err = models.UpdateCanvasFolderMembership(r.Organization.ID, uuid.MustParse(canvasID), &folder.ID)
+		require.NoError(t, err)
+
+		_, err = PublishCanvasVersion(
+			ctx,
+			r.Encryptor, r.Registry,
+			r.Organization.ID.String(), canvasID, draftVersionID,
+			testWebhookBaseURL, r.AuthService,
+		)
+		require.NoError(t, err)
+
+		canvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(canvasID))
+		require.NoError(t, err)
+		require.NotNil(t, canvas.CanvasFolderID)
+		assert.Equal(t, folder.ID, *canvas.CanvasFolderID)
+	})
+
 	t.Run("change management enabled -> direct publish blocked", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-cm-enabled")

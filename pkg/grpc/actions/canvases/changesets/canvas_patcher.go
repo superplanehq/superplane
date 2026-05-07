@@ -243,18 +243,22 @@ func (p *CanvasPatcher) validateIntegration(node *pb.CanvasChangeset_Change_Node
 		return nil, fmt.Errorf("integration is required for %s", node.GetBlock())
 	}
 
-	integration := node.GetIntegrationId()
-	integrationID, err := uuid.Parse(integration)
+	id := node.GetIntegrationId()
+	integrationID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, fmt.Errorf("invalid integration id: %v", err)
 	}
 
-	_, err = models.FindIntegrationInTransaction(p.tx, p.orgID, integrationID)
+	integration, err := models.FindIntegrationInTransaction(p.tx, p.orgID, integrationID)
 	if err != nil {
-		return nil, fmt.Errorf("integration %s not found", node.GetIntegrationId())
+		return nil, fmt.Errorf("integration %s not found", id)
 	}
 
-	return &integration, nil
+	if !integration.HasCapabilityEnabled(node.GetBlock()) {
+		return nil, fmt.Errorf("%s is not enabled for integration %s", node.GetBlock(), integration.InstallationName)
+	}
+
+	return &id, nil
 }
 
 func (p *CanvasPatcher) deleteNode(change *pb.CanvasChangeset_Change) error {

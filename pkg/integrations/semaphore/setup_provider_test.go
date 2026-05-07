@@ -47,13 +47,13 @@ func Test__Semaphore__SetupProvider__OnSecretUpdate(t *testing.T) {
 	s := &SetupProvider{}
 	logger := logger.DiscardLogger()
 
-	props := contexts.NewIntegrationPropertyStorage()
+	intCtx := &contexts.IntegrationContext{}
+	props := intCtx.Properties()
 	require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
 		Name:  "organizationUrl",
 		Value: orgURL,
 	}))
 
-	intCtx := &contexts.IntegrationContext{}
 	secrets := intCtx.Secrets()
 
 	t.Run("unknown secret", func(t *testing.T) {
@@ -169,7 +169,8 @@ func Test__Semaphore__SetupProvider__OnStepSubmit(t *testing.T) {
 	})
 
 	t.Run("selectOrganization success", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
+		intCtx := &contexts.IntegrationContext{}
+		props := intCtx.Properties()
 		orgURL := "https://org.semaphoreci.com"
 		next, err := s.OnStepSubmit(core.SetupStepContext{
 			Step:       core.StepInfo{Name: SetupStepSelectOrganization, Inputs: map[string]any{"organizationUrl": orgURL}},
@@ -189,7 +190,7 @@ func Test__Semaphore__SetupProvider__OnStepSubmit(t *testing.T) {
 
 	t.Run("enterAPIToken validation", func(t *testing.T) {
 		intCtx := &contexts.IntegrationContext{}
-		props := contexts.NewIntegrationPropertyStorage()
+		props := intCtx.Properties()
 		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
 			Name:  "organizationUrl",
 			Value: "https://example.semaphoreci.com",
@@ -231,7 +232,7 @@ func Test__Semaphore__SetupProvider__OnStepSubmit(t *testing.T) {
 
 	t.Run("enterAPIToken ListProjects fails", func(t *testing.T) {
 		intCtx := &contexts.IntegrationContext{}
-		props := contexts.NewIntegrationPropertyStorage()
+		props := intCtx.Properties()
 		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
 			Name:  "organizationUrl",
 			Value: "https://example.semaphoreci.com",
@@ -260,7 +261,7 @@ func Test__Semaphore__SetupProvider__OnStepSubmit(t *testing.T) {
 	t.Run("enterAPIToken success", func(t *testing.T) {
 		intCtx := &contexts.IntegrationContext{}
 		orgURL := "https://good.semaphoreci.com"
-		props := contexts.NewIntegrationPropertyStorage()
+		props := intCtx.Properties()
 		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
 			Name:  "organizationUrl",
 			Value: orgURL,
@@ -312,7 +313,8 @@ func Test__Semaphore__SetupProvider__OnStepRevert(t *testing.T) {
 	})
 
 	t.Run("selectOrganization clears property", func(t *testing.T) {
-		props := contexts.NewIntegrationPropertyStorage()
+		intCtx := &contexts.IntegrationContext{}
+		props := intCtx.Properties()
 		require.NoError(t, props.Create(core.IntegrationPropertyDefinition{
 			Name:  "organizationUrl",
 			Value: "https://example.semaphoreci.com",

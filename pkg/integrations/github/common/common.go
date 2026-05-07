@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -16,6 +15,13 @@ import (
 
 var expressionPlaceholderRegex = regexp.MustCompile(`(?s)\{\{.*?\}\}`)
 
+// IsExpression reports whether the given string contains an expression
+// placeholder (e.g. `{{ ... }}`). Useful in Setup paths to skip strict
+// validation of values that will only be known at execution time.
+func IsExpression(s string) bool {
+	return expressionPlaceholderRegex.MatchString(s)
+}
+
 type Repository struct {
 	ID   int64  `json:"id"`
 	Name string `json:"name"`
@@ -26,7 +32,7 @@ type NodeMetadata struct {
 	Repository *Repository `json:"repository"`
 }
 
-func EnsureRepoInMetadata(ctx core.MetadataWriter, app core.IntegrationContext, configuration any) error {
+func EnsureRepoInMetadata(ctx core.MetadataWriter, integration core.IntegrationContext, httpCtx core.HTTPContext, configuration any) error {
 	var nodeMetadata NodeMetadata
 	err := mapstructure.Decode(ctx.Get(), &nodeMetadata)
 	if err != nil {
@@ -37,56 +43,29 @@ func EnsureRepoInMetadata(ctx core.MetadataWriter, app core.IntegrationContext, 
 	if repository == "" {
 		return fmt.Errorf("repository is required")
 	}
-	if expressionPlaceholderRegex.MatchString(repository) {
+	if IsExpression(repository) {
 		return nil
 	}
-
-	//
-	// Validate that the app has access to this repository
-	//
-	var appMetadata Metadata
-	if err := mapstructure.Decode(app.GetMetadata(), &appMetadata); err != nil {
-		return fmt.Errorf("failed to decode application metadata: %w", err)
-	}
-
-	repoIndex := slices.IndexFunc(appMetadata.Repositories, func(r Repository) bool {
-		return r.Name == repository
-	})
 
 	if nodeMetadata.Repository != nil && nodeMetadata.Repository.Name == repository {
 		return nil
 	}
 
-	// Prefer cached metadata when present (fast path).
-	if repoIndex != -1 {
-		return ctx.Set(NodeMetadata{
-			Repository: &appMetadata.Repositories[repoIndex],
-		})
-	}
-
-	// Cached metadata can be incomplete (pagination, stale cache). If we have enough information,
-	// validate live against GitHub to avoid false rejections.
-	if appMetadata.InstallationID == "" || appMetadata.GitHubApp.ID == 0 || appMetadata.Owner == "" {
-		return fmt.Errorf("repository %s is not accessible to app installation", repository)
-	}
-
-	client, err := NewClient(app, appMetadata.GitHubApp.ID, appMetadata.InstallationID)
+	client, err := NewClient(integration, httpCtx)
 	if err != nil {
-		return fmt.Errorf("failed to initialize GitHub client: %w", err)
+		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	repo, _, err := client.Repositories.Get(context.Background(), appMetadata.Owner, repository)
+	repo, err := client.FindRepository(repository)
 	if err != nil {
-		return fmt.Errorf("repository %s is not accessible to app installation", repository)
+		return fmt.Errorf("failed to find repository: %w", err)
 	}
 
-	live := Repository{
+	return ctx.Set(NodeMetadata{Repository: &Repository{
 		ID:   repo.GetID(),
 		Name: repo.GetName(),
 		URL:  repo.GetHTMLURL(),
-	}
-
-	return ctx.Set(NodeMetadata{Repository: &live})
+	}})
 }
 
 func getRepositoryFromConfiguration(c any) string {

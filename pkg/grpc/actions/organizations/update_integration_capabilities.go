@@ -214,11 +214,11 @@ func handleRequestingCapabilties(tx *gorm.DB, registry *registry.Registry, integ
 		return fmt.Errorf("failed to get setup provider: %v", err)
 	}
 
-	capabilityCtx := contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities)
+	capabilityCtx := contexts.NewCapabilityContext(registry.AllCapabilities(integration.AppName), integration.Capabilities)
 	nextStep, err := setupProvider.OnCapabilityUpdate(core.CapabilityUpdateContext{
 		Logger:       logging.ForIntegration(*integration),
 		Changes:      map[core.IntegrationCapabilityState][]string{core.IntegrationCapabilityStateRequested: capabilities},
-		HTTP:         registry.HTTPContext(),
+		HTTP:         registry.HTTPContextInTransaction(tx),
 		Properties:   contexts.NewIntegrationPropertyStorage(integration),
 		Secrets:      contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 		Capabilities: capabilityCtx,

@@ -22,6 +22,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/templates"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
+	"gorm.io/gorm"
 
 	// Import integrations, components and triggers to register them via init()
 	_ "github.com/superplanehq/superplane/pkg/components/addmemory"
@@ -445,6 +446,17 @@ func Start() {
 			MaxResponseBytes: DefaultMaxHTTPResponseBytes,
 			PolicyResolver: func() (registry.HTTPPolicy, error) {
 				policy, err := networkpolicy.ResolveHTTPPolicy()
+				if err != nil {
+					return registry.HTTPPolicy{}, err
+				}
+
+				return registry.HTTPPolicy{
+					BlockedHosts:    policy.BlockedHosts,
+					PrivateIPRanges: policy.PrivateIPRanges,
+				}, nil
+			},
+			PolicyResolverInTransaction: func(tx *gorm.DB) (registry.HTTPPolicy, error) {
+				policy, err := networkpolicy.ResolveHTTPPolicyInTransaction(tx)
 				if err != nil {
 					return registry.HTTPPolicy{}, err
 				}

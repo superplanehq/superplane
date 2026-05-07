@@ -86,18 +86,19 @@ func (m *MetadataContext) Set(metadata any) error {
 }
 
 type IntegrationContext struct {
-	NewSetupFlow     bool
-	IntegrationID    string
-	Configuration    map[string]any
-	Metadata         any
-	State            string
-	StateDescription string
-	BrowserAction    *core.BrowserAction
-	CurrentSecrets   map[string]core.IntegrationSecret
-	WebhookRequests  []any
-	ResyncRequests   []time.Duration
-	ActionRequests   []ActionRequest
-	Subscriptions    []Subscription
+	NewSetupFlow      bool
+	IntegrationID     string
+	Configuration     map[string]any
+	Metadata          any
+	State             string
+	StateDescription  string
+	BrowserAction     *core.BrowserAction
+	CurrentSecrets    map[string]core.IntegrationSecret
+	CurrentProperties map[string]any
+	WebhookRequests   []any
+	ResyncRequests    []time.Duration
+	ActionRequests    []ActionRequest
+	Subscriptions     []Subscription
 }
 
 type ActionRequest struct {
@@ -222,7 +223,7 @@ func (c *IntegrationContext) LegacySetup() bool {
 }
 
 func (c *IntegrationContext) Properties() core.IntegrationPropertyStorage {
-	return nil
+	return &IntegrationPropertyStorage{parentContext: c}
 }
 
 func (c *IntegrationContext) Secrets() core.IntegrationSecretStorage {
@@ -481,15 +482,15 @@ func (s *IntegrationSecretStorage) Update(name string, value string) error {
 }
 
 type IntegrationPropertyStorage struct {
-	values map[string]any
+	parentContext *IntegrationContext
 }
 
-func NewIntegrationPropertyStorage() *IntegrationPropertyStorage {
-	return &IntegrationPropertyStorage{values: make(map[string]any)}
+func NewIntegrationPropertyStorage(parentContext *IntegrationContext) *IntegrationPropertyStorage {
+	return &IntegrationPropertyStorage{parentContext: parentContext}
 }
 
 func (s *IntegrationPropertyStorage) Get(name string) (any, error) {
-	v, ok := s.values[name]
+	v, ok := s.parentContext.CurrentProperties[name]
 	if !ok {
 		return nil, fmt.Errorf("property not found: %s", name)
 	}
@@ -513,15 +514,18 @@ func (s *IntegrationPropertyStorage) GetString(name string) (string, error) {
 
 func (s *IntegrationPropertyStorage) Delete(names ...string) error {
 	for _, n := range names {
-		delete(s.values, n)
+		delete(s.parentContext.CurrentProperties, n)
 	}
 
 	return nil
 }
 
 func (s *IntegrationPropertyStorage) Create(def core.IntegrationPropertyDefinition) error {
-	s.values[def.Name] = def.Value
+	if len(s.parentContext.CurrentProperties) == 0 {
+		s.parentContext.CurrentProperties = make(map[string]any)
+	}
 
+	s.parentContext.CurrentProperties[def.Name] = def.Value
 	return nil
 }
 
@@ -584,4 +588,8 @@ func (c *CapabilityContext) IsRequested(capabilities ...string) bool {
 
 func (c *CapabilityContext) Requested() []string {
 	return c.RequestedCapabilties
+}
+
+func (c *CapabilityContext) Enabled() []string {
+	return c.EnabledCapabilities
 }
