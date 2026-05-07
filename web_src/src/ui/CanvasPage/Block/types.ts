@@ -52,7 +52,6 @@ export interface BlockInternalData {
 export type CanvasBlockData = BlockData & BlockInternalData;
 
 export type ComponentActionKeys =
-  | "onRun"
   | "runDisabled"
   | "runDisabledTooltip"
   | "onTogglePause"
