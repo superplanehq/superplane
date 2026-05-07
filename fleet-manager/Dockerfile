@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1
 # Context: repository root — docker build -f fleet-manager/Dockerfile .
+# EC2 images must be linux/amd64: docker build --platform linux/amd64 …
 
 FROM golang:1.22-bookworm AS build
 WORKDIR /workspace
