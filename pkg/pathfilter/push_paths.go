@@ -131,18 +131,18 @@ func EvaluatePushPathGlobFilter(
 	return false
 }
 
-// ChangedFilesMatchPushPathGlobs returns true when at least one entry in
+// changedFilesMatchPushPathGlobs returns true when at least one entry in
 // changedFiles satisfies the glob filter described by patterns.
 //
-// Prefer EvaluatePushPathGlobFilter for integrations; this wrapper exists mainly
-// for tests and callers that replicate the legacy API.
+// Unlike EvaluatePushPathGlobFilter with an empty pattern list (which passes
+// every event), an all-blank pattern list after trim returns false.
 //
 // Patterns follow GitHub Actions style for path filters:
 //   - Use glob syntax (see doublestar / bash globstar).
 //   - A pattern starting with "!" is an exclude (the "!" is stripped before matching).
 //   - If every pattern is an exclude, an implicit include of "**" is assumed so
 //     negation-only lists still make sense (e.g. "!docs/**").
-func ChangedFilesMatchPushPathGlobs(patterns []string, changedFiles []string, onBadPattern func(pattern string, err error)) bool {
+func changedFilesMatchPushPathGlobs(patterns []string, changedFiles []string, onBadPattern func(pattern string, err error)) bool {
 	trimmed := TrimNonEmptyStrings(patterns)
 	if len(trimmed) == 0 {
 		return false

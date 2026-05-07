@@ -11,19 +11,19 @@ func Test__TrimNonEmptyStrings(t *testing.T) {
 	assert.Nil(t, TrimNonEmptyStrings([]string{"", "  ", ""}))
 }
 
-func Test__ChangedFilesMatchPushPathGlobs(t *testing.T) {
+func Test__changedFilesMatchPushPathGlobs(t *testing.T) {
 	noLog := func(string, error) {}
 
 	t.Run("empty patterns -> false", func(t *testing.T) {
-		assert.False(t, ChangedFilesMatchPushPathGlobs([]string{}, []string{"a.go"}, noLog))
+		assert.False(t, changedFilesMatchPushPathGlobs([]string{}, []string{"a.go"}, noLog))
 	})
 
 	t.Run("empty changed files -> false", func(t *testing.T) {
-		assert.False(t, ChangedFilesMatchPushPathGlobs([]string{"**"}, []string{}, noLog))
+		assert.False(t, changedFilesMatchPushPathGlobs([]string{"**"}, []string{}, noLog))
 	})
 
 	t.Run("simple include matches", func(t *testing.T) {
-		assert.True(t, ChangedFilesMatchPushPathGlobs(
+		assert.True(t, changedFilesMatchPushPathGlobs(
 			[]string{"pkg/**"},
 			[]string{"pkg/models/x.go"},
 			noLog,
@@ -31,7 +31,7 @@ func Test__ChangedFilesMatchPushPathGlobs(t *testing.T) {
 	})
 
 	t.Run("does not match vendor/pkg as pkg prefix", func(t *testing.T) {
-		assert.False(t, ChangedFilesMatchPushPathGlobs(
+		assert.False(t, changedFilesMatchPushPathGlobs(
 			[]string{"pkg/**"},
 			[]string{"vendor/pkg/foo.go"},
 			noLog,
@@ -39,7 +39,7 @@ func Test__ChangedFilesMatchPushPathGlobs(t *testing.T) {
 	})
 
 	t.Run("exact path", func(t *testing.T) {
-		assert.True(t, ChangedFilesMatchPushPathGlobs(
+		assert.True(t, changedFilesMatchPushPathGlobs(
 			[]string{"go.sum"},
 			[]string{"go.mod", "go.sum"},
 			noLog,
@@ -47,12 +47,12 @@ func Test__ChangedFilesMatchPushPathGlobs(t *testing.T) {
 	})
 
 	t.Run("exclude markdown under billing", func(t *testing.T) {
-		assert.True(t, ChangedFilesMatchPushPathGlobs(
+		assert.True(t, changedFilesMatchPushPathGlobs(
 			[]string{"billing/**", "!billing/**/*.md"},
 			[]string{"billing/service/main.go"},
 			noLog,
 		))
-		assert.False(t, ChangedFilesMatchPushPathGlobs(
+		assert.False(t, changedFilesMatchPushPathGlobs(
 			[]string{"billing/**", "!billing/**/*.md"},
 			[]string{"billing/README.md"},
 			noLog,
@@ -60,12 +60,12 @@ func Test__ChangedFilesMatchPushPathGlobs(t *testing.T) {
 	})
 
 	t.Run("exclude only implies ** include", func(t *testing.T) {
-		assert.True(t, ChangedFilesMatchPushPathGlobs(
+		assert.True(t, changedFilesMatchPushPathGlobs(
 			[]string{"!docs/**"},
 			[]string{"pkg/main.go"},
 			noLog,
 		))
-		assert.False(t, ChangedFilesMatchPushPathGlobs(
+		assert.False(t, changedFilesMatchPushPathGlobs(
 			[]string{"!docs/**"},
 			[]string{"docs/README.md"},
 			noLog,
@@ -73,7 +73,7 @@ func Test__ChangedFilesMatchPushPathGlobs(t *testing.T) {
 	})
 
 	t.Run("trim and skip blank patterns", func(t *testing.T) {
-		assert.True(t, ChangedFilesMatchPushPathGlobs(
+		assert.True(t, changedFilesMatchPushPathGlobs(
 			[]string{"  pkg/**  ", "", " "},
 			[]string{"pkg/x.go"},
 			noLog,
@@ -81,7 +81,7 @@ func Test__ChangedFilesMatchPushPathGlobs(t *testing.T) {
 	})
 
 	t.Run("leading ** matches file at repo root", func(t *testing.T) {
-		assert.True(t, ChangedFilesMatchPushPathGlobs(
+		assert.True(t, changedFilesMatchPushPathGlobs(
 			[]string{"**/foo.go"},
 			[]string{"foo.go"},
 			noLog,
@@ -89,7 +89,7 @@ func Test__ChangedFilesMatchPushPathGlobs(t *testing.T) {
 	})
 
 	t.Run("zero intermediate directories with ** in middle", func(t *testing.T) {
-		assert.True(t, ChangedFilesMatchPushPathGlobs(
+		assert.True(t, changedFilesMatchPushPathGlobs(
 			[]string{"pkg/**/bar.go"},
 			[]string{"pkg/bar.go"},
 			noLog,
