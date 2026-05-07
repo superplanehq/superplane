@@ -361,6 +361,15 @@ func (s *CanvasService) ListCanvasEvents(ctx context.Context, req *pb.ListCanvas
 	return canvases.ListCanvasEvents(ctx, s.registry, canvasID, req.Limit, req.Before)
 }
 
+func (s *CanvasService) ListRuns(ctx context.Context, req *pb.ListRunsRequest) (*pb.ListRunsResponse, error) {
+	canvasID, err := uuid.Parse(req.CanvasId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+	}
+
+	return canvases.ListRuns(ctx, s.registry, canvasID, req.Limit, req.Before)
+}
+
 func (s *CanvasService) ListCanvasMemories(ctx context.Context, req *pb.ListCanvasMemoriesRequest) (*pb.ListCanvasMemoriesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.ListCanvasMemories(ctx, s.registry, organizationID, req.CanvasId)
