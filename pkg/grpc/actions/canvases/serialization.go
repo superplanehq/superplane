@@ -83,6 +83,11 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 		createdBy = &pb.UserRef{Id: user.ID.String(), Name: user.Name}
 	}
 
+	canvasFolderID := ""
+	if canvas.CanvasFolderID != nil {
+		canvasFolderID = canvas.CanvasFolderID.String()
+	}
+
 	if !includeStatus {
 		return &pb.Canvas{
 			Metadata: &pb.Canvas_Metadata{
@@ -94,6 +99,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 				UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 				CreatedBy:      createdBy,
 				IsTemplate:     canvas.IsTemplate,
+				FolderId:       canvasFolderID,
 			},
 			Spec: &pb.Canvas_Spec{
 				Nodes:            serializedNodes,
@@ -146,6 +152,7 @@ func SerializeCanvas(canvas *models.Canvas, includeStatus bool, user *models.Use
 			UpdatedAt:      timestamppb.New(*canvas.UpdatedAt),
 			CreatedBy:      createdBy,
 			IsTemplate:     canvas.IsTemplate,
+			FolderId:       canvasFolderID,
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes:            serializedNodes,
