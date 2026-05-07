@@ -184,7 +184,7 @@ func (c *UpdateOriginRule) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to update origin rule: %w", err)
 	}
 
-	return emitOriginRule(ctx, zoneID, rule)
+	return emitOriginRule(ctx, c.Name(), zoneID, rule)
 }
 
 func (c *UpdateOriginRule) Cancel(ctx core.ExecutionContext) error {

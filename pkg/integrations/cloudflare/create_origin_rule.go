@@ -160,7 +160,7 @@ func (c *CreateOriginRule) Execute(ctx core.ExecutionContext) error {
 			return errors.New("created origin rule not found in response")
 		}
 
-		return emitOriginRule(ctx, zoneID, &ruleset.Rules[len(ruleset.Rules)-1])
+		return emitOriginRule(ctx, c.Name(), zoneID, &ruleset.Rules[len(ruleset.Rules)-1])
 	}
 
 	rule, err := client.CreateOriginRule(zoneID, ruleset.ID, ruleReq)
@@ -168,7 +168,7 @@ func (c *CreateOriginRule) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create origin rule: %w", err)
 	}
 
-	return emitOriginRule(ctx, zoneID, rule)
+	return emitOriginRule(ctx, c.Name(), zoneID, rule)
 }
 
 func (c *CreateOriginRule) Cancel(ctx core.ExecutionContext) error {

@@ -69,8 +69,8 @@ services:
       GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
-      BASE_URL: ${BASE_URL:-http://localhost:8000}
-      WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
+      BASE_URL: ${BASE_URL:-https://b3ef-105-161-141-53.ngrok-free.app}
+      WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-https://b3ef-105-161-141-53.ngrok-free.app}
       ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
       AGENT_ENABLED: ${AGENT_ENABLED:-yes}
       AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://localhost:8090}

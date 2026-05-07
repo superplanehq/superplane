@@ -36,6 +36,17 @@ interface OriginRuleNodeMetadata extends OriginRuleConfiguration {
   rewrites?: string[];
 }
 
+interface OriginRuleActionParameters {
+  host_header?: string;
+  origin?: {
+    host?: string;
+    port?: number;
+  };
+  sni?: {
+    value?: string;
+  };
+}
+
 interface OriginRuleOutput {
   id?: string;
   zoneId?: string;
@@ -44,16 +55,7 @@ interface OriginRuleOutput {
     id?: string;
     expression?: string;
     enabled?: boolean;
-    action_parameters?: {
-      host_header?: string;
-      origin?: {
-        host?: string;
-        port?: number;
-      };
-      sni?: {
-        value?: string;
-      };
-    };
+    action_parameters?: OriginRuleActionParameters;
   };
 }
 
@@ -70,29 +72,13 @@ export const originRuleMapper: ComponentBaseMapper = {
     const nodeMetadata = context.node.metadata as OriginRuleNodeMetadata | undefined;
     const output = getOriginRuleOutput(context);
     const rule = output?.rule;
-    const actionParameters = rule?.action_parameters;
     const details: Record<string, string> = {};
 
     details["Executed At"] = executionTimestamp(context);
-    addDetail(details, "Rule ID", stringOrDash(output?.ruleId || output?.id || rule?.id || configuration?.rule));
+    addDetail(details, "Rule ID", originRuleIdLabel(configuration, output));
     addDetail(details, "Zone", stringOrDash(nodeMetadata?.zoneName));
     addDetail(details, "Match", originRuleMatchLabel(configuration, nodeMetadata, rule?.expression));
-    addDetail(
-      details,
-      "DNS Record",
-      stringOrDash(actionParameters?.origin?.host || configuration?.originHost || nodeMetadata?.originHost),
-    );
-    addDetail(
-      details,
-      "Host Header",
-      stringOrDash(actionParameters?.host_header || configuration?.hostHeader || nodeMetadata?.hostHeader),
-    );
-    addDetail(details, "SNI", stringOrDash(actionParameters?.sni?.value || configuration?.sni || nodeMetadata?.sni));
-    addDetail(
-      details,
-      "Destination Port",
-      stringOrDash(actionParameters?.origin?.port ?? configuration?.originPort ?? nodeMetadata?.originPort),
-    );
+    addOriginRewriteDetails(details, configuration, nodeMetadata, rule?.action_parameters);
     addDetail(details, "Enabled", booleanLabel(rule?.enabled ?? configuration?.enabled ?? nodeMetadata?.enabled));
 
     return details;
@@ -108,19 +94,47 @@ function originRuleMetadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as OriginRuleConfiguration | undefined;
   const nodeMetadata = node.metadata as OriginRuleNodeMetadata | undefined;
 
+  addOriginRuleLocationMetadata(metadata, configuration, nodeMetadata);
+  addOriginRuleMatchMetadata(metadata, configuration, nodeMetadata);
+  addOriginRuleRewriteMetadata(metadata, configuration, nodeMetadata);
+  addOriginRuleEnabledMetadata(metadata, configuration, nodeMetadata);
+
+  return metadata.slice(0, 3);
+}
+
+function addOriginRuleLocationMetadata(
+  metadata: MetadataItem[],
+  configuration?: OriginRuleConfiguration,
+  nodeMetadata?: OriginRuleNodeMetadata,
+): void {
   const zoneName = nodeMetadata?.zoneName;
   const rule = configuration?.rule || nodeMetadata?.rule;
   if (zoneName) {
     metadata.push({ icon: "globe", label: zoneName });
-  } else if (rule) {
-    metadata.push({ icon: "route", label: truncate(rule, 72) });
+    return;
   }
 
+  if (rule) {
+    metadata.push({ icon: "route", label: truncate(rule, 72) });
+  }
+}
+
+function addOriginRuleMatchMetadata(
+  metadata: MetadataItem[],
+  configuration?: OriginRuleConfiguration,
+  nodeMetadata?: OriginRuleNodeMetadata,
+): void {
   const match = originRuleMatchLabel(configuration, nodeMetadata);
   if (match !== "-") {
     metadata.push({ icon: "list-filter", label: match });
   }
+}
 
+function addOriginRuleRewriteMetadata(
+  metadata: MetadataItem[],
+  configuration?: OriginRuleConfiguration,
+  nodeMetadata?: OriginRuleNodeMetadata,
+): void {
   const originHost = configuration?.originHost || nodeMetadata?.originHost;
   if (originHost) {
     metadata.push({ icon: "server", label: `DNS: ${originHost}` });
@@ -130,13 +144,17 @@ function originRuleMetadataList(node: NodeInfo): MetadataItem[] {
   if (rewrites.length > 0) {
     metadata.push({ icon: "shuffle", label: rewrites.join(", ") });
   }
+}
 
+function addOriginRuleEnabledMetadata(
+  metadata: MetadataItem[],
+  configuration?: OriginRuleConfiguration,
+  nodeMetadata?: OriginRuleNodeMetadata,
+): void {
   const enabled = configuration?.enabled ?? nodeMetadata?.enabled;
   if (enabled !== undefined) {
     metadata.push({ icon: "power", label: enabled ? "Enabled" : "Disabled" });
   }
-
-  return metadata.slice(0, 3);
 }
 
 function getOriginRuleOutput(context: ExecutionDetailsContext): OriginRuleOutput | undefined {
@@ -154,17 +172,13 @@ function originRuleMatchLabel(
   nodeMetadata?: OriginRuleNodeMetadata,
   expression?: string,
 ): string {
-  if (configuration?.matchMode === "all" || nodeMetadata?.matchMode === "all" || expression === "true") {
+  if (isOriginRuleMatchAll(configuration, nodeMetadata, expression)) {
     return "All incoming requests";
   }
 
-  const rules = configuration?.matchRules;
-  if (Array.isArray(rules) && rules.length > 0) {
-    const preview = rules.slice(0, 2).map(formatMatchRule).filter(Boolean);
-    if (preview.length > 0) {
-      const suffix = rules.length > 2 ? ` +${rules.length - 2}` : "";
-      return `${preview.join(" / ")}${suffix}`;
-    }
+  const rulesLabel = originRuleMatchRulesLabel(configuration?.matchRules);
+  if (rulesLabel) {
+    return rulesLabel;
   }
 
   const resolvedExpression = expression || nodeMetadata?.expression || configuration?.expression;
@@ -173,6 +187,28 @@ function originRuleMatchLabel(
   }
 
   return "-";
+}
+
+function isOriginRuleMatchAll(
+  configuration?: OriginRuleConfiguration,
+  nodeMetadata?: OriginRuleNodeMetadata,
+  expression?: string,
+): boolean {
+  return configuration?.matchMode === "all" || nodeMetadata?.matchMode === "all" || expression === "true";
+}
+
+function originRuleMatchRulesLabel(rules?: OriginRuleMatchRule[]): string {
+  if (!Array.isArray(rules) || rules.length === 0) {
+    return "";
+  }
+
+  const preview = rules.slice(0, 2).map(formatMatchRule).filter(Boolean);
+  if (preview.length === 0) {
+    return "";
+  }
+
+  const suffix = rules.length > 2 ? ` +${rules.length - 2}` : "";
+  return `${preview.join(" / ")}${suffix}`;
 }
 
 function formatMatchRule(rule: OriginRuleMatchRule): string {
@@ -243,8 +279,56 @@ function originRuleRewriteLabels(
   return rewrites;
 }
 
+function originRuleIdLabel(configuration?: OriginRuleConfiguration, output?: OriginRuleOutput): string {
+  return stringOrDash(output?.ruleId || output?.id || output?.rule?.id || configuration?.rule);
+}
+
+function addOriginRewriteDetails(
+  details: Record<string, string>,
+  configuration?: OriginRuleConfiguration,
+  nodeMetadata?: OriginRuleNodeMetadata,
+  actionParameters?: OriginRuleActionParameters,
+): void {
+  addDetail(details, "DNS Record", originRuleDnsRecordLabel(configuration, nodeMetadata, actionParameters));
+  addDetail(details, "Host Header", originRuleHostHeaderLabel(configuration, nodeMetadata, actionParameters));
+  addDetail(details, "SNI", originRuleSniLabel(configuration, nodeMetadata, actionParameters));
+  addDetail(details, "Destination Port", originRulePortLabel(configuration, nodeMetadata, actionParameters));
+}
+
+function originRuleDnsRecordLabel(
+  configuration?: OriginRuleConfiguration,
+  nodeMetadata?: OriginRuleNodeMetadata,
+  actionParameters?: OriginRuleActionParameters,
+): string {
+  return stringOrDash(actionParameters?.origin?.host || configuration?.originHost || nodeMetadata?.originHost);
+}
+
+function originRuleHostHeaderLabel(
+  configuration?: OriginRuleConfiguration,
+  nodeMetadata?: OriginRuleNodeMetadata,
+  actionParameters?: OriginRuleActionParameters,
+): string {
+  return stringOrDash(actionParameters?.host_header || configuration?.hostHeader || nodeMetadata?.hostHeader);
+}
+
+function originRuleSniLabel(
+  configuration?: OriginRuleConfiguration,
+  nodeMetadata?: OriginRuleNodeMetadata,
+  actionParameters?: OriginRuleActionParameters,
+): string {
+  return stringOrDash(actionParameters?.sni?.value || configuration?.sni || nodeMetadata?.sni);
+}
+
+function originRulePortLabel(
+  configuration?: OriginRuleConfiguration,
+  nodeMetadata?: OriginRuleNodeMetadata,
+  actionParameters?: OriginRuleActionParameters,
+): string {
+  return stringOrDash(actionParameters?.origin?.port ?? configuration?.originPort ?? nodeMetadata?.originPort);
+}
+
 function addDetail(details: Record<string, string>, key: string, value: string): void {
-  if (Object.keys(details).length >= 6 || value === "-") {
+  if (Object.keys(details).length >= 10 || value === "-") {
     return;
   }
 

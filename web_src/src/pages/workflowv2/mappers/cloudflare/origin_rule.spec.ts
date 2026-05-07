@@ -122,9 +122,13 @@ describe("cloudflare origin rule mapper", () => {
                     expression: "true",
                     enabled: true,
                     action_parameters: {
+                      host_header: "api.example.com",
                       origin: {
                         host: "api-origin.example.com",
                         port: 8443,
+                      },
+                      sni: {
+                        value: "tls.example.com",
                       },
                     },
                   },
@@ -141,6 +145,10 @@ describe("cloudflare origin rule mapper", () => {
     expect(details["Executed At"]).toBe(new Date("2026-05-06T12:00:00Z").toLocaleString());
     expect(details["Zone"]).toBe("example.com");
     expect(details["DNS Record"]).toBe("api-origin.example.com");
+    expect(details["Host Header"]).toBe("api.example.com");
+    expect(details["SNI"]).toBe("tls.example.com");
+    expect(details["Destination Port"]).toBe("8443");
+    expect(details["Enabled"]).toBe("Yes");
   });
 
   it("uses wrapped example-output style payload data for details", () => {

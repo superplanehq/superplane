@@ -135,7 +135,7 @@ func (c *DeleteOriginRule) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to delete origin rule: %w", err)
 	}
 
-	return emitOriginRule(ctx, zoneID, deleted)
+	return emitOriginRule(ctx, c.Name(), zoneID, deleted)
 }
 
 func (c *DeleteOriginRule) Cancel(ctx core.ExecutionContext) error {

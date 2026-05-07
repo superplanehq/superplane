@@ -171,7 +171,7 @@ func Test__CreateOriginRule__Execute(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.True(t, execState.Passed)
-		assert.Equal(t, OriginRulePayloadType, execState.Type)
+		assert.Equal(t, "cloudflare.createOriginRule", execState.Type)
 		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t, "https://api.cloudflare.com/client/v4/zones/zone123/rulesets/phases/http_request_origin/entrypoint", httpContext.Requests[0].URL.String())
 		assert.Equal(t, "https://api.cloudflare.com/client/v4/zones/zone123/rulesets/ruleset123/rules", httpContext.Requests[1].URL.String())

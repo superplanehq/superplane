@@ -13,7 +13,6 @@ import (
 )
 
 const (
-	OriginRulePayloadType = "cloudflare.originRule"
 	originRulePhase       = "http_request_origin"
 	originRuleMatchAll    = "all"
 	originRuleMatchCustom = "custom"
@@ -614,8 +613,8 @@ func isCloudflareNotFound(err error) bool {
 	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
 }
 
-func emitOriginRule(ctx core.ExecutionContext, zoneID string, rule *OriginRule) error {
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, OriginRulePayloadType, []any{
+func emitOriginRule(ctx core.ExecutionContext, payloadType, zoneID string, rule *OriginRule) error {
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, payloadType, []any{
 		map[string]any{
 			"id":     rule.ID,
 			"zoneId": zoneID,
