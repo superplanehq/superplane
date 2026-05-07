@@ -247,7 +247,11 @@ func userDataScript(c Config) string {
 	b.WriteString("if [ -z \"$IID\" ]; then IID=$(curl -sf --max-time 3 \"$IMDS/latest/meta-data/instance-id\") || IID=\"unknown-host\"; fi\n")
 	b.WriteString("apt-get update -qy\n")
 	if strings.TrimSpace(c.RunnerS3URI) != "" {
-		b.WriteString("apt-get install -qy ca-certificates curl docker.io awscli\n")
+		// Noble: no usable awscli deb in default mirrors; CLI v2 bundle (paths must stay root — user-data).
+		b.WriteString("apt-get install -qy ca-certificates curl docker.io unzip\n")
+		b.WriteString("curl -fsSL \"https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip\" -o /tmp/awscliv2.zip\n")
+		b.WriteString("unzip -q /tmp/awscliv2.zip -d /tmp\n")
+		b.WriteString("/tmp/aws/install --update\n")
 	} else {
 		b.WriteString("apt-get install -qy ca-certificates curl docker.io\n")
 	}

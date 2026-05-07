@@ -16,7 +16,11 @@ blocks:
       jobs:
         - name: build and s3 cp
           commands:
-            - sudo apt-get update -qy && sudo apt-get install -qy awscli
+            # ubuntu2404 noble: awscli apt package missing; AWS CLI v2 official bundle
+            - sudo apt-get update -qy && sudo apt-get install -qy curl unzip
+            - curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+            - unzip -q /tmp/awscliv2.zip -d /tmp
+            - sudo /tmp/aws/install --update
             - checkout
             - sem-version go 1.22
             - cache restore
