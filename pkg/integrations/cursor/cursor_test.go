@@ -171,6 +171,97 @@ func Test__Cursor__Sync(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "admin key verification failed")
 	})
+
+	t.Run("new setup flow reads secrets and verifies launch key", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"agents":[]}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			NewSetupFlow: true,
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				"launchAgentKey": {Name: "launchAgentKey", Value: []byte("test-cloud-agent-key")},
+			},
+		}
+
+		err := c.Sync(core.SyncContext{
+			Configuration: map[string]any{},
+			HTTP:          httpContext,
+			Integration:   integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationCtx.State)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://api.cursor.com/v0/agents?limit=1", httpContext.Requests[0].URL.String())
+	})
+
+	t.Run("new setup flow verifies admin key only", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"data":[]}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			NewSetupFlow: true,
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				"adminKey": {Name: "adminKey", Value: []byte("test-admin-key")},
+			},
+		}
+
+		err := c.Sync(core.SyncContext{
+			Configuration: map[string]any{},
+			HTTP:          httpContext,
+			Integration:   integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationCtx.State)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "https://api.cursor.com/teams/daily-usage-data", httpContext.Requests[0].URL.String())
+	})
+
+	t.Run("new setup flow verifies both keys when both secrets present", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"agents":[]}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"data":[]}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			NewSetupFlow: true,
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				"launchAgentKey": {Name: "launchAgentKey", Value: []byte("test-cloud-agent-key")},
+				"adminKey":       {Name: "adminKey", Value: []byte("test-admin-key")},
+			},
+		}
+
+		err := c.Sync(core.SyncContext{
+			Configuration: map[string]any{},
+			HTTP:          httpContext,
+			Integration:   integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "ready", integrationCtx.State)
+		require.Len(t, httpContext.Requests, 2)
+	})
 }
 
 func Test__Cursor__Components(t *testing.T) {

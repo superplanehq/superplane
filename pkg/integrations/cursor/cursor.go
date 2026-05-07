@@ -2,6 +2,7 @@ package cursor
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -10,7 +11,9 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("cursor", &Cursor{})
+	registry.RegisterIntegrationWithOptions("cursor", &Cursor{}, registry.IntegrationRegistrationOptions{
+		SetupProvider: &SetupProvider{},
+	})
 }
 
 type Cursor struct{}
@@ -37,7 +40,7 @@ func (i *Cursor) Description() string {
 }
 
 func (i *Cursor) Instructions() string {
-	return "To get your API keys, visit the [Cursor Dashboard](https://cursor.com/dashboard). You may need separate keys for Agents and Admin features."
+	return "To get your API keys, visit the [Cursor Dashboard](https://cursor.com/dashboard)."
 }
 
 func (i *Cursor) Configuration() []configuration.Field {
@@ -62,13 +65,29 @@ func (i *Cursor) Configuration() []configuration.Field {
 }
 
 func (i *Cursor) Sync(ctx core.SyncContext) error {
-	config := Configuration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %v", err)
-	}
+	if ctx.Integration.LegacySetup() {
+		config := Configuration{}
+		if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+			return fmt.Errorf("failed to decode configuration: %v", err)
+		}
 
-	if config.LaunchAgentKey == "" && config.AdminKey == "" {
-		return fmt.Errorf("one of the keys is required")
+		if config.LaunchAgentKey == "" && config.AdminKey == "" {
+			return fmt.Errorf("one of the keys is required")
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return err
+		}
+
+		verifyLaunch := strings.TrimSpace(config.LaunchAgentKey) != ""
+		verifyAdmin := strings.TrimSpace(config.AdminKey) != ""
+		if err := verifyCursorCredentials(ctx.HTTP, client.LaunchAgentKey, client.AdminKey, verifyLaunch, verifyAdmin); err != nil {
+			return err
+		}
+
+		ctx.Integration.Ready()
+		return nil
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -76,16 +95,14 @@ func (i *Cursor) Sync(ctx core.SyncContext) error {
 		return err
 	}
 
-	if config.LaunchAgentKey != "" {
-		if err := client.VerifyLaunchAgent(); err != nil {
-			return fmt.Errorf("cloud agent key verification failed: %w", err)
-		}
+	verifyLaunch := strings.TrimSpace(client.LaunchAgentKey) != ""
+	verifyAdmin := strings.TrimSpace(client.AdminKey) != ""
+	if !verifyLaunch && !verifyAdmin {
+		return fmt.Errorf("one of the keys is required")
 	}
 
-	if config.AdminKey != "" {
-		if err := client.VerifyAdmin(); err != nil {
-			return fmt.Errorf("admin key verification failed: %w", err)
-		}
+	if err := verifyCursorCredentials(ctx.HTTP, client.LaunchAgentKey, client.AdminKey, verifyLaunch, verifyAdmin); err != nil {
+		return err
 	}
 
 	ctx.Integration.Ready()
