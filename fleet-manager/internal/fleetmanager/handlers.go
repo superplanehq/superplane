@@ -205,7 +205,7 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 				s.Log.Warn("terminate runner instance after task failed",
 					slog.String("instance_id", instanceID), slog.Any("err", err))
 			} else if s.Log != nil {
-				s.Log.Info("terminate runner instance after task scheduled", slog.String("instance_id", instanceID))
+				s.Log.Info("terminate runner instance after task (ec2 shutdown)", slog.String("instance_id", instanceID))
 			}
 		}(runnerID)
 	}
