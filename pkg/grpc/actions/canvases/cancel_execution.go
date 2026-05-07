@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -59,6 +60,11 @@ func CancelExecution(ctx context.Context, authService authorization.Authorizatio
 
 	if err != nil {
 		return nil, err
+	}
+
+	messages.NewCanvasExecutionMessage(workflowID.String(), execution.ID.String(), execution.NodeID).Publish()
+	if execution.RunID != nil {
+		messages.NewCanvasRunMessage(workflowID.String(), execution.RunID.String()).Publish()
 	}
 
 	return &pb.CancelExecutionResponse{}, nil
