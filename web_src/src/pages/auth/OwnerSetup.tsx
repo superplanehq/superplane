@@ -341,9 +341,11 @@ const OwnerSetup: React.FC = () => {
               )}
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Saving..." : "Next"}
-            </Button>
+            <div className="flex justify-end">
+              <Button type="submit" className="w-36" disabled={loading}>
+                {loading ? "Saving..." : "Next"}
+              </Button>
+            </div>
           </form>
         )}
 
@@ -385,11 +387,11 @@ const OwnerSetup: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Button type="button" variant="outline" disabled={loading} onClick={handlePrivateNetworkBack}>
                 Back
               </Button>
-              <Button type="button" className="flex-1" disabled={loading} onClick={handlePrivateNetworkNext}>
+              <Button type="button" className="ml-auto w-36" disabled={loading} onClick={handlePrivateNetworkNext}>
                 Next
               </Button>
             </div>
@@ -411,16 +413,19 @@ const OwnerSetup: React.FC = () => {
               </Text>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Button type="button" variant="outline" disabled={loading} onClick={handleSMTPPromptBack}>
                 Back
               </Button>
-              <Button type="button" disabled={loading} onClick={handleEnableSMTP}>
-                Set up SMTP
-              </Button>
-              <Button type="button" variant="outline" disabled={loading} onClick={handleSkipSMTP}>
-                Do this later
-              </Button>
+
+              <div className="ml-auto flex flex-wrap justify-end gap-3">
+                <Button type="button" className="w-36" disabled={loading} onClick={handleEnableSMTP}>
+                  Set up SMTP
+                </Button>
+                <Button type="button" className="w-36" variant="outline" disabled={loading} onClick={handleSkipSMTP}>
+                  Do this later
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -541,16 +546,18 @@ const OwnerSetup: React.FC = () => {
               Use TLS (STARTTLS)
             </Label>
 
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Button type="button" variant="outline" disabled={loading} onClick={handleSMTPConfigBack}>
                 Back
               </Button>
-              <Button type="button" variant="outline" disabled={loading} onClick={handleSkipSMTP}>
-                Do this later
-              </Button>
-              <Button type="submit" className="flex-1" disabled={loading}>
-                {loading ? "Saving..." : "Finish setup"}
-              </Button>
+              <div className="ml-auto flex flex-wrap justify-end gap-3">
+                <Button type="button" className="w-36" variant="outline" disabled={loading} onClick={handleSkipSMTP}>
+                  Do this later
+                </Button>
+                <Button type="submit" className="w-36" disabled={loading}>
+                  {loading ? "Saving..." : "Finish setup"}
+                </Button>
+              </div>
             </div>
           </form>
         )}
