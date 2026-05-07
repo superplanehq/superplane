@@ -104,7 +104,7 @@ import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-fie
 import { getVersionActionAvailability } from "./lib/version-action-state";
 import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
-import type { User } from "./mappers/types";
+import type { TriggerActionModal, User } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasYaml } from "./useCanvasYaml";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
@@ -1812,6 +1812,21 @@ export function WorkflowPageV2() {
     return integrationsByName;
   }, [integrations]);
   const canvasMode = hasEditableVersion ? "edit" : "live";
+  const triggerModalHostRef = useRef<((modal: TriggerActionModal) => void) | undefined>(undefined);
+  const runDisabledRef = useRef(false);
+  const runDisabledTooltipRef = useRef<string | undefined>(undefined);
+  const registerTriggerModalHost = useCallback((openModal: (modal: TriggerActionModal) => void) => {
+    triggerModalHostRef.current = openModal;
+  }, []);
+  const openTriggerModal = useCallback((modal: TriggerActionModal) => {
+    if (runDisabledRef.current) {
+      if (runDisabledTooltipRef.current) {
+        showErrorToast(runDisabledTooltipRef.current);
+      }
+      return;
+    }
+    triggerModalHostRef.current?.(modal);
+  }, []);
 
   const { nodes: preparedNodes, edges } = useMemo(() => {
     if (!canvas || canvasLoading || triggersLoading || componentsLoading || integrationsLoading) {
@@ -1829,6 +1844,7 @@ export function WorkflowPageV2() {
       queryClient,
       me,
       canvasMode,
+      openTriggerModal,
     );
   }, [
     canvas,
@@ -1846,6 +1862,7 @@ export function WorkflowPageV2() {
     organizationId,
     me,
     canvasMode,
+    openTriggerModal,
   ]);
 
   const nodesWithIntegrationStatus = useMemo(
@@ -3916,7 +3933,7 @@ export function WorkflowPageV2() {
     [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
-  const handleRun = useCallback(
+  const handleEmitNodeEvent = useCallback(
     async (nodeId: string, channel: string, data: any) => {
       if (!canvasId) return;
 
@@ -3933,7 +3950,7 @@ export function WorkflowPageV2() {
             },
           }),
         );
-        // Note: Success toast is shown by EmitEventModal
+
         const node = canvasNodesById.get(nodeId);
         if (node && organizationId) {
           const { nodeType, integration } = getNodeAnalyticsProps(node, availableIntegrations);
@@ -3941,7 +3958,7 @@ export function WorkflowPageV2() {
         }
       } catch (error) {
         showErrorToast("Failed to emit event");
-        throw error; // Re-throw to let EmitEventModal handle it
+        throw error;
       }
     },
     [canvasId, canvasNodesById, availableIntegrations, organizationId],
@@ -4007,9 +4024,9 @@ export function WorkflowPageV2() {
       if (!nodeEvents) return;
       const eventToReemit = nodeEvents.find((event) => event.id === eventOrExecutionId);
       if (!eventToReemit) return;
-      handleRun(nodeId, eventToReemit.channel || "", eventToReemit.data);
+      handleEmitNodeEvent(nodeId, eventToReemit.channel || "", eventToReemit.data);
     },
-    [handleRun, visibleNodeEventsMap],
+    [handleEmitNodeEvent, visibleNodeEventsMap],
   );
 
   const handleNodeDuplicate = useCallback(
@@ -4995,7 +5012,7 @@ export function WorkflowPageV2() {
   );
 
   const getCustomField = useCallback(
-    (nodeId: string, onRun?: (initialData?: string) => void, integration?: OrganizationsIntegration) => {
+    (nodeId: string, integration?: OrganizationsIntegration) => {
       const node = canvasNodesById.get(nodeId);
       if (!node) return null;
 
@@ -5010,10 +5027,11 @@ export function WorkflowPageV2() {
       if (!renderer) return null;
 
       const context: {
-        onRun?: (initialData?: string) => void;
         integration?: OrganizationsIntegration;
-      } = onRun ? { onRun } : {};
-      if (integration) context.integration = integration;
+      } = {};
+      if (integration) {
+        context.integration = integration;
+      }
 
       // Return a function that takes the current configuration
       return (configuration?: Record<string, unknown>) => {
@@ -5329,6 +5347,8 @@ export function WorkflowPageV2() {
             : hasRunBlockingChanges
               ? "Save canvas changes before running"
               : undefined;
+  runDisabledRef.current = runDisabled;
+  runDisabledTooltipRef.current = runDisabledTooltip;
 
   return (
     <>
@@ -5341,6 +5361,7 @@ export function WorkflowPageV2() {
             nodeId: searchParams.get("node") || null,
           }}
           onSidebarChange={handleSidebarChange}
+          onTriggerModalHostReady={registerTriggerModalHost}
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || (isTemplate ? "Template" : "Canvas")}
           headerBanner={headerBanner}
           canvasStateMode={canvasStateMode}
@@ -5382,7 +5403,6 @@ export function WorkflowPageV2() {
           onNodePositionChange={!isReadOnly ? handleNodePositionChange : undefined}
           onNodesPositionChange={!isReadOnly ? handleNodesPositionChange : undefined}
           onToggleView={!isReadOnly ? handleNodeCollapseChange : undefined}
-          onRun={isViewingLiveVersion ? handleRun : undefined}
           onTogglePause={!isReadOnly && isViewingLiveVersion ? handleTogglePause : undefined}
           onDuplicate={!isReadOnly ? handleNodeDuplicate : undefined}
           buildingBlocks={buildingBlocks}
@@ -5723,6 +5743,7 @@ function prepareData(
   queryClient: QueryClient,
   user?: SuperplaneMeUser | null,
   canvasMode: "live" | "edit" = "live",
+  openModal?: (modal: TriggerActionModal) => void,
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -5747,6 +5768,7 @@ function prepareData(
           currentUser,
           workflowEdges,
           canvasMode,
+          openModal,
         );
       })
       .map((node) => ({
@@ -5770,10 +5792,15 @@ function prepareNode(
   currentUser?: User,
   edges?: ComponentsEdge[],
   canvasMode: "live" | "edit" = "live",
+  openModal?: (modal: TriggerActionModal) => void,
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
-      return prepareTriggerNode(node, triggers, nodeEventsMap, canvasMode);
+      return prepareTriggerNode(node, triggers, nodeEventsMap, canvasMode, {
+        canvasId: workflowId,
+        queryClient,
+        openModal: (modal) => openModal?.(modal),
+      });
     case "TYPE_WIDGET":
       return prepareAnnotationNode(node);
 
