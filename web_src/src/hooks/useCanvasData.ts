@@ -629,16 +629,107 @@ export const useDeleteCanvasFolder = (organizationId: string) => {
   });
 };
 
+type UpdateCanvasFolderMembershipInput = {
+  folderId: string;
+  title: string;
+  backgroundColor: CanvasFolderColor;
+  canvasIds: string[];
+};
+
+type CanvasMetadataWithFolder = CanvasesCanvas["metadata"] & {
+  folderId?: string;
+};
+
+function updateCanvasListFolderMembership(
+  canvases: CanvasesCanvas[] | undefined,
+  data: UpdateCanvasFolderMembershipInput,
+) {
+  if (!canvases) {
+    return canvases;
+  }
+
+  const targetCanvasIds = new Set(data.canvasIds);
+
+  return canvases.map((canvas) => {
+    const metadata = canvas.metadata as CanvasMetadataWithFolder | undefined;
+    const canvasId = metadata?.id;
+    if (!canvasId) {
+      return canvas;
+    }
+
+    if (targetCanvasIds.has(canvasId)) {
+      return {
+        ...canvas,
+        metadata: {
+          ...metadata,
+          folderId: data.folderId,
+        },
+      };
+    }
+
+    if (metadata.folderId !== data.folderId) {
+      return canvas;
+    }
+
+    return {
+      ...canvas,
+      metadata: {
+        ...metadata,
+        folderId: undefined,
+      },
+    };
+  });
+}
+
+function updateCanvasFolderListMembership(
+  folders: CanvasFoldersCanvasFolder[] | undefined,
+  data: UpdateCanvasFolderMembershipInput,
+) {
+  if (!folders) {
+    return folders;
+  }
+
+  const targetCanvasIds = new Set(data.canvasIds);
+
+  return folders.map((folder) => {
+    const folderId = folder.metadata?.id;
+    if (!folderId) {
+      return folder;
+    }
+
+    if (folderId === data.folderId) {
+      return {
+        ...folder,
+        spec: {
+          ...folder.spec,
+          title: data.title,
+          backgroundColor: data.backgroundColor,
+          canvases: data.canvasIds.map((id) => ({ id })),
+        },
+      };
+    }
+
+    const canvases = folder.spec?.canvases || [];
+    const nextCanvases = canvases.filter((canvas) => !canvas.id || !targetCanvasIds.has(canvas.id));
+    if (nextCanvases.length === canvases.length) {
+      return folder;
+    }
+
+    return {
+      ...folder,
+      spec: {
+        ...folder.spec,
+        canvases: nextCanvases,
+      },
+    };
+  });
+}
+
 export const useUpdateCanvasFolderMembership = (organizationId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: {
-      folderId: string;
-      title: string;
-      backgroundColor: CanvasFolderColor;
-      canvasIds: string[];
-    }) => {
+    mutationFn: async (data: UpdateCanvasFolderMembershipInput) => {
       return await canvasFoldersUpdateCanvasFolder(
         withOrganizationHeader({
           organizationId,
@@ -656,7 +747,37 @@ export const useUpdateCanvasFolderMembership = (organizationId: string) => {
         }),
       );
     },
-    onSuccess: () => {
+    onMutate: async (data) => {
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: canvasKeys.list(organizationId) }),
+        queryClient.cancelQueries({ queryKey: canvasKeys.folderList(organizationId) }),
+      ]);
+
+      const previousCanvases = queryClient.getQueryData<CanvasesCanvas[]>(canvasKeys.list(organizationId));
+      const previousFolders = queryClient.getQueryData<CanvasFoldersCanvasFolder[]>(
+        canvasKeys.folderList(organizationId),
+      );
+
+      queryClient.setQueryData(canvasKeys.list(organizationId), (current: CanvasesCanvas[] | undefined) =>
+        updateCanvasListFolderMembership(current, data),
+      );
+      queryClient.setQueryData(
+        canvasKeys.folderList(organizationId),
+        (current: CanvasFoldersCanvasFolder[] | undefined) => updateCanvasFolderListMembership(current, data),
+      );
+
+      return { previousCanvases, previousFolders };
+    },
+    onError: (_error, _data, context) => {
+      if (context?.previousCanvases) {
+        queryClient.setQueryData(canvasKeys.list(organizationId), context.previousCanvases);
+      }
+
+      if (context?.previousFolders) {
+        queryClient.setQueryData(canvasKeys.folderList(organizationId), context.previousFolders);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.folderList(organizationId) });
     },
