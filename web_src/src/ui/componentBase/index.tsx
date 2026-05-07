@@ -137,6 +137,7 @@ export interface EventStateStyle {
 
 export type EventStateMap = Record<EventState, EventStateStyle>;
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const DEFAULT_EVENT_STATE_MAP: EventStateMap = {
   triggered: {
     icon: "circle",

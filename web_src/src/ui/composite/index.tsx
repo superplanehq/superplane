@@ -79,7 +79,7 @@ export const Composite: React.FC<CompositeProps> = ({
   lastRunItem,
   lastRunItems,
   maxVisibleEvents = 5,
-  nextInQueue,
+  nextInQueue: _nextInQueue,
   collapsed = false,
   collapsedBackground,
   onViewMoreEvents,
@@ -150,7 +150,7 @@ export const Composite: React.FC<CompositeProps> = ({
     }
 
     return sections;
-  }, [visibleEvents, hiddenEventsCount, nextInQueue, onViewMoreEvents]);
+  }, [visibleEvents, hiddenEventsCount, onViewMoreEvents]);
 
   // Convert parameters to specs format
   const specs = React.useMemo(() => {

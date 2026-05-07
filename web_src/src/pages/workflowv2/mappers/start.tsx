@@ -116,7 +116,7 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
                     description: (
                       <>
                         Run template <strong>{template.name}</strong> on node{" "}
-                        <strong>{node.name || definitionLabel(node)}</strong>. Edit the payload below to override the
+                        <strong>{node.name || "Unnamed trigger"}</strong>. Edit the payload below to override the
                         template default.
                       </>
                     ),
@@ -145,10 +145,6 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
     );
   },
 };
-
-function definitionLabel(node: NodeInfo): string {
-  return node.name || "Unnamed trigger";
-}
 
 function StartRunModal({
   initialPayload,
