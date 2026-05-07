@@ -17,6 +17,7 @@ interface CanvasActionsMenuProps {
   onEdit: (canvas: CanvasCardData) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
+  permissionsLoading: boolean;
 }
 
 export function CanvasActionsMenu({
@@ -26,6 +27,7 @@ export function CanvasActionsMenu({
   onEdit,
   canUpdateCanvases,
   canDeleteCanvases,
+  permissionsLoading,
 }: CanvasActionsMenuProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const deleteCanvasMutation = useDeleteCanvas(organizationId);
@@ -70,7 +72,7 @@ export function CanvasActionsMenu({
         }}
       >
         {!canManage ? (
-          <PermissionTooltip allowed={false} message="You don't have permission to manage this canvas.">
+          <PermissionTooltip allowed={permissionsLoading} message="You don't have permission to manage this canvas.">
             <button
               className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400 disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Canvas actions"

@@ -289,6 +289,7 @@ function Content({
           onEditCanvas={onEditCanvas}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
+          permissionsLoading={permissionsLoading}
         />
       ) : null}
     </div>

@@ -22,6 +22,7 @@ interface CanvasCardsGridProps {
   onEditCanvas: (canvas: CanvasCardData) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
+  permissionsLoading: boolean;
 }
 
 export function CanvasCardsGrid({
@@ -31,6 +32,7 @@ export function CanvasCardsGrid({
   onEditCanvas,
   canUpdateCanvases,
   canDeleteCanvases,
+  permissionsLoading,
 }: CanvasCardsGridProps) {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -43,6 +45,7 @@ export function CanvasCardsGrid({
           onEdit={onEditCanvas}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
+          permissionsLoading={permissionsLoading}
         />
       ))}
     </div>
@@ -56,6 +59,7 @@ interface CanvasCardProps {
   onEdit: (canvas: CanvasCardData) => void;
   canUpdateCanvases: boolean;
   canDeleteCanvases: boolean;
+  permissionsLoading: boolean;
 }
 
 function CanvasCard({
@@ -65,6 +69,7 @@ function CanvasCard({
   onEdit,
   canUpdateCanvases,
   canDeleteCanvases,
+  permissionsLoading,
 }: CanvasCardProps) {
   const canvasHref = `/${organizationId}/canvases/${canvas.id}`;
   const previewNodes = canvas.nodes || [];
@@ -92,6 +97,7 @@ function CanvasCard({
                 onEdit={onEdit}
                 canUpdateCanvases={canUpdateCanvases}
                 canDeleteCanvases={canDeleteCanvases}
+                permissionsLoading={permissionsLoading}
               />
             </div>
           </div>

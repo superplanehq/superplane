@@ -251,6 +251,7 @@ export function CanvasFolderSection({
           onEditCanvas={onEditCanvas}
           canUpdateCanvases={canUpdateCanvases}
           canDeleteCanvases={canDeleteCanvases}
+          permissionsLoading={permissionsLoading}
         />
       ) : (
         <EmptyCanvasFolder />
