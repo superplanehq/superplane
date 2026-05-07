@@ -19,6 +19,10 @@ CLAUDE.local.md
 .agents/
 .worktrees/
 coverage-go.out
+.specify/
+.vscode/
+.github/prompts/
+.github/agents/
 
 # Generated protobuf and OpenAPI artifacts
 /pkg/protos/
