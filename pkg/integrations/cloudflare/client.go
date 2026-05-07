@@ -3,6 +3,7 @@ package cloudflare
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -31,6 +32,11 @@ type CloudflareAPIError struct {
 
 func (e *CloudflareAPIError) Error() string {
 	return fmt.Sprintf("request got %d code: %s", e.StatusCode, string(e.Body))
+}
+
+func isCloudflareNotFound(err error) bool {
+	apiErr := (*CloudflareAPIError)(nil)
+	return errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound
 }
 
 func NewClient(http core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
@@ -194,6 +200,52 @@ type Ruleset struct {
 	Rules       []RedirectRule `json:"rules"`
 }
 
+// OriginRule represents a single origin rule in a ruleset.
+type OriginRule struct {
+	ID          string                  `json:"id,omitempty"`
+	Action      string                  `json:"action"`
+	Expression  string                  `json:"expression"`
+	Description string                  `json:"description,omitempty"`
+	Enabled     bool                    `json:"enabled"`
+	ActionParam *OriginActionParameters `json:"action_parameters,omitempty"`
+}
+
+type OriginActionParameters struct {
+	HostHeader string         `json:"host_header,omitempty"`
+	Origin     *RouteOrigin   `json:"origin,omitempty"`
+	SNI        *RouteSNIValue `json:"sni,omitempty"`
+}
+
+type RouteOrigin struct {
+	Host string `json:"host,omitempty"`
+	Port *int   `json:"port,omitempty"`
+}
+
+type RouteSNIValue struct {
+	Value string `json:"value,omitempty"`
+}
+
+type OriginRuleset struct {
+	ID          string       `json:"id"`
+	Name        string       `json:"name"`
+	Description string       `json:"description"`
+	Kind        string       `json:"kind"`
+	Phase       string       `json:"phase"`
+	Rules       []OriginRule `json:"rules"`
+}
+
+type CreateOriginRulesetRequest struct {
+	Name        string       `json:"name"`
+	Description string       `json:"description,omitempty"`
+	Kind        string       `json:"kind"`
+	Phase       string       `json:"phase"`
+	Rules       []OriginRule `json:"rules,omitempty"`
+}
+
+type UpdateOriginRulesetRequest struct {
+	Rules []OriginRule `json:"rules"`
+}
+
 // ListRedirectRules retrieves all redirect rules for a zone
 func (c *Client) ListRedirectRules(zoneID string) ([]RedirectRule, error) {
 	url := fmt.Sprintf("%s/zones/%s/rulesets/phases/http_request_dynamic_redirect/entrypoint", c.BaseURL, zoneID)
@@ -285,6 +337,181 @@ func (c *Client) GetRulesetForPhase(zoneID, phase string) (*Ruleset, error) {
 	}
 
 	return &response.Result, nil
+}
+
+func (c *Client) GetOriginRulesetForPhase(zoneID string) (*OriginRuleset, error) {
+	url := fmt.Sprintf("%s/zones/%s/rulesets/phases/http_request_origin/entrypoint", c.BaseURL, zoneID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool          `json:"success"`
+		Result  OriginRuleset `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+func (c *Client) CreateOriginRuleset(zoneID string, req CreateOriginRulesetRequest) (*OriginRuleset, error) {
+	url := fmt.Sprintf("%s/zones/%s/rulesets", c.BaseURL, zoneID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool          `json:"success"`
+		Result  OriginRuleset `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+func (c *Client) UpdateOriginRuleset(zoneID, rulesetID string, req UpdateOriginRulesetRequest) (*OriginRuleset, error) {
+	url := fmt.Sprintf("%s/zones/%s/rulesets/%s", c.BaseURL, zoneID, rulesetID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool          `json:"success"`
+		Result  OriginRuleset `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+func (c *Client) ListOriginRules(zoneID string) ([]OriginRule, error) {
+	ruleset, err := c.GetOriginRulesetForPhase(zoneID)
+	if err != nil {
+		return nil, err
+	}
+
+	return ruleset.Rules, nil
+}
+
+func (c *Client) CreateOriginRule(zoneID, rulesetID string, req OriginRule) (*OriginRule, error) {
+	url := fmt.Sprintf("%s/zones/%s/rulesets/%s/rules", c.BaseURL, zoneID, rulesetID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	return originRuleFromRulesetResponse(responseBody, "")
+}
+
+func (c *Client) UpdateOriginRule(zoneID, rulesetID, ruleID string, req OriginRule) (*OriginRule, error) {
+	url := fmt.Sprintf("%s/zones/%s/rulesets/%s/rules/%s", c.BaseURL, zoneID, rulesetID, ruleID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPatch, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	return originRuleFromRulesetResponse(responseBody, ruleID)
+}
+
+func (c *Client) DeleteOriginRule(zoneID, rulesetID, ruleID string) (*OriginRule, error) {
+	url := fmt.Sprintf("%s/zones/%s/rulesets/%s/rules/%s", c.BaseURL, zoneID, rulesetID, ruleID)
+	responseBody, err := c.execRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &OriginRule{ID: ruleID}, nil
+}
+
+func originRuleFromRulesetResponse(responseBody []byte, ruleID string) (*OriginRule, error) {
+	var response struct {
+		Success bool          `json:"success"`
+		Result  OriginRuleset `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	if ruleID != "" {
+		for _, rule := range response.Result.Rules {
+			if rule.ID == ruleID {
+				return &rule, nil
+			}
+		}
+
+		return nil, fmt.Errorf("origin rule not found in response")
+	}
+
+	if len(response.Result.Rules) > 0 {
+		return &response.Result.Rules[len(response.Result.Rules)-1], nil
+	}
+
+	return nil, fmt.Errorf("origin rule not found in response")
 }
 
 // DNSRecord represents a Cloudflare DNS record
