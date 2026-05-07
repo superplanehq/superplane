@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -47,6 +46,33 @@ func TestEchoHelloWorld(t *testing.T) {
 		}
 		if !strings.Contains(payload.Output, "second") {
 			t.Errorf("output should contain second line; got %q", payload.Output)
+		}
+	})
+}
+
+func TestCommandsFailOnFirstFailedLine(t *testing.T) {
+	t.Parallel()
+	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
+		return api.CreateTaskRequest{
+			Commands: []string{
+				"echo before",
+				"false",
+				"echo AFTER_SHOULD_NOT_RUN",
+			},
+			WebhookURL: wh,
+		}
+	}, func(t *testing.T, created api.CreateTaskResponse, payload api.WebhookPayload) {
+		if payload.Status != string(models.StatusFailed) {
+			t.Errorf("status: got %q want failed", payload.Status)
+		}
+		if payload.ExitCode == 0 {
+			t.Fatalf("exit_code: want non-zero, got 0")
+		}
+		if !strings.Contains(payload.Output, "before") {
+			t.Errorf("output missing first line: %q", payload.Output)
+		}
+		if strings.Contains(payload.Output, "AFTER_SHOULD_NOT_RUN") {
+			t.Errorf("later line should not run after failing directive (fail-fast): %q", payload.Output)
 		}
 	})
 }
@@ -105,7 +131,7 @@ func runFleetWebhookE2E(t *testing.T, makeReq func(webhookURL string) api.Create
 	_ = ln.Close()
 
 	fleetCmd := exec.Command(fleetPath)
-	fleetCmd.Env = append(os.Environ(),
+	fleetCmd.Env = subprocessEnv(
 		"DATABASE_PATH="+dbPath,
 		"LISTEN_ADDR="+addr,
 		"REAP_INTERVAL_SEC=3600",
@@ -145,7 +171,7 @@ func runFleetWebhookE2E(t *testing.T, makeReq func(webhookURL string) api.Create
 	t.Cleanup(whSrv.Close)
 
 	runnerCmd := exec.Command(runnerPath)
-	runnerCmd.Env = append(os.Environ(),
+	runnerCmd.Env = subprocessEnv(
 		"FLEET_MANAGER_URL="+baseURL,
 		"RUNNER_ID=e2e-runner-1",
 		"POLL_EMPTY_MS=20",

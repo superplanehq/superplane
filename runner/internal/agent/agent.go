@@ -192,7 +192,7 @@ func (a *Agent) runHost(ctx context.Context, task *api.TaskPayload) (int, string
 }
 
 func (a *Agent) runHostShellScripts(ctx context.Context, scripts []string) (int, string, error) {
-	combined, ok := joinShellScriptLines(scripts)
+	combined, ok := combineShellDirectives(scripts)
 	if !ok {
 		return 1, "", errors.New("empty commands")
 	}
@@ -215,9 +215,11 @@ func (a *Agent) runHostShellScripts(ctx context.Context, scripts []string) (int,
 	return exit, out, nil
 }
 
-// joinShellScriptLines joins non-empty trimmed command lines with newlines so a single
-// shell session preserves cwd, environment, and variables between lines.
-func joinShellScriptLines(scripts []string) (string, bool) {
+// combineShellDirectives mirrors Semaphore CI’s RunCommandsUntilFirstFailure: each
+// non-empty trimmed string is one directive executed in order, stopping at the first
+// failing directive. Without a persistent PTY we approximate that behavior with one
+// sh -c and && between directives so cd and export persist across them.
+func combineShellDirectives(scripts []string) (string, bool) {
 	var parts []string
 	for _, s := range scripts {
 		s = strings.TrimSpace(s)
@@ -228,7 +230,7 @@ func joinShellScriptLines(scripts []string) (string, bool) {
 	if len(parts) == 0 {
 		return "", false
 	}
-	return strings.Join(parts, "\n"), true
+	return strings.Join(parts, " && "), true
 }
 
 func (a *Agent) runDocker(ctx context.Context, task *api.TaskPayload) (int, string, error) {
@@ -260,7 +262,7 @@ func (a *Agent) runDocker(ctx context.Context, task *api.TaskPayload) (int, stri
 }
 
 func (a *Agent) runDockerShellScripts(ctx context.Context, image string, scripts []string) (int, string, error) {
-	combined, ok := joinShellScriptLines(scripts)
+	combined, ok := combineShellDirectives(scripts)
 	if !ok {
 		return 1, "", errors.New("empty commands")
 	}

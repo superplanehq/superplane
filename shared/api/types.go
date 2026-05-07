@@ -6,8 +6,9 @@ import "github.com/superplane/runner/shared/models"
 type CreateTaskRequest struct {
 	// Command is argv for one process. Omit when using Commands.
 	Command []string `json:"command,omitempty"`
-	// Commands are lines of one shell script: joined with newlines and run as a single
-	// sh -c so export, cd, and shell state persist between lines. Omit when using Command.
+	// Commands are directives (non-empty trimmed lines). The runner executes them in one
+	// shell with fail-fast chaining (&&), Semaphore CI–style ordering: stop at the first
+	// failing directive; export, cd, and shell state persist across directives. Omit when using Command.
 	Commands      []string `json:"commands,omitempty"`
 	WebhookURL    string   `json:"webhook_url"`
 	ExecutionMode string   `json:"execution_mode"` // "host" | "docker"
@@ -34,7 +35,7 @@ type ClaimTaskResponse struct {
 type TaskPayload struct {
 	ID            string   `json:"id"`
 	Command       []string `json:"command,omitempty"`
-	Commands      []string `json:"commands,omitempty"` // one script, lines joined with newlines; see CreateTaskRequest
+	Commands      []string `json:"commands,omitempty"` // see CreateTaskRequest (combined per runner with &&)
 	ExecutionMode string   `json:"execution_mode"`
 	DockerImage   string   `json:"docker_image,omitempty"`
 }
@@ -65,5 +66,24 @@ type WebhookPayload struct {
 	Status      string `json:"status"`
 	ExitCode    int    `json:"exit_code"`
 	Output      string `json:"output"`
+	Error       string `json:"error,omitempty"`
+}
+
+// TaskStatusResponse is GET fleet-manager /v1/tasks/{id}.
+type TaskStatusResponse struct {
+	ID       string `json:"id"`
+	Status   string `json:"status"`
+	ExitCode *int   `json:"exit_code,omitempty"`
+	Output   string `json:"output,omitempty"`
+	Error    string `json:"error,omitempty"`
+}
+
+// BrokerGetTaskResponse is GET task-broker /v1/tasks/{broker_task_id}.
+type BrokerGetTaskResponse struct {
+	TaskID      string `json:"task_id"`
+	FleetTaskID string `json:"fleet_task_id,omitempty"`
+	Status      string `json:"status"`
+	ExitCode    *int   `json:"exit_code,omitempty"`
+	Output      string `json:"output,omitempty"`
 	Error       string `json:"error,omitempty"`
 }

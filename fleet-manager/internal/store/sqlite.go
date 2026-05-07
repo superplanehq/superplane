@@ -113,6 +113,14 @@ func nullString(s string) any {
 	return s
 }
 
+func (s *SQLiteStore) GetTask(ctx context.Context, id string) (*models.Task, error) {
+	t, err := s.GetByID(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	return t, err
+}
+
 func (s *SQLiteStore) ClaimTask(ctx context.Context, runnerID string, lease time.Duration) (*models.Task, error) {
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {

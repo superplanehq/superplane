@@ -29,6 +29,7 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 		}
 		r.Post("/tasks", s.createTask)
 		r.Post("/tasks/claim", s.claimTask)
+		r.Get("/tasks/{id}", s.getTask)
 		r.Post("/tasks/{id}/complete", s.completeTask)
 	})
 

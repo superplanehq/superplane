@@ -124,6 +124,36 @@ func (s *Server) claimTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, api.ClaimTaskResponse{Task: payload})
 }
 
+func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "id required")
+		return
+	}
+	task, err := s.Store.GetTask(r.Context(), id)
+	if err != nil {
+		s.Log.Error("get task", slog.Any("err", err))
+		writeError(w, http.StatusInternalServerError, "could not load task")
+		return
+	}
+	if task == nil {
+		writeError(w, http.StatusNotFound, "task not found")
+		return
+	}
+
+	resp := api.TaskStatusResponse{
+		ID:     task.ID,
+		Status: string(task.Status),
+		Output: task.Output,
+		Error:  task.ErrorMessage,
+	}
+	if task.ExitCode != nil {
+		ec := *task.ExitCode
+		resp.ExitCode = &ec
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
 func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {

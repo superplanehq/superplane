@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -50,7 +49,7 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 	brokerPublic := "http://" + brokerAddr
 
 	fleetCmd := exec.Command(fleetBin)
-	fleetCmd.Env = append(os.Environ(),
+	fleetCmd.Env = subprocessEnv(
 		"DATABASE_PATH="+fleetDB,
 		"LISTEN_ADDR="+fleetAddr,
 		"REAP_INTERVAL_SEC=3600",
@@ -68,7 +67,7 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 	waitReady(t, "http://"+fleetAddr+"/healthz", 10*time.Second)
 
 	brokerCmd := exec.Command(brokerBin)
-	brokerCmd.Env = append(os.Environ(),
+	brokerCmd.Env = subprocessEnv(
 		"DATABASE_PATH="+brokerDB,
 		"LISTEN_ADDR="+brokerAddr,
 		"BROKER_PUBLIC_URL="+brokerPublic,
@@ -108,7 +107,7 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 	}
 
 	runnerCmd := exec.Command(runnerBin)
-	runnerCmd.Env = append(os.Environ(),
+	runnerCmd.Env = subprocessEnv(
 		"FLEET_MANAGER_URL="+fleetBase,
 		"RUNNER_ID=e2e-broker-runner-1",
 		"POLL_EMPTY_MS=20",
@@ -203,6 +202,27 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 	}
 	if !strings.Contains(payload.Output, "hello world") || !strings.Contains(payload.Output, "second") {
 		t.Errorf("combined output unexpected: %q", payload.Output)
+	}
+
+	pollURL := brokerPublic + "/v1/tasks/" + created.ID
+	pollResp, err := httpClient.Get(pollURL)
+	if err != nil {
+		t.Fatalf("broker get task: %v", err)
+	}
+	pollBody, _ := io.ReadAll(pollResp.Body)
+	_ = pollResp.Body.Close()
+	if pollResp.StatusCode != http.StatusOK {
+		t.Fatalf("broker get task: status %d %s", pollResp.StatusCode, strings.TrimSpace(string(pollBody)))
+	}
+	var polled api.BrokerGetTaskResponse
+	if err := json.Unmarshal(pollBody, &polled); err != nil {
+		t.Fatal(err)
+	}
+	if polled.TaskID != created.ID {
+		t.Errorf("poll task_id want %q got %q", created.ID, polled.TaskID)
+	}
+	if strings.ToLower(polled.Status) != string(models.StatusSucceeded) {
+		t.Errorf("poll status want succeeded got %q", polled.Status)
 	}
 }
 
