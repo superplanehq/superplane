@@ -5798,7 +5798,6 @@ function prepareNode(
     case "TYPE_TRIGGER":
       return prepareTriggerNode(node, triggers, nodeEventsMap, canvasMode, {
         canvasId: workflowId,
-        queryClient,
         openModal: (modal) => openModal?.(modal),
       });
     case "TYPE_WIDGET":

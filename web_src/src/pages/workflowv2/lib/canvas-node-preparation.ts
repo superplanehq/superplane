@@ -88,7 +88,6 @@ function buildPreparedTriggerCanvasNode(args: {
   position: NodePosition;
   canvasMode?: "live" | "edit";
   canvasId: string;
-  queryClient: QueryClient;
   openModal: (modal: TriggerActionModal) => void;
 }): CanvasNode {
   const {
@@ -99,7 +98,6 @@ function buildPreparedTriggerCanvasNode(args: {
     position,
     canvasMode = "live",
     canvasId,
-    queryClient,
     openModal,
   } = args;
   const renderer = getTriggerRenderer(node.component || "");
@@ -109,7 +107,7 @@ function buildPreparedTriggerCanvasNode(args: {
     definition: buildComponentDefinition(triggerMetadata),
     lastEvent: buildEventInfo(lastEvent),
     canvasMode,
-    actions: buildTriggerActionContext(queryClient, canvasId, node.id!, openModal),
+    actions: buildTriggerActionContext(canvasId, node.id!, openModal),
   });
 
   return {
@@ -182,7 +180,7 @@ export function prepareTriggerNode(
   triggers: TriggersTrigger[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   canvasMode: "live" | "edit" = "live",
-  options: { canvasId: string; queryClient: QueryClient; openModal: (modal: TriggerActionModal) => void },
+  options: { canvasId: string; openModal: (modal: TriggerActionModal) => void },
 ): CanvasNode {
   const triggerMetadata = triggers.find((t) => t.name === node.component);
   const displayLabel = getTriggerDisplayLabel(node, triggerMetadata);
@@ -197,7 +195,6 @@ export function prepareTriggerNode(
       position,
       canvasMode,
       canvasId: options.canvasId,
-      queryClient: options.queryClient,
       openModal: options.openModal,
     });
   } catch (error) {
@@ -312,7 +309,6 @@ function buildActionContext(queryClient: QueryClient, canvasId: string, nodeId: 
 }
 
 function buildTriggerActionContext(
-  queryClient: QueryClient,
   canvasId: string,
   nodeId: string,
   openModal: (modal: TriggerActionModal) => void,
