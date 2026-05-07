@@ -320,7 +320,7 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 	s.canvas.Publish()
 
 	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-start-header"]) [data-testid="start-template-run"]`)
-	emitEvent := q.Locator("button:has-text('Emit Event')")
+	emitEvent := q.TestID("emit-event-submit-button")
 
 	for i := 0; i < itemsAmount; i++ {
 		s.session.Click(startTemplateRun)
