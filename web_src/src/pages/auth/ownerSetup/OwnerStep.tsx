@@ -137,7 +137,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
         )}
       </div>
       <div className="flex justify-end">
-        <Button type="submit" className="w-36" disabled={loading}>
+        <Button type="submit" disabled={loading}>
           {loading ? "Saving..." : "Next"}
         </Button>
       </div>

@@ -218,10 +218,10 @@ export const SmtpConfigStep: React.FC<SmtpConfigStepProps> = ({
         Back
       </Button>
       <div className="ml-auto flex flex-wrap justify-end gap-3">
-        <Button type="button" className="w-36" variant="outline" disabled={loading} onClick={onSkipSMTP}>
+        <Button type="button" variant="outline" disabled={loading} onClick={onSkipSMTP}>
           Do this later
         </Button>
-        <Button type="submit" className="w-36" disabled={loading}>
+        <Button type="submit" disabled={loading}>
           {loading ? "Saving..." : "Finish setup"}
         </Button>
       </div>

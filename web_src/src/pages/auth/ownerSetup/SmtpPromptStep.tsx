@@ -28,10 +28,10 @@ export const SmtpPromptStep: React.FC<SmtpPromptStepProps> = ({ loading, error, 
       </Button>
 
       <div className="ml-auto flex flex-wrap justify-end gap-3">
-        <Button type="button" className="w-36" disabled={loading} onClick={onEnableSMTP}>
+        <Button type="button" disabled={loading} onClick={onEnableSMTP}>
           Set up SMTP
         </Button>
-        <Button type="button" className="w-36" variant="outline" disabled={loading} onClick={onSkipSMTP}>
+        <Button type="button" variant="outline" disabled={loading} onClick={onSkipSMTP}>
           Do this later
         </Button>
       </div>

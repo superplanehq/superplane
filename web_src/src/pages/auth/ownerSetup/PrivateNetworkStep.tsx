@@ -59,7 +59,7 @@ export const PrivateNetworkStep: React.FC<PrivateNetworkStepProps> = ({
       <Button type="button" variant="outline" disabled={loading} onClick={onBack}>
         Back
       </Button>
-      <Button type="button" className="ml-auto w-36" disabled={loading} onClick={onNext}>
+      <Button type="button" className="ml-auto" disabled={loading} onClick={onNext}>
         Next
       </Button>
     </div>
