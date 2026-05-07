@@ -116,6 +116,7 @@ func (i *OnIssue) Setup(ctx core.TriggerContext) error {
 	err := common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
+		ctx.HTTP,
 		ctx.Configuration,
 	)
 
