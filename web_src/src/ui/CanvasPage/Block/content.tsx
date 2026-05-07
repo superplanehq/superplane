@@ -31,7 +31,6 @@ function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isC
 
 function getActionProps(data: BlockProps["data"], compactView: boolean, props: Pick<BlockProps, ComponentActionKeys>) {
   return {
-    onRun: props.onRun,
     runDisabled: props.runDisabled,
     runDisabledTooltip: props.runDisabledTooltip,
     onTogglePause: data.type === "trigger" ? undefined : props.onTogglePause,
@@ -206,7 +205,6 @@ export function BlockContent({
   data,
   nodeId,
   selected = false,
-  onRun,
   runDisabled,
   runDisabledTooltip,
   onTogglePause,
@@ -223,7 +221,6 @@ export function BlockContent({
 }: BlockProps) {
   const compactView = getCompactView(data, isCompactView);
   const actionProps = getActionProps(data, compactView, {
-    onRun,
     runDisabled,
     runDisabledTooltip,
     onTogglePause,
