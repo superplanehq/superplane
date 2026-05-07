@@ -6,9 +6,9 @@ import "github.com/superplane/runner/shared/models"
 type CreateTaskRequest struct {
 	// Command is argv for one process. Omit when using Commands.
 	Command []string `json:"command,omitempty"`
-	// Commands are directives (non-empty trimmed lines). The runner executes them in one
-	// shell with fail-fast chaining (&&), Semaphore CI–style ordering: stop at the first
-	// failing directive; export, cd, and shell state persist across directives. Omit when using Command.
+	// Commands are shell directives (non-empty trimmed lines). The runner uses Bash on
+	// a PTY and sources each directive from a tempfile, stopping at the first failing
+	// directive ($? after source). Omit when using Command.
 	Commands      []string `json:"commands,omitempty"`
 	WebhookURL    string   `json:"webhook_url"`
 	ExecutionMode string   `json:"execution_mode"` // "host" | "docker"
@@ -35,7 +35,7 @@ type ClaimTaskResponse struct {
 type TaskPayload struct {
 	ID            string   `json:"id"`
 	Command       []string `json:"command,omitempty"`
-	Commands      []string `json:"commands,omitempty"` // see CreateTaskRequest (combined per runner with &&)
+	Commands      []string `json:"commands,omitempty"` // see CreateTaskRequest (Bash+PTY per directive on Unix)
 	ExecutionMode string   `json:"execution_mode"`
 	DockerImage   string   `json:"docker_image,omitempty"`
 }

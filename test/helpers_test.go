@@ -2,7 +2,12 @@ package e2e_test
 
 import (
 	"os"
+	"os/exec"
 	"strings"
+	"syscall"
+	"testing"
+
+	"github.com/creack/pty"
 )
 
 // subprocessEnv builds an environment for child processes spawned in tests.
@@ -17,4 +22,25 @@ func subprocessEnv(extra ...string) []string {
 		out = append(out, kv)
 	}
 	return append(out, extra...)
+}
+
+// skipIfPTYUnavailable skips the test when Bash+PTY cannot run (e.g. hardened
+// sandboxes). Production runners require PTY; this only relaxes local/CI preflight.
+func skipIfPTYUnavailable(t *testing.T) {
+	t.Helper()
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skipf("bash not on PATH: %v", err)
+	}
+	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "--noediting", "-i")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	f, err := pty.Start(cmd)
+	if err != nil {
+		t.Skipf("PTY required for runner e2e (not available here): %v", err)
+	}
+	if cmd.Process != nil {
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+	_ = f.Close()
+	_ = cmd.Wait()
 }

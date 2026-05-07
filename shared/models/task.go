@@ -25,7 +25,7 @@ type Task struct {
 	ID string
 	// Command is argv for a single process when Commands is empty (legacy).
 	Command []string
-	// Commands are directives run in order when non-empty; the runner joins them with && in one sh -c (Semaphore-style stop on first failure).
+	// Commands are shell directives when non-empty (Bash+PTY sourcing per line on workers).
 	Commands      []string
 	WebhookURL    string
 	Status        TaskStatus

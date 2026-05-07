@@ -22,6 +22,7 @@ import (
 )
 
 func TestEchoHelloWorld(t *testing.T) {
+	skipIfPTYUnavailable(t)
 	t.Parallel()
 	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
 		return api.CreateTaskRequest{
@@ -51,6 +52,7 @@ func TestEchoHelloWorld(t *testing.T) {
 }
 
 func TestCommandsFailOnFirstFailedLine(t *testing.T) {
+	skipIfPTYUnavailable(t)
 	t.Parallel()
 	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
 		return api.CreateTaskRequest{
@@ -72,12 +74,13 @@ func TestCommandsFailOnFirstFailedLine(t *testing.T) {
 			t.Errorf("output missing first line: %q", payload.Output)
 		}
 		if strings.Contains(payload.Output, "AFTER_SHOULD_NOT_RUN") {
-			t.Errorf("later line should not run after failing directive (fail-fast): %q", payload.Output)
+			t.Errorf("later directive should not run after failure (errexit / fail-fast): %q", payload.Output)
 		}
 	})
 }
 
 func TestCommandsShareShellEnv(t *testing.T) {
+	skipIfPTYUnavailable(t)
 	t.Parallel()
 	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
 		return api.CreateTaskRequest{

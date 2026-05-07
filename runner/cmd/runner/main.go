@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"syscall"
@@ -49,6 +50,20 @@ func main() {
 	defer stop()
 
 	log.Info("runner starting", slog.String("runner_id", runnerID), slog.String("fleet_manager", base))
+	if bi, ok := debug.ReadBuildInfo(); ok {
+		attrs := []any{
+			slog.String("main_path", bi.Main.Path),
+			slog.String("main_version", bi.Main.Version),
+			slog.String("go_version", bi.GoVersion),
+		}
+		for _, s := range bi.Settings {
+			switch s.Key {
+			case "vcs.revision", "vcs.time", "vcs.modified":
+				attrs = append(attrs, slog.String(strings.ReplaceAll(s.Key, ".", "_"), s.Value))
+			}
+		}
+		log.Info("runner build", attrs...)
+	}
 	if err := a.Run(ctx); err != nil && err != context.Canceled {
 		log.Error("runner stopped", slog.Any("err", err))
 		os.Exit(1)

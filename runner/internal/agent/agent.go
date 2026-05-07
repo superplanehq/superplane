@@ -192,45 +192,7 @@ func (a *Agent) runHost(ctx context.Context, task *api.TaskPayload) (int, string
 }
 
 func (a *Agent) runHostShellScripts(ctx context.Context, scripts []string) (int, string, error) {
-	combined, ok := combineShellDirectives(scripts)
-	if !ok {
-		return 1, "", errors.New("empty commands")
-	}
-	cmd := exec.CommandContext(ctx, "sh", "-c", combined)
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
-	err := cmd.Run()
-	out := truncateString(buf.String(), a.Config.MaxOutputBytes)
-	exit := 0
-	if err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			exit = ee.ExitCode()
-		} else {
-			exit = 1
-		}
-		return exit, out, err
-	}
-	return exit, out, nil
-}
-
-// combineShellDirectives mirrors Semaphore CI’s RunCommandsUntilFirstFailure: each
-// non-empty trimmed string is one directive executed in order, stopping at the first
-// failing directive. Without a persistent PTY we approximate that behavior with one
-// sh -c and && between directives so cd and export persist across them.
-func combineShellDirectives(scripts []string) (string, bool) {
-	var parts []string
-	for _, s := range scripts {
-		s = strings.TrimSpace(s)
-		if s != "" {
-			parts = append(parts, s)
-		}
-	}
-	if len(parts) == 0 {
-		return "", false
-	}
-	return strings.Join(parts, " && "), true
+	return runHostShellDirectives(ctx, a.Config.MaxOutputBytes, scripts)
 }
 
 func (a *Agent) runDocker(ctx context.Context, task *api.TaskPayload) (int, string, error) {
@@ -262,28 +224,7 @@ func (a *Agent) runDocker(ctx context.Context, task *api.TaskPayload) (int, stri
 }
 
 func (a *Agent) runDockerShellScripts(ctx context.Context, image string, scripts []string) (int, string, error) {
-	combined, ok := combineShellDirectives(scripts)
-	if !ok {
-		return 1, "", errors.New("empty commands")
-	}
-	args := []string{"run", "--rm", image, "sh", "-c", combined}
-	cmd := exec.CommandContext(ctx, "docker", args...)
-	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
-	err := cmd.Run()
-	out := truncateString(buf.String(), a.Config.MaxOutputBytes)
-	exit := 0
-	if err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			exit = ee.ExitCode()
-		} else {
-			exit = 1
-		}
-		return exit, out, err
-	}
-	return exit, out, nil
+	return runDockerShellDirectives(ctx, a.Config.MaxOutputBytes, image, scripts)
 }
 
 func truncateString(s string, max int) string {

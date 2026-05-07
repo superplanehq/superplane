@@ -22,6 +22,7 @@ import (
 // TestBrokerRoutesTask verifies task-broker → fleet-manager → runner and that the caller webhook
 // sees broker-scoped task_id plus fleet_task_id.
 func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
+	skipIfPTYUnavailable(t)
 	t.Parallel()
 
 	root := moduleRoot(t)
