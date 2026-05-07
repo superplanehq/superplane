@@ -317,6 +317,18 @@ function buildTriggerActionContext(
   nodeId: string,
   openModal: (modal: TriggerActionModal) => void,
 ): TriggerActionContext {
+  const refreshTriggerEventQueries = () => {
+    void queryClient
+      .invalidateQueries({ queryKey: [...canvasKeys.events(), canvasId] })
+      .catch((error) => console.error("[CanvasPage] Failed to invalidate events query:", error));
+    void queryClient
+      .invalidateQueries({ queryKey: [...canvasKeys.nodeEvents(), canvasId, nodeId] })
+      .catch((error) => console.error("[CanvasPage] Failed to invalidate node events query:", error));
+    void queryClient
+      .invalidateQueries({ queryKey: canvasKeys.nodeEventHistory(canvasId, nodeId) })
+      .catch((error) => console.error("[CanvasPage] Failed to invalidate node event history query:", error));
+  };
+
   return {
     invokeNodeTriggerHook: async (hookName: string, parameters: unknown) => {
       try {
@@ -332,13 +344,11 @@ function buildTriggerActionContext(
             },
           }),
         );
-        await queryClient.invalidateQueries({ queryKey: [...canvasKeys.events(), canvasId] });
-        await queryClient.invalidateQueries({ queryKey: [...canvasKeys.nodeEvents(), canvasId, nodeId] });
-        await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeEventHistory(canvasId, nodeId) });
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "failed to invoke hook"));
         throw error;
       }
+      refreshTriggerEventQueries();
     },
     openModal,
   };
