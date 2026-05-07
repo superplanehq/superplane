@@ -12,12 +12,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"gorm.io/datatypes"
 )
 
 func EmitNodeEvent(
 	ctx context.Context,
+	registry *registry.Registry,
 	orgID uuid.UUID,
 	canvasID uuid.UUID,
 	nodeID string,
@@ -44,12 +46,12 @@ func EmitNodeEvent(
 		CreatedAt:  &now,
 	}
 
-	customName, err := resolveCustomName(node, data)
+	runTitle, err := resolveRunTitle(registry, node, data, data)
 	if err != nil {
 		failed := fmt.Sprintf("Failed to resolve run title: %s", err.Error())
-		event.CustomName = &failed
-	} else if customName != nil {
-		event.CustomName = customName
+		event.RunTitle = &failed
+	} else if runTitle != nil {
+		event.RunTitle = runTitle
 	}
 
 	if err := database.Conn().Create(&event).Error; err != nil {
@@ -68,23 +70,12 @@ func EmitNodeEvent(
 	}, nil
 }
 
-func resolveCustomName(node *models.CanvasNode, payload map[string]any) (*string, error) {
-	config := node.Configuration.Data()
-	if config == nil {
-		return nil, nil
+func resolveRunTitle(registry *registry.Registry, node *models.CanvasNode, payload map[string]any, rootPayload map[string]any) (*string, error) {
+	template := strings.TrimSpace(contexts.DefaultRunTitleTemplate(registry, node))
+	if node.RunTitleTemplate != nil {
+		template = strings.TrimSpace(*node.RunTitleTemplate)
 	}
 
-	rawTemplate, ok := config["customName"]
-	if !ok || rawTemplate == nil {
-		return nil, nil
-	}
-
-	template, ok := rawTemplate.(string)
-	if !ok {
-		return nil, nil
-	}
-
-	template = strings.TrimSpace(template)
 	if template == "" {
 		return nil, nil
 	}
@@ -92,16 +83,16 @@ func resolveCustomName(node *models.CanvasNode, payload map[string]any) (*string
 	builder := contexts.NewNodeConfigurationBuilder(database.Conn(), node.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithInput(map[string]any{node.NodeID: payload}).
-		WithRootPayload(payload)
+		WithRootPayload(rootPayload)
 	resolved, err := builder.ResolveTemplateExpressions(template)
 	if err != nil {
 		return nil, err
 	}
 
-	resolvedName := strings.TrimSpace(fmt.Sprintf("%v", resolved))
-	if resolvedName == "" {
+	resolvedTitle := strings.TrimSpace(fmt.Sprintf("%v", resolved))
+	if resolvedTitle == "" {
 		return nil, nil
 	}
 
-	return &resolvedName, nil
+	return &resolvedTitle, nil
 }

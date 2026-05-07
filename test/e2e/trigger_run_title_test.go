@@ -29,8 +29,8 @@ func TestTriggerRunTitle(t *testing.T) {
 		steps.saveAndPublish()
 		steps.runManualTrigger()
 
-		// The emitted event should have the resolved custom name
-		steps.thenEventCustomNameEquals("Run: Hello, World!")
+		// The emitted event should have the resolved run title.
+		steps.thenEventRunTitleEquals("Run: Hello, World!")
 	})
 }
 
@@ -62,7 +62,7 @@ func (s *triggerRunTitleSteps) whenRunTitleToggleIsEnabled() {
 }
 
 func (s *triggerRunTitleSteps) whenRunTitleIsSetTo(value string) {
-	s.session.FillIn(q.TestID("string-field-customname"), value)
+	s.session.FillIn(q.TestID("string-field-runtitletemplate"), value)
 }
 
 func (s *triggerRunTitleSteps) waitForAutoSave() {
@@ -82,24 +82,24 @@ func (s *triggerRunTitleSteps) runManualTrigger() {
 func (s *triggerRunTitleSteps) thenRunTitleInDBEquals(expected string) {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
-		val, exists, found := s.getCustomNameField()
-		if found && exists && val == expected {
+		val, found := s.getRunTitleTemplate()
+		if found && val != nil && *val == expected {
 			return
 		}
 		time.Sleep(300 * time.Millisecond)
 	}
 
-	val, exists, found := s.getCustomNameField()
+	val, found := s.getRunTitleTemplate()
 	require.True(s.t, found, "expected node to exist in DB")
-	require.True(s.t, exists, "expected customName key to exist in DB config")
-	require.Equal(s.t, expected, val, "expected customName=%q in DB but got %v", expected, val)
+	require.NotNil(s.t, val, "expected run title template to exist in DB")
+	require.Equal(s.t, expected, *val, "expected runTitleTemplate=%q in DB but got %v", expected, val)
 }
 
-func (s *triggerRunTitleSteps) thenEventCustomNameEquals(expected string) {
+func (s *triggerRunTitleSteps) thenEventRunTitleEquals(expected string) {
 	deadline := time.Now().Add(15 * time.Second)
 	for time.Now().Before(deadline) {
 		event := s.findLatestRootEvent()
-		if event != nil && event.CustomName != nil && *event.CustomName == expected {
+		if event != nil && event.RunTitle != nil && *event.RunTitle == expected {
 			return
 		}
 		time.Sleep(300 * time.Millisecond)
@@ -107,8 +107,8 @@ func (s *triggerRunTitleSteps) thenEventCustomNameEquals(expected string) {
 
 	event := s.findLatestRootEvent()
 	require.NotNil(s.t, event, "no root event found for canvas")
-	require.NotNil(s.t, event.CustomName, "event custom name is nil, expected %q", expected)
-	require.Equal(s.t, expected, *event.CustomName)
+	require.NotNil(s.t, event.RunTitle, "event run title is nil, expected %q", expected)
+	require.Equal(s.t, expected, *event.RunTitle)
 }
 
 func (s *triggerRunTitleSteps) findLatestRootEvent() *models.CanvasEvent {
@@ -141,22 +141,21 @@ func (s *triggerRunTitleSteps) waitForNodeID() string {
 	return draft.Nodes[0].ID
 }
 
-func (s *triggerRunTitleSteps) getCustomNameField() (any, bool, bool) {
+func (s *triggerRunTitleSteps) getRunTitleTemplate() (*string, bool) {
 	if s.nodeID == "" {
-		return nil, false, false
+		return nil, false
 	}
 
 	draft := s.canvas.FindCurrentDraft()
 	if draft == nil {
-		return nil, false, false
+		return nil, false
 	}
 
 	for _, node := range draft.Nodes {
 		if node.ID == s.nodeID {
-			val, exists := node.Configuration["customName"]
-			return val, exists, true
+			return node.RunTitleTemplate, true
 		}
 	}
 
-	return nil, false, false
+	return nil, false
 }

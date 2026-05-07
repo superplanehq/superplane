@@ -77,6 +77,10 @@ func (t *OnBlobDeleted) Color() string {
 	return "blue"
 }
 
+func (t *OnBlobDeleted) DefaultRunTitle() string {
+	return "{{ root().data.data.url }}"
+}
+
 func (t *OnBlobDeleted) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

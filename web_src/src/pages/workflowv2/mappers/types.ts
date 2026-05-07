@@ -64,7 +64,7 @@ export type EventInfo =
   | {
       id: string;
       createdAt: string;
-      customName?: string;
+      runTitle?: string;
       data: any;
       nodeId: string;
       type: string;

@@ -2731,6 +2731,7 @@ export function WorkflowPageV2() {
             color: node.configuration?.color || "yellow",
           },
           configurationFields,
+          runTitleTemplate: node.runTitleTemplate,
           integrationName,
           integrationLabel,
           blockName,
@@ -2744,6 +2745,7 @@ export function WorkflowPageV2() {
         displayLabel,
         configuration: node.configuration || {},
         configurationFields,
+        runTitleTemplate: node.runTitleTemplate,
         integrationName,
         integrationLabel,
         blockName,
@@ -2897,6 +2899,7 @@ export function WorkflowPageV2() {
       updatedConfiguration: Record<string, any>,
       updatedNodeName: string,
       integrationRef?: ComponentsIntegrationRef,
+      runTitleTemplate?: string,
     ) => {
       if (!canvas || !organizationId || !canvasId) return;
 
@@ -2928,6 +2931,7 @@ export function WorkflowPageV2() {
             configuration: updatedConfiguration,
             name: updatedNodeName,
             integration: integrationRef,
+            runTitleTemplate,
           };
         }
         return node;
@@ -4820,14 +4824,18 @@ export function WorkflowPageV2() {
     }
 
     clearPendingAutoSaveWork();
+    const discardedVersionId = activeCanvasVersionId;
 
     try {
       setIsResetDraftPending(true);
-      await deleteCanvasVersionMutation.mutateAsync(activeCanvasVersionId);
+      await deleteCanvasVersionMutation.mutateAsync(discardedVersionId);
 
       setIsCreateChangeRequestMode(false);
       setSelectedChangeRequestId("");
+      activeCanvasVersionIdRef.current = "";
       setActiveCanvasVersion(null);
+      setDraftCanvasSpec(null);
+      draftCanvasSpecsRef.current.delete(discardedVersionId);
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
       setLastSavedWorkflowSnapshot(null);
@@ -4849,6 +4857,15 @@ export function WorkflowPageV2() {
           };
         });
       }
+
+      queryClient.setQueryData<CanvasesCanvasVersion[] | undefined>(canvasKeys.versionList(canvasId), (current) =>
+        current?.filter((version) => version.metadata?.id !== discardedVersionId),
+      );
+      queryClient.removeQueries({ queryKey: canvasKeys.versionDetail(canvasId, discardedVersionId) });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId), refetchType: "all" }),
+        queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId), refetchType: "all" }),
+      ]);
 
       showSuccessToast("Draft discarded");
     } catch (error) {

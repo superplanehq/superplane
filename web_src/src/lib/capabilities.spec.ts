@@ -1,10 +1,35 @@
 import type { IntegrationsCapabilityDefinition, IntegrationsIntegrationDefinition } from "@/api-client";
 import { describe, expect, it } from "vitest";
-import { buildIntegrationCapabilityGroupSections } from "@/lib/capabilities";
+import { buildIntegrationCapabilityGroupSections, triggersFromCapabilities } from "@/lib/capabilities";
 
 function capability(name: string, label: string): IntegrationsCapabilityDefinition {
   return { name, label };
 }
+
+describe("triggersFromCapabilities", () => {
+  it("preserves default run titles for integration triggers", () => {
+    const triggers = triggersFromCapabilities([
+      {
+        type: "TYPE_TRIGGER",
+        name: "github.onPush",
+        label: "On push",
+        description: "Runs when code is pushed",
+        configuration: [],
+        defaultRunTitle: "{{ root().data.head_commit.message }}",
+      },
+    ] as IntegrationsCapabilityDefinition[]);
+
+    expect(triggers).toEqual([
+      {
+        name: "github.onPush",
+        label: "On push",
+        description: "Runs when code is pushed",
+        configuration: [],
+        defaultRunTitle: "{{ root().data.head_commit.message }}",
+      },
+    ]);
+  });
+});
 
 describe("buildIntegrationCapabilityGroupSections", () => {
   it("returns one unlabeled section listing all definitions when capability groups are absent", () => {

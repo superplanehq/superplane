@@ -71,6 +71,10 @@ func (t *OnComputeInstanceCreated) Color() string {
 	return "red"
 }
 
+func (t *OnComputeInstanceCreated) DefaultRunTitle() string {
+	return "Compute instance created"
+}
+
 func (t *OnComputeInstanceCreated) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{

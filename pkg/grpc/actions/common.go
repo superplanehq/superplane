@@ -2,7 +2,6 @@ package actions
 
 import (
 	"encoding/json"
-	"slices"
 
 	uuid "github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -691,16 +690,17 @@ func ProtoToNodes(nodes []*componentpb.Node) []models.Node {
 		// Metadata is something only triggers/components implementations can set.
 		//
 		result[i] = models.Node{
-			ID:             node.Id,
-			Name:           node.Name,
-			Type:           nodeType,
-			Ref:            *nodeRef,
-			Configuration:  node.Configuration.AsMap(),
-			Position:       ProtoToPosition(node.Position),
-			IsCollapsed:    node.IsCollapsed,
-			IntegrationID:  integrationID,
-			ErrorMessage:   errorMessage,
-			WarningMessage: warningMessage,
+			ID:               node.Id,
+			Name:             node.Name,
+			Type:             nodeType,
+			Ref:              *nodeRef,
+			Configuration:    node.Configuration.AsMap(),
+			RunTitleTemplate: node.RunTitleTemplate,
+			Position:         ProtoToPosition(node.Position),
+			IsCollapsed:      node.IsCollapsed,
+			IntegrationID:    integrationID,
+			ErrorMessage:     errorMessage,
+			WarningMessage:   warningMessage,
 		}
 	}
 
@@ -741,6 +741,10 @@ func NodesToProto(nodes []models.Node) []*componentpb.Node {
 			Type:        NodeTypeToProto(node.Type),
 			Position:    PositionToProto(node.Position),
 			IsCollapsed: node.IsCollapsed,
+		}
+
+		if node.RunTitleTemplate != nil {
+			result[i].RunTitleTemplate = node.RunTitleTemplate
 		}
 
 		if node.Ref.Component != nil {
@@ -1021,7 +1025,6 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 	out := make([]*triggerpb.Trigger, len(in))
 	for i, trigger := range in {
 		configFields := trigger.Configuration()
-		configFields = AppendGlobalTriggerFields(configFields)
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = ConfigurationFieldToProto(field)
@@ -1029,35 +1032,17 @@ func SerializeTriggers(in []core.Trigger) []*triggerpb.Trigger {
 		exampleData, _ := structpb.NewStruct(trigger.ExampleData())
 
 		out[i] = &triggerpb.Trigger{
-			Name:          trigger.Name(),
-			Label:         trigger.Label(),
-			Description:   trigger.Description(),
-			Icon:          trigger.Icon(),
-			Color:         trigger.Color(),
-			Configuration: configuration,
-			ExampleData:   exampleData,
+			Name:            trigger.Name(),
+			Label:           trigger.Label(),
+			Description:     trigger.Description(),
+			Icon:            trigger.Icon(),
+			Color:           trigger.Color(),
+			Configuration:   configuration,
+			ExampleData:     exampleData,
+			DefaultRunTitle: trigger.DefaultRunTitle(),
 		}
 	}
 	return out
-}
-
-func AppendGlobalTriggerFields(fields []configuration.Field) []configuration.Field {
-	if slices.ContainsFunc(fields, func(field configuration.Field) bool {
-		return field.Name == "customName"
-	}) {
-		return fields
-	}
-
-	fields = append(fields, configuration.Field{
-		Name:        "customName",
-		Label:       "Run title",
-		Type:        configuration.FieldTypeString,
-		Togglable:   true,
-		Description: "Give each run a dynamic title using expressions. Use root().data to access the trigger payload.",
-		Placeholder: "{{ root().data.foo }}",
-	})
-
-	return fields
 }
 
 func SerializeWidgets(in []core.Widget) []*widgetpb.Widget {

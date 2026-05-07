@@ -67,6 +67,10 @@ func (s *Start) Color() string {
 	return "purple"
 }
 
+func (s *Start) DefaultRunTitle() string {
+	return "Event emitted by trigger"
+}
+
 func (s *Start) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
