@@ -1,5 +1,5 @@
 import type { CanvasFoldersCanvasFolder } from "@/api-client";
-import { Button } from "@/components/ui/button";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/Input/input";
 import { Text } from "@/components/Text/text";
 import {
@@ -33,6 +33,9 @@ interface CanvasFolderSubmenuProps {
   canUpdateCanvases: boolean;
 }
 
+type CreateCanvasFolderMutation = ReturnType<typeof useCreateCanvasFolder>;
+type UpdateCanvasFolderMembershipMutation = ReturnType<typeof useUpdateCanvasFolderMembership>;
+
 export function CanvasFolderSubmenu({
   canvas,
   canvasFolders,
@@ -46,96 +49,50 @@ export function CanvasFolderSubmenu({
   const queryClient = useQueryClient();
   const folderActionLabel = canvas.canvasFolderId ? "Move to Folder" : "Add to Folder";
   const isDuplicateNewFolderTitle = hasDuplicateFolderTitle(canvasFolders, newFolderTitle);
+  const isCreatingFolder = createCanvasFolderMutation.isPending;
+  const isUpdatingMembership = updateCanvasFolderMembershipMutation.isPending;
 
-  const handleAssignToFolder = async (folderId: string) => {
-    if (!canUpdateCanvases || folderId === canvas.canvasFolderId) return;
-
-    const folder = canvasFolders.find((canvasFolder) => canvasFolder.id === folderId);
-    if (!folder) {
-      showErrorToast("Folder not found");
-      return;
-    }
-
-    try {
-      await updateCanvasFolderMembershipMutation.mutateAsync({
-        folderId: folder.id,
-        title: folder.title,
-        backgroundColor: folder.backgroundColor,
-        canvasIds: addCanvasToFolder(folder.canvasIds, canvas.id),
-      });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to add canvas to folder"));
-    }
-  };
-
-  const handleRemoveFromFolder = async () => {
-    if (!canUpdateCanvases || !canvas.canvasFolderId) return;
-
-    const folder = canvasFolders.find((canvasFolder) => canvasFolder.id === canvas.canvasFolderId);
-    if (!folder) {
-      showErrorToast("Folder not found");
-      return;
-    }
-
-    try {
-      await updateCanvasFolderMembershipMutation.mutateAsync({
-        folderId: folder.id,
-        title: folder.title,
-        backgroundColor: folder.backgroundColor,
-        canvasIds: removeCanvasFromFolder(folder.canvasIds, canvas.id),
-      });
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to remove canvas from folder"));
-    }
-  };
-
-  const handleCreateFolder = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (!canUpdateCanvases) return;
-
-    const title = newFolderTitle.trim();
-    if (!title) return;
-
-    if (isDuplicateNewFolderTitle) {
-      showErrorToast("Folder name already exists");
-      return;
-    }
-
-    let responseFolderId: string | undefined;
-    try {
-      const response = await createCanvasFolderMutation.mutateAsync({ title, backgroundColor: newFolderColor });
-      responseFolderId = response.data?.folder?.metadata?.id;
-    } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to create folder"));
-      return;
-    }
-
-    try {
-      const folderId = await resolveCreatedFolderId(queryClient, organizationId, title, responseFolderId);
-
-      await updateCanvasFolderMembershipMutation.mutateAsync({
-        folderId,
-        title,
-        backgroundColor: newFolderColor,
-        canvasIds: [canvas.id],
-      });
-    } catch (error) {
-      setNewFolderTitle("");
-      setNewFolderColor(DEFAULT_CANVAS_FOLDER_COLOR);
-      showErrorToast(getFolderCreatedAssignmentErrorMessage(error));
-      return;
-    }
-
+  const resetNewFolderForm = () => {
     setNewFolderTitle("");
     setNewFolderColor(DEFAULT_CANVAS_FOLDER_COLOR);
-    showSuccessToast("Folder created");
   };
+
+  const handleAssignToFolder = (folderId: string) =>
+    assignCanvasToFolder({
+      canvas,
+      canvasFolders,
+      folderId,
+      canUpdateCanvases,
+      updateCanvasFolderMembershipMutation,
+    });
+
+  const handleRemoveFromFolder = () =>
+    removeCanvasFromFolder({
+      canvas,
+      canvasFolders,
+      canUpdateCanvases,
+      updateCanvasFolderMembershipMutation,
+    });
+
+  const handleCreateFolder = (event: FormEvent<HTMLFormElement>) =>
+    createFolderAndAssignCanvas({
+      event,
+      canvasId: canvas.id,
+      title: newFolderTitle,
+      backgroundColor: newFolderColor,
+      organizationId,
+      queryClient,
+      canUpdateCanvases,
+      isDuplicateTitle: isDuplicateNewFolderTitle,
+      createCanvasFolderMutation,
+      updateCanvasFolderMembershipMutation,
+      onReset: resetNewFolderForm,
+    });
 
   return (
     <>
       <DropdownMenuSub>
-        <DropdownMenuSubTrigger disabled={!canUpdateCanvases}>
+        <DropdownMenuSubTrigger disabled={!canUpdateCanvases || isCreatingFolder || isUpdatingMembership}>
           <FolderPlus size={16} />
           {folderActionLabel}
         </DropdownMenuSubTrigger>
@@ -143,7 +100,7 @@ export function CanvasFolderSubmenu({
           <CanvasFolderList
             canvas={canvas}
             canvasFolders={canvasFolders}
-            isUpdatingMembership={updateCanvasFolderMembershipMutation.isPending}
+            isUpdatingMembership={isUpdatingMembership}
             onAssignToFolder={(folderId) => void handleAssignToFolder(folderId)}
           />
           <CreateCanvasFolderForm
@@ -151,7 +108,8 @@ export function CanvasFolderSubmenu({
             backgroundColor={newFolderColor}
             isDuplicateTitle={isDuplicateNewFolderTitle}
             canUpdateCanvases={canUpdateCanvases}
-            isCreatingFolder={createCanvasFolderMutation.isPending}
+            isCreatingFolder={isCreatingFolder}
+            isUpdatingMembership={isUpdatingMembership}
             onTitleChange={setNewFolderTitle}
             onColorChange={setNewFolderColor}
             onSubmit={handleCreateFolder}
@@ -162,7 +120,7 @@ export function CanvasFolderSubmenu({
       <RemoveFromFolderItem
         canvasFolderId={canvas.canvasFolderId}
         canUpdateCanvases={canUpdateCanvases}
-        isUpdatingMembership={updateCanvasFolderMembershipMutation.isPending}
+        isUpdatingMembership={isUpdatingMembership}
         onRemoveFromFolder={() => void handleRemoveFromFolder()}
       />
     </>
@@ -172,6 +130,140 @@ export function CanvasFolderSubmenu({
 function hasDuplicateFolderTitle(canvasFolders: CanvasFolderData[], title: string) {
   const normalizedTitle = title.trim().toLowerCase();
   return canvasFolders.some((folder) => folder.title.trim().toLowerCase() === normalizedTitle);
+}
+
+async function assignCanvasToFolder({
+  canvas,
+  canvasFolders,
+  folderId,
+  canUpdateCanvases,
+  updateCanvasFolderMembershipMutation,
+}: {
+  canvas: CanvasCardData;
+  canvasFolders: CanvasFolderData[];
+  folderId: string;
+  canUpdateCanvases: boolean;
+  updateCanvasFolderMembershipMutation: UpdateCanvasFolderMembershipMutation;
+}) {
+  if (!canUpdateCanvases || folderId === canvas.canvasFolderId) return;
+
+  const folder = canvasFolders.find((canvasFolder) => canvasFolder.id === folderId);
+  if (!folder) {
+    showErrorToast("Folder not found");
+    return;
+  }
+
+  try {
+    await updateCanvasFolderMembershipMutation.mutateAsync({
+      folderId: folder.id,
+      title: folder.title,
+      backgroundColor: folder.backgroundColor,
+      canvasIds: addCanvasToFolder(folder.canvasIds, canvas.id),
+    });
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, "Failed to add canvas to folder"));
+  }
+}
+
+async function removeCanvasFromFolder({
+  canvas,
+  canvasFolders,
+  canUpdateCanvases,
+  updateCanvasFolderMembershipMutation,
+}: {
+  canvas: CanvasCardData;
+  canvasFolders: CanvasFolderData[];
+  canUpdateCanvases: boolean;
+  updateCanvasFolderMembershipMutation: UpdateCanvasFolderMembershipMutation;
+}) {
+  if (!canUpdateCanvases || !canvas.canvasFolderId) return;
+
+  const folder = canvasFolders.find((canvasFolder) => canvasFolder.id === canvas.canvasFolderId);
+  if (!folder) {
+    showErrorToast("Folder not found");
+    return;
+  }
+
+  try {
+    await updateCanvasFolderMembershipMutation.mutateAsync({
+      folderId: folder.id,
+      title: folder.title,
+      backgroundColor: folder.backgroundColor,
+      canvasIds: removeCanvasId(folder.canvasIds, canvas.id),
+    });
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, "Failed to remove canvas from folder"));
+  }
+}
+
+async function createFolderAndAssignCanvas({
+  event,
+  canvasId,
+  title,
+  backgroundColor,
+  organizationId,
+  queryClient,
+  canUpdateCanvases,
+  isDuplicateTitle,
+  createCanvasFolderMutation,
+  updateCanvasFolderMembershipMutation,
+  onReset,
+}: {
+  event: FormEvent<HTMLFormElement>;
+  canvasId: string;
+  title: string;
+  backgroundColor: CanvasFolderColor;
+  organizationId: string;
+  queryClient: QueryClient;
+  canUpdateCanvases: boolean;
+  isDuplicateTitle: boolean;
+  createCanvasFolderMutation: CreateCanvasFolderMutation;
+  updateCanvasFolderMembershipMutation: UpdateCanvasFolderMembershipMutation;
+  onReset: () => void;
+}) {
+  event.preventDefault();
+  event.stopPropagation();
+  const trimmedTitle = title.trim();
+  if (!canUpdateCanvases || !trimmedTitle) return;
+
+  if (isDuplicateTitle) {
+    showErrorToast("Folder name already exists");
+    return;
+  }
+
+  const createdFolder = await createCanvasFolder(trimmedTitle, backgroundColor, createCanvasFolderMutation);
+  if (!createdFolder.ok) return;
+
+  try {
+    const folderId = await resolveCreatedFolderId(queryClient, organizationId, trimmedTitle, createdFolder.folderId);
+    await updateCanvasFolderMembershipMutation.mutateAsync({
+      folderId,
+      title: trimmedTitle,
+      backgroundColor,
+      canvasIds: [canvasId],
+    });
+  } catch (error) {
+    onReset();
+    showErrorToast(getFolderCreatedAssignmentErrorMessage(error));
+    return;
+  }
+
+  onReset();
+  showSuccessToast("Folder created");
+}
+
+async function createCanvasFolder(
+  title: string,
+  backgroundColor: CanvasFolderColor,
+  createCanvasFolderMutation: CreateCanvasFolderMutation,
+) {
+  try {
+    const response = await createCanvasFolderMutation.mutateAsync({ title, backgroundColor });
+    return { ok: true as const, folderId: response.data?.folder?.metadata?.id };
+  } catch (error) {
+    showErrorToast(getApiErrorMessage(error, "Failed to create folder"));
+    return { ok: false as const };
+  }
 }
 
 async function resolveCreatedFolderId(
@@ -202,7 +294,7 @@ function addCanvasToFolder(canvasIds: string[], canvasId: string) {
   return canvasIds.includes(canvasId) ? canvasIds : [...canvasIds, canvasId];
 }
 
-function removeCanvasFromFolder(canvasIds: string[], canvasId: string) {
+function removeCanvasId(canvasIds: string[], canvasId: string) {
   return canvasIds.filter((id) => id !== canvasId);
 }
 
@@ -274,6 +366,7 @@ function CreateCanvasFolderForm({
   isDuplicateTitle,
   canUpdateCanvases,
   isCreatingFolder,
+  isUpdatingMembership,
   onTitleChange,
   onColorChange,
   onSubmit,
@@ -283,10 +376,14 @@ function CreateCanvasFolderForm({
   isDuplicateTitle: boolean;
   canUpdateCanvases: boolean;
   isCreatingFolder: boolean;
+  isUpdatingMembership: boolean;
   onTitleChange: (title: string) => void;
   onColorChange: (color: CanvasFolderColor) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const isSaving = isCreatingFolder || isUpdatingMembership;
+  const loadingText = isCreatingFolder ? "Creating..." : "Adding...";
+
   return (
     <form className="space-y-3 p-3" onSubmit={onSubmit} onClick={(event) => event.stopPropagation()}>
       <Input
@@ -296,20 +393,26 @@ function CreateCanvasFolderForm({
         placeholder="New folder name"
         className="h-8"
         maxLength={128}
-        disabled={!canUpdateCanvases || isCreatingFolder}
+        disabled={!canUpdateCanvases || isSaving}
       />
       {isDuplicateTitle ? (
         <Text className="text-xs text-red-600 dark:text-red-300">Folder name already exists</Text>
       ) : null}
-      <CanvasFolderColorPicker selectedColor={backgroundColor} onColorChange={onColorChange} />
-      <Button
+      <CanvasFolderColorPicker
+        selectedColor={backgroundColor}
+        onColorChange={onColorChange}
+        isColorDisabled={() => isSaving}
+      />
+      <LoadingButton
         type="submit"
         size="sm"
         className="w-full"
-        disabled={!title.trim() || isDuplicateTitle || isCreatingFolder}
+        disabled={!title.trim() || isDuplicateTitle || isSaving}
+        loading={isSaving}
+        loadingText={loadingText}
       >
         Create Folder
-      </Button>
+      </LoadingButton>
     </form>
   );
 }
