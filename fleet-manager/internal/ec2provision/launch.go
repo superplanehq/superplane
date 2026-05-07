@@ -248,12 +248,13 @@ func userDataScript(c Config) string {
 	b.WriteString("apt-get update -qy\n")
 	if strings.TrimSpace(c.RunnerS3URI) != "" {
 		// Noble: no usable awscli deb in default mirrors; CLI v2 bundle (paths must stay root — user-data).
-		b.WriteString("apt-get install -qy ca-certificates curl docker.io unzip\n")
+		// bash: host-mode runner looks up "bash" for PTY sessions; some minimal AMIs or systemd PATH omit it.
+		b.WriteString("apt-get install -qy bash ca-certificates curl docker.io unzip\n")
 		b.WriteString("curl -fsSL \"https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip\" -o /tmp/awscliv2.zip\n")
 		b.WriteString("unzip -q /tmp/awscliv2.zip -d /tmp\n")
 		b.WriteString("/tmp/aws/install --update\n")
 	} else {
-		b.WriteString("apt-get install -qy ca-certificates curl docker.io\n")
+		b.WriteString("apt-get install -qy bash ca-certificates curl docker.io\n")
 	}
 	b.WriteString("systemctl enable --now docker\n")
 	if strings.TrimSpace(c.RunnerS3URI) != "" {
@@ -271,6 +272,7 @@ func userDataScript(c Config) string {
 	b.WriteString("{\n")
 	b.WriteString("  printf 'FLEET_MANAGER_URL=%s\\n' \"$FMTMP\"\n")
 	b.WriteString("  printf 'RUNNER_ID=%s\\n' \"$IID\"\n")
+	b.WriteString("  printf 'RUNNER_SHELL=/bin/bash\\n'\n")
 	b.WriteString("  if [ -n \"$RUNTOK\" ]; then printf 'AUTH_TOKEN=%s\\n' \"$RUNTOK\"; fi\n")
 	if c.RunnerTerminateAfterEachTask {
 		b.WriteString("  printf 'RUNNER_TERMINATE_AFTER_EACH_TASK=true\\n'\n")
@@ -289,6 +291,7 @@ func userDataScript(c Config) string {
 	b.WriteString("\n")
 	b.WriteString("[Service]\n")
 	b.WriteString("Type=simple\n")
+	b.WriteString("Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n")
 	b.WriteString("EnvironmentFile=/etc/default/superplane-runner\n")
 	fmt.Fprintf(&b, "Restart=%s\n", restartPolicy)
 	b.WriteString("ExecStart=/usr/local/bin/runner\n")
