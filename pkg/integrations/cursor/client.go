@@ -37,8 +37,8 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 	}
 
 	return &Client{
-		LaunchAgentKey: launchAgentKey,
-		AdminKey:       adminKey,
+		LaunchAgentKey: strings.TrimSpace(launchAgentKey),
+		AdminKey:       strings.TrimSpace(adminKey),
 		BaseURL:        defaultBaseURL,
 		http:           httpClient,
 	}, nil
