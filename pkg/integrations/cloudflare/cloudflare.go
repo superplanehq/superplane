@@ -51,6 +51,7 @@ func (c *Cloudflare) Instructions() string {
      - Zone / Zone / Read
      - Zone / DNS / Edit
      - Zone / Single Redirect / Edit
+     - Zone / Origin Rules / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
@@ -74,9 +75,12 @@ func (c *Cloudflare) Configuration() []configuration.Field {
 func (c *Cloudflare) Actions() []core.Action {
 	return []core.Action{
 		&CreateDNSRecord{},
+		&CreateOriginRule{},
 		&UpdateRedirectRule{},
+		&UpdateOriginRule{},
 		&UpdateDNSRecord{},
 		&DeleteDNSRecord{},
+		&DeleteOriginRule{},
 	}
 }
 
@@ -183,6 +187,39 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 					Type: resourceType,
 					Name: fmt.Sprintf("%s (%s)", record.Name, record.Type),
 					ID:   fmt.Sprintf("%s/%s", zone.ID, record.ID),
+				})
+			}
+		}
+		return resources, nil
+
+	case "origin_rule":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		metadata := Metadata{}
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+			return nil, fmt.Errorf("failed to decode application metadata: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, zone := range metadata.Zones {
+			rules, err := client.ListOriginRules(zone.ID)
+			if err != nil {
+				continue
+			}
+
+			for _, rule := range rules {
+				name := rule.Description
+				if name == "" {
+					name = rule.Expression
+				}
+
+				resources = append(resources, core.IntegrationResource{
+					Type: resourceType,
+					Name: fmt.Sprintf("%s - %s", zone.Name, name),
+					ID:   fmt.Sprintf("%s/%s", zone.ID, rule.ID),
 				})
 			}
 		}
