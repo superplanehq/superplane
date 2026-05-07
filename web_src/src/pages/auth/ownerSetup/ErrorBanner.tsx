@@ -1,4 +1,3 @@
-import React from "react";
 import { Text } from "@/components/Text/text";
 
 export const ErrorBanner = ({ message }: { message: string | null }) => {

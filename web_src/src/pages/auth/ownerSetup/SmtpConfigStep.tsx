@@ -3,6 +3,7 @@ import { Input, InputGroup } from "@/components/Input/input";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/ui/checkbox";
 import { ErrorBanner } from "./ErrorBanner";
 
 type SmtpConfigStepProps = {
@@ -155,10 +156,14 @@ const SmtpConfigFields: React.FC<SmtpConfigFieldsProps> = ({
       )}
     </div>
 
-    <Label className="inline-flex items-center gap-2">
-      <input type="checkbox" checked={smtpUseTLS} onChange={(event) => onSmtpUseTLSChange(event.target.checked)} />
-      Use TLS (STARTTLS)
-    </Label>
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id="owner-setup-smtp-use-tls"
+        checked={smtpUseTLS}
+        onCheckedChange={(checked) => onSmtpUseTLSChange(checked === true)}
+      />
+      <Label htmlFor="owner-setup-smtp-use-tls">Use TLS (STARTTLS)</Label>
+    </div>
   </>
 );
 
