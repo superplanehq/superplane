@@ -492,4 +492,11 @@ func Test__Cursor__SetupProvider__OnStepRevert(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "adm", admin)
 	})
+
+	t.Run("done step revert is a no-op", func(t *testing.T) {
+		require.NoError(t, s.OnStepRevert(core.SetupStepContext{
+			Step:   core.StepInfo{Name: SetupStepDone},
+			Logger: log,
+		}))
+	})
 }

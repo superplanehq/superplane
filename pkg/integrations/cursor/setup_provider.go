@@ -102,9 +102,10 @@ func (s *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 		ctx.Capabilities.Clear()
 		return nil
 	case SetupStepEnterLaunchKey, SetupStepEnterAdminKey:
-		// Do not delete stored secrets here. Going "back" from the done step should not
-		// wipe keys the user already had (e.g. expansion flows or pre-existing secrets).
-		// Users can rotate keys via integration secret update.
+		// Do not delete stored secrets here. Users can rotate keys via integration secret update.
+		return nil
+	case SetupStepDone:
+		// Framework may call revert when navigating back from the completed step; no-op.
 		return nil
 	default:
 		return errors.New("unknown step")
@@ -336,18 +337,19 @@ func (s *SetupProvider) onEnterAdminKeySubmit(input any, ctx core.SetupStepConte
 		return nil, errors.New("admin API key is required")
 	}
 
-	if err := verifyCursorCredentials(ctx.HTTP, "", adminVal, false, true); err != nil {
-		return nil, err
-	}
-
-	if err := persistSecret(ctx, core.IntegrationSecretDefinition{
-		Name:        SecretAdminKey,
-		Label:       "Admin API Key",
-		Description: "API key for Cursor Admin / usage endpoints",
-		Value:       adminVal,
-		Editable:    true,
-	}); err != nil {
-		return nil, err
+	if needAdmin {
+		if err := verifyCursorCredentials(ctx.HTTP, "", adminVal, false, true); err != nil {
+			return nil, err
+		}
+		if err := persistSecret(ctx, core.IntegrationSecretDefinition{
+			Name:        SecretAdminKey,
+			Label:       "Admin API Key",
+			Description: "API key for Cursor Admin / usage endpoints",
+			Value:       adminVal,
+			Editable:    true,
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	if requestedNeedsLaunchAgentKey(requested) {
