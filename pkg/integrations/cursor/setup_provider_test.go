@@ -419,6 +419,45 @@ func Test__Cursor__SetupProvider__OnStepSubmit(t *testing.T) {
 		require.NoError(t, getErr)
 		assert.Equal(t, "adm", v)
 	})
+
+	t.Run("enterAdminKey verifies stored launch key when agent capabilities are requested", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"data":[]}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"agents":[]}`)),
+				},
+			},
+		}
+		cap := &contexts.CapabilityContext{}
+		cap.Request("cursor.launchAgent", "cursor.getDailyUsageData")
+		intCtx := &contexts.IntegrationContext{
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				SecretLaunchAgentKey: {Name: SecretLaunchAgentKey, Value: []byte("existing-launch")},
+			},
+		}
+
+		next, err := s.OnStepSubmit(core.SetupStepContext{
+			Step: core.StepInfo{
+				Name:   SetupStepEnterAdminKey,
+				Inputs: map[string]any{SecretAdminKey: "adm"},
+			},
+			Logger:       log,
+			Capabilities: cap,
+			Secrets:      intCtx.Secrets(),
+			HTTP:         httpCtx,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, next)
+		assert.Equal(t, core.SetupStepTypeDone, next.Type)
+		require.Len(t, httpCtx.Requests, 2)
+		assert.Equal(t, "https://api.cursor.com/teams/daily-usage-data", httpCtx.Requests[0].URL.String())
+		assert.Equal(t, "https://api.cursor.com/v0/agents?limit=1", httpCtx.Requests[1].URL.String())
+	})
 }
 
 func Test__Cursor__SetupProvider__OnStepRevert(t *testing.T) {

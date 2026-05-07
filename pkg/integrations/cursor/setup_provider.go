@@ -348,8 +348,12 @@ func (s *SetupProvider) onEnterAdminKeySubmit(input any, ctx core.SetupStepConte
 		return nil, err
 	}
 
-	// We verified the admin key above. If both keys are required, the launch key has already been
-	// verified in the previous step, so we don't re-verify it here.
+	if requestedNeedsLaunchAgentKey(requested) {
+		launchKey, _ := ctx.Secrets.Get(SecretLaunchAgentKey)
+		if err := verifyCursorCredentials(ctx.HTTP, launchKey, "", true, false); err != nil {
+			return nil, err
+		}
+	}
 
 	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
 	return cursorSetupDoneStep(), nil
