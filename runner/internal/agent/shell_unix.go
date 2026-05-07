@@ -13,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -128,7 +129,12 @@ func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, dir
 	}
 	defer func() { _ = os.RemoveAll(tmpRoot) }()
 
-	shellCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// github.com/creack/pty Start sets Setsid+Setctty (Linux). Combining that with Setpgid has
+	// produced fork/exec /bin/bash EPERM on Ubuntu EC2; omit Setpgid on Linux only. Non-Linux
+	// Unix (e.g. darwin dev) still uses Setpgid for stable process-group teardown.
+	if runtime.GOOS != "linux" {
+		shellCmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	}
 
 	master, err := pty.Start(shellCmd)
 	if err != nil {

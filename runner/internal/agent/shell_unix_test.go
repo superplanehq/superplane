@@ -5,6 +5,7 @@ package agent
 import (
 	"context"
 	"os/exec"
+	"runtime"
 	"strings"
 	"syscall"
 	"testing"
@@ -20,7 +21,9 @@ func skipIfPTYUnavailable(t *testing.T) {
 		t.Skipf("bash not on PATH: %v", err)
 	}
 	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "--noediting", "-i")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if runtime.GOOS != "linux" {
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	}
 	f, err := pty.Start(cmd)
 	if err != nil {
 		t.Skipf("PTY required (not available here): %v", err)
