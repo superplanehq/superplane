@@ -28,7 +28,7 @@ func Test__Cursor__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 		assert.Contains(t, err.Error(), "no requested capabilities")
 	})
 
-	t.Run("returns enterKeys when admin capability requested but admin secret missing", func(t *testing.T) {
+	t.Run("returns enterAdminKey when admin capability requested but admin secret missing", func(t *testing.T) {
 		cap := &contexts.CapabilityContext{}
 		step, err := s.OnCapabilityUpdate(core.CapabilityUpdateContext{
 			Logger: log,
@@ -41,13 +41,13 @@ func Test__Cursor__SetupProvider__OnCapabilityUpdate(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, step)
-		assert.Equal(t, SetupStepEnterKeys, step.Name)
+		assert.Equal(t, SetupStepEnterAdminKey, step.Name)
 		assert.Equal(t, core.SetupStepTypeInputs, step.Type)
 		require.Len(t, step.Inputs, 1)
 		assert.Equal(t, SecretAdminKey, step.Inputs[0].Name)
 	})
 
-	t.Run("returns enterKeys with only missing key", func(t *testing.T) {
+	t.Run("returns enterAdminKey when launch key exists but admin missing", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{}
 		intCtx := &contexts.IntegrationContext{
 			CurrentSecrets: map[string]core.IntegrationSecret{
@@ -219,7 +219,7 @@ func Test__Cursor__SetupProvider__OnStepSubmit(t *testing.T) {
 		assert.Contains(t, err.Error(), "at least one capability")
 	})
 
-	t.Run("capability selection skips enterKeys when secrets already satisfy selection", func(t *testing.T) {
+	t.Run("capability selection skips key steps when secrets already satisfy selection", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -253,7 +253,7 @@ func Test__Cursor__SetupProvider__OnStepSubmit(t *testing.T) {
 		assert.Equal(t, "https://api.cursor.com/v0/agents?limit=1", httpCtx.Requests[0].URL.String())
 	})
 
-	t.Run("capability selection with both key types asks for both keys", func(t *testing.T) {
+	t.Run("capability selection with both key types asks for launch key first", func(t *testing.T) {
 		intCtx := &contexts.IntegrationContext{CurrentSecrets: map[string]core.IntegrationSecret{}}
 		cap := &contexts.CapabilityContext{}
 		next, err := s.OnStepSubmit(core.SetupStepContext{
@@ -267,19 +267,18 @@ func Test__Cursor__SetupProvider__OnStepSubmit(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, next)
-		assert.Equal(t, SetupStepEnterKeys, next.Name)
+		assert.Equal(t, SetupStepEnterLaunchKey, next.Name)
 		assert.Equal(t, core.SetupStepTypeInputs, next.Type)
-		require.Len(t, next.Inputs, 2)
+		require.Len(t, next.Inputs, 1)
 		assert.Equal(t, SecretLaunchAgentKey, next.Inputs[0].Name)
-		assert.Equal(t, SecretAdminKey, next.Inputs[1].Name)
 	})
 
-	t.Run("enterKeys validation", func(t *testing.T) {
+	t.Run("enterLaunchKey validation", func(t *testing.T) {
 		cap := &contexts.CapabilityContext{}
 		cap.Request("cursor.launchAgent")
 
 		_, err := s.OnStepSubmit(core.SetupStepContext{
-			Step:         core.StepInfo{Name: SetupStepEnterKeys, Inputs: "not-a-map"},
+			Step:         core.StepInfo{Name: SetupStepEnterLaunchKey, Inputs: "not-a-map"},
 			Logger:       log,
 			Capabilities: cap,
 			Secrets:      (&contexts.IntegrationContext{CurrentSecrets: map[string]core.IntegrationSecret{}}).Secrets(),
@@ -288,7 +287,7 @@ func Test__Cursor__SetupProvider__OnStepSubmit(t *testing.T) {
 		assert.Contains(t, err.Error(), "invalid input")
 	})
 
-	t.Run("enterKeys success enables capabilities", func(t *testing.T) {
+	t.Run("enterLaunchKey success enables capabilities when only launch is needed", func(t *testing.T) {
 		httpCtx := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
@@ -303,7 +302,7 @@ func Test__Cursor__SetupProvider__OnStepSubmit(t *testing.T) {
 		intCtx := &contexts.IntegrationContext{CurrentSecrets: map[string]core.IntegrationSecret{}}
 		next, err := s.OnStepSubmit(core.SetupStepContext{
 			Step: core.StepInfo{
-				Name:   SetupStepEnterKeys,
+				Name:   SetupStepEnterLaunchKey,
 				Inputs: map[string]any{SecretLaunchAgentKey: "tok"},
 			},
 			Logger:       log,
@@ -318,6 +317,68 @@ func Test__Cursor__SetupProvider__OnStepSubmit(t *testing.T) {
 		v, getErr := intCtx.Secrets().Get(SecretLaunchAgentKey)
 		require.NoError(t, getErr)
 		assert.Equal(t, "tok", v)
+	})
+
+	t.Run("enterLaunchKey continues to admin step when admin is also needed", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"agents":[]}`)),
+				},
+			},
+		}
+		cap := &contexts.CapabilityContext{}
+		cap.Request("cursor.launchAgent", "cursor.getDailyUsageData")
+		intCtx := &contexts.IntegrationContext{CurrentSecrets: map[string]core.IntegrationSecret{}}
+
+		next, err := s.OnStepSubmit(core.SetupStepContext{
+			Step: core.StepInfo{
+				Name:   SetupStepEnterLaunchKey,
+				Inputs: map[string]any{SecretLaunchAgentKey: "tok"},
+			},
+			Logger:       log,
+			Capabilities: cap,
+			Secrets:      intCtx.Secrets(),
+			HTTP:         httpCtx,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, next)
+		assert.Equal(t, SetupStepEnterAdminKey, next.Name)
+		require.Len(t, next.Inputs, 1)
+		assert.Equal(t, SecretAdminKey, next.Inputs[0].Name)
+	})
+
+	t.Run("enterAdminKey success enables capabilities", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"data":[]}`)),
+				},
+			},
+		}
+		cap := &contexts.CapabilityContext{}
+		cap.Request("cursor.getDailyUsageData")
+		intCtx := &contexts.IntegrationContext{CurrentSecrets: map[string]core.IntegrationSecret{}}
+
+		next, err := s.OnStepSubmit(core.SetupStepContext{
+			Step: core.StepInfo{
+				Name:   SetupStepEnterAdminKey,
+				Inputs: map[string]any{SecretAdminKey: "adm"},
+			},
+			Logger:       log,
+			Capabilities: cap,
+			Secrets:      intCtx.Secrets(),
+			HTTP:         httpCtx,
+		})
+		require.NoError(t, err)
+		require.NotNil(t, next)
+		assert.Equal(t, core.SetupStepTypeDone, next.Type)
+		assert.Contains(t, cap.EnabledCapabilities, "cursor.getDailyUsageData")
+		v, getErr := intCtx.Secrets().Get(SecretAdminKey)
+		require.NoError(t, getErr)
+		assert.Equal(t, "adm", v)
 	})
 }
 
@@ -334,7 +395,7 @@ func Test__Cursor__SetupProvider__OnStepRevert(t *testing.T) {
 		assert.Contains(t, err.Error(), "unknown step")
 	})
 
-	t.Run("enterKeys revert preserves stored secrets", func(t *testing.T) {
+	t.Run("key step revert preserves stored secrets", func(t *testing.T) {
 		intCtx := &contexts.IntegrationContext{
 			CurrentSecrets: map[string]core.IntegrationSecret{
 				SecretLaunchAgentKey: {Name: SecretLaunchAgentKey, Value: []byte("sek")},
@@ -342,7 +403,7 @@ func Test__Cursor__SetupProvider__OnStepRevert(t *testing.T) {
 			},
 		}
 		require.NoError(t, s.OnStepRevert(core.SetupStepContext{
-			Step:    core.StepInfo{Name: SetupStepEnterKeys},
+			Step:    core.StepInfo{Name: SetupStepEnterLaunchKey},
 			Logger:  log,
 			Secrets: intCtx.Secrets(),
 		}))

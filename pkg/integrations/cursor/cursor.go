@@ -40,7 +40,7 @@ func (i *Cursor) Description() string {
 }
 
 func (i *Cursor) Instructions() string {
-	return "To get your API keys, visit the [Cursor Dashboard](https://cursor.com/dashboard). You may need separate keys for Agents and Admin features."
+	return "To get your API keys, visit the [Cursor Dashboard](https://cursor.com/dashboard)."
 }
 
 func (i *Cursor) Configuration() []configuration.Field {

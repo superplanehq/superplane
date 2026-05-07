@@ -12,7 +12,8 @@ import (
 
 const (
 	SetupStepCapabilitySelection = "capabilitySelection"
-	SetupStepEnterKeys           = "enterKeys"
+	SetupStepEnterLaunchKey      = "enterLaunchKey"
+	SetupStepEnterAdminKey       = "enterAdminKey"
 	SetupStepDone                = "done"
 )
 
@@ -126,8 +127,10 @@ func (s *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 	switch ctx.Step.Name {
 	case SetupStepCapabilitySelection:
 		return s.onCapabilitySelectionSubmit(ctx)
-	case SetupStepEnterKeys:
-		return s.onEnterKeysSubmit(ctx.Step.Inputs, ctx)
+	case SetupStepEnterLaunchKey:
+		return s.onEnterLaunchKeySubmit(ctx.Step.Inputs, ctx)
+	case SetupStepEnterAdminKey:
+		return s.onEnterAdminKeySubmit(ctx.Step.Inputs, ctx)
 	default:
 		return nil, errors.New("unknown step")
 	}
@@ -138,7 +141,7 @@ func (s *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 	case SetupStepCapabilitySelection:
 		ctx.Capabilities.Clear()
 		return nil
-	case SetupStepEnterKeys:
+	case SetupStepEnterLaunchKey, SetupStepEnterAdminKey:
 		// Do not delete stored secrets here. Going "back" from the done step should not
 		// wipe keys the user already had (e.g. expansion flows or pre-existing secrets).
 		// Users can rotate keys via integration secret update.
@@ -191,7 +194,7 @@ func (s *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*c
 	needAdmin := requestedNeedsAdminKey(requested)
 
 	if (needLaunch && !hasLaunch) || (needAdmin && !hasAdmin) {
-		return s.enterKeysOrDone(ctx.HTTP, ctx.Secrets, ctx.Capabilities, ctx.Capabilities.Requested(), hasLaunch, hasAdmin)
+		return s.nextStepOrDone(ctx.HTTP, ctx.Secrets, ctx.Capabilities, ctx.Capabilities.Requested(), hasLaunch, hasAdmin)
 	}
 
 	if err := verifyCursorCredentials(ctx.HTTP, launchKey, adminKey, needLaunch, needAdmin); err != nil {
@@ -215,27 +218,30 @@ func (s *SetupProvider) onCapabilitySelectionSubmit(ctx core.SetupStepContext) (
 	hasLaunch := errLaunch == nil && strings.TrimSpace(launchKey) != ""
 	hasAdmin := errAdmin == nil && strings.TrimSpace(adminKey) != ""
 
-	return s.enterKeysOrDone(ctx.HTTP, ctx.Secrets, ctx.Capabilities, ctx.Capabilities.Requested(), hasLaunch, hasAdmin)
+	return s.nextStepOrDone(ctx.HTTP, ctx.Secrets, ctx.Capabilities, ctx.Capabilities.Requested(), hasLaunch, hasAdmin)
 }
 
-// enterKeysOrDone returns an enter-keys step when inputs are needed; otherwise verifies stored secrets,
-// enables requested capabilities, and returns the done step (skips an empty key form).
-func (s *SetupProvider) enterKeysOrDone(
+// nextStepOrDone returns the next missing-key step (launch then admin), otherwise verifies stored secrets,
+// enables requested capabilities, and returns the done step.
+func (s *SetupProvider) nextStepOrDone(
 	http core.HTTPContext,
 	secrets core.IntegrationSecretStorage,
 	capabilities core.CapabilityContext,
 	requested []string,
 	hasLaunch, hasAdmin bool,
 ) (*core.SetupStep, error) {
-	step := s.enterKeysStep(requested, hasLaunch, hasAdmin)
-	if len(step.Inputs) > 0 {
-		return step, nil
+	needLaunch := requestedNeedsLaunchAgentKey(requested)
+	needAdmin := requestedNeedsAdminKey(requested)
+
+	if needLaunch && !hasLaunch {
+		return s.enterLaunchKeyStep(), nil
+	}
+	if needAdmin && !hasAdmin {
+		return s.enterAdminKeyStep(), nil
 	}
 
 	launchKey, _ := secrets.Get(SecretLaunchAgentKey)
 	adminKey, _ := secrets.Get(SecretAdminKey)
-	needLaunch := requestedNeedsLaunchAgentKey(requested)
-	needAdmin := requestedNeedsAdminKey(requested)
 
 	if err := verifyCursorCredentials(http, launchKey, adminKey, needLaunch, needAdmin); err != nil {
 		return nil, err
@@ -254,42 +260,45 @@ func cursorSetupDoneStep() *core.SetupStep {
 	}
 }
 
-func (s *SetupProvider) enterKeysStep(requested []string, hasLaunch, hasAdmin bool) *core.SetupStep {
-	needLaunch := requestedNeedsLaunchAgentKey(requested)
-	needAdmin := requestedNeedsAdminKey(requested)
-
-	inputs := []configuration.Field{}
-	if needLaunch && !hasLaunch {
-		inputs = append(inputs, configuration.Field{
-			Name:        SecretLaunchAgentKey,
-			Label:       "Cloud Agent API Key",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Sensitive:   true,
-			Description: "Required for launching Cloud Agents and related actions.",
-		})
-	}
-	if needAdmin && !hasAdmin {
-		inputs = append(inputs, configuration.Field{
-			Name:        SecretAdminKey,
-			Label:       "Admin API Key",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Sensitive:   true,
-			Description: "Required for team usage data (Admin API).",
-		})
-	}
-
+func (s *SetupProvider) enterLaunchKeyStep() *core.SetupStep {
 	return &core.SetupStep{
-		Type:         core.SetupStepTypeInputs,
-		Name:         SetupStepEnterKeys,
-		Label:        "Enter Cursor API keys",
-		Inputs:       inputs,
-		Instructions: (&Cursor{}).Instructions(),
+		Type:  core.SetupStepTypeInputs,
+		Name:  SetupStepEnterLaunchKey,
+		Label: "Enter Cloud Agent API key",
+		Inputs: []configuration.Field{
+			{
+				Name:        SecretLaunchAgentKey,
+				Label:       "Cloud Agent API Key",
+				Type:        configuration.FieldTypeString,
+				Required:    true,
+				Sensitive:   true,
+				Description: "Required for launching Cloud Agents and related actions.",
+			},
+		},
+		Instructions: "Create or copy a Cloud Agent API key from the Cursor Dashboard.",
 	}
 }
 
-func (s *SetupProvider) onEnterKeysSubmit(input any, ctx core.SetupStepContext) (*core.SetupStep, error) {
+func (s *SetupProvider) enterAdminKeyStep() *core.SetupStep {
+	return &core.SetupStep{
+		Type:  core.SetupStepTypeInputs,
+		Name:  SetupStepEnterAdminKey,
+		Label: "Enter Admin API key",
+		Inputs: []configuration.Field{
+			{
+				Name:        SecretAdminKey,
+				Label:       "Admin API Key",
+				Type:        configuration.FieldTypeString,
+				Required:    true,
+				Sensitive:   true,
+				Description: "Required for team usage data (Admin API).",
+			},
+		},
+		Instructions: "Create or copy an Admin API key from the Cursor Dashboard (requires appropriate org/team permissions).",
+	}
+}
+
+func (s *SetupProvider) onEnterLaunchKeySubmit(input any, ctx core.SetupStepContext) (*core.SetupStep, error) {
 	m, ok := input.(map[string]any)
 	if !ok {
 		return nil, errors.New("invalid input")
@@ -303,43 +312,37 @@ func (s *SetupProvider) onEnterKeysSubmit(input any, ctx core.SetupStepContext) 
 	if v, ok := m[SecretLaunchAgentKey].(string); ok {
 		launchVal = strings.TrimSpace(v)
 	}
-	adminVal := ""
-	if v, ok := m[SecretAdminKey].(string); ok {
-		adminVal = strings.TrimSpace(v)
-	}
 
 	if needLaunch && launchVal == "" {
-		if _, err := ctx.Secrets.Get(SecretLaunchAgentKey); err != nil {
-			return nil, errors.New("cloud agent API key is required")
-		}
-	}
-	if needAdmin && adminVal == "" {
-		if _, err := ctx.Secrets.Get(SecretAdminKey); err != nil {
-			return nil, errors.New("admin API key is required")
-		}
+		return nil, errors.New("cloud agent API key is required")
 	}
 
-	if launchVal != "" {
-		if err := persistSecret(ctx, core.IntegrationSecretDefinition{
-			Name:        SecretLaunchAgentKey,
-			Label:       "Cloud Agent API Key",
-			Description: "API key for Cursor Cloud Agents",
-			Value:       launchVal,
-			Editable:    true,
-		}); err != nil {
-			return nil, err
-		}
+	if err := verifyCursorCredentials(ctx.HTTP, launchVal, "", true, false); err != nil {
+		return nil, err
 	}
-	if adminVal != "" {
-		if err := persistSecret(ctx, core.IntegrationSecretDefinition{
-			Name:        SecretAdminKey,
-			Label:       "Admin API Key",
-			Description: "API key for Cursor Admin / usage endpoints",
-			Value:       adminVal,
-			Editable:    true,
-		}); err != nil {
-			return nil, err
-		}
+
+	if err := persistSecret(ctx, core.IntegrationSecretDefinition{
+		Name:        SecretLaunchAgentKey,
+		Label:       "Cloud Agent API Key",
+		Description: "API key for Cursor Cloud Agents",
+		Value:       launchVal,
+		Editable:    true,
+	}); err != nil {
+		return nil, err
+	}
+
+	// If only the launch key is required, we already verified it above.
+	if needLaunch && !needAdmin {
+		ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
+		return cursorSetupDoneStep(), nil
+	}
+
+	hasAdmin := false
+	if v, err := ctx.Secrets.Get(SecretAdminKey); err == nil && strings.TrimSpace(v) != "" {
+		hasAdmin = true
+	}
+	if needAdmin && !hasAdmin {
+		return s.enterAdminKeyStep(), nil
 	}
 
 	launchKey, _ := ctx.Secrets.Get(SecretLaunchAgentKey)
@@ -351,6 +354,44 @@ func (s *SetupProvider) onEnterKeysSubmit(input any, ctx core.SetupStepContext) 
 
 	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
 
+	return cursorSetupDoneStep(), nil
+}
+
+func (s *SetupProvider) onEnterAdminKeySubmit(input any, ctx core.SetupStepContext) (*core.SetupStep, error) {
+	m, ok := input.(map[string]any)
+	if !ok {
+		return nil, errors.New("invalid input")
+	}
+
+	requested := ctx.Capabilities.Requested()
+	needAdmin := requestedNeedsAdminKey(requested)
+
+	adminVal := ""
+	if v, ok := m[SecretAdminKey].(string); ok {
+		adminVal = strings.TrimSpace(v)
+	}
+	if needAdmin && adminVal == "" {
+		return nil, errors.New("admin API key is required")
+	}
+
+	if err := verifyCursorCredentials(ctx.HTTP, "", adminVal, false, true); err != nil {
+		return nil, err
+	}
+
+	if err := persistSecret(ctx, core.IntegrationSecretDefinition{
+		Name:        SecretAdminKey,
+		Label:       "Admin API Key",
+		Description: "API key for Cursor Admin / usage endpoints",
+		Value:       adminVal,
+		Editable:    true,
+	}); err != nil {
+		return nil, err
+	}
+
+	// We verified the admin key above. If both keys are required, the launch key has already been
+	// verified in the previous step, so we don't re-verify it here.
+
+	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
 	return cursorSetupDoneStep(), nil
 }
 
