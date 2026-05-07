@@ -32,8 +32,8 @@ func skipIfPTYUnavailable(t *testing.T) {
 	if err != nil {
 		t.Skipf("bash not on PATH: %v", err)
 	}
-	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "--noediting", "-i")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i")
+	// Do not set Setpgid: creack/pty uses Setsid+Setctty; combining them yields fork/exec EPERM on Darwin/Linux.
 	f, err := pty.Start(cmd)
 	if err != nil {
 		t.Skipf("PTY required for runner e2e (not available here): %v", err)

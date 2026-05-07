@@ -1,0 +1,1 @@
+echo 'bootready-123'
