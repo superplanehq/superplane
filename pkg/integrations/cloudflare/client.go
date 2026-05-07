@@ -728,11 +728,16 @@ func (c *Client) GetKVNamespace(accountID, namespaceID string) (*KVNamespace, er
 	}
 
 	var response struct {
-		Result KVNamespace `json:"result"`
+		Success bool        `json:"success"`
+		Result  KVNamespace `json:"result"`
 	}
 
 	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
 	}
 
 	return &response.Result, nil
@@ -850,11 +855,16 @@ func (c *Client) ListKVNamespaces(accountID string) ([]KVNamespace, error) {
 	}
 
 	var response struct {
-		Result []KVNamespace `json:"result"`
+		Success bool          `json:"success"`
+		Result  []KVNamespace `json:"result"`
 	}
 
 	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
 	}
 
 	return response.Result, nil
@@ -870,11 +880,16 @@ func (c *Client) ListKVKeys(accountID, namespaceID string) ([]KVKey, error) {
 	}
 
 	var response struct {
-		Result []KVKey `json:"result"`
+		Success bool    `json:"success"`
+		Result  []KVKey `json:"result"`
 	}
 
 	if err := json.Unmarshal(responseBody, &response); err != nil {
 		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
 	}
 
 	return response.Result, nil
@@ -884,6 +899,22 @@ func (c *Client) ListKVKeys(accountID, namespaceID string) ([]KVKey, error) {
 func (c *Client) DeleteKVNamespace(accountID, namespaceID string) error {
 	url := fmt.Sprintf("%s/accounts/%s/storage/kv/namespaces/%s", c.BaseURL, accountID, namespaceID)
 
-	_, err := c.execRequest(http.MethodDelete, url, nil)
-	return err
+	responseBody, err := c.execRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return fmt.Errorf("API returned success=false")
+	}
+
+	return nil
 }

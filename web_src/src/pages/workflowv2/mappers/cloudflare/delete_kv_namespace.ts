@@ -52,8 +52,8 @@ export const deleteKVNamespaceMapper: ComponentBaseMapper = {
     if (!result) return details;
 
     const ns = result.namespace as Record<string, unknown> | undefined;
-    details["Namespace"] =
-      ns?.title != null && String(ns.title) !== "" ? String(ns.title) : ns?.id != null ? String(ns.id) : "-";
+    const nsTitle = ns?.title != null ? String(ns.title) : "";
+    details["Namespace"] = nsTitle !== "" ? nsTitle : ns?.id != null ? String(ns.id) : "-";
     details["Deleted"] = result.deleted != null ? String(result.deleted) : "-";
 
     return details;
