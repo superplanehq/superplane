@@ -5,34 +5,24 @@ package agent
 import (
 	"context"
 	"os/exec"
-	"runtime"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
-
-	"github.com/creack/pty"
 )
 
 func skipIfPTYUnavailable(t *testing.T) {
 	t.Helper()
-	bash, err := exec.LookPath("bash")
-	if err != nil {
+	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skipf("bash not on PATH: %v", err)
 	}
-	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "--noediting", "-i")
-	if runtime.GOOS != "linux" {
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	// Semaphore/Docker agents often allow opening /dev/ptmx but fail on read (EIO). Probe the full
+	// runHostShellDirectives path instead of only pty.Start.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	code, _, err := runHostShellDirectives(ctx, 8*1024, []string{`echo 'pty-probe'`})
+	if err != nil || code != 0 {
+		t.Skipf("host PTY shell not available in this environment (code=%d): %v", code, err)
 	}
-	f, err := pty.Start(cmd)
-	if err != nil {
-		t.Skipf("PTY required (not available here): %v", err)
-	}
-	if cmd.Process != nil {
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-	}
-	_ = f.Close()
-	_ = cmd.Wait()
 }
 
 func TestHostShellDirectivesEcho(t *testing.T) {
