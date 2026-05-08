@@ -1,3 +1,10 @@
+import { renderTimeAgo } from "@/components/TimeAgo";
+import { getColorClass } from "@/lib/colors";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type React from "react";
+import { getTriggerRenderer } from ".";
+
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -8,12 +15,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "./types";
-import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
-import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { getColorClass } from "@/lib/colors";
-import type React from "react";
-import { getTriggerRenderer } from ".";
-import { renderTimeAgo } from "@/components/TimeAgo";
+
 import { stringOrDash } from "./utils";
 
 const RUNNER_STATE_MAP: EventStateMap = {
@@ -49,7 +51,6 @@ const runnerStateFunction = (execution: ExecutionInfo): EventState => {
     return "running";
   }
 
-  // Like SSH: treat terminal `failed` output channel as failed even if execution.result is passed.
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
     const outputs = execution.outputs as RunnerOutputs;
     if (outputs?.failed?.length) {
@@ -78,14 +79,14 @@ export const RUNNER_STATE_REGISTRY: EventStateRegistry = {
 export const runnerMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const title = context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component";
+    const iconSlug = context.componentDefinition.icon || "terminal";
+    const iconColor = getColorClass(context.componentDefinition?.color || "blue");
+
     return {
-      title:
-        context.node.name ||
-        context.componentDefinition.label ||
-        context.componentDefinition.name ||
-        "Unnamed component",
-      iconSlug: context.componentDefinition.icon || "terminal",
-      iconColor: getColorClass(context.componentDefinition?.color || "blue"),
+      title,
+      iconSlug,
+      iconColor,
       collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
       eventSections: lastExecution ? runnerEventSections(context.nodes, lastExecution) : undefined,
@@ -104,12 +105,8 @@ export const runnerMapper: ComponentBaseMapper = {
     const payload = firstRunnerPayload(context.execution);
     if (!payload) return details;
 
-    details["task_id"] = stringOrDash(payload.task_id);
-    details["fleet_task_id"] = stringOrDash(payload.fleet_task_id);
     details["status"] = stringOrDash(payload.status);
     details["exit_code"] = stringOrDash(payload.exit_code);
-    details["error"] = stringOrDash(payload.error);
-    details["output"] = stringOrDash(payload.output);
     return details;
   },
 };
