@@ -48,11 +48,11 @@ INSERT INTO workflow_runs (
 SELECT
   workflow_run_backfill.run_id,
   workflow_events.workflow_id,
-  'started',
-  NULL,
+  'finished',
+  'passed',
   workflow_events.created_at,
   workflow_events.created_at,
-  NULL
+  workflow_events.created_at
 FROM workflow_run_backfill
 INNER JOIN workflow_events
   ON workflow_events.id = workflow_run_backfill.root_event_id;
@@ -76,58 +76,6 @@ UPDATE workflow_events
 SET run_id = workflow_node_executions.run_id
 FROM workflow_node_executions
 WHERE workflow_events.execution_id = workflow_node_executions.id;
-
-UPDATE workflow_runs
-SET
-  state = 'finished',
-  result = CASE
-    WHEN EXISTS (
-      SELECT 1
-      FROM workflow_node_executions
-      WHERE workflow_node_executions.run_id = workflow_runs.id
-        AND workflow_node_executions.result = 'failed'
-    ) THEN 'failed'
-    WHEN EXISTS (
-      SELECT 1
-      FROM workflow_node_executions
-      WHERE workflow_node_executions.run_id = workflow_runs.id
-        AND workflow_node_executions.result = 'cancelled'
-    ) THEN 'cancelled'
-    ELSE 'passed'
-  END,
-  updated_at = GREATEST(
-    workflow_runs.updated_at,
-    COALESCE((
-      SELECT MAX(workflow_node_executions.updated_at)
-      FROM workflow_node_executions
-      WHERE workflow_node_executions.run_id = workflow_runs.id
-    ), workflow_runs.updated_at)
-  ),
-  finished_at = GREATEST(
-    workflow_runs.updated_at,
-    COALESCE((
-      SELECT MAX(workflow_node_executions.updated_at)
-      FROM workflow_node_executions
-      WHERE workflow_node_executions.run_id = workflow_runs.id
-    ), workflow_runs.updated_at)
-  )
-WHERE NOT EXISTS (
-  SELECT 1
-  FROM workflow_node_executions
-  WHERE workflow_node_executions.run_id = workflow_runs.id
-    AND workflow_node_executions.state IN ('pending', 'started')
-)
-AND NOT EXISTS (
-  SELECT 1
-  FROM workflow_node_queue_items
-  WHERE workflow_node_queue_items.run_id = workflow_runs.id
-)
-AND NOT EXISTS (
-  SELECT 1
-  FROM workflow_events
-  WHERE workflow_events.run_id = workflow_runs.id
-    AND workflow_events.state = 'pending'
-);
 
 ALTER TABLE workflow_events ALTER COLUMN run_id SET NOT NULL;
 ALTER TABLE workflow_node_queue_items ALTER COLUMN run_id SET NOT NULL;
