@@ -6,6 +6,7 @@ import { resolveIcon } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
+import { getMonacoOverflowWidgetsNode } from "@/lib/monacoOverflowWidgets";
 import { parseDefaultValues } from "../../lib/components";
 
 export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
@@ -139,6 +140,8 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
     const editorOptions = {
       minimap: { enabled: false },
       fontSize: 13,
+      fixedOverflowWidgets: true,
+      overflowWidgetsDomNode: getMonacoOverflowWidgetsNode(),
       lineNumbers: "on" as const,
       wordWrap: "on" as const,
       folding: true,
