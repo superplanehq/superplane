@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -123,7 +124,10 @@ func FindFirstCanvasMemoryByNamespaceAndMatchesInTransaction(tx *gorm.DB, canvas
 		Error
 
 	if err != nil {
-		return nil, nil
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
 	}
 
 	return &record, nil
@@ -144,7 +148,10 @@ func FindFirstCanvasMemoryByNamespaceInTransaction(tx *gorm.DB, canvasID uuid.UU
 		Error
 
 	if err != nil {
-		return nil, nil
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
 	}
 
 	return &record, nil
