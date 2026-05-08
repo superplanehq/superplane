@@ -1124,7 +1124,7 @@ type CreatePoolRequest struct {
 	Name           string          `json:"name"`
 	Description    string          `json:"description,omitempty"`
 	Enabled        bool            `json:"enabled"`
-	MinimumOrigins int             `json:"minimum_origins,omitempty"`
+	MinimumOrigins *int            `json:"minimum_origins,omitempty"`
 	Monitor        string          `json:"monitor,omitempty"`
 	Origins        []Origin        `json:"origins"`
 	LoadShedding   *LoadShedding   `json:"load_shedding,omitempty"`

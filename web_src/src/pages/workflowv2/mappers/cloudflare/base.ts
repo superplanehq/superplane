@@ -52,6 +52,32 @@ export const baseMapper: ComponentBaseMapper = {
   },
 };
 
+export function getPoolExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  const pool = result?.pool as Record<string, unknown> | undefined;
+  if (!pool) return details;
+
+  details["Pool ID"] = pool.id != null ? String(pool.id) : "-";
+  details["Name"] = pool.name != null ? String(pool.name) : "-";
+
+  if (pool.description != null) {
+    details["Description"] = String(pool.description);
+  }
+
+  details["Enabled"] = pool.enabled != null ? String(pool.enabled) : "-";
+  details["Minimum Origins"] = pool.minimum_origins != null ? String(pool.minimum_origins) : "-";
+  details["Number of Origins"] = Array.isArray(pool.origins) ? String(pool.origins.length) : "-";
+
+  return details;
+}
+
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const receivedAt = execution.createdAt ? new Date(execution.createdAt) : new Date();
   const subtitleDate = execution.updatedAt ?? execution.createdAt;

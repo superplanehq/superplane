@@ -25,7 +25,7 @@ type CreatePoolSpec struct {
 	Name                 string            `json:"name"`
 	Description          string            `json:"description"`
 	Enabled              bool              `json:"enabled"`
-	MinimumOrigins       int               `json:"minimumOrigins"`
+	MinimumOrigins       *int              `json:"minimumOrigins"`
 	Monitor              string            `json:"monitor"`
 	Origins              []OriginSpec      `json:"origins"`
 	OriginSteeringPolicy string            `json:"originSteeringPolicy"`
