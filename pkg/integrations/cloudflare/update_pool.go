@@ -197,6 +197,7 @@ func (c *UpdatePool) Configuration() []configuration.Field {
 			Label:       "Enabled",
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
+			Togglable:   true,
 			Default:     true,
 			Description: "Enable or disable the pool",
 		},
