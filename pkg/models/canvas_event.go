@@ -177,18 +177,7 @@ func ListExpiredRoutedRootCanvasEvents(referenceTime time.Time, limit int) ([]Ca
 func ListExpiredRoutedRootCanvasEventsInTransaction(tx *gorm.DB, referenceTime time.Time, limit int) ([]CanvasEvent, error) {
 	var events []CanvasEvent
 
-	query := tx.
-		Table("workflow_events").
-		Select("workflow_events.*").
-		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
-		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
-		Where("organizations.deleted_at IS NULL").
-		Where("organizations.usage_retention_window_days IS NOT NULL").
-		Where("organizations.usage_retention_window_days > 0").
-		Where("workflows.deleted_at IS NULL").
-		Where("workflow_events.execution_id IS NULL").
-		Where("workflow_events.state = ?", CanvasEventStateRouted).
-		Where("workflow_events.created_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC()).
+	query := expiredRoutedRootCanvasEventsQuery(tx, referenceTime).
 		Order("workflow_events.created_at ASC")
 
 	if limit > 0 {
@@ -201,6 +190,88 @@ func ListExpiredRoutedRootCanvasEventsInTransaction(tx *gorm.DB, referenceTime t
 	}
 
 	return events, nil
+}
+
+func LockExpiredRoutedRootCanvasEventsInTransaction(tx *gorm.DB, referenceTime time.Time, limit int) ([]CanvasEvent, error) {
+	var events []CanvasEvent
+
+	query := expiredRoutedRootCanvasEventsQuery(tx, referenceTime).
+		Scopes(
+			lockCanvasEventsForUpdate,
+			withoutRootEventQueueItems,
+			withoutActiveRootEventExecutions,
+			withoutPendingRootEventRequests,
+			oldestCanvasEventsFirst,
+		)
+
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+
+	err := query.Find(&events).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return events, nil
+}
+
+func expiredRoutedRootCanvasEventsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
+	query := tx.
+		Table("workflow_events").
+		Select("workflow_events.*").
+		Where("organizations.usage_retention_window_days IS NOT NULL").
+		Where("organizations.usage_retention_window_days > 0").
+		Where("workflow_events.execution_id IS NULL").
+		Where("workflow_events.state = ?", CanvasEventStateRouted).
+		Where("workflow_events.created_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC())
+
+	return withActiveCanvas(query, "workflow_events.workflow_id")
+}
+
+func lockCanvasEventsForUpdate(tx *gorm.DB) *gorm.DB {
+	return tx.Clauses(clause.Locking{
+		Strength: "UPDATE",
+		Table:    clause.Table{Name: "workflow_events"},
+		Options:  "SKIP LOCKED",
+	})
+}
+
+func withoutRootEventQueueItems(tx *gorm.DB) *gorm.DB {
+	return tx.Where(`
+		NOT EXISTS (
+			SELECT 1
+			FROM workflow_node_queue_items
+			WHERE workflow_node_queue_items.root_event_id = workflow_events.id
+		)
+	`)
+}
+
+func withoutActiveRootEventExecutions(tx *gorm.DB) *gorm.DB {
+	return tx.Where(`
+		NOT EXISTS (
+			SELECT 1
+			FROM workflow_node_executions
+			WHERE workflow_node_executions.root_event_id = workflow_events.id
+			AND workflow_node_executions.state IN ?
+		)
+	`, []string{CanvasNodeExecutionStatePending, CanvasNodeExecutionStateStarted})
+}
+
+func withoutPendingRootEventRequests(tx *gorm.DB) *gorm.DB {
+	return tx.Where(`
+		NOT EXISTS (
+			SELECT 1
+			FROM workflow_node_requests
+			JOIN workflow_node_executions ON workflow_node_requests.execution_id = workflow_node_executions.id
+			WHERE workflow_node_executions.root_event_id = workflow_events.id
+			AND workflow_node_requests.state = ?
+		)
+	`, NodeExecutionRequestStatePending)
+}
+
+func oldestCanvasEventsFirst(tx *gorm.DB) *gorm.DB {
+	return tx.Order("workflow_events.created_at ASC")
 }
 
 func ListPendingCanvasEvents() ([]CanvasEvent, error) {
@@ -249,24 +320,13 @@ func LockCanvasEvent(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, error) {
 func LockExpiredRoutedRootCanvasEvent(tx *gorm.DB, id uuid.UUID, referenceTime time.Time) (*CanvasEvent, error) {
 	var event CanvasEvent
 
-	err := tx.
-		Table("workflow_events").
-		Select("workflow_events.*").
-		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
-		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
+	err := expiredRoutedRootCanvasEventsQuery(tx, referenceTime).
 		Clauses(clause.Locking{
 			Strength: "UPDATE",
 			Table:    clause.Table{Name: "workflow_events"},
 			Options:  "SKIP LOCKED",
 		}).
 		Where("workflow_events.id = ?", id).
-		Where("organizations.deleted_at IS NULL").
-		Where("organizations.usage_retention_window_days IS NOT NULL").
-		Where("organizations.usage_retention_window_days > 0").
-		Where("workflows.deleted_at IS NULL").
-		Where("workflow_events.execution_id IS NULL").
-		Where("workflow_events.state = ?", CanvasEventStateRouted).
-		Where("workflow_events.created_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC()).
 		First(&event).
 		Error
 	if err != nil {
@@ -274,6 +334,42 @@ func LockExpiredRoutedRootCanvasEvent(tx *gorm.DB, id uuid.UUID, referenceTime t
 	}
 
 	return &event, nil
+}
+
+func DeleteRootCanvasEventChainsInTransaction(tx *gorm.DB, rootEventIDs []uuid.UUID) error {
+	if len(rootEventIDs) == 0 {
+		return nil
+	}
+
+	var executionIDs []uuid.UUID
+	err := tx.
+		Model(&CanvasNodeExecution{}).
+		Where("root_event_id IN ?", rootEventIDs).
+		Pluck("id", &executionIDs).
+		Error
+	if err != nil {
+		return err
+	}
+
+	if len(executionIDs) > 0 {
+		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&CanvasNodeRequest{}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&CanvasNodeExecutionKV{}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&CanvasEvent{}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Where("root_event_id IN ?", rootEventIDs).Delete(&CanvasNodeExecution{}).Error; err != nil {
+			return err
+		}
+	}
+
+	return tx.Where("id IN ?", rootEventIDs).Delete(&CanvasEvent{}).Error
 }
 
 func (e *CanvasEvent) Routed() error {
