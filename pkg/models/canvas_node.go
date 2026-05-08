@@ -314,6 +314,7 @@ type CanvasNodeQueueItem struct {
 	//
 	RootEventID uuid.UUID
 	RootEvent   *CanvasEvent `gorm:"foreignKey:RootEventID"`
+	RunID       uuid.UUID
 
 	//
 	// The reference to a CanvasEvent record,
@@ -324,6 +325,20 @@ type CanvasNodeQueueItem struct {
 
 func (i *CanvasNodeQueueItem) TableName() string {
 	return "workflow_node_queue_items"
+}
+
+func (i *CanvasNodeQueueItem) BeforeCreate(tx *gorm.DB) error {
+	if i.RunID != uuid.Nil {
+		return nil
+	}
+
+	run, err := FindCanvasRunByRootEventInTransaction(tx, i.RootEventID)
+	if err != nil {
+		return err
+	}
+
+	i.RunID = run.ID
+	return nil
 }
 
 func (i *CanvasNodeQueueItem) Delete(tx *gorm.DB) error {
