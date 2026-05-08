@@ -10,8 +10,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record in a Cloudflare zone" />
+  <LinkCard title="Create Origin Rule" href="#create-origin-rule" description="Create a rule to override the origin server for matching requests" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a Cloudflare zone" />
+  <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
+  <LinkCard title="Update Origin Rule" href="#update-origin-rule" description="Update an existing origin rule" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
 </CardGrid>
 
@@ -27,8 +30,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
      - Zone / DNS / Edit
-     - Zone / Dynamic Redirect / Edit
-     - Zone / DNS / Edit
+     - Zone / Single Redirect / Edit
+     - Zone / Origin Rules / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
@@ -78,6 +81,53 @@ Emits the created DNS record on the default channel. If the zone is not found, t
 }
 ```
 
+<a id="create-origin-rule"></a>
+
+## Create Origin Rule
+
+The Create Origin Rule component creates a Cloudflare origin rule that routes matching requests to a different origin server.
+
+### Configuration
+
+- **Zone**: Select the Cloudflare zone where the rule should run
+- **Apply To**: Apply to all incoming requests or build a custom filter
+- **Match Rules**: Field/operator/value predicates used to build the Cloudflare expression
+- **DNS Record**: Optional hostname Cloudflare should resolve and route to
+- **Destination Port**: Optional destination port override
+- **Host Header**: Optional HTTP Host header override
+- **SNI**: Optional SNI override
+- **Enabled**: Whether the rule is active
+
+### Output
+
+Emits the created origin rule on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "rule": {
+      "action": "route",
+      "action_parameters": {
+        "host_header": "api.example.com",
+        "origin": {
+          "host": "api-origin.example.com",
+          "port": 8443
+        }
+      },
+      "description": "Route API requests",
+      "enabled": true,
+      "expression": "starts_with(http.request.uri.path, \"/api/\")",
+      "id": "rule123"
+    },
+    "zoneId": "zone123"
+  },
+  "timestamp": "2026-05-06T12:00:00Z",
+  "type": "cloudflare.createOriginRule"
+}
+```
+
 <a id="delete-dns-record"></a>
 
 ## Delete DNS Record
@@ -116,6 +166,44 @@ Emits the deleted DNS record (zoneId, recordId, record) on the default channel. 
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "cloudflare.dnsRecord"
+}
+```
+
+<a id="delete-origin-rule"></a>
+
+## Delete Origin Rule
+
+The Delete Origin Rule component removes a Cloudflare origin rule from a zone.
+
+### Configuration
+
+- **Rule**: Select the origin rule to delete
+
+### Output
+
+Emits the deleted origin rule on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "rule": {
+      "action": "route",
+      "action_parameters": {
+        "origin": {
+          "host": "api-origin.example.com"
+        }
+      },
+      "description": "Route API requests",
+      "enabled": true,
+      "expression": "starts_with(http.request.uri.path, \"/api/\")",
+      "id": "rule123"
+    },
+    "zoneId": "zone123"
+  },
+  "timestamp": "2026-05-06T12:00:00Z",
+  "type": "cloudflare.deleteOriginRule"
 }
 ```
 
@@ -160,6 +248,51 @@ Emits the updated DNS record (id, type, name, content, proxied, ttl) on the defa
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "cloudflare.dnsRecord"
+}
+```
+
+<a id="update-origin-rule"></a>
+
+## Update Origin Rule
+
+The Update Origin Rule component updates a Cloudflare origin rule, such as changing the origin host for matching requests.
+
+### Configuration
+
+- **Rule**: Select the origin rule to update
+- **Apply To**: Apply to all incoming requests or build a custom filter
+- **Match Rules**: Field/operator/value predicates used to build the Cloudflare expression
+- **DNS Record**: Optional hostname Cloudflare should resolve and route to
+- **Destination Port**: Optional destination port override
+- **Host Header**: Optional HTTP Host header override
+- **SNI**: Optional SNI override
+- **Enabled**: Whether the rule is active
+
+### Output
+
+Emits the updated origin rule on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "rule": {
+      "action": "route",
+      "action_parameters": {
+        "origin": {
+          "host": "new-api-origin.example.com"
+        }
+      },
+      "description": "Route API requests",
+      "enabled": true,
+      "expression": "starts_with(http.request.uri.path, \"/api/\")",
+      "id": "rule123"
+    },
+    "zoneId": "zone123"
+  },
+  "timestamp": "2026-05-06T12:00:00Z",
+  "type": "cloudflare.updateOriginRule"
 }
 ```
 
