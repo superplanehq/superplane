@@ -99,6 +99,7 @@ func (b *BrokerClient) CreateTask(commands []string, webhookURL string) (string,
 		return "", fmt.Errorf("new request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+b.authToken)
 
 	resp, err := b.httpClient.Do(httpReq)
 	if err != nil {
@@ -145,7 +146,7 @@ func (b *BrokerClient) FetchTaskStatus(taskID string) (*task, error) {
 	if err != nil {
 		return nil, fmt.Errorf("new request: %w", err)
 	}
-	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+b.authToken)
 
 	resp, err := b.httpClient.Do(httpReq)
 	if err != nil {
