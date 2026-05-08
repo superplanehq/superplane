@@ -648,12 +648,14 @@ The Read Memory component looks up values from canvas-level memory storage.
 - Retrieve previously stored IDs before cleanup actions
 - Check whether related data already exists
 - Rehydrate context from prior runs
+- Enumerate every record in a namespace (for bulk processing or fan-out)
 
 ### How It Works
 
-1. Reads `namespace`, `resultMode`, `emitMode`, and `matchList` from configuration
-2. Finds memory rows matching all configured key/value pairs
-3. Emits `memory.read` to the `found` or `notFound` channel
+1. Reads `namespace`, `resultMode`, `emitMode`, and optional `matchList` from configuration
+2. When `matchList` is provided, finds memory rows matching all configured key/value pairs
+3. When `matchList` is omitted or empty, returns all rows in the namespace (or the most recently created row when `resultMode = latest`)
+4. Emits `memory.read` to the `found` or `notFound` channel
 
 ### Output Channels
 
