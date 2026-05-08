@@ -242,10 +242,6 @@ type CreateOriginRulesetRequest struct {
 	Rules       []OriginRule `json:"rules,omitempty"`
 }
 
-type UpdateOriginRulesetRequest struct {
-	Rules []OriginRule `json:"rules"`
-}
-
 // ListRedirectRules retrieves all redirect rules for a zone
 func (c *Client) ListRedirectRules(zoneID string) ([]RedirectRule, error) {
 	url := fmt.Sprintf("%s/zones/%s/rulesets/phases/http_request_dynamic_redirect/entrypoint", c.BaseURL, zoneID)
@@ -371,35 +367,6 @@ func (c *Client) CreateOriginRuleset(zoneID string, req CreateOriginRulesetReque
 	}
 
 	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		Success bool          `json:"success"`
-		Result  OriginRuleset `json:"result"`
-	}
-
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	if !response.Success {
-		return nil, fmt.Errorf("API returned success=false")
-	}
-
-	return &response.Result, nil
-}
-
-func (c *Client) UpdateOriginRuleset(zoneID, rulesetID string, req UpdateOriginRulesetRequest) (*OriginRuleset, error) {
-	url := fmt.Sprintf("%s/zones/%s/rulesets/%s", c.BaseURL, zoneID, rulesetID)
-
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling request: %v", err)
-	}
-
-	responseBody, err := c.execRequest(http.MethodPut, url, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}

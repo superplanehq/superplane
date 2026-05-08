@@ -9,6 +9,7 @@ import type {
   OutputPayload,
   SubtitleContext,
 } from "../types";
+import { stringOrDash } from "../utils";
 import { baseMapper } from "./base";
 
 interface OriginRuleMatchRule {
@@ -344,14 +345,6 @@ function booleanLabel(value?: boolean): string {
   }
 
   return value ? "Yes" : "No";
-}
-
-function stringOrDash(value: unknown): string {
-  if (value === undefined || value === null || value === "") {
-    return "-";
-  }
-
-  return String(value);
 }
 
 function truncate(value: string, maxLength: number): string {
