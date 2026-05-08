@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -48,7 +49,11 @@ func main() {
 		},
 	}
 
-	auth := getenv("AUTH_TOKEN", "")
+	auth := strings.TrimSpace(os.Getenv("AUTH_TOKEN"))
+	if auth == "" {
+		log.Error("AUTH_TOKEN is required — set a non-empty secret; clients send Authorization: Bearer <token> for /v1 (except webhook callbacks)")
+		os.Exit(1)
+	}
 	handler := broker.NewRouter(srv, broker.RouterOptions{AuthToken: auth})
 
 	addr := getenv("LISTEN_ADDR", ":8081")

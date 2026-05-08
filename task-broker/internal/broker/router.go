@@ -25,10 +25,12 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 	r.Route("/v1", func(r chi.Router) {
 		// Completion callbacks come from downstream fleet-manager; must not require caller bearer auth.
 		r.Post("/webhooks/complete/{brokerTaskID}", s.webhookComplete)
+		auth := strings.TrimSpace(opt.AuthToken)
+		if auth == "" {
+			panic("broker: AuthToken is required — use mandatory AUTH_TOKEN from main")
+		}
 		r.Group(func(r chi.Router) {
-			if strings.TrimSpace(opt.AuthToken) != "" {
-				r.Use(bearerAuth(opt.AuthToken))
-			}
+			r.Use(bearerAuth(auth))
 			r.Get("/fleets", s.listFleets)
 			r.Post("/fleets", s.registerFleet)
 			r.Delete("/fleets/{id}", s.deleteFleet)

@@ -56,7 +56,7 @@ The broker needs a URL that **downstream fleet-manager** instances can POST to w
 | `LISTEN_ADDR`        | `:8081`       | HTTP listen address                                                                                                      |
 | `DATABASE_PATH`      | `./broker.db` | SQLite (fleets + broker-scoped tasks)                                                                                    |
 | `BROKER_PUBLIC_URL`  | (empty)       | Base URL reachable by fleet-manager(s), used to build completion relay URLs (**set in real deployments**)                |
-| `AUTH_TOKEN`         | (empty)       | If set, required for **`/v1/fleets` and `/v1/tasks`** (`Authorization: Bearer …`). Webhook callbacks are unauthenticated |
+| `AUTH_TOKEN`         | —             | **Required.** Clients must send `Authorization: Bearer …` for **`/v1/fleets`** and **`/v1/tasks`** (and related routes). **`/v1/webhooks/complete/*`** stays unauthenticated for fleet-manager callbacks |
 
 **HTTP (`/v1`)**
 
@@ -72,6 +72,7 @@ The broker needs a URL that **downstream fleet-manager** instances can POST to w
 export DATABASE_PATH=./broker.db
 export LISTEN_ADDR=:8081
 export BROKER_PUBLIC_URL=http://127.0.0.1:8081   # fleet-manager must reach this
+export AUTH_TOKEN=your-secret                  # mandatory
 ./bin/task-broker
 ```
 
@@ -161,9 +162,13 @@ curl -X POST http://127.0.0.1:8080/v1/tasks \
 ## Example: register fleet and enqueue via task-broker (curl)
 
 ```bash
+# Same token as task-broker AUTH_TOKEN
+BROKER_TOKEN=your-secret
+
 # Register a fleet-manager (repeat per region/environment)
 curl -X POST http://127.0.0.1:8081/v1/fleets \
   -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer ${BROKER_TOKEN}" \
   -d '{
     "id": "aws-standard-1",
     "base_url": "http://127.0.0.1:8080",
@@ -172,6 +177,7 @@ curl -X POST http://127.0.0.1:8081/v1/fleets \
 
 curl -X POST http://127.0.0.1:8081/v1/tasks \
   -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer ${BROKER_TOKEN}" \
   -d '{
     "fleet_id": "aws-standard-1",
     "commands": ["export A=1", "echo $A"],

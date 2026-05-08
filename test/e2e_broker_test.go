@@ -48,6 +48,7 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 	brokerDB := filepath.Join(t.TempDir(), "broker.db")
 	brokerAddr := freeTCPAddr(t)
 	brokerPublic := "http://" + brokerAddr
+	const brokerAuthToken = "e2e-broker-auth-token"
 
 	fleetCmd := exec.Command(fleetBin)
 	fleetCmd.Env = subprocessEnv(
@@ -72,7 +73,7 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 		"DATABASE_PATH="+brokerDB,
 		"LISTEN_ADDR="+brokerAddr,
 		"BROKER_PUBLIC_URL="+brokerPublic,
-		"AUTH_TOKEN=", // no broker auth for e2e
+		"AUTH_TOKEN="+brokerAuthToken,
 	)
 	brokerCmd.Stdout = io.Discard
 	brokerCmd.Stderr = newTestLogWriter(t, "task-broker")
@@ -97,7 +98,13 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	regResp, err := httpClient.Post(brokerPublic+"/v1/fleets", "application/json", bytes.NewReader(regBody))
+	regReq, err := http.NewRequest(http.MethodPost, brokerPublic+"/v1/fleets", bytes.NewReader(regBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	regReq.Header.Set("Content-Type", "application/json")
+	regReq.Header.Set("Authorization", "Bearer "+brokerAuthToken)
+	regResp, err := httpClient.Do(regReq)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,6 +172,7 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+brokerAuthToken)
 	taskResp, err := httpClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -206,7 +214,12 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 	}
 
 	pollURL := brokerPublic + "/v1/tasks/" + created.ID
-	pollResp, err := httpClient.Get(pollURL)
+	pollReq, err := http.NewRequest(http.MethodGet, pollURL, nil)
+	if err != nil {
+		t.Fatalf("broker get task: %v", err)
+	}
+	pollReq.Header.Set("Authorization", "Bearer "+brokerAuthToken)
+	pollResp, err := httpClient.Do(pollReq)
 	if err != nil {
 		t.Fatalf("broker get task: %v", err)
 	}

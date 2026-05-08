@@ -9,7 +9,7 @@
 # BROKER_PUBLIC_URL — base URL fleet-managers use to POST completion relays.
 #                     Defaults to http://$SSH_HOST:$HOST_PORT when unset (plain HTTP only).
 #
-#   AUTH_TOKEN       — bearer token for broker /v1 (optional)
+#   AUTH_TOKEN       — bearer token for broker /v1 (required; or set in TASK_BROKER_ENV_FILE)
 #
 # Optional extra env for the container: TASK_BROKER_ENV_FILE → uploaded; docker --env-file
 # (LISTEN_ADDR, DATABASE_PATH override, etc.—usually unnecessary; image sets DATABASE_PATH).
