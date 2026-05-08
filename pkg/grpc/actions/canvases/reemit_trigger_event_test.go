@@ -85,18 +85,32 @@ func Test__ReemitTriggerEvent(t *testing.T) {
 	})
 
 	t.Run("non-root event -> error", func(t *testing.T) {
-		now := time.Now()
-		executionID := uuid.New()
 		sourceEvent := models.CanvasEvent{
-			WorkflowID:  canvas.ID,
-			NodeID:      triggerNodeID,
-			Channel:     "default",
-			Data:        datatypes.NewJSONType[any](map[string]any{"data": map[string]any{"message": "Hello"}}),
-			ExecutionID: &executionID,
-			State:       models.CanvasEventStatePending,
-			CreatedAt:   &now,
+			WorkflowID: canvas.ID,
+			NodeID:     triggerNodeID,
+			Channel:    "default",
+			Data:       datatypes.NewJSONType[any](map[string]any{"data": map[string]any{"message": "Hello"}}),
+			State:      models.CanvasEventStatePending,
+			CreatedAt:  ptr(time.Now()),
 		}
 		require.NoError(t, database.Conn().Create(&sourceEvent).Error)
+
+		execution := support.CreateCanvasNodeExecution(
+			t,
+			canvas.ID,
+			triggerNodeID,
+			sourceEvent.ID,
+			sourceEvent.ID,
+			nil,
+		)
+		require.NoError(
+			t,
+			database.Conn().
+				Model(&models.CanvasEvent{}).
+				Where("id = ?", sourceEvent.ID).
+				Update("execution_id", execution.ID).
+				Error,
+		)
 
 		_, err := ReemitTriggerEvent(ctx, r.Organization.ID, canvas.ID, triggerNodeID, sourceEvent.ID)
 		require.Error(t, err)
@@ -140,4 +154,8 @@ func Test__ReemitTriggerEvent(t *testing.T) {
 		require.NotNil(t, reemitted.CustomName)
 		assert.Equal(t, customName, *reemitted.CustomName)
 	})
+}
+
+func ptr[T any](v T) *T {
+	return &v
 }
