@@ -16,11 +16,11 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
-  createDnsRecord: buildActionStateRegistry("completed"),
-  createOriginRule: buildActionStateRegistry("completed"),
-  updateDNSRecord: buildActionStateRegistry("completed"),
-  deleteDnsRecord: buildActionStateRegistry("completed"),
-  updateRedirectRule: buildActionStateRegistry("completed"),
-  updateOriginRule: buildActionStateRegistry("completed"),
-  deleteOriginRule: buildActionStateRegistry("completed"),
+  createDnsRecord: buildActionStateRegistry("created"),
+  createOriginRule: buildActionStateRegistry("created"),
+  updateDNSRecord: buildActionStateRegistry("updated"),
+  deleteDnsRecord: buildActionStateRegistry("deleted"),
+  updateRedirectRule: buildActionStateRegistry("updated"),
+  updateOriginRule: buildActionStateRegistry("updated"),
+  deleteOriginRule: buildActionStateRegistry("deleted"),
 };
