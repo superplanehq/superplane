@@ -78,7 +78,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const nodeMetadata = node.metadata as UpdatePoolNodeMetadata | undefined;
   const configuration = node.configuration as UpdatePoolConfiguration;
 
-  const label = nodeMetadata?.poolName || configuration?.pool;
+  const label = nodeMetadata?.poolName || configuration?.name || configuration?.pool;
   if (label) {
     metadata.push({ icon: "network", label });
   }
