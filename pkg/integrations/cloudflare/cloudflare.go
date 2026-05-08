@@ -88,6 +88,7 @@ func (c *Cloudflare) Instructions() string {
    - **Token name**: SuperPlane Integration
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
+	 - Zone / DNS / Edit
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
 	 - Account / Workers KV Storage / Edit
