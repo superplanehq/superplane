@@ -39,10 +39,12 @@ func main() {
 		log.Warn("BROKER_PUBLIC_URL unset; downstream fleet-man cannot POST completion webhooks in production")
 	}
 
+	ws := webhook.DefaultSender()
+	ws.Log = log
 	srv := &broker.Server{
 		Store:     st,
 		PublicURL: publicURL,
-		Webhook:   webhook.DefaultSender(),
+		Webhook:   ws,
 		Log:       log,
 		HTTP: &http.Client{
 			Timeout: 60 * time.Second,

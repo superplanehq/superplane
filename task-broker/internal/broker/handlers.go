@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -193,10 +194,17 @@ func (s *Server) createBrokerTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	t0 := time.Now()
 	fleetTaskID, st, respBody := s.forwardCreateTask(ctx, fleet, payload)
+	upstreamDur := time.Since(t0)
 	if st != http.StatusCreated {
 		_ = s.Store.DeleteBrokerTask(ctx, brokerID)
-		s.warn("upstream create failed", slog.Int("status", st), slog.String("fleet", fleet.ID), slog.String("body", strings.TrimSpace(string(respBody))))
+		s.warn("upstream create failed",
+			slog.Int("status", st),
+			slog.String("fleet", fleet.ID),
+			slog.Duration("dur", upstreamDur),
+			slog.String("upstream_host", upstreamBaseHost(fleet.BaseURL)),
+			slog.String("body", strings.TrimSpace(string(respBody))))
 		writeError(w, http.StatusBadGateway, "fleet-manager rejected task")
 		return
 	}
@@ -209,6 +217,18 @@ func (s *Server) createBrokerTask(w http.ResponseWriter, r *http.Request) {
 		s.logErr("record fleet task id", err)
 		writeError(w, http.StatusInternalServerError, "could not correlate task")
 		return
+	}
+
+	if s.Log != nil {
+		s.Log.Info("fleet_upstream_http",
+			slog.String("op", "create_task"),
+			slog.Int("http_status", st),
+			slog.Duration("dur", upstreamDur),
+			slog.String("broker_task_id", brokerID),
+			slog.String("fleet_id", fleet.ID),
+			slog.String("fleet_task_id", fleetTaskID),
+			slog.String("upstream_host", upstreamBaseHost(fleet.BaseURL)),
+		)
 	}
 
 	writeJSON(w, http.StatusCreated, api.BrokerCreateTaskResponse{ID: brokerID})
@@ -393,6 +413,9 @@ func (s *Server) webhookComplete(w http.ResponseWriter, r *http.Request) {
 	if ws == nil {
 		ws = webhook.DefaultSender()
 	}
+	if ws.Log == nil {
+		ws.Log = s.Log
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 	if err := ws.Deliver(ctx, row.CallerWebhookURL, out); err != nil {
@@ -413,4 +436,12 @@ func (s *Server) warn(msg string, attrs ...any) {
 	if s.Log != nil {
 		s.Log.Warn(msg, attrs...)
 	}
+}
+
+func upstreamBaseHost(base string) string {
+	u, err := url.Parse(strings.TrimSpace(base))
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	return u.Host
 }

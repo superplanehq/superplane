@@ -6,6 +6,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/superplane/runner/shared/httpaccess"
 )
 
 // RouterOptions configures HTTP middleware.
@@ -19,6 +21,9 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
+	if s.Log != nil {
+		r.Use(httpaccess.ChiAccessLog(s.Log))
+	}
 
 	r.Get("/healthz", s.health)
 

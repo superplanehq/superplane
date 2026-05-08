@@ -35,9 +35,11 @@ func main() {
 	}
 	defer st.Close()
 
+	ws := webhook.DefaultSender()
+	ws.Log = log
 	srv := &fleetmanager.Server{
 		Store:   st,
-		Webhook: webhook.DefaultSender(),
+		Webhook: ws,
 		Log:     log,
 	}
 

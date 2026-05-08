@@ -58,6 +58,8 @@ The broker needs a URL that **downstream fleet-manager** instances can POST to w
 | `BROKER_PUBLIC_URL`  | (empty)       | Base URL reachable by fleet-manager(s), used to build completion relay URLs (**set in real deployments**)                |
 | `AUTH_TOKEN`         | —             | **Required.** Clients must send `Authorization: Bearer …` for **`/v1/fleets`** and **`/v1/tasks`** (and related routes). **`/v1/webhooks/complete/*`** stays unauthenticated for fleet-manager callbacks |
 
+**Logging:** stdout emits JSON **`http_access`** per request (**method**, **path**, **dur**, **status**, **bytes**, **remote**, optional **request_id** / **ua**). **`GET /healthz`** is skipped to reduce load-balancer noise. Successful fleet-manager creates also emit **`fleet_upstream_http`** (**op** `create_task`, **http_status**, **dur**, **broker_task_id**, **fleet_id**, **fleet_task_id**, **upstream_host**). Outbound caller webhooks log **`webhook_delivery`** per attempt (**attempt**, **task_id**, **fleet_task_id**, **status_outcome**, **url_host**, **dur**, **http_status** or **err**).
+
 **HTTP (`/v1`)**
 
 | Method   | Path                                | Notes                                                                                                                                                                                                                                           |
@@ -76,6 +78,10 @@ export AUTH_TOKEN=your-secret                  # mandatory
 ./bin/task-broker
 ```
 
+**Inspect upstream task status** (uses `AUTH_TOKEN` and broker base from **`scripts/deploy/task-broker.env`** unless you export overrides): `./scripts/check-broker-task.sh <broker_task_id>`
+
+**Correlate broker + fleet SQLite over SSH** (default EC2 hosts match deploy scripts): `./scripts/show-runner-queue-state.sh`
+
 ## Run fleet-manager
 
 | Environment variable | Default      | Description                                                  |
@@ -84,6 +90,8 @@ export AUTH_TOKEN=your-secret                  # mandatory
 | `DATABASE_PATH`      | `./fleet.db` | SQLite database file                                         |
 | `AUTH_TOKEN`         | (empty)      | If set, requires `Authorization: Bearer <token>` for `/v1/*` |
 | `REAP_INTERVAL_SEC`  | `15`         | How often to return expired leases to the queue              |
+
+**Logging:** same **`http_access`** JSON lines as task-broker; **`GET /healthz`** omitted. Task completions that POST **`webhook_url`** log **`webhook_delivery`** per attempt (same shape as broker).
 
 Optional **EC2 hot runner pool** — set **`AWS_REGION`** (also used as **`AWS_DEFAULT_REGION`** inside user-data for **`aws s3 cp`**), **`EC2_PROVISION_HOT_INSTANCE_COUNT`**, **`EC2_PROVISION_AMI_ID`**, **`EC2_PROVISION_SUBNET_ID`**, **`EC2_PROVISION_SECURITY_GROUP_IDS`**, **`EC2_PROVISION_FLEET_MANAGER_URL`**, plus **either**:
 
@@ -130,6 +138,8 @@ export FLEET_MANAGER_URL=http://127.0.0.1:8080
 export AUTH_TOKEN= # if fleet-manager uses it
 ./bin/runner
 ```
+
+**Logging:** JSON **`fleet_manager_http`** lines for **`claim_task`**/**`complete_task`**: **`op`**, **`http_status`**, **`dur`**, **`runner_id`**, **`task_id`** (when known); failures use **`Warn`** with **`err`**.
 
 ## HTTP API — fleet-manager (v1)
 

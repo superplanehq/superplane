@@ -44,6 +44,7 @@ func main() {
 		}
 	}
 	cfg.ExitAfterEachTask = envTruthy("RUNNER_TERMINATE_AFTER_EACH_TASK")
+	cfg.Log = log
 
 	a := &agent.Agent{Config: cfg}
 

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os/exec"
 	"strings"
@@ -27,6 +28,7 @@ type Config struct {
 	// ExitAfterEachTask stops the runner process after one successful CompleteTask once fleet-manager accepts the result.
 	// Fleet-manager terminates the EC2 instance when runner_id is the instance id (see cloud-init user-data). Local env: RUNNER_TERMINATE_AFTER_EACH_TASK.
 	ExitAfterEachTask bool
+	Log               *slog.Logger // optional: fleet_manager_http lines for claim / complete
 }
 
 // DefaultConfig returns safe defaults.
@@ -100,18 +102,35 @@ func (a *Agent) claim(ctx context.Context, base string) (*api.TaskPayload, error
 	req.Header.Set("Content-Type", "application/json")
 	a.auth(req)
 
+	start := time.Now()
 	resp, err := a.HTTP.Do(req)
+	dur := time.Since(start)
+	op := "claim_task"
 	if err != nil {
+		a.logFleetHTTPWarn(op, dur, 0, "", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	code := resp.StatusCode
+	if code != http.StatusOK {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return nil, fmt.Errorf("claim: status %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
+		err := fmt.Errorf("claim: status %d: %s", code, strings.TrimSpace(string(b)))
+		a.logFleetHTTPWarn(op, dur, code, "", err)
+		return nil, err
 	}
 	var out api.ClaimTaskResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		a.logFleetHTTPWarn(op, dur, code, "", err)
 		return nil, err
+	}
+	if out.Task != nil && a.Config.Log != nil {
+		a.Config.Log.Info("fleet_manager_http",
+			slog.String("op", op),
+			slog.Int("http_status", code),
+			slog.Duration("dur", dur),
+			slog.String("runner_id", a.Config.RunnerID),
+			slog.String("task_id", out.Task.ID),
+		)
 	}
 	return out.Task, nil
 }
@@ -134,14 +153,30 @@ func (a *Agent) complete(ctx context.Context, base, id string, exit int, output,
 	req.Header.Set("Content-Type", "application/json")
 	a.auth(req)
 
+	op := "complete_task"
+	start := time.Now()
 	resp, err := a.HTTP.Do(req)
+	dur := time.Since(start)
 	if err != nil {
+		a.logFleetHTTPWarn(op, dur, 0, id, err)
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
+	code := resp.StatusCode
+	if code != http.StatusNoContent {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf("complete: status %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
+		e := fmt.Errorf("complete: status %d: %s", code, strings.TrimSpace(string(b)))
+		a.logFleetHTTPWarn(op, dur, code, id, e)
+		return e
+	}
+	if a.Config.Log != nil {
+		a.Config.Log.Info("fleet_manager_http",
+			slog.String("op", op),
+			slog.Int("http_status", code),
+			slog.Duration("dur", dur),
+			slog.String("runner_id", a.Config.RunnerID),
+			slog.String("task_id", id),
+		)
 	}
 	return nil
 }
@@ -150,6 +185,25 @@ func (a *Agent) auth(req *http.Request) {
 	if t := strings.TrimSpace(a.Config.Token); t != "" {
 		req.Header.Set("Authorization", "Bearer "+t)
 	}
+}
+
+func (a *Agent) logFleetHTTPWarn(op string, dur time.Duration, status int, taskID string, err error) {
+	if a.Config.Log == nil {
+		return
+	}
+	args := []any{
+		slog.String("op", op),
+		slog.Duration("dur", dur),
+		slog.String("runner_id", a.Config.RunnerID),
+		slog.Any("err", err),
+	}
+	if status > 0 {
+		args = append(args, slog.Int("http_status", status))
+	}
+	if taskID != "" {
+		args = append(args, slog.String("task_id", taskID))
+	}
+	a.Config.Log.Warn("fleet_manager_http", args...)
 }
 
 func (a *Agent) execute(ctx context.Context, task *api.TaskPayload) (int, string, error) {
