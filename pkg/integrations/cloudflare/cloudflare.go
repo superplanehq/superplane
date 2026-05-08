@@ -2,6 +2,7 @@ package cloudflare
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -16,11 +17,49 @@ func init() {
 type Cloudflare struct{}
 
 type Configuration struct {
-	APIToken string `json:"apiToken"`
+	APIToken  string `json:"apiToken"`
+	AccountID string `json:"accountId"`
 }
 
 type Metadata struct {
-	Zones []Zone `json:"zones"`
+	Zones     []Zone `json:"zones"`
+	AccountID string `json:"accountId"`
+}
+
+type KVNodeMetadata struct {
+	NamespaceName string `json:"namespaceName"`
+	KeyName       string `json:"keyName"`
+}
+
+func resolveKVNamespaceMetadata(ctx core.SetupContext, accountID, namespaceID string) (string, error) {
+	if strings.Contains(namespaceID, "{{") || strings.Contains(accountID, "{{") {
+		return namespaceID, nil
+	}
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return "", fmt.Errorf("failed to create client: %w", err)
+	}
+	ns, err := client.GetKVNamespace(accountID, namespaceID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get KV namespace: %w", err)
+	}
+	return ns.Title, nil
+}
+
+func accountIDFromIntegration(ctx core.IntegrationContext) string {
+	if ctx == nil {
+		return ""
+	}
+	metadata := Metadata{}
+	mapstructure.Decode(ctx.GetMetadata(), &metadata)
+	return metadata.AccountID
+}
+
+func resolveAccountID(specAccountID string, integration core.IntegrationContext) string {
+	if specAccountID != "" {
+		return specAccountID
+	}
+	return accountIDFromIntegration(integration)
 }
 
 func (c *Cloudflare) Name() string {
@@ -49,12 +88,20 @@ func (c *Cloudflare) Instructions() string {
    - **Token name**: SuperPlane Integration
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
-     - Zone / DNS / Edit
+	 - Zone / DNS / Edit
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
+	 - Account / Workers KV Storage / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
+
+## Account ID (optional)
+
+The Account ID is required for KV storage components.
+
+1. On the account overview page, click on the **ellipsis (...)** next to the **Add** button and select **Copy Account ID**
+2. Paste the Account ID below
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.`
 }
@@ -69,6 +116,14 @@ func (c *Cloudflare) Configuration() []configuration.Field {
 			Sensitive:   true,
 			Description: "Cloudflare API Token with appropriate permissions",
 		},
+		{
+			Name:        "accountId",
+			Label:       "Account ID",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Cloudflare account ID.",
+			Placeholder: "e.g. 01a7362d577a6c3019a474fd6f485823",
+		},
 	}
 }
 
@@ -81,6 +136,11 @@ func (c *Cloudflare) Actions() []core.Action {
 		&UpdateDNSRecord{},
 		&DeleteDNSRecord{},
 		&DeleteOriginRule{},
+		&CreateKVNamespace{},
+		&PutKVValue{},
+		&GetKVValue{},
+		&DeleteKVValue{},
+		&DeleteKVNamespace{},
 	}
 }
 
@@ -109,7 +169,7 @@ func (c *Cloudflare) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error listing zones: %v", err)
 	}
 
-	ctx.Integration.SetMetadata(Metadata{Zones: zones})
+	ctx.Integration.SetMetadata(Metadata{Zones: zones, AccountID: configuration.AccountID})
 	ctx.Integration.Ready()
 	return nil
 }
@@ -224,6 +284,65 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 			}
 		}
 		return resources, nil
+
+	case "namespace":
+		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			accountID = accountIDFromIntegration(ctx.Integration)
+		}
+		if accountID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		namespaces, err := client.ListKVNamespaces(accountID)
+		if err != nil {
+			return nil, fmt.Errorf("error listing KV namespaces: %w", err)
+		}
+
+		var nsResources []core.IntegrationResource
+		for _, ns := range namespaces {
+			nsResources = append(nsResources, core.IntegrationResource{
+				Type: resourceType,
+				Name: ns.Title,
+				ID:   ns.ID,
+			})
+		}
+		return nsResources, nil
+
+	case "kv_key":
+		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			accountID = accountIDFromIntegration(ctx.Integration)
+		}
+		namespaceID := ctx.Parameters["namespace"]
+		if accountID == "" || namespaceID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		keys, err := client.ListKVKeys(accountID, namespaceID)
+		if err != nil {
+			return nil, fmt.Errorf("error listing KV keys: %w", err)
+		}
+
+		var keyResources []core.IntegrationResource
+		for _, key := range keys {
+			keyResources = append(keyResources, core.IntegrationResource{
+				Type: resourceType,
+				Name: key.Name,
+				ID:   key.Name,
+			})
+		}
+		return keyResources, nil
 
 	default:
 		return []core.IntegrationResource{}, nil
