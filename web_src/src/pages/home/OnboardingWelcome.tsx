@@ -1,7 +1,7 @@
 import {
   canvasesCreateCanvas,
   canvasesDescribeCanvas,
-  canvasesEmitNodeEvent,
+  canvasesInvokeNodeTriggerHook,
   canvasesListCanvasEvents,
   canvasesListEventExecutions,
 } from "@/api-client/sdk.gen";
@@ -143,32 +143,17 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
       let emittedEventId: string | undefined;
 
       if (triggerNode) {
-        const now = new Date();
         try {
-          const emitResponse = await canvasesEmitNodeEvent(
+          const invokeResponse = await canvasesInvokeNodeTriggerHook(
             withOrganizationHeader({
-              path: { canvasId, nodeId: triggerNode.id },
+              path: { canvasId, nodeId: triggerNode.id, hookName: "run" },
               body: {
-                channel: "default",
-                data: {
-                  type: "scheduler.tick",
-                  timestamp: now.toISOString(),
-                  data: {
-                    calendar: {
-                      year: String(now.getFullYear()),
-                      month: now.toLocaleString("en-US", { month: "long" }),
-                      day: String(now.getDate()),
-                      hour: String(now.getHours()).padStart(2, "0"),
-                      minute: String(now.getMinutes()).padStart(2, "0"),
-                      second: String(now.getSeconds()).padStart(2, "0"),
-                      week_day: now.toLocaleString("en-US", { weekday: "long" }),
-                    },
-                  },
-                },
+                parameters: {},
               },
             }),
           );
-          emittedEventId = emitResponse.data?.eventId;
+          const result = invokeResponse.data?.result as Record<string, unknown> | undefined;
+          emittedEventId = typeof result?.event_id === "string" ? result.event_id : undefined;
         } catch {
           // Best-effort; the regular schedule will fire within ten minutes.
         }
