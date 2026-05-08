@@ -51,9 +51,7 @@ func init() {
 type RunCommands struct{}
 
 type Spec struct {
-	Commands      string  `json:"commands" mapstructure:"commands"`
-	ExecutionMode string  `json:"executionMode,omitempty" mapstructure:"executionMode"`
-	DockerImage   *string `json:"dockerImage,omitempty" mapstructure:"dockerImage"`
+	Commands string `json:"commands" mapstructure:"commands"`
 }
 
 func (c *RunCommands) Name() string  { return ComponentName }
@@ -61,7 +59,7 @@ func (c *RunCommands) Label() string { return "Runner" }
 func (c *RunCommands) Icon() string  { return "terminal" }
 func (c *RunCommands) Color() string { return "blue" }
 func (c *RunCommands) ExampleOutput() map[string]any {
-	return map[string]any{"task_id": "…", "status": "succeeded", "exit_code": 0, "output": "…"}
+	return map[string]any{"status": "succeeded", "exit_code": 0}
 }
 
 func (c *RunCommands) OutputChannels(configuration any) []core.OutputChannel {
@@ -72,21 +70,19 @@ func (c *RunCommands) OutputChannels(configuration any) []core.OutputChannel {
 }
 
 func (c *RunCommands) Description() string {
-	return "Runs commands by creating a task via task-broker."
+	return "Runs bash commands on a dedicated machine"
 }
 
 func (c *RunCommands) Documentation() string {
-	return `Creates a task in **task-broker** and resolves when either the completion **webhook** runs or a **polling fallback** observes a terminal status (internal hooks call **task-broker** ` + "`GET /v1/tasks/{broker_task_id}`" + ` shortly after enqueue, then about every 30s until ` + "`succeeded`" + ` or ` + "`failed`" + `).
+	return `Runs bash commands on a dedicated machine.
 
-## Required configuration
-- **Commands**: Non-empty trimmed lines are **shell directives** run in **one Bash session on a pseudo-terminal**: each line is **sourced from a tempfile in order**, **stopping at the first directive with a non-zero exit** (exit status after ` + "`source`" + `). **Within a single line**, normal shell rules apply (e.g. ` + "`false; true`" + ` can exit 0; ` + "`|`" + ` uses the pipeline’s last-stage status unless you enable ` + "`pipefail`" + ` yourself). **` + "`cd`" + `** and **` + "`export`" + `** persist across lines. **Runner hosts and Docker images must provide GNU Bash at ` + "`/bin/bash`" + ` (Docker) or on ` + "`PATH`" + ` / ` + "`RUNNER_SHELL`" + ` (host); execution is **PTY-only** (no ` + "`sh -c`" + ` fallback).
+## Configuration
+- **Commands**: One or more shell commands, one per line.
 
 ## Output channels
-
-- **Passed**: Task finished with ` + "`succeeded`" + ` and exit code **0**.
-- **Failed**: Task finished with ` + "`failed`" + ` or non-zero exit code.
-
-Both emit ` + "`runner.finished`" + ` with ` + "`status`" + `, ` + "`exit_code`" + `, and ` + "`output`" + ` (and optional ` + "`error`" + `) from the runner.`
+- **Passed**: The commands finished with exit code **0**.
+- **Failed**: The commands finished with non-zero exit code.
+`
 }
 
 func (c *RunCommands) Configuration() []configuration.Field {
@@ -96,32 +92,8 @@ func (c *RunCommands) Configuration() []configuration.Field {
 			Label:       "Commands",
 			Type:        configuration.FieldTypeText,
 			Required:    true,
-			Placeholder: "echo hello\nuname -a",
-			Description: "One shell directive per non-empty line; Bash+PTY sourcing on the runner (cd/export persist). Requires Bash; no POSIX fallback",
-		},
-		{
-			Name:     "executionMode",
-			Label:    "Execution mode",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			Default:  "host",
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Host", Value: "host"},
-						{Label: "Docker", Value: "docker"},
-					},
-				},
-			},
-		},
-		{
-			Name:                 "dockerImage",
-			Label:                "Docker image",
-			Type:                 configuration.FieldTypeString,
-			Required:             false,
-			Description:          "Required when execution mode is docker",
-			VisibilityConditions: []configuration.VisibilityCondition{{Field: "executionMode", Values: []string{"docker"}}},
-			RequiredConditions:   []configuration.RequiredCondition{{Field: "executionMode", Values: []string{"docker"}}},
+			Placeholder: "echo \"Hello, World!\"",
+			Description: "One or more shell commands, one per line",
 		},
 	}
 }
@@ -131,18 +103,21 @@ func (c *RunCommands) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("decode configuration: %w", err)
 	}
-	if strings.TrimSpace(spec.Commands) == "" {
-		return errors.New("commands is required")
-	}
-	if strings.TrimSpace(spec.ExecutionMode) == "" {
-		spec.ExecutionMode = "host"
-	}
-	if strings.TrimSpace(spec.ExecutionMode) == "docker" && (spec.DockerImage == nil || strings.TrimSpace(*spec.DockerImage) == "") {
-		return errors.New("dockerImage is required when executionMode is docker")
+
+	if err := validateCommands(spec.Commands); err != nil {
+		return err
 	}
 
 	_, err := ctx.Webhook.Setup()
 	return err
+}
+
+func validateCommands(commands string) error {
+	lines := normalizeLines(commands)
+	if len(lines) == 0 {
+		return errors.New("at least one command is required")
+	}
+	return nil
 }
 
 func (c *RunCommands) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -152,11 +127,9 @@ func (c *RunCommands) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID
 type brokerCreateTaskRequest struct {
 	FleetID string `json:"fleet_id"`
 
-	Command       []string `json:"command,omitempty"`
-	Commands      []string `json:"commands,omitempty"`
+	Commands      []string `json:"commands"`
 	WebhookURL    string   `json:"webhook_url"`
 	ExecutionMode string   `json:"execution_mode,omitempty"`
-	DockerImage   string   `json:"docker_image,omitempty"`
 }
 
 type brokerCreateTaskResponse struct {
@@ -186,18 +159,13 @@ func emitRunnerFinished(state core.ExecutionStateContext, payload brokerCompleti
 	if state.IsFinished() {
 		return nil
 	}
+
 	channel := FailedOutputChannel
 	if strings.ToLower(strings.TrimSpace(payload.Status)) == "succeeded" && payload.ExitCode == 0 {
 		channel = PassedOutputChannel
 	}
-	out := map[string]any{
-		"task_id":       payload.TaskID,
-		"fleet_task_id": payload.FleetTaskID,
-		"status":        payload.Status,
-		"exit_code":     payload.ExitCode,
-		"output":        payload.Output,
-		"error":         payload.Error,
-	}
+
+	out := map[string]any{"status": payload.Status, "exit_code": payload.ExitCode}
 	return state.Emit(channel, RunnerFinishedEventType, []any{out})
 }
 
@@ -228,24 +196,11 @@ func (c *RunCommands) Execute(ctx core.ExecutionContext) error {
 		return errors.New("commands is required")
 	}
 
-	exMode := strings.ToLower(strings.TrimSpace(spec.ExecutionMode))
-	if exMode == "" {
-		exMode = "host"
-	}
-	var dockerImage string
-	if exMode == "docker" {
-		if spec.DockerImage == nil || strings.TrimSpace(*spec.DockerImage) == "" {
-			return errors.New("dockerImage is required when executionMode is docker")
-		}
-		dockerImage = strings.TrimSpace(*spec.DockerImage)
-	}
-
 	reqBody := brokerCreateTaskRequest{
 		FleetID:       strings.TrimSpace(defaultFleetID),
 		Commands:      cmds,
 		WebhookURL:    webhookURL,
-		ExecutionMode: exMode,
-		DockerImage:   dockerImage,
+		ExecutionMode: "host",
 	}
 	bodyBytes, err := json.Marshal(reqBody)
 	if err != nil {
