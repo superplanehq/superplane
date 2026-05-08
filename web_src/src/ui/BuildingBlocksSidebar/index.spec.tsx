@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import { BuildingBlocksSidebar } from "./index";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { BuildingBlocksSidebar, SHOW_CONNECTED_INTEGRATIONS_ON_TOP_STORAGE_KEY } from "./index";
 import type { BuildingBlockCategory } from "./types";
 
 const defaultProps = {
@@ -63,6 +64,48 @@ describe("BuildingBlocksSidebar", () => {
     const { container } = render(<BuildingBlocksSidebar {...defaultProps} isOpen={false} />);
 
     expect(container.querySelector('[data-testid="building-blocks-sidebar"]')).not.toBeInTheDocument();
+  });
+
+  describe("'Connected integrations on top' filter persistence", () => {
+    beforeEach(() => {
+      window.localStorage.removeItem(SHOW_CONNECTED_INTEGRATIONS_ON_TOP_STORAGE_KEY);
+    });
+
+    afterEach(() => {
+      window.localStorage.removeItem(SHOW_CONNECTED_INTEGRATIONS_ON_TOP_STORAGE_KEY);
+    });
+
+    it("defaults to off when no preference is stored", async () => {
+      const user = userEvent.setup();
+      render(<BuildingBlocksSidebar {...defaultProps} />);
+
+      await user.click(screen.getByLabelText("Sidebar settings"));
+
+      const checkbox = await screen.findByRole("menuitemcheckbox", { name: "Connected integrations on top" });
+      expect(checkbox).toHaveAttribute("aria-checked", "false");
+    });
+
+    it("writes the preference to localStorage when toggled on", async () => {
+      const user = userEvent.setup();
+      render(<BuildingBlocksSidebar {...defaultProps} />);
+
+      await user.click(screen.getByLabelText("Sidebar settings"));
+      await user.click(await screen.findByRole("menuitemcheckbox", { name: "Connected integrations on top" }));
+
+      expect(window.localStorage.getItem(SHOW_CONNECTED_INTEGRATIONS_ON_TOP_STORAGE_KEY)).toBe("true");
+    });
+
+    it("hydrates the toggle from localStorage on mount so the preference survives remounts", async () => {
+      window.localStorage.setItem(SHOW_CONNECTED_INTEGRATIONS_ON_TOP_STORAGE_KEY, "true");
+      const user = userEvent.setup();
+
+      render(<BuildingBlocksSidebar {...defaultProps} />);
+
+      await user.click(screen.getByLabelText("Sidebar settings"));
+
+      const checkbox = await screen.findByRole("menuitemcheckbox", { name: "Connected integrations on top" });
+      expect(checkbox).toHaveAttribute("aria-checked", "true");
+    });
   });
 
   describe("Enter-to-submit", () => {

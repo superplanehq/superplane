@@ -16,6 +16,8 @@ import type { BuildingBlock, BuildingBlockCategory } from "./types";
 export type { AgentContext, AgentMode } from "@/components/AgentSidebar/agentChat";
 export type { BuildingBlock, BuildingBlockCategory } from "./types";
 
+export const SHOW_CONNECTED_INTEGRATIONS_ON_TOP_STORAGE_KEY = "buildingBlocksSidebar:showConnectedIntegrationsOnTop";
+
 export interface BuildingBlocksSidebarProps {
   isOpen: boolean;
   onToggle: (open: boolean) => void;
@@ -103,11 +105,20 @@ function OpenBuildingBlocksSidebar({
   const [hoveredBlock, setHoveredBlock] = useState<BuildingBlock | null>(null);
   const dragPreviewRef = useRef<HTMLDivElement>(null);
   const [showIntegrationSetupStatus, setShowIntegrationSetupStatus] = useState(true);
-  const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(false);
+  const [showConnectedIntegrationsOnTop, setShowConnectedIntegrationsOnTop] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return window.localStorage.getItem(SHOW_CONNECTED_INTEGRATIONS_ON_TOP_STORAGE_KEY) === "true";
+  });
 
   useEffect(() => {
     localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
   }, [sidebarWidth]);
+
+  useEffect(() => {
+    localStorage.setItem(SHOW_CONNECTED_INTEGRATIONS_ON_TOP_STORAGE_KEY, String(showConnectedIntegrationsOnTop));
+  }, [showConnectedIntegrationsOnTop]);
 
   useEffect(() => {
     if (!searchInputRef.current) {
