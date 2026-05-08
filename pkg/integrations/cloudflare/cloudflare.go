@@ -68,7 +68,7 @@ type PoolNodeMetadata struct {
 
 func resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error {
 	meta := PoolNodeMetadata{}
-	if strings.Contains(poolID, "{{") {
+	if strings.Contains(poolID, "{{") || strings.Contains(accountID, "{{") {
 		meta.PoolName = poolID
 	} else {
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
