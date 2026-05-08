@@ -62,6 +62,28 @@ func resolveAccountID(specAccountID string, integration core.IntegrationContext)
 	return accountIDFromIntegration(integration)
 }
 
+type PoolNodeMetadata struct {
+	PoolName string `json:"poolName"`
+}
+
+func resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error {
+	meta := PoolNodeMetadata{}
+	if strings.Contains(poolID, "{{") || strings.Contains(accountID, "{{") {
+		meta.PoolName = poolID
+	} else {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create client: %w", err)
+		}
+		pool, err := client.GetPool(accountID, poolID)
+		if err != nil {
+			return fmt.Errorf("failed to get pool: %w", err)
+		}
+		meta.PoolName = pool.Name
+	}
+	return ctx.Metadata.Set(meta)
+}
+
 func (c *Cloudflare) Name() string {
 	return "cloudflare"
 }
@@ -92,6 +114,7 @@ func (c *Cloudflare) Instructions() string {
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
 	 - Account / Workers KV Storage / Edit
+     - Account / Load Balancing: Monitor and Pools / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
@@ -141,6 +164,10 @@ func (c *Cloudflare) Actions() []core.Action {
 		&GetKVValue{},
 		&DeleteKVValue{},
 		&DeleteKVNamespace{},
+		&CreatePool{},
+		&UpdatePool{},
+		&GetPool{},
+		&DeletePool{},
 	}
 }
 
@@ -343,6 +370,68 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 			})
 		}
 		return keyResources, nil
+
+	case "monitor":
+		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			accountID = accountIDFromIntegration(ctx.Integration)
+		}
+		if accountID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		monitors, err := client.ListMonitors(accountID)
+		if err != nil {
+			return nil, fmt.Errorf("error listing monitors: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, m := range monitors {
+			name := m.Description
+			if name == "" {
+				name = m.ID
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   m.ID,
+			})
+		}
+		return resources, nil
+
+	case "pool":
+		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			accountID = accountIDFromIntegration(ctx.Integration)
+		}
+		if accountID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		pools, err := client.ListPools(accountID)
+		if err != nil {
+			return nil, fmt.Errorf("error listing pools: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, p := range pools {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: p.Name,
+				ID:   p.ID,
+			})
+		}
+		return resources, nil
 
 	default:
 		return []core.IntegrationResource{}, nil

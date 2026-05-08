@@ -49,7 +49,8 @@ func Test__Cloudflare__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiToken": "token123",
+				"apiToken":  "token123",
+				"accountId": "acc123",
 			},
 		}
 
@@ -68,6 +69,7 @@ func Test__Cloudflare__Sync(t *testing.T) {
 		assert.Len(t, metadata.Zones, 1)
 		assert.Equal(t, "zone123", metadata.Zones[0].ID)
 		assert.Equal(t, "example.com", metadata.Zones[0].Name)
+		assert.Equal(t, "acc123", metadata.AccountID)
 	})
 
 	t.Run("api token -> failed zone list returns error", func(t *testing.T) {
