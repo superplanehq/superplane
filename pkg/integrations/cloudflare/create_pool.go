@@ -24,7 +24,7 @@ type CreatePoolSpec struct {
 	AccountID            string            `json:"accountId"`
 	Name                 string            `json:"name"`
 	Description          string            `json:"description"`
-	Enabled              bool              `json:"enabled"`
+	Enabled              *bool             `json:"enabled"`
 	MinimumOrigins       *int              `json:"minimumOrigins"`
 	Monitor              string            `json:"monitor"`
 	Origins              []OriginSpec      `json:"origins"`
@@ -394,10 +394,15 @@ func (c *CreatePool) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
+	enabled := true
+	if spec.Enabled != nil {
+		enabled = *spec.Enabled
+	}
+
 	req := CreatePoolRequest{
 		Name:           spec.Name,
 		Description:    spec.Description,
-		Enabled:        spec.Enabled,
+		Enabled:        enabled,
 		MinimumOrigins: spec.MinimumOrigins,
 		Monitor:        spec.Monitor,
 		Origins:        origins,
