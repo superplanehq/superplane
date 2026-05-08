@@ -1,4 +1,6 @@
 import uuid
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from unittest.mock import MagicMock
 
@@ -315,9 +317,6 @@ def test_set_canvas_memory_markdown_executes_pg_upsert(
     mock_begin.__enter__ = MagicMock(return_value=None)
     mock_begin.__exit__ = MagicMock(return_value=False)
     mock_session.begin.return_value = mock_begin
-
-    from collections.abc import Iterator
-    from contextlib import contextmanager
 
     @contextmanager
     def fake_session() -> Iterator[MagicMock]:

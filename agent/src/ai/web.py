@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
+import sentry_sdk
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, StreamingResponse
@@ -668,8 +669,6 @@ def _create_app() -> FastAPI:
                             break
                         yield _encode_sse_event(event)
                 except Exception as error:
-                    import sentry_sdk
-
                     sentry_sdk.capture_exception(error)
                     print(f"[web] stream failed chat_id={chat_id} error={error}", flush=True)
                     yield _encode_sse_event(
