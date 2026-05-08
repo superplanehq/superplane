@@ -22,11 +22,28 @@ import (
 const (
 	ComponentName = "runner"
 
-	channelSuccess = "success"
-	channelFailure = "failure"
+	// Output channel names match integrations that finish with a terminal pass/fail split
+	// (e.g. Semaphore runWorkflow: passed / failed).
+	PassedOutputChannel = "passed"
+	FailedOutputChannel = "failed"
 
-	brokerPollInterval = time.Minute
-	brokerHTTPTimeout  = 30 * time.Second
+	// RunnerFinishedEventType is the payload type passed to ExecutionState.Emit for terminal completion.
+	RunnerFinishedEventType = "runner.finished"
+
+	// Polling runs as internal hooks (see handleBrokerPoll), not inside Execute, so the
+	// interval is not limited by idle_in_transaction_session_timeout.
+	brokerPollInterval   = 30 * time.Second
+	runnerFirstPollDelay = 2 * time.Second
+	brokerHTTPTimeout    = 30 * time.Second
+
+	runnerBrokerPollHook = "brokerPoll"
+
+	// Persisted on each CanvasNodeRequest (hook parameters survive JSON round-trips cleanly).
+	paramKeyBrokerTaskID = "broker_task_id"
+	paramKeyBrokerBase   = "broker_base"
+
+	metaKeyRunnerBrokerTaskID = "runner_broker_task_id"
+	metaKeyRunnerBrokerBase   = "runner_broker_base"
 
 	// defaultBrokerBaseURL is the task-broker HTTP base URL (no trailing slash).
 	// Keep in sync with BROKER_PUBLIC_URL in the runner repo: ../runner/scripts/deploy/task-broker.env
@@ -64,8 +81,8 @@ func (c *RunCommands) ExampleOutput() map[string]any {
 
 func (c *RunCommands) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
-		{Name: channelSuccess, Label: "Success"},
-		{Name: channelFailure, Label: "Failure"},
+		{Name: PassedOutputChannel, Label: "Passed"},
+		{Name: FailedOutputChannel, Label: "Failed"},
 	}
 }
 
@@ -74,13 +91,17 @@ func (c *RunCommands) Description() string {
 }
 
 func (c *RunCommands) Documentation() string {
-	return `Creates a task in **task-broker** and resolves when either the completion **webhook** runs or a **polling fallback** observes a terminal status (polling uses **task-broker** ` + "`GET /v1/tasks/{broker_task_id}`" + ` every minute until ` + "`succeeded`" + ` or ` + "`failed`" + `).
+	return `Creates a task in **task-broker** and resolves when either the completion **webhook** runs or a **polling fallback** observes a terminal status (internal hooks call **task-broker** ` + "`GET /v1/tasks/{broker_task_id}`" + ` shortly after enqueue, then about every 30s until ` + "`succeeded`" + ` or ` + "`failed`" + `).
 
 ## Required configuration
-- **Commands**: One command per line
+- **Commands**: Non-empty trimmed lines are **shell directives** run in **one Bash session on a pseudo-terminal**: each line is **sourced from a tempfile in order**, **stopping at the first directive with a non-zero exit** (exit status after ` + "`source`" + `). **Within a single line**, normal shell rules apply (e.g. ` + "`false; true`" + ` can exit 0; ` + "`|`" + ` uses the pipeline’s last-stage status unless you enable ` + "`pipefail`" + ` yourself). **` + "`cd`" + `** and **` + "`export`" + `** persist across lines. **Runner hosts and Docker images must provide GNU Bash at ` + "`/bin/bash`" + ` (Docker) or on ` + "`PATH`" + ` / ` + "`RUNNER_SHELL`" + ` (host); execution is **PTY-only** (no ` + "`sh -c`" + ` fallback).
 
-## Output
-Emits on **Success** (exit code 0) or **Failure** (non-zero) with ` + "`status`" + `, ` + "`exit_code`" + `, and ` + "`output`" + ` from the runner.`
+## Output channels
+
+- **Passed**: Task finished with ` + "`succeeded`" + ` and exit code **0**.
+- **Failed**: Task finished with ` + "`failed`" + ` or non-zero exit code.
+
+Both emit ` + "`runner.finished`" + ` with ` + "`status`" + `, ` + "`exit_code`" + `, and ` + "`output`" + ` (and optional ` + "`error`" + `) from the runner.`
 }
 
 func (c *RunCommands) Configuration() []configuration.Field {
@@ -91,7 +112,7 @@ func (c *RunCommands) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeText,
 			Required:    true,
 			Placeholder: "echo hello\nuname -a",
-			Description: "One or more commands, one per line",
+			Description: "One shell directive per non-empty line; Bash+PTY sourcing on the runner (cd/export persist). Requires Bash; no POSIX fallback",
 		},
 		{
 			Name:     "executionMode",
@@ -180,9 +201,9 @@ func emitRunnerFinished(state core.ExecutionStateContext, payload brokerCompleti
 	if state.IsFinished() {
 		return nil
 	}
-	channel := channelFailure
+	channel := FailedOutputChannel
 	if strings.ToLower(strings.TrimSpace(payload.Status)) == "succeeded" && payload.ExitCode == 0 {
-		channel = channelSuccess
+		channel = PassedOutputChannel
 	}
 	out := map[string]any{
 		"task_id":       payload.TaskID,
@@ -192,7 +213,7 @@ func emitRunnerFinished(state core.ExecutionStateContext, payload brokerCompleti
 		"output":        payload.Output,
 		"error":         payload.Error,
 	}
-	return state.Emit(channel, "runner.finished", []any{out})
+	return state.Emit(channel, RunnerFinishedEventType, []any{out})
 }
 
 func isBrokerTerminalStatus(status string) bool {
@@ -279,65 +300,136 @@ func (c *RunCommands) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	return c.pollBrokerTaskUntilTerminal(ctx, brokerBase, out.ID)
+	if err := setRunnerPollMetadata(ctx.Metadata, brokerBase, out.ID); err != nil {
+		return err
+	}
+
+	return ctx.Requests.ScheduleActionCall(runnerBrokerPollHook, brokerPollHookParams(brokerBase, out.ID), runnerFirstPollDelay)
 }
 
-func (c *RunCommands) pollBrokerTaskUntilTerminal(ctx core.ExecutionContext, brokerBase, brokerTaskID string) error {
-	for attempt := 0; ; attempt++ {
-		if ctx.ExecutionState.IsFinished() {
-			return nil
-		}
-		if attempt > 0 {
-			time.Sleep(brokerPollInterval)
-			if ctx.ExecutionState.IsFinished() {
-				return nil
-			}
-		}
-
-		poll, err := c.fetchBrokerTaskStatus(ctx, brokerBase, brokerTaskID)
-		if err != nil {
-			if ctx.Logger != nil {
-				ctx.Logger.WithError(err).Warn("runner: broker poll failed, will retry")
-			}
-			continue
-		}
-		if !isBrokerTerminalStatus(poll.Status) {
-			continue
-		}
-		exit := 0
-		if poll.ExitCode != nil {
-			exit = *poll.ExitCode
-		}
-		payload := brokerCompletionPayload{
-			TaskID:      brokerTaskID,
-			FleetTaskID: poll.FleetTaskID,
-			Status:      poll.Status,
-			ExitCode:    exit,
-			Output:      poll.Output,
-			Error:       poll.Error,
-		}
-		if ctx.ExecutionState.IsFinished() {
-			return nil
-		}
-		if err := emitRunnerFinished(ctx.ExecutionState, payload); err != nil && ctx.Logger != nil {
-			ctx.Logger.WithError(err).Warn("runner: emit after poll failed")
-		}
-		return nil
+func brokerPollHookParams(brokerBase, taskID string) map[string]any {
+	return map[string]any{
+		paramKeyBrokerTaskID: taskID,
+		paramKeyBrokerBase:   brokerBase,
 	}
 }
 
-func (c *RunCommands) fetchBrokerTaskStatus(ctx core.ExecutionContext, brokerBase, brokerTaskID string) (*brokerTaskPollJSON, error) {
-	httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
+func coerceString(v any) string {
+	if v == nil {
+		return ""
+	}
+	switch s := v.(type) {
+	case string:
+		return strings.TrimSpace(s)
+	case json.Number:
+		return strings.TrimSpace(s.String())
+	default:
+		return strings.TrimSpace(fmt.Sprint(v))
+	}
+}
+
+func normalizedBrokerBase(raw string) string {
+	base := strings.TrimRight(strings.TrimSpace(raw), "/")
+	if base == "" {
+		base = strings.TrimRight(strings.TrimSpace(defaultBrokerBaseURL), "/")
+	}
+	return base
+}
+
+func setRunnerPollMetadata(metadata core.MetadataWriter, brokerBase, taskID string) error {
+	md := map[string]any{}
+	if existing := metadata.Get(); existing != nil {
+		if typed, ok := existing.(map[string]any); ok {
+			for k, v := range typed {
+				md[k] = v
+			}
+		}
+	}
+	md[metaKeyRunnerBrokerTaskID] = taskID
+	md[metaKeyRunnerBrokerBase] = brokerBase
+	return metadata.Set(md)
+}
+
+func runnerBrokerPollArgsFromMetadata(existing any) (brokerBase string, brokerTaskID string, err error) {
+	if existing == nil {
+		return "", "", fmt.Errorf("runner poll: execution metadata missing")
+	}
+	m, ok := existing.(map[string]any)
+	if !ok {
+		return "", "", fmt.Errorf("runner poll: execution metadata has unexpected shape")
+	}
+	tid := coerceString(m[metaKeyRunnerBrokerTaskID])
+	if tid == "" {
+		return "", "", fmt.Errorf("runner poll: %s missing in metadata", metaKeyRunnerBrokerTaskID)
+	}
+	return normalizedBrokerBase(coerceString(m[metaKeyRunnerBrokerBase])), tid, nil
+}
+
+func resolveBrokerPollArgs(ctx core.ActionHookContext) (brokerBase string, brokerTaskID string, err error) {
+	if ctx.Parameters != nil {
+		tid := coerceString(ctx.Parameters[paramKeyBrokerTaskID])
+		if tid != "" {
+			return normalizedBrokerBase(coerceString(ctx.Parameters[paramKeyBrokerBase])), tid, nil
+		}
+	}
+	return runnerBrokerPollArgsFromMetadata(ctx.Metadata.Get())
+}
+
+func (c *RunCommands) handleBrokerPoll(ctx core.ActionHookContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	brokerBase, brokerTaskID, argErr := resolveBrokerPollArgs(ctx)
+	if argErr != nil {
+		return argErr
+	}
+	next := brokerPollHookParams(brokerBase, brokerTaskID)
+
+	poll, err := c.fetchBrokerTaskStatus(ctx.HTTP, brokerBase, brokerTaskID)
+	if err != nil {
+		if ctx.Logger != nil {
+			ctx.Logger.WithError(err).Warn("runner: broker poll failed, will retry")
+		}
+		return ctx.Requests.ScheduleActionCall(runnerBrokerPollHook, next, brokerPollInterval)
+	}
+	if !isBrokerTerminalStatus(poll.Status) {
+		return ctx.Requests.ScheduleActionCall(runnerBrokerPollHook, next, brokerPollInterval)
+	}
+
+	exit := 0
+	if poll.ExitCode != nil {
+		exit = *poll.ExitCode
+	}
+	payload := brokerCompletionPayload{
+		TaskID:      brokerTaskID,
+		FleetTaskID: poll.FleetTaskID,
+		Status:      poll.Status,
+		ExitCode:    exit,
+		Output:      poll.Output,
+		Error:       poll.Error,
+	}
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+	if err := emitRunnerFinished(ctx.ExecutionState, payload); err != nil && ctx.Logger != nil {
+		ctx.Logger.WithError(err).Warn("runner: emit after poll failed")
+	}
+	return nil
+}
+
+func (c *RunCommands) fetchBrokerTaskStatus(httpCtx core.HTTPContext, brokerBase, brokerTaskID string) (*brokerTaskPollJSON, error) {
+	reqTimeout, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
 	defer cancel()
 
 	url := brokerBase + "/v1/tasks/" + brokerTaskID
-	req, err := http.NewRequestWithContext(httpCtx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(reqTimeout, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("new poll request: %w", err)
 	}
 	setBrokerAuthHeader(req)
 
-	resp, err := ctx.HTTP.Do(req)
+	resp, err := httpCtx.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("broker poll: %w", err)
 	}
@@ -356,9 +448,17 @@ func (c *RunCommands) fetchBrokerTaskStatus(ctx core.ExecutionContext, brokerBas
 	return &out, nil
 }
 
-func (c *RunCommands) Hooks() []core.Hook { return nil }
+func (c *RunCommands) Hooks() []core.Hook {
+	return []core.Hook{{Name: runnerBrokerPollHook, Type: core.HookTypeInternal}}
+}
+
 func (c *RunCommands) HandleHook(ctx core.ActionHookContext) error {
-	return nil
+	switch ctx.Name {
+	case runnerBrokerPollHook:
+		return c.handleBrokerPoll(ctx)
+	default:
+		return fmt.Errorf("unknown hook: %s", ctx.Name)
+	}
 }
 
 func (c *RunCommands) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {

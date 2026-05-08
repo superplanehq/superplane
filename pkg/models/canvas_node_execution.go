@@ -427,6 +427,11 @@ func (e *CanvasNodeExecution) Pass(outputs map[string][]any) ([]CanvasEvent, err
 }
 
 func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[string][]any) ([]CanvasEvent, error) {
+	return e.FinishWithOutputsInTransaction(tx, channelOutputs, CanvasNodeExecutionResultPassed, "", "")
+}
+
+// FinishWithOutputsInTransaction persists output channel events and marks the execution finished.
+func (e *CanvasNodeExecution) FinishWithOutputsInTransaction(tx *gorm.DB, channelOutputs map[string][]any, result string, resultReason string, resultMessage string) ([]CanvasEvent, error) {
 	now := time.Now()
 
 	//
@@ -474,13 +479,24 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 	//
 	// Update execution state
 	//
-	err = tx.Model(e).
-		Updates(map[string]interface{}{
-			"state":      CanvasNodeExecutionStateFinished,
-			"result":     CanvasNodeExecutionResultPassed,
-			"updated_at": &now,
-		}).Error
+	updates := map[string]interface{}{
+		"state":      CanvasNodeExecutionStateFinished,
+		"result":     result,
+		"updated_at": &now,
+	}
 
+	if result == CanvasNodeExecutionResultFailed {
+		if resultReason == "" {
+			resultReason = CanvasNodeExecutionResultReasonError
+		}
+		if resultMessage == "" {
+			resultMessage = "failed"
+		}
+		updates["result_reason"] = resultReason
+		updates["result_message"] = resultMessage
+	}
+
+	err = tx.Model(e).Updates(updates).Error
 	if err != nil {
 		return nil, err
 	}

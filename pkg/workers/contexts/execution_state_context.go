@@ -3,10 +3,17 @@ package contexts
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
+)
+
+// Runner terminal emit shape (must stay aligned with pkg/components/runner emitRunnerFinished).
+const (
+	runnerFinishedPayloadType     = "runner.finished"
+	runnerFailedOutputChannelName = "failed"
 )
 
 type ExecutionStateContext struct {
@@ -70,7 +77,20 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 		outputs[channel] = append(outputs[channel], json.RawMessage(data))
 	}
 
-	newEvents, err := s.execution.PassInTransaction(s.tx, outputs)
+	var newEvents []models.CanvasEvent
+	var err error
+	if payloadType == runnerFinishedPayloadType && channel == runnerFailedOutputChannelName {
+		msg := runnerFailureResultMessage(payloads)
+		newEvents, err = s.execution.FinishWithOutputsInTransaction(
+			s.tx,
+			outputs,
+			models.CanvasNodeExecutionResultFailed,
+			models.CanvasNodeExecutionResultReasonError,
+			msg,
+		)
+	} else {
+		newEvents, err = s.execution.PassInTransaction(s.tx, outputs)
+	}
 	if err != nil {
 		return err
 	}
@@ -80,6 +100,25 @@ func (s *ExecutionStateContext) Emit(channel, payloadType string, payloads []any
 	}
 
 	return nil
+}
+
+func runnerFailureResultMessage(payloads []any) string {
+	if len(payloads) == 0 {
+		return "failed"
+	}
+	m, ok := payloads[0].(map[string]any)
+	if !ok {
+		return "failed"
+	}
+	for _, key := range []string{"error", "message"} {
+		if v, ok := m[key]; ok {
+			s := strings.TrimSpace(fmt.Sprint(v))
+			if s != "" {
+				return s
+			}
+		}
+	}
+	return "failed"
 }
 
 func (s *ExecutionStateContext) Fail(reason, message string) error {
