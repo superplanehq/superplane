@@ -56,6 +56,8 @@ export type TriggerRendererContext = {
   definition: ComponentDefinition;
   lastEvent: EventInfo;
   canvasMode?: "live" | "edit";
+  /** Canvas-scoped trigger hook invoker (same layering as {@link ActionContext} on components). */
+  actions?: TriggerActionContext;
 };
 
 export type EventInfo =
@@ -129,6 +131,17 @@ export type ActionContext = {
   invokeNodeExecutionHook: (executionId: string, hook: string, parameters: unknown) => Promise<void>;
 };
 
+export type TriggerActionModal = {
+  title?: ReactNode;
+  description?: ReactNode;
+  content: (ctx: { close: () => void }) => ReactNode;
+};
+
+export type TriggerActionContext = {
+  invokeNodeTriggerHook: (hookName: string, parameters: unknown) => Promise<void>;
+  openModal: (modal: TriggerActionModal) => void;
+};
+
 export type SubtitleContext = {
   node: NodeInfo;
   execution: ExecutionInfo;
@@ -177,16 +190,19 @@ export interface EventStateRegistry {
  * (via getCustomFieldRenderer) and canvas nodes (via customField prop).
  */
 export interface CustomFieldRendererContext {
-  onRun?: (initialData?: string) => void;
   /** Full integration object when editing an app trigger/component (e.g. for incident webhook status) */
   integration?: OrganizationsIntegration;
+  /** Set when rendering the start trigger manual-run templates on the canvas. */
+  canvasMode?: "live" | "edit";
+  /** Start trigger template Run uses this on the canvas (parallel to component {@link ActionContext}). */
+  actions?: TriggerActionContext;
 }
 
 export interface CustomFieldRenderer {
   /**
    * Render custom UI for the given node configuration
    * @param node The node from the backend
-   * @param context Optional context (e.g., onRun, integration for app nodes)
+   * @param context Optional context (e.g., actions, integration for app nodes)
    * @returns React node to render
    */
   render(node: NodeInfo, context?: CustomFieldRendererContext): ReactNode;

@@ -52,7 +52,6 @@ export interface BlockInternalData {
 export type CanvasBlockData = BlockData & BlockInternalData;
 
 export type ComponentActionKeys =
-  | "onRun"
   | "runDisabled"
   | "runDisabledTooltip"
   | "onTogglePause"
@@ -73,5 +72,6 @@ export interface BlockProps extends ComponentActionsProps {
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
+  onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
   onClick?: (e: MouseEvent) => void;
 }

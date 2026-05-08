@@ -1,10 +1,19 @@
 package github
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/integrations/github/common"
+	"github.com/superplanehq/superplane/test/support/contexts"
+	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 )
 
 func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
@@ -19,11 +28,11 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 	}{
 		{
 			name: "identical configurations",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
@@ -32,11 +41,11 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 		},
 		{
 			name: "different event types",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				EventType:  "pull_request",
 				Repository: "superplane",
 			},
@@ -45,11 +54,11 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 		},
 		{
 			name: "different repositories",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "other-repo",
 			},
@@ -58,11 +67,11 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 		},
 		{
 			name: "both fields different",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				EventType:  "issues",
 				Repository: "other-repo",
 			},
@@ -85,7 +94,7 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 		{
 			name:    "invalid first configuration",
 			configA: "invalid",
-			configB: WebhookConfiguration{
+			configB: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
@@ -94,7 +103,7 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 		},
 		{
 			name: "invalid second configuration",
-			configA: WebhookConfiguration{
+			configA: common.WebhookConfiguration{
 				EventType:  "push",
 				Repository: "superplane",
 			},
@@ -117,4 +126,64 @@ func Test__GitHubWebhookHandler__CompareConfig(t *testing.T) {
 			assert.Equal(t, tc.expectEqual, equal)
 		})
 	}
+}
+
+func Test__GitHubWebhookHandler__Cleanup(t *testing.T) {
+	t.Run("ignores missing hook", func(t *testing.T) {
+		handler := &GitHubWebhookHandler{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+			},
+		}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: mocks.IntegrationContextForNewSetupFlow(),
+			Webhook: &contexts.WebhookContext{
+				Metadata:      Webhook{ID: 123},
+				Configuration: common.WebhookConfiguration{Repository: "hello"},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodDelete, httpCtx.Requests[0].Method)
+		assert.Equal(t, "/repos/testhq/hello/hooks/123", httpCtx.Requests[0].URL.Path)
+	})
+
+	t.Run("ignores missing app installation during token refresh", func(t *testing.T) {
+		handler := &GitHubWebhookHandler{}
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusNotFound, `{"message":"Not Found"}`),
+			},
+		}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpCtx,
+			Integration: mocks.IntegrationContextForLegacySetupFlow(githubPrivateKeyPEM(t)),
+			Webhook: &contexts.WebhookContext{
+				Metadata:      Webhook{ID: 123},
+				Configuration: common.WebhookConfiguration{Repository: "hello"},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 1)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
+		assert.Equal(t, "/app/installations/67890/access_tokens", httpCtx.Requests[0].URL.Path)
+	})
+}
+
+func githubPrivateKeyPEM(t *testing.T) []byte {
+	t.Helper()
+
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	return pem.EncodeToMemory(&pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(key),
+	})
 }

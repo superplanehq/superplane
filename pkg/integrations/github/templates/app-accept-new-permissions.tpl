@@ -1,0 +1,2 @@
+- Go to {{ .AcceptURL }}
+- Accept the new permissions

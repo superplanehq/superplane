@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate, Link, useLocation, matchPath } from "react-router-dom";
 import { Sidebar, SidebarBody, SidebarSection } from "../../../components/Sidebar/sidebar";
 import { General } from "./General";
 import { Groups } from "./Groups";
@@ -12,7 +12,6 @@ import { useAccount } from "../../../contexts/AccountContext";
 import { useParams } from "react-router-dom";
 import { Members } from "./Members";
 import { Integrations } from "./Integrations";
-import { IntegrationDetails } from "./IntegrationDetails";
 import { Secrets } from "./Secrets";
 import { SecretDetail } from "./SecretDetail";
 import { ServiceAccounts } from "./ServiceAccounts";
@@ -38,13 +37,18 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { usePermissions } from "@/contexts/PermissionsContext";
-import { PermissionTooltip, RequirePermission } from "@/components/PermissionGate";
+import { PermissionTooltip, RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { useOrganizationUsage } from "@/hooks/useOrganizationData";
+import { IntegrationDetailsRoute } from "./components/IntegrationDetailsRoute";
+import { IntegrationSetup } from "./components/IntegrationSetup";
 
 export function OrganizationSettings() {
   const location = useLocation();
   const { account: user, loading: userLoading } = useAccount();
   const { organizationId } = useParams<{ organizationId: string }>();
+  const isIntegrationSetupRoute = Boolean(
+    matchPath({ path: "/:organizationId/settings/integrations/:integrationName/setup", end: true }, location.pathname),
+  );
   const { canAct, isLoading: permissionsLoading } = usePermissions();
   const canReadOrg = permissionsLoading || canAct("org", "read");
 
@@ -432,7 +436,7 @@ export function OrganizationSettings() {
       </Sidebar>
 
       <div className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-900">
-        <div className="px-8 pb-8 w-full max-w-3xl mx-auto">
+        <div className={cn("mx-auto w-full px-8 pb-8", isIntegrationSetupRoute ? "max-w-6xl" : "max-w-3xl")}>
           <div className="pt-10 pb-8">
             <h1 className="!text-2xl font-medium text-gray-900 dark:text-white">{activeMeta.title}</h1>
             <p className="text-sm mt-2 text-gray-800 dark:text-gray-300">{activeMeta.description}</p>
@@ -486,10 +490,23 @@ export function OrganizationSettings() {
               }
             />
             <Route
+              path="integrations/:integrationName/setup"
+              element={
+                <RequireAnyPermission
+                  checks={[
+                    { resource: "integrations", action: "create" },
+                    { resource: "integrations", action: "update" },
+                  ]}
+                >
+                  <IntegrationSetup organizationId={organizationId || ""} />
+                </RequireAnyPermission>
+              }
+            />
+            <Route
               path="integrations/:integrationId"
               element={
                 <RequirePermission resource="integrations" action="read">
-                  <IntegrationDetails organizationId={organizationId || ""} />
+                  <IntegrationDetailsRoute organizationId={organizationId || ""} />
                 </RequirePermission>
               }
             />

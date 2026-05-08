@@ -166,7 +166,7 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 		Parameters:    spec.InvokeAction.Parameters,
 		Configuration: node.Configuration.Data(),
 		Logger:        logging.ForNode(*node),
-		HTTP:          w.registry.HTTPContext(),
+		HTTP:          w.registry.HTTPContextInTransaction(tx),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Events:        contexts.NewEventContext(tx, node, onNewEvents),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
@@ -225,7 +225,7 @@ func (w *NodeRequestWorker) invokeNodeComponentHook(tx *gorm.DB, request *models
 		Configuration: node.Configuration.Data(),
 		Parameters:    spec.InvokeAction.Parameters,
 		Logger:        logger,
-		HTTP:          w.registry.HTTPContext(),
+		HTTP:          w.registry.HTTPContextInTransaction(tx),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 	}
@@ -301,9 +301,9 @@ func (w *NodeRequestWorker) invokeParentNodeComponentAction(
 	logger := logging.ForExecution(execution, nil)
 	hookCtx := core.ActionHookContext{
 		Name:           spec.InvokeAction.ActionName,
-		Configuration:  node.Configuration.Data(),
+		Configuration:  execution.Configuration.Data(),
 		Parameters:     spec.InvokeAction.Parameters,
-		HTTP:           w.registry.HTTPContext(),
+		HTTP:           w.registry.HTTPContextInTransaction(tx),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
@@ -383,7 +383,7 @@ func (w *NodeRequestWorker) invokeChildNodeComponentAction(
 		Configuration:  execution.Configuration.Data(),
 		Parameters:     spec.InvokeAction.Parameters,
 		Logger:         logging.ForExecution(execution, parentExecution),
-		HTTP:           w.registry.HTTPContext(),
+		HTTP:           w.registry.HTTPContextInTransaction(tx),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),
 		Requests:       contexts.NewExecutionRequestContext(tx, execution),
