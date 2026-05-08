@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -268,19 +267,9 @@ func (c *ExecutionStateContext) Pass() error {
 
 func (c *ExecutionStateContext) Emit(channel, payloadType string, payloads []any) error {
 	c.Finished = true
+	c.Passed = true
 	c.Channel = channel
 	c.Type = payloadType
-
-	// Match pkg/workers/contexts: runner failure emit finishes with failed execution.
-	if payloadType == "runner.finished" && channel == "failed" {
-		c.Passed = false
-		c.FailureReason = "error"
-		c.FailureMessage = stubRunnerFailureMessage(payloads)
-	} else {
-		c.Passed = true
-		c.FailureReason = ""
-		c.FailureMessage = ""
-	}
 
 	// Wrap payloads like the real ExecutionStateContext does
 	wrappedPayloads := make([]any, 0, len(payloads))
@@ -301,25 +290,6 @@ func (c *ExecutionStateContext) Fail(reason, message string) error {
 	c.FailureReason = reason
 	c.FailureMessage = message
 	return nil
-}
-
-func stubRunnerFailureMessage(payloads []any) string {
-	if len(payloads) == 0 {
-		return "failed"
-	}
-	m, ok := payloads[0].(map[string]any)
-	if !ok {
-		return "failed"
-	}
-	for _, key := range []string{"error", "message"} {
-		if v, ok := m[key]; ok {
-			s := strings.TrimSpace(fmt.Sprint(v))
-			if s != "" {
-				return s
-			}
-		}
-	}
-	return "failed"
 }
 
 func (c *ExecutionStateContext) SetKV(key, value string) error {

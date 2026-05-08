@@ -22,40 +22,25 @@ import (
 const (
 	ComponentName = "runner"
 
-	// Output channel names match integrations that finish with a terminal pass/fail split
-	// (e.g. Semaphore runWorkflow: passed / failed).
 	PassedOutputChannel = "passed"
 	FailedOutputChannel = "failed"
 
-	// RunnerFinishedEventType is the payload type passed to ExecutionState.Emit for terminal completion.
 	RunnerFinishedEventType = "runner.finished"
 
-	// Polling runs as internal hooks (see handleBrokerPoll), not inside Execute, so the
-	// interval is not limited by idle_in_transaction_session_timeout.
 	brokerPollInterval   = 30 * time.Second
 	runnerFirstPollDelay = 2 * time.Second
 	brokerHTTPTimeout    = 30 * time.Second
 
 	runnerBrokerPollHook = "brokerPoll"
 
-	// Persisted on each CanvasNodeRequest (hook parameters survive JSON round-trips cleanly).
 	paramKeyBrokerTaskID = "broker_task_id"
 	paramKeyBrokerBase   = "broker_base"
 
 	metaKeyRunnerBrokerTaskID = "runner_broker_task_id"
 	metaKeyRunnerBrokerBase   = "runner_broker_base"
 
-	// defaultBrokerBaseURL is the task-broker HTTP base URL (no trailing slash).
-	// Keep in sync with BROKER_PUBLIC_URL in the runner repo: ../runner/scripts/deploy/task-broker.env
-	defaultBrokerBaseURL = "http://98.91.210.215:8081"
-
-	// defaultFleetID is the task-broker fleet id for POST /v1/tasks.
-	// Keep in sync with TASK_BROKER_FLEET_ID in the runner repo: ../runner/scripts/deploy/task-broker.env
-	defaultFleetID = "aws-standard-1"
-
-	// defaultBrokerAuthToken is an optional bearer token for task-broker /v1 when TASK_BROKER_AUTH_TOKEN is unset.
-	// Prefer env TASK_BROKER_AUTH_TOKEN (same value as AUTH_TOKEN on the task-broker; see runner/scripts/deploy/task-broker.env).
-	// When neither is set, no Authorization header is sent.
+	defaultBrokerBaseURL   = "http://98.91.210.215:8081"
+	defaultFleetID         = "aws-standard-1"
 	defaultBrokerAuthToken = ""
 )
 
