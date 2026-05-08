@@ -155,6 +155,85 @@ func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	support.VerifyNodeRequestCount(t, canvas.ID, 0)
 }
 
+func Test__CanvasCleanupWorker_ProcessesWorkflowFromSoftDeletedOrganization(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	worker := NewCanvasCleanupWorker()
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: "node-1",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+			{
+				NodeID: "node-2",
+				Type:   models.NodeTypeComponent,
+				Ref: datatypes.NewJSONType(models.NodeRef{
+					Component: &models.ComponentRef{Name: "noop"},
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	now := time.Now()
+	nodeRequest := models.CanvasNodeRequest{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     "node-1",
+		Type:       models.NodeRequestTypeInvokeAction,
+		State:      models.NodeExecutionRequestStatePending,
+		RunAt:      now,
+		CreatedAt:  now,
+		UpdatedAt:  now,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "test",
+				Parameters: map[string]any{},
+			},
+		}),
+	}
+	require.NoError(t, database.Conn().Create(&nodeRequest).Error)
+
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+	deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
+	require.NoError(t, database.Conn().
+		Unscoped().
+		Model(&models.Organization{}).
+		Where("id = ?", r.Organization.ID).
+		Update("deleted_at", deletedAtOutsideGracePeriod).
+		Error)
+
+	canvases, err := models.ListDeletedCanvases()
+	require.NoError(t, err)
+	require.Len(t, canvases, 1)
+	require.Equal(t, canvas.ID, canvases[0].ID)
+	require.True(t, canvases[0].DeletedAt.Valid)
+
+	require.NoError(t, worker.LockAndProcessCanvas(canvases[0]))
+
+	var canvasCount int64
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Count(&canvasCount).Error)
+	assert.Equal(t, int64(0), canvasCount)
+
+	nodes, err := models.FindCanvasNodes(canvas.ID)
+	require.NoError(t, err)
+	assert.Empty(t, nodes)
+
+	support.VerifyNodeRequestCount(t, canvas.ID, 0)
+
+	var organizationCount int64
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Organization{}).Where("id = ?", r.Organization.ID).Count(&organizationCount).Error)
+	assert.Equal(t, int64(1), organizationCount)
+}
+
 func Test__CanvasCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
