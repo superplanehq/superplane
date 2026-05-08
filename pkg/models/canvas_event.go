@@ -205,10 +205,12 @@ func ListExpiredRoutedRootCanvasEventsInTransaction(tx *gorm.DB, referenceTime t
 
 func ListPendingCanvasEvents() ([]CanvasEvent, error) {
 	var events []CanvasEvent
-	err := database.Conn().
-		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
-		Where("workflow_events.state = ?", CanvasEventStatePending).
-		Where("workflows.deleted_at IS NULL").
+	query := database.Conn().
+		Table("workflow_events").
+		Select("workflow_events.*").
+		Where("workflow_events.state = ?", CanvasEventStatePending)
+
+	err := withActiveCanvas(query, "workflow_events.workflow_id").
 		Find(&events).
 		Error
 
@@ -222,10 +224,18 @@ func ListPendingCanvasEvents() ([]CanvasEvent, error) {
 func LockCanvasEvent(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, error) {
 	var event CanvasEvent
 
-	err := tx.
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("id = ?", id).
-		Where("state = ?", CanvasEventStatePending).
+	query := tx.
+		Table("workflow_events").
+		Select("workflow_events.*").
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "workflow_events"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("workflow_events.id = ?", id).
+		Where("workflow_events.state = ?", CanvasEventStatePending)
+
+	err := withActiveCanvas(query, "workflow_events.workflow_id").
 		First(&event).
 		Error
 

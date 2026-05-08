@@ -74,6 +74,14 @@ func queryCanvasWithLiveVersion(tx *gorm.DB) *gorm.DB {
 		)
 }
 
+func withActiveCanvas(tx *gorm.DB, workflowIDColumn string) *gorm.DB {
+	return tx.
+		Joins(fmt.Sprintf("JOIN workflows ON %s = workflows.id", workflowIDColumn)).
+		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
+		Where("workflows.deleted_at IS NULL").
+		Where("organizations.deleted_at IS NULL")
+}
+
 func (c *Canvas) FindNode(id string) (*CanvasNode, error) {
 	var node CanvasNode
 	err := database.Conn().
@@ -328,9 +336,27 @@ func FindCanvasTemplateInTransaction(tx *gorm.DB, id uuid.UUID) (*Canvas, error)
 
 func ListDeletedCanvases() ([]Canvas, error) {
 	var canvases []Canvas
-	err := queryCanvasWithLiveVersion(database.Conn()).
+	err := database.Conn().
+		Model(&Canvas{}).
 		Unscoped().
-		Where("workflows.deleted_at IS NOT NULL").
+		Joins("JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id").
+		Joins("JOIN organizations ON organizations.id = workflows.organization_id").
+		Select(
+			"workflows.id",
+			"workflows.organization_id",
+			"workflows.live_version_id",
+			"workflows.folder_id",
+			"workflows.is_template",
+			"workflows.name",
+			"workflows.created_by",
+			"workflows.created_at",
+			"workflows.updated_at",
+			"COALESCE(workflows.deleted_at, organizations.deleted_at) AS deleted_at",
+			"live_version.description AS description",
+			"live_version.change_management_enabled AS change_management_enabled",
+			"live_version.change_request_approvers AS change_request_approvers",
+		).
+		Where("workflows.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
 		Find(&canvases).
 		Error
 
@@ -362,20 +388,26 @@ func LockCanvas(tx *gorm.DB, id uuid.UUID) (*Canvas, error) {
 	err := tx.
 		Unscoped().
 		Model(&Canvas{}).
+		Joins("JOIN organizations ON organizations.id = workflows.organization_id").
 		Select(
 			"workflows.id",
 			"workflows.organization_id",
 			"workflows.live_version_id",
+			"workflows.folder_id",
 			"workflows.is_template",
 			"workflows.name",
 			"workflows.created_by",
 			"workflows.created_at",
 			"workflows.updated_at",
-			"workflows.deleted_at",
+			"COALESCE(workflows.deleted_at, organizations.deleted_at) AS deleted_at",
 		).
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "workflows"},
+			Options:  "SKIP LOCKED",
+		}).
 		Where("workflows.id = ?", id).
-		Where("workflows.deleted_at IS NOT NULL").
+		Where("workflows.deleted_at IS NOT NULL OR organizations.deleted_at IS NOT NULL").
 		First(&canvas).
 		Error
 
