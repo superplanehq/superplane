@@ -133,6 +133,27 @@ func FindFirstCanvasMemoryByNamespaceAndMatches(canvasID uuid.UUID, namespace st
 	return FindFirstCanvasMemoryByNamespaceAndMatchesInTransaction(database.Conn(), canvasID, namespace, matches)
 }
 
+func FindFirstCanvasMemoryByNamespaceInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string) (*CanvasMemory, error) {
+	var record CanvasMemory
+
+	err := tx.
+		Where("canvas_id = ? AND namespace = ?", canvasID, namespace).
+		Order("created_at DESC").
+		Limit(1).
+		First(&record).
+		Error
+
+	if err != nil {
+		return nil, nil
+	}
+
+	return &record, nil
+}
+
+func FindFirstCanvasMemoryByNamespace(canvasID uuid.UUID, namespace string) (*CanvasMemory, error) {
+	return FindFirstCanvasMemoryByNamespaceInTransaction(database.Conn(), canvasID, namespace)
+}
+
 func DeleteCanvasMemory(canvasID, memoryID uuid.UUID) error {
 	return DeleteCanvasMemoryInTransaction(database.Conn(), canvasID, memoryID)
 }
