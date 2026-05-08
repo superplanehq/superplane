@@ -9,12 +9,13 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const (
-	brokerAuthToken = ""
+	brokerHTTPTimeout = 30 * time.Second
 )
 
 type BrokerClient struct {

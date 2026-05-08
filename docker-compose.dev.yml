@@ -74,7 +74,10 @@ services:
       # Runner + node webhooks: URLs sent to externals use this origin (must reach this process on PUBLIC_API_PORT).
       # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL=https://<subdomain>.ngrok-free.app (no trailing slash).
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
-      # Bearer for task-broker /v1 (Runner component); must match broker AUTH_TOKEN when auth is enabled
+      # Task broker /v1 (Runner component). Base URL has no trailing slash.
+      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-}
+      TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
+      # Bearer; must match broker AUTH_TOKEN when auth is enabled
       TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-}
       ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
       AGENT_ENABLED: ${AGENT_ENABLED:-yes}
