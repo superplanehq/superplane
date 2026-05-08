@@ -7,30 +7,45 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
 const (
-	brokerBaseURL   = "http://98.91.210.215:8081"
-	brokerFleetID   = "aws-standard-1"
 	brokerAuthToken = ""
 )
 
 type BrokerClient struct {
-	httpClient  core.HTTPContext
-	integration core.IntegrationContext
+	httpClient core.HTTPContext
+	baseURL    string
+	fleetID    string
+	authToken  string
 }
 
-func NewBrokerClient(httpClient core.HTTPContext) *BrokerClient {
+func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
+	baseURL := os.Getenv("TASK_BROKER_BASE_URL")
+	if baseURL == "" {
+		return nil, fmt.Errorf("TASK_BROKER_BASE_URL is not set")
+	}
+
+	fleetID := os.Getenv("TASK_BROKER_FLEET_ID")
+	if fleetID == "" {
+		return nil, fmt.Errorf("TASK_BROKER_FLEET_ID is not set")
+	}
+
+	authToken := os.Getenv("TASK_BROKER_AUTH_TOKEN")
+	if authToken == "" {
+		return nil, fmt.Errorf("TASK_BROKER_AUTH_TOKEN is not set")
+	}
+
 	return &BrokerClient{
 		httpClient: httpClient,
-	}
-}
-
-func (b *BrokerClient) BaseURL() string {
-	return strings.TrimRight(strings.TrimSpace(brokerBaseURL), "/")
+		baseURL:    baseURL,
+		fleetID:    fleetID,
+		authToken:  authToken,
+	}, nil
 }
 
 // Create Task
@@ -64,7 +79,7 @@ type brokerCreateTaskResponse struct {
 
 func (b *BrokerClient) CreateTask(commands []string, webhookURL string) (string, error) {
 	req := brokerCreateTaskRequest{
-		FleetID:       brokerFleetID,
+		FleetID:       b.fleetID,
 		Commands:      commands,
 		WebhookURL:    webhookURL,
 		ExecutionMode: "host",
@@ -78,7 +93,7 @@ func (b *BrokerClient) CreateTask(commands []string, webhookURL string) (string,
 	httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
 	defer cancel()
 
-	httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodPost, b.BaseURL()+"/v1/tasks", bytes.NewReader(bodyBytes))
+	httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodPost, b.baseURL+"/v1/tasks", bytes.NewReader(bodyBytes))
 	if err != nil {
 		return "", fmt.Errorf("new request: %w", err)
 	}
@@ -99,7 +114,7 @@ func (b *BrokerClient) CreateTask(commands []string, webhookURL string) (string,
 		return "", fmt.Errorf(
 			"broker rejected task: status=%d body=%s",
 			resp.StatusCode,
-			strings.TrimSpace(string(b)),
+			strings.TrimSpace(string(body)),
 		)
 	}
 
@@ -125,7 +140,7 @@ func (b *BrokerClient) FetchTaskStatus(taskID string) (*task, error) {
 	httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
 	defer cancel()
 
-	httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodGet, b.BaseURL()+"/v1/tasks/"+taskID, nil)
+	httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodGet, b.baseURL+"/v1/tasks/"+taskID, nil)
 	if err != nil {
 		return nil, fmt.Errorf("new request: %w", err)
 	}

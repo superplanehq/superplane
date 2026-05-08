@@ -14,56 +14,45 @@ import (
 )
 
 const (
-	ComponentName = "runner"
-
-	PassedOutputChannel = "passed"
-	FailedOutputChannel = "failed"
-
+	PassedOutputChannel     = "passed"
+	FailedOutputChannel     = "failed"
 	RunnerFinishedEventType = "runner.finished"
 
-	brokerPollInterval   = 30 * time.Second
-	runnerFirstPollDelay = 2 * time.Second
-	brokerHTTPTimeout    = 30 * time.Second
-
-	paramKeyBrokerTaskID = "broker_task_id"
-	paramKeyBrokerBase   = "broker_base"
-
-	metaKeyRunnerBrokerTaskID = "runner_broker_task_id"
-	metaKeyRunnerBrokerBase   = "runner_broker_base"
-
+	pollInterval   = 2 * time.Minute
 	hookActionPoll = "poll"
 )
 
 func init() {
-	registry.RegisterAction(ComponentName, &RunCommands{})
+	registry.RegisterAction("runner", &Runner{})
 }
 
-type RunCommands struct{}
+type Runner struct{}
 
 type Spec struct {
 	Commands string `json:"commands" mapstructure:"commands"`
 }
 
-func (c *RunCommands) Name() string  { return ComponentName }
-func (c *RunCommands) Label() string { return "Runner" }
-func (c *RunCommands) Icon() string  { return "terminal" }
-func (c *RunCommands) Color() string { return "blue" }
-func (c *RunCommands) ExampleOutput() map[string]any {
+func (c *Runner) Name() string  { return "runner" }
+func (c *Runner) Label() string { return "Runner" }
+func (c *Runner) Icon() string  { return "terminal" }
+func (c *Runner) Color() string { return "blue" }
+
+func (c *Runner) ExampleOutput() map[string]any {
 	return map[string]any{"status": "succeeded", "exit_code": 0}
 }
 
-func (c *RunCommands) OutputChannels(configuration any) []core.OutputChannel {
+func (c *Runner) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
 		{Name: PassedOutputChannel, Label: "Passed"},
 		{Name: FailedOutputChannel, Label: "Failed"},
 	}
 }
 
-func (c *RunCommands) Description() string {
+func (c *Runner) Description() string {
 	return "Runs bash commands on a dedicated machine"
 }
 
-func (c *RunCommands) Documentation() string {
+func (c *Runner) Documentation() string {
 	return `Runs bash commands on a dedicated machine.
 
 ## Configuration
@@ -75,7 +64,7 @@ func (c *RunCommands) Documentation() string {
 `
 }
 
-func (c *RunCommands) Configuration() []configuration.Field {
+func (c *Runner) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "commands",
@@ -88,7 +77,7 @@ func (c *RunCommands) Configuration() []configuration.Field {
 	}
 }
 
-func (c *RunCommands) Setup(ctx core.SetupContext) error {
+func (c *Runner) Setup(ctx core.SetupContext) error {
 	spec := Spec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("decode configuration: %w", err)
@@ -102,11 +91,11 @@ func (c *RunCommands) Setup(ctx core.SetupContext) error {
 	return err
 }
 
-func (c *RunCommands) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (c *Runner) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *RunCommands) Execute(ctx core.ExecutionContext) error {
+func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	spec := Spec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("decode configuration: %w", err)
@@ -118,7 +107,10 @@ func (c *RunCommands) Execute(ctx core.ExecutionContext) error {
 	}
 
 	cmds := normalizeCommands(spec.Commands)
-	broker := NewBrokerClient(ctx.HTTP)
+	broker, err := NewBrokerClient(ctx.HTTP)
+	if err != nil {
+		return fmt.Errorf("new broker client: %w", err)
+	}
 
 	taskID, err := broker.CreateTask(cmds, webhookURL)
 	if err != nil {
@@ -127,19 +119,19 @@ func (c *RunCommands) Execute(ctx core.ExecutionContext) error {
 
 	params := map[string]any{"task_id": taskID}
 
-	err = ctx.ExecutionState.SetKV(metaKeyRunnerBrokerTaskID, taskID)
+	err = ctx.ExecutionState.SetKV("task_id", taskID)
 	if err != nil {
 		return fmt.Errorf("set task id in kv: %w", err)
 	}
 
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, params, runnerFirstPollDelay)
+	return ctx.Requests.ScheduleActionCall(hookActionPoll, params, pollInterval)
 }
 
-func (c *RunCommands) Hooks() []core.Hook {
+func (c *Runner) Hooks() []core.Hook {
 	return []core.Hook{{Name: hookActionPoll, Type: core.HookTypeInternal}}
 }
 
-func (c *RunCommands) HandleHook(ctx core.ActionHookContext) error {
+func (c *Runner) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case hookActionPoll:
 		return c.handlePoll(ctx)
@@ -148,33 +140,39 @@ func (c *RunCommands) HandleHook(ctx core.ActionHookContext) error {
 	}
 }
 
-func (c *RunCommands) handlePoll(ctx core.ActionHookContext) error {
+func (c *Runner) handlePoll(ctx core.ActionHookContext) error {
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
 
-	taskID, ok := ctx.Parameters[paramKeyBrokerTaskID].(string)
+	taskID, ok := ctx.Parameters["task_id"].(string)
 	if !ok {
 		return fmt.Errorf("task_id is missing from parameters")
 	}
 
-	broker := NewBrokerClient(ctx.HTTP)
+	broker, err := NewBrokerClient(ctx.HTTP)
+	if err != nil {
+		return fmt.Errorf("new broker client: %w", err)
+	}
 
 	task, err := broker.FetchTaskStatus(taskID)
 	if err != nil {
 		ctx.Logger.WithError(err).Warn("runner: broker poll failed, will retry")
-		return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{paramKeyBrokerTaskID: taskID}, brokerPollInterval)
+		return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
 	}
 
 	if task.IsInTerminalState() {
 		return c.processTaskStatus(ctx.ExecutionState, task)
 	}
 
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{paramKeyBrokerTaskID: taskID}, brokerPollInterval)
+	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
 }
 
-func (c *RunCommands) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	broker := NewBrokerClient(ctx.HTTP)
+func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	broker, err := NewBrokerClient(ctx.HTTP)
+	if err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("new broker client: %w", err)
+	}
 
 	task, err := broker.ProcessWebhook(ctx.Body)
 	if err != nil {
@@ -185,9 +183,9 @@ func (c *RunCommands) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 		ctx.Logger.WithError(err).Warn("runner: broker webhook received non-terminal state")
 	}
 
-	executionCtx, err := ctx.FindExecutionByKV(metaKeyRunnerBrokerTaskID, task.TaskID)
+	executionCtx, err := ctx.FindExecutionByKV("task_id", task.TaskID)
 	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("find execution: %w", err)
+		return http.StatusNotFound, nil, nil
 	}
 
 	err = c.processTaskStatus(executionCtx.ExecutionState, task)
@@ -198,7 +196,7 @@ func (c *RunCommands) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 	return http.StatusOK, nil, nil
 }
 
-func (c *RunCommands) processTaskStatus(state core.ExecutionStateContext, task *task) error {
+func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *task) error {
 	if state.IsFinished() {
 		return nil
 	}
@@ -216,5 +214,5 @@ func (c *RunCommands) processTaskStatus(state core.ExecutionStateContext, task *
 	return state.Emit(channel, RunnerFinishedEventType, []any{out})
 }
 
-func (c *RunCommands) Cancel(ctx core.ExecutionContext) error { return nil }
-func (c *RunCommands) Cleanup(ctx core.SetupContext) error    { return nil }
+func (c *Runner) Cancel(ctx core.ExecutionContext) error { return nil }
+func (c *Runner) Cleanup(ctx core.SetupContext) error    { return nil }
