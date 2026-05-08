@@ -10,12 +10,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record in a Cloudflare zone" />
-  <LinkCard title="Create Origin Rule" href="#create-origin-rule" description="Create a rule to override the origin server for matching requests" />
   <LinkCard title="Create KV Namespace" href="#create-kv-namespace" description="Create a Cloudflare Workers KV namespace" />
+  <LinkCard title="Create Origin Rule" href="#create-origin-rule" description="Create a rule to override the origin server for matching requests" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a Cloudflare zone" />
-  <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
   <LinkCard title="Delete KV Namespace" href="#delete-kv-namespace" description="Delete a Cloudflare Workers KV namespace" />
   <LinkCard title="Delete KV Value" href="#delete-kv-value" description="Delete a key from a Cloudflare Workers KV namespace" />
+  <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
   <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
   <LinkCard title="Put KV Value" href="#put-kv-value" description="Write a key-value pair to a Cloudflare Workers KV namespace" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
@@ -93,6 +93,43 @@ Emits the created DNS record on the default channel. If the zone is not found, t
 }
 ```
 
+<a id="create-kv-namespace"></a>
+
+## Create KV Namespace
+
+The Create KV Namespace component creates a new Cloudflare Workers KV namespace.
+
+### Use Cases
+
+- **Feature flags**: Provision a dedicated namespace to store feature flag state
+- **Session storage**: Create a namespace for application session data
+- **Configuration store**: Set up a namespace for dynamic configuration values
+
+### Configuration
+
+- **Title**: A human-readable name for the namespace (must be unique per account)
+
+### Output
+
+Returns the created namespace with its assigned ID and title.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "namespace": {
+      "id": "0f2ac74b498b48028cb68387c421e279",
+      "supports_url_encoding": true,
+      "title": "my-kv-namespace"
+    }
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.kv.namespace.created"
+}
+```
+
 <a id="create-origin-rule"></a>
 
 ## Create Origin Rule
@@ -140,43 +177,6 @@ Emits the created origin rule on the default channel.
 }
 ```
 
-<a id="create-kv-namespace"></a>
-
-## Create KV Namespace
-
-The Create KV Namespace component creates a new Cloudflare Workers KV namespace.
-
-### Use Cases
-
-- **Feature flags**: Provision a dedicated namespace to store feature flag state
-- **Session storage**: Create a namespace for application session data
-- **Configuration store**: Set up a namespace for dynamic configuration values
-
-### Configuration
-
-- **Title**: A human-readable name for the namespace (must be unique per account)
-
-### Output
-
-Returns the created namespace with its assigned ID and title.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
-    "namespace": {
-      "id": "0f2ac74b498b48028cb68387c421e279",
-      "supports_url_encoding": true,
-      "title": "my-kv-namespace"
-    }
-  },
-  "timestamp": "2026-05-05T06:54:57.198268018Z",
-  "type": "cloudflare.kv.namespace.created"
-}
-```
-
 <a id="delete-dns-record"></a>
 
 ## Delete DNS Record
@@ -215,44 +215,6 @@ Emits the deleted DNS record (zoneId, recordId, record) on the default channel. 
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "cloudflare.dnsRecord"
-}
-```
-
-<a id="delete-origin-rule"></a>
-
-## Delete Origin Rule
-
-The Delete Origin Rule component removes a Cloudflare origin rule from a zone.
-
-### Configuration
-
-- **Rule**: Select the origin rule to delete
-
-### Output
-
-Emits the deleted origin rule on the default channel.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "rule": {
-      "action": "route",
-      "action_parameters": {
-        "origin": {
-          "host": "api-origin.example.com"
-        }
-      },
-      "description": "Route API requests",
-      "enabled": true,
-      "expression": "starts_with(http.request.uri.path, \"/api/\")",
-      "id": "rule123"
-    },
-    "zoneId": "zone123"
-  },
-  "timestamp": "2026-05-06T12:00:00Z",
-  "type": "cloudflare.deleteOriginRule"
 }
 ```
 
@@ -328,6 +290,44 @@ Emits a confirmation with the account ID, namespace ID, and key that was deleted
   },
   "timestamp": "2026-05-05T06:54:57.198268018Z",
   "type": "cloudflare.kv.value.deleted"
+}
+```
+
+<a id="delete-origin-rule"></a>
+
+## Delete Origin Rule
+
+The Delete Origin Rule component removes a Cloudflare origin rule from a zone.
+
+### Configuration
+
+- **Rule**: Select the origin rule to delete
+
+### Output
+
+Emits the deleted origin rule on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "rule": {
+      "action": "route",
+      "action_parameters": {
+        "origin": {
+          "host": "api-origin.example.com"
+        }
+      },
+      "description": "Route API requests",
+      "enabled": true,
+      "expression": "starts_with(http.request.uri.path, \"/api/\")",
+      "id": "rule123"
+    },
+    "zoneId": "zone123"
+  },
+  "timestamp": "2026-05-06T12:00:00Z",
+  "type": "cloudflare.deleteOriginRule"
 }
 ```
 
