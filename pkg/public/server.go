@@ -1059,8 +1059,8 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodes, err := models.FindWebhookNodes(webhookID)
-	if err != nil {
+	nodes, err := models.FindActiveWebhookNodes(webhookID)
+	if err != nil || len(nodes) == 0 {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
 	}
