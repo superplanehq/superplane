@@ -22,7 +22,7 @@ type Configuration struct {
 }
 
 type Metadata struct {
-	Zones         []Zone `json:"zones"`
+	Zones     []Zone `json:"zones"`
 	AccountID string `json:"accountId"`
 }
 
@@ -60,27 +60,10 @@ func resolveAccountID(specAccountID string, integration core.IntegrationContext)
 		return specAccountID
 	}
 	return accountIDFromIntegration(integration)
-	AccountID string `json:"accountId"`
 }
 
 type PoolNodeMetadata struct {
 	PoolName string `json:"poolName"`
-}
-
-func accountIDFromIntegration(ctx core.IntegrationContext) string {
-	if ctx == nil {
-		return ""
-	}
-	metadata := Metadata{}
-	mapstructure.Decode(ctx.GetMetadata(), &metadata)
-	return metadata.AccountID
-}
-
-func resolveAccountID(specAccountID string, integration core.IntegrationContext) string {
-	if specAccountID != "" {
-		return specAccountID
-	}
-	return accountIDFromIntegration(integration)
 }
 
 func resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error {

@@ -17,10 +17,10 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete KV Namespace" href="#delete-kv-namespace" description="Delete a Cloudflare Workers KV namespace" />
   <LinkCard title="Delete KV Value" href="#delete-kv-value" description="Delete a key from a Cloudflare Workers KV namespace" />
   <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
-  <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
-  <LinkCard title="Put KV Value" href="#put-kv-value" description="Write a key-value pair to a Cloudflare Workers KV namespace" />
   <LinkCard title="Delete Pool" href="#delete-pool" description="Delete a Cloudflare Load Balancer origin pool" />
+  <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
   <LinkCard title="Get Pool" href="#get-pool" description="Retrieve a Cloudflare Load Balancer origin pool by ID" />
+  <LinkCard title="Put KV Value" href="#put-kv-value" description="Write a key-value pair to a Cloudflare Workers KV namespace" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
   <LinkCard title="Update Origin Rule" href="#update-origin-rule" description="Update an existing origin rule" />
   <LinkCard title="Update Pool" href="#update-pool" description="Update a Cloudflare Load Balancer origin pool's configuration or origin weights" />
@@ -395,6 +395,41 @@ Emits the deleted origin rule on the default channel.
 }
 ```
 
+<a id="delete-pool"></a>
+
+## Delete Pool
+
+The Delete Pool component permanently removes a Cloudflare Load Balancer origin pool.
+
+### Use Cases
+
+- **Blue/green deployments**: Clean up the old (blue) pool after traffic has shifted
+- **Environment teardown**: Remove pools as part of infrastructure cleanup
+
+### Configuration
+
+- **Pool ID**: The origin pool to delete
+
+### Output
+
+Emits a confirmation with the account ID and pool ID of the deleted pool.
+
+> **Warning**: This operation is irreversible. Ensure the pool is not attached to any load balancer before deleting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
+  },
+  "timestamp": "2026-05-05T05:59:02.93536262Z",
+  "type": "cloudflare.pool.deleted"
+}
+```
+
 <a id="get-kv-value"></a>
 
 ## Get KV Value
@@ -428,79 +463,6 @@ Returns the account ID, namespace ID, key, and the retrieved value string.
   },
   "timestamp": "2026-05-05T06:54:57.198268018Z",
   "type": "cloudflare.kv.value.fetched"
-}
-```
-
-<a id="put-kv-value"></a>
-
-## Put KV Value
-
-The Put KV Value component writes a key-value pair to a Cloudflare Workers KV namespace.
-
-### Use Cases
-
-- **Feature flags**: Toggle features by writing flag values into KV storage
-- **Cache invalidation**: Store cache keys or version stamps
-- **Dynamic configuration**: Update runtime configuration values from a workflow
-
-### Configuration
-
-- **Namespace**: The ID of the KV namespace to write to
-- **Key**: The key name (up to 512 bytes, printable non-whitespace characters)
-- **Value**: The value to store (up to 25 MiB)
-- **Expiration TTL**: (Optional) Number of seconds until the key expires (minimum 60)
-
-### Output
-
-Emits a confirmation with the account ID, namespace ID, and key that was written.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
-    "key": "my-key",
-    "namespaceId": "0f2ac74b498b48028cb68387c421e279",
-    "written": true
-  },
-  "timestamp": "2026-05-05T06:54:57.198268018Z",
-  "type": "cloudflare.kv.value.put"
-}
-```
-
-<a id="delete-pool"></a>
-
-## Delete Pool
-
-The Delete Pool component permanently removes a Cloudflare Load Balancer origin pool.
-
-### Use Cases
-
-- **Blue/green deployments**: Clean up the old (blue) pool after traffic has shifted
-- **Environment teardown**: Remove pools as part of infrastructure cleanup
-
-### Configuration
-
-- **Pool ID**: The origin pool to delete
-
-### Output
-
-Emits a confirmation with the account ID and pool ID of the deleted pool.
-
-> **Warning**: This operation is irreversible. Ensure the pool is not attached to any load balancer before deleting.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
-    "deleted": true,
-    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
-  },
-  "timestamp": "2026-05-05T05:59:02.93536262Z",
-  "type": "cloudflare.pool.deleted"
 }
 ```
 
@@ -552,6 +514,44 @@ Returns the full pool configuration including its origins, enabled state, and he
   },
   "timestamp": "2026-05-05T05:58:40.060373991Z",
   "type": "cloudflare.pool.fetched"
+}
+```
+
+<a id="put-kv-value"></a>
+
+## Put KV Value
+
+The Put KV Value component writes a key-value pair to a Cloudflare Workers KV namespace.
+
+### Use Cases
+
+- **Feature flags**: Toggle features by writing flag values into KV storage
+- **Cache invalidation**: Store cache keys or version stamps
+- **Dynamic configuration**: Update runtime configuration values from a workflow
+
+### Configuration
+
+- **Namespace**: The ID of the KV namespace to write to
+- **Key**: The key name (up to 512 bytes, printable non-whitespace characters)
+- **Value**: The value to store (up to 25 MiB)
+- **Expiration TTL**: (Optional) Number of seconds until the key expires (minimum 60)
+
+### Output
+
+Emits a confirmation with the account ID, namespace ID, and key that was written.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "key": "my-key",
+    "namespaceId": "0f2ac74b498b48028cb68387c421e279",
+    "written": true
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.kv.value.put"
 }
 ```
 
