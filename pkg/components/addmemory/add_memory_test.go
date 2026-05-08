@@ -30,6 +30,14 @@ func (c *canvasMemoryContext) FindFirst(namespace string, matches map[string]any
 	return nil, c.err
 }
 
+func (c *canvasMemoryContext) FindAll(namespace string) ([]any, error) {
+	return []any{}, c.err
+}
+
+func (c *canvasMemoryContext) FindFirstInNamespace(namespace string) (any, error) {
+	return nil, c.err
+}
+
 func TestAddMemoryExecute(t *testing.T) {
 	t.Run("adds memory and emits payload", func(t *testing.T) {
 		component := &AddMemory{}
