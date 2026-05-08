@@ -1,16 +1,23 @@
 package pulls
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
+	"time"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
+
+// enrichPRTimeout caps the GitHub API lookup so the webhook handler can finish
+// well before GitHub's ~10s delivery timeout - blowing past it triggers retries
+// and duplicate events.
+const enrichPRTimeout = 7 * time.Second
 
 type prCommentTriggerConfiguration struct {
 	Repository    string `json:"repository" mapstructure:"repository"`
@@ -158,4 +165,71 @@ func extractPRCommentBody(eventType string, data map[string]any) (string, error)
 	}
 
 	return body, nil
+}
+
+// enrichPRPayload best-effort attaches the full PR (head/base SHA, branch refs)
+// to data["pull_request"]. The issue_comment webhook only carries URLs.
+// On any failure we log and return; the caller still emits the original event.
+func enrichPRPayload(ctx core.WebhookRequestContext, data map[string]any, repository string) {
+	if ctx.Integration == nil {
+		return
+	}
+
+	number, ok := extractPRNumber(data)
+	if !ok {
+		ctx.Logger.Warn("Skipping PR payload enrichment - missing PR number in webhook")
+		return
+	}
+
+	client, err := common.NewClient(ctx.Integration, ctx.HTTP)
+	if err != nil {
+		ctx.Logger.Warnf("Skipping PR payload enrichment - failed to build GitHub client: %v", err)
+		return
+	}
+
+	apiCtx, cancel := context.WithTimeout(context.Background(), enrichPRTimeout)
+	defer cancel()
+
+	pr, _, err := client.GetPullRequest(apiCtx, repository, number)
+	if err != nil {
+		ctx.Logger.Warnf("Skipping PR payload enrichment - GetPullRequest failed: %v", err)
+		return
+	}
+
+	asMap, err := structToMap(pr)
+	if err != nil {
+		ctx.Logger.Warnf("Skipping PR payload enrichment - failed to encode PR: %v", err)
+		return
+	}
+
+	data["pull_request"] = asMap
+}
+
+func extractPRNumber(data map[string]any) (int, bool) {
+	issue, ok := data["issue"].(map[string]any)
+	if !ok {
+		return 0, false
+	}
+
+	switch n := issue["number"].(type) {
+	case float64:
+		return int(n), true
+	case int:
+		return n, true
+	}
+	return 0, false
+}
+
+// structToMap round-trips through JSON so we honor the json tags on
+// *github.PullRequest. mapstructure would key off Go field names instead.
+func structToMap(v any) (map[string]any, error) {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]any{}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }

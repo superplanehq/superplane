@@ -188,6 +188,91 @@ func Test__OnPRComment__HandleWebhook(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 0, events.Count())
 	})
+
+	t.Run("PR comment payload is enriched with head/base details", func(t *testing.T) {
+		body := []byte(`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/testhq/test/pulls/1"},"number":1},"comment":{"body":"/deploy"}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusOK, `{
+					"number": 1,
+					"head": {"sha": "abc123", "ref": "feature-branch"},
+					"base": {"sha": "def456", "ref": "main"}
+				}`),
+			},
+		}
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook:     &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:      events,
+			Integration: integrationCtx,
+			HTTP:        httpCtx,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+
+		payload, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+
+		pr, ok := payload["pull_request"].(map[string]any)
+		require.True(t, ok, "expected enriched pull_request on payload, got %v", payload)
+
+		head, ok := pr["head"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "abc123", head["sha"])
+		assert.Equal(t, "feature-branch", head["ref"])
+
+		base, ok := pr["base"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "def456", base["sha"])
+		assert.Equal(t, "main", base["ref"])
+	})
+
+	t.Run("event still emits when GitHub API call fails", func(t *testing.T) {
+		body := []byte(`{"action":"created","issue":{"pull_request":{"url":"https://api.github.com/repos/testhq/test/pulls/1"},"number":1},"comment":{"body":"/deploy"}}`)
+		headers := signedHeaders(body, "test-secret", eventType)
+
+		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				mocks.GitHubResponse(http.StatusInternalServerError, `{"message":"oops"}`),
+			},
+		}
+
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    body,
+			Headers: headers,
+			Logger:  logrus.NewEntry(logrus.New()),
+			Configuration: map[string]any{
+				"repository": "test",
+			},
+			Webhook:     &contexts.NodeWebhookContext{Secret: "test-secret"},
+			Events:      events,
+			Integration: integrationCtx,
+			HTTP:        httpCtx,
+		})
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		require.Equal(t, 1, events.Count())
+
+		payload, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		_, hasEnriched := payload["pull_request"]
+		assert.False(t, hasEnriched, "expected no pull_request when API fails")
+	})
 }
 
 func Test__OnPRComment__Setup(t *testing.T) {

@@ -47,10 +47,18 @@ Each comment event includes:
 
 SuperPlane passes through the full GitHub webhook payload under data for the issue_comment event type.
 
+For PR-attached comments, SuperPlane also fetches the full pull request from the GitHub API and adds it under ` + "`root().data.pull_request`" + ` so head/base SHA and branch refs are available without an extra API call.
+
+> **Note:** This enrichment is best-effort. If the lookup fails (transient network error, missing permissions), the event is still emitted without the ` + "`pull_request`" + ` field, so downstream expressions referencing those paths should handle missing values.
+
 Common expression paths:
 - PR number: ` + "`root().data.issue.number`" + `
 - PR title: ` + "`root().data.issue.title`" + `
 - PR URL: ` + "`root().data.issue.pull_request.html_url`" + `
+- PR head SHA: ` + "`root().data.pull_request.head.sha`" + `
+- PR head branch: ` + "`root().data.pull_request.head.ref`" + `
+- PR base SHA: ` + "`root().data.pull_request.base.sha`" + `
+- PR base branch: ` + "`root().data.pull_request.base.ref`" + `
 - Comment body: ` + "`root().data.comment.body`" + `
 
 ## Webhook Setup
@@ -130,6 +138,8 @@ func (p *OnPRComment) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.
 		ctx.Logger.Info("Ignoring event - content filter did not match")
 		return http.StatusOK, nil, nil
 	}
+
+	enrichPRPayload(ctx, data, config.Repository)
 
 	if err := ctx.Events.Emit("github.prComment", data); err != nil {
 		ctx.Logger.Errorf("Failed to emit event: %v", err)
