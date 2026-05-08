@@ -2,6 +2,7 @@ package serviceaccounts
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
@@ -30,17 +31,16 @@ func CreateServiceAccount(ctx context.Context, req *pb.CreateServiceAccountReque
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
 
-	validRoles := map[string]bool{
-		models.RoleOrgAdmin:  true,
-		models.RoleOrgViewer: true,
-	}
-
 	if req.Role == "" {
 		return nil, status.Error(codes.InvalidArgument, "role is required")
 	}
 
-	if !validRoles[req.Role] {
-		return nil, status.Error(codes.InvalidArgument, "invalid role for service account; must be org_admin or org_viewer")
+	_, err := models.FindRoleMetadata(req.Role, models.DomainTypeOrganization, orgID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Error(codes.InvalidArgument, "invalid role for service account")
+		}
+		return nil, status.Errorf(codes.Internal, "failed to validate role: %v", err)
 	}
 
 	orgUUID, err := uuid.Parse(orgID)

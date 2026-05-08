@@ -11,11 +11,12 @@ import { Textarea } from "@/components/Textarea/textarea";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Bot, Copy } from "lucide-react";
-import { useState } from "react";
+import { ServiceAccountRoleSelect } from "./ServiceAccountRoleSelect";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useServiceAccounts, useCreateServiceAccount, useDeleteServiceAccount } from "@/hooks/useServiceAccounts";
+import { useOrganizationRoles } from "@/hooks/useOrganizationData";
 
 interface ServiceAccountsProps {
   organizationId: string;
@@ -28,7 +29,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [role, setRole] = useState("org_viewer");
+  const [role, setRole] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
   const canCreate = canAct("service_accounts", "create");
   const canDelete = canAct("service_accounts", "delete");
@@ -36,12 +37,31 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
   const { data: serviceAccounts = [], isLoading } = useServiceAccounts(organizationId);
   const createMutation = useCreateServiceAccount(organizationId);
   const deleteMutation = useDeleteServiceAccount(organizationId);
+  const { data: roles = [], isLoading: loadingRoles } = useOrganizationRoles(organizationId);
+
+  const sortedRoles = useMemo(() => {
+    const defaultRoles = new Set(["org_admin", "org_owner", "org_viewer"]);
+    const customRoles = roles
+      .filter((r) => !defaultRoles.has(r.metadata?.name || ""))
+      .sort((a, b) => (a.spec?.displayName || "").localeCompare(b.spec?.displayName || ""));
+    const baseRoles = roles
+      .filter((r) => defaultRoles.has(r.metadata?.name || ""))
+      .sort((a, b) => (a.spec?.displayName || "").localeCompare(b.spec?.displayName || ""));
+
+    return [...customRoles, ...baseRoles];
+  }, [roles]);
+
+  useEffect(() => {
+    if (sortedRoles.length > 0 && !role) {
+      setRole(sortedRoles[0].metadata?.name || "");
+    }
+  }, [sortedRoles, role]);
 
   const handleCreateClick = () => {
     if (!canCreate) return;
     setName("");
     setDescription("");
-    setRole("org_viewer");
+    setRole("");
     setNewToken(null);
     setIsCreateModalOpen(true);
   };
@@ -50,7 +70,7 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
     setIsCreateModalOpen(false);
     setName("");
     setDescription("");
-    setRole("org_viewer");
+    setRole("");
     setNewToken(null);
     createMutation.reset();
   };
@@ -289,16 +309,12 @@ export function ServiceAccounts({ organizationId }: ServiceAccountsProps) {
                   <Label className="text-gray-800 dark:text-gray-100 mb-2">
                     Role <span className="text-red-500">*</span>
                   </Label>
-                  <Select value={role} onValueChange={setRole}>
-                    <SelectTrigger className="w-full" data-testid="sa-create-role">
-                      <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="org_viewer">Viewer</SelectItem>
-                      <SelectItem value="org_admin">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="mt-1 text-xs text-gray-500">Determines what this service account can access.</p>
+                  <ServiceAccountRoleSelect
+                    roles={sortedRoles}
+                    role={role}
+                    onRoleChange={setRole}
+                    isLoading={loadingRoles}
+                  />
                 </div>
               </div>
 
