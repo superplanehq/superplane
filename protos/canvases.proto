@@ -307,6 +307,17 @@ service Canvases {
     };
   }
 
+  rpc ReemitTriggerEvent(ReemitTriggerEventRequest) returns (ReemitTriggerEventResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/triggers/{node_id}/events/{event_id}/reemit"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Re-emit trigger event";
+      description: "Re-emits an existing root event from a trigger node";
+      tags: "CanvasNode";
+    };
+  }
+
   rpc InvokeNodeExecutionHook(InvokeNodeExecutionHookRequest) returns (InvokeNodeExecutionHookResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/executions/{execution_id}/hooks/{hook_name}"
@@ -758,6 +769,8 @@ message ListNodeEventsResponse {
 }
 
 message EmitNodeEventRequest {
+  // Deprecated: keep temporarily for onboarding quickstart bootstrap.
+  // Prefer InvokeNodeTriggerHook for manual trigger runs and ReemitTriggerEvent for trigger event replay.
   string canvas_id = 1;
   string node_id = 2;
   string channel = 3;
@@ -765,6 +778,16 @@ message EmitNodeEventRequest {
 }
 
 message EmitNodeEventResponse {
+  string event_id = 1;
+}
+
+message ReemitTriggerEventRequest {
+  string canvas_id = 1;
+  string node_id = 2;
+  string event_id = 3;
+}
+
+message ReemitTriggerEventResponse {
   string event_id = 1;
 }
 

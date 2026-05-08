@@ -296,6 +296,32 @@ func (s *CanvasService) EmitNodeEvent(ctx context.Context, req *pb.EmitNodeEvent
 	)
 }
 
+func (s *CanvasService) ReemitTriggerEvent(ctx context.Context, req *pb.ReemitTriggerEventRequest) (*pb.ReemitTriggerEventResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+
+	canvasID, err := uuid.Parse(req.CanvasId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+	}
+
+	if req.NodeId == "" {
+		return nil, status.Error(codes.InvalidArgument, "node_id is required")
+	}
+
+	eventID, err := uuid.Parse(req.EventId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid event_id")
+	}
+
+	return canvases.ReemitTriggerEvent(
+		ctx,
+		uuid.MustParse(organizationID),
+		canvasID,
+		req.NodeId,
+		eventID,
+	)
+}
+
 func (s *CanvasService) InvokeNodeExecutionHook(ctx context.Context, req *pb.InvokeNodeExecutionHookRequest) (*pb.InvokeNodeExecutionHookResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 

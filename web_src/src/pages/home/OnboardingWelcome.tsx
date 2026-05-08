@@ -145,6 +145,8 @@ export function OnboardingWelcome({ organizationId, canCreateCanvases, permissio
       if (triggerNode) {
         const now = new Date();
         try {
+          // Temporary while EmitNodeEvent remains available for onboarding bootstrap.
+          // TODO: migrate to trigger hook/re-emit based bootstrap and remove EmitNodeEvent usage.
           const emitResponse = await canvasesEmitNodeEvent(
             withOrganizationHeader({
               path: { canvasId, nodeId: triggerNode.id },
