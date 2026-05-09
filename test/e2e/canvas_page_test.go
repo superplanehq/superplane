@@ -325,11 +325,10 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 	for i := 0; i < itemsAmount; i++ {
 		s.session.Click(startTemplateRun)
 		s.session.Click(emitEvent)
-		s.session.Sleep(100)
+		s.session.AssertHidden(emitEvent)
 	}
 
-	// wait for the first item to start processing
-	s.session.Sleep(500)
+	s.waitForExecutionToStart("Wait")
 }
 
 func (s *CanvasPageSteps) openSidebarForNode(node string) {
@@ -386,6 +385,40 @@ func (s *CanvasPageSteps) assertQueuedItemsCount(nodeName string, expected int) 
 	require.Equal(s.t, expected, lastCount)
 }
 
+func (s *CanvasPageSteps) waitForExecutionToStart(nodeName string) {
+	deadline := time.Now().Add(15 * time.Second)
+
+	for time.Now().Before(deadline) {
+		canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
+		require.NoError(s.t, err)
+
+		nodes, err := models.FindCanvasNodes(canvas.ID)
+		require.NoError(s.t, err)
+
+		for _, n := range nodes {
+			if n.Name == nodeName {
+				var count int64
+				err := database.Conn().
+					Model(&models.CanvasNodeExecution{}).
+					Where("workflow_id = ?", n.WorkflowID).
+					Where("node_id = ?", n.NodeID).
+					Where("state = ?", models.CanvasNodeExecutionStateStarted).
+					Count(&count).Error
+				require.NoError(s.t, err)
+
+				if count > 0 {
+					return
+				}
+				break
+			}
+		}
+
+		time.Sleep(250 * time.Millisecond)
+	}
+
+	s.t.Fatalf("timed out waiting for execution to start on node %q", nodeName)
+}
+
 func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int) {
 	deadline := time.Now().Add(10 * time.Second)
 	lastCount := -1
@@ -410,6 +443,7 @@ func (s *CanvasPageSteps) assertRunningItemsCount(nodeName string, expected int)
 		query := database.Conn().
 			Where("workflow_id = ?", waitNode.WorkflowID).
 			Where("node_id = ?", waitNode.NodeID).
+			Where("state IN ?", []string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted}).
 			Order("created_at DESC")
 
 		err = query.Find(&executions).Error

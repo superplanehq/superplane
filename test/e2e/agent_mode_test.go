@@ -2,6 +2,7 @@ package e2e
 
 import (
 	"testing"
+	"time"
 
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/assert"
@@ -99,17 +100,28 @@ func (s *agentModeSteps) thenISeeDisableAction() {
 func (s *agentModeSteps) whenIClickSetup() {
 	page := s.session.Page()
 	setup := page.GetByTestId("agent-mode-setup-button")
-	if count, countErr := setup.Count(); countErr == nil && count > 0 {
-		err := setup.Click()
-		require.NoError(s.t, err)
-		s.session.Sleep(500)
-		return
+	update := page.GetByTestId("agent-mode-update-key-button")
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if visible, _ := setup.IsVisible(); visible {
+			err := setup.Click()
+			require.NoError(s.t, err)
+			s.session.Sleep(500)
+			return
+		}
+
+		if visible, _ := update.IsVisible(); visible {
+			err := update.Click()
+			require.NoError(s.t, err)
+			s.session.Sleep(500)
+			return
+		}
+
+		time.Sleep(250 * time.Millisecond)
 	}
 
-	update := page.GetByTestId("agent-mode-update-key-button")
-	err := update.Click()
-	require.NoError(s.t, err)
-	s.session.Sleep(500)
+	s.t.Fatalf("neither setup nor update key button became visible")
 }
 
 func (s *agentModeSteps) whenIClickDisable() {
@@ -150,9 +162,16 @@ func (s *agentModeSteps) whenIEnterOpenAIKey(apiKey string) {
 
 func (s *agentModeSteps) whenISaveAgentModeKey() {
 	page := s.session.Page()
-	err := page.GetByTestId("agent-openai-key-save").Click()
+	saveBtn := page.GetByTestId("agent-openai-key-save")
+	err := saveBtn.Click()
 	require.NoError(s.t, err)
-	s.session.Sleep(1000)
+
+	err = saveBtn.WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateHidden,
+		Timeout: pw.Float(10000),
+	})
+	require.NoError(s.t, err)
+	s.session.Sleep(500)
 }
 
 func (s *agentModeSteps) thenAgentModeIsDisabledInDatabase() {
@@ -167,6 +186,15 @@ func (s *agentModeSteps) thenAgentModeIsDisabledInDatabase() {
 }
 
 func (s *agentModeSteps) thenAgentModeIsEnabledInDatabase() {
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		settings, err := models.FindOrganizationAgentSettingsByOrganizationID(s.session.OrgID.String())
+		if err == nil && settings.AgentModeEnabled {
+			return
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+
 	settings, err := models.FindOrganizationAgentSettingsByOrganizationID(s.session.OrgID.String())
 	require.NoError(s.t, err)
 	assert.True(s.t, settings.AgentModeEnabled)
@@ -181,6 +209,17 @@ func (s *agentModeSteps) thenNoAgentKeyIsStoredInDatabase() {
 }
 
 func (s *agentModeSteps) thenAgentKeyIsStoredWithLast4(last4 string) {
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		settings, err := models.FindOrganizationAgentSettingsByOrganizationID(s.session.OrgID.String())
+		if err == nil && settings.OpenAIKeyLast4 != nil && *settings.OpenAIKeyLast4 == last4 {
+			assert.NotEmpty(s.t, settings.OpenAIApiKeyCiphertext)
+			assert.NotNil(s.t, settings.OpenAIKeyEncryptionKeyID)
+			return
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+
 	settings, err := models.FindOrganizationAgentSettingsByOrganizationID(s.session.OrgID.String())
 	require.NoError(s.t, err)
 	assert.NotEmpty(s.t, settings.OpenAIApiKeyCiphertext)
