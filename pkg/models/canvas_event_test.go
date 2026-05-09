@@ -32,6 +32,104 @@ func Test__LockExpiredRoutedRootCanvasEventsInTransaction_ReturnsMultipleEligibl
 	require.ElementsMatch(t, []uuid.UUID{event1.ID, event2.ID}, canvasEventIDs(events))
 }
 
+func Test__LockExpiredRoutedRootCanvasEventsInTransaction_RespectsRetentionWindowBoundary(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	org := createOrganization(t)
+	cacheRetentionWindow(t, org.ID, 30)
+	canvas := createRetentionCanvas(t, org.ID)
+
+	expired := createRootEvent(t, canvas.ID)
+	updateRootEventAgeAndState(t, expired.ID, 31, models.CanvasEventStateRouted)
+
+	notExpired := createRootEvent(t, canvas.ID)
+	updateRootEventAgeAndState(t, notExpired.ID, 29, models.CanvasEventStateRouted)
+
+	var events []models.CanvasEvent
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		events, err = models.LockExpiredRoutedRootCanvasEventsInTransaction(tx, time.Now(), 10)
+		return err
+	})
+	require.NoError(t, err)
+	require.Equal(t, []uuid.UUID{expired.ID}, canvasEventIDs(events))
+}
+
+func Test__DeleteRootCanvasEventChainsInTransaction_DeletesAllRelatedRows(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	org := createOrganization(t)
+	cacheRetentionWindow(t, org.ID, 30)
+	canvas := createRetentionCanvas(t, org.ID)
+
+	root1 := createExpiredRootEvent(t, canvas.ID)
+	root2 := createExpiredRootEvent(t, canvas.ID)
+
+	exec1 := createExecution(t, canvas.ID, "component", root1.ID, root1.ID)
+	exec2 := createExecution(t, canvas.ID, "component", root2.ID, root2.ID)
+
+	createNodeRequest(t, canvas.ID, "component", exec1.ID, models.NodeExecutionRequestStateCompleted)
+	createNodeRequest(t, canvas.ID, "component", exec2.ID, models.NodeExecutionRequestStateCompleted)
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		return models.DeleteRootCanvasEventChainsInTransaction(tx, []uuid.UUID{root1.ID, root2.ID})
+	}))
+
+	var rootEventCount int64
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasEvent{}).
+		Where("id IN ?", []uuid.UUID{root1.ID, root2.ID}).
+		Count(&rootEventCount).Error)
+	require.Zero(t, rootEventCount)
+
+	var executionCount int64
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNodeExecution{}).
+		Where("id IN ?", []uuid.UUID{exec1.ID, exec2.ID}).
+		Count(&executionCount).Error)
+	require.Zero(t, executionCount)
+
+	var requestCount int64
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNodeRequest{}).
+		Where("execution_id IN ?", []uuid.UUID{exec1.ID, exec2.ID}).
+		Count(&requestCount).Error)
+	require.Zero(t, requestCount)
+}
+
+func Test__DeleteRootCanvasEventChainsInTransaction_HandlesMoreRootEventsThanChunkSize(t *testing.T) {
+	require.NoError(t, database.TruncateTables())
+
+	org := createOrganization(t)
+	cacheRetentionWindow(t, org.ID, 30)
+	canvas := createRetentionCanvas(t, org.ID)
+
+	//
+	// Create slightly more than one chunk worth of root events to exercise the
+	// chunking code path inside DeleteRootCanvasEventChainsInTransaction. The
+	// chunk size is large (500), so we rely on the constant being kept in sync;
+	// the important property here is that the function correctly handles a
+	// multi-chunk input rather than hitting an unbounded `IN (...)` clause.
+	//
+	const totalRootEvents = 600
+	rootEventIDs := make([]uuid.UUID, 0, totalRootEvents)
+	for i := 0; i < totalRootEvents; i++ {
+		root := createExpiredRootEvent(t, canvas.ID)
+		rootEventIDs = append(rootEventIDs, root.ID)
+	}
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		return models.DeleteRootCanvasEventChainsInTransaction(tx, rootEventIDs)
+	}))
+
+	var remaining int64
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasEvent{}).
+		Where("id IN ?", rootEventIDs).
+		Count(&remaining).Error)
+	require.Zero(t, remaining)
+}
+
 func Test__LockExpiredRoutedRootCanvasEventsInTransaction_ExcludesInactiveAndIneligibleEvents(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 

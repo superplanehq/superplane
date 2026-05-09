@@ -15,7 +15,20 @@ import (
 )
 
 const (
-	eventRetentionBatchSize            = 100
+	//
+	// eventRetentionBatchSize bounds how many root events are locked, walked
+	// and deleted in a single transaction. Each root event can fan out to
+	// many related rows (executions, requests, kvs, child events), so a large
+	// batch keeps the transaction open for longer and increases the chance of
+	// hitting `statement_timeout` (60s by default) on one of the cascading
+	// deletes — which surfaces in Sentry as
+	// `pgconn.PgError: ERROR: canceling statement due to statement timeout (SQLSTATE 57014)`.
+	//
+	// Keep this small enough that one batch comfortably fits inside the
+	// statement timeout even on busy canvases. Throughput is preserved by
+	// looping more times per tick (`eventRetentionMaxRootEventsPerTick`).
+	//
+	eventRetentionBatchSize            = 25
 	eventRetentionMaxRootEventsPerTick = 1000
 	eventRetentionEvery                = 1 * time.Minute
 )

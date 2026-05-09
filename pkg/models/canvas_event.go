@@ -195,6 +195,23 @@ func LockExpiredRoutedRootCanvasEventsInTransaction(tx *gorm.DB, referenceTime t
 }
 
 func expiredRoutedRootCanvasEventsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
+	//
+	// The predicate on `workflow_events.created_at` is intentionally written as
+	//
+	//     workflow_events.created_at < ? - (organizations.usage_retention_window_days * INTERVAL '1 day')
+	//
+	// instead of
+	//
+	//     workflow_events.created_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?
+	//
+	// The two are mathematically equivalent, but the first form keeps
+	// `workflow_events.created_at` as a bare column on the left side, which
+	// allows Postgres to use any index on `workflow_events.created_at`.
+	// The original form wraps the column in an expression and forces a Seq Scan
+	// on `workflow_events`. With a large `workflow_events` table that scan can
+	// exceed the configured `statement_timeout` and surface as
+	// `pgconn.PgError: ERROR: canceling statement due to statement timeout (SQLSTATE 57014)`.
+	//
 	query := tx.
 		Table("workflow_events").
 		Select("workflow_events.*").
@@ -202,7 +219,7 @@ func expiredRoutedRootCanvasEventsQuery(tx *gorm.DB, referenceTime time.Time) *g
 		Where("organizations.usage_retention_window_days > 0").
 		Where("workflow_events.execution_id IS NULL").
 		Where("workflow_events.state = ?", CanvasEventStateRouted).
-		Where("workflow_events.created_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC())
+		Where("workflow_events.created_at < ? - (organizations.usage_retention_window_days * INTERVAL '1 day')", referenceTime.UTC())
 
 	return withActiveCanvas(query, "workflow_events.workflow_id")
 }
@@ -295,40 +312,82 @@ func LockCanvasEvent(tx *gorm.DB, id uuid.UUID) (*CanvasEvent, error) {
 	return &event, nil
 }
 
+// canvasEventChainDeleteChunkSize bounds the size of `IN (...)` clauses used
+// during retention cleanup. A single `LockExpiredRoutedRootCanvasEventsInTransaction`
+// batch can fan out to hundreds or thousands of related executions/requests/kvs
+// on busy canvases. Sending one DELETE with a multi-thousand-element IN list
+// can blow past `statement_timeout` (60s by default) and trip Sentry with
+// SQLSTATE 57014, even when each individual lookup is index-backed.
+const canvasEventChainDeleteChunkSize = 500
+
 func DeleteRootCanvasEventChainsInTransaction(tx *gorm.DB, rootEventIDs []uuid.UUID) error {
 	if len(rootEventIDs) == 0 {
 		return nil
 	}
 
-	var executionIDs []uuid.UUID
-	err := tx.
-		Model(&CanvasNodeExecution{}).
-		Where("root_event_id IN ?", rootEventIDs).
-		Pluck("id", &executionIDs).
-		Error
+	executionIDs, err := pluckExecutionIDsForRootEvents(tx, rootEventIDs)
 	if err != nil {
 		return err
 	}
 
 	if len(executionIDs) > 0 {
-		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&CanvasNodeRequest{}).Error; err != nil {
+		if err := chunkedDeleteByUUIDColumn(tx, "execution_id", executionIDs, &CanvasNodeRequest{}); err != nil {
 			return err
 		}
 
-		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&CanvasNodeExecutionKV{}).Error; err != nil {
+		if err := chunkedDeleteByUUIDColumn(tx, "execution_id", executionIDs, &CanvasNodeExecutionKV{}); err != nil {
 			return err
 		}
 
-		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&CanvasEvent{}).Error; err != nil {
+		if err := chunkedDeleteByUUIDColumn(tx, "execution_id", executionIDs, &CanvasEvent{}); err != nil {
 			return err
 		}
 
-		if err := tx.Where("root_event_id IN ?", rootEventIDs).Delete(&CanvasNodeExecution{}).Error; err != nil {
+		if err := chunkedDeleteByUUIDColumn(tx, "root_event_id", rootEventIDs, &CanvasNodeExecution{}); err != nil {
 			return err
 		}
 	}
 
-	return tx.Where("id IN ?", rootEventIDs).Delete(&CanvasEvent{}).Error
+	return chunkedDeleteByUUIDColumn(tx, "id", rootEventIDs, &CanvasEvent{})
+}
+
+func pluckExecutionIDsForRootEvents(tx *gorm.DB, rootEventIDs []uuid.UUID) ([]uuid.UUID, error) {
+	executionIDs := make([]uuid.UUID, 0)
+	for start := 0; start < len(rootEventIDs); start += canvasEventChainDeleteChunkSize {
+		end := start + canvasEventChainDeleteChunkSize
+		if end > len(rootEventIDs) {
+			end = len(rootEventIDs)
+		}
+
+		var chunkIDs []uuid.UUID
+		err := tx.
+			Model(&CanvasNodeExecution{}).
+			Where("root_event_id IN ?", rootEventIDs[start:end]).
+			Pluck("id", &chunkIDs).
+			Error
+		if err != nil {
+			return nil, err
+		}
+
+		executionIDs = append(executionIDs, chunkIDs...)
+	}
+
+	return executionIDs, nil
+}
+
+func chunkedDeleteByUUIDColumn(tx *gorm.DB, column string, ids []uuid.UUID, model any) error {
+	for start := 0; start < len(ids); start += canvasEventChainDeleteChunkSize {
+		end := start + canvasEventChainDeleteChunkSize
+		if end > len(ids) {
+			end = len(ids)
+		}
+
+		if err := tx.Where(column+" IN ?", ids[start:end]).Delete(model).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (e *CanvasEvent) Routed() error {
