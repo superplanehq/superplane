@@ -33,6 +33,9 @@ The **data-flow** skill describes how `$` is built during a run.
 | `root()` | Root payload that started the run | `root().data.ref` |
 | `previous()` | Immediate upstream node’s payload | `previous().data.status` |
 | `previous(n)` | Walk *n* levels upstream | `previous(2).data.version` |
+| `memory(key)` | Read a value from Canvas Memory; returns `nil` if the key does not exist | `memory("last_deployed_sha")` |
+
+See the **canvas-memory** skill for the full Canvas Memory component reference (`addMemory`, `readMemory`, `upsertMemory`, `deleteMemory`).
 
 ## Common Expr functions
 
