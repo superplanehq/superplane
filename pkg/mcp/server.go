@@ -50,6 +50,11 @@ func registerTools(ctx context.Context, s *mcp.Server, apiClient *openapi_client
 		return fmt.Errorf("failed to register canvas tools: %w", err)
 	}
 
+	// Canvas mutation tools
+	if err := tools.RegisterCanvasMutationTools(ctx, s, apiClient); err != nil {
+		return fmt.Errorf("failed to register canvas mutation tools: %w", err)
+	}
+
 	// Event tools
 	if err := tools.RegisterEventTools(ctx, s, apiClient); err != nil {
 		return fmt.Errorf("failed to register event tools: %w", err)
