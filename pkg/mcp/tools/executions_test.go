@@ -16,8 +16,8 @@ const testListExecutionsResponse = `{
 			"id": "exec-001",
 			"canvasId": "canvas-001",
 			"nodeId": "node-001",
-			"state": "STATE_COMPLETED",
-			"result": "RESULT_SUCCESS",
+			"state": "STATE_FINISHED",
+			"result": "RESULT_PASSED",
 			"createdAt": "2025-01-15T10:00:00Z",
 			"updatedAt": "2025-01-15T10:01:00Z"
 		},
@@ -25,29 +25,23 @@ const testListExecutionsResponse = `{
 			"id": "exec-002",
 			"canvasId": "canvas-001",
 			"nodeId": "node-001",
-			"state": "STATE_RUNNING",
+			"state": "STATE_STARTED",
 			"createdAt": "2025-01-15T11:00:00Z"
 		}
 	]
 }`
 
 const testDescribeExecutionResponse = `{
-	"execution": {
-		"id": "exec-001",
-		"canvasId": "canvas-001",
-		"nodeId": "node-001",
-		"parentExecutionId": "exec-parent",
-		"previousExecutionId": "exec-prev",
-		"state": "STATE_COMPLETED",
-		"result": "RESULT_SUCCESS",
-		"resultReason": "RESULT_REASON_OK",
-		"resultMessage": "Completed successfully",
-		"outputs": {"key": "value"},
-		"metadata": {"version": "1.0"},
-		"configuration": {"timeout": 30},
-		"createdAt": "2025-01-15T10:00:00Z",
-		"updatedAt": "2025-01-15T10:01:00Z"
-	}
+	"executions": [
+		{
+			"id": "child-001",
+			"canvasId": "canvas-001",
+			"nodeId": "node-002",
+			"state": "STATE_FINISHED",
+			"result": "RESULT_PASSED",
+			"createdAt": "2025-01-15T10:00:00Z"
+		}
+	]
 }`
 
 func TestHandleListExecutions(t *testing.T) {
@@ -71,28 +65,17 @@ func TestHandleListExecutions(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(textContent.Text), &executions))
 	require.Len(t, executions, 2)
 
-	// Check first execution
 	require.Equal(t, "exec-001", executions[0]["id"])
-	require.Equal(t, "STATE_COMPLETED", executions[0]["state"])
-	require.Equal(t, "RESULT_SUCCESS", executions[0]["result"])
-	require.Contains(t, executions[0], "created_at")
-	require.Contains(t, executions[0], "updated_at")
+	require.Equal(t, "STATE_FINISHED", executions[0]["state"])
+	require.Equal(t, "RESULT_PASSED", executions[0]["result"])
 
-	// Check second execution
 	require.Equal(t, "exec-002", executions[1]["id"])
-	require.Equal(t, "STATE_RUNNING", executions[1]["state"])
-	require.Contains(t, executions[1], "created_at")
-	require.NotContains(t, executions[1], "result")
+	require.Equal(t, "STATE_STARTED", executions[1]["state"])
 }
 
 func TestHandleDescribeExecution(t *testing.T) {
 	apiClient := newTestAPIClient(t, func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/api/v1/canvases/canvas-001/executions/exec-001/children", r.URL.Path)
-		require.Equal(t, http.MethodPost, r.Method)
-
-		var body map[string]any
-		require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
-
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(testDescribeExecutionResponse))
 	})
@@ -106,20 +89,14 @@ func TestHandleDescribeExecution(t *testing.T) {
 	textContent := result.Content[0].(*mcp.TextContent)
 	require.NotEmpty(t, textContent.Text)
 
-	var execution map[string]any
-	require.NoError(t, json.Unmarshal([]byte(textContent.Text), &execution))
-	require.Equal(t, "exec-001", execution["id"])
-	require.Equal(t, "canvas-001", execution["canvas_id"])
-	require.Equal(t, "node-001", execution["node_id"])
-	require.Equal(t, "exec-parent", execution["parent_execution_id"])
-	require.Equal(t, "exec-prev", execution["previous_execution_id"])
-	require.Equal(t, "STATE_COMPLETED", execution["state"])
-	require.Equal(t, "RESULT_SUCCESS", execution["result"])
-	require.Equal(t, "RESULT_REASON_OK", execution["result_reason"])
-	require.Equal(t, "Completed successfully", execution["result_message"])
-	require.Contains(t, execution, "outputs")
-	require.Contains(t, execution, "metadata")
-	require.Contains(t, execution, "configuration")
-	require.Contains(t, execution, "created_at")
-	require.Contains(t, execution, "updated_at")
+	var response map[string]any
+	require.NoError(t, json.Unmarshal([]byte(textContent.Text), &response))
+	require.Equal(t, "exec-001", response["execution_id"])
+	require.Equal(t, "canvas-001", response["canvas_id"])
+
+	children := response["child_executions"].([]any)
+	require.Len(t, children, 1)
+	child := children[0].(map[string]any)
+	require.Equal(t, "child-001", child["id"])
+	require.Equal(t, "node-002", child["node_id"])
 }

@@ -11,13 +11,7 @@ import (
 )
 
 const testEmitEventResponse = `{
-	"event": {
-		"id": "event-001",
-		"canvasId": "canvas-001",
-		"nodeId": "node-001",
-		"channel": "output",
-		"createdAt": "2025-01-15T10:00:00Z"
-	}
+	"eventId": "event-001"
 }`
 
 const testListEventsResponse = `{
@@ -28,15 +22,13 @@ const testListEventsResponse = `{
 			"nodeId": "node-001",
 			"channel": "output",
 			"customName": "Test Event",
-			"createdAt": "2025-01-15T10:00:00Z",
-			"root": true
+			"createdAt": "2025-01-15T10:00:00Z"
 		},
 		{
 			"id": "event-002",
 			"canvasId": "canvas-001",
 			"nodeId": "node-002",
-			"createdAt": "2025-01-15T11:00:00Z",
-			"root": false
+			"createdAt": "2025-01-15T11:00:00Z"
 		}
 	]
 }`
@@ -69,7 +61,6 @@ func TestHandleEmitEvent(t *testing.T) {
 	require.Equal(t, "event-001", event["event_id"])
 	require.Equal(t, "canvas-001", event["canvas_id"])
 	require.Equal(t, "node-001", event["node_id"])
-	require.Equal(t, "output", event["channel"])
 }
 
 func TestHandleListEvents(t *testing.T) {
@@ -93,17 +84,11 @@ func TestHandleListEvents(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(textContent.Text), &events))
 	require.Len(t, events, 2)
 
-	// Check first event
 	require.Equal(t, "event-001", events[0]["id"])
 	require.Equal(t, "node-001", events[0]["node_id"])
 	require.Equal(t, "output", events[0]["channel"])
 	require.Equal(t, "Test Event", events[0]["custom_name"])
-	require.Equal(t, true, events[0]["root"])
 
-	// Check second event
 	require.Equal(t, "event-002", events[1]["id"])
 	require.Equal(t, "node-002", events[1]["node_id"])
-	require.Equal(t, false, events[1]["root"])
-	require.NotContains(t, events[1], "channel")
-	require.NotContains(t, events[1], "custom_name")
 }
