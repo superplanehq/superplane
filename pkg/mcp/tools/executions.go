@@ -94,67 +94,43 @@ func handleListExecutions(ctx context.Context, apiClient *openapi_client.APIClie
 	}, nil
 }
 
-// handleDescribeExecution describes a single execution with full details
+// handleDescribeExecution describes an execution by listing its child executions
 func handleDescribeExecution(ctx context.Context, apiClient *openapi_client.APIClient, canvasID, executionID string) (*mcp.CallToolResult, error) {
-	// Use list child executions API to get full execution details
-	emptyBody := make(map[string]interface{})
+	emptyBody := map[string]interface{}{}
 	response, _, err := apiClient.CanvasNodeExecutionAPI.CanvasesListChildExecutions(ctx, canvasID, executionID).Body(emptyBody).Execute()
 	if err != nil {
 		return nil, fmt.Errorf("failed to describe execution: %w", err)
 	}
 
-	execution := response.GetExecution()
-	result := map[string]any{
-		"id":        execution.GetId(),
-		"canvas_id": execution.GetCanvasId(),
-		"node_id":   execution.GetNodeId(),
+	executions := response.GetExecutions()
+	results := make([]map[string]any, 0, len(executions))
+
+	for _, execution := range executions {
+		result := map[string]any{
+			"id":      execution.GetId(),
+			"node_id": execution.GetNodeId(),
+		}
+
+		if execution.HasState() {
+			result["state"] = execution.GetState()
+		}
+
+		if execution.HasResult() {
+			result["result"] = execution.GetResult()
+		}
+
+		if execution.HasCreatedAt() {
+			result["created_at"] = execution.GetCreatedAt()
+		}
+
+		results = append(results, result)
 	}
 
-	if execution.HasState() {
-		result["state"] = execution.GetState()
-	}
-
-	if execution.HasResult() {
-		result["result"] = execution.GetResult()
-	}
-
-	if execution.HasResultReason() {
-		result["result_reason"] = execution.GetResultReason()
-	}
-
-	if execution.HasResultMessage() {
-		result["result_message"] = execution.GetResultMessage()
-	}
-
-	if execution.HasCreatedAt() {
-		result["created_at"] = execution.GetCreatedAt()
-	}
-
-	if execution.HasUpdatedAt() {
-		result["updated_at"] = execution.GetUpdatedAt()
-	}
-
-	if execution.HasParentExecutionId() {
-		result["parent_execution_id"] = execution.GetParentExecutionId()
-	}
-
-	if execution.HasPreviousExecutionId() {
-		result["previous_execution_id"] = execution.GetPreviousExecutionId()
-	}
-
-	if execution.HasOutputs() {
-		result["outputs"] = execution.GetOutputs()
-	}
-
-	if execution.HasMetadata() {
-		result["metadata"] = execution.GetMetadata()
-	}
-
-	if execution.HasConfiguration() {
-		result["configuration"] = execution.GetConfiguration()
-	}
-
-	content, err := json.MarshalIndent(result, "", "  ")
+	content, err := json.MarshalIndent(map[string]any{
+		"execution_id":     executionID,
+		"canvas_id":        canvasID,
+		"child_executions": results,
+	}, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal result: %w", err)
 	}

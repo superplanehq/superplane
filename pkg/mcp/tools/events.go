@@ -60,19 +60,10 @@ func handleEmitEvent(ctx context.Context, apiClient *openapi_client.APIClient, c
 		return nil, fmt.Errorf("failed to emit event: %w", err)
 	}
 
-	event := response.GetEvent()
 	result := map[string]any{
-		"event_id":  event.GetId(),
-		"canvas_id": event.GetCanvasId(),
-		"node_id":   event.GetNodeId(),
-	}
-
-	if event.HasChannel() {
-		result["channel"] = event.GetChannel()
-	}
-
-	if event.HasCreatedAt() {
-		result["created_at"] = event.GetCreatedAt()
+		"event_id":  response.GetEventId(),
+		"canvas_id": canvasID,
+		"node_id":   nodeID,
 	}
 
 	content, err := json.MarshalIndent(result, "", "  ")
@@ -111,10 +102,6 @@ func handleListEvents(ctx context.Context, apiClient *openapi_client.APIClient, 
 
 		if event.HasCreatedAt() {
 			result["created_at"] = event.GetCreatedAt()
-		}
-
-		if event.HasRoot() {
-			result["root"] = event.GetRoot()
 		}
 
 		results = append(results, result)
