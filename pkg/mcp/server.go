@@ -50,6 +50,16 @@ func registerTools(ctx context.Context, s *mcp.Server, apiClient *openapi_client
 		return fmt.Errorf("failed to register canvas tools: %w", err)
 	}
 
+	// Event tools
+	if err := tools.RegisterEventTools(ctx, s, apiClient); err != nil {
+		return fmt.Errorf("failed to register event tools: %w", err)
+	}
+
+	// Execution tools
+	if err := tools.RegisterExecutionTools(ctx, s, apiClient); err != nil {
+		return fmt.Errorf("failed to register execution tools: %w", err)
+	}
+
 	// Integration tools
 	if err := tools.RegisterIntegrationTools(ctx, s, apiClient); err != nil {
 		return fmt.Errorf("failed to register integration tools: %w", err)
