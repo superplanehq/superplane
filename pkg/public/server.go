@@ -570,6 +570,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute := r.NewRoute().Subrouter()
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	accountRoute.HandleFunc("/account", s.getAccount).Methods("GET")
+	accountRoute.HandleFunc("/account/password", s.changeAccountPassword).Methods("PATCH")
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
@@ -907,6 +908,7 @@ type AccountResponse struct {
 	Email             string                `json:"email"`
 	AvatarURL         string                `json:"avatar_url"`
 	InstallationAdmin bool                  `json:"installation_admin"`
+	HasPasswordAuth   bool                  `json:"has_password_auth"`
 	Impersonation     *AccountImpersonation `json:"impersonation,omitempty"`
 }
 
@@ -924,12 +926,20 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	hasPasswordAuth, err := account.HasPasswordAuth()
+	if err != nil {
+		log.Errorf("Error checking password auth for account %s: %v", account.Email, err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
 	accountResponse := AccountResponse{
 		ID:                account.ID.String(),
 		Name:              account.Name,
 		Email:             account.Email,
 		AvatarURL:         getAvatarURL(providers),
 		InstallationAdmin: account.IsInstallationAdmin(),
+		HasPasswordAuth:   hasPasswordAuth,
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
@@ -941,6 +951,76 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(accountResponse)
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password"`
+	NewPassword     string `json:"new_password"`
+}
+
+func (s *Server) changeAccountPassword(w http.ResponseWriter, r *http.Request) {
+	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
+		http.Error(w, "Cannot change password while impersonating another account", http.StatusForbidden)
+		return
+	}
+
+	account, ok := middleware.GetAccountFromContext(r.Context())
+	if !ok {
+		http.Error(w, "", http.StatusUnauthorized)
+		return
+	}
+
+	var request ChangePasswordRequest
+	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16*1024))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&request); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if request.CurrentPassword == "" || request.NewPassword == "" {
+		http.Error(w, "Current password and new password are required", http.StatusBadRequest)
+		return
+	}
+
+	hasPasswordAuth, err := account.HasPasswordAuth()
+	if err != nil {
+		log.Errorf("Failed to check password auth for account %s: %v", account.ID, err)
+		http.Error(w, "Failed to update password", http.StatusInternalServerError)
+		return
+	}
+
+	if !hasPasswordAuth {
+		http.Error(w, "Password changes are only available for email/password accounts", http.StatusForbidden)
+		return
+	}
+
+	passwordAuth, err := models.FindAccountPasswordAuthByAccountID(account.ID)
+	if err != nil {
+		log.Errorf("Failed to load password auth for account %s: %v", account.ID, err)
+		http.Error(w, "Failed to update password", http.StatusInternalServerError)
+		return
+	}
+
+	if !crypto.VerifyPassword(passwordAuth.PasswordHash, request.CurrentPassword) {
+		http.Error(w, "Current password is incorrect", http.StatusUnauthorized)
+		return
+	}
+
+	passwordHash, err := crypto.HashPassword(request.NewPassword)
+	if err != nil {
+		log.Errorf("Failed to hash changed password for account %s: %v", account.ID, err)
+		http.Error(w, "Failed to update password", http.StatusInternalServerError)
+		return
+	}
+
+	if err := passwordAuth.UpdatePasswordHash(passwordHash); err != nil {
+		log.Errorf("Failed to update password for account %s: %v", account.ID, err)
+		http.Error(w, "Failed to update password", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) listAccountOrganizations(w http.ResponseWriter, r *http.Request) {

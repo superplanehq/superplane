@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,6 +21,19 @@ type Account struct {
 
 func (a *Account) IsInstallationAdmin() bool {
 	return a.InstallationAdmin
+}
+
+func (a *Account) HasPasswordAuth() (bool, error) {
+	_, err := FindAccountPasswordAuthByAccountID(a.ID)
+	if err == nil {
+		return true, nil
+	}
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return false, nil
+	}
+
+	return false, err
 }
 
 func PromoteToInstallationAdmin(accountID string) error {

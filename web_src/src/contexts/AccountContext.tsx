@@ -12,6 +12,7 @@ interface Account {
   email: string;
   avatar_url: string;
   installation_admin: boolean;
+  has_password_auth: boolean;
   impersonation?: AccountImpersonation;
 }
 

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { meRegenerateToken } from "@/api-client/sdk.gen";
+import { useAccount } from "@/contexts/AccountContext";
 import { Avatar } from "@/components/Avatar/avatar";
 import { Heading } from "@/components/Heading/heading";
 import { Icon } from "@/components/Icon";
@@ -18,6 +19,7 @@ export function Profile() {
   usePageTitle(["Profile"]);
   const queryClient = useQueryClient();
   const organizationId = useOrganizationId();
+  const { account } = useAccount();
   const { data: user, isLoading: loading, error: meError } = useMe();
   const [actionError, setActionError] = useState<string | null>(null);
   const [token, setToken] = useState<string>("");
@@ -127,6 +129,8 @@ export function Profile() {
           </div>
         </div>
 
+        {account?.has_password_auth && !account.impersonation?.active && <PasswordSection />}
+
         <Heading level={2} className="text-lg text-left font-medium text-gray-800 dark:text-white mb-0">
           API Token
         </Heading>
@@ -200,5 +204,108 @@ export function Profile() {
         </div>
       </div>
     </div>
+  );
+}
+
+function PasswordSection() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const handleChangePassword = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showErrorToast("Enter your current password and a new password.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showErrorToast("New passwords do not match.");
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      const response = await fetch("/account/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || "Failed to update password");
+      }
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      showSuccessToast("Password updated.");
+    } catch (err) {
+      showErrorToast(err instanceof Error ? err.message : "Failed to update password.");
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  return (
+    <>
+      <Heading level={2} className="text-lg text-left font-medium text-gray-800 dark:text-white mb-0">
+        Password
+      </Heading>
+      <Text className="text-gray-800 text-left dark:text-gray-400 text-sm">
+        Update the password used for email sign-in.
+      </Text>
+
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 p-6">
+        <form className="max-w-sm space-y-4" onSubmit={handleChangePassword}>
+          <div className="space-y-1.5">
+            <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">Current Password</Text>
+            <Input
+              type="password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              className="ph-no-capture"
+              autoComplete="current-password"
+              disabled={changingPassword}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">New Password</Text>
+            <Input
+              type="password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              className="ph-no-capture"
+              autoComplete="new-password"
+              disabled={changingPassword}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Text className="text-sm text-left font-medium text-gray-800 dark:text-gray-300">Confirm New Password</Text>
+            <Input
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              className="ph-no-capture"
+              autoComplete="new-password"
+              disabled={changingPassword}
+            />
+          </div>
+
+          <LoadingButton type="submit" loading={changingPassword} loadingText="Updating..." className="mt-2">
+            Update Password
+          </LoadingButton>
+        </form>
+      </div>
+    </>
   );
 }

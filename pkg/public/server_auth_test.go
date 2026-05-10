@@ -1,6 +1,8 @@
 package public
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +12,7 @@ import (
 	"github.com/markbates/goth"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -83,7 +86,108 @@ func Test__GetAccount(t *testing.T) {
 		response := httptest.NewRecorder()
 		server.Router.ServeHTTP(response, req)
 		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body AccountResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.False(t, body.HasPasswordAuth)
 	})
+
+	t.Run("authenticated account with password auth -> includes password auth status", func(t *testing.T) {
+		r := support.Setup(t)
+		server, account, token := setupTestServer(r, t)
+		createPasswordAuth(t, account, "old-password")
+
+		req, _ := http.NewRequest(http.MethodGet, "/account", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+		response := httptest.NewRecorder()
+		server.Router.ServeHTTP(response, req)
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body AccountResponse
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.True(t, body.HasPasswordAuth)
+	})
+}
+
+func Test__ChangeAccountPassword(t *testing.T) {
+	t.Run("no authenticated account -> unauthorized", func(t *testing.T) {
+		r := support.Setup(t)
+		server, _, _ := setupTestServer(r, t)
+
+		response := changePasswordRequest(t, server, "", "old-password", "new-password")
+		assert.Equal(t, http.StatusUnauthorized, response.Code)
+		assert.Empty(t, response.Header().Get("Location"))
+	})
+
+	t.Run("account without password auth -> forbidden", func(t *testing.T) {
+		r := support.Setup(t)
+		server, _, token := setupTestServer(r, t)
+
+		response := changePasswordRequest(t, server, token, "old-password", "new-password")
+		assert.Equal(t, http.StatusForbidden, response.Code)
+	})
+
+	t.Run("wrong current password -> unauthorized and keeps existing password", func(t *testing.T) {
+		r := support.Setup(t)
+		server, account, token := setupTestServer(r, t)
+		originalHash := createPasswordAuth(t, account, "old-password")
+
+		response := changePasswordRequest(t, server, token, "wrong-password", "new-password")
+		assert.Equal(t, http.StatusUnauthorized, response.Code)
+
+		passwordAuth, err := models.FindAccountPasswordAuthByAccountID(account.ID)
+		require.NoError(t, err)
+		assert.Equal(t, originalHash, passwordAuth.PasswordHash)
+		assert.True(t, crypto.VerifyPassword(passwordAuth.PasswordHash, "old-password"))
+		assert.False(t, crypto.VerifyPassword(passwordAuth.PasswordHash, "new-password"))
+	})
+
+	t.Run("valid current password -> updates password", func(t *testing.T) {
+		r := support.Setup(t)
+		server, account, token := setupTestServer(r, t)
+		createPasswordAuth(t, account, "old-password")
+
+		response := changePasswordRequest(t, server, token, "old-password", "new-password")
+		assert.Equal(t, http.StatusNoContent, response.Code)
+
+		passwordAuth, err := models.FindAccountPasswordAuthByAccountID(account.ID)
+		require.NoError(t, err)
+		assert.False(t, crypto.VerifyPassword(passwordAuth.PasswordHash, "old-password"))
+		assert.True(t, crypto.VerifyPassword(passwordAuth.PasswordHash, "new-password"))
+	})
+}
+
+func createPasswordAuth(t *testing.T, account *models.Account, password string) string {
+	t.Helper()
+
+	hash, err := crypto.HashPassword(password)
+	require.NoError(t, err)
+
+	_, err = models.CreateAccountPasswordAuth(account.ID, hash)
+	require.NoError(t, err)
+
+	return hash
+}
+
+func changePasswordRequest(t *testing.T, server *Server, token string, currentPassword string, newPassword string) *httptest.ResponseRecorder {
+	t.Helper()
+
+	body, err := json.Marshal(ChangePasswordRequest{
+		CurrentPassword: currentPassword,
+		NewPassword:     newPassword,
+	})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodPatch, "/account/password", bytes.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+	}
+
+	response := httptest.NewRecorder()
+	server.Router.ServeHTTP(response, req)
+	return response
 }
 
 func Test__ListAccountOrganizations(t *testing.T) {
