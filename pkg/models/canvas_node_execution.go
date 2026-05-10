@@ -106,9 +106,10 @@ func LockCanvasNodeExecution(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, e
 	return &execution, nil
 }
 
-func CreatePendingChildExecution(tx *gorm.DB, parent *CanvasNodeExecution, childNodeID string, config map[string]any) (*CanvasNodeExecution, error) {
+func CreatePendingChildExecution(tx *gorm.DB, parent *CanvasNodeExecution, childNodeID string, config map[string]any, id uuid.UUID) (*CanvasNodeExecution, error) {
 	now := time.Now()
 	execution := CanvasNodeExecution{
+		ID:                  id,
 		WorkflowID:          parent.WorkflowID,
 		RootEventID:         parent.RootEventID,
 		EventID:             parent.EventID,

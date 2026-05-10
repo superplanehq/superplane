@@ -728,6 +728,7 @@ func Test__WorkflowNodeQueueWorker_ConfigurationBuildFailure_PropagateToParent(t
 		&parentExecution,
 		"noop1",
 		map[string]any{},
+		uuid.New(),
 	)
 	require.NoError(t, err)
 
