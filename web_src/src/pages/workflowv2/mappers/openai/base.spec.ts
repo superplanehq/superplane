@@ -126,4 +126,26 @@ describe("openai baseMapper.getExecutionDetails", () => {
     expect(details["Tokens"]).toBe("1,545 (1,200 in / 345 out)");
     expect(details["Emitted At"]).toBeDefined();
   });
+
+  it("falls back to zero when input and output token counts are missing", () => {
+    const details = baseMapper.getExecutionDetails(
+      buildDetailsContext({
+        outputs: {
+          default: [buildOutput({ usage: { total_tokens: 100 } })],
+        },
+      }),
+    );
+
+    expect(details["Tokens"]).toBe("100 (0 in / 0 out)");
+  });
+
+  it("returns Started At and no payload-derived fields when outputs are absent", () => {
+    const details = baseMapper.getExecutionDetails(buildDetailsContext({ outputs: undefined }));
+
+    expect(details["Started At"]).toBeDefined();
+    expect(details["Event Type"]).toBeUndefined();
+    expect(details["Model"]).toBeUndefined();
+    expect(details["Tokens"]).toBeUndefined();
+    expect(details["Emitted At"]).toBeUndefined();
+  });
 });
