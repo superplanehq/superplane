@@ -160,27 +160,18 @@ func handleListTriggers(ctx context.Context, apiClient *openapi_client.APIClient
 		return nil, fmt.Errorf("failed to list triggers: %w", err)
 	}
 
-	type triggerSummary struct {
-		Name         string   `json:"name"`
-		Label        string   `json:"label"`
-		Description  string   `json:"description"`
-		ConfigFields []string `json:"config_fields,omitempty"`
-	}
-
-	triggers := make([]triggerSummary, 0, len(response.Triggers))
+	triggers := make([]map[string]any, 0, len(response.Triggers))
 	for _, t := range response.Triggers {
-		fields := make([]string, 0, len(t.Configuration))
-		for _, f := range t.Configuration {
-			if f.Name != nil {
-				fields = append(fields, *f.Name)
-			}
+		trigger := map[string]any{
+			"name":        deref(t.Name),
+			"label":       deref(t.Label),
+			"description": deref(t.Description),
 		}
-		triggers = append(triggers, triggerSummary{
-			Name:         deref(t.Name),
-			Label:        deref(t.Label),
-			Description:  deref(t.Description),
-			ConfigFields: fields,
-		})
+		fields := buildConfigSchema(t.Configuration)
+		if len(fields) > 0 {
+			trigger["configuration_schema"] = fields
+		}
+		triggers = append(triggers, trigger)
 	}
 
 	resultJSON, _ := json.MarshalIndent(triggers, "", "  ")
@@ -195,21 +186,12 @@ func handleListActions(ctx context.Context, apiClient *openapi_client.APIClient)
 		return nil, fmt.Errorf("failed to list actions: %w", err)
 	}
 
-	type actionSummary struct {
-		Name           string   `json:"name"`
-		Label          string   `json:"label"`
-		Description    string   `json:"description"`
-		ConfigFields   []string `json:"config_fields,omitempty"`
-		OutputChannels []string `json:"output_channels,omitempty"`
-	}
-
-	actions := make([]actionSummary, 0, len(response.Actions))
+	actions := make([]map[string]any, 0, len(response.Actions))
 	for _, a := range response.Actions {
-		fields := make([]string, 0, len(a.Configuration))
-		for _, f := range a.Configuration {
-			if f.Name != nil {
-				fields = append(fields, *f.Name)
-			}
+		action := map[string]any{
+			"name":        deref(a.Name),
+			"label":       deref(a.Label),
+			"description": deref(a.Description),
 		}
 		channels := make([]string, 0, len(a.OutputChannels))
 		for _, ch := range a.OutputChannels {
@@ -217,13 +199,14 @@ func handleListActions(ctx context.Context, apiClient *openapi_client.APIClient)
 				channels = append(channels, *ch.Name)
 			}
 		}
-		actions = append(actions, actionSummary{
-			Name:           deref(a.Name),
-			Label:          deref(a.Label),
-			Description:    deref(a.Description),
-			ConfigFields:   fields,
-			OutputChannels: channels,
-		})
+		if len(channels) > 0 {
+			action["output_channels"] = channels
+		}
+		fields := buildConfigSchema(a.Configuration)
+		if len(fields) > 0 {
+			action["configuration_schema"] = fields
+		}
+		actions = append(actions, action)
 	}
 
 	resultJSON, _ := json.MarshalIndent(actions, "", "  ")
@@ -237,4 +220,44 @@ func deref(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+type configFieldSchema struct {
+	Name         string   `json:"name"`
+	Type         string   `json:"type"`
+	Label        string   `json:"label,omitempty"`
+	Description  string   `json:"description,omitempty"`
+	Required     bool     `json:"required"`
+	DefaultValue string   `json:"default,omitempty"`
+	Options      []string `json:"options,omitempty"`
+	Placeholder  string   `json:"placeholder,omitempty"`
+}
+
+func buildConfigSchema(fields []openapi_client.ConfigurationField) []configFieldSchema {
+	result := make([]configFieldSchema, 0, len(fields))
+	for _, f := range fields {
+		schema := configFieldSchema{
+			Name:        deref(f.Name),
+			Type:        deref(f.Type),
+			Label:       deref(f.Label),
+			Description: deref(f.Description),
+			Placeholder: deref(f.Placeholder),
+		}
+		if f.Required != nil {
+			schema.Required = *f.Required
+		}
+		if f.DefaultValue != nil {
+			schema.DefaultValue = *f.DefaultValue
+		}
+		// Include select options if available
+		if f.TypeOptions != nil && f.TypeOptions.Select != nil {
+			for _, opt := range f.TypeOptions.Select.Options {
+				if opt.Value != nil {
+					schema.Options = append(schema.Options, *opt.Value)
+				}
+			}
+		}
+		result = append(result, schema)
+	}
+	return result
 }
