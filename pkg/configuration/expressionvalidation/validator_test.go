@@ -55,6 +55,9 @@ func TestValidateExpression_Valid(t *testing.T) {
 		{name: "type conversion", raw: `int($['Build'].count) + 1`, knownNames: []string{"Build"}},
 		{name: "config blueprint placeholder", raw: `config.foo.bar`},
 		{name: "standalone dollar", raw: `$`},
+		{name: "eventId no args", raw: `eventId()`},
+		{name: "executionId no args", raw: `executionId()`},
+		{name: "eventId in url", raw: `'/runs/' + executionId() + '?event=' + eventId()`},
 	})
 }
 
@@ -87,6 +90,8 @@ func TestValidateExpression_BadArity(t *testing.T) {
 		{name: "memory.find no args", raw: `memory.find()`, wantErr: "memory.find() requires a namespace and matches"},
 		{name: "memory.findFirst no args", raw: `memory.findFirst()`, wantErr: "memory.findFirst() requires a namespace and matches"},
 		{name: "memory.find too many", raw: `memory.find('ns', {}, 'extra')`, wantErr: "memory.find() requires a namespace and matches"},
+		{name: "eventId with arg", raw: `eventId(1)`, wantErr: "eventId() takes no arguments"},
+		{name: "executionId with arg", raw: `executionId('x')`, wantErr: "executionId() takes no arguments"},
 	})
 }
 
