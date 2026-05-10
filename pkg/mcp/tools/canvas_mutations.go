@@ -270,15 +270,20 @@ func handleCreateCanvas(ctx context.Context, apiClient *openapi_client.APIClient
 
 	// Check for validation errors on newly created canvas
 	canvasID := metadata.GetId()
+	spec := canvas.GetSpec()
+	result["nodes"] = len(spec.GetNodes())
+	result["edges"] = len(spec.GetEdges())
+
 	versionsResp, _, versionsErr := apiClient.CanvasVersionAPI.CanvasesListCanvasVersions(ctx, canvasID).Execute()
 	if versionsErr == nil && len(versionsResp.GetVersions()) > 0 {
 		latestVersion := versionsResp.GetVersions()[0]
 		if errText := formatNodeErrors(latestVersion); errText != "" {
+			// Truncate to keep response small for SSE transport
+			if len(errText) > 2000 {
+				errText = errText[:2000] + "\n... (truncated, use describe_canvas for full errors)"
+			}
 			result["validation_errors"] = errText
-			result["message"] = fmt.Sprintf("Canvas %q created but has validation errors that should be fixed", metadata.GetName())
-		}
-		if warnText := formatNodeWarnings(latestVersion); warnText != "" {
-			result["warnings"] = warnText
+			result["message"] = fmt.Sprintf("Canvas %q created but has validation errors", metadata.GetName())
 		}
 	}
 
@@ -355,8 +360,12 @@ func handleUpdateCanvas(ctx context.Context, apiClient *openapi_client.APIClient
 
 	// Include validation errors as part of result (not as tool error)
 	if nodeErrors != "" {
+		// Truncate to keep response small for SSE transport
+		if len(nodeErrors) > 2000 {
+			nodeErrors = nodeErrors[:2000] + "\n... (truncated, use describe_canvas for full errors)"
+		}
 		result["validation_errors"] = nodeErrors
-		result["message"] = "Canvas updated and published, but has validation errors that should be fixed"
+		result["message"] = "Canvas updated and published, but has validation errors"
 	}
 
 	// Add warnings if any
