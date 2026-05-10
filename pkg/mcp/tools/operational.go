@@ -90,6 +90,41 @@ func RegisterDiscoveryTools(ctx context.Context, s *mcp.Server, apiClient *opena
 		Description: "List all available action components. Actions perform work in a workflow (e.g. run script, deploy, send notification).",
 		InputSchema: json.RawMessage(`{"type":"object","properties":{}}`),
 	}, listActionsHandler)
+
+	// describe_action tool
+	describeActionHandler := func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+			return nil, fmt.Errorf("failed to parse arguments: %w", err)
+		}
+		return handleDescribeAction(ctx, apiClient, args.Name)
+	}
+
+	s.AddTool(&mcp.Tool{
+		Name:        "describe_action",
+		Description: `Get detailed docs for an action component. Returns full configuration schema with field types, nested objects, required fields, defaults, select options, and value format hints (e.g. secret-key fields need {secretName: "SECRET_NAME"} map format, list fields with object items need [{name: "x", value: "y"}] format). Use before creating canvases with complex components.`,
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"name":{"type":"string","description":"Action name (e.g. http, ssh, approval, if, timeGate)"}},"required":["name"]}`),
+	}, describeActionHandler)
+
+	// describe_trigger tool
+	describeTriggerHandler := func(ctx context.Context, req *mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		var args struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
+			return nil, fmt.Errorf("failed to parse arguments: %w", err)
+		}
+		return handleDescribeTrigger(ctx, apiClient, args.Name)
+	}
+
+	s.AddTool(&mcp.Tool{
+		Name:        "describe_trigger",
+		Description: "Get detailed docs for a trigger component including full configuration schema.",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"name":{"type":"string","description":"Trigger name (e.g. webhook, schedule, start)"}},"required":["name"]}`),
+	}, describeTriggerHandler)
+
 	return nil
 }
 
@@ -260,4 +295,139 @@ func buildConfigSchema(fields []openapi_client.ConfigurationField) []configField
 		result = append(result, schema)
 	}
 	return result
+}
+
+// deepFieldSchema is a rich field description including nested objects and format hints
+type deepFieldSchema struct {
+	Name         string            `json:"name"`
+	Type         string            `json:"type"`
+	Label        string            `json:"label,omitempty"`
+	Description  string            `json:"description,omitempty"`
+	Required     bool              `json:"required"`
+	DefaultValue string            `json:"default,omitempty"`
+	Options      []string          `json:"options,omitempty"`
+	Placeholder  string            `json:"placeholder,omitempty"`
+	FormatHint   string            `json:"format_hint,omitempty"`
+	NestedSchema []deepFieldSchema `json:"nested_schema,omitempty"`
+	ItemSchema   []deepFieldSchema `json:"item_schema,omitempty"`
+}
+
+func buildDeepConfigSchema(fields []openapi_client.ConfigurationField) []deepFieldSchema {
+	result := make([]deepFieldSchema, 0, len(fields))
+	for _, f := range fields {
+		schema := deepFieldSchema{
+			Name:        deref(f.Name),
+			Type:        deref(f.Type),
+			Label:       deref(f.Label),
+			Description: deref(f.Description),
+			Placeholder: deref(f.Placeholder),
+		}
+		if f.Required != nil {
+			schema.Required = *f.Required
+		}
+		if f.DefaultValue != nil {
+			schema.DefaultValue = *f.DefaultValue
+		}
+
+		// Add format hints for special types
+		switch deref(f.Type) {
+		case "secret-key":
+			schema.FormatHint = `Value must be a map: {secretName: "YOUR_SECRET_NAME"}. The secret must exist in SuperPlane org secrets.`
+		case "number":
+			schema.FormatHint = "Value must be a string representation of a number, e.g. \"30\""
+		case "boolean":
+			schema.FormatHint = `Value must be string "true" or "false"`
+		}
+
+		if f.TypeOptions != nil {
+			// Select options
+			if f.TypeOptions.Select != nil {
+				for _, opt := range f.TypeOptions.Select.Options {
+					if opt.Value != nil {
+						schema.Options = append(schema.Options, *opt.Value)
+					}
+				}
+			}
+			// Nested object schema
+			if f.TypeOptions.Object != nil && len(f.TypeOptions.Object.Schema) > 0 {
+				schema.NestedSchema = buildDeepConfigSchema(f.TypeOptions.Object.Schema)
+			}
+			// List item schema
+			if f.TypeOptions.List != nil && f.TypeOptions.List.ItemDefinition != nil {
+				itemDef := f.TypeOptions.List.ItemDefinition
+				if itemDef.Schema != nil && len(itemDef.Schema) > 0 {
+					schema.ItemSchema = buildDeepConfigSchema(itemDef.Schema)
+					schema.FormatHint = "Value is a list of objects. Each item has the fields described in item_schema."
+				}
+			}
+		}
+		result = append(result, schema)
+	}
+	return result
+}
+
+func handleDescribeAction(ctx context.Context, apiClient *openapi_client.APIClient, name string) (*mcp.CallToolResult, error) {
+	response, _, err := apiClient.ActionAPI.ActionsDescribeAction(ctx, name).Execute()
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe action %q: %w", name, err)
+	}
+
+	a := response.GetAction()
+	result := map[string]any{
+		"name":        deref(a.Name),
+		"label":       deref(a.Label),
+		"description": deref(a.Description),
+	}
+
+	channels := make([]string, 0, len(a.OutputChannels))
+	for _, ch := range a.OutputChannels {
+		if ch.Name != nil {
+			channels = append(channels, *ch.Name)
+		}
+	}
+	if len(channels) > 0 {
+		result["output_channels"] = channels
+	}
+
+	fields := buildDeepConfigSchema(a.Configuration)
+	if len(fields) > 0 {
+		result["configuration_schema"] = fields
+	}
+
+	if a.ExampleOutput != nil {
+		result["example_output"] = a.ExampleOutput
+	}
+
+	resultJSON, _ := json.MarshalIndent(result, "", "  ")
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: string(resultJSON)}},
+	}, nil
+}
+
+func handleDescribeTrigger(ctx context.Context, apiClient *openapi_client.APIClient, name string) (*mcp.CallToolResult, error) {
+	response, _, err := apiClient.TriggerAPI.TriggersDescribeTrigger(ctx, name).Execute()
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe trigger %q: %w", name, err)
+	}
+
+	t := response.GetTrigger()
+	result := map[string]any{
+		"name":        deref(t.Name),
+		"label":       deref(t.Label),
+		"description": deref(t.Description),
+	}
+
+	fields := buildDeepConfigSchema(t.Configuration)
+	if len(fields) > 0 {
+		result["configuration_schema"] = fields
+	}
+
+	if t.ExampleData != nil {
+		result["example_data"] = t.ExampleData
+	}
+
+	resultJSON, _ := json.MarshalIndent(result, "", "  ")
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: string(resultJSON)}},
+	}, nil
 }
