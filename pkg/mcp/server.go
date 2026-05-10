@@ -75,5 +75,15 @@ func registerTools(ctx context.Context, s *mcp.Server, apiClient *openapi_client
 		return fmt.Errorf("failed to register secret tools: %w", err)
 	}
 
+	// Operational tools (delete, pause, cancel)
+	if err := tools.RegisterOperationalTools(ctx, s, apiClient); err != nil {
+		return fmt.Errorf("failed to register operational tools: %w", err)
+	}
+
+	// Discovery tools (list triggers, actions)
+	if err := tools.RegisterDiscoveryTools(ctx, s, apiClient); err != nil {
+		return fmt.Errorf("failed to register discovery tools: %w", err)
+	}
+
 	return nil
 }
