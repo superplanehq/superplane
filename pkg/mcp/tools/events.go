@@ -16,18 +16,22 @@ func RegisterEventTools(ctx context.Context, s *mcp.Server, apiClient *openapi_c
 		var args struct {
 			CanvasID string                 `json:"canvas_id"`
 			NodeID   string                 `json:"node_id"`
+			Channel  string                 `json:"channel"`
 			Data     map[string]interface{} `json:"data"`
 		}
 		if err := json.Unmarshal(req.Params.Arguments, &args); err != nil {
 			return nil, fmt.Errorf("failed to parse arguments: %w", err)
 		}
-		return handleEmitEvent(ctx, apiClient, args.CanvasID, args.NodeID, args.Data)
+		if args.Channel == "" {
+			args.Channel = "default"
+		}
+		return handleEmitEvent(ctx, apiClient, args.CanvasID, args.NodeID, args.Channel, args.Data)
 	}
 
 	s.AddTool(&mcp.Tool{
 		Name:        "emit_event",
-		Description: "Emit an output event for a canvas node. This triggers the execution flow for downstream nodes.",
-		InputSchema: json.RawMessage(`{"type":"object","properties":{"canvas_id":{"type":"string","description":"The ID of the canvas"},"node_id":{"type":"string","description":"The ID of the node to emit event from"},"data":{"type":"object","description":"Event data as a JSON object"}},"required":["canvas_id","node_id","data"]}`),
+		Description: "Emit an event to a canvas node trigger. This starts a new execution flow.",
+		InputSchema: json.RawMessage(`{"type":"object","properties":{"canvas_id":{"type":"string","description":"The ID of the canvas"},"node_id":{"type":"string","description":"The ID of the node to emit event to"},"channel":{"type":"string","description":"Event channel (defaults to 'default')"},"data":{"type":"object","description":"Event data as a JSON object"}},"required":["canvas_id","node_id","data"]}`),
 	}, emitEventHandler)
 
 	// list_events tool
@@ -51,8 +55,9 @@ func RegisterEventTools(ctx context.Context, s *mcp.Server, apiClient *openapi_c
 }
 
 // handleEmitEvent emits an event for a canvas node
-func handleEmitEvent(ctx context.Context, apiClient *openapi_client.APIClient, canvasID, nodeID string, data map[string]interface{}) (*mcp.CallToolResult, error) {
+func handleEmitEvent(ctx context.Context, apiClient *openapi_client.APIClient, canvasID, nodeID, channel string, data map[string]interface{}) (*mcp.CallToolResult, error) {
 	body := openapi_client.NewCanvasesEmitNodeEventBody()
+	body.SetChannel(channel)
 	body.SetData(data)
 
 	response, _, err := apiClient.CanvasNodeAPI.CanvasesEmitNodeEvent(ctx, canvasID, nodeID).Body(*body).Execute()
