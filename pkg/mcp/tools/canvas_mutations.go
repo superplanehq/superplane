@@ -268,6 +268,20 @@ func handleCreateCanvas(ctx context.Context, apiClient *openapi_client.APIClient
 		result["created_at"] = metadata.GetCreatedAt()
 	}
 
+	// Check for validation errors on newly created canvas
+	canvasID := metadata.GetId()
+	versionsResp, _, versionsErr := apiClient.CanvasVersionAPI.CanvasesListCanvasVersions(ctx, canvasID).Execute()
+	if versionsErr == nil && len(versionsResp.GetVersions()) > 0 {
+		latestVersion := versionsResp.GetVersions()[0]
+		if errText := formatNodeErrors(latestVersion); errText != "" {
+			result["validation_errors"] = errText
+			result["message"] = fmt.Sprintf("Canvas %q created but has validation errors that should be fixed", metadata.GetName())
+		}
+		if warnText := formatNodeWarnings(latestVersion); warnText != "" {
+			result["warnings"] = warnText
+		}
+	}
+
 	content, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal result: %w", err)
@@ -315,12 +329,10 @@ func handleUpdateCanvas(ctx context.Context, apiClient *openapi_client.APIClient
 
 	version := response.GetVersion()
 
-	// Check for errors
-	if errText := formatNodeErrors(version); errText != "" {
-		return nil, fmt.Errorf("canvas validation errors: %s", errText)
-	}
+	// Check for errors — return as result content, not as tool error
+	nodeErrors := formatNodeErrors(version)
 
-	// Auto-publish the version
+	// Auto-publish the version (even if there are validation warnings)
 	_, _, publishErr := apiClient.CanvasVersionAPI.
 		CanvasesPublishCanvasVersion(ctx, canvasID, targetVersionID).
 		Body(map[string]any{}).
@@ -339,6 +351,12 @@ func handleUpdateCanvas(ctx context.Context, apiClient *openapi_client.APIClient
 		"nodes":      len(spec.GetNodes()),
 		"edges":      len(spec.GetEdges()),
 		"message":    "Canvas updated and published successfully",
+	}
+
+	// Include validation errors as part of result (not as tool error)
+	if nodeErrors != "" {
+		result["validation_errors"] = nodeErrors
+		result["message"] = "Canvas updated and published, but has validation errors that should be fixed"
 	}
 
 	// Add warnings if any

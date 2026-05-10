@@ -92,6 +92,14 @@ const testDescribeVersionResponse = `{
 
 func TestHandleCreateCanvas(t *testing.T) {
 	apiClient := newTestAPIClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		// Handle the versions list call (for validation check)
+		if strings.Contains(r.URL.Path, "/versions") && r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`{"versions":[{"metadata":{"id":"v1","canvasId":"canvas-123","state":"STATE_PUBLISHED"},"spec":{"nodes":[],"edges":[]}}]}`))
+			return
+		}
+
 		require.Equal(t, "/api/v1/canvases", r.URL.Path)
 		require.Equal(t, http.MethodPost, r.Method)
 
@@ -102,7 +110,6 @@ func TestHandleCreateCanvas(t *testing.T) {
 		require.NoError(t, json.Unmarshal(body, &req))
 		require.Contains(t, req, "canvas")
 
-		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(testCreateCanvasResponse))
 	})
 
