@@ -23,6 +23,24 @@ func Test_RemoveUser(t *testing.T) {
 	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 
+	t.Run("invalid org ID -> error", func(t *testing.T) {
+		_, err := RemoveUser(ctx, r.AuthService, "not-a-uuid", uuid.NewString())
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "invalid organization ID", s.Message())
+	})
+
+	t.Run("invalid user ID -> error", func(t *testing.T) {
+		_, err := RemoveUser(ctx, r.AuthService, orgID, "not-a-uuid")
+		require.Error(t, err)
+		s, ok := status.FromError(err)
+		assert.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+		assert.Equal(t, "invalid user ID", s.Message())
+	})
+
 	t.Run("user not found -> error", func(t *testing.T) {
 		_, err := RemoveUser(ctx, r.AuthService, orgID, uuid.NewString())
 		require.Error(t, err)

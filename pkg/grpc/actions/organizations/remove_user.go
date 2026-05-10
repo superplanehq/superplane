@@ -4,6 +4,7 @@ import (
 	"context"
 	"slices"
 
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -13,6 +14,14 @@ import (
 )
 
 func RemoveUser(ctx context.Context, authService authorization.Authorization, orgID, userID string) (*pb.RemoveUserResponse, error) {
+	if _, err := uuid.Parse(orgID); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid organization ID")
+	}
+
+	if _, err := uuid.Parse(userID); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid user ID")
+	}
+
 	user, err := models.FindActiveUserByID(orgID, userID)
 	if err != nil {
 		return nil, status.Error(codes.NotFound, "user not found")
@@ -34,8 +43,8 @@ func RemoveUser(ctx context.Context, authService authorization.Authorization, or
 	//
 	roles, err := authService.GetUserRolesForOrg(user.ID.String(), orgID)
 	if err != nil {
-		log.Errorf("Error determing user roles for %s: %v", user.ID.String(), err)
-		return nil, status.Error(codes.Internal, "error determing user roles")
+		log.Errorf("Error determining user roles for %s: %v", user.ID.String(), err)
+		return nil, status.Error(codes.Internal, "error determining user roles")
 	}
 
 	for _, role := range roles {
