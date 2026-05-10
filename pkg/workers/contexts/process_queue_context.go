@@ -43,9 +43,18 @@ func BuildProcessQueueContext(
 		return nil, err
 	}
 
+	//
+	// Pre-generate the execution UUID so that expressions resolved against the
+	// node configuration can reference executionId() before the row is inserted.
+	// The same value is then assigned in CreateExecution below so the resolved
+	// config matches the row that ends up in the database.
+	//
+	executionID := uuid.New()
+
 	configBuilder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
+		WithCurrentExecution(&executionID).
 		WithPreviousExecution(event.ExecutionID).
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
 	if len(configFields) > 0 {
@@ -75,6 +84,7 @@ func BuildProcessQueueContext(
 	builder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
+		WithCurrentExecution(&executionID).
 		WithInput(map[string]any{event.NodeID: event.Data.Data()})
 	if event.ExecutionID != nil {
 		builder = builder.WithPreviousExecution(event.ExecutionID)
@@ -95,6 +105,7 @@ func BuildProcessQueueContext(
 		now := time.Now()
 
 		execution := models.CanvasNodeExecution{
+			ID:                  executionID,
 			WorkflowID:          queueItem.WorkflowID,
 			NodeID:              node.NodeID,
 			RootEventID:         queueItem.RootEventID,
@@ -238,6 +249,22 @@ func BuildProcessQueueContext(
 
 			return nil, err
 		}
+
+		//
+		// Rebind ctx.Expressions to the existing execution. Components like Merge
+		// reuse a previously-created execution via FindExecutionByKV and then
+		// evaluate stop expressions through ctx.Expressions; without rebinding,
+		// executionId() would return the unused pre-generated ID instead of the
+		// row that's actually in the database.
+		//
+		// NOTE: ctx.Configuration is NOT rebuilt here — it was resolved up front
+		// against the pre-generated UUID. Today no Merge config field templates
+		// executionId() outside the stop expression, but a future component that
+		// adds such a field on the existing-execution branch would need to also
+		// re-resolve ctx.Configuration (or read the existing execution's stored
+		// configuration) to keep the two consistent.
+		//
+		builder.SetCurrentExecution(&execution.ID)
 
 		orgUUID := uuid.Nil
 		orgID := ""
