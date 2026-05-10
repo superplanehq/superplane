@@ -889,6 +889,12 @@ function evaluate(node: ASTNode, context: Record<string, unknown>): unknown {
           return null;
         };
       }
+      if (node.name === "eventId") {
+        return () => (typeof context.__eventId === "string" ? context.__eventId : "");
+      }
+      if (node.name === "executionId") {
+        return () => (typeof context.__executionId === "string" ? context.__executionId : "");
+      }
       if (node.name in BUILTIN_FUNCTIONS) {
         return BUILTIN_FUNCTIONS[node.name];
       }

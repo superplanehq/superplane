@@ -74,6 +74,18 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
       "Returns the payload from the immediate predecessor that emitted this event. Provide depth to walk upstream.",
     example: "previous(2).data.image.version",
   },
+  {
+    name: "eventId",
+    snippet: "eventId()",
+    description: "UUID of the event that triggered the run. Useful for building deep links from notifications.",
+    example: "'/canvases/x/runs?event=' + eventId()",
+  },
+  {
+    name: "executionId",
+    snippet: "executionId()",
+    description: "UUID of the execution evaluating the expression. Useful for linking to a specific run step.",
+    example: "'/canvases/x/executions/' + executionId()",
+  },
   // String
   {
     name: "trim",
