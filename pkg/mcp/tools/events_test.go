@@ -48,7 +48,7 @@ func TestHandleEmitEvent(t *testing.T) {
 
 	ctx := context.Background()
 	data := map[string]interface{}{"key": "value", "count": float64(42)}
-	result, err := handleEmitEvent(ctx, apiClient, "canvas-001", "node-001", data)
+	result, err := handleEmitEvent(ctx, apiClient, "canvas-001", "node-001", "default", data)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	require.Len(t, result.Content, 1)
