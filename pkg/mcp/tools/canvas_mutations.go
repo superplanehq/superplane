@@ -26,8 +26,86 @@ func RegisterCanvasMutationTools(ctx context.Context, s *mcp.Server, apiClient *
 	}
 
 	s.AddTool(&mcp.Tool{
-		Name:        "create_canvas",
-		Description: "Create a new canvas from a YAML specification. The YAML must include apiVersion, kind, metadata (with name), and spec (with nodes and edges).",
+		Name: "create_canvas",
+		Description: `Create a new canvas (workflow) from a YAML specification.
+
+YAML Schema:
+` + "```" + `yaml
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: <canvas-name>
+spec:
+  nodes:
+    - id: <unique-node-id>        # lowercase-kebab-case
+      name: <Display Name>
+      type: TYPE_TRIGGER            # TYPE_TRIGGER | TYPE_ACTION
+      component: <component-name>   # e.g. webhook, http, ssh, approval, filter, if, noop, timeGate, wait, merge, upsertMemory, readMemory, deleteMemory, addMemory, updateMemory, schedule, start, sendEmail, graphql
+      configuration:                # component-specific config (all values must be strings)
+        key1: "value1"
+      integration:                  # only for integration-bound components
+        name: <integration-name>
+  edges:
+    - sourceId: <source-node-id>
+      targetId: <target-node-id>
+      channel: <output-channel>     # e.g. default, success, failure, approved, rejected, true, false, found, notFound, deleted
+` + "```" + `
+
+Key rules:
+- node.type must be TYPE_TRIGGER or TYPE_ACTION (not "trigger" or "action")
+- node.component is the component name from list_triggers/list_actions
+- All configuration values must be strings, including numbers (e.g. "30" not 30)
+- edge.channel specifies which output of the source node triggers the target
+- Common output channels: webhook/schedule/start triggers use "default"; http uses "success"/"failure"; approval uses "approved"/"rejected"; if uses "true"/"false"; readMemory uses "found"/"notFound"; deleteMemory uses "deleted"
+- For http action: set method, url, headers (as formData with key/value pairs), body, timeoutSeconds (string, max "30"), successCodes (string, e.g. "200,201")
+- For ssh action: set host, port, username, command; authentication requires privateKey as a map: {secretName: "SECRET_NAME"}
+- For approval action: set message (string), approvalType (e.g. "TYPE_ANYONE")
+- For timeGate action: set activeDays (comma-separated, e.g. "monday,tuesday,..."), timeRange (e.g. "09:00-17:00"), timezone (numeric offset string, e.g. "0" for UTC)
+- For if action: set expression (e.g. "data.status == 'ok'")
+- For memory actions (upsertMemory/readMemory/deleteMemory): set key (the lookup key expression), and for upsert set value
+- For filter action: set expression
+
+Example - webhook trigger connected to an approval gate:
+` + "```" + `yaml
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: my-workflow
+spec:
+  nodes:
+    - id: webhook-trigger
+      name: Incoming Request
+      type: TYPE_TRIGGER
+      component: webhook
+      configuration:
+        authentication: signature
+        signatureHeader: X-Hub-Signature-256
+    - id: approval-gate
+      name: Require Approval
+      type: TYPE_ACTION
+      component: approval
+      configuration:
+        message: "A new request needs approval"
+        approvalType: TYPE_ANYONE
+    - id: on-approved
+      name: Approved
+      type: TYPE_ACTION
+      component: noop
+    - id: on-rejected
+      name: Rejected
+      type: TYPE_ACTION
+      component: noop
+  edges:
+    - sourceId: webhook-trigger
+      targetId: approval-gate
+      channel: default
+    - sourceId: approval-gate
+      targetId: on-approved
+      channel: approved
+    - sourceId: approval-gate
+      targetId: on-rejected
+      channel: rejected
+` + "```",
 		InputSchema: json.RawMessage(`{
 			"type": "object",
 			"properties": {
@@ -37,7 +115,7 @@ func RegisterCanvasMutationTools(ctx context.Context, s *mcp.Server, apiClient *
 				},
 				"yaml_spec": {
 					"type": "string",
-					"description": "The complete YAML specification for the canvas including apiVersion, kind, metadata, and spec"
+					"description": "The complete YAML specification for the canvas"
 				}
 			},
 			"required": ["name", "yaml_spec"]
