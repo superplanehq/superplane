@@ -9,7 +9,6 @@ import (
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/protobuf/proto"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 
 	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
@@ -172,8 +171,6 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 	}
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		var execution models.CanvasNodeExecution
-
 		//
 		// Try to lock the execution record for update.
 		// If we can't, it means another worker is already processing it.
@@ -193,19 +190,13 @@ func (w *NodeExecutor) LockAndProcessNodeExecution(id uuid.UUID) error {
 		// Note: We use SKIP LOCKED to avoid waiting on locked records.
 		//
 
-		err := tx.
-			Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-			Where("id = ?", id).
-			Where("state = ?", models.CanvasNodeExecutionStatePending).
-			First(&execution).
-			Error
-
+		execution, err := models.LockPendingNodeExecutionInActiveCanvas(tx, id)
 		if err != nil {
 			w.logger.Debugf("Execution %s already being processed - skipping", id.String())
 			return ErrRecordLocked
 		}
 
-		return w.processNodeExecution(tx, &execution, onNewEvents)
+		return w.processNodeExecution(tx, execution, onNewEvents)
 	})
 
 	if err != nil {
@@ -380,7 +371,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		BaseURL:        w.baseURL,
 		Configuration:  execution.Configuration.Data(),
 		Data:           input,
-		HTTP:           w.registry.HTTPContext(),
+		HTTP:           w.registry.HTTPContextInTransaction(tx),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		NodeMetadata:   contexts.NewNodeMetadataContext(tx, node),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),

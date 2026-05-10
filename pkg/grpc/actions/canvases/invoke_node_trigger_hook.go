@@ -75,6 +75,11 @@ func InvokeNodeTriggerHook(
 	tx := database.Conn()
 	logger := logging.ForNode(*node)
 
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
 	hookCtx := core.TriggerHookContext{
 		Name:          hookName,
 		Parameters:    parameters,
@@ -83,11 +88,7 @@ func InvokeNodeTriggerHook(
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
-	}
-
-	newEvents := []models.CanvasEvent{}
-	onNewEvents := func(events []models.CanvasEvent) {
-		newEvents = append(newEvents, events...)
+		Events:        contexts.NewEventContext(tx, node, onNewEvents),
 	}
 
 	if node.AppInstallationID != nil {

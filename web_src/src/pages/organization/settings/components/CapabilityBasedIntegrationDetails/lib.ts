@@ -1,7 +1,9 @@
 import type {
+  IntegrationCapabilityState,
   IntegrationCapabilityStateState,
   IntegrationNodeRef,
   IntegrationsCapabilityDefinition,
+  IntegrationsIntegrationDefinition,
 } from "@/api-client";
 
 export const DEFAULT_CAPABILITY_STATE: IntegrationCapabilityStateState = "STATE_UNAVAILABLE";
@@ -11,6 +13,9 @@ export type DisplayCapability = {
   definition?: IntegrationsCapabilityDefinition;
   state: IntegrationCapabilityStateState;
 };
+
+/** Same chip styling as inline `code` in Integration setup instructions markdown. */
+export const INTEGRATION_INLINE_CODE_CLASSES = "rounded bg-black/10 px-1.5 py-0.5 font-mono text-xs";
 
 export function getCapabilityLabel(capability: DisplayCapability): string {
   return capability.definition?.label || capability.definition?.name || capability.name || "Unnamed capability";
@@ -103,3 +108,143 @@ export const groupNodeRefsByCanvas = (nodeRefs: IntegrationNodeRef[]): WorkflowG
     nodes: data.nodes,
   }));
 };
+
+/** Merged capability definitions plus integration status for the capabilities tab. */
+export function buildCapabilitiesTabDisplayList(
+  integrationDef: IntegrationsIntegrationDefinition | undefined,
+  statusCapabilities: IntegrationCapabilityState[] | undefined,
+): DisplayCapability[] {
+  const byName = new Map<string, DisplayCapability>();
+
+  (integrationDef?.capabilities || []).forEach((definition) => {
+    if (!definition.name) return;
+    byName.set(definition.name, {
+      name: definition.name,
+      definition,
+      state: DEFAULT_CAPABILITY_STATE,
+    });
+  });
+
+  (statusCapabilities || []).forEach((capability) => {
+    if (!capability.name) return;
+    const existing = byName.get(capability.name);
+    byName.set(capability.name, {
+      name: capability.name,
+      definition: existing?.definition,
+      state: capability.state || DEFAULT_CAPABILITY_STATE,
+    });
+  });
+
+  return Array.from(byName.values()).sort((left, right) =>
+    getCapabilityLabel(left).localeCompare(getCapabilityLabel(right)),
+  );
+}
+
+export function computeStagedCapabilityUpdates(
+  capabilities: DisplayCapability[],
+  capabilityStates: Record<string, IntegrationCapabilityStateState>,
+): IntegrationCapabilityState[] {
+  return capabilities.reduce<IntegrationCapabilityState[]>((updates, capability) => {
+    const serverState = capability.state || DEFAULT_CAPABILITY_STATE;
+    const effectiveState = capabilityStates[capability.name] ?? serverState;
+    if (effectiveState === serverState) return updates;
+    if (
+      effectiveState !== "STATE_ENABLED" &&
+      effectiveState !== "STATE_DISABLED" &&
+      effectiveState !== "STATE_REQUESTED"
+    ) {
+      return updates;
+    }
+    updates.push({ name: capability.name, state: effectiveState });
+    return updates;
+  }, []);
+}
+
+/** Capability names that appear as workflow nodes when disabling those capabilities (live canvas usage). */
+export function findCapabilityNamesInUseWhenDisabling(
+  updates: IntegrationCapabilityState[],
+  usedIn: IntegrationNodeRef[] | undefined,
+): string[] {
+  const disablingNames = new Set<string>();
+  for (const update of updates) {
+    if (update.state === "STATE_DISABLED" && update.name) {
+      disablingNames.add(update.name);
+    }
+  }
+  if (disablingNames.size === 0 || !usedIn?.length) {
+    return [];
+  }
+
+  const referenced = new Set<string>();
+  for (const ref of usedIn) {
+    const component = ref.component?.trim();
+    if (component && disablingNames.has(component)) {
+      referenced.add(component);
+    }
+  }
+
+  return [...referenced];
+}
+
+export type CapabilityDisableCanvasSummary = {
+  canvasId: string;
+  canvasName: string;
+};
+
+export type CapabilityDisableCanvasRow = {
+  capabilityName: string;
+  canvases: CapabilityDisableCanvasSummary[];
+};
+
+function canvasesForCapabilityInUse(
+  capabilityName: string,
+  usedIn: IntegrationNodeRef[],
+): CapabilityDisableCanvasSummary[] {
+  const canvasLabelById = new Map<string, string>();
+  for (const ref of usedIn) {
+    const component = ref.component?.trim();
+    if (component !== capabilityName) {
+      continue;
+    }
+    const canvasId = ref.canvasId?.trim() ?? "";
+    if (!canvasId) {
+      continue;
+    }
+    const label = (ref.canvasName?.trim() || canvasId || "").trim() || "Unknown canvas";
+    if (!canvasLabelById.has(canvasId)) {
+      canvasLabelById.set(canvasId, label);
+    }
+  }
+  if (canvasLabelById.size === 0) {
+    return [];
+  }
+  return [...canvasLabelById.entries()]
+    .map(([id, canvasName]) => ({ canvasId: id, canvasName }))
+    .sort((left, right) => left.canvasName.localeCompare(right.canvasName));
+}
+
+/** One row per capability in `capabilityNames`, with deduped canvases where that capability appears. */
+export function buildCapabilityDisableCanvasRows(
+  capabilityNames: string[],
+  usedIn: IntegrationNodeRef[] | undefined,
+): CapabilityDisableCanvasRow[] {
+  if (!usedIn?.length || capabilityNames.length === 0) {
+    return [];
+  }
+
+  const sortedNames = [...capabilityNames].sort((left, right) => left.localeCompare(right));
+  const rows: CapabilityDisableCanvasRow[] = [];
+
+  for (const capabilityName of sortedNames) {
+    const canvases = canvasesForCapabilityInUse(capabilityName, usedIn);
+    if (canvases.length === 0) {
+      continue;
+    }
+    rows.push({
+      capabilityName,
+      canvases,
+    });
+  }
+
+  return rows;
+}

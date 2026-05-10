@@ -52,20 +52,48 @@ export const baseMapper: ComponentBaseMapper = {
   },
 };
 
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
+export function getPoolExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
 
-  return [
-    {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventSubtitle,
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
-    },
-  ];
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  const pool = result?.pool as Record<string, unknown> | undefined;
+  if (!pool) return details;
+
+  details["Pool ID"] = pool.id != null ? String(pool.id) : "-";
+  details["Name"] = pool.name != null ? String(pool.name) : "-";
+
+  if (pool.description != null) {
+    details["Description"] = String(pool.description);
+  }
+
+  details["Enabled"] = pool.enabled != null ? String(pool.enabled) : "-";
+  details["Minimum Origins"] = pool.minimum_origins != null ? String(pool.minimum_origins) : "-";
+  details["Number of Origins"] = Array.isArray(pool.origins) ? String(pool.origins.length) : "-";
+
+  return details;
+}
+
+export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  const receivedAt = execution.createdAt ? new Date(execution.createdAt) : new Date();
+  const subtitleDate = execution.updatedAt ?? execution.createdAt;
+  const eventSubtitle = subtitleDate ? renderTimeAgo(new Date(subtitleDate)) : "";
+  const eventState = getState(componentName)(execution);
+
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  if (!rootTriggerNode || !execution.rootEvent?.id) {
+    return [{ receivedAt, eventTitle: "Execution", eventSubtitle, eventState, eventId: execution.id ?? "" }];
+  }
+
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
+  if (!rootTriggerRenderer) {
+    return [{ receivedAt, eventTitle: "Execution", eventSubtitle, eventState, eventId: execution.rootEvent.id }];
+  }
+
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  return [{ receivedAt, eventTitle: title, eventSubtitle, eventState, eventId: execution.rootEvent.id }];
 }

@@ -39,6 +39,7 @@ import (
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
+	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -318,6 +319,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbCanvasFolders.RegisterCanvasFoldersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	err = pbServiceAccounts.RegisterServiceAccountsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
@@ -344,6 +350,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/groups").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/roles").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/canvas-folders").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/invite-links").Handler(protectedAccountGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
@@ -658,14 +665,21 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		newEvents = append(newEvents, events...)
 	}
 
+	capabilityCtx := contexts.NewCapabilityContext(
+		s.registry.AllCapabilities(integrationInstance.AppName),
+		integrationInstance.Capabilities,
+	)
+
 	integration.HandleRequest(core.HTTPRequestContext{
-		Logger:          logging.ForIntegration(*integrationInstance),
-		Request:         r,
-		Response:        w,
-		BaseURL:         s.BaseURL,
-		WebhooksBaseURL: s.WebhooksBaseURL,
-		OrganizationID:  integrationInstance.OrganizationID.String(),
-		HTTP:            s.registry.HTTPContext(),
+		Logger:           logging.ForIntegration(*integrationInstance),
+		Request:          r,
+		Response:         w,
+		BaseURL:          s.BaseURL,
+		WebhooksBaseURL:  s.WebhooksBaseURL,
+		OrganizationID:   integrationInstance.OrganizationID.String(),
+		HTTP:             s.registry.HTTPContext(),
+		Capabilities:     capabilityCtx,
+		IntegrationSetup: contexts.NewIntegrationSetupContext(integrationInstance),
 		Integration: contexts.NewIntegrationContext(
 			database.Conn(),
 			nil,
@@ -676,6 +690,7 @@ func (s *Server) HandleIntegrationRequest(w http.ResponseWriter, r *http.Request
 		),
 	})
 
+	integrationInstance.Capabilities = capabilityCtx.States()
 	err = database.Conn().Save(&integrationInstance).Error
 	if err != nil {
 		http.Error(w, "integration not found", http.StatusNotFound)
@@ -1044,8 +1059,8 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodes, err := models.FindWebhookNodes(webhookID)
-	if err != nil {
+	nodes, err := models.FindActiveWebhookNodes(webhookID)
+	if err != nil || len(nodes) == 0 {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
 	}

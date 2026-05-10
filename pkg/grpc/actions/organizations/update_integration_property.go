@@ -60,10 +60,10 @@ func UpdateIntegrationProperty(
 			PropertyName: propertyName,
 			Value:        value,
 			Logger:       logrus.WithField("integration_id", integration.ID),
-			HTTP:         registry.HTTPContext(),
+			HTTP:         registry.HTTPContextInTransaction(tx),
 			Secrets:      contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, integration),
 			Properties:   contexts.NewIntegrationPropertyStorage(integration),
-			Capabilities: contexts.NewCapabilityContext(allCapabilities(setupProvider), integration.Capabilities),
+			Capabilities: contexts.NewCapabilityContext(registry.AllCapabilities(integration.AppName), integration.Capabilities),
 		})
 
 		if err != nil {
