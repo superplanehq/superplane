@@ -1130,9 +1130,16 @@ function CanvasPage(props: CanvasPageProps) {
   }, [props.canvasStateMode, state, templateNodeId]);
 
   const canvasStateMode = props.canvasStateMode || "default";
+  // Apps (launchpad) is not tied to which workflow version is loaded for edit/
+  // preview; don't surface version banners here — transient mismatches after
+  // refresh (before live version resolves) were flashing this chrome wrongly.
+  const hideVersionFloatingBars = props.headerMode === "launchpad";
   const showPreviewFloatingBar =
-    canvasStateMode === "previewing-previous-version" && !!props.onPreviewPreviousVersionViewDetails;
-  const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
+    !hideVersionFloatingBars &&
+    canvasStateMode === "previewing-previous-version" &&
+    !!props.onPreviewPreviousVersionViewDetails;
+  const showAwaitingFloatingBar =
+    !hideVersionFloatingBars && canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
   return (
     <HeaderActionSlotProvider>

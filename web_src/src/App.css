@@ -201,19 +201,19 @@
    * Chart palette — calm-by-default sequence used by widget block charts
    * (donut slices, multi-series bar/line/area). chart-1 is the slot a chart
    * lands in when no `color:` keyword is specified, so we keep it neutral
-   * blue rather than red/orange to avoid implying "danger" on any default
+   * sky rather than red/orange to avoid implying "danger" on any default
    * series (e.g. a Success Rate donut).
    *
-   * Sequence: blue → emerald → violet → amber → slate
+   * Sequence: sky → emerald → violet → amber → muted sky-gray
    * `--chart-red` is reserved for the explicit `color: red` keyword in the
    * widget-block YAML; it sits outside the cycling palette so an opt-in red
    * still reads as red.
    */
-  --chart-1: oklch(0.62 0.19 252);
+  --chart-1: #0ea5e9; /* Tailwind sky-500 */
   --chart-2: oklch(0.7 0.15 162);
   --chart-3: oklch(0.6 0.21 295);
   --chart-4: oklch(0.78 0.16 75);
-  --chart-5: oklch(0.6 0.04 252);
+  --chart-5: oklch(0.58 0.032 235); /* cool neutral aligned with sky hue */
   --chart-red: oklch(0.62 0.22 25);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);

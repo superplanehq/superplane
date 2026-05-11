@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentProps } from "react";
+import { useContext, useId, useMemo, useState, type ComponentProps } from "react";
 import * as yaml from "js-yaml";
 import {
   AlertTriangle,
@@ -19,6 +19,7 @@ import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecutionRef 
 import { getAggregateRunStatus } from "@/pages/workflowv2/lib/canvas-runs";
 import { formatRelativeTime } from "@/lib/timezone";
 import { showSuccessToast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { NodeChipContext } from "./CanvasMarkdown";
+import { AppsPanelMarkdownLinksContext } from "./appsPanelMarkdownLinksContext";
 import {
   buildEnv,
   compileMaybeExpr,
@@ -208,8 +210,8 @@ const AGGREGATE_OPS: readonly AggregateOp[] = ["avg", "sum", "min", "max", "coun
 type ChartType = "bar" | "line" | "area" | "stacked-bar" | "donut";
 const CHART_TYPES: readonly ChartType[] = ["bar", "line", "area", "stacked-bar", "donut"];
 
-type ChartColorKeyword = "blue" | "green" | "red" | "yellow" | "gray";
-const CHART_COLORS: readonly ChartColorKeyword[] = ["blue", "green", "red", "yellow", "gray"];
+type ChartColorKeyword = "blue" | "sky" | "green" | "red" | "yellow" | "gray";
+const CHART_COLORS: readonly ChartColorKeyword[] = ["blue", "sky", "green", "red", "yellow", "gray"];
 
 type ChartYUnit = "ms" | "s";
 
@@ -1089,14 +1091,14 @@ function truncate(value: string, max: number): string {
 }
 
 const STATUS_BADGE_CLASS: Record<WidgetRunStatus, string> = {
-  running: "bg-blue-100 text-blue-700 border-blue-200",
-  passed: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  failed: "bg-red-100 text-red-700 border-red-200",
-  cancelled: "bg-slate-100 text-slate-600 border-slate-200",
+  running: "bg-blue-100 text-blue-700 border-blue-950/20",
+  passed: "bg-emerald-100 text-emerald-700 border-emerald-950/20",
+  failed: "bg-red-100 text-red-700 border-red-950/20",
+  cancelled: "bg-slate-100 text-slate-600 border-slate-950/20",
 };
 
 const BADGE_PILL_BASE = "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none";
-const DEFAULT_BADGE_PILL = `${BADGE_PILL_BASE} bg-emerald-100 text-emerald-700 border-emerald-200`;
+const DEFAULT_BADGE_PILL = `${BADGE_PILL_BASE} bg-emerald-100 text-emerald-700 border-emerald-950/20`;
 
 function renderCell(value: unknown, format: Format): React.ReactNode {
   const text = stringifyCell(value);
@@ -1135,12 +1137,16 @@ function renderCell(value: unknown, format: Format): React.ReactNode {
 }
 
 function CellLink({ href, display }: { href: string; display: string }) {
+  const appsPanelLinks = useContext(AppsPanelMarkdownLinksContext);
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-0.5 text-blue-600 underline"
+      className={cn(
+        "inline-flex items-center gap-0.5 underline",
+        appsPanelLinks ? "text-sky-600 hover:text-sky-700" : "text-blue-600 hover:text-blue-700",
+      )}
     >
       {display}
       <ExternalLink className="inline h-3 w-3 shrink-0" />
@@ -1530,10 +1536,12 @@ const CHART_PALETTE = [
 
 const COLOR_KEYWORD_TO_VAR: Record<ChartColorKeyword, string> = {
   // Mapped semantically against the calm chart palette in App.css
-  // (blue / emerald / violet / amber / slate). `red` resolves to the
-  // dedicated `--chart-red` variable so it stays a true red even though
-  // the cycling palette no longer includes one.
+  // (sky primary / emerald / violet / amber / muted sky-gray). `blue` is
+  // kept as an alias for the primary slot (sky-toned). `red` resolves to
+  // `--chart-red` so it stays a true red even though the cycling palette
+  // no longer includes one.
   blue: "var(--chart-1)",
+  sky: "var(--chart-1)",
   green: "var(--chart-2)",
   yellow: "var(--chart-4)",
   gray: "var(--chart-5)",
@@ -1854,6 +1862,7 @@ function SingleSeriesInner({
   fill?: boolean;
   env: ExprEnv;
 }) {
+  const areaFillGradientId = useId().replace(/:/g, "");
   const resolvedChart = useMemo(() => resolveChartSpecForYAxis(chart, rows, env), [chart, rows, env]);
   const data = useMemo(() => shapeXY(rows, resolvedChart, env), [rows, resolvedChart, env]);
   const yTickFormatter = useMemo(() => widgetChartYTickFormatter(resolvedChart), [resolvedChart]);
@@ -1918,6 +1927,12 @@ function SingleSeriesInner({
           </LineChart>
         ) : (
           <AreaChart data={data} margin={WIDGET_CARTESIAN_MARGIN}>
+            <defs>
+              <linearGradient id={areaFillGradientId} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={colorVar} stopOpacity={0.42} />
+                <stop offset="100%" stopColor={colorVar} stopOpacity={0} />
+              </linearGradient>
+            </defs>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
             <XAxis
               dataKey="x"
@@ -1932,8 +1947,8 @@ function SingleSeriesInner({
               dataKey={seriesKey}
               type="monotone"
               stroke={colorVar}
-              fill={colorVar}
-              fillOpacity={0.25}
+              fill={`url(#${areaFillGradientId})`}
+              fillOpacity={1}
               strokeWidth={2}
               isAnimationActive
               animationDuration={CHART_ANIMATION_MS}
@@ -2110,20 +2125,28 @@ const SPARKLINE_CONFIG: ChartConfig = {
 };
 
 function SparklineInner({ points, fill }: { points: Array<{ i: number; y: number }>; fill?: boolean }) {
+  const sparkFillGradientId = useId().replace(/:/g, "");
   // In fill mode the sparkline gets a slightly larger fixed height since it
   // sits inside a much taller card; otherwise keep the compact 40px sparkline
   // used inline with markdown content.
   const height = fill ? 76 : SPARKLINE_HEIGHT;
+  const strokeColor = "var(--chart-1)";
   return (
     <div data-testid="canvas-widget-block-number-sparkline" className={fill ? "mt-3 w-full" : "mt-2 w-full"}>
       <ChartContainer config={SPARKLINE_CONFIG} className="aspect-auto" style={{ height }}>
         <AreaChart data={points} margin={WIDGET_SPARKLINE_MARGIN}>
+          <defs>
+            <linearGradient id={sparkFillGradientId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={strokeColor} stopOpacity={0.4} />
+              <stop offset="100%" stopColor={strokeColor} stopOpacity={0} />
+            </linearGradient>
+          </defs>
           <Area
             dataKey="y"
             type="monotone"
-            stroke="var(--chart-1)"
-            fill="var(--chart-1)"
-            fillOpacity={0.25}
+            stroke={strokeColor}
+            fill={`url(#${sparkFillGradientId})`}
+            fillOpacity={1}
             strokeWidth={1.5}
             isAnimationActive={false}
           />

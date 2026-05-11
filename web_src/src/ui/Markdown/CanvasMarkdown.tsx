@@ -18,6 +18,7 @@ import {
 import { cn, resolveIcon } from "@/lib/utils";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
 
+import { AppsPanelMarkdownLinksContext } from "./appsPanelMarkdownLinksContext";
 import { MermaidDiagram } from "./MermaidDiagram";
 import { WidgetBlock } from "./WidgetBlock";
 
@@ -369,12 +370,16 @@ function Blockquote({ children }: { children?: React.ReactNode }) {
 }
 
 function Anchor({ href, children }: { href?: string; children?: React.ReactNode }) {
+  const appsPanelLinks = React.useContext(AppsPanelMarkdownLinksContext);
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-0.5 text-blue-600 underline"
+      className={cn(
+        "inline-flex items-center gap-0.5 underline",
+        appsPanelLinks ? "text-sky-600 hover:text-sky-700" : "text-blue-600 hover:text-blue-700",
+      )}
     >
       {children}
       <ExternalLink className="inline h-3 w-3 shrink-0" />
@@ -384,7 +389,7 @@ function Anchor({ href, children }: { href?: string; children?: React.ReactNode 
 
 function Table({ children }: { children?: React.ReactNode }) {
   return (
-    <div className="my-2 overflow-x-auto rounded border border-slate-200">
+    <div className="my-2 overflow-x-auto border-t border-slate-200 shadow-none">
       <table className="min-w-full border-collapse text-left text-xs">{children}</table>
     </div>
   );
@@ -399,7 +404,7 @@ function Th({ children }: { children?: React.ReactNode }) {
 }
 
 function Td({ children }: { children?: React.ReactNode }) {
-  return <td className="border-b border-slate-100 px-3 py-1.5">{children}</td>;
+  return <td className="border-b border-slate-100 px-3 py-1.5 align-top">{children}</td>;
 }
 
 function Img({ src, alt }: { src?: string; alt?: string }) {
@@ -627,6 +632,19 @@ function themeFor(kind?: NodeChipKind): ChipTheme {
   return CHIP_THEMES[kind ?? "default"];
 }
 
+/** Apps panels use sky links; node chips that used `blue-*` get matching `sky-*` treatments. */
+function swapBluePaletteForSky(theme: ChipTheme): ChipTheme {
+  const map = (s: string) => s.replace(/blue-/g, "sky-");
+  return {
+    chip: map(theme.chip),
+    atSign: map(theme.atSign),
+    lucide: map(theme.lucide),
+    tileBg: map(theme.tileBg),
+    tileBorder: map(theme.tileBorder),
+    accent: map(theme.accent),
+  };
+}
+
 function NodeChipLeading({ icon, theme }: { icon?: NodeChipIcon; theme: ChipTheme }) {
   if (icon?.iconSrc) {
     return <img src={icon.iconSrc} alt="" aria-hidden="true" className="h-3 w-3 shrink-0 object-contain" />;
@@ -654,7 +672,8 @@ function KnownNodeChip({
   details?: NodeChipDetails;
 }) {
   const label = name || slug;
-  const theme = themeFor(details?.kind);
+  const appsPanelLinks = React.useContext(AppsPanelMarkdownLinksContext);
+  const theme = appsPanelLinks ? swapBluePaletteForSky(themeFor(details?.kind)) : themeFor(details?.kind);
   const classes = `sp-node-ref inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-none ${theme.chip}`;
 
   const chip = onClick ? (
@@ -1056,15 +1075,7 @@ function CanvasMdH1({ className, node: _n, ...props }: React.ComponentPropsWitho
 }
 
 function CanvasMdH2({ className, node: _n, ...props }: React.ComponentPropsWithoutRef<"h2"> & MdHeadingExtra) {
-  return (
-    <h2
-      className={cn(
-        "mt-5 mb-2 border-b border-slate-200 pb-1.5 text-[18px] font-semibold text-gray-800 first:mt-0",
-        className,
-      )}
-      {...props}
-    />
-  );
+  return <h2 className={cn("mt-5 mb-2 text-[18px] font-semibold text-gray-800 first:mt-0", className)} {...props} />;
 }
 
 function CanvasMdH3({ className, node: _n, ...props }: React.ComponentPropsWithoutRef<"h3"> & MdHeadingExtra) {

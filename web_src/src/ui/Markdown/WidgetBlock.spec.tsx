@@ -1297,8 +1297,24 @@ describe("WidgetBlock execution actions", () => {
   });
 
   it("maps variant destructive to danger for action styling", async () => {
-    const body = bodyWithActions("  - label: Destroy\n    trigger: destroy\n    variant: destructive\n");
-    renderWithActions(body);
+    canvasesListCanvasMemories.mockResolvedValue({
+      data: {
+        items: [{ id: "a", namespace: "envs", values: { name: "x" } }],
+      },
+    });
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: memory\nnamespace: envs\ncolumns:\n  - label: N\n    field: name\nactions:\n  - label: Destroy\n    kind: trigger\n    trigger: destroy\n    variant: destructive\n"
+        }
+        canvasId="c1"
+        nodeRefs={{
+          nodeIds: { destroy: "node-destroy" },
+          onEmitEvent: vi.fn(async () => undefined),
+        }}
+      />,
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("canvas-widget-block-action-destroy")).toBeInTheDocument();
@@ -1449,7 +1465,7 @@ describe("WidgetBlock render: chart", () => {
     ]);
   });
 
-  it("renders an AreaChart for type: area and respects color: blue", async () => {
+  it("renders an AreaChart for type: area and respects color: blue (chart-1)", async () => {
     canvasesListCanvasMemories.mockResolvedValue({
       data: {
         items: [
@@ -1471,7 +1487,7 @@ describe("WidgetBlock render: chart", () => {
     });
     expect(screen.getByTestId("rc-areachart")).toBeInTheDocument();
     const area = screen.getByTestId("rc-area-y");
-    expect(area.getAttribute("data-fill")).toBe("var(--chart-1)");
+    expect(area.getAttribute("data-fill")).toMatch(/^url\(#/);
     expect(area.getAttribute("data-stroke")).toBe("var(--chart-1)");
   });
 

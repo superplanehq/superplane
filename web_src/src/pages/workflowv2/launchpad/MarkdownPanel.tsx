@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { CanvasMarkdown } from "@/ui/Markdown/CanvasMarkdown";
+import { AppsPanelMarkdownLinksScope } from "@/ui/Markdown/appsPanelMarkdownLinksContext";
 import { WidgetBlock } from "@/ui/Markdown/WidgetBlock";
 import { Pencil } from "lucide-react";
 import type { PanelRenderProps } from "./panelRegistry";
@@ -36,7 +37,15 @@ const PLACEHOLDER = `# New panel
 
 Write **markdown** here. You can reference canvas nodes with \`@node-name\`.`;
 
-export function MarkdownPanel({ content, readOnly, onChange, ctx }: PanelRenderProps<MarkdownPanelContent>) {
+export function MarkdownPanel(props: PanelRenderProps<MarkdownPanelContent>) {
+  return (
+    <AppsPanelMarkdownLinksScope>
+      <MarkdownPanelInner {...props} />
+    </AppsPanelMarkdownLinksScope>
+  );
+}
+
+function MarkdownPanelInner({ content, readOnly, onChange, ctx }: PanelRenderProps<MarkdownPanelContent>) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(content.body);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
