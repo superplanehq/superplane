@@ -1,7 +1,7 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
-import { baseMapper } from "./base";
+import { baseMapper, firstDefaultChannelOutputData } from "./base";
 
 interface CreateMonitorConfiguration {
   description?: string;
@@ -51,7 +51,7 @@ export const createMonitorMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details = baseMapper.getExecutionDetails(context) as Record<string, string>;
-    const output = firstOutputData(context.execution.outputs) as CreateMonitorOutput | undefined;
+    const output = firstDefaultChannelOutputData(context.execution.outputs) as CreateMonitorOutput | undefined;
 
     return output ? { ...details, ...outputDetails(output) } : details;
   },
@@ -144,6 +144,7 @@ function hasAdvancedSettings(configuration?: CreateMonitorConfiguration): boolea
     return true;
   }
 
+  const adv = configuration.advanced;
   return Boolean(
     configuration.method ||
       configuration.expectedCodes ||
@@ -153,11 +154,9 @@ function hasAdvancedSettings(configuration?: CreateMonitorConfiguration): boolea
       configuration.allowInsecure != null ||
       configuration.probeZone ||
       configuration.consecutiveUp != null ||
-      configuration.consecutiveDown != null,
+      configuration.consecutiveDown != null ||
+      typeof adv?.interval === "number" ||
+      typeof adv?.timeout === "number" ||
+      typeof adv?.retries === "number",
   );
-}
-
-function firstOutputData(outputs: unknown): unknown {
-  const outputMap = outputs as { default?: Array<{ data?: unknown }> } | undefined;
-  return outputMap?.default?.[0]?.data;
 }

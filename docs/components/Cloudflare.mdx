@@ -209,7 +209,7 @@ The Create Monitor component creates a Cloudflare Load Balancing health monitor.
 ### Configuration
 
 - **Name / Type / Path / Port**: Basic monitor settings. Path is required for HTTP and HTTPS monitors. Port is required for HTTP, HTTPS, TCP, UDP ICMP, and SMTP monitors.
-- **Advanced Health Check Settings**: Optional method, expected response, headers, redirects, TLS, and health threshold settings.
+- **Advanced Health Check Settings**: Optional method, expected response, headers, redirects, TLS, probe zone, **interval** and **timeout** (seconds; omit both to let Cloudflare pick plan defaults), **retries**, and consecutive thresholds. Plan minimum interval: Pro 60s, Business 15s, Enterprise 10s.
 - **Pool**: Optional pool to attach the created monitor to immediately.
 
 ### Output
@@ -228,11 +228,11 @@ Emits the created monitor and, when configured, the attached pool.
       "description": "Login page monitor",
       "expected_codes": "2xx",
       "id": "monitor_abc123",
-      "interval": 1,
+      "interval": 60,
       "method": "GET",
       "path": "/health",
       "retries": 0,
-      "timeout": 1,
+      "timeout": 5,
       "type": "https"
     },
     "monitorId": "monitor_abc123",

@@ -15,6 +15,16 @@ import (
 
 const MonitorPayloadType = "cloudflare.monitor"
 
+const (
+	defaultMonitorIntervalSeconds = 60
+	defaultMonitorTimeoutSeconds  = 5
+	defaultMonitorRetries         = 0
+	minMonitorIntervalSeconds     = 10
+	maxMonitorIntervalSeconds     = 86400
+	minMonitorTimeoutSeconds      = 1
+	maxMonitorRetries             = 5
+)
+
 var (
 	allowedMonitorTypes   = []string{"http", "https", "tcp", "udp_icmp", "icmp_ping", "smtp"}
 	httpMonitorTypes      = []string{"http", "https"}
@@ -91,7 +101,7 @@ func (c *CreateMonitor) Documentation() string {
 ## Configuration
 
 - **Name / Type / Path / Port**: Basic monitor settings. Path is required for HTTP and HTTPS monitors. Port is required for HTTP, HTTPS, TCP, UDP ICMP, and SMTP monitors.
-- **Advanced Health Check Settings**: Optional method, expected response, headers, redirects, TLS, and health threshold settings.
+- **Advanced Health Check Settings**: Optional method, expected response, headers, redirects, TLS, probe zone, **interval** and **timeout** (seconds; omit both to let Cloudflare pick plan defaults), **retries**, and consecutive thresholds. Plan minimum interval: Pro 60s, Business 15s, Enterprise 10s.
 - **Pool**: Optional pool to attach the created monitor to immediately.
 
 ## Output
@@ -184,6 +194,9 @@ func (c *CreateMonitor) Configuration() []configuration.Field {
 				"expectedCodes":   "2xx",
 				"followRedirects": true,
 				"allowInsecure":   false,
+				"interval":        defaultMonitorIntervalSeconds,
+				"timeout":         defaultMonitorTimeoutSeconds,
+				"retries":         defaultMonitorRetries,
 			},
 			TypeOptions: &configuration.TypeOptions{
 				Object: &configuration.ObjectTypeOptions{
@@ -286,6 +299,47 @@ func createMonitorAdvancedFields() []configuration.Field {
 			Placeholder: "example.com",
 		},
 		{
+			Name:        "interval",
+			Label:       "Interval (seconds)",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Default:     defaultMonitorIntervalSeconds,
+			Description: "Seconds between health checks. Cloudflare minimums by plan: Pro 60s, Business 15s, Enterprise 10s. Values outside your plan often return a vague API error.",
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { min := minMonitorIntervalSeconds; return &min }(),
+					Max: func() *int { max := maxMonitorIntervalSeconds; return &max }(),
+				},
+			},
+		},
+		{
+			Name:        "timeout",
+			Label:       "Timeout (seconds)",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Default:     defaultMonitorTimeoutSeconds,
+			Description: "Seconds before marking a check as failed. Must be less than the interval.",
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { min := minMonitorTimeoutSeconds; return &min }(),
+				},
+			},
+		},
+		{
+			Name:        "retries",
+			Label:       "Retries",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Default:     defaultMonitorRetries,
+			Description: "Immediate retries after a timeout before marking the origin unhealthy",
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { min := 0; return &min }(),
+					Max: func() *int { max := maxMonitorRetries; return &max }(),
+				},
+			},
+		},
+		{
 			Name:        "consecutiveUp",
 			Label:       "Consecutive Up",
 			Type:        configuration.FieldTypeNumber,
@@ -304,10 +358,50 @@ func createMonitorAdvancedFields() []configuration.Field {
 	}
 }
 
-func (c *CreateMonitor) Setup(ctx core.SetupContext) error {
+func decodeCreateMonitorSpec(configuration any) (CreateMonitorSpec, error) {
 	spec := CreateMonitorSpec{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
-		return fmt.Errorf("error decoding configuration: %v", err)
+	dec, err := mapstructure.NewDecoder(&mapstructure.DecoderConfig{
+		WeaklyTypedInput: true,
+		TagName:          "json",
+		Result:           &spec,
+	})
+	if err != nil {
+		return spec, fmt.Errorf("error configuring decoder: %w", err)
+	}
+
+	if err := dec.Decode(configuration); err != nil {
+		return spec, fmt.Errorf("error decoding configuration: %w", err)
+	}
+
+	return spec, nil
+}
+
+func augmentLoadBalancerMonitorCreateError(err error) error {
+	var apiErr *CloudflareAPIError
+	if !errors.As(err, &apiErr) {
+		return err
+	}
+
+	for _, e := range apiErr.Errors {
+		msg := strings.ToLower(e.Message)
+		if strings.Contains(msg, "interval") && strings.Contains(msg, "not in range") {
+			return fmt.Errorf(
+				"%w — Cloudflare applies plan-specific minimum intervals for monitors (typically 60s on Pro, 15s on Business, 10s on Enterprise); "+
+					"intervals below your plan minimum produce misleading \"not in range\" errors. "+
+					"If timing fields are omitted, Cloudflare applies account defaults. "+
+					"Confirm Load Balancing is enabled and the integration Account ID matches your balancer account",
+				err,
+			)
+		}
+	}
+
+	return err
+}
+
+func (c *CreateMonitor) Setup(ctx core.SetupContext) error {
+	spec, err := decodeCreateMonitorSpec(ctx.Configuration)
+	if err != nil {
+		return err
 	}
 
 	return validateCreateMonitorSpec(spec)
@@ -360,13 +454,17 @@ func validateCreateMonitorSpec(spec CreateMonitorSpec) error {
 		}
 	}
 
+	if err := validateMonitorTiming(effectiveMonitorAdvanced(spec)); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (c *CreateMonitor) Execute(ctx core.ExecutionContext) error {
-	spec := CreateMonitorSpec{}
-	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
-		return fmt.Errorf("error decoding configuration: %v", err)
+	spec, err := decodeCreateMonitorSpec(ctx.Configuration)
+	if err != nil {
+		return err
 	}
 
 	if err := validateCreateMonitorSpec(spec); err != nil {
@@ -385,7 +483,7 @@ func (c *CreateMonitor) Execute(ctx core.ExecutionContext) error {
 
 	monitor, err := client.CreateMonitor(accountID, createMonitorRequest(spec))
 	if err != nil {
-		return fmt.Errorf("failed to create monitor: %w", err)
+		return fmt.Errorf("failed to create monitor: %w", augmentLoadBalancerMonitorCreateError(err))
 	}
 
 	payload := map[string]any{
@@ -412,9 +510,9 @@ func createMonitorRequest(spec CreateMonitorSpec) CreateMonitorRequest {
 	req := CreateMonitorRequest{
 		Type:            monitorType,
 		Description:     strings.TrimSpace(spec.Description),
-		Interval:        monitorIntValue(nil, 1),
-		Timeout:         monitorIntValue(nil, 1),
-		Retries:         monitorIntValue(nil, 0),
+		Interval:        advanced.Interval,
+		Timeout:         advanced.Timeout,
+		Retries:         advanced.Retries,
 		ConsecutiveUp:   advanced.ConsecutiveUp,
 		ConsecutiveDown: advanced.ConsecutiveDown,
 	}
@@ -455,7 +553,17 @@ func createMonitorRequest(spec CreateMonitorSpec) CreateMonitorRequest {
 
 func effectiveMonitorAdvanced(spec CreateMonitorSpec) CreateMonitorAdvancedSpec {
 	if spec.Advanced != nil {
-		return *spec.Advanced
+		out := *spec.Advanced
+		if out.Interval == nil {
+			out.Interval = spec.Interval
+		}
+		if out.Timeout == nil {
+			out.Timeout = spec.Timeout
+		}
+		if out.Retries == nil {
+			out.Retries = spec.Retries
+		}
+		return out
 	}
 
 	return CreateMonitorAdvancedSpec{
@@ -466,9 +574,57 @@ func effectiveMonitorAdvanced(spec CreateMonitorSpec) CreateMonitorAdvancedSpec 
 		FollowRedirects: spec.FollowRedirects,
 		AllowInsecure:   spec.AllowInsecure,
 		ProbeZone:       spec.ProbeZone,
+		Interval:        spec.Interval,
+		Timeout:         spec.Timeout,
+		Retries:         spec.Retries,
 		ConsecutiveUp:   spec.ConsecutiveUp,
 		ConsecutiveDown: spec.ConsecutiveDown,
 	}
+}
+
+func resolvedMonitorTiming(advanced CreateMonitorAdvancedSpec) (interval int, timeout int, retries int) {
+	interval = defaultMonitorIntervalSeconds
+	if advanced.Interval != nil {
+		interval = *advanced.Interval
+	}
+
+	timeout = defaultMonitorTimeoutSeconds
+	if advanced.Timeout != nil {
+		timeout = *advanced.Timeout
+	}
+
+	retries = defaultMonitorRetries
+	if advanced.Retries != nil {
+		retries = *advanced.Retries
+	}
+
+	return interval, timeout, retries
+}
+
+func validateMonitorTiming(advanced CreateMonitorAdvancedSpec) error {
+	if advanced.Interval != nil {
+		if *advanced.Interval < minMonitorIntervalSeconds {
+			return fmt.Errorf("interval must be at least %d seconds", minMonitorIntervalSeconds)
+		}
+		if *advanced.Interval > maxMonitorIntervalSeconds {
+			return fmt.Errorf("interval must be at most %d seconds", maxMonitorIntervalSeconds)
+		}
+	}
+
+	if advanced.Timeout != nil && *advanced.Timeout < minMonitorTimeoutSeconds {
+		return fmt.Errorf("timeout must be at least %d second(s)", minMonitorTimeoutSeconds)
+	}
+
+	if advanced.Retries != nil && (*advanced.Retries < 0 || *advanced.Retries > maxMonitorRetries) {
+		return fmt.Errorf("retries must be between 0 and %d", maxMonitorRetries)
+	}
+
+	interval, timeout, _ := resolvedMonitorTiming(advanced)
+	if timeout >= interval {
+		return fmt.Errorf("timeout (%ds) must be less than interval (%ds)", timeout, interval)
+	}
+
+	return nil
 }
 
 func monitorHeadersToMap(headers []MonitorHeader) map[string][]string {
@@ -485,14 +641,6 @@ func monitorHeadersToMap(headers []MonitorHeader) map[string][]string {
 		return nil
 	}
 	return result
-}
-
-func monitorIntValue(value *int, defaultValue int) *int {
-	if value != nil {
-		return value
-	}
-
-	return &defaultValue
 }
 
 func normalizeMonitorType(value string) string {

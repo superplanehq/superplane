@@ -52,6 +52,12 @@ export const baseMapper: ComponentBaseMapper = {
   },
 };
 
+/** First payload `data` from the default output channel (workflow execution outputs). */
+export function firstDefaultChannelOutputData(outputs: unknown): unknown {
+  const outputMap = outputs as { default?: Array<{ data?: unknown }> } | undefined;
+  return outputMap?.default?.[0]?.data;
+}
+
 export function getPoolExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
   const details: Record<string, string> = {};
 

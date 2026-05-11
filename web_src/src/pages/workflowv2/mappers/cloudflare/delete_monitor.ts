@@ -7,7 +7,7 @@ import type {
   NodeInfo,
   SubtitleContext,
 } from "../types";
-import { baseMapper } from "./base";
+import { baseMapper, firstDefaultChannelOutputData } from "./base";
 
 interface DeleteMonitorConfiguration {
   monitor?: string;
@@ -36,7 +36,7 @@ export const deleteMonitorMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details = baseMapper.getExecutionDetails(context) as Record<string, string>;
-    const output = firstOutputData(context.execution.outputs) as DeleteMonitorOutput | undefined;
+    const output = firstDefaultChannelOutputData(context.execution.outputs) as DeleteMonitorOutput | undefined;
 
     if (!output) {
       return details;
@@ -76,9 +76,4 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function firstOutputData(outputs: unknown): unknown {
-  const outputMap = outputs as { default?: Array<{ data?: unknown }> } | undefined;
-  return outputMap?.default?.[0]?.data;
 }

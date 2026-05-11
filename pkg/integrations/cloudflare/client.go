@@ -177,7 +177,7 @@ type Pool struct {
 	ID             string          `json:"id,omitempty"`
 	Name           string          `json:"name,omitempty"`
 	Description    string          `json:"description,omitempty"`
-	Enabled        bool            `json:"enabled,omitempty"`
+	Enabled        bool            `json:"enabled"`
 	MinimumOrigins int             `json:"minimum_origins,omitempty"`
 	Monitor        string          `json:"monitor,omitempty"`
 	Origins        []Origin        `json:"origins,omitempty"`

@@ -9,8 +9,8 @@
       "method": "GET",
       "path": "/health",
       "expected_codes": "2xx",
-      "interval": 1,
-      "timeout": 1,
+      "interval": 60,
+      "timeout": 5,
       "retries": 0,
       "consecutive_up": 2,
       "consecutive_down": 3

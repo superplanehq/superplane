@@ -48,7 +48,7 @@ func Test__CreateMonitor__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "port is required")
 	})
 
-	t.Run("stale advanced timing is ignored", func(t *testing.T) {
+	t.Run("advanced interval below Cloudflare minimum fails", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"type":        "https",
@@ -56,14 +56,31 @@ func Test__CreateMonitor__Setup(t *testing.T) {
 				"path":        "/health",
 				"port":        443,
 				"advanced": map[string]any{
-					"interval": 1,
+					"interval": 9,
 					"timeout":  5,
-					"retries":  2,
 				},
 			},
 		})
 
-		require.NoError(t, err)
+		require.ErrorContains(t, err, "interval must be at least")
+	})
+
+	t.Run("advanced timeout must be less than interval", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"type":        "https",
+				"description": "API health",
+				"path":        "/health",
+				"port":        443,
+				"advanced": map[string]any{
+					"interval": 60,
+					"timeout":  60,
+				},
+			},
+		})
+
+		require.ErrorContains(t, err, "timeout")
+		require.ErrorContains(t, err, "must be less than interval")
 	})
 
 	t.Run("valid https monitor passes", func(t *testing.T) {
@@ -112,16 +129,13 @@ func Test__CreateMonitor__Configuration(t *testing.T) {
 	require.NotNil(t, advanced.TypeOptions)
 	require.NotNil(t, advanced.TypeOptions.Object)
 	assert.NotEmpty(t, advanced.TypeOptions.Object.Schema)
-	for _, fieldName := range []string{"interval", "timeout", "retries"} {
-		for _, field := range advanced.TypeOptions.Object.Schema {
-			assert.NotEqual(t, fieldName, field.Name)
-		}
-	}
 
+	names := map[string]bool{}
+	for _, field := range advanced.TypeOptions.Object.Schema {
+		names[field.Name] = true
+	}
 	for _, fieldName := range []string{"interval", "timeout", "retries"} {
-		for _, field := range fields {
-			assert.NotEqual(t, fieldName, field.Name)
-		}
+		assert.True(t, names[fieldName], "advanced schema should include %s", fieldName)
 	}
 }
 
@@ -140,18 +154,15 @@ func Test__CreateMonitor__CreateMonitorRequest(t *testing.T) {
 	assert.Equal(t, 443, *req.Port)
 	assert.Equal(t, "GET", req.Method)
 	assert.Equal(t, "2xx", req.ExpectedCodes)
-	require.NotNil(t, req.Interval)
-	assert.Equal(t, 1, *req.Interval)
-	require.NotNil(t, req.Timeout)
-	assert.Equal(t, 1, *req.Timeout)
-	require.NotNil(t, req.Retries)
-	assert.Equal(t, 0, *req.Retries)
+	assert.Nil(t, req.Interval)
+	assert.Nil(t, req.Timeout)
+	assert.Nil(t, req.Retries)
 	require.NotNil(t, req.FollowRedirects)
 	assert.True(t, *req.FollowRedirects)
 
-	interval := 60
-	timeout := 5
-	retries := 2
+	interval := 120
+	timeout := 8
+	retries := 3
 	req = createMonitorRequest(CreateMonitorSpec{
 		Type:        "https",
 		Description: "API health",
@@ -165,11 +176,11 @@ func Test__CreateMonitor__CreateMonitorRequest(t *testing.T) {
 	})
 
 	require.NotNil(t, req.Interval)
-	assert.Equal(t, 1, *req.Interval)
+	assert.Equal(t, interval, *req.Interval)
 	require.NotNil(t, req.Timeout)
-	assert.Equal(t, 1, *req.Timeout)
+	assert.Equal(t, timeout, *req.Timeout)
 	require.NotNil(t, req.Retries)
-	assert.Equal(t, 0, *req.Retries)
+	assert.Equal(t, retries, *req.Retries)
 }
 
 func Test__CreateMonitor__Execute(t *testing.T) {
@@ -246,6 +257,42 @@ func Test__CreateMonitor__Execute(t *testing.T) {
 		assert.Equal(t, "https", body["type"])
 		assert.Equal(t, "/health", body["path"])
 		assert.Equal(t, "2xx", body["expected_codes"])
+		assert.NotContains(t, body, "interval")
+		assert.NotContains(t, body, "timeout")
+		assert.NotContains(t, body, "retries")
 		assert.Equal(t, map[string]any{"Host": []any{"api.example.com"}}, body["header"])
 	})
+}
+
+func Test__decodeCreateMonitorSpec__weakNumericTypes(t *testing.T) {
+	spec, err := decodeCreateMonitorSpec(map[string]any{
+		"type":        "https",
+		"description": "API health",
+		"path":        "/health",
+		"port":        float64(443),
+		"advanced": map[string]any{
+			"interval": float64(16),
+			"timeout":  float64(5),
+			"retries":  float64(2),
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, spec.Advanced)
+	require.NotNil(t, spec.Advanced.Interval)
+	require.NotNil(t, spec.Advanced.Timeout)
+	require.NotNil(t, spec.Advanced.Retries)
+	assert.Equal(t, 16, *spec.Advanced.Interval)
+	assert.Equal(t, 5, *spec.Advanced.Timeout)
+	assert.Equal(t, 2, *spec.Advanced.Retries)
+}
+
+func Test__augmentLoadBalancerMonitorCreateError(t *testing.T) {
+	apiErr := newCloudflareAPIError(http.StatusBadRequest, []byte(
+		`{"success":false,"errors":[{"code":1002,"message":"interval is not in range [1, 1]: validation failed"}]}`,
+	))
+
+	out := augmentLoadBalancerMonitorCreateError(apiErr)
+	require.ErrorIs(t, out, apiErr)
+	require.Contains(t, out.Error(), "plan-specific")
 }
