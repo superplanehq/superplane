@@ -349,6 +349,7 @@ message Organization {
 
   message Spec {
     optional bool change_management_enabled = 1;
+    repeated string enabled_experimental_features = 2;
   }
 
   Metadata metadata = 1;
