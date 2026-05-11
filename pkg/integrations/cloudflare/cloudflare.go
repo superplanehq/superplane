@@ -168,6 +168,9 @@ func (c *Cloudflare) Actions() []core.Action {
 		&UpdatePool{},
 		&GetPool{},
 		&DeletePool{},
+		&PurgeCache{},
+		&OrderCertificatePack{},
+		&DeleteCertificatePack{},
 	}
 }
 
@@ -430,6 +433,38 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 				Name: p.Name,
 				ID:   p.ID,
 			})
+		}
+		return resources, nil
+
+	case "certificate_pack":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		metadata := Metadata{}
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+			return nil, fmt.Errorf("failed to decode application metadata: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, zone := range metadata.Zones {
+			packs, err := client.ListCertificatePacks(zone.ID)
+			if err != nil {
+				continue
+			}
+
+			for _, pack := range packs {
+				label := pack.ID
+				if len(pack.Hosts) > 0 {
+					label = strings.Join(pack.Hosts, ", ")
+				}
+				resources = append(resources, core.IntegrationResource{
+					Type: resourceType,
+					Name: fmt.Sprintf("%s - %s", zone.Name, label),
+					ID:   fmt.Sprintf("%s/%s", zone.ID, pack.ID),
+				})
+			}
 		}
 		return resources, nil
 

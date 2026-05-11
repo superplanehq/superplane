@@ -136,3 +136,33 @@ var exampleOutputDeletePool map[string]any
 func (c *DeletePool) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeletePoolOnce, exampleOutputDeletePoolBytes, &exampleOutputDeletePool)
 }
+
+//go:embed example_output_purge_cache.json
+var exampleOutputPurgeCacheBytes []byte
+
+var exampleOutputPurgeCacheOnce sync.Once
+var exampleOutputPurgeCache map[string]any
+
+func (c *PurgeCache) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputPurgeCacheOnce, exampleOutputPurgeCacheBytes, &exampleOutputPurgeCache)
+}
+
+//go:embed example_output_order_certificate_pack.json
+var exampleOutputOrderCertificatePackBytes []byte
+
+var exampleOutputOrderCertificatePackOnce sync.Once
+var exampleOutputOrderCertificatePack map[string]any
+
+func (c *OrderCertificatePack) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputOrderCertificatePackOnce, exampleOutputOrderCertificatePackBytes, &exampleOutputOrderCertificatePack)
+}
+
+//go:embed example_output_delete_certificate_pack.json
+var exampleOutputDeleteCertificatePackBytes []byte
+
+var exampleOutputDeleteCertificatePackOnce sync.Once
+var exampleOutputDeleteCertificatePack map[string]any
+
+func (c *DeleteCertificatePack) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteCertificatePackOnce, exampleOutputDeleteCertificatePackBytes, &exampleOutputDeleteCertificatePack)
+}
