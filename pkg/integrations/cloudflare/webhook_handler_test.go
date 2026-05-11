@@ -63,6 +63,124 @@ func Test__CloudflareWebhookHandler__Setup(t *testing.T) {
 	}, policy["filters"])
 }
 
+func Test__CloudflareWebhookHandler__Cleanup(t *testing.T) {
+	handler := &CloudflareWebhookHandler{}
+	integration := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"apiToken":  "token123",
+			"accountId": "account123",
+		},
+	}
+	metadata := map[string]any{
+		"accountId":            "account123",
+		"notificationPolicyId": "policy123",
+		"destinationId":        "dest123",
+	}
+
+	t.Run("deletes policy then destination", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("{}"))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("{}"))},
+			},
+		}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpContext,
+			Integration: integration,
+			Webhook:     &contexts.WebhookContext{Metadata: metadata},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/alerting/v3/policies/policy123")
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "/alerting/v3/destinations/webhooks/dest123")
+	})
+
+	t.Run("404 on policy delete still deletes destination", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader(`{"success":false,"errors":[{"code":1003,"message":"not found"}]}`)),
+				},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("{}"))},
+			},
+		}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpContext,
+			Integration: integration,
+			Webhook:     &contexts.WebhookContext{Metadata: metadata},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 2)
+	})
+
+	t.Run("404 on destination delete succeeds", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("{}"))},
+				{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader(`{"success":false,"errors":[{"code":1003}]}`)),
+				},
+			},
+		}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpContext,
+			Integration: integration,
+			Webhook:     &contexts.WebhookContext{Metadata: metadata},
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("non-404 error on policy fails cleanup before destination", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusBadGateway,
+					Body:       io.NopCloser(strings.NewReader(`{"success":false}`)),
+				},
+			},
+		}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpContext,
+			Integration: integration,
+			Webhook:     &contexts.WebhookContext{Metadata: metadata},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "notification policy")
+		require.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("non-404 error on destination fails cleanup", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader("{}"))},
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"success":false}`)),
+				},
+			},
+		}
+
+		err := handler.Cleanup(core.WebhookHandlerContext{
+			HTTP:        httpContext,
+			Integration: integration,
+			Webhook:     &contexts.WebhookContext{Metadata: metadata},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "alerting webhook destination")
+	})
+}
+
 func Test__CloudflareWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &CloudflareWebhookHandler{}
 

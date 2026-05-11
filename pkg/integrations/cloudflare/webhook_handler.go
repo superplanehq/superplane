@@ -147,13 +147,13 @@ func (h *CloudflareWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error
 	}
 
 	if metadata.NotificationPolicyID != "" {
-		if err := client.DeleteNotificationPolicy(accountID, metadata.NotificationPolicyID); err != nil {
+		if err := client.DeleteNotificationPolicy(accountID, metadata.NotificationPolicyID); err != nil && !isCloudflareNotFound(err) {
 			return fmt.Errorf("failed to delete Cloudflare notification policy: %w", err)
 		}
 	}
 
 	if metadata.DestinationID != "" {
-		if err := client.DeleteAlertingWebhookDestination(accountID, metadata.DestinationID); err != nil {
+		if err := client.DeleteAlertingWebhookDestination(accountID, metadata.DestinationID); err != nil && !isCloudflareNotFound(err) {
 			return fmt.Errorf("failed to delete Cloudflare alerting webhook destination: %w", err)
 		}
 	}
