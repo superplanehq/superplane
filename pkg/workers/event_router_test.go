@@ -67,6 +67,54 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	assert.True(t, queueConsumer.HasReceivedMessage())
 }
 
+func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T) {
+	amqpURL, _ := config.RabbitMQURL()
+
+	router := NewEventRouter(amqpURL)
+	logger := log.NewEntry(log.New())
+	r := support.Setup(t)
+
+	queueConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemCreatedRoutingKey)
+	queueConsumer.Start()
+	defer queueConsumer.Stop()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
+			{NodeID: componentNode, Type: models.NodeTypeComponent},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	event := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+
+	events, err := models.ListPendingCanvasEvents()
+	require.NoError(t, err)
+	for _, pending := range events {
+		assert.NotEqual(t, event.ID, pending.ID)
+	}
+
+	require.NoError(t, router.LockAndProcessEvent(logger, *event))
+
+	updatedEvent, err := models.FindCanvasEvent(event.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasEventStatePending, updatedEvent.State)
+
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, queueItems)
+
+	assert.False(t, queueConsumer.HasReceivedMessage())
+}
+
 func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	amqpURL, _ := config.RabbitMQURL()
 

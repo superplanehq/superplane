@@ -30,21 +30,6 @@ func Test__Cloudflare__Sync(t *testing.T) {
 		require.ErrorContains(t, err, "apiToken is required")
 	})
 
-	t.Run("no accountId -> error", func(t *testing.T) {
-		integrationCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"apiToken": "token123",
-			},
-		}
-
-		err := c.Sync(core.SyncContext{
-			Configuration: integrationCtx.Configuration,
-			Integration:   integrationCtx,
-		})
-
-		require.ErrorContains(t, err, "accountId is required")
-	})
-
 	t.Run("api token -> successful zone list moves app to ready and sets metadata", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -65,7 +50,7 @@ func Test__Cloudflare__Sync(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken":  "token123",
-				"accountId": "account123",
+				"accountId": "acc123",
 			},
 		}
 
@@ -84,6 +69,7 @@ func Test__Cloudflare__Sync(t *testing.T) {
 		assert.Len(t, metadata.Zones, 1)
 		assert.Equal(t, "zone123", metadata.Zones[0].ID)
 		assert.Equal(t, "example.com", metadata.Zones[0].Name)
+		assert.Equal(t, "acc123", metadata.AccountID)
 	})
 
 	t.Run("api token -> failed zone list returns error", func(t *testing.T) {
@@ -125,7 +111,7 @@ func Test__Cloudflare__Configuration(t *testing.T) {
 	assert.Equal(t, "apiToken", fields[0].Name)
 	assert.True(t, fields[0].Required)
 	assert.Equal(t, "accountId", fields[1].Name)
-	assert.True(t, fields[1].Required)
+	assert.False(t, fields[1].Required)
 }
 
 func Test__Cloudflare__ListResources(t *testing.T) {
