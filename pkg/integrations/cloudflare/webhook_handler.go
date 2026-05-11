@@ -29,7 +29,9 @@ func (h *CloudflareWebhookHandler) CompareConfig(a, b any) (bool, error) {
 		return false, err
 	}
 
-	return configA.Pool == configB.Pool, nil
+	return configA.Pool == configB.Pool &&
+		sameStringSet(configA.NewHealth, configB.NewHealth) &&
+		sameStringSet(configA.EventSource, configB.EventSource), nil
 }
 
 func (h *CloudflareWebhookHandler) Merge(current, requested any) (any, bool, error) {

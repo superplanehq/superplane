@@ -62,3 +62,46 @@ func Test__CloudflareWebhookHandler__Setup(t *testing.T) {
 		"event_source": []any{"origin"},
 	}, policy["filters"])
 }
+
+func Test__CloudflareWebhookHandler__CompareConfig(t *testing.T) {
+	handler := &CloudflareWebhookHandler{}
+
+	t.Run("same pool but different newHealth -> not equal", func(t *testing.T) {
+		a := map[string]any{"pool": "pool123", "newHealth": []string{"Unhealthy"}, "eventSource": []string{"pool"}}
+		b := map[string]any{"pool": "pool123", "newHealth": []string{"Healthy"}, "eventSource": []string{"pool"}}
+
+		ok, err := handler.CompareConfig(a, b)
+		require.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("same pool but different eventSource -> not equal", func(t *testing.T) {
+		a := map[string]any{"pool": "pool123", "newHealth": []string{"Unhealthy"}, "eventSource": []string{"pool"}}
+		b := map[string]any{"pool": "pool123", "newHealth": []string{"Unhealthy"}, "eventSource": []string{"origin"}}
+
+		ok, err := handler.CompareConfig(a, b)
+		require.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("matching filters including defaults -> equal", func(t *testing.T) {
+		a := map[string]any{"pool": "", "newHealth": []string{"Unhealthy"}, "eventSource": []string{"pool", "origin"}}
+		b := map[string]any{}
+
+		ok, err := handler.CompareConfig(a, b)
+		require.NoError(t, err)
+		assert.True(t, ok)
+	})
+
+	t.Run("identical normalized configs -> equal", func(t *testing.T) {
+		spec := OnLoadBalancingHealthAlertSpec{
+			Pool:        "pool123",
+			NewHealth:   []string{"Unhealthy"},
+			EventSource: []string{"origin"},
+		}
+
+		ok, err := handler.CompareConfig(spec, spec)
+		require.NoError(t, err)
+		assert.True(t, ok)
+	})
+}

@@ -216,11 +216,62 @@ func (t *OnLoadBalancingHealthAlert) HandleWebhook(ctx core.WebhookRequestContex
 		payload = map[string]any{"raw": string(ctx.Body)}
 	}
 
+	triggerSpec := OnLoadBalancingHealthAlertSpec{}
+	if err := mapstructure.Decode(ctx.Configuration, &triggerSpec); err != nil {
+		return http.StatusInternalServerError, nil, fmt.Errorf("failed to decode trigger configuration: %w", err)
+	}
+
+	normalizedSpec, err := normalizeHealthAlertSpec(triggerSpec)
+	if err != nil {
+		return http.StatusInternalServerError, nil, err
+	}
+
+	if !healthAlertPayloadMatchesSpec(normalizedSpec, payload) {
+		return http.StatusOK, nil, nil
+	}
+
 	if err := ctx.Events.Emit(LoadBalancingHealthAlertPayloadType, payload); err != nil {
 		return http.StatusInternalServerError, nil, err
 	}
 
 	return http.StatusOK, nil, nil
+}
+
+func healthAlertPayloadMatchesSpec(spec OnLoadBalancingHealthAlertSpec, payload map[string]any) bool {
+	data := payload
+	if nested, ok := payload["data"].(map[string]any); ok && nested != nil {
+		data = nested
+	}
+
+	if spec.Pool != "" {
+		if strings.TrimSpace(healthAlertFieldString(data["pool_id"])) != spec.Pool {
+			return false
+		}
+	}
+
+	newHealth := normalizeOneOf(healthAlertFieldString(data["new_health"]), loadBalancingHealthValues)
+	if newHealth == "" || !slices.Contains(spec.NewHealth, newHealth) {
+		return false
+	}
+
+	eventSource := normalizeOneOf(healthAlertFieldString(data["event_source"]), loadBalancingEventSources)
+	if eventSource == "" || !slices.Contains(spec.EventSource, eventSource) {
+		return false
+	}
+
+	return true
+}
+
+func healthAlertFieldString(value any) string {
+	if value == nil {
+		return ""
+	}
+	s, ok := value.(string)
+	if ok {
+		return s
+	}
+
+	return fmt.Sprint(value)
 }
 
 func headerValue(headers http.Header, name string) string {
