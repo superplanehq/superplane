@@ -2,15 +2,8 @@ import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import type {
-  ComponentBaseContext,
-  ComponentBaseMapper,
-  ExecutionDetailsContext,
-  ExecutionInfo,
-  NodeInfo,
-  OutputPayload,
-  SubtitleContext,
-} from "../types";
+import { deleteLoadBalancerExecutionDetails } from "./base";
+import type { ComponentBaseContext, ComponentBaseMapper, ExecutionInfo, NodeInfo, SubtitleContext } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -40,22 +33,7 @@ export const deleteLoadBalancerMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, string> = {};
-
-    if (context.execution.createdAt) {
-      details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
-    }
-
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as Record<string, any> | undefined;
-    if (!result) return details;
-
-    details["Load Balancer ID"] = result.loadBalancerId?.toString() || "-";
-    details["Deleted"] = result.deleted != null ? String(result.deleted) : "-";
-
-    return details;
-  },
+  getExecutionDetails: deleteLoadBalancerExecutionDetails,
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";

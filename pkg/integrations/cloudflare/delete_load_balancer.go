@@ -40,7 +40,6 @@ func (c *DeleteLoadBalancer) Documentation() string {
 
 ## Configuration
 
-- **Zone**: The zone the load balancer belongs to
 - **Load Balancer**: The load balancer to delete
 
 ## Output

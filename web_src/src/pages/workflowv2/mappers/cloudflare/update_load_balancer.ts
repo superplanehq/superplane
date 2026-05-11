@@ -2,15 +2,8 @@ import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getState, getStateMap, getTriggerRenderer } from "..";
-import type {
-  ComponentBaseContext,
-  ComponentBaseMapper,
-  ExecutionDetailsContext,
-  ExecutionInfo,
-  NodeInfo,
-  OutputPayload,
-  SubtitleContext,
-} from "../types";
+import { updateLoadBalancerExecutionDetails } from "./base";
+import type { ComponentBaseContext, ComponentBaseMapper, ExecutionInfo, NodeInfo, SubtitleContext } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -41,32 +34,7 @@ export const updateLoadBalancerMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
-    const details: Record<string, string> = {};
-
-    if (context.execution.createdAt) {
-      details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
-    }
-
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as Record<string, any> | undefined;
-    const lb = result?.loadBalancer as Record<string, any> | undefined;
-    if (!lb) return details;
-
-    details["Load Balancer ID"] = lb.id?.toString() || "-";
-    details["Name"] = lb.name || "-";
-
-    if (lb.description) {
-      details["Description"] = lb.description;
-    }
-
-    details["Enabled"] = lb.enabled != null ? String(lb.enabled) : "-";
-    details["Steering Policy"] = lb.steering_policy || "-";
-    details["Session Affinity"] = lb.session_affinity || "-";
-    details["Default Pools"] = Array.isArray(lb.default_pools) ? String(lb.default_pools.length) : "-";
-
-    return details;
-  },
+  getExecutionDetails: updateLoadBalancerExecutionDetails,
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";

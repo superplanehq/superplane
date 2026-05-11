@@ -45,7 +45,6 @@ func (c *GetLoadBalancer) Documentation() string {
 
 ## Configuration
 
-- **Zone**: The zone the load balancer belongs to
 - **Load Balancer**: The load balancer to retrieve
 
 ## Output

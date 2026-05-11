@@ -78,6 +78,75 @@ export function getPoolExecutionDetails(context: ExecutionDetailsContext): Recor
   return details;
 }
 
+export function getLoadBalancerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  const lb = result?.loadBalancer as Record<string, unknown> | undefined;
+  if (!lb) return details;
+
+  details["Name"] = lb.name != null ? String(lb.name) : "-";
+
+  if (lb.description != null) {
+    details["Description"] = String(lb.description);
+  }
+
+  details["Enabled"] = lb.enabled != null ? String(lb.enabled) : "-";
+  details["Proxied"] = lb.proxied != null ? String(lb.proxied) : "-";
+  details["Steering Policy"] = lb.steering_policy != null ? String(lb.steering_policy) : "-";
+  details["Session Affinity"] = lb.session_affinity != null ? String(lb.session_affinity) : "-";
+  details["Default Pools"] = Array.isArray(lb.default_pools) ? String(lb.default_pools.length) : "-";
+
+  return details;
+}
+
+export function updateLoadBalancerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  const lb = result?.loadBalancer as Record<string, unknown> | undefined;
+  if (!lb) return details;
+
+  details["Name"] = lb.name != null ? String(lb.name) : "-";
+
+  if (lb.description != null) {
+    details["Description"] = String(lb.description);
+  }
+
+  details["Enabled"] = lb.enabled != null ? String(lb.enabled) : "-";
+  details["Steering Policy"] = lb.steering_policy != null ? String(lb.steering_policy) : "-";
+  details["Session Affinity"] = lb.session_affinity != null ? String(lb.session_affinity) : "-";
+  details["Default Pools"] = Array.isArray(lb.default_pools) ? String(lb.default_pools.length) : "-";
+
+  return details;
+}
+
+export function deleteLoadBalancerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  if (!result) return details;
+
+  details["Deleted"] = result.deleted != null ? String(result.deleted) : "-";
+
+  return details;
+}
+
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const receivedAt = execution.createdAt ? new Date(execution.createdAt) : new Date();
   const subtitleDate = execution.updatedAt ?? execution.createdAt;

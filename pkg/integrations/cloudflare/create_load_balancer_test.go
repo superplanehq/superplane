@@ -18,7 +18,7 @@ func Test__CreateLoadBalancer__Setup(t *testing.T) {
 	t.Run("missing zoneId returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":       "",
+				"zone":         "",
 				"name":         "lb.example.com",
 				"fallbackPool": "pool123",
 				"defaultPools": []any{"pool123"},
@@ -32,7 +32,7 @@ func Test__CreateLoadBalancer__Setup(t *testing.T) {
 	t.Run("missing name returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":       "zone123",
+				"zone":         "zone123",
 				"name":         "",
 				"fallbackPool": "pool123",
 				"defaultPools": []any{"pool123"},
@@ -46,7 +46,7 @@ func Test__CreateLoadBalancer__Setup(t *testing.T) {
 	t.Run("missing fallbackPool returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":       "zone123",
+				"zone":         "zone123",
 				"name":         "lb.example.com",
 				"fallbackPool": "",
 				"defaultPools": []any{"pool123"},
@@ -60,7 +60,7 @@ func Test__CreateLoadBalancer__Setup(t *testing.T) {
 	t.Run("missing defaultPools returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":       "zone123",
+				"zone":         "zone123",
 				"name":         "lb.example.com",
 				"fallbackPool": "pool123",
 				"defaultPools": []any{},
@@ -74,7 +74,7 @@ func Test__CreateLoadBalancer__Setup(t *testing.T) {
 	t.Run("valid configuration passes", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":       "zone123",
+				"zone":         "zone123",
 				"name":         "lb.example.com",
 				"fallbackPool": "pool123",
 				"defaultPools": []any{"pool123"},
@@ -124,7 +124,7 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
-				"zone":         "zone123",
+				"zone":           "zone123",
 				"name":           "lb.example.com",
 				"description":    "Test LB",
 				"fallbackPool":   "pool123",
@@ -171,7 +171,7 @@ func Test__CreateLoadBalancer__Execute(t *testing.T) {
 
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
-				"zone":       "zone123",
+				"zone":         "zone123",
 				"name":         "lb.example.com",
 				"fallbackPool": "pool123",
 				"defaultPools": []any{"pool123"},
