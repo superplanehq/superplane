@@ -36,12 +36,11 @@ export const onLoadBalancingHealthAlertTriggerRenderer: TriggerRenderer = {
     const eventData = context.event?.data as HealthAlertEventData;
 
     return {
+      "Triggered At": formatTriggeredAt(context.event?.createdAt),
       "Alert Type": displayValue(eventData?.alert_type),
       "Event Source": displayValue(eventData?.event_source),
       "New Health": displayValue(eventData?.new_health),
       Pool: displayValue(eventData?.pool_name || eventData?.pool_id),
-      Origin: displayValue(eventData?.origin_name),
-      "Load Balancer": displayValue(eventData?.load_balancer_name),
     };
   },
 
@@ -98,4 +97,15 @@ function getEventPoolName(eventDataSource?: { data?: unknown }): string | undefi
 
 function displayValue(value?: string): string {
   return value?.trim() || "-";
+}
+
+function formatTriggeredAt(createdAt?: string): string {
+  if (!createdAt?.trim()) {
+    return "-";
+  }
+  const parsed = new Date(createdAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return "-";
+  }
+  return parsed.toLocaleString();
 }

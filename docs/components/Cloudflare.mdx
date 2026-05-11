@@ -94,6 +94,18 @@ The On Load Balancing Health Alert trigger starts a workflow from Cloudflare Loa
 
 SuperPlane automatically creates a Cloudflare Alerting webhook destination and notification policy for `load_balancing_health_alert`. Cloudflare signs requests with the generated webhook secret and SuperPlane verifies the `cf-webhook-auth` header before emitting an event.
 
+### Workflow execution details
+
+In the workflow execution chain, the trigger's **Details** tab lists:
+
+- **Triggered At**: When SuperPlane recorded the webhook event.
+- **Alert Type**: For example `load_balancing_health_alert`.
+- **Event Source**: `pool` or `origin`.
+- **New Health**: The health state in the notification (for example `Unhealthy`).
+- **Pool**: Pool name when Cloudflare sends it; otherwise the pool ID.
+
+The trigger **title** still prefers an origin name, then pool name, then load balancer name when those fields are present in the payload. Use the **Payload** tab (or expressions such as `$.trigger.data`) for every field Cloudflare sends, including **origin name**, **load balancer id/name**, and **account id**.
+
 ### Example Data
 
 ```json
