@@ -121,6 +121,76 @@ export function deleteLoadBalancerExecutionDetails(context: ExecutionDetailsCont
   return details;
 }
 
+export function getDeployWorkerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const data = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  if (!data) {
+    return details;
+  }
+  details["Script"] = data.scriptName != null ? String(data.scriptName) : "-";
+  details["Version ID"] = data.versionId != null ? String(data.versionId) : "-";
+  const deployment = data.deployment as Record<string, unknown> | undefined;
+  if (deployment?.id != null) {
+    details["Deployment ID"] = String(deployment.id);
+  }
+  return details;
+}
+
+export function getWorkerMetadataExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const data = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  if (!data) {
+    return details;
+  }
+  details["Script"] = data.scriptName != null ? String(data.scriptName) : "-";
+  const deployments = data.deployments as unknown[] | undefined;
+  details["Deployments"] = deployments != null ? String(deployments.length) : "-";
+  const settings = data.settings as Record<string, unknown> | undefined;
+  if (settings?.compatibility_date != null) {
+    details["Compatibility date"] = String(settings.compatibility_date);
+  }
+  return details;
+}
+
+export function getDeleteWorkerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const data = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  if (!data) {
+    return details;
+  }
+  details["Script"] = data.scriptName != null ? String(data.scriptName) : "-";
+  return details;
+}
+
+export function getWorkerRouteExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const data = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  const route = data?.route as Record<string, unknown> | undefined;
+  if (!route) {
+    return details;
+  }
+  details["Route ID"] = route.id != null ? String(route.id) : "-";
+  details["Pattern"] = route.pattern != null ? String(route.pattern) : "-";
+  details["Script"] = route.script != null ? String(route.script) : "-";
+  return details;
+}
+
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const receivedAt = execution.createdAt ? new Date(execution.createdAt) : new Date();
   const subtitleDate = execution.updatedAt ?? execution.createdAt;

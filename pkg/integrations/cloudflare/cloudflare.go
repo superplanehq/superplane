@@ -131,7 +131,9 @@ func (c *Cloudflare) Instructions() string {
      - Zone / Dynamic Redirect / Edit
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
+     - Zone / Workers Routes / Edit
      - Account / Workers KV Storage / Edit
+     - Account / Workers Scripts / Edit
      - Account / Load Balancing: Monitors and Pools / Edit
      - Zone / Load Balancers / Edit
      - Account / Notifications / Edit
@@ -200,6 +202,10 @@ func (c *Cloudflare) Actions() []core.Action {
 		&GetLoadBalancer{},
 		&UpdateLoadBalancer{},
 		&DeleteLoadBalancer{},
+		&DeployWorker{},
+		&GetWorker{},
+		&DeleteWorker{},
+		&UpdateWorkerRoute{},
 	}
 }
 
