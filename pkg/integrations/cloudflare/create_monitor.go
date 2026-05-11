@@ -1,0 +1,528 @@
+package cloudflare
+
+import (
+	"errors"
+	"fmt"
+	"net/http"
+	"slices"
+	"strings"
+
+	"github.com/google/uuid"
+	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/core"
+)
+
+const MonitorPayloadType = "cloudflare.monitor"
+
+var (
+	allowedMonitorTypes   = []string{"http", "https", "tcp", "udp_icmp", "icmp_ping", "smtp"}
+	httpMonitorTypes      = []string{"http", "https"}
+	portMonitorTypes      = []string{"http", "https", "tcp", "udp_icmp", "smtp"}
+	allowedMonitorMethods = []string{"GET", "HEAD"}
+)
+
+type CreateMonitor struct{}
+
+type MonitorHeader struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type CreateMonitorSpec struct {
+	Type        string                     `json:"type"`
+	Description string                     `json:"description"`
+	Path        string                     `json:"path"`
+	Port        *int                       `json:"port"`
+	Advanced    *CreateMonitorAdvancedSpec `json:"advanced"`
+	Pool        string                     `json:"pool"`
+
+	// Legacy flat fields are kept for existing saved nodes. New nodes use Advanced.
+	Method          string          `json:"method"`
+	ExpectedCodes   string          `json:"expectedCodes"`
+	ExpectedBody    string          `json:"expectedBody"`
+	Headers         []MonitorHeader `json:"headers"`
+	FollowRedirects *bool           `json:"followRedirects"`
+	AllowInsecure   *bool           `json:"allowInsecure"`
+	ProbeZone       string          `json:"probeZone"`
+	Interval        *int            `json:"interval"`
+	Timeout         *int            `json:"timeout"`
+	Retries         *int            `json:"retries"`
+	ConsecutiveUp   *int            `json:"consecutiveUp"`
+	ConsecutiveDown *int            `json:"consecutiveDown"`
+}
+
+type CreateMonitorAdvancedSpec struct {
+	Method          string          `json:"method"`
+	ExpectedCodes   string          `json:"expectedCodes"`
+	ExpectedBody    string          `json:"expectedBody"`
+	Headers         []MonitorHeader `json:"headers"`
+	FollowRedirects *bool           `json:"followRedirects"`
+	AllowInsecure   *bool           `json:"allowInsecure"`
+	ProbeZone       string          `json:"probeZone"`
+	Interval        *int            `json:"interval"`
+	Timeout         *int            `json:"timeout"`
+	Retries         *int            `json:"retries"`
+	ConsecutiveUp   *int            `json:"consecutiveUp"`
+	ConsecutiveDown *int            `json:"consecutiveDown"`
+}
+
+func (c *CreateMonitor) Name() string {
+	return "cloudflare.createMonitor"
+}
+
+func (c *CreateMonitor) Label() string {
+	return "Create Monitor"
+}
+
+func (c *CreateMonitor) Description() string {
+	return "Create a Cloudflare load balancing health monitor"
+}
+
+func (c *CreateMonitor) Documentation() string {
+	return `The Create Monitor component creates a Cloudflare Load Balancing health monitor.
+
+## Use Cases
+
+- **Health checks**: Monitor HTTP, HTTPS, TCP, ICMP, UDP, or SMTP endpoints
+- **Failover**: Attach the new monitor to a pool so unhealthy origins are removed from load balancer rotation
+- **Release safety**: Create monitor definitions as part of load balancing setup automation
+
+## Configuration
+
+- **Name / Type / Path / Port**: Basic monitor settings. Path is required for HTTP and HTTPS monitors. Port is required for HTTP, HTTPS, TCP, UDP ICMP, and SMTP monitors.
+- **Advanced Health Check Settings**: Optional method, expected response, headers, redirects, TLS, and health threshold settings.
+- **Pool**: Optional pool to attach the created monitor to immediately.
+
+## Output
+
+Emits the created monitor and, when configured, the attached pool.`
+}
+
+func (c *CreateMonitor) Icon() string {
+	return "activity"
+}
+
+func (c *CreateMonitor) Color() string {
+	return "orange"
+}
+
+func (c *CreateMonitor) OutputChannels(configuration any) []core.OutputChannel {
+	return []core.OutputChannel{core.DefaultOutputChannel}
+}
+
+func (c *CreateMonitor) Configuration() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:     "type",
+			Label:    "Type",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  "http",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "HTTP", Value: "http"},
+						{Label: "HTTPS", Value: "https"},
+						{Label: "TCP", Value: "tcp"},
+						{Label: "UDP ICMP", Value: "udp_icmp"},
+						{Label: "ICMP Ping", Value: "icmp_ping"},
+						{Label: "SMTP", Value: "smtp"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "description",
+			Label:       "Name",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "Human-readable monitor name",
+			Placeholder: "Login page monitor",
+		},
+		{
+			Name:        "path",
+			Label:       "Path",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Endpoint path to check",
+			Default:     "/",
+			Placeholder: "/health",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "type", Values: httpMonitorTypes},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "type", Values: httpMonitorTypes},
+			},
+		},
+		{
+			Name:        "port",
+			Label:       "Port",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Default:     80,
+			Description: "Port for checks. Required for HTTP, HTTPS, TCP, UDP ICMP, and SMTP.",
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { min := 1; return &min }(),
+					Max: func() *int { max := 65535; return &max }(),
+				},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "type", Values: portMonitorTypes},
+			},
+		},
+		{
+			Name:        "advanced",
+			Label:       "Advanced Health Check Settings",
+			Type:        configuration.FieldTypeObject,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optional method, response validation, headers, redirect, TLS, and health threshold settings",
+			Default: map[string]any{
+				"method":          "GET",
+				"expectedCodes":   "2xx",
+				"followRedirects": true,
+				"allowInsecure":   false,
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: createMonitorAdvancedFields(),
+				},
+			},
+		},
+		{
+			Name:        "pool",
+			Label:       "Attach to Pool",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Togglable:   true,
+			Description: "Optional pool to attach this monitor to after creation",
+			Placeholder: "Select a pool",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "pool",
+				},
+			},
+		},
+	}
+}
+
+func createMonitorAdvancedFields() []configuration.Field {
+	return []configuration.Field{
+		{
+			Name:        "method",
+			Label:       "Method",
+			Type:        configuration.FieldTypeSelect,
+			Required:    false,
+			Default:     "GET",
+			Description: "HTTP method used for the health check",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "GET", Value: "GET"},
+						{Label: "HEAD", Value: "HEAD"},
+					},
+				},
+			},
+		},
+		{
+			Name:        "expectedCodes",
+			Label:       "Expected Codes",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Default:     "2xx",
+			Description: "Expected HTTP response code or code range",
+			Placeholder: "2xx",
+		},
+		{
+			Name:        "expectedBody",
+			Label:       "Expected Body",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Case-insensitive response body substring expected by Cloudflare",
+		},
+		{
+			Name:        "headers",
+			Label:       "Headers",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "HTTP request headers sent by the monitor",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Header",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{Name: "name", Label: "Name", Type: configuration.FieldTypeString, Required: true},
+							{Name: "value", Label: "Value", Type: configuration.FieldTypeString, Required: true},
+						},
+					},
+				},
+			},
+		},
+		{
+			Name:        "followRedirects",
+			Label:       "Follow Redirects",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     true,
+			Description: "Whether Cloudflare should follow origin redirects",
+		},
+		{
+			Name:        "allowInsecure",
+			Label:       "Allow Insecure HTTPS",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Do not validate the origin certificate for HTTPS checks",
+		},
+		{
+			Name:        "probeZone",
+			Label:       "Probe Zone",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Zone to emulate while probing",
+			Placeholder: "example.com",
+		},
+		{
+			Name:        "consecutiveUp",
+			Label:       "Consecutive Up",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Description: "Passes needed before marking an origin healthy",
+			TypeOptions: &configuration.TypeOptions{Number: &configuration.NumberTypeOptions{Min: func() *int { min := 0; return &min }()}},
+		},
+		{
+			Name:        "consecutiveDown",
+			Label:       "Consecutive Down",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Description: "Failures needed before marking an origin unhealthy",
+			TypeOptions: &configuration.TypeOptions{Number: &configuration.NumberTypeOptions{Min: func() *int { min := 0; return &min }()}},
+		},
+	}
+}
+
+func (c *CreateMonitor) Setup(ctx core.SetupContext) error {
+	spec := CreateMonitorSpec{}
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return fmt.Errorf("error decoding configuration: %v", err)
+	}
+
+	return validateCreateMonitorSpec(spec)
+}
+
+func validateCreateMonitorSpec(spec CreateMonitorSpec) error {
+	monitorType := normalizeMonitorType(spec.Type)
+	if monitorType == "" {
+		return errors.New("type is required")
+	}
+	if !slices.Contains(allowedMonitorTypes, monitorType) {
+		return fmt.Errorf("type must be one of %s", strings.Join(allowedMonitorTypes, ", "))
+	}
+
+	if strings.TrimSpace(spec.Description) == "" {
+		return errors.New("name is required")
+	}
+
+	if slices.Contains(httpMonitorTypes, monitorType) {
+		if strings.TrimSpace(spec.Path) == "" {
+			return errors.New("path is required for HTTP and HTTPS monitors")
+		}
+		method := normalizeMonitorMethod(effectiveMonitorAdvanced(spec).Method)
+		if method != "" && !slices.Contains(allowedMonitorMethods, method) {
+			return fmt.Errorf("method must be one of %s", strings.Join(allowedMonitorMethods, ", "))
+		}
+	}
+
+	if slices.Contains(portMonitorTypes, monitorType) && spec.Port == nil {
+		return fmt.Errorf("port is required for %s monitors", monitorType)
+	}
+
+	if spec.Port != nil && (*spec.Port < 1 || *spec.Port > 65535) {
+		return errors.New("port must be between 1 and 65535")
+	}
+
+	advanced := effectiveMonitorAdvanced(spec)
+	fields := []struct {
+		name  string
+		value *int
+		min   int
+	}{
+		{name: "consecutiveUp", value: advanced.ConsecutiveUp, min: 0},
+		{name: "consecutiveDown", value: advanced.ConsecutiveDown, min: 0},
+	}
+
+	for _, field := range fields {
+		if field.value != nil && *field.value < field.min {
+			return fmt.Errorf("%s must be >= %d", field.name, field.min)
+		}
+	}
+
+	return nil
+}
+
+func (c *CreateMonitor) Execute(ctx core.ExecutionContext) error {
+	spec := CreateMonitorSpec{}
+	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
+		return fmt.Errorf("error decoding configuration: %v", err)
+	}
+
+	if err := validateCreateMonitorSpec(spec); err != nil {
+		return err
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("error creating client: %v", err)
+	}
+
+	accountID, err := accountIDForIntegration(ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	monitor, err := client.CreateMonitor(accountID, createMonitorRequest(spec))
+	if err != nil {
+		return fmt.Errorf("failed to create monitor: %w", err)
+	}
+
+	payload := map[string]any{
+		"accountId": accountID,
+		"monitor":   monitor,
+		"monitorId": monitor.ID,
+	}
+
+	if strings.TrimSpace(spec.Pool) != "" {
+		pool, err := client.PatchPoolMonitor(accountID, spec.Pool, monitor.ID)
+		if err != nil {
+			return fmt.Errorf("failed to attach monitor to pool: %w", err)
+		}
+		payload["pool"] = pool
+		payload["poolId"] = spec.Pool
+	}
+
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, MonitorPayloadType, []any{payload})
+}
+
+func createMonitorRequest(spec CreateMonitorSpec) CreateMonitorRequest {
+	monitorType := normalizeMonitorType(spec.Type)
+	advanced := effectiveMonitorAdvanced(spec)
+	req := CreateMonitorRequest{
+		Type:            monitorType,
+		Description:     strings.TrimSpace(spec.Description),
+		Interval:        monitorIntValue(nil, 1),
+		Timeout:         monitorIntValue(nil, 1),
+		Retries:         monitorIntValue(nil, 0),
+		ConsecutiveUp:   advanced.ConsecutiveUp,
+		ConsecutiveDown: advanced.ConsecutiveDown,
+	}
+
+	if slices.Contains(portMonitorTypes, monitorType) {
+		req.Port = spec.Port
+	}
+
+	if slices.Contains(httpMonitorTypes, monitorType) {
+		req.Method = normalizeMonitorMethod(advanced.Method)
+		if req.Method == "" {
+			req.Method = "GET"
+		}
+		req.Path = strings.TrimSpace(spec.Path)
+		if req.Path == "" {
+			req.Path = "/"
+		}
+		req.ExpectedCodes = strings.TrimSpace(advanced.ExpectedCodes)
+		if req.ExpectedCodes == "" {
+			req.ExpectedCodes = "2xx"
+		}
+		req.ExpectedBody = strings.TrimSpace(advanced.ExpectedBody)
+		req.FollowRedirects = advanced.FollowRedirects
+		if req.FollowRedirects == nil {
+			followRedirects := true
+			req.FollowRedirects = &followRedirects
+		}
+		req.ProbeZone = strings.TrimSpace(advanced.ProbeZone)
+		req.Header = monitorHeadersToMap(advanced.Headers)
+	}
+
+	if monitorType == "https" {
+		req.AllowInsecure = advanced.AllowInsecure
+	}
+
+	return req
+}
+
+func effectiveMonitorAdvanced(spec CreateMonitorSpec) CreateMonitorAdvancedSpec {
+	if spec.Advanced != nil {
+		return *spec.Advanced
+	}
+
+	return CreateMonitorAdvancedSpec{
+		Method:          spec.Method,
+		ExpectedCodes:   spec.ExpectedCodes,
+		ExpectedBody:    spec.ExpectedBody,
+		Headers:         spec.Headers,
+		FollowRedirects: spec.FollowRedirects,
+		AllowInsecure:   spec.AllowInsecure,
+		ProbeZone:       spec.ProbeZone,
+		ConsecutiveUp:   spec.ConsecutiveUp,
+		ConsecutiveDown: spec.ConsecutiveDown,
+	}
+}
+
+func monitorHeadersToMap(headers []MonitorHeader) map[string][]string {
+	result := map[string][]string{}
+	for _, header := range headers {
+		name := strings.TrimSpace(header.Name)
+		value := strings.TrimSpace(header.Value)
+		if name == "" || value == "" {
+			continue
+		}
+		result[name] = append(result[name], value)
+	}
+	if len(result) == 0 {
+		return nil
+	}
+	return result
+}
+
+func monitorIntValue(value *int, defaultValue int) *int {
+	if value != nil {
+		return value
+	}
+
+	return &defaultValue
+}
+
+func normalizeMonitorType(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func normalizeMonitorMethod(value string) string {
+	return strings.ToUpper(strings.TrimSpace(value))
+}
+
+func (c *CreateMonitor) Cancel(ctx core.ExecutionContext) error {
+	return nil
+}
+
+func (c *CreateMonitor) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+	return ctx.DefaultProcessing()
+}
+
+func (c *CreateMonitor) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return http.StatusOK, nil, nil
+}
+
+func (c *CreateMonitor) Cleanup(ctx core.SetupContext) error {
+	return nil
+}
+
+func (c *CreateMonitor) Hooks() []core.Hook {
+	return []core.Hook{}
+}
+
+func (c *CreateMonitor) HandleHook(ctx core.ActionHookContext) error {
+	return nil
+}

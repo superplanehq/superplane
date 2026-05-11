@@ -30,6 +30,21 @@ func Test__Cloudflare__Sync(t *testing.T) {
 		require.ErrorContains(t, err, "apiToken is required")
 	})
 
+	t.Run("no accountId -> error", func(t *testing.T) {
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken": "token123",
+			},
+		}
+
+		err := c.Sync(core.SyncContext{
+			Configuration: integrationCtx.Configuration,
+			Integration:   integrationCtx,
+		})
+
+		require.ErrorContains(t, err, "accountId is required")
+	})
+
 	t.Run("api token -> successful zone list moves app to ready and sets metadata", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -49,7 +64,8 @@ func Test__Cloudflare__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiToken": "token123",
+				"apiToken":  "token123",
+				"accountId": "account123",
 			},
 		}
 
@@ -82,7 +98,8 @@ func Test__Cloudflare__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiToken": "invalid-token",
+				"apiToken":  "invalid-token",
+				"accountId": "account123",
 			},
 		}
 
@@ -98,6 +115,17 @@ func Test__Cloudflare__Sync(t *testing.T) {
 		assert.Equal(t, "https://api.cloudflare.com/client/v4/zones", httpContext.Requests[0].URL.String())
 		assert.Nil(t, integrationCtx.Metadata)
 	})
+}
+
+func Test__Cloudflare__Configuration(t *testing.T) {
+	c := &Cloudflare{}
+	fields := c.Configuration()
+
+	require.Len(t, fields, 2)
+	assert.Equal(t, "apiToken", fields[0].Name)
+	assert.True(t, fields[0].Required)
+	assert.Equal(t, "accountId", fields[1].Name)
+	assert.True(t, fields[1].Required)
 }
 
 func Test__Cloudflare__ListResources(t *testing.T) {

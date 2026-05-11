@@ -2,6 +2,7 @@ package cloudflare
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -10,13 +11,14 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("cloudflare", &Cloudflare{})
+	registry.RegisterIntegrationWithWebhookHandler("cloudflare", &Cloudflare{}, &CloudflareWebhookHandler{})
 }
 
 type Cloudflare struct{}
 
 type Configuration struct {
-	APIToken string `json:"apiToken"`
+	APIToken  string `json:"apiToken"`
+	AccountID string `json:"accountId"`
 }
 
 type Metadata struct {
@@ -51,10 +53,24 @@ func (c *Cloudflare) Instructions() string {
      - Zone / Zone / Read
      - Zone / DNS / Edit
      - Zone / Dynamic Redirect / Edit
-     - Zone / DNS / Edit
+     - Account / Load Balancing: Monitors and Pools / Edit
+     - Account / Notifications / Edit
+     - Account / Account Settings / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
+   - **Account Resources**: Include the account containing your load balancers
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
+
+## Find your Cloudflare Account ID
+
+The **Account ID** is required for load balancing monitors and health alert webhooks.
+
+1. Open the [Cloudflare dashboard](https://dash.cloudflare.com/)
+2. Select the account that contains your load balancers
+3. In the account home page, copy the **Account ID** from the right sidebar
+4. Paste it into the **Account ID** field below
+
+Make sure this is the same account selected in **Account Resources** when creating the API token.
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.`
 }
@@ -69,6 +85,13 @@ func (c *Cloudflare) Configuration() []configuration.Field {
 			Sensitive:   true,
 			Description: "Cloudflare API Token with appropriate permissions",
 		},
+		{
+			Name:        "accountId",
+			Label:       "Account ID",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "Cloudflare account ID from the account home page right sidebar. Required for load balancing monitors and alerting webhooks.",
+		},
 	}
 }
 
@@ -78,11 +101,15 @@ func (c *Cloudflare) Actions() []core.Action {
 		&UpdateRedirectRule{},
 		&UpdateDNSRecord{},
 		&DeleteDNSRecord{},
+		&CreateMonitor{},
+		&DeleteMonitor{},
 	}
 }
 
 func (c *Cloudflare) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnLoadBalancingHealthAlert{},
+	}
 }
 
 func (c *Cloudflare) Sync(ctx core.SyncContext) error {
@@ -94,6 +121,10 @@ func (c *Cloudflare) Sync(ctx core.SyncContext) error {
 
 	if configuration.APIToken == "" {
 		return fmt.Errorf("apiToken is required")
+	}
+
+	if strings.TrimSpace(configuration.AccountID) == "" {
+		return fmt.Errorf("accountId is required")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -186,6 +217,62 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 					ID:   fmt.Sprintf("%s/%s", zone.ID, record.ID),
 				})
 			}
+		}
+		return resources, nil
+
+	case "monitor":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		accountID, err := accountIDForIntegration(ctx.Integration)
+		if err != nil {
+			return nil, err
+		}
+
+		monitors, err := client.ListMonitors(accountID)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(monitors))
+		for _, monitor := range monitors {
+			name := monitor.Description
+			if name == "" {
+				name = monitor.ID
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   monitor.ID,
+			})
+		}
+		return resources, nil
+
+	case "pool":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		accountID, err := accountIDForIntegration(ctx.Integration)
+		if err != nil {
+			return nil, err
+		}
+
+		pools, err := client.ListPools(accountID)
+		if err != nil {
+			return nil, err
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(pools))
+		for _, pool := range pools {
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: pool.Name,
+				ID:   pool.ID,
+			})
 		}
 		return resources, nil
 

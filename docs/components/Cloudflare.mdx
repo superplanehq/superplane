@@ -6,11 +6,19 @@ Manage Cloudflare zones, rules, and DNS
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Load Balancing Health Alert" href="#on-load-balancing-health-alert" description="Trigger when a Cloudflare load balancing pool or origin health state changes" />
+</CardGrid>
+
 ## Actions
 
 <CardGrid>
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record in a Cloudflare zone" />
+  <LinkCard title="Create Monitor" href="#create-monitor" description="Create a Cloudflare load balancing health monitor" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a Cloudflare zone" />
+  <LinkCard title="Delete Monitor" href="#delete-monitor" description="Delete a Cloudflare load balancing health monitor" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
 </CardGrid>
@@ -28,12 +36,68 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
      - Zone / Zone / Read
      - Zone / DNS / Edit
      - Zone / Dynamic Redirect / Edit
-     - Zone / DNS / Edit
+     - Account / Load Balancing: Monitors and Pools / Edit
+     - Account / Notifications / Edit
+     - Account / Account Settings / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
+   - **Account Resources**: Include the account containing your load balancers
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
 
+## Find your Cloudflare Account ID
+
+The **Account ID** is required for load balancing monitors and health alert webhooks.
+
+1. Open the [Cloudflare dashboard](https://dash.cloudflare.com/)
+2. Select the account that contains your load balancers
+3. In the account home page, copy the **Account ID** from the right sidebar
+4. Paste it into the **Account ID** field below
+
+Make sure this is the same account selected in **Account Resources** when creating the API token.
+
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+<a id="on-load-balancing-health-alert"></a>
+
+## On Load Balancing Health Alert
+
+The On Load Balancing Health Alert trigger starts a workflow from Cloudflare Load Balancing health notifications.
+
+### Use Cases
+
+- **Pool unhealthy**: React when a load balancer pool becomes unhealthy
+- **Origin unhealthy**: Notify or remediate when an endpoint/origin fails health checks
+- **Failover awareness**: Detect health changes that cause Cloudflare to route traffic away from unhealthy pools
+
+### Configuration
+
+- **Pool**: Optional pool filter. Leave empty to listen across pools available to the account.
+- **New Health**: Health states to listen for. Defaults to `Unhealthy`.
+- **Event Source**: Listen for pool events, origin events, or both.
+
+### Webhook Setup
+
+SuperPlane automatically creates a Cloudflare Alerting webhook destination and notification policy for `load_balancing_health_alert`. Cloudflare signs requests with the generated webhook secret and SuperPlane verifies the `cf-webhook-auth` header before emitting an event.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account_id": "account_abc123",
+    "alert_type": "load_balancing_health_alert",
+    "event_source": "origin",
+    "load_balancer_id": "lb_123",
+    "load_balancer_name": "api.example.com",
+    "new_health": "Unhealthy",
+    "origin_name": "api-primary",
+    "pool_id": "pool_xyz789",
+    "pool_name": "Production pool"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.loadBalancing.healthAlert"
+}
+```
 
 <a id="create-dns-record"></a>
 
@@ -78,6 +142,60 @@ Emits the created DNS record on the default channel. If the zone is not found, t
 }
 ```
 
+<a id="create-monitor"></a>
+
+## Create Monitor
+
+The Create Monitor component creates a Cloudflare Load Balancing health monitor.
+
+### Use Cases
+
+- **Health checks**: Monitor HTTP, HTTPS, TCP, ICMP, UDP, or SMTP endpoints
+- **Failover**: Attach the new monitor to a pool so unhealthy origins are removed from load balancer rotation
+- **Release safety**: Create monitor definitions as part of load balancing setup automation
+
+### Configuration
+
+- **Name / Type / Path / Port**: Basic monitor settings. Path is required for HTTP and HTTPS monitors. Port is required for HTTP, HTTPS, TCP, UDP ICMP, and SMTP monitors.
+- **Advanced Health Check Settings**: Optional method, expected response, headers, redirects, TLS, and health threshold settings.
+- **Pool**: Optional pool to attach the created monitor to immediately.
+
+### Output
+
+Emits the created monitor and, when configured, the attached pool.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "account_abc123",
+    "monitor": {
+      "consecutive_down": 3,
+      "consecutive_up": 2,
+      "description": "Login page monitor",
+      "expected_codes": "2xx",
+      "id": "monitor_abc123",
+      "interval": 1,
+      "method": "GET",
+      "path": "/health",
+      "retries": 0,
+      "timeout": 1,
+      "type": "https"
+    },
+    "monitorId": "monitor_abc123",
+    "pool": {
+      "id": "pool_xyz789",
+      "monitor": "monitor_abc123",
+      "name": "Production pool"
+    },
+    "poolId": "pool_xyz789"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.monitor"
+}
+```
+
 <a id="delete-dns-record"></a>
 
 ## Delete DNS Record
@@ -116,6 +234,41 @@ Emits the deleted DNS record (zoneId, recordId, record) on the default channel. 
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "cloudflare.dnsRecord"
+}
+```
+
+<a id="delete-monitor"></a>
+
+## Delete Monitor
+
+The Delete Monitor component removes a Cloudflare Load Balancing health monitor.
+
+### Use Cases
+
+- **Cleanup**: Delete monitor definitions when load balancing resources are decommissioned
+- **Rollback**: Remove monitors created during test or migration workflows
+
+### Configuration
+
+- **Monitor**: The monitor to delete.
+- **Force**: Delete even when Cloudflare reports that pools or other resources reference the monitor.
+
+### Output
+
+Emits the deleted monitor ID and any references Cloudflare reported before deletion.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "account_abc123",
+    "deleted": true,
+    "monitorId": "monitor_abc123",
+    "references": []
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.monitor"
 }
 ```
 
