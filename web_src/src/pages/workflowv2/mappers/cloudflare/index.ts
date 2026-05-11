@@ -11,10 +11,6 @@ import { createPoolMapper } from "./create_pool";
 import { getPoolMapper } from "./get_pool";
 import { deletePoolMapper } from "./delete_pool";
 import { updatePoolMapper } from "./update_pool";
-import { createPoolMapper } from "./create_pool";
-import { getPoolMapper } from "./get_pool";
-import { deletePoolMapper } from "./delete_pool";
-import { updatePoolMapper } from "./update_pool";
 import { createLoadBalancerMapper } from "./create_load_balancer";
 import { getLoadBalancerMapper } from "./get_load_balancer";
 import { updateLoadBalancerMapper } from "./update_load_balancer";
@@ -33,10 +29,6 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getKVValue: getKVValueMapper,
   deleteKVValue: deleteKVValueMapper,
   deleteKVNamespace: deleteKVNamespaceMapper,
-  createPool: createPoolMapper,
-  updatePool: updatePoolMapper,
-  getPool: getPoolMapper,
-  deletePool: deletePoolMapper,
   createPool: createPoolMapper,
   updatePool: updatePoolMapper,
   getPool: getPoolMapper,
@@ -62,10 +54,6 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getKVValue: buildActionStateRegistry("fetched"),
   deleteKVValue: buildActionStateRegistry("deleted"),
   deleteKVNamespace: buildActionStateRegistry("deleted"),
-  createPool: buildActionStateRegistry("created"),
-  updatePool: buildActionStateRegistry("updated"),
-  getPool: buildActionStateRegistry("fetched"),
-  deletePool: buildActionStateRegistry("deleted"),
   createPool: buildActionStateRegistry("created"),
   updatePool: buildActionStateRegistry("updated"),
   getPool: buildActionStateRegistry("fetched"),

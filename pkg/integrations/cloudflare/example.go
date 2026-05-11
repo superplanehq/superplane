@@ -137,46 +137,6 @@ func (c *DeletePool) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeletePoolOnce, exampleOutputDeletePoolBytes, &exampleOutputDeletePool)
 }
 
-//go:embed example_output_create_pool.json
-var exampleOutputCreatePoolBytes []byte
-
-var exampleOutputCreatePoolOnce sync.Once
-var exampleOutputCreatePool map[string]any
-
-func (c *CreatePool) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreatePoolOnce, exampleOutputCreatePoolBytes, &exampleOutputCreatePool)
-}
-
-//go:embed example_output_update_pool.json
-var exampleOutputUpdatePoolBytes []byte
-
-var exampleOutputUpdatePoolOnce sync.Once
-var exampleOutputUpdatePool map[string]any
-
-func (c *UpdatePool) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdatePoolOnce, exampleOutputUpdatePoolBytes, &exampleOutputUpdatePool)
-}
-
-//go:embed example_output_get_pool.json
-var exampleOutputGetPoolBytes []byte
-
-var exampleOutputGetPoolOnce sync.Once
-var exampleOutputGetPool map[string]any
-
-func (c *GetPool) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetPoolOnce, exampleOutputGetPoolBytes, &exampleOutputGetPool)
-}
-
-//go:embed example_output_delete_pool.json
-var exampleOutputDeletePoolBytes []byte
-
-var exampleOutputDeletePoolOnce sync.Once
-var exampleOutputDeletePool map[string]any
-
-func (c *DeletePool) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeletePoolOnce, exampleOutputDeletePoolBytes, &exampleOutputDeletePool)
-}
-
 //go:embed example_output_create_load_balancer.json
 var exampleOutputCreateLoadBalancerBytes []byte
 
