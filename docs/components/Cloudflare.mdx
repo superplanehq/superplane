@@ -12,14 +12,18 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record in a Cloudflare zone" />
   <LinkCard title="Create KV Namespace" href="#create-kv-namespace" description="Create a Cloudflare Workers KV namespace" />
   <LinkCard title="Create Origin Rule" href="#create-origin-rule" description="Create a rule to override the origin server for matching requests" />
+  <LinkCard title="Create Pool" href="#create-pool" description="Create a Cloudflare Load Balancer origin pool" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a Cloudflare zone" />
   <LinkCard title="Delete KV Namespace" href="#delete-kv-namespace" description="Delete a Cloudflare Workers KV namespace" />
   <LinkCard title="Delete KV Value" href="#delete-kv-value" description="Delete a key from a Cloudflare Workers KV namespace" />
   <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
+  <LinkCard title="Delete Pool" href="#delete-pool" description="Delete a Cloudflare Load Balancer origin pool" />
   <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
+  <LinkCard title="Get Pool" href="#get-pool" description="Retrieve a Cloudflare Load Balancer origin pool by ID" />
   <LinkCard title="Put KV Value" href="#put-kv-value" description="Write a key-value pair to a Cloudflare Workers KV namespace" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
   <LinkCard title="Update Origin Rule" href="#update-origin-rule" description="Update an existing origin rule" />
+  <LinkCard title="Update Pool" href="#update-pool" description="Update a Cloudflare Load Balancer origin pool's configuration or origin weights" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
 </CardGrid>
 
@@ -38,6 +42,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
 	 - Account / Workers KV Storage / Edit
+     - Account / Load Balancing: Monitor and Pools / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
@@ -175,6 +180,64 @@ Emits the created origin rule on the default channel.
   },
   "timestamp": "2026-05-06T12:00:00Z",
   "type": "cloudflare.createOriginRule"
+}
+```
+
+<a id="create-pool"></a>
+
+## Create Pool
+
+The Create Pool component creates a new Cloudflare Load Balancer origin pool.
+
+### Use Cases
+
+- **Canary deployments**: Provision a new origin pool for a canary release
+- **Blue/green deployments**: Create the green pool before switching traffic
+- **Multi-region**: Add origin servers in new regions
+
+### Configuration
+
+- **Name**: A unique, human-readable name for the pool
+- **Description**: Optional description
+- **Origins**: List of origin servers with name, address, enabled flag, weight, optional port, and optional coordinates
+- **Enabled**: Whether the pool is active
+- **Minimum Origins**: Minimum number of healthy origins before marking pool unhealthy
+- **Origin Steering Policy**: How requests are distributed across origins
+- **Monitor**: (Optional) Health monitor to use for origin health checks
+- **Load Shedding**: (Optional) Configure load shedding for the pool
+
+### Output
+
+Returns the created origin pool with its assigned ID and full configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my pool",
+      "enabled": true,
+      "id": "483e85c07a861ae7a8813ef010be7036",
+      "minimum_origins": 1,
+      "name": "my-pool",
+      "origin_steering": {
+        "policy": "random"
+      },
+      "origins": [
+        {
+          "address": "192.0.2.1",
+          "enabled": true,
+          "name": "server-1",
+          "port": 2013,
+          "weight": 1
+        }
+      ]
+    }
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.pool.created"
 }
 ```
 
@@ -332,6 +395,41 @@ Emits the deleted origin rule on the default channel.
 }
 ```
 
+<a id="delete-pool"></a>
+
+## Delete Pool
+
+The Delete Pool component permanently removes a Cloudflare Load Balancer origin pool.
+
+### Use Cases
+
+- **Blue/green deployments**: Clean up the old (blue) pool after traffic has shifted
+- **Environment teardown**: Remove pools as part of infrastructure cleanup
+
+### Configuration
+
+- **Pool ID**: The origin pool to delete
+
+### Output
+
+Emits a confirmation with the account ID and pool ID of the deleted pool.
+
+> **Warning**: This operation is irreversible. Ensure the pool is not attached to any load balancer before deleting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
+  },
+  "timestamp": "2026-05-05T05:59:02.93536262Z",
+  "type": "cloudflare.pool.deleted"
+}
+```
+
 <a id="get-kv-value"></a>
 
 ## Get KV Value
@@ -365,6 +463,57 @@ Returns the account ID, namespace ID, key, and the retrieved value string.
   },
   "timestamp": "2026-05-05T06:54:57.198268018Z",
   "type": "cloudflare.kv.value.fetched"
+}
+```
+
+<a id="get-pool"></a>
+
+## Get Pool
+
+The Get Pool component fetches the current state of a Cloudflare Load Balancer origin pool.
+
+### Use Cases
+
+- **Health checks**: Inspect origin health and pool status in a workflow
+- **Pre-flight validation**: Confirm a pool exists before updating it
+- **Audit**: Capture a snapshot of pool configuration at a point in time
+
+### Configuration
+
+- **Pool ID**: The origin pool to retrieve
+
+### Output
+
+Returns the full pool configuration including its origins, enabled state, and health monitor.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my updated pool",
+      "enabled": true,
+      "id": "f7be7edc94014415ba06bca7b13c5c5a",
+      "minimum_origins": 1,
+      "name": "my-updated-pool",
+      "origin_steering": {
+        "policy": "random"
+      },
+      "origins": [
+        {
+          "address": "192.0.2.1:2015",
+          "enabled": false,
+          "name": "server-1",
+          "weight": 1
+        }
+      ]
+    },
+    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
+  },
+  "timestamp": "2026-05-05T05:58:40.060373991Z",
+  "type": "cloudflare.pool.fetched"
 }
 ```
 
@@ -492,6 +641,66 @@ Emits the updated origin rule on the default channel.
   },
   "timestamp": "2026-05-06T12:00:00Z",
   "type": "cloudflare.updateOriginRule"
+}
+```
+
+<a id="update-pool"></a>
+
+## Update Pool
+
+The Update Pool component modifies an existing Cloudflare Load Balancer origin pool.
+
+### Use Cases
+
+- **Canary deployments**: Shift traffic weight from stable to canary origin
+- **Blue/green deployments**: Disable blue origins and enable green origins
+- **Scaling**: Add or remove origin servers dynamically
+- **Health management**: Enable or disable individual origins without removing them
+
+### Configuration
+
+- **Pool ID**: The ID of the pool to update
+- **Origins**: Full list of origin servers with updated weights or enabled status
+- **Name**: Optional new name for the pool
+- **Description**: Optional new description
+- **Enabled**: Enable or disable the entire pool
+- **Minimum Origins**: Minimum number of healthy origins before pool is marked unhealthy
+- **Origin Steering Policy**: How requests are distributed across origins
+- **Monitor**: Health monitor ID for origin health checks
+- **Load Shedding**: Configure load shedding for the pool
+
+### Output
+
+Returns the updated origin pool configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my updated pool",
+      "enabled": true,
+      "id": "f7be7edc94014415ba06bca7b13c5c5a",
+      "minimum_origins": 1,
+      "name": "my-updated-pool",
+      "origin_steering": {
+        "policy": "random"
+      },
+      "origins": [
+        {
+          "address": "192.0.2.1:2015",
+          "enabled": false,
+          "name": "server-1",
+          "weight": 1
+        }
+      ]
+    },
+    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
+  },
+  "timestamp": "2026-05-05T05:57:59.044021383Z",
+  "type": "cloudflare.pool.updated"
 }
 ```
 
