@@ -271,18 +271,25 @@ func (t *OnLoadBalancingHealthAlert) HandleWebhook(ctx core.WebhookRequestContex
 		return http.StatusOK, nil, nil
 	}
 
-	if err := ctx.Events.Emit(LoadBalancingHealthAlertPayloadType, payload); err != nil {
+	if err := ctx.Events.Emit(LoadBalancingHealthAlertPayloadType, healthAlertWebhookEventData(payload)); err != nil {
 		return http.StatusInternalServerError, nil, err
 	}
 
 	return http.StatusOK, nil, nil
 }
 
-func healthAlertPayloadMatchesSpec(spec OnLoadBalancingHealthAlertSpec, payload map[string]any) bool {
-	data := payload
+// healthAlertWebhookEventData returns the object stored on the workflow event. Cloudflare may POST either
+// flat alert fields or the same fields nested under a top-level "data" key; matching uses the same unwrap
+// rule as healthAlertPayloadMatchesSpec.
+func healthAlertWebhookEventData(payload map[string]any) map[string]any {
 	if nested, ok := payload["data"].(map[string]any); ok && nested != nil {
-		data = nested
+		return nested
 	}
+	return payload
+}
+
+func healthAlertPayloadMatchesSpec(spec OnLoadBalancingHealthAlertSpec, payload map[string]any) bool {
+	data := healthAlertWebhookEventData(payload)
 
 	if spec.Pool != "" {
 		if strings.TrimSpace(healthAlertFieldString(data["pool_id"])) != spec.Pool {

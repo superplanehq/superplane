@@ -22,9 +22,22 @@ interface HealthAlertEventData {
   load_balancer_name?: string;
 }
 
+/** Cloudflare may send alert fields at the top level or under a `data` object; backend now normalizes on emit, but unwrap here for older executions. */
+function parseHealthAlertEventData(raw: unknown): HealthAlertEventData | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return undefined;
+  }
+  const envelope = raw as Record<string, unknown>;
+  const nested = envelope["data"];
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    return nested as HealthAlertEventData;
+  }
+  return envelope as HealthAlertEventData;
+}
+
 export const onLoadBalancingHealthAlertTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext): { title: string; subtitle: string | React.ReactNode } => {
-    const eventData = context.event?.data as HealthAlertEventData;
+    const eventData = parseHealthAlertEventData(context.event?.data);
 
     return {
       title: buildEventTitle(eventData),
@@ -33,7 +46,7 @@ export const onLoadBalancingHealthAlertTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as HealthAlertEventData;
+    const eventData = parseHealthAlertEventData(context.event?.data);
 
     return {
       "Triggered At": formatTriggeredAt(context.event?.createdAt),
@@ -67,7 +80,7 @@ export const onLoadBalancingHealthAlertTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as HealthAlertEventData;
+      const eventData = parseHealthAlertEventData(lastEvent.data);
       props.lastEventData = {
         title: buildEventTitle(eventData),
         subtitle: lastEvent.createdAt ? renderTimeAgo(new Date(lastEvent.createdAt)) : "",
@@ -91,7 +104,7 @@ function buildEventTitle(eventData?: HealthAlertEventData): string {
 }
 
 function getEventPoolName(eventDataSource?: { data?: unknown }): string | undefined {
-  const eventData = eventDataSource?.data as HealthAlertEventData | undefined;
+  const eventData = parseHealthAlertEventData(eventDataSource?.data);
   return eventData?.pool_name?.trim() || undefined;
 }
 

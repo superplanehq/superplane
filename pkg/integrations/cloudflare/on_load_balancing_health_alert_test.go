@@ -166,5 +166,12 @@ func Test__OnLoadBalancingHealthAlert__HandleWebhook(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 		require.Len(t, events.Payloads, 1)
+		emitted, ok := events.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "Unhealthy", emitted["new_health"])
+		assert.Equal(t, "pool", emitted["event_source"])
+		assert.Equal(t, "pool123", emitted["pool_id"])
+		_, hasEnvelope := emitted["data"]
+		assert.False(t, hasEnvelope)
 	})
 }
