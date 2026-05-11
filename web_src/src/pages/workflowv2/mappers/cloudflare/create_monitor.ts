@@ -90,7 +90,6 @@ function metadataList(configuration?: CreateMonitorConfiguration): MetadataItem[
 
 function outputDetails(output: CreateMonitorOutput): Record<string, string> {
   return compactDetails({
-    "Monitor ID": output.monitorId || output.monitor?.id || "-",
     Name: output.monitor?.description || "-",
     Type: output.monitor?.type?.toUpperCase() || "-",
     Path: output.monitor?.path,

@@ -42,11 +42,11 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createDnsRecord: buildActionStateRegistry("completed"),
-  createMonitor: buildActionStateRegistry("completed"),
+  createMonitor: buildActionStateRegistry("created"),
   createOriginRule: buildActionStateRegistry("created"),
   updateDNSRecord: buildActionStateRegistry("completed"),
   deleteDnsRecord: buildActionStateRegistry("completed"),
-  deleteMonitor: buildActionStateRegistry("completed"),
+  deleteMonitor: buildActionStateRegistry("deleted"),
   updateRedirectRule: buildActionStateRegistry("completed"),
   updateOriginRule: buildActionStateRegistry("updated"),
   deleteOriginRule: buildActionStateRegistry("deleted"),

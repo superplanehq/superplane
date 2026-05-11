@@ -35,10 +35,6 @@ export const baseMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
 
-    if (payload?.type) {
-      details["Event Type"] = payload.type;
-    }
-
     if (payload?.timestamp) {
       details["Emitted At"] = new Date(payload.timestamp).toLocaleString();
     }
