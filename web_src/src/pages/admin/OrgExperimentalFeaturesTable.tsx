@@ -1,6 +1,9 @@
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
-import { useExperimentalFeaturesRegistry, useToggleAdminExperimentalFeature } from "@/hooks/useAdminExperimentalFeatures";
+import {
+  useExperimentalFeaturesRegistry,
+  useToggleAdminExperimentalFeature,
+} from "@/hooks/useAdminExperimentalFeatures";
 import { Switch } from "@/ui/switch";
 import { FlaskConical } from "lucide-react";
 import { useMemo, useState } from "react";
