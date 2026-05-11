@@ -129,7 +129,36 @@ func (t *OnLoadBalancingHealthAlert) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
+	if err := resolveHealthAlertPoolMetadata(ctx, normalized.Pool); err != nil {
+		return err
+	}
+
 	return ctx.Integration.RequestWebhook(normalized)
+}
+
+func resolveHealthAlertPoolMetadata(ctx core.TriggerContext, poolID string) error {
+	poolID = strings.TrimSpace(poolID)
+	if poolID == "" || ctx.Metadata == nil {
+		return nil
+	}
+
+	meta := PoolNodeMetadata{PoolName: poolID}
+	accountID := accountIDFromIntegration(ctx.Integration)
+	if strings.Contains(poolID, "{{") || strings.Contains(accountID, "{{") || accountID == "" {
+		return ctx.Metadata.Set(meta)
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+	pool, err := client.GetPool(accountID, poolID)
+	if err != nil {
+		return fmt.Errorf("failed to get pool: %w", err)
+	}
+
+	meta.PoolName = pool.Name
+	return ctx.Metadata.Set(meta)
 }
 
 func normalizeHealthAlertSpec(spec OnLoadBalancingHealthAlertSpec) (OnLoadBalancingHealthAlertSpec, error) {

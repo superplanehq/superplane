@@ -4,6 +4,7 @@ import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import type { TriggerProps } from "@/ui/trigger";
 import type React from "react";
 import type { TriggerEventContext, TriggerRenderer, TriggerRendererContext } from "../types";
+import { getCloudflarePoolName } from "./metadata";
 
 interface HealthAlertConfiguration {
   pool?: string;
@@ -49,8 +50,9 @@ export const onLoadBalancingHealthAlertTriggerRenderer: TriggerRenderer = {
     const configuration = node.configuration as HealthAlertConfiguration | undefined;
     const metadata = [];
 
-    if (configuration?.pool) {
-      metadata.push({ icon: "server", label: configuration.pool });
+    const poolLabel = getCloudflarePoolName(node.metadata) || getEventPoolName(lastEvent) || configuration?.pool;
+    if (poolLabel) {
+      metadata.push({ icon: "server", label: poolLabel });
     }
 
     if (configuration?.newHealth?.length) {
@@ -87,6 +89,11 @@ function buildEventTitle(eventData?: HealthAlertEventData): string {
     eventData?.origin_name?.trim() || eventData?.pool_name?.trim() || eventData?.load_balancer_name?.trim();
 
   return [target, source, health].filter(Boolean).join(" · ");
+}
+
+function getEventPoolName(eventDataSource?: { data?: unknown }): string | undefined {
+  const eventData = eventDataSource?.data as HealthAlertEventData | undefined;
+  return eventData?.pool_name?.trim() || undefined;
 }
 
 function displayValue(value?: string): string {

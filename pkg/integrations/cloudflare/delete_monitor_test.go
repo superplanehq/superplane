@@ -146,7 +146,7 @@ func Test__DeleteMonitor__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, MonitorPayloadType, execState.Type)
+		assert.Equal(t, DeleteMonitorPayloadType, execState.Type)
 		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t, "https://api.cloudflare.com/client/v4/accounts/account123/load_balancers/monitors/monitor123/references", httpContext.Requests[0].URL.String())
 		assert.Equal(t, "https://api.cloudflare.com/client/v4/accounts/account123/load_balancers/monitors/monitor123", httpContext.Requests[1].URL.String())

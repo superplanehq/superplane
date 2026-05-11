@@ -38,7 +38,7 @@ export const deleteMonitorMapper: ComponentBaseMapper = {
       return details;
     }
 
-    details["Monitor ID"] = output.monitorId || "-";
+    details["Monitor"] = output.monitorId ? resolvedMonitorDisplayLabel(context.node.metadata, output.monitorId) : "-";
     details["Deleted"] = output.deleted ? "Yes" : "No";
 
     if (output.references) {
@@ -59,10 +59,10 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   const monitorId = configuration?.monitor?.trim();
   if (monitorId) {
-    const resolvedId = getCloudflareMonitorId(node.metadata);
-    const resolvedDesc = getCloudflareMonitorDescription(node.metadata);
-    const display = resolvedId === monitorId && resolvedDesc ? resolvedDesc : monitorId;
-    metadata.push({ icon: "trash-2", label: display });
+    metadata.push({
+      icon: "trash-2",
+      label: resolvedMonitorDisplayLabel(node.metadata, monitorId),
+    });
   }
 
   if (configuration?.force) {
@@ -70,4 +70,20 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
+}
+
+/** Prefer Cloudflare monitor description when node metadata matches the monitor id (see Setup resolver). */
+function resolvedMonitorDisplayLabel(metadata: unknown, monitorId: string): string {
+  const id = monitorId.trim();
+  if (!id) {
+    return "-";
+  }
+
+  const resolvedId = getCloudflareMonitorId(metadata);
+  const resolvedDesc = getCloudflareMonitorDescription(metadata);
+  if (resolvedId === id && resolvedDesc) {
+    return resolvedDesc;
+  }
+
+  return id;
 }

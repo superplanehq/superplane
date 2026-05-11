@@ -12,6 +12,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+// DeleteMonitorPayloadType is the emitted execution payload type (dash0-style: integration.resource.operation).
+const DeleteMonitorPayloadType = "cloudflare.monitor.deleted"
+
 type DeleteMonitor struct{}
 
 type DeleteMonitorSpec struct {
@@ -191,7 +194,7 @@ func (c *DeleteMonitor) Execute(ctx core.ExecutionContext) error {
 		deletedID = monitorID
 	}
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, MonitorPayloadType, []any{
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteMonitorPayloadType, []any{
 		map[string]any{
 			"accountId":  accountID,
 			"monitorId":  deletedID,

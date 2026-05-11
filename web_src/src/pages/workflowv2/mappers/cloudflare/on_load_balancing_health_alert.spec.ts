@@ -66,9 +66,24 @@ describe("onLoadBalancingHealthAlertTriggerRenderer", () => {
     const props = onLoadBalancingHealthAlertTriggerRenderer.getTriggerProps(context);
 
     expect(props.metadata).toEqual([
-      { icon: "server", label: "pool123" },
+      { icon: "server", label: "Production pool" },
       { icon: "activity", label: "Unhealthy" },
     ]);
     expect(props.lastEventData?.title).toBe("api-primary · origin · Unhealthy");
+  });
+
+  it("prefers resolved pool name from node metadata", () => {
+    const context: TriggerRendererContext = {
+      node: { ...NODE, metadata: { poolName: "Resolved pool" } },
+      definition: DEFINITION,
+      lastEvent: undefined,
+    };
+
+    const props = onLoadBalancingHealthAlertTriggerRenderer.getTriggerProps(context);
+
+    expect(props.metadata).toEqual([
+      { icon: "server", label: "Resolved pool" },
+      { icon: "activity", label: "Unhealthy" },
+    ]);
   });
 });

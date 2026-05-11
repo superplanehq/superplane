@@ -3,6 +3,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
+  ExecutionInfo,
   ExecutionDetailsContext,
   NodeInfo,
   SubtitleContext,
@@ -35,7 +36,6 @@ interface CreateMonitorOutput {
     description?: string;
     path?: string;
     port?: number;
-    expected_codes?: string;
   };
   pool?: {
     id?: string;
@@ -47,7 +47,7 @@ export const createMonitorMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return {
       ...baseMapper.props(context),
-      metadata: metadataList(context.node),
+      metadata: metadataList(context.node, context.lastExecutions[0]),
     };
   },
 
@@ -63,7 +63,7 @@ export const createMonitorMapper: ComponentBaseMapper = {
   },
 };
 
-function metadataList(node: NodeInfo): MetadataItem[] {
+function metadataList(node: NodeInfo, lastExecution?: ExecutionInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as CreateMonitorConfiguration | undefined;
 
@@ -82,7 +82,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   const poolId = configuration?.pool?.trim();
   if (poolId) {
-    const poolLabel = getCloudflarePoolName(node.metadata) || poolId;
+    const poolLabel = getCloudflarePoolName(node.metadata) || getPoolNameFromExecution(lastExecution) || poolId;
     metadata.push({ icon: "server", label: `Pool: ${poolLabel}` });
   }
 
@@ -93,13 +93,18 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
+function getPoolNameFromExecution(execution?: ExecutionInfo): string | undefined {
+  const output = firstOutputData(execution?.outputs) as CreateMonitorOutput | undefined;
+  const name = output?.pool?.name?.trim();
+  return name || undefined;
+}
+
 function outputDetails(output: CreateMonitorOutput): Record<string, string> {
   return compactDetails({
     Name: output.monitor?.description || "-",
     Type: output.monitor?.type?.toUpperCase() || "-",
     Path: output.monitor?.path,
     Port: output.monitor?.port != null ? String(output.monitor.port) : undefined,
-    "Expected Codes": output.monitor?.expected_codes,
     Pool: output.pool?.name || output.poolId,
   });
 }

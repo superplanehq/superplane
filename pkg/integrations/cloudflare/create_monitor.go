@@ -13,7 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-const MonitorPayloadType = "cloudflare.monitor"
+// CreateMonitorPayloadType is the emitted execution payload type (dash0-style: integration.resource.operation).
+const CreateMonitorPayloadType = "cloudflare.monitor.created"
 
 const (
 	defaultMonitorIntervalSeconds = 60
@@ -504,7 +505,7 @@ func (c *CreateMonitor) Execute(ctx core.ExecutionContext) error {
 		payload["poolId"] = spec.Pool
 	}
 
-	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, MonitorPayloadType, []any{payload})
+	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateMonitorPayloadType, []any{payload})
 }
 
 func createMonitorRequest(spec CreateMonitorSpec) CreateMonitorRequest {

@@ -305,7 +305,7 @@ func Test__CreateMonitor__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, MonitorPayloadType, execState.Type)
+		assert.Equal(t, CreateMonitorPayloadType, execState.Type)
 		require.Len(t, execState.Payloads, 1)
 		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t, "https://api.cloudflare.com/client/v4/accounts/account123/load_balancers/monitors", httpContext.Requests[0].URL.String())

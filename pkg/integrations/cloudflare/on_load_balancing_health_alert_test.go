@@ -1,7 +1,9 @@
 package cloudflare
 
 import (
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -30,6 +32,40 @@ func Test__OnLoadBalancingHealthAlert__Setup(t *testing.T) {
 		NewHealth:   []string{"Unhealthy"},
 		EventSource: []string{"pool"},
 	}, integration.WebhookRequests[0])
+}
+
+func Test__OnLoadBalancingHealthAlert__SetupResolvesPoolMetadata(t *testing.T) {
+	trigger := &OnLoadBalancingHealthAlert{}
+	metadata := &contexts.MetadataContext{}
+	integration := &contexts.IntegrationContext{
+		Configuration: map[string]any{"apiToken": "token123"},
+		Metadata:      Metadata{AccountID: "acc123"},
+	}
+
+	err := trigger.Setup(core.TriggerContext{
+		Configuration: map[string]any{
+			"pool": "pool123",
+		},
+		HTTP: &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"success": true,
+						"result": {"id": "pool123", "name": "Production pool"}
+					}`)),
+				},
+			},
+		},
+		Integration: integration,
+		Metadata:    metadata,
+	})
+
+	require.NoError(t, err)
+	poolMeta, ok := metadata.Metadata.(PoolNodeMetadata)
+	require.True(t, ok)
+	assert.Equal(t, "Production pool", poolMeta.PoolName)
+	require.Len(t, integration.WebhookRequests, 1)
 }
 
 func Test__OnLoadBalancingHealthAlert__HandleWebhook(t *testing.T) {
