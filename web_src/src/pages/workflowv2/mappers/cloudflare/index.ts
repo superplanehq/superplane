@@ -1,6 +1,9 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { baseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
+import { onLoadBalancingHealthAlertTriggerRenderer } from "./on_load_balancing_health_alert";
+import { createMonitorMapper } from "./create_monitor";
+import { deleteMonitorMapper } from "./delete_monitor";
 import { originRuleMapper } from "./origin_rule";
 import { createKVNamespaceMapper } from "./create_kv_namespace";
 import { putKVValueMapper } from "./put_kv_value";
@@ -14,9 +17,11 @@ import { updatePoolMapper } from "./update_pool";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createDnsRecord: baseMapper,
+  createMonitor: createMonitorMapper,
   createOriginRule: originRuleMapper,
   updateDNSRecord: baseMapper,
   deleteDnsRecord: baseMapper,
+  deleteMonitor: deleteMonitorMapper,
   updateRedirectRule: baseMapper,
   updateOriginRule: originRuleMapper,
   deleteOriginRule: originRuleMapper,
@@ -31,13 +36,17 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   deletePool: deletePoolMapper,
 };
 
-export const triggerRenderers: Record<string, TriggerRenderer> = {};
+export const triggerRenderers: Record<string, TriggerRenderer> = {
+  onLoadBalancingHealthAlert: onLoadBalancingHealthAlertTriggerRenderer,
+};
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createDnsRecord: buildActionStateRegistry("completed"),
+  createMonitor: buildActionStateRegistry("completed"),
   createOriginRule: buildActionStateRegistry("created"),
   updateDNSRecord: buildActionStateRegistry("completed"),
   deleteDnsRecord: buildActionStateRegistry("completed"),
+  deleteMonitor: buildActionStateRegistry("completed"),
   updateRedirectRule: buildActionStateRegistry("completed"),
   updateOriginRule: buildActionStateRegistry("updated"),
   deleteOriginRule: buildActionStateRegistry("deleted"),
