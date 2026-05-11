@@ -2,7 +2,7 @@ import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getStateMap } from "..";
-import { baseEventSections, updateLoadBalancerExecutionDetails } from "./base";
+import { baseEventSections, getLoadBalancerExecutionDetails } from "./base";
 import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo, SubtitleContext } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
@@ -37,7 +37,7 @@ export const updateLoadBalancerMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails: updateLoadBalancerExecutionDetails,
+  getExecutionDetails: getLoadBalancerExecutionDetails,
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
@@ -48,27 +48,27 @@ export const updateLoadBalancerMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as UpdateLoadBalancerNodeMetadata | undefined;
-  const config = node.configuration as UpdateLoadBalancerConfiguration;
+  const config = node.configuration as UpdateLoadBalancerConfiguration | undefined;
 
-  const label = nodeMetadata?.loadBalancerName || config.loadBalancer;
+  const label = nodeMetadata?.loadBalancerName || config?.loadBalancer;
   if (label) {
     metadata.push({ icon: "network", label });
   }
 
-  if (config.description) {
+  if (config?.description) {
     metadata.push({ icon: "text", label: config.description });
   }
 
-  if (config.steeringPolicy) {
+  if (config?.steeringPolicy) {
     metadata.push({ icon: "git-branch", label: config.steeringPolicy });
   }
 
-  if (config.defaultPools != null && config.defaultPools.length > 0) {
+  if (config?.defaultPools != null && config.defaultPools.length > 0) {
     const count = config.defaultPools.length;
     metadata.push({ icon: "layers", label: `${count} pool${count === 1 ? "" : "s"}` });
   }
 
-  if (config.enabled != null) {
+  if (config?.enabled != null) {
     metadata.push({
       icon: config.enabled ? "check-circle" : "circle",
       label: config.enabled ? "Enabled" : "Disabled",
