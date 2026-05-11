@@ -10,16 +10,18 @@ import (
 	"time"
 )
 
-const baseURL = "https://api.anthropic.com/v1"
+const defaultBaseURL = "https://api.anthropic.com/v1"
 
 type Client struct {
 	apiKey     string
 	httpClient *http.Client
+	baseURL    string
 }
 
 func NewClient(apiKey string) *Client {
 	return &Client{
-		apiKey: apiKey,
+		apiKey:  apiKey,
+		baseURL: defaultBaseURL,
 		httpClient: &http.Client{
 			Timeout: 60 * time.Second,
 		},
@@ -36,7 +38,7 @@ func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte,
 		bodyReader = bytes.NewReader(b)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, baseURL+path, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}

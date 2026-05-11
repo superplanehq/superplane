@@ -10,6 +10,7 @@ import (
 
 	"github.com/superplanehq/superplane/agent2/internal/anthropic"
 	"github.com/superplanehq/superplane/agent2/internal/store"
+	"github.com/superplanehq/superplane/pkg/jwt"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -23,19 +24,30 @@ type HandlerConfig struct {
 type Handler struct {
 	client    *anthropic.Client
 	store     *store.Store
-	jwtSecret string
+	signer    *jwt.Signer
 }
 
 func NewHandler(cfg HandlerConfig) *Handler {
 	return &Handler{
-		client:    cfg.Client,
-		store:     cfg.Store,
-		jwtSecret: cfg.JWTSecret,
+		client: cfg.Client,
+		store:  cfg.Store,
+		signer: jwt.NewSigner(cfg.JWTSecret),
 	}
 }
 
+// streamRequest matches the frontend's POST body.
+type streamRequest struct {
+	Question     string       `json:"question"`
+	AgentContext agentContext `json:"agent_context"`
+}
+
+type agentContext struct {
+	Enabled       bool   `json:"enabled"`
+	Mode          string `json:"mode"`
+	CanvasVersion string `json:"canvas_version"`
+}
+
 // HandleStream handles POST /agents/chats/{chatID}/stream
-// The frontend sends a user message and receives SSE events back.
 func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -43,42 +55,47 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Extract chat ID from path: /agents/chats/{chatID}/stream
-	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	if len(parts) < 4 || parts[3] != "stream" {
+	chatID := extractChatID(r.URL.Path)
+	if chatID == "" {
 		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
-	chatID := parts[2]
 
-	// TODO: validate JWT from Authorization header
-	// For now, extract org_id from token claims
+	// Validate JWT
+	claims, err := h.validateAuth(r)
+	if err != nil {
+		http.Error(w, "unauthorized: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
 
 	// Parse request body
-	var body struct {
-		Message string `json:"message"`
-	}
+	var body streamRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
 
-	if body.Message == "" {
-		http.Error(w, "message is required", http.StatusBadRequest)
+	if body.Question == "" {
+		http.Error(w, "question is required", http.StatusBadRequest)
 		return
 	}
 
 	// Look up chat session
-	// TODO: get org_id from JWT claims
-	orgID := r.Header.Get("X-Organization-ID")
-	chat, err := h.store.GetChat(r.Context(), orgID, chatID)
+	chat, err := h.store.GetChat(r.Context(), claims.OrgID, chatID)
 	if err != nil {
 		http.Error(w, "chat not found", http.StatusNotFound)
 		return
 	}
 
-	// Update initial message if this is the first message
+	// Verify user owns this chat
+	if chat.UserID != claims.Subject {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Update initial message if first message
 	if chat.InitialMessage == "" {
-		truncated := body.Message
+		truncated := body.Question
 		if len(truncated) > 100 {
 			truncated = truncated[:100]
 		}
@@ -100,8 +117,14 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 	// Send run_started
 	writeSSE(w, flusher, map[string]any{"type": "run_started", "model": "claude-sonnet-4-6"})
 
+	// Build prompt with canvas context
+	prompt := body.Question
+	if body.AgentContext.Mode == "build" && body.AgentContext.CanvasVersion != "" {
+		prompt = fmt.Sprintf("[Canvas version: %s]\n\n%s", body.AgentContext.CanvasVersion, body.Question)
+	}
+
 	// Send message to Anthropic
-	if err := h.client.SendMessage(r.Context(), chat.AnthropicSessionID, body.Message); err != nil {
+	if err := h.client.SendMessage(r.Context(), chat.AnthropicSessionID, prompt); err != nil {
 		writeSSE(w, flusher, map[string]any{"type": "run_failed", "error": err.Error()})
 		writeSSE(w, flusher, map[string]any{"type": "done"})
 		return
@@ -114,8 +137,32 @@ func (h *Handler) HandleStream(w http.ResponseWriter, r *http.Request) {
 	h.pollAndStream(ctx, w, flusher, chat.AnthropicSessionID)
 }
 
+func (h *Handler) validateAuth(r *http.Request) (*jwt.ScopedTokenClaims, error) {
+	auth := r.Header.Get("Authorization")
+	if auth == "" {
+		return nil, fmt.Errorf("missing authorization header")
+	}
+
+	parts := strings.SplitN(auth, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
+		return nil, fmt.Errorf("invalid authorization format")
+	}
+
+	claims, err := h.signer.ValidateScopedToken(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("invalid token: %w", err)
+	}
+
+	if claims.Purpose != "agent-builder" {
+		return nil, fmt.Errorf("invalid token purpose")
+	}
+
+	return claims, nil
+}
+
 func (h *Handler) pollAndStream(ctx context.Context, w http.ResponseWriter, flusher http.Flusher, sessionID string) {
 	lastEventCount := 0
+	seenEventIDs := make(map[string]bool)
 
 	for {
 		select {
@@ -133,33 +180,30 @@ func (h *Handler) pollAndStream(ctx context.Context, w http.ResponseWriter, flus
 			continue
 		}
 
-		// Get new events
+		// Get events
 		events, err := h.client.ListEvents(ctx, sessionID, 200)
 		if err != nil {
 			log.WithError(err).Error("failed to list events")
 			continue
 		}
 
-		// Stream new events to client
-		if len(events.Data) > lastEventCount {
-			newEvents := events.Data[lastEventCount:]
-			for _, event := range newEvents {
-				streamEvent(w, flusher, event)
+		// Stream new events
+		for i := lastEventCount; i < len(events.Data); i++ {
+			event := events.Data[i]
+			if seenEventIDs[event.ID] {
+				continue
 			}
-			lastEventCount = len(events.Data)
+			seenEventIDs[event.ID] = true
+			streamEvent(w, flusher, event)
 		}
+		lastEventCount = len(events.Data)
 
 		// Check if done
 		if session.Status == "idle" && session.Usage.OutputTokens > 0 {
-			// Send final answer from last assistant message
+			// Extract final assistant message
 			for i := len(events.Data) - 1; i >= 0; i-- {
 				if events.Data[i].Type == "agent.message" {
-					text := ""
-					for _, c := range events.Data[i].Content {
-						if c.Type == "text" {
-							text += c.Text
-						}
-					}
+					text := extractText(events.Data[i])
 					if text != "" {
 						writeSSE(w, flusher, map[string]any{"type": "final_answer", "output": text})
 					}
@@ -183,6 +227,9 @@ func streamEvent(w http.ResponseWriter, flusher http.Flusher, event anthropic.Ev
 	switch event.Type {
 	case "agent.tool_use":
 		label := event.Name
+		if label == "" {
+			label = "working..."
+		}
 		writeSSE(w, flusher, map[string]any{
 			"type":         "tool_started",
 			"tool_name":    event.Name,
@@ -197,16 +244,30 @@ func streamEvent(w http.ResponseWriter, flusher http.Flusher, event anthropic.Ev
 			"tool_label":   event.Name,
 		})
 	case "agent.message":
-		text := ""
-		for _, c := range event.Content {
-			if c.Type == "text" {
-				text += c.Text
-			}
-		}
+		text := extractText(event)
 		if text != "" {
 			writeSSE(w, flusher, map[string]any{"type": "model_delta", "content": text})
 		}
 	}
+}
+
+func extractText(event anthropic.Event) string {
+	var text string
+	for _, c := range event.Content {
+		if c.Type == "text" {
+			text += c.Text
+		}
+	}
+	return text
+}
+
+func extractChatID(path string) string {
+	// /agents/chats/{chatID}/stream
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) >= 4 && parts[0] == "agents" && parts[1] == "chats" && parts[3] == "stream" {
+		return parts[2]
+	}
+	return ""
 }
 
 func writeSSE(w http.ResponseWriter, flusher http.Flusher, data map[string]any) {
