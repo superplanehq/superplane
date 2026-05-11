@@ -106,16 +106,23 @@ func Test__Cloudflare__ListResources(t *testing.T) {
 	c := &Cloudflare{}
 
 	t.Run("list zones from metadata", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{}
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"success": true,
+						"result": [
+							{"id": "zone1", "name": "example.com", "status": "active"},
+							{"id": "zone2", "name": "test.com", "status": "active"}
+						]
+					}`)),
+				},
+			},
+		}
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
-			},
-			Metadata: Metadata{
-				Zones: []Zone{
-					{ID: "zone1", Name: "example.com", Status: "active"},
-					{ID: "zone2", Name: "test.com", Status: "active"},
-				},
 			},
 		}
 
