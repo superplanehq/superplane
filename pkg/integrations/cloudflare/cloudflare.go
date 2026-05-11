@@ -91,6 +91,16 @@ func resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error 
 	return ctx.Metadata.Set(meta)
 }
 
+// splitLBID splits a composite load balancer ID of the form "zoneID/lbID"
+// into its component parts.
+func splitLBID(compositeID string) (zoneID, lbID string, err error) {
+	parts := strings.SplitN(compositeID, "/", 2)
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
+		return "", "", fmt.Errorf("invalid load balancer ID %q: expected format zoneId/lbId", compositeID)
+	}
+	return parts[0], parts[1], nil
+}
+
 func (c *Cloudflare) Name() string {
 	return "cloudflare"
 }
@@ -123,6 +133,7 @@ func (c *Cloudflare) Instructions() string {
      - Zone / Origin Rules / Edit
      - Account / Workers KV Storage / Edit
      - Account / Load Balancing: Monitors and Pools / Edit
+     - Zone / Load Balancers / Edit
      - Account / Notifications / Edit
      - Account / Account Settings / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
@@ -185,6 +196,10 @@ func (c *Cloudflare) Actions() []core.Action {
 		&UpdatePool{},
 		&GetPool{},
 		&DeletePool{},
+		&CreateLoadBalancer{},
+		&GetLoadBalancer{},
+		&UpdateLoadBalancer{},
+		&DeleteLoadBalancer{},
 	}
 }
 
@@ -227,13 +242,18 @@ func (c *Cloudflare) Cleanup(ctx core.IntegrationCleanupContext) error {
 func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "zone":
-		metadata := Metadata{}
-		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-			return nil, fmt.Errorf("failed to decode application metadata: %w", err)
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
 		}
 
-		resources := make([]core.IntegrationResource, 0, len(metadata.Zones))
-		for _, zone := range metadata.Zones {
+		zones, err := client.ListZones()
+		if err != nil {
+			return nil, fmt.Errorf("error listing zones: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(zones))
+		for _, zone := range zones {
 			resources = append(resources, core.IntegrationResource{
 				Type: resourceType,
 				Name: zone.Name,
@@ -449,6 +469,34 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 				Name: p.Name,
 				ID:   p.ID,
 			})
+		}
+		return resources, nil
+
+	case "load_balancer":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		zones, err := client.ListZones()
+		if err != nil {
+			return nil, fmt.Errorf("error listing zones: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, zone := range zones {
+			lbs, err := client.ListLoadBalancers(zone.ID)
+			if err != nil {
+				ctx.Logger.WithError(err).WithField("zone_id", zone.ID).WithField("zone_name", zone.Name).Warn("failed to list load balancers for zone, skipping")
+				continue
+			}
+			for _, lb := range lbs {
+				resources = append(resources, core.IntegrationResource{
+					Type: resourceType,
+					Name: fmt.Sprintf("%s (%s)", lb.Name, zone.Name),
+					ID:   fmt.Sprintf("%s/%s", zone.ID, lb.ID),
+				})
+			}
 		}
 		return resources, nil
 

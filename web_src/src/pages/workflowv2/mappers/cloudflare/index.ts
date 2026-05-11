@@ -14,6 +14,10 @@ import { createPoolMapper } from "./create_pool";
 import { getPoolMapper } from "./get_pool";
 import { deletePoolMapper } from "./delete_pool";
 import { updatePoolMapper } from "./update_pool";
+import { createLoadBalancerMapper } from "./create_load_balancer";
+import { getLoadBalancerMapper } from "./get_load_balancer";
+import { updateLoadBalancerMapper } from "./update_load_balancer";
+import { deleteLoadBalancerMapper } from "./delete_load_balancer";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createDnsRecord: baseMapper,
@@ -34,6 +38,10 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   updatePool: updatePoolMapper,
   getPool: getPoolMapper,
   deletePool: deletePoolMapper,
+  createLoadBalancer: createLoadBalancerMapper,
+  getLoadBalancer: getLoadBalancerMapper,
+  updateLoadBalancer: updateLoadBalancerMapper,
+  deleteLoadBalancer: deleteLoadBalancerMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -59,4 +67,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   updatePool: buildActionStateRegistry("updated"),
   getPool: buildActionStateRegistry("fetched"),
   deletePool: buildActionStateRegistry("deleted"),
+  createLoadBalancer: buildActionStateRegistry("created"),
+  getLoadBalancer: buildActionStateRegistry("fetched"),
+  updateLoadBalancer: buildActionStateRegistry("updated"),
+  deleteLoadBalancer: buildActionStateRegistry("deleted"),
 };

@@ -166,3 +166,43 @@ var exampleOutputDeletePool map[string]any
 func (c *DeletePool) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeletePoolOnce, exampleOutputDeletePoolBytes, &exampleOutputDeletePool)
 }
+
+//go:embed example_output_create_load_balancer.json
+var exampleOutputCreateLoadBalancerBytes []byte
+
+var exampleOutputCreateLoadBalancerOnce sync.Once
+var exampleOutputCreateLoadBalancer map[string]any
+
+func (c *CreateLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateLoadBalancerOnce, exampleOutputCreateLoadBalancerBytes, &exampleOutputCreateLoadBalancer)
+}
+
+//go:embed example_output_get_load_balancer.json
+var exampleOutputGetLoadBalancerBytes []byte
+
+var exampleOutputGetLoadBalancerOnce sync.Once
+var exampleOutputGetLoadBalancer map[string]any
+
+func (c *GetLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetLoadBalancerOnce, exampleOutputGetLoadBalancerBytes, &exampleOutputGetLoadBalancer)
+}
+
+//go:embed example_output_update_load_balancer.json
+var exampleOutputUpdateLoadBalancerBytes []byte
+
+var exampleOutputUpdateLoadBalancerOnce sync.Once
+var exampleOutputUpdateLoadBalancer map[string]any
+
+func (c *UpdateLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateLoadBalancerOnce, exampleOutputUpdateLoadBalancerBytes, &exampleOutputUpdateLoadBalancer)
+}
+
+//go:embed example_output_delete_load_balancer.json
+var exampleOutputDeleteLoadBalancerBytes []byte
+
+var exampleOutputDeleteLoadBalancerOnce sync.Once
+var exampleOutputDeleteLoadBalancer map[string]any
+
+func (c *DeleteLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteLoadBalancerOnce, exampleOutputDeleteLoadBalancerBytes, &exampleOutputDeleteLoadBalancer)
+}
