@@ -13,7 +13,7 @@ export interface GetDropletConfiguration {
 }
 
 export interface DeleteDropletConfiguration {
-  dropletId: string;
+  droplet: string;
 }
 
 export interface ManageDropletPowerConfiguration {

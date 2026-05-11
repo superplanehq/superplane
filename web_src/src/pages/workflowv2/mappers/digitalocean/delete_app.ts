@@ -64,7 +64,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   if (nodeMetadata?.appName) {
     metadata.push({ icon: "trash-2", label: nodeMetadata.appName });
   } else if (configuration?.app) {
-    metadata.push({ icon: "trash-2", label: `App ID: ${configuration.app}` });
+    metadata.push({ icon: "trash-2", label: `App: ${configuration.app}` });
   }
 
   return metadata;
