@@ -1727,3 +1727,255 @@ func (c *Client) DeleteLoadBalancer(zoneID, lbID string) error {
 
 	return nil
 }
+
+const workerModuleFileName = "worker.js"
+
+// UploadWorkerScriptVersion uploads a new Worker version using multipart/form-data (POST .../versions).
+func (c *Client) UploadWorkerScriptVersion(accountID, scriptName string, metadata map[string]any, moduleContent string) (string, error) {
+	if metadata == nil {
+		metadata = map[string]any{}
+	}
+	if _, ok := metadata["main_module"]; !ok {
+		metadata["main_module"] = workerModuleFileName
+	}
+
+	metaBytes, err := json.Marshal(metadata)
+	if err != nil {
+		return "", fmt.Errorf("error marshaling worker metadata: %w", err)
+	}
+
+	buf := &bytes.Buffer{}
+	writer := multipart.NewWriter(buf)
+	if err := writer.WriteField("metadata", string(metaBytes)); err != nil {
+		return "", fmt.Errorf("error writing metadata field: %w", err)
+	}
+	part, err := writer.CreateFormFile(workerModuleFileName, workerModuleFileName)
+	if err != nil {
+		return "", fmt.Errorf("error creating script form part: %w", err)
+	}
+	if _, err := part.Write([]byte(moduleContent)); err != nil {
+		return "", fmt.Errorf("error writing script content: %w", err)
+	}
+	if err := writer.Close(); err != nil {
+		return "", fmt.Errorf("error closing multipart writer: %w", err)
+	}
+
+	rawURL := fmt.Sprintf("%s/accounts/%s/workers/scripts/%s/versions", c.BaseURL, accountID, url.PathEscape(scriptName))
+	req, err := http.NewRequest(http.MethodPost, rawURL, buf)
+	if err != nil {
+		return "", fmt.Errorf("error building request: %w", err)
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("error executing request: %w", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading body: %w", err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return "", newCloudflareAPIError(res.StatusCode, responseBody)
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+		Result  struct {
+			ID string `json:"id"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return "", fmt.Errorf("error parsing response: %w", err)
+	}
+	if !response.Success {
+		return "", newCloudflareAPIError(http.StatusOK, responseBody)
+	}
+	if response.Result.ID == "" {
+		return "", fmt.Errorf("upload response missing version id")
+	}
+	return response.Result.ID, nil
+}
+
+type workerDeploymentRequest struct {
+	Strategy    string                    `json:"strategy"`
+	Versions    []workerDeploymentVersion `json:"versions"`
+	Annotations map[string]string         `json:"annotations,omitempty"`
+}
+
+type workerDeploymentVersion struct {
+	Percentage int    `json:"percentage"`
+	VersionID  string `json:"version_id"`
+}
+
+// CreateWorkerDeployment creates a deployment so the given version serves traffic.
+func (c *Client) CreateWorkerDeployment(accountID, scriptName, versionID string, annotations map[string]string) (map[string]any, error) {
+	rawURL := fmt.Sprintf("%s/accounts/%s/workers/scripts/%s/deployments", c.BaseURL, accountID, url.PathEscape(scriptName))
+
+	reqBody := workerDeploymentRequest{
+		Strategy: "percentage",
+		Versions: []workerDeploymentVersion{
+			{Percentage: 100, VersionID: versionID},
+		},
+		Annotations: annotations,
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling deployment request: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, rawURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool           `json:"success"`
+		Result  map[string]any `json:"result"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %w", err)
+	}
+	if !response.Success {
+		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
+	}
+	return response.Result, nil
+}
+
+// GetWorkerSettings returns script settings (bindings, compatibility, etc.).
+func (c *Client) GetWorkerSettings(accountID, scriptName string) (map[string]any, error) {
+	rawURL := fmt.Sprintf("%s/accounts/%s/workers/scripts/%s/settings", c.BaseURL, accountID, url.PathEscape(scriptName))
+	responseBody, err := c.execRequest(http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool           `json:"success"`
+		Result  map[string]any `json:"result"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %w", err)
+	}
+	if !response.Success {
+		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
+	}
+	return response.Result, nil
+}
+
+// ListWorkerDeployments returns deployments for a script (newest first per API).
+func (c *Client) ListWorkerDeployments(accountID, scriptName string) ([]map[string]any, error) {
+	rawURL := fmt.Sprintf("%s/accounts/%s/workers/scripts/%s/deployments", c.BaseURL, accountID, url.PathEscape(scriptName))
+	responseBody, err := c.execRequest(http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+		Result  struct {
+			Deployments []map[string]any `json:"deployments"`
+		} `json:"result"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %w", err)
+	}
+	if !response.Success {
+		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
+	}
+	return response.Result.Deployments, nil
+}
+
+// DeleteWorkerScript deletes a Worker script from the account.
+func (c *Client) DeleteWorkerScript(accountID, scriptName string, force bool) error {
+	rawURL := fmt.Sprintf("%s/accounts/%s/workers/scripts/%s", c.BaseURL, accountID, url.PathEscape(scriptName))
+	if force {
+		rawURL += "?force=true"
+	}
+	responseBody, err := c.execRequest(http.MethodDelete, rawURL, nil)
+	if err != nil {
+		return err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return fmt.Errorf("error parsing response: %w", err)
+	}
+	if !response.Success {
+		return newCloudflareAPIError(http.StatusOK, responseBody)
+	}
+	return nil
+}
+
+// WorkerRoute is a zone route mapping a pattern to a Worker script name.
+type WorkerRoute struct {
+	ID      string `json:"id"`
+	Pattern string `json:"pattern"`
+	Script  string `json:"script,omitempty"`
+}
+
+type workerRouteRequest struct {
+	Pattern string `json:"pattern"`
+	Script  string `json:"script,omitempty"`
+}
+
+// CreateWorkerRoute creates a zone route for a Worker.
+func (c *Client) CreateWorkerRoute(zoneID, pattern, script string) (*WorkerRoute, error) {
+	rawURL := fmt.Sprintf("%s/zones/%s/workers/routes", c.BaseURL, zoneID)
+
+	body, err := json.Marshal(workerRouteRequest{Pattern: pattern, Script: script})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling route request: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, rawURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool        `json:"success"`
+		Result  WorkerRoute `json:"result"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %w", err)
+	}
+	if !response.Success {
+		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
+	}
+	return &response.Result, nil
+}
+
+// UpdateWorkerRoute updates an existing zone route.
+func (c *Client) UpdateWorkerRoute(zoneID, routeID, pattern, script string) (*WorkerRoute, error) {
+	rawURL := fmt.Sprintf("%s/zones/%s/workers/routes/%s", c.BaseURL, zoneID, routeID)
+
+	body, err := json.Marshal(workerRouteRequest{Pattern: pattern, Script: script})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling route request: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, rawURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool        `json:"success"`
+		Result  WorkerRoute `json:"result"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %w", err)
+	}
+	if !response.Success {
+		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
+	}
+	return &response.Result, nil
+}
