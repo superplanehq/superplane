@@ -382,6 +382,35 @@ func (c *Client) ListMonitorReferences(accountID, monitorID string) ([]MonitorRe
 	return response.Result, nil
 }
 
+func (c *Client) UpdateMonitor(accountID, monitorID string, req CreateMonitorRequest) (*Monitor, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/monitors/%s", c.BaseURL, accountID, monitorID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool    `json:"success"`
+		Result  Monitor `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
 func (c *Client) ListPools(accountID string) ([]Pool, error) {
 	url := fmt.Sprintf("%s/accounts/%s/load_balancers/pools", c.BaseURL, accountID)
 	responseBody, err := c.execRequest(http.MethodGet, url, nil)
