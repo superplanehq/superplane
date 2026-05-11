@@ -489,11 +489,16 @@ func ListOrganizationsPendingUsageLimitsRefreshInTransaction(
 // enabled set, deduping. The caller is responsible for validating that the
 // feature id exists in the registry.
 func EnableExperimentalFeature(orgID uuid.UUID, featureID string) error {
-	return EnableExperimentalFeatureInTransaction(database.Conn(), orgID, featureID)
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		return EnableExperimentalFeatureInTransaction(tx, orgID, featureID)
+	})
 }
 
 func EnableExperimentalFeatureInTransaction(tx *gorm.DB, orgID uuid.UUID, featureID string) error {
-	organization, err := FindOrganizationByIDInTransaction(tx, orgID.String())
+	organization, err := FindOrganizationByIDInTransaction(
+		tx.Clauses(clause.Locking{Strength: "UPDATE"}),
+		orgID.String(),
+	)
 	if err != nil {
 		return err
 	}
@@ -517,11 +522,16 @@ func EnableExperimentalFeatureInTransaction(tx *gorm.DB, orgID uuid.UUID, featur
 // DisableExperimentalFeature removes the given feature id from the
 // organization's enabled set. Disabling an id that is not enabled is a no-op.
 func DisableExperimentalFeature(orgID uuid.UUID, featureID string) error {
-	return DisableExperimentalFeatureInTransaction(database.Conn(), orgID, featureID)
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		return DisableExperimentalFeatureInTransaction(tx, orgID, featureID)
+	})
 }
 
 func DisableExperimentalFeatureInTransaction(tx *gorm.DB, orgID uuid.UUID, featureID string) error {
-	organization, err := FindOrganizationByIDInTransaction(tx, orgID.String())
+	organization, err := FindOrganizationByIDInTransaction(
+		tx.Clauses(clause.Locking{Strength: "UPDATE"}),
+		orgID.String(),
+	)
 	if err != nil {
 		return err
 	}

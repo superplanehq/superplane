@@ -1,6 +1,8 @@
 package models
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -93,6 +95,47 @@ func Test__ExperimentalFeatures(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, ok)
 	})
+
+	t.Run("concurrent enables on the same org do not lose updates", func(t *testing.T) {
+		org, err := CreateOrganization("expfeat-concurrent", "")
+		require.NoError(t, err)
+
+		const n = 10
+		ids := make([]string, n)
+		for i := 0; i < n; i++ {
+			ids[i] = fmt.Sprintf("concurrent-feature-%d", i)
+		}
+		t.Cleanup(features.WithRegistryForTest(featuresFromIDs(ids)))
+
+		var wg sync.WaitGroup
+		errs := make(chan error, n)
+		for _, id := range ids {
+			wg.Add(1)
+			go func(featureID string) {
+				defer wg.Done()
+				if err := EnableExperimentalFeature(org.ID, featureID); err != nil {
+					errs <- err
+				}
+			}(id)
+		}
+		wg.Wait()
+		close(errs)
+		for err := range errs {
+			require.NoError(t, err)
+		}
+
+		reloaded, err := FindOrganizationByID(org.ID.String())
+		require.NoError(t, err)
+		assert.ElementsMatch(t, ids, []string(reloaded.EnabledExperimentalFeatures))
+	})
+}
+
+func featuresFromIDs(ids []string) []features.Feature {
+	out := make([]features.Feature, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, features.Feature{ID: id, Label: id})
+	}
+	return out
 }
 
 // stubReleasedFeature monkey-patches the registry to include a released

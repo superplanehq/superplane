@@ -1,71 +1,27 @@
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
-import { organizationKeys } from "@/hooks/useOrganizationData";
+import { useExperimentalFeaturesRegistry, useToggleAdminExperimentalFeature } from "@/hooks/useAdminExperimentalFeatures";
 import { Switch } from "@/ui/switch";
-import { useQueryClient } from "@tanstack/react-query";
 import { FlaskConical } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-
-interface ExperimentalFeature {
-  id: string;
-  label: string;
-  description: string;
-  released: boolean;
-}
-
-interface RegistryResponse {
-  features: ExperimentalFeature[];
-  enabled: string[];
-}
+import { useMemo, useState } from "react";
 
 export function OrgExperimentalFeaturesTable({ orgId }: { orgId: string }) {
-  const queryClient = useQueryClient();
-  const [features, setFeatures] = useState<ExperimentalFeature[]>([]);
-  const [enabled, setEnabled] = useState<Set<string>>(new Set());
-  const [loading, setLoading] = useState(true);
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const { data, isLoading } = useExperimentalFeaturesRegistry(orgId);
+  const toggleFeature = useToggleAdminExperimentalFeature(orgId);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchFeatures = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch(`/admin/api/organizations/${orgId}/experimental-features`, {
-      credentials: "include",
-    });
-    if (res.ok) {
-      const data: RegistryResponse = await res.json();
-      setFeatures(data.features ?? []);
-      setEnabled(new Set(data.enabled ?? []));
-    }
-    setLoading(false);
-  }, [orgId]);
+  const features = data?.features ?? [];
+  const enabled = useMemo(() => new Set(data?.enabled ?? []), [data?.enabled]);
+  const pendingId = toggleFeature.isPending ? (toggleFeature.variables?.featureId ?? null) : null;
 
-  useEffect(() => {
-    fetchFeatures();
-  }, [fetchFeatures]);
-
-  const handleToggle = async (featureId: string, next: boolean) => {
-    setPendingId(featureId);
+  const handleToggle = (featureId: string, next: boolean) => {
     setError(null);
-
-    const previous = new Set(enabled);
-    const optimistic = new Set(previous);
-    if (next) optimistic.add(featureId);
-    else optimistic.delete(featureId);
-    setEnabled(optimistic);
-
-    const res = await fetch(`/admin/api/organizations/${orgId}/experimental-features/${featureId}`, {
-      method: next ? "POST" : "DELETE",
-      credentials: "include",
-    });
-
-    if (!res.ok) {
-      setEnabled(previous);
-      setError(`Failed to ${next ? "enable" : "disable"} ${featureId}`);
-    } else {
-      queryClient.invalidateQueries({ queryKey: organizationKeys.details(orgId) });
-    }
-
-    setPendingId(null);
+    toggleFeature.mutate(
+      { featureId, enabled: next },
+      {
+        onError: () => setError(`Failed to ${next ? "enable" : "disable"} ${featureId}`),
+      },
+    );
   };
 
   const visible = features.filter((f) => !f.released);
@@ -79,7 +35,7 @@ export function OrgExperimentalFeaturesTable({ orgId }: { orgId: string }) {
         </Heading>
       </div>
 
-      {loading ? (
+      {isLoading ? (
         <Text className="text-gray-500 text-sm">Loading...</Text>
       ) : visible.length === 0 ? (
         <Text className="text-gray-500 text-sm">No experimental features are available right now.</Text>
