@@ -113,9 +113,19 @@ type SSHConfiguration = {
   host: string;
   port?: number;
   username: string;
-  commands?: string;
+  commands?: unknown;
   authMethod?: string;
 };
+
+function normalizeCommands(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === "string").join("\n");
+  }
+  return "";
+}
 
 export const sshMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -222,15 +232,18 @@ function getSSHMetadataList(node: NodeInfo): Array<{ icon: string; label: string
       label: `${config.username || "user"}@${config.host}${port}`,
     });
   }
-  if (config?.commands) {
-    const oneline = config.commands
+  const commands = normalizeCommands(config?.commands);
+  if (commands) {
+    const oneline = commands
       .split("\n")
       .filter((l) => l.trim() !== "")
       .join(" && ");
-    metadata.push({
-      icon: "terminal",
-      label: oneline,
-    });
+    if (oneline) {
+      metadata.push({
+        icon: "terminal",
+        label: oneline,
+      });
+    }
   }
 
   return metadata;
