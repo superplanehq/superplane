@@ -142,6 +142,18 @@ describe("deletePoolMapper.props", () => {
     expect(props.metadata).toEqual([{ icon: "network", label: "My Pool" }]);
   });
 
+  it("prefers pool name from snake_case node metadata keys", () => {
+    const props = deletePoolMapper.props(
+      buildPropsContext({
+        node: buildNode({
+          configuration: { pool: "pool-id" },
+          metadata: { pool_name: "My Pool" },
+        }),
+      }),
+    );
+    expect(props.metadata).toEqual([{ icon: "network", label: "My Pool" }]);
+  });
+
   it("falls back to pool id from configuration when metadata is absent", () => {
     const props = deletePoolMapper.props(
       buildPropsContext({

@@ -35,10 +35,6 @@ export const baseMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
 
-    if (payload?.type) {
-      details["Event Type"] = payload.type;
-    }
-
     if (payload?.timestamp) {
       details["Emitted At"] = new Date(payload.timestamp).toLocaleString();
     }
@@ -51,6 +47,12 @@ export const baseMapper: ComponentBaseMapper = {
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
+
+/** First payload `data` from the default output channel (workflow execution outputs). */
+export function firstOutputData(outputs: unknown): unknown {
+  const outputMap = outputs as { default?: Array<{ data?: unknown }> } | undefined;
+  return outputMap?.default?.[0]?.data;
+}
 
 export function getPoolExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
   const details: Record<string, string> = {};
