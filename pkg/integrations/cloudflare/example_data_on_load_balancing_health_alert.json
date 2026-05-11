@@ -1,0 +1,15 @@
+{
+  "data": {
+    "account_id": "account_abc123",
+    "alert_type": "load_balancing_health_alert",
+    "event_source": "origin",
+    "new_health": "Unhealthy",
+    "pool_id": "pool_xyz789",
+    "pool_name": "Production pool",
+    "origin_name": "api-primary",
+    "load_balancer_id": "lb_123",
+    "load_balancer_name": "api.example.com"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.loadBalancing.healthAlert"
+}
