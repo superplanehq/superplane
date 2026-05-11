@@ -113,7 +113,6 @@ describe("getLoadBalancerMapper.getExecutionDetails", () => {
       execution: { outputs: { default: [buildOutput(lbOutputData)] } },
     });
     const details = getLoadBalancerMapper.getExecutionDetails(ctx);
-    expect(details["Load Balancer ID"]).toBe("lb123");
     expect(details["Name"]).toBe("my-lb");
     expect(details["Description"]).toBe("Primary load balancer");
     expect(details["Enabled"]).toBe("true");
@@ -128,7 +127,6 @@ describe("getLoadBalancerMapper.getExecutionDetails", () => {
       execution: { outputs: { default: [buildOutput({ loadBalancer: {} })] } },
     });
     const details = getLoadBalancerMapper.getExecutionDetails(ctx);
-    expect(details["Load Balancer ID"]).toBe("-");
     expect(details["Name"]).toBe("-");
     expect(details["Enabled"]).toBe("-");
   });

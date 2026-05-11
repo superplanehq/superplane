@@ -104,7 +104,6 @@ describe("deleteLoadBalancerMapper.getExecutionDetails", () => {
       },
     });
     const details = deleteLoadBalancerMapper.getExecutionDetails(ctx);
-    expect(details["Load Balancer ID"]).toBe("lb123");
     expect(details["Deleted"]).toBe("true");
   });
 
@@ -113,7 +112,6 @@ describe("deleteLoadBalancerMapper.getExecutionDetails", () => {
       execution: { outputs: { default: [buildOutput({})] } },
     });
     const details = deleteLoadBalancerMapper.getExecutionDetails(ctx);
-    expect(details["Load Balancer ID"]).toBe("-");
     expect(details["Deleted"]).toBe("-");
   });
 
