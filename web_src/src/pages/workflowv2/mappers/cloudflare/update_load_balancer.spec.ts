@@ -83,6 +83,7 @@ const lbOutputData = {
     name: "my-lb",
     description: "Primary load balancer",
     enabled: true,
+    proxied: true,
     steering_policy: "random",
     session_affinity: "cookie",
     default_pools: ["pool1", "pool2"],
@@ -115,8 +116,7 @@ describe("updateLoadBalancerMapper.getExecutionDetails", () => {
     expect(details["Name"]).toBe("my-lb");
     expect(details["Description"]).toBe("Primary load balancer");
     expect(details["Enabled"]).toBe("true");
-    expect(details["Steering Policy"]).toBe("random");
-    expect(details["Session Affinity"]).toBe("cookie");
+    expect(details["Proxied"]).toBe("true");
     expect(details["Default Pools"]).toBe("2");
   });
 
@@ -162,6 +162,24 @@ describe("updateLoadBalancerMapper.props", () => {
     expect(props.metadata).toEqual([{ icon: "network", label: "lb-id" }]);
   });
 
+  it("shows description in metadata when set", () => {
+    const props = updateLoadBalancerMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: { loadBalancer: "lb-id", description: "My LB" }, metadata: {} }),
+      }),
+    );
+    expect(props.metadata).toContainEqual({ icon: "text", label: "My LB" });
+  });
+
+  it("omits description when not set", () => {
+    const props = updateLoadBalancerMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: { loadBalancer: "lb-id" }, metadata: {} }),
+      }),
+    );
+    expect(props.metadata?.find((m) => m.icon === "text")).toBeUndefined();
+  });
+
   it("shows steering policy in metadata when set", () => {
     const props = updateLoadBalancerMapper.props(
       buildPropsContext({
@@ -180,6 +198,60 @@ describe("updateLoadBalancerMapper.props", () => {
     const labels = props.metadata?.map((m) => m.label) ?? [];
     expect(labels).not.toContain("geo");
     expect(props.metadata).toHaveLength(1);
+  });
+
+  it("shows default pools count in metadata when set", () => {
+    const props = updateLoadBalancerMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: { loadBalancer: "lb-id", defaultPools: ["pool1", "pool2"] }, metadata: {} }),
+      }),
+    );
+    expect(props.metadata).toContainEqual({ icon: "layers", label: "2 pools" });
+  });
+
+  it("shows singular pool label when only one default pool", () => {
+    const props = updateLoadBalancerMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: { loadBalancer: "lb-id", defaultPools: ["pool1"] }, metadata: {} }),
+      }),
+    );
+    expect(props.metadata).toContainEqual({ icon: "layers", label: "1 pool" });
+  });
+
+  it("omits pools item when defaultPools is empty", () => {
+    const props = updateLoadBalancerMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: { loadBalancer: "lb-id", defaultPools: [] }, metadata: {} }),
+      }),
+    );
+    expect(props.metadata?.find((m) => m.icon === "layers")).toBeUndefined();
+  });
+
+  it("shows enabled state in metadata when set", () => {
+    const props = updateLoadBalancerMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: { loadBalancer: "lb-id", enabled: true }, metadata: {} }),
+      }),
+    );
+    expect(props.metadata).toContainEqual({ icon: "check-circle", label: "Enabled" });
+  });
+
+  it("shows disabled state in metadata when enabled is false", () => {
+    const props = updateLoadBalancerMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: { loadBalancer: "lb-id", enabled: false }, metadata: {} }),
+      }),
+    );
+    expect(props.metadata).toContainEqual({ icon: "circle", label: "Disabled" });
+  });
+
+  it("omits enabled item when enabled is not set", () => {
+    const props = updateLoadBalancerMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: { loadBalancer: "lb-id" }, metadata: {} }),
+      }),
+    );
+    expect(props.metadata?.find((m) => m.icon === "check-circle" || m.icon === "circle")).toBeUndefined();
   });
 
   it("returns empty metadata when configuration is empty", () => {

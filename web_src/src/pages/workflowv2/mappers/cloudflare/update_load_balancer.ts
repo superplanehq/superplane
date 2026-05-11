@@ -10,7 +10,10 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 
 interface UpdateLoadBalancerConfiguration {
   loadBalancer?: string;
+  description?: string;
   steeringPolicy?: string;
+  defaultPools?: string[];
+  enabled?: boolean;
 }
 
 interface UpdateLoadBalancerNodeMetadata {
@@ -45,15 +48,31 @@ export const updateLoadBalancerMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as UpdateLoadBalancerNodeMetadata | undefined;
-  const configuration = node.configuration as UpdateLoadBalancerConfiguration;
+  const config = node.configuration as UpdateLoadBalancerConfiguration;
 
-  const label = nodeMetadata?.loadBalancerName || configuration?.loadBalancer;
+  const label = nodeMetadata?.loadBalancerName || config.loadBalancer;
   if (label) {
     metadata.push({ icon: "network", label });
   }
 
-  if (configuration?.steeringPolicy) {
-    metadata.push({ icon: "git-branch", label: configuration.steeringPolicy });
+  if (config.description) {
+    metadata.push({ icon: "text", label: config.description });
+  }
+
+  if (config.steeringPolicy) {
+    metadata.push({ icon: "git-branch", label: config.steeringPolicy });
+  }
+
+  if (config.defaultPools != null && config.defaultPools.length > 0) {
+    const count = config.defaultPools.length;
+    metadata.push({ icon: "layers", label: `${count} pool${count === 1 ? "" : "s"}` });
+  }
+
+  if (config.enabled != null) {
+    metadata.push({
+      icon: config.enabled ? "check-circle" : "circle",
+      label: config.enabled ? "Enabled" : "Disabled",
+    });
   }
 
   return metadata;

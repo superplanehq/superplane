@@ -117,8 +117,6 @@ describe("createLoadBalancerMapper.getExecutionDetails", () => {
     expect(details["Description"]).toBe("Primary load balancer");
     expect(details["Enabled"]).toBe("true");
     expect(details["Proxied"]).toBe("true");
-    expect(details["Steering Policy"]).toBe("random");
-    expect(details["Session Affinity"]).toBe("cookie");
     expect(details["Default Pools"]).toBe("2");
   });
 
@@ -151,11 +149,49 @@ describe("createLoadBalancerMapper.props", () => {
     ]);
   });
 
+  it("includes default pools count in metadata", () => {
+    const props = createLoadBalancerMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: { name: "my-lb", defaultPools: ["pool1", "pool2", "pool3"] } }),
+      }),
+    );
+    expect(props.metadata).toContainEqual({ icon: "layers", label: "3 pools" });
+  });
+
+  it("shows singular pool label when only one default pool", () => {
+    const props = createLoadBalancerMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: { name: "my-lb", defaultPools: ["pool1"] } }),
+      }),
+    );
+    expect(props.metadata).toContainEqual({ icon: "layers", label: "1 pool" });
+  });
+
+  it("omits pools item when defaultPools is empty", () => {
+    const props = createLoadBalancerMapper.props(
+      buildPropsContext({ node: buildNode({ configuration: { name: "my-lb", defaultPools: [] } }) }),
+    );
+    expect(props.metadata?.find((m) => m.icon === "layers")).toBeUndefined();
+  });
+
   it("shows disabled icon when enabled is false", () => {
     const props = createLoadBalancerMapper.props(
       buildPropsContext({ node: buildNode({ configuration: { name: "my-lb", enabled: false } }) }),
     );
     expect(props.metadata).toContainEqual({ icon: "circle", label: "Disabled" });
+  });
+
+  it("includes both pools and enabled state in metadata", () => {
+    const props = createLoadBalancerMapper.props(
+      buildPropsContext({
+        node: buildNode({ configuration: { name: "my-lb", defaultPools: ["pool1", "pool2"], enabled: true } }),
+      }),
+    );
+    expect(props.metadata).toEqual([
+      { icon: "network", label: "my-lb" },
+      { icon: "layers", label: "2 pools" },
+      { icon: "check-circle", label: "Enabled" },
+    ]);
   });
 
   it("omits enabled item when enabled is not set", () => {

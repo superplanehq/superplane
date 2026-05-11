@@ -117,8 +117,6 @@ describe("getLoadBalancerMapper.getExecutionDetails", () => {
     expect(details["Description"]).toBe("Primary load balancer");
     expect(details["Enabled"]).toBe("true");
     expect(details["Proxied"]).toBe("true");
-    expect(details["Steering Policy"]).toBe("random");
-    expect(details["Session Affinity"]).toBe("cookie");
     expect(details["Default Pools"]).toBe("2");
   });
 

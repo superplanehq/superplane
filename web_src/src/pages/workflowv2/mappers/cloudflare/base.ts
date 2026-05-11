@@ -98,8 +98,6 @@ export function getLoadBalancerExecutionDetails(context: ExecutionDetailsContext
 
   details["Enabled"] = lb.enabled != null ? String(lb.enabled) : "-";
   details["Proxied"] = lb.proxied != null ? String(lb.proxied) : "-";
-  details["Steering Policy"] = lb.steering_policy != null ? String(lb.steering_policy) : "-";
-  details["Session Affinity"] = lb.session_affinity != null ? String(lb.session_affinity) : "-";
   details["Default Pools"] = Array.isArray(lb.default_pools) ? String(lb.default_pools.length) : "-";
 
   return details;
@@ -124,8 +122,7 @@ export function updateLoadBalancerExecutionDetails(context: ExecutionDetailsCont
   }
 
   details["Enabled"] = lb.enabled != null ? String(lb.enabled) : "-";
-  details["Steering Policy"] = lb.steering_policy != null ? String(lb.steering_policy) : "-";
-  details["Session Affinity"] = lb.session_affinity != null ? String(lb.session_affinity) : "-";
+  details["Proxied"] = lb.proxied != null ? String(lb.proxied) : "-";
   details["Default Pools"] = Array.isArray(lb.default_pools) ? String(lb.default_pools.length) : "-";
 
   return details;

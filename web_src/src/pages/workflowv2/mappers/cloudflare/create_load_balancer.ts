@@ -11,6 +11,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 interface CreateLoadBalancerConfiguration {
   name?: string;
   enabled?: boolean;
+  defaultPools?: string[];
 }
 
 export const createLoadBalancerMapper: ComponentBaseMapper = {
@@ -44,6 +45,13 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   if (configuration?.name) {
     metadata.push({ icon: "network", label: configuration.name });
+  }
+
+  if (configuration?.defaultPools != null && configuration.defaultPools.length > 0) {
+    metadata.push({
+      icon: "layers",
+      label: `${configuration.defaultPools.length} pool${configuration.defaultPools.length === 1 ? "" : "s"}`,
+    });
   }
 
   if (configuration?.enabled != null) {
