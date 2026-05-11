@@ -28,6 +28,15 @@ type Metadata struct {
 	WebhookURL string `json:"webhookUrl" mapstructure:"webhookUrl"`
 }
 
+const dash0Instructions = `1. In Dash0, open Organization settings > Auth Tokens and create or reuse an auth token for SuperPlane.
+2. Grant the token access to the dataset(s) SuperPlane will work with:
+   - Read/query permissions are enough for connection validation, Query Prometheus, List Issues, and get actions.
+   - Edit or maintain permissions are required for creating, updating, or deleting check rules and synthetic checks.
+   - Log ingestion permissions are required for Send Log Event. If the token is restricted by signal type, allow logs.
+3. Open Organization settings > Endpoints and copy the Prometheus API endpoint for your Dash0 region.
+4. Paste either the full Prometheus API endpoint, such as https://api.us-west-2.aws.dash0.com/api/prometheus, or the regional API base URL, such as https://api.us-west-2.aws.dash0.com.
+5. After the integration is saved, copy the webhook URL from SuperPlane and configure Dash0 alert or synthetic-check notifications to send HTTP POST requests to it.`
+
 func (d *Dash0) Name() string {
 	return "dash0"
 }
@@ -45,7 +54,7 @@ func (d *Dash0) Description() string {
 }
 
 func (d *Dash0) Instructions() string {
-	return ""
+	return dash0Instructions
 }
 
 func (d *Dash0) Configuration() []configuration.Field {
@@ -63,7 +72,7 @@ func (d *Dash0) Configuration() []configuration.Field {
 			Label:       "Prometheus API Base URL",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Your Dash0 Prometheus API base URL. Find this in Dash0 dashboard: Organization Settings > Endpoints > Prometheus API. You can use either the full endpoint URL (https://api.us-west-2.aws.dash0.com/api/prometheus) or just the base URL (https://api.us-west-2.aws.dash0.com)",
+			Description: "Your Dash0 regional API base URL or full Prometheus API endpoint.",
 			Placeholder: "https://api.us-west-2.aws.dash0.com",
 		},
 	}
