@@ -9,6 +9,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -114,6 +115,127 @@ type Zone struct {
 	Status string `json:"status"`
 }
 
+type Monitor struct {
+	ID              string              `json:"id,omitempty"`
+	AllowInsecure   *bool               `json:"allow_insecure,omitempty"`
+	ConsecutiveDown *int                `json:"consecutive_down,omitempty"`
+	ConsecutiveUp   *int                `json:"consecutive_up,omitempty"`
+	CreatedOn       string              `json:"created_on,omitempty"`
+	Description     string              `json:"description,omitempty"`
+	ExpectedBody    string              `json:"expected_body,omitempty"`
+	ExpectedCodes   string              `json:"expected_codes,omitempty"`
+	FollowRedirects *bool               `json:"follow_redirects,omitempty"`
+	Header          map[string][]string `json:"header,omitempty"`
+	Interval        *int                `json:"interval,omitempty"`
+	Method          string              `json:"method,omitempty"`
+	ModifiedOn      string              `json:"modified_on,omitempty"`
+	Path            string              `json:"path,omitempty"`
+	Port            *int                `json:"port,omitempty"`
+	ProbeZone       string              `json:"probe_zone,omitempty"`
+	Retries         *int                `json:"retries,omitempty"`
+	Timeout         *int                `json:"timeout,omitempty"`
+	Type            string              `json:"type,omitempty"`
+}
+
+type CreateMonitorRequest struct {
+	AllowInsecure   *bool               `json:"allow_insecure,omitempty"`
+	ConsecutiveDown *int                `json:"consecutive_down,omitempty"`
+	ConsecutiveUp   *int                `json:"consecutive_up,omitempty"`
+	Description     string              `json:"description,omitempty"`
+	ExpectedBody    string              `json:"expected_body,omitempty"`
+	ExpectedCodes   string              `json:"expected_codes,omitempty"`
+	FollowRedirects *bool               `json:"follow_redirects,omitempty"`
+	Header          map[string][]string `json:"header,omitempty"`
+	Interval        *int                `json:"interval,omitempty"`
+	Method          string              `json:"method,omitempty"`
+	Path            string              `json:"path,omitempty"`
+	Port            *int                `json:"port,omitempty"`
+	ProbeZone       string              `json:"probe_zone,omitempty"`
+	Retries         *int                `json:"retries,omitempty"`
+	Timeout         *int                `json:"timeout,omitempty"`
+	Type            string              `json:"type"`
+}
+
+type DeleteMonitorResponse struct {
+	ID string `json:"id,omitempty"`
+}
+
+type MonitorReference struct {
+	ReferenceType string `json:"reference_type,omitempty"`
+	ResourceID    string `json:"resource_id,omitempty"`
+	ResourceName  string `json:"resource_name,omitempty"`
+	ResourceType  string `json:"resource_type,omitempty"`
+}
+
+type Pool struct {
+	ID          string `json:"id,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	// Enabled must not use omitempty: disabled pools must still serialize enabled:false.
+	Enabled bool `json:"enabled"`
+	// MinimumOrigins must not use omitempty: 0 is a valid value and must serialize as minimum_origins:0.
+	MinimumOrigins int             `json:"minimum_origins"`
+	Monitor        string          `json:"monitor,omitempty"`
+	Origins        []Origin        `json:"origins,omitempty"`
+	LoadShedding   *LoadShedding   `json:"load_shedding,omitempty"`
+	OriginSteering *OriginSteering `json:"origin_steering,omitempty"`
+}
+
+type AlertingWebhookDestination struct {
+	ID   string `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+	URL  string `json:"url,omitempty"`
+}
+
+type CreateAlertingWebhookDestinationRequest struct {
+	Name   string `json:"name"`
+	URL    string `json:"url"`
+	Secret string `json:"secret,omitempty"`
+}
+
+type CreateNotificationPolicyRequest struct {
+	AlertType   string                       `json:"alert_type"`
+	Enabled     bool                         `json:"enabled"`
+	Mechanisms  NotificationPolicyMechanisms `json:"mechanisms"`
+	Name        string                       `json:"name"`
+	Description string                       `json:"description,omitempty"`
+	Filters     NotificationPolicyFilters    `json:"filters,omitempty"`
+}
+
+type NotificationPolicyMechanisms struct {
+	Email     []NotificationMechanism `json:"email,omitempty"`
+	PagerDuty []NotificationMechanism `json:"pagerduty,omitempty"`
+	Webhooks  []NotificationMechanism `json:"webhooks,omitempty"`
+}
+
+type NotificationMechanism struct {
+	ID string `json:"id,omitempty"`
+}
+
+type NotificationPolicyFilters struct {
+	PoolID      []string `json:"pool_id,omitempty"`
+	NewHealth   []string `json:"new_health,omitempty"`
+	EventSource []string `json:"event_source,omitempty"`
+}
+
+type NotificationPolicyResponse struct {
+	ID string `json:"id,omitempty"`
+}
+
+func accountIDForIntegration(ctx core.IntegrationContext) (string, error) {
+	accountID, err := ctx.GetConfig("accountId")
+	if err != nil {
+		return "", fmt.Errorf("accountId is required")
+	}
+
+	value := strings.TrimSpace(string(accountID))
+	if value == "" {
+		return "", fmt.Errorf("accountId is required")
+	}
+
+	return value, nil
+}
+
 // ListZones retrieves all zones accessible with the API token
 func (c *Client) ListZones() ([]Zone, error) {
 	url := fmt.Sprintf("%s/zones", c.BaseURL)
@@ -137,6 +259,254 @@ func (c *Client) ListZones() ([]Zone, error) {
 	}
 
 	return response.Result, nil
+}
+
+func (c *Client) ListMonitors(accountID string) ([]Monitor, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/monitors", c.BaseURL, accountID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool      `json:"success"`
+		Result  []Monitor `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return response.Result, nil
+}
+
+func (c *Client) GetMonitor(accountID, monitorID string) (*Monitor, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/monitors/%s", c.BaseURL, accountID, monitorID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool    `json:"success"`
+		Result  Monitor `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+func (c *Client) CreateMonitor(accountID string, req CreateMonitorRequest) (*Monitor, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/monitors", c.BaseURL, accountID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool    `json:"success"`
+		Result  Monitor `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+func (c *Client) DeleteMonitor(accountID, monitorID string) (*DeleteMonitorResponse, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/monitors/%s", c.BaseURL, accountID, monitorID)
+	responseBody, err := c.execRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool                  `json:"success"`
+		Result  DeleteMonitorResponse `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+func (c *Client) ListMonitorReferences(accountID, monitorID string) ([]MonitorReference, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/monitors/%s/references", c.BaseURL, accountID, monitorID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool               `json:"success"`
+		Result  []MonitorReference `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return response.Result, nil
+}
+
+func (c *Client) ListPools(accountID string) ([]Pool, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/pools", c.BaseURL, accountID)
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool   `json:"success"`
+		Result  []Pool `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return response.Result, nil
+}
+
+func (c *Client) PatchPoolMonitor(accountID, poolID, monitorID string) (*Pool, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/pools/%s", c.BaseURL, accountID, poolID)
+	body, err := json.Marshal(map[string]string{"monitor": monitorID})
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPatch, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+		Result  Pool `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+func (c *Client) CreateAlertingWebhookDestination(
+	accountID string,
+	req CreateAlertingWebhookDestinationRequest,
+) (*AlertingWebhookDestination, error) {
+	url := fmt.Sprintf("%s/accounts/%s/alerting/v3/destinations/webhooks", c.BaseURL, accountID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool                       `json:"success"`
+		Result  AlertingWebhookDestination `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+func (c *Client) DeleteAlertingWebhookDestination(accountID, webhookID string) error {
+	url := fmt.Sprintf("%s/accounts/%s/alerting/v3/destinations/webhooks/%s", c.BaseURL, accountID, webhookID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
+}
+
+func (c *Client) CreateNotificationPolicy(
+	accountID string,
+	req CreateNotificationPolicyRequest,
+) (*NotificationPolicyResponse, error) {
+	url := fmt.Sprintf("%s/accounts/%s/alerting/v3/policies", c.BaseURL, accountID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool                       `json:"success"`
+		Result  NotificationPolicyResponse `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+func (c *Client) DeleteNotificationPolicy(accountID, policyID string) error {
+	url := fmt.Sprintf("%s/accounts/%s/alerting/v3/policies/%s", c.BaseURL, accountID, policyID)
+	_, err := c.execRequest(http.MethodDelete, url, nil)
+	return err
 }
 
 // DeleteDNSRecord deletes a DNS record by its ID within a zone.
@@ -999,76 +1369,6 @@ type LoadShedding struct {
 	DefaultPolicy  string  `json:"default_policy"`
 	SessionPercent float64 `json:"session_percent"`
 	SessionPolicy  string  `json:"session_policy"`
-}
-
-// Pool represents a Cloudflare Load Balancer origin pool
-type Pool struct {
-	ID             string          `json:"id"`
-	Name           string          `json:"name"`
-	Description    string          `json:"description"`
-	Enabled        bool            `json:"enabled"`
-	MinimumOrigins int             `json:"minimum_origins"`
-	Monitor        string          `json:"monitor,omitempty"`
-	Origins        []Origin        `json:"origins"`
-	LoadShedding   *LoadShedding   `json:"load_shedding,omitempty"`
-	OriginSteering *OriginSteering `json:"origin_steering,omitempty"`
-}
-
-// PoolMonitor represents a Cloudflare health monitor
-type PoolMonitor struct {
-	ID          string `json:"id"`
-	Description string `json:"description"`
-	Type        string `json:"type"`
-}
-
-// ListMonitors lists all health monitors for a Cloudflare account
-func (c *Client) ListMonitors(accountID string) ([]PoolMonitor, error) {
-	url := fmt.Sprintf("%s/accounts/%s/load_balancers/monitors", c.BaseURL, accountID)
-
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		Success bool          `json:"success"`
-		Result  []PoolMonitor `json:"result"`
-	}
-
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	if !response.Success {
-		return nil, fmt.Errorf("API returned success=false")
-	}
-
-	return response.Result, nil
-}
-
-// ListPools lists all origin pools for a Cloudflare account
-func (c *Client) ListPools(accountID string) ([]Pool, error) {
-	url := fmt.Sprintf("%s/accounts/%s/load_balancers/pools", c.BaseURL, accountID)
-
-	responseBody, err := c.execRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var response struct {
-		Success bool   `json:"success"`
-		Result  []Pool `json:"result"`
-	}
-
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing response: %v", err)
-	}
-
-	if !response.Success {
-		return nil, fmt.Errorf("API returned success=false")
-	}
-
-	return response.Result, nil
 }
 
 // GetPool retrieves an origin pool by ID for a given account
