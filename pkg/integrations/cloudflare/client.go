@@ -174,9 +174,10 @@ type MonitorReference struct {
 }
 
 type Pool struct {
-	ID             string          `json:"id,omitempty"`
-	Name           string          `json:"name,omitempty"`
-	Description    string          `json:"description,omitempty"`
+	ID          string `json:"id,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Description string `json:"description,omitempty"`
+	// Enabled must not use omitempty: disabled pools must still serialize enabled:false.
 	Enabled        bool            `json:"enabled"`
 	MinimumOrigins int             `json:"minimum_origins,omitempty"`
 	Monitor        string          `json:"monitor,omitempty"`

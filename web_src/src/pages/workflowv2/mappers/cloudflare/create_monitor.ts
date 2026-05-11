@@ -1,7 +1,7 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
 import type { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
-import { baseMapper, firstDefaultChannelOutputData } from "./base";
+import { baseMapper, firstOutputData } from "./base";
 
 interface CreateMonitorConfiguration {
   description?: string;
@@ -51,7 +51,7 @@ export const createMonitorMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details = baseMapper.getExecutionDetails(context) as Record<string, string>;
-    const output = firstDefaultChannelOutputData(context.execution.outputs) as CreateMonitorOutput | undefined;
+    const output = firstOutputData(context.execution.outputs) as CreateMonitorOutput | undefined;
 
     return output ? { ...details, ...outputDetails(output) } : details;
   },
