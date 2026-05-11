@@ -108,6 +108,16 @@ func InvokeNodeTriggerHook(
 		return nil, status.Errorf(codes.InvalidArgument, "hook execution failed: %v", err)
 	}
 
+	if len(newEvents) > 0 {
+		if result == nil {
+			result = map[string]any{}
+		}
+
+		if _, exists := result["event_id"]; !exists {
+			result["event_id"] = newEvents[0].ID.String()
+		}
+	}
+
 	for _, event := range newEvents {
 		messages.PublishCanvasEventCreatedMessage(&event)
 	}
