@@ -53,7 +53,7 @@ export function CanvasModeToggle({
   const showRuns = !!onSelectRuns;
 
   const baseTrigger =
-    "border-none px-3 py-1 text-slate-600 transition-colors data-[state=active]:bg-sky-50 data-[state=active]:text-sky-700 data-[state=active]:shadow-none";
+    "border-none px-3 py-1 text-[13px] font-medium text-slate-600 transition-colors data-[state=active]:bg-sky-50 data-[state=active]:text-sky-700 data-[state=active]:shadow-none";
   // When editing, the active Canvas tab uses an amber/draft palette to make it
   // unambiguous that the canvas being shown represents an in-progress draft.
   const editingActive =
@@ -71,7 +71,7 @@ export function CanvasModeToggle({
 
   return (
     <Tabs value={mode} onValueChange={handleValueChange} className="inline-flex w-auto" aria-label="Canvas view">
-      <TabsList className="h-8 w-fit gap-0 rounded-sm border border-slate-300 bg-white/80 p-0">
+      <TabsList className="h-7 w-fit gap-0 rounded-sm border border-slate-300 bg-white/80 p-0">
         {showLaunchpad ? (
           <>
             <TabsTrigger

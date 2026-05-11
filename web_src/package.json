@@ -94,6 +94,7 @@
     "tailwind-merge": "^3.3.1",
     "tailwindcss": "^4.1.6",
     "tailwindcss-animate": "^1.0.7",
+    "uplot": "^1.6.32",
     "vaul": "^1.1.2",
     "websocket-ts": "^2.2.1",
     "zustand": "^5.0.4"

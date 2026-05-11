@@ -700,7 +700,7 @@ describe("WidgetBlock actions", () => {
     expect(button).toBeInTheDocument();
     expect(button.textContent).toContain("Destroy");
     expect(button.getAttribute("data-variant")).toBe("danger");
-    expect(button.className).toContain("bg-red-50");
+    expect(button.querySelector("svg")).toBeTruthy();
   });
 
   it("does not render an Actions column when actions are omitted", async () => {
@@ -851,8 +851,10 @@ describe("WidgetBlock actions", () => {
 
     const open = screen.getByTestId("canvas-widget-block-action-deploy");
     const destroy = screen.getByTestId("canvas-widget-block-action-destroy");
-    expect(open.className).toContain("bg-blue-50");
-    expect(destroy.className).toContain("bg-red-50");
+    expect(open.getAttribute("data-variant")).toBe("primary");
+    expect(open.querySelector("svg")).toBeTruthy();
+    expect(destroy.getAttribute("data-variant")).toBe("danger");
+    expect(destroy.querySelector("svg")).toBeTruthy();
   });
 
   it("warns and falls back when `icon` is unknown", async () => {
@@ -878,7 +880,6 @@ describe("WidgetBlock actions", () => {
     });
     const button = screen.getByTestId("canvas-widget-block-action-destroy");
     expect(button.getAttribute("data-variant")).toBe("default");
-    expect(button.className).toContain("bg-white");
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();
   });
@@ -1260,6 +1261,51 @@ describe("WidgetBlock execution actions", () => {
         executionId: "exec-gate",
       });
     });
+  });
+
+  it("push-through Reject renders default X icon when icon omitted", async () => {
+    const evt: EventsPage["events"][number] = {
+      ...sampleRunningEvent,
+      executions: [
+        ...(sampleRunningEvent.executions ?? []),
+        {
+          id: "exec-gate",
+          nodeId: "approval-gate",
+          state: "STATE_STARTED",
+          createdAt: "2026-01-01T10:00:30Z",
+          updatedAt: "2026-01-01T10:00:30Z",
+        },
+      ],
+    };
+    mockEventsResponse([evt]);
+
+    renderWithClient(
+      <WidgetBlock
+        body={
+          "source: executions\ncolumns:\n  - label: ID\n    field: root.id\nactions:\n  - label: Reject\n    kind: push-through\n    node: approval-gate\n"
+        }
+        canvasId="c1"
+        nodeRefs={{ onExecutionAction: vi.fn(async () => undefined) }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-action-push-through-approval-gate")).toBeInTheDocument();
+    });
+    const btn = screen.getByTestId("canvas-widget-block-action-push-through-approval-gate");
+    expect(btn.querySelector("svg")).toBeTruthy();
+  });
+
+  it("maps variant destructive to danger for action styling", async () => {
+    const body = bodyWithActions("  - label: Destroy\n    trigger: destroy\n    variant: destructive\n");
+    renderWithActions(body);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("canvas-widget-block-action-destroy")).toBeInTheDocument();
+    });
+    const button = screen.getByTestId("canvas-widget-block-action-destroy");
+    expect(button.getAttribute("data-variant")).toBe("danger");
+    expect(button.querySelector("svg")).toBeTruthy();
   });
 
   it("hides approve when no matching execution exists", async () => {

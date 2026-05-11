@@ -151,7 +151,7 @@ export function MarkdownPanel({ content, readOnly, onChange, ctx }: PanelRenderP
     const trailing = widgetPanel.trailing.trim() ? widgetPanel.trailing : null;
     return (
       <div
-        className="flex h-full w-full flex-col overflow-hidden px-4 pb-3 pt-7"
+        className="flex h-full w-full flex-col overflow-hidden px-3 pb-3 pt-2"
         onDoubleClick={startEdit}
         data-testid="launchpad-markdown-view"
         data-fill="true"
@@ -175,7 +175,7 @@ export function MarkdownPanel({ content, readOnly, onChange, ctx }: PanelRenderP
 
   return (
     <div
-      className="h-full w-full overflow-auto px-4 pb-3 pt-7"
+      className="h-full w-full overflow-auto px-3 pb-3 pt-2"
       onDoubleClick={startEdit}
       data-testid="launchpad-markdown-view"
       data-fill="false"

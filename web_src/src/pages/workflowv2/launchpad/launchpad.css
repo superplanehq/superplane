@@ -3,18 +3,14 @@
  *
  * Imported AFTER react-grid-layout's own stylesheets so these rules win.
  * Targets:
- *   - the dotted grid background on the Apps overlay container
+ *   - the Apps overlay surface color (solid; no dot grid)
  *   - the drag placeholder (replaces the library's red rectangle)
- *   - the resize handles (replaces the tiny SE arrow with themed indicators
- *     on south, east, and south-east edges, visible on panel hover)
+ *   - the resize handle (south-east only; same diagonal grip as canvas notes, visible on panel hover)
  *   - the active drag/resize state on the panel chrome
  */
 
 .launchpad-canvas {
-  background-color: rgb(248 250 252); /* slate-50 */
-  background-image: radial-gradient(circle, rgb(203 213 225 / 0.7) 1px, transparent 1px);
-  background-size: 24px 24px;
-  background-position: 16px 16px;
+  background-color: #f1f5f9; /* slate-100 — matches Canvas editor pane */
 }
 
 /* Drag placeholder ------------------------------------------------------- */
@@ -29,7 +25,7 @@
   transition-duration: 150ms;
 }
 
-/* Resize handles --------------------------------------------------------- */
+/* Resize handle ---------------------------------------------------------- */
 
 .launchpad-grid > .react-grid-item > .react-resizable-handle {
   background-image: none;
@@ -52,63 +48,25 @@
 }
 
 .launchpad-grid > .react-grid-item > .react-resizable-handle-se {
-  /* The library positions this in the bottom-right; we draw a small bracket. */
+  /* Bottom-right: same diagonal grip asset as canvas notes (annotation component). */
   cursor: nwse-resize;
 }
 .launchpad-grid > .react-grid-item > .react-resizable-handle-se::after {
-  right: 4px;
-  bottom: 4px;
-  width: 10px;
-  height: 10px;
-  border-right: 2px solid rgb(148 163 184); /* slate-400 */
-  border-bottom: 2px solid rgb(148 163 184);
-  border-bottom-right-radius: 2px;
+  right: 6px;
+  bottom: 6px;
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 0;
+  background-color: transparent;
+  background-image: url("../../../assets/icons/note-resize-grip.svg");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 12px 12px;
+  opacity: 0.3;
 }
 .launchpad-grid > .react-grid-item:hover > .react-resizable-handle-se:hover::after {
-  border-color: rgb(56 189 248); /* sky-400 on hover */
-}
-
-.launchpad-grid > .react-grid-item > .react-resizable-handle-s {
-  cursor: ns-resize;
-  /* The library applies bottom-center positioning by default; reinforce it. */
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 32px;
-  height: 8px;
-}
-.launchpad-grid > .react-grid-item > .react-resizable-handle-s::after {
-  left: 50%;
-  bottom: 2px;
-  transform: translateX(-50%);
-  width: 24px;
-  height: 3px;
-  background: rgb(148 163 184 / 0.7); /* slate-400 */
-  border-radius: 9999px;
-}
-.launchpad-grid > .react-grid-item > .react-resizable-handle-s:hover::after {
-  background: rgb(56 189 248);
-}
-
-.launchpad-grid > .react-grid-item > .react-resizable-handle-e {
-  cursor: ew-resize;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 8px;
-  height: 32px;
-}
-.launchpad-grid > .react-grid-item > .react-resizable-handle-e::after {
-  right: 2px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 24px;
-  background: rgb(148 163 184 / 0.7);
-  border-radius: 9999px;
-}
-.launchpad-grid > .react-grid-item > .react-resizable-handle-e:hover::after {
-  background: rgb(56 189 248);
+  opacity: 0.45;
 }
 
 /* Active drag/resize states --------------------------------------------- */

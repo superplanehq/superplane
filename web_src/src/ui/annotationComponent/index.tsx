@@ -3,6 +3,7 @@ import debounce from "lodash.debounce";
 import { Trash2 } from "lucide-react";
 import { NodeResizeControl, type ResizeParams } from "@xyflow/react";
 import ReactMarkdown from "react-markdown";
+import noteResizeGripSrc from "@/assets/icons/note-resize-grip.svg";
 import { cn } from "@/lib/utils";
 import { SelectionWrapper } from "../selectionWrapper";
 import { setActiveNoteId } from "./noteFocus";
@@ -406,17 +407,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
           >
             <span className="sr-only">Resize note</span>
             <span className="pointer-events-none flex h-full w-full items-end justify-end" aria-hidden>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 12 12"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="opacity-30"
-              >
-                <path d="M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z" fill="black" />
-                <path d="M11.707 5.70703L5.70703 11.707L5 11L11 5L11.707 5.70703Z" fill="black" />
-              </svg>
+              <img src={noteResizeGripSrc} alt="" width={12} height={12} className="opacity-30" />
             </span>
           </NodeResizeControl>
         </div>

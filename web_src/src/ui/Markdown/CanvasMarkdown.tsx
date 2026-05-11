@@ -15,7 +15,7 @@ import {
   Play,
 } from "lucide-react";
 
-import { resolveIcon } from "@/lib/utils";
+import { cn, resolveIcon } from "@/lib/utils";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/ui/hoverCard";
 
 import { MermaidDiagram } from "./MermaidDiagram";
@@ -1038,24 +1038,63 @@ function buildSpanComponent(context: NodeChipContext) {
   };
 }
 
+type MdHeadingExtra = { node?: unknown };
+
 //
-// Default typography for full-page readme-style rendering: a proper heading
-// scale, paragraph spacing, and list indentation. Compact surfaces (e.g. the
-// Reports panel) pass their own `className` to opt out of this scale.
+// Default readme / Apps-panel typography uses explicit heading components so
+// sizes always apply (wrapper-only `[&_h1]:…` selectors are brittle with some
+// Tailwind builds). Call-sites that pass `className` keep native headings and
+// style them via descendant selectors (e.g. Reports).
 //
+function CanvasMdH1({ className, node: _n, ...props }: React.ComponentPropsWithoutRef<"h1"> & MdHeadingExtra) {
+  return (
+    <h1
+      className={cn("mt-6 mb-3 text-[24px] font-semibold tracking-tight text-gray-800 first:mt-0", className)}
+      {...props}
+    />
+  );
+}
+
+function CanvasMdH2({ className, node: _n, ...props }: React.ComponentPropsWithoutRef<"h2"> & MdHeadingExtra) {
+  return (
+    <h2
+      className={cn(
+        "mt-5 mb-2 border-b border-slate-200 pb-1.5 text-[18px] font-semibold text-gray-800 first:mt-0",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+function CanvasMdH3({ className, node: _n, ...props }: React.ComponentPropsWithoutRef<"h3"> & MdHeadingExtra) {
+  return <h3 className={cn("mt-4 mb-2 text-[16px] font-semibold text-gray-800 first:mt-0", className)} {...props} />;
+}
+
+function CanvasMdH4({ className, node: _n, ...props }: React.ComponentPropsWithoutRef<"h4"> & MdHeadingExtra) {
+  return <h4 className={cn("mt-3 mb-1 text-[14px] font-semibold text-gray-800 first:mt-0", className)} {...props} />;
+}
+
+function CanvasMdH5({ className, node: _n, ...props }: React.ComponentPropsWithoutRef<"h5"> & MdHeadingExtra) {
+  return <h5 className={cn("mt-2 mb-1 text-sm font-semibold text-gray-800 first:mt-0", className)} {...props} />;
+}
+
+function CanvasMdH6({ className, node: _n, ...props }: React.ComponentPropsWithoutRef<"h6"> & MdHeadingExtra) {
+  return (
+    <h6
+      className={cn("mt-2 mb-1 text-xs font-semibold uppercase tracking-wide text-gray-600 first:mt-0", className)}
+      {...props}
+    />
+  );
+}
+
 const DEFAULT_TYPOGRAPHY_CLASS = [
-  "text-sm text-gray-800 leading-relaxed",
+  "mb-1 text-sm text-gray-800 leading-relaxed",
   "[&>:first-child]:mt-0",
   "[&_p]:my-2",
   "[&_ul]:my-2 [&_ul]:pl-5 [&_ul]:list-disc",
   "[&_ol]:my-2 [&_ol]:pl-5 [&_ol]:list-decimal",
   "[&_li]:my-0.5",
-  "[&_h1]:text-2xl [&_h1]:font-semibold [&_h1]:tracking-tight [&_h1]:mt-6 [&_h1]:mb-3",
-  "[&_h2]:text-xl [&_h2]:font-semibold [&_h2]:mt-5 [&_h2]:mb-2 [&_h2]:border-b [&_h2]:border-slate-200 [&_h2]:pb-1",
-  "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2",
-  "[&_h4]:text-base [&_h4]:font-semibold [&_h4]:mt-3 [&_h4]:mb-1",
-  "[&_h5]:text-sm [&_h5]:font-semibold [&_h5]:mt-2 [&_h5]:mb-1",
-  "[&_h6]:text-xs [&_h6]:font-semibold [&_h6]:uppercase [&_h6]:tracking-wide [&_h6]:text-gray-600 [&_h6]:mt-2 [&_h6]:mb-1",
 ].join(" ");
 
 interface CanvasMarkdownProps {
@@ -1066,6 +1105,8 @@ interface CanvasMarkdownProps {
 }
 
 export function CanvasMarkdown({ children, className, nodeRefs, canvasId }: CanvasMarkdownProps) {
+  const useExplicitHeadingComponents = className === undefined;
+
   const components = React.useMemo(
     () => ({
       code: buildInlineCodeComponent({ canvasId, nodeRefs }),
@@ -1079,8 +1120,18 @@ export function CanvasMarkdown({ children, className, nodeRefs, canvasId }: Canv
       details: Details,
       summary: Summary,
       span: buildSpanComponent(nodeRefs ?? {}),
+      ...(useExplicitHeadingComponents
+        ? {
+            h1: CanvasMdH1,
+            h2: CanvasMdH2,
+            h3: CanvasMdH3,
+            h4: CanvasMdH4,
+            h5: CanvasMdH5,
+            h6: CanvasMdH6,
+          }
+        : {}),
     }),
-    [nodeRefs, canvasId],
+    [nodeRefs, canvasId, useExplicitHeadingComponents],
   );
 
   const wrapperClassName = className ?? DEFAULT_TYPOGRAPHY_CLASS;

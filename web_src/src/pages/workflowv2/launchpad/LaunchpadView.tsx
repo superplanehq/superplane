@@ -4,7 +4,7 @@ import "./launchpad.css";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { ReactGridLayout, type Layout, type LayoutItem } from "react-grid-layout/legacy";
-import { Plus, GripVertical, Loader2, Pencil, Trash2, LayoutDashboard, AtSign, BarChart3, Play } from "lucide-react";
+import { Plus, Grip, Loader2, Pencil, Trash2, LayoutDashboard, AtSign, BarChart3, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -272,7 +272,7 @@ export function LaunchpadView({
               }))}
               isDraggable={!readOnly}
               isResizable={!readOnly}
-              resizeHandles={["s", "e", "se"]}
+              resizeHandles={["se"]}
               compactType="vertical"
               preventCollision={false}
               draggableHandle={DRAG_HANDLE_SELECTOR}
@@ -349,11 +349,10 @@ function PanelChrome({
       <Card
         data-panel-chrome
         className={cn(
-          "group/panel relative flex h-full w-full flex-col overflow-hidden gap-0 p-0 rounded-lg",
-          "border-slate-200/80 bg-white",
-          "shadow-[0_1px_2px_rgb(15_23_42_/_0.04)]",
-          "transition-[box-shadow,border-color,transform] duration-150",
-          "hover:border-slate-300 hover:shadow-[0_4px_12px_-2px_rgb(15_23_42_/_0.08)]",
+          "group/panel relative flex h-full w-full flex-col overflow-hidden gap-0 p-0 rounded-lg border-0 bg-white shadow-none",
+          "outline outline-1 outline-offset-0 outline-slate-950/10",
+          "transition-[outline-color] duration-150",
+          "hover:outline-slate-950/10",
         )}
       >
         <div className="min-h-0 flex-1 overflow-hidden">
@@ -405,7 +404,7 @@ function PanelOverlay({
   // killed dragging entirely.
   return (
     <div
-      className="absolute right-1 top-1 z-20 flex items-center gap-0.5 rounded-md bg-white/85 opacity-0 shadow-[0_1px_2px_rgb(15_23_42_/_0.04)] backdrop-blur transition-opacity duration-150 group-hover/panel:opacity-100 focus-within:opacity-100"
+      className="pointer-events-none absolute right-0 top-0 z-20 flex items-center gap-0.5 rounded-tl-none rounded-tr-sm rounded-br-none rounded-bl-sm border-b border-l border-slate-200 bg-white/90 p-1 opacity-0 shadow-none backdrop-blur transition-opacity duration-150 group-hover/panel:pointer-events-auto group-hover/panel:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100"
       data-testid="launchpad-panel-actions"
     >
       <span
@@ -415,7 +414,7 @@ function PanelOverlay({
         aria-label="Drag panel"
         title="Drag to move"
       >
-        <GripVertical className="h-3.5 w-3.5" />
+        <Grip className="h-3.5 w-3.5" />
       </span>
       {supportsEdit ? (
         <Button
@@ -522,8 +521,8 @@ function EmptyState({ readOnly, onAdd }: { readOnly: boolean; onAdd: (def: Panel
         <div className="flex flex-col gap-1.5">
           <h3 className="text-lg font-semibold text-slate-800">Build your Apps page</h3>
           <p className="mx-auto max-w-md text-sm leading-relaxed text-slate-500">
-            Apps panels surface the most important docs, links, and live data for this canvas. Drag and resize panels to
-            lay them out the way your team works.
+            Apps panels surface the most important docs, links, and live data for this canvas. Drag panels into place
+            and resize from the bottom-right corner to lay them out the way your team works.
           </p>
         </div>
 

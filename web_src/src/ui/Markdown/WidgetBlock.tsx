@@ -1,6 +1,18 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ComponentProps } from "react";
 import * as yaml from "js-yaml";
-import { AlertTriangle, ExternalLink, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Check,
+  ExternalLink,
+  Loader2,
+  Play,
+  RefreshCw,
+  RotateCcw,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { useCanvasMemoryEntries, useInfiniteCanvasEvents, type CanvasMemoryEntry } from "@/hooks/useCanvasData";
 import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecutionRef } from "@/api-client";
@@ -57,12 +69,19 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } f
 //     - field: url
 //       op: exists
 //   actions:                  # optional — kind: trigger | approve | cancel | push-through
+//                             # optional `icon:` when label keywords don't apply; defaults use kind/variant too
+//                             # (label tokens approve / reject|deny / rollback / reapply pick icons first)
 //     - label: Open
 //       kind: trigger
 //       trigger: my-trigger
 //   render:                   # optional — table | chart | number; defaults to table
 //     kind: chart
-//     chart: { type: bar, x: pr_number, y: created_at }
+//     chart:
+//       type: bar
+//       x: name
+//       y: duration
+//       label: Latencies           # optional; label containing "duration" + large Y infers ms to seconds
+//       y_unit: ms                  # optional explicit ms column → axis/tooltips use compact seconds
 //   ```
 //
 //   ```widget
@@ -192,6 +211,8 @@ const CHART_TYPES: readonly ChartType[] = ["bar", "line", "area", "stacked-bar",
 type ChartColorKeyword = "blue" | "green" | "red" | "yellow" | "gray";
 const CHART_COLORS: readonly ChartColorKeyword[] = ["blue", "green", "red", "yellow", "gray"];
 
+type ChartYUnit = "ms" | "s";
+
 interface ChartSpec {
   type: ChartType;
   x: MaybeExpr;
@@ -203,6 +224,12 @@ interface ChartSpec {
   aggregate?: AggregateOp;
   /** Single-series only (bar | line | area). Ignored for stacked-bar / donut. */
   color?: ChartColorKeyword;
+  /**
+   * Y-axis units: `ms` divides values by 1000 so axes show seconds (`30.7s`).
+   * Also accepts YAML `y_unit`. When omitted, widgets whose `label` mentions
+   * “duration” may auto-detect ms from large magnitudes (see inferChartYUnitFromRows).
+   */
+  yUnit?: ChartYUnit;
 }
 
 interface NumberSpec {
@@ -501,8 +528,13 @@ function parseActions(raw: unknown): ParsePartResult<ActionSpec[]> {
           error: { message: `Invalid widget block: actions[${i}].variant must be a string` },
         };
       }
-      if ((ACTION_VARIANTS as readonly string[]).includes(variantRaw)) {
-        variant = variantRaw as ActionVariant;
+      const normalized = variantRaw.trim().toLowerCase();
+      const variantAliases: Record<string, ActionVariant> = {
+        destructive: "danger",
+      };
+      const resolved = variantAliases[normalized] ?? normalized;
+      if ((ACTION_VARIANTS as readonly string[]).includes(resolved)) {
+        variant = resolved as ActionVariant;
       } else {
         // eslint-disable-next-line no-console
         console.warn(`[WidgetBlock] Unknown action variant "${variantRaw}", falling back to default`);
@@ -609,6 +641,14 @@ function parseActions(raw: unknown): ParsePartResult<ActionSpec[]> {
   return { kind: "ok", value: result };
 }
 
+function parseChartYUnitField(raw: unknown): ChartYUnit | undefined {
+  if (typeof raw !== "string") return undefined;
+  const u = raw.trim().toLowerCase();
+  if (u === "ms" || u === "milliseconds" || u === "millisecond") return "ms";
+  if (u === "s" || u === "sec" || u === "secs" || u === "second" || u === "seconds") return "s";
+  return undefined;
+}
+
 function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
   if (raw === undefined || raw === null) return { kind: "ok", value: { kind: "table" } };
   if (!isPlainObject(raw)) {
@@ -695,6 +735,19 @@ function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
         console.warn(`[WidgetBlock] Unknown chart color "${chart.color}", falling back to default`);
       }
     }
+
+    let yUnit: ChartYUnit | undefined;
+    const yUnitRaw = (chart as Record<string, unknown>).y_unit ?? (chart as Record<string, unknown>).yUnit;
+    if (yUnitRaw !== undefined && yUnitRaw !== null) {
+      const parsed = parseChartYUnitField(yUnitRaw);
+      if (parsed) {
+        yUnit = parsed;
+      } else {
+        // eslint-disable-next-line no-console
+        console.warn(`[WidgetBlock] Unknown render.chart.y_unit "${String(yUnitRaw)}", ignoring`);
+      }
+    }
+
     return {
       kind: "ok",
       value: {
@@ -707,6 +760,7 @@ function parseRender(raw: unknown): ParsePartResult<RenderSpec> {
           label: typeof chart.label === "string" ? chart.label : undefined,
           aggregate,
           color,
+          yUnit,
         },
       },
     };
@@ -1124,14 +1178,8 @@ function formatAbsoluteUtc(date: Date): string {
 }
 
 //
-// Action button
+// Action button (shared outline style — white/bordered, matches app Button outline)
 //
-
-const VARIANT_CLASSES: Record<ActionVariant, string> = {
-  default: "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
-  danger: "border-red-300 bg-red-50 text-red-700 hover:bg-red-100",
-  primary: "border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100",
-};
 
 const ICON_MAP: Record<ActionIcon, React.ComponentType<{ className?: string }>> = {
   trash: Trash2,
@@ -1140,6 +1188,43 @@ const ICON_MAP: Record<ActionIcon, React.ComponentType<{ className?: string }>> 
   stop: Square,
   "external-link": ExternalLink,
 };
+
+/** Normalize widget action labels for keyword matching (NBSP / ZWSP / bidi marks). */
+function normalizeWidgetActionLabel(label: string): string {
+  return label.replace(/[\uFEFF\u200B-\u200D\u2060\u200E\u200F]/g, "").trim();
+}
+
+/** Strong semantic icons from button wording (runs before explicit YAML `icon:`). */
+function iconFromActionLabel(label: string): React.ComponentType<{ className?: string }> | null {
+  const normalized = normalizeWidgetActionLabel(label).toLowerCase();
+  const words = normalized.split(/[\s/]+/).filter(Boolean);
+  if (words.includes("approve")) return Check;
+  if (words.includes("reject") || words.includes("deny")) return X;
+  if (words.includes("rollback")) return RotateCcw;
+  if (words.includes("reapply")) return ArrowRight;
+  return null;
+}
+
+/** Pick Trigger / Approve / Cancel / … icons: label keywords → YAML `icon` → kind/variant defaults. */
+function resolvedWidgetActionIcon(action: ActionSpec): React.ComponentType<{ className?: string }> | null {
+  const fromLabel = iconFromActionLabel(action.label);
+  if (fromLabel) return fromLabel;
+
+  if (action.icon) {
+    const mapped = ICON_MAP[action.icon];
+    if (mapped) return mapped;
+  }
+
+  if (action.kind === "approve") return Check;
+  if (action.kind === "cancel") return X;
+
+  if (action.kind === "trigger") {
+    if (action.variant === "danger") return RotateCcw;
+    if (action.variant === "primary") return ArrowRight;
+  }
+
+  return null;
+}
 
 function findRunningExecution(executions: CanvasesCanvasNodeExecutionRef[]): CanvasesCanvasNodeExecutionRef | null {
   // Most recent (by updatedAt fallback createdAt) execution still running.
@@ -1185,7 +1270,7 @@ function ActionButtons({
   env: ExprEnv;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="flex flex-wrap items-center gap-2">
       {actions.map((action, i) => (
         <ActionButton
           key={`${action.kind}-${actionId(action)}-${i}`}
@@ -1229,10 +1314,7 @@ function ActionButton({
 
   if (!passesShow || !resolved.visible) return null;
 
-  const Icon = action.icon ? ICON_MAP[action.icon] : null;
-  const baseClass =
-    "inline-flex items-center gap-1 rounded border px-2 py-1 text-xs font-medium transition disabled:cursor-not-allowed disabled:opacity-60";
-  const variantClass = VARIANT_CLASSES[action.variant];
+  const Icon = resolvedWidgetActionIcon(action);
   const disabled = !resolved.fire || isFiring;
 
   const fire = async () => {
@@ -1268,19 +1350,20 @@ function ActionButton({
 
   return (
     <div className="inline-flex flex-col items-start gap-0.5">
-      <button
+      <Button
         type="button"
+        variant="outline"
+        size="xs"
         onClick={handleClick}
         disabled={disabled}
         title={resolved.tooltip}
         data-testid={`canvas-widget-block-action-${testIdSuffix}`}
         data-variant={action.variant}
         data-kind={action.kind}
-        className={`${baseClass} ${variantClass}`}
       >
-        {isFiring ? <Loader2 className="h-3 w-3 animate-spin" /> : Icon ? <Icon className="h-3 w-3" /> : null}
-        <span>{action.label}</span>
-      </button>
+        {isFiring ? <Loader2 className="animate-spin" /> : Icon ? <Icon /> : null}
+        {action.label}
+      </Button>
       {error ? (
         <span
           className="max-w-[18rem] text-[11px] text-red-600"
@@ -1393,7 +1476,7 @@ interface BaseRowsRenderProps {
 function TableRenderer({ rows, columns, actions, nodeRefs, env }: BaseRowsRenderProps) {
   const hasActions = !!actions && actions.length > 0;
   return (
-    <div data-testid="canvas-widget-block" className="my-2 overflow-x-auto rounded border border-slate-200">
+    <div data-testid="canvas-widget-block" className="my-2 overflow-x-auto border-t border-slate-200 shadow-none">
       <table className="min-w-full border-collapse text-left text-xs">
         <thead>
           <tr>
@@ -1461,6 +1544,11 @@ const CHART_ANIMATION_MS = 300;
 const CHART_HEIGHT = 240;
 const SPARKLINE_HEIGHT = 40;
 
+/** In-svg breathing room so axes / curves aren’t clipped in launchpad panels */
+const WIDGET_CARTESIAN_MARGIN = { top: 12, right: 18, left: 16, bottom: 28 };
+const WIDGET_PIE_MARGIN = { top: 12, right: 12, bottom: 12, left: 12 };
+const WIDGET_SPARKLINE_MARGIN = { top: 8, right: 10, left: 6, bottom: 8 };
+
 //
 // Aggregate helper (reused by NumberRenderer + chart shapers).
 //
@@ -1476,12 +1564,114 @@ function applyAggregate(values: number[], op: AggregateOp): number {
 }
 
 //
+// Chart axis timestamps — short labels for ISO / epoch x-values; otherwise unchanged.
+//
+
+const ISO_DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function tryParseChartTimestamp(raw: string): Date | null {
+  const s = raw.trim();
+  if (!s) return null;
+  if (/^\d{10}$/.test(s)) {
+    const d = new Date(Number(s) * 1000);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (/^\d{12}$|^\d{13}$/.test(s)) {
+    const d = new Date(Number(s));
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Compact locale-aware labels, e.g. `May 7` or `May 7, 2:30 PM`. */
+function formatChartAxisTick(raw: string): string {
+  const trimmed = raw.trim();
+  const d = tryParseChartTimestamp(trimmed);
+  if (!d) return raw;
+
+  const dateTimeCompact: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  };
+  const dateCompact: Intl.DateTimeFormatOptions = { month: "short", day: "numeric" };
+
+  if (/^\d{10}$/.test(trimmed) || /^\d{12}$|^\d{13}$/.test(trimmed)) {
+    return new Intl.DateTimeFormat(undefined, dateTimeCompact).format(d);
+  }
+  if (ISO_DATE_ONLY_RE.test(trimmed)) {
+    return new Intl.DateTimeFormat(undefined, dateCompact).format(d);
+  }
+  if (/T00:00:00(\.\d+)?(Z|[+-]00:00)?$/i.test(trimmed)) {
+    return new Intl.DateTimeFormat(undefined, dateCompact).format(d);
+  }
+  return new Intl.DateTimeFormat(undefined, dateTimeCompact).format(d);
+}
+
+function widgetChartXTickFormatter(value: string | number): string {
+  return formatChartAxisTick(String(value));
+}
+
+function WidgetChartTooltipContent(props: ComponentProps<typeof ChartTooltipContent>) {
+  return <ChartTooltipContent {...props} labelFormatter={(lbl) => formatChartAxisTick(String(lbl ?? ""))} />;
+}
+
+//
 // Data shapers — convert widget rows into the shape Recharts expects.
 //
 
 function coerceNumber(raw: unknown): number {
   if (typeof raw === "number") return raw;
   return Number(stringifyCell(raw));
+}
+
+/** Values are already in seconds (after ms→s conversion when applicable). */
+function formatSecondsCompact(sec: number): string {
+  if (!Number.isFinite(sec)) return "";
+  const a = Math.abs(sec);
+  if (a >= 100) return `${Math.round(sec)}s`;
+  if (a >= 10) return `${sec.toFixed(1)}s`;
+  return `${sec.toFixed(2)}s`;
+}
+
+function finalizeChartDisplayY(y: number, yUnit: ChartYUnit | undefined, aggregate?: AggregateOp): number {
+  if (!Number.isFinite(y)) return y;
+  if (yUnit === "ms" && aggregate !== "count") return y / 1000;
+  return y;
+}
+
+function inferChartYUnitFromRows(
+  chart: ChartSpec,
+  rows: Record<string, unknown>[],
+  env: ExprEnv,
+): ChartYUnit | undefined {
+  if (chart.yUnit !== undefined || !chart.y) return undefined;
+  const lbl = chart.label?.toLowerCase() ?? "";
+  if (!/\bduration\b/.test(lbl)) return undefined;
+  let maxAbs = -Infinity;
+  for (const row of rows) {
+    const y = coerceNumber(evalRowFieldExpr(chart.y, row, env, getByPath));
+    if (Number.isFinite(y)) maxAbs = Math.max(maxAbs, Math.abs(y));
+  }
+  if (maxAbs === -Infinity) return undefined;
+  return maxAbs >= 2500 ? "ms" : undefined;
+}
+
+function resolveChartSpecForYAxis(chart: ChartSpec, rows: Record<string, unknown>[], env: ExprEnv): ChartSpec {
+  const inferred = inferChartYUnitFromRows(chart, rows, env);
+  const yUnit = chart.yUnit ?? inferred;
+  return yUnit === chart.yUnit ? chart : { ...chart, yUnit };
+}
+
+function widgetChartYTickFormatter(chart: ChartSpec): (v: number | string) => string {
+  return (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return String(v);
+    if (chart.yUnit === "ms" || chart.yUnit === "s") return formatSecondsCompact(n);
+    return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { maximumFractionDigits: 3 });
+  };
 }
 
 interface XYPoint {
@@ -1498,8 +1688,9 @@ function shapeXY(rows: Record<string, unknown>[], chart: ChartSpec, env: ExprEnv
     if (!Number.isFinite(y)) continue;
     points.push([x, y]);
   }
+  const { yUnit } = chart;
   if (!chart.aggregate) {
-    return points.map(([x, y]) => ({ x, y }));
+    return points.map(([x, y]) => ({ x, y: finalizeChartDisplayY(y, yUnit, undefined) }));
   }
   const groups = new Map<string, number[]>();
   for (const [x, y] of points) {
@@ -1508,7 +1699,9 @@ function shapeXY(rows: Record<string, unknown>[], chart: ChartSpec, env: ExprEnv
     groups.set(x, arr);
   }
   const out: XYPoint[] = [];
-  for (const [x, ys] of groups) out.push({ x, y: applyAggregate(ys, chart.aggregate) });
+  for (const [x, ys] of groups) {
+    out.push({ x, y: finalizeChartDisplayY(applyAggregate(ys, chart.aggregate!), yUnit, chart.aggregate) });
+  }
   return out;
 }
 
@@ -1551,7 +1744,7 @@ function shapeStacked(rows: Record<string, unknown>[], chart: ChartSpec, env: Ex
     const row: Record<string, string | number> = { x };
     for (const g of groupOrder) {
       const values = inner.get(g);
-      row[g] = values ? applyAggregate(values, op) : 0;
+      row[g] = values ? finalizeChartDisplayY(applyAggregate(values, op), chart.yUnit, op) : 0;
     }
     data.push(row);
   }
@@ -1585,7 +1778,8 @@ function shapeDonut(rows: Record<string, unknown>[], chart: ChartSpec, env: Expr
   const out: DonutSlice[] = [];
   for (const name of order) {
     const values = buckets.get(name)!;
-    const value = applyAggregate(values, op);
+    const raw = applyAggregate(values, op);
+    const value = finalizeChartDisplayY(raw, chart.yUnit, op);
     if (Number.isFinite(value)) out.push({ name, value });
   }
   return out;
@@ -1660,7 +1854,9 @@ function SingleSeriesInner({
   fill?: boolean;
   env: ExprEnv;
 }) {
-  const data = useMemo(() => shapeXY(rows, chart, env), [rows, chart, env]);
+  const resolvedChart = useMemo(() => resolveChartSpecForYAxis(chart, rows, env), [chart, rows, env]);
+  const data = useMemo(() => shapeXY(rows, resolvedChart, env), [rows, resolvedChart, env]);
+  const yTickFormatter = useMemo(() => widgetChartYTickFormatter(resolvedChart), [resolvedChart]);
   const colorVar = chart.color ? COLOR_KEYWORD_TO_VAR[chart.color] : "var(--chart-1)";
   const seriesKey = "y";
   const seriesLabel = chart.label ?? "Value";
@@ -1679,11 +1875,17 @@ function SingleSeriesInner({
         style={fill ? undefined : { height: CHART_HEIGHT }}
       >
         {chart.type === "bar" ? (
-          <BarChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
+          <BarChart data={data} margin={WIDGET_CARTESIAN_MARGIN}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
-            <XAxis dataKey="x" tickLine={false} axisLine={false} interval="preserveStartEnd" />
-            <YAxis tickLine={false} axisLine={false} width={32} />
-            <ChartTooltip content={<ChartTooltipContent />} />
+            <XAxis
+              dataKey="x"
+              tickLine={false}
+              axisLine={false}
+              interval="preserveStartEnd"
+              tickFormatter={widgetChartXTickFormatter}
+            />
+            <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={yTickFormatter} />
+            <ChartTooltip content={<WidgetChartTooltipContent />} />
             <Bar
               dataKey={seriesKey}
               fill={colorVar}
@@ -1693,11 +1895,17 @@ function SingleSeriesInner({
             />
           </BarChart>
         ) : chart.type === "line" ? (
-          <LineChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
+          <LineChart data={data} margin={WIDGET_CARTESIAN_MARGIN}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
-            <XAxis dataKey="x" tickLine={false} axisLine={false} interval="preserveStartEnd" />
-            <YAxis tickLine={false} axisLine={false} width={32} />
-            <ChartTooltip content={<ChartTooltipContent />} />
+            <XAxis
+              dataKey="x"
+              tickLine={false}
+              axisLine={false}
+              interval="preserveStartEnd"
+              tickFormatter={widgetChartXTickFormatter}
+            />
+            <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={yTickFormatter} />
+            <ChartTooltip content={<WidgetChartTooltipContent />} />
             <Line
               dataKey={seriesKey}
               type="monotone"
@@ -1709,11 +1917,17 @@ function SingleSeriesInner({
             />
           </LineChart>
         ) : (
-          <AreaChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
+          <AreaChart data={data} margin={WIDGET_CARTESIAN_MARGIN}>
             <CartesianGrid vertical={false} strokeDasharray="3 3" />
-            <XAxis dataKey="x" tickLine={false} axisLine={false} interval="preserveStartEnd" />
-            <YAxis tickLine={false} axisLine={false} width={32} />
-            <ChartTooltip content={<ChartTooltipContent />} />
+            <XAxis
+              dataKey="x"
+              tickLine={false}
+              axisLine={false}
+              interval="preserveStartEnd"
+              tickFormatter={widgetChartXTickFormatter}
+            />
+            <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={yTickFormatter} />
+            <ChartTooltip content={<WidgetChartTooltipContent />} />
             <Area
               dataKey={seriesKey}
               type="monotone"
@@ -1742,7 +1956,9 @@ function StackedBarInner({
   fill?: boolean;
   env: ExprEnv;
 }) {
-  const { data, groups } = useMemo(() => shapeStacked(rows, chart, env), [rows, chart, env]);
+  const resolvedChart = useMemo(() => resolveChartSpecForYAxis(chart, rows, env), [chart, rows, env]);
+  const { data, groups } = useMemo(() => shapeStacked(rows, resolvedChart, env), [rows, resolvedChart, env]);
+  const yTickFormatter = useMemo(() => widgetChartYTickFormatter(resolvedChart), [resolvedChart]);
   const config: ChartConfig = useMemo(() => {
     const cfg: ChartConfig = {};
     groups.forEach((g, i) => {
@@ -1766,11 +1982,17 @@ function StackedBarInner({
         className={fill ? fillChartClass : "aspect-auto"}
         style={fill ? undefined : { height: CHART_HEIGHT }}
       >
-        <BarChart data={data} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
+        <BarChart data={data} margin={WIDGET_CARTESIAN_MARGIN}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" />
-          <XAxis dataKey="x" tickLine={false} axisLine={false} interval="preserveStartEnd" />
-          <YAxis tickLine={false} axisLine={false} width={32} />
-          <ChartTooltip content={<ChartTooltipContent />} />
+          <XAxis
+            dataKey="x"
+            tickLine={false}
+            axisLine={false}
+            interval="preserveStartEnd"
+            tickFormatter={widgetChartXTickFormatter}
+          />
+          <YAxis tickLine={false} axisLine={false} width={44} tickFormatter={yTickFormatter} />
+          <ChartTooltip content={<WidgetChartTooltipContent />} />
           {groups.map((g, i) => (
             <Bar
               key={g}
@@ -1799,7 +2021,8 @@ function DonutInner({
   fill?: boolean;
   env: ExprEnv;
 }) {
-  const data = useMemo(() => shapeDonut(rows, chart, env), [rows, chart, env]);
+  const resolvedChart = useMemo(() => resolveChartSpecForYAxis(chart, rows, env), [chart, rows, env]);
+  const data = useMemo(() => shapeDonut(rows, resolvedChart, env), [rows, resolvedChart, env]);
   const config: ChartConfig = useMemo(() => {
     const cfg: ChartConfig = {};
     data.forEach((slice, i) => {
@@ -1817,8 +2040,8 @@ function DonutInner({
         className={fill ? fillChartClass : "aspect-auto"}
         style={fill ? undefined : { height: CHART_HEIGHT }}
       >
-        <PieChart>
-          <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
+        <PieChart margin={WIDGET_PIE_MARGIN}>
+          <ChartTooltip content={<WidgetChartTooltipContent nameKey="name" />} />
           <Pie
             data={data}
             dataKey="value"
@@ -1860,21 +2083,23 @@ function NumberRenderer({
     () => (number.sparkline ? collectSparklineSeries(rows, number, env) : null),
     [rows, number, env],
   );
-  // In fill mode the card stretches to fill the panel and the value is
-  // visually centered, with the sparkline (if any) anchored to the bottom.
+  // In fill mode the block stretches to the panel height; content aligns to the
+  // top with a large headline and optional sparkline below the label.
   return (
     <div
       data-testid="canvas-widget-block-number"
       className={
-        fill
-          ? "flex h-full w-full flex-col items-start justify-center gap-1.5 rounded border border-slate-200 bg-white px-6 py-5"
-          : "my-2 flex flex-col items-start gap-1 rounded border border-slate-200 bg-white px-4 py-3"
+        fill ? "flex h-full w-full flex-col items-start justify-start gap-2" : "my-2 flex flex-col items-start gap-1"
       }
     >
-      <span className={fill ? "text-5xl font-semibold text-slate-800" : "text-3xl font-semibold text-slate-800"}>
+      <span
+        className={
+          fill ? "text-7xl font-normal tracking-tight text-slate-800" : "text-4xl font-semibold text-slate-800"
+        }
+      >
         {display}
       </span>
-      <span className="text-xs uppercase tracking-wide text-slate-500">{number.label}</span>
+      <span className="text-sm font-medium text-slate-500">{number.label}</span>
       {sparkPoints && sparkPoints.length > 1 ? <SparklineInner points={sparkPoints} fill={fill} /> : null}
     </div>
   );
@@ -1888,11 +2113,11 @@ function SparklineInner({ points, fill }: { points: Array<{ i: number; y: number
   // In fill mode the sparkline gets a slightly larger fixed height since it
   // sits inside a much taller card; otherwise keep the compact 40px sparkline
   // used inline with markdown content.
-  const height = fill ? 64 : SPARKLINE_HEIGHT;
+  const height = fill ? 76 : SPARKLINE_HEIGHT;
   return (
     <div data-testid="canvas-widget-block-number-sparkline" className={fill ? "mt-3 w-full" : "mt-2 w-full"}>
       <ChartContainer config={SPARKLINE_CONFIG} className="aspect-auto" style={{ height }}>
-        <AreaChart data={points} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+        <AreaChart data={points} margin={WIDGET_SPARKLINE_MARGIN}>
           <Area
             dataKey="y"
             type="monotone"

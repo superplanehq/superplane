@@ -134,7 +134,7 @@ function SecondaryHeader(props: HeaderProps) {
   const editing = props.mode === "version-edit";
 
   return (
-    <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
+    <div className="relative flex h-12 items-center border-b border-slate-950/10 bg-slate-100 px-4 gap-3">
       <AgentSidebarTrigger agentState={props.agentState} />
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
