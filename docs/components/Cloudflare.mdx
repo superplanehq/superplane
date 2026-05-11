@@ -11,17 +11,21 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 <CardGrid>
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record in a Cloudflare zone" />
   <LinkCard title="Create KV Namespace" href="#create-kv-namespace" description="Create a Cloudflare Workers KV namespace" />
+  <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a Cloudflare Load Balancer on a zone, with support for private/public visibility, monitor attachment, and custom rules" />
   <LinkCard title="Create Origin Rule" href="#create-origin-rule" description="Create a rule to override the origin server for matching requests" />
   <LinkCard title="Create Pool" href="#create-pool" description="Create a Cloudflare Load Balancer origin pool" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a Cloudflare zone" />
   <LinkCard title="Delete KV Namespace" href="#delete-kv-namespace" description="Delete a Cloudflare Workers KV namespace" />
   <LinkCard title="Delete KV Value" href="#delete-kv-value" description="Delete a key from a Cloudflare Workers KV namespace" />
+  <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a Cloudflare Load Balancer" />
   <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
   <LinkCard title="Delete Pool" href="#delete-pool" description="Delete a Cloudflare Load Balancer origin pool" />
   <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
+  <LinkCard title="Get Load Balancer" href="#get-load-balancer" description="Retrieve a Cloudflare Load Balancer by ID" />
   <LinkCard title="Get Pool" href="#get-pool" description="Retrieve a Cloudflare Load Balancer origin pool by ID" />
   <LinkCard title="Put KV Value" href="#put-kv-value" description="Write a key-value pair to a Cloudflare Workers KV namespace" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
+  <LinkCard title="Update Load Balancer" href="#update-load-balancer" description="Update a Cloudflare Load Balancer's steering policy, pool weights, or session affinity" />
   <LinkCard title="Update Origin Rule" href="#update-origin-rule" description="Update an existing origin rule" />
   <LinkCard title="Update Pool" href="#update-pool" description="Update a Cloudflare Load Balancer origin pool's configuration or origin weights" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
@@ -41,6 +45,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 	 - Zone / DNS / Edit
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
+	 - Zone / Load Balancers / Edit
 	 - Account / Workers KV Storage / Edit
      - Account / Load Balancing: Monitor and Pools / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
@@ -49,7 +54,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Account ID (optional)
 
-The Account ID is required for KV storage components.
+The Account ID is required for Load Balancing, Pool, and KV storage components.
 
 1. On the account overview page, click on the **ellipsis (...)** next to the **Add** button and select **Copy Account ID**
 2. Paste the Account ID below
@@ -133,6 +138,69 @@ Returns the created namespace with its assigned ID and title.
   },
   "timestamp": "2026-05-05T06:54:57.198268018Z",
   "type": "cloudflare.kv.namespace.created"
+}
+```
+
+<a id="create-load-balancer"></a>
+
+## Create Load Balancer
+
+The Create Load Balancer component creates a new Cloudflare Load Balancer attached to a zone.
+
+### Use Cases
+
+- **Traffic distribution**: Route traffic across multiple origin pools
+- **Blue/green deployments**: Create a load balancer backed by your new (green) pool
+- **Multi-region failover**: Define ordered pools with a fallback for automatic failover
+
+### Configuration
+
+- **Zone**: The zone to attach the load balancer to
+- **Name**: The hostname of the load balancer (e.g. `lb.example.com`)
+- **Fallback Pool**: Pool to use when all default pools are unhealthy
+- **Default Pools**: Ordered list of pools to route traffic to
+- **Steering Policy**: How traffic is distributed across pools
+- **Session Affinity**: How client sessions are pinned to a pool
+- **Pool Weights**: Per-pool weights used when steering policy is set to Random
+
+### Output
+
+Returns the created load balancer with its assigned ID and full configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "loadBalancer": {
+      "default_pools": [
+        "64d858d71f1e9839fdfb0d2ca78951f5"
+      ],
+      "description": "description",
+      "enabled": true,
+      "fallback_pool": "64d858d71f1e9839fdfb0d2ca78951f5",
+      "id": "f7adb491a20dcab2e29a3141f2f197f7",
+      "name": "example.org",
+      "networks": [
+        "cloudflare"
+      ],
+      "proxied": true,
+      "random_steering": {
+        "default_weight": 1
+      },
+      "session_affinity": "none",
+      "session_affinity_attributes": {
+        "samesite": "Auto",
+        "secure": "Auto",
+        "zero_downtime_failover": "none"
+      },
+      "steering_policy": "random",
+      "ttl": 30
+    },
+    "zoneId": "8132be7b33d9dc874ee6da0fa112945b"
+  },
+  "timestamp": "2026-05-05T13:00:33.465739808Z",
+  "type": "cloudflare.loadBalancer.created"
 }
 ```
 
@@ -357,6 +425,41 @@ Emits a confirmation with the account ID, namespace ID, and key that was deleted
 }
 ```
 
+<a id="delete-load-balancer"></a>
+
+## Delete Load Balancer
+
+The Delete Load Balancer component permanently removes a Cloudflare Load Balancer from a zone.
+
+### Use Cases
+
+- **Teardown**: Remove a load balancer as part of environment cleanup
+- **Blue/green decommission**: Delete the old load balancer after traffic has been fully migrated
+
+### Configuration
+
+- **Load Balancer**: The load balancer to delete
+
+### Output
+
+Emits a confirmation with the zone ID and load balancer ID of the deleted load balancer.
+
+> **Warning**: This operation is irreversible. Deleting the load balancer will immediately stop routing traffic through it.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "loadBalancerId": "699d98642c564d2e855e9661899b7252",
+    "zoneId": "023e105f4ecef8ad9ca31a8372d0c353"
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.loadBalancer.deleted"
+}
+```
+
 <a id="delete-origin-rule"></a>
 
 ## Delete Origin Rule
@@ -463,6 +566,52 @@ Returns the account ID, namespace ID, key, and the retrieved value string.
   },
   "timestamp": "2026-05-05T06:54:57.198268018Z",
   "type": "cloudflare.kv.value.fetched"
+}
+```
+
+<a id="get-load-balancer"></a>
+
+## Get Load Balancer
+
+The Get Load Balancer component fetches the current state of a Cloudflare Load Balancer.
+
+### Use Cases
+
+- **Pre-flight validation**: Confirm a load balancer exists before updating it
+- **Audit**: Capture a snapshot of the load balancer configuration at a point in time
+- **Conditional logic**: Branch a workflow based on the current steering policy or pool set
+
+### Configuration
+
+- **Load Balancer**: The load balancer to retrieve
+
+### Output
+
+Returns the full load balancer configuration including pools, steering policy, and session affinity settings.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "loadBalancer": {
+      "default_pools": [
+        "17b5962d775c646f3f9725cbc7a53df4"
+      ],
+      "description": "Example load balancer",
+      "enabled": true,
+      "fallback_pool": "17b5962d775c646f3f9725cbc7a53df4",
+      "id": "699d98642c564d2e855e9661899b7252",
+      "name": "lb.example.com",
+      "proxied": true,
+      "session_affinity": "none",
+      "steering_policy": "random"
+    },
+    "loadBalancerId": "699d98642c564d2e855e9661899b7252",
+    "zoneId": "023e105f4ecef8ad9ca31a8372d0c353"
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.loadBalancer.fetched"
 }
 ```
 
@@ -596,6 +745,67 @@ Emits the updated DNS record (id, type, name, content, proxied, ttl) on the defa
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "cloudflare.dnsRecord"
+}
+```
+
+<a id="update-load-balancer"></a>
+
+## Update Load Balancer
+
+The Update Load Balancer component modifies an existing Cloudflare Load Balancer.
+
+### Use Cases
+
+- **Traffic shifting**: Change pool weights to shift traffic between canary and stable pools
+- **Blue/green cutover**: Switch default pools to point at the green pool
+- **Session affinity changes**: Enable or disable sticky sessions for a release
+- **Steering policy update**: Switch from random to geo or latency-based steering
+
+### Configuration
+
+- **Load Balancer**: The load balancer to update
+- **Steering Policy**: (Optional) New distribution policy across pools
+- **Pool Weights**: (Optional) Per-pool weights for random steering
+- **Session Affinity**: (Optional) How client sessions are pinned to a specific pool
+- **Session Affinity TTL**: (Optional) Duration of session affinity in seconds
+- **Fallback Pool**: (Optional) New fallback pool
+- **Default Pools**: (Optional) New ordered list of active pools
+
+### Output
+
+Returns the updated load balancer configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "loadBalancer": {
+      "default_pools": [
+        "9290f38c5d07c2e2f4df57b1f61d4196",
+        "17b5962d775c646f3f9725cbc7a53df4"
+      ],
+      "description": "Example load balancer",
+      "enabled": true,
+      "fallback_pool": "17b5962d775c646f3f9725cbc7a53df4",
+      "id": "699d98642c564d2e855e9661899b7252",
+      "name": "lb.example.com",
+      "proxied": true,
+      "random_steering": {
+        "pool_weights": {
+          "17b5962d775c646f3f9725cbc7a53df4": 0.1,
+          "9290f38c5d07c2e2f4df57b1f61d4196": 0.9
+        }
+      },
+      "session_affinity": "cookie",
+      "session_affinity_ttl": 1800,
+      "steering_policy": "random"
+    },
+    "loadBalancerId": "699d98642c564d2e855e9661899b7252",
+    "zoneId": "023e105f4ecef8ad9ca31a8372d0c353"
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.loadBalancer.updated"
 }
 ```
 
