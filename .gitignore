@@ -31,3 +31,4 @@ coverage-go.out
 /api/swagger/*
 !/api/swagger/swagger-ui.html
 agent2/agent2
+agent2/.env
