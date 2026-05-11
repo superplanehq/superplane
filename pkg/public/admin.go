@@ -8,9 +8,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/impersonation"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
@@ -673,4 +675,99 @@ func (s *Server) demoteAdmin(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "demoted"})
+}
+
+// adminListOrgExperimentalFeatures returns the registry of experimental
+// features plus the set of ids currently enabled for the organization.
+func (s *Server) adminListOrgExperimentalFeatures(w http.ResponseWriter, r *http.Request) {
+	orgID := mux.Vars(r)["orgId"]
+
+	organization, err := models.FindOrganizationByID(orgID)
+	if err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	type featureItem struct {
+		ID          string `json:"id"`
+		Label       string `json:"label"`
+		Description string `json:"description"`
+		Released    bool   `json:"released"`
+	}
+
+	registry := features.All()
+	items := make([]featureItem, 0, len(registry))
+	for _, f := range registry {
+		items = append(items, featureItem{
+			ID:          f.ID,
+			Label:       f.Label,
+			Description: f.Description,
+			Released:    f.Released != nil && *f.Released,
+		})
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"features": items,
+		"enabled":  []string(organization.EnabledExperimentalFeatures),
+	})
+}
+
+// adminEnableOrgExperimentalFeature toggles an experimental feature on for
+// the given organization.
+func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *http.Request) {
+	orgID := mux.Vars(r)["orgId"]
+	featureID := mux.Vars(r)["featureId"]
+
+	if !features.Exists(featureID) {
+		http.Error(w, "Unknown experimental feature", http.StatusBadRequest)
+		return
+	}
+
+	parsedOrgID, err := uuid.Parse(orgID)
+	if err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	if _, err := models.FindOrganizationByID(orgID); err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	if err := models.EnableExperimentalFeature(parsedOrgID, featureID); err != nil {
+		log.Errorf("admin: failed to enable feature %s for org %s: %v", featureID, orgID, err)
+		http.Error(w, "Failed to enable feature", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "enabled"})
+}
+
+// adminDisableOrgExperimentalFeature toggles an experimental feature off for
+// the given organization. Disabling an id that is not enabled is a no-op.
+func (s *Server) adminDisableOrgExperimentalFeature(w http.ResponseWriter, r *http.Request) {
+	orgID := mux.Vars(r)["orgId"]
+	featureID := mux.Vars(r)["featureId"]
+
+	parsedOrgID, err := uuid.Parse(orgID)
+	if err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	if _, err := models.FindOrganizationByID(orgID); err != nil {
+		http.Error(w, "Organization not found", http.StatusNotFound)
+		return
+	}
+
+	if err := models.DisableExperimentalFeature(parsedOrgID, featureID); err != nil {
+		log.Errorf("admin: failed to disable feature %s for org %s: %v", featureID, orgID, err)
+		http.Error(w, "Failed to disable feature", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "disabled"})
 }

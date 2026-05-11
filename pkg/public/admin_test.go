@@ -791,3 +791,114 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 		require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
 	})
 }
+
+func TestAdminListOrgExperimentalFeatures(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Run("returns registry and currently enabled set", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, "runners"))
+		t.Cleanup(func() {
+			_ = models.DisableExperimentalFeature(r.Organization.ID, "runners")
+		})
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body struct {
+			Features []map[string]any `json:"features"`
+			Enabled  []string         `json:"enabled"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		require.NotEmpty(t, body.Features)
+		assert.Contains(t, body.Enabled, "runners")
+	})
+
+	t.Run("returns 404 for non-existent org", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+}
+
+func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Cleanup(func() {
+		_ = models.DisableExperimentalFeature(r.Organization.ID, "runners")
+	})
+
+	t.Run("enables a known feature", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/runners",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), "runners")
+	})
+
+	t.Run("rejects unknown feature ids", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/does-not-exist",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+	})
+
+	t.Run("returns 404 for non-existent org", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/runners",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+}
+
+func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Run("disables a previously enabled feature", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, "runners"))
+
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/runners",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), "runners")
+	})
+
+	t.Run("is idempotent for ids not currently enabled", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/does-not-exist",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+	})
+
+	t.Run("returns 404 for non-existent org", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/runners",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+}
