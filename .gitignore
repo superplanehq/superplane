@@ -30,3 +30,5 @@ coverage-go.out
 /agent/src/private/agents_pb2_grpc.py
 /api/swagger/*
 !/api/swagger/swagger-ui.html
+agent2/agent2
+agent2/.env
