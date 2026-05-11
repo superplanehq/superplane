@@ -384,7 +384,8 @@ CREATE TABLE public.organizations (
     usage_synced_at timestamp with time zone,
     usage_retention_window_days integer,
     usage_limits_synced_at timestamp with time zone,
-    change_management_enabled boolean DEFAULT false NOT NULL
+    change_management_enabled boolean DEFAULT false NOT NULL,
+    enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
