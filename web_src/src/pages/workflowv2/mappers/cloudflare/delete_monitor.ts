@@ -8,15 +8,11 @@ import type {
   SubtitleContext,
 } from "../types";
 import { baseMapper, firstOutputData } from "./base";
+import { getCloudflareMonitorDescription, getCloudflareMonitorId } from "./metadata";
 
 interface DeleteMonitorConfiguration {
   monitor?: string;
   force?: boolean;
-}
-
-interface DeleteMonitorNodeMetadata {
-  monitorId?: string;
-  monitorDescription?: string;
 }
 
 interface DeleteMonitorOutput {
@@ -59,15 +55,13 @@ export const deleteMonitorMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as DeleteMonitorConfiguration | undefined;
-  const nodeMetadata = node.metadata as DeleteMonitorNodeMetadata | undefined;
   const metadata: MetadataItem[] = [];
 
   const monitorId = configuration?.monitor?.trim();
   if (monitorId) {
-    const display =
-      nodeMetadata?.monitorId === monitorId && nodeMetadata.monitorDescription?.trim()
-        ? nodeMetadata.monitorDescription.trim()
-        : monitorId;
+    const resolvedId = getCloudflareMonitorId(node.metadata);
+    const resolvedDesc = getCloudflareMonitorDescription(node.metadata);
+    const display = resolvedId === monitorId && resolvedDesc ? resolvedDesc : monitorId;
     metadata.push({ icon: "trash-2", label: display });
   }
 

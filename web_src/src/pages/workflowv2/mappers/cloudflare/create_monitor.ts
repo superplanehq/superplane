@@ -1,7 +1,14 @@
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type { MetadataItem } from "@/ui/metadataList";
-import type { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext, SubtitleContext } from "../types";
+import type {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  ExecutionDetailsContext,
+  NodeInfo,
+  SubtitleContext,
+} from "../types";
 import { baseMapper, firstOutputData } from "./base";
+import { getCloudflarePoolName } from "./metadata";
 
 interface CreateMonitorConfiguration {
   description?: string;
@@ -10,15 +17,10 @@ interface CreateMonitorConfiguration {
   port?: number;
   pool?: string;
   advanced?: Record<string, unknown>;
-
-  // Legacy flat fields.
-  method?: string;
-  expectedCodes?: string;
-  headers?: unknown[];
-  expectedBody?: string;
-  followRedirects?: boolean;
-  allowInsecure?: boolean;
-  probeZone?: string;
+  /** Legacy flat fields saved before nested `advanced` was standard */
+  interval?: number;
+  timeout?: number;
+  retries?: number;
   consecutiveUp?: number;
   consecutiveDown?: number;
 }
@@ -45,7 +47,7 @@ export const createMonitorMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return {
       ...baseMapper.props(context),
-      metadata: metadataList(context.node.configuration as CreateMonitorConfiguration | undefined),
+      metadata: metadataList(context.node),
     };
   },
 
@@ -61,8 +63,9 @@ export const createMonitorMapper: ComponentBaseMapper = {
   },
 };
 
-function metadataList(configuration?: CreateMonitorConfiguration): MetadataItem[] {
+function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
+  const configuration = node.configuration as CreateMonitorConfiguration | undefined;
 
   if (configuration?.description) {
     metadata.push({ icon: "activity", label: configuration.description });
@@ -77,11 +80,13 @@ function metadataList(configuration?: CreateMonitorConfiguration): MetadataItem[
     metadata.push({ icon: "link", label: target });
   }
 
-  if (configuration?.pool) {
-    metadata.push({ icon: "server", label: `Pool: ${configuration.pool}` });
+  const poolId = configuration?.pool?.trim();
+  if (poolId) {
+    const poolLabel = getCloudflarePoolName(node.metadata) || poolId;
+    metadata.push({ icon: "server", label: `Pool: ${poolLabel}` });
   }
 
-  if (hasAdvancedSettings(configuration)) {
+  if (createMonitorShowsAdvancedBadge(configuration)) {
     metadata.push({ icon: "settings", label: "Advanced health check settings" });
   }
 
@@ -134,28 +139,41 @@ function monitorTarget(configuration?: CreateMonitorConfiguration): string {
   return "";
 }
 
-function hasAdvancedSettings(configuration?: CreateMonitorConfiguration): boolean {
+function createMonitorShowsAdvancedBadge(configuration?: CreateMonitorConfiguration): boolean {
+  if (advancedObjectHasSettings(configuration?.advanced)) {
+    return true;
+  }
   if (!configuration) {
     return false;
   }
+  const legacyKeys: (keyof CreateMonitorConfiguration)[] = [
+    "interval",
+    "timeout",
+    "retries",
+    "consecutiveUp",
+    "consecutiveDown",
+  ];
+  return legacyKeys.some(
+    (key) => typeof configuration[key] === "number" && !Number.isNaN(configuration[key] as number),
+  );
+}
 
-  if (configuration.advanced && Object.keys(configuration.advanced).length > 0) {
-    return true;
+function advancedObjectHasSettings(adv: Record<string, unknown> | undefined): boolean {
+  if (!adv || typeof adv !== "object") {
+    return false;
   }
 
-  const adv = configuration.advanced;
-  return Boolean(
-    configuration.method ||
-      configuration.expectedCodes ||
-      configuration.expectedBody ||
-      configuration.headers?.length ||
-      configuration.followRedirects != null ||
-      configuration.allowInsecure != null ||
-      configuration.probeZone ||
-      configuration.consecutiveUp != null ||
-      configuration.consecutiveDown != null ||
-      typeof adv?.interval === "number" ||
-      typeof adv?.timeout === "number" ||
-      typeof adv?.retries === "number",
-  );
+  return Object.values(adv).some(advancedValuePresent);
+}
+
+function advancedValuePresent(value: unknown): boolean {
+  if (value === undefined || value === null || value === "") {
+    return false;
+  }
+
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+
+  return true;
 }

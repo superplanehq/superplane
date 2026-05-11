@@ -27,12 +27,6 @@ type CloudflareError struct {
 	Message string `json:"message"`
 }
 
-type CloudflareResponseInfo struct {
-	Code             int    `json:"code,omitempty"`
-	Message          string `json:"message"`
-	DocumentationURL string `json:"documentation_url,omitempty"`
-}
-
 type CloudflareAPIError struct {
 	StatusCode int
 	Errors     []CloudflareError
@@ -178,8 +172,9 @@ type Pool struct {
 	Name        string `json:"name,omitempty"`
 	Description string `json:"description,omitempty"`
 	// Enabled must not use omitempty: disabled pools must still serialize enabled:false.
-	Enabled        bool            `json:"enabled"`
-	MinimumOrigins int             `json:"minimum_origins,omitempty"`
+	Enabled bool `json:"enabled"`
+	// MinimumOrigins must not use omitempty: 0 is a valid value and must serialize as minimum_origins:0.
+	MinimumOrigins int             `json:"minimum_origins"`
 	Monitor        string          `json:"monitor,omitempty"`
 	Origins        []Origin        `json:"origins,omitempty"`
 	LoadShedding   *LoadShedding   `json:"load_shedding,omitempty"`

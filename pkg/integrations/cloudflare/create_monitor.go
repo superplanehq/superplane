@@ -46,20 +46,13 @@ type CreateMonitorSpec struct {
 	Port        *int                       `json:"port"`
 	Advanced    *CreateMonitorAdvancedSpec `json:"advanced"`
 	Pool        string                     `json:"pool"`
-
-	// Legacy flat fields are kept for existing saved nodes. New nodes use Advanced.
-	Method          string          `json:"method"`
-	ExpectedCodes   string          `json:"expectedCodes"`
-	ExpectedBody    string          `json:"expectedBody"`
-	Headers         []MonitorHeader `json:"headers"`
-	FollowRedirects *bool           `json:"followRedirects"`
-	AllowInsecure   *bool           `json:"allowInsecure"`
-	ProbeZone       string          `json:"probeZone"`
-	Interval        *int            `json:"interval"`
-	Timeout         *int            `json:"timeout"`
-	Retries         *int            `json:"retries"`
-	ConsecutiveUp   *int            `json:"consecutiveUp"`
-	ConsecutiveDown *int            `json:"consecutiveDown"`
+	// Flat timing/threshold fields from legacy workflows or alongside partial `advanced`
+	// objects when nested pointers are unset.
+	Interval        *int `json:"interval,omitempty"`
+	Timeout         *int `json:"timeout,omitempty"`
+	Retries         *int `json:"retries,omitempty"`
+	ConsecutiveUp   *int `json:"consecutiveUp,omitempty"`
+	ConsecutiveDown *int `json:"consecutiveDown,omitempty"`
 }
 
 type CreateMonitorAdvancedSpec struct {
@@ -404,7 +397,21 @@ func (c *CreateMonitor) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	return validateCreateMonitorSpec(spec)
+	if err := validateCreateMonitorSpec(spec); err != nil {
+		return err
+	}
+
+	poolID := strings.TrimSpace(spec.Pool)
+	if poolID == "" {
+		return nil
+	}
+
+	accountID, err := accountIDForIntegration(ctx.Integration)
+	if err != nil {
+		return err
+	}
+
+	return resolvePoolMetadata(ctx, accountID, poolID)
 }
 
 func validateCreateMonitorSpec(spec CreateMonitorSpec) error {
@@ -454,11 +461,7 @@ func validateCreateMonitorSpec(spec CreateMonitorSpec) error {
 		}
 	}
 
-	if err := validateMonitorTiming(effectiveMonitorAdvanced(spec)); err != nil {
-		return err
-	}
-
-	return nil
+	return validateMonitorTiming(effectiveMonitorAdvanced(spec))
 }
 
 func (c *CreateMonitor) Execute(ctx core.ExecutionContext) error {
@@ -552,34 +555,26 @@ func createMonitorRequest(spec CreateMonitorSpec) CreateMonitorRequest {
 }
 
 func effectiveMonitorAdvanced(spec CreateMonitorSpec) CreateMonitorAdvancedSpec {
+	var adv CreateMonitorAdvancedSpec
 	if spec.Advanced != nil {
-		out := *spec.Advanced
-		if out.Interval == nil {
-			out.Interval = spec.Interval
-		}
-		if out.Timeout == nil {
-			out.Timeout = spec.Timeout
-		}
-		if out.Retries == nil {
-			out.Retries = spec.Retries
-		}
-		return out
+		adv = *spec.Advanced
 	}
-
-	return CreateMonitorAdvancedSpec{
-		Method:          spec.Method,
-		ExpectedCodes:   spec.ExpectedCodes,
-		ExpectedBody:    spec.ExpectedBody,
-		Headers:         spec.Headers,
-		FollowRedirects: spec.FollowRedirects,
-		AllowInsecure:   spec.AllowInsecure,
-		ProbeZone:       spec.ProbeZone,
-		Interval:        spec.Interval,
-		Timeout:         spec.Timeout,
-		Retries:         spec.Retries,
-		ConsecutiveUp:   spec.ConsecutiveUp,
-		ConsecutiveDown: spec.ConsecutiveDown,
+	if adv.Interval == nil {
+		adv.Interval = spec.Interval
 	}
+	if adv.Timeout == nil {
+		adv.Timeout = spec.Timeout
+	}
+	if adv.Retries == nil {
+		adv.Retries = spec.Retries
+	}
+	if adv.ConsecutiveUp == nil {
+		adv.ConsecutiveUp = spec.ConsecutiveUp
+	}
+	if adv.ConsecutiveDown == nil {
+		adv.ConsecutiveDown = spec.ConsecutiveDown
+	}
+	return adv
 }
 
 func resolvedMonitorTiming(advanced CreateMonitorAdvancedSpec) (interval int, timeout int, retries int) {

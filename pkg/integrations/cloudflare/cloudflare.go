@@ -52,7 +52,14 @@ func accountIDFromIntegration(ctx core.IntegrationContext) string {
 	}
 	metadata := Metadata{}
 	mapstructure.Decode(ctx.GetMetadata(), &metadata)
-	return metadata.AccountID
+	if id := strings.TrimSpace(metadata.AccountID); id != "" {
+		return id
+	}
+	cfg, err := ctx.GetConfig("accountId")
+	if err != nil || len(cfg) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(string(cfg))
 }
 
 func resolveAccountID(specAccountID string, integration core.IntegrationContext) string {

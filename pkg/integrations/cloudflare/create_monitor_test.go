@@ -95,6 +95,63 @@ func Test__CreateMonitor__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 	})
+
+	t.Run("optional pool resolves pool name metadata when accountId is configured", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"type":        "https",
+				"description": "API health",
+				"path":        "/health",
+				"port":        443,
+				"pool":        "pool123",
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"success": true,
+							"result": {"id": "pool123", "name": "my-pool"}
+						}`)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken":  "token123",
+					"accountId": "account123",
+				},
+			},
+			Metadata: &contexts.MetadataContext{},
+		}
+
+		err := component.Setup(ctx)
+		require.NoError(t, err)
+
+		meta, ok := ctx.Metadata.(*contexts.MetadataContext)
+		require.True(t, ok)
+		poolMeta, ok := meta.Metadata.(PoolNodeMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "my-pool", poolMeta.PoolName)
+	})
+
+	t.Run("pool without accountId returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"type":        "https",
+				"description": "API health",
+				"path":        "/health",
+				"port":        443,
+				"pool":        "pool123",
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "token123"},
+			},
+			Metadata: &contexts.MetadataContext{},
+		})
+
+		require.ErrorContains(t, err, "accountId is required")
+	})
 }
 
 func Test__CreateMonitor__Configuration(t *testing.T) {
@@ -224,15 +281,17 @@ func Test__CreateMonitor__Execute(t *testing.T) {
 		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"type":          "https",
-				"description":   "API health",
-				"method":        "GET",
-				"path":          "/health",
-				"port":          443,
-				"expectedCodes": "2xx",
-				"pool":          "pool123",
-				"headers": []map[string]any{
-					{"name": "Host", "value": "api.example.com"},
+				"type":        "https",
+				"description": "API health",
+				"path":        "/health",
+				"port":        443,
+				"pool":        "pool123",
+				"advanced": map[string]any{
+					"method":        "GET",
+					"expectedCodes": "2xx",
+					"headers": []map[string]any{
+						{"name": "Host", "value": "api.example.com"},
+					},
 				},
 			},
 			HTTP: httpContext,
@@ -262,6 +321,73 @@ func Test__CreateMonitor__Execute(t *testing.T) {
 		assert.NotContains(t, body, "retries")
 		assert.Equal(t, map[string]any{"Host": []any{"api.example.com"}}, body["header"])
 	})
+}
+
+func Test__effectiveMonitorAdvanced__mergesFlatLegacyFields(t *testing.T) {
+	t.Run("partial advanced inherits flat consecutive thresholds", func(t *testing.T) {
+		cu := 2
+		cd := 4
+		adv := effectiveMonitorAdvanced(CreateMonitorSpec{
+			Advanced: &CreateMonitorAdvancedSpec{
+				Interval: func() *int { i := 60; return &i }(),
+				Timeout:  func() *int { t := 5; return &t }(),
+			},
+			ConsecutiveUp:   &cu,
+			ConsecutiveDown: &cd,
+		})
+		require.NotNil(t, adv.Interval)
+		require.NotNil(t, adv.ConsecutiveUp)
+		require.NotNil(t, adv.ConsecutiveDown)
+		assert.Equal(t, 60, *adv.Interval)
+		assert.Equal(t, 2, *adv.ConsecutiveUp)
+		assert.Equal(t, 4, *adv.ConsecutiveDown)
+	})
+
+	t.Run("advanced timing overrides flat timing when both set", func(t *testing.T) {
+		adv := effectiveMonitorAdvanced(CreateMonitorSpec{
+			Interval: func() *int { i := 999; return &i }(),
+			Advanced: &CreateMonitorAdvancedSpec{
+				Interval: func() *int { i := 120; return &i }(),
+			},
+		})
+		require.NotNil(t, adv.Interval)
+		assert.Equal(t, 120, *adv.Interval)
+	})
+
+	t.Run("flat fields used when advanced is nil", func(t *testing.T) {
+		adv := effectiveMonitorAdvanced(CreateMonitorSpec{
+			Interval: func() *int { i := 30; return &i }(),
+			Retries:  func() *int { i := 1; return &i }(),
+		})
+		require.NotNil(t, adv.Interval)
+		require.NotNil(t, adv.Retries)
+		assert.Equal(t, 30, *adv.Interval)
+		assert.Equal(t, 1, *adv.Retries)
+	})
+}
+
+func Test__decodeCreateMonitorSpec__flatConsecutiveWithPartialAdvanced(t *testing.T) {
+	spec, err := decodeCreateMonitorSpec(map[string]any{
+		"type":          "https",
+		"description":   "API health",
+		"path":          "/health",
+		"port":          float64(443),
+		"consecutiveUp": float64(2),
+		"advanced": map[string]any{
+			"interval": float64(60),
+			"timeout":  float64(5),
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, spec.ConsecutiveUp)
+	assert.Equal(t, 2, *spec.ConsecutiveUp)
+
+	req := createMonitorRequest(spec)
+	require.NotNil(t, req.ConsecutiveUp)
+	assert.Equal(t, 2, *req.ConsecutiveUp)
+	require.NotNil(t, req.Interval)
+	assert.Equal(t, 60, *req.Interval)
 }
 
 func Test__decodeCreateMonitorSpec__weakNumericTypes(t *testing.T) {
