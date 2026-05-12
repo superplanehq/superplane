@@ -43,6 +43,7 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 			r.Use(bearerAuth(opt.AuthToken))
 		}
 		r.Post("/tasks", s.createTask)
+		r.Get("/runners/stream", s.runnerStream)
 		r.Post("/tasks/claim", s.claimTask)
 		r.Get("/tasks/{id}", s.getTask)
 		r.Post("/tasks/{id}/complete", s.completeTask)

@@ -24,6 +24,9 @@ type Server struct {
 	Webhook *webhook.Sender
 	Log     *slog.Logger
 
+	// TaskNotify wakes WebSocket runners when a new task is enqueued; nil disables notifications.
+	TaskNotify *WaitHub
+
 	// EC2Launcher when EC2 hot pool is enabled; used for optional /v1/admin diagnostics.
 	EC2Launcher *ec2provision.Launcher
 
@@ -101,6 +104,9 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		s.Log.Error("create task", slog.Any("err", err))
 		writeError(w, http.StatusInternalServerError, "could not create task")
 		return
+	}
+	if s.TaskNotify != nil {
+		s.TaskNotify.Notify()
 	}
 	writeJSON(w, http.StatusCreated, api.CreateTaskResponse{ID: task.ID})
 }
@@ -184,7 +190,7 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := s.Store.CompleteTask(r.Context(), id, runnerID, req.ExitCode, req.Output, req.Error)
+	_, err := s.completeTaskCore(r.Context(), id, runnerID, req)
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "wrong runner") {
 			writeError(w, http.StatusConflict, "cannot complete task")
@@ -195,13 +201,24 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// completeTaskCore runs Store.CompleteTask, delivers the webhook, and schedules optional EC2 termination.
+// On conflict (wrong runner / bad state), err message contains "not found" or "wrong runner" for HTTP 409 mapping.
+func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, req api.CompleteTaskRequest) (*models.Task, error) {
+	task, err := s.Store.CompleteTask(ctx, taskID, runnerID, req.ExitCode, req.Output, req.Error)
+	if err != nil {
+		return nil, err
+	}
+
 	go s.deliverWebhook(task)
 
 	if s.TerminateRunnerAfterTaskEnabled && s.TerminateRunnerInstance != nil && isEC2InstanceID(runnerID) {
 		go func(instanceID string) {
-			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			tctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 			defer cancel()
-			if err := s.TerminateRunnerInstance(ctx, instanceID); err != nil && s.Log != nil {
+			if err := s.TerminateRunnerInstance(tctx, instanceID); err != nil && s.Log != nil {
 				s.Log.Warn("terminate runner instance after task failed",
 					slog.String("instance_id", instanceID), slog.Any("err", err))
 			} else if s.Log != nil {
@@ -210,7 +227,7 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 		}(runnerID)
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	return task, nil
 }
 
 func (s *Server) deliverWebhook(task *models.Task) {

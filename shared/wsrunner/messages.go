@@ -1,0 +1,50 @@
+// Package wsrunner defines JSON message types for the fleet-manager runner WebSocket
+// stream (GET /v1/runners/stream)
+package wsrunner
+
+import "github.com/superplane/runner/shared/api"
+
+// Message type discriminator values (JSON field "type").
+const (
+	TypeHello    = "hello"
+	TypeTask     = "task"
+	TypeComplete = "complete"
+	TypeAck      = "ack"
+	TypeError    = "error"
+)
+
+// Hello is the first client message after connect. Fields match api.ClaimTaskRequest JSON tags.
+type Hello struct {
+	Type         string `json:"type"`
+	RunnerID     string `json:"runner_id"`
+	LeaseSeconds int    `json:"lease_seconds"`
+}
+
+// Task is server -> client after a successful claim.
+type Task struct {
+	Type string           `json:"type"`
+	Task *api.TaskPayload `json:"task"`
+}
+
+// Complete is client -> server to finish a claimed task.
+type Complete struct {
+	Type     string `json:"type"`
+	TaskID   string `json:"task_id"`
+	RunnerID string `json:"runner_id"`
+	ExitCode int    `json:"exit_code"`
+	Output   string `json:"output"`
+	Error    string `json:"error,omitempty"`
+}
+
+// Ack is server -> client after successful complete (HTTP 204 equivalent).
+type Ack struct {
+	Type string `json:"type"`
+	OK   bool   `json:"ok"`
+}
+
+// Error is server -> client when complete fails or protocol is invalid.
+type Error struct {
+	Type    string `json:"type"`
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
