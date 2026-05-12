@@ -13,7 +13,7 @@ import (
 
 // RegisterAgentStreamHandler registers the SSE stream route for agents.
 func (s *Server) RegisterAgentStreamHandler(agentService *agents.Service) {
-	streamHandler := agents.NewStreamHandler(agentService.Client, agentService.Store)
+	streamHandler := agents.NewStreamHandler(agentService.Client, agentService.Store, agentService.BaseURL)
 
 	log.Println("Registering agent stream handler at /api/v1/agents/chats/{canvas_id}/stream")
 
