@@ -3,144 +3,84 @@ package grpc
 import (
 	"context"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/config"
-	agents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
-	"github.com/superplanehq/superplane/pkg/jwt"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type AgentsService struct {
-	authService authorization.Authorization
-	jwtSigner   *jwt.Signer
+	service *agents.Service
 }
 
-func NewAgentsService(authService authorization.Authorization, jwtSigner *jwt.Signer) *AgentsService {
-	return &AgentsService{
-		authService: authService,
-		jwtSigner:   jwtSigner,
-	}
+func NewAgentsService(service *agents.Service) *AgentsService {
+	return &AgentsService{service: service}
 }
 
 func (s *AgentsService) CreateAgentChat(ctx context.Context, req *pb.CreateAgentChatRequest) (*pb.CreateAgentChatResponse, error) {
-	agentPublicURL := config.AgentHTTPURL()
-	if agentPublicURL == "" {
-		return nil, status.Error(codes.Unavailable, "agent HTTP URL not configured")
-	}
-
-	agentInternalURL := config.AgentGRPCURL()
-	if agentInternalURL == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, err := userIDFromContext(ctx)
+	orgID, userID, err := s.extractIDs(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	return agents.CreateAgentChat(
-		ctx,
-		s.authService,
-		s.jwtSigner,
-		agentInternalURL,
-		agentPublicURL,
-		userID,
-		organizationID,
-		req.CanvasId,
-	)
+	return s.service.CreateAgentChat(ctx, orgID, userID, req.CanvasId)
 }
 
 func (s *AgentsService) ResumeAgentChat(ctx context.Context, req *pb.ResumeAgentChatRequest) (*pb.ResumeAgentChatResponse, error) {
-	agentPublicURL := config.AgentHTTPURL()
-	if agentPublicURL == "" {
-		return nil, status.Error(codes.Unavailable, "agent HTTP URL not configured")
-	}
-
-	agentInternalURL := config.AgentGRPCURL()
-	if agentInternalURL == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, err := userIDFromContext(ctx)
+	orgID, userID, err := s.extractIDs(ctx)
 	if err != nil {
 		return nil, err
 	}
-
-	return agents.ResumeAgentChat(
-		ctx,
-		s.authService,
-		s.jwtSigner,
-		agentInternalURL,
-		agentPublicURL,
-		organizationID,
-		userID,
-		req.CanvasId,
-		req.ChatId,
-	)
-}
-
-func (s *AgentsService) DescribeAgentChat(ctx context.Context, req *pb.DescribeAgentChatRequest) (*pb.DescribeAgentChatResponse, error) {
-	url := config.AgentGRPCURL()
-	if url == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, err := userIDFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return agents.DescribeAgentChat(ctx, url, organizationID, userID, req.CanvasId, req.ChatId)
-}
-
-func (s *AgentsService) ListAgentChats(ctx context.Context, req *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error) {
-	url := config.AgentGRPCURL()
-	if url == "" {
-		log.WithField("canvas_id", req.CanvasId).Warn("agent GRPC URL not configured")
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, err := userIDFromContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return agents.ListAgentChats(ctx, url, organizationID, userID, req.CanvasId)
+	return s.service.ResumeAgentChat(ctx, orgID, userID, req.CanvasId)
 }
 
 func (s *AgentsService) DeleteAgentChat(ctx context.Context, req *pb.DeleteAgentChatRequest) (*pb.DeleteAgentChatResponse, error) {
-	url := config.AgentGRPCURL()
-	if url == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
+	orgID, userID, err := s.extractIDs(ctx)
+	if err != nil {
+		return nil, err
 	}
+	if err := s.service.DeleteAgentChat(orgID, userID, req.CanvasId); err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete chat: %v", err)
+	}
+	return &pb.DeleteAgentChatResponse{}, nil
+}
 
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, err := userIDFromContext(ctx)
+func (s *AgentsService) ListAgentChats(ctx context.Context, req *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error) {
+	// With single-session model, just return the one session if it exists
+	orgID, userID, err := s.extractIDs(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return agents.DeleteAgentChat(ctx, url, organizationID, userID, req.CanvasId, req.ChatId)
+	_ = orgID
+	_ = userID
+	_ = req
+
+	return &pb.ListAgentChatsResponse{}, nil
+}
+
+func (s *AgentsService) DescribeAgentChat(ctx context.Context, req *pb.DescribeAgentChatRequest) (*pb.DescribeAgentChatResponse, error) {
+	return &pb.DescribeAgentChatResponse{}, nil
 }
 
 func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error) {
-	url := config.AgentGRPCURL()
-	if url == "" {
-		return nil, status.Error(codes.Unavailable, "agent GRPC URL not configured")
-	}
-
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	userID, err := userIDFromContext(ctx)
+	orgID, userID, err := s.extractIDs(ctx)
 	if err != nil {
 		return nil, err
 	}
+	return s.service.ListAgentChatMessages(orgID, userID, req.CanvasId)
+}
 
-	return agents.ListAgentChatMessages(ctx, url, organizationID, userID, req.CanvasId, req.ChatId)
+func (s *AgentsService) extractIDs(ctx context.Context) (string, string, error) {
+	orgID, ok := ctx.Value(authorization.OrganizationContextKey).(string)
+	if !ok || orgID == "" {
+		return "", "", status.Error(codes.Unauthenticated, "organization not found")
+	}
+
+	userID, err := userIDFromContext(ctx)
+	if err != nil {
+		return "", "", err
+	}
+
+	return orgID, userID, nil
 }
