@@ -5741,6 +5741,8 @@ export function WorkflowPageV2() {
                 isFetchingNextPage={infiniteRunsQuery.isFetchingNextPage}
                 onLoadMore={() => infiniteRunsQuery.fetchNextPage()}
                 isLoading={infiniteRunsQuery.isLoading}
+                isError={infiniteRunsQuery.isError}
+                onRetry={() => infiniteRunsQuery.refetch()}
                 workflowNodes={canvasNodes}
                 componentIconMap={componentIconMap}
                 totalCount={runsData.totalCount}

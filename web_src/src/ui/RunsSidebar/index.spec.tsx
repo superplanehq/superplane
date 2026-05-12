@@ -96,7 +96,7 @@ describe("RunsSidebar", () => {
     expect(screen.getByText("Passed")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Failed"));
     expect(screen.getByText("Cancelled")).toBeInTheDocument();
-    expect(screen.queryByText("Running")).not.toBeInTheDocument();
+    expect(screen.getByText("Running")).toBeInTheDocument();
     expect(screen.queryByText("Completed")).not.toBeInTheDocument();
 
     expect(screen.getByText("Broken deploy")).toBeInTheDocument();

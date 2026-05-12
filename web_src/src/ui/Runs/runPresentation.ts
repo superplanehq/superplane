@@ -1,6 +1,5 @@
 /* eslint-disable complexity */
 import type { CanvasesCanvasNodeExecutionRef, CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
-import { formatDuration } from "@/lib/duration";
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
 import { buildEventInfo } from "@/pages/workflowv2/utils";
 import { AlertTriangle, CheckCircle2, CircleDashed, Clock, MinusCircle, type LucideIcon } from "lucide-react";
@@ -59,21 +58,6 @@ export const RUN_STATUS_META = {
 
 export function shortId(value: string | undefined) {
   return value ? value.slice(0, 8) : "";
-}
-
-export function formatAbsolute(value: string | undefined): string {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
-}
-
-export function formatRunDuration(startedAt: string | undefined, finishedAt: string | undefined) {
-  if (!startedAt || !finishedAt) return null;
-  const started = new Date(startedAt).getTime();
-  const finished = new Date(finishedAt).getTime();
-  if (Number.isNaN(started) || Number.isNaN(finished) || finished < started) return null;
-  return formatDuration(finished - started);
 }
 
 export function getRunStatus(run: CanvasesCanvasRun): RunStatusKey {
