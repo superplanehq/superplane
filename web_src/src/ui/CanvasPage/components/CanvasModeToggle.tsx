@@ -5,48 +5,52 @@ type CanvasMode = "version-live" | "version-edit" | "runs";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
-  onSelectEditor: () => void;
   onSelectLive: () => void;
   onSelectRuns?: () => void;
   runsNotificationCount?: number;
+  editing?: boolean;
+  hasDraft?: boolean;
 }
 
 export function CanvasModeToggle({
   mode,
-  onSelectEditor,
   onSelectLive,
   onSelectRuns,
   runsNotificationCount,
+  editing = false,
+  hasDraft = false,
 }: CanvasModeToggleProps) {
   const showRuns = !!onSelectRuns;
   const baseTrigger =
     "h-full border-none px-3 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50";
+  const canvasActiveClassName =
+    editing || hasDraft
+      ? "bg-amber-50 text-amber-800 shadow-[0_0_0_2px_rgba(251,146,60,0.35)] ring-1 ring-inset ring-amber-200"
+      : "bg-sky-50 text-sky-700 shadow-none";
 
   return (
     <div className="inline-flex w-auto" aria-label="Canvas view" role="group">
       <div className="flex h-8 w-fit gap-0 overflow-hidden rounded-sm border border-slate-300 bg-white/80 p-0">
         <ModeButton
-          isActive={mode === "version-edit"}
-          data-testid="canvas-view-mode-editor"
-          aria-label="Editor"
-          onClick={() => {
-            if (mode !== "version-edit") void onSelectEditor();
-          }}
-          className={cn(baseTrigger, "rounded-sm rounded-br-none rounded-tr-none")}
-        >
-          Editor
-        </ModeButton>
-        <div className="h-full w-px bg-slate-300"></div>
-        <ModeButton
-          isActive={mode === "version-live"}
+          isActive={mode === "version-live" || mode === "version-edit"}
+          activeClassName={canvasActiveClassName}
           data-testid="canvas-view-mode-live"
-          aria-label="Live Canvas"
+          aria-label={editing ? "Canvas (editing)" : hasDraft ? "Canvas (unpublished draft)" : "Canvas"}
           onClick={() => {
-            if (mode !== "version-live") void onSelectLive();
+            if (mode !== "version-live" && mode !== "version-edit") void onSelectLive();
           }}
           className={cn(baseTrigger, showRuns ? "rounded-none" : "rounded-sm rounded-bl-none rounded-tl-none")}
         >
-          Live Canvas
+          <span className="inline-flex items-center gap-1.5">
+            Canvas
+            {hasDraft ? (
+              <span
+                className="inline-flex h-1.5 w-1.5 rounded-full bg-orange-500"
+                aria-hidden="true"
+                data-testid="canvas-view-mode-live-draft-dot"
+              />
+            ) : null}
+          </span>
         </ModeButton>
         {showRuns ? (
           <>
@@ -78,15 +82,16 @@ export function CanvasModeToggle({
 
 interface ModeButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   isActive: boolean;
+  activeClassName?: string;
 }
 
-function ModeButton({ isActive, className, ...props }: ModeButtonProps) {
+function ModeButton({
+  isActive,
+  activeClassName = "bg-sky-50 text-sky-700 shadow-none",
+  className,
+  ...props
+}: ModeButtonProps) {
   return (
-    <button
-      type="button"
-      aria-pressed={isActive}
-      className={cn(isActive && "bg-sky-50 text-sky-700 shadow-none", className)}
-      {...props}
-    />
+    <button type="button" aria-pressed={isActive} className={cn(isActive && activeClassName, className)} {...props} />
   );
 }

@@ -93,7 +93,7 @@ func (s *runsViewSteps) whenICloseRunNodeDetails() {
 }
 
 func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
-	s.session.Click(q.TestID("canvas-view-mode-editor"))
+	s.session.Click(q.TestID("canvas-edit-button"))
 }
 
 func (s *runsViewSteps) thenEditModeIsVisible() {
