@@ -378,6 +378,17 @@ service Canvases {
     };
   }
 
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/runs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas runs";
+      description: "Returns a list of runs for a canvas";
+      tags: "CanvasRun";
+    };
+  }
+
   rpc ListCanvasMemories(ListCanvasMemoriesRequest) returns (ListCanvasMemoriesResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/memory"
@@ -927,6 +938,21 @@ message ListCanvasEventsResponse {
   google.protobuf.Timestamp last_timestamp = 4;
 }
 
+message ListRunsRequest {
+  string canvas_id = 1;
+  uint32 limit = 2;
+  google.protobuf.Timestamp before = 3;
+  repeated CanvasRun.State states = 4;
+  repeated CanvasRun.Result results = 5;
+}
+
+message ListRunsResponse {
+  repeated CanvasRun runs = 1;
+  uint32 total_count = 2;
+  bool has_next_page = 3;
+  google.protobuf.Timestamp last_timestamp = 4;
+}
+
 message CanvasMemory {
   string id = 1;
   string namespace = 2;
@@ -968,6 +994,31 @@ message CanvasEventWithExecutions {
   google.protobuf.Timestamp created_at = 6;
   repeated CanvasNodeExecutionRef executions = 7;
   string custom_name = 8;
+}
+
+message CanvasRun {
+  enum State {
+    STATE_UNKNOWN = 0;
+    STATE_STARTED = 1;
+    STATE_FINISHED = 2;
+  }
+
+  enum Result {
+    RESULT_UNKNOWN = 0;
+    RESULT_PASSED = 1;
+    RESULT_FAILED = 2;
+    RESULT_CANCELLED = 3;
+  }
+
+  string id = 1;
+  string canvas_id = 2;
+  CanvasEvent root_event = 3;
+  State state = 4;
+  Result result = 5;
+  repeated CanvasNodeExecutionRef executions = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  google.protobuf.Timestamp finished_at = 9;
 }
 
 message ListEventExecutionsRequest {
@@ -1063,6 +1114,12 @@ message CanvasNodeQueueItemMessage {
   string canvas_id = 2;
   string node_id = 3;
   google.protobuf.Timestamp timestamp = 4;
+}
+
+message CanvasRunMessage {
+  string id = 1;
+  string canvas_id = 2;
+  google.protobuf.Timestamp timestamp = 3;
 }
 
 message CanvasMessage {
