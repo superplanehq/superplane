@@ -161,6 +161,21 @@ func (h *StreamHandler) pollAndStream(ctx context.Context, w http.ResponseWriter
 
 		// Check if done
 		if session.Status == "idle" && session.Usage.OutputTokens > 0 {
+			// Final fetch to catch any events that arrived between our list and status check
+			finalEvents, err := h.client.ListEvents(ctx, sessionID, 200)
+			if err == nil {
+				for _, event := range finalEvents.Data {
+					if seenEventIDs[event.ID] {
+						continue
+					}
+					seenEventIDs[event.ID] = true
+					text := h.streamEvent(w, flusher, event)
+					if text != "" {
+						assistantContent += text
+					}
+				}
+			}
+
 			if assistantContent != "" {
 				writeSSE(w, flusher, map[string]any{"type": "final_answer", "output": assistantContent})
 			}
