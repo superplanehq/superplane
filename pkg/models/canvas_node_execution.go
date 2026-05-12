@@ -148,15 +148,43 @@ func CreatePendingChildExecution(tx *gorm.DB, parent *CanvasNodeExecution, child
 func ListPendingNodeExecutions() ([]CanvasNodeExecution, error) {
 	var executions []CanvasNodeExecution
 	query := database.Conn().
-		Where("state = ?", CanvasNodeExecutionStatePending).
-		Order("created_at DESC")
+		Table("workflow_node_executions").
+		Select("workflow_node_executions.*").
+		Where("workflow_node_executions.state = ?", CanvasNodeExecutionStatePending).
+		Order("workflow_node_executions.created_at DESC")
 
-	err := query.Find(&executions).Error
+	err := withActiveCanvas(query, "workflow_node_executions.workflow_id").
+		Find(&executions).
+		Error
 	if err != nil {
 		return nil, err
 	}
 
 	return executions, nil
+}
+
+func LockPendingNodeExecutionInActiveCanvas(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+
+	query := tx.
+		Table("workflow_node_executions").
+		Select("workflow_node_executions.*").
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "workflow_node_executions"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("workflow_node_executions.id = ?", id).
+		Where("workflow_node_executions.state = ?", CanvasNodeExecutionStatePending)
+
+	err := withActiveCanvas(query, "workflow_node_executions.workflow_id").
+		First(&execution).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution, nil
 }
 
 func ListNodeExecutions(workflowID uuid.UUID, nodeID string, states []string, results []string, limit int, beforeTime *time.Time) ([]CanvasNodeExecution, error) {

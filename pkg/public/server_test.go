@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,6 +27,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -193,6 +195,71 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 
 	require.Equal(t, "", response.Body.String())
 	require.Equal(t, 200, response.Code)
+}
+
+func Test__HandleWebhook_DoesNotRunNodesForSoftDeletedOrganization(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	signer := jwt.NewSigner("test")
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		signer,
+		support.NewOIDCProvider(),
+		"",
+		"http://localhost",
+		"http://localhost",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+
+	webhookID := uuid.New()
+	webhook := models.Webhook{
+		ID:     webhookID,
+		State:  models.WebhookStateReady,
+		Secret: []byte("secret"),
+	}
+	require.NoError(t, database.Conn().Create(&webhook).Error)
+
+	nodeID := "start-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: nodeID,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNode{}).
+		Where("workflow_id = ?", canvas.ID).
+		Where("node_id = ?", nodeID).
+		Update("webhook_id", webhookID).
+		Error)
+
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+
+	response := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   []byte(`{"ok": true}`),
+	})
+
+	require.Equal(t, http.StatusNotFound, response.Code)
+
+	eventCount, err := models.CountCanvasEvents(canvas.ID, nodeID)
+	require.NoError(t, err)
+	assert.Zero(t, eventCount)
 }
 
 type canvasesGatewayStubServer struct {
