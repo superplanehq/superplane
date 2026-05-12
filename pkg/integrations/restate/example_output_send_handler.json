@@ -1,0 +1,10 @@
+{
+    "type": "restate.invocation.sent",
+    "data": {
+        "invocation_id": "inv_1aiqX0vFEFNH0TF1pLRFBDFosQCCTAN1M5",
+        "status": "Accepted",
+        "service": "EmailService",
+        "handler": "sendWelcomeEmail"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

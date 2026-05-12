@@ -22,6 +22,7 @@ const INTEGRATION_TYPE_DISPLAY_NAMES: Record<string, string> = {
   statuspage: "Statuspage",
   daytona: "Daytona",
   dash0: "Dash0",
+  restate: "Restate",
   aws: "AWS",
   gcp: "GCP",
   azure: "Azure",

@@ -1,0 +1,22 @@
+{
+    "type": "restate.deployment.registered",
+    "data": {
+        "id": "dp_14LsPzGz9HBxXIeBoH5wYUh",
+        "uri": "http://cart-service:9080",
+        "protocol_type": "BidiStream",
+        "services": [
+            {
+                "name": "CartService",
+                "revision": 3,
+                "ty": "Service",
+                "public": true,
+                "handlers": [
+                    {"name": "addItem", "ty": "Exclusive"},
+                    {"name": "getCart", "ty": "Shared"},
+                    {"name": "checkout", "ty": "Exclusive"}
+                ]
+            }
+        ]
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

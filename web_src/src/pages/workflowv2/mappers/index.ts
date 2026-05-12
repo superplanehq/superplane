@@ -240,6 +240,11 @@ import {
   triggerRenderers as ociTriggerRenderers,
   eventStateRegistry as ociEventStateRegistry,
 } from "./oci/index";
+import {
+  componentMappers as restateComponentMappers,
+  triggerRenderers as restateTriggerRenderers,
+  eventStateRegistry as restateEventStateRegistry,
+} from "./restate/index";
 
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
@@ -325,6 +330,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   servicenow: servicenowComponentMappers,
   elastic: elasticComponentMappers,
   oci: ociComponentMappers,
+  restate: restateComponentMappers,
 };
 
 const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
@@ -371,6 +377,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   servicenow: servicenowTriggerRenderers,
   elastic: elasticTriggerRenderers,
   oci: ociTriggerRenderers,
+  restate: restateTriggerRenderers,
 };
 
 const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>> = {
@@ -416,6 +423,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   servicenow: servicenowEventStateRegistry,
   elastic: elasticEventStateRegistry,
   oci: ociEventStateRegistry,
+  restate: restateEventStateRegistry,
 };
 
 const eventStateRegistries: Record<string, EventStateRegistry> = {

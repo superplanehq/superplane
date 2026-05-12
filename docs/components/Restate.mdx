@@ -1,0 +1,545 @@
+---
+title: "Restate"
+---
+
+Invoke handlers, manage deployments, and control invocations in Restate
+
+import { CardGrid, LinkCard } from "@astrojs/starlight/components";
+
+## Actions
+
+<CardGrid>
+  <LinkCard title="Cancel Invocation" href="#cancel-invocation" description="Cancel a running Restate invocation gracefully" />
+  <LinkCard title="Get Service" href="#get-service" description="Get details about a registered Restate service" />
+  <LinkCard title="Health Check" href="#health-check" description="Check the health status of the Restate cluster" />
+  <LinkCard title="Invoke Handler" href="#invoke-handler" description="Invoke a Restate service handler synchronously and wait for the response" />
+  <LinkCard title="Kill Invocation" href="#kill-invocation" description="Force-kill a running Restate invocation without running compensation logic" />
+  <LinkCard title="List Services" href="#list-services" description="List all services registered with the Restate server" />
+  <LinkCard title="Purge Invocation" href="#purge-invocation" description="Purge a completed Restate invocation and its associated data" />
+  <LinkCard title="Register Deployment" href="#register-deployment" description="Register a new service deployment with the Restate server" />
+  <LinkCard title="Remove Deployment" href="#remove-deployment" description="Remove a service deployment from the Restate server" />
+  <LinkCard title="Send Delayed Handler" href="#send-delayed-handler" description="Send a delayed fire-and-forget invocation to a Restate service handler" />
+  <LinkCard title="Send Handler" href="#send-handler" description="Send a fire-and-forget invocation to a Restate service handler" />
+</CardGrid>
+
+## Instructions
+
+To configure Restate to work with SuperPlane:
+
+1. **Admin URL**: The URL of your Restate Admin API (default: http://localhost:9070)
+2. **Ingress URL**: The URL of your Restate Ingress API (default: http://localhost:8080)
+3. **Auth Token** (optional): A Bearer token for authenticating requests to your Restate server
+
+Both URLs must be reachable from the SuperPlane instance. For Restate Cloud,
+use the endpoints provided in your Restate Cloud dashboard.
+
+<a id="cancel-invocation"></a>
+
+## Cancel Invocation
+
+The Cancel Invocation component cancels a running invocation in Restate gracefully.
+
+Cancellation allows the handler to run its compensation logic (sagas) before terminating,
+ensuring consistent state. If you need to force-stop without compensation, use Kill Invocation instead.
+
+### Use Cases
+
+- **Graceful rollback**: Cancel in-flight invocations during a rollback, allowing compensation to run
+- **Timeout handling**: Cancel invocations that have exceeded an expected duration
+- **Incident response**: Cancel active invocations for a misbehaving service
+
+### Important Notes
+
+- Cancellation is **non-blocking** — the invocation may not be fully cancelled when this component completes
+- Handlers need compensation logic for cancellation to roll back state correctly
+- If cancellation doesn't work (e.g. endpoint unreachable), use Kill Invocation as a fallback
+
+### Outputs
+
+The component emits an event containing:
+- `invocation_id`: The cancelled invocation ID
+- `status`: "cancelled"
+
+### Example Output
+
+```json
+{
+  "data": {
+    "invocation_id": "inv_1gdJBtdVEcM942bjcDmb1c1khoaJe11Hbz",
+    "status": "cancelled"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "restate.invocation.cancelled"
+}
+```
+
+<a id="get-service"></a>
+
+## Get Service
+
+The Get Service component retrieves details about a specific service registered with Restate.
+
+### Use Cases
+
+- **Pre-deploy validation**: Check that a service is registered before invoking it
+- **Service inspection**: View service handlers, revision, and deployment info
+- **Conditional workflows**: Branch workflow logic based on service properties
+
+### Outputs
+
+The component emits the full service details from Restate, including:
+- `name`: The service name
+- `revision`: The current revision number
+- `ty`: The service type (Service, VirtualObject, or Workflow)
+- `deployment_id`: The associated deployment ID
+- `public`: Whether the service is publicly accessible
+- `handlers`: Array of handler definitions
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deployment_id": "dp_14LsPzGz9HBxXIeBoH5wYUh",
+    "handlers": [
+      {
+        "input": {
+          "content_type": "application/json",
+          "required": true
+        },
+        "name": "addItem",
+        "output": {
+          "content_type": "application/json"
+        },
+        "ty": "Exclusive"
+      },
+      {
+        "input": {
+          "required": false
+        },
+        "name": "getCart",
+        "output": {
+          "content_type": "application/json"
+        },
+        "ty": "Shared"
+      },
+      {
+        "input": {
+          "content_type": "application/json",
+          "required": true
+        },
+        "name": "checkout",
+        "output": {
+          "content_type": "application/json"
+        },
+        "ty": "Exclusive"
+      }
+    ],
+    "idempotency_retention": "1d",
+    "name": "CartService",
+    "public": true,
+    "revision": 3,
+    "ty": "Service"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "restate.service"
+}
+```
+
+<a id="health-check"></a>
+
+## Health Check
+
+The Health Check component verifies the Restate cluster is healthy and operational.
+
+### Use Cases
+
+- **Pre-deploy gate**: Verify the cluster is healthy before registering a new deployment
+- **Post-deploy validation**: Confirm the cluster is still healthy after a deployment
+- **Monitoring workflows**: Periodic health checks as part of operational workflows
+- **Incident investigation**: Check cluster health during incident triage
+
+### Outputs
+
+The component emits an event containing:
+- `healthy`: Boolean indicating if the basic health check passed
+- `cluster_health`: Detailed cluster health information
+- `version`: Restate server version information
+
+### Example Output
+
+```json
+{
+  "data": {
+    "cluster_health": {
+      "nodes": {
+        "0": {
+          "last_seen_alive": "2026-01-19T12:00:00Z",
+          "status": "ALIVE"
+        }
+      }
+    },
+    "healthy": true,
+    "version": {
+      "max_admin_api_version": 1,
+      "min_admin_api_version": 1,
+      "version": "1.1.4"
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "restate.health"
+}
+```
+
+<a id="invoke-handler"></a>
+
+## Invoke Handler
+
+The Invoke Handler component calls a Restate service handler and waits for the response.
+
+### Use Cases
+
+- **Workflow steps**: Execute a durable handler as part of a multi-step workflow
+- **Data processing**: Invoke a handler to transform or validate data
+- **Idempotent operations**: Use an idempotency key to ensure exactly-once execution
+
+### Outputs
+
+The component emits an event containing:
+- `service`: The service name
+- `handler`: The handler name
+- `status_code`: The HTTP status code of the response
+- `response`: The response body from the handler
+- `idempotency_key`: The idempotency key used (if any)
+
+### Example Output
+
+```json
+{
+  "data": {
+    "handler": "addItem",
+    "idempotency_key": "order-abc-123",
+    "response": {
+      "cart_id": "cart-12345",
+      "items": [
+        {
+          "price": 29.99,
+          "product_id": "SKU-001",
+          "quantity": 2
+        }
+      ],
+      "total": 59.98
+    },
+    "service": "CartService",
+    "status_code": 200
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "restate.invocation.response"
+}
+```
+
+<a id="kill-invocation"></a>
+
+## Kill Invocation
+
+The Kill Invocation component force-kills a running invocation in Restate **without** running compensation logic.
+
+Use this as a last resort when Cancel Invocation doesn't work — for example, when the service
+endpoint is permanently unavailable and Restate cannot invoke the handler to run cleanup.
+
+### Use Cases
+
+- **Stuck invocations**: Kill invocations that are stuck in retry loops with unreachable endpoints
+- **Emergency cleanup**: Force-terminate invocations during incidents when graceful cancellation fails
+- **Resource reclamation**: Free up resources held by invocations that cannot complete
+
+### Important Notes
+
+- Kill does **not** run compensation logic — state may be left inconsistent
+- Use Cancel Invocation first; only kill if cancellation fails
+- Killing is non-blocking — the invocation may not be fully terminated when this component completes
+
+### Outputs
+
+The component emits an event containing:
+- `invocation_id`: The killed invocation ID
+- `status`: "killed"
+
+### Example Output
+
+```json
+{
+  "data": {
+    "invocation_id": "inv_1gdJBtdVEcM942bjcDmb1c1khoaJe11Hbz",
+    "status": "killed"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "restate.invocation.killed"
+}
+```
+
+<a id="list-services"></a>
+
+## List Services
+
+The List Services component retrieves all services currently registered with the Restate server.
+
+### Use Cases
+
+- **Inventory checks**: Verify which services are deployed before running a workflow
+- **Health monitoring**: List all registered services as part of a status check
+- **Post-deploy validation**: Confirm a newly deployed service appears in the registry
+
+### Outputs
+
+The component emits an event containing:
+- `services`: Array of service objects, each containing name, revision, type, deployment ID, and handlers
+- `count`: Total number of registered services
+
+### Example Output
+
+```json
+{
+  "data": {
+    "count": 3,
+    "services": [
+      {
+        "deployment_id": "dp_14LsPzGz9HBxXIeBoH5wYUh",
+        "name": "CartService",
+        "public": true,
+        "revision": 3,
+        "ty": "Service"
+      },
+      {
+        "deployment_id": "dp_14LsPzGz9HBxXIeBoH5wYUh",
+        "name": "OrderWorkflow",
+        "public": true,
+        "revision": 1,
+        "ty": "Workflow"
+      },
+      {
+        "deployment_id": "dp_9KmNpQr3SJCyZOgDpI7xWFk",
+        "name": "InventoryObject",
+        "public": true,
+        "revision": 2,
+        "ty": "VirtualObject"
+      }
+    ]
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "restate.services"
+}
+```
+
+<a id="purge-invocation"></a>
+
+## Purge Invocation
+
+The Purge Invocation component purges a completed invocation and all its associated data from the Restate server.
+
+### Use Cases
+
+- **Data cleanup**: Remove invocation data after it's no longer needed
+- **Post-migration cleanup**: Purge old invocations after a service migration
+- **Storage management**: Free up storage by removing completed invocation journals
+
+### Important Notes
+
+- Only completed (succeeded, failed, or killed) invocations can be purged
+- Purging removes the invocation journal and response data permanently
+- This action is irreversible
+
+### Outputs
+
+The component emits an event containing:
+- `invocation_id`: The purged invocation ID
+- `status`: "purged"
+
+### Example Output
+
+```json
+{
+  "data": {
+    "invocation_id": "inv_1gdJBtdVEcM942bjcDmb1c1khoaJe11Hbz",
+    "status": "purged"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "restate.invocation.purged"
+}
+```
+
+<a id="register-deployment"></a>
+
+## Register Deployment
+
+The Register Deployment component registers a new service deployment endpoint with the Restate server.
+
+### Use Cases
+
+- **CI/CD pipelines**: Automatically register new service versions after deployment
+- **Service discovery**: Register services with Restate as part of infrastructure provisioning
+- **Rolling updates**: Force-register updated service endpoints during rolling deployments
+
+### Options
+
+- **Force**: Override an existing deployment with the same URI. Required when updating a deployment.
+- **Dry Run**: Validate the deployment without actually registering it.
+- **Use HTTP 1.1**: Use HTTP 1.1 instead of HTTP 2 for service communication.
+
+### Outputs
+
+The component emits the full deployment response from Restate, including:
+- `id`: The deployment ID
+- `uri`: The registered URI
+- `services`: Array of discovered services and their handlers
+- `protocol_type`: The protocol type used
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "dp_14LsPzGz9HBxXIeBoH5wYUh",
+    "protocol_type": "BidiStream",
+    "services": [
+      {
+        "handlers": [
+          {
+            "name": "addItem",
+            "ty": "Exclusive"
+          },
+          {
+            "name": "getCart",
+            "ty": "Shared"
+          },
+          {
+            "name": "checkout",
+            "ty": "Exclusive"
+          }
+        ],
+        "name": "CartService",
+        "public": true,
+        "revision": 3,
+        "ty": "Service"
+      }
+    ],
+    "uri": "http://cart-service:9080"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "restate.deployment.registered"
+}
+```
+
+<a id="remove-deployment"></a>
+
+## Remove Deployment
+
+The Remove Deployment component removes a service deployment from the Restate server.
+
+### Use Cases
+
+- **Cleanup**: Remove old deployments after a successful migration
+- **Rollback**: Remove a failed deployment to restore previous state
+- **Decommissioning**: Remove service deployments that are no longer needed
+
+### Options
+
+- **Force**: Force removal even if the deployment has active invocations.
+
+### Outputs
+
+The component emits an event containing:
+- `deployment_id`: The ID of the removed deployment
+- `force`: Whether force removal was used
+- `status`: "removed"
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deployment_id": "dp_14LsPzGz9HBxXIeBoH5wYUh",
+    "force": false,
+    "status": "removed"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "restate.deployment.removed"
+}
+```
+
+<a id="send-delayed-handler"></a>
+
+## Send Delayed Handler
+
+The Send Delayed Handler component schedules a fire-and-forget invocation to a Restate handler with a configurable delay.
+
+### Use Cases
+
+- **Scheduled processing**: Delay handler execution for a specified duration
+- **Retry with backoff**: Schedule retries with increasing delays
+- **Timed workflows**: Execute handler steps at specific intervals
+
+### Delay Format
+
+The delay can be specified in humantime format (e.g. `10s`, `5m`, `1h`) or ISO8601 duration (e.g. `PT10S`, `PT5M`).
+
+### Outputs
+
+The component emits an event containing:
+- `invocation_id`: The Restate invocation identifier
+- `status`: The acceptance status
+- `service`: The target service name
+- `handler`: The target handler name
+- `delay`: The configured delay
+
+### Example Output
+
+```json
+{
+  "data": {
+    "delay": "30m",
+    "handler": "sendReminder",
+    "invocation_id": "inv_19maBAlEOOH8VBKFpLRFIlposACCTAv2u3",
+    "service": "ReminderService",
+    "status": "Accepted"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "restate.invocation.delayed"
+}
+```
+
+<a id="send-handler"></a>
+
+## Send Handler
+
+The Send Handler component sends a fire-and-forget invocation to a Restate handler without waiting for the response.
+
+### Use Cases
+
+- **Async processing**: Trigger a long-running handler without blocking the workflow
+- **Event-driven workflows**: Send events to Restate handlers for background processing
+- **Decoupled execution**: Start an invocation and track it separately via its invocation ID
+
+### Outputs
+
+The component emits an event containing:
+- `invocation_id`: The Restate invocation identifier (starts with inv_)
+- `status`: The acceptance status (e.g. "Accepted")
+- `service`: The target service name
+- `handler`: The target handler name
+
+### Example Output
+
+```json
+{
+  "data": {
+    "handler": "sendWelcomeEmail",
+    "invocation_id": "inv_1aiqX0vFEFNH0TF1pLRFBDFosQCCTAN1M5",
+    "service": "EmailService",
+    "status": "Accepted"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "restate.invocation.sent"
+}
+```
+

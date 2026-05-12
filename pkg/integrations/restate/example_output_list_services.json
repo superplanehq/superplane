@@ -1,0 +1,30 @@
+{
+    "type": "restate.services",
+    "data": {
+        "services": [
+            {
+                "name": "CartService",
+                "revision": 3,
+                "ty": "Service",
+                "deployment_id": "dp_14LsPzGz9HBxXIeBoH5wYUh",
+                "public": true
+            },
+            {
+                "name": "OrderWorkflow",
+                "revision": 1,
+                "ty": "Workflow",
+                "deployment_id": "dp_14LsPzGz9HBxXIeBoH5wYUh",
+                "public": true
+            },
+            {
+                "name": "InventoryObject",
+                "revision": 2,
+                "ty": "VirtualObject",
+                "deployment_id": "dp_9KmNpQr3SJCyZOgDpI7xWFk",
+                "public": true
+            }
+        ],
+        "count": 3
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

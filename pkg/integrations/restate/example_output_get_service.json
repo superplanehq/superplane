@@ -1,0 +1,17 @@
+{
+    "type": "restate.service",
+    "data": {
+        "name": "CartService",
+        "revision": 3,
+        "ty": "Service",
+        "deployment_id": "dp_14LsPzGz9HBxXIeBoH5wYUh",
+        "public": true,
+        "idempotency_retention": "1d",
+        "handlers": [
+            {"name": "addItem", "ty": "Exclusive", "input": {"required": true, "content_type": "application/json"}, "output": {"content_type": "application/json"}},
+            {"name": "getCart", "ty": "Shared", "input": {"required": false}, "output": {"content_type": "application/json"}},
+            {"name": "checkout", "ty": "Exclusive", "input": {"required": true, "content_type": "application/json"}, "output": {"content_type": "application/json"}}
+        ]
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}
