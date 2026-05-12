@@ -251,9 +251,17 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 	// since this means the first node has improper configuration,
 	// and the user should be aware of this.
 	//
+	//
+	// Pre-generate the child execution UUID so executionId() in the child node's
+	// configuration resolves to the same row we will insert below via
+	// CreatePendingChildExecution.
+	//
+	childExecutionID := uuid.New()
+
 	configBuilder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&execution.RootEventID).
+		WithCurrentExecution(&childExecutionID).
 		WithPreviousExecution(&execution.ID).
 		ForBlueprintNode(node).
 		WithInput(map[string]any{inputEvent.NodeID: input})
@@ -283,7 +291,7 @@ func (w *NodeExecutor) executeBlueprintNode(tx *gorm.DB, execution *models.Canva
 		return nil
 	}
 
-	_, err = models.CreatePendingChildExecution(tx, execution, firstNode.ID, config)
+	_, err = models.CreatePendingChildExecution(tx, execution, firstNode.ID, config, childExecutionID)
 	if err != nil {
 		return fmt.Errorf("failed to create child execution: %w", err)
 	}
@@ -355,6 +363,7 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 	builder := contexts.NewNodeConfigurationBuilder(tx, execution.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&execution.RootEventID).
+		WithCurrentExecution(&execution.ID).
 		WithInput(map[string]any{inputEvent.NodeID: input})
 	if execution.PreviousExecutionID != nil {
 		builder = builder.WithPreviousExecution(execution.PreviousExecutionID)

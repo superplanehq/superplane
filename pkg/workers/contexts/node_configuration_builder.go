@@ -22,6 +22,7 @@ type NodeConfigurationBuilder struct {
 	tx                  *gorm.DB
 	workflowID          uuid.UUID
 	nodeID              string
+	currentExecutionID  *uuid.UUID
 	previousExecutionID *uuid.UUID
 	rootEventID         *uuid.UUID
 	rootPayload         any
@@ -60,6 +61,19 @@ func (b *NodeConfigurationBuilder) WithRootPayload(payload any) *NodeConfigurati
 func (b *NodeConfigurationBuilder) WithPreviousExecution(previousExecutionID *uuid.UUID) *NodeConfigurationBuilder {
 	b.previousExecutionID = previousExecutionID
 	return b
+}
+
+func (b *NodeConfigurationBuilder) WithCurrentExecution(currentExecutionID *uuid.UUID) *NodeConfigurationBuilder {
+	b.currentExecutionID = currentExecutionID
+	return b
+}
+
+// SetCurrentExecution rebinds the executionId() return value after the builder
+// has been wired into a long-lived context. ProcessQueueContext uses this to
+// switch ctx.Expressions from the pre-generated ID to the actual execution
+// once FindExecutionByKV resolves to a different existing row.
+func (b *NodeConfigurationBuilder) SetCurrentExecution(currentExecutionID *uuid.UUID) {
+	b.currentExecutionID = currentExecutionID
 }
 
 func (b *NodeConfigurationBuilder) WithInput(input any) *NodeConfigurationBuilder {
@@ -291,6 +305,24 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 			}
 
 			return b.resolvePreviousPayload(depth)
+		}),
+		expr.Function("eventId", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("eventId() takes no arguments")
+			}
+			if b.rootEventID == nil {
+				return nil, fmt.Errorf("eventId() is not available in this context")
+			}
+			return b.rootEventID.String(), nil
+		}),
+		expr.Function("executionId", func(params ...any) (any, error) {
+			if len(params) != 0 {
+				return nil, fmt.Errorf("executionId() takes no arguments")
+			}
+			if b.currentExecutionID == nil {
+				return nil, fmt.Errorf("executionId() is not available in this context")
+			}
+			return b.currentExecutionID.String(), nil
 		}),
 	}
 

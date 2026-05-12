@@ -33,6 +33,8 @@ The **data-flow** skill describes how `$` is built during a run.
 | `root()` | Root payload that started the run | `root().data.ref` |
 | `previous()` | Immediate upstream node’s payload | `previous().data.status` |
 | `previous(n)` | Walk *n* levels upstream | `previous(2).data.version` |
+| `eventId()` | UUID of the **root** event that started the run (same value across every step in the chain) | `'/canvases/x/runs?event=' + eventId()` |
+| `executionId()` | UUID of the execution evaluating the expression (the current step) | `'/canvases/x/executions/' + executionId()` |
 
 ## Common Expr functions
 
