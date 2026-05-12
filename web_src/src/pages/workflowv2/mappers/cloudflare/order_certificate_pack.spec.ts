@@ -107,11 +107,11 @@ describe("orderCertificatePackMapper.props metadata", () => {
       buildPropsCtx({
         configuration: {
           hosts: ["example.com"],
-          certificateAuthority: "lets_encrypt",
+          certificateAuthority: "custom_ca_provider",
         },
       }),
     );
-    expect(props.metadata).toContainEqual({ icon: "award", label: "lets encrypt" });
+    expect(props.metadata).toContainEqual({ icon: "award", label: "custom ca provider" });
   });
 
   it("returns empty metadata when configuration is empty", () => {

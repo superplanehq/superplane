@@ -93,7 +93,7 @@ function orderMetadataList(node: NodeInfo): MetadataItem[] {
   }
 
   if (config?.certificateAuthority) {
-    metadata.push({ icon: "award", label: config.certificateAuthority.replace("_", " ") });
+    metadata.push({ icon: "award", label: config.certificateAuthority.replace(/_/g, " ") });
   }
 
   return metadata;
