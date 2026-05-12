@@ -677,42 +677,6 @@ func (s *Server) demoteAdmin(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "demoted"})
 }
 
-// adminListOrgExperimentalFeatures returns the registry of experimental
-// features plus the set of ids currently enabled for the organization.
-func (s *Server) adminListOrgExperimentalFeatures(w http.ResponseWriter, r *http.Request) {
-	orgID := mux.Vars(r)["orgId"]
-
-	organization, err := models.FindOrganizationByID(orgID)
-	if err != nil {
-		http.Error(w, "Organization not found", http.StatusNotFound)
-		return
-	}
-
-	type featureItem struct {
-		ID          string `json:"id"`
-		Label       string `json:"label"`
-		Description string `json:"description"`
-		Released    bool   `json:"released"`
-	}
-
-	registry := features.All()
-	items := make([]featureItem, 0, len(registry))
-	for _, f := range registry {
-		items = append(items, featureItem{
-			ID:          f.ID,
-			Label:       f.Label,
-			Description: f.Description,
-			Released:    f.Released != nil && *f.Released,
-		})
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"features": items,
-		"enabled":  []string(organization.EnabledExperimentalFeatures),
-	})
-}
-
 // adminEnableOrgExperimentalFeature toggles an experimental feature on for
 // the given organization.
 func (s *Server) adminEnableOrgExperimentalFeature(w http.ResponseWriter, r *http.Request) {

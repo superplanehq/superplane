@@ -792,41 +792,6 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 	})
 }
 
-func TestAdminListOrgExperimentalFeatures(t *testing.T) {
-	server, r, token := setupAdminTestServer(t)
-
-	t.Run("returns registry and currently enabled set", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, "runners"))
-		t.Cleanup(func() {
-			_ = models.DisableExperimentalFeature(r.Organization.ID, "runners")
-		})
-
-		response := execRequest(server, requestParams{
-			method:     "GET",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features",
-			authCookie: token,
-		})
-		assert.Equal(t, http.StatusOK, response.Code)
-
-		var body struct {
-			Features []map[string]any `json:"features"`
-			Enabled  []string         `json:"enabled"`
-		}
-		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
-		require.NotEmpty(t, body.Features)
-		assert.Contains(t, body.Enabled, "runners")
-	})
-
-	t.Run("returns 404 for non-existent org", func(t *testing.T) {
-		response := execRequest(server, requestParams{
-			method:     "GET",
-			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features",
-			authCookie: token,
-		})
-		assert.Equal(t, http.StatusNotFound, response.Code)
-	})
-}
-
 func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 

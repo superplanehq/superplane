@@ -1,21 +1,25 @@
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
-import {
-  useExperimentalFeaturesRegistry,
-  useToggleAdminExperimentalFeature,
-} from "@/hooks/useAdminExperimentalFeatures";
+import { useToggleAdminExperimentalFeature } from "@/hooks/useAdminExperimentalFeatures";
+import { useExperimentalFeaturesRegistry } from "@/hooks/useExperimentalFeatures";
+import { useOrganization } from "@/hooks/useOrganizationData";
 import { Switch } from "@/ui/switch";
 import { FlaskConical } from "lucide-react";
 import { useMemo, useState } from "react";
 
 export function OrgExperimentalFeaturesTable({ orgId }: { orgId: string }) {
-  const { data, isLoading } = useExperimentalFeaturesRegistry(orgId);
+  const { data: registry, isLoading: registryLoading } = useExperimentalFeaturesRegistry();
+  const { data: organization, isLoading: orgLoading } = useOrganization(orgId);
   const toggleFeature = useToggleAdminExperimentalFeature(orgId);
   const [error, setError] = useState<string | null>(null);
 
-  const features = data?.features ?? [];
-  const enabled = useMemo(() => new Set(data?.enabled ?? []), [data?.enabled]);
+  const features = registry?.features ?? [];
+  const enabled = useMemo(
+    () => new Set(organization?.spec?.enabledExperimentalFeatures ?? []),
+    [organization?.spec?.enabledExperimentalFeatures],
+  );
   const pendingId = toggleFeature.isPending ? (toggleFeature.variables?.featureId ?? null) : null;
+  const isLoading = registryLoading || orgLoading;
 
   const handleToggle = (featureId: string, next: boolean) => {
     setError(null);

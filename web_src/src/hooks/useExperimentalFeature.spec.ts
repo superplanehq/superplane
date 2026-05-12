@@ -12,12 +12,12 @@ vi.mock("./useOrganizationId", () => ({
   useOrganizationId: useOrganizationIdMock,
 }));
 
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import {
-  adminExperimentalFeaturesKeys,
+  experimentalFeaturesKeys,
   type ExperimentalFeature,
   type ExperimentalFeaturesRegistry,
-} from "@/hooks/useAdminExperimentalFeatures";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
+} from "@/hooks/useExperimentalFeatures";
 import { organizationKeys } from "@/hooks/useOrganizationData";
 
 const ORG_ID = "org-1";
@@ -62,7 +62,7 @@ function seedQueries(
     queryClient.setQueryData(organizationKeys.details(orgId), organization);
   }
   if (registry !== undefined) {
-    queryClient.setQueryData(adminExperimentalFeaturesKeys.registry(orgId), registry);
+    queryClient.setQueryData(experimentalFeaturesKeys.registry(), registry);
   }
 }
 
@@ -77,7 +77,7 @@ describe("useExperimentalFeature", () => {
       organization: {
         spec: { enabledExperimentalFeatures: ["ghost"] },
       } as OrganizationsOrganization,
-      registry: { features: [makeFeature({ id: "alpha" })], enabled: [] },
+      registry: { features: [makeFeature({ id: "alpha" })] },
     });
 
     const { result } = renderHook(() => useExperimentalFeature("ghost"), {
@@ -95,7 +95,6 @@ describe("useExperimentalFeature", () => {
       } as OrganizationsOrganization,
       registry: {
         features: [makeFeature({ id: "alpha", released: true })],
-        enabled: [],
       },
     });
 
@@ -114,7 +113,6 @@ describe("useExperimentalFeature", () => {
       } as OrganizationsOrganization,
       registry: {
         features: [makeFeature({ id: "alpha" })],
-        enabled: ["alpha"],
       },
     });
 
@@ -133,7 +131,6 @@ describe("useExperimentalFeature", () => {
       } as OrganizationsOrganization,
       registry: {
         features: [makeFeature({ id: "alpha" })],
-        enabled: [],
       },
     });
 
@@ -150,7 +147,6 @@ describe("useExperimentalFeature", () => {
       organization: { spec: {} } as OrganizationsOrganization,
       registry: {
         features: [makeFeature({ id: "alpha" })],
-        enabled: [],
       },
     });
 
