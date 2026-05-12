@@ -71,13 +71,17 @@ func (c *Client) GetSession(ctx context.Context, sessionID string) (*Session, er
 // SendMessage sends a user message to the session.
 func (c *Client) SendMessage(ctx context.Context, sessionID, message string) error {
 	body := map[string]any{
-		"type": "user_message",
-		"content": []map[string]string{
-			{"type": "text", "text": message},
+		"events": []map[string]any{
+			{
+				"type": "user.message",
+				"content": []map[string]string{
+					{"type": "text", "text": message},
+				},
+			},
 		},
 	}
 
-	_, err := c.do(ctx, "POST", "/sessions/"+sessionID+"/events", body)
+	_, err := c.do(ctx, "POST", "/sessions/"+sessionID+"/events?beta=true", body)
 	if err != nil {
 		return fmt.Errorf("send message: %w", err)
 	}
@@ -86,7 +90,7 @@ func (c *Client) SendMessage(ctx context.Context, sessionID, message string) err
 
 // ListEvents retrieves events from a session.
 func (c *Client) ListEvents(ctx context.Context, sessionID string, limit int) (*EventList, error) {
-	path := fmt.Sprintf("/sessions/%s/events?limit=%d", sessionID, limit)
+	path := fmt.Sprintf("/sessions/%s/events?beta=true&limit=%d", sessionID, limit)
 	resp, err := c.do(ctx, "GET", path, nil)
 	if err != nil {
 		return nil, fmt.Errorf("list events: %w", err)
@@ -115,7 +119,7 @@ func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte,
 	}
 
 	req.Header.Set("x-api-key", c.apiKey)
-	req.Header.Set("anthropic-version", "2025-01-01")
+	req.Header.Set("anthropic-version", "2023-06-01")
 	req.Header.Set("anthropic-beta", "managed-agents-2026-04-01")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
