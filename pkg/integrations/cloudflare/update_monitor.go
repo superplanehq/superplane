@@ -174,13 +174,28 @@ func (c *UpdateMonitor) Setup(ctx core.SetupContext) error {
 		return errors.New("port must be between 1 and 65535")
 	}
 
+	var preloaded *Monitor
 	if spec.Advanced != nil {
-		if err := validateMonitorTiming(*spec.Advanced); err != nil {
+		if ctx.HTTP != nil && ctx.Integration != nil && !strings.Contains(monitorID, "{{") {
+			client, err := NewClient(ctx.HTTP, ctx.Integration)
+			if err != nil {
+				return fmt.Errorf("failed to create client for monitor validation: %w", err)
+			}
+			accountID, err := accountIDForIntegration(ctx.Integration)
+			if err != nil {
+				return err
+			}
+			preloaded, err = client.GetMonitor(accountID, monitorID)
+			if err != nil {
+				return fmt.Errorf("failed to fetch monitor for validation: %w", err)
+			}
+		}
+		if err := validateMonitorTimingForUpdate(*spec.Advanced, preloaded); err != nil {
 			return err
 		}
 	}
 
-	return resolveMonitorMetadata(ctx, monitorID)
+	return resolveMonitorMetadata(ctx, monitorID, preloaded)
 }
 
 func isAllowedMonitorType(t string) bool {

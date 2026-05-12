@@ -91,7 +91,7 @@ func (c *GetMonitor) Setup(ctx core.SetupContext) error {
 		return errors.New("monitor is required")
 	}
 
-	return resolveMonitorMetadata(ctx, monitorID)
+	return resolveMonitorMetadata(ctx, monitorID, nil)
 }
 
 func (c *GetMonitor) Execute(ctx core.ExecutionContext) error {

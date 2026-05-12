@@ -60,6 +60,84 @@ func Test__UpdateMonitor__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "interval must be at least")
 	})
 
+	t.Run("advanced timeout only uses fetched monitor interval for relationship check", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"success":true,"result":{"id":"monitor123","description":"LB","interval":120,"timeout":5}}`,
+					)),
+				},
+			},
+		}
+
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"monitor": "monitor123",
+				"advanced": map[string]any{
+					"timeout": 70,
+				},
+			},
+			HTTP:     httpContext,
+			Metadata: &contexts.MetadataContext{},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken":  "token123",
+					"accountId": "account123",
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+	})
+
+	t.Run("advanced timeout only passes without integration when relationship cannot be checked", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"monitor": "monitor123",
+				"advanced": map[string]any{
+					"timeout": 70,
+				},
+			},
+		})
+
+		require.NoError(t, err)
+	})
+
+	t.Run("advanced timeout rejected when it is not less than fetched monitor interval", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"success":true,"result":{"id":"monitor123","description":"LB","interval":60,"timeout":5}}`,
+					)),
+				},
+			},
+		}
+
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"monitor": "monitor123",
+				"advanced": map[string]any{
+					"timeout": 70,
+				},
+			},
+			HTTP:     httpContext,
+			Metadata: &contexts.MetadataContext{},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken":  "token123",
+					"accountId": "account123",
+				},
+			},
+		})
+
+		require.ErrorContains(t, err, "timeout (70s) must be less than interval (60s)")
+	})
+
 	t.Run("validation passes without metadata resolution when integration context is absent", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
