@@ -494,7 +494,7 @@ func Start() {
 			os.Getenv("ANTHROPIC_ENVIRONMENT_ID"),
 		)
 		agentStore := agents.NewStore(database.Conn())
-		agentService = agents.NewService(agentClient, agentStore)
+		agentService = agents.NewService(agentClient, agentStore, jwtSigner, baseURL)
 	}
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
