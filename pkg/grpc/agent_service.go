@@ -8,6 +8,7 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type AgentsService struct {
@@ -46,17 +47,34 @@ func (s *AgentsService) DeleteAgentChat(ctx context.Context, req *pb.DeleteAgent
 }
 
 func (s *AgentsService) ListAgentChats(ctx context.Context, req *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error) {
-	// With single-session model, just return the one session if it exists
 	orgID, userID, err := s.extractIDs(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	_ = orgID
-	_ = userID
-	_ = req
+	// Single session per canvas/user — return it if it exists
+	session, err := s.service.Store.FindSession(orgID, userID, req.CanvasId)
+	if err != nil {
+		return &pb.ListAgentChatsResponse{}, nil
+	}
 
-	return &pb.ListAgentChatsResponse{}, nil
+	// Get the first user message as initial_message
+	var initialMessage string
+	msgs, _ := s.service.Store.ListMessages(session.ID)
+	for _, m := range msgs {
+		if m.Role == "user" {
+			initialMessage = m.Content
+			break
+		}
+	}
+
+	return &pb.ListAgentChatsResponse{
+		Chats: []*pb.AgentChatInfo{{
+			Id:             session.ID,
+			InitialMessage: initialMessage,
+			CreatedAt:      timestamppb.New(session.CreatedAt),
+		}},
+	}, nil
 }
 
 func (s *AgentsService) DescribeAgentChat(ctx context.Context, req *pb.DescribeAgentChatRequest) (*pb.DescribeAgentChatResponse, error) {
@@ -64,11 +82,25 @@ func (s *AgentsService) DescribeAgentChat(ctx context.Context, req *pb.DescribeA
 }
 
 func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error) {
-	orgID, userID, err := s.extractIDs(ctx)
+	// chat_id is the session ID from our DB
+	messages, err := s.service.Store.ListMessages(req.ChatId)
 	if err != nil {
-		return nil, err
+		return &pb.ListAgentChatMessagesResponse{}, nil
 	}
-	return s.service.ListAgentChatMessages(orgID, userID, req.CanvasId)
+
+	var pbMessages []*pb.AgentChatMessage
+	for _, m := range messages {
+		pbMessages = append(pbMessages, &pb.AgentChatMessage{
+			Id:         m.ID,
+			Role:       m.Role,
+			Content:    m.Content,
+			ToolCallId: m.ToolCallID,
+			ToolStatus: m.ToolStatus,
+			CreatedAt:  timestamppb.New(m.CreatedAt),
+		})
+	}
+
+	return &pb.ListAgentChatMessagesResponse{Messages: pbMessages}, nil
 }
 
 func (s *AgentsService) extractIDs(ctx context.Context) (string, string, error) {
