@@ -573,6 +573,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
+	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
@@ -582,6 +583,8 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/users", s.adminListOrgUsers).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminEnableOrgExperimentalFeature).Methods("POST")
+	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminDisableOrgExperimentalFeature).Methods("DELETE")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminUpdateInstallationNetworkSettings).Methods("PATCH")
 	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
@@ -1059,8 +1062,8 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodes, err := models.FindWebhookNodes(webhookID)
-	if err != nil {
+	nodes, err := models.FindActiveWebhookNodes(webhookID)
+	if err != nil || len(nodes) == 0 {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
 	}

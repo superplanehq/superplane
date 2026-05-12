@@ -182,13 +182,14 @@ func FindCanvasNodesByIDs(tx *gorm.DB, canvasID uuid.UUID, nodeIDs []string) ([]
 
 func ListCanvasNodesReady() ([]CanvasNode, error) {
 	var nodes []CanvasNode
-	err := database.Conn().
+	query := database.Conn().
 		Distinct().
 		Joins("JOIN workflow_node_queue_items ON workflow_nodes.workflow_id = workflow_node_queue_items.workflow_id AND workflow_nodes.node_id = workflow_node_queue_items.node_id").
-		Joins("JOIN workflows ON workflow_nodes.workflow_id = workflows.id").
 		Where("workflow_nodes.state = ?", CanvasNodeStateReady).
 		Where("workflow_nodes.type IN ?", []string{NodeTypeComponent, NodeTypeBlueprint}).
-		Where("workflows.deleted_at IS NULL").
+		Where("workflow_nodes.deleted_at IS NULL")
+
+	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
 		Find(&nodes).
 		Error
 
@@ -217,11 +218,20 @@ func ListReadyTriggers() ([]CanvasNode, error) {
 func LockCanvasNode(tx *gorm.DB, workflowID uuid.UUID, nodeId string) (*CanvasNode, error) {
 	var node CanvasNode
 
-	err := tx.
-		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-		Where("workflow_id = ?", workflowID).
-		Where("node_id = ?", nodeId).
-		Where("state = ?", CanvasNodeStateReady).
+	query := tx.
+		Table("workflow_nodes").
+		Select("workflow_nodes.*").
+		Clauses(clause.Locking{
+			Strength: "UPDATE",
+			Table:    clause.Table{Name: "workflow_nodes"},
+			Options:  "SKIP LOCKED",
+		}).
+		Where("workflow_nodes.workflow_id = ?", workflowID).
+		Where("workflow_nodes.node_id = ?", nodeId).
+		Where("workflow_nodes.state = ?", CanvasNodeStateReady).
+		Where("workflow_nodes.deleted_at IS NULL")
+
+	err := withActiveCanvas(query, "workflow_nodes.workflow_id").
 		First(&node).
 		Error
 
