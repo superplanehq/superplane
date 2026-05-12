@@ -186,7 +186,7 @@ function requireChatSessionPayload(payload: AgentsCreateAgentChatResponse | Agen
   const token = typeof payload.token === "string" ? payload.token.trim() : "";
   const url = typeof payload.url === "string" ? payload.url.trim() : "";
 
-  if (!token || !url) {
+  if (!url) {
     throw new Error("Invalid chat session response");
   }
 
@@ -364,13 +364,17 @@ async function fetchChatStreamResponse({
       canvas_version: canvasVersion,
     },
   };
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "text/event-stream",
+  };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "text/event-stream",
-      Authorization: `Bearer ${token}`,
-    },
+    headers,
+    credentials: "include",
     body: JSON.stringify(body),
   });
 
