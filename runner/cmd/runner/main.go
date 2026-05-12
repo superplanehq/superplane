@@ -38,6 +38,7 @@ func main() {
 	cfg.BaseURL = base
 	cfg.RunnerID = runnerID
 	cfg.Token = os.Getenv("AUTH_TOKEN")
+	cfg.Transport = strings.TrimSpace(os.Getenv("RUNNER_TRANSPORT"))
 	if v := os.Getenv("POLL_EMPTY_MS"); v != "" {
 		if ms, err := strconv.Atoi(v); err == nil && ms > 0 {
 			cfg.PollEmpty = time.Duration(ms) * time.Millisecond
@@ -51,7 +52,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	log.Info("runner starting", slog.String("runner_id", runnerID), slog.String("fleet_manager", base))
+	log.Info("runner starting", slog.String("runner_id", runnerID), slog.String("fleet_manager", base), slog.String("transport", transportLabel(cfg)))
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		attrs := []any{
 			slog.String("main_path", bi.Main.Path),
@@ -76,4 +77,11 @@ func main() {
 func envTruthy(key string) bool {
 	v := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
 	return v == "1" || v == "true" || v == "yes"
+}
+
+func transportLabel(cfg agent.Config) string {
+	if strings.EqualFold(strings.TrimSpace(cfg.Transport), "websocket") {
+		return "websocket"
+	}
+	return "http"
 }
