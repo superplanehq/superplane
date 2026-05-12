@@ -1,0 +1,28 @@
+{
+  "data": {
+    "loadBalancer": {
+      "default_pools": ["64d858d71f1e9839fdfb0d2ca78951f5"],
+      "description": "description",
+      "enabled": true,
+      "fallback_pool": "64d858d71f1e9839fdfb0d2ca78951f5",
+      "id": "f7adb491a20dcab2e29a3141f2f197f7",
+      "name": "example.org",
+      "networks": ["cloudflare"],
+      "proxied": true,
+      "random_steering": {
+        "default_weight": 1
+      },
+      "session_affinity": "none",
+      "session_affinity_attributes": {
+        "samesite": "Auto",
+        "secure": "Auto",
+        "zero_downtime_failover": "none"
+      },
+      "steering_policy": "random",
+      "ttl": 30
+    },
+    "zoneId": "8132be7b33d9dc874ee6da0fa112945b"
+  },
+  "timestamp": "2026-05-05T13:00:33.465739808Z",
+  "type": "cloudflare.loadBalancer.created"
+}
