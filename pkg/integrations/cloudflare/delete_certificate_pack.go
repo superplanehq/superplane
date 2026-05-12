@@ -48,7 +48,7 @@ func (c *DeleteCertificatePack) Documentation() string {
 
 ## Output
 
-Emits the zone ID and pack ID of the deleted certificate pack.`
+Emits the deleted pack ID, resolved zone ID, zone name when known from integration metadata, certificate hostnames when returned by the Cloudflare API (before deletion), and ` + "`deleted: true`" + `.`
 }
 
 func (c *DeleteCertificatePack) Icon() string {
@@ -116,12 +116,15 @@ func (c *DeleteCertificatePack) Execute(ctx core.ExecutionContext) error {
 	}
 
 	var zoneID string
+	var packHosts []string
 	if strings.TrimSpace(zoneFragment) != "" {
 		zoneID = resolveZoneID(strings.TrimSpace(zoneFragment), ctx.Integration)
+		packHosts = hostsForCertificatePack(ctx.Logger, client, zoneID, packID)
 	} else {
-		zoneID, err = lookupZoneForCertificatePack(ctx.Logger, client, ctx.Integration, packID)
-		if err != nil {
-			return err
+		var lookupErr error
+		zoneID, packHosts, lookupErr = lookupZoneForCertificatePack(ctx.Logger, client, ctx.Integration, packID)
+		if lookupErr != nil {
+			return lookupErr
 		}
 	}
 	if strings.TrimSpace(zoneID) == "" {
@@ -132,14 +135,22 @@ func (c *DeleteCertificatePack) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to delete certificate pack: %w", err)
 	}
 
+	payload := map[string]any{
+		"zoneId":  zoneID,
+		"packId":  packID,
+		"deleted": true,
+	}
+	if zn := resolveZoneName(zoneID, ctx.Integration); zn != "" {
+		payload["zoneName"] = zn
+	}
+	if len(packHosts) > 0 {
+		payload["hosts"] = packHosts
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		DeleteCertificatePackPayloadType,
-		[]any{map[string]any{
-			"zoneId":  zoneID,
-			"packId":  packID,
-			"deleted": true,
-		}},
+		[]any{payload},
 	)
 }
 
@@ -152,30 +163,47 @@ func splitCertificatePackReference(value string) (zoneFragment, packID string) {
 	return "", strings.TrimSpace(value)
 }
 
-func lookupZoneForCertificatePack(logger *log.Entry, client *Client, integration core.IntegrationContext, packID string) (string, error) {
+func lookupZoneForCertificatePack(logger *log.Entry, client *Client, integration core.IntegrationContext, packID string) (zoneID string, hosts []string, err error) {
 	metadata := Metadata{}
-	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
-		return "", fmt.Errorf("failed to decode integration metadata: %w", err)
+	if decodeErr := mapstructure.Decode(integration.GetMetadata(), &metadata); decodeErr != nil {
+		return "", nil, fmt.Errorf("failed to decode integration metadata: %w", decodeErr)
 	}
 	if len(metadata.Zones) == 0 {
-		return "", fmt.Errorf("cannot resolve zone for certificate pack %q: no zones in integration metadata", packID)
+		return "", nil, fmt.Errorf("cannot resolve zone for certificate pack %q: no zones in integration metadata", packID)
 	}
 	for _, zone := range metadata.Zones {
-		packs, err := client.ListCertificatePacks(zone.ID)
-		if err != nil {
+		packs, listErr := client.ListCertificatePacks(zone.ID)
+		if listErr != nil {
 			if logger != nil {
-				logger.WithError(err).WithField("zone_id", zone.ID).WithField("zone_name", zone.Name).
+				logger.WithError(listErr).WithField("zone_id", zone.ID).WithField("zone_name", zone.Name).
 					Warn("failed to list certificate packs for zone while resolving certificate pack, skipping zone")
 			}
 			continue
 		}
 		for _, pack := range packs {
 			if pack.ID == packID {
-				return zone.ID, nil
+				return zone.ID, pack.Hosts, nil
 			}
 		}
 	}
-	return "", fmt.Errorf("certificate pack %q not found in any configured zone", packID)
+	return "", nil, fmt.Errorf("certificate pack %q not found in any configured zone", packID)
+}
+
+func hostsForCertificatePack(logger *log.Entry, client *Client, zoneID, packID string) []string {
+	packs, err := client.ListCertificatePacks(zoneID)
+	if err != nil {
+		if logger != nil {
+			logger.WithError(err).WithField("zone_id", zoneID).
+				Warn("failed to list certificate packs for zone while enriching delete payload")
+		}
+		return nil
+	}
+	for _, pack := range packs {
+		if pack.ID == packID {
+			return pack.Hosts
+		}
+	}
+	return nil
 }
 
 func (c *DeleteCertificatePack) Cancel(ctx core.ExecutionContext) error {

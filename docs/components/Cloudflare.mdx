@@ -455,7 +455,7 @@ The Delete Certificate Pack component removes a custom SSL/TLS certificate pack 
 
 ### Output
 
-Emits the zone ID and pack ID of the deleted certificate pack.
+Emits the deleted pack ID, resolved zone ID, zone name when known from integration metadata, certificate hostnames when returned by the Cloudflare API (before deletion), and `deleted: true`.
 
 ### Example Output
 
@@ -463,8 +463,12 @@ Emits the zone ID and pack ID of the deleted certificate pack.
 {
   "data": {
     "deleted": true,
+    "hosts": [
+      "preview-123.example.com"
+    ],
     "packId": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
-    "zoneId": "abc123def456abc123def456abc12345"
+    "zoneId": "abc123def456abc123def456abc12345",
+    "zoneName": "example.com"
   },
   "timestamp": "2026-05-11T10:00:00.000000000Z",
   "type": "cloudflare.certificate_pack.deleted"
@@ -885,7 +889,7 @@ The Order Certificate Pack component orders an advanced SSL/TLS certificate pack
 
 ### Output
 
-Emits the ordered certificate pack including its ID, status, and covered hostnames. Status will typically be `initializing` or `pending_validation` immediately after ordering.
+Emits the resolved zone ID, zone name when known from integration metadata, pack ID, and the ordered certificate pack object (including covered hostnames). Status will typically be `initializing` or `pending_validation` immediately after ordering.
 
 ### Example Output
 
@@ -903,7 +907,8 @@ Emits the ordered certificate pack including its ID, status, and covered hostnam
       "validation_method": "txt"
     },
     "packId": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
-    "zoneId": "abc123def456abc123def456abc12345"
+    "zoneId": "abc123def456abc123def456abc12345",
+    "zoneName": "example.com"
   },
   "timestamp": "2026-05-11T10:00:00.000000000Z",
   "type": "cloudflare.certificate_pack.ordered"

@@ -55,7 +55,7 @@ func (c *OrderCertificatePack) Documentation() string {
 
 ## Output
 
-Emits the ordered certificate pack including its ID, status, and covered hostnames. Status will typically be ` + "`initializing`" + ` or ` + "`pending_validation`" + ` immediately after ordering.`
+Emits the resolved zone ID, zone name when known from integration metadata, pack ID, and the ordered certificate pack object (including covered hostnames). Status will typically be ` + "`initializing`" + ` or ` + "`pending_validation`" + ` immediately after ordering.`
 }
 
 func (c *OrderCertificatePack) Icon() string {
@@ -211,14 +211,19 @@ func (c *OrderCertificatePack) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to order certificate pack: %w", err)
 	}
 
+	payload := map[string]any{
+		"zoneId": zoneID,
+		"packId": pack.ID,
+		"pack":   pack,
+	}
+	if zn := resolveZoneName(zoneID, ctx.Integration); zn != "" {
+		payload["zoneName"] = zn
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		OrderCertificatePackPayloadType,
-		[]any{map[string]any{
-			"zoneId": zoneID,
-			"packId": pack.ID,
-			"pack":   pack,
-		}},
+		[]any{payload},
 	)
 }
 

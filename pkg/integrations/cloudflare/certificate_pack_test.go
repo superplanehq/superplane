@@ -145,6 +145,10 @@ func Test__OrderCertificatePack__Execute(t *testing.T) {
 		hosts, ok := body["hosts"].([]any)
 		require.True(t, ok)
 		assert.Equal(t, "preview.example.com", hosts[0])
+
+		wrapped := execState.Payloads[0].(map[string]any)
+		payload := wrapped["data"].(map[string]any)
+		assert.Equal(t, "example.com", payload["zoneName"])
 	})
 
 	t.Run("API error returns error", func(t *testing.T) {
@@ -199,11 +203,18 @@ func Test__DeleteCertificatePack__Execute(t *testing.T) {
 
 	integration := &contexts.IntegrationContext{
 		Configuration: map[string]any{"apiToken": "token123"},
+		Metadata: Metadata{
+			Zones: []Zone{{ID: "zone123", Name: "zone.example.com"}},
+		},
 	}
 
 	t.Run("deletes certificate pack and emits result", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"success":true,"result":[]}`)),
+				},
 				{
 					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"success":true,"result":{}}`)),
@@ -224,23 +235,32 @@ func Test__DeleteCertificatePack__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, DeleteCertificatePackPayloadType, execState.Type)
 
-		require.Len(t, httpContext.Requests, 1)
+		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t,
-			"https://api.cloudflare.com/client/v4/zones/zone123/ssl/certificate_packs/pack-abc",
+			"https://api.cloudflare.com/client/v4/zones/zone123/ssl/certificate_packs",
 			httpContext.Requests[0].URL.String(),
 		)
-		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+		assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+		assert.Equal(t,
+			"https://api.cloudflare.com/client/v4/zones/zone123/ssl/certificate_packs/pack-abc",
+			httpContext.Requests[1].URL.String(),
+		)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[1].Method)
 
 		wrapped := execState.Payloads[0].(map[string]any)
 		payload := wrapped["data"].(map[string]any)
 		assert.Equal(t, "zone123", payload["zoneId"])
 		assert.Equal(t, "pack-abc", payload["packId"])
 		assert.Equal(t, true, payload["deleted"])
+		assert.Equal(t, "zone.example.com", payload["zoneName"])
+		_, hasHosts := payload["hosts"]
+		assert.False(t, hasHosts)
 	})
 
 	t.Run("parses zone and pack from slash-separated value", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"success":true,"result":[]}`))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"success":true,"result":{}}`))},
 			},
 		}
@@ -256,15 +276,21 @@ func Test__DeleteCertificatePack__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Equal(t,
+			"https://api.cloudflare.com/client/v4/zones/abczone/ssl/certificate_packs",
+			httpContext.Requests[0].URL.String(),
+		)
 		assert.Equal(t,
 			"https://api.cloudflare.com/client/v4/zones/abczone/ssl/certificate_packs/defpack",
-			httpContext.Requests[0].URL.String(),
+			httpContext.Requests[1].URL.String(),
 		)
 	})
 
 	t.Run("API error returns error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"success":true,"result":[]}`))},
 				{
 					StatusCode: http.StatusNotFound,
 					Body:       io.NopCloser(strings.NewReader(`{"success":false,"errors":[{"message":"Certificate pack not found"}]}`)),
@@ -347,6 +373,8 @@ func Test__DeleteCertificatePack__Execute(t *testing.T) {
 		payload := wrapped["data"].(map[string]any)
 		assert.Equal(t, "z-second", payload["zoneId"])
 		assert.Equal(t, "found-pack-id", payload["packId"])
+		assert.Equal(t, "second.example.com", payload["zoneName"])
+		assert.Equal(t, []string{"preview.example.com"}, payload["hosts"])
 	})
 
 	t.Run("pack id only returns error when pack is not in any configured zone", func(t *testing.T) {
@@ -385,6 +413,13 @@ func Test__DeleteCertificatePack__Execute(t *testing.T) {
 			Responses: []*http.Response{
 				{
 					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"success": true,
+						"result": [{"id": "pack-xyz", "hosts": ["svc.named.example.com"]}]
+					}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`{"success":true,"result":{}}`)),
 				},
 			},
@@ -407,10 +442,19 @@ func Test__DeleteCertificatePack__Execute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.Len(t, httpContext.Requests, 1)
+		require.Len(t, httpContext.Requests, 2)
 		assert.Equal(t,
-			"https://api.cloudflare.com/client/v4/zones/zone-by-id/ssl/certificate_packs/pack-xyz",
+			"https://api.cloudflare.com/client/v4/zones/zone-by-id/ssl/certificate_packs",
 			httpContext.Requests[0].URL.String(),
 		)
+		assert.Equal(t,
+			"https://api.cloudflare.com/client/v4/zones/zone-by-id/ssl/certificate_packs/pack-xyz",
+			httpContext.Requests[1].URL.String(),
+		)
+
+		wrapped := execState.Payloads[0].(map[string]any)
+		payload := wrapped["data"].(map[string]any)
+		assert.Equal(t, "named.example.com", payload["zoneName"])
+		assert.Equal(t, []string{"svc.named.example.com"}, payload["hosts"])
 	})
 }

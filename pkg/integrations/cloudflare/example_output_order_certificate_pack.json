@@ -1,6 +1,7 @@
 {
   "data": {
     "zoneId": "abc123def456abc123def456abc12345",
+    "zoneName": "example.com",
     "packId": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
     "pack": {
       "id": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
