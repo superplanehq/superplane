@@ -1,11 +1,23 @@
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/ui/dropdownMenu";
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
-import { Trash2 } from "lucide-react";
+import { useCanvasMemoryColumnVisibility } from "@/hooks/useCanvasMemoryColumnVisibility";
+import { Columns3, Trash2 } from "lucide-react";
+import { useMemo } from "react";
 
 export type CanvasMemoryModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  canvasId: string;
   entries: CanvasMemoryEntry[];
   isLoading?: boolean;
   errorMessage?: string;
@@ -24,6 +36,7 @@ export function CanvasMemoryModal(props: CanvasMemoryModalProps) {
 
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
             <CanvasMemoryModalBody
+              canvasId={props.canvasId}
               entries={props.entries}
               isLoading={props.isLoading}
               errorMessage={props.errorMessage}
@@ -38,6 +51,7 @@ export function CanvasMemoryModal(props: CanvasMemoryModalProps) {
 }
 
 type CanvasMemoryBodyProps = {
+  canvasId: string;
   entries: CanvasMemoryEntry[];
   isLoading?: boolean;
   errorMessage?: string;
@@ -45,7 +59,14 @@ type CanvasMemoryBodyProps = {
   deletingId?: string;
 };
 
-function CanvasMemoryModalBody({ entries, isLoading, errorMessage, onDeleteEntry, deletingId }: CanvasMemoryBodyProps) {
+function CanvasMemoryModalBody({
+  canvasId,
+  entries,
+  isLoading,
+  errorMessage,
+  onDeleteEntry,
+  deletingId,
+}: CanvasMemoryBodyProps) {
   const groupedEntries = entries.reduce<Record<string, CanvasMemoryEntry[]>>((acc, entry) => {
     const namespace = entry.namespace || "(no namespace)";
     if (!acc[namespace]) {
@@ -79,13 +100,14 @@ function CanvasMemoryModalBody({ entries, isLoading, errorMessage, onDeleteEntry
   return (
     <div className="min-h-0 w-full min-w-0 flex-1 overflow-auto">
       {Object.entries(groupedEntries).map(([namespace, values]) => (
-        <div key={namespace} className="m-4 border border-slate-300 rounded-md bg-white">
-          <div className="px-3 py-2 font-mono text-sm text-gray-600 border-b border-slate-300">
-            Namespace: {namespace}
-          </div>
-
-          {renderNamespaceTable(values, onDeleteEntry, deletingId)}
-        </div>
+        <NamespaceCard
+          key={namespace}
+          canvasId={canvasId}
+          namespace={namespace}
+          values={values}
+          onDeleteEntry={onDeleteEntry}
+          deletingId={deletingId}
+        />
       ))}
     </div>
   );
@@ -132,67 +154,195 @@ function collectColumns(items: Record<string, unknown>[]): string[] {
   return Array.from(set);
 }
 
-function renderNamespaceTable(
-  values: CanvasMemoryEntry[],
-  onDeleteEntry?: (memoryId: string) => void,
-  deletingId?: string,
-) {
-  if (values.length === 0) {
-    return <div className="px-3 py-2 text-xs text-gray-500">No items</div>;
-  }
+type NamespaceCardProps = {
+  canvasId: string;
+  namespace: string;
+  values: CanvasMemoryEntry[];
+  onDeleteEntry?: (memoryId: string) => void;
+  deletingId?: string;
+};
 
-  const objectValues = values.map((entry) => entry.values).filter(isRecord) as Record<string, unknown>[];
-  if (objectValues.length === values.length) {
-    const columns = collectColumns(objectValues);
+function NamespaceCard({ canvasId, namespace, values, onDeleteEntry, deletingId }: NamespaceCardProps) {
+  const objectValues = useMemo(
+    () => values.map((entry) => entry.values).filter(isRecord) as Record<string, unknown>[],
+    [values],
+  );
+  const allValuesAreObjects = objectValues.length === values.length && values.length > 0;
+  const allColumns = useMemo(
+    () => (allValuesAreObjects ? collectColumns(objectValues) : []),
+    [allValuesAreObjects, objectValues],
+  );
+
+  const visibility = useCanvasMemoryColumnVisibility(canvasId, namespace, allColumns);
+
+  return (
+    <div className="m-4 border border-slate-300 rounded-md bg-white">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-300 px-3 py-2">
+        <span className="font-mono text-sm text-gray-600">Namespace: {namespace}</span>
+        {allValuesAreObjects && allColumns.length > 0 ? (
+          <ColumnVisibilityMenu
+            allColumns={allColumns}
+            hidden={visibility.hidden}
+            onToggle={visibility.toggle}
+            onShowAll={visibility.showAll}
+            onHideAll={visibility.hideAll}
+          />
+        ) : null}
+      </div>
+
+      {allValuesAreObjects ? (
+        <ObjectNamespaceTable
+          values={values}
+          objectValues={objectValues}
+          visibleColumns={visibility.visibleColumns}
+          totalColumns={allColumns.length}
+          onShowAll={visibility.showAll}
+          onDeleteEntry={onDeleteEntry}
+          deletingId={deletingId}
+        />
+      ) : values.length === 0 ? (
+        <div className="px-3 py-2 text-xs text-gray-500">No items</div>
+      ) : (
+        <RawNamespaceTable values={values} onDeleteEntry={onDeleteEntry} deletingId={deletingId} />
+      )}
+    </div>
+  );
+}
+
+type ColumnVisibilityMenuProps = {
+  allColumns: string[];
+  hidden: Set<string>;
+  onToggle: (column: string) => void;
+  onShowAll: () => void;
+  onHideAll: () => void;
+};
+
+function ColumnVisibilityMenu({ allColumns, hidden, onToggle, onShowAll, onHideAll }: ColumnVisibilityMenuProps) {
+  const visibleCount = allColumns.length - hidden.size;
+  const allVisible = hidden.size === 0;
+  const allHidden = hidden.size === allColumns.length;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="h-7 gap-1.5 px-2 text-xs">
+          <Columns3 className="h-3.5 w-3.5" />
+          Columns
+          <span className="text-gray-500">
+            ({visibleCount}/{allColumns.length})
+          </span>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-[60vh] min-w-[12rem]">
+        <DropdownMenuLabel className="text-xs font-semibold uppercase text-gray-500">Toggle columns</DropdownMenuLabel>
+        {allColumns.map((column) => (
+          <DropdownMenuCheckboxItem
+            key={column}
+            checked={!hidden.has(column)}
+            onCheckedChange={() => onToggle(column)}
+            onSelect={(event) => event.preventDefault()}
+          >
+            <span className="truncate font-mono text-xs">{column}</span>
+          </DropdownMenuCheckboxItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled={allVisible} onSelect={onShowAll}>
+          Show all
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={allHidden} onSelect={onHideAll}>
+          Hide all
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+type ObjectNamespaceTableProps = {
+  values: CanvasMemoryEntry[];
+  objectValues: Record<string, unknown>[];
+  visibleColumns: string[];
+  totalColumns: number;
+  onShowAll: () => void;
+  onDeleteEntry?: (memoryId: string) => void;
+  deletingId?: string;
+};
+
+function ObjectNamespaceTable({
+  values,
+  objectValues,
+  visibleColumns,
+  totalColumns,
+  onShowAll,
+  onDeleteEntry,
+  deletingId,
+}: ObjectNamespaceTableProps) {
+  if (totalColumns > 0 && visibleColumns.length === 0) {
     return (
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-slate-950/15 bg-slate-50">
-              {columns.map((column) => (
-                <th key={column} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
-                  {column}
-                </th>
-              ))}
-              <th className="w-12 px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {values.map((entry, index) => {
-              const item = objectValues[index];
-              return (
-                <tr key={entry.id || index} className="border-b border-slate-950/15">
-                  {columns.map((column) => (
-                    <td key={`${index}-${column}`} className="px-3 py-2 align-middle font-mono text-xs text-gray-700">
-                      {formatValue(item[column])}
-                    </td>
-                  ))}
-                  <td className="px-3 py-2 text-right align-middle">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={!onDeleteEntry || !entry.id || deletingId === entry.id}
-                      onClick={() => {
-                        if (entry.id) onDeleteEntry?.(entry.id);
-                      }}
-                      className="text-gray-500 hover:text-red-600"
-                      title="Delete entry"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="flex items-center justify-between gap-3 px-3 py-3 text-xs text-gray-500">
+        <span>All columns are hidden.</span>
+        <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={onShowAll}>
+          Show all
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="overflow-x-auto bg-red-500">
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-950/15 bg-slate-50">
+            {visibleColumns.map((column) => (
+              <th key={column} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
+                {column}
+              </th>
+            ))}
+            <th className="w-12 px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {values.map((entry, index) => {
+            const item = objectValues[index];
+            return (
+              <tr key={entry.id || index} className="border-b border-slate-950/15">
+                {visibleColumns.map((column) => (
+                  <td key={`${index}-${column}`} className="px-3 py-2 align-middle font-mono text-xs text-gray-700">
+                    {formatValue(item[column])}
+                  </td>
+                ))}
+                <td className="px-3 py-2 text-right align-middle">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={!onDeleteEntry || !entry.id || deletingId === entry.id}
+                    onClick={() => {
+                      if (entry.id) onDeleteEntry?.(entry.id);
+                    }}
+                    className="text-gray-500 hover:text-red-600"
+                    title="Delete entry"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+type RawNamespaceTableProps = {
+  values: CanvasMemoryEntry[];
+  onDeleteEntry?: (memoryId: string) => void;
+  deletingId?: string;
+};
+
+function RawNamespaceTable({ values, onDeleteEntry, deletingId }: RawNamespaceTableProps) {
+  return (
+    <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-950/15 bg-slate-50">
