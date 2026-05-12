@@ -8,7 +8,7 @@ import type {
   NodeInfo,
   OutputPayload,
 } from "../types";
-import { deletePoolMapper } from "./delete_pool";
+import { getLoadBalancerMapper } from "./get_load_balancer";
 import { eventStateRegistry } from "./index";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -17,7 +17,7 @@ function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
   return {
     id: "node-1",
     name: "Test Node",
-    componentName: "cloudflare.deletePool",
+    componentName: "cloudflare.getLoadBalancer",
     isCollapsed: false,
     configuration: {},
     metadata: {},
@@ -27,7 +27,7 @@ function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
 
 function buildOutput(data: unknown): OutputPayload {
   return {
-    type: "cloudflare.pool",
+    type: "cloudflare.loadBalancer",
     timestamp: new Date().toISOString(),
     data,
   };
@@ -58,8 +58,8 @@ function buildDetailsCtx(overrides?: {
 }
 
 const defaultDefinition: ComponentDefinition = {
-  name: "cloudflare.deletePool",
-  label: "Delete Pool",
+  name: "cloudflare.getLoadBalancer",
+  label: "Get Load Balancer",
   description: "",
   icon: "cloud",
   color: "orange",
@@ -77,106 +77,103 @@ function buildPropsContext(overrides?: Partial<ComponentBaseContext>): Component
   };
 }
 
+const lbOutputData = {
+  loadBalancer: {
+    id: "lb123",
+    name: "my-lb",
+    description: "Primary load balancer",
+    enabled: true,
+    proxied: true,
+    steering_policy: "random",
+    session_affinity: "cookie",
+    default_pools: ["pool1", "pool2"],
+  },
+};
+
 // ── getExecutionDetails ───────────────────────────────────────────────────────
 
-describe("deletePoolMapper.getExecutionDetails", () => {
+describe("getLoadBalancerMapper.getExecutionDetails", () => {
   it("does not throw when outputs is undefined", () => {
     const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
-    expect(() => deletePoolMapper.getExecutionDetails(ctx)).not.toThrow();
+    expect(() => getLoadBalancerMapper.getExecutionDetails(ctx)).not.toThrow();
   });
 
   it("does not throw when default array is empty", () => {
     const ctx = buildDetailsCtx({ execution: { outputs: { default: [] } } });
-    expect(() => deletePoolMapper.getExecutionDetails(ctx)).not.toThrow();
+    expect(() => getLoadBalancerMapper.getExecutionDetails(ctx)).not.toThrow();
   });
 
-  it("does not throw when output data is empty", () => {
+  it("does not throw when output data has no loadBalancer key", () => {
     const ctx = buildDetailsCtx({ execution: { outputs: { default: [buildOutput({})] } } });
-    expect(() => deletePoolMapper.getExecutionDetails(ctx)).not.toThrow();
+    expect(() => getLoadBalancerMapper.getExecutionDetails(ctx)).not.toThrow();
   });
 
-  it("extracts pool id and deleted status from output", () => {
+  it("extracts all load balancer fields from output", () => {
     const ctx = buildDetailsCtx({
-      execution: {
-        outputs: {
-          default: [buildOutput({ poolId: "pool123", accountId: "acc123", deleted: true })],
-        },
-      },
+      execution: { outputs: { default: [buildOutput(lbOutputData)] } },
     });
-    const details = deletePoolMapper.getExecutionDetails(ctx);
-    expect(details["Pool ID"]).toBe("pool123");
-    expect(details["Deleted"]).toBe("true");
+    const details = getLoadBalancerMapper.getExecutionDetails(ctx);
+    expect(details["Name"]).toBe("my-lb");
+    expect(details["Description"]).toBe("Primary load balancer");
+    expect(details["Enabled"]).toBe("true");
+    expect(details["Proxied"]).toBe("true");
+    expect(details["Default Pools"]).toBe("2");
   });
 
-  it("uses dash placeholders when result fields are missing", () => {
+  it("uses dash placeholders when lb fields are missing", () => {
     const ctx = buildDetailsCtx({
-      execution: { outputs: { default: [buildOutput({})] } },
+      execution: { outputs: { default: [buildOutput({ loadBalancer: {} })] } },
     });
-    const details = deletePoolMapper.getExecutionDetails(ctx);
-    expect(details["Pool ID"]).toBe("-");
-    expect(details["Deleted"]).toBe("-");
+    const details = getLoadBalancerMapper.getExecutionDetails(ctx);
+    expect(details["Name"]).toBe("-");
+    expect(details["Enabled"]).toBe("-");
   });
 
   it("includes executed at timestamp", () => {
     const ctx = buildDetailsCtx({
-      execution: {
-        outputs: { default: [buildOutput({ poolId: "pool123", deleted: true })] },
-      },
+      execution: { outputs: { default: [buildOutput(lbOutputData)] } },
     });
-    expect(deletePoolMapper.getExecutionDetails(ctx)["Executed At"]).toBeDefined();
+    expect(getLoadBalancerMapper.getExecutionDetails(ctx)["Executed At"]).toBeDefined();
   });
 });
 
 // ── props ─────────────────────────────────────────────────────────────────────
 
-describe("deletePoolMapper.props", () => {
-  it("prefers pool name from node metadata", () => {
-    const props = deletePoolMapper.props(
+describe("getLoadBalancerMapper.props", () => {
+  it("prefers load balancer name from node metadata", () => {
+    const props = getLoadBalancerMapper.props(
       buildPropsContext({
         node: buildNode({
-          configuration: { pool: "pool-id" },
-          metadata: { poolName: "My Pool" },
+          configuration: { loadBalancer: "lb-id" },
+          metadata: { loadBalancerName: "Resolved Name" },
         }),
       }),
     );
-    expect(props.metadata).toEqual([{ icon: "network", label: "My Pool" }]);
+    expect(props.metadata).toEqual([{ icon: "network", label: "Resolved Name" }]);
   });
 
-  it("prefers pool name from snake_case node metadata keys", () => {
-    const props = deletePoolMapper.props(
+  it("falls back to load balancer id from configuration when metadata is absent", () => {
+    const props = getLoadBalancerMapper.props(
       buildPropsContext({
-        node: buildNode({
-          configuration: { pool: "pool-id" },
-          metadata: { pool_name: "My Pool" },
-        }),
+        node: buildNode({ configuration: { loadBalancer: "lb-id" }, metadata: {} }),
       }),
     );
-    expect(props.metadata).toEqual([{ icon: "network", label: "My Pool" }]);
-  });
-
-  it("falls back to pool id from configuration when metadata is absent", () => {
-    const props = deletePoolMapper.props(
-      buildPropsContext({
-        node: buildNode({
-          configuration: { pool: "pool-id" },
-          metadata: {},
-        }),
-      }),
-    );
-    expect(props.metadata).toEqual([{ icon: "network", label: "pool-id" }]);
+    expect(props.metadata).toEqual([{ icon: "network", label: "lb-id" }]);
   });
 
   it("returns empty metadata when both metadata and configuration are empty", () => {
-    const props = deletePoolMapper.props(buildPropsContext({ node: buildNode({ configuration: {}, metadata: {} }) }));
+    const props = getLoadBalancerMapper.props(
+      buildPropsContext({ node: buildNode({ configuration: {}, metadata: {} }) }),
+    );
     expect(props.metadata).toEqual([]);
   });
 });
 
 // ── eventStateRegistry ────────────────────────────────────────────────────────
 
-describe("eventStateRegistry.deletePool", () => {
-  it("maps finished success to deleted", () => {
-    expect(eventStateRegistry.deletePool.getState(buildExecution())).toBe("deleted");
+describe("eventStateRegistry.getLoadBalancer", () => {
+  it("maps finished success to fetched", () => {
+    expect(eventStateRegistry.getLoadBalancer.getState(buildExecution())).toBe("fetched");
   });
 
   it("returns running when execution is in progress", () => {
@@ -185,7 +182,7 @@ describe("eventStateRegistry.deletePool", () => {
       result: "RESULT_UNSPECIFIED" as ExecutionInfo["result"],
       resultReason: "RESULT_REASON_UNSPECIFIED" as ExecutionInfo["resultReason"],
     });
-    expect(eventStateRegistry.deletePool.getState(running)).toBe("running");
+    expect(eventStateRegistry.getLoadBalancer.getState(running)).toBe("running");
   });
 
   it("returns failed when execution fails", () => {
@@ -194,6 +191,6 @@ describe("eventStateRegistry.deletePool", () => {
       result: "RESULT_FAILED" as ExecutionInfo["result"],
       resultReason: "RESULT_REASON_COMPONENT_FAILED" as ExecutionInfo["resultReason"],
     });
-    expect(eventStateRegistry.deletePool.getState(failed)).toBe("failed");
+    expect(eventStateRegistry.getLoadBalancer.getState(failed)).toBe("failed");
   });
 });
