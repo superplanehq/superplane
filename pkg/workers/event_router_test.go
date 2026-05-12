@@ -27,6 +27,10 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	queueConsumer.Start()
 	defer queueConsumer.Stop()
 
+	runConsumer := testconsumer.New(amqpURL, messages.CanvasRunRoutingKey)
+	runConsumer.Start()
+	defer runConsumer.Stop()
+
 	//
 	// Create a simple canvas with just a trigger and a component nodes.
 	//
@@ -73,6 +77,7 @@ func Test__EventRouter_ProcessRootEvent(t *testing.T) {
 	assert.Equal(t, run.ID, queueItems[0].RunID)
 
 	assert.True(t, queueConsumer.HasReceivedMessage())
+	assert.True(t, runConsumer.HasReceivedMessage())
 }
 
 func Test__EventRouter_DoesNotRouteEventForSoftDeletedOrganization(t *testing.T) {
@@ -134,6 +139,10 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	queueConsumer.Start()
 	defer queueConsumer.Stop()
 
+	runConsumer := testconsumer.New(amqpURL, messages.CanvasRunRoutingKey)
+	runConsumer.Start()
+	defer runConsumer.Stop()
+
 	trigger1 := "trigger-1"
 	node1 := "component-1"
 	node2 := "component-2"
@@ -187,6 +196,7 @@ func Test__EventRouter_ProcessExecutionEvent(t *testing.T) {
 	assert.Equal(t, outputEvent.ID, queueItems[0].EventID)
 
 	assert.True(t, queueConsumer.HasReceivedMessage())
+	assert.False(t, runConsumer.HasReceivedMessage())
 }
 
 func Test__EventRouter_ProcessTerminalExecutionEventFinishesRun(t *testing.T) {
