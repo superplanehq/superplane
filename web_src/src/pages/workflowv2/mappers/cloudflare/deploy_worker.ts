@@ -11,6 +11,8 @@ import { baseEventSections, getDeployWorkerExecutionDetails } from "./base";
 interface DeployWorkerConfiguration {
   scriptName?: string;
   source?: string;
+  provisionIfMissing?: boolean;
+  provision?: Record<string, unknown>;
 }
 
 export const deployWorkerMapper: ComponentBaseMapper = {
@@ -38,6 +40,8 @@ export const deployWorkerMapper: ComponentBaseMapper = {
   },
 };
 
+const maxMetadataItems = 3;
+
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as DeployWorkerConfiguration;
@@ -52,5 +56,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "file-text", label: "Inline" });
   }
 
-  return metadata;
+  const provisionOn = configuration?.provisionIfMissing !== false;
+  metadata.push({ icon: "package", label: provisionOn ? "Provision on" : "Provision off" });
+
+  return metadata.slice(0, maxMetadataItems);
 }

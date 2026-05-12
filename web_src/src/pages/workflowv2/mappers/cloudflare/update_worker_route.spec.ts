@@ -70,7 +70,6 @@ describe("updateWorkerRouteMapper.getExecutionDetails", () => {
       default: [{ type: "cloudflare.workerRoute.created", timestamp: new Date().toISOString(), data }],
     };
     const details = updateWorkerRouteMapper.getExecutionDetails(buildDetailsCtx({ execution: { outputs } }));
-    expect(details["Route ID"]).toBe("r1");
     expect(details["Pattern"]).toBe("ex.com/*");
     expect(details["Script"]).toBe("w");
   });
@@ -81,7 +80,7 @@ describe("updateWorkerRouteMapper.props metadata", () => {
     const props = updateWorkerRouteMapper.props(
       buildPropsContext({
         node: buildNode({
-          configuration: { pattern: "ex.com/*", script: "w" },
+          configuration: { pattern: "ex.com/*", workerScript: "w" },
         }),
       }),
     );
@@ -96,7 +95,7 @@ describe("updateWorkerRouteMapper.props metadata", () => {
     const props = updateWorkerRouteMapper.props(
       buildPropsContext({
         node: buildNode({
-          configuration: { pattern: "ex.com/*", script: "w", routeId: "rid" },
+          configuration: { pattern: "ex.com/*", workerScript: "w", routeId: "rid" },
         }),
       }),
     );
@@ -117,7 +116,7 @@ describe("eventStateRegistry.updateWorkerRoute", () => {
   it("returns updated when payload type is updated", () => {
     const execution = buildExecution({
       outputs: {
-        default: [{ type: "cloudflare.workerRoute.updated", timestamp: new Date().toISOString(), data: {} }],
+        default: [{ type: "cloudflare.workerRoute.update", timestamp: new Date().toISOString(), data: {} }],
       },
     });
     expect(eventStateRegistry.updateWorkerRoute.getState(execution)).toBe("updated");

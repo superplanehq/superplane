@@ -13,6 +13,18 @@ import type {
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
+export type WorkerScriptNodeMetadata = {
+  scriptDisplayName?: string;
+};
+
+/** Prefer backend-resolved display name for Worker script integration resources (value is script id). */
+export function workerScriptDisplayLabel(node: NodeInfo, scriptValue: string | undefined): string {
+  const meta = node.metadata as WorkerScriptNodeMetadata | undefined;
+  const label = meta?.scriptDisplayName?.trim();
+  if (label) return label;
+  return (scriptValue ?? "").trim();
+}
+
 export const baseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -131,12 +143,9 @@ export function getDeployWorkerExecutionDetails(context: ExecutionDetailsContext
   if (!data) {
     return details;
   }
-  details["Script"] = data.scriptName != null ? String(data.scriptName) : "-";
-  details["Version ID"] = data.versionId != null ? String(data.versionId) : "-";
-  const deployment = data.deployment as Record<string, unknown> | undefined;
-  if (deployment?.id != null) {
-    details["Deployment ID"] = String(deployment.id);
-  }
+  const script =
+    data.workerScript != null ? String(data.workerScript) : data.scriptName != null ? String(data.scriptName) : "-";
+  details["Script"] = script;
   return details;
 }
 
@@ -150,7 +159,9 @@ export function getWorkerMetadataExecutionDetails(context: ExecutionDetailsConte
   if (!data) {
     return details;
   }
-  details["Script"] = data.scriptName != null ? String(data.scriptName) : "-";
+  const script =
+    data.workerScript != null ? String(data.workerScript) : data.scriptName != null ? String(data.scriptName) : "-";
+  details["Script"] = script;
   const deployments = data.deployments as unknown[] | undefined;
   details["Deployments"] = deployments != null ? String(deployments.length) : "-";
   const settings = data.settings as Record<string, unknown> | undefined;
@@ -170,7 +181,12 @@ export function getDeleteWorkerExecutionDetails(context: ExecutionDetailsContext
   if (!data) {
     return details;
   }
-  details["Script"] = data.scriptName != null ? String(data.scriptName) : "-";
+  const script =
+    data.workerScript != null ? String(data.workerScript) : data.scriptName != null ? String(data.scriptName) : "-";
+  details["Script"] = script;
+  if (data.deleted != null) {
+    details["Deleted"] = String(data.deleted);
+  }
   return details;
 }
 
@@ -185,7 +201,6 @@ export function getWorkerRouteExecutionDetails(context: ExecutionDetailsContext)
   if (!route) {
     return details;
   }
-  details["Route ID"] = route.id != null ? String(route.id) : "-";
   details["Pattern"] = route.pattern != null ? String(route.pattern) : "-";
   details["Script"] = route.script != null ? String(route.script) : "-";
   return details;

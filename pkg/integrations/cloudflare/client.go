@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"strings"
 
@@ -1728,7 +1729,70 @@ func (c *Client) DeleteLoadBalancer(zoneID, lbID string) error {
 	return nil
 }
 
+// WorkerScriptSummary is one script from GET .../workers/scripts (ID is the script name used in upload and route URLs).
+type WorkerScriptSummary struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ListWorkerScripts lists uploaded Worker scripts for an account.
+func (c *Client) ListWorkerScripts(accountID string) ([]WorkerScriptSummary, error) {
+	rawURL := fmt.Sprintf("%s/accounts/%s/workers/scripts", c.BaseURL, accountID)
+	responseBody, err := c.execRequest(http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool                  `json:"success"`
+		Result  []WorkerScriptSummary `json:"result"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %w", err)
+	}
+	if !response.Success {
+		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
+	}
+	return response.Result, nil
+}
+
 const workerModuleFileName = "worker.js"
+
+// Cloudflare's upload API treats ES module entrypoints correctly when the script part uses a
+// module JavaScript media type. mime/multipart.Writer.CreateFormFile defaults to application/octet-stream,
+// which can surface as validation error 10021 ("Main module must be an ES module").
+const workerModulePartContentType = "application/javascript+module"
+
+// When compatibility_date is omitted, the API falls back to a very old date; set a modern default so
+// module Workers validate consistently.
+const defaultWorkerUploadCompatibilityDate = "2024-01-15"
+
+// CreateWorkerResource provisions a Worker via POST .../workers/workers before the first script upload.
+func (c *Client) CreateWorkerResource(accountID string, body map[string]any) (map[string]any, error) {
+	rawURL := fmt.Sprintf("%s/accounts/%s/workers/workers", c.BaseURL, accountID)
+
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling create worker request: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, rawURL, bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool           `json:"success"`
+		Result  map[string]any `json:"result"`
+	}
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %w", err)
+	}
+	if !response.Success {
+		return nil, newCloudflareAPIError(http.StatusOK, responseBody)
+	}
+	return response.Result, nil
+}
 
 // UploadWorkerScriptVersion uploads a new Worker version using multipart/form-data (POST .../versions).
 func (c *Client) UploadWorkerScriptVersion(accountID, scriptName string, metadata map[string]any, moduleContent string) (string, error) {
@@ -1737,6 +1801,9 @@ func (c *Client) UploadWorkerScriptVersion(accountID, scriptName string, metadat
 	}
 	if _, ok := metadata["main_module"]; !ok {
 		metadata["main_module"] = workerModuleFileName
+	}
+	if v, ok := metadata["compatibility_date"]; !ok || strings.TrimSpace(fmt.Sprint(v)) == "" {
+		metadata["compatibility_date"] = defaultWorkerUploadCompatibilityDate
 	}
 
 	metaBytes, err := json.Marshal(metadata)
@@ -1749,7 +1816,10 @@ func (c *Client) UploadWorkerScriptVersion(accountID, scriptName string, metadat
 	if err := writer.WriteField("metadata", string(metaBytes)); err != nil {
 		return "", fmt.Errorf("error writing metadata field: %w", err)
 	}
-	part, err := writer.CreateFormFile(workerModuleFileName, workerModuleFileName)
+	partHeader := make(textproto.MIMEHeader)
+	partHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, workerModuleFileName, workerModuleFileName))
+	partHeader.Set("Content-Type", workerModulePartContentType)
+	part, err := writer.CreatePart(partHeader)
 	if err != nil {
 		return "", fmt.Errorf("error creating script form part: %w", err)
 	}

@@ -6,13 +6,13 @@ import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo, SubtitleConte
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { baseEventSections, getWorkerRouteExecutionDetails } from "./base";
+import { baseEventSections, getWorkerRouteExecutionDetails, workerScriptDisplayLabel } from "./base";
 
 interface UpdateWorkerRouteConfiguration {
   zone?: string;
   routeId?: string;
   pattern?: string;
-  script?: string;
+  workerScript?: string;
 }
 
 export const updateWorkerRouteMapper: ComponentBaseMapper = {
@@ -48,8 +48,9 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "route", label: configuration.pattern });
   }
 
-  if (configuration?.script) {
-    metadata.push({ icon: "code", label: configuration.script });
+  const scriptLabel = workerScriptDisplayLabel(node, configuration?.workerScript);
+  if (scriptLabel) {
+    metadata.push({ icon: "code", label: scriptLabel });
   }
 
   if (configuration?.routeId) {

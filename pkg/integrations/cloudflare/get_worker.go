@@ -14,8 +14,8 @@ import (
 type GetWorker struct{}
 
 type GetWorkerSpec struct {
-	AccountID  string `json:"accountId"`
-	ScriptName string `json:"scriptName"`
+	AccountID    string `json:"accountId"`
+	WorkerScript string `json:"workerScript"`
 }
 
 func (g *GetWorker) Name() string {
@@ -35,7 +35,7 @@ func (g *GetWorker) Documentation() string {
 
 ## Configuration
 
-- **Script name**: The Worker script name in your Cloudflare account.
+- **Worker Script**: The Worker script in your Cloudflare account (picker lists scripts for the account).
 
 ## Output
 
@@ -57,12 +57,23 @@ func (g *GetWorker) OutputChannels(configuration any) []core.OutputChannel {
 func (g *GetWorker) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "scriptName",
-			Label:       "Worker script name",
-			Type:        configuration.FieldTypeString,
+			Name:        "workerScript",
+			Label:       "Worker Script",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Name of the Worker script to describe",
-			Placeholder: "my-worker",
+			Description: "The Worker Script to describe",
+			Placeholder: "Select a Worker script",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "workerScript",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "accountId",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "accountId"},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -78,11 +89,11 @@ func (g *GetWorker) Setup(ctx core.SetupContext) error {
 		return errors.New("accountId is required")
 	}
 
-	if spec.ScriptName == "" {
-		return errors.New("scriptName is required")
+	if spec.WorkerScript == "" {
+		return errors.New("workerScript is required")
 	}
 
-	return nil
+	return resolveWorkerScriptMetadata(ctx, accountID, spec.WorkerScript)
 }
 
 func (g *GetWorker) Execute(ctx core.ExecutionContext) error {
@@ -101,26 +112,26 @@ func (g *GetWorker) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	settings, err := client.GetWorkerSettings(accountID, spec.ScriptName)
+	settings, err := client.GetWorkerSettings(accountID, spec.WorkerScript)
 	if err != nil {
 		return fmt.Errorf("failed to get worker settings: %w", err)
 	}
 
-	deployments, err := client.ListWorkerDeployments(accountID, spec.ScriptName)
+	deployments, err := client.ListWorkerDeployments(accountID, spec.WorkerScript)
 	if err != nil {
 		return fmt.Errorf("failed to list worker deployments: %w", err)
 	}
 
 	result := map[string]any{
-		"accountId":   accountID,
-		"scriptName":  spec.ScriptName,
-		"settings":    settings,
-		"deployments": deployments,
+		"accountId":    accountID,
+		"workerScript": spec.WorkerScript,
+		"settings":     settings,
+		"deployments":  deployments,
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		"cloudflare.worker.metadata",
+		"cloudflare.worker.fetched",
 		[]any{result},
 	)
 }
