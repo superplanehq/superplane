@@ -197,7 +197,7 @@ func (u *UpdateWorkerRoute) Execute(ctx core.ExecutionContext) error {
 
 	eventType := "cloudflare.workerRoute.created"
 	if routeID != "" {
-		eventType = "cloudflare.workerRoute.update"
+		eventType = "cloudflare.workerRoute.updated"
 	}
 
 	return ctx.ExecutionState.Emit(

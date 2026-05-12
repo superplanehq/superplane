@@ -165,11 +165,11 @@ func (c *Cloudflare) Instructions() string {
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
      - Zone / Workers Routes / Edit
+	 - Zone / Load Balancers / Edit
      - Account / Workers KV Storage / Edit
      - Account / Workers Scripts / Edit
      - Account / Workers / Edit
      - Account / Load Balancing: Monitors and Pools / Edit
-     - Zone / Load Balancers / Edit
      - Account / Notifications / Edit
      - Account / Account Settings / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
