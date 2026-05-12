@@ -1,6 +1,7 @@
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
+  CustomFieldRenderer,
   EventStateRegistry,
   ExecutionDetailsContext,
   ExecutionInfo,
@@ -15,12 +16,13 @@ import type {
   EventStateMap,
   EventState,
 } from "@/ui/componentBase";
-import type React from "react";
+import React from "react";
 import { getColorClass } from "@/lib/colors";
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
 import { getTriggerRenderer } from ".";
 import { stringOrDash } from "./utils";
+import { CurlImportSection } from "./http/CurlImportSection";
 
 // Custom state map for HTTP component with error state
 const HTTP_EVENT_STATE_MAP: EventStateMap = {
@@ -535,3 +537,11 @@ function getHTTPEventSections(
 
   return [eventSection];
 }
+
+export const httpCustomFieldRenderer: CustomFieldRenderer = {
+  position: "before",
+  render(_node, context) {
+    if (!context?.applyConfigurationPatch) return null;
+    return React.createElement(CurlImportSection, { onApply: context.applyConfigurationPatch });
+  },
+};
