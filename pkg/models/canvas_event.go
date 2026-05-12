@@ -369,6 +369,10 @@ func DeleteRootCanvasEventChainsInTransaction(tx *gorm.DB, rootEventIDs []uuid.U
 		}
 	}
 
+	if err := tx.Where("root_event_id IN ?", rootEventIDs).Delete(&CanvasNodeQueueItem{}).Error; err != nil {
+		return err
+	}
+
 	if err := tx.Where("id IN ?", rootEventIDs).Delete(&CanvasEvent{}).Error; err != nil {
 		return err
 	}
