@@ -1,5 +1,6 @@
 import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
 import { onAppMentionTriggerRenderer } from "./on_app_mention";
+import { onReactionAddedTriggerRenderer } from "./on_reaction_added";
 import { sendTextMessageMapper } from "./send_text_message";
 import { waitForButtonClickMapper, WAIT_FOR_BUTTON_CLICK_STATE_REGISTRY } from "./wait_for_button_click";
 import { buildActionStateRegistry } from "../utils";
@@ -11,6 +12,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onAppMention: onAppMentionTriggerRenderer,
+  onReactionAdded: onReactionAddedTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {

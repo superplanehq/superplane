@@ -108,6 +108,7 @@ func (s *Slack) Actions() []core.Action {
 func (s *Slack) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnAppMention{},
+		&OnReactionAdded{},
 	}
 }
 
