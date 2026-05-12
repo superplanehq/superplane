@@ -66,7 +66,7 @@ export function CanvasModeToggle({
             >
               <span className="inline-flex items-center gap-1.5">
                 Runs
-                {runsNotificationCount && runsNotificationCount > 0 ? (
+                {runsNotificationCount != null && runsNotificationCount > 0 ? (
                   <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-medium leading-none text-white">
                     {runsNotificationCount > 99 ? "99+" : runsNotificationCount}
                   </span>

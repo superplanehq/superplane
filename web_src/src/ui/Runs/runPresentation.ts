@@ -66,9 +66,10 @@ export function shortId(value: string | undefined) {
   return value ? value.slice(0, 8) : "";
 }
 
-export function statusFiltersToApiFilters(
-  filters: RunStatusFilter[],
-): { states: CanvasesCanvasRunState[]; results: CanvasesCanvasRunResult[] } {
+export function statusFiltersToApiFilters(filters: RunStatusFilter[]): {
+  states: CanvasesCanvasRunState[];
+  results: CanvasesCanvasRunResult[];
+} {
   const resultByFilter: Record<RunResultFilter, CanvasesCanvasRunResult> = {
     passed: "RESULT_PASSED",
     failed: "RESULT_FAILED",

@@ -12,12 +12,7 @@ interface UseRunFiltersParams {
   onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
 }
 
-export function useRunFilters({
-  runs,
-  workflowNodes,
-  componentIconMap,
-  onStatusFiltersChange,
-}: UseRunFiltersParams) {
+export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange }: UseRunFiltersParams) {
   const [search, setSearch] = useState("");
   const [selectedTriggerIds, setSelectedTriggerIds] = useState<Set<string>>(() => loadPersistedFilters().triggerIds);
   const [selectedStatuses, setSelectedStatuses] = useState<Set<RunStatusFilter>>(() => loadPersistedFilters().statuses);
