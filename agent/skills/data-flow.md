@@ -86,7 +86,7 @@ Examples:
 |-----------|----------|-----|
 | GitHub runWorkflow | passed, failed | Success vs failure |
 | Approval | approved, rejected | Decision |
-| Merge | success, stopped, timeout | Merge outcome |
+| Merge | success, fail, timeout | Merge outcome |
 | Dash0 listIssues | clear, degraded, critical | Severity |
 | PagerDuty listIncidents | clear, low, high | Urgency |
 
