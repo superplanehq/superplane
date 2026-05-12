@@ -90,6 +90,10 @@ services:
       VITE_FORCE_USAGE_PAGE: ${VITE_FORCE_USAGE_PAGE:-true}
       VITE_CHANGE_MANAGEMENT_SETTINGS: ${VITE_CHANGE_MANAGEMENT_SETTINGS:-true}
 
+    env_file:
+      - path: .env
+        required: false
+
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}
       - ${VITE_PREVIEW_PORT:-4173}:${VITE_PREVIEW_PORT:-4173}

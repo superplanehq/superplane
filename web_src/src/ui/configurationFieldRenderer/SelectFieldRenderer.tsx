@@ -28,11 +28,17 @@ export const SelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value
         <SelectValue placeholder={`Select ${field.label || field.name}`} />
       </SelectTrigger>
       <SelectContent className="max-h-60">
-        {selectOptions.map((opt) => (
-          <SelectItem key={opt.value} value={opt.value ?? ""}>
-            {opt.label}
-          </SelectItem>
-        ))}
+        {selectOptions.map((opt) => {
+          const optionDescription =
+            opt && typeof opt === "object" && "description" in opt
+              ? (opt as { description?: string }).description
+              : undefined;
+          return (
+            <SelectItem key={opt.value} value={opt.value ?? ""} description={optionDescription}>
+              {opt.label}
+            </SelectItem>
+          );
+        })}
       </SelectContent>
     </Select>
   );

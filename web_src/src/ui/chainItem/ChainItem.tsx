@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { resolveIcon, isUrl, calcRelativeTimeFromDiff } from "@/lib/utils";
 import React, { useCallback, useMemo, useState } from "react";
+import { ScrollText } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
@@ -11,6 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { getComponentBaseMapper } from "@/pages/workflowv2/mappers";
 import { buildExecutionInfo, buildNodeInfo } from "@/pages/workflowv2/utils";
 import { ChainItemIcon } from "./ChainItemIcon";
+import { RunnerLogsDialog } from "./RunnerLogsDialog";
 import type { ChainItemData } from "./types";
 
 interface ChainItemProps {
@@ -24,6 +27,8 @@ interface ChainItemProps {
     nodeId: string,
     execution: CanvasesCanvasNodeExecution,
   ) => { map: EventStateMap; state: EventState };
+  /** When set with a Runner execution, shows an in-app CloudWatch logs viewer. */
+  canvasId?: string;
 }
 
 function getReactNodeText(node: React.ReactNode): string {
@@ -84,9 +89,11 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   isSelected = false,
   onToggleOpen,
   getExecutionState,
+  canvasId,
 }) => {
   const [activeTab, setActiveTab] = useState<"current" | "payload" | "configuration">("current");
   const [isPayloadModalOpen, setIsPayloadModalOpen] = useState(false);
+  const [runnerLogsOpen, setRunnerLogsOpen] = useState(false);
   const [modalPayload, setModalPayload] = useState<any>(null);
   const [payloadCopied, setPayloadCopied] = useState(false);
   const state = useMemo(() => {
@@ -152,6 +159,9 @@ export const ChainItem: React.FC<ChainItemProps> = ({
   const errorMessage =
     typeof item.originalExecution?.resultMessage === "string" ? item.originalExecution.resultMessage : "";
   const isError = item.originalExecution?.resultReason === "RESULT_REASON_ERROR" && errorMessage !== "";
+
+  const runnerExecutionId = item.originalExecution?.id;
+  const showRunnerLogsButton = item.workflowNode?.component === "runner" && Boolean(canvasId && runnerExecutionId);
 
   return (
     <div className="relative">
@@ -249,8 +259,8 @@ export const ChainItem: React.FC<ChainItemProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             {/* Tab Navigation */}
-            <div className="flex items-center h-8 border-b-1 border-gray-300">
-              <div className="flex">
+            <div className="flex items-center justify-between gap-2 h-8 border-b-1 border-gray-300 pr-2">
+              <div className="flex min-w-0 flex-wrap">
                 {!!item.tabData.current && (
                   <button
                     onClick={() => setActiveTab("current")}
@@ -264,32 +274,47 @@ export const ChainItem: React.FC<ChainItemProps> = ({
                     Details
                   </button>
                 )}
+                {!!item.tabData.payload && (
+                  <button
+                    onClick={() => setActiveTab("payload")}
+                    className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1 ${
+                      activeTab === "payload"
+                        ? "text-gray-800 border-b-1 border-gray-800"
+                        : "text-gray-500 hover:text-gray-800"
+                    }`}
+                  >
+                    {React.createElement(resolveIcon("code"), { size: 16 })}
+                    Payload
+                  </button>
+                )}
+                {!!item.tabData.configuration && Object.keys(item.tabData.configuration).length > 0 && (
+                  <button
+                    onClick={() => setActiveTab("configuration")}
+                    className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1 ${
+                      activeTab === "configuration"
+                        ? "text-gray-800 border-b-1 border-gray-800"
+                        : "text-gray-500 hover:text-gray-800"
+                    }`}
+                  >
+                    {React.createElement(resolveIcon("settings"), { size: 16 })}
+                    Config
+                  </button>
+                )}
               </div>
-              {!!item.tabData.payload && (
-                <button
-                  onClick={() => setActiveTab("payload")}
-                  className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1 ${
-                    activeTab === "payload"
-                      ? "text-gray-800 border-b-1 border-gray-800"
-                      : "text-gray-500 hover:text-gray-800"
-                  }`}
+              {showRunnerLogsButton && canvasId && runnerExecutionId && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 shrink-0 gap-1 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setRunnerLogsOpen(true);
+                  }}
                 >
-                  {React.createElement(resolveIcon("code"), { size: 16 })}
-                  Payload
-                </button>
-              )}
-              {!!item.tabData.configuration && Object.keys(item.tabData.configuration).length > 0 && (
-                <button
-                  onClick={() => setActiveTab("configuration")}
-                  className={`py-1.5 ml-4 text-[13px] font-medium rounded-tr-md flex items-center border-b-1 gap-1 ${
-                    activeTab === "configuration"
-                      ? "text-gray-800 border-b-1 border-gray-800"
-                      : "text-gray-500 hover:text-gray-800"
-                  }`}
-                >
-                  {React.createElement(resolveIcon("settings"), { size: 16 })}
-                  Config
-                </button>
+                  <ScrollText className="size-3.5" aria-hidden />
+                  Logs
+                </Button>
               )}
             </div>
 
@@ -487,6 +512,15 @@ export const ChainItem: React.FC<ChainItemProps> = ({
           </DialogContent>
         </Dialog>
       </div>
+
+      {showRunnerLogsButton && canvasId && runnerExecutionId && (
+        <RunnerLogsDialog
+          open={runnerLogsOpen}
+          onOpenChange={setRunnerLogsOpen}
+          canvasId={canvasId}
+          executionId={runnerExecutionId}
+        />
+      )}
 
       {/* Connecting line */}
       {showConnectingLine && <div className="absolute left-5 -bottom-3 w-[1px] h-3 bg-slate-400 z-10" />}

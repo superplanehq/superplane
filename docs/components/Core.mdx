@@ -29,6 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
+  <LinkCard title="Runner" href="#runner" description="Run shell commands on provisioned compute with full logs, managed by your SuperPlane deployment." />
   <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
@@ -683,6 +684,52 @@ The Read Memory component looks up values from canvas-level memory storage.
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.read"
+}
+```
+
+<a id="runner"></a>
+
+## Runner
+
+Run shell commands in a managed, ephemeral environment on dedicated runners.
+
+### Use Cases
+
+- Clone a repository and run project scripts
+- Build and push Docker images
+- Run Terraform plan/apply/destroy commands
+- Execute release, deployment, migration, diagnostic, or remediation scripts
+
+### Server configuration
+
+Self-hosted SuperPlane must configure dedicated RUNNER_* environment variables for the execution backend. See your installation or operations guide for the required variables and how to set them.
+
+### Output
+
+- **success**: Command exits with code 0
+- **failed**: Command runs and exits with a non-zero code
+
+Submission, checkout, credential injection, or infrastructure issues are shown as execution errors.
+
+### Example Output
+
+```json
+{
+  "command": {
+    "buildArn": "arn:example:superplane-run/abc123",
+    "buildId": "superplane-runner:example",
+    "durationSeconds": 42,
+    "exitCode": 0,
+    "logUrl": "https://example.com/logs/...",
+    "source": {
+      "commitSha": "abc123",
+      "ref": "main",
+      "repository": "github.com/example/app"
+    },
+    "status": "SUCCEEDED",
+    "stderr": "",
+    "stdout": "Successfully built image\n"
+  }
 }
 ```
 

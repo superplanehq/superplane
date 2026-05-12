@@ -19,6 +19,7 @@ import { upsertMemoryMapper } from "./upsertMemory";
 import { ifMapper, IF_STATE_REGISTRY } from "./if";
 import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
 import { graphqlMapper, GRAPHQL_STATE_REGISTRY } from "./graphql";
+import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import {
   componentMappers as semaphoreComponentMappers,
   triggerRenderers as semaphoreTriggerRenderers,
@@ -272,6 +273,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   if: ifMapper,
   http: httpMapper,
   graphql: graphqlMapper,
+  runner: runnerMapper,
   ssh: sshMapper,
   timeGate: timeGateMapper,
   filter: filterMapper,
@@ -422,6 +424,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   approval: APPROVAL_STATE_REGISTRY,
   http: HTTP_STATE_REGISTRY,
   graphql: GRAPHQL_STATE_REGISTRY,
+  runner: RUNNER_STATE_REGISTRY,
   ssh: SSH_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,

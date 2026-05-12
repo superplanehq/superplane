@@ -405,6 +405,20 @@ func (s *CanvasService) CancelExecution(ctx context.Context, req *pb.CancelExecu
 	return canvases.CancelExecution(ctx, s.authService, s.encryptor, organizationID, s.registry, canvasID, executionID)
 }
 
+func (s *CanvasService) GetRunnerExecutionLogs(ctx context.Context, req *pb.GetRunnerExecutionLogsRequest) (*pb.GetRunnerExecutionLogsResponse, error) {
+	canvasID, err := uuid.Parse(req.CanvasId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid canvas id")
+	}
+
+	executionID, err := uuid.Parse(req.ExecutionId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid execution id")
+	}
+
+	return canvases.GetRunnerExecutionLogs(ctx, canvasID, executionID, req.GetNextForwardToken())
+}
+
 func (s *CanvasService) ResolveExecutionErrors(ctx context.Context, req *pb.ResolveExecutionErrorsRequest) (*pb.ResolveExecutionErrorsResponse, error) {
 	canvasID, err := uuid.Parse(req.CanvasId)
 	if err != nil {

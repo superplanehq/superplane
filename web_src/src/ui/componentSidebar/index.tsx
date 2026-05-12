@@ -149,6 +149,9 @@ interface ComponentSidebarProps {
   actions?: SuperplaneActionsAction[];
   triggers?: TriggersTrigger[];
 
+  /** Canvas workflow ID (Runner CloudWatch logs in execution chain). */
+  canvasId?: string;
+
   // Highlighting callback for execution chain nodes
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
 
@@ -222,6 +225,7 @@ export const ComponentSidebar = ({
   workflowNodes = [],
   actions = [],
   triggers = [],
+  canvasId,
   onHighlightedNodesChange,
   executionChainEventId,
   executionChainExecutionId,
@@ -877,6 +881,7 @@ export const ComponentSidebar = ({
                       workflowNodes={workflowNodes}
                       actions={actions}
                       triggers={triggers}
+                      canvasId={canvasId}
                       onHighlightedNodesChange={onHighlightedNodesChange}
                       organizationId={domainId}
                     />

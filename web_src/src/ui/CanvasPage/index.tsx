@@ -1280,6 +1280,7 @@ function CanvasPage(props: CanvasPageProps) {
             onHighlightedNodesChange={setHighlightedNodeIds}
             focusRequest={props.focusRequest}
             onExecutionChainHandled={props.onExecutionChainHandled}
+            canvasId={props.canvasId}
             readOnly={readOnly}
             canReadIntegrations={props.canReadIntegrations}
             canCreateIntegrations={props.canCreateIntegrations}
@@ -1339,6 +1340,7 @@ function Sidebar({
   onHighlightedNodesChange,
   focusRequest,
   onExecutionChainHandled,
+  canvasId,
   readOnly,
   canReadIntegrations,
   canCreateIntegrations,
@@ -1386,6 +1388,7 @@ function Sidebar({
   onHighlightedNodesChange?: (nodeIds: Set<string>) => void;
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
+  canvasId?: string;
   readOnly?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
@@ -1566,6 +1569,7 @@ function Sidebar({
       workflowNodes={workflowNodes}
       actions={components}
       triggers={triggers}
+      canvasId={canvasId}
       onHighlightedNodesChange={onHighlightedNodesChange}
       executionChainEventId={focusRequest?.executionChain?.eventId || null}
       executionChainExecutionId={focusRequest?.executionChain?.executionId || null}
