@@ -67,7 +67,7 @@ function buildPropsContext(overrides?: Partial<ComponentBaseContext>): Component
 }
 
 describe("deployWorkerMapper.getExecutionDetails", () => {
-  it("includes script and version when data is present", () => {
+  it("includes script only when data is present", () => {
     const data = {
       scriptName: "my-worker",
       versionId: "ver-1",
@@ -76,13 +76,13 @@ describe("deployWorkerMapper.getExecutionDetails", () => {
     const outputs = { default: [{ type: "cloudflare.worker.deployed", timestamp: new Date().toISOString(), data }] };
     const details = deployWorkerMapper.getExecutionDetails(buildDetailsCtx({ execution: { outputs } }));
     expect(details["Script"]).toBe("my-worker");
-    expect(details["Version ID"]).toBe("ver-1");
-    expect(details["Deployment ID"]).toBe("dep-1");
+    expect(details["Version ID"]).toBeUndefined();
+    expect(details["Deployment ID"]).toBeUndefined();
   });
 });
 
 describe("deployWorkerMapper.props", () => {
-  it("shows script name and inline in metadata", () => {
+  it("shows at most three chips: name, source, provision", () => {
     const props = deployWorkerMapper.props(
       buildPropsContext({
         node: buildNode({
@@ -93,12 +93,36 @@ describe("deployWorkerMapper.props", () => {
     expect(props.metadata).toEqual([
       { icon: "code", label: "w" },
       { icon: "file-text", label: "Inline" },
+      { icon: "package", label: "Provision on" },
     ]);
+  });
+
+  it("shows provision off when disabled", () => {
+    const props = deployWorkerMapper.props(
+      buildPropsContext({
+        node: buildNode({
+          configuration: { scriptName: "w", source: "inline", provisionIfMissing: false },
+        }),
+      }),
+    );
+    expect(props.metadata?.[2]).toEqual({ icon: "package", label: "Provision off" });
   });
 });
 
 describe("eventStateRegistry.deployWorker", () => {
-  it("maps finished success to deployed", () => {
-    expect(eventStateRegistry.deployWorker.getState(buildExecution())).toBe("deployed");
+  it("maps deploy output to deployed", () => {
+    const execution = buildExecution({
+      outputs: {
+        default: [
+          {
+            type: "cloudflare.worker.deployed",
+            timestamp: new Date().toISOString(),
+            data: {},
+          },
+        ],
+      },
+    });
+
+    expect(eventStateRegistry.deployWorker.getState(execution)).toBe("deployed");
   });
 });

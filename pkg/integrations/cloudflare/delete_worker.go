@@ -14,9 +14,9 @@ import (
 type DeleteWorker struct{}
 
 type DeleteWorkerSpec struct {
-	AccountID  string `json:"accountId"`
-	ScriptName string `json:"scriptName"`
-	Force      *bool  `json:"force"`
+	AccountID    string `json:"accountId"`
+	WorkerScript string `json:"workerScript"`
+	Force        *bool  `json:"force"`
 }
 
 func (d *DeleteWorker) Name() string {
@@ -36,12 +36,12 @@ func (d *DeleteWorker) Documentation() string {
 
 ## Configuration
 
-- **Script name**: Worker to delete.
+- **Worker Script**: Worker to delete (picker lists scripts for the account).
 - **Force**: When enabled, Cloudflare deletes the script even when blocked by bindings (see Cloudflare API ` + "`force`" + ` query parameter).
 
 ## Output
 
-Emits the account ID and script name that were deleted.
+Emits the account ID and Worker Script that were deleted.
 
 > **Warning**: This operation is irreversible for the Worker script.`
 }
@@ -61,12 +61,23 @@ func (d *DeleteWorker) OutputChannels(configuration any) []core.OutputChannel {
 func (d *DeleteWorker) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "scriptName",
-			Label:       "Worker script name",
-			Type:        configuration.FieldTypeString,
+			Name:        "workerScript",
+			Label:       "Worker Script",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Name of the Worker script to delete",
-			Placeholder: "my-worker",
+			Description: "The Worker Script to delete",
+			Placeholder: "Select a Worker script",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "workerScript",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "accountId",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "accountId"},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "force",
@@ -90,11 +101,11 @@ func (d *DeleteWorker) Setup(ctx core.SetupContext) error {
 		return errors.New("accountId is required")
 	}
 
-	if spec.ScriptName == "" {
-		return errors.New("scriptName is required")
+	if spec.WorkerScript == "" {
+		return errors.New("workerScript is required")
 	}
 
-	return nil
+	return resolveWorkerScriptMetadata(ctx, accountID, spec.WorkerScript)
 }
 
 func (d *DeleteWorker) Execute(ctx core.ExecutionContext) error {
@@ -118,14 +129,14 @@ func (d *DeleteWorker) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	if err := client.DeleteWorkerScript(accountID, spec.ScriptName, force); err != nil {
+	if err := client.DeleteWorkerScript(accountID, spec.WorkerScript, force); err != nil {
 		return fmt.Errorf("failed to delete worker: %w", err)
 	}
 
 	result := map[string]any{
-		"accountId":  accountID,
-		"scriptName": spec.ScriptName,
-		"deleted":    true,
+		"accountId":    accountID,
+		"workerScript": spec.WorkerScript,
+		"deleted":      true,
 	}
 
 	return ctx.ExecutionState.Emit(

@@ -38,10 +38,24 @@ const updateWorkerRouteStateRegistry: EventStateRegistry = {
     }
     const payloads = execution.outputs?.default as OutputPayload[] | undefined;
     const payloadType = payloads?.[0]?.type;
-    if (payloadType === "cloudflare.workerRoute.updated") {
+    if (payloadType === "cloudflare.workerRoute.update") {
       return "updated";
     }
     return "created";
+  },
+};
+
+const deployWorkerStateRegistry: EventStateRegistry = {
+  stateMap: {
+    ...DEFAULT_EVENT_STATE_MAP,
+    deployed: DEFAULT_EVENT_STATE_MAP.success,
+  },
+  getState: (execution: ExecutionInfo) => {
+    const state = defaultStateFunction(execution);
+    if (state !== "success") {
+      return state;
+    }
+    return "deployed";
   },
 };
 
@@ -101,7 +115,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getLoadBalancer: buildActionStateRegistry("fetched"),
   updateLoadBalancer: buildActionStateRegistry("updated"),
   deleteLoadBalancer: buildActionStateRegistry("deleted"),
-  deployWorker: buildActionStateRegistry("deployed"),
+  deployWorker: deployWorkerStateRegistry,
   getWorker: buildActionStateRegistry("fetched"),
   deleteWorker: buildActionStateRegistry("deleted"),
   updateWorkerRoute: updateWorkerRouteStateRegistry,

@@ -38,11 +38,12 @@ function buildDetailsCtx(overrides?: { execution?: Partial<ExecutionInfo> }): Ex
 }
 
 describe("deleteWorkerMapper.getExecutionDetails", () => {
-  it("includes script name", () => {
-    const data = { scriptName: "gone" };
+  it("includes script name and deleted flag", () => {
+    const data = { workerScript: "gone", deleted: true };
     const outputs = { default: [{ type: "cloudflare.worker.deleted", timestamp: new Date().toISOString(), data }] };
     const details = deleteWorkerMapper.getExecutionDetails(buildDetailsCtx({ execution: { outputs } }));
     expect(details["Script"]).toBe("gone");
+    expect(details["Deleted"]).toBe("true");
   });
 });
 

@@ -29,7 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
   <LinkCard title="Delete Pool" href="#delete-pool" description="Delete a Cloudflare Load Balancer origin pool" />
   <LinkCard title="Delete Worker" href="#delete-worker" description="Delete a Worker script from your Cloudflare account" />
-  <LinkCard title="Deploy Worker" href="#deploy-worker" description="Upload a Worker script and deploy a new version to production traffic" />
+  <LinkCard title="Deploy Worker" href="#deploy-worker" description="Provision a Worker if needed, upload a script version, and deploy it to traffic" />
   <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
   <LinkCard title="Get Load Balancer" href="#get-load-balancer" description="Retrieve a Cloudflare Load Balancer by ID" />
   <LinkCard title="Get Pool" href="#get-pool" description="Retrieve a Cloudflare Load Balancer origin pool by ID" />
@@ -704,12 +704,12 @@ The Delete Worker component removes a Worker script.
 
 ### Configuration
 
-- **Script name**: Worker to delete.
+- **Worker Script**: Worker to delete (picker lists scripts for the account).
 - **Force**: When enabled, Cloudflare deletes the script even when blocked by bindings (see Cloudflare API `force` query parameter).
 
 ### Output
 
-Emits the account ID and script name that were deleted.
+Emits the account ID and Worker Script that were deleted.
 
 > **Warning**: This operation is irreversible for the Worker script.
 
@@ -720,7 +720,7 @@ Emits the account ID and script name that were deleted.
   "data": {
     "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
     "deleted": true,
-    "scriptName": "my-worker"
+    "workerScript": "my-worker"
   },
   "timestamp": "2026-05-05T12:00:00.000000000Z",
   "type": "cloudflare.worker.deleted"
@@ -731,7 +731,7 @@ Emits the account ID and script name that were deleted.
 
 ## Deploy Worker
 
-The Deploy Worker component uploads a single-module Worker (`worker.js`) and creates a deployment so that version serves 100% of traffic.
+The Deploy Worker component uploads a single-module Worker (`worker.js`) to a **Worker script name** in your account. When **Provision Worker if missing** is enabled (default), it first calls Cloudflare's Create Worker API so a **new** name works without a separate step. After upload, SuperPlane always creates a **deployment** so the new version serves 100% of traffic (`cloudflare.worker.deployed`).
 
 ### Script source
 
@@ -740,9 +740,11 @@ The Deploy Worker component uploads a single-module Worker (`worker.js`) and cre
 
 ### Configuration
 
-- **Script name**: Cloudflare Worker script name (used in routes and the dashboard).
-- **Compatibility date** (optional): Workers compatibility date (for example `2024-01-01`). Recommended; if omitted, Cloudflare applies account defaults.
-- **Compatibility flags** (optional): comma- or newline-separated flags (for example `nodejs_compat`).
+- **Worker script name**: Name of the Worker in your account (same name used in routes and the dashboard). Used for both provisioning and upload.
+- **Provision Worker if missing** (default on): Calls `POST .../workers/workers` with the optional metadata fields in **Provision settings** when that section is visible. If the Worker already exists, the error is ignored and upload continues.
+- **Provision settings** (optional): Tags, Logpush, Observability, Subdomain, Tail consumers — sent only on the provision step when it runs; omit toggles to leave those keys out of the API request.
+- **Compatibility date** (optional): Passed to the **script upload** metadata. If omitted, SuperPlane sends a recent default so Cloudflare treats the upload as a modern module Worker.
+- **Compatibility flags** (optional): comma- or newline-separated flags for the upload metadata.
 - **Deployment message** (optional): annotation stored on the deployment.
 
 ### Output
@@ -916,7 +918,7 @@ The Get Worker component loads Workers script **settings** (bindings, compatibil
 
 ### Configuration
 
-- **Script name**: The Worker script name in your Cloudflare account.
+- **Worker Script**: The Worker script in your Cloudflare account (picker lists scripts for the account).
 
 ### Output
 
@@ -942,15 +944,15 @@ Emits `settings` and `deployments` for use in later workflow steps.
         ]
       }
     ],
-    "scriptName": "my-worker",
     "settings": {
       "bindings": [],
       "compatibility_date": "2024-01-01",
       "usage_model": "standard"
-    }
+    },
+    "workerScript": "my-worker"
   },
   "timestamp": "2026-05-05T12:00:00.000000000Z",
-  "type": "cloudflare.worker.metadata"
+  "type": "cloudflare.worker.fetched"
 }
 ```
 
@@ -1277,7 +1279,7 @@ The Update Worker Route component manages **zone routes** for Workers.
 
 - **Zone**: Cloudflare zone for the route.
 - **Pattern**: URL pattern (for example `example.com/*`).
-- **Script**: Worker script name invoked for matching traffic.
+- **Worker Script**: Worker script invoked for matching traffic (picker lists scripts for the account).
 
 ### Output
 
