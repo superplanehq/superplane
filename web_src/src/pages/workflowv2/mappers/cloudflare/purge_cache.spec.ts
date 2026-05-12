@@ -134,13 +134,14 @@ describe("purgeCacheMapper.props metadata", () => {
 // ── getExecutionDetails ───────────────────────────────────────────────────────
 
 describe("purgeCacheMapper.getExecutionDetails", () => {
-  it("returns details with mode, zone and purge ID", () => {
+  it("returns details with mode, zone, and file count", () => {
     const ctx = buildDetailsCtx({
       execution: {
         outputs: {
           default: [
             buildOutput({
               zoneId: "zone123",
+              zoneName: "example.com",
               id: "purge-abc",
               mode: "files",
               files: ["https://example.com/a.js", "https://example.com/b.js"],
@@ -151,14 +152,30 @@ describe("purgeCacheMapper.getExecutionDetails", () => {
     });
     const details = purgeCacheMapper.getExecutionDetails(ctx);
     expect(details["Mode"]).toBe("files");
-    expect(details["Zone ID"]).toBe("zone123");
-    expect(details["Purge ID"]).toBe("purge-abc");
+    expect(details["Zone"]).toBe("example.com");
     expect(details["Files"]).toBe("2");
   });
 
   it("does not throw when outputs is undefined", () => {
     const ctx = buildDetailsCtx({ execution: { outputs: undefined } });
     expect(() => purgeCacheMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
+
+  it("falls back to zone ID when zone name is omitted", () => {
+    const ctx = buildDetailsCtx({
+      execution: {
+        outputs: {
+          default: [
+            buildOutput({
+              zoneId: "zone123",
+              id: "p",
+              mode: "everything",
+            }),
+          ],
+        },
+      },
+    });
+    expect(purgeCacheMapper.getExecutionDetails(ctx)["Zone"]).toBe("zone123");
   });
 
   it("includes executed at timestamp", () => {

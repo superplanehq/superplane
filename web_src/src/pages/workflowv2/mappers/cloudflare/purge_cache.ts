@@ -25,6 +25,7 @@ interface PurgeCacheConfiguration {
 
 interface PurgeCacheOutput {
   zoneId?: string;
+  zoneName?: string;
   id?: string;
   mode?: string;
   files?: string[];
@@ -61,8 +62,8 @@ export const purgeCacheMapper: ComponentBaseMapper = {
     if (!result) return details;
 
     if (result.mode) details["Mode"] = result.mode;
-    if (result.zoneId) details["Zone ID"] = result.zoneId;
-    if (result.id) details["Purge ID"] = result.id;
+    const zoneLabel = purgeCacheZoneLabel(result);
+    if (zoneLabel) details["Zone"] = zoneLabel;
     if (result.files?.length) details["Files"] = String(result.files.length);
     if (result.tags?.length) details["Tags"] = String(result.tags.length);
     if (result.hosts?.length) details["Hosts"] = String(result.hosts.length);
@@ -75,6 +76,10 @@ export const purgeCacheMapper: ComponentBaseMapper = {
     return renderTimeAgo(new Date(context.execution.createdAt));
   },
 };
+
+function purgeCacheZoneLabel(result: PurgeCacheOutput): string | undefined {
+  return result.zoneName?.trim() || result.zoneId;
+}
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];

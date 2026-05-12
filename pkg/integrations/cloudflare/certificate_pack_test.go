@@ -284,4 +284,133 @@ func Test__DeleteCertificatePack__Execute(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to delete certificate pack")
 	})
+
+	t.Run("resolves zone from metadata when certificate pack id has no slash", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"success":true,"result":[]}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"success": true,
+						"result": [{"id": "found-pack-id", "hosts": ["preview.example.com"]}]
+					}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"success":true,"result":{}}`)),
+				},
+			},
+		}
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		integrationZones := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "token123"},
+			Metadata: Metadata{
+				Zones: []Zone{
+					{ID: "z-first", Name: "first.example.com"},
+					{ID: "z-second", Name: "second.example.com"},
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"certificatePack": "found-pack-id",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationZones,
+			ExecutionState: execState,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 3)
+		assert.Equal(t,
+			"https://api.cloudflare.com/client/v4/zones/z-first/ssl/certificate_packs",
+			httpContext.Requests[0].URL.String(),
+		)
+		assert.Equal(t,
+			"https://api.cloudflare.com/client/v4/zones/z-second/ssl/certificate_packs",
+			httpContext.Requests[1].URL.String(),
+		)
+		assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+		assert.Equal(t, http.MethodGet, httpContext.Requests[1].Method)
+		assert.Equal(t,
+			"https://api.cloudflare.com/client/v4/zones/z-second/ssl/certificate_packs/found-pack-id",
+			httpContext.Requests[2].URL.String(),
+		)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[2].Method)
+
+		wrapped := execState.Payloads[0].(map[string]any)
+		payload := wrapped["data"].(map[string]any)
+		assert.Equal(t, "z-second", payload["zoneId"])
+		assert.Equal(t, "found-pack-id", payload["packId"])
+	})
+
+	t.Run("pack id only returns error when pack is not in any configured zone", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"success":true,"result":[]}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"success":true,"result":[]}`))},
+			},
+		}
+		integrationZones := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "token123"},
+			Metadata: Metadata{
+				Zones: []Zone{
+					{ID: "z1", Name: "a.example.com"},
+					{ID: "z2", Name: "b.example.com"},
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"certificatePack": "missing-pack-id",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationZones,
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "not found in any configured zone")
+		require.Len(t, httpContext.Requests, 2)
+	})
+
+	t.Run("slash form resolves zone name via integration metadata", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"success":true,"result":{}}`)),
+				},
+			},
+		}
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		integrationZones := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "token123"},
+			Metadata: Metadata{
+				Zones: []Zone{{ID: "zone-by-id", Name: "named.example.com"}},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"certificatePack": "named.example.com/pack-xyz",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationZones,
+			ExecutionState: execState,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t,
+			"https://api.cloudflare.com/client/v4/zones/zone-by-id/ssl/certificate_packs/pack-xyz",
+			httpContext.Requests[0].URL.String(),
+		)
+	})
 }

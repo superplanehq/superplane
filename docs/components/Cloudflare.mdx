@@ -54,7 +54,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
      - Zone / DNS / Edit
-     - Zone / Dynamic Redirect / Edit
+     - Zone / Cache Purge / Purge
+     - Zone / SSL and Certificates / Edit
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
      - Account / Workers KV Storage / Edit
@@ -932,7 +933,7 @@ The Purge Cache component clears cached content from the Cloudflare CDN.
 
 ### Output
 
-Emits the Cloudflare purge result ID, zone ID, and the purge scope (mode + items).
+Emits the Cloudflare purge result ID, zone ID, zone name (when known from integration metadata), and the purge scope (mode + items).
 
 ### Example Output
 
@@ -945,7 +946,8 @@ Emits the Cloudflare purge result ID, zone ID, and the purge scope (mode + items
     ],
     "id": "9a7806061c88ada191ed06f989cc3dac",
     "mode": "files",
-    "zoneId": "abc123def456abc123def456abc12345"
+    "zoneId": "abc123def456abc123def456abc12345",
+    "zoneName": "example.com"
   },
   "timestamp": "2026-05-11T10:00:00.000000000Z",
   "type": "cloudflare.cache.purged"

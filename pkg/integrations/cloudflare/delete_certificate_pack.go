@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 )
@@ -109,7 +110,23 @@ func (c *DeleteCertificatePack) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	zoneID, packID := parseCertificatePackID(packValue, ctx.Integration)
+	zoneFragment, packID := splitCertificatePackReference(packValue)
+	if strings.TrimSpace(packID) == "" {
+		return errors.New("certificate pack id is required")
+	}
+
+	var zoneID string
+	if strings.TrimSpace(zoneFragment) != "" {
+		zoneID = resolveZoneID(strings.TrimSpace(zoneFragment), ctx.Integration)
+	} else {
+		zoneID, err = lookupZoneForCertificatePack(ctx.Logger, client, ctx.Integration, packID)
+		if err != nil {
+			return err
+		}
+	}
+	if strings.TrimSpace(zoneID) == "" {
+		return fmt.Errorf("could not resolve Cloudflare zone for certificate pack %q", packValue)
+	}
 
 	if err := client.DeleteCertificatePack(zoneID, packID); err != nil {
 		return fmt.Errorf("failed to delete certificate pack: %w", err)
@@ -126,14 +143,39 @@ func (c *DeleteCertificatePack) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-// parseCertificatePackID splits a "{zone_id}/{pack_id}" resource value into its parts.
-// If the value was set directly (e.g. from an expression), it is treated as the pack ID
-// and the zone is resolved from the integration's zone list.
-func parseCertificatePackID(value string, integration core.IntegrationContext) (zoneID, packID string) {
-	if zonePart, packPart, ok := strings.Cut(value, "/"); ok && zonePart != "" && packPart != "" {
-		return zonePart, packPart
+// splitCertificatePackReference splits a "{zone}/{pack_id}" resource id (from the picker) into parts.
+// If there is no slash, the entire value is the pack ID and the zone must be discovered via the API.
+func splitCertificatePackReference(value string) (zoneFragment, packID string) {
+	if zonePart, packPart, ok := strings.Cut(value, "/"); ok && strings.TrimSpace(zonePart) != "" && strings.TrimSpace(packPart) != "" {
+		return strings.TrimSpace(zonePart), strings.TrimSpace(packPart)
 	}
-	return "", value
+	return "", strings.TrimSpace(value)
+}
+
+func lookupZoneForCertificatePack(logger *log.Entry, client *Client, integration core.IntegrationContext, packID string) (string, error) {
+	metadata := Metadata{}
+	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
+		return "", fmt.Errorf("failed to decode integration metadata: %w", err)
+	}
+	if len(metadata.Zones) == 0 {
+		return "", fmt.Errorf("cannot resolve zone for certificate pack %q: no zones in integration metadata", packID)
+	}
+	for _, zone := range metadata.Zones {
+		packs, err := client.ListCertificatePacks(zone.ID)
+		if err != nil {
+			if logger != nil {
+				logger.WithError(err).WithField("zone_id", zone.ID).WithField("zone_name", zone.Name).
+					Warn("failed to list certificate packs for zone while resolving certificate pack, skipping zone")
+			}
+			continue
+		}
+		for _, pack := range packs {
+			if pack.ID == packID {
+				return zone.ID, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("certificate pack %q not found in any configured zone", packID)
 }
 
 func (c *DeleteCertificatePack) Cancel(ctx core.ExecutionContext) error {

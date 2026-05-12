@@ -58,7 +58,7 @@ func (c *PurgeCache) Documentation() string {
 
 ## Output
 
-Emits the Cloudflare purge result ID, zone ID, and the purge scope (mode + items).`
+Emits the Cloudflare purge result ID, zone ID, zone name (when known from integration metadata), and the purge scope (mode + items).`
 }
 
 func (c *PurgeCache) Icon() string {
@@ -247,6 +247,9 @@ func (c *PurgeCache) Execute(ctx core.ExecutionContext) error {
 		"zoneId": zoneID,
 		"id":     result.ID,
 		"mode":   spec.Mode,
+	}
+	if zoneName := resolveZoneName(zoneID, ctx.Integration); zoneName != "" {
+		payload["zoneName"] = zoneName
 	}
 
 	switch spec.Mode {
