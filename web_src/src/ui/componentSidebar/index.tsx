@@ -135,6 +135,12 @@ interface ComponentSidebarProps {
   domainId?: string;
   domainType?: AuthorizationDomainType;
   customField?: (configuration: Record<string, unknown>) => ReactNode;
+  preConfigurationField?: (context: {
+    configuration: Record<string, unknown>;
+    onConfigurationPatch: (patch: Record<string, unknown>) => void;
+    requestAutosave: () => void;
+    readOnly: boolean;
+  }) => ReactNode;
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
@@ -207,6 +213,7 @@ export const ComponentSidebar = ({
   domainId,
   domainType,
   customField,
+  preConfigurationField,
   integrationName,
   integrationRef,
   integrations,
@@ -767,6 +774,7 @@ export const ComponentSidebar = ({
                   domainId={domainId}
                   domainType={domainType}
                   customField={customField}
+                  preConfigurationField={preConfigurationField}
                   integrationName={integrationName}
                   integrationRef={integrationRef}
                   integrations={integrations}
