@@ -220,6 +220,12 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 		return expression, nil
 	}
 
+	// When the entire value is a single expression with no surrounding text,
+	// return the native type so numbers and booleans are not coerced to strings.
+	if matches := expressionRegex.FindStringSubmatch(expression); matches != nil && matches[0] == expression {
+		return b.ResolveExpression(matches[1])
+	}
+
 	var err error
 
 	result := expressionRegex.ReplaceAllStringFunc(expression, func(match string) string {
