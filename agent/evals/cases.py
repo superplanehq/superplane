@@ -124,5 +124,17 @@ dataset = Dataset(
                 evals.ContainsDatetimeExpression(),
             ),
         ),
+        Case(
+            name="parallel_branches_converge_with_merge",
+            inputs=(
+                "Build a workflow that runs two HTTP requests in parallel "
+                "and continues only after both have finished"
+            ),
+            evaluators=(
+                evals.CanvasHasNode("http", count=2),
+                evals.CanvasHasNode("merge", count=1),
+                evals.CanvasHasWorkflow("http", "...", "merge"),
+            ),
+        ),
     ],
 )

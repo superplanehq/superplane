@@ -84,7 +84,8 @@ func Test__Cloudflare__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiToken": "invalid-token",
+				"apiToken":  "invalid-token",
+				"accountId": "account123",
 			},
 		}
 
@@ -102,20 +103,38 @@ func Test__Cloudflare__Sync(t *testing.T) {
 	})
 }
 
+func Test__Cloudflare__Configuration(t *testing.T) {
+	c := &Cloudflare{}
+	fields := c.Configuration()
+
+	require.Len(t, fields, 2)
+	assert.Equal(t, "apiToken", fields[0].Name)
+	assert.True(t, fields[0].Required)
+	assert.Equal(t, "accountId", fields[1].Name)
+	assert.False(t, fields[1].Required)
+}
+
 func Test__Cloudflare__ListResources(t *testing.T) {
 	c := &Cloudflare{}
 
 	t.Run("list zones from metadata", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{}
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"success": true,
+						"result": [
+							{"id": "zone1", "name": "example.com", "status": "active"},
+							{"id": "zone2", "name": "test.com", "status": "active"}
+						]
+					}`)),
+				},
+			},
+		}
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
-			},
-			Metadata: Metadata{
-				Zones: []Zone{
-					{ID: "zone1", Name: "example.com", Status: "active"},
-					{ID: "zone2", Name: "test.com", Status: "active"},
-				},
 			},
 		}
 

@@ -1,0 +1,29 @@
+{
+  "data": {
+    "zoneId": "023e105f4ecef8ad9ca31a8372d0c353",
+    "loadBalancerId": "699d98642c564d2e855e9661899b7252",
+    "loadBalancer": {
+      "id": "699d98642c564d2e855e9661899b7252",
+      "name": "lb.example.com",
+      "description": "Example load balancer",
+      "enabled": true,
+      "proxied": true,
+      "fallback_pool": "17b5962d775c646f3f9725cbc7a53df4",
+      "default_pools": [
+        "9290f38c5d07c2e2f4df57b1f61d4196",
+        "17b5962d775c646f3f9725cbc7a53df4"
+      ],
+      "steering_policy": "random",
+      "session_affinity": "cookie",
+      "session_affinity_ttl": 1800,
+      "random_steering": {
+        "pool_weights": {
+          "9290f38c5d07c2e2f4df57b1f61d4196": 0.9,
+          "17b5962d775c646f3f9725cbc7a53df4": 0.1
+        }
+      }
+    }
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.loadBalancer.updated"
+}

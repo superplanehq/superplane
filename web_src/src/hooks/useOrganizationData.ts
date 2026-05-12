@@ -50,6 +50,7 @@ export const useOrganization = (organizationId: string, enabled = true) => {
     queryFn: async () => {
       const response = await organizationsDescribeOrganization(
         withOrganizationHeader({
+          organizationId,
           path: { id: organizationId },
         }),
       );

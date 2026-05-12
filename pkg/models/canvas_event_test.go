@@ -32,7 +32,7 @@ func Test__LockExpiredRoutedRootCanvasEventsInTransaction_ReturnsMultipleEligibl
 	require.ElementsMatch(t, []uuid.UUID{event1.ID, event2.ID}, canvasEventIDs(events))
 }
 
-func Test__LockExpiredRoutedRootCanvasEventsInTransaction_ExcludesInactiveAndIneligibleEvents(t *testing.T) {
+func Test__LockExpiredRoutedRootCanvasEventsInTransaction_IncludesSoftDeletedCanvasesAndOrganizations(t *testing.T) {
 	require.NoError(t, database.TruncateTables())
 
 	org := createOrganization(t)
@@ -48,13 +48,13 @@ func Test__LockExpiredRoutedRootCanvasEventsInTransaction_ExcludesInactiveAndIne
 	createExpiredRootEvent(t, noRetentionCanvas.ID)
 
 	deletedCanvas := createRetentionCanvas(t, org.ID)
-	createExpiredRootEvent(t, deletedCanvas.ID)
+	deletedCanvasEvent := createExpiredRootEvent(t, deletedCanvas.ID)
 	require.NoError(t, database.Conn().Delete(&models.Canvas{}, "id = ?", deletedCanvas.ID).Error)
 
 	deletedOrg := createOrganization(t)
 	cacheRetentionWindow(t, deletedOrg.ID, 30)
 	deletedOrgCanvas := createRetentionCanvas(t, deletedOrg.ID)
-	createExpiredRootEvent(t, deletedOrgCanvas.ID)
+	deletedOrgEvent := createExpiredRootEvent(t, deletedOrgCanvas.ID)
 	require.NoError(t, database.Conn().Delete(&models.Organization{}, "id = ?", deletedOrg.ID).Error)
 
 	queuedRoot := createExpiredRootEvent(t, canvas.ID)
@@ -87,7 +87,7 @@ func Test__LockExpiredRoutedRootCanvasEventsInTransaction_ExcludesInactiveAndIne
 		return err
 	})
 	require.NoError(t, err)
-	require.Equal(t, []uuid.UUID{eligible.ID}, canvasEventIDs(events))
+	require.ElementsMatch(t, []uuid.UUID{eligible.ID, deletedCanvasEvent.ID, deletedOrgEvent.ID}, canvasEventIDs(events))
 }
 
 func createOrganization(t *testing.T) *models.Organization {

@@ -195,16 +195,16 @@ func LockExpiredRoutedRootCanvasEventsInTransaction(tx *gorm.DB, referenceTime t
 }
 
 func expiredRoutedRootCanvasEventsQuery(tx *gorm.DB, referenceTime time.Time) *gorm.DB {
-	query := tx.
+	return tx.
 		Table("workflow_events").
 		Select("workflow_events.*").
+		Joins("JOIN workflows ON workflow_events.workflow_id = workflows.id").
+		Joins("JOIN organizations ON workflows.organization_id = organizations.id").
 		Where("organizations.usage_retention_window_days IS NOT NULL").
 		Where("organizations.usage_retention_window_days > 0").
 		Where("workflow_events.execution_id IS NULL").
 		Where("workflow_events.state = ?", CanvasEventStateRouted).
 		Where("workflow_events.created_at + (organizations.usage_retention_window_days * INTERVAL '1 day') < ?", referenceTime.UTC())
-
-	return withActiveCanvas(query, "workflow_events.workflow_id")
 }
 
 func lockCanvasEventsForUpdate(tx *gorm.DB) *gorm.DB {
