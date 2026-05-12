@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -13,15 +14,20 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UUID, limit uint32, before *timestamppb.Timestamp) (*pb.ListRunsResponse, error) {
+func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UUID, limit uint32, before *timestamppb.Timestamp, states []pb.CanvasRun_State, results []pb.CanvasRun_Result) (*pb.ListRunsResponse, error) {
 	limit = getLimit(limit)
 	beforeTime := getBefore(before)
-	runs, err := models.ListCanvasRuns(canvasID, int(limit), beforeTime)
+	filters, err := buildCanvasRunFilters(states, results)
 	if err != nil {
 		return nil, err
 	}
 
-	count, err := models.CountCanvasRuns(canvasID)
+	runs, err := models.ListCanvasRuns(canvasID, int(limit), beforeTime, filters)
+	if err != nil {
+		return nil, err
+	}
+
+	count, err := models.CountCanvasRuns(canvasID, filters)
 	if err != nil {
 		return nil, err
 	}
@@ -56,6 +62,33 @@ func ListRuns(ctx context.Context, registry *registry.Registry, canvasID uuid.UU
 		TotalCount:    uint32(count),
 		HasNextPage:   hasNextPage(len(runs), int(limit), count),
 		LastTimestamp: getLastRunTimestamp(runs),
+	}, nil
+}
+
+func buildCanvasRunFilters(states []pb.CanvasRun_State, results []pb.CanvasRun_Result) (models.CanvasRunFilters, error) {
+	modelStates := make([]string, 0, len(states))
+	for _, state := range states {
+		modelState, err := ProtoRunStateToModel(state)
+		if err != nil {
+			return models.CanvasRunFilters{}, err
+		}
+
+		modelStates = append(modelStates, modelState)
+	}
+
+	modelResults := make([]string, 0, len(results))
+	for _, result := range results {
+		modelResult, err := ProtoRunResultToModel(result)
+		if err != nil {
+			return models.CanvasRunFilters{}, err
+		}
+
+		modelResults = append(modelResults, modelResult)
+	}
+
+	return models.CanvasRunFilters{
+		States:  modelStates,
+		Results: modelResults,
 	}, nil
 }
 
@@ -129,6 +162,30 @@ func SerializeCanvasRun(run models.CanvasRun, rootEvent models.CanvasEvent, exec
 	}
 
 	return serialized, nil
+}
+
+func ProtoRunStateToModel(state pb.CanvasRun_State) (string, error) {
+	switch state {
+	case pb.CanvasRun_STATE_STARTED:
+		return models.CanvasRunStateStarted, nil
+	case pb.CanvasRun_STATE_FINISHED:
+		return models.CanvasRunStateFinished, nil
+	default:
+		return "", status.Error(codes.InvalidArgument, fmt.Sprintf("invalid run state filter: %s", state.String()))
+	}
+}
+
+func ProtoRunResultToModel(result pb.CanvasRun_Result) (string, error) {
+	switch result {
+	case pb.CanvasRun_RESULT_PASSED:
+		return models.CanvasRunResultPassed, nil
+	case pb.CanvasRun_RESULT_FAILED:
+		return models.CanvasRunResultFailed, nil
+	case pb.CanvasRun_RESULT_CANCELLED:
+		return models.CanvasRunResultCancelled, nil
+	default:
+		return "", status.Error(codes.InvalidArgument, fmt.Sprintf("invalid run result filter: %s", result.String()))
+	}
 }
 
 func RunStateToProto(state string) pb.CanvasRun_State {

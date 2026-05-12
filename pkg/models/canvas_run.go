@@ -104,12 +104,19 @@ func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*CanvasRun
 	return run, nil
 }
 
-func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time) ([]CanvasRun, error) {
+type CanvasRunFilters struct {
+	States  []string
+	Results []string
+}
+
+func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
 	var runs []CanvasRun
 	query := database.Conn().
 		Where("workflow_id = ?", workflowID).
 		Order("created_at DESC").
 		Limit(limit)
+
+	query = applyCanvasRunFilters(query, filters)
 
 	if beforeTime != nil {
 		query = query.Where("created_at < ?", beforeTime)
@@ -123,18 +130,32 @@ func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time) ([]C
 	return runs, nil
 }
 
-func CountCanvasRuns(workflowID uuid.UUID) (int64, error) {
+func CountCanvasRuns(workflowID uuid.UUID, filters CanvasRunFilters) (int64, error) {
 	var count int64
-	err := database.Conn().
+	query := database.Conn().
 		Model(&CanvasRun{}).
-		Where("workflow_id = ?", workflowID).
-		Count(&count).
-		Error
+		Where("workflow_id = ?", workflowID)
+
+	query = applyCanvasRunFilters(query, filters)
+
+	err := query.Count(&count).Error
 	if err != nil {
 		return 0, err
 	}
 
 	return count, nil
+}
+
+func applyCanvasRunFilters(query *gorm.DB, filters CanvasRunFilters) *gorm.DB {
+	if len(filters.States) > 0 {
+		query = query.Where("state IN ?", filters.States)
+	}
+
+	if len(filters.Results) > 0 {
+		query = query.Where("result IN ?", filters.Results)
+	}
+
+	return query
 }
 
 func ListParentExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID) ([]CanvasNodeExecution, error) {

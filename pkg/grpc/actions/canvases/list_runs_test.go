@@ -33,7 +33,7 @@ func Test__ListRuns__ReturnsRunsWithRootEventsAndExecutionRefs(t *testing.T) {
 	run := createFinishedRun(t, rootEvent, models.CanvasRunResultPassed)
 	execution := createRunExecution(t, run, rootEvent.ID, "node-1", models.CanvasNodeExecutionResultPassed)
 
-	response, err := ListRuns(context.Background(), r.Registry, canvas.ID, 0, nil)
+	response, err := ListRuns(context.Background(), r.Registry, canvas.ID, 0, nil, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.Len(t, response.Runs, 1)
@@ -60,10 +60,93 @@ func Test__ListRuns__ScopesRunsToCanvas(t *testing.T) {
 	runOne := createFinishedRun(t, rootEventOne, models.CanvasRunResultPassed)
 	createFinishedRun(t, rootEventTwo, models.CanvasRunResultPassed)
 
-	response, err := ListRuns(context.Background(), r.Registry, canvasOne.ID, 0, nil)
+	response, err := ListRuns(context.Background(), r.Registry, canvasOne.ID, 0, nil, nil, nil)
 	require.NoError(t, err)
 	require.Len(t, response.Runs, 1)
 	assert.Equal(t, runOne.ID.String(), response.Runs[0].Id)
+}
+
+func Test__ListRuns__FiltersByStateAndResult(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
+
+	startedRootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	startedRun := createStartedRun(t, startedRootEvent)
+
+	failedRootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	failedRun := createFinishedRun(t, failedRootEvent, models.CanvasRunResultFailed)
+
+	cancelledRootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	cancelledRun := createFinishedRun(t, cancelledRootEvent, models.CanvasRunResultCancelled)
+
+	passedRootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
+	createFinishedRun(t, passedRootEvent, models.CanvasRunResultPassed)
+
+	response, err := ListRuns(
+		context.Background(),
+		r.Registry,
+		canvas.ID,
+		0,
+		nil,
+		[]pb.CanvasRun_State{pb.CanvasRun_STATE_FINISHED},
+		[]pb.CanvasRun_Result{pb.CanvasRun_RESULT_FAILED, pb.CanvasRun_RESULT_CANCELLED},
+	)
+	require.NoError(t, err)
+	require.Len(t, response.Runs, 2)
+	assert.Equal(t, uint32(2), response.TotalCount)
+	assert.ElementsMatch(t, []string{failedRun.ID.String(), cancelledRun.ID.String()}, []string{response.Runs[0].Id, response.Runs[1].Id})
+
+	response, err = ListRuns(
+		context.Background(),
+		r.Registry,
+		canvas.ID,
+		0,
+		nil,
+		[]pb.CanvasRun_State{pb.CanvasRun_STATE_STARTED},
+		nil,
+	)
+	require.NoError(t, err)
+	require.Len(t, response.Runs, 1)
+	assert.Equal(t, startedRun.ID.String(), response.Runs[0].Id)
+	assert.Equal(t, uint32(1), response.TotalCount)
+}
+
+func Test__ListRuns__RejectsUnknownFilterValues(t *testing.T) {
+	r := support.Setup(t)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
+
+	_, err := ListRuns(
+		context.Background(),
+		r.Registry,
+		canvas.ID,
+		0,
+		nil,
+		[]pb.CanvasRun_State{pb.CanvasRun_STATE_UNKNOWN},
+		nil,
+	)
+	require.Error(t, err)
+
+	_, err = ListRuns(
+		context.Background(),
+		r.Registry,
+		canvas.ID,
+		0,
+		nil,
+		nil,
+		[]pb.CanvasRun_Result{pb.CanvasRun_RESULT_UNKNOWN},
+	)
+	require.Error(t, err)
+}
+
+func createStartedRun(t *testing.T, rootEvent *models.CanvasEvent) *models.CanvasRun {
+	var run *models.CanvasRun
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		run, err = models.FindOrCreateCanvasRunForRootEventInTransaction(tx, rootEvent)
+		return err
+	}))
+
+	return run
 }
 
 func createFinishedRun(t *testing.T, rootEvent *models.CanvasEvent, result string) *models.CanvasRun {

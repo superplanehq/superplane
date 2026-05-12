@@ -942,6 +942,8 @@ message ListRunsRequest {
   string canvas_id = 1;
   uint32 limit = 2;
   google.protobuf.Timestamp before = 3;
+  repeated CanvasRun.State states = 4;
+  repeated CanvasRun.Result results = 5;
 }
 
 message ListRunsResponse {
