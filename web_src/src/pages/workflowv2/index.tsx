@@ -32,7 +32,7 @@ import type {
   SuperplaneMeUser,
   TriggersTrigger,
 } from "@/api-client";
-import { canvasesApplyCanvasVersionChangeset, canvasesEmitNodeEvent, canvasesUpdateNodePause } from "@/api-client";
+import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { Button } from "@/components/ui/button";
@@ -4050,37 +4050,6 @@ export function WorkflowPageV2() {
     [canvas, organizationId, canvasId, handleSaveWorkflow, isReadOnly, applyLocalWorkflowUpdate],
   );
 
-  const handleEmitNodeEvent = useCallback(
-    async (nodeId: string, channel: string, data: any) => {
-      if (!canvasId) return;
-
-      try {
-        await canvasesEmitNodeEvent(
-          withOrganizationHeader({
-            path: {
-              canvasId: canvasId,
-              nodeId: nodeId,
-            },
-            body: {
-              channel,
-              data,
-            },
-          }),
-        );
-
-        const node = canvasNodesById.get(nodeId);
-        if (node && organizationId) {
-          const { nodeType, integration } = getNodeAnalyticsProps(node, availableIntegrations);
-          analytics.eventEmit(nodeType, integration, organizationId);
-        }
-      } catch (error) {
-        showErrorToast("Failed to emit event");
-        throw error;
-      }
-    },
-    [canvasId, canvasNodesById, availableIntegrations, organizationId],
-  );
-
   const handleTogglePause = useCallback(
     async (nodeId: string) => {
       if (!canvasId || !organizationId || !canvas) return;
@@ -4137,13 +4106,30 @@ export function WorkflowPageV2() {
 
   const handleReEmit = useCallback(
     async (nodeId: string, eventOrExecutionId: string) => {
-      const nodeEvents = visibleNodeEventsMap[nodeId];
-      if (!nodeEvents) return;
-      const eventToReemit = nodeEvents.find((event) => event.id === eventOrExecutionId);
-      if (!eventToReemit) return;
-      handleEmitNodeEvent(nodeId, eventToReemit.channel || "", eventToReemit.data);
+      if (!canvasId) return;
+
+      try {
+        await canvasesReemitTriggerEvent(
+          withOrganizationHeader({
+            path: {
+              canvasId,
+              nodeId,
+              eventId: eventOrExecutionId,
+            },
+          }),
+        );
+
+        const node = canvasNodesById.get(nodeId);
+        if (node && organizationId) {
+          const { nodeType, integration } = getNodeAnalyticsProps(node, availableIntegrations);
+          analytics.eventEmit(nodeType, integration, organizationId);
+        }
+      } catch (error) {
+        showErrorToast("Failed to re-emit event");
+        throw error;
+      }
     },
-    [handleEmitNodeEvent, visibleNodeEventsMap],
+    [canvasId, canvasNodesById, availableIntegrations, organizationId],
   );
 
   const handleNodeDuplicate = useCallback(

@@ -270,7 +270,7 @@ func (s *CanvasService) ListNodeEvents(ctx context.Context, req *pb.ListNodeEven
 	return canvases.ListNodeEvents(ctx, s.registry, canvasID, req.NodeId, req.Limit, req.Before)
 }
 
-func (s *CanvasService) EmitNodeEvent(ctx context.Context, req *pb.EmitNodeEventRequest) (*pb.EmitNodeEventResponse, error) {
+func (s *CanvasService) ReemitTriggerEvent(ctx context.Context, req *pb.ReemitTriggerEventRequest) (*pb.ReemitTriggerEventResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 
 	canvasID, err := uuid.Parse(req.CanvasId)
@@ -282,17 +282,17 @@ func (s *CanvasService) EmitNodeEvent(ctx context.Context, req *pb.EmitNodeEvent
 		return nil, status.Error(codes.InvalidArgument, "node_id is required")
 	}
 
-	if req.Channel == "" {
-		return nil, status.Error(codes.InvalidArgument, "channel is required")
+	eventID, err := uuid.Parse(req.EventId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid event_id")
 	}
 
-	return canvases.EmitNodeEvent(
+	return canvases.ReemitTriggerEvent(
 		ctx,
 		uuid.MustParse(organizationID),
 		canvasID,
 		req.NodeId,
-		req.Channel,
-		req.Data.AsMap(),
+		eventID,
 	)
 }
 
