@@ -39,7 +39,7 @@ func (c *Client) CreateSession(ctx context.Context) (*Session, error) {
 		"agent": c.agentID,
 	}
 	if c.envID != "" {
-		body["environment"] = c.envID
+		body["environment_id"] = c.envID
 	}
 
 	resp, err := c.do(ctx, "POST", "/sessions", body)
