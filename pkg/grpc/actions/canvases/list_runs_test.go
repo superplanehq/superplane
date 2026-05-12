@@ -66,7 +66,7 @@ func Test__ListRuns__ScopesRunsToCanvas(t *testing.T) {
 	assert.Equal(t, runOne.ID.String(), response.Runs[0].Id)
 }
 
-func Test__ListRuns__FiltersByStateAndResult(t *testing.T) {
+func Test__ListRuns__FiltersByStateOrResult(t *testing.T) {
 	r := support.Setup(t)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}}, []models.Edge{})
 
@@ -80,22 +80,45 @@ func Test__ListRuns__FiltersByStateAndResult(t *testing.T) {
 	cancelledRun := createFinishedRun(t, cancelledRootEvent, models.CanvasRunResultCancelled)
 
 	passedRootEvent := support.EmitCanvasEventForNode(t, canvas.ID, "trigger", "default", nil)
-	createFinishedRun(t, passedRootEvent, models.CanvasRunResultPassed)
+	passedRun := createFinishedRun(t, passedRootEvent, models.CanvasRunResultPassed)
 
+	// State + result filters are combined with OR so the status filter UI can ask for
+	// "running OR passed" in a single request.
 	response, err := ListRuns(
 		context.Background(),
 		r.Registry,
 		canvas.ID,
 		0,
 		nil,
-		[]pb.CanvasRun_State{pb.CanvasRun_STATE_FINISHED},
-		[]pb.CanvasRun_Result{pb.CanvasRun_RESULT_FAILED, pb.CanvasRun_RESULT_CANCELLED},
+		[]pb.CanvasRun_State{pb.CanvasRun_STATE_STARTED},
+		[]pb.CanvasRun_Result{pb.CanvasRun_RESULT_PASSED},
 	)
 	require.NoError(t, err)
 	require.Len(t, response.Runs, 2)
 	assert.Equal(t, uint32(2), response.TotalCount)
-	assert.ElementsMatch(t, []string{failedRun.ID.String(), cancelledRun.ID.String()}, []string{response.Runs[0].Id, response.Runs[1].Id})
+	assert.ElementsMatch(t,
+		[]string{startedRun.ID.String(), passedRun.ID.String()},
+		[]string{response.Runs[0].Id, response.Runs[1].Id},
+	)
 
+	// Result-only filter still narrows to the requested results.
+	response, err = ListRuns(
+		context.Background(),
+		r.Registry,
+		canvas.ID,
+		0,
+		nil,
+		nil,
+		[]pb.CanvasRun_Result{pb.CanvasRun_RESULT_FAILED, pb.CanvasRun_RESULT_CANCELLED},
+	)
+	require.NoError(t, err)
+	require.Len(t, response.Runs, 2)
+	assert.ElementsMatch(t,
+		[]string{failedRun.ID.String(), cancelledRun.ID.String()},
+		[]string{response.Runs[0].Id, response.Runs[1].Id},
+	)
+
+	// State-only filter narrows to running runs.
 	response, err = ListRuns(
 		context.Background(),
 		r.Registry,
