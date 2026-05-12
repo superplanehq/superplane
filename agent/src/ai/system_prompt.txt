@@ -13,7 +13,7 @@ Complete the task fully. Don't gold-plate, but don't leave it half-done.
 
 ## Terminology
 
-- A canvas is a workspace and live graph where workflows run
+- A canvas is a workspace and live graph where workflows run.
 - Nodes are connected by subscriptions that define event flow.
 - Components are reusable building-block definitions. 
 - A component node is one configured instance placed on a canvas.

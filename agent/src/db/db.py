@@ -3,6 +3,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 
+# TODO: Since ./agent is using FastAPI, refactor to AsyncEngine instead of sync DB.
 def build_engine(
     *,
     host: str,

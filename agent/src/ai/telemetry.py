@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 
+import sentry_sdk
 from opentelemetry import metrics
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -11,6 +12,7 @@ from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import set_tracer_provider
+from pydantic_ai import Agent
 
 from ai.config import config
 
@@ -31,7 +33,6 @@ def init_telemetry() -> None:
         return
 
     try:
-        from pydantic_ai import Agent
 
         _tracer_provider = TracerProvider()
         _tracer_provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
@@ -77,7 +78,6 @@ def init_sentry() -> None:
         return
 
     try:
-        import sentry_sdk
 
         sentry_sdk.init(
             dsn=config.sentry_dsn,
@@ -96,7 +96,6 @@ def shutdown_sentry() -> None:
         return
 
     try:
-        import sentry_sdk
 
         sentry_sdk.flush(timeout=2)
     except Exception:
