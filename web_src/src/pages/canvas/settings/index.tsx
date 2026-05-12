@@ -94,6 +94,8 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
       <div className="min-h-0 flex-1 overflow-auto">
         <SettingsView
           initialValues={initialValues}
+          canvasId={resolvedCanvasId}
+          canvasName={canvasName}
           canUpdateCanvas={canUpdateCanvas}
           orgChangeManagementEnabled={isOrgChangeManagementEnabled}
           isSaving={updateCanvasMutation.isPending}

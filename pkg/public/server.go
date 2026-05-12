@@ -34,6 +34,7 @@ import (
 	nooptrace "go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/gitserver"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
@@ -1305,4 +1306,54 @@ func getBaseURL() string {
 		baseURL = fmt.Sprintf("http://localhost:%s", port)
 	}
 	return baseURL
+}
+
+// RegisterGitServer sets up the internal git HTTP server for repo-backed projects.
+func (s *Server) RegisterGitServer(reposDir string) error {
+	gitServer, err := gitserver.NewServer(reposDir)
+	if err != nil {
+		return err
+	}
+
+	// Auth: validate the Basic auth password as an API token
+	var lastValidToken string
+	gitServer.AuthFunc = func(token string) error {
+		hashedToken := crypto.HashToken(token)
+		_, err := models.FindActiveUserByTokenHash(hashedToken)
+		if err == nil {
+			lastValidToken = token
+		}
+		return err
+	}
+
+	// Registry maps slugs to canvas IDs
+	registry := gitserver.NewRegistry(reposDir)
+
+	// Use API sync handler that calls REST endpoints
+	baseURL := "http://localhost:" + os.Getenv("PUBLIC_API_PORT")
+	if baseURL == "http://localhost:" {
+		baseURL = "http://localhost:8000"
+	}
+
+	syncHandler := gitserver.APISyncHandler(baseURL, func() string {
+		return lastValidToken
+	}, registry.Resolve)
+
+	gitServer.OnPush = syncHandler.HandlePush
+
+	// Register reverse sync (UI edits → git commit)
+	reverseToken := os.Getenv("GIT_SYNC_TOKEN")
+	reverseSync := gitserver.NewReverseSync(gitServer, registry, baseURL, func() string {
+		if reverseToken != "" {
+			return reverseToken
+		}
+		return lastValidToken
+	})
+	gitserver.RegisterPostPublishHook(reverseSync.OnCanvasPublished)
+
+	// Register routes on the main router
+	gitServer.RegisterRoutes(s.Router)
+	gitServer.RegisterBootstrapRoute(s.Router, s.BaseURL, registry)
+	log.Infof("Git server enabled, repos at %s", reposDir)
+	return nil
 }

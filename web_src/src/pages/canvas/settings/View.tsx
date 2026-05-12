@@ -6,10 +6,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { normalizeApprovers, validateApproverConfig } from "./approverUtils";
 import { ChangeManagementFieldset } from "./ChangeManagementFieldset";
 import { IdentityFields } from "./IdentityFields";
+import { RepositoryInfo } from "./RepositoryInfo";
 import type { ChangeRequestApproverType, SettingsApprover, SettingsViewProps } from "./types";
 
 export function SettingsView({
   initialValues,
+  canvasId,
+  canvasName,
   canUpdateCanvas,
   orgChangeManagementEnabled,
   isSaving,
@@ -174,6 +177,13 @@ export function SettingsView({
           onDescriptionChange={setDescription}
           canUpdateCanvas={canUpdateCanvas}
         />
+        {canvasId && canvasName ? (
+          <RepositoryInfo
+            canvasId={canvasId}
+            canvasName={canvasName}
+            baseUrl={window.location.origin}
+          />
+        ) : null}
         {isChangeManagementSettingsEnabled() ? (
           <ChangeManagementFieldset
             isChangeManagementEnforcedByOrganization={isChangeManagementEnforcedByOrganization}

@@ -35,6 +35,8 @@ export type SettingsSavePayload = {
 
 export interface SettingsViewProps {
   initialValues: SettingsValues;
+  canvasId?: string;
+  canvasName?: string;
   canUpdateCanvas: boolean;
   orgChangeManagementEnabled?: boolean;
   isSaving: boolean;

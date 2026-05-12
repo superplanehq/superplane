@@ -307,6 +307,17 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 		server.RegisterOpenAPIHandler()
 	}
 
+	// Register git server for repo-backed projects (before web routes to avoid catch-all)
+	if os.Getenv("ENABLE_GIT_SERVER") == "yes" {
+		gitReposDir := os.Getenv("GIT_REPOS_DIR")
+		if gitReposDir == "" {
+			gitReposDir = "/data/repos"
+		}
+		if err := server.RegisterGitServer(gitReposDir); err != nil {
+			log.Errorf("Failed to start git server: %v", err)
+		}
+	}
+
 	// Register web routes only if START_WEB_SERVER is set to "yes"
 	if os.Getenv("START_WEB_SERVER") == "yes" {
 		webBasePath := os.Getenv("WEB_BASE_PATH")

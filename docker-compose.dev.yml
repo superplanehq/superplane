@@ -35,6 +35,9 @@ services:
       START_CONSUMERS: "yes"
       PUBLIC_API_BASE_PATH: /api/v1
       START_WEB_SERVER: "yes"
+      ENABLE_GIT_SERVER: "yes"
+      GIT_REPOS_DIR: "/data/repos"
+      GIT_SYNC_TOKEN: "EeVhQCCYr-q23hFvcetSf7NAe5RnZ2-L9C0phosD8mX9FrOUssSiZYhSmIWczE9ezWlsFH0JOSWD8KmiMASt0w=="
       PUBLIC_API_PORT: ${PUBLIC_API_PORT:-8000}
       INTERNAL_API_PORT: ${INTERNAL_API_PORT:-50051}
       GRPC_SERVER_ADDR: ${GRPC_SERVER_ADDR:-127.0.0.1:${INTERNAL_API_PORT:-50051}}
@@ -110,6 +113,7 @@ services:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
+      - git-repos:/data/repos
 
   agent:
     build:
@@ -218,6 +222,9 @@ services:
 
 volumes:
   repo-data:
+    driver: local
+
+  git-repos:
     driver: local
 
   go-pkg-cache:
