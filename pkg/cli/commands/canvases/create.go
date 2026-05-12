@@ -135,7 +135,14 @@ func validateAndPrintCreateResponse(
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, err := fmt.Fprintf(stdout, "Canvas %q created (ID: %s)\n", canvas.Metadata.GetName(), canvas.Metadata.GetId())
+		if _, err := fmt.Fprintf(stdout, "Canvas %q created (ID: %s)\n", canvas.Metadata.GetName(), canvas.Metadata.GetId()); err != nil {
+			return err
+		}
+		orgID, err := core.ResolveOrganizationID(ctx)
+		if err != nil {
+			return nil
+		}
+		_, err = fmt.Fprintf(stdout, "URL: https://app.superplane.com/%s/canvases/%s\n", orgID, canvas.Metadata.GetId())
 		return err
 	})
 }
