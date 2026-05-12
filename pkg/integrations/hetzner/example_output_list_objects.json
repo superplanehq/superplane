@@ -1,0 +1,19 @@
+{
+  "bucket": "my-artifacts",
+  "prefix": "releases/",
+  "objects": [
+    {
+      "key": "releases/v1.2.3/app.tar.gz",
+      "size": 4096000,
+      "lastModified": "2024-03-15T10:30:00.000Z",
+      "etag": "\"d41d8cd98f00b204e9800998ecf8427e\""
+    },
+    {
+      "key": "releases/v1.2.2/app.tar.gz",
+      "size": 3921000,
+      "lastModified": "2024-03-01T08:15:00.000Z",
+      "etag": "\"5d41402abc4b2a76b9719d911017c592\""
+    }
+  ],
+  "count": 2
+}
