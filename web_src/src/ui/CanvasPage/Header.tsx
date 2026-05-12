@@ -9,7 +9,7 @@ import { Button } from "../button";
 import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
 
-type HeaderMode = "default" | "version-live" | "version-edit";
+type HeaderMode = "default" | "version-live" | "version-edit" | "runs";
 
 interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). */
@@ -33,6 +33,8 @@ interface HeaderProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
+  onSelectRuns?: () => void;
+  runsNotificationCount?: number;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
   publishVersionLabel?: string;
   /** When true, shows the Discard control next to Publish in version edit mode (draft differs from live). */
@@ -111,8 +113,9 @@ function PageHeader({
 }
 
 function SecondaryHeader(props: HeaderProps) {
-  const showCanvasViewModeToggle = props.mode === "version-live" || props.mode === "version-edit";
-  const canvasViewMode = props.mode === "version-edit" ? "version-edit" : "version-live";
+  const showCanvasViewModeToggle =
+    props.mode === "version-live" || props.mode === "version-edit" || props.mode === "runs";
+  const canvasViewMode = props.mode === "version-edit" || props.mode === "runs" ? props.mode : "version-live";
 
   return (
     <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
@@ -125,6 +128,8 @@ function SecondaryHeader(props: HeaderProps) {
               mode={canvasViewMode}
               onSelectEditor={props.onEnterEditMode}
               onSelectLive={props.onExitEditMode}
+              onSelectRuns={props.onSelectRuns}
+              runsNotificationCount={props.runsNotificationCount}
             />
           ) : null}
         </div>

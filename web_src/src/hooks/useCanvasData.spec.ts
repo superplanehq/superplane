@@ -4,8 +4,9 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { canvasFoldersUpdateCanvasFolder } = vi.hoisted(() => ({
+const { canvasFoldersUpdateCanvasFolder, canvasesListRuns } = vi.hoisted(() => ({
   canvasFoldersUpdateCanvasFolder: vi.fn(),
+  canvasesListRuns: vi.fn(),
 }));
 
 vi.mock("../api-client/sdk.gen", async (importOriginal) => {
@@ -13,10 +14,11 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
   return {
     ...(actual as Record<string, unknown>),
     canvasFoldersUpdateCanvasFolder,
+    canvasesListRuns,
   };
 });
 
-import { canvasKeys, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
+import { canvasKeys, useInfiniteCanvasRuns, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
 
 type TestCanvasFolder = {
   metadata?: { id?: string };
@@ -48,6 +50,93 @@ describe("canvasKeys.nodeExecution", () => {
     });
 
     expect(queryClient.getQueryState(cachedKey)?.isInvalidated).toBe(true);
+  });
+});
+
+describe("useInfiniteCanvasRuns", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("fetches runs and paginates with the previous page last timestamp", async () => {
+    const queryClient = createQueryClient();
+    canvasesListRuns
+      .mockResolvedValueOnce({
+        data: {
+          runs: [{ id: "run-1", state: "STATE_FINISHED", result: "RESULT_PASSED" }],
+          totalCount: 2,
+          hasNextPage: true,
+          lastTimestamp: "2026-05-01T00:00:00Z",
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          runs: [{ id: "run-2", state: "STATE_STARTED" }],
+          totalCount: 2,
+          hasNextPage: false,
+          lastTimestamp: "2026-04-30T00:00:00Z",
+        },
+      });
+
+    const { result } = renderHook(() => useInfiniteCanvasRuns("canvas-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await waitFor(() => {
+      expect(result.current.data?.pages[0]?.runs?.[0]?.id).toBe("run-1");
+    });
+
+    await result.current.fetchNextPage();
+
+    expect(canvasesListRuns).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        path: { canvasId: "canvas-1" },
+        query: { limit: 25 },
+      }),
+    );
+    expect(canvasesListRuns).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        path: { canvasId: "canvas-1" },
+        query: { limit: 25, before: "2026-05-01T00:00:00Z" },
+      }),
+    );
+  });
+
+  it("passes run filters to the list runs request", async () => {
+    const queryClient = createQueryClient();
+    canvasesListRuns.mockResolvedValueOnce({
+      data: {
+        runs: [],
+        totalCount: 0,
+        hasNextPage: false,
+      },
+    });
+
+    renderHook(
+      () =>
+        useInfiniteCanvasRuns("canvas-1", {
+          states: ["STATE_FINISHED"],
+          results: ["RESULT_FAILED", "RESULT_CANCELLED"],
+        }),
+      {
+        wrapper: createWrapper(queryClient),
+      },
+    );
+
+    await waitFor(() => {
+      expect(canvasesListRuns).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: { canvasId: "canvas-1" },
+          query: {
+            limit: 25,
+            states: ["STATE_FINISHED"],
+            results: ["RESULT_FAILED", "RESULT_CANCELLED"],
+          },
+        }),
+      );
+    });
   });
 });
 

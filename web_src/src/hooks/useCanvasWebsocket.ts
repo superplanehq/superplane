@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
 import useWebSocket from "react-use-websocket";
 import { useQueryClient } from "@tanstack/react-query";
-import type { CanvasesCanvasNodeExecution, CanvasesCanvasEvent, CanvasesCanvasNodeQueueItem } from "@/api-client";
+import type {
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasEvent,
+  CanvasesCanvasNodeQueueItem,
+  CanvasesCanvasRun,
+} from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { canvasKeys } from "./useCanvasData";
 
@@ -18,6 +23,7 @@ type WebsocketPayload =
   | CanvasesCanvasNodeExecution
   | CanvasesCanvasEvent
   | CanvasesCanvasNodeQueueItem
+  | CanvasesCanvasRun
   | CanvasWebsocketPayload;
 
 interface QueuedMessage {
@@ -119,6 +125,18 @@ export function useCanvasWebsocket(
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
           break;
+        case "run_started":
+        case "run_finished": {
+          const run = payload as CanvasesCanvasRun;
+          if (!run.canvasId || run.canvasId !== canvasId) {
+            break;
+          }
+
+          queryClient.invalidateQueries({
+            queryKey: canvasKeys.infiniteRuns(canvasId),
+          });
+          break;
+        }
         case "canvas_updated":
         case "canvas_version_updated":
         case "canvas_deleted": {
