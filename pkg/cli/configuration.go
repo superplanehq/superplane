@@ -307,3 +307,7 @@ func (c *CurrentContext) SetActiveCanvas(canvasID string) error {
 	_, err := UpsertContext(c.context)
 	return err
 }
+
+func (c *CurrentContext) GetURL() string {
+	return c.context.URL
+}
