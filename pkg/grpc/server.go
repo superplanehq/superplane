@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
+	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -65,6 +66,7 @@ func RunServer(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
+	agentService *agents.Service,
 	port int,
 ) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)
@@ -156,7 +158,7 @@ func RunServer(
 	serviceAccountsService := NewServiceAccountsService(authService)
 	pbServiceAccounts.RegisterServiceAccountsServer(grpcServer, serviceAccountsService)
 
-	agentsService := NewAgentsService(authService, jwtSigner)
+	agentsService := NewAgentsService(agentService)
 	pbAgents.RegisterAgentsServer(grpcServer, agentsService)
 
 	reflection.Register(grpcServer)
