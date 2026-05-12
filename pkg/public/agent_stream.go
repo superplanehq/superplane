@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -13,10 +15,13 @@ import (
 func (s *Server) RegisterAgentStreamHandler(agentService *agents.Service) {
 	streamHandler := agents.NewStreamHandler(agentService.Client, agentService.Store)
 
+	log.Println("Registering agent stream handler at /api/v1/agents/chats/{canvas_id}/stream")
+
 	s.Router.HandleFunc("/api/v1/agents/chats/{canvas_id}/stream", func(w http.ResponseWriter, r *http.Request) {
 		// Authenticate via cookie (same as other routes)
 		accountID, err := getAccountIDFromCookie(r, s.jwt)
 		if err != nil {
+			log.WithError(err).Warn("agent stream: cookie auth failed")
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -27,7 +32,8 @@ func (s *Server) RegisterAgentStreamHandler(agentService *agents.Service) {
 			orgID = r.URL.Query().Get("organization_id")
 		}
 		if orgID == "" {
-			http.Error(w, "organization ID required", http.StatusBadRequest)
+			log.Warn("agent stream: missing X-Organization-Id header")
+			http.Error(w, "X-Organization-Id header is required", http.StatusBadRequest)
 			return
 		}
 
