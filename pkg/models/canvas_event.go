@@ -23,12 +23,42 @@ type CanvasEvent struct {
 	CustomName  *string
 	Data        datatypes.JSONType[any]
 	ExecutionID *uuid.UUID
+	RunID       uuid.UUID
 	State       string
 	CreatedAt   *time.Time
 }
 
 func (e *CanvasEvent) TableName() string {
 	return "workflow_events"
+}
+
+func (e *CanvasEvent) BeforeCreate(tx *gorm.DB) error {
+	if e.RunID != uuid.Nil {
+		return nil
+	}
+
+	if e.ExecutionID != nil {
+		var execution CanvasNodeExecution
+		err := tx.
+			Select("run_id").
+			Where("id = ?", *e.ExecutionID).
+			First(&execution).
+			Error
+		if err != nil {
+			return err
+		}
+
+		e.RunID = execution.RunID
+		return nil
+	}
+
+	run, err := CreateCanvasRunInTransaction(tx, e.WorkflowID)
+	if err != nil {
+		return err
+	}
+
+	e.RunID = run.ID
+	return nil
 }
 
 func FindCanvasEvents(ids []string) ([]CanvasEvent, error) {
@@ -310,6 +340,17 @@ func DeleteRootCanvasEventChainsInTransaction(tx *gorm.DB, rootEventIDs []uuid.U
 		return err
 	}
 
+	var runIDs []uuid.UUID
+	err = tx.
+		Model(&CanvasEvent{}).
+		Where("id IN ?", rootEventIDs).
+		Distinct("run_id").
+		Pluck("run_id", &runIDs).
+		Error
+	if err != nil {
+		return err
+	}
+
 	if len(executionIDs) > 0 {
 		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&CanvasNodeRequest{}).Error; err != nil {
 			return err
@@ -328,7 +369,19 @@ func DeleteRootCanvasEventChainsInTransaction(tx *gorm.DB, rootEventIDs []uuid.U
 		}
 	}
 
-	return tx.Where("id IN ?", rootEventIDs).Delete(&CanvasEvent{}).Error
+	if err := tx.Where("root_event_id IN ?", rootEventIDs).Delete(&CanvasNodeQueueItem{}).Error; err != nil {
+		return err
+	}
+
+	if err := tx.Where("id IN ?", rootEventIDs).Delete(&CanvasEvent{}).Error; err != nil {
+		return err
+	}
+
+	if len(runIDs) > 0 {
+		return tx.Where("id IN ?", runIDs).Delete(&CanvasRun{}).Error
+	}
+
+	return nil
 }
 
 func (e *CanvasEvent) Routed() error {
