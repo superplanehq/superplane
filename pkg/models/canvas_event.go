@@ -340,6 +340,17 @@ func DeleteRootCanvasEventChainsInTransaction(tx *gorm.DB, rootEventIDs []uuid.U
 		return err
 	}
 
+	var runIDs []uuid.UUID
+	err = tx.
+		Model(&CanvasEvent{}).
+		Where("id IN ?", rootEventIDs).
+		Distinct("run_id").
+		Pluck("run_id", &runIDs).
+		Error
+	if err != nil {
+		return err
+	}
+
 	if len(executionIDs) > 0 {
 		if err := tx.Where("execution_id IN ?", executionIDs).Delete(&CanvasNodeRequest{}).Error; err != nil {
 			return err
@@ -358,7 +369,15 @@ func DeleteRootCanvasEventChainsInTransaction(tx *gorm.DB, rootEventIDs []uuid.U
 		}
 	}
 
-	return tx.Where("id IN ?", rootEventIDs).Delete(&CanvasEvent{}).Error
+	if err := tx.Where("id IN ?", rootEventIDs).Delete(&CanvasEvent{}).Error; err != nil {
+		return err
+	}
+
+	if len(runIDs) > 0 {
+		return tx.Where("id IN ?", runIDs).Delete(&CanvasRun{}).Error
+	}
+
+	return nil
 }
 
 func (e *CanvasEvent) Routed() error {
