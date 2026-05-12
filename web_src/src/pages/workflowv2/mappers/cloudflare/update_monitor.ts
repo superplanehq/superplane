@@ -8,7 +8,7 @@ import type {
   SubtitleContext,
 } from "../types";
 import { baseMapper, firstOutputData } from "./base";
-import { getCloudflareMonitorDescription, getCloudflareMonitorId } from "./metadata";
+import { getCloudflareMonitorDisplayLabel } from "./metadata";
 
 interface UpdateMonitorConfiguration {
   monitor?: string;
@@ -74,7 +74,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   if (monitorId) {
     metadata.push({
       icon: "activity",
-      label: resolvedMonitorLabel(node.metadata, monitorId),
+      label: getCloudflareMonitorDisplayLabel(node.metadata, monitorId),
     });
   }
 
@@ -87,17 +87,4 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function resolvedMonitorLabel(metadata: unknown, monitorId: string): string {
-  const id = monitorId.trim();
-  if (!id) return "-";
-
-  const resolvedId = getCloudflareMonitorId(metadata);
-  const resolvedDesc = getCloudflareMonitorDescription(metadata);
-  if (resolvedId === id && resolvedDesc) {
-    return resolvedDesc;
-  }
-
-  return id;
 }
