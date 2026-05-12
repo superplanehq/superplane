@@ -12,9 +12,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import {
   buildNodeMap,
   buildRunPresentation,
-  RUN_RESULT_FILTER_OPTIONS,
+  RUN_STATUS_FILTER_OPTIONS,
   RUN_STATUS_META,
-  type RunResultFilter,
+  type RunStatusFilter,
 } from "@/ui/Runs/runPresentation";
 import { RunNodeIcon } from "@/ui/Runs/RunNodeIcon";
 import { Filter, Link as LinkIcon, Loader2, Search, X } from "lucide-react";
@@ -37,10 +37,10 @@ interface RunsSidebarProps {
   workflowNodes?: ComponentsNode[];
   componentIconMap?: Record<string, string>;
   totalCount?: number;
-  onResultFiltersChange?: (filters: RunResultFilter[]) => void;
+  onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
 }
 
-function loadPersistedFilters(): { statuses: Set<RunResultFilter>; triggerIds: Set<string> } {
+function loadPersistedFilters(): { statuses: Set<RunStatusFilter>; triggerIds: Set<string> } {
   if (typeof window === "undefined") return { statuses: new Set(), triggerIds: new Set() };
 
   try {
@@ -48,12 +48,12 @@ function loadPersistedFilters(): { statuses: Set<RunResultFilter>; triggerIds: S
     if (!raw) return { statuses: new Set(), triggerIds: new Set() };
 
     const parsed = JSON.parse(raw) as { statuses?: unknown; triggerIds?: unknown };
-    const validStatuses = new Set<RunResultFilter>(RUN_RESULT_FILTER_OPTIONS.map((option) => option.id));
-    const statuses = new Set<RunResultFilter>(
+    const validStatuses = new Set<RunStatusFilter>(RUN_STATUS_FILTER_OPTIONS.map((option) => option.id));
+    const statuses = new Set<RunStatusFilter>(
       Array.isArray(parsed.statuses)
         ? parsed.statuses.filter(
-            (status: unknown): status is RunResultFilter =>
-              typeof status === "string" && validStatuses.has(status as RunResultFilter),
+            (status: unknown): status is RunStatusFilter =>
+              typeof status === "string" && validStatuses.has(status as RunStatusFilter),
           )
         : [],
     );
@@ -80,7 +80,7 @@ export function RunsSidebar({
   workflowNodes = [],
   componentIconMap = {},
   totalCount,
-  onResultFiltersChange,
+  onStatusFiltersChange,
 }: RunsSidebarProps) {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -92,7 +92,7 @@ export function RunsSidebar({
   const [isResizing, setIsResizing] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedTriggerIds, setSelectedTriggerIds] = useState<Set<string>>(() => loadPersistedFilters().triggerIds);
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<RunResultFilter>>(() => loadPersistedFilters().statuses);
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<RunStatusFilter>>(() => loadPersistedFilters().statuses);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
 
   const nodeMap = useMemo(() => {
@@ -116,7 +116,7 @@ export function RunsSidebar({
   }, [sidebarWidth]);
 
   useEffect(() => {
-    onResultFiltersChange?.(Array.from(selectedStatuses));
+    onStatusFiltersChange?.(Array.from(selectedStatuses));
 
     if (typeof window === "undefined") return;
     try {
@@ -130,7 +130,7 @@ export function RunsSidebar({
     } catch {
       // Filter persistence is optional.
     }
-  }, [selectedStatuses, selectedTriggerIds, onResultFiltersChange]);
+  }, [selectedStatuses, selectedTriggerIds, onStatusFiltersChange]);
 
   useEffect(() => {
     if (triggerOptions.length === 0) return;
@@ -182,7 +182,7 @@ export function RunsSidebar({
     return decoratedRuns.filter(({ run, status, haystack }) => {
       if (query && !haystack.includes(query)) return false;
       if (selectedStatuses.size > 0) {
-        if (status === "running" || status === "unknown" || !selectedStatuses.has(status)) {
+        if (status === "unknown" || !selectedStatuses.has(status)) {
           return false;
         }
       }
@@ -339,7 +339,7 @@ export function RunsSidebar({
               </button>
             </div>
             <div className="py-1">
-              {RUN_RESULT_FILTER_OPTIONS.map((option) => (
+              {RUN_STATUS_FILTER_OPTIONS.map((option) => (
                 <label
                   key={option.id}
                   className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50"

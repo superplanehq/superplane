@@ -169,7 +169,7 @@ function SecondaryHeaderActions({
   exitEditModeDisabledTooltip,
 }: HeaderProps) {
   const showVersionControlTrigger = mode === "version-live" && !!onOpenVersionControl;
-  const showEditButton = (mode === "version-live" || mode === "runs") && !!onEnterEditMode;
+  const showEditButton = mode === "version-live" && !!onEnterEditMode;
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">

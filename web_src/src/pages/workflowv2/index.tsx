@@ -21,6 +21,7 @@ import type {
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
   CanvasesCanvasRunResult,
+  CanvasesCanvasRunState,
   CanvasesCanvasVersion,
   CanvasesListEventExecutionsResponse,
   SuperplaneActionsAction,
@@ -83,7 +84,7 @@ import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import type { RunResultFilter } from "@/ui/Runs/runPresentation";
+import type { RunResultFilter, RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import { RunsSidebar } from "@/ui/RunsSidebar";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
@@ -549,7 +550,7 @@ export function WorkflowPageV2() {
   const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(() => searchParams.get("run"));
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
-  const [runResultFilters, setRunResultFilters] = useState<RunResultFilter[]>([]);
+  const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
   const runApiFilters = useMemo(() => {
     const resultByFilter: Record<RunResultFilter, CanvasesCanvasRunResult> = {
       passed: "RESULT_PASSED",
@@ -557,10 +558,13 @@ export function WorkflowPageV2() {
       cancelled: "RESULT_CANCELLED",
     };
 
-    return {
-      results: runResultFilters.map((filter) => resultByFilter[filter]),
-    };
-  }, [runResultFilters]);
+    const states: CanvasesCanvasRunState[] = runStatusFilters.includes("running") ? ["STATE_STARTED"] : [];
+    const results = runStatusFilters
+      .filter((filter): filter is RunResultFilter => filter !== "running")
+      .map((filter) => resultByFilter[filter]);
+
+    return { states, results };
+  }, [runStatusFilters]);
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, isViewingLiveVersion);
   const runsEventsData = useMemo(() => {
@@ -1916,8 +1920,12 @@ export function WorkflowPageV2() {
     nodes: CanvasNode[];
     edges: CanvasEdge[];
   } | null>(() => {
-    if (!isRunsMode || !selectedRun || !canvas || canvasLoading || triggersLoading || componentsLoading) {
+    if (!isRunsMode || !canvas || canvasLoading || triggersLoading || componentsLoading) {
       return null;
+    }
+
+    if (!selectedRun) {
+      return { nodes: [], edges: [] };
     }
 
     const runNodeIds = new Set<string>();
@@ -5736,7 +5744,7 @@ export function WorkflowPageV2() {
                 workflowNodes={canvasNodes}
                 componentIconMap={componentIconMap}
                 totalCount={runsData.totalCount}
-                onResultFiltersChange={setRunResultFilters}
+                onStatusFiltersChange={setRunStatusFilters}
               />
             ) : null
           }

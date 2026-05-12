@@ -147,15 +147,19 @@ func CountCanvasRuns(workflowID uuid.UUID, filters CanvasRunFilters) (int64, err
 }
 
 func applyCanvasRunFilters(query *gorm.DB, filters CanvasRunFilters) *gorm.DB {
-	if len(filters.States) > 0 {
-		query = query.Where("state IN ?", filters.States)
-	}
+	hasStates := len(filters.States) > 0
+	hasResults := len(filters.Results) > 0
 
-	if len(filters.Results) > 0 {
-		query = query.Where("result IN ?", filters.Results)
+	switch {
+	case hasStates && hasResults:
+		return query.Where("state IN ? OR result IN ?", filters.States, filters.Results)
+	case hasStates:
+		return query.Where("state IN ?", filters.States)
+	case hasResults:
+		return query.Where("result IN ?", filters.Results)
+	default:
+		return query
 	}
-
-	return query
 }
 
 func ListParentExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID) ([]CanvasNodeExecution, error) {

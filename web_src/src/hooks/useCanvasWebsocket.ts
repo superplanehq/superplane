@@ -99,6 +99,10 @@ export function useCanvasWebsocket(
                 queryKey: canvasKeys.infiniteEvents(canvasId),
               });
 
+              queryClient.invalidateQueries({
+                queryKey: canvasKeys.infiniteRuns(canvasId),
+              });
+
               if (execution.rootEvent?.id) {
                 queryClient.invalidateQueries({
                   queryKey: canvasKeys.eventExecution(canvasId, execution.rootEvent.id),

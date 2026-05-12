@@ -6,9 +6,11 @@ import { buildEventInfo } from "@/pages/workflowv2/utils";
 import { AlertTriangle, CheckCircle2, CircleDashed, Clock, MinusCircle, type LucideIcon } from "lucide-react";
 
 export type RunResultFilter = "passed" | "failed" | "cancelled";
-export type RunStatusKey = "running" | RunResultFilter | "unknown";
+export type RunStatusFilter = "running" | RunResultFilter;
+export type RunStatusKey = RunStatusFilter | "unknown";
 
-export const RUN_RESULT_FILTER_OPTIONS: { id: RunResultFilter; label: string; dotClassName: string }[] = [
+export const RUN_STATUS_FILTER_OPTIONS: { id: RunStatusFilter; label: string; dotClassName: string }[] = [
+  { id: "running", label: "Running", dotClassName: "bg-blue-500" },
   { id: "passed", label: "Passed", dotClassName: "bg-emerald-500" },
   { id: "failed", label: "Failed", dotClassName: "bg-red-500" },
   { id: "cancelled", label: "Cancelled", dotClassName: "bg-gray-400" },

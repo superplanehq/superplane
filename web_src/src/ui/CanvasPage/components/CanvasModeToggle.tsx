@@ -25,7 +25,7 @@ export function CanvasModeToggle({
     "h-full border-none px-3 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50";
   const canvasActiveClassName =
     editing || hasDraft
-      ? "bg-amber-50 text-amber-800 shadow-[0_0_0_2px_rgba(251,146,60,0.35)] ring-1 ring-inset ring-amber-200"
+      ? "bg-amber-50 text-amber-800 shadow-none ring-1 ring-inset ring-amber-200"
       : "bg-sky-50 text-sky-700 shadow-none";
 
   return (
