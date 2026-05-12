@@ -12,6 +12,7 @@ import (
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
+	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -261,6 +262,31 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: defaultResourceResolver,
 		},
+		pbCanvasFolders.CanvasFolders_ListCanvasFolders_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "read",
+			DomainType: models.DomainTypeOrganization,
+		},
+		pbCanvasFolders.CanvasFolders_CreateCanvasFolder_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		pbCanvasFolders.CanvasFolders_UpdateCanvasFolder_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		pbCanvasFolders.CanvasFolders_UpdateCanvasFolderPosition_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
+		pbCanvasFolders.CanvasFolders_DeleteCanvasFolder_FullMethodName: {
+			Resource:   "canvases",
+			Action:     "update",
+			DomainType: models.DomainTypeOrganization,
+		},
 		pbCanvases.Canvases_ListNodeExecutions_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "read",
@@ -345,7 +371,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_EmitNodeEvent_FullMethodName: {
+		pbCanvases.Canvases_ReemitTriggerEvent_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "update",
 			DomainType:       models.DomainTypeOrganization,

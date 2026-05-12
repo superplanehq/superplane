@@ -18,7 +18,7 @@ import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CreateCanvasPage } from "./pages/canvas/CreateCanvasPage";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import { TemplatesPage } from "./pages/canvas/TemplatesPage";
-import HomePage from "./pages/home";
+import { HomePage } from "./pages/home";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";

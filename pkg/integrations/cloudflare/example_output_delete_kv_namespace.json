@@ -1,0 +1,11 @@
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "namespace": {
+      "id": "8cc7c421092f456389b23bac8c6b609c"
+    }
+  },
+  "timestamp": "2026-05-07T05:56:34.511115884Z",
+  "type": "cloudflare.kv.namespace.deleted"
+}
