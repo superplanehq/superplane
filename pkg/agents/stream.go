@@ -13,12 +13,13 @@ import (
 
 // StreamHandler handles SSE streaming for agent chats.
 type StreamHandler struct {
-	client *Client
-	store  *Store
+	client  *Client
+	store   *Store
+	baseURL string // SuperPlane API URL for CLI config
 }
 
-func NewStreamHandler(client *Client, store *Store) *StreamHandler {
-	return &StreamHandler{client: client, store: store}
+func NewStreamHandler(client *Client, store *Store, baseURL string) *StreamHandler {
+	return &StreamHandler{client: client, store: store, baseURL: baseURL}
 }
 
 // streamRequest is the POST body from the frontend.
@@ -78,11 +79,12 @@ func (h *StreamHandler) HandleStream(w http.ResponseWriter, r *http.Request, org
 	// Send run_started
 	writeSSE(w, flusher, map[string]any{"type": "run_started", "model": "claude-sonnet-4-6"})
 
-	// Build prompt with canvas context
-	prompt := body.Question
-	if body.AgentContext.Mode == "build" && body.AgentContext.CanvasVersion != "" {
-		prompt = fmt.Sprintf("[Canvas version: %s]\n\n%s", body.AgentContext.CanvasVersion, body.Question)
+	// Build prompt with canvas context and CLI credentials
+	msgCount := 1 // We just stored the current user message
+	if existingMsgs, _ := h.store.ListMessages(session.ID); len(existingMsgs) > 0 {
+		msgCount = len(existingMsgs)
 	}
+	prompt := h.buildPrompt(session, body, canvasID, msgCount)
 
 	// Count existing events before sending (to skip old turns when streaming)
 	existingEvents, _ := h.client.ListEvents(r.Context(), session.AnthropicSessionID, 200)
@@ -229,6 +231,54 @@ func extractText(event Event) string {
 		}
 	}
 	return strings.Join(parts, "")
+}
+
+// buildPrompt constructs the message to send to Anthropic, injecting CLI setup when needed.
+func (h *StreamHandler) buildPrompt(session *ChatSession, body streamRequest, canvasID string, msgCount int) string {
+	var parts []string
+
+	// Inject CLI credentials if token is available and this needs setup
+	if session.APIToken != nil && *session.APIToken != "" {
+		needsSetup := msgCount <= 1 // Only the current user message = first turn
+
+		// Also re-inject if token was recently refreshed
+		tokenRefreshed := session.APITokenExpiresAt != nil &&
+			time.Until(*session.APITokenExpiresAt) > 50*time.Minute // freshly generated = ~1h remaining
+
+		if needsSetup || tokenRefreshed {
+			setup := fmt.Sprintf(`[Agent CLI Setup — run this silently before any SuperPlane commands]
+cat > ~/.superplane.yaml << 'SUPERPLANE_CONFIG_EOF'
+contexts:
+- apiToken: %s
+  organization: %s
+  organizationId: %s
+  url: %s
+currentcontext: %s/%s
+output: text
+SUPERPLANE_CONFIG_EOF`,
+				*session.APIToken,
+				session.OrganizationID,
+				session.OrganizationID,
+				h.baseURL,
+				h.baseURL,
+				session.OrganizationID,
+			)
+			parts = append(parts, setup)
+		}
+	}
+
+	// Add canvas context
+	if canvasID != "" {
+		parts = append(parts, fmt.Sprintf("[Canvas ID: %s]", canvasID))
+	}
+	if body.AgentContext.Mode == "build" && body.AgentContext.CanvasVersion != "" {
+		parts = append(parts, fmt.Sprintf("[Canvas version: %s]", body.AgentContext.CanvasVersion))
+	}
+
+	// Add user question
+	parts = append(parts, body.Question)
+
+	return strings.Join(parts, "\n\n")
 }
 
 func writeSSE(w http.ResponseWriter, flusher http.Flusher, data map[string]any) {

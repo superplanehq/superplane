@@ -10,7 +10,7 @@ import (
 )
 
 func TestStreamHandler_MissingQuestion(t *testing.T) {
-	handler := NewStreamHandler(&Client{}, &Store{})
+	handler := NewStreamHandler(&Client{}, &Store{}, "https://app.superplane.com")
 
 	body := `{"question":"","agent_context":{"enabled":true,"mode":"inspect"}}`
 	req := httptest.NewRequest("POST", "/stream", strings.NewReader(body))
@@ -28,7 +28,7 @@ func TestStreamHandler_MissingQuestion(t *testing.T) {
 }
 
 func TestStreamHandler_InvalidJSON(t *testing.T) {
-	handler := NewStreamHandler(&Client{}, &Store{})
+	handler := NewStreamHandler(&Client{}, &Store{}, "https://app.superplane.com")
 
 	req := httptest.NewRequest("POST", "/stream", strings.NewReader("not json"))
 	req.Header.Set("Content-Type", "application/json")
@@ -42,7 +42,7 @@ func TestStreamHandler_InvalidJSON(t *testing.T) {
 }
 
 func TestStreamHandler_MethodNotAllowed(t *testing.T) {
-	handler := NewStreamHandler(&Client{}, &Store{})
+	handler := NewStreamHandler(&Client{}, &Store{}, "https://app.superplane.com")
 
 	req := httptest.NewRequest("GET", "/stream", nil)
 	w := httptest.NewRecorder()
@@ -150,5 +150,71 @@ func TestStreamRequest_ParsesCorrectly(t *testing.T) {
 	}
 	if req.AgentContext.CanvasVersion != "v123" {
 		t.Errorf("expected canvas_version=v123, got %q", req.AgentContext.CanvasVersion)
+	}
+}
+
+func TestBuildPrompt_WithToken_FirstMessage(t *testing.T) {
+	token := "test-jwt-token"
+	h := NewStreamHandler(&Client{}, &Store{}, "https://app.superplane.com")
+
+	session := &ChatSession{
+		ID:             "sess-1",
+		OrganizationID: "org-123",
+		APIToken:       &token,
+	}
+
+	body := streamRequest{
+		Question: "List canvases",
+		AgentContext: agentContext{Mode: "build", CanvasVersion: "v42"},
+	}
+
+	prompt := h.buildPrompt(session, body, "canvas-456", 1)
+
+	// Should contain CLI setup with token
+	if !strings.Contains(prompt, "test-jwt-token") {
+		t.Error("expected prompt to contain the API token")
+	}
+	if !strings.Contains(prompt, "org-123") {
+		t.Error("expected prompt to contain org ID")
+	}
+	if !strings.Contains(prompt, "https://app.superplane.com") {
+		t.Error("expected prompt to contain base URL")
+	}
+	if !strings.Contains(prompt, "canvas-456") {
+		t.Error("expected prompt to contain canvas ID")
+	}
+	if !strings.Contains(prompt, "v42") {
+		t.Error("expected prompt to contain canvas version")
+	}
+	if !strings.Contains(prompt, "List canvases") {
+		t.Error("expected prompt to contain user question")
+	}
+}
+
+func TestBuildPrompt_WithoutToken(t *testing.T) {
+	h := NewStreamHandler(&Client{}, &Store{}, "https://app.superplane.com")
+
+	session := &ChatSession{
+		ID:             "sess-1",
+		OrganizationID: "org-123",
+	}
+
+	body := streamRequest{
+		Question: "Hello",
+		AgentContext: agentContext{Mode: "inspect"},
+	}
+
+	prompt := h.buildPrompt(session, body, "canvas-456", 1)
+
+	// Should NOT contain CLI setup
+	if strings.Contains(prompt, "superplane.yaml") {
+		t.Error("expected prompt to NOT contain CLI setup when no token")
+	}
+	// Should still contain canvas ID and question
+	if !strings.Contains(prompt, "canvas-456") {
+		t.Error("expected prompt to contain canvas ID")
+	}
+	if !strings.Contains(prompt, "Hello") {
+		t.Error("expected prompt to contain user question")
 	}
 }
