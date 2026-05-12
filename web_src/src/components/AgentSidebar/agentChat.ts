@@ -364,12 +364,23 @@ async function fetchChatStreamResponse({
       canvas_version: canvasVersion,
     },
   };
+  const organizationId = (() => {
+    const pathSegments = window.location.pathname.split("/");
+    if (pathSegments[1] && pathSegments[1] !== "auth" && pathSegments[1] !== "login" && pathSegments[1] !== "register") {
+      return pathSegments[1];
+    }
+    return null;
+  })();
+
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     Accept: "text/event-stream",
   };
   if (token) {
     headers.Authorization = `Bearer ${token}`;
+  }
+  if (organizationId) {
+    headers["x-organization-id"] = organizationId;
   }
   const response = await fetch(url, {
     method: "POST",
