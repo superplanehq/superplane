@@ -73,6 +73,39 @@ type PoolNodeMetadata struct {
 	PoolName string `json:"poolName"`
 }
 
+// WorkerScriptNodeMetadata stores a display label for Worker script integration resources (picker value is script ID).
+type WorkerScriptNodeMetadata struct {
+	ScriptDisplayName string `json:"scriptDisplayName"`
+}
+
+func resolveWorkerScriptMetadata(ctx core.SetupContext, accountID, scriptID string) error {
+	meta := WorkerScriptNodeMetadata{}
+	if strings.Contains(scriptID, "{{") || strings.Contains(accountID, "{{") {
+		meta.ScriptDisplayName = scriptID
+		return ctx.Metadata.Set(meta)
+	}
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+	scripts, err := client.ListWorkerScripts(accountID)
+	if err != nil {
+		return fmt.Errorf("failed to list worker scripts: %w", err)
+	}
+	for _, s := range scripts {
+		if s.ID == scriptID {
+			name := s.Name
+			if name == "" {
+				name = s.ID
+			}
+			meta.ScriptDisplayName = name
+			return ctx.Metadata.Set(meta)
+		}
+	}
+	meta.ScriptDisplayName = scriptID
+	return ctx.Metadata.Set(meta)
+}
+
 func resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error {
 	meta := PoolNodeMetadata{}
 	if strings.Contains(poolID, "{{") || strings.Contains(accountID, "{{") {
@@ -134,6 +167,7 @@ func (c *Cloudflare) Instructions() string {
      - Zone / Workers Routes / Edit
      - Account / Workers KV Storage / Edit
      - Account / Workers Scripts / Edit
+     - Account / Workers / Edit
      - Account / Load Balancing: Monitors and Pools / Edit
      - Zone / Load Balancers / Edit
      - Account / Notifications / Edit
@@ -503,6 +537,39 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 					ID:   fmt.Sprintf("%s/%s", zone.ID, lb.ID),
 				})
 			}
+		}
+		return resources, nil
+
+	case "workerScript":
+		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			accountID = accountIDFromIntegration(ctx.Integration)
+		}
+		if accountID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		scripts, err := client.ListWorkerScripts(accountID)
+		if err != nil {
+			return nil, fmt.Errorf("error listing worker scripts: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(scripts))
+		for _, s := range scripts {
+			name := s.Name
+			if name == "" {
+				name = s.ID
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   s.ID,
+			})
 		}
 		return resources, nil
 

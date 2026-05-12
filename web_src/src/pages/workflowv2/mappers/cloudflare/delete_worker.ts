@@ -6,10 +6,10 @@ import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo, SubtitleConte
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { baseEventSections, getDeleteWorkerExecutionDetails } from "./base";
+import { baseEventSections, getDeleteWorkerExecutionDetails, workerScriptDisplayLabel } from "./base";
 
 interface DeleteWorkerConfiguration {
-  scriptName?: string;
+  workerScript?: string;
   force?: boolean;
 }
 
@@ -42,8 +42,9 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as DeleteWorkerConfiguration;
 
-  if (configuration?.scriptName) {
-    metadata.push({ icon: "trash-2", label: configuration.scriptName });
+  const scriptLabel = workerScriptDisplayLabel(node, configuration?.workerScript);
+  if (scriptLabel) {
+    metadata.push({ icon: "trash-2", label: scriptLabel });
   }
 
   if (configuration?.force === true) {

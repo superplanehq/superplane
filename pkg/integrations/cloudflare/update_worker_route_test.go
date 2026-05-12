@@ -15,12 +15,25 @@ import (
 func Test__UpdateWorkerRoute__Setup(t *testing.T) {
 	component := &UpdateWorkerRoute{}
 
+	t.Run("missing accountId returns error", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"accountId":    "",
+				"zone":         "z1",
+				"pattern":      "ex.com/*",
+				"workerScript": "w",
+			},
+			Integration: &contexts.IntegrationContext{},
+		}
+		require.ErrorContains(t, component.Setup(ctx), "accountId is required")
+	})
+
 	t.Run("missing zone returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":    "",
-				"pattern": "ex.com/*",
-				"script":  "w",
+				"zone":         "",
+				"pattern":      "ex.com/*",
+				"workerScript": "w",
 			},
 		}
 		require.ErrorContains(t, component.Setup(ctx), "zone is required")
@@ -29,32 +42,48 @@ func Test__UpdateWorkerRoute__Setup(t *testing.T) {
 	t.Run("missing pattern returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":    "z1",
-				"pattern": "",
-				"script":  "w",
+				"zone":         "z1",
+				"pattern":      "",
+				"workerScript": "w",
 			},
 		}
 		require.ErrorContains(t, component.Setup(ctx), "pattern is required")
 	})
 
-	t.Run("missing script returns error", func(t *testing.T) {
+	t.Run("missing workerScript returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":    "z1",
-				"pattern": "ex.com/*",
-				"script":  "",
+				"zone":         "z1",
+				"pattern":      "ex.com/*",
+				"workerScript": "",
 			},
 		}
-		require.ErrorContains(t, component.Setup(ctx), "script is required")
+		require.ErrorContains(t, component.Setup(ctx), "workerScript is required")
 	})
 
 	t.Run("valid create shape passes", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"zone":    "z1",
-				"pattern": "ex.com/*",
-				"script":  "w",
+				"accountId":    "acc1",
+				"zone":         "z1",
+				"pattern":      "ex.com/*",
+				"workerScript": "w",
 			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"success": true,
+							"result": [{"id": "w", "name": "w"}]
+						}`)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "token"},
+			},
+			Metadata: &contexts.MetadataContext{},
 		}
 		require.NoError(t, component.Setup(ctx))
 	})
@@ -82,9 +111,9 @@ func Test__UpdateWorkerRoute__Execute__create(t *testing.T) {
 
 	ctx := core.ExecutionContext{
 		Configuration: map[string]any{
-			"zone":    "zone-id",
-			"pattern": "ex.com/*",
-			"script":  "w",
+			"zone":         "zone-id",
+			"pattern":      "ex.com/*",
+			"workerScript": "w",
 		},
 		HTTP:           httpContext,
 		Integration:    integrationCtx,
@@ -120,10 +149,10 @@ func Test__UpdateWorkerRoute__Execute__update(t *testing.T) {
 
 	ctx := core.ExecutionContext{
 		Configuration: map[string]any{
-			"zone":    "zone-id",
-			"routeId": "route-1",
-			"pattern": "ex.com/api/*",
-			"script":  "w2",
+			"zone":         "zone-id",
+			"routeId":      "route-1",
+			"pattern":      "ex.com/api/*",
+			"workerScript": "w2",
 		},
 		HTTP:           httpContext,
 		Integration:    integrationCtx,
@@ -131,7 +160,7 @@ func Test__UpdateWorkerRoute__Execute__update(t *testing.T) {
 	}
 
 	require.NoError(t, component.Execute(ctx))
-	assert.Equal(t, "cloudflare.workerRoute.updated", execState.Type)
+	assert.Equal(t, "cloudflare.workerRoute.update", execState.Type)
 	require.Len(t, httpContext.Requests, 1)
 	assert.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
 	assert.Contains(t, httpContext.Requests[0].URL.String(), "/zones/zone-id/workers/routes/route-1")

@@ -6,10 +6,10 @@ import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo, SubtitleConte
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { baseEventSections, getWorkerMetadataExecutionDetails } from "./base";
+import { baseEventSections, getWorkerMetadataExecutionDetails, workerScriptDisplayLabel } from "./base";
 
 interface GetWorkerConfiguration {
-  scriptName?: string;
+  workerScript?: string;
 }
 
 export const getWorkerMapper: ComponentBaseMapper = {
@@ -41,8 +41,9 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as GetWorkerConfiguration;
 
-  if (configuration?.scriptName) {
-    metadata.push({ icon: "code", label: configuration.scriptName });
+  const label = workerScriptDisplayLabel(node, configuration?.workerScript);
+  if (label) {
+    metadata.push({ icon: "code", label });
   }
 
   return metadata;
