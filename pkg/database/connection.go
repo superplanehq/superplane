@@ -147,6 +147,7 @@ func TruncateTables() error {
 			installation_metadata,
 			blueprints,
 			workflows,
+			workflow_runs,
 			workflow_nodes,
 			workflow_events,
 			workflow_node_execution_kvs,
