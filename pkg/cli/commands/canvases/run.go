@@ -13,10 +13,10 @@ import (
 )
 
 type runCommand struct {
-	trigger     *string
-	template    *string
-	payloadFile *string
-	replay      *string
+	trigger  *string
+	template *string
+	payload  *string
+	replay   *string
 }
 
 func (c *runCommand) Execute(ctx core.CommandContext) error {
@@ -38,9 +38,9 @@ func (c *runCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("either --template or --replay is required")
 	}
 
-	payloadPath := strings.TrimSpace(ptrVal(c.payloadFile))
-	if replay != "" && payloadPath != "" {
-		return fmt.Errorf("cannot use --payload-file with --replay")
+	payloadArg := strings.TrimSpace(ptrVal(c.payload))
+	if replay != "" && payloadArg != "" {
+		return fmt.Errorf("cannot use --payload with --replay")
 	}
 
 	canvasID, err := findCanvasID(ctx, ctx.API, ctx.Args[0])
@@ -52,7 +52,7 @@ func (c *runCommand) Execute(ctx core.CommandContext) error {
 		return c.executeReplay(ctx, canvasID, trigger, replay)
 	}
 
-	return c.executeManualHook(ctx, canvasID, trigger, templateName, payloadPath)
+	return c.executeManualHook(ctx, canvasID, trigger, templateName, payloadArg)
 }
 
 func (c *runCommand) executeReplay(ctx core.CommandContext, canvasID, triggerNodeID, eventID string) error {
@@ -75,14 +75,14 @@ func (c *runCommand) executeReplay(ctx core.CommandContext, canvasID, triggerNod
 
 func (c *runCommand) executeManualHook(
 	ctx core.CommandContext,
-	canvasID, triggerNodeID, templateName, payloadPath string,
+	canvasID, triggerNodeID, templateName, payloadArg string,
 ) error {
 	parameters := map[string]interface{}{
 		"template": templateName,
 	}
 
-	if payloadPath != "" {
-		payload, err := readJSONObjectFile(payloadPath)
+	if payloadArg != "" {
+		payload, err := parseJSONObjectPayload(payloadArg)
 		if err != nil {
 			return err
 		}
@@ -118,20 +118,53 @@ func (c *runCommand) executeManualHook(
 	})
 }
 
-func readJSONObjectFile(path string) (map[string]interface{}, error) {
+// parseJSONObjectPayload accepts:
+//   - Inline JSON object, e.g. '{"message":"hi"}'
+//   - A path prefixed with @, e.g. '@payload.json' (reads that file)
+//   - Otherwise a filesystem path to a JSON file (same contents rules as @)
+func parseJSONObjectPayload(s string) (map[string]interface{}, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return nil, fmt.Errorf("payload value is empty")
+	}
+
+	if strings.HasPrefix(s, "@") {
+		path := strings.TrimSpace(strings.TrimPrefix(s, "@"))
+		if path == "" {
+			return nil, fmt.Errorf("payload @-path is empty")
+		}
+		return readJSONObjectFromFile(path)
+	}
+
+	if strings.HasPrefix(s, "{") {
+		var decoded interface{}
+		if err := json.Unmarshal([]byte(s), &decoded); err != nil {
+			return nil, fmt.Errorf("parse payload as JSON: %w", err)
+		}
+		obj, ok := decoded.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("payload JSON must be a single object at the top level")
+		}
+		return obj, nil
+	}
+
+	return readJSONObjectFromFile(s)
+}
+
+func readJSONObjectFromFile(path string) (map[string]interface{}, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("read payload file: %w", err)
+		return nil, fmt.Errorf("read payload from file %q: %w", path, err)
 	}
 
 	var decoded interface{}
 	if err := json.Unmarshal(data, &decoded); err != nil {
-		return nil, fmt.Errorf("parse payload file as JSON: %w", err)
+		return nil, fmt.Errorf("parse payload file %q as JSON: %w", path, err)
 	}
 
 	obj, ok := decoded.(map[string]interface{})
 	if !ok {
-		return nil, fmt.Errorf("payload file must contain a JSON object at the top level")
+		return nil, fmt.Errorf("payload file %q must contain a JSON object at the top level", path)
 	}
 
 	return obj, nil

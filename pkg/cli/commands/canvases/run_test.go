@@ -62,18 +62,18 @@ func TestRunCommandRequiresTemplateOrReplay(t *testing.T) {
 	require.Contains(t, err.Error(), "either --template or --replay")
 }
 
-func TestRunCommandRejectsPayloadFileWithReplay(t *testing.T) {
+func TestRunCommandRejectsPayloadWithReplay(t *testing.T) {
 	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
 	ctx.Args = []string{"4e9ae08d-0363-40d2-ba2c-5f6389a418d8"}
 	trigger := "n1"
 	replay := "evt-1"
-	payloadFile := "/tmp/x.json"
+	payload := `{"x":1}`
 	empty := ""
-	cmd := &runCommand{trigger: &trigger, template: &empty, replay: &replay, payloadFile: &payloadFile}
+	cmd := &runCommand{trigger: &trigger, template: &empty, replay: &replay, payload: &payload}
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "cannot use --payload-file with --replay")
+	require.Contains(t, err.Error(), "cannot use --payload with --replay")
 }
 
 func TestRunCommandInvokeManualHook(t *testing.T) {
@@ -106,7 +106,7 @@ func TestRunCommandInvokeManualHook(t *testing.T) {
 	trigger := nodeID
 	template := "Hello World"
 	empty := ""
-	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payloadFile: &empty}
+	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payload: &empty}
 
 	require.NoError(t, cmd.Execute(ctx))
 	require.Contains(t, stdout.String(), "Hello World")
@@ -115,7 +115,7 @@ func TestRunCommandInvokeManualHook(t *testing.T) {
 	})
 }
 
-func TestRunCommandInvokeManualHookWithPayloadFile(t *testing.T) {
+func TestRunCommandInvokeManualHookWithPayloadFromFile(t *testing.T) {
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 	nodeID := "start-node"
 
@@ -150,12 +150,89 @@ func TestRunCommandInvokeManualHookWithPayloadFile(t *testing.T) {
 	trigger := nodeID
 	template := "Hello World"
 	empty := ""
-	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payloadFile: &payloadPath}
+	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payload: &payloadPath}
 
 	require.NoError(t, cmd.Execute(ctx))
 	server.AssertCalls(t, []string{
 		http.MethodPost + " /api/v1/canvases/" + canvasID + "/triggers/" + nodeID + "/hooks/run",
 	})
+}
+
+func TestRunCommandInvokeManualHookWithPayloadAtFile(t *testing.T) {
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+	nodeID := "start-node"
+
+	dir := t.TempDir()
+	payloadPath := filepath.Join(dir, "payload.json")
+	require.NoError(t, os.WriteFile(payloadPath, []byte(`{"message":"at-file"}`), 0o644))
+
+	atPath := "@" + payloadPath
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodPost,
+			path:   "/api/v1/canvases/" + canvasID + "/triggers/" + nodeID + "/hooks/run",
+			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+
+				var envelope map[string]interface{}
+				require.NoError(t, json.Unmarshal(body, &envelope))
+				params := envelope["parameters"].(map[string]interface{})
+				override := params["payload"].(map[string]interface{})
+				require.Equal(t, "at-file", override["message"])
+
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{}`))
+			},
+		},
+	)
+
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{canvasID}
+	trigger := nodeID
+	template := "Hello World"
+	empty := ""
+	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payload: &atPath}
+
+	require.NoError(t, cmd.Execute(ctx))
+}
+
+func TestRunCommandInvokeManualHookWithInlinePayloadJSON(t *testing.T) {
+	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
+	nodeID := "start-node"
+	inline := `{"message":"inline"}`
+
+	server := newAPITestServer(
+		t,
+		requestExpectation{
+			method: http.MethodPost,
+			path:   "/api/v1/canvases/" + canvasID + "/triggers/" + nodeID + "/hooks/run",
+			handle: func(t *testing.T, w http.ResponseWriter, r *http.Request) {
+				body, err := io.ReadAll(r.Body)
+				require.NoError(t, err)
+
+				var envelope map[string]interface{}
+				require.NoError(t, json.Unmarshal(body, &envelope))
+				params := envelope["parameters"].(map[string]interface{})
+				override := params["payload"].(map[string]interface{})
+				require.Equal(t, "inline", override["message"])
+
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{}`))
+			},
+		},
+	)
+
+	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx.Args = []string{canvasID}
+	trigger := nodeID
+	template := "Hello World"
+	empty := ""
+	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payload: &inline}
+
+	require.NoError(t, cmd.Execute(ctx))
 }
 
 func TestRunCommandReemitTriggerEvent(t *testing.T) {
@@ -220,7 +297,7 @@ func TestRunCommandResolveCanvasNameThenInvoke(t *testing.T) {
 	trigger := nodeID
 	template := "Hello World"
 	empty := ""
-	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payloadFile: &empty}
+	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payload: &empty}
 
 	require.NoError(t, cmd.Execute(ctx))
 	server.AssertCalls(t, []string{
@@ -229,7 +306,7 @@ func TestRunCommandResolveCanvasNameThenInvoke(t *testing.T) {
 	})
 }
 
-func TestRunCommandPayloadFileMustBeObject(t *testing.T) {
+func TestRunCommandPayloadFromFileMustBeObject(t *testing.T) {
 	canvasID := "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
 	dir := t.TempDir()
 	payloadPath := filepath.Join(dir, "payload.json")
@@ -240,9 +317,26 @@ func TestRunCommandPayloadFileMustBeObject(t *testing.T) {
 	trigger := "n1"
 	template := "T"
 	emptyReplay := ""
-	cmd := &runCommand{trigger: &trigger, template: &template, payloadFile: &payloadPath, replay: &emptyReplay}
+	cmd := &runCommand{trigger: &trigger, template: &template, payload: &payloadPath, replay: &emptyReplay}
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
 	require.True(t, strings.Contains(err.Error(), "JSON object"), err.Error())
+}
+
+func TestParseJSONObjectPayloadInline(t *testing.T) {
+	obj, err := parseJSONObjectPayload(`  {"a": 1, "b": "x"} `)
+	require.NoError(t, err)
+	require.Equal(t, float64(1), obj["a"])
+	require.Equal(t, "x", obj["b"])
+}
+
+func TestParseJSONObjectPayloadAtFile(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "p.json")
+	require.NoError(t, os.WriteFile(p, []byte(`{"k":"v"}`), 0o644))
+
+	obj, err := parseJSONObjectPayload("@" + p)
+	require.NoError(t, err)
+	require.Equal(t, "v", obj["k"])
 }
