@@ -1,0 +1,15 @@
+{
+    "type": "openrouter.response",
+    "data": {
+        "id": "gen-1234567890",
+        "model": "anthropic/claude-3.5-sonnet",
+        "text": "Hello, world! This is a response from a model via OpenRouter.",
+        "usage": {
+            "prompt_tokens": 10,
+            "completion_tokens": 20,
+            "total_tokens": 30
+        },
+        "reason": "stop"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}
