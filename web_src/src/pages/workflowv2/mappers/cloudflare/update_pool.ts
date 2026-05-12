@@ -2,23 +2,12 @@ import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getStateMap } from "..";
-import type {
-  ComponentBaseContext,
-  ComponentBaseMapper,
-  ExecutionDetailsContext,
-  NodeInfo,
-  OutputPayload,
-  SubtitleContext,
-} from "../types";
+import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo, SubtitleContext } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-<<<<<<< HEAD
 import { baseEventSections, getPoolExecutionDetails } from "./base";
 import { getCloudflarePoolName } from "./metadata";
-=======
-import { baseEventSections } from "./base";
->>>>>>> 401fa587 (feat: add worker components)
 
 interface UpdatePoolConfiguration {
   name?: string;
@@ -42,31 +31,7 @@ export const updatePoolMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const details: Record<string, string> = {};
-
-    if (context.execution.createdAt) {
-      details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
-    }
-
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
-    const pool = result?.pool as Record<string, unknown> | undefined;
-    if (!pool) return details;
-
-    details["Pool ID"] = pool.id != null ? String(pool.id) : "-";
-    details["Name"] = pool.name != null ? String(pool.name) : "-";
-
-    if (pool.description != null) {
-      details["Description"] = String(pool.description);
-    }
-
-    details["Enabled"] = pool.enabled != null ? String(pool.enabled) : "-";
-    details["Minimum Origins"] = pool.minimum_origins != null ? String(pool.minimum_origins) : "-";
-    details["Number of Origins"] = Array.isArray(pool.origins) ? String(pool.origins.length) : "-";
-
-    return details;
-  },
+  getExecutionDetails: getPoolExecutionDetails,
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
@@ -78,16 +43,9 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const configuration = node.configuration as UpdatePoolConfiguration;
 
-<<<<<<< HEAD
   const label = getCloudflarePoolName(node.metadata) || configuration?.name || configuration?.pool;
   if (label) {
     metadata.push({ icon: "network", label });
-=======
-  if (configuration?.name) {
-    metadata.push({ icon: "network", label: configuration.name });
-  } else if (configuration?.pool) {
-    metadata.push({ icon: "network", label: configuration.pool });
->>>>>>> 401fa587 (feat: add worker components)
   }
 
   return metadata;
