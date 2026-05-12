@@ -134,26 +134,31 @@ func (h *StreamHandler) pollAndStream(ctx context.Context, w http.ResponseWriter
 		case <-time.After(2 * time.Second):
 		}
 
-		// Check session status
-		session, err := h.client.GetSession(ctx, sessionID)
-		if err != nil {
-			log.WithError(err).Error("failed to poll session")
-			continue
-		}
-
-		// Get events
+		// Get events first
 		events, err := h.client.ListEvents(ctx, sessionID, 200)
 		if err != nil {
 			log.WithError(err).Error("failed to list events")
 			continue
 		}
 
-		// Stream new events
+		// Stream new events and detect completion from event types
+		sawIdle := false
+		sawFailed := false
 		for _, event := range events.Data {
 			if seenEventIDs[event.ID] {
 				continue
 			}
 			seenEventIDs[event.ID] = true
+
+			// Detect session completion from events themselves
+			if event.Type == "session.status_idle" {
+				sawIdle = true
+				continue
+			}
+			if event.Type == "session.status_failed" {
+				sawFailed = true
+				continue
+			}
 
 			text := h.streamEvent(w, flusher, event)
 			if text != "" {
@@ -161,23 +166,8 @@ func (h *StreamHandler) pollAndStream(ctx context.Context, w http.ResponseWriter
 			}
 		}
 
-		// Check if done
-		if session.Status == "idle" && session.Usage.OutputTokens > 0 {
-			// Final fetch to catch any events that arrived between our list and status check
-			finalEvents, err := h.client.ListEvents(ctx, sessionID, 200)
-			if err == nil {
-				for _, event := range finalEvents.Data {
-					if seenEventIDs[event.ID] {
-						continue
-					}
-					seenEventIDs[event.ID] = true
-					text := h.streamEvent(w, flusher, event)
-					if text != "" {
-						assistantContent += text
-					}
-				}
-			}
-
+		// Only consider done AFTER processing all events in this batch
+		if sawIdle {
 			if assistantContent != "" {
 				writeSSE(w, flusher, map[string]any{"type": "final_answer", "output": assistantContent})
 			}
@@ -186,7 +176,7 @@ func (h *StreamHandler) pollAndStream(ctx context.Context, w http.ResponseWriter
 			return assistantContent
 		}
 
-		if session.Status == "failed" {
+		if sawFailed {
 			writeSSE(w, flusher, map[string]any{"type": "run_failed", "error": "agent session failed"})
 			writeSSE(w, flusher, map[string]any{"type": "done"})
 			return assistantContent
