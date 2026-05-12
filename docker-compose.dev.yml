@@ -113,6 +113,14 @@ services:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
+      # Keep Vite's dependency optimization cache on a Docker-managed volume
+      # rather than on the host bind-mount. Some host filesystems (notably the
+      # 9p mounts used by Docker Desktop on Windows for /mnt/<drive>/ paths)
+      # do not support the atomic rename(2) that Vite uses to commit the
+      # optimized dependencies, causing EACCES failures and 504 responses on
+      # /node_modules/.vite/deps/* in development. This mirrors the existing
+      # go-pkg-cache and uv-cache volumes used for the same reason.
+      - vite-cache:/app/web_src/node_modules/.vite
 
   agent:
     build:
@@ -230,4 +238,7 @@ volumes:
     driver: local
 
   uv-cache:
+    driver: local
+
+  vite-cache:
     driver: local
