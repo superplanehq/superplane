@@ -11,7 +11,7 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("cloudflare", &Cloudflare{})
+	registry.RegisterIntegrationWithWebhookHandler("cloudflare", &Cloudflare{}, &CloudflareWebhookHandler{})
 }
 
 type Cloudflare struct{}
@@ -52,7 +52,14 @@ func accountIDFromIntegration(ctx core.IntegrationContext) string {
 	}
 	metadata := Metadata{}
 	mapstructure.Decode(ctx.GetMetadata(), &metadata)
-	return metadata.AccountID
+	if id := strings.TrimSpace(metadata.AccountID); id != "" {
+		return id
+	}
+	cfg, err := ctx.GetConfig("accountId")
+	if err != nil || len(cfg) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(string(cfg))
 }
 
 func resolveAccountID(specAccountID string, integration core.IntegrationContext) string {
@@ -120,22 +127,30 @@ func (c *Cloudflare) Instructions() string {
    - **Token name**: SuperPlane Integration
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
-	 - Zone / DNS / Edit
+     - Zone / DNS / Edit
+     - Zone / Dynamic Redirect / Edit
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
-	 - Zone / Load Balancers / Edit
-	 - Account / Workers KV Storage / Edit
-     - Account / Load Balancing: Monitor and Pools / Edit
+     - Account / Workers KV Storage / Edit
+     - Account / Load Balancing: Monitors and Pools / Edit
+     - Zone / Load Balancers / Edit
+     - Account / Notifications / Edit
+     - Account / Account Settings / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
+   - **Account Resources**: Include the account containing your load balancers
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
 
-## Account ID (optional)
+## Find your Cloudflare Account ID
 
-The Account ID is required for Load Balancing, Pool, and KV storage components.
+The **Account ID** is required for KV storage, load balancing monitors/pools, and health alert webhooks.
 
-1. On the account overview page, click on the **ellipsis (...)** next to the **Add** button and select **Copy Account ID**
-2. Paste the Account ID below
+1. Open the [Cloudflare dashboard](https://dash.cloudflare.com/)
+2. Select the account that contains your load balancers
+3. In the account home page, copy the **Account ID** from the right sidebar
+4. Paste it into the **Account ID** field below
+
+Make sure this is the same account selected in **Account Resources** when creating the API token.
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.`
 }
@@ -155,7 +170,7 @@ func (c *Cloudflare) Configuration() []configuration.Field {
 			Label:       "Account ID",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Cloudflare account ID.",
+			Description: "Cloudflare account ID. Required for KV storage, load balancing monitors/pools, and alerting webhooks.",
 			Placeholder: "e.g. 01a7362d577a6c3019a474fd6f485823",
 		},
 	}
@@ -169,6 +184,8 @@ func (c *Cloudflare) Actions() []core.Action {
 		&UpdateOriginRule{},
 		&UpdateDNSRecord{},
 		&DeleteDNSRecord{},
+		&CreateMonitor{},
+		&DeleteMonitor{},
 		&DeleteOriginRule{},
 		&CreateKVNamespace{},
 		&PutKVValue{},
@@ -187,7 +204,9 @@ func (c *Cloudflare) Actions() []core.Action {
 }
 
 func (c *Cloudflare) Triggers() []core.Trigger {
-	return []core.Trigger{}
+	return []core.Trigger{
+		&OnLoadBalancingHealthAlert{},
+	}
 }
 
 func (c *Cloudflare) Sync(ctx core.SyncContext) error {
