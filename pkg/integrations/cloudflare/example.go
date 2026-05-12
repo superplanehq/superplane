@@ -13,11 +13,29 @@ var exampleOutputUpdateRedirectRuleBytes []byte
 //go:embed example_output_create_dns_record.json
 var exampleOutputCreateDNSRecordBytes []byte
 
+//go:embed example_output_create_monitor.json
+var exampleOutputCreateMonitorBytes []byte
+
+//go:embed example_output_delete_monitor.json
+var exampleOutputDeleteMonitorBytes []byte
+
+//go:embed example_data_on_load_balancing_health_alert.json
+var exampleDataOnLoadBalancingHealthAlertBytes []byte
+
 var exampleOutputUpdateRedirectRuleOnce sync.Once
 var exampleOutputUpdateRedirectRule map[string]any
 
 var exampleOutputCreateDNSRecordOnce sync.Once
 var exampleOutputCreateDNSRecord map[string]any
+
+var exampleOutputCreateMonitorOnce sync.Once
+var exampleOutputCreateMonitor map[string]any
+
+var exampleOutputDeleteMonitorOnce sync.Once
+var exampleOutputDeleteMonitor map[string]any
+
+var exampleDataOnLoadBalancingHealthAlertOnce sync.Once
+var exampleDataOnLoadBalancingHealthAlert map[string]any
 
 func (c *CreateDNSRecord) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateDNSRecordOnce, exampleOutputCreateDNSRecordBytes, &exampleOutputCreateDNSRecord)
@@ -25,6 +43,18 @@ func (c *CreateDNSRecord) ExampleOutput() map[string]any {
 
 func (c *UpdateRedirectRule) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateRedirectRuleOnce, exampleOutputUpdateRedirectRuleBytes, &exampleOutputUpdateRedirectRule)
+}
+
+func (c *CreateMonitor) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateMonitorOnce, exampleOutputCreateMonitorBytes, &exampleOutputCreateMonitor)
+}
+
+func (c *DeleteMonitor) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteMonitorOnce, exampleOutputDeleteMonitorBytes, &exampleOutputDeleteMonitor)
+}
+
+func (t *OnLoadBalancingHealthAlert) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnLoadBalancingHealthAlertOnce, exampleDataOnLoadBalancingHealthAlertBytes, &exampleDataOnLoadBalancingHealthAlert)
 }
 
 //go:embed example_output_update_dns_record.json
@@ -135,4 +165,44 @@ var exampleOutputDeletePool map[string]any
 
 func (c *DeletePool) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeletePoolOnce, exampleOutputDeletePoolBytes, &exampleOutputDeletePool)
+}
+
+//go:embed example_output_create_load_balancer.json
+var exampleOutputCreateLoadBalancerBytes []byte
+
+var exampleOutputCreateLoadBalancerOnce sync.Once
+var exampleOutputCreateLoadBalancer map[string]any
+
+func (c *CreateLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateLoadBalancerOnce, exampleOutputCreateLoadBalancerBytes, &exampleOutputCreateLoadBalancer)
+}
+
+//go:embed example_output_get_load_balancer.json
+var exampleOutputGetLoadBalancerBytes []byte
+
+var exampleOutputGetLoadBalancerOnce sync.Once
+var exampleOutputGetLoadBalancer map[string]any
+
+func (c *GetLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetLoadBalancerOnce, exampleOutputGetLoadBalancerBytes, &exampleOutputGetLoadBalancer)
+}
+
+//go:embed example_output_update_load_balancer.json
+var exampleOutputUpdateLoadBalancerBytes []byte
+
+var exampleOutputUpdateLoadBalancerOnce sync.Once
+var exampleOutputUpdateLoadBalancer map[string]any
+
+func (c *UpdateLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateLoadBalancerOnce, exampleOutputUpdateLoadBalancerBytes, &exampleOutputUpdateLoadBalancer)
+}
+
+//go:embed example_output_delete_load_balancer.json
+var exampleOutputDeleteLoadBalancerBytes []byte
+
+var exampleOutputDeleteLoadBalancerOnce sync.Once
+var exampleOutputDeleteLoadBalancer map[string]any
+
+func (c *DeleteLoadBalancer) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteLoadBalancerOnce, exampleOutputDeleteLoadBalancerBytes, &exampleOutputDeleteLoadBalancer)
 }

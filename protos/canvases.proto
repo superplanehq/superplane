@@ -295,14 +295,13 @@ service Canvases {
     };
   }
 
-  rpc EmitNodeEvent(EmitNodeEventRequest) returns (EmitNodeEventResponse) {
+  rpc ReemitTriggerEvent(ReemitTriggerEventRequest) returns (ReemitTriggerEventResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/events"
-      body: "*"
+      post: "/api/v1/canvases/{canvas_id}/triggers/{node_id}/events/{event_id}/reemit"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Emit output event for canvas node";
-      description: "Emit output event for canvas node";
+      summary: "Re-emit trigger event";
+      description: "Re-emits an existing root event from a trigger node";
       tags: "CanvasNode";
     };
   }
@@ -757,14 +756,13 @@ message ListNodeEventsResponse {
   google.protobuf.Timestamp last_timestamp = 4;
 }
 
-message EmitNodeEventRequest {
+message ReemitTriggerEventRequest {
   string canvas_id = 1;
   string node_id = 2;
-  string channel = 3;
-  google.protobuf.Struct data = 4;
+  string event_id = 3;
 }
 
-message EmitNodeEventResponse {
+message ReemitTriggerEventResponse {
   string event_id = 1;
 }
 
