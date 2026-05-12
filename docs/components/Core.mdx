@@ -485,6 +485,18 @@ The component emits the response with:
 - **headers**: Response headers
 - **body**: Parsed response body (JSON if possible, otherwise string)
 
+### Payload Size
+
+The serialized event emitted by this component is capped at **64 KiB (65,536 bytes)**, the same limit applied to every event in the graph. The HTTP call itself can return a larger response, but if the resulting event would exceed the limit, the component fails with `event payload too large: <size> bytes (max 65536)`.
+
+When fetching content that may exceed this limit (large diffs, file contents, logs, paginated lists), prefer one of:
+
+- Filter or project the response to the fields downstream nodes actually need.
+- Persist the blob to external storage (S3, GCS, etc.) and emit only the URL or key.
+- Page the request and fan out one event per page, so the work happens in parallel without a single oversized payload.
+
+See [Architecture: Event Size Limits](../contributing/architecture.md#core-event-processing-system) for more on the cap and the surfaces that enforce it.
+
 ### Example Output
 
 ```json
