@@ -116,7 +116,6 @@ func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte,
 
 	req.Header.Set("x-api-key", c.apiKey)
 	req.Header.Set("anthropic-version", "2025-01-01")
-	req.Header.Set("anthropic-beta", "interleaved-thinking-2025-05-14")
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
