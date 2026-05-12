@@ -1,0 +1,12 @@
+{
+  "tunnel": {
+    "id": "f70ff0a7-6f32-4385-8c15-199f8d7a2d0f",
+    "account_tag": "01a7362d577a6c3019a474fd6f485823",
+    "name": "api-staging",
+    "status": "inactive",
+    "config_src": "cloudflare",
+    "created_at": "2026-03-01T12:00:00Z"
+  },
+  "accountId": "01a7362d577a6c3019a474fd6f485823",
+  "tunnelId": "f70ff0a7-6f32-4385-8c15-199f8d7a2d0f"
+}

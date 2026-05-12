@@ -1,0 +1,11 @@
+{
+  "data": {
+    "account_id": "01a7362d577a6c3019a474fd6f485823",
+    "alert_type": "tunnel_health_event",
+    "tunnel_id": "f70ff0a7-6f32-4385-8c15-199f8d7a2d0f",
+    "tunnel_name": "api-staging",
+    "new_status": "Degraded"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.tunnel.healthEvent"
+}
