@@ -84,6 +84,18 @@ func (h *StreamHandler) HandleStream(w http.ResponseWriter, r *http.Request, org
 		prompt = fmt.Sprintf("[Canvas version: %s]\n\n%s", body.AgentContext.CanvasVersion, body.Question)
 	}
 
+	// Count existing events before sending (to skip old turns when streaming)
+	existingEvents, _ := h.client.ListEvents(r.Context(), session.AnthropicSessionID, 200)
+	var skipEventIDs map[string]bool
+	if existingEvents != nil {
+		skipEventIDs = make(map[string]bool, len(existingEvents.Data))
+		for _, ev := range existingEvents.Data {
+			skipEventIDs[ev.ID] = true
+		}
+	} else {
+		skipEventIDs = make(map[string]bool)
+	}
+
 	// Send message to Anthropic
 	if err := h.client.SendMessage(r.Context(), session.AnthropicSessionID, prompt); err != nil {
 		writeSSE(w, flusher, map[string]any{"type": "run_failed", "error": err.Error()})
@@ -95,7 +107,7 @@ func (h *StreamHandler) HandleStream(w http.ResponseWriter, r *http.Request, org
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
 	defer cancel()
 
-	assistantContent := h.pollAndStream(ctx, w, flusher, session.AnthropicSessionID)
+	assistantContent := h.pollAndStream(ctx, w, flusher, session.AnthropicSessionID, skipEventIDs)
 
 	// Store assistant response
 	if assistantContent != "" {
@@ -103,8 +115,12 @@ func (h *StreamHandler) HandleStream(w http.ResponseWriter, r *http.Request, org
 	}
 }
 
-func (h *StreamHandler) pollAndStream(ctx context.Context, w http.ResponseWriter, flusher http.Flusher, sessionID string) string {
+func (h *StreamHandler) pollAndStream(ctx context.Context, w http.ResponseWriter, flusher http.Flusher, sessionID string, skipEventIDs map[string]bool) string {
 	seenEventIDs := make(map[string]bool)
+	// Pre-populate with events from previous turns
+	for id := range skipEventIDs {
+		seenEventIDs[id] = true
+	}
 	var assistantContent string
 
 	for {
