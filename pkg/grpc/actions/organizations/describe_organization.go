@@ -34,7 +34,8 @@ func DescribeOrganization(ctx context.Context, orgID string) (*pb.DescribeOrgani
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
 			},
 			Spec: &pb.Organization_Spec{
-				ChangeManagementEnabled: &organization.ChangeManagementEnabled,
+				ChangeManagementEnabled:     &organization.ChangeManagementEnabled,
+				EnabledExperimentalFeatures: []string(organization.EnabledExperimentalFeatures),
 			},
 		},
 	}
