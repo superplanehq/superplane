@@ -158,3 +158,10 @@ func (lrw *loggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) 
 	}
 	return hijacker.Hijack()
 }
+
+// Implement http.Flusher interface to support SSE streaming
+func (lrw *loggingResponseWriter) Flush() {
+	if flusher, ok := lrw.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
