@@ -98,7 +98,7 @@ describe("getTunnelMapper.getExecutionDetails", () => {
       },
     });
     const details = getTunnelMapper.getExecutionDetails(ctx);
-    expect(details["Tunnel ID"]).toBe("tun123");
+    expect(details["Tunnel ID"]).toBeUndefined();
     expect(details["Name"]).toBe("edge-tunnel");
     expect(details["Status"]).toBe("healthy");
   });

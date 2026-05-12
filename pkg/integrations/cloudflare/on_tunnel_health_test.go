@@ -56,24 +56,75 @@ func Test__OnTunnelHealth__HandleWebhook(t *testing.T) {
 		assert.Equal(t, TunnelHealthEventPayloadType, events.Payloads[0].Type)
 	})
 
-	t.Run("skips when tunnel filter does not match", func(t *testing.T) {
+	t.Run("skips emit when tunnel_id does not match spec tunnel", func(t *testing.T) {
 		events := &contexts.EventContext{}
 		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
-			Body:    []byte(`{"new_status":"Down","tunnel_id":"tun123"}`),
+			Body: []byte(`{
+				"alert_type": "tunnel_health_event",
+				"data": {
+					"new_status": "TUNNEL_STATUS_TYPE_DEGRADED",
+					"tunnel_id": "wrong-id",
+					"tunnel_name": "tunnel-name"
+				}
+			}`),
 			Headers: http.Header{"cf-webhook-auth": []string{"secret123"}},
 			Webhook: &contexts.NodeWebhookContext{
 				Secret: "secret123",
 			},
 			Events: events,
 			Configuration: map[string]any{
-				"tunnel":    "other",
-				"newStatus": []string{"TUNNEL_STATUS_TYPE_DOWN"},
+				"tunnel":    "60d33a5d-1228-47e0-813d-a5297cc0624b",
+				"newStatus": []string{"TUNNEL_STATUS_TYPE_DEGRADED"},
 			},
 		})
 
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 		assert.Len(t, events.Payloads, 0)
+	})
+
+	t.Run("matches tunnel_id case-insensitively", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body: []byte(`{
+				"data": {
+					"new_status": "TUNNEL_STATUS_TYPE_DEGRADED",
+					"tunnel_id": "60D33A5D-1228-47E0-813D-A5297CC0624B"
+				}
+			}`),
+			Headers: http.Header{"cf-webhook-auth": []string{"secret123"}},
+			Webhook: &contexts.NodeWebhookContext{
+				Secret: "secret123",
+			},
+			Events: events,
+			Configuration: map[string]any{
+				"tunnel":    "60d33a5d-1228-47e0-813d-a5297cc0624b",
+				"newStatus": []string{"TUNNEL_STATUS_TYPE_DEGRADED"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Len(t, events.Payloads, 1)
+	})
+
+	t.Run("new_status with suffix still matches", func(t *testing.T) {
+		events := &contexts.EventContext{}
+		code, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
+			Body:    []byte(`{"new_status":"TUNNEL_STATUS_TYPE_DEGRADED (status change)","tunnel_id":"t1"}`),
+			Headers: http.Header{"cf-webhook-auth": []string{"secret123"}},
+			Webhook: &contexts.NodeWebhookContext{
+				Secret: "secret123",
+			},
+			Events: events,
+			Configuration: map[string]any{
+				"newStatus": []string{"TUNNEL_STATUS_TYPE_DEGRADED"},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, http.StatusOK, code)
+		require.Len(t, events.Payloads, 1)
 	})
 }
 

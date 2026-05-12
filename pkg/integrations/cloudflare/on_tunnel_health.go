@@ -52,8 +52,9 @@ func (t *OnTunnelHealth) Documentation() string {
 
 ## Configuration
 
-- **Tunnel**: Optional tunnel filter. Leave empty to receive events for any tunnel on the account.
-- **New status**: Which tunnel status transitions should start a workflow. Values are sent to Cloudflare as ` + "`TUNNEL_STATUS_TYPE_*`" + ` enums; webhook payloads may use human-readable names (for example Down) and SuperPlane still matches your selection.
+- **Tunnel**: Optional. SuperPlane adds this tunnel to the Cloudflare notification policy **and** requires the webhook payload's ` + "`tunnel_id`" + ` to match (case-insensitive), so a mis-scoped or forged request is less likely to start your workflow. Leave **Tunnel** empty to accept any tunnel on the account (policy and webhook checks both allow any tunnel id present in the payload).
+
+> **Note**: Cloudflare's **Send test** notification may include a sample ` + "`tunnel_id`" + ` that does not match your real tunnel. With a tunnel selected, that test delivery will not emit until you clear the tunnel filter or use a payload that matches your tunnel id.
 
 ## Webhook Setup
 
@@ -61,7 +62,7 @@ SuperPlane provisions a Cloudflare Alerting webhook destination and a notificati
 
 ## Workflow execution details
 
-The trigger **Payload** tab (and expressions such as ` + "`$.trigger.data`" + `) contain the fields Cloudflare sends, typically including **tunnel id**, **tunnel name**, **new status**, **account id**, and **alert type**.`
+The trigger **Payload** tab (and expressions such as ` + "`$.trigger.data`" + `) use a merged view of the webhook JSON: fields inside ` + "`data`" + ` are combined with top-level fields (for example ` + "`alert_type`" + `, ` + "`account_id`" + `) so everything is available in one object.`
 }
 
 func (t *OnTunnelHealth) Icon() string {
@@ -79,7 +80,7 @@ func (t *OnTunnelHealth) Configuration() []configuration.Field {
 			Label:       "Tunnel",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Optional tunnel to filter notifications by",
+			Description: "Optional. Scopes the Cloudflare policy and requires matching tunnel_id in the webhook payload (case-insensitive).",
 			Placeholder: "Select a tunnel",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -249,37 +250,68 @@ func (t *OnTunnelHealth) HandleWebhook(ctx core.WebhookRequestContext) (int, *co
 		return http.StatusOK, nil, nil
 	}
 
-	if err := ctx.Events.Emit(TunnelHealthEventPayloadType, tunnelHealthWebhookEventData(payload)); err != nil {
+	if err := ctx.Events.Emit(TunnelHealthEventPayloadType, tunnelHealthEventPayloadForEmit(payload)); err != nil {
 		return http.StatusInternalServerError, nil, err
 	}
 
 	return http.StatusOK, nil, nil
 }
 
-func tunnelHealthWebhookEventData(payload map[string]any) map[string]any {
-	if nested, ok := payload["data"].(map[string]any); ok && nested != nil {
-		return nested
+// tunnelHealthFlattenPayload merges top-level webhook fields with the nested "data" object
+// (inner keys win on collision). Cloudflare tunnel health notifications often put tunnel fields
+// under "data" while alert_type and account_id sit at the top level.
+func tunnelHealthFlattenPayload(payload map[string]any) map[string]any {
+	out := make(map[string]any, len(payload)+16)
+	for k, v := range payload {
+		if k == "data" {
+			continue
+		}
+		out[k] = v
 	}
-	return payload
+	if inner, ok := payload["data"].(map[string]any); ok && inner != nil {
+		for k, v := range inner {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+func tunnelHealthEventPayloadForEmit(payload map[string]any) map[string]any {
+	return tunnelHealthFlattenPayload(payload)
 }
 
 func tunnelHealthPayloadMatchesSpec(spec OnTunnelHealthSpec, payload map[string]any) bool {
-	data := tunnelHealthWebhookEventData(payload)
+	data := tunnelHealthFlattenPayload(payload)
 
 	if spec.Tunnel != "" {
 		tunnelID := strings.TrimSpace(tunnelHealthStringField(data, "tunnel_id", "tunnelId"))
-		if tunnelID != spec.Tunnel {
+		if tunnelID == "" || !strings.EqualFold(tunnelID, spec.Tunnel) {
 			return false
 		}
 	}
 
-	rawStatus := tunnelHealthStringField(data, "new_status", "newStatus", "status")
+	rawStatus := tunnelHealthNormalizeNewStatusRaw(tunnelHealthStringField(data, "new_status", "newStatus", "status"))
 	normalized := tunnelHealthPayloadStatusForMatch(rawStatus)
 	if normalized == "" || !slices.Contains(spec.NewStatus, normalized) {
 		return false
 	}
 
 	return true
+}
+
+func tunnelHealthNormalizeNewStatusRaw(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	// e.g. "TUNNEL_STATUS_TYPE_DEGRADED (status change)"
+	if i := strings.Index(raw, " "); i > 0 {
+		prefix := raw[:i]
+		if strings.HasPrefix(prefix, "TUNNEL_STATUS_TYPE_") {
+			return prefix
+		}
+	}
+	return raw
 }
 
 // tunnelHealthPayloadStatusForMatch maps webhook body status (enum or human-readable) to the same

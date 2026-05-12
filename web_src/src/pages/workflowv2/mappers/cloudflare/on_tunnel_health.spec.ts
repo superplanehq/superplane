@@ -42,6 +42,24 @@ describe("onTunnelHealthTriggerRenderer", () => {
     expect(values.Tunnel).toBe("t1");
   });
 
+  it("getRootEventValues reads alert_type from merged-style payload", () => {
+    const event: EventInfo = {
+      id: "evt-1",
+      createdAt: new Date().toISOString(),
+      nodeId: "node-1",
+      type: "cloudflare.tunnel.healthEvent",
+      data: {
+        alert_type: "tunnel_health_event",
+        new_status: "TUNNEL_STATUS_TYPE_DEGRADED",
+        tunnel_name: "tunnel-name",
+        tunnel_id: "abc",
+      },
+    };
+    const values = onTunnelHealthTriggerRenderer.getRootEventValues({ event });
+    expect(values["Alert Type"]).toBe("tunnel_health_event");
+    expect(values["New Status"]).toBe("Degraded");
+  });
+
   it("getTriggerProps returns metadata from configuration", () => {
     const context: TriggerRendererContext = {
       node: {

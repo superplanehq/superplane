@@ -104,7 +104,6 @@ export function getTunnelExecutionDetails(context: ExecutionDetailsContext): Rec
   const tunnel = result?.tunnel as Record<string, unknown> | undefined;
   if (!tunnel) return details;
 
-  details["Tunnel ID"] = tunnel.id != null ? String(tunnel.id) : "-";
   details["Name"] = tunnel.name != null ? String(tunnel.name) : "-";
   if (tunnel.status != null) {
     details["Status"] = String(tunnel.status);
@@ -241,7 +240,6 @@ export function deleteTunnelExecutionDetails(context: ExecutionDetailsContext): 
   const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
   if (!result) return details;
 
-  details["Tunnel ID"] = result.tunnelId != null ? String(result.tunnelId) : "-";
   details["Deleted"] = result.deleted != null ? String(result.deleted) : "-";
 
   return details;
