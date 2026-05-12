@@ -25,7 +25,9 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("gcp", &GCP{})
+	registry.RegisterIntegrationWithOptions("gcp", &GCP{}, registry.IntegrationRegistrationOptions{
+		SetupProvider: &SetupProvider{},
+	})
 	compute.SetClientFactory(func(ctx core.ExecutionContext) (compute.Client, error) {
 		return gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
 	})
@@ -59,10 +61,11 @@ const (
 )
 
 type Configuration struct {
-	ConnectionMethod          string `json:"connectionMethod" mapstructure:"connectionMethod"`
-	ServiceAccountKey         string `json:"serviceAccountKey" mapstructure:"serviceAccountKey"`
-	WorkloadIdentityProvider  string `json:"workloadIdentityProvider" mapstructure:"workloadIdentityProvider"`
-	WorkloadIdentityProjectID string `json:"workloadIdentityProjectId" mapstructure:"workloadIdentityProjectId"`
+	ConnectionMethod                    string `json:"connectionMethod" mapstructure:"connectionMethod"`
+	ServiceAccountKey                   string `json:"serviceAccountKey" mapstructure:"serviceAccountKey"`
+	WorkloadIdentityProvider            string `json:"workloadIdentityProvider" mapstructure:"workloadIdentityProvider"`
+	WorkloadIdentityProjectID           string `json:"workloadIdentityProjectId" mapstructure:"workloadIdentityProjectId"`
+	WorkloadIdentityServiceAccountEmail string `json:"workloadIdentityServiceAccountEmail" mapstructure:"workloadIdentityServiceAccountEmail"`
 }
 
 func (g *GCP) Name() string {
@@ -92,14 +95,21 @@ func (g *GCP) Instructions() string {
 
 ### Workload Identity Federation (keyless)
 
-1. Create a [Workload Identity Pool](https://cloud.google.com/iam/docs/workload-identity-federation) with an OIDC provider.
-2. Set the **Issuer URL** to this SuperPlane instance's URL.
-3. Set the **Audience** to the pool provider resource name.
-4. Grant the federated identity permission to [impersonate a service account](https://cloud.google.com/iam/docs/workload-identity-federation-with-other-providers#mapping) with the roles your workflows need.
-5. Enter the **pool provider resource name** and **Project ID** below.
+1. Enable the **Security Token Service API**, **IAM Service Account Credentials API**, **Cloud Resource Manager API**, **Service Usage API**, and **Pub/Sub API**.
+2. Create a service account and grant it the IAM roles your workflows need.
+3. Create a [Workload Identity Pool](https://cloud.google.com/iam/docs/workload-identity-federation) with an OIDC provider.
+4. Set the provider attribute mapping to ` + "`google.subject=assertion.sub`" + `.
+5. Set the **Issuer URL** to the public SuperPlane URL that serves ` + "`/.well-known/openid-configuration`" + `.
+6. Set the **Audience** to the pool provider resource name.
+7. Grant ` + "`roles/iam.workloadIdentityUser`" + ` on the service account to this SuperPlane integration's federated principal:
+   ` + "`principal://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/subject/app-installation:INTEGRATION_ID`" + `
+8. Enter the **pool provider resource name**, **Project ID**, and **Service account email** below.
+
+IAM bindings often take a minute or longer to propagate. SuperPlane waits briefly before the first sync after setup for workload identity; if sync fails with a permission error, wait and trigger another sync from the integration settings.
 
 ## Required IAM roles
 
+- ` + "`roles/viewer`" + ` — validate project access and check enabled APIs
 - ` + "`roles/logging.configWriter`" + ` — create logging sinks for event triggers
 - ` + "`roles/pubsub.admin`" + ` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
 - Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management)`
@@ -136,11 +146,11 @@ func (g *GCP) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "workloadIdentityProvider",
-			Label:       "Workload Identity Pool Provider Resource Name",
+			Label:       "Workload Identity pool provider (resource name or URL)",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Full resource name of the OIDC provider. Must match the audience configured in the provider.",
-			Placeholder: "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/my-pool/providers/superplane",
+			Description: "OIDC provider resource name or full IAM URL from Google Cloud Console; must match the audience configured in the provider. SuperPlane normalizes this to //iam.googleapis.com/…",
+			Placeholder: "https://iam.googleapis.com/v1/projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/superplane",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "connectionMethod", Values: []string{ConnectionMethodWIF}},
 			},
@@ -152,6 +162,17 @@ func (g *GCP) Configuration() []configuration.Field {
 			Required:    true,
 			Description: "GCP project ID",
 			Placeholder: "e.g. my-project",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "connectionMethod", Values: []string{ConnectionMethodWIF}},
+			},
+		},
+		{
+			Name:        "workloadIdentityServiceAccountEmail",
+			Label:       "Service Account Email",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "Email of the service account SuperPlane should impersonate with Workload Identity Federation.",
+			Placeholder: "e.g. superplane@my-project.iam.gserviceaccount.com",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "connectionMethod", Values: []string{ConnectionMethodWIF}},
 			},
@@ -190,6 +211,10 @@ func (g *GCP) Triggers() []core.Trigger {
 }
 
 func (g *GCP) Sync(ctx core.SyncContext) error {
+	if !ctx.Integration.LegacySetup() {
+		return g.syncFromSetupProvider(ctx)
+	}
+
 	config := Configuration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
@@ -205,15 +230,86 @@ func (g *GCP) Sync(ctx core.SyncContext) error {
 	}
 }
 
+func (g *GCP) syncFromSetupProvider(ctx core.SyncContext) error {
+	props := ctx.Integration.Properties()
+	connectionMethod, err := props.GetString(PropertyConnectionMethod)
+	if err != nil {
+		return fmt.Errorf("connection method not set: %w", err)
+	}
+
+	switch connectionMethod {
+	case ConnectionMethodServiceAccountKey:
+		return g.syncServiceAccountKeyFromStorage(ctx)
+	case ConnectionMethodWIF:
+		provider, _ := props.GetString(PropertyWIFProvider)
+		projectID, _ := props.GetString(PropertyProjectID)
+		saEmail, _ := props.GetString(PropertyServiceAccountEmail)
+		return g.syncWIF(ctx, Configuration{
+			ConnectionMethod:                    ConnectionMethodWIF,
+			WorkloadIdentityProvider:            provider,
+			WorkloadIdentityProjectID:           projectID,
+			WorkloadIdentityServiceAccountEmail: saEmail,
+		})
+	default:
+		return fmt.Errorf("unknown connection method: %s", connectionMethod)
+	}
+}
+
+func (g *GCP) syncServiceAccountKeyFromStorage(ctx core.SyncContext) error {
+	props := ctx.Integration.Properties()
+	projectID, err := props.GetString(PropertyProjectID)
+	if err != nil {
+		return fmt.Errorf("project ID not found in properties: %w", err)
+	}
+	clientEmail, _ := props.GetString(PropertyClientEmail)
+
+	metadata := gcpcommon.Metadata{
+		ProjectID:   projectID,
+		ClientEmail: clientEmail,
+		AuthMethod:  gcpcommon.AuthMethodServiceAccountKey,
+	}
+	ctx.Integration.SetMetadata(metadata)
+
+	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create GCP client: %w", err)
+	}
+
+	callCtx := context.Background()
+	crmURL := fmt.Sprintf("https://cloudresourcemanager.googleapis.com/v3/projects/%s", projectID)
+	if _, err := client.GetURL(callCtx, crmURL); err != nil {
+		return fmt.Errorf("connection failed. Ensure the 'Cloud Resource Manager API' is enabled and the service account has 'Viewer' permissions: %w", err)
+	}
+
+	if err := g.configurePubSub(ctx, client, &metadata); err != nil {
+		return fmt.Errorf("failed to configure Pub/Sub event bus: %w", err)
+	}
+	if err := g.configureCloudBuild(ctx, client, &metadata); err != nil {
+		ctx.Logger.Warnf("failed to configure Cloud Build subscription: %v", err)
+	}
+	if err := g.configureArtifactRegistry(ctx, client, &metadata); err != nil {
+		ctx.Logger.Warnf("failed to configure Artifact Registry subscription: %v", err)
+	}
+	ctx.Integration.SetMetadata(metadata)
+	ctx.Integration.Ready()
+	return nil
+}
+
 func (g *GCP) syncWIF(ctx core.SyncContext, config Configuration) error {
 	provider := strings.TrimSpace(config.WorkloadIdentityProvider)
 	if provider == "" {
 		return fmt.Errorf("Workload Identity Pool provider resource name is required")
 	}
+	normalizedProvider, err := NormalizeWorkloadIdentityProviderResourceName(provider)
+	if err != nil {
+		return fmt.Errorf("invalid workload identity provider: %w", err)
+	}
+	provider = normalizedProvider
 	projectID := strings.TrimSpace(config.WorkloadIdentityProjectID)
 	if projectID == "" {
 		return fmt.Errorf("Project ID is required for Workload Identity Federation")
 	}
+	serviceAccountEmail := strings.TrimSpace(config.WorkloadIdentityServiceAccountEmail)
 
 	subject := fmt.Sprintf("app-installation:%s", ctx.Integration.ID())
 	oidcToken, err := ctx.OIDC.Sign(subject, 5*time.Minute, provider, nil)
@@ -226,8 +322,14 @@ func (g *GCP) syncWIF(ctx core.SyncContext, config Configuration) error {
 	if err != nil {
 		return fmt.Errorf("Workload Identity Federation token exchange failed. Ensure your SuperPlane instance URL is set as the OIDC issuer in GCP, the audience matches the provider resource name, and the URL is reachable by Google: %w", err)
 	}
+	if serviceAccountEmail != "" {
+		accessToken, expiresIn, err = GenerateServiceAccountAccessToken(callCtx, ctx.HTTP, accessToken, serviceAccountEmail, gcpcommon.ScopeCloudPlatform)
+		if err != nil {
+			return fmt.Errorf("service account impersonation failed. Ensure the IAM Service Account Credentials API is enabled and grant roles/iam.workloadIdentityUser on %s to principal subject %s: %w", serviceAccountEmail, subject, err)
+		}
+	}
 
-	if err := ctx.Integration.SetSecret(gcpcommon.SecretNameAccessToken, []byte(accessToken)); err != nil {
+	if err := putIntegrationSecret(ctx.Integration, gcpcommon.SecretNameAccessToken, "GCP access token", "OAuth access token for Workload Identity Federation (rotated when the integration syncs).", accessToken); err != nil {
 		return fmt.Errorf("failed to store access token: %w", err)
 	}
 
@@ -239,7 +341,7 @@ func (g *GCP) syncWIF(ctx core.SyncContext, config Configuration) error {
 
 	metadata := gcpcommon.Metadata{
 		ProjectID:            projectID,
-		ClientEmail:          "",
+		ClientEmail:          serviceAccountEmail,
 		AuthMethod:           gcpcommon.AuthMethodWIF,
 		AccessTokenExpiresAt: expiresAt.Format(time.RFC3339),
 	}
@@ -251,7 +353,10 @@ func (g *GCP) syncWIF(ctx core.SyncContext, config Configuration) error {
 	}
 	crmURL := fmt.Sprintf("https://cloudresourcemanager.googleapis.com/v3/projects/%s", projectID)
 	if _, err := client.GetURL(callCtx, crmURL); err != nil {
-		return fmt.Errorf("connection failed. Ensure the 'Cloud Resource Manager API' is enabled and the federated identity has 'Viewer' (or equivalent) on the project: %w", err)
+		if serviceAccountEmail == "" {
+			return fmt.Errorf("connection failed. Ensure the 'Cloud Resource Manager API' is enabled and the federated identity has 'Viewer' (or equivalent) on the project: %w", err)
+		}
+		return fmt.Errorf("connection failed. Ensure the 'Cloud Resource Manager API' is enabled and the service account %s has 'Viewer' (or equivalent) on the project: %w", serviceAccountEmail, err)
 	}
 
 	if err := g.configurePubSub(ctx, client, &metadata); err != nil {
@@ -637,15 +742,10 @@ func (g *GCP) createContainerAnalysisSubscription(
 }
 
 func (g *GCP) cloudBuildSecret(integration core.IntegrationContext) (string, error) {
-	secrets, err := integration.GetSecrets()
-	if err != nil {
+	if s, ok, err := getIntegrationSecretString(integration, CloudBuildSecretName); err != nil {
 		return "", err
-	}
-
-	for _, s := range secrets {
-		if s.Name == CloudBuildSecretName {
-			return string(s.Value), nil
-		}
+	} else if ok {
+		return s, nil
 	}
 
 	secret, err := crypto.Base64String(32)
@@ -653,7 +753,7 @@ func (g *GCP) cloudBuildSecret(integration core.IntegrationContext) (string, err
 		return "", fmt.Errorf("generate random secret: %w", err)
 	}
 
-	if err := integration.SetSecret(CloudBuildSecretName, []byte(secret)); err != nil {
+	if err := putIntegrationSecret(integration, CloudBuildSecretName, "Cloud Build webhook secret", "Verifies incoming Cloud Build Pub/Sub push notifications.", secret); err != nil {
 		return "", fmt.Errorf("store cloud build secret: %w", err)
 	}
 	return secret, nil
@@ -668,15 +768,10 @@ func (g *GCP) containerAnalysisSecret(integration core.IntegrationContext) (stri
 }
 
 func (g *GCP) getOrCreateSecret(integration core.IntegrationContext, secretName string) (string, error) {
-	secrets, err := integration.GetSecrets()
-	if err != nil {
+	if s, ok, err := getIntegrationSecretString(integration, secretName); err != nil {
 		return "", err
-	}
-
-	for _, s := range secrets {
-		if s.Name == secretName {
-			return string(s.Value), nil
-		}
+	} else if ok {
+		return s, nil
 	}
 
 	secret, err := crypto.Base64String(32)
@@ -684,22 +779,18 @@ func (g *GCP) getOrCreateSecret(integration core.IntegrationContext, secretName 
 		return "", fmt.Errorf("generate random secret: %w", err)
 	}
 
-	if err := integration.SetSecret(secretName, []byte(secret)); err != nil {
+	label, description := integrationWebhookSecretLabel(secretName)
+	if err := putIntegrationSecret(integration, secretName, label, description, secret); err != nil {
 		return "", fmt.Errorf("store secret %s: %w", secretName, err)
 	}
 	return secret, nil
 }
 
 func (g *GCP) eventsSecret(integration core.IntegrationContext) (string, error) {
-	secrets, err := integration.GetSecrets()
-	if err != nil {
+	if s, ok, err := getIntegrationSecretString(integration, PubSubSecretName); err != nil {
 		return "", err
-	}
-
-	for _, s := range secrets {
-		if s.Name == PubSubSecretName {
-			return string(s.Value), nil
-		}
+	} else if ok {
+		return s, nil
 	}
 
 	secret, err := crypto.Base64String(32)
@@ -707,10 +798,60 @@ func (g *GCP) eventsSecret(integration core.IntegrationContext) (string, error) 
 		return "", fmt.Errorf("generate random secret: %w", err)
 	}
 
-	if err := integration.SetSecret(PubSubSecretName, []byte(secret)); err != nil {
+	label, description := integrationWebhookSecretLabel(PubSubSecretName)
+	if err := putIntegrationSecret(integration, PubSubSecretName, label, description, secret); err != nil {
 		return "", fmt.Errorf("store events secret: %w", err)
 	}
 	return secret, nil
+}
+
+func putIntegrationSecret(integration core.IntegrationContext, name, label, description, value string) error {
+	if integration.LegacySetup() {
+		return integration.SetSecret(name, []byte(value))
+	}
+	_, err := integration.Secrets().Get(name)
+	if err != nil {
+		return integration.Secrets().Create(core.IntegrationSecretDefinition{
+			Name:        name,
+			Label:       label,
+			Description: description,
+			Value:       value,
+			Editable:    false,
+		})
+	}
+	return integration.Secrets().Update(name, value)
+}
+
+func getIntegrationSecretString(integration core.IntegrationContext, name string) (string, bool, error) {
+	if integration.LegacySetup() {
+		secrets, err := integration.GetSecrets()
+		if err != nil {
+			return "", false, err
+		}
+		v := gcpcommon.FindSecretValue(secrets, name)
+		if len(v) == 0 {
+			return "", false, nil
+		}
+		return string(v), true, nil
+	}
+	v, err := integration.Secrets().Get(name)
+	if err != nil || strings.TrimSpace(v) == "" {
+		return "", false, nil
+	}
+	return v, true, nil
+}
+
+func integrationWebhookSecretLabel(secretName string) (label, description string) {
+	switch secretName {
+	case ArtifactPushSecretName:
+		return "Artifact Registry webhook secret", "Verifies incoming Artifact Registry Pub/Sub push notifications."
+	case ContainerAnalysisSecretName:
+		return "Container Analysis webhook secret", "Verifies incoming Container Analysis Pub/Sub push notifications."
+	case PubSubSecretName:
+		return "Pub/Sub audit webhook secret", "Verifies incoming Pub/Sub push notifications for audit log triggers."
+	default:
+		return secretName, "Managed by the Google Cloud integration."
+	}
 }
 
 func sanitizeID(s string) string {
@@ -1047,21 +1188,16 @@ func (g *GCP) handleEvent(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	secrets, err := ctx.Integration.GetSecrets()
+	secret, hasSecret, err := getIntegrationSecretString(ctx.Integration, PubSubSecretName)
 	if err != nil {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	var secret string
-	for _, s := range secrets {
-		if s.Name == PubSubSecretName {
-			secret = string(s.Value)
-			break
-		}
+	secretStr := ""
+	if hasSecret {
+		secretStr = secret
 	}
-
-	if token != secret {
+	if token != secretStr {
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -1149,21 +1285,16 @@ func (g *GCP) handleCloudBuildEvent(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	secrets, err := ctx.Integration.GetSecrets()
+	secret, hasSecret, err := getIntegrationSecretString(ctx.Integration, CloudBuildSecretName)
 	if err != nil {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	var secret string
-	for _, s := range secrets {
-		if s.Name == CloudBuildSecretName {
-			secret = string(s.Value)
-			break
-		}
+	secretStr := ""
+	if hasSecret {
+		secretStr = secret
 	}
-
-	if token != secret {
+	if token != secretStr {
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -1231,21 +1362,16 @@ func (g *GCP) handleArtifactPushEvent(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	secrets, err := ctx.Integration.GetSecrets()
+	secret, hasSecret, err := getIntegrationSecretString(ctx.Integration, ArtifactPushSecretName)
 	if err != nil {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	var secret string
-	for _, s := range secrets {
-		if s.Name == ArtifactPushSecretName {
-			secret = string(s.Value)
-			break
-		}
+	secretStr := ""
+	if hasSecret {
+		secretStr = secret
 	}
-
-	if token != secret {
+	if token != secretStr {
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -1312,21 +1438,16 @@ func (g *GCP) handleArtifactAnalysisEvent(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	secrets, err := ctx.Integration.GetSecrets()
+	secret, hasSecret, err := getIntegrationSecretString(ctx.Integration, ContainerAnalysisSecretName)
 	if err != nil {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	var secret string
-	for _, s := range secrets {
-		if s.Name == ContainerAnalysisSecretName {
-			secret = string(s.Value)
-			break
-		}
+	secretStr := ""
+	if hasSecret {
+		secretStr = secret
 	}
-
-	if token != secret {
+	if token != secretStr {
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
 	}
@@ -1393,21 +1514,16 @@ func (g *GCP) handlePubSubEvent(ctx core.HTTPRequestContext) {
 		return
 	}
 
-	secrets, err := ctx.Integration.GetSecrets()
+	secret, hasSecret, err := getIntegrationSecretString(ctx.Integration, PubSubSecretName)
 	if err != nil {
 		ctx.Response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-
-	var secret string
-	for _, s := range secrets {
-		if s.Name == PubSubSecretName {
-			secret = string(s.Value)
-			break
-		}
+	secretStr := ""
+	if hasSecret {
+		secretStr = secret
 	}
-
-	if token != secret {
+	if token != secretStr {
 		ctx.Response.WriteHeader(http.StatusForbidden)
 		return
 	}

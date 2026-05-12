@@ -122,6 +122,9 @@ func (w *IntegrationRequestWorker) syncIntegration(tx *gorm.DB, request *models.
 		instance.StateDescription = fmt.Sprintf("Sync failed: %v", syncErr)
 	} else {
 		instance.StateDescription = ""
+		if instance.State == models.IntegrationStatePending {
+			instance.State = models.IntegrationStateReady
+		}
 	}
 
 	if err := tx.Save(instance).Error; err != nil {

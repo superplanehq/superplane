@@ -48,14 +48,21 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ### Workload Identity Federation (keyless)
 
-1. Create a [Workload Identity Pool](https://cloud.google.com/iam/docs/workload-identity-federation) with an OIDC provider.
-2. Set the **Issuer URL** to this SuperPlane instance's URL.
-3. Set the **Audience** to the pool provider resource name.
-4. Grant the federated identity permission to [impersonate a service account](https://cloud.google.com/iam/docs/workload-identity-federation-with-other-providers#mapping) with the roles your workflows need.
-5. Enter the **pool provider resource name** and **Project ID** below.
+1. Enable the **Security Token Service API**, **IAM Service Account Credentials API**, **Cloud Resource Manager API**, **Service Usage API**, and **Pub/Sub API**.
+2. Create a service account and grant it the IAM roles your workflows need.
+3. Create a [Workload Identity Pool](https://cloud.google.com/iam/docs/workload-identity-federation) with an OIDC provider.
+4. Set the provider attribute mapping to `google.subject=assertion.sub`.
+5. Set the **Issuer URL** to the public SuperPlane URL that serves `/.well-known/openid-configuration`.
+6. Set the **Audience** to the pool provider resource name.
+7. Grant `roles/iam.workloadIdentityUser` on the service account to this SuperPlane integration's federated principal:
+   `principal://iam.googleapis.com/projects/PROJECT_NUMBER/locations/global/workloadIdentityPools/POOL_ID/subject/app-installation:INTEGRATION_ID`
+8. Enter the **pool provider resource name**, **Project ID**, and **Service account email** below.
+
+The `INTEGRATION_ID` is the SuperPlane integration ID. If the first sync fails before this role is granted, copy the integration ID from SuperPlane, add the IAM binding, then resync.
 
 ## Required IAM roles
 
+- `roles/viewer` — validate project access and check enabled APIs
 - `roles/logging.configWriter` — create logging sinks for event triggers
 - `roles/pubsub.admin` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
 - Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management)
