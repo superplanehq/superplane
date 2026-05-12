@@ -93,6 +93,8 @@ func (s *runsViewSteps) whenICloseRunNodeDetails() {
 }
 
 func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
+	// The Edit button is hidden in runs view; switch back to the canvas tab first.
+	s.session.Click(q.TestID("canvas-view-mode-live"))
 	s.session.Click(q.TestID("canvas-edit-button"))
 }
 

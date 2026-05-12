@@ -20,8 +20,6 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
-  CanvasesCanvasRunResult,
-  CanvasesCanvasRunState,
   CanvasesCanvasVersion,
   CanvasesListEventExecutionsResponse,
   SuperplaneActionsAction,
@@ -84,7 +82,7 @@ import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import type { RunResultFilter, RunStatusFilter } from "@/ui/Runs/runPresentation";
+import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import { RunsSidebar } from "@/ui/RunsSidebar";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
@@ -551,20 +549,7 @@ export function WorkflowPageV2() {
   const [selectedRunId, setSelectedRunId] = useState<string | null>(() => searchParams.get("run"));
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
-  const runApiFilters = useMemo(() => {
-    const resultByFilter: Record<RunResultFilter, CanvasesCanvasRunResult> = {
-      passed: "RESULT_PASSED",
-      failed: "RESULT_FAILED",
-      cancelled: "RESULT_CANCELLED",
-    };
-
-    const states: CanvasesCanvasRunState[] = runStatusFilters.includes("running") ? ["STATE_STARTED"] : [];
-    const results = runStatusFilters
-      .filter((filter): filter is RunResultFilter => filter !== "running")
-      .map((filter) => resultByFilter[filter]);
-
-    return { states, results };
-  }, [runStatusFilters]);
+  const runApiFilters = useMemo(() => statusFiltersToApiFilters(runStatusFilters), [runStatusFilters]);
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
   const infiniteRunsQuery = useInfiniteCanvasRuns(canvasId!, runApiFilters, isViewingLiveVersion);
   const runsEventsData = useMemo(() => {

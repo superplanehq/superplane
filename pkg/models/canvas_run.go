@@ -152,7 +152,7 @@ func applyCanvasRunFilters(query *gorm.DB, filters CanvasRunFilters) *gorm.DB {
 
 	switch {
 	case hasStates && hasResults:
-		return query.Where("state IN ? OR result IN ?", filters.States, filters.Results)
+		return query.Where("(state IN ? OR result IN ?)", filters.States, filters.Results)
 	case hasStates:
 		return query.Where("state IN ?", filters.States)
 	case hasResults:

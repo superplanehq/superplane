@@ -102,6 +102,59 @@ func Test__CanvasRun__ResultPrecedence(t *testing.T) {
 	assert.Equal(t, models.CanvasRunResultFailed, updatedRun.Result)
 }
 
+func Test__ListCanvasRuns__StatesAndResultsAreOredWithinWorkflow(t *testing.T) {
+	r := support.Setup(t)
+
+	canvasA, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		[]models.Edge{},
+	)
+	canvasB, _ := support.CreateCanvas(t, r.Organization.ID, r.User,
+		[]models.CanvasNode{{NodeID: "trigger", Type: models.NodeTypeTrigger}},
+		[]models.Edge{},
+	)
+
+	runningA := createRunWithState(t, canvasA.ID, models.CanvasRunStateStarted, "")
+	passedA := createRunWithState(t, canvasA.ID, models.CanvasRunStateFinished, models.CanvasRunResultPassed)
+	createRunWithState(t, canvasA.ID, models.CanvasRunStateFinished, models.CanvasRunResultFailed)
+
+	// Runs in workflow B should never leak in even when their result matches the filter.
+	createRunWithState(t, canvasB.ID, models.CanvasRunStateFinished, models.CanvasRunResultPassed)
+	createRunWithState(t, canvasB.ID, models.CanvasRunStateStarted, "")
+
+	runs, err := models.ListCanvasRuns(canvasA.ID, 50, nil, models.CanvasRunFilters{
+		States:  []string{models.CanvasRunStateStarted},
+		Results: []string{models.CanvasRunResultPassed},
+	})
+	require.NoError(t, err)
+
+	ids := make(map[uuid.UUID]bool, len(runs))
+	for _, run := range runs {
+		assert.Equal(t, canvasA.ID, run.WorkflowID, "filter must not leak runs from other workflows")
+		ids[run.ID] = true
+	}
+	assert.True(t, ids[runningA.ID], "expected the running run to be included")
+	assert.True(t, ids[passedA.ID], "expected the passed run to be included")
+	assert.Len(t, runs, 2, "expected only running+passed runs from canvas A")
+}
+
+func createRunWithState(t *testing.T, workflowID uuid.UUID, state, result string) *models.CanvasRun {
+	now := time.Now()
+	run := models.CanvasRun{
+		ID:         uuid.New(),
+		WorkflowID: workflowID,
+		State:      state,
+		Result:     result,
+		CreatedAt:  &now,
+		UpdatedAt:  &now,
+	}
+	if state == models.CanvasRunStateFinished {
+		run.FinishedAt = &now
+	}
+	require.NoError(t, database.Conn().Create(&run).Error)
+	return &run
+}
+
 func setupRunWithExecution(t *testing.T) (*models.CanvasRun, *models.CanvasNodeExecution) {
 	r := support.Setup(t)
 	canvas, _ := support.CreateCanvas(

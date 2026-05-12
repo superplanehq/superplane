@@ -1,5 +1,11 @@
 /* eslint-disable complexity */
-import type { CanvasesCanvasNodeExecutionRef, CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
+import type {
+  CanvasesCanvasNodeExecutionRef,
+  CanvasesCanvasRun,
+  CanvasesCanvasRunResult,
+  CanvasesCanvasRunState,
+  SuperplaneComponentsNode,
+} from "@/api-client";
 import { getTriggerRenderer } from "@/pages/workflowv2/mappers";
 import { buildEventInfo } from "@/pages/workflowv2/utils";
 import { AlertTriangle, CheckCircle2, CircleDashed, Clock, MinusCircle, type LucideIcon } from "lucide-react";
@@ -58,6 +64,23 @@ export const RUN_STATUS_META = {
 
 export function shortId(value: string | undefined) {
   return value ? value.slice(0, 8) : "";
+}
+
+export function statusFiltersToApiFilters(
+  filters: RunStatusFilter[],
+): { states: CanvasesCanvasRunState[]; results: CanvasesCanvasRunResult[] } {
+  const resultByFilter: Record<RunResultFilter, CanvasesCanvasRunResult> = {
+    passed: "RESULT_PASSED",
+    failed: "RESULT_FAILED",
+    cancelled: "RESULT_CANCELLED",
+  };
+
+  const states: CanvasesCanvasRunState[] = filters.includes("running") ? ["STATE_STARTED"] : [];
+  const results = filters
+    .filter((filter): filter is RunResultFilter => filter !== "running")
+    .map((filter) => resultByFilter[filter]);
+
+  return { states, results };
 }
 
 export function getRunStatus(run: CanvasesCanvasRun): RunStatusKey {
