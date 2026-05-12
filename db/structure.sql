@@ -525,7 +525,8 @@ CREATE TABLE public.workflow_events (
     state character varying(32) NOT NULL,
     execution_id uuid,
     created_at timestamp without time zone NOT NULL,
-    custom_name text
+    custom_name text,
+    run_id uuid NOT NULL
 );
 
 
@@ -564,7 +565,8 @@ CREATE TABLE public.workflow_node_executions (
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    cancelled_by uuid
+    cancelled_by uuid,
+    run_id uuid NOT NULL
 );
 
 
@@ -578,7 +580,8 @@ CREATE TABLE public.workflow_node_queue_items (
     node_id character varying(128) NOT NULL,
     root_event_id uuid,
     event_id uuid,
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    run_id uuid NOT NULL
 );
 
 
@@ -622,6 +625,21 @@ CREATE TABLE public.workflow_nodes (
     deleted_at timestamp with time zone,
     app_installation_id uuid,
     state_reason text
+);
+
+
+--
+-- Name: workflow_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_runs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    workflow_id uuid NOT NULL,
+    state character varying(32) NOT NULL,
+    result character varying(32),
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    finished_at timestamp without time zone
 );
 
 
@@ -1064,6 +1082,14 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: workflow_runs workflow_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: workflow_versions workflow_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1347,6 +1373,13 @@ CREATE INDEX idx_workflow_events_execution_id ON public.workflow_events USING bt
 
 
 --
+-- Name: idx_workflow_events_run_id_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_run_id_state ON public.workflow_events USING btree (run_id, state);
+
+
+--
 -- Name: idx_workflow_events_state; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1410,6 +1443,13 @@ CREATE INDEX idx_workflow_node_executions_root_event_id ON public.workflow_node_
 
 
 --
+-- Name: idx_workflow_node_executions_run_id_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_run_id_state ON public.workflow_node_executions USING btree (run_id, state);
+
+
+--
 -- Name: idx_workflow_node_executions_state_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1438,6 +1478,13 @@ CREATE INDEX idx_workflow_node_queue_items_root_event_id ON public.workflow_node
 
 
 --
+-- Name: idx_workflow_node_queue_items_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_queue_items_run_id ON public.workflow_node_queue_items USING btree (run_id);
+
+
+--
 -- Name: idx_workflow_node_requests_execution_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1463,6 +1510,20 @@ CREATE INDEX idx_workflow_nodes_parent ON public.workflow_nodes USING btree (wor
 --
 
 CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (state);
+
+
+--
+-- Name: idx_workflow_runs_workflow_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_workflow_created_at ON public.workflow_runs USING btree (workflow_id, created_at DESC);
+
+
+--
+-- Name: idx_workflow_runs_workflow_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_workflow_state ON public.workflow_runs USING btree (workflow_id, state);
 
 
 --
@@ -1816,6 +1877,14 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
+-- Name: workflow_events workflow_events_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_events
+    ADD CONSTRAINT workflow_events_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id);
+
+
+--
 -- Name: workflow_events workflow_events_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1864,6 +1933,14 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
+-- Name: workflow_node_executions workflow_node_executions_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_executions
+    ADD CONSTRAINT workflow_node_executions_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id);
+
+
+--
 -- Name: workflow_node_executions workflow_node_executions_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1885,6 +1962,14 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 ALTER TABLE ONLY public.workflow_node_queue_items
     ADD CONSTRAINT workflow_node_queue_items_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_node_queue_items workflow_node_queue_items_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_queue_items
+    ADD CONSTRAINT workflow_node_queue_items_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id);
 
 
 --
@@ -1933,6 +2018,14 @@ ALTER TABLE ONLY public.workflow_nodes
 
 ALTER TABLE ONLY public.workflow_nodes
     ADD CONSTRAINT workflow_nodes_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
+
+
+--
+-- Name: workflow_runs workflow_runs_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
 
 
 --
@@ -1999,7 +2092,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260511133726	f
+20260512125440	f
 \.
 
 
