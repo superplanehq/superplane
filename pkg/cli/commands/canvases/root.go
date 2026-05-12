@@ -244,6 +244,35 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	}
 	core.Bind(deleteCmd, &deleteCommand{}, options)
 
+	var runTrigger string
+	var runTemplate string
+	var runPayloadFile string
+	var runReplay string
+	runCmd := &cobra.Command{
+		Use:   "run <name-or-id>",
+		Short: "Run a manual trigger or replay a trigger root event",
+		Long: `Start a Manual Run trigger via its "run" hook, or re-emit an existing root trigger event.
+
+Manual run invokes the trigger hook with the same parameters as the UI (template name and optional JSON payload override).
+
+Examples:
+  superplane canvases run my-canvas --trigger start-node --template "Hello World"
+  superplane canvases run my-canvas --trigger start-node --template "Hello World" --payload-file ./payload.json
+  superplane canvases run 4e9ae08d-0363-40d2-ba2c-5f6389a418d8 --trigger start-node --replay evt-uuid`,
+		Args: cobra.ExactArgs(1),
+	}
+	runCmd.Flags().StringVar(&runTrigger, "trigger", "", "trigger node id on the canvas")
+	runCmd.Flags().StringVar(&runTemplate, "template", "", "manual run template name (required unless using --replay)")
+	runCmd.Flags().StringVar(&runPayloadFile, "payload-file", "", "path to a JSON file containing the payload object to pass to the manual run hook")
+	runCmd.Flags().StringVar(&runReplay, "replay", "", "id of an existing root trigger event to re-emit (mutually exclusive with --template)")
+	_ = runCmd.MarkFlagRequired("trigger")
+	core.Bind(runCmd, &runCommand{
+		trigger:     &runTrigger,
+		template:    &runTemplate,
+		payloadFile: &runPayloadFile,
+		replay:      &runReplay,
+	}, options)
+
 	root.AddCommand(listCmd)
 	root.AddCommand(getCmd)
 	root.AddCommand(activeCmd)
@@ -251,6 +280,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	root.AddCommand(createCmd)
 	root.AddCommand(updateCmd)
 	root.AddCommand(deleteCmd)
+	root.AddCommand(runCmd)
 	root.AddCommand(changeRequestsCmd)
 
 	return root
