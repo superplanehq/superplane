@@ -54,12 +54,19 @@ export function PayloadPreview({
         <p className={labelClass}>{label}</p>
         <div className="flex items-center gap-1">
           {showCopy && (
-            <button onClick={handleCopy} className="p-1 text-gray-500 hover:text-gray-800">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="p-1 text-gray-500 hover:text-gray-800"
+              aria-label="Copy to clipboard"
+            >
               {copied ? <Check size={iconSize} /> : <Copy size={iconSize} />}
             </button>
           )}
           <button
+            type="button"
             className="p-1 text-gray-500 hover:text-gray-800"
+            aria-label="Expand payload"
             onClick={(e) => {
               e.stopPropagation();
               e.preventDefault();

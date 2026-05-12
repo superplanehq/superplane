@@ -176,7 +176,13 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
               />
             )}
           </div>
-          <Button variant="ghost" size="icon" onClick={() => removeItem(index)} className="mt-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => removeItem(index)}
+            className="mt-1"
+            aria-label="Remove item"
+          >
             <Trash2 className="h-4 w-4 text-red-500" />
           </Button>
         </div>

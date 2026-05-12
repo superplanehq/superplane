@@ -89,12 +89,22 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
         <div className="border rounded-md border-gray-300 dark:border-gray-700 p-1" style={{ height: "200px" }}>
           <div className="absolute right-1.5 top-1.5 z-10 flex items-center gap-1">
             <SimpleTooltip content={copied ? "Copied!" : "Copy"} hideOnClick={false}>
-              <button onClick={copyToClipboard} className="p-1 rounded text-gray-500 hover:text-gray-800">
+              <button
+                type="button"
+                onClick={copyToClipboard}
+                className="p-1 rounded text-gray-500 hover:text-gray-800"
+                aria-label="Copy to clipboard"
+              >
                 {React.createElement(resolveIcon("copy"), { size: 14 })}
               </button>
             </SimpleTooltip>
             <SimpleTooltip content="Expand">
-              <button onClick={() => setIsModalOpen(true)} className="p-1 text-gray-500 hover:text-gray-800">
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="p-1 text-gray-500 hover:text-gray-800"
+                aria-label="Expand editor"
+              >
                 {React.createElement(resolveIcon("maximize-2"), { size: 14 })}
               </button>
             </SimpleTooltip>
