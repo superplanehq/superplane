@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -22,15 +23,36 @@ const (
 
 type DeployWorker struct{}
 
+// DeployWorkerProvision holds optional Create Worker metadata when provision runs.
+type DeployWorkerProvision struct {
+	Tags                          string `json:"tags"`
+	Logpush                       *bool  `json:"logpush"`
+	ObservabilityEnabled          *bool  `json:"observabilityEnabled"`
+	ObservabilityHeadSamplingRate string `json:"observabilityHeadSamplingRate"`
+	SubdomainEnabled              *bool  `json:"subdomainEnabled"`
+	SubdomainPreviewsEnabled      *bool  `json:"subdomainPreviewsEnabled"`
+	TailConsumers                 string `json:"tailConsumers"`
+}
+
 type DeployWorkerSpec struct {
-	AccountID          string  `json:"accountId"`
-	ScriptName         string  `json:"scriptName"`
-	Source             string  `json:"source"`
-	InlineCode         *string `json:"inlineCode,omitempty"`
-	ScriptURL          *string `json:"scriptUrl,omitempty"`
-	CompatibilityDate  string  `json:"compatibilityDate"`
-	CompatibilityFlags string  `json:"compatibilityFlags"`
-	DeploymentMessage  string  `json:"deploymentMessage"`
+	AccountID          string                 `json:"accountId"`
+	ScriptName         string                 `json:"scriptName"`
+	ProvisionIfMissing *bool                  `json:"provisionIfMissing"`
+	Provision          *DeployWorkerProvision `json:"provision"`
+	Source             string                 `json:"source"`
+	InlineCode         *string                `json:"inlineCode,omitempty"`
+	ScriptURL          *string                `json:"scriptUrl,omitempty"`
+	CompatibilityDate  string                 `json:"compatibilityDate"`
+	CompatibilityFlags string                 `json:"compatibilityFlags"`
+	DeploymentMessage  string                 `json:"deploymentMessage"`
+}
+
+func deployProvisionArgs(spec DeployWorkerSpec) (tags string, logpush *bool, observabilityEnabled *bool, observabilityHeadSamplingRate string, subdomainEnabled *bool, subdomainPreviewsEnabled *bool, tailConsumers string) {
+	p := spec.Provision
+	if p == nil {
+		return "", nil, nil, "", nil, nil, ""
+	}
+	return p.Tags, p.Logpush, p.ObservabilityEnabled, p.ObservabilityHeadSamplingRate, p.SubdomainEnabled, p.SubdomainPreviewsEnabled, p.TailConsumers
 }
 
 func (d *DeployWorker) Name() string {
@@ -42,11 +64,11 @@ func (d *DeployWorker) Label() string {
 }
 
 func (d *DeployWorker) Description() string {
-	return "Upload a Worker script and deploy a new version to production traffic"
+	return "Provision a Worker if needed, upload a script version, and deploy it to traffic"
 }
 
 func (d *DeployWorker) Documentation() string {
-	return `The Deploy Worker component uploads a single-module Worker (` + "`worker.js`" + `) and creates a deployment so that version serves 100% of traffic.
+	return `The Deploy Worker component uploads a single-module Worker (` + "`worker.js`" + `) to a **Worker script name** in your account. When **Provision Worker if missing** is enabled (default), it first calls Cloudflare's Create Worker API so a **new** name works without a separate step. After upload, SuperPlane always creates a **deployment** so the new version serves 100% of traffic (` + "`cloudflare.worker.deployed`" + `).
 
 ## Script source
 
@@ -55,9 +77,11 @@ func (d *DeployWorker) Documentation() string {
 
 ## Configuration
 
-- **Script name**: Cloudflare Worker script name (used in routes and the dashboard).
-- **Compatibility date** (optional): Workers compatibility date (for example ` + "`2024-01-01`" + `). Recommended; if omitted, Cloudflare applies account defaults.
-- **Compatibility flags** (optional): comma- or newline-separated flags (for example ` + "`nodejs_compat`" + `).
+- **Worker script name**: Name of the Worker in your account (same name used in routes and the dashboard). Used for both provisioning and upload.
+- **Provision Worker if missing** (default on): Calls ` + "`POST .../workers/workers`" + ` with the optional metadata fields in **Provision settings** when that section is visible. If the Worker already exists, the error is ignored and upload continues.
+- **Provision settings** (optional): Tags, Logpush, Observability, Subdomain, Tail consumers — sent only on the provision step when it runs; omit toggles to leave those keys out of the API request.
+- **Compatibility date** (optional): Passed to the **script upload** metadata. If omitted, SuperPlane sends a recent default so Cloudflare treats the upload as a modern module Worker.
+- **Compatibility flags** (optional): comma- or newline-separated flags for the upload metadata.
 - **Deployment message** (optional): annotation stored on the deployment.
 
 ## Output
@@ -78,14 +102,92 @@ func (d *DeployWorker) OutputChannels(configuration any) []core.OutputChannel {
 }
 
 func (d *DeployWorker) Configuration() []configuration.Field {
+	provisionSchema := []configuration.Field{
+		{
+			Name:        "tags",
+			Label:       "Tags",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Optional tags for the Worker resource, comma- or newline-separated",
+			Placeholder: "team:platform, env:production",
+		},
+		{
+			Name:        "logpush",
+			Label:       "Logpush enabled",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Description: "Whether Logpush is enabled (only sent when this toggle is set)",
+		},
+		{
+			Name:        "observabilityEnabled",
+			Label:       "Observability enabled",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Description: "When set, sends an observability object with this enabled flag",
+		},
+		{
+			Name:        "observabilityHeadSamplingRate",
+			Label:       "Observability sampling rate",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Optional head sampling rate from 0 to 1 (sent inside observability when observability is included)",
+			Placeholder: "1",
+		},
+		{
+			Name:        "subdomainEnabled",
+			Label:       "workers.dev subdomain enabled",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Description: "Subdomain enabled flag for the provision request",
+		},
+		{
+			Name:        "subdomainPreviewsEnabled",
+			Label:       "Preview URLs enabled",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Description: "Whether preview URLs are enabled for the Worker",
+		},
+		{
+			Name:        "tailConsumers",
+			Label:       "Tail consumer Worker names",
+			Type:        configuration.FieldTypeString,
+			Required:    false,
+			Description: "Comma- or newline-separated Worker names that consume logs from this Worker",
+			Placeholder: "my-log-consumer",
+		},
+	}
+
 	return []configuration.Field{
 		{
 			Name:        "scriptName",
 			Label:       "Worker script name",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "Name of the Worker script in your Cloudflare account",
+			Description: "Name of the Worker script in your Cloudflare account (new or existing)",
 			Placeholder: "my-worker",
+		},
+		{
+			Name:        "provisionIfMissing",
+			Label:       "Provision Worker if missing",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     true,
+			Description: "Call Cloudflare Create Worker before upload so a new script name works (ignored if Worker already exists)",
+		},
+		{
+			Name:        "provision",
+			Label:       "Provision settings",
+			Type:        configuration.FieldTypeObject,
+			Required:    false,
+			Description: "Optional metadata for Create Worker (only used when provision is enabled)",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "provisionIfMissing", Values: []string{"true"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: provisionSchema,
+				},
+			},
 		},
 		{
 			Name:        "source",
@@ -129,7 +231,7 @@ func (d *DeployWorker) Configuration() []configuration.Field {
 			Label:       "Compatibility date",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Workers compatibility date (YYYY-MM-DD)",
+			Description: "Workers compatibility date for the uploaded script (YYYY-MM-DD)",
 			Placeholder: "2024-01-01",
 		},
 		{
@@ -137,7 +239,7 @@ func (d *DeployWorker) Configuration() []configuration.Field {
 			Label:       "Compatibility flags",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Optional flags, comma- or newline-separated",
+			Description: "Optional flags for the upload, comma- or newline-separated",
 			Placeholder: "nodejs_compat",
 		},
 		{
@@ -148,6 +250,19 @@ func (d *DeployWorker) Configuration() []configuration.Field {
 			Description: "Optional human-readable message stored on the deployment",
 		},
 	}
+}
+
+func (d *DeployWorker) validateObservabilitySamplingRate(rate string) error {
+	if s := strings.TrimSpace(rate); s != "" {
+		rateVal, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return fmt.Errorf("observabilityHeadSamplingRate must be a number between 0 and 1: %w", err)
+		}
+		if rateVal < 0 || rateVal > 1 {
+			return errors.New("observabilityHeadSamplingRate must be between 0 and 1")
+		}
+	}
+	return nil
 }
 
 func (d *DeployWorker) Setup(ctx core.SetupContext) error {
@@ -163,6 +278,12 @@ func (d *DeployWorker) Setup(ctx core.SetupContext) error {
 
 	if strings.TrimSpace(spec.ScriptName) == "" {
 		return errors.New("scriptName is required")
+	}
+
+	if spec.Provision != nil {
+		if err := d.validateObservabilitySamplingRate(spec.Provision.ObservabilityHeadSamplingRate); err != nil {
+			return err
+		}
 	}
 
 	switch spec.Source {
@@ -220,12 +341,12 @@ func (d *DeployWorker) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("source must be %q or %q", deployWorkerScriptSourceInline, deployWorkerScriptSourceURL)
 	}
 
-	metadata := map[string]any{}
+	uploadMeta := map[string]any{}
 	if strings.TrimSpace(spec.CompatibilityDate) != "" {
-		metadata["compatibility_date"] = strings.TrimSpace(spec.CompatibilityDate)
+		uploadMeta["compatibility_date"] = strings.TrimSpace(spec.CompatibilityDate)
 	}
 	if flags := parseCommaOrNewlineList(spec.CompatibilityFlags); len(flags) > 0 {
-		metadata["compatibility_flags"] = flags
+		uploadMeta["compatibility_flags"] = flags
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -233,7 +354,29 @@ func (d *DeployWorker) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	versionID, err := client.UploadWorkerScriptVersion(accountID, strings.TrimSpace(spec.ScriptName), metadata, module)
+	scriptName := strings.TrimSpace(spec.ScriptName)
+	provision := spec.ProvisionIfMissing == nil || *spec.ProvisionIfMissing
+	if provision {
+		tags, logpush, obsEn, obsRate, subEn, subPrev, tails := deployProvisionArgs(spec)
+		provBody, err := buildWorkerProvisionRequestBody(
+			scriptName,
+			tags,
+			logpush,
+			obsEn,
+			obsRate,
+			subEn,
+			subPrev,
+			tails,
+		)
+		if err != nil {
+			return err
+		}
+		if err := ensureWorkerProvisioned(client, accountID, provBody); err != nil {
+			return fmt.Errorf("failed to provision worker: %w", err)
+		}
+	}
+
+	versionID, err := client.UploadWorkerScriptVersion(accountID, scriptName, uploadMeta, module)
 	if err != nil {
 		return fmt.Errorf("failed to upload worker version: %w", err)
 	}
@@ -243,14 +386,14 @@ func (d *DeployWorker) Execute(ctx core.ExecutionContext) error {
 		annotations = map[string]string{"workers/message": msg}
 	}
 
-	deployment, err := client.CreateWorkerDeployment(accountID, strings.TrimSpace(spec.ScriptName), versionID, annotations)
+	deployment, err := client.CreateWorkerDeployment(accountID, scriptName, versionID, annotations)
 	if err != nil {
 		return fmt.Errorf("failed to create worker deployment: %w", err)
 	}
 
 	result := map[string]any{
 		"accountId":  accountID,
-		"scriptName": strings.TrimSpace(spec.ScriptName),
+		"scriptName": scriptName,
 		"versionId":  versionID,
 		"deployment": deployment,
 	}

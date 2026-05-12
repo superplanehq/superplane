@@ -18,32 +18,66 @@ func Test__DeleteWorker__Setup(t *testing.T) {
 	t.Run("missing accountId returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"accountId":  "",
-				"scriptName": "w",
+				"accountId":    "",
+				"workerScript": "w",
 			},
 		}
 		require.ErrorContains(t, component.Setup(ctx), "accountId is required")
 	})
 
-	t.Run("missing scriptName returns error", func(t *testing.T) {
+	t.Run("missing workerScript returns error", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"accountId":  "acc",
-				"scriptName": "",
+				"accountId":    "acc",
+				"workerScript": "",
 			},
 		}
-		require.ErrorContains(t, component.Setup(ctx), "scriptName is required")
+		require.ErrorContains(t, component.Setup(ctx), "workerScript is required")
 	})
 
-	t.Run("valid passes", func(t *testing.T) {
+	t.Run("expression workerScript skips list API", func(t *testing.T) {
 		ctx := core.SetupContext{
 			Configuration: map[string]any{
-				"accountId":  "acc",
-				"scriptName": "w",
+				"accountId":    "acc",
+				"workerScript": "{{ $.trigger.data.name }}",
 			},
 			Integration: &contexts.IntegrationContext{},
+			Metadata:    &contexts.MetadataContext{},
 		}
 		require.NoError(t, component.Setup(ctx))
+	})
+
+	t.Run("valid configuration resolves script display name", func(t *testing.T) {
+		ctx := core.SetupContext{
+			Configuration: map[string]any{
+				"accountId":    "acc123",
+				"workerScript": "gone",
+			},
+			HTTP: &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`{
+							"success": true,
+							"result": [{"id": "gone", "name": "Gone Worker"}]
+						}`)),
+					},
+				},
+			},
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "token123"},
+			},
+			Metadata: &contexts.MetadataContext{},
+		}
+
+		err := component.Setup(ctx)
+		require.NoError(t, err)
+
+		meta, ok := ctx.Metadata.(*contexts.MetadataContext)
+		require.True(t, ok)
+		scriptMeta, ok := meta.Metadata.(WorkerScriptNodeMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "Gone Worker", scriptMeta.ScriptDisplayName)
 	})
 }
 
@@ -66,8 +100,8 @@ func Test__DeleteWorker__Execute(t *testing.T) {
 
 	ctx := core.ExecutionContext{
 		Configuration: map[string]any{
-			"accountId":  "acc",
-			"scriptName": "gone",
+			"accountId":    "acc",
+			"workerScript": "gone",
 		},
 		HTTP:           httpContext,
 		Integration:    integrationCtx,

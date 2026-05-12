@@ -15,11 +15,11 @@ import (
 type UpdateWorkerRoute struct{}
 
 type UpdateWorkerRouteSpec struct {
-	AccountID string `json:"accountId"`
-	Zone      string `json:"zone"`
-	RouteID   string `json:"routeId"`
-	Pattern   string `json:"pattern"`
-	Script    string `json:"script"`
+	AccountID    string `json:"accountId"`
+	Zone         string `json:"zone"`
+	RouteID      string `json:"routeId"`
+	Pattern      string `json:"pattern"`
+	WorkerScript string `json:"workerScript"`
 }
 
 func (u *UpdateWorkerRoute) Name() string {
@@ -46,7 +46,7 @@ func (u *UpdateWorkerRoute) Documentation() string {
 
 - **Zone**: Cloudflare zone for the route.
 - **Pattern**: URL pattern (for example ` + "`example.com/*`" + `).
-- **Script**: Worker script name invoked for matching traffic.
+- **Worker Script**: Worker script invoked for matching traffic (picker lists scripts for the account).
 
 ## Output
 
@@ -97,12 +97,23 @@ func (u *UpdateWorkerRoute) Configuration() []configuration.Field {
 			Placeholder: "example.com/*",
 		},
 		{
-			Name:        "script",
-			Label:       "Worker script name",
-			Type:        configuration.FieldTypeString,
+			Name:        "workerScript",
+			Label:       "Worker Script",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Name of the Worker script invoked when the route matches",
-			Placeholder: "my-worker",
+			Description: "The Worker Script invoked when the route matches",
+			Placeholder: "Select a Worker script",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "workerScript",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "accountId",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "accountId"},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -121,11 +132,17 @@ func (u *UpdateWorkerRoute) Setup(ctx core.SetupContext) error {
 		return errors.New("pattern is required")
 	}
 
-	if strings.TrimSpace(spec.Script) == "" {
-		return errors.New("script is required")
+	workerScript := strings.TrimSpace(spec.WorkerScript)
+	if workerScript == "" {
+		return errors.New("workerScript is required")
 	}
 
-	return nil
+	accountID := resolveAccountID(spec.AccountID, ctx.Integration)
+	if accountID == "" {
+		return errors.New("accountId is required")
+	}
+
+	return resolveWorkerScriptMetadata(ctx, accountID, workerScript)
 }
 
 func (u *UpdateWorkerRoute) Execute(ctx core.ExecutionContext) error {
@@ -139,12 +156,12 @@ func (u *UpdateWorkerRoute) Execute(ctx core.ExecutionContext) error {
 	}
 
 	pattern := strings.TrimSpace(spec.Pattern)
-	script := strings.TrimSpace(spec.Script)
+	workerScript := strings.TrimSpace(spec.WorkerScript)
 	if pattern == "" {
 		return errors.New("pattern is required")
 	}
-	if script == "" {
-		return errors.New("script is required")
+	if workerScript == "" {
+		return errors.New("workerScript is required")
 	}
 
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
@@ -155,12 +172,12 @@ func (u *UpdateWorkerRoute) Execute(ctx core.ExecutionContext) error {
 	routeID := strings.TrimSpace(spec.RouteID)
 	var route *WorkerRoute
 	if routeID == "" {
-		route, err = client.CreateWorkerRoute(spec.Zone, pattern, script)
+		route, err = client.CreateWorkerRoute(spec.Zone, pattern, workerScript)
 		if err != nil {
 			return fmt.Errorf("failed to create worker route: %w", err)
 		}
 	} else {
-		route, err = client.UpdateWorkerRoute(spec.Zone, routeID, pattern, script)
+		route, err = client.UpdateWorkerRoute(spec.Zone, routeID, pattern, workerScript)
 		if err != nil {
 			return fmt.Errorf("failed to update worker route: %w", err)
 		}
@@ -180,7 +197,7 @@ func (u *UpdateWorkerRoute) Execute(ctx core.ExecutionContext) error {
 
 	eventType := "cloudflare.workerRoute.created"
 	if routeID != "" {
-		eventType = "cloudflare.workerRoute.updated"
+		eventType = "cloudflare.workerRoute.update"
 	}
 
 	return ctx.ExecutionState.Emit(
