@@ -22,7 +22,6 @@ blocks:
           commands:
             - checkout
             - chmod 600 ~/.ssh/deploy.pem
-            - ssh-keygen -y -f ~/.ssh/deploy.pem
             - export SSH_KEY=~/.ssh/deploy.pem
             - export SSH_HOST=13.220.51.216
             - export AUTH_TOKEN="$FLEET_AUTH_TOKEN"
