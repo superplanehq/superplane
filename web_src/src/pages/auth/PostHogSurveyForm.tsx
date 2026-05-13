@@ -168,6 +168,21 @@ const SurveyProgress: React.FC<SurveyProgressProps> = ({ questionCount, currentQ
   </div>
 );
 
+const buildSurveyResponseProps = (survey: PostHogSurvey, responses: SurveyResponses) => {
+  const responseProps: Record<string, string | string[]> = {};
+  survey.questions.forEach((question, index) => {
+    const answer = responses[index];
+    if (answer === undefined) return;
+    const key = question.id
+      ? `$survey_response_${question.id}`
+      : index === 0
+        ? "$survey_response"
+        : `$survey_response_${index}`;
+    responseProps[key] = answer;
+  });
+  return responseProps;
+};
+
 const PostHogSurveyForm: React.FC<PostHogSurveyFormProps> = ({ survey, redirectTo, onComplete }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [surveyResponses, setSurveyResponses] = useState<SurveyResponses>({});
@@ -193,19 +208,7 @@ const PostHogSurveyForm: React.FC<PostHogSurveyFormProps> = ({ survey, redirectT
     if (Object.keys(responses).length === 0) {
       analytics.surveyDismissed(survey.id);
     } else {
-      const responseProps: Record<string, string | string[]> = {};
-      survey.questions.forEach((question, index) => {
-        const answer = responses[index];
-        if (answer === undefined) return;
-        if (question.id) {
-          responseProps[`$survey_response_${question.id}`] = answer;
-        } else if (index === 0) {
-          responseProps["$survey_response"] = answer;
-        } else {
-          responseProps[`$survey_response_${index}`] = answer;
-        }
-      });
-      analytics.surveySent(survey.id, survey.name, responseProps);
+      analytics.surveySent(survey.id, survey.name, buildSurveyResponseProps(survey, responses));
     }
     handleComplete();
   };
