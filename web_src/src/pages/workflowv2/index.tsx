@@ -5695,6 +5695,7 @@ export function WorkflowPageV2() {
           viewportRef={isRunsMode ? runsViewportRef : viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
           fitAllRequest={isRunsMode ? runsFitAllNonce : null}
+          runCanvasLoading={isRunsMode && !!selectedRunRootEventId && selectedRunExecutionsQuery.isLoading}
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}

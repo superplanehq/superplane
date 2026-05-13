@@ -287,6 +287,8 @@ export interface CanvasPageProps {
   initialFocusNodeId?: string | null;
   /** Bump this counter to fit all currently-rendered nodes into view (e.g., when run selection changes). */
   fitAllRequest?: number | null;
+  /** Shows a loading indicator over the canvas (not the sidebar) while run executions are being fetched. */
+  runCanvasLoading?: boolean;
 
   // Full history functionality
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
@@ -1160,6 +1162,11 @@ function CanvasPage(props: CanvasPageProps) {
         )}
 
         <div className="flex-1 relative">
+          {props.runCanvasLoading && props.headerMode === "runs" ? (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-50">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+            </div>
+          ) : null}
           {showPreviewFloatingBar || showAwaitingFloatingBar ? (
             <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
               <div
