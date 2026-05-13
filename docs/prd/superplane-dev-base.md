@@ -16,13 +16,13 @@ PostgreSQL client, migration tooling, protobuf tooling, and test browsers) acros
 This increased build/test time, duplicated installation logic, and made CI behavior more sensitive
 to network flakiness.
 
-A deterministic, reusable image layer that can be versioned solves most of these problem.
+A deterministic, reusable image layer that can be versioned solves most of these problems.
 
 ## Proof-Of-Concept results
 
 I ran a POC to get some numbers:
 
-- An image that contains everything abouve is around: 800 mb
+- An image that contains everything above is around: 800 mb
 - It downloads in CI in about: 35 seconds
 - This is faster by around 100 seconds from what we have atm.
 
