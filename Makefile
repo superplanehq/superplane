@@ -58,7 +58,6 @@ test.coverage.baseline.update:
 	$(MAKE) check.coverage.go.baseline.update
 
 test.license.check:
-	$(MAKE) pb.gen
 	bash ./scripts/license-check.sh
 
 test.watch:
@@ -273,24 +272,32 @@ MODULES := authorization,organizations,integrations,secrets,users,groups,roles,m
 REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents
 
 pb.gen: dev.test.is.running
-	@$(COMPOSE) exec app /app/scripts/protoc.sh $(MODULES)
-	@$(COMPOSE) exec app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	$(MAKE) pb.gen.models
+	$(MAKE) pb.gen.gateway
 	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
-	@$(MAKE) openapi.spec.gen
-	@$(MAKE) openapi.client.gen
-	@$(MAKE) openapi.web.client.gen
+	$(MAKE) openapi.spec.gen
+	$(MAKE) openapi.client.gen
+	$(MAKE) openapi.web.client.gen
+
+pb.gen.models:
+	@$(COMPOSE) exec app /app/scripts/protoc.sh $(MODULES)
+
+pb.gen.gateway:
+	@$(COMPOSE) exec app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
 
 openapi.spec.gen: dev.test.is.running
-	$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
 
 openapi.client.gen: dev.test.is.running
 	@rm -rf pkg/openapi_client
-	@docker run --rm --user $(shell id -u):$(shell id -g) \
+	@log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	if ! docker run --rm --user $(shell id -u):$(shell id -g) \
 		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g go \
 		-o /local/pkg/openapi_client \
-		--additional-properties=packageName=openapi_client,enumClassPrefix=true,isGoSubmodule=true,withGoMod=false
+		--additional-properties=packageName=openapi_client,enumClassPrefix=true,isGoSubmodule=true,withGoMod=false \
+		>"$$log" 2>&1; then cat "$$log"; exit 1; fi
 	@rm -rf pkg/openapi_client/test
 	@rm -rf pkg/openapi_client/docs
 	@rm -rf pkg/openapi_client/api
@@ -301,7 +308,7 @@ openapi.client.gen: dev.test.is.running
 
 openapi.web.client.gen: dev.test.is.running
 	@rm -rf web_src/src/api-client
-	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm run generate:api && npx prettier --write 'src/api-client/**/*.{ts,tsx}'"
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm -s run generate:api && npx prettier --log-level silent --write 'src/api-client/**/*.{ts,tsx}'"
 
 #
 # Image and CLI build
