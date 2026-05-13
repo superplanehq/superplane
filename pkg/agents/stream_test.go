@@ -164,7 +164,7 @@ func TestBuildPrompt_WithToken_FirstMessage(t *testing.T) {
 	}
 
 	body := streamRequest{
-		Question: "List canvases",
+		Question:     "List canvases",
 		AgentContext: agentContext{Mode: "build", CanvasVersion: "v42"},
 	}
 
@@ -200,7 +200,7 @@ func TestBuildPrompt_WithoutToken(t *testing.T) {
 	}
 
 	body := streamRequest{
-		Question: "Hello",
+		Question:     "Hello",
 		AgentContext: agentContext{Mode: "inspect"},
 	}
 

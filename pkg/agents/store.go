@@ -9,14 +9,14 @@ import (
 
 // ChatSession represents a persisted agent chat session.
 type ChatSession struct {
-	ID                   string     `gorm:"column:id;primaryKey"`
-	OrganizationID       string     `gorm:"column:organization_id"`
-	UserID               string     `gorm:"column:user_id"`
-	CanvasID             string     `gorm:"column:canvas_id"`
-	AnthropicSessionID   string     `gorm:"column:anthropic_session_id"`
-	APIToken             *string    `gorm:"column:api_token"`
-	APITokenExpiresAt    *time.Time `gorm:"column:api_token_expires_at"`
-	CreatedAt            time.Time  `gorm:"column:created_at"`
+	ID                 string     `gorm:"column:id;primaryKey"`
+	OrganizationID     string     `gorm:"column:organization_id"`
+	UserID             string     `gorm:"column:user_id"`
+	CanvasID           string     `gorm:"column:canvas_id"`
+	AnthropicSessionID string     `gorm:"column:anthropic_session_id"`
+	APIToken           *string    `gorm:"column:api_token"`
+	APITokenExpiresAt  *time.Time `gorm:"column:api_token_expires_at"`
+	CreatedAt          time.Time  `gorm:"column:created_at"`
 }
 
 func (ChatSession) TableName() string { return "agent_sessions" }

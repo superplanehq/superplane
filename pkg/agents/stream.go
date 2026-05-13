@@ -193,7 +193,7 @@ func (h *StreamHandler) forwardSSEStream(ctx context.Context, sseStream interfac
 				"tool_call_id": event.ID,
 			})
 
-		// Ignore other event types (span.*, session.status_running, etc.)
+			// Ignore other event types (span.*, session.status_running, etc.)
 		}
 	}
 
