@@ -89,8 +89,8 @@ func NewCanvasPublisher(tx *gorm.DB, draft *models.CanvasVersion, liveVersion *m
 		return nil, err
 	}
 
-	readmeChanged := draft.Readme != liveVersion.Readme
-	if (changeset == nil || len(changeset.Changes) == 0) && !readmeChanged {
+	// Readme removed from version — only check node/edge changes
+	if changeset == nil || len(changeset.Changes) == 0 {
 		return nil, fmt.Errorf("no changes between live and draft version being applied")
 	}
 

@@ -854,7 +854,8 @@ message Canvas {
     repeated Components.Node nodes = 1;
     repeated Components.Edge edges = 2;
     ChangeManagement change_management = 3;
-    string readme = 4;
+    // Field 4 was `readme`; removed — docs now live in git repo (docs/README.md)
+    reserved 4;
   }
 
   message Status {

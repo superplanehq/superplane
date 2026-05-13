@@ -50,7 +50,6 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 		Spec: &pb.Canvas_Spec{
 			Nodes:  actions.NodesToProto(version.Nodes),
 			Edges:  actions.EdgesToProto(version.Edges),
-			Readme: version.Readme,
 		},
 	}
 }
