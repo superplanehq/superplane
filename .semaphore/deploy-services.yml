@@ -21,13 +21,11 @@ blocks:
         - name: SSH deploy fleet-manager
           commands:
             - checkout
-            - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-            - echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/deploy.pem && chmod 600 ~/.ssh/deploy.pem
+            - chmod 600 ~/.ssh/deploy.pem
             - export SSH_KEY=~/.ssh/deploy.pem
             - export SSH_HOST=13.220.51.216
             - export AUTH_TOKEN="$FLEET_AUTH_TOKEN"
             - export FLEET_MANAGER_IMAGE="ghcr.io/superplanehq/runner/fleet-manager:$(echo $SEMAPHORE_GIT_SHA | cut -c1-12)"
-            - ssh -o StrictHostKeyChecking=accept-new ubuntu@13.220.51.216 exit
             - bash scripts/start-fleet-manager-remote.sh
 
   - name: Deploy task-broker
@@ -38,12 +36,10 @@ blocks:
         - name: SSH deploy task-broker
           commands:
             - checkout
-            - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-            - echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/deploy.pem && chmod 600 ~/.ssh/deploy.pem
+            - chmod 600 ~/.ssh/deploy.pem
             - export SSH_KEY=~/.ssh/deploy.pem
             - export SSH_HOST=98.91.210.215
             - export AUTH_TOKEN="$TASK_BROKER_AUTH_TOKEN"
             - export BROKER_PUBLIC_URL="$BROKER_PUBLIC_URL"
             - export TASK_BROKER_IMAGE="ghcr.io/superplanehq/runner/task-broker:$(echo $SEMAPHORE_GIT_SHA | cut -c1-12)"
-            - ssh -o StrictHostKeyChecking=accept-new ubuntu@98.91.210.215 exit
             - bash scripts/start-task-broker-remote.sh
