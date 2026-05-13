@@ -22,7 +22,7 @@ type Config struct {
 	BaseURL  string
 	RunnerID string
 	Token    string
-	// Transport is "http" (default) or "websocket" for fleet-manager /v1/runners/stream.
+	// Transport selects fleet-manager API: default WebSocket (GET /v1/runners/stream). Set "http", "polling", or "legacy" for POST claim/complete.
 	Transport string
 	PollEmpty time.Duration
 	// MaxOutputBytes caps combined stdout+stderr stored and sent back.

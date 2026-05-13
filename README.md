@@ -3,7 +3,7 @@
 Monorepo (single Go module) for **task-broker**, **fleet-manager**, and the **runner** worker.
 
 - **Task-broker** — optional front door: registers downstream fleet-manager instances (per region/cloud), routes `POST /v1/tasks`, and relays completion webhooks to callers (`task_id` is broker-scoped; `fleet_task_id` identifies the upstream task).
-- **Fleet-manager** — durable queue per fleet, runners claim work via HTTP, completions POST to either the caller webhook or the broker relay URL.
+- **Fleet-manager** — durable queue per fleet; runners use **WebSocket** by default (`GET /v1/runners/stream`) or optional HTTP claim/complete when **`RUNNER_TRANSPORT=http`**. Completions POST to either the caller webhook or the broker relay URL.
 - **Runner** — long-lived worker: claims tasks, executes `command` argv or multi-line **`commands`** shell scripts, completes results.
 
 Shared JSON types live under **`shared/`**; webhook retries use **`shared/webhook`**.
@@ -128,6 +128,7 @@ export DATABASE_PATH=./fleet.db
 | Environment variable | Description                                                                                            |
 | -------------------- | ------------------------------------------------------------------------------------------------------ |
 | `FLEET_MANAGER_URL`  | **Required.** Base URL of **that fleet’s** fleet-manager (not the broker unless you bypass the broker) |
+| `RUNNER_TRANSPORT`   | Default **WebSocket**. Set **`http`**, **`polling`**, or **`legacy`** to use **`POST /v1/tasks/claim`** / **`complete`** instead (e.g. old fleet-manager without the stream route). |
 | `RUNNER_ID`          | Optional; defaults to host name or a random id                                                         |
 | `AUTH_TOKEN`         | Optional; must match fleet-manager if set                                                              |
 | `POLL_EMPTY_MS`      | Sleep when no work (default ~1000 ms)                                                                  |
@@ -139,14 +140,15 @@ export AUTH_TOKEN= # if fleet-manager uses it
 ./bin/runner
 ```
 
-**Logging:** JSON **`fleet_manager_http`** lines for **`claim_task`**/**`complete_task`**: **`op`**, **`http_status`**, **`dur`**, **`runner_id`**, **`task_id`** (when known); failures use **`Warn`** with **`err`**.
+**Logging:** Default transport logs **`fleet_manager_ws`** for stream lifecycle; HTTP transport logs **`fleet_manager_http`** for **`claim_task`**/**`complete_task`**: **`op`**, **`http_status`**, **`dur`**, **`runner_id`**, **`task_id`** (when known); failures use **`Warn`** with **`err`**.
 
 ## HTTP API — fleet-manager (v1)
 
 - `GET /healthz` — liveness
 - `POST /v1/tasks` — enqueue: **`command`** (argv for one process) **or** **`commands`** (string lines concatenated into one `sh -c` script so `export` / `cd` persist), **`webhook_url`**, optional `execution_mode` / `docker_image`
-- `POST /v1/tasks/claim` — runner pulls the next task
-- `POST /v1/tasks/{id}/complete` — runner reports result
+- `GET /v1/runners/stream` — runner WebSocket (default worker transport)
+- `POST /v1/tasks/claim` — runner pulls the next task (HTTP transport)
+- `POST /v1/tasks/{id}/complete` — runner reports result (HTTP transport)
 
 When the broker is **not** in the path, fleet-manager POSTs the completion **webhook** to `webhook_url` with `task_id`, `status`, `exit_code`, `output`, optional `error` (no `fleet_task_id`).
 
