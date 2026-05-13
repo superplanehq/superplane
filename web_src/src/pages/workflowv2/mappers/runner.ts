@@ -32,6 +32,23 @@ function firstRunnerPayload(execution: ExecutionInfo): Record<string, unknown> |
   return payload as Record<string, unknown>;
 }
 
+function runnerFinishedPassedState(execution: ExecutionInfo): EventState {
+  const outputs = execution.outputs as RunnerOutputs;
+  if (outputs?.failed?.length) {
+    return "failed";
+  }
+  if (outputs?.passed?.length) {
+    return "passed";
+  }
+
+  const payload = firstRunnerPayload(execution);
+  const exitCode = payload?.exit_code;
+  if (typeof exitCode === "number") {
+    return exitCode === 0 ? "passed" : "failed";
+  }
+  return "passed";
+}
+
 const runnerStateFunction = (execution: ExecutionInfo): EventState => {
   if (!execution) return "neutral";
 
@@ -52,20 +69,7 @@ const runnerStateFunction = (execution: ExecutionInfo): EventState => {
   }
 
   if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
-    const outputs = execution.outputs as RunnerOutputs;
-    if (outputs?.failed?.length) {
-      return "failed";
-    }
-    if (outputs?.passed?.length) {
-      return "passed";
-    }
-
-    const payload = firstRunnerPayload(execution);
-    const exitCode = payload?.exit_code;
-    if (typeof exitCode === "number") {
-      return exitCode === 0 ? "passed" : "failed";
-    }
-    return "passed";
+    return runnerFinishedPassedState(execution);
   }
 
   return "failed";
@@ -115,7 +119,7 @@ export const runnerMapper: ComponentBaseMapper = {
 function runnerEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
   if (!execution) return undefined;
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const state = runnerStateFunction(execution);
   const subtitleTimestamp = state === "running" ? execution.createdAt : execution.updatedAt || execution.createdAt;
