@@ -52,6 +52,7 @@ import {
   useDeleteCanvasMemoryEntry,
   useDeleteCanvasVersion,
   usePublishCanvasVersion,
+  useEventExecutions,
   useInfiniteCanvasEvents,
   useInfiniteCanvasRuns,
   useInfiniteCanvasLiveVersions,
@@ -583,6 +584,14 @@ export function WorkflowPageV2() {
     () => runsData.runs.find((run) => run.id === selectedRunId) || null,
     [runsData.runs, selectedRunId],
   );
+  // Prefetch full executions (with metadata/outputs) for the selected run as soon
+  // as the user picks it in the sidebar. Mappers like wait/timegate compute states
+  // such as "pushed through" from execution.outputs, which selectedRun.executions
+  // (lightweight refs) don't carry. The same query backs RunNodeDetailModal, so the
+  // payload tab also opens without a follow-up fetch.
+  const selectedRunRootEventId = selectedRun?.rootEvent?.id ?? null;
+  const selectedRunExecutionsQuery = useEventExecutions(canvasId!, selectedRunRootEventId);
+  const selectedRunFullExecutions = selectedRunExecutionsQuery.data?.executions;
   const canvasEventsResponse = infiniteEventsQuery.data?.pages?.[0];
   const componentIconMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -1106,7 +1115,10 @@ export function WorkflowPageV2() {
 
     return { nodeExecutionsMap: executionsMap, nodeQueueItemsMap: queueItemsMap, nodeEventsMap: eventsMap };
   }, [storeVersion]);
-  const visibleNodeExecutionsMap = isViewingLiveVersion ? nodeExecutionsMap : {};
+  const visibleNodeExecutionsMap = useMemo(
+    () => (isViewingLiveVersion ? nodeExecutionsMap : {}),
+    [isViewingLiveVersion, nodeExecutionsMap],
+  );
   const visibleNodeQueueItemsMap = isViewingLiveVersion ? nodeQueueItemsMap : {};
   const visibleNodeEventsMap = isViewingLiveVersion ? nodeEventsMap : {};
 
@@ -1929,17 +1941,15 @@ export function WorkflowPageV2() {
       if (!nodeExecutionsMap[execution.nodeId]) {
         nodeExecutionsMap[execution.nodeId] = [];
       }
-      // selectedRun.executions are lightweight refs without `metadata` / `outputs`,
-      // so mappers that need approval records, pushThrough state, etc. can't render
-      // their interactive controls. Hydrate from the live store when available.
-      const fullExecution = visibleNodeExecutionsMap[execution.nodeId]?.find((e) => e.id === execution.id);
-      nodeExecutionsMap[execution.nodeId].push({
-        ...(fullExecution || {}),
-        ...execution,
-        ...(fullExecution?.metadata ? { metadata: fullExecution.metadata } : {}),
-        ...(fullExecution?.outputs ? { outputs: fullExecution.outputs } : {}),
-        rootEvent: selectedRun.rootEvent,
-      } as CanvasesCanvasNodeExecution);
+
+      nodeExecutionsMap[execution.nodeId].push(
+        hydrateRunExecution(
+          execution,
+          selectedRunFullExecutions,
+          visibleNodeExecutionsMap[execution.nodeId],
+          selectedRun.rootEvent,
+        ),
+      );
     }
 
     if (runNodeIds.size === 0) {
@@ -1979,6 +1989,7 @@ export function WorkflowPageV2() {
     queryClient,
     me,
     visibleNodeExecutionsMap,
+    selectedRunFullExecutions,
   ]);
 
   const nodes = runCanvasData ? runCanvasData.nodes : nodesWithIntegrationStatus;
@@ -5974,6 +5985,25 @@ function useExecutionChainData(workflowId: string, queryClient: QueryClient, wor
   );
 
   return { loadExecutionChain };
+}
+
+// Merge a run's lightweight execution ref with the matching full execution (preferred from the
+// prefetched event-executions query, falling back to the live store), so mappers receive metadata
+// (approval records) and outputs (wait/timegate "pushed through" detection).
+function hydrateRunExecution(
+  ref: CanvasesCanvasNodeExecution,
+  prefetched: CanvasesCanvasNodeExecution[] | undefined,
+  storeExecutions: CanvasesCanvasNodeExecution[] | undefined,
+  rootEvent: CanvasesCanvasEvent | undefined,
+): CanvasesCanvasNodeExecution {
+  const full = prefetched?.find((e) => e.id === ref.id) ?? storeExecutions?.find((e) => e.id === ref.id);
+  return {
+    ...(full ?? {}),
+    ...ref,
+    ...(full?.metadata && { metadata: full.metadata }),
+    ...(full?.outputs && { outputs: full.outputs }),
+    rootEvent,
+  } as CanvasesCanvasNodeExecution;
 }
 
 // Helper function to build topological path to find all nodes that should execute before the given target node
