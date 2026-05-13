@@ -25,6 +25,7 @@ import type { TabData } from "./SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "./types";
 import { DocsTab } from "./DocsTab";
 import { LatestTab } from "./LatestTab";
+import { RunnerLiveLogsModal } from "./RunnerLiveLogsModal";
 import { SettingsTab } from "./SettingsTab";
 import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
 import type {
@@ -56,6 +57,8 @@ const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
 interface ComponentSidebarProps {
   isOpen?: boolean;
   canvasMode?: "live" | "edit";
+  /** Canvas id for API calls (e.g. runner live log stream). */
+  canvasId?: string;
 
   latestEvents: SidebarEvent[];
   nextInQueueEvents: SidebarEvent[];
@@ -164,6 +167,7 @@ interface ComponentSidebarProps {
 export const ComponentSidebar = ({
   isOpen,
   canvasMode = "live",
+  canvasId,
   nodeId,
   iconSrc,
   iconSlug,
@@ -238,6 +242,7 @@ export const ComponentSidebar = ({
   const sidebarRef = useRef<HTMLDivElement>(null);
   // Keep expanded state stable across parent re-renders
   const [openEventIds, setOpenEventIds] = useState<Set<string>>(new Set());
+  const [runnerLiveLogsExecutionId, setRunnerLiveLogsExecutionId] = useState<string | null>(null);
 
   const [page, setPage] = useState<"overview" | "history" | "queue" | "execution-chain">("overview");
   const [previousPage, setPreviousPage] = useState<"overview" | "history" | "queue" | "execution-chain">("overview");
@@ -749,6 +754,11 @@ export const ComponentSidebar = ({
                   getExecutionState={getExecutionState}
                   workflowNodes={workflowNodes}
                   actions={actions}
+                  onOpenRunnerLiveLogs={
+                    canvasId && domainId
+                      ? (executionId: string) => setRunnerLiveLogsExecutionId(executionId)
+                      : undefined
+                  }
                 />
               </TabsContent>
             )}
@@ -855,6 +865,11 @@ export const ComponentSidebar = ({
                       loadingMoreItems={loadingMoreItems}
                       showMoreCount={showMoreCount}
                       onLoadMoreItems={handleLoadMoreItems}
+                      onOpenRunnerLiveLogs={
+                        canvasId && domainId
+                          ? (executionId: string) => setRunnerLiveLogsExecutionId(executionId)
+                          : undefined
+                      }
                     />
                   )}
                 </div>
@@ -1040,6 +1055,19 @@ export const ComponentSidebar = ({
           ) : null}
         </DialogContent>
       </Dialog>
+      {canvasId && domainId ? (
+        <RunnerLiveLogsModal
+          open={runnerLiveLogsExecutionId != null}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setRunnerLiveLogsExecutionId(null);
+            }
+          }}
+          organizationId={domainId}
+          canvasId={canvasId}
+          executionId={runnerLiveLogsExecutionId ?? ""}
+        />
+      ) : null}
     </div>
   );
 };

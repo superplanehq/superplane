@@ -1299,6 +1299,7 @@ function CanvasPage(props: CanvasPageProps) {
               onTabChange={setCurrentTab}
               canvasMode={props.headerMode === "version-live" ? "live" : "edit"}
               organizationId={props.organizationId}
+              canvasId={props.canvasId}
               getCustomField={props.getCustomField}
               integrations={props.integrations}
               workflowNodes={props.workflowNodes}
@@ -1359,6 +1360,7 @@ function Sidebar({
   onTabChange,
   canvasMode,
   organizationId,
+  canvasId,
   getCustomField,
   integrations,
   workflowNodes,
@@ -1406,6 +1408,7 @@ function Sidebar({
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
   canvasMode: "live" | "edit";
   organizationId?: string;
+  canvasId?: string;
   getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
   integrations?: OrganizationsIntegration[];
   workflowNodes?: ComponentsNode[];
@@ -1524,6 +1527,7 @@ function Sidebar({
       key={state.componentSidebar.selectedNodeId}
       isOpen={state.componentSidebar.isOpen}
       canvasMode={canvasMode}
+      canvasId={canvasId}
       onClose={onSidebarClose || state.componentSidebar.close}
       latestEvents={latestEvents}
       nextInQueueEvents={nextInQueueEvents}

@@ -197,6 +197,7 @@ export function mapExecutionsToSidebarEvents(
       nodeId: execution?.nodeId,
       originalExecution: execution,
       triggerEventId: execution.rootEvent?.id,
+      component: componentName,
     };
   });
 }

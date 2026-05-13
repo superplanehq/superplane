@@ -16,6 +16,7 @@ interface HistoryQueuePageProps {
   getTabData?: (event: SidebarEvent) => TabData | undefined;
   onCancelExecution?: (executionId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
+  onOpenRunnerLiveLogs?: (executionId: string) => void;
   loadExecutionChain?: (
     eventId: string,
     nodeId?: string,
@@ -44,6 +45,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
   getTabData,
   onCancelExecution,
   onReEmit,
+  onOpenRunnerLiveLogs,
   loadExecutionChain,
   getExecutionState,
   hasMoreItems,
@@ -76,6 +78,7 @@ export const HistoryQueuePage: React.FC<HistoryQueuePageProps> = ({
                 tabData={getTabData?.(event)}
                 onCancelExecution={onCancelExecution}
                 onReEmit={onReEmit}
+                onOpenRunnerLiveLogs={onOpenRunnerLiveLogs}
                 loadExecutionChain={loadExecutionChain}
                 getExecutionState={getExecutionState}
               />
