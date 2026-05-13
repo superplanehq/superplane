@@ -8,7 +8,6 @@ approval_defaults:
 policy:
   approval:
     - db_changes_require_core_reviewer
-    - agent_changes_require_agent_reviewer
     - protos_changes_require_platform_reviewer
     - rbac_changes_require_security_reviewer
     - release_changes_require_release_reviewer
@@ -33,22 +32,6 @@ approval_rules:
         - lucaspin
         - shiroyasha
         - forestileao
-
-  - name: agent_changes_require_agent_reviewer
-    if:
-      changed_files:
-        paths:
-          - "^agent/.*$"
-        ignore:
-          - "^agent/src/superplaneapi/.*$"
-    options:
-      allow_author: true
-      allow_contributor: true
-    requires:
-      count: 1
-      users:
-        - shiroyasha
-        - lucaspin
 
   - name: protos_changes_require_platform_reviewer
     if:
@@ -171,7 +154,6 @@ approval_rules:
       no_changed_files:
         paths:
           - "^db/.*$"
-          - "^agent/.*$"
           - "^protos/.*$"
           - "^rbac/.*$"
           - "^release/.*$"

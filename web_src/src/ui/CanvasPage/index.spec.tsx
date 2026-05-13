@@ -167,6 +167,7 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
+          headerMode="version-edit"
           nodes={[]}
           edges={[]}
           buildingBlocks={[]}
