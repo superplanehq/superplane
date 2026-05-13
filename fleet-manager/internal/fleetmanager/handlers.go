@@ -157,10 +157,11 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := api.TaskStatusResponse{
-		ID:     task.ID,
-		Status: string(task.Status),
-		Output: task.Output,
-		Error:  task.ErrorMessage,
+		ID:              task.ID,
+		Status:          string(task.Status),
+		Output:          task.Output,
+		Error:           task.ErrorMessage,
+		CancelRequested: task.CancelRequested,
 	}
 	if task.ExitCode != nil {
 		ec := *task.ExitCode
@@ -204,17 +205,49 @@ func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (s *Server) cancelTask(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "id required")
+		return
+	}
+	task, outcome, err := s.Store.RequestCancelTask(r.Context(), id)
+	if err != nil {
+		s.Log.Error("cancel task", slog.Any("err", err))
+		writeError(w, http.StatusInternalServerError, "could not cancel task")
+		return
+	}
+	switch outcome {
+	case store.CancelOutcomeNotFound:
+		writeError(w, http.StatusNotFound, "task not found")
+		return
+	case store.CancelOutcomeCanceledQueued:
+		go s.DeliverWebhook(task)
+	}
+
+	state := string(outcome)
+	if task == nil {
+		writeError(w, http.StatusInternalServerError, "cancel task missing row")
+		return
+	}
+	writeJSON(w, http.StatusOK, api.CancelTaskResponse{
+		ID:     task.ID,
+		State:  state,
+		Status: string(task.Status),
+	})
+}
+
 // completeTaskCore runs Store.CompleteTask, delivers the webhook, and schedules optional EC2 termination.
 // On conflict (wrong runner / bad state), err message contains "not found" or "wrong runner" for HTTP 409 mapping.
 func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, req api.CompleteTaskRequest) (*models.Task, error) {
-	task, err := s.Store.CompleteTask(ctx, taskID, runnerID, req.ExitCode, req.Output, req.Error)
+	task, err := s.Store.CompleteTask(ctx, taskID, runnerID, req.ExitCode, req.Output, req.Error, req.Canceled)
 	if err != nil {
 		return nil, err
 	}
 
-	go s.deliverWebhook(task)
+	go s.DeliverWebhook(task)
 
-	if s.TerminateRunnerAfterTaskEnabled && s.TerminateRunnerInstance != nil && isEC2InstanceID(runnerID) {
+	if !req.Canceled && s.TerminateRunnerAfterTaskEnabled && s.TerminateRunnerInstance != nil && isEC2InstanceID(runnerID) {
 		go func(instanceID string) {
 			tctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 			defer cancel()
@@ -230,7 +263,8 @@ func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, 
 	return task, nil
 }
 
-func (s *Server) deliverWebhook(task *models.Task) {
+// DeliverWebhook POSTs terminal task state to the task webhook URL.
+func (s *Server) DeliverWebhook(task *models.Task) {
 	if s.Webhook == nil {
 		return
 	}

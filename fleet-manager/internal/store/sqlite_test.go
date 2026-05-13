@@ -43,7 +43,7 @@ func TestSQLite_CreateClaimComplete(t *testing.T) {
 		t.Fatalf("claim state: %+v", got)
 	}
 
-	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 0, "hello\n", "")
+	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 0, "hello\n", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,12 +121,15 @@ func TestSQLite_ReapExpiredLeases(t *testing.T) {
 	}
 	time.Sleep(5 * time.Millisecond)
 
-	n, err := s.ReapExpiredLeases(ctx)
+	n, canceled, err := s.ReapExpiredLeases(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if n != 1 {
 		t.Fatalf("reap count: %d", n)
+	}
+	if len(canceled) != 0 {
+		t.Fatalf("unexpected canceled from reap: %v", canceled)
 	}
 
 	again, err := s.ClaimTask(ctx, "runner-2", time.Minute)
@@ -135,5 +138,139 @@ func TestSQLite_ReapExpiredLeases(t *testing.T) {
 	}
 	if again == nil || again.ID != task.ID {
 		t.Fatalf("expected task back in queue, got %+v", again)
+	}
+}
+
+func TestSQLite_CancelQueued(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	task := &models.Task{
+		ID:            uuid.NewString(),
+		Command:       []string{"echo", "x"},
+		WebhookURL:    "https://example.com/hook",
+		Status:        models.StatusQueued,
+		CreatedAt:     time.Now().UTC(),
+		ExecutionMode: models.ExecutionHost,
+	}
+	if err := s.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+
+	got, outcome, err := s.RequestCancelTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outcome != CancelOutcomeCanceledQueued {
+		t.Fatalf("outcome: %s", outcome)
+	}
+	if got.Status != models.StatusCanceled {
+		t.Fatalf("status: %s", got.Status)
+	}
+	if got.ExitCode == nil || *got.ExitCode != exitCanceled {
+		t.Fatalf("exit: %v", got.ExitCode)
+	}
+}
+
+func TestSQLite_CancelClaimedThenCompleteCanceled(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	task := &models.Task{
+		ID:            uuid.NewString(),
+		Command:       []string{"sleep", "9"},
+		WebhookURL:    "https://example.com/hook",
+		Status:        models.StatusQueued,
+		CreatedAt:     time.Now().UTC(),
+		ExecutionMode: models.ExecutionHost,
+	}
+	if err := s.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ClaimTask(ctx, "runner-1", 5*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+
+	got, outcome, err := s.RequestCancelTask(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if outcome != CancelOutcomeCancelRequested {
+		t.Fatalf("outcome: %s", outcome)
+	}
+	if !got.CancelRequested {
+		t.Fatal("expected cancel_requested")
+	}
+
+	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 130, "stopped\n", "", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if done.Status != models.StatusCanceled {
+		t.Fatalf("want canceled got %s", done.Status)
+	}
+	if done.CancelRequested {
+		t.Fatal("cancel_requested should be cleared")
+	}
+}
+
+func TestSQLite_ReapExpiredLeaseWithCancelRequested(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	task := &models.Task{
+		ID:            uuid.NewString(),
+		Command:       []string{"sleep", "999"},
+		WebhookURL:    "https://example.com/hook",
+		Status:        models.StatusQueued,
+		CreatedAt:     time.Now().UTC(),
+		ExecutionMode: models.ExecutionHost,
+	}
+	if err := s.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ClaimTask(ctx, "runner-1", time.Nanosecond); err != nil {
+		t.Fatal(err)
+	}
+	if _, outcome, err := s.RequestCancelTask(ctx, task.ID); err != nil || outcome != CancelOutcomeCancelRequested {
+		t.Fatalf("cancel claimed: %v %s", err, outcome)
+	}
+	time.Sleep(5 * time.Millisecond)
+
+	requeued, canceled, err := s.ReapExpiredLeases(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requeued != 0 {
+		t.Fatalf("requeued: %d", requeued)
+	}
+	if len(canceled) != 1 || canceled[0].ID != task.ID {
+		t.Fatalf("canceled: %+v", canceled)
+	}
+	if canceled[0].Status != models.StatusCanceled {
+		t.Fatalf("status: %s", canceled[0].Status)
+	}
+
+	empty, err := s.ClaimTask(ctx, "runner-2", time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if empty != nil {
+		t.Fatalf("task should not be requeued, got %+v", empty)
 	}
 }

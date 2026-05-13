@@ -34,6 +34,7 @@ type Complete struct {
 	ExitCode int    `json:"exit_code"`
 	Output   string `json:"output"`
 	Error    string `json:"error,omitempty"`
+	Canceled bool   `json:"canceled,omitempty"`
 }
 
 // Ack is server -> client after successful complete (HTTP 204 equivalent).

@@ -107,13 +107,20 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				n, err := st.ReapExpiredLeases(context.Background())
+				requeued, canceledTasks, err := st.ReapExpiredLeases(context.Background())
 				if err != nil {
 					log.Warn("reap leases", slog.Any("err", err))
 					continue
 				}
-				if n > 0 {
-					log.Info("reaped expired task leases", slog.Int64("count", n))
+				for _, task := range canceledTasks {
+					t := task
+					go srv.DeliverWebhook(t)
+				}
+				if requeued > 0 {
+					log.Info("reaped expired task leases", slog.Int64("count", requeued))
+				}
+				if len(canceledTasks) > 0 {
+					log.Info("finalized canceled tasks after lease expiry", slog.Int("count", len(canceledTasks)))
 				}
 			}
 		}

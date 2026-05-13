@@ -10,6 +10,7 @@ const (
 	StatusClaimed   TaskStatus = "claimed"
 	StatusSucceeded TaskStatus = "succeeded"
 	StatusFailed    TaskStatus = "failed"
+	StatusCanceled  TaskStatus = "canceled"
 )
 
 // ExecutionMode selects how the runner executes the command.
@@ -38,4 +39,6 @@ type Task struct {
 	ExitCode      *int
 	Output        string
 	ErrorMessage  string
+	// CancelRequested is true while the task is claimed and a caller asked to stop it (persisted).
+	CancelRequested bool
 }

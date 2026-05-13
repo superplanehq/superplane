@@ -283,13 +283,81 @@ func (s *Server) getBrokerTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, api.BrokerGetTaskResponse{
-		TaskID:      brokerID,
-		FleetTaskID: row.FleetTaskID,
-		Status:      strings.TrimSpace(up.Status),
-		ExitCode:    up.ExitCode,
-		Output:      up.Output,
-		Error:       up.Error,
+		TaskID:          brokerID,
+		FleetTaskID:     row.FleetTaskID,
+		Status:          strings.TrimSpace(up.Status),
+		ExitCode:        up.ExitCode,
+		Output:          up.Output,
+		Error:           up.Error,
+		CancelRequested: up.CancelRequested,
 	})
+}
+
+func (s *Server) cancelBrokerTask(w http.ResponseWriter, r *http.Request) {
+	brokerID := strings.TrimSpace(chi.URLParam(r, "id"))
+	if brokerID == "" {
+		writeError(w, http.StatusBadRequest, "id required")
+		return
+	}
+	row, err := s.Store.GetBrokerTask(r.Context(), brokerID)
+	if err != nil {
+		s.logErr("get broker task", err)
+		writeError(w, http.StatusInternalServerError, "lookup failed")
+		return
+	}
+	if row == nil {
+		writeError(w, http.StatusNotFound, "task not found")
+		return
+	}
+	if row.FleetTaskID == "" {
+		writeError(w, http.StatusConflict, "task not yet assigned upstream")
+		return
+	}
+	fleet, err := s.Store.GetFleet(r.Context(), row.FleetID)
+	if err != nil {
+		s.logErr("get fleet for cancel", err)
+		writeError(w, http.StatusInternalServerError, "could not load fleet")
+		return
+	}
+	if fleet == nil {
+		writeError(w, http.StatusInternalServerError, "fleet missing")
+		return
+	}
+	st, upstream := s.forwardCancelTask(r.Context(), fleet, row.FleetTaskID)
+	if st == http.StatusNotFound {
+		writeError(w, http.StatusBadGateway, "upstream task missing")
+		return
+	}
+	if st != http.StatusOK {
+		s.warn("upstream cancel failed", slog.Int("status", st), slog.String("fleet", fleet.ID))
+		writeError(w, http.StatusBadGateway, "fleet-manager rejected cancel")
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(upstream)
+}
+
+func (s *Server) forwardCancelTask(ctx context.Context, fleet *brokermodels.Fleet, fleetTaskID string) (status int, respBody []byte) {
+	c := s.HTTP
+	if c == nil {
+		c = http.DefaultClient
+	}
+	u := strings.TrimRight(fleet.BaseURL, "/") + "/v1/tasks/" + fleetTaskID + "/cancel"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, nil)
+	if err != nil {
+		return 0, nil
+	}
+	if t := fleet.AuthToken; t != "" {
+		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(t))
+	}
+	resp, err := c.Do(req)
+	if err != nil {
+		return 0, []byte(err.Error())
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 65536))
+	return resp.StatusCode, b
 }
 
 func (s *Server) forwardGetTask(ctx context.Context, fleet *brokermodels.Fleet, fleetTaskID string) (status int, respBody []byte) {

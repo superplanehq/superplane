@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os/exec"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/superplane/runner/shared/api"
@@ -61,7 +62,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	if transportWebSocket(a.Config) {
 		return RunWebSocket(ctx, a)
 	}
-	base := strings.TrimRight(a.Config.BaseURL, "/")
+	base := a.fleetBase()
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -78,12 +79,12 @@ func (a *Agent) Run(ctx context.Context) error {
 			}
 			continue
 		}
-		exit, out, runErr := a.execute(ctx, task)
+		exit, out, runErr, userCanceled := a.execute(ctx, base, task)
 		errMsg := ""
 		if runErr != nil {
 			errMsg = runErr.Error()
 		}
-		if err := a.complete(ctx, base, task.ID, exit, out, errMsg); err != nil {
+		if err := a.complete(ctx, base, task.ID, exit, out, errMsg, userCanceled); err != nil {
 			return err
 		}
 		if a.Config.ExitAfterEachTask {
@@ -140,12 +141,13 @@ func (a *Agent) claim(ctx context.Context, base string) (*api.TaskPayload, error
 	return out.Task, nil
 }
 
-func (a *Agent) complete(ctx context.Context, base, id string, exit int, output, errMsg string) error {
+func (a *Agent) complete(ctx context.Context, base, id string, exit int, output, errMsg string, canceled bool) error {
 	payload := api.CompleteTaskRequest{
 		RunnerID: a.Config.RunnerID,
 		ExitCode: exit,
 		Output:   output,
 		Error:    errMsg,
+		Canceled: canceled,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -211,23 +213,84 @@ func (a *Agent) logFleetHTTPWarn(op string, dur time.Duration, status int, taskI
 	a.Config.Log.Warn("fleet_manager_http", args...)
 }
 
-func (a *Agent) execute(ctx context.Context, task *api.TaskPayload) (int, string, error) {
+const cancelPollInterval = 1500 * time.Millisecond
+
+func (a *Agent) fleetBase() string {
+	return strings.TrimRight(strings.TrimSpace(a.Config.BaseURL), "/")
+}
+
+func (a *Agent) getTaskStatus(ctx context.Context, base, id string) (*api.TaskStatusResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base+"/v1/tasks/"+id, nil)
+	if err != nil {
+		return nil, err
+	}
+	a.auth(req)
+	resp, err := a.HTTP.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		return nil, fmt.Errorf("get task: status %d: %s", resp.StatusCode, strings.TrimSpace(string(b)))
+	}
+	var out api.TaskStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload) (int, string, error, bool) {
 	mode := models.ExecutionMode(strings.ToLower(strings.TrimSpace(task.ExecutionMode)))
 	if mode == "" {
 		mode = models.ExecutionHost
 	}
 
-	execCtx, cancel := context.WithTimeout(ctx, 9*time.Minute)
-	defer cancel()
+	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, 9*time.Minute)
+	defer cancelTimeout()
 
+	execCtx, cancelExec := context.WithCancel(timeoutCtx)
+	defer cancelExec()
+
+	var stoppedByCancel atomic.Bool
+	go func() {
+		tick := time.NewTicker(cancelPollInterval)
+		defer tick.Stop()
+		for {
+			select {
+			case <-execCtx.Done():
+				return
+			case <-ctx.Done():
+				return
+			case <-tick.C:
+				qctx, qc := context.WithTimeout(ctx, 8*time.Second)
+				st, err := a.getTaskStatus(qctx, base, task.ID)
+				qc()
+				if err != nil {
+					continue
+				}
+				if st.CancelRequested || strings.EqualFold(st.Status, string(models.StatusCanceled)) {
+					stoppedByCancel.Store(true)
+					cancelExec()
+					return
+				}
+			}
+		}
+	}()
+
+	var exit int
+	var out string
+	var runErr error
 	switch mode {
 	case models.ExecutionDocker:
-		return a.runDocker(execCtx, task)
+		exit, out, runErr = a.runDocker(execCtx, task)
 	case models.ExecutionHost:
-		return a.runHost(execCtx, task)
+		exit, out, runErr = a.runHost(execCtx, task)
 	default:
-		return 1, "", fmt.Errorf("unknown execution_mode %q", task.ExecutionMode)
+		return 1, "", fmt.Errorf("unknown execution_mode %q", task.ExecutionMode), false
 	}
+	return exit, out, runErr, stoppedByCancel.Load()
 }
 
 func (a *Agent) runHost(ctx context.Context, task *api.TaskPayload) (int, string, error) {

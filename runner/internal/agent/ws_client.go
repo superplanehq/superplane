@@ -104,7 +104,7 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 		}
 		task := taskMsg.Task
 
-		exit, out, runErr := a.execute(ctx, task)
+		exit, out, runErr, userCanceled := a.execute(ctx, a.fleetBase(), task)
 		errMsg := ""
 		if runErr != nil {
 			errMsg = runErr.Error()
@@ -116,6 +116,7 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 			ExitCode: exit,
 			Output:   truncateString(out, a.Config.MaxOutputBytes),
 			Error:    errMsg,
+			Canceled: userCanceled,
 		}
 		if err := conn.WriteJSON(comp); err != nil {
 			return fmt.Errorf("write complete: %w", err)
