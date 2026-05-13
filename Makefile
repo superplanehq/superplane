@@ -11,7 +11,6 @@ PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
 
 COMPOSE=docker compose -f docker-compose.dev.yml
-DOCKER_RUN_AS_CURRENT_USER=docker run --rm --user $(shell id -u):$(shell id -g)
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
 
 #
@@ -110,11 +109,11 @@ dev.setup:
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 dev.setup.npm:
-	@$(COMPOSE) exec -T app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --silent"
+	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --silent"
 
 dev.setup.go:
-	@$(COMPOSE) exec -T app go mod download
-	@$(COMPOSE) exec -T app go build cmd/server/main.go
+	@$(COMPOSE) exec app go mod download
+	@$(COMPOSE) exec app go build cmd/server/main.go
 
 dev.setup.no.cache:
 	rm -rf tmp
@@ -218,20 +217,20 @@ ui.start:
 #
 
 db.create:
-	@$(COMPOSE) exec -T app ./scripts/db_create.sh $(DB_NAME)
+	@$(COMPOSE) exec app ./scripts/db_create.sh $(DB_NAME)
 
 db.migration.create:
-	$(COMPOSE) exec -T app mkdir -p db/migrations
-	$(COMPOSE) exec -T app migrate create -ext sql -dir db/migrations $(NAME)
+	$(COMPOSE) exec app mkdir -p db/migrations
+	$(COMPOSE) exec app migrate create -ext sql -dir db/migrations $(NAME)
 	ls -lah db/migrations/*$(NAME)*
 
 db.data_migration.create:
-	$(COMPOSE) exec -T app mkdir -p db/data_migrations
-	$(COMPOSE) exec -T app migrate create -ext sql -dir db/data_migrations $(NAME)
+	$(COMPOSE) exec app mkdir -p db/data_migrations
+	$(COMPOSE) exec app migrate create -ext sql -dir db/data_migrations $(NAME)
 	ls -lah db/data_migrations/*$(NAME)*
 
 db.migrate:
-	@$(COMPOSE) exec -T app ./scripts/db_migrate.sh $(DB_NAME)
+	@$(COMPOSE) exec app ./scripts/db_migrate.sh $(DB_NAME)
 
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
@@ -241,7 +240,7 @@ db.console:
 	$(COMPOSE) exec -it --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
 
 db.delete:
-	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app dropdb -h db -p 5432 -U postgres $(DB_NAME)
+	$(COMPOSE) exec --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app dropdb -h db -p 5432 -U postgres $(DB_NAME)
 
 db.recreate.all.dangerous:
 	$(MAKE) dev.down
@@ -254,7 +253,7 @@ db.recreate.all.dangerous:
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 #
-# Protobuf compilation
+# Protobuf / OpenAPI codegen runs in the running `app` container (`make dev.up` first).
 #
 
 gen:
@@ -275,36 +274,36 @@ check.components.docs:
 MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents,usage,private/agents
 REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents
 
-pb.gen:
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
-	$(MAKE) openapi.spec.gen
-	$(MAKE) openapi.client.gen
-	$(MAKE) openapi.web.client.gen
+pb.gen: dev.test.is.running
+	@$(COMPOSE) exec app /app/scripts/protoc.sh $(MODULES)
+	@$(COMPOSE) exec app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
+	@$(MAKE) openapi.spec.gen
+	@$(MAKE) openapi.client.gen
+	@$(MAKE) openapi.web.client.gen
 
-openapi.spec.gen:
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+openapi.spec.gen: dev.test.is.running
+	$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
 
-openapi.client.gen:
-	rm -rf pkg/openapi_client
-	$(DOCKER_RUN_AS_CURRENT_USER) \
+openapi.client.gen: dev.test.is.running
+	@rm -rf pkg/openapi_client
+	@docker run --rm --user $(shell id -u):$(shell id -g) \
 		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g go \
 		-o /local/pkg/openapi_client \
 		--additional-properties=packageName=openapi_client,enumClassPrefix=true,isGoSubmodule=true,withGoMod=false
-	rm -rf pkg/openapi_client/test
-	rm -rf pkg/openapi_client/docs
-	rm -rf pkg/openapi_client/api
-	rm -rf pkg/openapi_client/.travis.yml
-	rm -rf pkg/openapi_client/README.md
-	rm -rf pkg/openapi_client/git_push.sh
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/openapi_client -name '*.go' -print0 | xargs -0 gofmt -s -w"
+	@rm -rf pkg/openapi_client/test
+	@rm -rf pkg/openapi_client/docs
+	@rm -rf pkg/openapi_client/api
+	@rm -rf pkg/openapi_client/.travis.yml
+	@rm -rf pkg/openapi_client/README.md
+	@rm -rf pkg/openapi_client/git_push.sh
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/openapi_client -name '*.go' -print0 | xargs -0 gofmt -s -w"
 
-openapi.web.client.gen:
-	rm -rf web_src/src/api-client
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm run generate:api && npx prettier --write 'src/api-client/**/*.{ts,tsx}'"
+openapi.web.client.gen: dev.test.is.running
+	@rm -rf web_src/src/api-client
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm run generate:api && npx prettier --write 'src/api-client/**/*.{ts,tsx}'"
 
 #
 # Image and CLI build
@@ -314,7 +313,7 @@ CLI_VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
 
 cli.build:
 	$(MAKE) pb.gen
-	$(COMPOSE) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o build/cli cmd/cli/main.go'
+	$(COMPOSE) exec -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o build/cli cmd/cli/main.go'
 
 cli.build.m1:
 	$(MAKE) cli.build OS=darwin ARCH=arm64
@@ -322,6 +321,7 @@ cli.build.m1:
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
+# pb.gen runs in the compose app container; run `make dev.up` first.
 image.build:
 	$(MAKE) pb.gen
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner --build-arg BASE_URL=$(BASE_URL) --progress plain -t $(IMAGE):$(IMAGE_TAG) .
