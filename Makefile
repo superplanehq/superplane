@@ -1,7 +1,9 @@
-.PHONY: lint test test.coverage test.license.check test.setup test.e2e.ui.setup gen.setup gen.setup.backend gen.setup.ui check.generated.artifacts check.templates
+.PHONY: lint test test.coverage test.license.check gen.setup gen.setup.prep gen.setup.backend gen.setup.ui web_src.npm.install.compose check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
+# Databases to create and migrate in `make dev.setup` (space-separated). CI sets superplane_test alongside superplane_dev.
+DEV_SETUP_DBS ?= superplane_dev
 BASE_URL?=https://app.superplane.com
 
 export BUILDKIT_PROGRESS ?= plain
@@ -32,35 +34,6 @@ lint:
 
 tidy:
 	$(COMPOSE) exec app go mod tidy
-
-test.setup.build:
-	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
-	@mkdir -p tmp/screenshots
-	$(COMPOSE) build --pull
-	$(COMPOSE) run --rm app go mod download
-	$(MAKE) gen.setup.backend
-	$(MAKE) test.e2e.ui.setup
-
-test.setup:
-	$(MAKE) test.setup.build
-	$(MAKE) test.setup.db
-	$(MAKE) test.start
-
-test.setup.db:
-	$(MAKE) db.create DB_NAME=superplane_test
-	$(MAKE) db.migrate DB_NAME=superplane_test
-
-test.start:
-	$(COMPOSE) up -d --wait
-
-test.down:
-	$(COMPOSE) down --remove-orphans
-
-test.e2e.setup:
-	$(MAKE) test.setup
-
-test.e2e.ui.setup:
-	$(MAKE) openapi.web.client.gen
 
 test.e2e:
 	$(COMPOSE) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1
@@ -115,38 +88,50 @@ format.js.check:
 #
 # Targets for dev environment
 #
+# Typical flow: `make dev.up` then `make dev.setup` (first time / after proto or dependency changes),
+# then `make dev.server`. Day-to-day: `make dev.up` then `make dev.server` (or `make dev.server.fg` for attached logs).
+# For E2E locally, migrate the test DB too: `DEV_SETUP_DBS="superplane_dev superplane_test" make dev.setup` (after `make dev.up`).
+
+dev.up:
+	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
 
 dev.setup:
-	$(COMPOSE) build
-	$(COMPOSE) pull
-	$(MAKE) gen.setup
+	@mkdir -p tmp/screenshots
+	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
+	$(COMPOSE) exec -T app bash -lc "cd /app/web_src && npm install"
+	$(MAKE) gen.setup SKIP_WEB_SRC_NPM_INSTALL=1
 	$(MAKE) dev.setup.app
-	$(MAKE) db.create DB_NAME=superplane_dev
-	$(MAKE) db.migrate DB_NAME=superplane_dev
+	@set -euo pipefail; for db in $(DEV_SETUP_DBS); do \
+		$(MAKE) db.create DB_NAME=$$db; \
+		$(MAKE) db.migrate DB_NAME=$$db; \
+	done
 
 dev.setup.app:
-	$(COMPOSE) run --rm app go mod download
-	$(COMPOSE) run --rm app go build cmd/server/main.go
+	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
+	$(COMPOSE) exec -T app go mod download
+	$(COMPOSE) exec -T app go build cmd/server/main.go
 
 dev.setup.no.cache:
 	rm -rf tmp
 	$(COMPOSE) down -v --remove-orphans
 	$(COMPOSE) build --no-cache
-	$(MAKE) gen.setup
-	$(MAKE) db.create DB_NAME=superplane_dev
-	$(MAKE) db.migrate DB_NAME=superplane_dev
+	$(MAKE) dev.up
+	$(MAKE) dev.setup
 
-dev.start.fg:
-	$(COMPOSE) up
-
-dev.start:
-	$(COMPOSE) up -d
+dev.server:
+	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
+	$(COMPOSE) exec -d app bash /app/docker-entrypoint.dev.sh
 	@bash ./scripts/wait-for-app
+
+dev.server.fg:
+	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
+	$(COMPOSE) exec app bash /app/docker-entrypoint.dev.sh
 
 dev.start.ephemeral:
 	bash ./scripts/ephemeral/start-caddy.sh $(BASE_URL)
 	bash ./scripts/ephemeral/setup-env.sh $(BASE_URL)
-	$(COMPOSE) up -d
+	$(MAKE) dev.up
+	$(MAKE) dev.server
 
 dev.logs:
 	$(COMPOSE) logs -f
@@ -164,7 +149,7 @@ dev.console:
 	$(COMPOSE) run --rm app /bin/bash
 
 dev.db:
-	$(COMPOSE) run --rm app sh -c 'PGPASSWORD=$(DB_PASSWORD) psql -h db -p 5432 -U postgres -d superplane_dev'
+	$(COMPOSE) exec -it -e PGPASSWORD=$(DB_PASSWORD) app psql -h db -p 5432 -U postgres -d superplane_dev
 
 dev.db.console:
 	$(MAKE) db.console DB_NAME=superplane_dev
@@ -224,46 +209,47 @@ ui.start:
 	npm run storybook
 
 #
-# Database target helpers
+# Database target helpers (require a running app container: `make dev.up`)
 #
 
 db.create:
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
-	-$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
-	$(COMPOSE) run --rm -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+	-$(COMPOSE) exec -T -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
+	-$(COMPOSE) exec -T -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
+	-$(COMPOSE) exec -T -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
+	$(COMPOSE) exec -T -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
 
 db.migration.create:
-	$(COMPOSE) run --rm app mkdir -p db/migrations
-	$(COMPOSE) run --rm app migrate create -ext sql -dir db/migrations $(NAME)
+	$(COMPOSE) exec -T app mkdir -p db/migrations
+	$(COMPOSE) exec -T app migrate create -ext sql -dir db/migrations $(NAME)
 	ls -lah db/migrations/*$(NAME)*
 
 db.data_migration.create:
-	$(COMPOSE) run --rm app mkdir -p db/data_migrations
-	$(COMPOSE) run --rm app migrate create -ext sql -dir db/data_migrations $(NAME)
+	$(COMPOSE) exec -T app mkdir -p db/data_migrations
+	$(COMPOSE) exec -T app migrate create -ext sql -dir db/data_migrations $(NAME)
 	ls -lah db/data_migrations/*$(NAME)*
 
 db.migrate:
 	rm -f db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
+	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
+	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
 	# echo dump schema to db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
+	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
 
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 db.console:
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
+	$(COMPOSE) exec -it --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
 
 db.delete:
-	$(COMPOSE) run --rm --user $$(id -u):$$(id -g) --rm -e PGPASSWORD=$(DB_PASSWORD) app dropdb -h db -p 5432 -U postgres $(DB_NAME)
+	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app dropdb -h db -p 5432 -U postgres $(DB_NAME)
 
 db.recreate.all.dangerous:
 	$(MAKE) dev.down
+	$(COMPOSE) up -d --wait
 	-$(MAKE) db.delete DB_NAME=superplane_dev
 	-$(MAKE) db.delete DB_NAME=superplane_test
 	$(MAKE) db.create DB_NAME=superplane_dev
@@ -275,7 +261,18 @@ db.recreate.all.dangerous:
 # Protobuf compilation
 #
 
-gen.setup:
+# Install web_src deps via a one-off compose run (CI, `make gen`, release).
+# `make dev.setup` installs into the running app container first, then calls
+# `gen.setup` with SKIP_WEB_SRC_NPM_INSTALL=1 so this step is skipped.
+web_src.npm.install.compose:
+	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm install"
+
+gen.setup.prep:
+ifneq ($(SKIP_WEB_SRC_NPM_INSTALL),1)
+	$(MAKE) web_src.npm.install.compose
+endif
+
+gen.setup: gen.setup.prep
 	$(MAKE) pb.gen
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
@@ -288,6 +285,7 @@ gen.setup.backend:
 
 gen.setup.ui:
 	$(MAKE) openapi.spec.gen
+	$(MAKE) web_src.npm.install.compose
 	$(MAKE) openapi.web.client.gen
 
 gen:
@@ -334,7 +332,7 @@ openapi.client.gen:
 
 openapi.web.client.gen:
 	rm -rf web_src/src/api-client
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm ci && npm run generate:api && npx prettier --write 'src/api-client/**/*.{ts,tsx}'"
+	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm run generate:api && npx prettier --write 'src/api-client/**/*.{ts,tsx}'"
 
 #
 # Image and CLI build

@@ -71,6 +71,18 @@ beforeEach(() => {
 });
 
 describe("useExperimentalFeature", () => {
+  it("returns has function and enabledExperimentalFeatures array", () => {
+    const queryClient = createQueryClient();
+
+    const { result } = renderHook(() => useExperimentalFeature(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(Object.keys(result.current).sort()).toEqual(["enabledExperimentalFeatures", "has"]);
+    expect(result.current.has).toEqual(expect.any(Function));
+    expect(result.current.enabledExperimentalFeatures).toEqual(expect.any(Array));
+  });
+
   it("returns false when the feature is not in the registry, even if the org has opted in", () => {
     const queryClient = createQueryClient();
     seedQueries(queryClient, {
@@ -80,11 +92,11 @@ describe("useExperimentalFeature", () => {
       registry: { features: [makeFeature({ id: "alpha" })] },
     });
 
-    const { result } = renderHook(() => useExperimentalFeature("ghost"), {
+    const { result } = renderHook(() => useExperimentalFeature(), {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(result.current).toBe(false);
+    expect(result.current.has("ghost")).toBe(false);
   });
 
   it("returns true when the feature is marked released, regardless of org opt-in", () => {
@@ -98,11 +110,11 @@ describe("useExperimentalFeature", () => {
       },
     });
 
-    const { result } = renderHook(() => useExperimentalFeature("alpha"), {
+    const { result } = renderHook(() => useExperimentalFeature(), {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(result.current).toBe(true);
+    expect(result.current.has("alpha")).toBe(true);
   });
 
   it("returns true when the feature exists and the organization has opted in", () => {
@@ -116,11 +128,11 @@ describe("useExperimentalFeature", () => {
       },
     });
 
-    const { result } = renderHook(() => useExperimentalFeature("alpha"), {
+    const { result } = renderHook(() => useExperimentalFeature(), {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(result.current).toBe(true);
+    expect(result.current.has("alpha")).toBe(true);
   });
 
   it("returns false when the feature exists but the organization has not opted in", () => {
@@ -134,11 +146,11 @@ describe("useExperimentalFeature", () => {
       },
     });
 
-    const { result } = renderHook(() => useExperimentalFeature("alpha"), {
+    const { result } = renderHook(() => useExperimentalFeature(), {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(result.current).toBe(false);
+    expect(result.current.has("alpha")).toBe(false);
   });
 
   it("returns false when enabledExperimentalFeatures is undefined on the organization", () => {
@@ -150,22 +162,22 @@ describe("useExperimentalFeature", () => {
       },
     });
 
-    const { result } = renderHook(() => useExperimentalFeature("alpha"), {
+    const { result } = renderHook(() => useExperimentalFeature(), {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(result.current).toBe(false);
+    expect(result.current.has("alpha")).toBe(false);
   });
 
   it("returns false when no organization id is available", () => {
     useOrganizationIdMock.mockReturnValue(null);
     const queryClient = createQueryClient();
 
-    const { result } = renderHook(() => useExperimentalFeature("alpha"), {
+    const { result } = renderHook(() => useExperimentalFeature(), {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(result.current).toBe(false);
+    expect(result.current.has("alpha")).toBe(false);
   });
 
   it("returns false while the registry has not loaded yet", () => {
@@ -176,10 +188,47 @@ describe("useExperimentalFeature", () => {
       } as OrganizationsOrganization,
     });
 
-    const { result } = renderHook(() => useExperimentalFeature("alpha"), {
+    const { result } = renderHook(() => useExperimentalFeature(), {
       wrapper: createWrapper(queryClient),
     });
 
-    expect(result.current).toBe(false);
+    expect(result.current.has("alpha")).toBe(false);
+  });
+
+  it("lists released features and features the organization opted into", () => {
+    const queryClient = createQueryClient();
+    seedQueries(queryClient, {
+      organization: {
+        spec: { enabledExperimentalFeatures: ["beta"] },
+      } as OrganizationsOrganization,
+      registry: {
+        features: [
+          makeFeature({ id: "alpha", released: true }),
+          makeFeature({ id: "beta" }),
+          makeFeature({ id: "gamma" }),
+        ],
+      },
+    });
+
+    const { result } = renderHook(() => useExperimentalFeature(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.enabledExperimentalFeatures).toEqual(["alpha", "beta"]);
+  });
+
+  it("returns an empty list while the registry has not loaded yet", () => {
+    const queryClient = createQueryClient();
+    seedQueries(queryClient, {
+      organization: {
+        spec: { enabledExperimentalFeatures: ["alpha"] },
+      } as OrganizationsOrganization,
+    });
+
+    const { result } = renderHook(() => useExperimentalFeature(), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    expect(result.current.enabledExperimentalFeatures).toEqual([]);
   });
 });
