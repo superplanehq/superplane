@@ -59,7 +59,10 @@ export function InputForm({
     <div className={cn("m-1.5", expanded && "mb-3")}>
       <form
         onSubmit={submitHandler}
-        className={cn("rounded-md border border-slate-300 bg-white p-1.5", expanded && "p-3 shadow-sm")}
+        className={cn(
+          "rounded-md border border-slate-950/15 bg-white p-1.5 hover:border-slate-950/40 focus-within:border-slate-950/40",
+          expanded && "p-3 shadow-sm",
+        )}
       >
         <Textarea
           ref={aiInputRef}

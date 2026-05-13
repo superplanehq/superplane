@@ -13,9 +13,27 @@ import { useSidebarWidth } from "./useSidebarWidth";
 
 export interface AgentSidebarProps {
   agentState: AgentState;
+  showCloseButton?: boolean;
+  showHeaderBorder?: boolean;
+  showHeader?: boolean;
+  inputPlacement?: "top" | "bottom";
+  compact?: boolean;
+  sidebarWidthStorageKey?: string;
+  defaultWidthPercent?: number;
+  showConversationList?: boolean;
 }
 
-export function AgentSidebar({ agentState }: AgentSidebarProps) {
+export function AgentSidebar({
+  agentState,
+  showCloseButton = true,
+  showHeaderBorder = true,
+  showHeader = true,
+  inputPlacement = "top",
+  compact = false,
+  sidebarWidthStorageKey,
+  defaultWidthPercent,
+  showConversationList = true,
+}: AgentSidebarProps) {
   if (!agentState.showAgentSidebarToggle) {
     return null;
   }
@@ -24,10 +42,32 @@ export function AgentSidebar({ agentState }: AgentSidebarProps) {
     return null;
   }
 
-  return <OpenAgentSidebar agentState={agentState} />;
+  return (
+    <OpenAgentSidebar
+      agentState={agentState}
+      showCloseButton={showCloseButton}
+      showHeaderBorder={showHeaderBorder}
+      showHeader={showHeader}
+      inputPlacement={inputPlacement}
+      compact={compact}
+      sidebarWidthStorageKey={sidebarWidthStorageKey}
+      defaultWidthPercent={defaultWidthPercent}
+      showConversationList={showConversationList}
+    />
+  );
 }
 
-function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
+function OpenAgentSidebar({
+  agentState,
+  showCloseButton,
+  showHeaderBorder,
+  showHeader,
+  inputPlacement,
+  compact,
+  sidebarWidthStorageKey,
+  defaultWidthPercent,
+  showConversationList,
+}: AgentSidebarProps) {
   const { canvasId, organizationId, agentContext, onApplyAiOperations } = agentState;
 
   const aiInputRef = useRef<HTMLTextAreaElement>(null);
@@ -119,10 +159,15 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
 
   return (
     <AgentSidebarContainer
-      onClose={agentState.closeSidebar}
       title={sidebarTitle}
       showBack={currentChatId !== null}
       onBack={handleStartNewChatSession}
+      onClose={agentState.closeSidebar}
+      showCloseButton={showCloseButton ?? true}
+      showHeaderBorder={showHeaderBorder ?? true}
+      showHeader={showHeader ?? true}
+      sidebarWidthStorageKey={sidebarWidthStorageKey}
+      defaultWidthPercent={defaultWidthPercent}
     >
       <AiBuilderChatPanel
         chatSessions={chatSessions}
@@ -149,6 +194,9 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
         onSelectChat={handleSelectChatSession}
         onSendPrompt={() => void handleSendPrompt()}
         aiInputRef={aiInputRef}
+        inputPlacement={inputPlacement}
+        compact={compact}
+        showConversationList={showConversationList}
       />
     </AgentSidebarContainer>
   );
@@ -162,33 +210,62 @@ function AgentSidebarContainer({
   title,
   showBack,
   onBack,
+  showCloseButton,
+  showHeaderBorder,
+  showHeader,
+  sidebarWidthStorageKey,
+  defaultWidthPercent,
 }: {
   children: React.ReactNode;
   onClose: () => void;
   title: string;
   showBack: boolean;
   onBack: () => void;
+  showCloseButton: boolean;
+  showHeaderBorder: boolean;
+  showHeader: boolean;
+  sidebarWidthStorageKey?: string;
+  defaultWidthPercent?: number;
 }) {
-  const { sidebarRef, isResizing, onResizeMouseDown, sidebarStyle } = useSidebarWidth();
+  const defaultWidthPx =
+    defaultWidthPercent && typeof window !== "undefined"
+      ? Math.round(window.innerWidth * defaultWidthPercent)
+      : undefined;
+  const maxWidthPx =
+    defaultWidthPercent && typeof window !== "undefined" ? Math.round(window.innerWidth * 0.8) : undefined;
+
+  const { sidebarRef, isResizing, onResizeMouseDown, sidebarStyle } = useSidebarWidth({
+    storageKey: sidebarWidthStorageKey,
+    defaultWidthPx,
+    maxWidthPx,
+  });
 
   return (
     <div
       ref={sidebarRef}
-      className="relative border-r border-border shrink-0 h-full z-21 flex flex-col overflow-hidden bg-white"
+      className="relative border-r border-slate-950/10 shrink-0 h-full z-21 flex flex-col overflow-hidden bg-white"
       style={sidebarStyle}
       data-testid="agent-sidebar"
     >
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border shrink-0 min-w-0">
-        <div className="flex min-w-0 flex-1 items-center gap-1">
-          {showBack ? <BackButton onBack={onBack} /> : null}
-          <h2 className="text-base font-medium min-w-0 flex-1 truncate" title={title}>
-            {title}
-          </h2>
+      {showHeader ? (
+        <div
+          className={`flex items-center justify-between gap-3 px-4 py-2.5 shrink-0 min-w-0 ${
+            showHeaderBorder ? "border-b border-border" : ""
+          }`}
+        >
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            {showBack ? <BackButton onBack={onBack} /> : null}
+            <h2 className="text-base font-medium min-w-0 flex-1 truncate" title={title}>
+              {title}
+            </h2>
+          </div>
+          {showCloseButton ? (
+            <div className="flex shrink-0 items-center gap-1">
+              <CloseButton onClose={onClose} />
+            </div>
+          ) : null}
         </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <CloseButton onClose={onClose} />
-        </div>
-      </div>
+      ) : null}
 
       <div className="flex flex-1 flex-col min-h-0">{children}</div>
 
@@ -201,18 +278,10 @@ function AgentSidebarResizeHandle({ isResizing, onMouseDown }: { isResizing: boo
   return (
     <div
       onMouseDown={onMouseDown}
-      className={`absolute right-0 top-0 bottom-0 w-4 cursor-ew-resize hover:bg-gray-100 transition-colors flex items-center justify-center group ${
-        isResizing ? "bg-blue-50" : ""
-      }`}
+      className={`absolute right-0 top-0 bottom-0 w-4 hover:cursor-col-resize ${isResizing ? "cursor-col-resize" : ""}`}
       style={{ marginRight: "-8px" }}
       aria-hidden
-    >
-      <div
-        className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors ${
-          isResizing ? "bg-blue-500" : ""
-        }`}
-      />
-    </div>
+    />
   );
 }
 

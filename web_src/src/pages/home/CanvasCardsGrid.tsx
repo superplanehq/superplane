@@ -71,7 +71,7 @@ function CanvasCard({
   canDeleteCanvases,
   permissionsLoading,
 }: CanvasCardProps) {
-  const canvasHref = `/${organizationId}/canvases/${canvas.id}`;
+  const canvasHref = `/${organizationId}/apps/${canvas.id}`;
   const previewNodes = canvas.nodes || [];
   const previewEdges = canvas.edges || [];
 
