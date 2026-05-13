@@ -20,8 +20,6 @@ MERGE_FILE_NAME=superplane.swagger
 generate_openapi_spec() {
   FILES=$ALL_MODULE_PATHS
 
-  echo "$(bold "Generating OpenAPI spec for $FILES")"
-  
   # Create output directories
   mkdir -p $OPENAPI_OUT
 
@@ -34,14 +32,6 @@ generate_openapi_spec() {
          --openapiv2_opt=allow_merge=true \
          --openapiv2_opt=merge_file_name=$MERGE_FILE_NAME \
          -I . $FILES
-         
-  echo "Generated OpenAPI specification in $OPENAPI_OUT"
-}
-
-bold() {
-  bold_text=$(tput bold)
-  normal_text=$(tput sgr0)
-  echo -n "${bold_text}$@${normal_text}"
 }
 
 # Main execution
@@ -52,5 +42,3 @@ do
 done
 
 generate_openapi_spec $ALL_MODULE_PATHS
-
-echo "$(bold "Done generating OpenAPI spec for: ${MODULES[@]}")"
