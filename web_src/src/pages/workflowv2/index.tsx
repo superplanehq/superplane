@@ -44,6 +44,8 @@ import {
   eventExecutionsQueryOptions,
   useActOnCanvasChangeRequest,
   useCanvas,
+  useCanvasLaunchpad,
+  useUpdateCanvasLaunchpad,
   useCanvasChangeRequests,
   useCanvasMemoryEntries,
   useCanvasVersion,
@@ -241,6 +243,8 @@ export function WorkflowPageV2() {
     refetchOnMount: false,
   });
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
+  const launchpadQuery = useCanvasLaunchpad(canvasId!);
+  const updateLaunchpadMutation = useUpdateCanvasLaunchpad(organizationId!, canvasId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);
   const { data: canvasChangeRequests = [] } = useCanvasChangeRequests(organizationId!, canvasId!);
@@ -5772,13 +5776,18 @@ export function WorkflowPageV2() {
           launchpadOverlay={
             isLaunchpadMode ? (
               <LaunchpadView
-                panels={[]}
-                layout={[]}
-                isLoading={false}
+                panels={launchpadQuery.data?.panels ?? []}
+                layout={launchpadQuery.data?.layout ?? []}
+                isLoading={launchpadQuery.isLoading}
                 readOnly={!canUpdateCanvas || isTemplate}
                 canvasId={canvasId}
                 nodeRefs={{}}
-                onChange={() => {}}
+                onChange={async (next) => {
+                  await updateLaunchpadMutation.mutateAsync({
+                    panels: next.panels,
+                    layout: next.layout,
+                  });
+                }}
               />
             ) : null
           }
