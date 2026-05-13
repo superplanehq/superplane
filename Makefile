@@ -83,13 +83,6 @@ format.js:
 format.js.check:
 	cd web_src && npm run format:check
 
-#
-# Targets for dev environment
-#
-# Typical flow: `make dev.up` then `make dev.setup` (first time / after proto or dependency changes),
-# then `make dev.server`. Day-to-day: `make dev.up` then `make dev.server` (or `make dev.server.fg` for attached logs).
-# For E2E locally, migrate the test DB too: `DEV_SETUP_DBS="superplane_dev superplane_test" make dev.setup` (after `make dev.up`).
-
 dev.test.is.running:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 
@@ -97,12 +90,11 @@ dev.up:
 	@mkdir -p tmp/screenshots
 	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
 
-
 dev.setup:
 	@$(MAKE) dev.test.is.running
 	$(MAKE) dev.setup.npm
-	$(MAKE) dev.setup.go
 	$(MAKE) pb.gen
+	$(MAKE) dev.setup.go
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.create DB_NAME=superplane_test
