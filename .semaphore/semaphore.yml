@@ -34,15 +34,16 @@ blocks:
       env_vars:
         - name: DOCKER_BUILDKIT
           value: "1"
+        - name: DEV_SETUP_DBS
+          value: "superplane_dev superplane_test"
       prologue:
         commands:
           - checkout
           - mkdir -p tmp/go tmp/go-build
           - "cache restore go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-mod-$SEMAPHORE_GIT_BRANCH,go-mod"
           - "cache restore go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-build-$SEMAPHORE_GIT_BRANCH,go-build"
-          - make test.setup.build
-          - make test.start
-          - make test.setup.db
+          - make dev.up
+          - make dev.setup
       jobs:
         - name: Lint
           commands:
