@@ -79,7 +79,8 @@ export const RUNNER_STATE_REGISTRY: EventStateRegistry = {
 export const runnerMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const title = context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component";
+    const title =
+      context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component";
     const iconSlug = context.componentDefinition.icon || "terminal";
     const iconColor = getColorClass(context.componentDefinition?.color || "blue");
 
