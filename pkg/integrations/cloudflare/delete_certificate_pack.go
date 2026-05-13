@@ -74,7 +74,8 @@ func (c *DeleteCertificatePack) Configuration() []configuration.Field {
 			Placeholder: "Select a certificate pack",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
-					Type: "certificate_pack",
+					Type:           "certificate_pack",
+					UseNameAsValue: true,
 				},
 			},
 		},
@@ -122,7 +123,7 @@ func (c *DeleteCertificatePack) Execute(ctx core.ExecutionContext) error {
 		packHosts = hostsForCertificatePack(ctx.Logger, client, zoneID, packID)
 	} else {
 		var lookupErr error
-		zoneID, packHosts, lookupErr = lookupZoneForCertificatePack(ctx.Logger, client, ctx.Integration, packID)
+		zoneID, packID, packHosts, lookupErr = lookupCertificatePackReference(ctx.Logger, client, ctx.Integration, packID)
 		if lookupErr != nil {
 			return lookupErr
 		}
@@ -163,13 +164,13 @@ func splitCertificatePackReference(value string) (zoneFragment, packID string) {
 	return "", strings.TrimSpace(value)
 }
 
-func lookupZoneForCertificatePack(logger *log.Entry, client *Client, integration core.IntegrationContext, packID string) (zoneID string, hosts []string, err error) {
+func lookupCertificatePackReference(logger *log.Entry, client *Client, integration core.IntegrationContext, reference string) (zoneID string, packID string, hosts []string, err error) {
 	metadata := Metadata{}
 	if decodeErr := mapstructure.Decode(integration.GetMetadata(), &metadata); decodeErr != nil {
-		return "", nil, fmt.Errorf("failed to decode integration metadata: %w", decodeErr)
+		return "", "", nil, fmt.Errorf("failed to decode integration metadata: %w", decodeErr)
 	}
 	if len(metadata.Zones) == 0 {
-		return "", nil, fmt.Errorf("cannot resolve zone for certificate pack %q: no zones in integration metadata", packID)
+		return "", "", nil, fmt.Errorf("cannot resolve zone for certificate pack %q: no zones in integration metadata", reference)
 	}
 	for _, zone := range metadata.Zones {
 		packs, listErr := client.ListCertificatePacks(zone.ID)
@@ -181,12 +182,28 @@ func lookupZoneForCertificatePack(logger *log.Entry, client *Client, integration
 			continue
 		}
 		for _, pack := range packs {
-			if pack.ID == packID {
-				return zone.ID, pack.Hosts, nil
+			if certificatePackMatchesReference(zone.Name, pack, reference) {
+				return zone.ID, pack.ID, pack.Hosts, nil
 			}
 		}
 	}
-	return "", nil, fmt.Errorf("certificate pack %q not found in any configured zone", packID)
+	return "", "", nil, fmt.Errorf("certificate pack %q not found in any configured zone", reference)
+}
+
+func certificatePackMatchesReference(zoneName string, pack CertificatePack, reference string) bool {
+	value := strings.TrimSpace(reference)
+	return pack.ID == value || certificatePackResourceName(zoneName, pack) == value
+}
+
+func certificatePackResourceName(zoneName string, pack CertificatePack) string {
+	label := pack.ID
+	if len(pack.Hosts) > 0 {
+		label = strings.Join(pack.Hosts, ", ")
+	}
+	if strings.TrimSpace(zoneName) == "" {
+		return label
+	}
+	return fmt.Sprintf("%s - %s", zoneName, label)
 }
 
 func hostsForCertificatePack(logger *log.Entry, client *Client, zoneID, packID string) []string {

@@ -86,13 +86,13 @@ describe("deleteCertificatePackMapper.props metadata", () => {
     expect(props.metadata).toEqual([{ icon: "shield-off", label: "pack-abc" }]);
   });
 
-  it("shows the raw value when there is no slash", () => {
+  it("shows the stored readable resource name when there is no slash", () => {
     const props = deleteCertificatePackMapper.props(
       buildPropsCtx({
-        configuration: { certificatePack: "pack-only-id" },
+        configuration: { certificatePack: "example.com - www.example.com" },
       }),
     );
-    expect(props.metadata).toEqual([{ icon: "shield-off", label: "pack-only-id" }]);
+    expect(props.metadata).toEqual([{ icon: "shield-off", label: "example.com - www.example.com" }]);
   });
 
   it("returns empty metadata when configuration is empty", () => {

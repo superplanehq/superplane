@@ -325,6 +325,15 @@ func Test__OrderCertificatePack__Execute(t *testing.T) {
 func Test__DeleteCertificatePack__Setup(t *testing.T) {
 	component := &DeleteCertificatePack{}
 
+	t.Run("configuration stores selected certificate pack by readable name", func(t *testing.T) {
+		fields := component.Configuration()
+		require.Len(t, fields, 1)
+		require.NotNil(t, fields[0].TypeOptions)
+		require.NotNil(t, fields[0].TypeOptions.Resource)
+		assert.Equal(t, "certificate_pack", fields[0].TypeOptions.Resource.Type)
+		assert.True(t, fields[0].TypeOptions.Resource.UseNameAsValue)
+	})
+
 	t.Run("missing certificatePack returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{},
@@ -507,6 +516,62 @@ func Test__DeleteCertificatePack__Execute(t *testing.T) {
 		)
 		assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
 		assert.Equal(t, http.MethodGet, httpContext.Requests[1].Method)
+		assert.Equal(t,
+			"https://api.cloudflare.com/client/v4/zones/z-second/ssl/certificate_packs/found-pack-id",
+			httpContext.Requests[2].URL.String(),
+		)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[2].Method)
+
+		wrapped := execState.Payloads[0].(map[string]any)
+		payload := wrapped["data"].(map[string]any)
+		assert.Equal(t, "z-second", payload["zoneId"])
+		assert.Equal(t, "found-pack-id", payload["packId"])
+		assert.Equal(t, "second.example.com", payload["zoneName"])
+		assert.Equal(t, []string{"preview.example.com"}, payload["hosts"])
+	})
+
+	t.Run("resolves readable resource name to certificate pack id", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"success":true,"result":[]}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"success": true,
+						"result": [{"id": "found-pack-id", "hosts": ["preview.example.com"]}]
+					}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"success":true,"result":{}}`)),
+				},
+			},
+		}
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		integrationZones := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "token123"},
+			Metadata: Metadata{
+				Zones: []Zone{
+					{ID: "z-first", Name: "first.example.com"},
+					{ID: "z-second", Name: "second.example.com"},
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"certificatePack": "second.example.com - preview.example.com",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationZones,
+			ExecutionState: execState,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 3)
 		assert.Equal(t,
 			"https://api.cloudflare.com/client/v4/zones/z-second/ssl/certificate_packs/found-pack-id",
 			httpContext.Requests[2].URL.String(),

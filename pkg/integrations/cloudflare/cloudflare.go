@@ -496,13 +496,9 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 			}
 
 			for _, pack := range packs {
-				label := pack.ID
-				if len(pack.Hosts) > 0 {
-					label = strings.Join(pack.Hosts, ", ")
-				}
 				resources = append(resources, core.IntegrationResource{
 					Type: resourceType,
-					Name: fmt.Sprintf("%s - %s", zone.Name, label),
+					Name: certificatePackResourceName(zone.Name, pack),
 					ID:   fmt.Sprintf("%s/%s", zone.ID, pack.ID),
 				})
 			}
