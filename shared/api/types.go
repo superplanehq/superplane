@@ -1,6 +1,21 @@
 package api
 
-import "github.com/superplane/runner/shared/models"
+import (
+	"strconv"
+
+	"github.com/superplane/runner/shared/models"
+)
+
+// DefaultExecutionTimeoutSeconds is used when create omits execution_timeout_seconds
+// (runner wall-clock limit and fleet-manager lease lower bound for COALESCE).
+const DefaultExecutionTimeoutSeconds = 540 // 9 minutes
+
+// MaxExecutionTimeoutSecondsRequest is the largest execution_timeout_seconds accepted on create.
+const MaxExecutionTimeoutSecondsRequest = 86400 // 24 hours
+
+// LeaseBufferSeconds is added to the execution window when computing claim lease_until
+// (complete RPC, clock skew).
+const LeaseBufferSeconds = 90
 
 // CreateTaskRequest is POST /v1/tasks.
 type CreateTaskRequest struct {
@@ -13,6 +28,9 @@ type CreateTaskRequest struct {
 	WebhookURL    string   `json:"webhook_url"`
 	ExecutionMode string   `json:"execution_mode"` // "host" | "docker"
 	DockerImage   string   `json:"docker_image,omitempty"`
+	// ExecutionTimeoutSeconds is optional wall-clock limit for the runner execution phase (seconds).
+	// Omit to use DefaultExecutionTimeoutSeconds on the runner; if set, must be 1..MaxExecutionTimeoutSecondsRequest.
+	ExecutionTimeoutSeconds *int `json:"execution_timeout_seconds,omitempty"`
 }
 
 // CreateTaskResponse returns the task id.
@@ -38,6 +56,8 @@ type TaskPayload struct {
 	Commands      []string `json:"commands,omitempty"` // see CreateTaskRequest (Bash+PTY per directive on Unix)
 	ExecutionMode string   `json:"execution_mode"`
 	DockerImage   string   `json:"docker_image,omitempty"`
+	// ExecutionTimeoutSeconds is nil when unset at create (runner uses default).
+	ExecutionTimeoutSeconds *int `json:"execution_timeout_seconds,omitempty"`
 }
 
 // CompleteTaskRequest is POST /v1/tasks/{id}/complete.
@@ -50,13 +70,30 @@ type CompleteTaskRequest struct {
 
 // TaskPayloadFrom maps models.Task to TaskPayload.
 func TaskPayloadFrom(t *models.Task) *TaskPayload {
-	return &TaskPayload{
+	p := &TaskPayload{
 		ID:            t.ID,
 		Command:       t.Command,
 		Commands:      t.Commands,
 		ExecutionMode: string(t.ExecutionMode),
 		DockerImage:   t.DockerImage,
 	}
+	if t.ExecutionTimeoutSeconds != nil {
+		v := *t.ExecutionTimeoutSeconds
+		p.ExecutionTimeoutSeconds = &v
+	}
+	return p
+}
+
+// ValidateExecutionTimeoutSeconds returns a non-empty error message if p is set but out of range.
+func ValidateExecutionTimeoutSeconds(p *int) string {
+	if p == nil {
+		return ""
+	}
+	v := *p
+	if v < 1 || v > MaxExecutionTimeoutSecondsRequest {
+		return "execution_timeout_seconds must be between 1 and " + strconv.Itoa(MaxExecutionTimeoutSecondsRequest)
+	}
+	return ""
 }
 
 // WebhookPayload is POSTed to the caller webhook URL on terminal status.
@@ -83,20 +120,22 @@ type TaskStatusResponse struct {
 	Error    string `json:"error,omitempty"`
 	// CloudWatchLogGroup and CloudWatchLogStream are set when fleet-manager is configured
 	// with TASK_CLOUDWATCH_LOG_GROUP so clients can tail logs in AWS (runner must use the same group/prefix).
-	CloudWatchLogGroup  string       `json:"cloudwatch_log_group,omitempty"`
-	CloudWatchLogStream string       `json:"cloudwatch_log_stream,omitempty"`
-	TaskLog             *TaskLogSink `json:"task_log,omitempty"`
+	CloudWatchLogGroup      string       `json:"cloudwatch_log_group,omitempty"`
+	CloudWatchLogStream     string       `json:"cloudwatch_log_stream,omitempty"`
+	TaskLog                 *TaskLogSink `json:"task_log,omitempty"`
+	ExecutionTimeoutSeconds *int         `json:"execution_timeout_seconds,omitempty"`
 }
 
 // BrokerGetTaskResponse is GET task-broker /v1/tasks/{broker_task_id}.
 type BrokerGetTaskResponse struct {
-	TaskID              string       `json:"task_id"`
-	FleetTaskID         string       `json:"fleet_task_id,omitempty"`
-	Status              string       `json:"status"`
-	ExitCode            *int         `json:"exit_code,omitempty"`
-	Output              string       `json:"output,omitempty"`
-	Error               string       `json:"error,omitempty"`
-	CloudWatchLogGroup  string       `json:"cloudwatch_log_group,omitempty"`
-	CloudWatchLogStream string       `json:"cloudwatch_log_stream,omitempty"`
-	TaskLog             *TaskLogSink `json:"task_log,omitempty"`
+	TaskID                  string       `json:"task_id"`
+	FleetTaskID             string       `json:"fleet_task_id,omitempty"`
+	Status                  string       `json:"status"`
+	ExitCode                *int         `json:"exit_code,omitempty"`
+	Output                  string       `json:"output,omitempty"`
+	Error                   string       `json:"error,omitempty"`
+	CloudWatchLogGroup      string       `json:"cloudwatch_log_group,omitempty"`
+	CloudWatchLogStream     string       `json:"cloudwatch_log_stream,omitempty"`
+	TaskLog                 *TaskLogSink `json:"task_log,omitempty"`
+	ExecutionTimeoutSeconds *int         `json:"execution_timeout_seconds,omitempty"`
 }

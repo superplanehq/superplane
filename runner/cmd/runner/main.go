@@ -45,6 +45,18 @@ func main() {
 		}
 	}
 	cfg.ExitAfterEachTask = envTruthy("RUNNER_TERMINATE_AFTER_EACH_TASK")
+	if v := strings.TrimSpace(os.Getenv("RUNNER_MAX_EXECUTION_SECONDS")); v != "" {
+		// Caps local run wall clock only; fleet-manager lease still uses task execution_timeout_seconds (see README).
+		sec, err := strconv.Atoi(v)
+		switch {
+		case err != nil:
+			log.Warn("invalid RUNNER_MAX_EXECUTION_SECONDS, ignoring", slog.String("value", v), slog.Any("err", err))
+		case sec <= 0:
+			log.Warn("invalid RUNNER_MAX_EXECUTION_SECONDS, ignoring", slog.String("value", v), slog.Int("parsed_seconds", sec))
+		default:
+			cfg.MaxExecutionSeconds = sec
+		}
+	}
 	cfg.Log = log
 	cfg.CloudWatchLogGroup = strings.TrimSpace(os.Getenv("RUNNER_CLOUDWATCH_LOG_GROUP"))
 	cfg.CloudWatchRegion = strings.TrimSpace(os.Getenv("RUNNER_CLOUDWATCH_REGION"))
