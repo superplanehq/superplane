@@ -5,57 +5,28 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
-	internalpb "github.com/superplanehq/superplane/pkg/protos/private/agents"
-
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func ListAgentChats(ctx context.Context, agentURL string, orgID string, userID string, canvasID string) (*pb.ListAgentChatsResponse, error) {
-	conn, err := grpc.NewClient(agentURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func ListAgentChats(_ context.Context, svc AgentsService, orgID, userID string, req *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error) {
+	org, user, canvas, err := parseCanvasScope(orgID, userID, req.CanvasId)
 	if err != nil {
-		return nil, status.Error(codes.Unavailable, "failed to create agent GRPC client")
+		return nil, err
 	}
-	defer closeAgentConnection(conn)
+	if err := ensureCanvas(org, canvas); err != nil {
+		return nil, err
+	}
 
-	client := internalpb.NewAgentsClient(conn)
-	response, err := client.ListAgentChats(ctx, &internalpb.ListAgentChatsRequest{
-		OrgId:    orgID,
-		UserId:   userID,
-		CanvasId: canvasID,
-	})
-
+	sessions, err := svc.ListSessions(org, user, canvas)
 	if err != nil {
-		log.WithError(err).Errorf("failed to list agent chats for org %s, user %s, canvas %s", orgID, userID, canvasID)
-		return nil, status.Error(codes.Unavailable, "failed to list agent chats")
+		log.WithError(err).WithField("canvas_id", canvas).Error("failed to list agent chats")
+		return nil, status.Error(codes.Internal, "failed to list agent chats")
 	}
 
-	return &pb.ListAgentChatsResponse{
-		Chats: serializeAgentChats(response.Chats),
-	}, nil
-}
-
-func serializeAgentChats(in []*internalpb.ChatInfo) []*pb.AgentChatInfo {
-	out := make([]*pb.AgentChatInfo, 0, len(in))
-	for _, c := range in {
-		if c == nil {
-			continue
-		}
-
-		chat := &pb.AgentChatInfo{
-			Id:             c.Id,
-			InitialMessage: c.InitialMessage,
-		}
-
-		if c.CreatedAt != nil {
-			chat.CreatedAt = timestamppb.New(c.CreatedAt.AsTime())
-		}
-
-		out = append(out, chat)
+	out := make([]*pb.AgentChatInfo, 0, len(sessions))
+	for i := range sessions {
+		out = append(out, serializeChat(&sessions[i]))
 	}
-
-	return out
+	return &pb.ListAgentChatsResponse{Chats: out}, nil
 }
