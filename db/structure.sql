@@ -210,6 +210,18 @@ CREATE TABLE public.canvas_folders (
 
 
 --
+-- Name: canvas_launchpads; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.canvas_launchpads (
+    canvas_id uuid NOT NULL,
+    panels jsonb DEFAULT '[]'::jsonb NOT NULL,
+    layout jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: canvas_memories; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -823,6 +835,14 @@ ALTER TABLE ONLY public.canvas_folders
 
 ALTER TABLE ONLY public.canvas_folders
     ADD CONSTRAINT canvas_folders_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: canvas_launchpads canvas_launchpads_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_launchpads
+    ADD CONSTRAINT canvas_launchpads_pkey PRIMARY KEY (canvas_id);
 
 
 --
@@ -1674,6 +1694,14 @@ ALTER TABLE ONLY public.app_installations
 
 ALTER TABLE ONLY public.canvas_folders
     ADD CONSTRAINT canvas_folders_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: canvas_launchpads canvas_launchpads_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_launchpads
+    ADD CONSTRAINT canvas_launchpads_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
 
 
 --
