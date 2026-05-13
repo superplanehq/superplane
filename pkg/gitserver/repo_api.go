@@ -17,6 +17,7 @@ import (
 func (s *Server) RegisterRepoAPIRoutes(router *mux.Router) {
 	// Register directly on the main router — no subrouter middleware
 	// (auth is handled by the existing session cookie via the org-auth path)
+	router.HandleFunc("/api/repo/{canvasId}/archive", s.handleRepoArchive).Methods("GET")
 	router.HandleFunc("/api/repo/{canvasId}/files", s.handleRepoListFiles).Methods("GET")
 	router.HandleFunc("/api/repo/{canvasId}/files/{path:.*}", s.handleRepoGetFile).Methods("GET")
 	router.HandleFunc("/api/repo/{canvasId}/files/{path:.*}", s.handleRepoUpdateFile).Methods("PUT")
@@ -173,4 +174,23 @@ func (s *Server) handleRepoUpdateFile(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{
 		"sha": strings.TrimSpace(string(shaOut)),
 	})
+}
+
+func (s *Server) handleRepoArchive(w http.ResponseWriter, r *http.Request) {
+	canvasID := mux.Vars(r)["canvasId"]
+	slug := s.resolveSlugFromCanvasID(canvasID, s.Registry)
+	if slug == "" {
+		http.Error(w, "No repository for this canvas", http.StatusNotFound)
+		return
+	}
+
+	repoPath := s.RepoPath(slug)
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.zip"`, slug))
+
+	cmd := exec.Command("git", "--git-dir", repoPath, "archive", "--format=zip", "HEAD")
+	cmd.Stdout = w
+	if err := cmd.Run(); err != nil {
+		log.Errorf("repo-api: archive failed for %s: %v", slug, err)
+	}
 }

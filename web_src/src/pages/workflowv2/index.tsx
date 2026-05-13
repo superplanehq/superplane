@@ -6261,6 +6261,7 @@ export function WorkflowPageV2() {
               <RepoTab
                 canvasId={canvasId!}
                 canvasName={canvas?.metadata?.name || ""}
+                organizationId={organizationId!}
                 nodeRefs={{
                   nodes: readmeNodesBySlug,
                   icons: readmeIconsBySlug,

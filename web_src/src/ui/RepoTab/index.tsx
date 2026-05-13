@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileTree } from "./FileTree";
 import { FileViewer } from "./FileViewer";
+import { CloneDropdown } from "./CloneDropdown";
 import { Loader2, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useHeaderActionSlotSetter } from "@/ui/CanvasPage/HeaderActionSlotContext";
 
 import type { NodeChipContext } from "@/ui/Markdown/CanvasMarkdown";
 
 interface RepoTabProps {
   canvasId: string;
   canvasName: string;
+  organizationId: string;
   nodeRefs?: NodeChipContext;
 }
 
@@ -30,7 +33,7 @@ const REPO_SIDEBAR_MAX_WIDTH = 480;
 const REPO_SIDEBAR_DEFAULT_WIDTH = 260;
 const REPO_SIDEBAR_WIDTH_KEY = "repo-sidebar-width";
 
-export function RepoTab({ canvasId, canvasName, nodeRefs }: RepoTabProps) {
+export function RepoTab({ canvasId, canvasName, organizationId, nodeRefs }: RepoTabProps) {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [commit, setCommit] = useState<CommitInfo | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -75,6 +78,21 @@ export function RepoTab({ canvasId, canvasName, nodeRefs }: RepoTabProps) {
       document.body.style.cursor = "";
     };
   }, [isResizing, handleMouseMove, handleMouseUp]);
+
+  // Register Clone button in the header action slot
+  const setHeaderActionNode = useHeaderActionSlotSetter();
+  const slug = files.length > 0 ? (commit as CommitInfo | null) : null; // just need to trigger re-render
+  useEffect(() => {
+    if (!setHeaderActionNode) return;
+    setHeaderActionNode(
+      <CloneDropdown
+        repoUrl={`${window.location.origin}/git/${canvasName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "")}`}
+        organizationId={organizationId}
+        canvasId={canvasId}
+      />
+    );
+    return () => setHeaderActionNode(null);
+  }, [setHeaderActionNode, canvasName]);
 
   const fetchFiles = useCallback(async () => {
     setLoading(true);
