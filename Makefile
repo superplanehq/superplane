@@ -120,9 +120,7 @@ format.js.check:
 # then `make dev.server`. Day-to-day: `make dev.up` then `make dev.server` (or `make dev.server.fg` for attached logs).
 
 dev.up:
-	$(COMPOSE) build
-	$(COMPOSE) pull
-	$(COMPOSE) up -d --wait
+	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
 
 dev.setup:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
