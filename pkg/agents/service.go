@@ -117,6 +117,11 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	}
 
 	preamble := ""
+	persisted := &models.AgentSessionMessage{
+		SessionID: sessionID,
+		Role:      models.AgentMessageRoleUser,
+		Content:   content,
+	}
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		count, err := models.CountAgentSessionMessagesInTransaction(tx, sessionID)
 		if err != nil {
@@ -137,12 +142,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 			}
 		}
 
-		msg := &models.AgentSessionMessage{
-			SessionID: sessionID,
-			Role:      models.AgentMessageRoleUser,
-			Content:   content,
-		}
-		return models.AppendAgentSessionMessageInTransaction(tx, msg)
+		return models.AppendAgentSessionMessageInTransaction(tx, persisted)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("persist user message: %w", err)
@@ -166,12 +166,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, fmt.Errorf("enqueue stream: %w", err)
 	}
 
-	persisted, err := models.ListAgentSessionMessages(sessionID)
-	if err != nil || len(persisted) == 0 {
-		return nil, err
-	}
-	last := persisted[len(persisted)-1]
-	return &last, nil
+	return persisted, nil
 }
 
 // ArchiveSession soft-archives locally even if the upstream archive fails so

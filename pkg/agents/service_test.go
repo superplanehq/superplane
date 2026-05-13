@@ -149,6 +149,24 @@ func TestService_GetSession_PrivateToUser(t *testing.T) {
 	require.Error(t, err, "session ownership must be enforced")
 }
 
+func TestService_SendMessage_ReturnsPersistedUserMessage(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	session, err := svc.CreateSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "hello")
+	require.NoError(t, err)
+	require.NotNil(t, persisted, "SendMessage must not return a nil message — gRPC serialise dereferences it")
+	require.NotEqual(t, uuid.Nil, persisted.ID)
+	assert.Equal(t, "hello", persisted.Content)
+}
+
 func TestService_SendMessage_PersistsUserTurnAndPublishesPreambleOnFirstTurn(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

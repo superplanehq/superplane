@@ -156,12 +156,9 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 			}
 			publish(messages.AgentSessionEventMessage{Event: "turn_completed", Status: models.AgentSessionStatusIdle})
 		case agents.ProviderEventSessionFailed:
+			// Don't publish here — the post-loop block owns
+			// session_failed broadcasting so it stays single-source.
 			streamErr = fmt.Errorf("provider reported session failed: %s", evt.ErrorMessage)
-			publish(messages.AgentSessionEventMessage{
-				Event:  "session_failed",
-				Status: models.AgentSessionStatusFailed,
-				Error:  evt.ErrorMessage,
-			})
 		}
 		return nil
 	})
