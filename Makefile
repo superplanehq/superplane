@@ -1,7 +1,9 @@
-.PHONY: lint test test.coverage test.license.check test.setup test.e2e.ui.setup gen.setup gen.setup.prep gen.setup.backend gen.setup.ui web_src.npm.install.compose check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
+.PHONY: lint test test.coverage test.license.check gen.setup gen.setup.prep gen.setup.backend gen.setup.ui web_src.npm.install.compose check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
 
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
+# Databases to create and migrate in `make dev.setup` (space-separated). CI sets superplane_test alongside superplane_dev.
+DEV_SETUP_DBS ?= superplane_dev
 BASE_URL?=https://app.superplane.com
 
 export BUILDKIT_PROGRESS ?= plain
@@ -32,32 +34,6 @@ lint:
 
 tidy:
 	$(COMPOSE) exec app go mod tidy
-
-test.setup.build:
-	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
-	@mkdir -p tmp/screenshots
-	$(COMPOSE) run --rm app go mod download
-	$(MAKE) gen.setup.backend
-	$(MAKE) test.e2e.ui.setup
-
-test.setup:
-	$(MAKE) test.setup.build
-	$(MAKE) dev.up
-	$(MAKE) test.setup.db
-
-test.setup.db:
-	$(MAKE) db.create DB_NAME=superplane_test
-	$(MAKE) db.migrate DB_NAME=superplane_test
-
-test.down:
-	$(COMPOSE) down --remove-orphans
-
-test.e2e.setup:
-	$(MAKE) test.setup
-
-test.e2e.ui.setup:
-	$(MAKE) web_src.npm.install.compose
-	$(MAKE) openapi.web.client.gen
 
 test.e2e:
 	$(COMPOSE) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1
@@ -114,17 +90,21 @@ format.js.check:
 #
 # Typical flow: `make dev.up` then `make dev.setup` (first time / after proto or dependency changes),
 # then `make dev.server`. Day-to-day: `make dev.up` then `make dev.server` (or `make dev.server.fg` for attached logs).
+# For E2E locally, migrate the test DB too: `DEV_SETUP_DBS="superplane_dev superplane_test" make dev.setup` (after `make dev.up`).
 
 dev.up:
 	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
 
 dev.setup:
+	@mkdir -p tmp/screenshots
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 	$(COMPOSE) exec -T app bash -lc "cd /app/web_src && npm install"
 	$(MAKE) gen.setup SKIP_WEB_SRC_NPM_INSTALL=1
 	$(MAKE) dev.setup.app
-	$(MAKE) db.create DB_NAME=superplane_dev
-	$(MAKE) db.migrate DB_NAME=superplane_dev
+	@set -euo pipefail; for db in $(DEV_SETUP_DBS); do \
+		$(MAKE) db.create DB_NAME=$$db; \
+		$(MAKE) db.migrate DB_NAME=$$db; \
+	done
 
 dev.setup.app:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }

@@ -18,7 +18,7 @@
 ## Build, Test, and Development Commands
 
 - Bring up dev containers: `make dev.up`
-- Install deps, codegen, DB: `make dev.setup` (after `dev.up`; re-run when protos, Go modules, or frontend deps change)
+- Install deps, codegen, DB: `make dev.setup` after `dev.up` (re-run when protos, Go modules, or frontend deps change). By default only `superplane_dev` is migrated; use `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also need `superplane_test` (E2E; backend CI sets this via the environment).
 - Start API + Vite: `make dev.server` (after `make dev.up`) — UI at http://localhost:8000; use `make dev.server.fg` for foreground logs
 - One-shot backend tests: `make test` (Golang).
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
