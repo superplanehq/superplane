@@ -128,17 +128,18 @@ func (b *BrokerClient) CreateTask(commands []string, webhookURL string) (string,
 	return out.ID, nil
 }
 
-type task struct {
+// Task is the broker task payload (GET /v1/tasks/:id and webhook body).
+type Task struct {
 	TaskID   string `json:"task_id"`
 	Status   string `json:"status"`
 	ExitCode int    `json:"exit_code"`
 }
 
-func (t *task) IsInTerminalState() bool {
+func (t *Task) IsInTerminalState() bool {
 	return t.Status == "succeeded" || t.Status == "failed"
 }
 
-func (b *BrokerClient) FetchTaskStatus(taskID string) (*task, error) {
+func (b *BrokerClient) FetchTaskStatus(taskID string) (*Task, error) {
 	httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
 	defer cancel()
 
@@ -163,7 +164,7 @@ func (b *BrokerClient) FetchTaskStatus(taskID string) (*task, error) {
 		return nil, fmt.Errorf("broker rejected task: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
-	var out task
+	var out Task
 	if err := json.Unmarshal(body, &out); err != nil {
 		return nil, fmt.Errorf("unmarshal task response: %w", err)
 	}
@@ -171,8 +172,8 @@ func (b *BrokerClient) FetchTaskStatus(taskID string) (*task, error) {
 	return &out, nil
 }
 
-func (b *BrokerClient) ProcessWebhook(body []byte) (*task, error) {
-	var out task
+func (b *BrokerClient) ProcessWebhook(body []byte) (*Task, error) {
+	var out Task
 	if err := json.Unmarshal(body, &out); err != nil {
 		return nil, fmt.Errorf("unmarshal webhook response: %w", err)
 	}

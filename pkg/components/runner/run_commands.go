@@ -196,7 +196,7 @@ func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 	return http.StatusOK, nil, nil
 }
 
-func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *task) error {
+func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task) error {
 	if state.IsFinished() {
 		return nil
 	}
