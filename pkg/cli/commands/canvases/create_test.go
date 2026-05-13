@@ -21,7 +21,7 @@ func newCanvasCreateServer(t *testing.T) *httptest.Server {
 		require.Equal(t, http.MethodPost, r.Method)
 		require.Equal(t, "/api/v1/canvases", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"abc-123","name":"my-canvas"}}}`))
+		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"abc-123","name":"my-canvas","organizationId":"org-uuid"}}}`))
 	}))
 	t.Cleanup(server.Close)
 	return server
@@ -35,6 +35,38 @@ func TestCreateCommandPrintsCanvasOnSuccess(t *testing.T) {
 	err := (&createCommand{}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), `Canvas "my-canvas" created (ID: abc-123)`)
+	require.NotContains(t, stdout.String(), "Canvas URL:")
+}
+
+func TestCreateCommandPrintsURLFromResponseOrgID(t *testing.T) {
+	server := newCanvasCreateServer(t)
+	ctx, stdout := newCommandContextWithConfigForTest(t, server, "text", &fakeConfig{
+		url: "https://app.superplane.com",
+	})
+	ctx.Args = []string{"my-canvas"}
+
+	err := (&createCommand{}).Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), `Canvas "my-canvas" created (ID: abc-123)`)
+	require.Contains(t, stdout.String(), "Canvas URL: https://app.superplane.com/org-uuid/canvases/abc-123")
+}
+
+func TestCreateCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"canvas":{"metadata":{"id":"abc-123","name":"my-canvas"}}}`))
+	}))
+	t.Cleanup(server.Close)
+
+	ctx, stdout := newCommandContextWithConfigForTest(t, server, "text", &fakeConfig{
+		url: "https://app.superplane.com",
+	})
+	ctx.Args = []string{"my-canvas"}
+
+	err := (&createCommand{}).Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), `Canvas "my-canvas" created (ID: abc-123)`)
+	require.NotContains(t, stdout.String(), "Canvas URL:")
 }
 
 func TestCreateCommandReturnsJSONOutput(t *testing.T) {

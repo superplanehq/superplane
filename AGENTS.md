@@ -18,7 +18,7 @@
 ## Build, Test, and Development Commands
 
 - Bring up dev containers: `make dev.up`
-- Install deps, codegen, DB: `make dev.setup` after `dev.up` (re-run when protos, Go modules, or frontend deps change). By default only `superplane_dev` is migrated; use `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also need `superplane_test` (E2E; backend CI sets this via the environment).
+- Install deps, codegen, DB: `make dev.setup` after `dev.up` (re-run when protos, Go modules, or frontend deps change). By default only `superplane_dev` is migrated; use `DEV_SETUP_DBS="superplane_dev superplane_test"` when you also need `superplane_test` (E2E; backend CI sets this via the environment). If `go mod download` / `go build` fail with missing files under `tmp/go/pkg/mod`, run `make dev.clean.go.cache` then `make dev.setup.go` (often after disk-full or interrupted downloads).
 - Start API + Vite: `make dev.server` (after `make dev.up`) — UI at http://localhost:8000; use `make dev.server.fg` for foreground logs
 - One-shot backend tests: `make test` (Golang).
 - Targeted backend tests: `make test PKG_TEST_PACKAGES=./pkg/workers`
@@ -35,7 +35,7 @@
 - For UI component workflow, see [web_src/AGENTS.md](web_src/AGENTS.md)
 - For new components or triggers, see [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
 - For component design guidelines and quality standards, see [docs/contributing/component-design.md](docs/contributing/component-design.md)
-- After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI:
+- After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI (requires a running `app` container from `make dev.up`):
   - `make pb.gen` to regenerate protobuf files
   - `make openapi.spec.gen` to generate OpenAPI spec for the API
   - `make openapi.client.gen` to generate GoLang SDK for the API

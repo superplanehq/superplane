@@ -1,9 +1,8 @@
-.PHONY: lint test test.coverage test.license.check gen.setup gen.setup.prep gen.setup.backend gen.setup.ui web_src.npm.install.compose check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
+.PHONY: lint test test.coverage test.license.check check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
 
+MAKE=make
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
-# Databases to create and migrate in `make dev.setup` (space-separated). CI sets superplane_test alongside superplane_dev.
-DEV_SETUP_DBS ?= superplane_dev
 BASE_URL?=https://app.superplane.com
 
 export BUILDKIT_PROGRESS ?= plain
@@ -12,7 +11,6 @@ PKG_TEST_PACKAGES := ./pkg/...
 E2E_TEST_PACKAGES := ./test/e2e/...
 
 COMPOSE=docker compose -f docker-compose.dev.yml
-DOCKER_RUN_AS_CURRENT_USER=docker run --rm --user $(shell id -u):$(shell id -g)
 GENERATED_ARTIFACT_PATHS := pkg/protos pkg/openapi_client web_src/src/api-client api/swagger/superplane.swagger.json
 
 #
@@ -60,7 +58,6 @@ test.coverage.baseline.update:
 	$(MAKE) check.coverage.go.baseline.update
 
 test.license.check:
-	$(MAKE) gen.setup.backend
 	bash ./scripts/license-check.sh
 
 test.watch:
@@ -85,31 +82,29 @@ format.js:
 format.js.check:
 	cd web_src && npm run format:check
 
-#
-# Targets for dev environment
-#
-# Typical flow: `make dev.up` then `make dev.setup` (first time / after proto or dependency changes),
-# then `make dev.server`. Day-to-day: `make dev.up` then `make dev.server` (or `make dev.server.fg` for attached logs).
-# For E2E locally, migrate the test DB too: `DEV_SETUP_DBS="superplane_dev superplane_test" make dev.setup` (after `make dev.up`).
+dev.test.is.running:
+	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
 
 dev.up:
+	@mkdir -p tmp/screenshots
 	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
 
 dev.setup:
-	@mkdir -p tmp/screenshots
-	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
-	$(COMPOSE) exec -T app bash -lc "cd /app/web_src && npm install"
-	$(MAKE) gen.setup SKIP_WEB_SRC_NPM_INSTALL=1
-	$(MAKE) dev.setup.app
-	@set -euo pipefail; for db in $(DEV_SETUP_DBS); do \
-		$(MAKE) db.create DB_NAME=$$db; \
-		$(MAKE) db.migrate DB_NAME=$$db; \
-	done
+	@$(MAKE) dev.test.is.running
+	$(MAKE) dev.setup.npm
+	$(MAKE) pb.gen
+	$(MAKE) dev.setup.go
+	$(MAKE) db.create DB_NAME=superplane_dev
+	$(MAKE) db.migrate DB_NAME=superplane_dev
+	$(MAKE) db.create DB_NAME=superplane_test
+	$(MAKE) db.migrate DB_NAME=superplane_test
 
-dev.setup.app:
-	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
-	$(COMPOSE) exec -T app go mod download
-	$(COMPOSE) exec -T app go build cmd/server/main.go
+dev.setup.npm:
+	@$(COMPOSE) exec app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --silent"
+
+dev.setup.go:
+	@$(COMPOSE) exec app go mod download
+	@$(COMPOSE) exec app go build cmd/server/main.go
 
 dev.setup.no.cache:
 	rm -rf tmp
@@ -169,6 +164,12 @@ check.db.migrations:
 check.build.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build"
 
+check.test.ui:
+	$(COMPOSE) exec app bash -c "cd web_src && npm run test:coverage"
+
+check.format.js:
+	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"
+
 check.lint.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:budget"
 
@@ -213,29 +214,20 @@ ui.start:
 #
 
 db.create:
-	-$(COMPOSE) exec -T -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
-	-$(COMPOSE) exec -T -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
-	-$(COMPOSE) exec -T -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
-	$(COMPOSE) exec -T -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+	@$(COMPOSE) exec app ./scripts/db_create.sh $(DB_NAME)
 
 db.migration.create:
-	$(COMPOSE) exec -T app mkdir -p db/migrations
-	$(COMPOSE) exec -T app migrate create -ext sql -dir db/migrations $(NAME)
+	$(COMPOSE) exec app mkdir -p db/migrations
+	$(COMPOSE) exec app migrate create -ext sql -dir db/migrations $(NAME)
 	ls -lah db/migrations/*$(NAME)*
 
 db.data_migration.create:
-	$(COMPOSE) exec -T app mkdir -p db/data_migrations
-	$(COMPOSE) exec -T app migrate create -ext sql -dir db/data_migrations $(NAME)
+	$(COMPOSE) exec app mkdir -p db/data_migrations
+	$(COMPOSE) exec app migrate create -ext sql -dir db/data_migrations $(NAME)
 	ls -lah db/data_migrations/*$(NAME)*
 
 db.migrate:
-	rm -f db/structure.sql
-	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
-	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
-	# echo dump schema to db/structure.sql
-	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
-	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
-	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	@$(COMPOSE) exec app ./scripts/db_migrate.sh $(DB_NAME)
 
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
@@ -245,7 +237,7 @@ db.console:
 	$(COMPOSE) exec -it --user $$(id -u):$$(id -g) -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME)
 
 db.delete:
-	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app dropdb -h db -p 5432 -U postgres $(DB_NAME)
+	$(COMPOSE) exec --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app dropdb -h db -p 5432 -U postgres $(DB_NAME)
 
 db.recreate.all.dangerous:
 	$(MAKE) dev.down
@@ -258,38 +250,11 @@ db.recreate.all.dangerous:
 	$(MAKE) db.migrate DB_NAME=superplane_test
 
 #
-# Protobuf compilation
+# Protobuf / OpenAPI codegen runs in the running `app` container (`make dev.up` first).
 #
 
-# Install web_src deps via a one-off compose run (CI, `make gen`, release).
-# `make dev.setup` installs into the running app container first, then calls
-# `gen.setup` with SKIP_WEB_SRC_NPM_INSTALL=1 so this step is skipped.
-web_src.npm.install.compose:
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm install"
-
-gen.setup.prep:
-ifneq ($(SKIP_WEB_SRC_NPM_INSTALL),1)
-	$(MAKE) web_src.npm.install.compose
-endif
-
-gen.setup: gen.setup.prep
-	$(MAKE) pb.gen
-	$(MAKE) openapi.spec.gen
-	$(MAKE) openapi.client.gen
-	$(MAKE) openapi.web.client.gen
-
-gen.setup.backend:
-	$(MAKE) pb.gen
-	$(MAKE) openapi.spec.gen
-	$(MAKE) openapi.client.gen
-
-gen.setup.ui:
-	$(MAKE) openapi.spec.gen
-	$(MAKE) web_src.npm.install.compose
-	$(MAKE) openapi.web.client.gen
-
 gen:
-	$(MAKE) gen.setup
+	$(MAKE) pb.gen
 	$(MAKE) format.go
 	$(MAKE) format.js
 	$(MAKE) gen.components.docs
@@ -306,33 +271,44 @@ check.components.docs:
 MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents,usage,private/agents
 REST_API_MODULES := authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents
 
-pb.gen:
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
+pb.gen: dev.test.is.running
+	$(MAKE) pb.gen.models
+	$(MAKE) pb.gen.gateway
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
+	$(MAKE) openapi.spec.gen
+	$(MAKE) openapi.client.gen
+	$(MAKE) openapi.web.client.gen
 
-openapi.spec.gen:
-	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+pb.gen.models:
+	@$(COMPOSE) exec app /app/scripts/protoc.sh $(MODULES)
 
-openapi.client.gen:
-	rm -rf pkg/openapi_client
-	$(DOCKER_RUN_AS_CURRENT_USER) \
+pb.gen.gateway:
+	@$(COMPOSE) exec app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
+
+openapi.spec.gen: dev.test.is.running
+	@$(COMPOSE) exec app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
+
+openapi.client.gen: dev.test.is.running
+	@rm -rf pkg/openapi_client
+	@log=$$(mktemp); trap 'rm -f "$$log"' EXIT; \
+	if ! docker run --rm --user $(shell id -u):$(shell id -g) \
 		-v ${PWD}:/local openapitools/openapi-generator-cli:v7.13.0 generate \
 		-i /local/api/swagger/superplane.swagger.json \
 		-g go \
 		-o /local/pkg/openapi_client \
-		--additional-properties=packageName=openapi_client,enumClassPrefix=true,isGoSubmodule=true,withGoMod=false
-	rm -rf pkg/openapi_client/test
-	rm -rf pkg/openapi_client/docs
-	rm -rf pkg/openapi_client/api
-	rm -rf pkg/openapi_client/.travis.yml
-	rm -rf pkg/openapi_client/README.md
-	rm -rf pkg/openapi_client/git_push.sh
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/openapi_client -name '*.go' -print0 | xargs -0 gofmt -s -w"
+		--additional-properties=packageName=openapi_client,enumClassPrefix=true,isGoSubmodule=true,withGoMod=false \
+		>"$$log" 2>&1; then cat "$$log"; exit 1; fi
+	@rm -rf pkg/openapi_client/test
+	@rm -rf pkg/openapi_client/docs
+	@rm -rf pkg/openapi_client/api
+	@rm -rf pkg/openapi_client/.travis.yml
+	@rm -rf pkg/openapi_client/README.md
+	@rm -rf pkg/openapi_client/git_push.sh
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/openapi_client -name '*.go' -print0 | xargs -0 gofmt -s -w"
 
-openapi.web.client.gen:
-	rm -rf web_src/src/api-client
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm run generate:api && npx prettier --write 'src/api-client/**/*.{ts,tsx}'"
+openapi.web.client.gen: dev.test.is.running
+	@rm -rf web_src/src/api-client
+	@$(COMPOSE) exec --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm -s run generate:api && npx prettier --log-level silent --write 'src/api-client/**/*.{ts,tsx}'"
 
 #
 # Image and CLI build
@@ -341,8 +317,8 @@ openapi.web.client.gen:
 CLI_VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
 
 cli.build:
-	$(MAKE) gen.setup.backend
-	$(COMPOSE) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o build/cli cmd/cli/main.go'
+	$(MAKE) pb.gen
+	$(COMPOSE) exec -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o build/cli cmd/cli/main.go'
 
 cli.build.m1:
 	$(MAKE) cli.build OS=darwin ARCH=arm64
@@ -350,8 +326,9 @@ cli.build.m1:
 IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
+# pb.gen runs in the compose app container; run `make dev.up` first.
 image.build:
-	$(MAKE) gen.setup
+	$(MAKE) pb.gen
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner --build-arg BASE_URL=$(BASE_URL) --progress plain -t $(IMAGE):$(IMAGE_TAG) .
 
 image.auth:
