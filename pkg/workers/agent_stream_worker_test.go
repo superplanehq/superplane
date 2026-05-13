@@ -129,6 +129,41 @@ func TestAgentStreamWorker_PersistsToolEvents(t *testing.T) {
 	assert.Equal(t, models.AgentToolStatusFinished, stored[0].ToolStatus)
 }
 
+func TestAgentStreamWorker_ClosesPreviousToolWhenNewOneStarts(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	// Three sequential bash calls with no tool_result events. Only the
+	// last one should still be in "started" once the worker is done.
+	provider := &scriptedProvider{
+		name: testProvider,
+		events: []agents.ProviderEvent{
+			{ProviderEventID: "bash-1", Type: agents.ProviderEventToolUseStarted, ToolName: "bash", ToolCallID: "c1"},
+			{ProviderEventID: "bash-2", Type: agents.ProviderEventToolUseStarted, ToolName: "bash", ToolCallID: "c2"},
+			{ProviderEventID: "bash-3", Type: agents.ProviderEventToolUseStarted, ToolName: "bash", ToolCallID: "c3"},
+			{Type: agents.ProviderEventTurnCompleted},
+		},
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+	require.NoError(t, w.Handle(context.Background(), body))
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
+	require.NoError(t, err)
+	require.Len(t, stored, 3)
+
+	statuses := map[string]string{}
+	for _, m := range stored {
+		statuses[m.ProviderEventID] = m.ToolStatus
+	}
+	assert.Equal(t, models.AgentToolStatusFinished, statuses["bash-1"], "first tool must be marked finished when the second starts")
+	assert.Equal(t, models.AgentToolStatusFinished, statuses["bash-2"], "second tool must be marked finished when the third starts")
+	assert.Equal(t, models.AgentToolStatusFinished, statuses["bash-3"], "last tool flips to finished on turn end")
+}
+
 func TestAgentStreamWorker_ForceClosesOpenToolsOnTurnEnd(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

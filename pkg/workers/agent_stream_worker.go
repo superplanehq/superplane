@@ -203,6 +203,11 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 				Extra: map[string]any{"text": evt.Text},
 			})
 		case agents.ProviderEventToolUseStarted:
+			// Anthropic's built-in toolset runs tools sequentially and
+			// often skips tool_result events, so a fresh tool_use
+			// implies any previous in-flight tool finished. Close
+			// them before persisting the new row.
+			closeOpenTools(sessionID, publish)
 			if err := persistAndBroadcast(sessionID, &models.AgentSessionMessage{
 				SessionID:       sessionID,
 				ProviderEventID: evt.ProviderEventID,
