@@ -4,6 +4,20 @@ agent:
   machine:
     type: f1-standard-2
     os_image: ubuntu2204
+
+global_job_config:
+  env_vars:
+    - name: DOCKER_BUILDKIT
+      value: "1"
+  prologue:
+    commands:
+      - checkout
+      - mkdir -p tmp/go tmp/go-build
+      - "cache restore go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-mod-$SEMAPHORE_GIT_BRANCH,go-mod"
+      - "cache restore go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-build-$SEMAPHORE_GIT_BRANCH,go-build"
+      - make dev.up
+      - make dev.setup
+
 auto_cancel:
   running:
     when: branch != 'main'
@@ -15,13 +29,6 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
-      env_vars:
-        - name: DOCKER_BUILDKIT
-          value: "1"
-      prologue:
-        commands:
-          - checkout
-          - make dev.up
       jobs:
         - name: Licence Check
           commands:
@@ -32,19 +39,6 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
-      env_vars:
-        - name: DOCKER_BUILDKIT
-          value: "1"
-        - name: DEV_SETUP_DBS
-          value: "superplane_dev superplane_test"
-      prologue:
-        commands:
-          - checkout
-          - mkdir -p tmp/go tmp/go-build
-          - "cache restore go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-mod-$SEMAPHORE_GIT_BRANCH,go-mod"
-          - "cache restore go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-build-$SEMAPHORE_GIT_BRANCH,go-build"
-          - make dev.up
-          - make dev.setup
       jobs:
         - name: Lint
           commands:
@@ -67,7 +61,7 @@ blocks:
             - make check.format.go
             - make check.example.payloads
             - make check.templates
-            - make check.generated.artifacts 
+            - make check.generated.artifacts
 
       epilogue:
         always:
@@ -77,26 +71,21 @@ blocks:
             - "cache store go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go"
             - "cache store go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go-build"
 
-  - name: "Frondend Tests"
+  - name: "Frontend Tests"
     dependencies: []
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
-      env_vars:
-        - name: DOCKER_BUILDKIT
-          value: "1"
       prologue:
         commands:
-          - checkout
           - sem-version node 20
           - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
-          - make gen.setup.ui
           - cd web_src
           - npm ci
       epilogue:
         always:
           commands:
-            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum package-lock.json) node_modules
+            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json) web_src/node_modules
       jobs:
         - name: Check Build
           commands:
