@@ -2,8 +2,10 @@ package agents
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"time"
 
 	"github.com/google/uuid"
@@ -47,34 +49,52 @@ func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, can
 		return nil, err
 	}
 
-	existing, err := models.FindAgentSessionByCanvasInTransaction(database.Conn(), organizationID, userID, canvasID)
-	if err == nil {
+	if existing, err := models.FindAgentSessionByCanvasInTransaction(database.Conn(), organizationID, userID, canvasID); err == nil {
 		return existing, nil
-	}
-	if !errors.Is(err, gorm.ErrRecordNotFound) {
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, fmt.Errorf("load session: %w", err)
 	}
 
-	upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("create provider session: %w", err)
-	}
+	var session *models.AgentSession
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", ensureSessionLockKey(organizationID, userID, canvasID)).Error; err != nil {
+			return err
+		}
 
-	session := &models.AgentSession{
-		OrganizationID:    organizationID,
-		UserID:            userID,
-		CanvasID:          canvasID,
-		Provider:          s.provider.Name(),
-		ProviderSessionID: upstream.ProviderSessionID,
-		Status:            models.AgentSessionStatusIdle,
-	}
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		if found, err := models.FindAgentSessionByCanvasInTransaction(tx, organizationID, userID, canvasID); err == nil {
+			session = found
+			return nil
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{})
+		if err != nil {
+			return fmt.Errorf("create provider session: %w", err)
+		}
+
+		session = &models.AgentSession{
+			OrganizationID:    organizationID,
+			UserID:            userID,
+			CanvasID:          canvasID,
+			Provider:          s.provider.Name(),
+			ProviderSessionID: upstream.ProviderSessionID,
+			Status:            models.AgentSessionStatusIdle,
+		}
 		return models.CreateAgentSessionInTransaction(tx, session)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("persist session: %w", err)
+		return nil, fmt.Errorf("ensure session: %w", err)
 	}
 	return session, nil
+}
+
+func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
+	h := fnv.New64a()
+	h.Write(organizationID[:])
+	h.Write(userID[:])
+	h.Write(canvasID[:])
+	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
 }
 
 func (s *Service) GetSession(organizationID, userID, sessionID uuid.UUID) (*models.AgentSession, error) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/uuid"
@@ -15,6 +16,29 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 )
+
+type blockingProvider struct {
+	created  atomic.Int32
+	onCreate func()
+}
+
+func (b *blockingProvider) Name() string { return testProviderName }
+
+func (b *blockingProvider) CreateSession(_ context.Context, _ agents.CreateSessionOptions) (*agents.CreateSessionResult, error) {
+	b.created.Add(1)
+	if b.onCreate != nil {
+		b.onCreate()
+	}
+	return &agents.CreateSessionResult{ProviderSessionID: "provider-session-" + uuid.NewString()}, nil
+}
+
+func (b *blockingProvider) SendMessage(context.Context, string, string, agents.SendMessageOptions) error {
+	return nil
+}
+
+func (b *blockingProvider) StreamEvents(context.Context, string, func(agents.ProviderEvent) error) error {
+	return nil
+}
 
 const testProviderName = "test"
 
@@ -77,6 +101,48 @@ func TestService_EnsureSession_CreatesOnFirstCall(t *testing.T) {
 	assert.Equal(t, testProviderName, session.Provider)
 	assert.Equal(t, models.AgentSessionStatusIdle, session.Status)
 	assert.Equal(t, 1, provider.createCalled)
+}
+
+func TestService_EnsureSession_ConcurrentCallsProvisionOnce(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	// The provider blocks the first CreateSession until both callers have
+	// reached the lock-protected region, ensuring they would race without
+	// the advisory lock.
+	release := make(chan struct{})
+	reached := make(chan struct{}, 1)
+	provider := &blockingProvider{onCreate: func() {
+		select {
+		case reached <- struct{}{}:
+		default:
+		}
+		<-release
+	}}
+	svc := newService(t, r, provider)
+
+	type result struct {
+		session *models.AgentSession
+		err     error
+	}
+	results := make(chan result, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			s, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+			results <- result{s, err}
+		}()
+	}
+
+	<-reached
+	close(release)
+
+	first := <-results
+	second := <-results
+	require.NoError(t, first.err)
+	require.NoError(t, second.err)
+	assert.Equal(t, first.session.ID, second.session.ID, "both callers must see the same session row")
+	assert.Equal(t, int32(1), provider.created.Load(), "upstream session must be provisioned exactly once")
 }
 
 func TestService_EnsureSession_IsIdempotent(t *testing.T) {
