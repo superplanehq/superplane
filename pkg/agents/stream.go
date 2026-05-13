@@ -142,21 +142,39 @@ func (h *StreamHandler) pollAndStream(ctx context.Context, w http.ResponseWriter
 		}
 
 		// Stream new events and detect completion from event types
+		// Only consider idle/failed events that come AFTER we've seen the user.message
+		// for this turn (to avoid reacting to idle events from previous turns)
 		sawIdle := false
 		sawFailed := false
+		sawCurrentUserMessage := false
 		for _, event := range events.Data {
 			if seenEventIDs[event.ID] {
 				continue
 			}
 			seenEventIDs[event.ID] = true
 
-			// Detect session completion from events themselves
+			// Track when we see our user message (marks the start of current turn)
+			if event.Type == "user.message" {
+				sawCurrentUserMessage = true
+				continue
+			}
+
+			// Only detect completion if it's after our user message
 			if event.Type == "session.status_idle" {
-				sawIdle = true
+				if sawCurrentUserMessage {
+					sawIdle = true
+				}
 				continue
 			}
 			if event.Type == "session.status_failed" {
-				sawFailed = true
+				if sawCurrentUserMessage {
+					sawFailed = true
+				}
+				continue
+			}
+
+			// Skip other session/thread status events
+			if strings.HasPrefix(event.Type, "session.") || strings.HasPrefix(event.Type, "session.thread") {
 				continue
 			}
 
