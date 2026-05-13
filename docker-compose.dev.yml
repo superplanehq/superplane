@@ -6,7 +6,9 @@ services:
       cache_from:
         - ghcr.io/superplanehq/superplane-dev-base:app-latest
     tty: true
-    command: bash /app/docker-entrypoint.dev.sh
+    # Idle by default so `make dev.up` does not run installs or the API/UI stack.
+    # Run `make dev.server` to start air + Vite inside this container.
+    command: ["sleep", "infinity"]
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"

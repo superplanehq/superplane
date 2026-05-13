@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
+#
+# Hot-reload stack for local development (run via `make dev.server`).
+# Install JS deps with `make dev.setup` first so `npm run dev` can start quickly.
+#
+set -euo pipefail
 
-# Start air for hot-reloading the Golang application
+# Best-effort: allow re-running `make dev.server` without recreating the container.
+pkill -x air 2>/dev/null || true
+pkill -f '/app/web_src/node_modules/.bin/vite' 2>/dev/null || true
+sleep 1
+
 air &
 
-# Start vite for hot-reloading the frontend application
 cd web_src
-npm install
 npm run dev &
 cd ..
 
-# Wait for any process to exit
 wait -n
-
-# Exit with status of process that exited first
 exit $?
