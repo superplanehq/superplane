@@ -285,6 +285,10 @@ export interface CanvasPageProps {
   onTriggerModalHostReady?: (openModal: (modal: TriggerActionModal) => void) => void;
   initialSidebar?: { isOpen?: boolean; nodeId?: string | null };
   initialFocusNodeId?: string | null;
+  /** Bump this counter to fit all currently-rendered nodes into view (e.g., when run selection changes). */
+  fitAllRequest?: number | null;
+  /** Shows a loading indicator over the canvas (not the sidebar) while run executions are being fetched. */
+  runCanvasLoading?: boolean;
 
   // Full history functionality
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
@@ -1158,6 +1162,11 @@ function CanvasPage(props: CanvasPageProps) {
         )}
 
         <div className="flex-1 relative">
+          {props.runCanvasLoading && props.headerMode === "runs" ? (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-50">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+            </div>
+          ) : null}
           {showPreviewFloatingBar || showAwaitingFloatingBar ? (
             <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
               <div
@@ -1239,6 +1248,7 @@ function CanvasPage(props: CanvasPageProps) {
               logEntries={props.logEntries}
               focusRequest={props.focusRequest}
               initialFocusNodeId={props.initialFocusNodeId}
+              fitAllRequest={props.fitAllRequest}
               runsEvents={props.runsEvents}
               runsTotalCount={props.runsTotalCount}
               runsHasNextPage={props.runsHasNextPage}
@@ -1775,6 +1785,7 @@ function CanvasContent({
   logEntries = [],
   focusRequest,
   initialFocusNodeId,
+  fitAllRequest,
   runsEvents,
   runsTotalCount,
   runsHasNextPage,
@@ -1833,6 +1844,7 @@ function CanvasContent({
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
   initialFocusNodeId?: string | null;
+  fitAllRequest?: number | null;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsTotalCount?: number;
   runsHasNextPage?: boolean;
@@ -2271,6 +2283,18 @@ function CanvasContent({
     },
     [fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef, initialFocusNodeId],
   );
+
+  // Fit all currently-rendered nodes into view whenever the parent bumps `fitAllRequest`.
+  // Wait a microtask so ReactFlow has measured the just-swapped node set (e.g. switching
+  // between runs whose participating nodes have different coordinates) before fitting.
+  useEffect(() => {
+    if (fitAllRequest == null) return;
+    if (!hasFitToViewRef.current) return;
+    const id = window.setTimeout(() => {
+      fitView({ duration: 500, maxZoom: 1.0, padding: 0.2 });
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [fitAllRequest, fitView, hasFitToViewRef]);
 
   const showHeader = !isReadOnly;
 
