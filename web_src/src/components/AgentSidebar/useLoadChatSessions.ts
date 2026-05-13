@@ -49,6 +49,11 @@ export function useLoadChatSessions({
             return previousChatId;
           }
 
+          // Auto-select the most recent session (single session per canvas/user)
+          if (sessions.length > 0) {
+            return sessions[0].id;
+          }
+
           return null;
         });
       } catch (error) {
