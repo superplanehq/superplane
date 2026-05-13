@@ -6,7 +6,7 @@ import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo, SubtitleConte
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { baseEventSections, deleteTunnelExecutionDetails } from "./base";
+import { baseEventSections, cloudflareDeletedResourceExecutionDetails } from "./base";
 import { getCloudflareTunnelName } from "./metadata";
 
 interface DeleteTunnelConfiguration {
@@ -30,7 +30,7 @@ export const deleteTunnelMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails: deleteTunnelExecutionDetails,
+  getExecutionDetails: cloudflareDeletedResourceExecutionDetails,
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
