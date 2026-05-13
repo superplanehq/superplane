@@ -3,7 +3,9 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { GitBranch, MoreVertical, Pencil, Settings } from "lucide-react";
+import { GitBranch, MoreVertical, Pencil, Settings, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
 import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
@@ -30,8 +32,11 @@ interface HeaderProps {
   discardVersionDisabledTooltip?: string;
   mode?: HeaderMode;
   onEnterEditMode?: () => void;
+  onDiscardAndEdit?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
+  hasDraft?: boolean;
+  draftAge?: string;
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
@@ -181,8 +186,11 @@ function SecondaryHeaderActions({
   publishVersionDisabled,
   publishVersionDisabledTooltip,
   onEnterEditMode,
+  onDiscardAndEdit,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
+  hasDraft,
+  draftAge,
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
@@ -209,8 +217,11 @@ function SecondaryHeaderActions({
       {mode === "version-live" && onEnterEditMode ? (
         <EnterEditButton
           onClick={onEnterEditMode}
+          onDiscardAndEdit={onDiscardAndEdit}
           disabled={!!enterEditModeDisabled}
           disabledTooltip={enterEditModeDisabledTooltip}
+          hasDraft={hasDraft}
+          draftAge={draftAge}
         />
       ) : null}
 
@@ -254,13 +265,66 @@ function SecondaryHeaderActions({
 
 function EnterEditButton({
   onClick,
+  onDiscardAndEdit,
   disabled,
   disabledTooltip,
+  hasDraft,
+  draftAge,
 }: {
   onClick: () => void;
+  onDiscardAndEdit?: () => void;
   disabled: boolean;
   disabledTooltip?: string;
+  hasDraft?: boolean;
+  draftAge?: string;
 }) {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+
+  // If there's an existing draft, show a popover with options
+  if (hasDraft && !disabled) {
+    return (
+      <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <PopoverTrigger asChild>
+          <UIButton
+            type="button"
+            variant="default"
+            size="sm"
+            data-testid="canvas-edit-button"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </UIButton>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-64 p-0">
+          <div className="px-3 py-2.5 border-b border-gray-100">
+            <p className="text-xs font-medium text-gray-700">You have an unpublished draft</p>
+            {draftAge ? <p className="text-[11px] text-gray-400 mt-0.5">Last edited {draftAge}</p> : null}
+          </div>
+          <div className="p-2 flex flex-col gap-1">
+            <button
+              type="button"
+              className="flex items-center gap-2 rounded px-2.5 py-1.5 text-[12px] text-gray-700 hover:bg-gray-50 text-left"
+              onClick={() => { setPopoverOpen(false); onClick(); }}
+            >
+              <Pencil className="h-3.5 w-3.5 text-gray-400" />
+              Continue editing
+            </button>
+            {onDiscardAndEdit ? (
+              <button
+                type="button"
+                className="flex items-center gap-2 rounded px-2.5 py-1.5 text-[12px] text-red-600 hover:bg-red-50 text-left"
+                onClick={() => { setPopoverOpen(false); onDiscardAndEdit(); }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Discard draft &amp; start fresh
+              </button>
+            ) : null}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
   const button = (
     <UIButton
       type="button"

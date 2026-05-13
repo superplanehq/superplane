@@ -82,6 +82,7 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { getColorClass } from "@/lib/colors";
 import { filterVisibleConfiguration } from "@/lib/components";
+import { formatRelativeTime } from "@/lib/timezone";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { DefaultLayoutEngine } from "@/lib/layout";
@@ -6167,8 +6168,18 @@ export function WorkflowPageV2() {
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           headerMode={headerMode}
           onEnterEditMode={handleEnterEditMode}
+          onDiscardAndEdit={latestDraftVersion?.metadata?.id ? async () => {
+            try {
+              await deleteCanvasVersionMutation.mutateAsync(latestDraftVersion.metadata!.id!);
+              showSuccessToast("Draft discarded");
+            } catch (e) {
+              showErrorToast("Failed to discard draft");
+            }
+          } : undefined}
           enterEditModeDisabled={toggleEditModeDisabled}
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
+          hasDraft={!!latestDraftVersion}
+          draftAge={latestDraftVersion?.metadata?.updatedAt ? formatRelativeTime(latestDraftVersion.metadata.updatedAt) : undefined}
           onExitEditMode={handleExitEditMode}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}

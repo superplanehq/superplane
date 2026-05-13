@@ -188,6 +188,9 @@ export interface CanvasPageProps {
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
+  onDiscardAndEdit?: () => void;
+  hasDraft?: boolean;
+  draftAge?: string;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
   onExitEditMode?: () => void;
@@ -1171,8 +1174,11 @@ function CanvasPage(props: CanvasPageProps) {
             discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
             headerMode={props.headerMode}
             onEnterEditMode={props.onEnterEditMode}
+            onDiscardAndEdit={props.onDiscardAndEdit}
             enterEditModeDisabled={props.enterEditModeDisabled}
             enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+            hasDraft={props.hasDraft}
+            draftAge={props.draftAge}
             onExitEditMode={props.onExitEditMode}
             exitEditModeDisabled={props.exitEditModeDisabled}
             exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
@@ -1698,8 +1704,11 @@ function CanvasContentHeader({
   discardVersionDisabledTooltip,
   headerMode,
   onEnterEditMode,
+  onDiscardAndEdit,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
+  hasDraft,
+  draftAge,
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
@@ -1732,6 +1741,9 @@ function CanvasContentHeader({
   discardVersionDisabledTooltip?: string;
   headerMode?: "default" | "launchpad" | "version-live" | "version-edit" | "runs" | "repo";
   onEnterEditMode?: () => void;
+  onDiscardAndEdit?: () => void;
+  hasDraft?: boolean;
+  draftAge?: string;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
   onExitEditMode?: () => void;
@@ -1784,8 +1796,11 @@ function CanvasContentHeader({
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       mode={headerMode}
       onEnterEditMode={onEnterEditMode}
+      onDiscardAndEdit={onDiscardAndEdit}
       enterEditModeDisabled={enterEditModeDisabled}
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+      hasDraft={hasDraft}
+      draftAge={draftAge}
       onExitEditMode={onExitEditMode}
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
