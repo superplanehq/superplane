@@ -27,6 +27,7 @@ import {
   type PanelImperativeHandle,
   type PanelRenderCtx,
 } from "./panelRegistry";
+import { AddPanelDialog } from "./AddPanelDialog";
 
 const GRID_COLS = 12;
 const ROW_HEIGHT = 40;
@@ -130,8 +131,11 @@ export function LaunchpadView({
   const ctx: PanelRenderCtx = useMemo(() => ({ nodeRefs, canvasId }), [nodeRefs, canvasId]);
 
   const handleAddPanel = useCallback(
-    (def: PanelDef) => {
-      const id = `panel-${Math.random().toString(36).slice(2, 10)}`;
+    (def: PanelDef, name?: string) => {
+      const slug = name
+        ? name.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").replace(/-+/g, "-").replace(/^-|-$/g, "")
+        : "";
+      const id = slug || `panel-${Math.random().toString(36).slice(2, 10)}`;
       const newPanel: PanelInternal = {
         id,
         type: def.type,
@@ -166,8 +170,8 @@ export function LaunchpadView({
   const setHeaderActionNode = useHeaderActionSlotSetter();
   const handleAddPanelRef = useRef(handleAddPanel);
   handleAddPanelRef.current = handleAddPanel;
-  const stableHandleAddPanel = useCallback((def: PanelDef) => {
-    handleAddPanelRef.current(def);
+  const stableHandleAddPanel = useCallback((def: PanelDef, name?: string) => {
+    handleAddPanelRef.current(def, name);
   }, []);
   useEffect(() => {
     if (!setHeaderActionNode) return;
@@ -365,6 +369,7 @@ function PanelChrome({
         </div>
         {!readOnly ? (
           <PanelOverlay
+            panelId={panel.id}
             supportsEdit={supportsEdit}
             onEdit={triggerEdit}
             onRequestDelete={() => setConfirmingDelete(true)}
@@ -384,10 +389,12 @@ function PanelChrome({
 }
 
 function PanelOverlay({
+  panelId,
   supportsEdit,
   onEdit,
   onRequestDelete,
 }: {
+  panelId: string;
   supportsEdit: boolean;
   onEdit: () => void;
   onRequestDelete: () => void;
@@ -407,6 +414,11 @@ function PanelOverlay({
       className="pointer-events-none absolute right-0 top-0 z-20 flex items-center gap-0.5 rounded-tl-none rounded-tr-sm rounded-br-none rounded-bl-sm border-b border-l border-slate-200 bg-white/90 p-1 opacity-0 shadow-none backdrop-blur transition-opacity duration-150 group-hover/panel:pointer-events-auto group-hover/panel:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100"
       data-testid="launchpad-panel-actions"
     >
+      {panelId && !panelId.startsWith("panel-") ? (
+        <span className="max-w-[120px] truncate px-1 text-[10px] font-medium text-slate-400" title={panelId}>
+          {panelId}
+        </span>
+      ) : null}
       <span
         className="launchpad-drag-handle inline-flex h-6 w-6 cursor-grab items-center justify-center rounded text-slate-500 transition-colors hover:text-slate-700 active:cursor-grabbing"
         data-testid="launchpad-drag-handle"
@@ -478,40 +490,65 @@ function DeleteConfirmDialog({
   );
 }
 
-function AddPanelButton({ onAdd }: { onAdd: (def: PanelDef) => void }) {
+function AddPanelButton({ onAdd }: { onAdd: (def: PanelDef, name?: string) => void }) {
   const defs = listPanelDefs();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [pendingDef, setPendingDef] = useState<PanelDef | null>(null);
+
+  const openDialog = useCallback((def: PanelDef) => {
+    setPendingDef(def);
+    setDialogOpen(true);
+  }, []);
+
+  const handleConfirm = useCallback((def: PanelDef, name: string) => {
+    onAdd(def, name);
+    setDialogOpen(false);
+    setPendingDef(null);
+  }, [onAdd]);
+
+  const handleCancel = useCallback(() => {
+    setDialogOpen(false);
+    setPendingDef(null);
+  }, []);
+
   // With one panel type today, show a single-action button. The dropdown is
   // wired up so adding a second panel type later doesn't require UI changes.
   if (defs.length === 1) {
     const only = defs[0];
     return (
-      <Button size="sm" variant="default" onClick={() => onAdd(only)} data-testid="launchpad-add-panel">
-        <Plus className="mr-1 h-3.5 w-3.5" />
-        Add panel
-      </Button>
-    );
-  }
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button size="sm" variant="default" data-testid="launchpad-add-panel">
+      <>
+        <Button size="sm" variant="default" onClick={() => openDialog(only)} data-testid="launchpad-add-panel">
           <Plus className="mr-1 h-3.5 w-3.5" />
           Add panel
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {defs.map((def) => (
-          <DropdownMenuItem key={def.type} onClick={() => onAdd(def)}>
-            <def.icon className="h-4 w-4" />
-            {def.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+        <AddPanelDialog open={dialogOpen} panelDef={pendingDef} onConfirm={handleConfirm} onCancel={handleCancel} />
+      </>
+    );
+  }
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="default" data-testid="launchpad-add-panel">
+            <Plus className="mr-1 h-3.5 w-3.5" />
+            Add panel
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {defs.map((def) => (
+            <DropdownMenuItem key={def.type} onClick={() => openDialog(def)}>
+              <def.icon className="h-4 w-4" />
+              {def.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <AddPanelDialog open={dialogOpen} panelDef={pendingDef} onConfirm={handleConfirm} onCancel={handleCancel} />
+    </>
   );
 }
 
-function EmptyState({ readOnly, onAdd }: { readOnly: boolean; onAdd: (def: PanelDef) => void }) {
+function EmptyState({ readOnly, onAdd }: { readOnly: boolean; onAdd: (def: PanelDef, name?: string) => void }) {
   return (
     <div className="flex flex-1 items-center justify-center p-8" data-testid="launchpad-empty-state">
       <div className="flex w-full max-w-2xl flex-col items-center gap-5 rounded-xl border border-dashed border-slate-300 bg-white/70 px-8 py-10 text-center shadow-[0_1px_2px_rgb(15_23_42_/_0.04)] backdrop-blur">

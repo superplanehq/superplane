@@ -77,3 +77,27 @@ func (r *InternalReader) ReadReadme(canvasID string) (string, error) {
 
 	return version.Readme, nil
 }
+
+// LaunchpadData holds the exported launchpad state.
+type LaunchpadData struct {
+	Panels []dbmodels.LaunchpadPanel
+	Layout []dbmodels.LaunchpadLayoutItem
+}
+
+// ReadLaunchpad returns the canvas launchpad panels and layout.
+func (r *InternalReader) ReadLaunchpad(canvasID string) (*LaunchpadData, error) {
+	canvasUUID, err := uuid.Parse(canvasID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid canvas ID: %w", err)
+	}
+
+	lp, err := dbmodels.FindCanvasLaunchpad(canvasUUID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read launchpad: %w", err)
+	}
+
+	return &LaunchpadData{
+		Panels: lp.Panels.Data(),
+		Layout: lp.Layout.Data(),
+	}, nil
+}

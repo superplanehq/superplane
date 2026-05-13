@@ -110,10 +110,10 @@ func (c *APIClient) UpdateCanvasYAML(canvasID string, yamlContent []byte) error 
 
 // UpdateLaunchpad updates the canvas launchpad/apps panels.
 func (c *APIClient) UpdateLaunchpad(canvasID string, panels map[string]string, layout []byte) error {
-	// Build the launchpad payload
 	type Panel struct {
-		ID      string `json:"id"`
-		Content string `json:"content"`
+		ID      string            `json:"id"`
+		Type    string            `json:"type"`
+		Content map[string]string `json:"content"`
 	}
 
 	payload := struct {
@@ -123,8 +123,12 @@ func (c *APIClient) UpdateLaunchpad(canvasID string, panels map[string]string, l
 		Layout: layout,
 	}
 
-	for id, content := range panels {
-		payload.Panels = append(payload.Panels, Panel{ID: id, Content: content})
+	for id, body := range panels {
+		payload.Panels = append(payload.Panels, Panel{
+			ID:      id,
+			Type:    "markdown",
+			Content: map[string]string{"body": body},
+		})
 	}
 
 	jsonBody, _ := json.Marshal(payload)

@@ -1,6 +1,7 @@
 package gitserver
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,24 @@ import (
 
 	log "github.com/sirupsen/logrus"
 )
+
+// exportAppsToDir writes launchpad panels as individual markdown files
+// and the layout as _layout.json.
+func exportAppsToDir(appsDir string, lp *LaunchpadData) {
+	os.MkdirAll(appsDir, 0755)
+
+	for _, panel := range lp.Panels {
+		body, _ := panel.Content["body"].(string)
+		if panel.ID != "" {
+			os.WriteFile(filepath.Join(appsDir, panel.ID+".md"), []byte(body), 0644)
+		}
+	}
+
+	if len(lp.Layout) > 0 {
+		layoutJSON, _ := json.MarshalIndent(lp.Layout, "", "  ")
+		os.WriteFile(filepath.Join(appsDir, "_layout.json"), layoutJSON, 0644)
+	}
+}
 
 // ReverseSync auto-commits canvas state to git after UI publishes.
 type ReverseSync struct {
@@ -128,6 +147,14 @@ func (rs *ReverseSync) commitCurrentState(slug, canvasID, userName string) error
 		log.Warnf("git-reverse-sync: failed to read readme: %v", err)
 	} else if readme != "" {
 		os.WriteFile(filepath.Join(workDir, "README.md"), []byte(readme), 0644)
+	}
+
+	// Export launchpad panels as apps/<panel-id>.md + apps/_layout.json
+	lp, err := rs.reader.ReadLaunchpad(canvasID)
+	if err != nil {
+		log.Warnf("git-reverse-sync: failed to read launchpad: %v", err)
+	} else if len(lp.Panels) > 0 {
+		exportAppsToDir(filepath.Join(workDir, "apps"), lp)
 	}
 
 	// Check if anything changed
