@@ -73,8 +73,10 @@ services:
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
       ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
       AGENT_ENABLED: ${AGENT_ENABLED:-yes}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_AGENT_ID: ${ANTHROPIC_AGENT_ID:-}
+      ANTHROPIC_ENVIRONMENT_ID: ${ANTHROPIC_ENVIRONMENT_ID:-}
       AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://localhost:8090}
-      AGENT_GRPC_URL: ${AGENT_GRPC_URL:-agent:50061}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}
@@ -106,67 +108,11 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      agent:
-        condition: service_healthy
 
     volumes:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
-
-  agent:
-    build:
-      context: agent
-      dockerfile: Dockerfile
-      target: dev
-      cache_from:
-        - ghcr.io/superplanehq/superplane-dev-base:agent-latest
-    working_dir: /app/agent
-    env_file:
-      - agent/.env
-    environment:
-      APP_PORT: ${APP_PORT:-8000}
-      SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
-      INTERNAL_GRPC_HOST: ${INTERNAL_GRPC_HOST:-0.0.0.0}
-      INTERNAL_GRPC_PORT: ${INTERNAL_GRPC_PORT:-50061}
-      DB_HOST: ${DB_HOST:-db}
-      DB_PORT: ${DB_PORT:-5432}
-      DB_NAME: ${DB_NAME:-agents_dev}
-      DB_USERNAME: ${DB_USERNAME:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-the-cake-is-a-lie}
-      DB_SSLMODE: ${DB_SSLMODE:-disable}
-      APPLICATION_NAME: ${APPLICATION_NAME:-superplane-agent}
-      AGENT_HTTP_DEBUG: ${AGENT_HTTP_DEBUG:-true}
-      JWT_SECRET: 1234567890abcdefghijklmnopqrstuv # must be the same as in the app
-      OTEL_ENABLED: "yes"
-      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"
-      OTEL_SERVICE_NAME: "superplane-agent"
-      SENTRY_DSN: ""
-      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
-    command: >-
-      bash -lc "uv run python -m uvicorn ai.web:create_app
-      --factory
-      --host 0.0.0.0
-      --port 8090
-      --timeout-graceful-shutdown ${AGENT_UVICORN_GRACEFUL_SHUTDOWN:-0}
-      --reload
-      --reload-dir /app/agent/src
-      --reload-dir /app/agent/evals"
-    stop_grace_period: ${AGENT_STOP_GRACE_PERIOD:-0s}
-    tty: true
-    stdin_open: true
-    ports:
-      - ${AGENT_HTTP_PORT:-${AGENT_REPL_WEB_PORT:-8090}}:8090
-    volumes:
-      - .:/app
-      - ./tmp/agent/evals:/app/tmp/agent/evals
-      - uv-cache:/root/.cache/uv
-    healthcheck:
-      test: ["CMD", "bash", "-lc", "uv --version >/dev/null && python --version >/dev/null"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
@@ -227,7 +173,4 @@ volumes:
     driver: local
 
   postgres-data:
-    driver: local
-
-  uv-cache:
     driver: local

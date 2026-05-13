@@ -36,6 +36,7 @@ export default defineConfig(({ command }: { command: string }) => {
       port: devPort,
       strictPort: true,
       host: true,
+      allowedHosts: ["nandor.superplane.com"],
       headers: !isProduction ? { "X-Robots-Tag": "noindex" } : undefined,
       watch: {
         usePolling: true,
