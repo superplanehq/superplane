@@ -19,9 +19,11 @@ import (
 
 // Config controls runner behavior.
 type Config struct {
-	BaseURL   string
-	RunnerID  string
-	Token     string
+	BaseURL  string
+	RunnerID string
+	Token    string
+	// Transport is "http" (default) or "websocket" for fleet-manager /v1/runners/stream.
+	Transport string
 	PollEmpty time.Duration
 	// MaxOutputBytes caps combined stdout+stderr stored and sent back.
 	MaxOutputBytes int
@@ -55,6 +57,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	if a.Config.PollEmpty <= 0 {
 		a.Config.PollEmpty = time.Second
+	}
+	if transportWebSocket(a.Config) {
+		return RunWebSocket(ctx, a)
 	}
 	base := strings.TrimRight(a.Config.BaseURL, "/")
 	for {
