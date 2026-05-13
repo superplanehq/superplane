@@ -1,5 +1,5 @@
 import { Loader2, Send, SquareTerminal, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -130,11 +130,6 @@ function ChatConversation({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const previousScrollHeight = useRef<number | null>(null);
-  const hasInitialScrolled = useRef(false);
-
-  useEffect(() => {
-    hasInitialScrolled.current = false;
-  }, [chatId]);
 
   // Load older pages when the user scrolls to the top. We snapshot the
   // pre-fetch scrollHeight so we can restore the scroll position after the
@@ -152,7 +147,9 @@ function ChatConversation({
     return () => el.removeEventListener("scroll", onScroll);
   }, [messagesQuery]);
 
-  useEffect(() => {
+  // Always land at the bottom in one paint. useLayoutEffect runs before the
+  // browser paints, so there's no animation to interrupt.
+  useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     if (previousScrollHeight.current !== null) {
@@ -160,12 +157,8 @@ function ChatConversation({
       previousScrollHeight.current = null;
       return;
     }
-    el.scrollTo({
-      top: el.scrollHeight,
-      behavior: hasInitialScrolled.current ? "smooth" : "auto",
-    });
-    hasInitialScrolled.current = true;
-  }, [messages.length, streamingText]);
+    el.scrollTop = el.scrollHeight;
+  }, [chatId, messages.length, streamingText, showThinking]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
