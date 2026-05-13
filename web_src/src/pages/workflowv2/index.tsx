@@ -5059,6 +5059,33 @@ export function WorkflowPageV2() {
     handleUseVersion(liveCanvasVersionId);
   }, [handleUseVersion, isRunsMode, isViewingLiveVersion, liveCanvasVersionId]);
 
+  const handleDiscardDraftAndStartEdit = useCallback(async () => {
+    if (!canUpdateCanvas) {
+      showErrorToast("You don't have permission to edit this canvas");
+      return;
+    }
+    if (isTemplate) {
+      showErrorToast("Template canvases are read-only");
+      return;
+    }
+
+    const draftId = latestDraftVersion?.metadata?.id;
+    if (draftId) {
+      try {
+        await deleteCanvasVersionMutation.mutateAsync(draftId);
+      } catch (error) {
+        const message =
+          (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          (error as { message?: string })?.message ||
+          "Failed to discard draft";
+        showErrorToast(message);
+        return;
+      }
+    }
+
+    await handleCreateVersion();
+  }, [canUpdateCanvas, isTemplate, latestDraftVersion, deleteCanvasVersionMutation, handleCreateVersion]);
+
   const handleResetDraftChanges = useCallback(async () => {
     if (!organizationId || !canvasId) {
       return;
@@ -5707,6 +5734,8 @@ export function WorkflowPageV2() {
           onDiscardVersion={handleResetDraftChanges}
           discardVersionDisabled={resetDraftDisabled}
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
+          onDiscardDraftAndStartEdit={handleDiscardDraftAndStartEdit}
+          unpublishedDraftUpdatedAt={latestDraftVersion?.metadata?.updatedAt || latestDraftVersion?.metadata?.createdAt}
           headerMode={headerMode}
           onEnterEditMode={handleEnterEditModeFromHeader}
           enterEditModeDisabled={toggleEditModeDisabled}
