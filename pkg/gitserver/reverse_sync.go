@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,10 +18,25 @@ import (
 func exportAppsToDir(appsDir string, lp *LaunchpadData) {
 	os.MkdirAll(appsDir, 0755)
 
+	// Build set of current panel IDs
+	activePanels := make(map[string]bool)
 	for _, panel := range lp.Panels {
 		body, _ := panel.Content["body"].(string)
 		if panel.ID != "" {
 			os.WriteFile(filepath.Join(appsDir, panel.ID+".md"), []byte(body), 0644)
+			activePanels[panel.ID+".md"] = true
+		}
+	}
+
+	// Remove orphan .md files (panels that were deleted in the UI)
+	entries, _ := os.ReadDir(appsDir)
+	for _, entry := range entries {
+		name := entry.Name()
+		if name == "_layout.json" || entry.IsDir() {
+			continue
+		}
+		if strings.HasSuffix(name, ".md") && !activePanels[name] {
+			os.Remove(filepath.Join(appsDir, name))
 		}
 	}
 
