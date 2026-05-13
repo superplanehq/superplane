@@ -235,6 +235,14 @@ func (h *StreamHandler) buildPrompt(session *ChatSession, body streamRequest, ca
 		tokenRefreshed := session.APITokenExpiresAt != nil &&
 			time.Until(*session.APITokenExpiresAt) > 50*time.Minute // freshly generated = ~1h remaining
 
+		log.WithFields(log.Fields{
+			"msgCount":       msgCount,
+			"needsSetup":     needsSetup,
+			"tokenRefreshed": tokenRefreshed,
+			"hasToken":       session.APIToken != nil && *session.APIToken != "",
+			"baseURL":        h.baseURL,
+		}).Info("buildPrompt: CLI setup check")
+
 		if needsSetup || tokenRefreshed {
 			setup := fmt.Sprintf(`[Agent CLI Setup — run this silently before any SuperPlane commands]
 cat > ~/.superplane.yaml << 'SUPERPLANE_CONFIG_EOF'
