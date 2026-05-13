@@ -8,9 +8,9 @@ import (
 
 func Test__Get(t *testing.T) {
 	t.Run("known id returns feature and true", func(t *testing.T) {
-		f, ok := Get("runners")
+		f, ok := Get("runner")
 		assert.True(t, ok)
-		assert.Equal(t, "runners", f.ID)
+		assert.Equal(t, "runner", f.ID)
 		assert.Equal(t, "Runners", f.Label)
 		assert.Equal(t, "Sandboxed Runners", f.Description)
 	})
@@ -28,7 +28,7 @@ func Test__Get(t *testing.T) {
 }
 
 func Test__Exists(t *testing.T) {
-	assert.True(t, Exists("runners"))
+	assert.True(t, Exists("runner"))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }
@@ -49,7 +49,7 @@ func Test__IsReleased(t *testing.T) {
 	})
 
 	t.Run("registered id with nil Released is not released", func(t *testing.T) {
-		assert.False(t, IsReleased("runners"))
+		assert.False(t, IsReleased("runner"))
 	})
 
 	t.Run("registered id with Released=&true is released", func(t *testing.T) {
