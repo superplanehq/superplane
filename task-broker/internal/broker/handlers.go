@@ -282,13 +282,20 @@ func (s *Server) getBrokerTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "invalid upstream response")
 		return
 	}
+	taskLog := up.TaskLog
+	if taskLog == nil && strings.TrimSpace(up.CloudWatchLogGroup) != "" && strings.TrimSpace(up.CloudWatchLogStream) != "" {
+		taskLog = api.TaskLogSinkCloudWatchFromParts(up.CloudWatchLogGroup, up.CloudWatchLogStream, "")
+	}
 	writeJSON(w, http.StatusOK, api.BrokerGetTaskResponse{
-		TaskID:      brokerID,
-		FleetTaskID: row.FleetTaskID,
-		Status:      strings.TrimSpace(up.Status),
-		ExitCode:    up.ExitCode,
-		Output:      up.Output,
-		Error:       up.Error,
+		TaskID:              brokerID,
+		FleetTaskID:         row.FleetTaskID,
+		Status:              strings.TrimSpace(up.Status),
+		ExitCode:            up.ExitCode,
+		Output:              up.Output,
+		Error:               up.Error,
+		CloudWatchLogGroup:  up.CloudWatchLogGroup,
+		CloudWatchLogStream: up.CloudWatchLogStream,
+		TaskLog:             taskLog,
 	})
 }
 
@@ -401,12 +408,18 @@ func (s *Server) webhookComplete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	out := api.WebhookPayload{
-		TaskID:      brokerID,
-		FleetTaskID: upstream.TaskID,
-		Status:      upstream.Status,
-		ExitCode:    upstream.ExitCode,
-		Output:      upstream.Output,
-		Error:       upstream.Error,
+		TaskID:              brokerID,
+		FleetTaskID:         upstream.TaskID,
+		Status:              upstream.Status,
+		ExitCode:            upstream.ExitCode,
+		Output:              upstream.Output,
+		Error:               upstream.Error,
+		CloudWatchLogGroup:  upstream.CloudWatchLogGroup,
+		CloudWatchLogStream: upstream.CloudWatchLogStream,
+		TaskLog:             upstream.TaskLog,
+	}
+	if out.TaskLog == nil && strings.TrimSpace(upstream.CloudWatchLogGroup) != "" && strings.TrimSpace(upstream.CloudWatchLogStream) != "" {
+		out.TaskLog = api.TaskLogSinkCloudWatchFromParts(upstream.CloudWatchLogGroup, upstream.CloudWatchLogStream, "")
 	}
 
 	ws := s.Webhook

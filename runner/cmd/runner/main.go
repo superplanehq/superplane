@@ -46,13 +46,16 @@ func main() {
 	}
 	cfg.ExitAfterEachTask = envTruthy("RUNNER_TERMINATE_AFTER_EACH_TASK")
 	cfg.Log = log
+	cfg.CloudWatchLogGroup = strings.TrimSpace(os.Getenv("RUNNER_CLOUDWATCH_LOG_GROUP"))
+	cfg.CloudWatchRegion = strings.TrimSpace(os.Getenv("RUNNER_CLOUDWATCH_REGION"))
+	cfg.CloudWatchLogStreamPrefix = strings.TrimSpace(os.Getenv("RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX"))
 
 	a := &agent.Agent{Config: cfg}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	log.Info("runner starting", slog.String("runner_id", runnerID), slog.String("fleet_manager", base), slog.String("transport", transportLabel(cfg)))
+	log.Info("runner starting", slog.String("runner_id", runnerID), slog.String("fleet_manager", base), slog.String("transport", transportLabel(cfg)), slog.Bool("cloudwatch_logs", strings.TrimSpace(cfg.CloudWatchLogGroup) != ""))
 	if bi, ok := debug.ReadBuildInfo(); ok {
 		attrs := []any{
 			slog.String("main_path", bi.Main.Path),
