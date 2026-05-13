@@ -165,6 +165,12 @@ check.db.migrations:
 check.build.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run build"
 
+check.test.ui:
+	$(COMPOSE) exec app bash -c "cd web_src && npm run test:coverage"
+
+check.format.js:
+	$(COMPOSE) exec app bash -c "cd web_src && npm run format:check"
+
 check.lint.ui:
 	$(COMPOSE) exec app bash -c "cd web_src && npm run lint:budget"
 

@@ -76,36 +76,26 @@ blocks:
     run:
       when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'})"
     task:
-      prologue:
-        commands:
-          - sem-version node 20
-          - "cache restore node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json),node-modules-$SEMAPHORE_GIT_BRANCH,node-modules"
-          - cd web_src
-          - npm ci
-      epilogue:
-        always:
-          commands:
-            - cache store node-modules-$SEMAPHORE_GIT_BRANCH-$(checksum web_src/package-lock.json) web_src/node_modules
       jobs:
         - name: Check Build
           commands:
-            - npm run build
+            - make check.build.ui
 
         - name: Unit Tests
           commands:
-            - npm run test:coverage
+            - make check.test.ui
 
         - name: Format Check
           commands:
-            - cd .. && make format.js.check
+            - make check.format.js
 
         - name: EsLint
           commands:
-            - npm run lint:budget
+            - make check.lint.ui
 
         - name: Knip (dead files check)
           commands:
-            - npm run lint:knip
+            - make check.lint.ui.knip
 
 after_pipeline:
   task:
