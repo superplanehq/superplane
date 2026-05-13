@@ -199,7 +199,7 @@ func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 	}
 
 	if !task.IsInTerminalState() {
-		ctx.Logger.WithError(err).Warn("runner: broker webhook received non-terminal state")
+		ctx.Logger.Warn("runner: broker webhook received non-terminal state")
 	}
 
 	executionCtx, err := ctx.FindExecutionByKV("task_id", task.TaskID)

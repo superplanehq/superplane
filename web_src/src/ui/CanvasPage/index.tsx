@@ -53,7 +53,7 @@ import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { findFreePositionInViewport } from "@/pages/workflowv2/lib/find-free-position-in-viewport";
-import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
+import { CANVAS_NODE_FALLBACK_MESSAGE, isRecord } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
@@ -61,6 +61,7 @@ import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import type { EventState, EventStateMap } from "../componentBase";
 import { ComponentSidebar } from "../componentSidebar";
+import { RunnerLiveLogsModal } from "../componentSidebar/RunnerLiveLogsModal";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
@@ -387,6 +388,7 @@ type CanvasNodeRendererCallbacks = {
   onToggleView: React.MutableRefObject<((nodeId: string) => void) | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
   onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
+  onOpenRunnerLiveLogs: React.MutableRefObject<((executionId: string) => void) | undefined>;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
   showHeader: boolean;
@@ -416,6 +418,7 @@ type EnrichedCanvasNodeCacheEntry = {
   edges: CanvasEdge[];
   isHighlighted: boolean;
   hasHighlightedNodes: boolean;
+  isEditMode: boolean;
 };
 
 type CollapsibleNodeData = {
@@ -519,6 +522,7 @@ function getAnnotationUpdateAction(callbacks?: CanvasNodeRendererCallbacks) {
 function buildInteractiveNodeBlockProps(
   callbacks: CanvasNodeRendererCallbacks | undefined,
   nodeId: string,
+  options?: { onOpenRunnerLiveLogs?: () => void },
 ): Omit<BlockProps, "data" | "nodeId" | "selected" | "runDisabled" | "runDisabledTooltip"> {
   if (!callbacks) {
     return {};
@@ -537,6 +541,7 @@ function buildInteractiveNodeBlockProps(
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
     onAnnotationUpdate: getAnnotationUpdateAction(callbacks),
     onAnnotationBlur: getVoidAction(callbacks.onAnnotationBlur),
+    onOpenRunnerLiveLogs: options?.onOpenRunnerLiveLogs,
   };
 }
 
@@ -544,15 +549,16 @@ function buildDefaultNodeBlockProps(args: {
   nodeId: string;
   selected?: boolean;
   callbacks?: CanvasNodeRendererCallbacks;
+  onOpenRunnerLiveLogs?: () => void;
 }): Omit<BlockProps, "data"> {
-  const { nodeId, selected, callbacks } = args;
+  const { nodeId, selected, callbacks, onOpenRunnerLiveLogs } = args;
 
   return {
     nodeId,
     selected,
     runDisabled: callbacks?.runDisabled,
     runDisabledTooltip: callbacks?.runDisabledTooltip,
-    ...buildInteractiveNodeBlockProps(callbacks, nodeId),
+    ...buildInteractiveNodeBlockProps(callbacks, nodeId, { onOpenRunnerLiveLogs }),
   };
 }
 
@@ -634,10 +640,24 @@ function areDefaultNodeRendererPropsEqual(
 const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: DefaultNodeRendererProps) {
   const { _callbacksRef, ...blockData } = nodeProps.data;
   const callbacks = _callbacksRef?.current;
+  const runnerLiveLogsExecutionId =
+    blockData.type === "component" &&
+    isRecord(blockData.component) &&
+    typeof blockData.component.runnerLiveLogsExecutionId === "string"
+      ? blockData.component.runnerLiveLogsExecutionId
+      : undefined;
+  const openRunnerLiveLogs = callbacks?.onOpenRunnerLiveLogs?.current;
+  const onOpenRunnerLiveLogs =
+    callbacks?.canvasMode === "live" && runnerLiveLogsExecutionId && openRunnerLiveLogs
+      ? () => {
+          openRunnerLiveLogs(runnerLiveLogsExecutionId);
+        }
+      : undefined;
   const blockProps = buildDefaultNodeBlockProps({
     nodeId: nodeProps.id,
     selected: nodeProps.selected,
     callbacks,
+    onOpenRunnerLiveLogs,
   });
   const fallback = <Block {...blockProps} data={createNodeRenderFallbackData(blockData)} />;
 
@@ -711,6 +731,11 @@ function CanvasPage(props: CanvasPageProps) {
   const closeCanvasModal = useCallback(() => {
     setCanvasModalRequest(null);
   }, []);
+  const [runnerLiveLogsExecutionId, setRunnerLiveLogsExecutionId] = useState<string | null>(null);
+  const openRunnerLiveLogs = useCallback((executionId: string) => {
+    setRunnerLiveLogsExecutionId(executionId);
+  }, []);
+  const runnerLiveLogsOpener = props.canvasId && props.organizationId ? openRunnerLiveLogs : undefined;
   useEffect(() => {
     props.onTriggerModalHostReady?.(openCanvasModal);
   }, [props.onTriggerModalHostReady, openCanvasModal]);
@@ -1268,6 +1293,7 @@ function CanvasPage(props: CanvasPageProps) {
               onConnectIntegration={props.onConnectIntegration}
               canCreateIntegrations={props.canCreateIntegrations}
               onLogView={props.onLogView}
+              onOpenRunnerLiveLogs={runnerLiveLogsOpener}
             />
           </ReactFlowProvider>
           {props.headerMode === "runs" ? null : (
@@ -1328,6 +1354,19 @@ function CanvasPage(props: CanvasPageProps) {
           {canvasModalRequest ? canvasModalRequest.content({ close: closeCanvasModal }) : null}
         </DialogContent>
       </Dialog>
+      {props.canvasId && props.organizationId ? (
+        <RunnerLiveLogsModal
+          open={runnerLiveLogsExecutionId != null}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              setRunnerLiveLogsExecutionId(null);
+            }
+          }}
+          organizationId={props.organizationId}
+          canvasId={props.canvasId}
+          executionId={runnerLiveLogsExecutionId ?? ""}
+        />
+      ) : null}
     </div>
   );
 }
@@ -1815,6 +1854,7 @@ function CanvasContent({
   onConnectIntegration,
   canCreateIntegrations,
   onLogView,
+  onOpenRunnerLiveLogs,
 }: {
   state: CanvasPageState;
   onNodeEdit: (nodeId: string) => void;
@@ -1879,6 +1919,7 @@ function CanvasContent({
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
   onLogView?: () => void;
+  onOpenRunnerLiveLogs?: (executionId: string) => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode, setViewport } = useReactFlow();
   const { zoom } = useViewport();
@@ -2107,6 +2148,9 @@ function CanvasContent({
   onAnnotationUpdateRef.current = onAnnotationUpdate;
   const onAnnotationBlurRef = useRef(onAnnotationBlur);
   onAnnotationBlurRef.current = onAnnotationBlur;
+
+  const onOpenRunnerLiveLogsRef = useRef(onOpenRunnerLiveLogs);
+  onOpenRunnerLiveLogsRef.current = onOpenRunnerLiveLogs;
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -2370,6 +2414,7 @@ function CanvasContent({
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
+    onOpenRunnerLiveLogs: onOpenRunnerLiveLogsRef,
     runDisabled,
     runDisabledTooltip,
     showHeader,
@@ -2387,6 +2432,7 @@ function CanvasContent({
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
+    onOpenRunnerLiveLogs: onOpenRunnerLiveLogsRef,
     runDisabled,
     runDisabledTooltip,
     showHeader,
@@ -2487,7 +2533,8 @@ function CanvasContent({
         cachedNode.connectingFrom === connectingFrom &&
         cachedNode.edges === state.edges &&
         cachedNode.isHighlighted === isHighlighted &&
-        cachedNode.hasHighlightedNodes === hasHighlightedNodes;
+        cachedNode.hasHighlightedNodes === hasHighlightedNodes &&
+        cachedNode.isEditMode === isEditMode;
 
       if (canReuseData && cachedNode.sourceNode === node) {
         return cachedNode.node;
@@ -2520,6 +2567,7 @@ function CanvasContent({
         edges: state.edges,
         isHighlighted,
         hasHighlightedNodes,
+        isEditMode,
       });
 
       return enrichedNode;
@@ -2532,7 +2580,7 @@ function CanvasContent({
     }
 
     return enrichedNodes;
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, blockConnectingFrom]);
+  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, blockConnectingFrom, isEditMode]);
 
   const edgeTypes = useMemo(
     () => ({

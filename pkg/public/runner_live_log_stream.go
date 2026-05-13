@@ -1,9 +1,11 @@
 package public
 
 import (
-	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 
 	"github.com/google/uuid"
@@ -12,26 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
-	"github.com/superplanehq/superplane/pkg/runnerlive"
 )
-
-func decodeTaskLogSink(v any) (*runneraction.TaskLogSink, error) {
-	if v == nil {
-		return nil, nil
-	}
-	b, err := json.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-	var sink runneraction.TaskLogSink
-	if err := json.Unmarshal(b, &sink); err != nil {
-		return nil, err
-	}
-	if strings.TrimSpace(sink.Type) == "" {
-		return nil, nil
-	}
-	return &sink, nil
-}
 
 func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Request) {
 	user, ok := middleware.GetUserFromContext(r.Context())
@@ -91,47 +74,87 @@ func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Reques
 	}
 
 	meta := execution.Metadata.Data()
-	rawSink, ok := meta[runneraction.ExecutionMetadataTaskLog]
-	if !ok || rawSink == nil {
+	var brokerTaskID string
+	if v, ok := meta[runneraction.ExecutionMetadataBrokerTaskID]; ok && v != nil {
+		if s, ok2 := v.(string); ok2 {
+			brokerTaskID = strings.TrimSpace(s)
+		} else {
+			brokerTaskID = strings.TrimSpace(fmt.Sprint(v))
+		}
+	}
+	if brokerTaskID == "" {
 		http.Error(
 			w,
-			"No live log sink recorded for this execution yet. When the task broker and fleet manager expose CloudWatch task logs, they appear here after the next poll.",
+			"Logs are not available for this execution yet. Check again shortly.",
 			http.StatusNotFound,
 		)
 		return
 	}
 
-	sink, err := decodeTaskLogSink(rawSink)
-	if err != nil || sink == nil || sink.Type != "cloudwatch" || sink.CloudWatch == nil {
-		http.Error(w, "Live logs are not configured for this execution", http.StatusNotFound)
+	base := strings.TrimRight(strings.TrimSpace(os.Getenv("TASK_BROKER_BASE_URL")), "/")
+	token := strings.TrimSpace(os.Getenv("TASK_BROKER_AUTH_TOKEN"))
+	if base == "" || token == "" {
+		http.Error(w, "Live logs are not configured on this installation", http.StatusServiceUnavailable)
+		return
+	}
+	upstream := base + "/v1/tasks/" + url.PathEscape(brokerTaskID) + "/live-logs"
+
+	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstream, nil)
+	if err != nil {
+		http.Error(w, "Bad gateway", http.StatusBadGateway)
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Accept", "application/x-ndjson")
+	// Avoid upstream gzip; it adds latency and can buffer small NDJSON chunks.
+	req.Header.Set("Accept-Encoding", "identity")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		if ct := resp.Header.Get("Content-Type"); ct != "" {
+			w.Header().Set("Content-Type", ct)
+		} else {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		}
+		w.WriteHeader(resp.StatusCode)
+		_, _ = io.Copy(w, resp.Body)
 		return
 	}
 
-	g := strings.TrimSpace(sink.CloudWatch.LogGroupName)
-	st := strings.TrimSpace(sink.CloudWatch.LogStreamName)
-	if g == "" || st == "" {
-		http.Error(w, "Incomplete CloudWatch log descriptor", http.StatusNotFound)
-		return
+	if ct := resp.Header.Get("Content-Type"); ct != "" {
+		w.Header().Set("Content-Type", ct)
+	} else {
+		w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
 	}
-
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
-	flusher.Flush()
+	flusher, flusherOK := w.(http.Flusher)
+	if flusherOK {
+		flusher.Flush()
+	}
 
-	region := strings.TrimSpace(sink.CloudWatch.Region)
-	if err := runnerlive.StreamCloudWatchLogToNDJSON(r.Context(), w, flusher, g, st, region); err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "context canceled") {
+	buf := make([]byte, 16*1024)
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
+				return
+			}
+			if flusherOK {
+				flusher.Flush()
+			}
+		}
+		if readErr != nil {
+			if readErr == io.EOF {
+				break
+			}
 			return
 		}
-		// Response may already be partially written; best-effort JSON line.
-		_, _ = fmt.Fprintf(w, "{\"type\":\"error\",\"message\":%q}\n", err.Error())
-		flusher.Flush()
 	}
 }

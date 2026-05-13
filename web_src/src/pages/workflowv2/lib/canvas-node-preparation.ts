@@ -258,6 +258,7 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
     }
 
     const emptyStateProps = resolveComponentEmptyStateProps(componentBaseProps, node);
+    const latestRunnerExecutionId = node.component === "runner" && executions[0]?.id ? executions[0].id : undefined;
 
     return {
       id: node.id!,
@@ -273,6 +274,7 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
           error: node.errorMessage,
           warning: node.warningMessage,
           paused: !!node.paused,
+          ...(latestRunnerExecutionId ? { runnerLiveLogsExecutionId: latestRunnerExecutionId } : {}),
         },
       },
     };

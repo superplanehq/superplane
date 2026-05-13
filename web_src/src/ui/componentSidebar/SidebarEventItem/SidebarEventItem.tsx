@@ -9,7 +9,6 @@ import { SimpleTooltip } from "../SimpleTooltip";
 import type { EventState, EventStateMap, EventStateStyle } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type { CanvasesCanvasNodeExecution } from "@/api-client";
-import { ScrollText } from "lucide-react";
 
 export interface ExecutionChainItem extends EventStateStyle {
   name: string;
@@ -40,8 +39,6 @@ interface SidebarEventItemProps {
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
-  /** Opens the runner CloudWatch live log stream for this execution (Runner component only). */
-  onOpenRunnerLiveLogs?: (executionId: string) => void;
   loadExecutionChain?: (
     eventId: string,
     nodeId?: string,
@@ -66,7 +63,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   onCancelQueueItem,
   onCancelExecution,
   onReEmit,
-  onOpenRunnerLiveLogs,
   loadExecutionChain,
   getExecutionState,
 }) => {
@@ -275,11 +271,6 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
   const showCancel = (event.kind === "queue" && isQueued) || (event.kind === "execution" && (isRunning || isWaiting));
   const showReEmit = event.kind === "trigger";
   const showActionsMenu = showCancel || showReEmit;
-  const showRunnerLiveLogs =
-    event.kind === "execution" &&
-    event.component === "runner" &&
-    Boolean(event.executionId) &&
-    Boolean(onOpenRunnerLiveLogs);
 
   return (
     <div
@@ -328,44 +319,26 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         </div>
       </div>
 
-      {/* Hover overlay: cancel / re-emit menu and runner live logs */}
-      {(showActionsMenu || showRunnerLiveLogs) && (isHovered || isDropdownOpen) && (
+      {/* Hover overlay: cancel / re-emit menu */}
+      {showActionsMenu && (isHovered || isDropdownOpen) && (
         <div className="absolute top-0 right-0 h-full flex items-center bg-transparent">
           <div
             className="h-full bg-white/50 backdrop-blur-[3px] rounded-r-md shadow-sm p-1 pt-2 flex items-start gap-0.5"
             onClick={(e) => e.stopPropagation()}
           >
-            {showRunnerLiveLogs && event.executionId ? (
-              <SimpleTooltip content="Live logs">
-                <button
-                  type="button"
-                  className="h-6 w-6 flex items-center justify-center rounded text-gray-500 hover:text-gray-800"
-                  aria-label="Open live logs"
-                  data-testid="runner-live-logs"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenRunnerLiveLogs?.(event.executionId!);
-                  }}
-                >
-                  <ScrollText size={16} />
-                </button>
-              </SimpleTooltip>
-            ) : null}
-            {showActionsMenu ? (
-              <SidebarEventActionsMenu
-                eventId={event.id}
-                executionId={event.executionId}
-                onCancelQueueItem={onCancelQueueItem}
-                onCancelExecution={onCancelExecution}
-                eventState={event.state}
-                kind={event.kind || "execution"}
-                onReEmit={() => {
-                  if (["queue", "execution"].includes(event.kind || "")) return;
-                  onReEmit?.(event.nodeId || "", event.id);
-                }}
-                onOpenChange={setIsDropdownOpen}
-              />
-            ) : null}
+            <SidebarEventActionsMenu
+              eventId={event.id}
+              executionId={event.executionId}
+              onCancelQueueItem={onCancelQueueItem}
+              onCancelExecution={onCancelExecution}
+              eventState={event.state}
+              kind={event.kind || "execution"}
+              onReEmit={() => {
+                if (["queue", "execution"].includes(event.kind || "")) return;
+                onReEmit?.(event.nodeId || "", event.id);
+              }}
+              onOpenChange={setIsDropdownOpen}
+            />
           </div>
         </div>
       )}

@@ -25,11 +25,12 @@ services:
       SWAGGER_BASE_PATH: "/app/api/swagger"
       RBAC_MODEL_PATH: "/app/rbac/rbac_model.conf"
       RBAC_ORG_POLICY_PATH: "/app/rbac/rbac_org_policy.csv"
-      # Ensure Go build cache initializes in a writable, persisted location
-      # This fixes: "failed to initialize build cache at /.cache/go-build: permission denied"
-      # and keeps the cache across container restarts (since /app is bind-mounted)
-      GOMODCACHE: "/app/tmp/go/pkg/mod"
-      GOCACHE: "/app/tmp/go-build"
+      # Keep GOMODCACHE and GOCACHE outside /app. If they live under the bind-mounted repo,
+      # `go mod tidy` tries to load module cache paths as this module (errors like
+      # import path ".../tmp/go/pkg/mod/github.com/.../pkg@v0.9.1" should not have @version).
+      # The go-pkg-cache named volume is mounted at /go (see volumes: below).
+      GOMODCACHE: /go/pkg/mod
+      GOCACHE: /go/go-build
       XDG_CACHE_HOME: "/app/tmp"
       # Lock Playwright browsers location so install and runtime match
       PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"

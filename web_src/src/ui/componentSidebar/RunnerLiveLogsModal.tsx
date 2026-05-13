@@ -1,12 +1,4 @@
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -59,8 +51,10 @@ export function RunnerLiveLogsModal({
           method: "GET",
           credentials: "include",
           signal: ac.signal,
-          ...withOrganizationHeader({ organizationId }),
-          headers: { Accept: "application/x-ndjson" },
+          ...withOrganizationHeader({
+            organizationId,
+            headers: { Accept: "application/x-ndjson" },
+          }),
         });
 
         if (!res.ok) {
@@ -121,30 +115,28 @@ export function RunnerLiveLogsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl gap-0 p-0">
-        <DialogHeader className="px-6 pt-6 pb-2">
-          <DialogTitle>Runner live logs</DialogTitle>
-          <DialogDescription>
-            Streams stdout and stderr from the task broker&apos;s CloudWatch log sink when it is configured for your
-            fleet.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="px-6 pb-2">
-          <pre
-            ref={scrollRef}
-            className="h-[min(70vh,420px)] w-full overflow-auto rounded-md border border-border bg-muted/40 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-left"
-          >
-            {error ? <span className="text-destructive">{error}</span> : null}
-            {!error && !text && !isStreaming ? <span className="text-muted-foreground">No log lines yet.</span> : null}
-            {!error && text}
-            {!error && isStreaming && !text ? <span className="text-muted-foreground">Connecting…</span> : null}
-          </pre>
+      <DialogContent size="large" className="flex max-h-[90vh] w-[90vw] h-full flex-col gap-0 overflow-hidden p-0">
+        <DialogTitle className="sr-only">Logs</DialogTitle>
+
+        <div className="flex h-full min-h-0 flex-col">
+          <div className="flex shrink-0 items-center border-b border-gray-200 bg-white px-4 py-3 pr-12">
+            <span className="font-mono text-sm text-gray-600">Logs</span>
+          </div>
+
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
+            <pre
+              ref={scrollRef}
+              className="min-h-0 flex-1 overflow-auto p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-left text-gray-800"
+            >
+              {error ? <span className="text-destructive">{error}</span> : null}
+              {!error && !text && !isStreaming ? (
+                <span className="text-muted-foreground">No log lines yet.</span>
+              ) : null}
+              {!error && text}
+              {!error && isStreaming && !text ? <span className="text-muted-foreground">Connecting…</span> : null}
+            </pre>
+          </div>
         </div>
-        <DialogFooter className="px-6 pb-6">
-          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

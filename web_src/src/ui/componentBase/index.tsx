@@ -232,6 +232,8 @@ export interface ComponentBaseProps extends ComponentActionsProps {
   error?: string;
   warning?: string;
   canvasMode?: "live" | "edit";
+  /** Latest execution id for Runner nodes (canvas reads this before render; unused inside ComponentBase). */
+  runnerLiveLogsExecutionId?: string;
 }
 
 export const ComponentBase: React.FC<ComponentBaseProps> = ({
@@ -253,6 +255,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   onDeactivate: _onDeactivate,
   onToggleView,
   onDelete,
+  onOpenRunnerLiveLogs,
   isCompactView,
   hideCount,
   hideMetadataList,
@@ -267,6 +270,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
   warning,
   paused,
   canvasMode = "live",
+  runnerLiveLogsExecutionId: _runnerLiveLogsExecutionId,
 }) => {
   const safeMetadata = Array.isArray(metadata) ? metadata : undefined;
   const safeSpecs = Array.isArray(specs) ? specs : undefined;
@@ -335,7 +339,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         className={`group relative flex flex-col outline-1 outline-slate-950/20 rounded-md w-[23rem] bg-white ${hasError ? "!outline-orange-500" : ""}`}
         data-view-mode={isCompactView ? "compact" : "expanded"}
       >
-        <div className="absolute -top-8 right-0 z-10 h-8 w-44 opacity-0" />
+        {showHeader ? <div className="absolute -top-8 right-0 z-10 h-8 w-56 opacity-0" /> : null}
         {showHeader ? (
           <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
             {onTogglePause && !hasError && (
@@ -404,6 +408,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
           title={title}
           isCompactView={isCompactView}
           statusBadgeColor={compactStatusBadgeColor}
+          onOpenRunnerLiveLogs={onOpenRunnerLiveLogs}
         />
 
         {hasBadge && (

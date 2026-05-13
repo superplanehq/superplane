@@ -21,7 +21,6 @@ interface LatestTabProps {
   onCancelQueueItem?: (id: string) => void;
   onCancelExecution?: (executionId: string) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
-  onOpenRunnerLiveLogs?: (executionId: string) => void;
   loadExecutionChain?: (
     eventId: string,
     nodeId?: string,
@@ -51,7 +50,6 @@ export const LatestTab = ({
   onCancelQueueItem,
   onCancelExecution,
   onReEmit,
-  onOpenRunnerLiveLogs,
   loadExecutionChain,
   getExecutionState,
   workflowNodes,
@@ -107,7 +105,6 @@ export const LatestTab = ({
                     tabData={getTabData?.(event)}
                     onCancelExecution={onCancelExecution}
                     onReEmit={onReEmit}
-                    onOpenRunnerLiveLogs={onOpenRunnerLiveLogs}
                     loadExecutionChain={loadExecutionChain}
                     getExecutionState={getExecutionState}
                   />
@@ -150,7 +147,6 @@ export const LatestTab = ({
                       tabData={getTabData?.(event)}
                       onCancelQueueItem={onCancelQueueItem}
                       onReEmit={onReEmit}
-                      onOpenRunnerLiveLogs={onOpenRunnerLiveLogs}
                       loadExecutionChain={loadExecutionChain}
                       getExecutionState={getExecutionState}
                     />
