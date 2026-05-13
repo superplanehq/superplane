@@ -35,10 +35,6 @@ export const baseMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const payload = outputs?.default?.[0];
 
-    if (payload?.type) {
-      details["Event Type"] = payload.type;
-    }
-
     if (payload?.timestamp) {
       details["Emitted At"] = new Date(payload.timestamp).toLocaleString();
     }
@@ -51,6 +47,12 @@ export const baseMapper: ComponentBaseMapper = {
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
+
+/** First payload `data` from the default output channel (workflow execution outputs). */
+export function firstOutputData(outputs: unknown): unknown {
+  const outputMap = outputs as { default?: Array<{ data?: unknown }> } | undefined;
+  return outputMap?.default?.[0]?.data;
+}
 
 export function getPoolExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
   const details: Record<string, string> = {};
@@ -74,6 +76,47 @@ export function getPoolExecutionDetails(context: ExecutionDetailsContext): Recor
   details["Enabled"] = pool.enabled != null ? String(pool.enabled) : "-";
   details["Minimum Origins"] = pool.minimum_origins != null ? String(pool.minimum_origins) : "-";
   details["Number of Origins"] = Array.isArray(pool.origins) ? String(pool.origins.length) : "-";
+
+  return details;
+}
+
+export function getLoadBalancerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  const lb = result?.loadBalancer as Record<string, unknown> | undefined;
+  if (!lb) return details;
+
+  details["Name"] = lb.name != null ? String(lb.name) : "-";
+
+  if (lb.description != null) {
+    details["Description"] = String(lb.description);
+  }
+
+  details["Enabled"] = lb.enabled != null ? String(lb.enabled) : "-";
+  details["Proxied"] = lb.proxied != null ? String(lb.proxied) : "-";
+  details["Default Pools"] = Array.isArray(lb.default_pools) ? String(lb.default_pools.length) : "-";
+
+  return details;
+}
+
+export function deleteLoadBalancerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  if (!result) return details;
+
+  details["Deleted"] = result.deleted != null ? String(result.deleted) : "-";
 
   return details;
 }

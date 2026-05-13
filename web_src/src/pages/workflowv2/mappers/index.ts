@@ -243,6 +243,7 @@ import {
 
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
+import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
@@ -273,6 +274,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   http: httpMapper,
   graphql: graphqlMapper,
   ssh: sshMapper,
+  runner: runnerMapper,
   timeGate: timeGateMapper,
   filter: filterMapper,
   wait: waitMapper,
@@ -423,6 +425,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   http: HTTP_STATE_REGISTRY,
   graphql: GRAPHQL_STATE_REGISTRY,
   ssh: SSH_STATE_REGISTRY,
+  runner: RUNNER_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
   timeGate: TIME_GATE_STATE_REGISTRY,
