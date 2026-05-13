@@ -65,7 +65,19 @@ function buildPropsCtx(nodeOverrides?: Partial<NodeInfo>): ComponentBaseContext 
 }
 
 describe("deleteCertificatePackMapper.props metadata", () => {
-  it("shows the pack ID extracted from zone/pack value", () => {
+  it("shows the certificate pack picker display name when present", () => {
+    const props = deleteCertificatePackMapper.props(
+      buildPropsCtx({
+        configuration: {
+          certificatePack: "zone123/pack-abc",
+          certificatePackDisplayName: "example.com - www.example.com",
+        },
+      }),
+    );
+    expect(props.metadata).toEqual([{ icon: "shield-off", label: "example.com - www.example.com" }]);
+  });
+
+  it("shows the pack ID extracted from zone/pack value when display name is absent", () => {
     const props = deleteCertificatePackMapper.props(
       buildPropsCtx({
         configuration: { certificatePack: "zone123/pack-abc" },

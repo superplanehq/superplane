@@ -113,6 +113,7 @@ type PurgeCacheRequest struct {
 	Files           []string `json:"files,omitempty"`
 	Tags            []string `json:"tags,omitempty"`
 	Hosts           []string `json:"hosts,omitempty"`
+	Prefixes        []string `json:"prefixes,omitempty"`
 }
 
 type PurgeCacheResult struct {

@@ -20,11 +20,14 @@ func Test__OrderCertificatePack__Setup(t *testing.T) {
 	t.Run("configuration excludes deprecated DigiCert and conditionally requires validity days", func(t *testing.T) {
 		fields := component.Configuration()
 		var caField *configuration.Field
+		var validationMethodField *configuration.Field
 		var validityField *configuration.Field
 		for i := range fields {
 			switch fields[i].Name {
 			case "certificateAuthority":
 				caField = &fields[i]
+			case "validationMethod":
+				validationMethodField = &fields[i]
 			case "validityDays":
 				validityField = &fields[i]
 			}
@@ -35,6 +38,13 @@ func Test__OrderCertificatePack__Setup(t *testing.T) {
 		require.NotNil(t, caField.TypeOptions.Select)
 		for _, option := range caField.TypeOptions.Select.Options {
 			assert.NotEqual(t, "digicert", option.Value)
+		}
+
+		require.NotNil(t, validationMethodField)
+		require.NotNil(t, validationMethodField.TypeOptions)
+		require.NotNil(t, validationMethodField.TypeOptions.Select)
+		for _, option := range validationMethodField.TypeOptions.Select.Options {
+			assert.NotEqual(t, "cname", option.Value)
 		}
 
 		require.NotNil(t, validityField)
@@ -113,6 +123,18 @@ func Test__OrderCertificatePack__Setup(t *testing.T) {
 			},
 		})
 		require.ErrorContains(t, err, "validationMethod is required")
+	})
+
+	t.Run("unsupported validationMethod returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"zone":                 "zone123",
+				"hosts":                []any{"example.com"},
+				"certificateAuthority": "lets_encrypt",
+				"validationMethod":     "cname",
+			},
+		})
+		require.ErrorContains(t, err, "unsupported validationMethod")
 	})
 
 	t.Run("missing validityDays for SSL.com returns error", func(t *testing.T) {

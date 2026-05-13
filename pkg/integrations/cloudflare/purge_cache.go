@@ -14,16 +14,17 @@ import (
 
 const PurgeCachePayloadType = "cloudflare.cache.purged"
 
-var allowedPurgeModes = []string{"everything", "files", "tags", "hosts"}
+var allowedPurgeModes = []string{"everything", "files", "tags", "hosts", "prefixes"}
 
 type PurgeCache struct{}
 
 type PurgeCacheSpec struct {
-	Zone  string   `json:"zone"`
-	Mode  string   `json:"mode"`
-	Files []string `json:"files"`
-	Tags  []string `json:"tags"`
-	Hosts []string `json:"hosts"`
+	Zone     string   `json:"zone"`
+	Mode     string   `json:"mode"`
+	Files    []string `json:"files"`
+	Tags     []string `json:"tags"`
+	Hosts    []string `json:"hosts"`
+	Prefixes []string `json:"prefixes"`
 }
 
 func (c *PurgeCache) Name() string {
@@ -55,6 +56,7 @@ func (c *PurgeCache) Documentation() string {
   - *Files*: Purge one or more specific URLs. Supports both plain URLs and URLs with custom cache headers.
   - *Tags*: Purge by Cache-Tag header values (Enterprise plan only).
   - *Hosts*: Purge all files cached under one or more hostnames (Enterprise plan only).
+  - *Prefixes*: Purge all cached assets whose URL starts with one of the provided prefixes.
 
 ## Output
 
@@ -101,6 +103,7 @@ func (c *PurgeCache) Configuration() []configuration.Field {
 						{Label: "Everything (purge all)", Value: "everything"},
 						{Label: "Tags (cache tags, Enterprise)", Value: "tags"},
 						{Label: "Hosts (hostnames, Enterprise)", Value: "hosts"},
+						{Label: "Prefixes (URL prefixes)", Value: "prefixes"},
 					},
 				},
 			},
@@ -168,6 +171,27 @@ func (c *PurgeCache) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "prefixes",
+			Label:       "Prefixes",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "URL prefixes to purge from the cache",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "mode", Values: []string{"prefixes"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "mode", Values: []string{"prefixes"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Prefix",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeString,
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -214,6 +238,10 @@ func validatePurgeCacheSpec(spec PurgeCacheSpec) error {
 		if len(spec.Hosts) == 0 {
 			return errors.New("at least one hostname is required when mode is hosts")
 		}
+	case "prefixes":
+		if len(spec.Prefixes) == 0 {
+			return errors.New("at least one prefix is required when mode is prefixes")
+		}
 	}
 
 	return nil
@@ -259,6 +287,8 @@ func (c *PurgeCache) Execute(ctx core.ExecutionContext) error {
 		payload["tags"] = spec.Tags
 	case "hosts":
 		payload["hosts"] = spec.Hosts
+	case "prefixes":
+		payload["prefixes"] = spec.Prefixes
 	}
 
 	return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, PurgeCachePayloadType, []any{payload})
@@ -274,6 +304,8 @@ func buildPurgeCacheRequest(spec PurgeCacheSpec) PurgeCacheRequest {
 		return PurgeCacheRequest{Tags: spec.Tags}
 	case "hosts":
 		return PurgeCacheRequest{Hosts: spec.Hosts}
+	case "prefixes":
+		return PurgeCacheRequest{Prefixes: spec.Prefixes}
 	default:
 		return PurgeCacheRequest{}
 	}

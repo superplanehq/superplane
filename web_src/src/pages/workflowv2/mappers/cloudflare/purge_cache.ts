@@ -21,6 +21,7 @@ interface PurgeCacheConfiguration {
   files?: string[];
   tags?: string[];
   hosts?: string[];
+  prefixes?: string[];
 }
 
 interface PurgeCacheOutput {
@@ -31,7 +32,17 @@ interface PurgeCacheOutput {
   files?: string[];
   tags?: string[];
   hosts?: string[];
+  prefixes?: string[];
 }
+
+type PurgeItemMode = "files" | "tags" | "hosts" | "prefixes";
+
+const purgeMetadataByMode: Record<PurgeItemMode, { icon: string; singular: string; plural: string }> = {
+  files: { icon: "link", singular: "URL", plural: "URLs" },
+  tags: { icon: "tag", singular: "tag", plural: "tags" },
+  hosts: { icon: "server", singular: "host", plural: "hosts" },
+  prefixes: { icon: "folder-tree", singular: "prefix", plural: "prefixes" },
+};
 
 export const purgeCacheMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -64,9 +75,7 @@ export const purgeCacheMapper: ComponentBaseMapper = {
     if (result.mode) details["Mode"] = result.mode;
     const zoneLabel = purgeCacheZoneLabel(result);
     if (zoneLabel) details["Zone"] = zoneLabel;
-    if (result.files?.length) details["Files"] = String(result.files.length);
-    if (result.tags?.length) details["Tags"] = String(result.tags.length);
-    if (result.hosts?.length) details["Hosts"] = String(result.hosts.length);
+    addPurgeItemCounts(details, result);
 
     return details;
   },
@@ -81,22 +90,46 @@ function purgeCacheZoneLabel(result: PurgeCacheOutput): string | undefined {
   return result.zoneName?.trim() || result.zoneId;
 }
 
+function addPurgeItemCounts(details: Record<string, string>, result: PurgeCacheOutput): void {
+  const fields: Array<[string, string[] | undefined]> = [
+    ["Files", result.files],
+    ["Tags", result.tags],
+    ["Hosts", result.hosts],
+    ["Prefixes", result.prefixes],
+  ];
+
+  for (const [label, values] of fields) {
+    if (values?.length) details[label] = String(values.length);
+  }
+}
+
 function metadataList(node: NodeInfo): MetadataItem[] {
-  const metadata: MetadataItem[] = [];
   const config = node.configuration as PurgeCacheConfiguration | undefined;
 
   const mode = config?.mode;
   if (mode === "everything") {
-    metadata.push({ icon: "zap", label: "Purge everything" });
-  } else if (mode === "files" && config?.files?.length) {
-    metadata.push({ icon: "link", label: `${config.files.length} URL${config.files.length > 1 ? "s" : ""}` });
-  } else if (mode === "tags" && config?.tags?.length) {
-    metadata.push({ icon: "tag", label: `${config.tags.length} tag${config.tags.length > 1 ? "s" : ""}` });
-  } else if (mode === "hosts" && config?.hosts?.length) {
-    metadata.push({ icon: "server", label: `${config.hosts.length} host${config.hosts.length > 1 ? "s" : ""}` });
-  } else if (mode) {
-    metadata.push({ icon: "zap", label: mode });
+    return [{ icon: "zap", label: "Purge everything" }];
   }
 
-  return metadata;
+  const itemMetadata = metadataForItemMode(config, mode);
+  if (itemMetadata) return [itemMetadata];
+  return mode ? [{ icon: "zap", label: mode }] : [];
+}
+
+function metadataForItemMode(
+  config: PurgeCacheConfiguration | undefined,
+  mode: string | undefined,
+): MetadataItem | undefined {
+  if (!isPurgeItemMode(mode)) return undefined;
+
+  const items = config?.[mode];
+  if (!items?.length) return undefined;
+
+  const metadata = purgeMetadataByMode[mode];
+  const label = items.length === 1 ? metadata.singular : metadata.plural;
+  return { icon: metadata.icon, label: `${items.length} ${label}` };
+}
+
+function isPurgeItemMode(mode: string | undefined): mode is PurgeItemMode {
+  return mode === "files" || mode === "tags" || mode === "hosts" || mode === "prefixes";
 }

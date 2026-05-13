@@ -23,6 +23,7 @@ import {
 
 interface DeleteCertificatePackConfiguration {
   certificatePack?: string;
+  certificatePackDisplayName?: string;
 }
 
 export const deleteCertificatePackMapper: ComponentBaseMapper = {
@@ -81,8 +82,13 @@ function deleteMetadataList(node: NodeInfo): MetadataItem[] {
 
   const packValue = config?.certificatePack?.trim();
   if (packValue) {
-    const packId = packValue.includes("/") ? packValue.split("/")[1] : packValue;
-    metadata.push({ icon: "shield-off", label: packId });
+    const named = config?.certificatePackDisplayName?.trim();
+    if (named) {
+      metadata.push({ icon: "shield-off", label: named });
+    } else {
+      const packId = packValue.includes("/") ? packValue.split("/")[1]! : packValue;
+      metadata.push({ icon: "shield-off", label: packId });
+    }
   }
 
   return metadata;

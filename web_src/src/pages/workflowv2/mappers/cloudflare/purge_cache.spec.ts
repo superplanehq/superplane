@@ -125,6 +125,15 @@ describe("purgeCacheMapper.props metadata", () => {
     expect(props.metadata).toEqual([{ icon: "server", label: "1 host" }]);
   });
 
+  it("shows prefix count when mode is prefixes", () => {
+    const props = purgeCacheMapper.props(
+      buildPropsCtx({
+        node: buildNode({ configuration: { mode: "prefixes", prefixes: ["www.example.com/foo"] } }),
+      }),
+    );
+    expect(props.metadata).toEqual([{ icon: "folder-tree", label: "1 prefix" }]);
+  });
+
   it("returns empty metadata when configuration is empty", () => {
     const props = purgeCacheMapper.props(buildPropsCtx({ node: buildNode({ configuration: {} }) }));
     expect(props.metadata).toEqual([]);
@@ -145,6 +154,7 @@ describe("purgeCacheMapper.getExecutionDetails", () => {
               id: "purge-abc",
               mode: "files",
               files: ["https://example.com/a.js", "https://example.com/b.js"],
+              prefixes: ["www.example.com/foo"],
             }),
           ],
         },
@@ -154,6 +164,7 @@ describe("purgeCacheMapper.getExecutionDetails", () => {
     expect(details["Mode"]).toBe("files");
     expect(details["Zone"]).toBe("example.com");
     expect(details["Files"]).toBe("2");
+    expect(details["Prefixes"]).toBe("1");
   });
 
   it("does not throw when outputs is undefined", () => {

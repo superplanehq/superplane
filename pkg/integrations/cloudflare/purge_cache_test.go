@@ -32,7 +32,7 @@ func Test__PurgeCache__Setup(t *testing.T) {
 
 	t.Run("invalid mode returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"zone": "zone123", "mode": "prefix"},
+			Configuration: map[string]any{"zone": "zone123", "mode": "unknown"},
 		})
 		require.ErrorContains(t, err, "mode must be one of")
 	})
@@ -58,6 +58,13 @@ func Test__PurgeCache__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "at least one hostname is required")
 	})
 
+	t.Run("prefixes mode without prefixes returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{"zone": "zone123", "mode": "prefixes"},
+		})
+		require.ErrorContains(t, err, "at least one prefix is required")
+	})
+
 	t.Run("everything mode passes without additional fields", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{"zone": "zone123", "mode": "everything"},
@@ -71,6 +78,17 @@ func Test__PurgeCache__Setup(t *testing.T) {
 				"zone":  "zone123",
 				"mode":  "files",
 				"files": []any{"https://example.com/a.js"},
+			},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("prefixes mode with prefixes passes", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"zone":     "zone123",
+				"mode":     "prefixes",
+				"prefixes": []any{"www.example.com/foo"},
 			},
 		})
 		require.NoError(t, err)
@@ -150,6 +168,42 @@ func Test__PurgeCache__Execute(t *testing.T) {
 		require.NoError(t, json.NewDecoder(httpContext.Requests[0].Body).Decode(&body))
 		assert.Equal(t, true, body["purge_everything"])
 		assert.Nil(t, body["files"])
+	})
+
+	t.Run("purges by prefixes and emits result", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"success":true,"result":{"id":"purge-prefix"}}`)),
+				},
+			},
+		}
+		execState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"zone":     "zone123",
+				"mode":     "prefixes",
+				"prefixes": []any{"www.example.com/foo", "www.example.com/bar"},
+			},
+			HTTP:           httpContext,
+			Integration:    integration,
+			ExecutionState: execState,
+		})
+
+		require.NoError(t, err)
+
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(httpContext.Requests[0].Body).Decode(&body))
+		prefixes, ok := body["prefixes"].([]any)
+		require.True(t, ok)
+		assert.Equal(t, []any{"www.example.com/foo", "www.example.com/bar"}, prefixes)
+
+		wrapped := execState.Payloads[0].(map[string]any)
+		payload := wrapped["data"].(map[string]any)
+		assert.Equal(t, "prefixes", payload["mode"])
+		assert.Equal(t, []string{"www.example.com/foo", "www.example.com/bar"}, payload["prefixes"])
 	})
 
 	t.Run("API error returns error", func(t *testing.T) {

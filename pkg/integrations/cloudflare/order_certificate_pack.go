@@ -53,7 +53,7 @@ func (c *OrderCertificatePack) Documentation() string {
 - **Zone**: The Cloudflare zone to issue the certificate in
 - **Hosts**: One or more hostnames the certificate should cover. Include both apex and wildcard variants (e.g., ` + "`example.com`" + ` and ` + "`*.example.com`" + `) if needed.
 - **Certificate Authority**: The CA to use — Let's Encrypt (free, automated), Google, or SSL.com.
-- **Validation Method**: How domain ownership is verified — TXT record, HTTP file, CNAME, or email.
+- **Validation Method**: How domain ownership is verified — TXT record, HTTP file, or email.
 - **Certificate Validity Period**: How long the certificate should be valid. Available for Google and SSL.com certificates.
 - **Cloudflare Branding**: Whether to include Cloudflare branding on the certificate (optional).
 
@@ -135,7 +135,6 @@ func (c *OrderCertificatePack) Configuration() []configuration.Field {
 					Options: []configuration.FieldOption{
 						{Label: "TXT Record", Value: "txt"},
 						{Label: "HTTP File", Value: "http"},
-						{Label: "CNAME", Value: "cname"},
 						{Label: "Email", Value: "email"},
 					},
 				},
@@ -209,6 +208,11 @@ func validateOrderCertificatePackSpec(spec OrderCertificatePackSpec) error {
 
 	if strings.TrimSpace(spec.ValidationMethod) == "" {
 		return errors.New("validationMethod is required")
+	}
+
+	validationMethod := strings.TrimSpace(spec.ValidationMethod)
+	if !slices.Contains([]string{"txt", "http", "email"}, validationMethod) {
+		return fmt.Errorf("unsupported validationMethod: %s", validationMethod)
 	}
 
 	if certificateAuthoritySupportsValidityDays(certificateAuthority) {
