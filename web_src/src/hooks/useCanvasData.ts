@@ -24,6 +24,7 @@ import {
   canvasesPublishCanvasVersion,
   canvasesListNodeExecutions,
   canvasesListCanvasEvents,
+  canvasesListRuns,
   canvasesListCanvasMemories,
   canvasesDeleteCanvasMemory,
   canvasesListEventExecutions,
@@ -38,6 +39,8 @@ import {
 import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
+  CanvasesCanvasRunResult,
+  CanvasesCanvasRunState,
   CanvasesCanvasVersion,
   CanvasChangeManagement,
   SuperplaneComponentsNode,
@@ -96,6 +99,15 @@ export const canvasKeys = {
   events: () => [...canvasKeys.all, "events"] as const,
   eventList: (canvasId: string, limit?: number) => [...canvasKeys.events(), canvasId, limit] as const,
   infiniteEvents: (canvasId: string) => [...canvasKeys.events(), canvasId, "infinite"] as const,
+  runs: () => [...canvasKeys.all, "runs"] as const,
+  infiniteRuns: (canvasId: string, filters?: CanvasRunsFilters) =>
+    [
+      ...canvasKeys.runs(),
+      canvasId,
+      "infinite",
+      ...(filters?.states?.length ? ["states", ...filters.states] : []),
+      ...(filters?.results?.length ? ["results", ...filters.results] : []),
+    ] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
   childExecutions: () => [...canvasKeys.all, "childExecutions"] as const,
@@ -1145,6 +1157,44 @@ export const useInfiniteCanvasEvents = (canvasId: string, enabled = true) => {
         return lastEvent.createdAt;
       }
       return undefined;
+    },
+    initialPageParam: undefined as string | undefined,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    enabled: !!canvasId && enabled,
+  });
+};
+
+export type CanvasRunsFilters = {
+  states?: CanvasesCanvasRunState[];
+  results?: CanvasesCanvasRunResult[];
+};
+
+export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilters = {}, enabled = true) => {
+  const limit = 25;
+
+  return useInfiniteQuery({
+    queryKey: canvasKeys.infiniteRuns(canvasId, filters),
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const response = await canvasesListRuns(
+        withOrganizationHeader({
+          path: { canvasId },
+          query: {
+            limit,
+            ...(filters.states?.length ? { states: filters.states } : {}),
+            ...(filters.results?.length ? { results: filters.results } : {}),
+            ...(pageParam ? { before: pageParam } : {}),
+          },
+        }),
+      );
+      return response.data;
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.runs?.length || 0), 0);
+      const totalCount = lastPage?.totalCount || 0;
+
+      if (currentLoadedCount >= totalCount) return undefined;
+      return lastPage?.lastTimestamp;
     },
     initialPageParam: undefined as string | undefined,
     staleTime: 0,
