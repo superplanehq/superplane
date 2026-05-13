@@ -114,6 +114,32 @@ describe("orderCertificatePackMapper.props metadata", () => {
     expect(props.metadata).toContainEqual({ icon: "award", label: "custom ca provider" });
   });
 
+  it("shows validity period for certificate authorities that support it", () => {
+    const props = orderCertificatePackMapper.props(
+      buildPropsCtx({
+        configuration: {
+          hosts: ["example.com"],
+          certificateAuthority: "google",
+          validityDays: "90",
+        },
+      }),
+    );
+    expect(props.metadata).toContainEqual({ icon: "calendar-clock", label: "3 months" });
+  });
+
+  it("does not show validity period for certificate authorities that do not support it", () => {
+    const props = orderCertificatePackMapper.props(
+      buildPropsCtx({
+        configuration: {
+          hosts: ["example.com"],
+          certificateAuthority: "lets_encrypt",
+          validityDays: "90",
+        },
+      }),
+    );
+    expect(props.metadata).not.toContainEqual({ icon: "calendar-clock", label: "3 months" });
+  });
+
   it("returns empty metadata when configuration is empty", () => {
     const props = orderCertificatePackMapper.props(buildPropsCtx({ configuration: {} }));
     expect(props.metadata).toEqual([]);
@@ -137,6 +163,7 @@ describe("orderCertificatePackMapper.getExecutionDetails", () => {
                 status: "initializing",
                 type: "advanced",
                 validation_method: "txt",
+                validity_days: 90,
               },
             }),
           ],
@@ -149,6 +176,7 @@ describe("orderCertificatePackMapper.getExecutionDetails", () => {
     expect(details["Status"]).toBe("initializing");
     expect(details["CA"]).toBe("lets_encrypt");
     expect(details["Validation"]).toBe("txt");
+    expect(details["Validity"]).toBe("3 months");
     expect(details["Hosts"]).toBe("preview.example.com");
   });
 

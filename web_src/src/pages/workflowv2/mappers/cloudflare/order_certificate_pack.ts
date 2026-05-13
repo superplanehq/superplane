@@ -26,6 +26,7 @@ interface OrderCertificatePackConfiguration {
   hosts?: string[];
   certificateAuthority?: string;
   validationMethod?: string;
+  validityDays?: string | number;
 }
 
 export const orderCertificatePackMapper: ComponentBaseMapper = {
@@ -73,6 +74,7 @@ export const orderCertificatePackMapper: ComponentBaseMapper = {
     if (pack.status) details["Status"] = pack.status;
     if (pack.certificate_authority) details["CA"] = pack.certificate_authority;
     if (pack.validation_method) details["Validation"] = pack.validation_method;
+    if (pack.validity_days) details["Validity"] = certificateValidityLabel(pack.validity_days);
 
     return details;
   },
@@ -96,5 +98,26 @@ function orderMetadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "award", label: config.certificateAuthority.replace(/_/g, " ") });
   }
 
+  if (config?.validityDays && certificateAuthoritySupportsValidityDays(config.certificateAuthority)) {
+    metadata.push({ icon: "calendar-clock", label: certificateValidityLabel(config.validityDays) });
+  }
+
   return metadata;
+}
+
+function certificateAuthoritySupportsValidityDays(certificateAuthority: string | undefined): boolean {
+  return certificateAuthority === "google" || certificateAuthority === "ssl_com";
+}
+
+function certificateValidityLabel(validityDays: string | number): string {
+  switch (String(validityDays)) {
+    case "14":
+      return "2 weeks";
+    case "30":
+      return "1 month";
+    case "90":
+      return "3 months";
+    default:
+      return `${validityDays} days`;
+  }
 }

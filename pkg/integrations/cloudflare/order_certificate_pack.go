@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -21,6 +23,7 @@ type OrderCertificatePackSpec struct {
 	Hosts                []string `json:"hosts"`
 	CertificateAuthority string   `json:"certificateAuthority"`
 	ValidationMethod     string   `json:"validationMethod"`
+	ValidityDays         string   `json:"validityDays,omitempty"`
 	CloudflareBranding   *bool    `json:"cloudflareBranding,omitempty"`
 }
 
@@ -49,8 +52,9 @@ func (c *OrderCertificatePack) Documentation() string {
 
 - **Zone**: The Cloudflare zone to issue the certificate in
 - **Hosts**: One or more hostnames the certificate should cover. Include both apex and wildcard variants (e.g., ` + "`example.com`" + ` and ` + "`*.example.com`" + `) if needed.
-- **Certificate Authority**: The CA to use — Let's Encrypt (free, automated), Google, DigiCert, or SSL.com.
+- **Certificate Authority**: The CA to use — Let's Encrypt (free, automated), Google, or SSL.com.
 - **Validation Method**: How domain ownership is verified — TXT record, HTTP file, CNAME, or email.
+- **Certificate Validity Period**: How long the certificate should be valid. Available for Google and SSL.com certificates.
 - **Cloudflare Branding**: Whether to include Cloudflare branding on the certificate (optional).
 
 ## Output
@@ -71,6 +75,10 @@ func (c *OrderCertificatePack) OutputChannels(configuration any) []core.OutputCh
 }
 
 func (c *OrderCertificatePack) Configuration() []configuration.Field {
+	validitySupportedCA := []configuration.VisibilityCondition{
+		{Field: "certificateAuthority", Values: []string{"google", "ssl_com"}},
+	}
+
 	return []configuration.Field{
 		{
 			Name:        "zone",
@@ -111,7 +119,6 @@ func (c *OrderCertificatePack) Configuration() []configuration.Field {
 					Options: []configuration.FieldOption{
 						{Label: "Let's Encrypt", Value: "lets_encrypt"},
 						{Label: "Google", Value: "google"},
-						{Label: "DigiCert", Value: "digicert"},
 						{Label: "SSL.com", Value: "ssl_com"},
 					},
 				},
@@ -130,6 +137,27 @@ func (c *OrderCertificatePack) Configuration() []configuration.Field {
 						{Label: "HTTP File", Value: "http"},
 						{Label: "CNAME", Value: "cname"},
 						{Label: "Email", Value: "email"},
+					},
+				},
+			},
+		},
+		{
+			Name:                 "validityDays",
+			Label:                "Certificate Validity Period",
+			Type:                 configuration.FieldTypeSelect,
+			Required:             false,
+			Default:              "90",
+			Description:          "How long the certificate should be valid",
+			VisibilityConditions: validitySupportedCA,
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "certificateAuthority", Values: []string{"google", "ssl_com"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{Label: "2 weeks", Value: "14"},
+						{Label: "1 month", Value: "30"},
+						{Label: "3 months", Value: "90"},
 					},
 				},
 			},
@@ -174,8 +202,23 @@ func validateOrderCertificatePackSpec(spec OrderCertificatePackSpec) error {
 		return errors.New("certificateAuthority is required")
 	}
 
+	certificateAuthority := strings.TrimSpace(spec.CertificateAuthority)
+	if !slices.Contains([]string{"lets_encrypt", "google", "ssl_com"}, certificateAuthority) {
+		return fmt.Errorf("unsupported certificateAuthority: %s", certificateAuthority)
+	}
+
 	if strings.TrimSpace(spec.ValidationMethod) == "" {
 		return errors.New("validationMethod is required")
+	}
+
+	if certificateAuthoritySupportsValidityDays(certificateAuthority) {
+		if strings.TrimSpace(spec.ValidityDays) == "" {
+			return errors.New("validityDays is required for the selected certificateAuthority")
+		}
+
+		if _, err := parseCertificateValidityDays(spec.ValidityDays); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -204,6 +247,14 @@ func (c *OrderCertificatePack) Execute(ctx core.ExecutionContext) error {
 		Type:                 "advanced",
 		ValidationMethod:     strings.TrimSpace(spec.ValidationMethod),
 		CloudflareBranding:   spec.CloudflareBranding,
+	}
+
+	if certificateAuthoritySupportsValidityDays(req.CertificateAuthority) {
+		validityDays, err := parseCertificateValidityDays(spec.ValidityDays)
+		if err != nil {
+			return err
+		}
+		req.ValidityDays = &validityDays
 	}
 
 	pack, err := client.OrderCertificatePack(zoneID, req)
@@ -249,4 +300,21 @@ func (c *OrderCertificatePack) Hooks() []core.Hook {
 
 func (c *OrderCertificatePack) HandleHook(ctx core.ActionHookContext) error {
 	return nil
+}
+
+func certificateAuthoritySupportsValidityDays(certificateAuthority string) bool {
+	return slices.Contains([]string{"google", "ssl_com"}, certificateAuthority)
+}
+
+func parseCertificateValidityDays(value string) (int, error) {
+	validityDays, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return 0, fmt.Errorf("validityDays must be one of: 14, 30, 90")
+	}
+
+	if !slices.Contains([]int{14, 30, 90}, validityDays) {
+		return 0, fmt.Errorf("validityDays must be one of: 14, 30, 90")
+	}
+
+	return validityDays, nil
 }

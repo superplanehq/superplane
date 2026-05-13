@@ -9,12 +9,43 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 func Test__OrderCertificatePack__Setup(t *testing.T) {
 	component := &OrderCertificatePack{}
+
+	t.Run("configuration excludes deprecated DigiCert and conditionally requires validity days", func(t *testing.T) {
+		fields := component.Configuration()
+		var caField *configuration.Field
+		var validityField *configuration.Field
+		for i := range fields {
+			switch fields[i].Name {
+			case "certificateAuthority":
+				caField = &fields[i]
+			case "validityDays":
+				validityField = &fields[i]
+			}
+		}
+
+		require.NotNil(t, caField)
+		require.NotNil(t, caField.TypeOptions)
+		require.NotNil(t, caField.TypeOptions.Select)
+		for _, option := range caField.TypeOptions.Select.Options {
+			assert.NotEqual(t, "digicert", option.Value)
+		}
+
+		require.NotNil(t, validityField)
+		assert.Equal(t, "90", validityField.Default)
+		assert.Equal(t, []configuration.VisibilityCondition{
+			{Field: "certificateAuthority", Values: []string{"google", "ssl_com"}},
+		}, validityField.VisibilityConditions)
+		assert.Equal(t, []configuration.RequiredCondition{
+			{Field: "certificateAuthority", Values: []string{"google", "ssl_com"}},
+		}, validityField.RequiredConditions)
+	})
 
 	t.Run("missing zone returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
@@ -61,6 +92,18 @@ func Test__OrderCertificatePack__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "certificateAuthority is required")
 	})
 
+	t.Run("deprecated DigiCert returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"zone":                 "zone123",
+				"hosts":                []any{"example.com"},
+				"certificateAuthority": "digicert",
+				"validationMethod":     "txt",
+			},
+		})
+		require.ErrorContains(t, err, "unsupported certificateAuthority")
+	})
+
 	t.Run("missing validationMethod returns error", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
@@ -72,6 +115,31 @@ func Test__OrderCertificatePack__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "validationMethod is required")
 	})
 
+	t.Run("missing validityDays for SSL.com returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"zone":                 "zone123",
+				"hosts":                []any{"example.com"},
+				"certificateAuthority": "ssl_com",
+				"validationMethod":     "txt",
+			},
+		})
+		require.ErrorContains(t, err, "validityDays is required")
+	})
+
+	t.Run("invalid validityDays returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"zone":                 "zone123",
+				"hosts":                []any{"example.com"},
+				"certificateAuthority": "google",
+				"validationMethod":     "txt",
+				"validityDays":         "45",
+			},
+		})
+		require.ErrorContains(t, err, "validityDays must be one of")
+	})
+
 	t.Run("valid configuration passes", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
@@ -79,6 +147,19 @@ func Test__OrderCertificatePack__Setup(t *testing.T) {
 				"hosts":                []any{"example.com", "*.example.com"},
 				"certificateAuthority": "lets_encrypt",
 				"validationMethod":     "txt",
+			},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("valid Google configuration passes with validityDays", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"zone":                 "zone123",
+				"hosts":                []any{"example.com", "*.example.com"},
+				"certificateAuthority": "google",
+				"validationMethod":     "txt",
+				"validityDays":         "90",
 			},
 		})
 		require.NoError(t, err)
@@ -149,6 +230,47 @@ func Test__OrderCertificatePack__Execute(t *testing.T) {
 		wrapped := execState.Payloads[0].(map[string]any)
 		payload := wrapped["data"].(map[string]any)
 		assert.Equal(t, "example.com", payload["zoneName"])
+	})
+
+	t.Run("orders Google certificate pack with validity days", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"success": true,
+						"result": {
+							"id": "pack-google",
+							"certificate_authority": "google",
+							"hosts": ["example.com"],
+							"status": "initializing",
+							"type": "advanced",
+							"validation_method": "txt",
+							"validity_days": 90
+						}
+					}`)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"zone":                 "zone123",
+				"hosts":                []any{"example.com"},
+				"certificateAuthority": "google",
+				"validationMethod":     "txt",
+				"validityDays":         "90",
+			},
+			HTTP:           httpContext,
+			Integration:    integration,
+			ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		})
+
+		require.NoError(t, err)
+
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(httpContext.Requests[0].Body).Decode(&body))
+		assert.Equal(t, float64(90), body["validity_days"])
 	})
 
 	t.Run("API error returns error", func(t *testing.T) {

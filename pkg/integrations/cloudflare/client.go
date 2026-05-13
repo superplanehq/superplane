@@ -126,6 +126,7 @@ type CertificatePack struct {
 	Status               string   `json:"status,omitempty"`
 	Type                 string   `json:"type,omitempty"`
 	ValidationMethod     string   `json:"validation_method,omitempty"`
+	ValidityDays         int      `json:"validity_days,omitempty"`
 }
 
 type OrderCertificatePackRequest struct {
@@ -133,6 +134,7 @@ type OrderCertificatePackRequest struct {
 	Hosts                []string `json:"hosts"`
 	Type                 string   `json:"type"`
 	ValidationMethod     string   `json:"validation_method"`
+	ValidityDays         *int     `json:"validity_days,omitempty"`
 	CloudflareBranding   *bool    `json:"cloudflare_branding,omitempty"`
 }
 

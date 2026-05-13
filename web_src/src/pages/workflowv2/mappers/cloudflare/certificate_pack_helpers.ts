@@ -11,6 +11,7 @@ export interface CertificatePackOutput {
     status?: string;
     type?: string;
     validation_method?: string;
+    validity_days?: number;
   };
   deleted?: boolean;
 }

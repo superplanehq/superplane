@@ -883,8 +883,9 @@ The Order Certificate Pack component orders an advanced SSL/TLS certificate pack
 
 - **Zone**: The Cloudflare zone to issue the certificate in
 - **Hosts**: One or more hostnames the certificate should cover. Include both apex and wildcard variants (e.g., `example.com` and `*.example.com`) if needed.
-- **Certificate Authority**: The CA to use — Let's Encrypt (free, automated), Google, DigiCert, or SSL.com.
+- **Certificate Authority**: The CA to use — Let's Encrypt (free, automated), Google, or SSL.com.
 - **Validation Method**: How domain ownership is verified — TXT record, HTTP file, CNAME, or email.
+- **Certificate Validity Period**: How long the certificate should be valid. Available for Google and SSL.com certificates.
 - **Cloudflare Branding**: Whether to include Cloudflare branding on the certificate (optional).
 
 ### Output
@@ -1266,4 +1267,3 @@ Returns the updated redirect rule with all current configuration.
   "type": "cloudflare.redirectRule"
 }
 ```
-
