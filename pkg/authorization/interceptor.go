@@ -408,19 +408,21 @@ func (a *AuthorizationInterceptor) UnaryInterceptor() grpc.UnaryServerIntercepto
 
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
-			log.Errorf("Metadata not found in context")
+			log.Errorf("Metadata not found in context for method %s", info.FullMethod)
 			return nil, status.Error(codes.NotFound, "Not found")
 		}
 
 		userMeta, ok := md["x-user-id"]
 		if !ok || len(userMeta) == 0 {
-			log.Errorf("User not found in metadata, metadata %v", md)
+			// Do not log `md` itself — it carries the Authorization header,
+			// scoped-token scopes, cookies, etc. Log only the method.
+			log.Errorf("x-user-id missing from metadata for method %s", info.FullMethod)
 			return nil, status.Error(codes.NotFound, "Not found")
 		}
 
 		orgMeta, ok := md["x-organization-id"]
 		if !ok || len(orgMeta) == 0 {
-			log.Errorf("Organization not found in metadata, metadata %v", md)
+			log.Errorf("x-organization-id missing from metadata for method %s", info.FullMethod)
 			return nil, status.Error(codes.NotFound, "Not found")
 		}
 
