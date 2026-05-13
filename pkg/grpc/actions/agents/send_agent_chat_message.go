@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
@@ -35,7 +36,8 @@ func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID 
 		if errors.Is(err, agents.ErrSessionAlreadyTerminated) {
 			return nil, status.Error(codes.FailedPrecondition, "agent chat is archived")
 		}
-		return nil, status.Errorf(codes.Internal, "failed to send agent chat message: %v", err)
+		log.WithError(err).WithField("chat_id", chatID).Error("failed to send agent chat message")
+		return nil, status.Error(codes.Internal, "failed to send agent chat message")
 	}
 	return &pb.SendAgentChatMessageResponse{Message: serializeMessage(persisted)}, nil
 }

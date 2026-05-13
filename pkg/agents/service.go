@@ -64,7 +64,7 @@ func NewService(provider Provider, auth authorization.Authorization, jwtSigner *
 func (s *Service) ProviderName() string { return s.provider.Name() }
 
 func (s *Service) CreateSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
-	if err := s.checkAgentPermission(userID.String(), organizationID.String(), canvasID.String()); err != nil {
+	if err := s.checkAgentPermission(userID.String(), organizationID.String()); err != nil {
 		return nil, err
 	}
 
@@ -224,7 +224,11 @@ func (s *Service) mintAgentToken(organizationID, userID, canvasID string) (strin
 	return token, s.clock().Add(agentTokenTTL), nil
 }
 
-func (s *Service) checkAgentPermission(userID, organizationID, _ string) error {
+// checkAgentPermission enforces the org-level baseline. Canvas-level access
+// is implicitly enforced by the caller's models.FindCanvas(orgID, canvasID)
+// — this codebase's auth model has no per-canvas RBAC layer; org members
+// see all of the org's canvases.
+func (s *Service) checkAgentPermission(userID, organizationID string) error {
 	checks := []struct{ resource, action string }{
 		{"agents", "create"},
 		{"canvases", "read"},

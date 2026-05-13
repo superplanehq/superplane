@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -26,7 +27,8 @@ func DescribeAgentChat(_ context.Context, svc AgentsService, orgID, userID strin
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "agent chat not found")
 		}
-		return nil, status.Errorf(codes.Internal, "failed to load agent chat: %v", err)
+		log.WithError(err).WithField("chat_id", chatID).Error("failed to load agent chat")
+		return nil, status.Error(codes.Internal, "failed to load agent chat")
 	}
 	return &pb.DescribeAgentChatResponse{Chat: serializeChat(session)}, nil
 }

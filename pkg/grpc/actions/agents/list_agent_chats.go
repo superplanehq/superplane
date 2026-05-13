@@ -3,6 +3,7 @@ package agents
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -19,7 +20,8 @@ func ListAgentChats(_ context.Context, svc AgentsService, orgID, userID string, 
 
 	sessions, err := svc.ListSessions(org, user, canvas)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to list agent chats: %v", err)
+		log.WithError(err).WithField("canvas_id", canvas).Error("failed to list agent chats")
+		return nil, status.Error(codes.Internal, "failed to list agent chats")
 	}
 
 	out := make([]*pb.AgentChatInfo, 0, len(sessions))

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/agents"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
@@ -24,7 +25,8 @@ func CreateAgentChat(ctx context.Context, svc AgentsService, orgID, userID strin
 		if errors.Is(err, agents.ErrSessionForbidden) {
 			return nil, status.Error(codes.PermissionDenied, "agent chat is not allowed")
 		}
-		return nil, status.Errorf(codes.Internal, "failed to create agent chat: %v", err)
+		log.WithError(err).WithField("canvas_id", canvas).Error("failed to create agent chat")
+		return nil, status.Error(codes.Internal, "failed to create agent chat")
 	}
 	return &pb.CreateAgentChatResponse{Chat: serializeChat(session)}, nil
 }
