@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { posthog, isPostHogEnabled } from "@/posthog";
-import OwnerSetupSurvey, { type PostHogSurvey } from "./OwnerSetupSurvey";
+import PostHogSurveyForm, { type PostHogSurvey } from "./PostHogSurveyForm";
 import { OwnerStep } from "./ownerSetup/OwnerStep";
 import { PrivateNetworkStep } from "./ownerSetup/PrivateNetworkStep";
 import { SmtpPromptStep } from "./ownerSetup/SmtpPromptStep";
@@ -271,7 +271,7 @@ const OwnerSetup: React.FC = () => {
         )}
 
         {step === "survey" && activeSurvey && pendingOrganizationId && (
-          <OwnerSetupSurvey survey={activeSurvey} organizationId={pendingOrganizationId} />
+          <PostHogSurveyForm survey={activeSurvey} redirectTo={`/${pendingOrganizationId}`} />
         )}
 
         {step === "smtpConfig" && (

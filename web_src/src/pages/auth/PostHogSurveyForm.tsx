@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { analytics } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,9 +22,10 @@ export interface PostHogSurvey {
   questions: SurveyQuestion[];
 }
 
-interface OwnerSetupSurveyProps {
+interface PostHogSurveyFormProps {
   survey: PostHogSurvey;
-  organizationId: string;
+  redirectTo: string;
+  onComplete?: () => void;
 }
 
 type SurveyAnswer = string | string[];
@@ -167,7 +168,22 @@ const SurveyProgress: React.FC<SurveyProgressProps> = ({ questionCount, currentQ
   </div>
 );
 
-const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizationId }) => {
+const buildSurveyResponseProps = (survey: PostHogSurvey, responses: SurveyResponses) => {
+  const responseProps: Record<string, string | string[]> = {};
+  survey.questions.forEach((question, index) => {
+    const answer = responses[index];
+    if (answer === undefined) return;
+    const key = question.id
+      ? `$survey_response_${question.id}`
+      : index === 0
+        ? "$survey_response"
+        : `$survey_response_${index}`;
+    responseProps[key] = answer;
+  });
+  return responseProps;
+};
+
+const PostHogSurveyForm: React.FC<PostHogSurveyFormProps> = ({ survey, redirectTo, onComplete }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [surveyResponses, setSurveyResponses] = useState<SurveyResponses>({});
   const [textAnswer, setTextAnswer] = useState("");
@@ -180,25 +196,21 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
   );
   const currentType = currentQuestion ? getQuestionType(currentQuestion, currentChoices.length > 0) : "text";
 
+  const handleComplete = useCallback(() => {
+    if (onComplete) {
+      onComplete();
+      return;
+    }
+    window.location.href = redirectTo;
+  }, [onComplete, redirectTo]);
+
   const finishSurvey = (responses: SurveyResponses) => {
     if (Object.keys(responses).length === 0) {
       analytics.surveyDismissed(survey.id);
     } else {
-      const responseProps: Record<string, string | string[]> = {};
-      survey.questions.forEach((question, index) => {
-        const answer = responses[index];
-        if (answer === undefined) return;
-        if (question.id) {
-          responseProps[`$survey_response_${question.id}`] = answer;
-        } else if (index === 0) {
-          responseProps["$survey_response"] = answer;
-        } else {
-          responseProps[`$survey_response_${index}`] = answer;
-        }
-      });
-      analytics.surveySent(survey.id, survey.name, responseProps);
+      analytics.surveySent(survey.id, survey.name, buildSurveyResponseProps(survey, responses));
     }
-    window.location.href = `/${organizationId}`;
+    handleComplete();
   };
 
   const advanceOrFinish = (responses: SurveyResponses) => {
@@ -253,8 +265,8 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
       return;
     }
     analytics.surveyDismissed(survey.id);
-    window.location.href = `/${organizationId}`;
-  }, [currentQuestion, organizationId, survey.id]);
+    handleComplete();
+  }, [currentQuestion, handleComplete, survey.id]);
 
   if (!currentQuestion) return null;
 
@@ -298,4 +310,4 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
   );
 };
 
-export default OwnerSetupSurvey;
+export default PostHogSurveyForm;
