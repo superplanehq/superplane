@@ -8,6 +8,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
 import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
+import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
 
 type HeaderMode = "default" | "version-live" | "version-edit" | "runs";
 
@@ -39,6 +40,10 @@ interface HeaderProps {
   publishVersionLabel?: string;
   /** When true, shows the Discard control next to Publish in version edit mode (draft differs from live). */
   hasUnpublishedDraftChanges?: boolean;
+  /** ISO timestamp of the existing unpublished draft, used to label "Last edited X" in the Edit dropdown. */
+  unpublishedDraftUpdatedAt?: string;
+  /** Discard the existing draft and start a new edit session from live. Shown in the Edit dropdown when a draft exists. */
+  onDiscardDraftAndStartEdit?: () => void;
   /** Canvas settings route requires `canvases:update`; hide the menu when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
   isVersionControlOpen?: boolean;
@@ -167,9 +172,13 @@ function SecondaryHeaderActions({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
+  unpublishedDraftUpdatedAt,
+  onDiscardDraftAndStartEdit,
 }: HeaderProps) {
   const showVersionControlTrigger = mode === "version-live" && !!onOpenVersionControl;
   const showEditButton = mode === "version-live" && !!onEnterEditMode;
+  const showDraftDropdown =
+    showEditButton && !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
@@ -183,11 +192,19 @@ function SecondaryHeaderActions({
       ) : null}
 
       {showEditButton ? (
-        <EnterEditButton
-          onClick={onEnterEditMode}
-          disabled={!!enterEditModeDisabled}
-          disabledTooltip={enterEditModeDisabledTooltip}
-        />
+        showDraftDropdown ? (
+          <EnterEditDraftDropdown
+            onContinueEditing={onEnterEditMode}
+            onDiscardAndStartEdit={onDiscardDraftAndStartEdit!}
+            updatedAt={unpublishedDraftUpdatedAt}
+          />
+        ) : (
+          <EnterEditButton
+            onClick={onEnterEditMode}
+            disabled={!!enterEditModeDisabled}
+            disabledTooltip={enterEditModeDisabledTooltip}
+          />
+        )
       ) : null}
 
       {mode === "default" && onSave && !saveButtonHidden ? (

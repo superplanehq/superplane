@@ -170,6 +170,8 @@ export interface CanvasPageProps {
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
+  unpublishedDraftUpdatedAt?: string;
+  onDiscardDraftAndStartEdit?: () => void;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -1119,6 +1121,8 @@ function CanvasPage(props: CanvasPageProps) {
           runsNotificationCount={props.runsNotificationCount}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
+          unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
+          onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           isVersionControlOpen={props.isVersionControlOpen}
           onOpenVersionControl={props.onOpenVersionControl}
@@ -1630,6 +1634,8 @@ function CanvasContentHeader({
   runsNotificationCount,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
+  unpublishedDraftUpdatedAt,
+  onDiscardDraftAndStartEdit,
   showCanvasSettingsMenu,
   isVersionControlOpen,
   onOpenVersionControl,
@@ -1662,6 +1668,8 @@ function CanvasContentHeader({
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
+  unpublishedDraftUpdatedAt?: string;
+  onDiscardDraftAndStartEdit?: () => void;
   showCanvasSettingsMenu?: boolean;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
@@ -1704,6 +1712,8 @@ function CanvasContentHeader({
       runsNotificationCount={runsNotificationCount}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+      unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
+      onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
       isVersionControlOpen={isVersionControlOpen}
       onOpenVersionControl={onOpenVersionControl}
