@@ -38,7 +38,11 @@ func (c *Runner) Icon() string  { return "terminal" }
 func (c *Runner) Color() string { return "blue" }
 
 func (c *Runner) ExampleOutput() map[string]any {
-	return map[string]any{"status": "succeeded", "exit_code": 0}
+	return map[string]any{
+		"type":      RunnerFinishedEventType,
+		"timestamp": "2026-01-16T17:56:16.680755501Z",
+		"data":      []any{map[string]any{"status": "succeeded", "exit_code": 0}},
+	}
 }
 
 func (c *Runner) OutputChannels(configuration any) []core.OutputChannel {
