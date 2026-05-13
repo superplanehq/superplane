@@ -31,3 +31,26 @@ func FirePostPublishHooks(canvasID, orgID, userName string) {
 		fn(canvasID, orgID, userName)
 	}
 }
+
+var (
+	postCreateHooksMu sync.RWMutex
+	postCreateHooks   []func(canvasID, orgID, canvasName string)
+)
+
+// RegisterPostCreateHook adds a callback that fires after canvas creation.
+func RegisterPostCreateHook(fn func(canvasID, orgID, canvasName string)) {
+	postCreateHooksMu.Lock()
+	defer postCreateHooksMu.Unlock()
+	postCreateHooks = append(postCreateHooks, fn)
+	log.Info("gitserver: registered post-create hook for auto-init repos")
+}
+
+// FirePostCreateHooks is called from the canvas creation code path.
+func FirePostCreateHooks(canvasID, orgID, canvasName string) {
+	postCreateHooksMu.RLock()
+	defer postCreateHooksMu.RUnlock()
+
+	for _, fn := range postCreateHooks {
+		fn(canvasID, orgID, canvasName)
+	}
+}

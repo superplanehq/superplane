@@ -189,3 +189,89 @@ func ToSlug(name string) string {
 	}
 	return string(clean)
 }
+
+// BootstrapFromDB exports the current canvas state from the DB and creates
+// the initial git commit. No API token needed.
+func (s *Server) BootstrapFromDB(slug, canvasID, orgID string) error {
+	reader := &InternalReader{}
+
+	repoPath, err := s.InitRepo(slug)
+	if err != nil {
+		return err
+	}
+
+	// Check if repo already has commits
+	cmd := exec.Command("git", "--git-dir", repoPath, "rev-parse", "HEAD")
+	if err := cmd.Run(); err == nil {
+		log.Infof("gitserver: repo %s already has commits, skipping bootstrap", slug)
+		return nil
+	}
+
+	workDir, err := os.MkdirTemp("", "sp-git-bootstrap-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer os.RemoveAll(workDir)
+
+	run := func(args ...string) error {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = workDir
+		cmd.Env = append(os.Environ(),
+			"GIT_AUTHOR_NAME=SuperPlane",
+			"GIT_AUTHOR_EMAIL=system@superplane.com",
+			"GIT_COMMITTER_NAME=SuperPlane",
+			"GIT_COMMITTER_EMAIL=system@superplane.com",
+		)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("git %s failed: %w: %s", args[0], err, out)
+		}
+		return nil
+	}
+
+	if err := run("init", "--initial-branch=main"); err != nil {
+		if err2 := run("init"); err2 != nil {
+			return err2
+		}
+		run("checkout", "-b", "main")
+	}
+
+	// Export canvas YAML from DB
+	canvasYAML, err := reader.ReadCanvasYAML(canvasID)
+	if err != nil {
+		log.Warnf("gitserver: failed to read canvas YAML: %v", err)
+	} else {
+		os.WriteFile(filepath.Join(workDir, "canvas.yaml"), canvasYAML, 0644)
+	}
+
+	// Export README from DB
+	readme, err := reader.ReadReadme(canvasID)
+	if err != nil {
+		log.Warnf("gitserver: failed to read readme: %v", err)
+	} else if readme != "" {
+		os.WriteFile(filepath.Join(workDir, "README.md"), []byte(readme), 0644)
+	}
+
+	// Write .superplane.yaml
+	spConfig := fmt.Sprintf("canvasId: %s\norgId: %s\nslug: %s\n", canvasID, orgID, slug)
+	os.WriteFile(filepath.Join(workDir, ".superplane.yaml"), []byte(spConfig), 0644)
+
+	if err := run("add", "-A"); err != nil {
+		return err
+	}
+	if err := run("commit", "-m", "Initial commit (bootstrapped from canvas)"); err != nil {
+		return err
+	}
+	if err := run("remote", "add", "origin", repoPath); err != nil {
+		return err
+	}
+	if err := run("push", "origin", "main"); err != nil {
+		return fmt.Errorf("push to bare repo failed: %w", err)
+	}
+
+	configDest := filepath.Join(repoPath, "superplane.yaml")
+	os.WriteFile(configDest, []byte(spConfig), 0644)
+
+	log.Infof("gitserver: bootstrapped repo for %s (canvas %s) from DB", slug, canvasID)
+	return nil
+}

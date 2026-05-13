@@ -1,10 +1,7 @@
 package gitserver
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,28 +9,24 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
-	"gopkg.in/yaml.v3"
 )
 
 // ReverseSync auto-commits canvas state to git after UI publishes.
 type ReverseSync struct {
 	gitServer *Server
 	registry  *Registry
-	baseURL   string
-	tokenFunc func() string
+	reader    *InternalReader
 
 	// Debounce: avoid committing twice for rapid successive publishes
 	mu         sync.Mutex
 	lastCommit map[string]time.Time
 }
 
-func NewReverseSync(gitServer *Server, registry *Registry, baseURL string, tokenFunc func() string) *ReverseSync {
+func NewReverseSync(gitServer *Server, registry *Registry) *ReverseSync {
 	return &ReverseSync{
 		gitServer:  gitServer,
 		registry:   registry,
-		baseURL:    baseURL,
-		tokenFunc:  tokenFunc,
+		reader:     &InternalReader{},
 		lastCommit: make(map[string]time.Time),
 	}
 }
@@ -87,12 +80,6 @@ func (rs *ReverseSync) findSlugByCanvasID(canvasID string) string {
 }
 
 func (rs *ReverseSync) commitCurrentState(slug, canvasID, userName string) error {
-	token := rs.tokenFunc()
-	if token == "" {
-		return fmt.Errorf("no API token available for reverse sync")
-	}
-
-	client := &APIClient{BaseURL: rs.baseURL, Token: token}
 	repoPath := rs.gitServer.RepoPath(slug)
 
 	// Clone to temp worktree
@@ -129,16 +116,16 @@ func (rs *ReverseSync) commitCurrentState(slug, canvasID, userName string) error
 		return err
 	}
 
-	// Export current canvas state
-	canvasYAML, err := client.ExportCanvasYAML(canvasID)
+	// Export current canvas state directly from DB (no API token needed)
+	canvasYAML, err := rs.reader.ReadCanvasYAML(canvasID)
 	if err != nil {
-		return fmt.Errorf("failed to export canvas: %w", err)
+		return fmt.Errorf("failed to read canvas: %w", err)
 	}
 	os.WriteFile(filepath.Join(workDir, "canvas.yaml"), canvasYAML, 0644)
 
-	readme, err := client.ExportReadme(canvasID)
+	readme, err := rs.reader.ReadReadme(canvasID)
 	if err != nil {
-		log.Warnf("git-reverse-sync: failed to export readme: %v", err)
+		log.Warnf("git-reverse-sync: failed to read readme: %v", err)
 	} else if readme != "" {
 		os.WriteFile(filepath.Join(workDir, "README.md"), []byte(readme), 0644)
 	}
@@ -167,36 +154,3 @@ func (rs *ReverseSync) commitCurrentState(slug, canvasID, userName string) error
 	return nil
 }
 
-// ExportCanvasYAML for reverse sync — same as bootstrap but using yaml.v3
-func (c *APIClient) ExportCanvasYAMLForSync(canvasID string) ([]byte, error) {
-	url := fmt.Sprintf("%s/api/v1/canvases/%s", c.BaseURL, canvasID)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.Token)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("canvas GET returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	var apiResp struct {
-		Canvas json.RawMessage `json:"canvas"`
-	}
-	body, _ := io.ReadAll(resp.Body)
-	json.Unmarshal(body, &apiResp)
-
-	var canvas models.Canvas
-	canvas.APIVersion = "v1"
-	canvas.Kind = "Canvas"
-	json.Unmarshal(apiResp.Canvas, &canvas)
-
-	return yaml.Marshal(canvas)
-}

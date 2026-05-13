@@ -1341,15 +1341,25 @@ func (s *Server) RegisterGitServer(reposDir string) error {
 
 	gitServer.OnPush = syncHandler.HandlePush
 
-	// Register reverse sync (UI edits → git commit)
-	reverseToken := os.Getenv("GIT_SYNC_TOKEN")
-	reverseSync := gitserver.NewReverseSync(gitServer, registry, baseURL, func() string {
-		if reverseToken != "" {
-			return reverseToken
-		}
-		return lastValidToken
-	})
+	// Register reverse sync (UI edits → git commit) — reads DB directly, no token needed
+	reverseSync := gitserver.NewReverseSync(gitServer, registry)
 	gitserver.RegisterPostPublishHook(reverseSync.OnCanvasPublished)
+
+	// Auto-init git repo on canvas creation
+	gitserver.RegisterPostCreateHook(func(canvasID, orgID, canvasName string) {
+		slug := gitserver.ToSlug(canvasName)
+		go func() {
+			if err := gitServer.BootstrapFromDB(slug, canvasID, orgID); err != nil {
+				log.Errorf("gitserver: auto-init failed for %s: %v", slug, err)
+				return
+			}
+			registry.Register(slug, &gitserver.SlugToCanvasMapping{
+				CanvasID: canvasID,
+				OrgID:    orgID,
+			})
+			log.Infof("gitserver: auto-initialized repo for canvas %s (slug: %s)", canvasID, slug)
+		}()
+	})
 
 	// Register routes on the main router
 	gitServer.RegisterRoutes(s.Router)

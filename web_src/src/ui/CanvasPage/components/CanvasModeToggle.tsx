@@ -77,10 +77,10 @@ export function CanvasModeToggle({
             <TabsTrigger
               value="launchpad"
               data-testid="canvas-view-mode-launchpad"
-              aria-label="Apps"
+              aria-label="Dashboard"
               className={launchpadCls}
             >
-              Apps
+              Dashboard
             </TabsTrigger>
             <div className="h-full w-px bg-slate-300"></div>
           </>
