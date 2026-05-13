@@ -34,13 +34,13 @@ func usePipeShell() bool {
 	}
 }
 
-func runHostShellDirectives(ctx context.Context, maxOut int, scripts []string) (int, string, error) {
+func runHostShellDirectives(ctx context.Context, maxOut int, scripts []string, live io.Writer) (int, string, error) {
 	bash, err := resolveBash()
 	if err != nil {
 		return 1, "", err
 	}
 	if usePipeShell() {
-		return runHostShellDirectivesPipe(ctx, maxOut, bash, scripts)
+		return runHostShellDirectivesPipe(ctx, maxOut, bash, scripts, live)
 	}
 	// Plain exec.Command (not CommandContext): attaching ctx to os/exec races with creack/pty on
 	// some Darwin setups; cancellation is handled inside runShellPTYSession via ctx + Process.Kill().
@@ -48,7 +48,7 @@ func runHostShellDirectives(ctx context.Context, maxOut int, scripts []string) (
 	// `/bin/bash: --: invalid option`). Keep job-control off (`+m`) for non-interactive scripts but
 	// omit `--noediting`; readline editing is irrelevant on our PTY-driven line protocol anyway.
 	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i")
-	return runShellPTYSession(ctx, maxOut, cmd, scripts)
+	return runShellPTYSession(ctx, maxOut, cmd, scripts, live)
 }
 
 type cappedShellWriter struct {
@@ -93,7 +93,7 @@ func writeDirectiveBundle(tmpRoot string, parts []string) (metaPath string, err 
 
 // runHostShellDirectivesPipe runs directives in one bash process without a PTY (same source bundle
 // semantics as the PTY path: cwd/env persist across sources).
-func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, scripts []string) (int, string, error) {
+func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, scripts []string, live io.Writer) (int, string, error) {
 	parts := normalizeDirectiveLines(scripts)
 	if len(parts) == 0 {
 		return 1, "", errEmptyCommands()
@@ -116,8 +116,13 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, sc
 	}
 	var buf bytes.Buffer
 	w := &cappedShellWriter{buf: &buf, max: max}
-	cmd.Stdout = w
-	cmd.Stderr = w
+	if live != nil {
+		cmd.Stdout = io.MultiWriter(w, live)
+		cmd.Stderr = io.MultiWriter(w, live)
+	} else {
+		cmd.Stdout = w
+		cmd.Stderr = w
+	}
 
 	if runErr := cmd.Run(); runErr != nil {
 		outStr := truncateString(buf.String(), max)
@@ -131,10 +136,10 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, sc
 	return 0, truncateString(buf.String(), max), nil
 }
 
-func runDockerShellDirectives(ctx context.Context, maxOut int, image string, scripts []string) (int, string, error) {
+func runDockerShellDirectives(ctx context.Context, maxOut int, image string, scripts []string, live io.Writer) (int, string, error) {
 	args := []string{"run", "-i", "--rm", strings.TrimSpace(image), "/bin/bash", "--norc", "--noprofile", "+m", "-i"}
 	cmd := exec.CommandContext(ctx, "docker", args...)
-	return runShellPTYSession(ctx, maxOut, cmd, scripts)
+	return runShellPTYSession(ctx, maxOut, cmd, scripts, live)
 }
 
 func resolveBash() (string, error) {
@@ -161,6 +166,7 @@ type shellSession struct {
 	maxOut int
 
 	master io.Writer
+	live   io.Writer
 }
 
 func (s *shellSession) appendOut(p []byte) {
@@ -174,9 +180,16 @@ func (s *shellSession) appendOut(p []byte) {
 	if len(p) > room {
 		s.out.Write(p[:room])
 		s.out.WriteString("\n…(truncated)")
+		if s.live != nil {
+			_, _ = s.live.Write(p[:room])
+			_, _ = s.live.Write([]byte("\n…(truncated)\n"))
+		}
 		return
 	}
 	s.out.Write(p)
+	if s.live != nil {
+		_, _ = s.live.Write(p)
+	}
 }
 
 func (s *shellSession) push(b []byte) {
@@ -228,7 +241,7 @@ func killShellProcess(shellCmd *exec.Cmd) {
 	_ = shellCmd.Process.Kill()
 }
 
-func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, directives []string) (_ int, out string, err error) {
+func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, directives []string, live io.Writer) (_ int, out string, err error) {
 	parts := normalizeDirectiveLines(directives)
 	if len(parts) == 0 {
 		return 1, "", errEmptyCommands()
@@ -265,7 +278,7 @@ func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, dir
 		max = 512 * 1024
 	}
 
-	sess := &shellSession{master: master, maxOut: max}
+	sess := &shellSession{master: master, maxOut: max, live: live}
 
 	// Boot synchronously (no concurrent master reader): wait for a full line equal to bootMarker so
 	// we do not treat the marker as a substring inside the echoed `echo '…'` line.
