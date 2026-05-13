@@ -10,7 +10,7 @@ import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
 import { useHeaderActionSlotNode } from "./HeaderActionSlotContext";
 
-type HeaderMode = "default" | "launchpad" | "version-live" | "version-edit" | "runs";
+type HeaderMode = "default" | "launchpad" | "version-live" | "version-edit" | "runs" | "repo";
 
 interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). */
@@ -50,6 +50,7 @@ interface HeaderProps {
   runsNotificationCount?: number;
   /** Called when the user clicks the "Launchpad" tab in the mode toggle. When omitted, the tab is hidden. */
   onSelectLaunchpad?: () => void;
+  onSelectRepo?: () => void;
   agentState: AgentState;
 }
 
@@ -129,8 +130,9 @@ function SecondaryHeader(props: HeaderProps) {
     props.mode === "launchpad" ||
     props.mode === "version-live" ||
     props.mode === "version-edit" ||
-    props.mode === "runs";
-  const canvasViewMode = props.mode === "launchpad" ? "launchpad" : props.mode === "runs" ? "runs" : "version-live";
+    props.mode === "runs" ||
+    props.mode === "repo";
+  const canvasViewMode = props.mode === "launchpad" ? "launchpad" : props.mode === "runs" ? "runs" : props.mode === "repo" ? "repo" : "version-live";
   const editing = props.mode === "version-edit";
 
   return (
@@ -145,6 +147,7 @@ function SecondaryHeader(props: HeaderProps) {
               onSelectLaunchpad={props.onSelectLaunchpad}
               onSelectLive={props.onExitEditMode}
               onSelectRuns={props.onSelectRuns}
+              onSelectRepo={props.onSelectRepo}
               runsNotificationCount={props.runsNotificationCount}
               editing={editing}
               hasDraft={!!props.hasUnpublishedDraftChanges}

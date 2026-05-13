@@ -35,6 +35,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/gitserver"
+	canvases "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
@@ -1328,6 +1329,7 @@ func (s *Server) RegisterGitServer(reposDir string) error {
 
 	// Registry maps slugs to canvas IDs
 	registry := gitserver.NewRegistry(reposDir)
+	gitServer.Registry = registry
 
 	// Use API sync handler that calls REST endpoints
 	baseURL := "http://localhost:" + os.Getenv("PUBLIC_API_PORT")
@@ -1341,8 +1343,27 @@ func (s *Server) RegisterGitServer(reposDir string) error {
 
 	gitServer.OnPush = syncHandler.HandlePush
 
+	// Build the canvas serializer function (breaks import cycle)
+	canvasSerializer := func(canvasID string) ([]byte, error) {
+		canvasUUID, err := uuid.Parse(canvasID)
+		if err != nil {
+			return nil, err
+		}
+		canvas, err := models.FindCanvasWithoutOrgScope(canvasUUID)
+		if err != nil {
+			return nil, err
+		}
+		protoCanvas, err := canvases.SerializeCanvas(canvas, false, nil)
+		if err != nil {
+			return nil, err
+		}
+		marshaler := protojson.MarshalOptions{EmitUnpopulated: true}
+		return marshaler.Marshal(protoCanvas)
+	}
+
 	// Register reverse sync (UI edits → git commit) — reads DB directly, no token needed
 	reverseSync := gitserver.NewReverseSync(gitServer, registry)
+	reverseSync.SetCanvasSerializer(canvasSerializer)
 	gitserver.RegisterPostPublishHook(reverseSync.OnCanvasPublished)
 
 	// Auto-init git repo on canvas creation
@@ -1363,6 +1384,7 @@ func (s *Server) RegisterGitServer(reposDir string) error {
 
 	// Register routes on the main router
 	gitServer.RegisterRoutes(s.Router)
+	gitServer.RegisterRepoAPIRoutes(s.Router)
 	gitServer.RegisterBootstrapRoute(s.Router, s.BaseURL, registry)
 	log.Infof("Git server enabled, repos at %s", reposDir)
 	return nil

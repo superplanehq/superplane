@@ -1,13 +1,14 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
-export type CanvasMode = "launchpad" | "version-live" | "runs";
+export type CanvasMode = "launchpad" | "version-live" | "runs" | "repo";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLaunchpad?: () => void;
   onSelectLive: () => void;
   onSelectRuns?: () => void;
+  onSelectRepo?: () => void;
   runsNotificationCount?: number;
   /**
    * When true, the active Canvas tab uses an amber palette to signal that the
@@ -27,6 +28,7 @@ export function CanvasModeToggle({
   onSelectLaunchpad,
   onSelectLive,
   onSelectRuns,
+  onSelectRepo,
   runsNotificationCount,
   editing = false,
   hasDraft = false,
@@ -42,6 +44,8 @@ export function CanvasModeToggle({
       void onSelectLive();
     } else if (next === "runs" && onSelectRuns) {
       void onSelectRuns();
+    } else if (next === "repo" && onSelectRepo) {
+      void onSelectRepo();
     }
   };
 
@@ -67,7 +71,8 @@ export function CanvasModeToggle({
   const liveSlotCls =
     showLaunchpad && showRuns ? middle : showLaunchpad ? rightRounded : showRuns ? leftRounded : fullRounded;
   const liveCls = cn(baseTrigger, liveSlotCls, editing && editingActive);
-  const runsCls = `${baseTrigger} ${rightRounded}`;
+  const showRepo = !!onSelectRepo;
+  const runsCls = `${baseTrigger} ${showRepo ? middle : rightRounded}`;
 
   return (
     <Tabs value={mode} onValueChange={handleValueChange} className="inline-flex w-auto" aria-label="Canvas view">
@@ -114,6 +119,19 @@ export function CanvasModeToggle({
                   </span>
                 ) : null}
               </span>
+            </TabsTrigger>
+          </>
+        ) : null}
+        {onSelectRepo ? (
+          <>
+            <div className="h-full w-px bg-slate-300"></div>
+            <TabsTrigger
+              value="repo"
+              data-testid="canvas-view-mode-repo"
+              aria-label="Repo"
+              className={`${baseTrigger} ${rightRounded}`}
+            >
+              Repo
             </TabsTrigger>
           </>
         ) : null}

@@ -22,6 +22,7 @@ import (
 type Server struct {
 	reposDir string
 	mu       sync.RWMutex
+	Registry *Registry
 
 	// AuthFunc validates a token and returns error if invalid.
 	AuthFunc func(token string) error

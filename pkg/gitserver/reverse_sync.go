@@ -66,6 +66,11 @@ func NewReverseSync(gitServer *Server, registry *Registry) *ReverseSync {
 	}
 }
 
+// SetCanvasSerializer sets the proper canvas serialization function.
+func (rs *ReverseSync) SetCanvasSerializer(fn func(canvasID string) ([]byte, error)) {
+	rs.reader.SerializeCanvasFunc = fn
+}
+
 // OnCanvasPublished is called after a canvas version is published via UI/API.
 // It exports the new state and commits it to the git repo.
 func (rs *ReverseSync) OnCanvasPublished(canvasID, orgID, userName string) {

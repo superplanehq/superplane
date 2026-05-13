@@ -156,12 +156,14 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "launchpad" | "version-live" | "version-edit" | "runs";
+  headerMode?: "default" | "launchpad" | "version-live" | "version-edit" | "runs" | "repo";
   /** Called when the user clicks the "Runs" tab in the mode toggle. When omitted, the tab is hidden. */
   onSelectRuns?: () => void;
   runsNotificationCount?: number;
   /** Called when the user clicks the "Launchpad" tab in the mode toggle. When omitted, the tab is hidden. */
   onSelectLaunchpad?: () => void;
+  /** Called when the user clicks the "Repo" tab in the mode toggle. When omitted, the tab is hidden. */
+  onSelectRepo?: () => void;
   /** Optional left sidebar rendered in runs mode (e.g. RunsSidebar). */
   runsSidebar?: React.ReactNode;
   /** Optional overlay panel rendered on top of the canvas area when a run is selected. */
@@ -172,6 +174,7 @@ export interface CanvasPageProps {
    * graph state aren't churned on tab switches.
    */
   launchpadOverlay?: React.ReactNode;
+  repoOverlay?: React.ReactNode;
   /** Called when a node is double-clicked. Used in runs mode for node drill-down. */
   onNodeDoubleClick?: (nodeId: string) => void;
   /**
@@ -1184,6 +1187,7 @@ function CanvasPage(props: CanvasPageProps) {
             onSelectRuns={props.onSelectRuns}
             runsNotificationCount={props.runsNotificationCount}
             onSelectLaunchpad={props.onSelectLaunchpad}
+            onSelectRepo={props.onSelectRepo}
             agentState={agentState}
           />
           {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
@@ -1193,13 +1197,13 @@ function CanvasPage(props: CanvasPageProps) {
         <div className="flex-1 flex relative overflow-hidden">
           {props.headerMode === "runs"
             ? props.runsSidebar
-            : props.headerMode === "launchpad"
+            : props.headerMode === "launchpad" || props.headerMode === "repo"
               ? null
               : props.versionControlSidebar}
 
           <AgentSidebar agentState={agentState} />
 
-          {props.headerMode === "launchpad" || props.headerMode === "runs" ? null : (
+          {props.headerMode === "launchpad" || props.headerMode === "runs" || props.headerMode === "repo" ? null : (
             <RightSideControls
               mode={readOnly ? "live" : "edit"}
               onSidebarOpen={() => handleSidebarToggle(true)}
@@ -1232,6 +1236,9 @@ function CanvasPage(props: CanvasPageProps) {
             ) : null}
             {props.headerMode === "launchpad" && props.launchpadOverlay ? (
               <div className="launchpad-canvas absolute inset-0 z-[15] overflow-hidden">{props.launchpadOverlay}</div>
+            ) : null}
+            {props.headerMode === "repo" && props.repoOverlay ? (
+              <div className="absolute inset-0 z-[15] overflow-hidden bg-white">{props.repoOverlay}</div>
             ) : null}
             {props.headerMode === "runs" && props.runDetailPanel ? props.runDetailPanel : null}
             {showPreviewFloatingBar || showAwaitingFloatingBar ? (
@@ -1708,6 +1715,7 @@ function CanvasContentHeader({
   onSelectRuns,
   runsNotificationCount,
   onSelectLaunchpad,
+  onSelectRepo,
   agentState,
 }: {
   state: CanvasPageState;
@@ -1724,7 +1732,7 @@ function CanvasContentHeader({
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "launchpad" | "version-live" | "version-edit" | "runs";
+  headerMode?: "default" | "launchpad" | "version-live" | "version-edit" | "runs" | "repo";
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -1741,6 +1749,8 @@ function CanvasContentHeader({
   onSelectRuns?: () => void;
   runsNotificationCount?: number;
   onSelectLaunchpad?: () => void;
+  /** Called when the user clicks the "Repo" tab in the mode toggle. When omitted, the tab is hidden. */
+  onSelectRepo?: () => void;
   agentState: AgentState;
 }) {
   const stateRef = useRef(state);
@@ -1791,6 +1801,7 @@ function CanvasContentHeader({
       onSelectRuns={onSelectRuns}
       runsNotificationCount={runsNotificationCount}
       onSelectLaunchpad={onSelectLaunchpad}
+      onSelectRepo={onSelectRepo}
       agentState={agentState}
     />
   );

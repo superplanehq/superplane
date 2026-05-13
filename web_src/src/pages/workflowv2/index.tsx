@@ -1,3 +1,4 @@
+import { RepoTab } from "@/ui/RepoTab";
 import { Badge } from "@/components/ui/badge";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
@@ -165,7 +166,7 @@ const RUN_VIEW_MODE_STORAGE_KEY = "run-view-mode";
 // persisted -- entering edit always requires explicit intent.
 //
 const CANVAS_VIEW_MODE_STORAGE_KEY = "canvas-view-mode";
-type StoredCanvasView = "launchpad" | "version-live" | "runs";
+type StoredCanvasView = "launchpad" | "version-live" | "runs" | "repo";
 const canvasViewStorageKey = (canvasId: string) => `${CANVAS_VIEW_MODE_STORAGE_KEY}:${canvasId}`;
 const loadStoredCanvasView = (canvasId: string | undefined): StoredCanvasView | null => {
   if (!canvasId || typeof window === "undefined") return null;
@@ -663,6 +664,10 @@ export function WorkflowPageV2() {
     if (url === "launchpad") return true;
     if (url) return false;
     return loadStoredCanvasView(canvasId) === "launchpad";
+  });
+  const [isRepoMode, setIsRepoModeState] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return new URLSearchParams(window.location.search).get("view") === "repo";
   });
   const [selectedRunEventId, setSelectedRunEventIdState] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
@@ -2079,8 +2084,8 @@ export function WorkflowPageV2() {
     (on: boolean) => {
       setIsRunsModeState(on);
       if (on) {
-        // Switching into Runs leaves Launchpad behind.
         setIsLaunchpadModeState(false);
+        setIsRepoModeState(false);
       }
       const next = new URLSearchParams(searchParams);
       if (on) {
@@ -2103,9 +2108,8 @@ export function WorkflowPageV2() {
     (on: boolean) => {
       setIsLaunchpadModeState(on);
       if (on) {
-        // Switching into Launchpad clears any Runs selection so flipping
-        // back into Runs starts from a clean state.
         setIsRunsModeState(false);
+        setIsRepoModeState(false);
         setSelectedRunEventIdState(null);
         setRunDetailNodeId(null);
       }
@@ -2118,6 +2122,27 @@ export function WorkflowPageV2() {
       }
       setSearchParams(next, { replace: true });
       persistCanvasView(canvasId, on ? "launchpad" : "version-live");
+    },
+    [canvasId, searchParams, setSearchParams],
+  );
+
+  const setRepoMode = useCallback(
+    (on: boolean) => {
+      setIsRepoModeState(on);
+      if (on) {
+        setIsRunsModeState(false);
+        setIsLaunchpadModeState(false);
+        setSelectedRunEventIdState(null);
+        setRunDetailNodeId(null);
+      }
+      const next = new URLSearchParams(searchParams);
+      if (on) {
+        next.set("view", "repo");
+        next.delete("run");
+      } else if (next.get("view") === "repo") {
+        next.delete("view");
+      }
+      setSearchParams(next, { replace: true });
     },
     [canvasId, searchParams, setSearchParams],
   );
@@ -5024,6 +5049,10 @@ export function WorkflowPageV2() {
         return;
       }
     }
+    if (isRepoMode) {
+      setRepoMode(false);
+      return;
+    }
     if (isLaunchpadMode) {
       setLaunchpadMode(false);
       // Coming from Launchpad to Live: only flip out of edit mode if we're
@@ -5038,6 +5067,8 @@ export function WorkflowPageV2() {
     isRunsMode,
     hasEditableVersion,
     setRunsMode,
+    isRepoMode,
+    setRepoMode,
     isLaunchpadMode,
     setLaunchpadMode,
     canvasMode,
@@ -6001,13 +6032,15 @@ export function WorkflowPageV2() {
     isPreparingVersionAction,
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftGraphDiffVersusLive,
   });
-  const headerMode: "launchpad" | "runs" | "version-edit" | "version-live" = isLaunchpadMode
+  const headerMode: "launchpad" | "runs" | "repo" | "version-edit" | "version-live" = isLaunchpadMode
     ? "launchpad"
     : isRunsMode
       ? "runs"
-      : canvasMode === "edit"
-        ? "version-edit"
-        : "version-live";
+      : isRepoMode
+        ? "repo"
+        : canvasMode === "edit"
+          ? "version-edit"
+          : "version-live";
   const hasUnpublishedDraftChanges =
     !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftGraphDiffVersusLive;
   const canvasStateMode = hasEditableVersion
@@ -6179,6 +6212,7 @@ export function WorkflowPageV2() {
           fitAllRequest={showRunCanvas ? runsFitAllNonce : null}
           onExecutionChainHandled={handleExecutionChainHandled}
           onSelectRuns={() => setRunsMode(true)}
+          onSelectRepo={() => setRepoMode(true)}
           runsNotificationCount={countActiveRuns(runsEventsData.events)}
           onSelectLaunchpad={() => setLaunchpadMode(true)}
           launchpadOverlay={
@@ -6222,6 +6256,11 @@ export function WorkflowPageV2() {
               componentIconMap={componentIconMap}
               totalCount={runsEventsData.totalCount}
             />
+          }
+          repoOverlay={
+            isRepoMode ? (
+              <RepoTab canvasId={canvasId!} canvasName={canvas?.metadata?.name || ""} />
+            ) : null
           }
           runViewOverlay={
             isRunsMode ? (

@@ -13,10 +13,30 @@ import (
 
 // InternalReader reads canvas data directly from the database,
 // no API token needed. Used by reverse sync and bootstrap.
-type InternalReader struct{}
+type InternalReader struct {
+	// SerializeCanvasFunc serializes a canvas to proto JSON bytes.
+	// Set by the caller to break the import cycle with grpc/actions/canvases.
+	SerializeCanvasFunc func(canvasID string) ([]byte, error)
+}
 
 // ReadCanvasYAML exports the canvas as CLI-compatible YAML.
 func (r *InternalReader) ReadCanvasYAML(canvasID string) ([]byte, error) {
+	if r.SerializeCanvasFunc != nil {
+		// Use the proper proto serialization path
+		jsonBytes, err := r.SerializeCanvasFunc(canvasID)
+		if err != nil {
+			return nil, err
+		}
+
+		var cliCanvas models.Canvas
+		cliCanvas.APIVersion = "v1"
+		cliCanvas.Kind = "Canvas"
+		json.Unmarshal(jsonBytes, &cliCanvas)
+
+		return yaml.Marshal(cliCanvas)
+	}
+
+	// Fallback: basic DB read (less accurate)
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid canvas ID: %w", err)
@@ -32,26 +52,17 @@ func (r *InternalReader) ReadCanvasYAML(canvasID string) ([]byte, error) {
 		return nil, fmt.Errorf("no live version: %w", err)
 	}
 
-	// Build CLI-compatible YAML structure
-	cliCanvas := models.Canvas{
-		APIVersion: "v1",
-		Kind:       "Canvas",
-	}
-
-	// Marshal canvas + version data through JSON to populate the openapi model
 	canvasJSON := map[string]interface{}{
 		"metadata": map[string]interface{}{
-			"id":             canvas.ID.String(),
-			"organizationId": canvas.OrganizationID.String(),
-			"name":           canvas.Name,
-			"description":    canvas.Description,
+			"id": canvas.ID.String(), "organizationId": canvas.OrganizationID.String(),
+			"name": canvas.Name, "description": canvas.Description,
 		},
-		"spec": map[string]interface{}{
-			"nodes": version.Nodes,
-			"edges": version.Edges,
-		},
+		"spec": map[string]interface{}{"nodes": version.Nodes, "edges": version.Edges},
 	}
 
+	var cliCanvas models.Canvas
+	cliCanvas.APIVersion = "v1"
+	cliCanvas.Kind = "Canvas"
 	jsonBytes, _ := json.Marshal(canvasJSON)
 	json.Unmarshal(jsonBytes, &cliCanvas)
 
