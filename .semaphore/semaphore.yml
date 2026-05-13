@@ -16,6 +16,10 @@ promotions:
     pipeline_file: runner-binary-s3.yml
     auto_promote:
       when: "result = 'passed' and branch = 'main'"
+  - name: Deploy services
+    pipeline_file: deploy-services.yml
+    auto_promote:
+      when: "result = 'passed' and branch = 'main'"
 
 blocks:
   - name: Build and test
