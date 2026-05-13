@@ -12,7 +12,7 @@ services:
       DB_PORT: "5432"
       DB_NAME: "superplane_dev"
       DB_USERNAME: "postgres"
-      DB_POOL_SIZE: "2"
+      DB_POOL_SIZE: "20"
       DB_STATEMENT_TIMEOUT: ${DB_STATEMENT_TIMEOUT:-60s}
       DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT: ${DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT:-30s}
       POSTGRES_DB_SSL: "false"
@@ -69,8 +69,16 @@ services:
       GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
+      # Browser / links. For tunnels: match your public UI URL if you load the app through it.
       BASE_URL: ${BASE_URL:-http://localhost:8000}
+      # Runner + node webhooks: URLs sent to externals use this origin (must reach this process on PUBLIC_API_PORT).
+      # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL=https://<subdomain>.ngrok-free.app (no trailing slash).
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
+      # Task broker /v1 (Runner component). Base URL has no trailing slash.
+      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-}
+      TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
+      # Bearer; must match broker AUTH_TOKEN when auth is enabled
+      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-}
       ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
       AGENT_ENABLED: ${AGENT_ENABLED:-yes}
       AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://localhost:8090}
