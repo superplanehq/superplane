@@ -548,6 +548,7 @@ export function WorkflowPageV2() {
   const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(() => searchParams.get("run"));
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
+  const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
   const runApiFilters = useMemo(() => statusFiltersToApiFilters(runStatusFilters), [runStatusFilters]);
   const infiniteEventsQuery = useInfiniteCanvasEvents(canvasId!, isViewingLiveVersion);
@@ -1928,8 +1929,15 @@ export function WorkflowPageV2() {
       if (!nodeExecutionsMap[execution.nodeId]) {
         nodeExecutionsMap[execution.nodeId] = [];
       }
+      // selectedRun.executions are lightweight refs without `metadata` / `outputs`,
+      // so mappers that need approval records, pushThrough state, etc. can't render
+      // their interactive controls. Hydrate from the live store when available.
+      const fullExecution = visibleNodeExecutionsMap[execution.nodeId]?.find((e) => e.id === execution.id);
       nodeExecutionsMap[execution.nodeId].push({
+        ...(fullExecution || {}),
         ...execution,
+        ...(fullExecution?.metadata ? { metadata: fullExecution.metadata } : {}),
+        ...(fullExecution?.outputs ? { outputs: fullExecution.outputs } : {}),
         rootEvent: selectedRun.rootEvent,
       } as CanvasesCanvasNodeExecution);
     }
@@ -1970,6 +1978,7 @@ export function WorkflowPageV2() {
     canvasId,
     queryClient,
     me,
+    visibleNodeExecutionsMap,
   ]);
 
   const nodes = runCanvasData ? runCanvasData.nodes : nodesWithIntegrationStatus;
@@ -1981,6 +1990,20 @@ export function WorkflowPageV2() {
     runsViewportRef.current = undefined;
     lastRunsViewportKeyRef.current = runsViewportKey;
   }
+
+  const runCanvasNodeIdsKey = useMemo(() => {
+    if (!isRunsMode || !runCanvasData) return null;
+    return runCanvasData.nodes
+      .map((n) => n.id)
+      .sort()
+      .join("|");
+  }, [isRunsMode, runCanvasData]);
+
+  useEffect(() => {
+    if (!isRunsMode) return;
+    if (!runCanvasNodeIdsKey) return;
+    setRunsFitAllNonce((n) => n + 1);
+  }, [isRunsMode, runCanvasNodeIdsKey]);
 
   const getSidebarData = useCallback(
     (nodeId: string): SidebarData | null => {
@@ -5660,6 +5683,7 @@ export function WorkflowPageV2() {
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={isRunsMode ? runsViewportRef : viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
+          fitAllRequest={isRunsMode ? runsFitAllNonce : null}
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
