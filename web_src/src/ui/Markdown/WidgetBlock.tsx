@@ -16,7 +16,7 @@ import {
 
 import { useCanvasMemoryEntries, useInfiniteCanvasEvents, type CanvasMemoryEntry } from "@/hooks/useCanvasData";
 import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecutionRef } from "@/api-client";
-import { getAggregateRunStatus } from "@/pages/workflowv2/lib/canvas-runs";
+import { getAggregateStatus } from "@/pages/workflowv2/lib/canvas-runs";
 import { formatRelativeTime } from "@/lib/timezone";
 import { showSuccessToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
@@ -1027,7 +1027,7 @@ function indexExecutionsByNodeId(
 function eventToRow(event: CanvasesCanvasEventWithExecutions): ExecutionsRow {
   const executions = event.executions ?? [];
   const queueItems = event.queueItems ?? [];
-  const aggregate = getAggregateRunStatus(executions, queueItems.length > 0);
+  const aggregate = getAggregateStatus(executions);
   return {
     id: event.id || "",
     root: event,

@@ -1,3 +1,5 @@
+import { RepoTab } from "@/ui/RepoTab";
+import { LaunchpadView } from "./launchpad/LaunchpadView";
 import { Badge } from "@/components/ui/badge";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
@@ -547,6 +549,8 @@ export function WorkflowPageV2() {
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
+  const [isLaunchpadMode, setIsLaunchpadMode] = useState(() => searchParams.get("view") === "launchpad");
+  const [isRepoMode, setIsRepoMode] = useState(() => searchParams.get("view") === "repo");
   const [selectedRunId, setSelectedRunId] = useState<string | null>(() => searchParams.get("run"));
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
   const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
@@ -4933,6 +4937,8 @@ export function WorkflowPageV2() {
     (runId: string) => {
       setSelectedRunId(runId);
       setIsRunsMode(true);
+      setIsLaunchpadMode(false);
+      setIsRepoMode(false);
       setRunDetailNodeId(null);
       setSearchParams(
         (current) => {
@@ -4955,6 +4961,8 @@ export function WorkflowPageV2() {
     }
 
     setIsRunsMode(true);
+    setIsLaunchpadMode(false);
+    setIsRepoMode(false);
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
@@ -5007,8 +5015,16 @@ export function WorkflowPageV2() {
       handleExitRunsMode();
       return;
     }
+    if (isLaunchpadMode) {
+      setIsLaunchpadMode(false);
+      return;
+    }
+    if (isRepoMode) {
+      setIsRepoMode(false);
+      return;
+    }
     await handleToggleEditMode();
-  }, [handleExitRunsMode, handleToggleEditMode, isRunsMode]);
+  }, [handleExitRunsMode, handleToggleEditMode, isRunsMode, isLaunchpadMode, isRepoMode]);
 
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
@@ -5605,7 +5621,15 @@ export function WorkflowPageV2() {
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftGraphDiffVersusLive,
   });
   const activeRunsCount = runsData.runs.filter((run) => run.state === "STATE_STARTED").length;
-  const headerMode = isRunsMode ? "runs" : canvasMode === "edit" ? "version-edit" : "version-live";
+  const headerMode = isLaunchpadMode
+    ? "launchpad"
+    : isRunsMode
+      ? "runs"
+      : isRepoMode
+        ? "repo"
+        : canvasMode === "edit"
+          ? "version-edit"
+          : "version-live";
   const hasUnpublishedDraftChanges =
     !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftGraphDiffVersusLive;
   const canvasStateMode = hasEditableVersion
@@ -5742,7 +5766,27 @@ export function WorkflowPageV2() {
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
           onExitEditMode={handleExitEditModeFromHeader}
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
+          onSelectLaunchpad={() => { setIsLaunchpadMode(true); setIsRunsMode(false); setIsRepoMode(false); }}
+          onSelectRepo={() => { setIsRepoMode(true); setIsRunsMode(false); setIsLaunchpadMode(false); }}
           runsNotificationCount={activeRunsCount}
+          launchpadOverlay={
+            isLaunchpadMode ? (
+              <LaunchpadView
+                panels={[]}
+                layout={[]}
+                isLoading={false}
+                readOnly={!canUpdateCanvas || isTemplate}
+                canvasId={canvasId}
+                nodeRefs={{}}
+                onChange={() => {}}
+              />
+            ) : null
+          }
+          repoOverlay={
+            isRepoMode ? (
+              <RepoTab canvasId={canvasId!} canvasName={canvas?.metadata?.name || ""} organizationId={organizationId!} />
+            ) : null
+          }
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
