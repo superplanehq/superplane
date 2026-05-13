@@ -2,10 +2,8 @@
 -- PostgreSQL database dump
 --
 
-\restrict abcdef123
-
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.5 (Debian 17.5-1.pgdg130+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -27,7 +25,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 
 
 --
--- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: -
+-- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: 
 --
 
 COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
@@ -38,7 +36,7 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: account_magic_codes; Type: TABLE; Schema: public; Owner: -
+-- Name: account_magic_codes; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.account_magic_codes (
@@ -52,8 +50,10 @@ CREATE TABLE public.account_magic_codes (
 );
 
 
+ALTER TABLE public.account_magic_codes OWNER TO postgres;
+
 --
--- Name: account_password_auth; Type: TABLE; Schema: public; Owner: -
+-- Name: account_password_auth; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.account_password_auth (
@@ -65,8 +65,10 @@ CREATE TABLE public.account_password_auth (
 );
 
 
+ALTER TABLE public.account_password_auth OWNER TO postgres;
+
 --
--- Name: account_providers; Type: TABLE; Schema: public; Owner: -
+-- Name: account_providers; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.account_providers (
@@ -86,8 +88,10 @@ CREATE TABLE public.account_providers (
 );
 
 
+ALTER TABLE public.account_providers OWNER TO postgres;
+
 --
--- Name: accounts; Type: TABLE; Schema: public; Owner: -
+-- Name: accounts; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.accounts (
@@ -100,8 +104,45 @@ CREATE TABLE public.accounts (
 );
 
 
+ALTER TABLE public.accounts OWNER TO postgres;
+
 --
--- Name: app_installation_requests; Type: TABLE; Schema: public; Owner: -
+-- Name: agent_messages; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.agent_messages (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    session_id uuid NOT NULL,
+    role character varying(20) NOT NULL,
+    content text DEFAULT ''::text NOT NULL,
+    tool_call_id text,
+    tool_status character varying(20),
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.agent_messages OWNER TO postgres;
+
+--
+-- Name: agent_sessions; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.agent_sessions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
+    anthropic_session_id text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    api_token text,
+    api_token_expires_at timestamp with time zone
+);
+
+
+ALTER TABLE public.agent_sessions OWNER TO postgres;
+
+--
+-- Name: app_installation_requests; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.app_installation_requests (
@@ -116,8 +157,10 @@ CREATE TABLE public.app_installation_requests (
 );
 
 
+ALTER TABLE public.app_installation_requests OWNER TO postgres;
+
 --
--- Name: app_installation_secrets; Type: TABLE; Schema: public; Owner: -
+-- Name: app_installation_secrets; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.app_installation_secrets (
@@ -134,8 +177,10 @@ CREATE TABLE public.app_installation_secrets (
 );
 
 
+ALTER TABLE public.app_installation_secrets OWNER TO postgres;
+
 --
--- Name: app_installation_subscriptions; Type: TABLE; Schema: public; Owner: -
+-- Name: app_installation_subscriptions; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.app_installation_subscriptions (
@@ -149,8 +194,10 @@ CREATE TABLE public.app_installation_subscriptions (
 );
 
 
+ALTER TABLE public.app_installation_subscriptions OWNER TO postgres;
+
 --
--- Name: app_installations; Type: TABLE; Schema: public; Owner: -
+-- Name: app_installations; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.app_installations (
@@ -172,8 +219,10 @@ CREATE TABLE public.app_installations (
 );
 
 
+ALTER TABLE public.app_installations OWNER TO postgres;
+
 --
--- Name: blueprints; Type: TABLE; Schema: public; Owner: -
+-- Name: blueprints; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.blueprints (
@@ -193,8 +242,10 @@ CREATE TABLE public.blueprints (
 );
 
 
+ALTER TABLE public.blueprints OWNER TO postgres;
+
 --
--- Name: canvas_folders; Type: TABLE; Schema: public; Owner: -
+-- Name: canvas_folders; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.canvas_folders (
@@ -209,8 +260,10 @@ CREATE TABLE public.canvas_folders (
 );
 
 
+ALTER TABLE public.canvas_folders OWNER TO postgres;
+
 --
--- Name: canvas_memories; Type: TABLE; Schema: public; Owner: -
+-- Name: canvas_memories; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.canvas_memories (
@@ -223,12 +276,14 @@ CREATE TABLE public.canvas_memories (
 );
 
 
+ALTER TABLE public.canvas_memories OWNER TO postgres;
+
 --
--- Name: casbin_rule; Type: TABLE; Schema: public; Owner: -
+-- Name: casbin_rule; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.casbin_rule (
-    id integer NOT NULL,
+    id bigint NOT NULL,
     ptype character varying(100),
     v0 character varying(100),
     v1 character varying(100),
@@ -239,12 +294,13 @@ CREATE TABLE public.casbin_rule (
 );
 
 
+ALTER TABLE public.casbin_rule OWNER TO postgres;
+
 --
--- Name: casbin_rule_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+-- Name: casbin_rule_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
 --
 
 CREATE SEQUENCE public.casbin_rule_id_seq
-    AS integer
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -252,15 +308,17 @@ CREATE SEQUENCE public.casbin_rule_id_seq
     CACHE 1;
 
 
+ALTER SEQUENCE public.casbin_rule_id_seq OWNER TO postgres;
+
 --
--- Name: casbin_rule_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+-- Name: casbin_rule_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
 --
 
 ALTER SEQUENCE public.casbin_rule_id_seq OWNED BY public.casbin_rule.id;
 
 
 --
--- Name: data_migrations; Type: TABLE; Schema: public; Owner: -
+-- Name: data_migrations; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.data_migrations (
@@ -269,8 +327,10 @@ CREATE TABLE public.data_migrations (
 );
 
 
+ALTER TABLE public.data_migrations OWNER TO postgres;
+
 --
--- Name: email_settings; Type: TABLE; Schema: public; Owner: -
+-- Name: email_settings; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.email_settings (
@@ -288,8 +348,10 @@ CREATE TABLE public.email_settings (
 );
 
 
+ALTER TABLE public.email_settings OWNER TO postgres;
+
 --
--- Name: group_metadata; Type: TABLE; Schema: public; Owner: -
+-- Name: group_metadata; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.group_metadata (
@@ -304,8 +366,10 @@ CREATE TABLE public.group_metadata (
 );
 
 
+ALTER TABLE public.group_metadata OWNER TO postgres;
+
 --
--- Name: installation_metadata; Type: TABLE; Schema: public; Owner: -
+-- Name: installation_metadata; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.installation_metadata (
@@ -318,8 +382,10 @@ CREATE TABLE public.installation_metadata (
 );
 
 
+ALTER TABLE public.installation_metadata OWNER TO postgres;
+
 --
--- Name: organization_agent_settings; Type: TABLE; Schema: public; Owner: -
+-- Name: organization_agent_settings; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.organization_agent_settings (
@@ -339,8 +405,10 @@ CREATE TABLE public.organization_agent_settings (
 );
 
 
+ALTER TABLE public.organization_agent_settings OWNER TO postgres;
+
 --
--- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
+-- Name: organization_invitations; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.organization_invitations (
@@ -355,8 +423,10 @@ CREATE TABLE public.organization_invitations (
 );
 
 
+ALTER TABLE public.organization_invitations OWNER TO postgres;
+
 --
--- Name: organization_invite_links; Type: TABLE; Schema: public; Owner: -
+-- Name: organization_invite_links; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.organization_invite_links (
@@ -369,8 +439,10 @@ CREATE TABLE public.organization_invite_links (
 );
 
 
+ALTER TABLE public.organization_invite_links OWNER TO postgres;
+
 --
--- Name: organizations; Type: TABLE; Schema: public; Owner: -
+-- Name: organizations; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.organizations (
@@ -389,8 +461,10 @@ CREATE TABLE public.organizations (
 );
 
 
+ALTER TABLE public.organizations OWNER TO postgres;
+
 --
--- Name: role_metadata; Type: TABLE; Schema: public; Owner: -
+-- Name: role_metadata; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.role_metadata (
@@ -405,8 +479,10 @@ CREATE TABLE public.role_metadata (
 );
 
 
+ALTER TABLE public.role_metadata OWNER TO postgres;
+
 --
--- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
+-- Name: schema_migrations; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.schema_migrations (
@@ -415,8 +491,10 @@ CREATE TABLE public.schema_migrations (
 );
 
 
+ALTER TABLE public.schema_migrations OWNER TO postgres;
+
 --
--- Name: secrets; Type: TABLE; Schema: public; Owner: -
+-- Name: secrets; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.secrets (
@@ -432,8 +510,10 @@ CREATE TABLE public.secrets (
 );
 
 
+ALTER TABLE public.secrets OWNER TO postgres;
+
 --
--- Name: users; Type: TABLE; Schema: public; Owner: -
+-- Name: users; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.users (
@@ -452,8 +532,10 @@ CREATE TABLE public.users (
 );
 
 
+ALTER TABLE public.users OWNER TO postgres;
+
 --
--- Name: webhooks; Type: TABLE; Schema: public; Owner: -
+-- Name: webhooks; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.webhooks (
@@ -471,8 +553,10 @@ CREATE TABLE public.webhooks (
 );
 
 
+ALTER TABLE public.webhooks OWNER TO postgres;
+
 --
--- Name: workflow_change_request_approvals; Type: TABLE; Schema: public; Owner: -
+-- Name: workflow_change_request_approvals; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.workflow_change_request_approvals (
@@ -491,8 +575,10 @@ CREATE TABLE public.workflow_change_request_approvals (
 );
 
 
+ALTER TABLE public.workflow_change_request_approvals OWNER TO postgres;
+
 --
--- Name: workflow_change_requests; Type: TABLE; Schema: public; Owner: -
+-- Name: workflow_change_requests; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.workflow_change_requests (
@@ -512,8 +598,10 @@ CREATE TABLE public.workflow_change_requests (
 );
 
 
+ALTER TABLE public.workflow_change_requests OWNER TO postgres;
+
 --
--- Name: workflow_events; Type: TABLE; Schema: public; Owner: -
+-- Name: workflow_events; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.workflow_events (
@@ -530,8 +618,10 @@ CREATE TABLE public.workflow_events (
 );
 
 
+ALTER TABLE public.workflow_events OWNER TO postgres;
+
 --
--- Name: workflow_node_execution_kvs; Type: TABLE; Schema: public; Owner: -
+-- Name: workflow_node_execution_kvs; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.workflow_node_execution_kvs (
@@ -545,8 +635,10 @@ CREATE TABLE public.workflow_node_execution_kvs (
 );
 
 
+ALTER TABLE public.workflow_node_execution_kvs OWNER TO postgres;
+
 --
--- Name: workflow_node_executions; Type: TABLE; Schema: public; Owner: -
+-- Name: workflow_node_executions; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.workflow_node_executions (
@@ -570,8 +662,10 @@ CREATE TABLE public.workflow_node_executions (
 );
 
 
+ALTER TABLE public.workflow_node_executions OWNER TO postgres;
+
 --
--- Name: workflow_node_queue_items; Type: TABLE; Schema: public; Owner: -
+-- Name: workflow_node_queue_items; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.workflow_node_queue_items (
@@ -585,8 +679,10 @@ CREATE TABLE public.workflow_node_queue_items (
 );
 
 
+ALTER TABLE public.workflow_node_queue_items OWNER TO postgres;
+
 --
--- Name: workflow_node_requests; Type: TABLE; Schema: public; Owner: -
+-- Name: workflow_node_requests; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.workflow_node_requests (
@@ -603,8 +699,10 @@ CREATE TABLE public.workflow_node_requests (
 );
 
 
+ALTER TABLE public.workflow_node_requests OWNER TO postgres;
+
 --
--- Name: workflow_nodes; Type: TABLE; Schema: public; Owner: -
+-- Name: workflow_nodes; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.workflow_nodes (
@@ -628,8 +726,10 @@ CREATE TABLE public.workflow_nodes (
 );
 
 
+ALTER TABLE public.workflow_nodes OWNER TO postgres;
+
 --
--- Name: workflow_runs; Type: TABLE; Schema: public; Owner: -
+-- Name: workflow_runs; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.workflow_runs (
@@ -643,8 +743,10 @@ CREATE TABLE public.workflow_runs (
 );
 
 
+ALTER TABLE public.workflow_runs OWNER TO postgres;
+
 --
--- Name: workflow_versions; Type: TABLE; Schema: public; Owner: -
+-- Name: workflow_versions; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.workflow_versions (
@@ -664,8 +766,10 @@ CREATE TABLE public.workflow_versions (
 );
 
 
+ALTER TABLE public.workflow_versions OWNER TO postgres;
+
 --
--- Name: workflows; Type: TABLE; Schema: public; Owner: -
+-- Name: workflows; Type: TABLE; Schema: public; Owner: postgres
 --
 
 CREATE TABLE public.workflows (
@@ -682,15 +786,17 @@ CREATE TABLE public.workflows (
 );
 
 
+ALTER TABLE public.workflows OWNER TO postgres;
+
 --
--- Name: casbin_rule id; Type: DEFAULT; Schema: public; Owner: -
+-- Name: casbin_rule id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.casbin_rule ALTER COLUMN id SET DEFAULT nextval('public.casbin_rule_id_seq'::regclass);
 
 
 --
--- Name: account_magic_codes account_magic_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: account_magic_codes account_magic_codes_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.account_magic_codes
@@ -698,7 +804,7 @@ ALTER TABLE ONLY public.account_magic_codes
 
 
 --
--- Name: account_password_auth account_password_auth_account_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: account_password_auth account_password_auth_account_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.account_password_auth
@@ -706,7 +812,7 @@ ALTER TABLE ONLY public.account_password_auth
 
 
 --
--- Name: account_password_auth account_password_auth_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: account_password_auth account_password_auth_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.account_password_auth
@@ -714,7 +820,7 @@ ALTER TABLE ONLY public.account_password_auth
 
 
 --
--- Name: account_providers account_providers_account_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: account_providers account_providers_account_id_provider_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.account_providers
@@ -722,7 +828,7 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
--- Name: account_providers account_providers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: account_providers account_providers_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.account_providers
@@ -730,7 +836,7 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
--- Name: account_providers account_providers_provider_provider_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: account_providers account_providers_provider_provider_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.account_providers
@@ -738,7 +844,7 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
--- Name: accounts accounts_email_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: accounts accounts_email_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.accounts
@@ -746,7 +852,7 @@ ALTER TABLE ONLY public.accounts
 
 
 --
--- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: accounts accounts_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.accounts
@@ -754,7 +860,31 @@ ALTER TABLE ONLY public.accounts
 
 
 --
--- Name: app_installation_requests app_installation_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: agent_messages agent_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.agent_messages
+    ADD CONSTRAINT agent_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_sessions agent_sessions_organization_id_user_id_canvas_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.agent_sessions
+    ADD CONSTRAINT agent_sessions_organization_id_user_id_canvas_id_key UNIQUE (organization_id, user_id, canvas_id);
+
+
+--
+-- Name: agent_sessions agent_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.agent_sessions
+    ADD CONSTRAINT agent_sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: app_installation_requests app_installation_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_installation_requests
@@ -762,7 +892,7 @@ ALTER TABLE ONLY public.app_installation_requests
 
 
 --
--- Name: app_installation_secrets app_installation_secrets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: app_installation_secrets app_installation_secrets_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_installation_secrets
@@ -770,7 +900,7 @@ ALTER TABLE ONLY public.app_installation_secrets
 
 
 --
--- Name: app_installation_subscriptions app_installation_subscription_installation_id_workflow_id_n_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: app_installation_subscriptions app_installation_subscription_installation_id_workflow_id_n_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_installation_subscriptions
@@ -778,7 +908,7 @@ ALTER TABLE ONLY public.app_installation_subscriptions
 
 
 --
--- Name: app_installation_subscriptions app_installation_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: app_installation_subscriptions app_installation_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_installation_subscriptions
@@ -786,7 +916,7 @@ ALTER TABLE ONLY public.app_installation_subscriptions
 
 
 --
--- Name: app_installations app_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: app_installations app_installations_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_installations
@@ -794,7 +924,7 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
--- Name: blueprints blueprints_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: blueprints blueprints_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.blueprints
@@ -802,7 +932,7 @@ ALTER TABLE ONLY public.blueprints
 
 
 --
--- Name: blueprints blueprints_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: blueprints blueprints_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.blueprints
@@ -810,7 +940,7 @@ ALTER TABLE ONLY public.blueprints
 
 
 --
--- Name: canvas_folders canvas_folders_organization_id_title_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: canvas_folders canvas_folders_organization_id_title_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.canvas_folders
@@ -818,7 +948,7 @@ ALTER TABLE ONLY public.canvas_folders
 
 
 --
--- Name: canvas_folders canvas_folders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: canvas_folders canvas_folders_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.canvas_folders
@@ -826,7 +956,7 @@ ALTER TABLE ONLY public.canvas_folders
 
 
 --
--- Name: canvas_memories canvas_memories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: canvas_memories canvas_memories_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.canvas_memories
@@ -834,7 +964,7 @@ ALTER TABLE ONLY public.canvas_memories
 
 
 --
--- Name: casbin_rule casbin_rule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: casbin_rule casbin_rule_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.casbin_rule
@@ -842,7 +972,7 @@ ALTER TABLE ONLY public.casbin_rule
 
 
 --
--- Name: data_migrations data_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: data_migrations data_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.data_migrations
@@ -850,7 +980,7 @@ ALTER TABLE ONLY public.data_migrations
 
 
 --
--- Name: email_settings email_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: email_settings email_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.email_settings
@@ -858,7 +988,7 @@ ALTER TABLE ONLY public.email_settings
 
 
 --
--- Name: email_settings email_settings_provider_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: email_settings email_settings_provider_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.email_settings
@@ -866,7 +996,7 @@ ALTER TABLE ONLY public.email_settings
 
 
 --
--- Name: group_metadata group_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: group_metadata group_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.group_metadata
@@ -874,7 +1004,7 @@ ALTER TABLE ONLY public.group_metadata
 
 
 --
--- Name: installation_metadata installation_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: installation_metadata installation_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.installation_metadata
@@ -882,7 +1012,7 @@ ALTER TABLE ONLY public.installation_metadata
 
 
 --
--- Name: organization_agent_settings organization_agent_settings_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_agent_settings organization_agent_settings_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.organization_agent_settings
@@ -890,7 +1020,7 @@ ALTER TABLE ONLY public.organization_agent_settings
 
 
 --
--- Name: organization_agent_settings organization_agent_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_agent_settings organization_agent_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.organization_agent_settings
@@ -898,7 +1028,7 @@ ALTER TABLE ONLY public.organization_agent_settings
 
 
 --
--- Name: organization_invitations organization_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_invitations organization_invitations_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.organization_invitations
@@ -906,7 +1036,7 @@ ALTER TABLE ONLY public.organization_invitations
 
 
 --
--- Name: organization_invite_links organization_invite_links_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_invite_links organization_invite_links_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.organization_invite_links
@@ -914,7 +1044,7 @@ ALTER TABLE ONLY public.organization_invite_links
 
 
 --
--- Name: organization_invite_links organization_invite_links_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_invite_links organization_invite_links_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.organization_invite_links
@@ -922,7 +1052,7 @@ ALTER TABLE ONLY public.organization_invite_links
 
 
 --
--- Name: organization_invite_links organization_invite_links_token_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_invite_links organization_invite_links_token_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.organization_invite_links
@@ -930,7 +1060,7 @@ ALTER TABLE ONLY public.organization_invite_links
 
 
 --
--- Name: organizations organizations_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: organizations organizations_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.organizations
@@ -938,7 +1068,7 @@ ALTER TABLE ONLY public.organizations
 
 
 --
--- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: organizations organizations_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.organizations
@@ -946,7 +1076,7 @@ ALTER TABLE ONLY public.organizations
 
 
 --
--- Name: role_metadata role_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: role_metadata role_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.role_metadata
@@ -954,7 +1084,7 @@ ALTER TABLE ONLY public.role_metadata
 
 
 --
--- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.schema_migrations
@@ -962,7 +1092,7 @@ ALTER TABLE ONLY public.schema_migrations
 
 
 --
--- Name: secrets secrets_domain_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: secrets secrets_domain_id_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.secrets
@@ -970,7 +1100,7 @@ ALTER TABLE ONLY public.secrets
 
 
 --
--- Name: secrets secrets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: secrets secrets_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.secrets
@@ -978,7 +1108,7 @@ ALTER TABLE ONLY public.secrets
 
 
 --
--- Name: group_metadata uq_group_metadata_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: group_metadata uq_group_metadata_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.group_metadata
@@ -986,7 +1116,7 @@ ALTER TABLE ONLY public.group_metadata
 
 
 --
--- Name: role_metadata uq_role_metadata_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: role_metadata uq_role_metadata_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.role_metadata
@@ -994,7 +1124,7 @@ ALTER TABLE ONLY public.role_metadata
 
 
 --
--- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.users
@@ -1002,7 +1132,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: webhooks webhooks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: webhooks webhooks_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.webhooks
@@ -1010,7 +1140,7 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
--- Name: workflow_change_request_approvals workflow_change_request_approvals_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_change_request_approvals workflow_change_request_approvals_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_change_request_approvals
@@ -1018,7 +1148,7 @@ ALTER TABLE ONLY public.workflow_change_request_approvals
 
 
 --
--- Name: workflow_change_requests workflow_change_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_change_requests workflow_change_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_change_requests
@@ -1026,7 +1156,7 @@ ALTER TABLE ONLY public.workflow_change_requests
 
 
 --
--- Name: workflow_change_requests workflow_change_requests_workflow_version_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_change_requests workflow_change_requests_workflow_version_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_change_requests
@@ -1034,7 +1164,7 @@ ALTER TABLE ONLY public.workflow_change_requests
 
 
 --
--- Name: workflow_events workflow_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_events workflow_events_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_events
@@ -1042,7 +1172,7 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
--- Name: workflow_node_execution_kvs workflow_node_execution_kvs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_execution_kvs workflow_node_execution_kvs_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_execution_kvs
@@ -1050,7 +1180,7 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 
 
 --
--- Name: workflow_node_requests workflow_node_execution_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_requests workflow_node_execution_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_requests
@@ -1058,7 +1188,7 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 
 --
--- Name: workflow_node_executions workflow_node_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_executions workflow_node_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
@@ -1066,7 +1196,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
--- Name: workflow_node_queue_items workflow_node_queue_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_queue_items workflow_node_queue_items_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
@@ -1074,7 +1204,7 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 
 --
--- Name: workflow_nodes workflow_nodes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_nodes workflow_nodes_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_nodes
@@ -1082,7 +1212,7 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
--- Name: workflow_runs workflow_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_runs workflow_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_runs
@@ -1090,7 +1220,7 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
--- Name: workflow_versions workflow_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_versions workflow_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_versions
@@ -1098,7 +1228,7 @@ ALTER TABLE ONLY public.workflow_versions
 
 
 --
--- Name: workflows workflows_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflows workflows_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflows
@@ -1106,7 +1236,7 @@ ALTER TABLE ONLY public.workflows
 
 
 --
--- Name: workflows workflows_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: workflows workflows_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflows
@@ -1114,490 +1244,497 @@ ALTER TABLE ONLY public.workflows
 
 
 --
--- Name: idx_account_magic_codes_email; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_account_magic_codes_email; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_account_magic_codes_email ON public.account_magic_codes USING btree (email);
 
 
 --
--- Name: idx_account_magic_codes_email_code_hash; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_account_magic_codes_email_code_hash; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_account_magic_codes_email_code_hash ON public.account_magic_codes USING btree (email, code_hash);
 
 
 --
--- Name: idx_account_password_auth_account_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_account_password_auth_account_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_account_password_auth_account_id ON public.account_password_auth USING btree (account_id);
 
 
 --
--- Name: idx_account_providers_account_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_account_providers_account_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_account_providers_account_id ON public.account_providers USING btree (account_id);
 
 
 --
--- Name: idx_account_providers_provider; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_account_providers_provider; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_account_providers_provider ON public.account_providers USING btree (provider);
 
 
 --
--- Name: idx_app_installation_requests_installation_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_agent_messages_session_id; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_agent_messages_session_id ON public.agent_messages USING btree (session_id, created_at);
+
+
+--
+-- Name: idx_app_installation_requests_installation_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_app_installation_requests_installation_id ON public.app_installation_requests USING btree (app_installation_id);
 
 
 --
--- Name: idx_app_installation_requests_state_run_at; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_app_installation_requests_state_run_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_app_installation_requests_state_run_at ON public.app_installation_requests USING btree (state, run_at) WHERE ((state)::text = 'pending'::text);
 
 
 --
--- Name: idx_app_installation_secrets_installation_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_app_installation_secrets_installation_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_app_installation_secrets_installation_id ON public.app_installation_secrets USING btree (installation_id);
 
 
 --
--- Name: idx_app_installation_secrets_organization_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_app_installation_secrets_organization_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_app_installation_secrets_organization_id ON public.app_installation_secrets USING btree (organization_id);
 
 
 --
--- Name: idx_app_installation_subscriptions_installation; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_app_installation_subscriptions_installation; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_app_installation_subscriptions_installation ON public.app_installation_subscriptions USING btree (installation_id);
 
 
 --
--- Name: idx_app_installation_subscriptions_node; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_app_installation_subscriptions_node; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_app_installation_subscriptions_node ON public.app_installation_subscriptions USING btree (workflow_id, node_id);
 
 
 --
--- Name: idx_app_installation_subscriptions_workflow; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_app_installation_subscriptions_workflow; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_app_installation_subscriptions_workflow ON public.app_installation_subscriptions USING btree (workflow_id);
 
 
 --
--- Name: idx_app_installations_deleted_at; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_app_installations_deleted_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_app_installations_deleted_at ON public.app_installations USING btree (deleted_at);
 
 
 --
--- Name: idx_app_installations_org_name_unique; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_app_installations_org_name_unique; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX idx_app_installations_org_name_unique ON public.app_installations USING btree (organization_id, installation_name);
 
 
 --
--- Name: idx_app_installations_organization_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_app_installations_organization_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_app_installations_organization_id ON public.app_installations USING btree (organization_id);
 
 
 --
--- Name: idx_blueprints_organization_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_blueprints_organization_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (organization_id);
 
 
 --
--- Name: idx_canvas_folders_organization_id_title; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_canvas_folders_organization_id_title; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_canvas_folders_organization_id_title ON public.canvas_folders USING btree (organization_id, title);
 
 
 --
--- Name: idx_canvas_memories_canvas_namespace; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_canvas_memories_canvas_namespace; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USING btree (canvas_id, namespace);
 
 
 --
--- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_casbin_rule; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX idx_casbin_rule ON public.casbin_rule USING btree (ptype, v0, v1, v2, v3, v4, v5);
 
 
 --
--- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_casbin_rule_ptype; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_casbin_rule_ptype ON public.casbin_rule USING btree (ptype);
 
 
 --
--- Name: idx_casbin_rule_v0; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_casbin_rule_v0; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_casbin_rule_v0 ON public.casbin_rule USING btree (v0);
 
 
 --
--- Name: idx_casbin_rule_v1; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_casbin_rule_v1; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_casbin_rule_v1 ON public.casbin_rule USING btree (v1);
 
 
 --
--- Name: idx_casbin_rule_v2; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_casbin_rule_v2; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_casbin_rule_v2 ON public.casbin_rule USING btree (v2);
 
 
 --
--- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_group_metadata_lookup; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (group_name, domain_type, domain_id);
 
 
 --
--- Name: idx_node_requests_state_run_at; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_node_requests_state_run_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_node_requests_state_run_at ON public.workflow_node_requests USING btree (state, run_at) WHERE ((state)::text = 'pending'::text);
 
 
 --
--- Name: idx_organization_agent_settings_organization_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_organization_agent_settings_organization_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_organization_agent_settings_organization_id ON public.organization_agent_settings USING btree (organization_id);
 
 
 --
--- Name: idx_organizations_deleted_at; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_organizations_deleted_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (deleted_at);
 
 
 --
--- Name: idx_role_metadata_lookup; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_role_metadata_lookup; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_role_metadata_lookup ON public.role_metadata USING btree (role_name, domain_type, domain_id);
 
 
 --
--- Name: idx_webhooks_app_installation_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_webhooks_app_installation_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_webhooks_app_installation_id ON public.webhooks USING btree (app_installation_id);
 
 
 --
--- Name: idx_webhooks_deleted_at; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_webhooks_deleted_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_webhooks_deleted_at ON public.webhooks USING btree (deleted_at);
 
 
 --
--- Name: idx_workflow_change_request_approvals_active; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_change_request_approvals_active; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_change_request_approvals_active ON public.workflow_change_request_approvals USING btree (workflow_change_request_id, invalidated_at, approver_index);
 
 
 --
--- Name: idx_workflow_change_request_approvals_change_request; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_change_request_approvals_change_request; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_change_request_approvals_change_request ON public.workflow_change_request_approvals USING btree (workflow_change_request_id, created_at DESC);
 
 
 --
--- Name: idx_workflow_change_requests_based_on_version; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_change_requests_based_on_version; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_change_requests_based_on_version ON public.workflow_change_requests USING btree (workflow_id, based_on_version_id);
 
 
 --
--- Name: idx_workflow_change_requests_owner; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_change_requests_owner; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_change_requests_owner ON public.workflow_change_requests USING btree (owner_id);
 
 
 --
--- Name: idx_workflow_change_requests_status; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_change_requests_status; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_change_requests_status ON public.workflow_change_requests USING btree (workflow_id, status, created_at DESC);
 
 
 --
--- Name: idx_workflow_change_requests_workflow_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_change_requests_workflow_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_change_requests_workflow_id ON public.workflow_change_requests USING btree (workflow_id);
 
 
 --
--- Name: idx_workflow_events_execution_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_events_execution_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_events_execution_id ON public.workflow_events USING btree (execution_id);
 
 
 --
--- Name: idx_workflow_events_run_id_state; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_events_run_id_state; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_events_run_id_state ON public.workflow_events USING btree (run_id, state);
 
 
 --
--- Name: idx_workflow_events_state; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_events_state; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_events_state ON public.workflow_events USING btree (state);
 
 
 --
--- Name: idx_workflow_events_workflow_node_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_events_workflow_node_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_events_workflow_node_id ON public.workflow_events USING btree (workflow_id, node_id);
 
 
 --
--- Name: idx_workflow_node_execution_kvs_ekv; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_execution_kvs_ekv; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_execution_kvs_ekv ON public.workflow_node_execution_kvs USING btree (execution_id, key, value);
 
 
 --
--- Name: idx_workflow_node_execution_kvs_workflow_node_key_value; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_execution_kvs_workflow_node_key_value; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_execution_kvs_workflow_node_key_value ON public.workflow_node_execution_kvs USING btree (workflow_id, node_id, key, value);
 
 
 --
--- Name: idx_workflow_node_executions_event_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_executions_event_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_executions_event_id ON public.workflow_node_executions USING btree (event_id);
 
 
 --
--- Name: idx_workflow_node_executions_parent_execution_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_executions_parent_execution_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_executions_parent_execution_id ON public.workflow_node_executions USING btree (parent_execution_id);
 
 
 --
--- Name: idx_workflow_node_executions_parent_state; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_executions_parent_state; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_executions_parent_state ON public.workflow_node_executions USING btree (parent_execution_id, state);
 
 
 --
--- Name: idx_workflow_node_executions_previous_execution_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_executions_previous_execution_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_executions_previous_execution_id ON public.workflow_node_executions USING btree (previous_execution_id);
 
 
 --
--- Name: idx_workflow_node_executions_root_event_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_executions_root_event_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_executions_root_event_id ON public.workflow_node_executions USING btree (root_event_id);
 
 
 --
--- Name: idx_workflow_node_executions_run_id_state; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_executions_run_id_state; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_executions_run_id_state ON public.workflow_node_executions USING btree (run_id, state);
 
 
 --
--- Name: idx_workflow_node_executions_state_created_at; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_executions_state_created_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_executions_state_created_at ON public.workflow_node_executions USING btree (state, created_at DESC);
 
 
 --
--- Name: idx_workflow_node_executions_workflow_node_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_executions_workflow_node_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_executions_workflow_node_id ON public.workflow_node_executions USING btree (workflow_id, node_id);
 
 
 --
--- Name: idx_workflow_node_installation_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_installation_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_installation_id ON public.workflow_nodes USING btree (app_installation_id);
 
 
 --
--- Name: idx_workflow_node_queue_items_root_event_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_queue_items_root_event_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_queue_items_root_event_id ON public.workflow_node_queue_items USING btree (root_event_id);
 
 
 --
--- Name: idx_workflow_node_queue_items_run_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_queue_items_run_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_queue_items_run_id ON public.workflow_node_queue_items USING btree (run_id);
 
 
 --
--- Name: idx_workflow_node_requests_execution_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_node_requests_execution_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_node_requests_execution_id ON public.workflow_node_requests USING btree (execution_id);
 
 
 --
--- Name: idx_workflow_nodes_deleted_at; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_nodes_deleted_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_nodes_deleted_at ON public.workflow_nodes USING btree (deleted_at);
 
 
 --
--- Name: idx_workflow_nodes_parent; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_nodes_parent; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_nodes_parent ON public.workflow_nodes USING btree (workflow_id, parent_node_id);
 
 
 --
--- Name: idx_workflow_nodes_state; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_nodes_state; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (state);
 
 
 --
--- Name: idx_workflow_runs_workflow_created_at; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_runs_workflow_created_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_runs_workflow_created_at ON public.workflow_runs USING btree (workflow_id, created_at DESC);
 
 
 --
--- Name: idx_workflow_runs_workflow_state; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_runs_workflow_state; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_runs_workflow_state ON public.workflow_runs USING btree (workflow_id, state);
 
 
 --
--- Name: idx_workflow_versions_owner; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_versions_owner; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_versions_owner ON public.workflow_versions USING btree (owner_id);
 
 
 --
--- Name: idx_workflow_versions_unique_draft; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_versions_unique_draft; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX idx_workflow_versions_unique_draft ON public.workflow_versions USING btree (workflow_id, owner_id) WHERE ((state)::text = 'draft'::text);
 
 
 --
--- Name: idx_workflow_versions_workflow_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflow_versions_workflow_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflow_versions_workflow_id ON public.workflow_versions USING btree (workflow_id);
 
 
 --
--- Name: idx_workflows_deleted_at; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflows_deleted_at; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflows_deleted_at ON public.workflows USING btree (deleted_at);
 
 
 --
--- Name: idx_workflows_folder_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflows_folder_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflows_folder_id ON public.workflows USING btree (folder_id);
 
 
 --
--- Name: idx_workflows_is_template; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflows_is_template; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflows_is_template ON public.workflows USING btree (is_template);
 
 
 --
--- Name: idx_workflows_live_version_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflows_live_version_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflows_live_version_id ON public.workflows USING btree (live_version_id);
 
 
 --
--- Name: idx_workflows_organization_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_workflows_organization_id; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (organization_id);
 
 
 --
--- Name: unique_human_user_in_organization; Type: INDEX; Schema: public; Owner: -
+-- Name: unique_human_user_in_organization; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX unique_human_user_in_organization ON public.users USING btree (organization_id, account_id, email) WHERE ((type)::text = 'human'::text);
 
 
 --
--- Name: unique_service_account_in_organization; Type: INDEX; Schema: public; Owner: -
+-- Name: unique_service_account_in_organization; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE UNIQUE INDEX unique_service_account_in_organization ON public.users USING btree (organization_id, name) WHERE ((type)::text = 'service_account'::text);
 
 
 --
--- Name: account_password_auth account_password_auth_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: account_password_auth account_password_auth_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.account_password_auth
@@ -1605,7 +1742,7 @@ ALTER TABLE ONLY public.account_password_auth
 
 
 --
--- Name: account_providers account_providers_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: account_providers account_providers_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.account_providers
@@ -1613,7 +1750,15 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
--- Name: app_installation_requests app_installation_requests_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: agent_messages agent_messages_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.agent_messages
+    ADD CONSTRAINT agent_messages_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.agent_sessions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: app_installation_requests app_installation_requests_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_installation_requests
@@ -1621,7 +1766,7 @@ ALTER TABLE ONLY public.app_installation_requests
 
 
 --
--- Name: app_installation_secrets app_installation_secrets_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: app_installation_secrets app_installation_secrets_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_installation_secrets
@@ -1629,7 +1774,7 @@ ALTER TABLE ONLY public.app_installation_secrets
 
 
 --
--- Name: app_installation_secrets app_installation_secrets_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: app_installation_secrets app_installation_secrets_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_installation_secrets
@@ -1637,7 +1782,7 @@ ALTER TABLE ONLY public.app_installation_secrets
 
 
 --
--- Name: app_installation_subscriptions app_installation_subscriptions_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: app_installation_subscriptions app_installation_subscriptions_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_installation_subscriptions
@@ -1645,7 +1790,7 @@ ALTER TABLE ONLY public.app_installation_subscriptions
 
 
 --
--- Name: app_installation_subscriptions app_installation_subscriptions_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: app_installation_subscriptions app_installation_subscriptions_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_installation_subscriptions
@@ -1653,7 +1798,7 @@ ALTER TABLE ONLY public.app_installation_subscriptions
 
 
 --
--- Name: app_installation_subscriptions app_installation_subscriptions_workflow_id_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: app_installation_subscriptions app_installation_subscriptions_workflow_id_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_installation_subscriptions
@@ -1661,7 +1806,7 @@ ALTER TABLE ONLY public.app_installation_subscriptions
 
 
 --
--- Name: app_installations app_installations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: app_installations app_installations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.app_installations
@@ -1669,7 +1814,7 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
--- Name: canvas_folders canvas_folders_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: canvas_folders canvas_folders_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.canvas_folders
@@ -1677,7 +1822,7 @@ ALTER TABLE ONLY public.canvas_folders
 
 
 --
--- Name: canvas_memories canvas_memories_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: canvas_memories canvas_memories_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.canvas_memories
@@ -1685,7 +1830,7 @@ ALTER TABLE ONLY public.canvas_memories
 
 
 --
--- Name: workflow_node_execution_kvs fk_wnek_workflow; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_execution_kvs fk_wnek_workflow; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_execution_kvs
@@ -1693,7 +1838,7 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 
 
 --
--- Name: workflow_node_execution_kvs fk_wnek_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_execution_kvs fk_wnek_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_execution_kvs
@@ -1701,7 +1846,7 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 
 
 --
--- Name: workflow_events fk_workflow_events_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_events fk_workflow_events_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_events
@@ -1709,7 +1854,7 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
--- Name: workflow_node_executions fk_workflow_node_executions_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_executions fk_workflow_node_executions_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
@@ -1717,7 +1862,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
--- Name: workflow_node_queue_items fk_workflow_node_queue_items_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_queue_items fk_workflow_node_queue_items_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
@@ -1725,7 +1870,7 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 
 --
--- Name: workflow_node_requests fk_workflow_node_requests_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_requests fk_workflow_node_requests_workflow_node; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_requests
@@ -1733,7 +1878,7 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 
 --
--- Name: workflow_nodes fk_workflow_nodes_parent; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_nodes fk_workflow_nodes_parent; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_nodes
@@ -1741,7 +1886,7 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
--- Name: organization_agent_settings organization_agent_settings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_agent_settings organization_agent_settings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.organization_agent_settings
@@ -1749,7 +1894,7 @@ ALTER TABLE ONLY public.organization_agent_settings
 
 
 --
--- Name: organization_agent_settings organization_agent_settings_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_agent_settings organization_agent_settings_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.organization_agent_settings
@@ -1757,7 +1902,7 @@ ALTER TABLE ONLY public.organization_agent_settings
 
 
 --
--- Name: organization_invitations organization_invitations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_invitations organization_invitations_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.organization_invitations
@@ -1765,7 +1910,7 @@ ALTER TABLE ONLY public.organization_invitations
 
 
 --
--- Name: organization_invite_links organization_invite_links_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: organization_invite_links organization_invite_links_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.organization_invite_links
@@ -1773,7 +1918,7 @@ ALTER TABLE ONLY public.organization_invite_links
 
 
 --
--- Name: users users_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: users users_account_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.users
@@ -1781,7 +1926,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: users users_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: users users_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.users
@@ -1789,7 +1934,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: users users_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: users users_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.users
@@ -1797,7 +1942,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: webhooks webhooks_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: webhooks webhooks_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.webhooks
@@ -1805,7 +1950,7 @@ ALTER TABLE ONLY public.webhooks
 
 
 --
--- Name: workflow_change_request_approvals workflow_change_request_approvals_actor_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_change_request_approvals workflow_change_request_approvals_actor_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_change_request_approvals
@@ -1813,7 +1958,7 @@ ALTER TABLE ONLY public.workflow_change_request_approvals
 
 
 --
--- Name: workflow_change_request_approvals workflow_change_request_approvals_approver_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_change_request_approvals workflow_change_request_approvals_approver_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_change_request_approvals
@@ -1821,7 +1966,7 @@ ALTER TABLE ONLY public.workflow_change_request_approvals
 
 
 --
--- Name: workflow_change_request_approvals workflow_change_request_approvals_change_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_change_request_approvals workflow_change_request_approvals_change_request_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_change_request_approvals
@@ -1829,7 +1974,7 @@ ALTER TABLE ONLY public.workflow_change_request_approvals
 
 
 --
--- Name: workflow_change_request_approvals workflow_change_request_approvals_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_change_request_approvals workflow_change_request_approvals_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_change_request_approvals
@@ -1837,7 +1982,7 @@ ALTER TABLE ONLY public.workflow_change_request_approvals
 
 
 --
--- Name: workflow_change_requests workflow_change_requests_based_on_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_change_requests workflow_change_requests_based_on_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_change_requests
@@ -1845,7 +1990,7 @@ ALTER TABLE ONLY public.workflow_change_requests
 
 
 --
--- Name: workflow_change_requests workflow_change_requests_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_change_requests workflow_change_requests_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_change_requests
@@ -1853,7 +1998,7 @@ ALTER TABLE ONLY public.workflow_change_requests
 
 
 --
--- Name: workflow_change_requests workflow_change_requests_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_change_requests workflow_change_requests_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_change_requests
@@ -1861,7 +2006,7 @@ ALTER TABLE ONLY public.workflow_change_requests
 
 
 --
--- Name: workflow_change_requests workflow_change_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_change_requests workflow_change_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_change_requests
@@ -1869,7 +2014,7 @@ ALTER TABLE ONLY public.workflow_change_requests
 
 
 --
--- Name: workflow_events workflow_events_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_events workflow_events_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_events
@@ -1877,7 +2022,7 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
--- Name: workflow_events workflow_events_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_events workflow_events_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_events
@@ -1885,7 +2030,7 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
--- Name: workflow_events workflow_events_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_events workflow_events_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_events
@@ -1893,7 +2038,7 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
--- Name: workflow_node_execution_kvs workflow_node_execution_kvs_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_execution_kvs workflow_node_execution_kvs_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_execution_kvs
@@ -1901,7 +2046,7 @@ ALTER TABLE ONLY public.workflow_node_execution_kvs
 
 
 --
--- Name: workflow_node_executions workflow_node_executions_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_executions workflow_node_executions_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
@@ -1909,7 +2054,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
--- Name: workflow_node_executions workflow_node_executions_parent_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_executions workflow_node_executions_parent_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
@@ -1917,7 +2062,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
--- Name: workflow_node_executions workflow_node_executions_previous_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_executions workflow_node_executions_previous_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
@@ -1925,7 +2070,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
--- Name: workflow_node_executions workflow_node_executions_root_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_executions workflow_node_executions_root_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
@@ -1933,7 +2078,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
--- Name: workflow_node_executions workflow_node_executions_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_executions workflow_node_executions_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
@@ -1941,7 +2086,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
--- Name: workflow_node_executions workflow_node_executions_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_executions workflow_node_executions_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_executions
@@ -1949,7 +2094,7 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
--- Name: workflow_node_queue_items workflow_node_queue_items_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_queue_items workflow_node_queue_items_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
@@ -1957,7 +2102,7 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 
 --
--- Name: workflow_node_queue_items workflow_node_queue_items_root_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_queue_items workflow_node_queue_items_root_event_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
@@ -1965,7 +2110,7 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 
 --
--- Name: workflow_node_queue_items workflow_node_queue_items_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_queue_items workflow_node_queue_items_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
@@ -1973,7 +2118,7 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 
 --
--- Name: workflow_node_queue_items workflow_node_queue_items_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_queue_items workflow_node_queue_items_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_queue_items
@@ -1981,7 +2126,7 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 
 --
--- Name: workflow_node_requests workflow_node_requests_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_requests workflow_node_requests_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_requests
@@ -1989,7 +2134,7 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 
 --
--- Name: workflow_node_requests workflow_node_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_node_requests workflow_node_requests_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_node_requests
@@ -1997,7 +2142,7 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 
 --
--- Name: workflow_nodes workflow_nodes_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_nodes workflow_nodes_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_nodes
@@ -2005,7 +2150,7 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
--- Name: workflow_nodes workflow_nodes_webhook_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_nodes workflow_nodes_webhook_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_nodes
@@ -2013,7 +2158,7 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
--- Name: workflow_nodes workflow_nodes_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_nodes workflow_nodes_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_nodes
@@ -2021,7 +2166,7 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
--- Name: workflow_runs workflow_runs_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_runs workflow_runs_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_runs
@@ -2029,7 +2174,7 @@ ALTER TABLE ONLY public.workflow_runs
 
 
 --
--- Name: workflow_versions workflow_versions_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_versions workflow_versions_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_versions
@@ -2037,7 +2182,7 @@ ALTER TABLE ONLY public.workflow_versions
 
 
 --
--- Name: workflow_versions workflow_versions_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflow_versions workflow_versions_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflow_versions
@@ -2045,7 +2190,7 @@ ALTER TABLE ONLY public.workflow_versions
 
 
 --
--- Name: workflows workflows_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflows workflows_folder_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflows
@@ -2053,7 +2198,7 @@ ALTER TABLE ONLY public.workflows
 
 
 --
--- Name: workflows workflows_live_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: workflows workflows_live_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.workflows
@@ -2063,78 +2208,4 @@ ALTER TABLE ONLY public.workflows
 --
 -- PostgreSQL database dump complete
 --
-
-\unrestrict abcdef123
-
---
--- PostgreSQL database dump
---
-
-\restrict abcdef123
-
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
-
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
-
---
--- Data for Name: schema_migrations; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.schema_migrations (version, dirty) FROM stdin;
-20260512125440	f
-\.
-
-
---
--- PostgreSQL database dump complete
---
-
-\unrestrict abcdef123
-
---
--- PostgreSQL database dump
---
-
-\restrict abcdef123
-
--- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
-
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
-
---
--- Data for Name: data_migrations; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.data_migrations (version, dirty) FROM stdin;
-20260417035041	f
-\.
-
-
---
--- PostgreSQL database dump complete
---
-
-\unrestrict abcdef123
 
