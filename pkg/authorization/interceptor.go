@@ -157,7 +157,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 
 		// Agent rules
 		pbAgents.Agents_CreateAgentChat_FullMethodName:       {Resource: "agents", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbAgents.Agents_ResumeAgentChat_FullMethodName:       {Resource: "agents", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbAgents.Agents_SendAgentChatMessage_FullMethodName:  {Resource: "agents", Action: "create", DomainType: models.DomainTypeOrganization},
 		pbAgents.Agents_ListAgentChats_FullMethodName:        {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbAgents.Agents_DescribeAgentChat_FullMethodName:     {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbAgents.Agents_ListAgentChatMessages_FullMethodName: {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
