@@ -22,7 +22,7 @@ blocks:
           commands:
             - checkout
             - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-            - printf '%s' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy.pem && chmod 600 ~/.ssh/deploy.pem
+            - echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/deploy.pem && chmod 600 ~/.ssh/deploy.pem
             - export SSH_KEY=~/.ssh/deploy.pem
             - export SSH_HOST=13.220.51.216
             - export AUTH_TOKEN="$FLEET_AUTH_TOKEN"
@@ -39,7 +39,7 @@ blocks:
           commands:
             - checkout
             - mkdir -p ~/.ssh && chmod 700 ~/.ssh
-            - printf '%s' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy.pem && chmod 600 ~/.ssh/deploy.pem
+            - echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/deploy.pem && chmod 600 ~/.ssh/deploy.pem
             - export SSH_KEY=~/.ssh/deploy.pem
             - export SSH_HOST=98.91.210.215
             - export AUTH_TOKEN="$TASK_BROKER_AUTH_TOKEN"
