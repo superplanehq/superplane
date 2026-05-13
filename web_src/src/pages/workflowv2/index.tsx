@@ -103,7 +103,6 @@ import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasMemoryModal } from "./CanvasMemoryModal";
-import { CanvasReadmeModal } from "./CanvasReadmeModal";
 import { LaunchpadView } from "./launchpad/LaunchpadView";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
@@ -6105,7 +6104,7 @@ export function WorkflowPageV2() {
           hideAddControls={isTemplate}
           memoryItemCount={canvasMemoryEntries.length}
           onMemoryOpen={() => setIsMemoryViewModalOpen(true)}
-          onReadmeOpen={() => setIsReadmeModalOpen(true)}
+          
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           nodes={nodes}
           edges={runViewEdges}
@@ -6386,28 +6385,7 @@ export function WorkflowPageV2() {
         }
         deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
       />
-      <CanvasReadmeModal
-        open={isReadmeModalOpen}
-        onOpenChange={setIsReadmeModalOpen}
-        mode={readmeMode}
-        changeManagementEnabled={readmeChangeManagementEnabled}
-        liveContent={liveReadmeQuery.data?.content ?? ""}
-        draftContent={draftReadmeQuery.data?.content ?? ""}
-        isLoadingLive={liveReadmeQuery.isLoading}
-        isLoadingDraft={readmeMode === "edit" && draftReadmeQuery.isLoading}
-        isSavingDraft={updateCanvasReadmeMutation.isPending}
-        isCreatingChangeRequest={createCanvasChangeRequestMutation.isPending}
-        nodes={readmeNodesBySlug}
-        icons={readmeIconsBySlug}
-        details={readmeNodeDetailsBySlug}
-        linkFor={linkForReadmeNode}
-        onNodeClick={handleReadmeNodeChipClick}
-        triggerTemplates={readmeTriggerTemplatesBySlug}
-        onTriggerTemplateRun={!canUpdateCanvas || isTemplate || runDisabled ? undefined : handleTriggerTemplateRun}
-        nodeStatuses={readmeNodeStatusBySlug}
-        onSaveDraft={handleReadmeSaveDraft}
-        onCreateChangeRequest={handleReadmeCreateChangeRequest}
-      />
+      {/* Readme modal removed — docs live in the Repo tab */}
       {resolvingConflictChangeRequest ? (
         <div className="fixed inset-0 z-[100] min-h-0 bg-slate-50">
           <CanvasChangeRequestConflictResolver

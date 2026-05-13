@@ -76,7 +76,8 @@ func (s *Server) BootstrapFromAPI(slug, canvasID, orgID, baseURL, token string) 
 	if err != nil {
 		log.Warnf("gitserver: failed to export readme: %v", err)
 	} else if readme != "" {
-		os.WriteFile(filepath.Join(workDir, "README.md"), []byte(readme), 0644)
+		os.MkdirAll(filepath.Join(workDir, "docs"), 0755)
+		os.WriteFile(filepath.Join(workDir, "docs", "README.md"), []byte(readme), 0644)
 	}
 
 	// 3. Write .superplane.yaml
@@ -249,7 +250,8 @@ func (s *Server) BootstrapFromDB(slug, canvasID, orgID string) error {
 	if err != nil {
 		log.Warnf("gitserver: failed to read readme: %v", err)
 	} else if readme != "" {
-		os.WriteFile(filepath.Join(workDir, "README.md"), []byte(readme), 0644)
+		os.MkdirAll(filepath.Join(workDir, "docs"), 0755)
+		os.WriteFile(filepath.Join(workDir, "docs", "README.md"), []byte(readme), 0644)
 	}
 
 	// Export launchpad panels

@@ -30,16 +30,9 @@ type SlugResolver func(slug string, repoPath string) (*SlugToCanvasMapping, erro
 func APISyncHandler(baseURL string, tokenFunc func() string, resolver SlugResolver) *SyncHandler {
 	return &SyncHandler{
 		UpdateReadme: func(slug string, content string) error {
-			mapping, err := resolver(slug, "")
-			if err != nil {
-				return fmt.Errorf("failed to resolve slug %s: %w", slug, err)
-			}
-
-			MarkSyncActive(mapping.CanvasID)
-			defer MarkSyncDone(mapping.CanvasID)
-
-			client := &APIClient{BaseURL: baseURL, Token: tokenFunc()}
-			return client.UpdateReadme(mapping.CanvasID, content)
+			// Deprecated: readme lives in git, no longer synced to DB
+			log.Infof("git-sync: readme change detected for %s (not syncing to DB — git is source of truth)", slug)
+			return nil
 		},
 		UpdateCanvas: func(slug string, yamlContent []byte) error {
 			mapping, err := resolver(slug, "")

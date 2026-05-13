@@ -167,7 +167,8 @@ func (rs *ReverseSync) commitCurrentState(slug, canvasID, userName string) error
 	if err != nil {
 		log.Warnf("git-reverse-sync: failed to read readme: %v", err)
 	} else if readme != "" {
-		os.WriteFile(filepath.Join(workDir, "README.md"), []byte(readme), 0644)
+		os.MkdirAll(filepath.Join(workDir, "docs"), 0755)
+		os.WriteFile(filepath.Join(workDir, "docs", "README.md"), []byte(readme), 0644)
 	}
 
 	// Export launchpad panels as apps/<panel-id>.md + apps/_layout.json

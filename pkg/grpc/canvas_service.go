@@ -416,13 +416,13 @@ func (s *CanvasService) DeleteCanvasMemory(ctx context.Context, req *pb.DeleteCa
 }
 
 func (s *CanvasService) GetCanvasReadme(ctx context.Context, req *pb.GetCanvasReadmeRequest) (*pb.GetCanvasReadmeResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.GetCanvasReadme(ctx, organizationID, req.CanvasId, req.VersionId)
+	// Deprecated: readme now lives in the git repo (docs/README.md)
+	return &pb.GetCanvasReadmeResponse{Content: "README has moved to the Repo tab (docs/README.md)"}, nil
 }
 
 func (s *CanvasService) UpdateCanvasReadme(ctx context.Context, req *pb.UpdateCanvasReadmeRequest) (*pb.UpdateCanvasReadmeResponse, error) {
-	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.UpdateCanvasReadme(ctx, organizationID, req.CanvasId, req.VersionId, req.Content)
+	// Deprecated: readme now lives in the git repo (docs/README.md)
+	return nil, status.Error(codes.Unimplemented, "UpdateCanvasReadme is deprecated — edit docs/README.md in the Repo tab or via git")
 }
 
 func (s *CanvasService) GetCanvasLaunchpad(ctx context.Context, req *pb.GetCanvasLaunchpadRequest) (*pb.GetCanvasLaunchpadResponse, error) {

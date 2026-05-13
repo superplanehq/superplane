@@ -56,9 +56,12 @@ func (h *SyncHandler) HandlePush(slug string, repoPath string) error {
 		}
 	}
 
-	// 2. README
+	// 2. README (prefer docs/README.md, fall back to root README.md)
 	if h.UpdateReadme != nil {
-		readmePath := filepath.Join(workDir, "README.md")
+		readmePath := filepath.Join(workDir, "docs", "README.md")
+		if _, err := os.Stat(readmePath); os.IsNotExist(err) {
+			readmePath = filepath.Join(workDir, "README.md") // fallback for old repos
+		}
 		if content, err := os.ReadFile(readmePath); err == nil {
 			log.Infof("gitserver/sync: updating readme for %s", slug)
 			if err := h.UpdateReadme(slug, string(content)); err != nil {
