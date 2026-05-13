@@ -1,45 +1,47 @@
-package agents
+package agents_test
 
 import (
 	"context"
+	"errors"
 	"testing"
-	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	actionsagents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	pb "github.com/superplanehq/superplane/pkg/protos/agents"
+	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
-func Test__DeleteAgentChat(t *testing.T) {
-	t.Run("successful delete", func(t *testing.T) {
-		addr, _ := startMockAgentServer(t)
-
-		resp, err := DeleteAgentChat(context.Background(), addr, "org-1", "user-1", "canvas-1", "chat-1")
-		require.NoError(t, err)
-		require.NotNil(t, resp)
+func TestDeleteAgentChat_TranslatesNotFound(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	svc := &stubService{
+		archiveSession: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error {
+			return gorm.ErrRecordNotFound
+		},
+	}
+	_, err := actionsagents.DeleteAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.DeleteAgentChatRequest{
+		ChatId: uuid.NewString(),
 	})
+	require.Error(t, err)
+	assert.Equal(t, codes.NotFound, status.Code(err))
+}
 
-	t.Run("returns not found when chat does not exist", func(t *testing.T) {
-		addr, _ := startMockAgentServer(t)
-
-		_, err := DeleteAgentChat(context.Background(), addr, "org-1", "user-1", "canvas-1", "not-found")
-		require.Error(t, err)
-		assert.Equal(t, codes.NotFound, status.Code(err))
+func TestDeleteAgentChat_BubblesUnknownError(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	svc := &stubService{
+		archiveSession: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error {
+			return errors.New("boom")
+		},
+	}
+	_, err := actionsagents.DeleteAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.DeleteAgentChatRequest{
+		ChatId: uuid.NewString(),
 	})
-
-	t.Run("closes gRPC connection after call", func(t *testing.T) {
-		addr, tracker := startMockAgentServer(t)
-
-		_, err := DeleteAgentChat(context.Background(), addr, "org-1", "user-1", "canvas-1", "chat-1")
-		require.NoError(t, err)
-
-		assert.Eventually(t, func() bool { return tracker.open.Load() == 0 }, 2*time.Second, 10*time.Millisecond)
-	})
-
-	t.Run("returns unavailable when agent is down", func(t *testing.T) {
-		_, err := DeleteAgentChat(context.Background(), "127.0.0.1:1", "org-1", "user-1", "canvas-1", "chat-1")
-		require.Error(t, err)
-		assert.Equal(t, codes.Unavailable, status.Code(err))
-	})
+	require.Error(t, err)
+	assert.Equal(t, codes.Internal, status.Code(err))
 }
