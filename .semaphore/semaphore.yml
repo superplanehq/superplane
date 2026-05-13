@@ -32,6 +32,7 @@ blocks:
       jobs:
         - name: Licence Check
           commands:
+            - sudo rm -rf tmp/go/pkg/mod tmp/go-build
             - make test.license.check
 
   - name: "Backend Tests"

@@ -20,14 +20,6 @@ on_error() {
 
 bundle install
 
-# Docker dev bind-mounts the Go module cache under ./tmp/go/pkg/mod (see docker-compose.dev.yml).
-# license_finder runs `go list ./...`, which then treats those trees as in-repo packages and fails
-# ("directory tmp/go/pkg/mod/... outside main module"). CI always runs dev.setup first, so clear
-# only in automation; locally run `make dev.clean.go.cache` before this script if you hit the same.
-if [ -n "${SEMAPHORE:-}${CI:-}" ]; then
-	rm -rf tmp/go/pkg/mod tmp/go-build
-fi
-
 echo "CHECKING LICENSES FOR BACKEND (Go modules)"
 bundle exec license_finder --project-path . --decisions-file scripts/license_finder.yml || on_error
 
