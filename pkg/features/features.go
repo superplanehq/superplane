@@ -12,7 +12,7 @@ type Feature struct {
 }
 
 var registry = []Feature{
-	{ID: "runners", Label: "Runners", Description: "Sandboxed Runners"},
+	{ID: "runner", Label: "Runners", Description: "Sandboxed Runners"},
 }
 
 func All() []Feature {
