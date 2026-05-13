@@ -72,10 +72,16 @@ interface PasswordFieldProps {
   value: string;
   onChange: (next: string) => void;
   disabled: boolean;
+  /**
+   * Optional minimum length enforced by the browser. We only set this on the
+   * "new password" fields. The current-password field must accept whatever
+   * the user signed up with, even if it predates the current minimum.
+   */
+  minLength?: number;
   hint?: string;
 }
 
-function PasswordField({ id, label, autoComplete, value, onChange, disabled, hint }: PasswordFieldProps) {
+function PasswordField({ id, label, autoComplete, value, onChange, disabled, minLength, hint }: PasswordFieldProps) {
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
@@ -86,7 +92,7 @@ function PasswordField({ id, label, autoComplete, value, onChange, disabled, hin
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={disabled}
-        minLength={MIN_PASSWORD_LENGTH}
+        minLength={minLength}
         className="ph-no-capture"
         required
       />
@@ -193,6 +199,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
             value={form.newPassword}
             onChange={(value) => setForm((prev) => ({ ...prev, newPassword: value }))}
             disabled={submitting}
+            minLength={MIN_PASSWORD_LENGTH}
             hint={`Must be at least ${MIN_PASSWORD_LENGTH} characters long.`}
           />
           <PasswordField
@@ -202,6 +209,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
             value={form.confirmPassword}
             onChange={(value) => setForm((prev) => ({ ...prev, confirmPassword: value }))}
             disabled={submitting}
+            minLength={MIN_PASSWORD_LENGTH}
           />
           {formError && (
             <p className="text-sm text-red-600 dark:text-red-400" role="alert">
