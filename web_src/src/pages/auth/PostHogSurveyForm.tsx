@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { analytics } from "@/lib/analytics";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,9 +22,10 @@ export interface PostHogSurvey {
   questions: SurveyQuestion[];
 }
 
-interface OwnerSetupSurveyProps {
+interface PostHogSurveyFormProps {
   survey: PostHogSurvey;
-  organizationId: string;
+  redirectTo: string;
+  onComplete?: () => void;
 }
 
 type SurveyAnswer = string | string[];
@@ -167,7 +168,7 @@ const SurveyProgress: React.FC<SurveyProgressProps> = ({ questionCount, currentQ
   </div>
 );
 
-const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizationId }) => {
+const PostHogSurveyForm: React.FC<PostHogSurveyFormProps> = ({ survey, redirectTo, onComplete }) => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [surveyResponses, setSurveyResponses] = useState<SurveyResponses>({});
   const [textAnswer, setTextAnswer] = useState("");
@@ -179,6 +180,14 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
     [currentQuestion],
   );
   const currentType = currentQuestion ? getQuestionType(currentQuestion, currentChoices.length > 0) : "text";
+
+  const handleComplete = useCallback(() => {
+    if (onComplete) {
+      onComplete();
+      return;
+    }
+    window.location.href = redirectTo;
+  }, [onComplete, redirectTo]);
 
   const finishSurvey = (responses: SurveyResponses) => {
     if (Object.keys(responses).length === 0) {
@@ -198,7 +207,7 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
       });
       analytics.surveySent(survey.id, survey.name, responseProps);
     }
-    window.location.href = `/${organizationId}`;
+    handleComplete();
   };
 
   const advanceOrFinish = (responses: SurveyResponses) => {
@@ -253,8 +262,8 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
       return;
     }
     analytics.surveyDismissed(survey.id);
-    window.location.href = `/${organizationId}`;
-  }, [currentQuestion, organizationId, survey.id]);
+    handleComplete();
+  }, [currentQuestion, handleComplete, survey.id]);
 
   if (!currentQuestion) return null;
 
@@ -298,4 +307,4 @@ const OwnerSetupSurvey: React.FC<OwnerSetupSurveyProps> = ({ survey, organizatio
   );
 };
 
-export default OwnerSetupSurvey;
+export default PostHogSurveyForm;
