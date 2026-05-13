@@ -41,11 +41,11 @@ func main() {
 	hub := fleetmanager.NewWaitHub()
 	cancelHub := fleetmanager.NewRunnerCancelHub()
 	srv := &fleetmanager.Server{
-		Store:                           st,
-		Webhook:                         ws,
-		Log:                             log,
-		TaskNotify:                      hub,
-		RunnerCancel: cancelHub,
+		Store:                         st,
+		Webhook:                       ws,
+		Log:                           log,
+		TaskNotify:                    hub,
+		RunnerCancel:                  cancelHub,
 		TaskCloudWatchLogGroup:        strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_GROUP")),
 		TaskCloudWatchLogStreamPrefix: strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_STREAM_PREFIX")),
 		TaskCloudWatchRegion:          strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_REGION")),
