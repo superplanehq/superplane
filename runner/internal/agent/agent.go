@@ -79,7 +79,7 @@ func (a *Agent) Run(ctx context.Context) error {
 			}
 			continue
 		}
-		exit, out, runErr, userCanceled := a.execute(ctx, base, task)
+		exit, out, runErr, userCanceled := a.execute(ctx, base, task, nil)
 		errMsg := ""
 		if runErr != nil {
 			errMsg = runErr.Error()
@@ -241,7 +241,7 @@ func (a *Agent) getTaskStatus(ctx context.Context, base, id string) (*api.TaskSt
 	return &out, nil
 }
 
-func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload) (int, string, error, bool) {
+func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload, wsPushCancel <-chan struct{}) (int, string, error, bool) {
 	mode := models.ExecutionMode(strings.ToLower(strings.TrimSpace(task.ExecutionMode)))
 	if mode == "" {
 		mode = models.ExecutionHost
@@ -254,30 +254,47 @@ func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload)
 	defer cancelExec()
 
 	var stoppedByCancel atomic.Bool
-	go func() {
-		tick := time.NewTicker(cancelPollInterval)
-		defer tick.Stop()
-		for {
-			select {
-			case <-execCtx.Done():
-				return
-			case <-ctx.Done():
-				return
-			case <-tick.C:
-				qctx, qc := context.WithTimeout(ctx, 8*time.Second)
-				st, err := a.getTaskStatus(qctx, base, task.ID)
-				qc()
-				if err != nil {
-					continue
-				}
-				if st.CancelRequested || strings.EqualFold(st.Status, string(models.StatusCanceled)) {
+	if wsPushCancel != nil {
+		go func() {
+			for {
+				select {
+				case <-execCtx.Done():
+					return
+				case <-ctx.Done():
+					return
+				case <-wsPushCancel:
 					stoppedByCancel.Store(true)
 					cancelExec()
 					return
 				}
 			}
-		}
-	}()
+		}()
+	} else {
+		go func() {
+			tick := time.NewTicker(cancelPollInterval)
+			defer tick.Stop()
+			for {
+				select {
+				case <-execCtx.Done():
+					return
+				case <-ctx.Done():
+					return
+				case <-tick.C:
+					qctx, qc := context.WithTimeout(ctx, 8*time.Second)
+					st, err := a.getTaskStatus(qctx, base, task.ID)
+					qc()
+					if err != nil {
+						continue
+					}
+					if st.CancelRequested || strings.EqualFold(st.Status, string(models.StatusCanceled)) {
+						stoppedByCancel.Store(true)
+						cancelExec()
+						return
+					}
+				}
+			}
+		}()
+	}
 
 	var exit int
 	var out string

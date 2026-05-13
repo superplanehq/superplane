@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -16,6 +17,10 @@ import (
 )
 
 const wsReconnectDelay = 2 * time.Second
+
+const wsClientWriteWait = 10 * time.Second
+
+const wsClientReadIdle = 90 * time.Second
 
 func fleetStreamURL(base string) (string, error) {
 	b := strings.TrimSpace(base)
@@ -70,7 +75,7 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 	dialer := websocket.Dialer{}
 	hdr := http.Header{}
 	if t := strings.TrimSpace(a.Config.Token); t != "" {
-		hdr.Set("Authorization", "Bearer "+t)
+		hdr.Set("Authorization", "Bearer "+strings.TrimSpace(t))
 	}
 	conn, _, err := dialer.DialContext(ctx, wsURL, hdr)
 	if err != nil {
@@ -82,13 +87,17 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 		a.Config.Log.Info("fleet_manager_ws", slog.String("op", "connect"), slog.String("url", wsURL))
 	}
 
+	var writeMu sync.Mutex
 	hello := wsrunner.Hello{
 		Type:         wsrunner.TypeHello,
 		RunnerID:     a.Config.RunnerID,
 		LeaseSeconds: int((10 * time.Minute).Seconds()),
 	}
-	if err := conn.WriteJSON(hello); err != nil {
-		return fmt.Errorf("hello: %w", err)
+	writeMu.Lock()
+	helloErr := conn.WriteJSON(hello)
+	writeMu.Unlock()
+	if helloErr != nil {
+		return fmt.Errorf("hello: %w", helloErr)
 	}
 
 	for {
@@ -104,7 +113,19 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 		}
 		task := taskMsg.Task
 
-		exit, out, runErr, userCanceled := a.execute(ctx, a.fleetBase(), task)
+		pushCh := make(chan struct{}, 1)
+		readCtx, readStop := context.WithCancel(ctx)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go wsCtrlReadDuringExecute(readCtx, conn, task.ID, pushCh, &wg, &writeMu)
+
+		exit, out, runErr, userCanceled := a.execute(ctx, a.fleetBase(), task, pushCh)
+
+		readStop()
+		_ = conn.SetReadDeadline(time.Now().Add(time.Millisecond))
+		wg.Wait()
+		_ = conn.SetReadDeadline(time.Now().Add(wsClientReadIdle))
+
 		errMsg := ""
 		if runErr != nil {
 			errMsg = runErr.Error()
@@ -118,8 +139,12 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 			Error:    errMsg,
 			Canceled: userCanceled,
 		}
-		if err := conn.WriteJSON(comp); err != nil {
-			return fmt.Errorf("write complete: %w", err)
+		writeMu.Lock()
+		_ = conn.SetWriteDeadline(time.Now().Add(wsClientWriteWait))
+		werr := conn.WriteJSON(comp)
+		writeMu.Unlock()
+		if werr != nil {
+			return fmt.Errorf("write complete: %w", werr)
 		}
 
 		_, raw, err := conn.ReadMessage()
@@ -153,6 +178,45 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 
 		if a.Config.ExitAfterEachTask {
 			return nil
+		}
+	}
+}
+
+// wsCtrlReadDuringExecute reads control frames and server push cancel while execute runs.
+// Exactly one goroutine may call ReadMessage on conn until this returns.
+func wsCtrlReadDuringExecute(readCtx context.Context, conn *websocket.Conn, taskID string, pushCh chan<- struct{}, wg *sync.WaitGroup, writeMu *sync.Mutex) {
+	defer wg.Done()
+	for {
+		select {
+		case <-readCtx.Done():
+			return
+		default:
+		}
+		_ = conn.SetReadDeadline(time.Now().Add(wsClientReadIdle))
+		mt, r, err := conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		switch mt {
+		case websocket.PingMessage:
+			writeMu.Lock()
+			_ = conn.SetWriteDeadline(time.Now().Add(wsClientWriteWait))
+			_ = conn.WriteMessage(websocket.PongMessage, nil)
+			writeMu.Unlock()
+		case websocket.TextMessage:
+			var d struct {
+				Type   string `json:"type"`
+				TaskID string `json:"task_id"`
+			}
+			if json.Unmarshal(r, &d) != nil {
+				continue
+			}
+			if strings.EqualFold(d.Type, wsrunner.TypeCancel) && strings.TrimSpace(d.TaskID) == taskID {
+				select {
+				case pushCh <- struct{}{}:
+				default:
+				}
+			}
 		}
 	}
 }

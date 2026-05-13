@@ -27,6 +27,9 @@ type Server struct {
 	// TaskNotify wakes WebSocket runners when a new task is enqueued; nil disables notifications.
 	TaskNotify *WaitHub
 
+	// RunnerCancel maps active WebSocket runner connections for immediate cancel push; nil disables push.
+	RunnerCancel *RunnerCancelHub
+
 	// EC2Launcher when EC2 hot pool is enabled; used for optional /v1/admin diagnostics.
 	EC2Launcher *ec2provision.Launcher
 
@@ -223,6 +226,14 @@ func (s *Server) cancelTask(w http.ResponseWriter, r *http.Request) {
 		return
 	case store.CancelOutcomeCanceledQueued:
 		go s.DeliverWebhook(task)
+	case store.CancelOutcomeCancelRequested:
+		rid := strings.TrimSpace(task.RunnerID)
+		if s.RunnerCancel != nil && rid != "" {
+			if !s.RunnerCancel.PushCancel(rid, task.ID) && s.Log != nil {
+				s.Log.Debug("runner cancel ws push not delivered",
+					slog.String("runner_id", rid), slog.String("task_id", task.ID))
+			}
+		}
 	}
 
 	state := string(outcome)

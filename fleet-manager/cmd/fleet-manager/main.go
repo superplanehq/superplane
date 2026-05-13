@@ -38,11 +38,13 @@ func main() {
 	ws := webhook.DefaultSender()
 	ws.Log = log
 	hub := fleetmanager.NewWaitHub()
+	cancelHub := fleetmanager.NewRunnerCancelHub()
 	srv := &fleetmanager.Server{
-		Store:      st,
-		Webhook:    ws,
-		Log:        log,
-		TaskNotify: hub,
+		Store:        st,
+		Webhook:      ws,
+		Log:          log,
+		TaskNotify:   hub,
+		RunnerCancel: cancelHub,
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

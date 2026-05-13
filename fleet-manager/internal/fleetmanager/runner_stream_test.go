@@ -238,3 +238,100 @@ func TestRunnerStream_UnavailableWithoutHub(t *testing.T) {
 		t.Fatal("expected error body")
 	}
 }
+
+func TestRunnerStream_CancelPushDeliversFrame(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "fleet.db")
+	st, err := store.OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer st.Close()
+
+	hub := NewWaitHub()
+	cancelHub := NewRunnerCancelHub()
+	srv := &Server{
+		Store:        st,
+		Webhook:      nil,
+		Log:          slog.Default(),
+		TaskNotify:   hub,
+		RunnerCancel: cancelHub,
+	}
+	ts := httptest.NewServer(NewRouter(srv, RouterOptions{}))
+	defer ts.Close()
+
+	body := `{"command":["sleep","999"],"webhook_url":"https://example.com/hook"}`
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/v1/tasks", bytes.NewReader([]byte(body)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("create task: %d", resp.StatusCode)
+	}
+
+	const runnerID = "runner-ws-cancel"
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/v1/runners/stream"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	if err := conn.WriteJSON(wsrunner.Hello{Type: wsrunner.TypeHello, RunnerID: runnerID, LeaseSeconds: 300}); err != nil {
+		t.Fatal(err)
+	}
+	var taskMsg wsrunner.Task
+	if err := conn.ReadJSON(&taskMsg); err != nil {
+		t.Fatal(err)
+	}
+	if taskMsg.Task == nil {
+		t.Fatal("nil task")
+	}
+	taskID := taskMsg.Task.ID
+
+	cancelReq, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/v1/tasks/"+taskID+"/cancel", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cancelResp, err := http.DefaultClient.Do(cancelReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = cancelResp.Body.Close()
+	if cancelResp.StatusCode != http.StatusOK {
+		t.Fatalf("cancel http: %d", cancelResp.StatusCode)
+	}
+
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	var cancelMsg wsrunner.Cancel
+	if err := conn.ReadJSON(&cancelMsg); err != nil {
+		t.Fatalf("read cancel: %v", err)
+	}
+	if cancelMsg.Type != wsrunner.TypeCancel || cancelMsg.TaskID != taskID {
+		t.Fatalf("cancel payload: %+v", cancelMsg)
+	}
+
+	if err := conn.WriteJSON(wsrunner.Complete{
+		Type:     wsrunner.TypeComplete,
+		TaskID:   taskID,
+		RunnerID: runnerID,
+		ExitCode: 130,
+		Output:   "",
+		Canceled: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var ack wsrunner.Ack
+	if err := conn.ReadJSON(&ack); err != nil {
+		t.Fatal(err)
+	}
+	if ack.Type != wsrunner.TypeAck || !ack.OK {
+		t.Fatalf("ack: %+v", ack)
+	}
+}
