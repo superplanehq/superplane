@@ -32,8 +32,9 @@ func deriveChatTitle(content string) string {
 		trimmed = line
 		break
 	}
-	if len(trimmed) > chatTitleMaxLength {
-		return trimmed[:chatTitleMaxLength-1] + "…"
+	runes := []rune(trimmed)
+	if len(runes) > chatTitleMaxLength {
+		return string(runes[:chatTitleMaxLength-1]) + "…"
 	}
 	return trimmed
 }
