@@ -2,46 +2,30 @@ package agents
 
 import (
 	"context"
+	"errors"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/google/uuid"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
-	internalpb "github.com/superplanehq/superplane/pkg/protos/private/agents"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
-func DeleteAgentChat(
-	ctx context.Context,
-	agentURL string,
-	orgID string,
-	userID string,
-	canvasID string,
-	chatID string,
-) (*pb.DeleteAgentChatResponse, error) {
-	conn, err := grpc.NewClient(agentURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func DeleteAgentChat(ctx context.Context, svc AgentsService, orgID, userID string, req *pb.DeleteAgentChatRequest) (*pb.DeleteAgentChatResponse, error) {
+	org, user, err := parseOrgUser(orgID, userID)
 	if err != nil {
-		return nil, status.Error(codes.Unavailable, "failed to create agent GRPC client")
+		return nil, err
 	}
-	defer closeAgentConnection(conn)
-
-	client := internalpb.NewAgentsClient(conn)
-	_, err = client.DeleteAgentChat(ctx, &internalpb.DeleteAgentChatRequest{
-		OrgId:    orgID,
-		UserId:   userID,
-		CanvasId: canvasID,
-		ChatId:   chatID,
-	})
-
+	chatID, err := uuid.Parse(req.ChatId)
 	if err != nil {
-		if s, ok := status.FromError(err); ok && s.Code() == codes.NotFound {
+		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
+	}
+
+	if err := svc.ArchiveSession(ctx, org, user, chatID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "agent chat not found")
 		}
-
-		log.WithError(err).Errorf("failed to delete agent chat %s for org %s, user %s", chatID, orgID, userID)
-		return nil, status.Error(codes.Unavailable, "failed to delete agent chat")
+		return nil, status.Errorf(codes.Internal, "failed to delete agent chat: %v", err)
 	}
-
 	return &pb.DeleteAgentChatResponse{}, nil
 }
