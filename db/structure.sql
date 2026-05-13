@@ -101,6 +101,37 @@ CREATE TABLE public.accounts (
 
 
 --
+-- Name: agent_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_messages (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    session_id uuid NOT NULL,
+    role character varying(20) NOT NULL,
+    content text DEFAULT ''::text NOT NULL,
+    tool_call_id text,
+    tool_status character varying(20),
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: agent_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_sessions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
+    anthropic_session_id text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    api_token text,
+    api_token_expires_at timestamp with time zone
+);
+
+
+--
 -- Name: app_installation_requests; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -754,6 +785,30 @@ ALTER TABLE ONLY public.accounts
 
 
 --
+-- Name: agent_messages agent_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_messages
+    ADD CONSTRAINT agent_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_sessions agent_sessions_organization_id_user_id_canvas_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_sessions
+    ADD CONSTRAINT agent_sessions_organization_id_user_id_canvas_id_key UNIQUE (organization_id, user_id, canvas_id);
+
+
+--
+-- Name: agent_sessions agent_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_sessions
+    ADD CONSTRAINT agent_sessions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: app_installation_requests app_installation_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1146,6 +1201,13 @@ CREATE INDEX idx_account_providers_account_id ON public.account_providers USING 
 --
 
 CREATE INDEX idx_account_providers_provider ON public.account_providers USING btree (provider);
+
+
+--
+-- Name: idx_agent_messages_session_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_messages_session_id ON public.agent_messages USING btree (session_id, created_at);
 
 
 --
@@ -1610,6 +1672,14 @@ ALTER TABLE ONLY public.account_password_auth
 
 ALTER TABLE ONLY public.account_providers
     ADD CONSTRAINT account_providers_account_id_fkey FOREIGN KEY (account_id) REFERENCES public.accounts(id);
+
+
+--
+-- Name: agent_messages agent_messages_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_messages
+    ADD CONSTRAINT agent_messages_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.agent_sessions(id) ON DELETE CASCADE;
 
 
 --
@@ -2092,7 +2162,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260512125440	f
+20260512210222	f
 \.
 
 
