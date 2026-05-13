@@ -14,7 +14,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/superplane/runner/runner/internal/cloudwatchlog"
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/cwstream"
 	"github.com/superplane/runner/shared/models"
 )
 
@@ -32,6 +34,12 @@ type Config struct {
 	// Fleet-manager terminates the EC2 instance when runner_id is the instance id (see cloud-init user-data). Local env: RUNNER_TERMINATE_AFTER_EACH_TASK.
 	ExitAfterEachTask bool
 	Log               *slog.Logger // optional: fleet_manager_http lines for claim / complete
+
+	// CloudWatchLogGroup when non-empty streams task stdout/stderr to Amazon CloudWatch Logs
+	// (one log stream per task; see shared/cwstream.TaskLogStream).
+	CloudWatchLogGroup        string
+	CloudWatchRegion          string // optional; uses default AWS credential chain region when empty
+	CloudWatchLogStreamPrefix string // optional prefix for log stream name (must match TASK_CLOUDWATCH_LOG_STREAM_PREFIX on fleet-manager for callers)
 }
 
 // DefaultConfig returns safe defaults.
@@ -296,31 +304,59 @@ func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload,
 		}()
 	}
 
+	var live io.Writer
+	var cwClose func()
+	if g := strings.TrimSpace(a.Config.CloudWatchLogGroup); g != "" {
+		stream := cwstream.TaskLogStream(strings.TrimSpace(a.Config.CloudWatchLogStreamPrefix), task.ID)
+		sw, err := cloudwatchlog.NewStreamWriter(execCtx, cloudwatchlog.StreamConfig{
+			LogGroup:   g,
+			StreamName: stream,
+			Region:     strings.TrimSpace(a.Config.CloudWatchRegion),
+		})
+		if err != nil {
+			if a.Config.Log != nil {
+				a.Config.Log.Warn("cloudwatch_log_stream", slog.String("task_id", task.ID), slog.Any("err", err))
+			}
+		} else {
+			live = sw
+			cwClose = func() { _ = sw.Close() }
+		}
+	}
+	if cwClose != nil {
+		defer cwClose()
+	}
+
 	var exit int
 	var out string
 	var runErr error
 	switch mode {
 	case models.ExecutionDocker:
-		exit, out, runErr = a.runDocker(execCtx, task)
+		exit, out, runErr = a.runDocker(execCtx, task, live)
 	case models.ExecutionHost:
-		exit, out, runErr = a.runHost(execCtx, task)
+		exit, out, runErr = a.runHost(execCtx, task, live)
 	default:
 		return 1, "", fmt.Errorf("unknown execution_mode %q", task.ExecutionMode), false
 	}
 	return exit, out, runErr, stoppedByCancel.Load()
 }
 
-func (a *Agent) runHost(ctx context.Context, task *api.TaskPayload) (int, string, error) {
+func (a *Agent) runHost(ctx context.Context, task *api.TaskPayload, live io.Writer) (int, string, error) {
 	if len(task.Commands) > 0 {
-		return a.runHostShellScripts(ctx, task.Commands)
+		return a.runHostShellScripts(ctx, task.Commands, live)
 	}
 	if len(task.Command) == 0 {
 		return 1, "", errors.New("empty command")
 	}
 	cmd := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
 	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
+	if live != nil {
+		mw := io.MultiWriter(&buf, live)
+		cmd.Stdout = mw
+		cmd.Stderr = mw
+	} else {
+		cmd.Stdout = &buf
+		cmd.Stderr = &buf
+	}
 	err := cmd.Run()
 	out := truncateString(buf.String(), a.Config.MaxOutputBytes)
 	exit := 0
@@ -336,23 +372,29 @@ func (a *Agent) runHost(ctx context.Context, task *api.TaskPayload) (int, string
 	return exit, out, nil
 }
 
-func (a *Agent) runHostShellScripts(ctx context.Context, scripts []string) (int, string, error) {
-	return runHostShellDirectives(ctx, a.Config.MaxOutputBytes, scripts)
+func (a *Agent) runHostShellScripts(ctx context.Context, scripts []string, live io.Writer) (int, string, error) {
+	return runHostShellDirectives(ctx, a.Config.MaxOutputBytes, scripts, live)
 }
 
-func (a *Agent) runDocker(ctx context.Context, task *api.TaskPayload) (int, string, error) {
+func (a *Agent) runDocker(ctx context.Context, task *api.TaskPayload, live io.Writer) (int, string, error) {
 	if strings.TrimSpace(task.DockerImage) == "" {
 		return 1, "", errors.New("docker_image required")
 	}
 	if len(task.Commands) > 0 {
-		return a.runDockerShellScripts(ctx, task.DockerImage, task.Commands)
+		return a.runDockerShellScripts(ctx, task.DockerImage, task.Commands, live)
 	}
 	args := []string{"run", "--rm", task.DockerImage}
 	args = append(args, task.Command...)
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	var buf bytes.Buffer
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
+	if live != nil {
+		mw := io.MultiWriter(&buf, live)
+		cmd.Stdout = mw
+		cmd.Stderr = mw
+	} else {
+		cmd.Stdout = &buf
+		cmd.Stderr = &buf
+	}
 	err := cmd.Run()
 	out := truncateString(buf.String(), a.Config.MaxOutputBytes)
 	exit := 0
@@ -368,8 +410,8 @@ func (a *Agent) runDocker(ctx context.Context, task *api.TaskPayload) (int, stri
 	return exit, out, nil
 }
 
-func (a *Agent) runDockerShellScripts(ctx context.Context, image string, scripts []string) (int, string, error) {
-	return runDockerShellDirectives(ctx, a.Config.MaxOutputBytes, image, scripts)
+func (a *Agent) runDockerShellScripts(ctx context.Context, image string, scripts []string, live io.Writer) (int, string, error) {
+	return runDockerShellDirectives(ctx, a.Config.MaxOutputBytes, image, scripts, live)
 }
 
 func truncateString(s string, max int) string {

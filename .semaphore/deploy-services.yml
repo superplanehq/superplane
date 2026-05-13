@@ -24,9 +24,8 @@ blocks:
             - chmod 600 ~/.ssh/deploy.pem
             - export SSH_KEY=~/.ssh/deploy.pem
             - export SSH_HOST=13.220.51.216
-            - export AUTH_TOKEN="$FLEET_AUTH_TOKEN"
             - export FLEET_MANAGER_IMAGE="ghcr.io/superplanehq/runner/fleet-manager:latest"
-            - bash scripts/start-fleet-manager-remote.sh
+            - ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/deploy.pem ubuntu@13.220.51.216 "docker pull $FLEET_MANAGER_IMAGE && docker stop fleet-manager && docker rm fleet-manager && docker run -d --name fleet-manager --restart unless-stopped -p 8080:8080 -v fleet-manager-data:/home/nonroot --env-file /home/ubuntu/fleet-manager.env $FLEET_MANAGER_IMAGE && docker ps --filter name=fleet-manager"
 
   - name: Deploy task-broker
     task:
