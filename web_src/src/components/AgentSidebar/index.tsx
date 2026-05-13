@@ -130,6 +130,11 @@ function ChatConversation({
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const previousScrollHeight = useRef<number | null>(null);
+  const hasInitialScrolled = useRef(false);
+
+  useEffect(() => {
+    hasInitialScrolled.current = false;
+  }, [chatId]);
 
   // Load older pages when the user scrolls to the top. We snapshot the
   // pre-fetch scrollHeight so we can restore the scroll position after the
@@ -155,8 +160,12 @@ function ChatConversation({
       previousScrollHeight.current = null;
       return;
     }
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages.length, streamingText, showThinking]);
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: hasInitialScrolled.current ? "smooth" : "auto",
+    });
+    hasInitialScrolled.current = true;
+  }, [messages.length, streamingText]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
