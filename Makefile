@@ -1,9 +1,8 @@
 .PHONY: lint test test.coverage test.license.check gen.setup gen.setup.prep gen.setup.backend gen.setup.ui web_src.npm.install.compose check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
 
+MAKE=make
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
-# Databases to create and migrate in `make dev.setup` (space-separated). CI sets superplane_test alongside superplane_dev.
-DEV_SETUP_DBS ?= superplane_dev
 BASE_URL?=https://app.superplane.com
 
 export BUILDKIT_PROGRESS ?= plain
@@ -92,24 +91,30 @@ format.js.check:
 # then `make dev.server`. Day-to-day: `make dev.up` then `make dev.server` (or `make dev.server.fg` for attached logs).
 # For E2E locally, migrate the test DB too: `DEV_SETUP_DBS="superplane_dev superplane_test" make dev.setup` (after `make dev.up`).
 
+dev.test.is.running:
+	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
+
 dev.up:
+	@mkdir -p tmp/screenshots
 	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
 
-dev.setup:
-	@mkdir -p tmp/screenshots
-	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
-	$(COMPOSE) exec -T app bash -lc "cd /app/web_src && npm install"
-	$(MAKE) gen.setup SKIP_WEB_SRC_NPM_INSTALL=1
-	$(MAKE) dev.setup.app
-	@set -euo pipefail; for db in $(DEV_SETUP_DBS); do \
-		$(MAKE) db.create DB_NAME=$$db; \
-		$(MAKE) db.migrate DB_NAME=$$db; \
-	done
 
-dev.setup.app:
-	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
-	$(COMPOSE) exec -T app go mod download
-	$(COMPOSE) exec -T app go build cmd/server/main.go
+dev.setup:
+	@$(MAKE) dev.test.is.running
+	$(MAKE) dev.setup.npm
+	$(MAKE) dev.setup.go
+	$(MAKE) gen.setup
+	$(MAKE) db.create DB_NAME=superplane_dev
+	$(MAKE) db.migrate DB_NAME=superplane_dev
+	$(MAKE) db.create DB_NAME=superplane_test
+	$(MAKE) db.migrate DB_NAME=superplane_test
+
+dev.setup.npm:
+	@$(COMPOSE) exec -T app bash -lc "cd /app/web_src && npm install --no-audit --no-fund --silent"
+
+dev.setup.go:
+	@$(COMPOSE) exec -T app go mod download
+	@$(COMPOSE) exec -T app go build cmd/server/main.go
 
 dev.setup.no.cache:
 	rm -rf tmp
@@ -213,10 +218,7 @@ ui.start:
 #
 
 db.create:
-	-$(COMPOSE) exec -T -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE template1 REFRESH COLLATION VERSION';
-	-$(COMPOSE) exec -T -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres -c 'ALTER DATABASE postgres REFRESH COLLATION VERSION';
-	-$(COMPOSE) exec -T -e PGPASSWORD=the-cake-is-a-lie app createdb -h db -p 5432 -U postgres $(DB_NAME)
-	$(COMPOSE) exec -T -e PGPASSWORD=the-cake-is-a-lie app psql -h db -p 5432 -U postgres $(DB_NAME) -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp";'
+	@$(COMPOSE) exec -T app ./scripts/db_create.sh $(DB_NAME)
 
 db.migration.create:
 	$(COMPOSE) exec -T app mkdir -p db/migrations
@@ -229,13 +231,7 @@ db.data_migration.create:
 	ls -lah db/data_migrations/*$(NAME)*
 
 db.migrate:
-	rm -f db/structure.sql
-	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) app migrate -source file://db/migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable up
-	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) app migrate -source file://db/data_migrations -database postgres://postgres:$(DB_PASSWORD)@db:5432/$(DB_NAME)?sslmode=disable\&x-migrations-table=data_migrations up
-	# echo dump schema to db/structure.sql
-	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --schema-only --no-privileges --restrict-key abcdef123 --no-owner -h db -p 5432 -U postgres -d $(DB_NAME)" > db/structure.sql
-	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table schema_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
-	$(COMPOSE) exec -T --user $$(id -u):$$(id -g) -e PGPASSWORD=$(DB_PASSWORD) app bash -c "pg_dump --data-only --restrict-key abcdef123 --table data_migrations -h db -p 5432 -U postgres -d $(DB_NAME)" >> db/structure.sql
+	@$(COMPOSE) exec -T app ./scripts/db_migrate.sh $(DB_NAME)
 
 db.migrate.all:
 	$(MAKE) db.migrate DB_NAME=superplane_dev
@@ -261,18 +257,7 @@ db.recreate.all.dangerous:
 # Protobuf compilation
 #
 
-# Install web_src deps via a one-off compose run (CI, `make gen`, release).
-# `make dev.setup` installs into the running app container first, then calls
-# `gen.setup` with SKIP_WEB_SRC_NPM_INSTALL=1 so this step is skipped.
-web_src.npm.install.compose:
-	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "export HOME=/tmp && export NPM_CONFIG_CACHE=/tmp/.npm && cd web_src && npm install"
-
-gen.setup.prep:
-ifneq ($(SKIP_WEB_SRC_NPM_INSTALL),1)
-	$(MAKE) web_src.npm.install.compose
-endif
-
-gen.setup: gen.setup.prep
+gen.setup:
 	$(MAKE) pb.gen
 	$(MAKE) openapi.spec.gen
 	$(MAKE) openapi.client.gen
