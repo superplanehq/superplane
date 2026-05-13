@@ -41,28 +41,12 @@ func (s *AgentsService) requestContext(ctx context.Context) (orgID, userID strin
 	return orgIDVal, userID, nil
 }
 
-func (s *AgentsService) CreateAgentChat(ctx context.Context, req *pb.CreateAgentChatRequest) (*pb.CreateAgentChatResponse, error) {
+func (s *AgentsService) GetCanvasAgentChat(ctx context.Context, req *pb.GetCanvasAgentChatRequest) (*pb.GetCanvasAgentChatResponse, error) {
 	orgID, userID, err := s.requestContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return agentsActions.CreateAgentChat(ctx, s.service, orgID, userID, req)
-}
-
-func (s *AgentsService) ListAgentChats(ctx context.Context, req *pb.ListAgentChatsRequest) (*pb.ListAgentChatsResponse, error) {
-	orgID, userID, err := s.requestContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return agentsActions.ListAgentChats(ctx, s.service, orgID, userID, req)
-}
-
-func (s *AgentsService) DescribeAgentChat(ctx context.Context, req *pb.DescribeAgentChatRequest) (*pb.DescribeAgentChatResponse, error) {
-	orgID, userID, err := s.requestContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return agentsActions.DescribeAgentChat(ctx, s.service, orgID, userID, req)
+	return agentsActions.GetCanvasAgentChat(ctx, s.service, orgID, userID, req)
 }
 
 func (s *AgentsService) ListAgentChatMessages(ctx context.Context, req *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error) {
@@ -79,12 +63,4 @@ func (s *AgentsService) SendAgentChatMessage(ctx context.Context, req *pb.SendAg
 		return nil, err
 	}
 	return agentsActions.SendAgentChatMessage(ctx, s.service, orgID, userID, req)
-}
-
-func (s *AgentsService) DeleteAgentChat(ctx context.Context, req *pb.DeleteAgentChatRequest) (*pb.DeleteAgentChatResponse, error) {
-	orgID, userID, err := s.requestContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return agentsActions.DeleteAgentChat(ctx, s.service, orgID, userID, req)
 }

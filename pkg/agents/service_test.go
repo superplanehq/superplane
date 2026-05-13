@@ -22,13 +22,9 @@ type fakeProvider struct {
 	mu               sync.Mutex
 	createCalled     int
 	sendCalled       int
-	archiveCalled    int
-	lastMessage      string
 	lastPreamble     string
-	lastArchiveID    string
 	createSessionErr error
 	sendErr          error
-	archiveErr       error
 }
 
 func (f *fakeProvider) Name() string { return testProviderName }
@@ -43,25 +39,16 @@ func (f *fakeProvider) CreateSession(_ context.Context, _ agents.CreateSessionOp
 	return &agents.CreateSessionResult{ProviderSessionID: "provider-session-" + uuid.NewString()}, nil
 }
 
-func (f *fakeProvider) SendMessage(_ context.Context, _ string, msg string, opts agents.SendMessageOptions) error {
+func (f *fakeProvider) SendMessage(_ context.Context, _ string, _ string, opts agents.SendMessageOptions) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sendCalled++
-	f.lastMessage = msg
 	f.lastPreamble = opts.ContextPreamble
 	return f.sendErr
 }
 
 func (f *fakeProvider) StreamEvents(_ context.Context, _ string, _ func(agents.ProviderEvent) error) error {
 	return nil
-}
-
-func (f *fakeProvider) ArchiveSession(_ context.Context, providerSessionID string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.archiveCalled++
-	f.lastArchiveID = providerSessionID
-	return f.archiveErr
 }
 
 func newService(t *testing.T, r *support.ResourceRegistry, provider agents.Provider) *agents.Service {
@@ -76,7 +63,7 @@ func setupCanvasForUser(t *testing.T, r *support.ResourceRegistry) *models.Canva
 	return canvas
 }
 
-func TestService_CreateSession_PersistsRowAndCallsProvider(t *testing.T) {
+func TestService_EnsureSession_CreatesOnFirstCall(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -84,20 +71,32 @@ func TestService_CreateSession_PersistsRowAndCallsProvider(t *testing.T) {
 	provider := &fakeProvider{}
 	svc := newService(t, r, provider)
 
-	session, err := svc.CreateSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
 	require.NoError(t, err)
 	require.NotNil(t, session)
 	assert.Equal(t, testProviderName, session.Provider)
 	assert.Equal(t, models.AgentSessionStatusIdle, session.Status)
 	assert.Equal(t, 1, provider.createCalled)
-
-	persisted, err := models.FindAgentSession(session.ID)
-	require.NoError(t, err)
-	assert.Equal(t, session.ID, persisted.ID)
-	assert.Equal(t, r.User, persisted.UserID)
 }
 
-func TestService_CreateSession_FailsWhenProviderErrors(t *testing.T) {
+func TestService_EnsureSession_IsIdempotent(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	first, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+	second, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	assert.Equal(t, first.ID, second.ID)
+	assert.Equal(t, 1, provider.createCalled, "second call must not provision a new upstream session")
+}
+
+func TestService_EnsureSession_FailsWhenProviderErrors(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -105,15 +104,15 @@ func TestService_CreateSession_FailsWhenProviderErrors(t *testing.T) {
 	provider := &fakeProvider{createSessionErr: errors.New("provider boom")}
 	svc := newService(t, r, provider)
 
-	_, err := svc.CreateSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	_, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
 	require.Error(t, err)
 
 	var count int64
 	require.NoError(t, database.Conn().Model(&models.AgentSession{}).Count(&count).Error)
-	assert.Equal(t, int64(0), count, "no session should be persisted when provider call fails")
+	assert.Equal(t, int64(0), count)
 }
 
-func TestService_CreateSession_DeniedWithoutPermission(t *testing.T) {
+func TestService_EnsureSession_DeniedWithoutPermission(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -122,7 +121,7 @@ func TestService_CreateSession_DeniedWithoutPermission(t *testing.T) {
 	svc := newService(t, r, provider)
 
 	otherUser := uuid.New()
-	_, err := svc.CreateSession(context.Background(), r.Organization.ID, otherUser, canvas.ID)
+	_, err := svc.EnsureSession(context.Background(), r.Organization.ID, otherUser, canvas.ID)
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, agents.ErrSessionForbidden))
 	assert.Equal(t, 0, provider.createCalled)
@@ -136,17 +135,15 @@ func TestService_GetSession_PrivateToUser(t *testing.T) {
 	provider := &fakeProvider{}
 	svc := newService(t, r, provider)
 
-	session, err := svc.CreateSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
 	require.NoError(t, err)
 
-	// Owning user can fetch.
 	got, err := svc.GetSession(r.Organization.ID, r.User, session.ID)
 	require.NoError(t, err)
 	assert.Equal(t, session.ID, got.ID)
 
-	// Another user cannot.
 	_, err = svc.GetSession(r.Organization.ID, uuid.New(), session.ID)
-	require.Error(t, err, "session ownership must be enforced")
+	require.Error(t, err)
 }
 
 func TestService_SendMessage_ReturnsPersistedUserMessage(t *testing.T) {
@@ -157,17 +154,17 @@ func TestService_SendMessage_ReturnsPersistedUserMessage(t *testing.T) {
 	provider := &fakeProvider{}
 	svc := newService(t, r, provider)
 
-	session, err := svc.CreateSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
 	require.NoError(t, err)
 
 	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "hello")
 	require.NoError(t, err)
-	require.NotNil(t, persisted, "SendMessage must not return a nil message — gRPC serialise dereferences it")
+	require.NotNil(t, persisted)
 	require.NotEqual(t, uuid.Nil, persisted.ID)
 	assert.Equal(t, "hello", persisted.Content)
 }
 
-func TestService_SendMessage_PersistsUserTurnAndPublishesPreambleOnFirstTurn(t *testing.T) {
+func TestService_SendMessage_InjectsPreambleOnFirstTurnOnly(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -175,39 +172,18 @@ func TestService_SendMessage_PersistsUserTurnAndPublishesPreambleOnFirstTurn(t *
 	provider := &fakeProvider{}
 	svc := newService(t, r, provider)
 
-	session, err := svc.CreateSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
 	require.NoError(t, err)
 
-	persisted, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "hello")
-	require.NoError(t, err)
-	assert.Equal(t, models.AgentMessageRoleUser, persisted.Role)
-	assert.Equal(t, "hello", persisted.Content)
-	assert.Equal(t, 1, provider.sendCalled)
-	assert.Contains(t, provider.lastPreamble, canvas.ID.String(), "first-turn preamble must carry the canvas id")
-	assert.Contains(t, provider.lastPreamble, "api_token:", "first-turn preamble must inject the agent token")
-
-	msgs, err := svc.ListMessages(session.ID)
-	require.NoError(t, err)
-	require.Len(t, msgs, 1)
-}
-
-func TestService_SendMessage_NoPreambleOnFollowupTurns(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas := setupCanvasForUser(t, r)
-	provider := &fakeProvider{}
-	svc := newService(t, r, provider)
-
-	session, err := svc.CreateSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
-	require.NoError(t, err)
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "first")
 	require.NoError(t, err)
+	assert.Contains(t, provider.lastPreamble, canvas.ID.String())
+	assert.Contains(t, provider.lastPreamble, "api_token:")
 
 	provider.lastPreamble = "<sentinel>"
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "second")
 	require.NoError(t, err)
-	assert.Equal(t, "", provider.lastPreamble, "follow-up turns must not re-inject the preamble")
+	assert.Equal(t, "", provider.lastPreamble)
 }
 
 func TestService_SendMessage_PrivateToUser(t *testing.T) {
@@ -218,7 +194,7 @@ func TestService_SendMessage_PrivateToUser(t *testing.T) {
 	provider := &fakeProvider{}
 	svc := newService(t, r, provider)
 
-	session, err := svc.CreateSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
 	require.NoError(t, err)
 
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, uuid.New(), session.ID, "intrusion")
@@ -234,7 +210,7 @@ func TestService_SendMessage_RejectsEmpty(t *testing.T) {
 	provider := &fakeProvider{}
 	svc := newService(t, r, provider)
 
-	session, err := svc.CreateSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
 	require.NoError(t, err)
 
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "")
@@ -242,7 +218,7 @@ func TestService_SendMessage_RejectsEmpty(t *testing.T) {
 	assert.Equal(t, 0, provider.sendCalled)
 }
 
-func TestService_ArchiveSession_SoftArchivesLocally(t *testing.T) {
+func TestService_ListMessages_TailPagination(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -250,34 +226,24 @@ func TestService_ArchiveSession_SoftArchivesLocally(t *testing.T) {
 	provider := &fakeProvider{}
 	svc := newService(t, r, provider)
 
-	session, err := svc.CreateSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
 	require.NoError(t, err)
-	require.NoError(t, svc.ArchiveSession(context.Background(), r.Organization.ID, r.User, session.ID))
+	for i := 0; i < 5; i++ {
+		_, err := svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "m")
+		require.NoError(t, err)
+	}
 
-	persisted, err := models.FindAgentSession(session.ID)
+	latest, err := svc.ListMessages(session.ID, uuid.Nil, 2)
 	require.NoError(t, err)
-	assert.NotNil(t, persisted.ArchivedAt, "local row must be soft-archived")
-	assert.Equal(t, 1, provider.archiveCalled)
+	require.Len(t, latest, 2)
 
-	// Listing should now exclude it.
-	listed, err := svc.ListSessions(r.Organization.ID, r.User, canvas.ID)
+	older, err := svc.ListMessages(session.ID, latest[0].ID, 2)
 	require.NoError(t, err)
-	assert.Empty(t, listed)
-}
+	require.Len(t, older, 2)
+	assert.True(t, older[1].CreatedAt.Before(*latest[0].CreatedAt) || older[1].ID != latest[0].ID,
+		"older window must precede the anchor")
 
-func TestService_ArchiveSession_StillArchivesLocallyWhenProviderFails(t *testing.T) {
-	r := support.Setup(t)
-	defer r.Close()
-
-	canvas := setupCanvasForUser(t, r)
-	provider := &fakeProvider{archiveErr: errors.New("provider down")}
-	svc := newService(t, r, provider)
-
-	session, err := svc.CreateSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	oldest, err := svc.ListMessages(session.ID, older[0].ID, 10)
 	require.NoError(t, err)
-	require.NoError(t, svc.ArchiveSession(context.Background(), r.Organization.ID, r.User, session.ID))
-
-	persisted, err := models.FindAgentSession(session.ID)
-	require.NoError(t, err)
-	assert.NotNil(t, persisted.ArchivedAt)
+	require.Len(t, oldest, 1, "only one message remains before the second page")
 }

@@ -16,14 +16,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func TestCreateAgentChat_SerializesSession(t *testing.T) {
+func TestGetCanvasAgentChat_SerializesSession(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	canvas := setupCanvas(t, r)
-
 	sessionID := uuid.New()
+
 	svc := &stubService{
-		createSession: func(ctx context.Context, o, u, c uuid.UUID) (*models.AgentSession, error) {
+		ensureSession: func(_ context.Context, o, u, c uuid.UUID) (*models.AgentSession, error) {
 			assert.Equal(t, r.Organization.ID, o)
 			assert.Equal(t, r.User, u)
 			assert.Equal(t, canvas.ID, c)
@@ -38,45 +38,44 @@ func TestCreateAgentChat_SerializesSession(t *testing.T) {
 		},
 	}
 
-	resp, err := actionsagents.CreateAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.CreateAgentChatRequest{CanvasId: canvas.ID.String()})
+	resp, err := actionsagents.GetCanvasAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.GetCanvasAgentChatRequest{CanvasId: canvas.ID.String()})
 	require.NoError(t, err)
 	require.NotNil(t, resp.Chat)
 	assert.Equal(t, sessionID.String(), resp.Chat.Id)
-	assert.Equal(t, canvas.ID.String(), resp.Chat.CanvasId)
 	assert.Equal(t, "anthropic", resp.Chat.Provider)
 }
 
-func TestCreateAgentChat_RejectsInvalidCanvas(t *testing.T) {
+func TestGetCanvasAgentChat_RejectsInvalidCanvas(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
 	svc := &stubService{}
-	_, err := actionsagents.CreateAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.CreateAgentChatRequest{CanvasId: "not-a-uuid"})
+	_, err := actionsagents.GetCanvasAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.GetCanvasAgentChatRequest{CanvasId: "nope"})
 	require.Error(t, err)
 	assert.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
-func TestCreateAgentChat_NotFoundWhenCanvasMissing(t *testing.T) {
+func TestGetCanvasAgentChat_NotFoundWhenCanvasMissing(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
 	svc := &stubService{}
-	_, err := actionsagents.CreateAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.CreateAgentChatRequest{CanvasId: uuid.NewString()})
+	_, err := actionsagents.GetCanvasAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.GetCanvasAgentChatRequest{CanvasId: uuid.NewString()})
 	require.Error(t, err)
 	assert.Equal(t, codes.NotFound, status.Code(err))
 }
 
-func TestCreateAgentChat_PermissionDenied(t *testing.T) {
+func TestGetCanvasAgentChat_PermissionDenied(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	canvas := setupCanvas(t, r)
 
 	svc := &stubService{
-		createSession: func(_ context.Context, _, _, _ uuid.UUID) (*models.AgentSession, error) {
+		ensureSession: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error) {
 			return nil, agents.ErrSessionForbidden
 		},
 	}
-	_, err := actionsagents.CreateAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.CreateAgentChatRequest{CanvasId: canvas.ID.String()})
+	_, err := actionsagents.GetCanvasAgentChat(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.GetCanvasAgentChatRequest{CanvasId: canvas.ID.String()})
 	require.Error(t, err)
 	assert.Equal(t, codes.PermissionDenied, status.Code(err))
 }

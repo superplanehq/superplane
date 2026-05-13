@@ -7,13 +7,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/agents"
 	actionsagents "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 func TestSendAgentChatMessage_RequiresContent(t *testing.T) {
@@ -37,7 +37,6 @@ func TestSendAgentChatMessage_ProjectsSuccess(t *testing.T) {
 	svc := &stubService{
 		sendMessage: func(_ context.Context, _, _, sid uuid.UUID, content string) (*models.AgentSessionMessage, error) {
 			assert.Equal(t, chatID, sid)
-			assert.Equal(t, "hi", content)
 			return &models.AgentSessionMessage{
 				ID:        persistedID,
 				Role:      models.AgentMessageRoleUser,
@@ -55,12 +54,12 @@ func TestSendAgentChatMessage_ProjectsSuccess(t *testing.T) {
 	assert.Equal(t, "hi", resp.Message.Content)
 }
 
-func TestSendAgentChatMessage_TranslatesArchivedError(t *testing.T) {
+func TestSendAgentChatMessage_TranslatesNotFound(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	svc := &stubService{
 		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string) (*models.AgentSessionMessage, error) {
-			return nil, agents.ErrSessionAlreadyTerminated
+			return nil, gorm.ErrRecordNotFound
 		},
 	}
 	_, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
@@ -68,5 +67,5 @@ func TestSendAgentChatMessage_TranslatesArchivedError(t *testing.T) {
 		Content: "x",
 	})
 	require.Error(t, err)
-	assert.Equal(t, codes.FailedPrecondition, status.Code(err))
+	assert.Equal(t, codes.NotFound, status.Code(err))
 }

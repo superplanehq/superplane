@@ -12,6 +12,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const defaultMessagePageLimit = 50
+
 func ListAgentChatMessages(_ context.Context, svc AgentsService, orgID, userID string, req *pb.ListAgentChatMessagesRequest) (*pb.ListAgentChatMessagesResponse, error) {
 	org, user, err := parseOrgUser(orgID, userID)
 	if err != nil {
@@ -30,7 +32,20 @@ func ListAgentChatMessages(_ context.Context, svc AgentsService, orgID, userID s
 		return nil, status.Error(codes.Internal, "failed to load agent chat")
 	}
 
-	messages, err := svc.ListMessages(chatID)
+	var beforeID uuid.UUID
+	if req.BeforeId != "" {
+		beforeID, err = uuid.Parse(req.BeforeId)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, "invalid before_id")
+		}
+	}
+
+	limit := int(req.Limit)
+	if limit <= 0 {
+		limit = defaultMessagePageLimit
+	}
+
+	messages, err := svc.ListMessages(chatID, beforeID, limit)
 	if err != nil {
 		log.WithError(err).WithField("chat_id", chatID).Error("failed to list agent chat messages")
 		return nil, status.Error(codes.Internal, "failed to list messages")
@@ -40,5 +55,5 @@ func ListAgentChatMessages(_ context.Context, svc AgentsService, orgID, userID s
 	for i := range messages {
 		out = append(out, serializeMessage(&messages[i]))
 	}
-	return &pb.ListAgentChatMessagesResponse{Messages: out}, nil
+	return &pb.ListAgentChatMessagesResponse{Messages: out, HasMore: len(messages) == limit}, nil
 }

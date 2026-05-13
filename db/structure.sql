@@ -128,12 +128,10 @@ CREATE TABLE public.agent_sessions (
     canvas_id uuid NOT NULL,
     provider character varying(40) NOT NULL,
     provider_session_id text NOT NULL,
-    title character varying(200) DEFAULT ''::character varying NOT NULL,
     status character varying(40) DEFAULT 'idle'::character varying NOT NULL,
     last_active_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    archived_at timestamp with time zone
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -1177,7 +1175,7 @@ CREATE UNIQUE INDEX agent_session_messages_provider_event_idx ON public.agent_se
 -- Name: agent_session_messages_session_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX agent_session_messages_session_idx ON public.agent_session_messages USING btree (session_id, created_at);
+CREATE INDEX agent_session_messages_session_idx ON public.agent_session_messages USING btree (session_id, created_at DESC, id DESC);
 
 
 --
@@ -1191,7 +1189,7 @@ CREATE INDEX agent_sessions_provider_session_id_idx ON public.agent_sessions USI
 -- Name: agent_sessions_user_canvas_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USING btree (organization_id, user_id, canvas_id) WHERE (archived_at IS NULL);
+CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USING btree (organization_id, user_id, canvas_id);
 
 
 --

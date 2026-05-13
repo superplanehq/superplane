@@ -17,10 +17,8 @@ describe("fromApiChat", () => {
       canvasId: "",
       provider: "",
       status: "idle",
-      title: "",
       createdAt: null,
       updatedAt: null,
-      archivedAt: null,
     });
   });
 });

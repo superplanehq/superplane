@@ -23,15 +23,15 @@ type AgentSession struct {
 	CanvasID          uuid.UUID
 	Provider          string
 	ProviderSessionID string
-	Title             string
 	Status            string
 	LastActiveAt      *time.Time
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
-	ArchivedAt        *time.Time
 }
 
 func (AgentSession) TableName() string { return "agent_sessions" }
+
+var ErrAgentSessionNotFound = errors.New("agent session not found")
 
 func CreateAgentSessionInTransaction(tx *gorm.DB, session *AgentSession) error {
 	return tx.Create(session).Error
@@ -70,20 +70,18 @@ func FindAgentSessionForUser(organizationID, userID, sessionID uuid.UUID) (*Agen
 	return FindAgentSessionForUserInTransaction(database.Conn(), organizationID, userID, sessionID)
 }
 
-func ListAgentSessionsForUser(organizationID, userID, canvasID uuid.UUID) ([]AgentSession, error) {
-	var sessions []AgentSession
-	err := database.Conn().
+func FindAgentSessionByCanvasInTransaction(tx *gorm.DB, organizationID, userID, canvasID uuid.UUID) (*AgentSession, error) {
+	var session AgentSession
+	err := tx.
 		Where("organization_id = ?", organizationID).
 		Where("user_id = ?", userID).
 		Where("canvas_id = ?", canvasID).
-		Where("archived_at IS NULL").
-		Order("created_at DESC").
-		Find(&sessions).
+		First(&session).
 		Error
 	if err != nil {
 		return nil, err
 	}
-	return sessions, nil
+	return &session, nil
 }
 
 func UpdateAgentSessionStatusInTransaction(tx *gorm.DB, sessionID uuid.UUID, status string) error {
@@ -100,17 +98,6 @@ func UpdateAgentSessionStatusInTransaction(tx *gorm.DB, sessionID uuid.UUID, sta
 
 func UpdateAgentSessionStatus(sessionID uuid.UUID, status string) error {
 	return UpdateAgentSessionStatusInTransaction(database.Conn(), sessionID, status)
-}
-
-func UpdateAgentSessionTitleInTransaction(tx *gorm.DB, sessionID uuid.UUID, title string) error {
-	now := time.Now()
-	return tx.Model(&AgentSession{}).
-		Where("id = ?", sessionID).
-		Updates(map[string]any{
-			"title":      title,
-			"updated_at": &now,
-		}).
-		Error
 }
 
 // FailStuckStreamingSessions marks any session in "streaming" state whose
@@ -145,17 +132,3 @@ func FailStuckStreamingSessions(cutoff time.Time) ([]AgentSession, error) {
 	}
 	return stuck, nil
 }
-
-func ArchiveAgentSessionInTransaction(tx *gorm.DB, sessionID uuid.UUID) error {
-	now := time.Now()
-	return tx.Model(&AgentSession{}).
-		Where("id = ?", sessionID).
-		Where("archived_at IS NULL").
-		Updates(map[string]any{
-			"archived_at": &now,
-			"updated_at":  &now,
-		}).
-		Error
-}
-
-var ErrAgentSessionNotFound = errors.New("agent session not found")

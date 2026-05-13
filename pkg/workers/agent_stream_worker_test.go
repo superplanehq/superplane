@@ -87,7 +87,7 @@ func TestAgentStreamWorker_PersistsAssistantTurn(t *testing.T) {
 	defer cancel()
 	require.NoError(t, w.Handle(ctx, body))
 
-	stored, err := models.ListAgentSessionMessages(session.ID)
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
 	require.NoError(t, err)
 	require.Len(t, stored, 1, "the streamed text deltas must be coalesced into a single assistant message")
 	assert.Equal(t, models.AgentMessageRoleAssistant, stored[0].Role)
@@ -121,7 +121,7 @@ func TestAgentStreamWorker_PersistsToolEvents(t *testing.T) {
 	})
 	require.NoError(t, w.Handle(context.Background(), body))
 
-	stored, err := models.ListAgentSessionMessages(session.ID)
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
 	require.NoError(t, err)
 	require.Len(t, stored, 1, "matching tool start+finish must collapse into a single row (provider_event_id is unique)")
 	assert.Equal(t, models.AgentMessageRoleTool, stored[0].Role)
@@ -150,7 +150,7 @@ func TestAgentStreamWorker_ForceClosesOpenToolsOnTurnEnd(t *testing.T) {
 	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
 	require.NoError(t, w.Handle(context.Background(), body))
 
-	stored, err := models.ListAgentSessionMessages(session.ID)
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
 	require.NoError(t, err)
 	require.Len(t, stored, 1)
 	assert.Equal(t, models.AgentToolStatusFinished, stored[0].ToolStatus, "open tool must be force-closed when the turn ends")
@@ -203,15 +203,14 @@ func TestAgentStreamWorker_SkipsUnknownProvider(t *testing.T) {
 func TestAgentStreamWorker_CleanupFailsStuckStreamingSessions(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	staleCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	freshCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 
-	// Two streaming sessions: one whose last update is well past the
-	// stuck grace, one freshly streaming. Only the stale one should flip.
-	stale := mustCreateSession(t, r, canvas.ID)
+	stale := mustCreateSession(t, r, staleCanvas.ID)
 	require.NoError(t, database.Conn().Model(&models.AgentSession{}).
 		Where("id = ?", stale.ID).
 		Update("updated_at", time.Now().Add(-2*time.Hour)).Error)
-	fresh := mustCreateSession(t, r, canvas.ID)
+	fresh := mustCreateSession(t, r, freshCanvas.ID)
 
 	closed, err := models.FailStuckStreamingSessions(time.Now().Add(-30 * time.Minute))
 	require.NoError(t, err)

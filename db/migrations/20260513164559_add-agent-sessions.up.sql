@@ -7,17 +7,14 @@ CREATE TABLE IF NOT EXISTS agent_sessions (
     canvas_id UUID NOT NULL,
     provider VARCHAR(40) NOT NULL,
     provider_session_id TEXT NOT NULL,
-    title VARCHAR(200) NOT NULL DEFAULT '',
     status VARCHAR(40) NOT NULL DEFAULT 'idle',
     last_active_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    archived_at TIMESTAMPTZ
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX agent_sessions_user_canvas_idx
-    ON agent_sessions (organization_id, user_id, canvas_id)
-    WHERE archived_at IS NULL;
+CREATE UNIQUE INDEX agent_sessions_user_canvas_idx
+    ON agent_sessions (organization_id, user_id, canvas_id);
 
 CREATE INDEX agent_sessions_provider_session_id_idx
     ON agent_sessions (provider, provider_session_id);
@@ -35,7 +32,7 @@ CREATE TABLE IF NOT EXISTS agent_session_messages (
 );
 
 CREATE INDEX agent_session_messages_session_idx
-    ON agent_session_messages (session_id, created_at);
+    ON agent_session_messages (session_id, created_at DESC, id DESC);
 
 CREATE UNIQUE INDEX agent_session_messages_provider_event_idx
     ON agent_session_messages (session_id, provider_event_id)

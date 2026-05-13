@@ -53,7 +53,6 @@ type Provider interface {
 	// cancelled, or onEvent errors. Implementations must not call onEvent
 	// after returning.
 	StreamEvents(ctx context.Context, providerSessionID string, onEvent func(ProviderEvent) error) error
-	ArchiveSession(ctx context.Context, providerSessionID string) error
 }
 
 var ErrSessionAlreadyTerminated = errors.New("agent session already terminated")

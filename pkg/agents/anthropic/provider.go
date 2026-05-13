@@ -97,16 +97,6 @@ func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, o
 	return forwardSSE(ctx, body, onEvent)
 }
 
-func (p *Provider) ArchiveSession(ctx context.Context, providerSessionID string) error {
-	if providerSessionID == "" {
-		return fmt.Errorf("anthropic: provider session id is required")
-	}
-	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/archive", nil); err != nil {
-		return fmt.Errorf("anthropic: archive session: %w", err)
-	}
-	return nil
-}
-
 func withPreamble(message, preamble string) string {
 	if preamble == "" {
 		return message

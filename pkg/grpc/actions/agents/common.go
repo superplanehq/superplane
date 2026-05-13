@@ -15,12 +15,10 @@ import (
 )
 
 type AgentsService interface {
-	CreateSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error)
-	ListSessions(organizationID, userID, canvasID uuid.UUID) ([]models.AgentSession, error)
+	EnsureSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error)
 	GetSession(organizationID, userID, sessionID uuid.UUID) (*models.AgentSession, error)
-	ListMessages(sessionID uuid.UUID) ([]models.AgentSessionMessage, error)
+	ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]models.AgentSessionMessage, error)
 	SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string) (*models.AgentSessionMessage, error)
-	ArchiveSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error
 }
 
 func parseOrgUser(orgID, userID string) (org, user uuid.UUID, err error) {
@@ -33,18 +31,6 @@ func parseOrgUser(orgID, userID string) (org, user uuid.UUID, err error) {
 		return uuid.Nil, uuid.Nil, status.Error(codes.Internal, "invalid user")
 	}
 	return org, user, nil
-}
-
-func parseCanvasScope(orgID, userID, canvasID string) (org, user, canvas uuid.UUID, err error) {
-	org, user, err = parseOrgUser(orgID, userID)
-	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, err
-	}
-	canvas, err = uuid.Parse(canvasID)
-	if err != nil {
-		return uuid.Nil, uuid.Nil, uuid.Nil, status.Error(codes.InvalidArgument, "invalid canvas id")
-	}
-	return org, user, canvas, nil
 }
 
 func ensureCanvas(orgID, canvasID uuid.UUID) error {
@@ -63,16 +49,12 @@ func serializeChat(session *models.AgentSession) *pb.AgentChatInfo {
 		CanvasId: session.CanvasID.String(),
 		Provider: session.Provider,
 		Status:   session.Status,
-		Title:    session.Title,
 	}
 	if session.CreatedAt != nil {
 		info.CreatedAt = timestamppb.New(*session.CreatedAt)
 	}
 	if session.UpdatedAt != nil {
 		info.UpdatedAt = timestamppb.New(*session.UpdatedAt)
-	}
-	if session.ArchivedAt != nil {
-		info.ArchivedAt = timestamppb.New(*session.ArchivedAt)
 	}
 	return info
 }

@@ -1,7 +1,7 @@
 import { useCallback, useRef } from "react";
 import useWebSocket from "react-use-websocket";
-import { useQueryClient, type QueryClient } from "@tanstack/react-query";
-import { agentChatKeys } from "./useAgentChats";
+import { useQueryClient, type InfiniteData, type QueryClient } from "@tanstack/react-query";
+import { agentChatKeys, type AgentMessagesPage } from "./useAgentChats";
 import type { AgentMessage, AgentSessionWebsocketEvent } from "@/components/AgentSidebar/types";
 
 function parseAgentEvent(event: MessageEvent<unknown>): AgentSessionWebsocketEvent | null {
@@ -28,13 +28,10 @@ function dispatchAgentEvent(
   }
   if (data.event === "stream_started" || data.event === "turn_completed" || data.event === "session_failed") {
     callbacks.onStatusChange?.(data.status ?? "", data.error);
-    // Refresh the chat list so status pills (streaming → idle) update.
     void queryClient.invalidateQueries({ queryKey: agentChatKeys.all });
   }
 }
 
-// Upsert before notifying the consumer so the persisted row is in the
-// cached list before its streaming buffer is cleared.
 function handlePersistedMessage(
   data: { sessionId: string; message: AgentMessage },
   callbacks: AgentStreamCallbacks,
@@ -46,14 +43,25 @@ function handlePersistedMessage(
   callbacks.onPersistedMessage?.(data.message);
 }
 
+// The infinite cache stores oldest-first pages with the newest page LAST.
+// New messages go into the latest page; an existing message (by id) is
+// updated in place.
 function upsertMessageInCache(queryClient: QueryClient, sessionId: string, message: AgentMessage): void {
-  queryClient.setQueryData<AgentMessage[]>(agentChatKeys.messages(sessionId), (prev) => {
+  queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages(sessionId), (prev) => {
     if (!prev) return prev;
-    const existing = prev.findIndex((m) => m.id === message.id);
-    if (existing === -1) return [...prev, message];
-    const next = prev.slice();
-    next[existing] = message;
-    return next;
+    const pages = prev.pages.map((p) => ({ ...p, messages: p.messages.slice() }));
+    for (const page of pages) {
+      const idx = page.messages.findIndex((m) => m.id === message.id);
+      if (idx !== -1) {
+        page.messages[idx] = message;
+        return { ...prev, pages };
+      }
+    }
+    if (pages.length === 0) {
+      return { ...prev, pages: [{ messages: [message], hasMore: false }] };
+    }
+    pages[pages.length - 1].messages.push(message);
+    return { ...prev, pages };
   });
 }
 

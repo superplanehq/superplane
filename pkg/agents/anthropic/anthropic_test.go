@@ -134,21 +134,6 @@ func TestSendMessage_RequiresSessionID(t *testing.T) {
 	require.Error(t, p.SendMessage(context.Background(), "", "hi", agents.SendMessageOptions{}))
 }
 
-func TestArchiveSession(t *testing.T) {
-	called := false
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		called = true
-		assert.Equal(t, "/sessions/sesn_abc/archive", r.URL.Path)
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("{}"))
-	}))
-	defer server.Close()
-
-	p := newTestProvider(t, server)
-	require.NoError(t, p.ArchiveSession(context.Background(), "sesn_abc"))
-	assert.True(t, called)
-}
-
 func TestStreamEvents_MapsKnownTypes(t *testing.T) {
 	const sse = "data: {\"id\":\"e1\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"Hello\"}]}\n\n" +
 		"data: {\"id\":\"e2\",\"type\":\"agent.tool_use\",\"name\":\"bash\",\"input\":{\"command\":\"ls -la\"}}\n\n" +

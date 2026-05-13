@@ -76,21 +76,30 @@ func AppendAgentSessionMessage(msg *AgentSessionMessage) error {
 	return AppendAgentSessionMessageInTransaction(database.Conn(), msg)
 }
 
-func ListAgentSessionMessagesInTransaction(tx *gorm.DB, sessionID uuid.UUID) ([]AgentSessionMessage, error) {
-	var messages []AgentSessionMessage
-	err := tx.
+// ListAgentSessionMessagesPage returns up to `limit` messages strictly older
+// than `before` (or the most recent `limit` when `before` is nil), in
+// chronological order (oldest-first). Used for tail-paginated chat scroll.
+func ListAgentSessionMessagesPage(sessionID uuid.UUID, before *AgentSessionMessage, limit int) ([]AgentSessionMessage, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	query := database.Conn().
 		Where("session_id = ?", sessionID).
-		Order("created_at ASC, id ASC").
-		Find(&messages).
-		Error
-	if err != nil {
+		Order("created_at DESC, id DESC").
+		Limit(limit)
+
+	if before != nil && before.CreatedAt != nil {
+		query = query.Where("(created_at, id) < (?, ?)", before.CreatedAt, before.ID)
+	}
+
+	var rows []AgentSessionMessage
+	if err := query.Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	return messages, nil
-}
-
-func ListAgentSessionMessages(sessionID uuid.UUID) ([]AgentSessionMessage, error) {
-	return ListAgentSessionMessagesInTransaction(database.Conn(), sessionID)
+	for i, j := 0, len(rows)-1; i < j; i, j = i+1, j-1 {
+		rows[i], rows[j] = rows[j], rows[i]
+	}
+	return rows, nil
 }
 
 func CountAgentSessionMessagesInTransaction(tx *gorm.DB, sessionID uuid.UUID) (int64, error) {

@@ -172,9 +172,6 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 		}).Warn("agent stream: provider mismatch, dropping")
 		return nil
 	}
-	if session.ArchivedAt != nil {
-		return nil
-	}
 
 	ctx, cancel := context.WithTimeout(parentCtx, agentStreamTimeout)
 	defer cancel()

@@ -1,8 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createElement, type ReactNode } from "react";
-import { agentChatKeys } from "@/hooks/useAgentChats";
+import { agentChatKeys, type AgentMessagesPage } from "@/hooks/useAgentChats";
 
 const { useWebSocketMock } = vi.hoisted(() => ({
   useWebSocketMock: vi.fn(),
@@ -45,6 +45,19 @@ function render(callbacks: Parameters<typeof useAgentSessionWebsocket>[2]) {
   return queryClient;
 }
 
+function seedPages(queryClient: QueryClient, pages: AgentMessagesPage[]) {
+  queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("session-1"), {
+    pages,
+    pageParams: pages.map(() => ""),
+  });
+}
+
+function flatMessageIds(queryClient: QueryClient): string[] {
+  const data = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("session-1"));
+  if (!data) return [];
+  return data.pages.flatMap((p) => p.messages.map((m) => m.id));
+}
+
 describe("useAgentSessionWebsocket", () => {
   it("connects to the per-session WebSocket URL with org id", () => {
     render({});
@@ -72,20 +85,23 @@ describe("useAgentSessionWebsocket", () => {
     expect(onDelta).toHaveBeenCalledWith("Hello");
   });
 
-  it("appends an assistant_message into the cached list and fires onPersistedMessage", () => {
+  it("appends an assistant_message to the newest page and fires onPersistedMessage", () => {
     const onPersisted = vi.fn();
     const queryClient = render({ onPersistedMessage: onPersisted });
-    // Seed the cache so the upsert can apply; the hook deliberately
-    // doesn't seed from WS alone (the initial list comes from the API).
-    queryClient.setQueryData(agentChatKeys.messages("session-1"), [
+    seedPages(queryClient, [
       {
-        id: "msg-existing",
-        role: "user",
-        content: "hi",
-        toolName: "",
-        toolCallId: "",
-        toolStatus: "",
-        createdAt: null,
+        messages: [
+          {
+            id: "msg-existing",
+            role: "user",
+            content: "hi",
+            toolName: "",
+            toolCallId: "",
+            toolStatus: "",
+            createdAt: null,
+          },
+        ],
+        hasMore: false,
       },
     ]);
     emit("assistant_message", {
@@ -94,13 +110,12 @@ describe("useAgentSessionWebsocket", () => {
       message: { id: "msg-1", role: "assistant", content: "done" },
     });
     expect(onPersisted).toHaveBeenCalledWith(expect.objectContaining({ id: "msg-1", content: "done" }));
-    const cached = queryClient.getQueryData(agentChatKeys.messages("session-1")) as Array<{ id: string }>;
-    expect(cached.map((m) => m.id)).toEqual(["msg-existing", "msg-1"]);
+    expect(flatMessageIds(queryClient)).toEqual(["msg-existing", "msg-1"]);
   });
 
-  it("upserts tool events into the cache (started -> finished updates in place)", () => {
+  it("upserts tool events in place across pages", () => {
     const queryClient = render({});
-    queryClient.setQueryData(agentChatKeys.messages("session-1"), []);
+    seedPages(queryClient, [{ messages: [], hasMore: false }]);
     emit("tool_started", {
       sessionId: "session-1",
       messageId: "tool-1",
@@ -111,15 +126,12 @@ describe("useAgentSessionWebsocket", () => {
       messageId: "tool-1",
       message: { id: "tool-1", role: "tool", toolName: "search", toolStatus: "finished" },
     });
-    const cached = queryClient.getQueryData(agentChatKeys.messages("session-1")) as Array<{
-      id: string;
-      toolStatus: string;
-    }>;
-    expect(cached).toHaveLength(1);
-    expect(cached[0].toolStatus).toBe("finished");
+    const data = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("session-1"));
+    expect(data?.pages[0].messages).toHaveLength(1);
+    expect(data?.pages[0].messages[0].toolStatus).toBe("finished");
   });
 
-  it("does not seed the cache when the messages query has not been fetched yet", () => {
+  it("does not seed the cache when no pages have been fetched yet", () => {
     const queryClient = render({});
     emit("assistant_message", {
       sessionId: "session-1",

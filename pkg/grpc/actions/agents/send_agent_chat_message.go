@@ -6,15 +6,12 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/agents"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
-// SendAgentChatMessage returns the persisted user message. The assistant
-// reply streams back asynchronously over the chat's websocket topic.
 func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID string, req *pb.SendAgentChatMessageRequest) (*pb.SendAgentChatMessageResponse, error) {
 	org, user, err := parseOrgUser(orgID, userID)
 	if err != nil {
@@ -32,9 +29,6 @@ func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "agent chat not found")
-		}
-		if errors.Is(err, agents.ErrSessionAlreadyTerminated) {
-			return nil, status.Error(codes.FailedPrecondition, "agent chat is archived")
 		}
 		log.WithError(err).WithField("chat_id", chatID).Error("failed to send agent chat message")
 		return nil, status.Error(codes.Internal, "failed to send agent chat message")

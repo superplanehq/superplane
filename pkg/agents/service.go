@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,28 +15,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
-
-const chatTitleMaxLength = 60
-
-func deriveChatTitle(content string) string {
-	trimmed := strings.TrimSpace(content)
-	if trimmed == "" {
-		return ""
-	}
-	for _, line := range strings.Split(trimmed, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		trimmed = line
-		break
-	}
-	runes := []rune(trimmed)
-	if len(runes) > chatTitleMaxLength {
-		return string(runes[:chatTitleMaxLength-1]) + "…"
-	}
-	return trimmed
-}
 
 const agentTokenTTL = 1 * time.Hour
 
@@ -63,9 +40,19 @@ func NewService(provider Provider, auth authorization.Authorization, jwtSigner *
 
 func (s *Service) ProviderName() string { return s.provider.Name() }
 
-func (s *Service) CreateSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
+// EnsureSession returns the user's single chat session for the given canvas,
+// provisioning it on the upstream provider on first call.
+func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
 	if err := s.checkAgentPermission(userID.String(), organizationID.String()); err != nil {
 		return nil, err
+	}
+
+	existing, err := models.FindAgentSessionByCanvasInTransaction(database.Conn(), organizationID, userID, canvasID)
+	if err == nil {
+		return existing, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("load session: %w", err)
 	}
 
 	upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{})
@@ -81,27 +68,37 @@ func (s *Service) CreateSession(ctx context.Context, organizationID, userID, can
 		ProviderSessionID: upstream.ProviderSessionID,
 		Status:            models.AgentSessionStatusIdle,
 	}
-
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		return models.CreateAgentSessionInTransaction(tx, session)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("persist session: %w", err)
 	}
-
 	return session, nil
-}
-
-func (s *Service) ListSessions(organizationID, userID, canvasID uuid.UUID) ([]models.AgentSession, error) {
-	return models.ListAgentSessionsForUser(organizationID, userID, canvasID)
 }
 
 func (s *Service) GetSession(organizationID, userID, sessionID uuid.UUID) (*models.AgentSession, error) {
 	return models.FindAgentSessionForUser(organizationID, userID, sessionID)
 }
 
-func (s *Service) ListMessages(sessionID uuid.UUID) ([]models.AgentSessionMessage, error) {
-	return models.ListAgentSessionMessages(sessionID)
+// ListMessages returns up to `limit` messages older than `beforeID` (or the
+// most recent `limit` when `beforeID` is uuid.Nil), chronologically ordered.
+func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]models.AgentSessionMessage, error) {
+	var before *models.AgentSessionMessage
+	if beforeID != uuid.Nil {
+		var anchor models.AgentSessionMessage
+		if err := database.Conn().
+			Where("session_id = ?", sessionID).
+			Where("id = ?", beforeID).
+			First(&anchor).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, nil
+			}
+			return nil, err
+		}
+		before = &anchor
+	}
+	return models.ListAgentSessionMessagesPage(sessionID, before, limit)
 }
 
 func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string) (*models.AgentSessionMessage, error) {
@@ -112,9 +109,6 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	session, err := models.FindAgentSessionForUser(organizationID, userID, sessionID)
 	if err != nil {
 		return nil, err
-	}
-	if session.ArchivedAt != nil {
-		return nil, ErrSessionAlreadyTerminated
 	}
 
 	preamble := ""
@@ -129,20 +123,12 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 			return err
 		}
 		if count == 0 {
-			// Mint and inject without persisting — the token never
-			// touches the DB.
 			token, _, mintErr := s.mintAgentToken(organizationID.String(), userID.String(), session.CanvasID.String())
 			if mintErr != nil {
 				return mintErr
 			}
 			preamble = s.firstTurnPreamble(session, token)
-			if title := deriveChatTitle(content); title != "" {
-				if err := models.UpdateAgentSessionTitleInTransaction(tx, sessionID, title); err != nil {
-					return err
-				}
-			}
 		}
-
 		return models.AppendAgentSessionMessageInTransaction(tx, persisted)
 	})
 	if err != nil {
@@ -166,28 +152,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		log.WithError(err).Error("failed to enqueue agent stream request")
 		return nil, fmt.Errorf("enqueue stream: %w", err)
 	}
-
 	return persisted, nil
-}
-
-// ArchiveSession soft-archives locally even if the upstream archive fails so
-// the user is never stuck in a chat we cannot get them out of.
-func (s *Service) ArchiveSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error {
-	session, err := models.FindAgentSessionForUser(organizationID, userID, sessionID)
-	if err != nil {
-		return err
-	}
-	if session.ArchivedAt != nil {
-		return nil
-	}
-
-	if err := s.provider.ArchiveSession(ctx, session.ProviderSessionID); err != nil {
-		log.WithError(err).WithField("session_id", sessionID).Warn("failed to archive upstream agent session")
-	}
-
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		return models.ArchiveAgentSessionInTransaction(tx, sessionID)
-	})
 }
 
 func (s *Service) firstTurnPreamble(session *models.AgentSession, token string) string {
