@@ -56,6 +56,7 @@ type Field struct {
 	 */
 	Type        string `json:"type"`
 	Description string `json:"description"`
+	Tooltip     string `json:"tooltip,omitempty"`
 	Required    bool   `json:"required"`
 	Default     any    `json:"default"`
 	Togglable   bool   `json:"togglable"`

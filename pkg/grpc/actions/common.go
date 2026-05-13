@@ -305,6 +305,10 @@ func ConfigurationFieldToProto(field configuration.Field) *configpb.Field {
 		pbField.Placeholder = &field.Placeholder
 	}
 
+	if field.Tooltip != "" {
+		pbField.Tooltip = &field.Tooltip
+	}
+
 	if len(field.VisibilityConditions) > 0 {
 		pbField.VisibilityConditions = make([]*configpb.VisibilityCondition, len(field.VisibilityConditions))
 		for i, cond := range field.VisibilityConditions {
@@ -640,6 +644,10 @@ func ProtoToConfigurationField(pbField *configpb.Field) configuration.Field {
 
 	if pbField.Togglable != nil {
 		field.Togglable = *pbField.Togglable
+	}
+
+	if pbField.Tooltip != nil {
+		field.Tooltip = *pbField.Tooltip
 	}
 
 	if len(pbField.VisibilityConditions) > 0 {

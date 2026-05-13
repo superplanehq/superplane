@@ -57,6 +57,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
     );
   }
 
+  const fieldWithTooltip = field as { tooltip?: string };
   return (
     <AutoCompleteInput
       exampleObj={autocompleteExampleObj ?? null}
@@ -68,7 +69,7 @@ export const StringFieldRenderer: React.FC<FieldRendererProps> = ({
       suffix=" }}"
       inputSize="md"
       showValuePreview
-      quickTip="Tip: type `{{` to start an expression."
+      quickTip={fieldWithTooltip.tooltip ? undefined : "Tip: type `{{` to start an expression."}
       className=""
       data-testid={toTestId(`string-field-${field.name}`)}
       excludedSuggestions={excludedSuggestions}

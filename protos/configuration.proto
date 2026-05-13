@@ -17,6 +17,7 @@ message Field {
   optional string placeholder = 10;
   optional bool sensitive = 11;
   optional bool togglable = 12;
+  optional string tooltip = 13;
 }
 
 message TypeOptions {

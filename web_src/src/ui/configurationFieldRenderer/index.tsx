@@ -1,6 +1,8 @@
 import React from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/ui/switch";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
 import type { FieldRendererProps, ValidationError } from "./types";
 import { StringFieldRenderer } from "./StringFieldRenderer";
 import { ExpressionFieldRenderer } from "./ExpressionFieldRenderer";
@@ -264,6 +266,9 @@ export const ConfigurationFieldRenderer = ({
   if (!isVisible) {
     return null;
   }
+
+  const fieldTooltip = (field as { tooltip?: string }).tooltip;
+
   const renderField = () => {
     const commonProps = {
       field,
@@ -440,9 +445,19 @@ export const ConfigurationFieldRenderer = ({
         <div className="flex items-center gap-3">
           {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
           {isEnabled && renderField()}
-          <Label className="text-left cursor-pointer">
+          <Label className="text-left cursor-pointer flex items-center gap-1">
             {field.label || field.name}
             {isRequired && <span className="text-gray-800 ml-1">*</span>}
+            {fieldTooltip && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="size-3.5 shrink-0 text-gray-400 hover:text-gray-600 cursor-default" aria-hidden />
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-balance">
+                  {fieldTooltip}
+                </TooltipContent>
+              </Tooltip>
+            )}
             {hasFieldError &&
               ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
                 (!enableRealtimeValidation &&
@@ -469,7 +484,7 @@ export const ConfigurationFieldRenderer = ({
         )}
 
         {/* Display field description */}
-        {field.description && (
+        {field.description && !fieldTooltip && (
           <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
         )}
       </div>
@@ -481,9 +496,19 @@ export const ConfigurationFieldRenderer = ({
     <div className="space-y-2">
       <div className="flex items-center gap-3">
         {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
-        <Label className="block text-left flex-1 min-w-0">
+        <Label className="flex items-center gap-1 text-left flex-1 min-w-0">
           {field.label || field.name}
           {isRequired && <span className="text-gray-800 ml-1">*</span>}
+          {fieldTooltip && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Info className="size-3.5 shrink-0 text-gray-400 hover:text-gray-600 cursor-default" aria-hidden />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-balance">
+                {fieldTooltip}
+              </TooltipContent>
+            </Tooltip>
+          )}
           {hasFieldError &&
             ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
               (!enableRealtimeValidation &&
@@ -516,7 +541,7 @@ export const ConfigurationFieldRenderer = ({
       )}
 
       {/* Display field description */}
-      {field.description && (
+      {field.description && !fieldTooltip && (
         <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
       )}
     </div>
