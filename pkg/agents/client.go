@@ -103,6 +103,36 @@ func (c *Client) ListEvents(ctx context.Context, sessionID string, limit int) (*
 	return &events, nil
 }
 
+// OpenEventStream opens an SSE stream for real-time session events.
+// The caller must close the returned response body when done.
+func (c *Client) OpenEventStream(ctx context.Context, sessionID string) (io.ReadCloser, error) {
+	url := c.baseURL + "/sessions/" + sessionID + "/events/stream?beta=true"
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create stream request: %w", err)
+	}
+
+	req.Header.Set("x-api-key", c.apiKey)
+	req.Header.Set("anthropic-version", "2023-06-01")
+	req.Header.Set("anthropic-beta", "managed-agents-2026-04-01")
+	req.Header.Set("Accept", "text/event-stream")
+
+	// Use a client without timeout for long-lived SSE connections
+	sseClient := &http.Client{}
+	resp, err := sseClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("open stream: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		data, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		return nil, fmt.Errorf("stream API error %d: %s", resp.StatusCode, string(data))
+	}
+
+	return resp.Body, nil
+}
+
 func (c *Client) do(ctx context.Context, method, path string, body any) ([]byte, error) {
 	var bodyReader io.Reader
 	if body != nil {

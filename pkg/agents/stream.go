@@ -1,6 +1,7 @@
 package agents
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -35,14 +36,12 @@ type agentContext struct {
 }
 
 // HandleStream handles POST /api/v1/agents/chats/{canvas_id}/stream
-// Authentication is handled by the caller (middleware extracts user/org from cookie).
 func (h *StreamHandler) HandleStream(w http.ResponseWriter, r *http.Request, orgID, userID, canvasID string) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Parse request body
 	var body streamRequest
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
@@ -54,7 +53,6 @@ func (h *StreamHandler) HandleStream(w http.ResponseWriter, r *http.Request, org
 		return
 	}
 
-	// Get or create session
 	session, err := h.store.FindSession(orgID, userID, canvasID)
 	if err != nil {
 		http.Error(w, "session not found — call GetOrCreateChat first", http.StatusNotFound)
@@ -76,40 +74,37 @@ func (h *StreamHandler) HandleStream(w http.ResponseWriter, r *http.Request, org
 		return
 	}
 
-	// Send run_started
 	writeSSE(w, flusher, map[string]any{"type": "run_started", "model": "claude-sonnet-4-6"})
 
-	// Build prompt with canvas context and CLI credentials
-	msgCount := 1 // We just stored the current user message
+	// Build prompt with context
+	msgCount := 1
 	if existingMsgs, _ := h.store.ListMessages(session.ID); len(existingMsgs) > 0 {
 		msgCount = len(existingMsgs)
 	}
 	prompt := h.buildPrompt(session, body, canvasID, msgCount)
 
-	// Count existing events before sending (to skip old turns when streaming)
-	existingEvents, _ := h.client.ListEvents(r.Context(), session.AnthropicSessionID, 200)
-	var skipEventIDs map[string]bool
-	if existingEvents != nil {
-		skipEventIDs = make(map[string]bool, len(existingEvents.Data))
-		for _, ev := range existingEvents.Data {
-			skipEventIDs[ev.ID] = true
-		}
-	} else {
-		skipEventIDs = make(map[string]bool)
-	}
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
+	defer cancel()
 
-	// Send message to Anthropic
-	if err := h.client.SendMessage(r.Context(), session.AnthropicSessionID, prompt); err != nil {
+	// 1. Open SSE stream from Anthropic BEFORE sending message (per docs)
+	sseStream, err := h.client.OpenEventStream(ctx, session.AnthropicSessionID)
+	if err != nil {
+		log.WithError(err).Error("failed to open Anthropic SSE stream")
+		writeSSE(w, flusher, map[string]any{"type": "run_failed", "error": "failed to open event stream"})
+		writeSSE(w, flusher, map[string]any{"type": "done"})
+		return
+	}
+	defer sseStream.Close()
+
+	// 2. Send the user message
+	if err := h.client.SendMessage(ctx, session.AnthropicSessionID, prompt); err != nil {
 		writeSSE(w, flusher, map[string]any{"type": "run_failed", "error": err.Error()})
 		writeSSE(w, flusher, map[string]any{"type": "done"})
 		return
 	}
 
-	// Poll for completion and stream events
-	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
-	defer cancel()
-
-	assistantContent := h.pollAndStream(ctx, w, flusher, session.AnthropicSessionID, skipEventIDs)
+	// 3. Read events from the SSE stream and forward to the browser
+	assistantContent := h.forwardSSEStream(ctx, sseStream, w, flusher)
 
 	// Store assistant response
 	if assistantContent != "" {
@@ -117,118 +112,98 @@ func (h *StreamHandler) HandleStream(w http.ResponseWriter, r *http.Request, org
 	}
 }
 
-func (h *StreamHandler) pollAndStream(ctx context.Context, w http.ResponseWriter, flusher http.Flusher, sessionID string, skipEventIDs map[string]bool) string {
-	seenEventIDs := make(map[string]bool)
-	// Pre-populate with events from previous turns
-	for id := range skipEventIDs {
-		seenEventIDs[id] = true
-	}
+// forwardSSEStream reads events from the Anthropic SSE stream and forwards them to the browser.
+func (h *StreamHandler) forwardSSEStream(ctx context.Context, sseStream interface{ Read([]byte) (int, error) }, w http.ResponseWriter, flusher http.Flusher) string {
+	scanner := bufio.NewScanner(sseStream)
+	// Increase buffer for large events
+	scanner.Buffer(make([]byte, 0, 256*1024), 256*1024)
+
 	var assistantContent string
 
-	for {
+	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
 			writeSSE(w, flusher, map[string]any{"type": "run_failed", "error": "timeout"})
 			writeSSE(w, flusher, map[string]any{"type": "done"})
 			return assistantContent
-		case <-time.After(2 * time.Second):
+		default:
 		}
 
-		// Get events first
-		events, err := h.client.ListEvents(ctx, sessionID, 200)
-		if err != nil {
-			log.WithError(err).Error("failed to list events")
+		line := scanner.Text()
+
+		// SSE format: "data: {json}"
+		if !strings.HasPrefix(line, "data: ") {
 			continue
 		}
 
-		// Stream new events and detect completion from event types
-		// Only consider idle/failed events that come AFTER we've seen the user.message
-		// for this turn (to avoid reacting to idle events from previous turns)
-		sawIdle := false
-		sawFailed := false
-		sawCurrentUserMessage := false
-		for _, event := range events.Data {
-			if seenEventIDs[event.ID] {
-				continue
-			}
-			seenEventIDs[event.ID] = true
-
-			// Track when we see our user message (marks the start of current turn)
-			if event.Type == "user.message" {
-				sawCurrentUserMessage = true
-				continue
-			}
-
-			// Only detect completion if it's after our user message
-			if event.Type == "session.status_idle" {
-				if sawCurrentUserMessage {
-					sawIdle = true
-				}
-				continue
-			}
-			if event.Type == "session.status_failed" {
-				if sawCurrentUserMessage {
-					sawFailed = true
-				}
-				continue
-			}
-
-			// Skip other session/thread status events
-			if strings.HasPrefix(event.Type, "session.") || strings.HasPrefix(event.Type, "session.thread") {
-				continue
-			}
-
-			text := h.streamEvent(w, flusher, event)
-			if text != "" {
-				assistantContent += text
-			}
+		jsonData := strings.TrimPrefix(line, "data: ")
+		if jsonData == "" {
+			continue
 		}
 
-		// Only consider done AFTER processing all events in this batch
-		if sawIdle {
+		var event Event
+		if err := json.Unmarshal([]byte(jsonData), &event); err != nil {
+			log.WithError(err).WithField("data", jsonData[:min(len(jsonData), 100)]).Warn("failed to parse SSE event")
+			continue
+		}
+
+		// Process the event
+		switch event.Type {
+		case "session.status_idle":
+			// Turn complete — close the stream
 			if assistantContent != "" {
 				writeSSE(w, flusher, map[string]any{"type": "final_answer", "output": assistantContent})
 			}
 			writeSSE(w, flusher, map[string]any{"type": "run_completed"})
 			writeSSE(w, flusher, map[string]any{"type": "done"})
 			return assistantContent
-		}
 
-		if sawFailed {
-			writeSSE(w, flusher, map[string]any{"type": "run_failed", "error": "agent session failed"})
+		case "session.status_terminated", "session.error":
+			errMsg := "agent session failed"
+			if event.Type == "session.error" {
+				errMsg = "agent error"
+			}
+			writeSSE(w, flusher, map[string]any{"type": "run_failed", "error": errMsg})
 			writeSSE(w, flusher, map[string]any{"type": "done"})
 			return assistantContent
-		}
-	}
-}
 
-func (h *StreamHandler) streamEvent(w http.ResponseWriter, flusher http.Flusher, event Event) string {
-	switch event.Type {
-	case "agent.tool_use":
-		label := event.Name
-		if label == "" {
-			label = "working..."
-		}
-		writeSSE(w, flusher, map[string]any{
-			"type":         "tool_started",
-			"tool_name":    event.Name,
-			"tool_call_id": event.ID,
-			"tool_label":   label,
-		})
-	case "agent.tool_result":
-		writeSSE(w, flusher, map[string]any{
-			"type":         "tool_finished",
-			"tool_name":    event.Name,
-			"tool_call_id": event.ID,
-		})
-	case "agent.message":
-		text := extractText(event)
-		if text != "" {
-			writeSSE(w, flusher, map[string]any{"type": "model_delta", "content": text})
-			return text
+		case "agent.message":
+			text := extractText(event)
+			if text != "" {
+				assistantContent += text
+				writeSSE(w, flusher, map[string]any{"type": "model_delta", "content": text})
+			}
+
+		case "agent.tool_use":
+			label := event.Name
+			if label == "" {
+				label = "working..."
+			}
+			writeSSE(w, flusher, map[string]any{
+				"type":         "tool_started",
+				"tool_name":    event.Name,
+				"tool_call_id": event.ID,
+				"tool_label":   label,
+			})
+
+		case "agent.tool_result":
+			writeSSE(w, flusher, map[string]any{
+				"type":         "tool_finished",
+				"tool_name":    event.Name,
+				"tool_call_id": event.ID,
+			})
+
+		// Ignore other event types (span.*, session.status_running, etc.)
 		}
 	}
-	return ""
+
+	if err := scanner.Err(); err != nil {
+		log.WithError(err).Error("SSE stream read error")
+		writeSSE(w, flusher, map[string]any{"type": "run_failed", "error": "stream disconnected"})
+		writeSSE(w, flusher, map[string]any{"type": "done"})
+	}
+
+	return assistantContent
 }
 
 func extractText(event Event) string {
@@ -304,4 +279,11 @@ func writeSSE(w http.ResponseWriter, flusher http.Flusher, data map[string]any) 
 	}
 	fmt.Fprintf(w, "data: %s\n\n", b)
 	flusher.Flush()
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
