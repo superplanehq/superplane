@@ -36,22 +36,18 @@ tidy:
 test.setup.build:
 	@if [ -d "tmp/screenshots" ]; then rm -rf tmp/screenshots; fi
 	@mkdir -p tmp/screenshots
-	$(COMPOSE) build --pull
 	$(COMPOSE) run --rm app go mod download
 	$(MAKE) gen.setup.backend
 	$(MAKE) test.e2e.ui.setup
 
 test.setup:
 	$(MAKE) test.setup.build
-	$(MAKE) test.start
+	$(MAKE) dev.up
 	$(MAKE) test.setup.db
 
 test.setup.db:
 	$(MAKE) db.create DB_NAME=superplane_test
 	$(MAKE) db.migrate DB_NAME=superplane_test
-
-test.start:
-	$(COMPOSE) up -d --wait
 
 test.down:
 	$(COMPOSE) down --remove-orphans
@@ -120,9 +116,7 @@ format.js.check:
 # then `make dev.server`. Day-to-day: `make dev.up` then `make dev.server` (or `make dev.server.fg` for attached logs).
 
 dev.up:
-	$(COMPOSE) build
-	$(COMPOSE) pull
-	$(COMPOSE) up -d --wait
+	$(COMPOSE) up -d --wait --build --pull always --quiet-pull
 
 dev.setup:
 	@test -n "$$($(COMPOSE) ps --status running -q app 2>/dev/null)" || { echo "Run \`make dev.up\` first (app container is not running)." >&2; exit 1; }
@@ -235,7 +229,7 @@ ui.start:
 	npm run storybook
 
 #
-# Database target helpers (require a running app container: `make dev.up` or `make test.start`)
+# Database target helpers (require a running app container: `make dev.up`)
 #
 
 db.create:
