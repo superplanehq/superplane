@@ -14,6 +14,9 @@ import { createPoolMapper } from "./create_pool";
 import { getPoolMapper } from "./get_pool";
 import { deletePoolMapper } from "./delete_pool";
 import { updatePoolMapper } from "./update_pool";
+import { purgeCacheMapper } from "./purge_cache";
+import { orderCertificatePackMapper } from "./order_certificate_pack";
+import { deleteCertificatePackMapper } from "./delete_certificate_pack";
 import { createLoadBalancerMapper } from "./create_load_balancer";
 import { getLoadBalancerMapper } from "./get_load_balancer";
 import { updateLoadBalancerMapper } from "./update_load_balancer";
@@ -38,6 +41,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   updatePool: updatePoolMapper,
   getPool: getPoolMapper,
   deletePool: deletePoolMapper,
+  purgeCache: purgeCacheMapper,
+  orderCertificatePack: orderCertificatePackMapper,
+  deleteCertificatePack: deleteCertificatePackMapper,
   createLoadBalancer: createLoadBalancerMapper,
   getLoadBalancer: getLoadBalancerMapper,
   updateLoadBalancer: updateLoadBalancerMapper,
@@ -67,6 +73,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   updatePool: buildActionStateRegistry("updated"),
   getPool: buildActionStateRegistry("fetched"),
   deletePool: buildActionStateRegistry("deleted"),
+  purgeCache: buildActionStateRegistry("purged"),
+  orderCertificatePack: buildActionStateRegistry("ordered"),
+  deleteCertificatePack: buildActionStateRegistry("deleted"),
   createLoadBalancer: buildActionStateRegistry("created"),
   getLoadBalancer: buildActionStateRegistry("fetched"),
   updateLoadBalancer: buildActionStateRegistry("updated"),
