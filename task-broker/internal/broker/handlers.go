@@ -277,14 +277,10 @@ func (s *Server) getBrokerTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, "fleet-manager rejected status request")
 		return
 	}
-	var up api.TaskStatusResponse
-	if err := json.Unmarshal(upstream, &up); err != nil {
+	up, taskLog, err := parseUpstreamTaskLog(upstream)
+	if err != nil {
 		writeError(w, http.StatusBadGateway, "invalid upstream response")
 		return
-	}
-	taskLog := up.TaskLog
-	if taskLog == nil && strings.TrimSpace(up.CloudWatchLogGroup) != "" && strings.TrimSpace(up.CloudWatchLogStream) != "" {
-		taskLog = api.TaskLogSinkCloudWatchFromParts(up.CloudWatchLogGroup, up.CloudWatchLogStream, "")
 	}
 	writeJSON(w, http.StatusOK, api.BrokerGetTaskResponse{
 		TaskID:              brokerID,
@@ -297,6 +293,20 @@ func (s *Server) getBrokerTask(w http.ResponseWriter, r *http.Request) {
 		CloudWatchLogStream: up.CloudWatchLogStream,
 		TaskLog:             taskLog,
 	})
+}
+
+// parseUpstreamTaskLog unmarshals fleet-manager GET /v1/tasks/{id} JSON and derives task_log
+// (including legacy cloudwatch_log_group / cloudwatch_log_stream fields).
+func parseUpstreamTaskLog(upstream []byte) (api.TaskStatusResponse, *api.TaskLogSink, error) {
+	var up api.TaskStatusResponse
+	if err := json.Unmarshal(upstream, &up); err != nil {
+		return up, nil, err
+	}
+	taskLog := up.TaskLog
+	if taskLog == nil && strings.TrimSpace(up.CloudWatchLogGroup) != "" && strings.TrimSpace(up.CloudWatchLogStream) != "" {
+		taskLog = api.TaskLogSinkCloudWatchFromParts(up.CloudWatchLogGroup, up.CloudWatchLogStream, "")
+	}
+	return up, taskLog, nil
 }
 
 func (s *Server) forwardGetTask(ctx context.Context, fleet *brokermodels.Fleet, fleetTaskID string) (status int, respBody []byte) {
