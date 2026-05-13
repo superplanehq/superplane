@@ -135,7 +135,14 @@ func validateAndPrintCreateResponse(
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, err := fmt.Fprintf(stdout, "Canvas %q created (ID: %s)\n", canvas.Metadata.GetName(), canvas.Metadata.GetId())
-		return err
+		if _, err := fmt.Fprintf(stdout, "Canvas %q created (ID: %s)\n", canvas.Metadata.GetName(), canvas.Metadata.GetId()); err != nil {
+			return err
+		}
+		if url := BuildCanvasURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId()); url != "" {
+			if _, err := fmt.Fprintf(stdout, "Canvas URL: %s\n", url); err != nil {
+				return err
+			}
+		}
+		return nil
 	})
 }
