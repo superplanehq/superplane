@@ -120,7 +120,7 @@ func (d *DeleteDroplet) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	target, err := resolveDropletDeleteTarget(client, spec.Droplet)
+	target, err := resolveDropletDeleteExecutionTarget(client, spec.Droplet, ctx.NodeMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to resolve droplet: %w", err)
 	}

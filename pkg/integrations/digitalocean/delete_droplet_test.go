@@ -230,6 +230,46 @@ func Test__DeleteDroplet__Execute(t *testing.T) {
 		assert.Equal(t, map[string]any{"dropletId": 98765432, "dropletName": "test-droplet"}, payload)
 	})
 
+	t.Run("droplet name with cached metadata -> deletes cached ID without lookup", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader(`{"message": "not found"}`)),
+				},
+			},
+		}
+
+		executionState := &contexts.ExecutionStateContext{
+			KVs: map[string]string{},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"droplet": "test-droplet",
+			},
+			HTTP: httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{
+					"apiToken": "test-token",
+				},
+			},
+			NodeMetadata: &contexts.MetadataContext{
+				Metadata: DropletNodeMetadata{DropletID: 98765432, DropletName: "test-droplet"},
+			},
+			ExecutionState: executionState,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, executionState.Passed)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.Path, "/droplets/98765432")
+		require.Len(t, executionState.Payloads, 1)
+		payload := executionState.Payloads[0].(map[string]any)["data"]
+		assert.Equal(t, map[string]any{"dropletId": 98765432, "dropletName": "test-droplet"}, payload)
+	})
+
 	t.Run("droplet ID out of int64 range (2^63) in scientific notation string -> returns error", func(t *testing.T) {
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{

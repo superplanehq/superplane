@@ -178,6 +178,48 @@ func Test__DeleteApp__Execute(t *testing.T) {
 		}, payload)
 	})
 
+	t.Run("app name with cached metadata -> deletes cached ID without lookup", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader(`{"message": "not found"}`)),
+				},
+			},
+		}
+
+		executionState := &contexts.ExecutionStateContext{
+			KVs: map[string]string{},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{"app": "test-app"},
+			HTTP:          httpContext,
+			Integration: &contexts.IntegrationContext{
+				Configuration: map[string]any{"apiToken": "test-token"},
+			},
+			NodeMetadata: &contexts.MetadataContext{
+				Metadata: AppNodeMetadata{
+					AppID:   "b6bdf840-2854-4f87-a9f6-6a0c4dbf3a48",
+					AppName: "test-app",
+				},
+			},
+			ExecutionState: executionState,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, executionState.Passed)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.Path, "/apps/b6bdf840-2854-4f87-a9f6-6a0c4dbf3a48")
+		require.Len(t, executionState.Payloads, 1)
+		payload := executionState.Payloads[0].(map[string]any)["data"]
+		assert.Equal(t, map[string]any{
+			"appId":   "b6bdf840-2854-4f87-a9f6-6a0c4dbf3a48",
+			"appName": "test-app",
+		}, payload)
+	})
+
 	t.Run("app name not found -> returns error", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{

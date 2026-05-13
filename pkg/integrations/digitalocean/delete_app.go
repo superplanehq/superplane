@@ -117,7 +117,7 @@ func (d *DeleteApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	target, err := resolveAppDeleteTarget(client, spec.App)
+	target, err := resolveAppDeleteExecutionTarget(client, spec.App, ctx.NodeMetadata)
 	if err != nil {
 		return fmt.Errorf("failed to resolve app: %w", err)
 	}

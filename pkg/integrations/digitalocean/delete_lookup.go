@@ -38,6 +38,36 @@ func resolveDropletDeleteTarget(client *Client, droplet string) (dropletDeleteTa
 	return resolveDropletDeleteTargetByName(client, value)
 }
 
+func resolveDropletDeleteExecutionTarget(client *Client, droplet string, metadata core.MetadataReader) (dropletDeleteTarget, error) {
+	if target, ok := dropletDeleteTargetFromMetadata(droplet, metadata); ok {
+		return target, nil
+	}
+
+	return resolveDropletDeleteTarget(client, droplet)
+}
+
+func dropletDeleteTargetFromMetadata(droplet string, metadata core.MetadataReader) (dropletDeleteTarget, bool) {
+	if metadata == nil {
+		return dropletDeleteTarget{}, false
+	}
+
+	value := strings.TrimSpace(droplet)
+	var existing DropletNodeMetadata
+	if err := mapstructure.Decode(metadata.Get(), &existing); err != nil || existing.DropletID == 0 {
+		return dropletDeleteTarget{}, false
+	}
+
+	if existing.DropletName != "" && existing.DropletName == value {
+		return dropletDeleteTarget{ID: existing.DropletID, Name: existing.DropletName}, true
+	}
+
+	if fmt.Sprintf("%d", existing.DropletID) == value {
+		return dropletDeleteTarget{ID: existing.DropletID, Name: existing.DropletName}, true
+	}
+
+	return dropletDeleteTarget{}, false
+}
+
 func resolveDropletDeleteTargetByName(client *Client, name string) (dropletDeleteTarget, error) {
 	droplets, err := client.ListDropletsByName(name)
 	if err != nil {
@@ -120,6 +150,36 @@ func resolveAppDeleteTarget(client *Client, app string) (appDeleteTarget, error)
 	}
 
 	return resolveAppDeleteTargetByName(client, value)
+}
+
+func resolveAppDeleteExecutionTarget(client *Client, app string, metadata core.MetadataReader) (appDeleteTarget, error) {
+	if target, ok := appDeleteTargetFromMetadata(app, metadata); ok {
+		return target, nil
+	}
+
+	return resolveAppDeleteTarget(client, app)
+}
+
+func appDeleteTargetFromMetadata(app string, metadata core.MetadataReader) (appDeleteTarget, bool) {
+	if metadata == nil {
+		return appDeleteTarget{}, false
+	}
+
+	value := strings.TrimSpace(app)
+	var existing AppNodeMetadata
+	if err := mapstructure.Decode(metadata.Get(), &existing); err != nil || existing.AppID == "" {
+		return appDeleteTarget{}, false
+	}
+
+	if existing.AppName != "" && existing.AppName == value {
+		return appDeleteTarget{ID: existing.AppID, Name: existing.AppName}, true
+	}
+
+	if existing.AppID == value {
+		return appDeleteTarget{ID: existing.AppID, Name: existing.AppName}, true
+	}
+
+	return appDeleteTarget{}, false
 }
 
 func resolveAppDeleteTargetByName(client *Client, name string) (appDeleteTarget, error) {

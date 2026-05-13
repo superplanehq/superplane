@@ -6,18 +6,26 @@ Manage Cloudflare zones, rules, and DNS
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Load Balancing Health Alert" href="#on-load-balancing-health-alert" description="Trigger when a Cloudflare load balancing pool or origin health state changes" />
+</CardGrid>
+
 ## Actions
 
 <CardGrid>
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record in a Cloudflare zone" />
   <LinkCard title="Create KV Namespace" href="#create-kv-namespace" description="Create a Cloudflare Workers KV namespace" />
   <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a Cloudflare Load Balancer on a zone, with support for private/public visibility, monitor attachment, and custom rules" />
+  <LinkCard title="Create Monitor" href="#create-monitor" description="Create a Cloudflare load balancing health monitor" />
   <LinkCard title="Create Origin Rule" href="#create-origin-rule" description="Create a rule to override the origin server for matching requests" />
   <LinkCard title="Create Pool" href="#create-pool" description="Create a Cloudflare Load Balancer origin pool" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a Cloudflare zone" />
   <LinkCard title="Delete KV Namespace" href="#delete-kv-namespace" description="Delete a Cloudflare Workers KV namespace" />
   <LinkCard title="Delete KV Value" href="#delete-kv-value" description="Delete a key from a Cloudflare Workers KV namespace" />
   <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a Cloudflare Load Balancer" />
+  <LinkCard title="Delete Monitor" href="#delete-monitor" description="Delete a Cloudflare load balancing health monitor" />
   <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
   <LinkCard title="Delete Pool" href="#delete-pool" description="Delete a Cloudflare Load Balancer origin pool" />
   <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
@@ -42,24 +50,86 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - **Token name**: SuperPlane Integration
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
-	 - Zone / DNS / Edit
+     - Zone / DNS / Edit
+     - Zone / Dynamic Redirect / Edit
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
-	 - Zone / Load Balancers / Edit
-	 - Account / Workers KV Storage / Edit
-     - Account / Load Balancing: Monitor and Pools / Edit
+     - Account / Workers KV Storage / Edit
+     - Account / Load Balancing: Monitors and Pools / Edit
+     - Zone / Load Balancers / Edit
+     - Account / Notifications / Edit
+     - Account / Account Settings / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
+   - **Account Resources**: Include the account containing your load balancers
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
 
-## Account ID (optional)
+## Find your Cloudflare Account ID
 
-The Account ID is required for Load Balancing, Pool, and KV storage components.
+The **Account ID** is required for KV storage, load balancing monitors/pools, and health alert webhooks.
 
-1. On the account overview page, click on the **ellipsis (...)** next to the **Add** button and select **Copy Account ID**
-2. Paste the Account ID below
+1. Open the [Cloudflare dashboard](https://dash.cloudflare.com/)
+2. Select the account that contains your load balancers
+3. In the account home page, copy the **Account ID** from the right sidebar
+4. Paste it into the **Account ID** field below
+
+Make sure this is the same account selected in **Account Resources** when creating the API token.
 
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+<a id="on-load-balancing-health-alert"></a>
+
+## On Load Balancing Health Alert
+
+The On Load Balancing Health Alert trigger starts a workflow from Cloudflare Load Balancing health notifications.
+
+### Use Cases
+
+- **Pool unhealthy**: React when a load balancer pool becomes unhealthy
+- **Origin unhealthy**: Notify or remediate when an endpoint/origin fails health checks
+- **Failover awareness**: Detect health changes that cause Cloudflare to route traffic away from unhealthy pools
+
+### Configuration
+
+- **Pool**: Optional pool filter. Leave empty to listen across pools available to the account.
+- **New Health**: Health states to listen for. Defaults to `Unhealthy`.
+- **Event Source**: Listen for pool events, origin events, or both.
+
+### Webhook Setup
+
+SuperPlane automatically creates a Cloudflare Alerting webhook destination and notification policy for `load_balancing_health_alert`. Cloudflare signs requests with the generated webhook secret and SuperPlane verifies the `cf-webhook-auth` header before emitting an event.
+
+### Workflow execution details
+
+In the workflow execution chain, the trigger's **Details** tab lists:
+
+- **Triggered At**: When SuperPlane recorded the webhook event.
+- **Alert Type**: For example `load_balancing_health_alert`.
+- **Event Source**: `pool` or `origin`.
+- **New Health**: The health state in the notification (for example `Unhealthy`).
+- **Pool**: Pool name when Cloudflare sends it; otherwise the pool ID.
+
+The trigger **title** still prefers an origin name, then pool name, then load balancer name when those fields are present in the payload. Use the **Payload** tab (or expressions such as `$.trigger.data`) for every field Cloudflare sends, including **origin name**, **load balancer id/name**, and **account id**.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account_id": "account_abc123",
+    "alert_type": "load_balancing_health_alert",
+    "event_source": "origin",
+    "load_balancer_id": "lb_123",
+    "load_balancer_name": "api.example.com",
+    "new_health": "Unhealthy",
+    "origin_name": "api-primary",
+    "pool_id": "pool_xyz789",
+    "pool_name": "Production pool"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.loadBalancing.healthAlert"
+}
+```
 
 <a id="create-dns-record"></a>
 
@@ -201,6 +271,60 @@ Returns the created load balancer with its assigned ID and full configuration.
   },
   "timestamp": "2026-05-05T13:00:33.465739808Z",
   "type": "cloudflare.loadBalancer.created"
+}
+```
+
+<a id="create-monitor"></a>
+
+## Create Monitor
+
+The Create Monitor component creates a Cloudflare Load Balancing health monitor.
+
+### Use Cases
+
+- **Health checks**: Monitor HTTP, HTTPS, TCP, ICMP, UDP, or SMTP endpoints
+- **Failover**: Attach the new monitor to a pool so unhealthy origins are removed from load balancer rotation
+- **Release safety**: Create monitor definitions as part of load balancing setup automation
+
+### Configuration
+
+- **Name / Type / Path / Port**: Basic monitor settings. Path is required for HTTP and HTTPS monitors. Port is required for HTTP, HTTPS, TCP, UDP ICMP, and SMTP monitors.
+- **Advanced Health Check Settings**: Optional method, expected response, headers, redirects, TLS, probe zone, **interval** and **timeout** (seconds; omit both to let Cloudflare pick plan defaults), **retries**, and consecutive thresholds. Plan minimum interval: Pro 60s, Business 15s, Enterprise 10s.
+- **Pool**: Optional pool to attach the created monitor to immediately.
+
+### Output
+
+Emits the created monitor and, when configured, the attached pool.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "account_abc123",
+    "monitor": {
+      "consecutive_down": 3,
+      "consecutive_up": 2,
+      "description": "Login page monitor",
+      "expected_codes": "2xx",
+      "id": "monitor_abc123",
+      "interval": 60,
+      "method": "GET",
+      "path": "/health",
+      "retries": 0,
+      "timeout": 5,
+      "type": "https"
+    },
+    "monitorId": "monitor_abc123",
+    "pool": {
+      "id": "pool_xyz789",
+      "monitor": "monitor_abc123",
+      "name": "Production pool"
+    },
+    "poolId": "pool_xyz789"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.monitor.created"
 }
 ```
 
@@ -457,6 +581,41 @@ Emits a confirmation with the zone ID and load balancer ID of the deleted load b
   },
   "timestamp": "2026-05-05T06:54:57.198268018Z",
   "type": "cloudflare.loadBalancer.deleted"
+}
+```
+
+<a id="delete-monitor"></a>
+
+## Delete Monitor
+
+The Delete Monitor component removes a Cloudflare Load Balancing health monitor.
+
+### Use Cases
+
+- **Cleanup**: Delete monitor definitions when load balancing resources are decommissioned
+- **Rollback**: Remove monitors created during test or migration workflows
+
+### Configuration
+
+- **Monitor**: The monitor to delete.
+- **Force**: Delete even when Cloudflare reports that pools or other resources reference the monitor.
+
+### Output
+
+Emits the deleted monitor ID and any references Cloudflare reported before deletion.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "account_abc123",
+    "deleted": true,
+    "monitorId": "monitor_abc123",
+    "references": []
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.monitor.deleted"
 }
 ```
 
