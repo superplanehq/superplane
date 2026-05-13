@@ -431,3 +431,21 @@ func (s *CanvasService) ResolveExecutionErrors(ctx context.Context, req *pb.Reso
 
 	return canvases.ResolveExecutionErrors(ctx, canvasID, executionIDs)
 }
+
+func (s *CanvasService) GetCanvasLaunchpad(ctx context.Context, req *pb.GetCanvasLaunchpadRequest) (*pb.GetCanvasLaunchpadResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetCanvasLaunchpad(ctx, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) UpdateCanvasLaunchpad(ctx context.Context, req *pb.UpdateCanvasLaunchpadRequest) (*pb.UpdateCanvasLaunchpadResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvasLaunchpad(ctx, organizationID, req.CanvasId, req.Panels, req.Layout)
+}
+
+func (s *CanvasService) InvokeNodeExecutionAction(ctx context.Context, req *pb.InvokeNodeExecutionActionBody) (*pb.InvokeNodeExecutionActionResponse, error) {
+	return &pb.InvokeNodeExecutionActionResponse{}, nil
+}
+
+func (s *CanvasService) InvokeNodeTriggerAction(ctx context.Context, req *pb.InvokeNodeTriggerActionBody) (*pb.InvokeNodeTriggerActionResponse, error) {
+	return &pb.InvokeNodeTriggerActionResponse{}, nil
+}

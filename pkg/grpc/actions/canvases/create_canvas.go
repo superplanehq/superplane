@@ -13,6 +13,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
+	"github.com/superplanehq/superplane/pkg/gitserver"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -218,6 +219,9 @@ func CreateCanvas(
 	if publishErr := messages.NewCanvasCreatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishCreated(); publishErr != nil {
 		log.Errorf("failed to publish canvas created RabbitMQ message: %v", publishErr)
 	}
+
+	// Fire git repo auto-init hook
+	gitserver.FirePostCreateHooks(canvas.ID.String(), canvas.OrganizationID.String(), canvas.Name)
 
 	canvas.ChangeManagementEnabled = changeManagementEnabled
 	canvas.ChangeRequestApprovers = datatypes.NewJSONSlice(changeRequestApprovers)

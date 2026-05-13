@@ -76,22 +76,8 @@ func (r *InternalReader) ReadCanvasYAML(canvasID string) ([]byte, error) {
 
 // ReadReadme returns the canvas readme content.
 func (r *InternalReader) ReadReadme(canvasID string) (string, error) {
-	canvasUUID, err := uuid.Parse(canvasID)
-	if err != nil {
-		return "", fmt.Errorf("invalid canvas ID: %w", err)
-	}
-
-	canvas, err := dbmodels.FindCanvasWithoutOrgScope(canvasUUID)
-	if err != nil {
-		return "", fmt.Errorf("canvas not found: %w", err)
-	}
-
-	version, err := dbmodels.FindLiveCanvasVersionByCanvasInTransaction(database.Conn(), canvas)
-	if err != nil {
-		return "", fmt.Errorf("no live version: %w", err)
-	}
-
-	return version.Readme, nil
+	// Readme is no longer stored in DB — it lives in git (docs/README.md)
+	return "", nil
 }
 
 // LaunchpadData holds the exported launchpad state.

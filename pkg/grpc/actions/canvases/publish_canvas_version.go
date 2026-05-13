@@ -10,6 +10,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/gitserver"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -82,6 +83,15 @@ func PublishCanvasVersion(
 	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), publishedVersion.ID.String()).PublishVersionUpdated(); err != nil {
 		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
 	}
+
+	// Fire git reverse-sync hook
+	userName := ""
+	if userID, ok := authentication.GetUserIdFromMetadata(ctx); ok {
+		if user, err := models.FindMaybeDeletedUserByID(organizationID, userID); err == nil {
+			userName = user.Name
+		}
+	}
+	gitserver.FirePostPublishHooks(canvas.ID.String(), canvas.OrganizationID.String(), userName)
 
 	return &pb.PublishCanvasVersionResponse{
 		Version: SerializeCanvasVersion(publishedVersion, organizationID),
