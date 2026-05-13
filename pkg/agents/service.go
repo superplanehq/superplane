@@ -39,7 +39,7 @@ func (s *Service) GenerateAgentToken(orgID, userID string) (string, time.Time, e
 		Subject: userID,
 		OrgID:   orgID,
 		Purpose: "agent",
-		Scopes:  []string{"canvases:read", "canvases:write", "integrations:read", "components:read"},
+		Scopes:  []string{"canvases:read", "canvases:create", "canvases:update", "org:read", "agents:read", "agents:create"},
 	}, agentTokenTTL)
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("generate agent token: %w", err)
