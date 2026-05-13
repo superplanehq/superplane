@@ -21,6 +21,7 @@ blocks:
       prologue:
         commands:
           - checkout
+          - make dev.up
       jobs:
         - name: Licence Check
           commands:
