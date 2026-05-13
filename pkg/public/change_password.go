@@ -18,6 +18,20 @@ import (
 	"gorm.io/gorm"
 )
 
+// hasActiveImpersonation reports whether the request is being served
+// inside a fully validated impersonation session. We deliberately rely
+// on middleware.GetImpersonationFromContext rather than re-parsing the
+// cookie locally: the middleware has already verified that the cookie
+// is a real impersonation token issued to *this* admin, that the admin
+// is still an installation admin, and that the session is fresh
+// relative to password rotation. A stale or unrelated cookie that
+// happens to be structurally valid will not produce an Active info
+// here, so we won't incorrectly block password changes for it.
+func hasActiveImpersonation(r *http.Request) bool {
+	info, ok := middleware.GetImpersonationFromContext(r.Context())
+	return ok && info != nil && info.Active
+}
+
 const minPasswordLength = 8
 
 type changePasswordRequest struct {
@@ -50,7 +64,7 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if hasActiveImpersonation(s, r) {
+	if hasActiveImpersonation(r) {
 		http.Error(w, "Password change is not allowed while impersonating", http.StatusForbidden)
 		return
 	}
@@ -142,20 +156,6 @@ func (s *Server) changePassword(w http.ResponseWriter, r *http.Request) {
 
 	authentication.SetAccountCookie(w, r, token, 24*time.Hour)
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// hasActiveImpersonation returns true when the request carries a valid
-// impersonation cookie. Used to short-circuit account-mutating endpoints
-// (like change-password) so an admin in impersonation mode cannot mutate
-// the impersonated user's credentials.
-func hasActiveImpersonation(s *Server, r *http.Request) bool {
-	tokenStr, err := impersonation.ReadCookie(r)
-	if err != nil {
-		return false
-	}
-
-	_, err = impersonation.ValidateToken(s.jwt, tokenStr)
-	return err == nil
 }
 
 // accountHasPassword reports whether the account has an
