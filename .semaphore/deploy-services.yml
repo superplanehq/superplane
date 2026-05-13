@@ -1,11 +1,9 @@
 # Auto-promoted from main after docker-publish passes.
-# Uses AWS SSM Run Command — no SSH keys needed.
-# Requires Semaphore secret "deploy-ssm" with:
-#   AWS_ACCESS_KEY_ID
-#   AWS_SECRET_ACCESS_KEY
-#   AWS_DEFAULT_REGION       — e.g. us-east-1
-#   TASK_BROKER_AUTH_TOKEN   — AUTH_TOKEN for task-broker
-#   BROKER_PUBLIC_URL        — e.g. http://98.91.210.215:8081
+# Requires Semaphore secret "deploy-ssh" with:
+#   SSH_PRIVATE_KEY      — contents of igor-runners.pem (base64 or raw PEM)
+#   FLEET_AUTH_TOKEN     — AUTH_TOKEN for fleet-manager container
+#   TASK_BROKER_AUTH_TOKEN — AUTH_TOKEN for task-broker container
+#   BROKER_PUBLIC_URL    — e.g. http://98.91.210.215:8081
 version: v1.0
 name: Deploy services
 
@@ -18,65 +16,31 @@ blocks:
   - name: Deploy fleet-manager
     task:
       secrets:
-        - name: deploy-ssm
+        - name: deploy-ssh
       jobs:
-        - name: SSM redeploy fleet-manager
+        - name: SSH deploy fleet-manager
           commands:
-            - sudo apt-get install -qy awscli
-            - export IMAGE="ghcr.io/superplanehq/runner/fleet-manager:latest"
-            - |
-              SCRIPT="set -e
-              docker pull $IMAGE
-              ENV_ARGS=\$(docker inspect fleet-manager --format '{{range .Config.Env}}-e {{.}} {{end}}' 2>/dev/null)
-              PORT_ARGS=\$(docker inspect fleet-manager --format '{{range \$p, \$b := .HostConfig.PortBindings}}-p {{\$b | index 0 | .HostPort}}:{{\$p}} {{end}}' 2>/dev/null)
-              VOLUME_ARGS=\$(docker inspect fleet-manager --format '{{range .HostConfig.Binds}}-v {{.}} {{end}}' 2>/dev/null)
-              docker stop fleet-manager && docker rm fleet-manager
-              docker run -d --name fleet-manager --restart unless-stopped \$PORT_ARGS \$VOLUME_ARGS \$ENV_ARGS $IMAGE
-              docker ps --filter name=fleet-manager --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'"
-            - |
-              CMD_ID=$(aws ssm send-command \
-                --instance-id "i-0b59f9cd95f6fbd70" \
-                --document-name "AWS-RunShellScript" \
-                --parameters "commands=[\"$SCRIPT\"]" \
-                --query "Command.CommandId" --output text)
-              echo "Command ID: $CMD_ID"
-              sleep 30
-              aws ssm get-command-invocation \
-                --command-id "$CMD_ID" \
-                --instance-id "i-0b59f9cd95f6fbd70" \
-                --query "[Status,StandardOutputContent,StandardErrorContent]" \
-                --output text
+            - checkout
+            - chmod 600 ~/.ssh/deploy.pem
+            - ssh-keygen -y -f ~/.ssh/deploy.pem
+            - export SSH_KEY=~/.ssh/deploy.pem
+            - export SSH_HOST=13.220.51.216
+            - export AUTH_TOKEN="$FLEET_AUTH_TOKEN"
+            - export FLEET_MANAGER_IMAGE="ghcr.io/superplanehq/runner/fleet-manager:$(echo $SEMAPHORE_GIT_SHA | cut -c1-12)"
+            - bash scripts/start-fleet-manager-remote.sh
 
   - name: Deploy task-broker
     task:
       secrets:
-        - name: deploy-ssm
+        - name: deploy-ssh
       jobs:
-        - name: SSM redeploy task-broker
+        - name: SSH deploy task-broker
           commands:
-            - sudo apt-get install -qy awscli
-            - export IMAGE="ghcr.io/superplanehq/runner/task-broker:latest"
-            - |
-              SCRIPT="set -e
-              docker pull $IMAGE
-              docker stop task-broker && docker rm task-broker
-              docker run -d --name task-broker --restart unless-stopped \
-                -p 8081:8081 \
-                -v task-broker-data:/home/nonroot \
-                -e BROKER_PUBLIC_URL=$BROKER_PUBLIC_URL \
-                -e AUTH_TOKEN=$TASK_BROKER_AUTH_TOKEN \
-                $IMAGE
-              docker ps --filter name=task-broker --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'"
-            - |
-              CMD_ID=$(aws ssm send-command \
-                --instance-id "i-0fcf14aaeb8845cba" \
-                --document-name "AWS-RunShellScript" \
-                --parameters "commands=[\"$SCRIPT\"]" \
-                --query "Command.CommandId" --output text)
-              echo "Command ID: $CMD_ID"
-              sleep 30
-              aws ssm get-command-invocation \
-                --command-id "$CMD_ID" \
-                --instance-id "i-0fcf14aaeb8845cba" \
-                --query "[Status,StandardOutputContent,StandardErrorContent]" \
-                --output text
+            - checkout
+            - chmod 600 ~/.ssh/deploy.pem
+            - export SSH_KEY=~/.ssh/deploy.pem
+            - export SSH_HOST=98.91.210.215
+            - export AUTH_TOKEN="$TASK_BROKER_AUTH_TOKEN"
+            - export BROKER_PUBLIC_URL="$BROKER_PUBLIC_URL"
+            - export TASK_BROKER_IMAGE="ghcr.io/superplanehq/runner/task-broker:$(echo $SEMAPHORE_GIT_SHA | cut -c1-12)"
+            - bash scripts/start-task-broker-remote.sh
