@@ -9,23 +9,117 @@ import { Input } from "@/components/Input/input";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
+import { Input as ShadcnInput } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { meKeys, useMe } from "@/hooks/useMe";
+import { useAccount } from "@/contexts/AccountContext";
 import { showErrorToast, showSuccessToast } from "@/lib/toast.ts";
+
+const MIN_PASSWORD_LENGTH = 8;
 
 export function Profile() {
   usePageTitle(["Profile"]);
   const queryClient = useQueryClient();
   const organizationId = useOrganizationId();
   const { data: user, isLoading: loading, error: meError } = useMe();
+  const { account } = useAccount();
   const [actionError, setActionError] = useState<string | null>(null);
   const [token, setToken] = useState<string>("");
   const [tokenVisible, setTokenVisible] = useState(false);
   const [regeneratingToken, setRegeneratingToken] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false);
+  const [passwordFormError, setPasswordFormError] = useState<string | null>(null);
 
   const errorMessage =
     actionError || (meError instanceof Error ? meError.message : meError ? "Failed to load profile" : null);
+
+  const resetPasswordForm = () => {
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setPasswordFormError(null);
+  };
+
+  const closePasswordModal = () => {
+    if (passwordSubmitting) return;
+    setPasswordModalOpen(false);
+    resetPasswordForm();
+  };
+
+  const handleChangePassword = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPasswordFormError(null);
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPasswordFormError("All fields are required.");
+      return;
+    }
+
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      setPasswordFormError(`New password must be at least ${MIN_PASSWORD_LENGTH} characters long.`);
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordFormError("New password and confirmation do not match.");
+      return;
+    }
+
+    if (newPassword === currentPassword) {
+      setPasswordFormError("New password must be different from the current password.");
+      return;
+    }
+
+    setPasswordSubmitting(true);
+    try {
+      const response = await fetch("/account/password", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      if (response.status === 204) {
+        resetPasswordForm();
+        setPasswordModalOpen(false);
+        showSuccessToast("Password updated. Other sessions have been signed out.");
+        return;
+      }
+
+      const message = (await response.text()).trim();
+      switch (response.status) {
+        case 401:
+          setPasswordFormError(message || "Current password is incorrect.");
+          break;
+        case 403:
+          setPasswordFormError(message || "Password change is unavailable for this account.");
+          break;
+        case 400:
+          setPasswordFormError(message || "Invalid request.");
+          break;
+        default:
+          setPasswordFormError(message || "Failed to update password.");
+      }
+    } catch (err) {
+      setPasswordFormError(err instanceof Error ? err.message : "Failed to update password.");
+    } finally {
+      setPasswordSubmitting(false);
+    }
+  };
 
   const handleRegenerateToken = async () => {
     try {
@@ -83,6 +177,8 @@ export function Profile() {
     );
   }
 
+  const canChangePassword = account?.has_password === true;
+
   return (
     <div className="pt-6 max-w-none">
       <Heading level={2} className="text-lg font-medium text-left text-gray-800 dark:text-white mb-4">
@@ -124,6 +220,23 @@ export function Profile() {
                 </Text>
               </div>
             </div>
+
+            {canChangePassword && (
+              <div className="flex items-center gap-4">
+                <Button
+                  type="button"
+                  onClick={() => {
+                    resetPasswordForm();
+                    setPasswordModalOpen(true);
+                  }}
+                  className="flex items-center gap-2"
+                  data-testid="change-password-button"
+                >
+                  <Icon name="lock" />
+                  Change password
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -199,6 +312,91 @@ export function Profile() {
           </div>
         </div>
       </div>
+
+      <Dialog
+        open={passwordModalOpen}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            closePasswordModal();
+            return;
+          }
+          setPasswordModalOpen(true);
+        }}
+      >
+        <DialogContent showCloseButton={!passwordSubmitting}>
+          <DialogHeader>
+            <DialogTitle>Change password</DialogTitle>
+            <DialogDescription>
+              Update the password for your SuperPlane account. This will sign you out of every other session and revoke
+              all API tokens issued for your account.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleChangePassword}>
+            <div className="space-y-2">
+              <Label htmlFor="profile-current-password">Current password</Label>
+              <ShadcnInput
+                id="profile-current-password"
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                disabled={passwordSubmitting}
+                className="ph-no-capture"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-new-password">New password</Label>
+              <ShadcnInput
+                id="profile-new-password"
+                type="password"
+                autoComplete="new-password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                disabled={passwordSubmitting}
+                minLength={MIN_PASSWORD_LENGTH}
+                className="ph-no-capture"
+                required
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Must be at least {MIN_PASSWORD_LENGTH} characters long.
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-confirm-password">Confirm new password</Label>
+              <ShadcnInput
+                id="profile-confirm-password"
+                type="password"
+                autoComplete="new-password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                disabled={passwordSubmitting}
+                minLength={MIN_PASSWORD_LENGTH}
+                className="ph-no-capture"
+                required
+              />
+            </div>
+            {passwordFormError && (
+              <p className="text-sm text-red-600 dark:text-red-400" role="alert">
+                {passwordFormError}
+              </p>
+            )}
+            <DialogFooter className="mt-4">
+              <Button type="button" variant="outline" onClick={closePasswordModal} disabled={passwordSubmitting}>
+                Cancel
+              </Button>
+              <LoadingButton
+                type="submit"
+                loading={passwordSubmitting}
+                loadingText="Updating..."
+                data-testid="change-password-submit"
+              >
+                Update password
+              </LoadingButton>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
