@@ -128,7 +128,8 @@ func (c *Cloudflare) Instructions() string {
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
      - Zone / DNS / Edit
-     - Zone / Dynamic Redirect / Edit
+     - Zone / Cache Purge / Purge
+     - Zone / SSL and Certificates / Edit
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
      - Account / Workers KV Storage / Edit
@@ -196,6 +197,9 @@ func (c *Cloudflare) Actions() []core.Action {
 		&UpdatePool{},
 		&GetPool{},
 		&DeletePool{},
+		&PurgeCache{},
+		&OrderCertificatePack{},
+		&DeleteCertificatePack{},
 		&CreateLoadBalancer{},
 		&GetLoadBalancer{},
 		&UpdateLoadBalancer{},
@@ -469,6 +473,35 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 				Name: p.Name,
 				ID:   p.ID,
 			})
+		}
+		return resources, nil
+
+	case "certificate_pack":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		metadata := Metadata{}
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+			return nil, fmt.Errorf("failed to decode application metadata: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, zone := range metadata.Zones {
+			packs, err := client.ListCertificatePacks(zone.ID)
+			if err != nil {
+				ctx.Logger.WithError(err).WithField("zone_id", zone.ID).WithField("zone_name", zone.Name).Warn("failed to list certificate packs for zone, skipping")
+				continue
+			}
+
+			for _, pack := range packs {
+				resources = append(resources, core.IntegrationResource{
+					Type: resourceType,
+					Name: certificatePackResourceName(zone.Name, pack),
+					ID:   fmt.Sprintf("%s/%s", zone.ID, pack.ID),
+				})
+			}
 		}
 		return resources, nil
 
