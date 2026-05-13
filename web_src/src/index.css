@@ -128,3 +128,16 @@ div.monaco-editor {
     transparent 9px
   );
 }
+
+@keyframes tool-glow {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-tool-glow {
+  animation: tool-glow 1.4s ease-in-out infinite;
+}

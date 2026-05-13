@@ -1,108 +1,75 @@
-import type { CanvasChangesetChange } from "@/api-client";
 import { useCallback, useEffect, useState } from "react";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 
-import { useAgentContext } from "./agentChat";
-
-export const CANVAS_AGENT_SIDEBAR_STORAGE_KEY = "canvasAgentSidebarOpen";
+// Keep in sync with pkg/features/features.go.
+const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
+const CANVAS_AGENT_SIDEBAR_STORAGE_KEY = "canvasAgentSidebarOpen";
 
 function readInitialAgentSidebarOpen(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-
-  const stored = window.localStorage.getItem(CANVAS_AGENT_SIDEBAR_STORAGE_KEY);
-  if (stored === null) {
-    return false;
-  }
-
+  if (typeof window === "undefined") return false;
   try {
-    return JSON.parse(stored) === true;
-  } catch (error) {
-    console.warn("Failed to parse agent sidebar state from local storage:", error);
+    return window.localStorage.getItem(CANVAS_AGENT_SIDEBAR_STORAGE_KEY) === "true";
+  } catch {
     return false;
   }
 }
 
 export type UseAgentStateOptions = {
   isEditing: boolean;
-  canvasVersion: string;
-  hideAddControls?: boolean;
   readOnly: boolean;
   canvasId?: string;
   organizationId?: string;
-  onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
+  hideAddControls?: boolean;
 };
 
 export function useAgentState({
   isEditing,
-  canvasVersion,
-  hideAddControls = false,
   readOnly,
   canvasId,
   organizationId,
-  onApplyAiOperations,
+  hideAddControls,
 }: UseAgentStateOptions) {
-  const agentContext = useAgentContext(isEditing, canvasVersion);
+  const { has: hasFeature } = useExperimentalFeature(organizationId);
+  const featureEnabled = hasFeature(FEATURE_CLAUDE_MANAGED_AGENTS);
+
   const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState(readInitialAgentSidebarOpen);
 
-  const persistAgentSidebarOpen = useCallback((open: boolean) => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(CANVAS_AGENT_SIDEBAR_STORAGE_KEY, JSON.stringify(open));
-    }
+  const persistOpen = useCallback((open: boolean) => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(CANVAS_AGENT_SIDEBAR_STORAGE_KEY, open ? "true" : "false");
   }, []);
 
-  const handleAgentSidebarOpenChange = useCallback(
-    (open: boolean) => {
-      setIsAgentSidebarOpen(open);
-      persistAgentSidebarOpen(open);
-    },
-    [persistAgentSidebarOpen],
-  );
+  const closeSidebar = useCallback(() => {
+    setIsAgentSidebarOpen(false);
+    persistOpen(false);
+  }, [persistOpen]);
 
   const handleAgentSidebarToggle = useCallback(() => {
-    setIsAgentSidebarOpen((previous) => {
-      const next = !previous;
-      persistAgentSidebarOpen(next);
+    setIsAgentSidebarOpen((prev) => {
+      const next = !prev;
+      persistOpen(next);
       return next;
     });
-  }, [persistAgentSidebarOpen]);
+  }, [persistOpen]);
 
-  const closeAgentSidebar = useCallback(() => {
-    setIsAgentSidebarOpen(false);
-    persistAgentSidebarOpen(false);
-  }, [persistAgentSidebarOpen]);
-
+  // The agent is read-only-safe: a user can still ask questions about a
+  // published canvas without editing it. Only the feature flag and the
+  // canvas-creation-mode flag (hideAddControls) gate the sidebar entirely.
   useEffect(() => {
-    if (!agentContext.enabled) {
-      closeAgentSidebar();
-    }
-  }, [agentContext.enabled, closeAgentSidebar]);
+    if (!featureEnabled || hideAddControls) closeSidebar();
+  }, [featureEnabled, hideAddControls, closeSidebar]);
 
-  useEffect(() => {
-    if (hideAddControls) {
-      closeAgentSidebar();
-    }
-  }, [hideAddControls, closeAgentSidebar]);
-
-  useEffect(() => {
-    if (readOnly) {
-      closeAgentSidebar();
-    }
-  }, [readOnly, closeAgentSidebar]);
-
-  const showAgentSidebarToggle = agentContext.enabled && !hideAddControls && !readOnly;
+  const showAgentSidebarToggle = featureEnabled && !hideAddControls;
 
   return {
-    agentContext,
-    isAgentSidebarOpen,
-    handleAgentSidebarOpenChange,
-    handleAgentSidebarToggle,
     canvasId,
     organizationId,
-    showAgentSidebarToggle,
+    isEditing,
     readOnly,
-    onApplyAiOperations: onApplyAiOperations ?? (async () => {}),
-    closeSidebar: closeAgentSidebar,
+    isAgentSidebarOpen,
+    showAgentSidebarToggle,
+    handleAgentSidebarToggle,
+    closeSidebar,
   };
 }
 

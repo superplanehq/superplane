@@ -2,56 +2,31 @@ package agents
 
 import (
 	"context"
+	"errors"
 
+	"github.com/google/uuid"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
-	internalpb "github.com/superplanehq/superplane/pkg/protos/private/agents"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"gorm.io/gorm"
 )
 
-func DescribeAgentChat(
-	ctx context.Context,
-	agentURL string,
-	orgID string,
-	userID string,
-	canvasID string,
-	chatID string,
-) (*pb.DescribeAgentChatResponse, error) {
-	conn, err := grpc.NewClient(agentURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+func DescribeAgentChat(_ context.Context, svc AgentsService, orgID, userID string, req *pb.DescribeAgentChatRequest) (*pb.DescribeAgentChatResponse, error) {
+	org, user, err := parseOrgUser(orgID, userID)
 	if err != nil {
-		return nil, status.Error(codes.Unavailable, "failed to create agent GRPC client")
+		return nil, err
 	}
-	defer closeAgentConnection(conn)
-
-	client := internalpb.NewAgentsClient(conn)
-	response, err := client.DescribeAgentChat(ctx, &internalpb.DescribeAgentChatRequest{
-		OrgId:    orgID,
-		UserId:   userID,
-		CanvasId: canvasID,
-		ChatId:   chatID,
-	})
-
+	chatID, err := uuid.Parse(req.ChatId)
 	if err != nil {
-		return nil, status.Error(codes.Unavailable, "failed to describe agent chat")
+		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
 
-	if response.Chat == nil {
-		return nil, status.Error(codes.NotFound, "agent chat not found")
+	session, err := svc.GetSession(org, user, chatID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, status.Error(codes.NotFound, "agent chat not found")
+		}
+		return nil, status.Errorf(codes.Internal, "failed to load agent chat: %v", err)
 	}
-
-	chat := &pb.AgentChatInfo{
-		Id:             response.Chat.Id,
-		InitialMessage: response.Chat.InitialMessage,
-	}
-
-	if response.Chat.CreatedAt != nil {
-		chat.CreatedAt = timestamppb.New(response.Chat.CreatedAt.AsTime())
-	}
-
-	return &pb.DescribeAgentChatResponse{
-		Chat: chat,
-	}, nil
+	return &pb.DescribeAgentChatResponse{Chat: serializeChat(session)}, nil
 }
