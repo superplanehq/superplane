@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2, Pencil, Save, X } from "lucide-react";
+import { Editor } from "@monaco-editor/react";
+import { CanvasMarkdown, type NodeChipContext } from "@/ui/Markdown/CanvasMarkdown";
 
 interface FileViewerProps {
   canvasId: string;
   path: string;
+  nodeRefs?: NodeChipContext;
   onSaved?: () => void;
 }
 
-export function FileViewer({ canvasId, path, onSaved }: FileViewerProps) {
+export function FileViewer({ canvasId, path, nodeRefs, onSaved }: FileViewerProps) {
   const [content, setContent] = useState("");
   const [editContent, setEditContent] = useState("");
   const [editable, setEditable] = useState(false);
@@ -117,18 +120,49 @@ export function FileViewer({ canvasId, path, onSaved }: FileViewerProps) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-hidden">
         {editing ? (
-          <textarea
-            className="h-full w-full resize-none border-0 bg-white p-4 font-mono text-sm text-slate-800 focus:outline-none"
+          <Editor
+            height="100%"
+            language="markdown"
             value={editContent}
-            onChange={(e) => setEditContent(e.target.value)}
-            spellCheck={false}
+            onChange={(val) => setEditContent(val || "")}
+            theme="vs"
+            options={{
+              minimap: { enabled: false },
+              fontSize: 13,
+              lineNumbers: "on",
+              wordWrap: "on",
+              scrollBeyondLastLine: false,
+              tabSize: 2,
+              renderLineHighlight: "line",
+              automaticLayout: true,
+            }}
           />
+        ) : isMd ? (
+          <div className="h-full overflow-auto p-6 prose prose-sm prose-slate max-w-none">
+            <CanvasMarkdown canvasId={canvasId} nodeRefs={nodeRefs}>{content}</CanvasMarkdown>
+          </div>
         ) : (
-          <pre className={`whitespace-pre-wrap p-4 text-sm ${isYaml || isJson ? "font-mono text-slate-700" : isMd ? "font-sans text-slate-800" : "font-mono text-slate-700"}`}>
-            {content}
-          </pre>
+          <Editor
+            height="100%"
+            language={isYaml ? "yaml" : isJson ? "json" : "plaintext"}
+            value={content}
+            theme="vs"
+            options={{
+              readOnly: true,
+              domReadOnly: true,
+              minimap: { enabled: false },
+              fontSize: 13,
+              lineNumbers: "on",
+              wordWrap: "on",
+              folding: true,
+              scrollBeyondLastLine: false,
+              tabSize: 2,
+              renderLineHighlight: "line",
+              automaticLayout: true,
+            }}
+          />
         )}
       </div>
     </div>

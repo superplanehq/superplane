@@ -6259,7 +6259,17 @@ export function WorkflowPageV2() {
           }
           repoOverlay={
             isRepoMode ? (
-              <RepoTab canvasId={canvasId!} canvasName={canvas?.metadata?.name || ""} />
+              <RepoTab
+                canvasId={canvasId!}
+                canvasName={canvas?.metadata?.name || ""}
+                nodeRefs={{
+                  nodes: readmeNodesBySlug,
+                  icons: readmeIconsBySlug,
+                  details: readmeNodeDetailsBySlug,
+                  nodeStatuses: readmeNodeStatusBySlug,
+                  nodeIds: readmeNodeIdBySlug,
+                }}
+              />
             ) : null
           }
           runViewOverlay={

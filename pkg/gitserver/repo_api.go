@@ -157,6 +157,15 @@ func (s *Server) handleRepoUpdateFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fire forward sync (same as git push via HTTP)
+	if s.OnPush != nil {
+		go func() {
+			if err := s.OnPush(slug, repoPath); err != nil {
+				log.Errorf("repo-api: post-save sync failed for %s: %v", slug, err)
+			}
+		}()
+	}
+
 	shaCmd := exec.Command("git", "--git-dir", repoPath, "rev-parse", "HEAD")
 	shaOut, _ := shaCmd.Output()
 

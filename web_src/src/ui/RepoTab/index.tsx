@@ -3,9 +3,12 @@ import { FileTree } from "./FileTree";
 import { FileViewer } from "./FileViewer";
 import { Loader2, GitBranch } from "lucide-react";
 
+import type { NodeChipContext } from "@/ui/Markdown/CanvasMarkdown";
+
 interface RepoTabProps {
   canvasId: string;
   canvasName: string;
+  nodeRefs?: NodeChipContext;
 }
 
 interface FileInfo {
@@ -21,7 +24,7 @@ interface CommitInfo {
 }
 
 
-export function RepoTab({ canvasId, canvasName }: RepoTabProps) {
+export function RepoTab({ canvasId, canvasName, nodeRefs }: RepoTabProps) {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [commit, setCommit] = useState<CommitInfo | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -111,6 +114,7 @@ export function RepoTab({ canvasId, canvasName }: RepoTabProps) {
           <FileViewer
             canvasId={canvasId}
             path={selectedPath}
+            nodeRefs={nodeRefs}
             onSaved={fetchFiles}
           />
         ) : (

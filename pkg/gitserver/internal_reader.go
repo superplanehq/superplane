@@ -33,6 +33,11 @@ func (r *InternalReader) ReadCanvasYAML(canvasID string) ([]byte, error) {
 		cliCanvas.Kind = "Canvas"
 		json.Unmarshal(jsonBytes, &cliCanvas)
 
+		// Strip readme from canvas.yaml — it lives in README.md
+		if cliCanvas.Spec != nil {
+			cliCanvas.Spec.Readme = nil
+		}
+
 		return yaml.Marshal(cliCanvas)
 	}
 

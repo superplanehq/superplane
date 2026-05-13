@@ -1337,8 +1337,12 @@ func (s *Server) RegisterGitServer(reposDir string) error {
 		baseURL = "http://localhost:8000"
 	}
 
+	gitSyncToken := os.Getenv("GIT_SYNC_TOKEN")
 	syncHandler := gitserver.APISyncHandler(baseURL, func() string {
-		return lastValidToken
+		if lastValidToken != "" {
+			return lastValidToken
+		}
+		return gitSyncToken
 	}, registry.Resolve)
 
 	gitServer.OnPush = syncHandler.HandlePush
