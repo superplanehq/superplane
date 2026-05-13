@@ -1,4 +1,4 @@
-.PHONY: lint test test.coverage test.license.check gen.setup gen.setup.prep gen.setup.backend gen.setup.ui web_src.npm.install.compose check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
+.PHONY: lint test test.coverage test.license.check check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
 
 MAKE=make
 DB_NAME=superplane
@@ -59,7 +59,7 @@ test.coverage.baseline.update:
 	$(MAKE) check.coverage.go.baseline.update
 
 test.license.check:
-	$(MAKE) gen.setup.backend
+	$(MAKE) pb.gen
 	bash ./scripts/license-check.sh
 
 test.watch:
@@ -103,7 +103,7 @@ dev.setup:
 	@$(MAKE) dev.test.is.running
 	$(MAKE) dev.setup.npm
 	$(MAKE) dev.setup.go
-	$(MAKE) gen.setup
+	$(MAKE) pb.gen
 	$(MAKE) db.create DB_NAME=superplane_dev
 	$(MAKE) db.migrate DB_NAME=superplane_dev
 	$(MAKE) db.create DB_NAME=superplane_test
@@ -257,24 +257,8 @@ db.recreate.all.dangerous:
 # Protobuf compilation
 #
 
-gen.setup:
-	$(MAKE) pb.gen
-	$(MAKE) openapi.spec.gen
-	$(MAKE) openapi.client.gen
-	$(MAKE) openapi.web.client.gen
-
-gen.setup.backend:
-	$(MAKE) pb.gen
-	$(MAKE) openapi.spec.gen
-	$(MAKE) openapi.client.gen
-
-gen.setup.ui:
-	$(MAKE) openapi.spec.gen
-	$(MAKE) web_src.npm.install.compose
-	$(MAKE) openapi.web.client.gen
-
 gen:
-	$(MAKE) gen.setup
+	$(MAKE) pb.gen
 	$(MAKE) format.go
 	$(MAKE) format.js
 	$(MAKE) gen.components.docs
@@ -295,6 +279,9 @@ pb.gen:
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc.sh $(MODULES)
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_gateway.sh $(REST_API_MODULES)
 	$(COMPOSE) run --rm --no-deps --user $(shell id -u):$(shell id -g) app bash -lc "find pkg/protos -name '*.go' -print0 | xargs -0 gofmt -s -w"
+	$(MAKE) openapi.spec.gen
+	$(MAKE) openapi.client.gen
+	$(MAKE) openapi.web.client.gen
 
 openapi.spec.gen:
 	$(COMPOSE) run --rm --no-deps app /app/scripts/protoc_openapi_spec.sh $(REST_API_MODULES)
@@ -326,7 +313,7 @@ openapi.web.client.gen:
 CLI_VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "dev")
 
 cli.build:
-	$(MAKE) gen.setup.backend
+	$(MAKE) pb.gen
 	$(COMPOSE) run --rm --no-deps -e GOOS=$(OS) -e GOARCH=$(ARCH) app bash -c 'go build -ldflags "-X github.com/superplanehq/superplane/pkg/cli.Version=$(CLI_VERSION)" -o build/cli cmd/cli/main.go'
 
 cli.build.m1:
@@ -336,7 +323,7 @@ IMAGE?=superplane
 IMAGE_TAG?=$(shell git rev-list -1 HEAD -- .)
 REGISTRY_HOST?=ghcr.io/superplanehq
 image.build:
-	$(MAKE) gen.setup
+	$(MAKE) pb.gen
 	DOCKER_DEFAULT_PLATFORM=linux/amd64 docker build -f Dockerfile --target runner --build-arg BASE_URL=$(BASE_URL) --progress plain -t $(IMAGE):$(IMAGE_TAG) .
 
 image.auth:
