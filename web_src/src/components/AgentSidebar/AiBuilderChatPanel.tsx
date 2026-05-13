@@ -5,6 +5,7 @@ import { AiBuilderConversationMessageList } from "./AiBuilderConversationMessage
 import { InputForm } from "./AiBuilderInputForm";
 import { ProposalsList } from "./AiBuilderProposalsList";
 import { type AiBuilderMessage, type AiBuilderProposal, type AiChatSession } from "./agentChat";
+import { cn } from "@/lib/utils";
 import { useApplyOnCmdEnter } from "./useApplyOnCmdEnter";
 import { useDeleteChatSession } from "./useDeleteChatSession";
 
@@ -33,6 +34,9 @@ type AiBuilderChatPanelProps = {
   onSelectChat: (chatId: string) => void;
   onSendPrompt: () => void;
   aiInputRef: RefObject<HTMLTextAreaElement | null>;
+  inputPlacement?: "top" | "bottom";
+  compact?: boolean;
+  showConversationList?: boolean;
 };
 
 export function AiBuilderChatPanel({
@@ -60,6 +64,9 @@ export function AiBuilderChatPanel({
   onSelectChat,
   onSendPrompt,
   aiInputRef,
+  inputPlacement = "top",
+  compact = false,
+  showConversationList = true,
 }: AiBuilderChatPanelProps) {
   const currentChatIdRef = useRef(currentChatId);
   currentChatIdRef.current = currentChatId;
@@ -96,32 +103,51 @@ export function AiBuilderChatPanel({
     <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
       <div className="h-full min-h-0 flex flex-col">
         {isNewChatView ? (
-          <div className="m-3">
-            <InputForm
-              aiInputRef={aiInputRef}
-              aiInput={aiInput}
-              onAiInputChange={onAiInputChange}
-              onSendPrompt={onSendPrompt}
-              disabled={disabled}
-              canvasId={canvasId}
-              isGeneratingResponse={isGeneratingResponse}
-              maxAiInputHeight={maxAiInputHeight}
-              expanded
-            />
+          <div className={cn("flex min-h-0 flex-1 flex-col", compact ? "m-1.5" : "m-3")}>
+            {inputPlacement === "top" ? (
+              <InputForm
+                aiInputRef={aiInputRef}
+                aiInput={aiInput}
+                onAiInputChange={onAiInputChange}
+                onSendPrompt={onSendPrompt}
+                disabled={disabled}
+                canvasId={canvasId}
+                isGeneratingResponse={isGeneratingResponse}
+                maxAiInputHeight={maxAiInputHeight}
+                expanded
+              />
+            ) : null}
 
-            <ConversationList
-              chatSessions={chatSessions}
-              currentChatId={currentChatId}
-              isLoadingChatSessions={isLoadingChatSessions}
-              isGeneratingResponse={isGeneratingResponse}
-              onSelectChat={onSelectChat}
-              onDeleteChat={handleDeleteChatSession}
-              className="flex-1 min-h-0 px-2 py-2 space-y-2"
-              fillAvailable
-            />
+            {showConversationList ? (
+              <ConversationList
+                chatSessions={chatSessions}
+                currentChatId={currentChatId}
+                isLoadingChatSessions={isLoadingChatSessions}
+                isGeneratingResponse={isGeneratingResponse}
+                onSelectChat={onSelectChat}
+                onDeleteChat={handleDeleteChatSession}
+                className={cn("flex-1 min-h-0 space-y-2", compact ? "px-1 py-1" : "px-2 py-2")}
+                fillAvailable
+              />
+            ) : (
+              <div className="flex-1" />
+            )}
+
+            {inputPlacement === "bottom" ? (
+              <InputForm
+                aiInputRef={aiInputRef}
+                aiInput={aiInput}
+                onAiInputChange={onAiInputChange}
+                onSendPrompt={onSendPrompt}
+                disabled={disabled}
+                canvasId={canvasId}
+                isGeneratingResponse={isGeneratingResponse}
+                maxAiInputHeight={maxAiInputHeight}
+              />
+            ) : null}
           </div>
         ) : (
-          <div className="mx-2 mb-2 h-full flex flex-col">
+          <div className={cn("h-full flex flex-col", compact ? "mx-1 mb-1" : "mx-2 mb-2")}>
             <ConversationContent
               aiMessagesContainerRef={aiMessagesContainerRef}
               isLoadingChatMessages={isLoadingChatMessages}
