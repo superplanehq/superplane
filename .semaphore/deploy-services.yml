@@ -25,7 +25,7 @@ blocks:
             - export SSH_KEY=~/.ssh/deploy.pem
             - export SSH_HOST=13.220.51.216
             - export AUTH_TOKEN="$FLEET_AUTH_TOKEN"
-            - export FLEET_MANAGER_IMAGE="ghcr.io/superplanehq/runner/fleet-manager:$(echo $SEMAPHORE_GIT_SHA | cut -c1-12)"
+            - export FLEET_MANAGER_IMAGE="ghcr.io/superplanehq/runner/fleet-manager:latest"
             - bash scripts/start-fleet-manager-remote.sh
 
   - name: Deploy task-broker
@@ -41,5 +41,5 @@ blocks:
             - export SSH_HOST=98.91.210.215
             - export AUTH_TOKEN="$TASK_BROKER_AUTH_TOKEN"
             - export BROKER_PUBLIC_URL="$BROKER_PUBLIC_URL"
-            - export TASK_BROKER_IMAGE="ghcr.io/superplanehq/runner/task-broker:$(echo $SEMAPHORE_GIT_SHA | cut -c1-12)"
+            - export TASK_BROKER_IMAGE="ghcr.io/superplanehq/runner/task-broker:latest"
             - bash scripts/start-task-broker-remote.sh
