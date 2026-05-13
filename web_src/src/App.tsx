@@ -18,6 +18,7 @@ import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CreateCanvasPage } from "./pages/canvas/CreateCanvasPage";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import { TemplatesPage } from "./pages/canvas/TemplatesPage";
+import { AppPrototypePage } from "./pages/apps/AppPrototypePage";
 import { HomePage } from "./pages/home";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
@@ -102,6 +103,7 @@ function AppRouter() {
                   path="canvases/:canvasId/settings"
                   element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
                 />
+                <Route path="apps/:canvasId" element={withAuthAndPermission(AppPrototypePage, "canvases", "read")} />
                 <Route path="canvases/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
                 <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
                 <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
