@@ -10,7 +10,7 @@ import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
 
-type HeaderMode = "default" | "version-live" | "version-edit" | "runs";
+type HeaderMode = "default" | "launchpad" | "version-live" | "version-edit" | "runs" | "repo";
 
 interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). */
@@ -35,6 +35,8 @@ interface HeaderProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectRuns?: () => void;
+  onSelectLaunchpad?: () => void;
+  onSelectRepo?: () => void;
   runsNotificationCount?: number;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
   publishVersionLabel?: string;
@@ -119,8 +121,8 @@ function PageHeader({
 
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle =
-    props.mode === "version-live" || props.mode === "version-edit" || props.mode === "runs";
-  const canvasViewMode = props.mode === "runs" ? props.mode : "version-live";
+    props.mode === "launchpad" || props.mode === "version-live" || props.mode === "version-edit" || props.mode === "runs" || props.mode === "repo";
+  const canvasViewMode = props.mode === "launchpad" ? "launchpad" : props.mode === "runs" ? "runs" : props.mode === "repo" ? "repo" : "version-live";
   const editing = props.mode === "version-edit";
 
   return (
@@ -132,8 +134,10 @@ function SecondaryHeader(props: HeaderProps) {
           {showCanvasViewModeToggle && props.onExitEditMode ? (
             <CanvasModeToggle
               mode={canvasViewMode}
+              onSelectLaunchpad={props.onSelectLaunchpad}
               onSelectLive={props.onExitEditMode}
               onSelectRuns={props.onSelectRuns}
+              onSelectRepo={props.onSelectRepo}
               runsNotificationCount={props.runsNotificationCount}
               editing={editing}
               hasDraft={!!props.hasUnpublishedDraftChanges}
