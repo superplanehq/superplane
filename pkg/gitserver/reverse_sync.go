@@ -163,13 +163,8 @@ func (rs *ReverseSync) commitCurrentState(slug, canvasID, userName string) error
 	}
 	os.WriteFile(filepath.Join(workDir, "canvas.yaml"), canvasYAML, 0644)
 
-	readme, err := rs.reader.ReadReadme(canvasID)
-	if err != nil {
-		log.Warnf("git-reverse-sync: failed to read readme: %v", err)
-	} else if readme != "" {
-		os.MkdirAll(filepath.Join(workDir, "docs"), 0755)
-		os.WriteFile(filepath.Join(workDir, "docs", "README.md"), []byte(readme), 0644)
-	}
+	// README is NOT reverse-synced — git is the source of truth for docs.
+	// Only canvas.yaml and apps are synced from UI publishes.
 
 	// Export launchpad panels as apps/<panel-id>.md + apps/_layout.json
 	lp, err := rs.reader.ReadLaunchpad(canvasID)

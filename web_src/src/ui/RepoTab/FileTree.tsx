@@ -106,12 +106,12 @@ function TreeNodeView({
       <button
         type="button"
         className={cn(
-          "flex w-full items-center gap-1.5 px-3 py-1 text-left text-xs hover:bg-slate-100",
-          isSelected && "bg-slate-200 font-medium",
-          node.isDir && "text-slate-600",
-          !node.isDir && "text-slate-700",
+          "flex w-full items-center gap-1.5 px-3 py-1.5 text-left text-[12px] hover:bg-gray-50",
+          isSelected && "bg-sky-50 font-medium text-sky-700",
+          !isSelected && node.isDir && "text-gray-500",
+          !isSelected && !node.isDir && "text-gray-700",
         )}
-        style={{ paddingLeft: `${12 + depth * 12}px` }}
+        style={{ paddingLeft: `${12 + depth * 14}px` }}
         onClick={() => {
           if (!node.isDir) {
             onSelect(node.path);

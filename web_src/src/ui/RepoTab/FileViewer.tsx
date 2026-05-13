@@ -90,7 +90,7 @@ export function FileViewer({ canvasId, path, nodeRefs, onSaved }: FileViewerProp
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
+      <div className="flex h-10 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-slate-700">{path}</span>
           {!editable && (

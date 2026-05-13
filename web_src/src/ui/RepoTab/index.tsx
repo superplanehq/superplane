@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FileTree } from "./FileTree";
 import { FileViewer } from "./FileViewer";
 import { Loader2, GitBranch } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import type { NodeChipContext } from "@/ui/Markdown/CanvasMarkdown";
 
@@ -24,12 +25,56 @@ interface CommitInfo {
 }
 
 
+const REPO_SIDEBAR_MIN_WIDTH = 200;
+const REPO_SIDEBAR_MAX_WIDTH = 480;
+const REPO_SIDEBAR_DEFAULT_WIDTH = 260;
+const REPO_SIDEBAR_WIDTH_KEY = "repo-sidebar-width";
+
 export function RepoTab({ canvasId, canvasName, nodeRefs }: RepoTabProps) {
   const [files, setFiles] = useState<FileInfo[]>([]);
   const [commit, setCommit] = useState<CommitInfo | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Resizable sidebar
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const stored = localStorage.getItem(REPO_SIDEBAR_WIDTH_KEY);
+    return stored ? Number(stored) : REPO_SIDEBAR_DEFAULT_WIDTH;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isResizing) return;
+      const left = sidebarRef.current?.getBoundingClientRect()?.left ?? 0;
+      const w = Math.max(REPO_SIDEBAR_MIN_WIDTH, Math.min(REPO_SIDEBAR_MAX_WIDTH, e.clientX - left));
+      setSidebarWidth(w);
+    },
+    [isResizing],
+  );
+
+  const handleMouseUp = useCallback(() => setIsResizing(false), []);
+
+  useEffect(() => { localStorage.setItem(REPO_SIDEBAR_WIDTH_KEY, String(sidebarWidth)); }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    document.body.style.cursor = "ew-resize";
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+    };
+  }, [isResizing, handleMouseMove, handleMouseUp]);
 
   const fetchFiles = useCallback(async () => {
     setLoading(true);
@@ -82,9 +127,13 @@ export function RepoTab({ canvasId, canvasName, nodeRefs }: RepoTabProps) {
   return (
     <div className="flex h-full min-h-0">
       {/* Left sidebar: file tree */}
-      <div className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-slate-50">
-        <div className="border-b border-slate-200 px-3 py-2">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+      <div
+        ref={sidebarRef}
+        className="relative flex shrink-0 flex-col border-r border-slate-200 bg-white"
+        style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
+      >
+        <div className="flex h-10 shrink-0 items-center border-b border-slate-200 px-3">
+          <div className="flex items-center gap-1.5 text-sm font-medium text-gray-700">
             <GitBranch className="h-3.5 w-3.5" />
             main
           </div>
@@ -97,15 +146,37 @@ export function RepoTab({ canvasId, canvasName, nodeRefs }: RepoTabProps) {
           />
         </div>
         {commit ? (
-          <div className="border-t border-slate-200 px-3 py-2">
-            <p className="truncate text-[10px] text-slate-400" title={`${commit.sha.slice(0, 7)} ${commit.message}`}>
-              {commit.sha.slice(0, 7)} · {commit.message}
-            </p>
-            <p className="text-[10px] text-slate-400">
-              {commit.author} · {formatRelativeDate(commit.date)}
-            </p>
+          <div className="flex shrink-0 items-center gap-2 border-t border-slate-200 bg-slate-50 px-3 py-1.5">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[11px] text-gray-500" title={`${commit.sha.slice(0, 7)} ${commit.message}`}>
+                <code className="font-mono text-[10px] text-gray-400">{commit.sha.slice(0, 7)}</code>
+                {" · "}{commit.message}
+              </p>
+              <p className="text-[10px] text-gray-400">
+                {commit.author} · {formatRelativeDate(commit.date)}
+              </p>
+            </div>
           </div>
         ) : null}
+
+        {/* Resize handle */}
+        <div
+          onMouseDown={handleMouseDown}
+          className={cn(
+            "absolute right-0 top-0 bottom-0 z-30 flex w-4 cursor-ew-resize items-center justify-center transition-colors hover:bg-gray-100 group",
+            isResizing && "bg-blue-50",
+          )}
+          style={{ marginRight: "-8px" }}
+          aria-label="Resize sidebar"
+          role="separator"
+        >
+          <div
+            className={cn(
+              "h-14 w-1 rounded-full bg-gray-300 transition-colors group-hover:bg-gray-800",
+              isResizing && "bg-blue-500",
+            )}
+          />
+        </div>
       </div>
 
       {/* Right panel: file viewer */}
