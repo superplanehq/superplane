@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -101,6 +102,84 @@ func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*CanvasRun
 	}
 
 	return run, nil
+}
+
+type CanvasRunFilters struct {
+	States  []string
+	Results []string
+}
+
+func ListCanvasRuns(workflowID uuid.UUID, limit int, beforeTime *time.Time, filters CanvasRunFilters) ([]CanvasRun, error) {
+	var runs []CanvasRun
+	query := database.Conn().
+		Where("workflow_id = ?", workflowID).
+		Order("created_at DESC").
+		Limit(limit)
+
+	query = applyCanvasRunFilters(query, filters)
+
+	if beforeTime != nil {
+		query = query.Where("created_at < ?", beforeTime)
+	}
+
+	err := query.Find(&runs).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return runs, nil
+}
+
+func CountCanvasRuns(workflowID uuid.UUID, filters CanvasRunFilters) (int64, error) {
+	var count int64
+	query := database.Conn().
+		Model(&CanvasRun{}).
+		Where("workflow_id = ?", workflowID)
+
+	query = applyCanvasRunFilters(query, filters)
+
+	err := query.Count(&count).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+func applyCanvasRunFilters(query *gorm.DB, filters CanvasRunFilters) *gorm.DB {
+	hasStates := len(filters.States) > 0
+	hasResults := len(filters.Results) > 0
+
+	switch {
+	case hasStates && hasResults:
+		return query.Where("(state IN ? OR result IN ?)", filters.States, filters.Results)
+	case hasStates:
+		return query.Where("state IN ?", filters.States)
+	case hasResults:
+		return query.Where("result IN ?", filters.Results)
+	default:
+		return query
+	}
+}
+
+func ListParentExecutionsForRunsInTransaction(tx *gorm.DB, workflowID uuid.UUID, runIDs []uuid.UUID) ([]CanvasNodeExecution, error) {
+	if len(runIDs) == 0 {
+		return []CanvasNodeExecution{}, nil
+	}
+
+	var executions []CanvasNodeExecution
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("run_id IN ?", runIDs).
+		Where("parent_execution_id IS NULL").
+		Order("created_at ASC").
+		Find(&executions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return executions, nil
 }
 
 func MaybeFinalizeRunInTransaction(tx *gorm.DB, runID uuid.UUID) (bool, error) {

@@ -124,6 +124,19 @@ describe("workflow v2 edit-mode action affordances", () => {
     expect(screen.getByTestId("start-template-run")).toBeInTheDocument();
   });
 
+  it("hides start trigger run buttons in live mode when actions are unavailable", () => {
+    const props = startTriggerRenderer.getTriggerProps({
+      ...makeTriggerContext(),
+      canvasMode: "live",
+      actions: undefined,
+    });
+
+    render(<Trigger {...props} canvasMode="live" />);
+
+    expect(screen.queryByTestId("start-template-run")).not.toBeInTheDocument();
+    expect(screen.getByText("Example")).toBeInTheDocument();
+  });
+
   it("disables approval actions in edit mode", () => {
     const props = approvalMapper.props(
       makeComponentBaseContext({

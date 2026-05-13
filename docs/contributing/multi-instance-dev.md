@@ -17,7 +17,7 @@ cp .env.multi-instance.example .env
 
 3) In the second repo, uncomment the **Instance B** block.
 
-4) Start each repo normally (for example `make dev.start`).
+4) Start each repo normally (for example `make dev.up` then `make dev.server`).
 
 The UI will be available at:
 - Instance A: `http://localhost:8000`

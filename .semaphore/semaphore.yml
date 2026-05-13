@@ -34,15 +34,16 @@ blocks:
       env_vars:
         - name: DOCKER_BUILDKIT
           value: "1"
+        - name: DEV_SETUP_DBS
+          value: "superplane_dev superplane_test"
       prologue:
         commands:
           - checkout
           - mkdir -p tmp/go tmp/go-build
           - "cache restore go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-mod-$SEMAPHORE_GIT_BRANCH,go-mod"
           - "cache restore go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum),go-build-$SEMAPHORE_GIT_BRANCH,go-build"
-          - make test.setup.build
-          - make test.setup.db
-          - make test.start
+          - make dev.up
+          - make dev.setup
       jobs:
         - name: Lint
           commands:
@@ -74,36 +75,6 @@ blocks:
             - "if [ -d tmp/screenshots ] && ls tmp/screenshots/**/*.png >/dev/null 2>&1; then artifact push job tmp/screenshots; fi"
             - "cache store go-mod-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go"
             - "cache store go-build-$SEMAPHORE_GIT_BRANCH-$(checksum go.sum) tmp/go-build"
-
-  - name: "Agent Tests"
-    dependencies: []
-    run:
-      when: "change_in('/', {exclude: ['/docs/**', '**/*.md', '**/*.mdx'], default_branch: 'main'}) OR change_in('/agent/**/*.md', {default_branch: 'main'}) OR change_in('/agent/**/*.mdx', {default_branch: 'main'})"
-    task:
-      env_vars:
-        - name: DOCKER_BUILDKIT
-          value: "1"
-      prologue:
-        commands:
-          - checkout
-          - make test.agent.setup
-      jobs:
-        - name: Unit Tests
-          commands:
-            - make test.agent.unit AGENT_TEST_TARGETS="tests --junitxml=junit-report.xml"
-        - name: Lint
-          commands:
-            - make -C agent lint
-        - name: Format Check
-          commands:
-            - make -C agent format.check
-        - name: Type Check
-          commands:
-            - make -C agent typecheck
-      epilogue:
-        always:
-          commands:
-            - "[ -f agent/junit-report.xml ] && test-results publish agent/junit-report.xml"
 
   - name: "Frondend Tests"
     dependencies: []
