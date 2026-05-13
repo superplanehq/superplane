@@ -16,27 +16,11 @@ func Test__CreateIssue__Setup(t *testing.T) {
 	component := CreateIssue{}
 
 	t.Run("missing project -> error", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`[{"id":"10000","key":"TEST","name":"Test Project"}]`)),
-				},
-			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
 		err := component.Setup(core.SetupContext{
-			HTTP:        httpContext,
-			Integration: appCtx,
-			Metadata:    &contexts.MetadataContext{},
+			Integration: newAuthorizedIntegrationWithMetadata(Metadata{
+				Projects: []Project{{Key: "TEST", Name: "Test Project"}},
+			}),
+			Metadata: &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"issueType": "Task",
 				"summary":   "Test summary",
@@ -47,17 +31,11 @@ func Test__CreateIssue__Setup(t *testing.T) {
 	})
 
 	t.Run("missing issueType -> error", func(t *testing.T) {
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
 		err := component.Setup(core.SetupContext{
-			Integration: appCtx,
-			Metadata:    &contexts.MetadataContext{},
+			Integration: newAuthorizedIntegrationWithMetadata(Metadata{
+				Projects: []Project{{Key: "TEST", Name: "Test Project"}},
+			}),
+			Metadata: &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"project": "TEST",
 				"summary": "Test summary",
@@ -68,17 +46,11 @@ func Test__CreateIssue__Setup(t *testing.T) {
 	})
 
 	t.Run("missing summary -> error", func(t *testing.T) {
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
 		err := component.Setup(core.SetupContext{
-			Integration: appCtx,
-			Metadata:    &contexts.MetadataContext{},
+			Integration: newAuthorizedIntegrationWithMetadata(Metadata{
+				Projects: []Project{{Key: "TEST", Name: "Test Project"}},
+			}),
+			Metadata: &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"project":   "TEST",
 				"issueType": "Task",
@@ -98,18 +70,12 @@ func Test__CreateIssue__Setup(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
 		err := component.Setup(core.SetupContext{
-			HTTP:        httpContext,
-			Integration: appCtx,
-			Metadata:    &contexts.MetadataContext{},
+			HTTP: httpContext,
+			Integration: newAuthorizedIntegrationWithMetadata(Metadata{
+				Projects: []Project{{Key: "OTHER", Name: "Other Project"}},
+			}),
+			Metadata: &contexts.MetadataContext{},
 			Configuration: map[string]any{
 				"project":   "TEST",
 				"issueType": "Task",
@@ -121,28 +87,12 @@ func Test__CreateIssue__Setup(t *testing.T) {
 	})
 
 	t.Run("valid setup", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`[{"id":"10000","key":"TEST","name":"Test Project"}]`)),
-				},
-			},
-		}
-
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
 		metadataCtx := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
-			HTTP:        httpContext,
-			Integration: appCtx,
-			Metadata:    metadataCtx,
+			Integration: newAuthorizedIntegrationWithMetadata(Metadata{
+				Projects: []Project{{Key: "TEST", Name: "Test Project"}},
+			}),
+			Metadata: metadataCtx,
 			Configuration: map[string]any{
 				"project":   "TEST",
 				"issueType": "Task",
@@ -151,6 +101,10 @@ func Test__CreateIssue__Setup(t *testing.T) {
 		})
 
 		require.NoError(t, err)
+		nodeMetadata, ok := metadataCtx.Metadata.(NodeMetadata)
+		require.True(t, ok)
+		require.NotNil(t, nodeMetadata.Project)
+		assert.Equal(t, "TEST", nodeMetadata.Project.Key)
 	})
 }
 
@@ -167,14 +121,6 @@ func Test__CreateIssue__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -183,7 +129,7 @@ func Test__CreateIssue__Execute(t *testing.T) {
 				"summary":   "New task",
 			},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    newAuthorizedIntegration(),
 			ExecutionState: execCtx,
 		})
 
@@ -204,14 +150,6 @@ func Test__CreateIssue__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -221,7 +159,7 @@ func Test__CreateIssue__Execute(t *testing.T) {
 				"description": "This is a detailed bug description",
 			},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    newAuthorizedIntegration(),
 			ExecutionState: execCtx,
 		})
 
@@ -240,14 +178,6 @@ func Test__CreateIssue__Execute(t *testing.T) {
 			},
 		}
 
-		appCtx := &contexts.IntegrationContext{
-			Configuration: map[string]any{
-				"baseUrl":  "https://test.atlassian.net",
-				"email":    "test@example.com",
-				"apiToken": "test-token",
-			},
-		}
-
 		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -256,7 +186,7 @@ func Test__CreateIssue__Execute(t *testing.T) {
 				"summary":   "Test",
 			},
 			HTTP:           httpContext,
-			Integration:    appCtx,
+			Integration:    newAuthorizedIntegration(),
 			ExecutionState: execCtx,
 		})
 
