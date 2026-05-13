@@ -113,6 +113,39 @@ func UpdateAgentSessionTitleInTransaction(tx *gorm.DB, sessionID uuid.UUID, titl
 		Error
 }
 
+// FailStuckStreamingSessions marks any session in "streaming" state whose
+// last update predates cutoff as failed and returns the affected rows so
+// the caller can fan out session_failed events.
+func FailStuckStreamingSessions(cutoff time.Time) ([]AgentSession, error) {
+	var stuck []AgentSession
+	err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := tx.
+			Where("status = ?", AgentSessionStatusStreaming).
+			Where("updated_at < ?", cutoff).
+			Find(&stuck).Error; err != nil {
+			return err
+		}
+		if len(stuck) == 0 {
+			return nil
+		}
+		ids := make([]uuid.UUID, 0, len(stuck))
+		for _, s := range stuck {
+			ids = append(ids, s.ID)
+		}
+		now := time.Now()
+		return tx.Model(&AgentSession{}).
+			Where("id IN ?", ids).
+			Updates(map[string]any{
+				"status":     AgentSessionStatusFailed,
+				"updated_at": &now,
+			}).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return stuck, nil
+}
+
 func ArchiveAgentSessionInTransaction(tx *gorm.DB, sessionID uuid.UUID) error {
 	now := time.Now()
 	return tx.Model(&AgentSession{}).

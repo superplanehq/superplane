@@ -20,19 +20,35 @@ import (
 	"gorm.io/gorm"
 )
 
-const agentStreamTimeout = 15 * time.Minute
+const (
+	agentStreamTimeout   = 15 * time.Minute
+	maxConcurrentStreams = 10
+	// stuckStreamGrace pads the per-turn timeout before the cleanup loop
+	// considers a "streaming" row leaked. A turn that legitimately ran for
+	// the full timeout should have been transitioned to idle or failed by
+	// then; anything still streaming past 2× is stuck.
+	stuckStreamGrace    = 2 * agentStreamTimeout
+	stuckCleanupCadence = 5 * time.Minute
+)
 
 // AgentStreamWorker is stateless and safe to run as competing consumers.
 type AgentStreamWorker struct {
 	provider    agents.Provider
 	rabbitMQURL string
+	slots       chan struct{}
 }
 
 func NewAgentStreamWorker(provider agents.Provider, rabbitMQURL string) *AgentStreamWorker {
-	return &AgentStreamWorker{provider: provider, rabbitMQURL: rabbitMQURL}
+	return &AgentStreamWorker{
+		provider:    provider,
+		rabbitMQURL: rabbitMQURL,
+		slots:       make(chan struct{}, maxConcurrentStreams),
+	}
 }
 
 func (w *AgentStreamWorker) Start(ctx context.Context) {
+	go w.runStuckSessionCleanup(ctx)
+
 	logger := logging.NewTackleLogger(log.StandardLogger().WithFields(log.Fields{
 		"worker":    "agent_stream",
 		"route_key": messages.AgentStreamRequestedRoutingKey,
@@ -48,14 +64,7 @@ func (w *AgentStreamWorker) Start(ctx context.Context) {
 			Service:        "superplane.agent-stream-worker",
 			RoutingKey:     messages.AgentStreamRequestedRoutingKey,
 		}, func(delivery tackle.Delivery) error {
-			// Run each stream in a goroutine so the consumer can process
-			// multiple concurrent streams without blocking.
-			go func() {
-				if err := w.handle(ctx, delivery.Body()); err != nil {
-					log.WithError(err).Error("agent stream handler error")
-				}
-			}()
-			return nil
+			return w.dispatch(ctx, delivery.Body())
 		})
 
 		if err != nil {
@@ -66,6 +75,68 @@ func (w *AgentStreamWorker) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-time.After(5 * time.Second):
+		}
+	}
+}
+
+// dispatch acquires a concurrency slot (back-pressures the consumer when N
+// streams are in flight), spawns the worker, and returns so the message can
+// be ACKed. A panic in the goroutine is recovered and logged so one bad
+// stream can't kill the worker.
+func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
+	select {
+	case w.slots <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	go func() {
+		defer func() {
+			<-w.slots
+			if r := recover(); r != nil {
+				log.WithField("panic", r).Error("agent stream handler panicked")
+			}
+		}()
+		if err := w.handle(ctx, body); err != nil {
+			log.WithError(err).Error("agent stream handler error")
+		}
+	}()
+	return nil
+}
+
+func (w *AgentStreamWorker) runStuckSessionCleanup(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.WithField("panic", r).Error("agent stream cleanup panicked")
+		}
+	}()
+	ticker := time.NewTicker(stuckCleanupCadence)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			w.cleanupStuckSessions()
+		}
+	}
+}
+
+func (w *AgentStreamWorker) cleanupStuckSessions() {
+	cutoff := time.Now().Add(-stuckStreamGrace)
+	closed, err := models.FailStuckStreamingSessions(cutoff)
+	if err != nil {
+		log.WithError(err).Warn("agent stream cleanup: query failed")
+		return
+	}
+	for _, session := range closed {
+		if err := messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
+			SessionID: session.ID.String(),
+			Event:     "session_failed",
+			Status:    models.AgentSessionStatusFailed,
+			Error:     "stream timed out",
+		}); err != nil {
+			log.WithError(err).WithField("session_id", session.ID).Warn("agent stream cleanup: failed to publish")
 		}
 	}
 }

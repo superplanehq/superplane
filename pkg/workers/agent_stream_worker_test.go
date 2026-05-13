@@ -200,6 +200,33 @@ func TestAgentStreamWorker_SkipsUnknownProvider(t *testing.T) {
 	assert.Equal(t, models.AgentSessionStatusStreaming, refreshed.Status)
 }
 
+func TestAgentStreamWorker_CleanupFailsStuckStreamingSessions(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+
+	// Two streaming sessions: one whose last update is well past the
+	// stuck grace, one freshly streaming. Only the stale one should flip.
+	stale := mustCreateSession(t, r, canvas.ID)
+	require.NoError(t, database.Conn().Model(&models.AgentSession{}).
+		Where("id = ?", stale.ID).
+		Update("updated_at", time.Now().Add(-2*time.Hour)).Error)
+	fresh := mustCreateSession(t, r, canvas.ID)
+
+	closed, err := models.FailStuckStreamingSessions(time.Now().Add(-30 * time.Minute))
+	require.NoError(t, err)
+	require.Len(t, closed, 1)
+	assert.Equal(t, stale.ID, closed[0].ID)
+
+	staleAfter, err := models.FindAgentSession(stale.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusFailed, staleAfter.Status)
+
+	freshAfter, err := models.FindAgentSession(fresh.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusStreaming, freshAfter.Status)
+}
+
 func TestAgentStreamWorker_DropsUnknownSession(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
