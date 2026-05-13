@@ -796,20 +796,20 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
 	t.Cleanup(func() {
-		_ = models.DisableExperimentalFeature(r.Organization.ID, "runners")
+		_ = models.DisableExperimentalFeature(r.Organization.ID, "runner")
 	})
 
 	t.Run("enables a known feature", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "POST",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/runners",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/runner",
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 
 		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)
-		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), "runners")
+		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), "runner")
 	})
 
 	t.Run("rejects unknown feature ids", func(t *testing.T) {
@@ -824,7 +824,7 @@ func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "POST",
-			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/runners",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/runner",
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
@@ -835,18 +835,18 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	server, r, token := setupAdminTestServer(t)
 
 	t.Run("disables a previously enabled feature", func(t *testing.T) {
-		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, "runners"))
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, "runner"))
 
 		response := execRequest(server, requestParams{
 			method:     "DELETE",
-			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/runners",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/runner",
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusOK, response.Code)
 
 		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
 		require.NoError(t, err)
-		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), "runners")
+		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), "runner")
 	})
 
 	t.Run("is idempotent for ids not currently enabled", func(t *testing.T) {
@@ -861,7 +861,7 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 	t.Run("returns 404 for non-existent org", func(t *testing.T) {
 		response := execRequest(server, requestParams{
 			method:     "DELETE",
-			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/runners",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/runner",
 			authCookie: token,
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
