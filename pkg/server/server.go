@@ -8,9 +8,11 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
@@ -240,6 +242,7 @@ func startInternalAPI(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
+	agentService *agents.Service,
 ) {
 	log.Println("Starting Internal API")
 
@@ -252,11 +255,12 @@ func startInternalAPI(
 		authService,
 		registry,
 		oidcProvider,
+		agentService,
 		lookupInternalAPIPort(),
 	)
 }
 
-func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization) {
+func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization, agentService *agents.Service) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	appEnv := os.Getenv("APP_ENV")
@@ -299,7 +303,12 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 		log.Println("Adding gRPC Gateway to Public API")
 
 		grpcServerAddr := os.Getenv("GRPC_SERVER_ADDR")
-		if grpcServerAddr == "" {
+			// Register agent stream handler BEFORE gRPC gateway (PathPrefix would shadow it)
+	if os.Getenv("AGENT_ENABLED") == "yes" && agentService != nil {
+		server.RegisterAgentStreamHandler(agentService)
+	}
+
+	if grpcServerAddr == "" {
 			grpcServerAddr = "localhost:50051"
 		}
 
@@ -477,12 +486,24 @@ func Start() {
 
 	templates.Setup(registry)
 
+		// Initialize agents service
+	var agentService *agents.Service
+	if os.Getenv("AGENT_ENABLED") == "yes" {
+		agentClient := agents.NewClient(
+			os.Getenv("ANTHROPIC_API_KEY"),
+			os.Getenv("ANTHROPIC_AGENT_ID"),
+			os.Getenv("ANTHROPIC_ENVIRONMENT_ID"),
+		)
+		agentStore := agents.NewStore(database.Conn())
+		agentService = agents.NewService(agentClient, agentStore, jwtSigner, baseURL)
+	}
+
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService)
+		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService, agentService)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, jwtSigner, authService, registry, oidcProvider)
+		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, jwtSigner, authService, registry, oidcProvider, agentService)
 	}
 
 	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService)

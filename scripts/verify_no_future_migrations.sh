@@ -27,7 +27,7 @@ yellow "Current timestamp (UTC): $current_timestamp"
 yellow ""
 
 # Find all migration files and extract their timestamps
-migration_dirs=("db/migrations" "db/data_migrations" "agent/db/migrations")
+migration_dirs=("db/migrations" "db/data_migrations")
 future_migrations=()
 files=()
 
