@@ -48,7 +48,14 @@ func (w *AgentStreamWorker) Start(ctx context.Context) {
 			Service:        "superplane.agent-stream-worker",
 			RoutingKey:     messages.AgentStreamRequestedRoutingKey,
 		}, func(delivery tackle.Delivery) error {
-			return w.handle(ctx, delivery.Body())
+			// Run each stream in a goroutine so the consumer can process
+			// multiple concurrent streams without blocking.
+			go func() {
+				if err := w.handle(ctx, delivery.Body()); err != nil {
+					log.WithError(err).Error("agent stream handler error")
+				}
+			}()
+			return nil
 		})
 
 		if err != nil {
