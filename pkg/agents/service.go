@@ -149,6 +149,17 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		OrganizationID: organizationID.String(),
 		UserID:         userID.String(),
 	}); err != nil {
+		// The provider has already accepted the message, so its response
+		// will go to a worker that no longer exists. Flip the session to
+		// failed and emit the matching event so the UI doesn't show a
+		// hung "streaming" state until the cleanup loop catches it.
+		_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
+		_ = messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
+			SessionID: sessionID.String(),
+			Event:     "session_failed",
+			Status:    models.AgentSessionStatusFailed,
+			Error:     "failed to enqueue stream",
+		})
 		log.WithError(err).Error("failed to enqueue agent stream request")
 		return nil, fmt.Errorf("enqueue stream: %w", err)
 	}

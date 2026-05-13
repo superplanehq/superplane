@@ -16,7 +16,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
@@ -105,11 +104,6 @@ func (w *AgentStreamWorker) dispatch(ctx context.Context, body []byte) error {
 }
 
 func (w *AgentStreamWorker) runStuckSessionCleanup(ctx context.Context) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.WithField("panic", r).Error("agent stream cleanup panicked")
-		}
-	}()
 	ticker := time.NewTicker(stuckCleanupCadence)
 	defer ticker.Stop()
 	for {
@@ -117,9 +111,21 @@ func (w *AgentStreamWorker) runStuckSessionCleanup(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			w.cleanupStuckSessions()
+			w.cleanupTickSafely()
 		}
 	}
+}
+
+// cleanupTickSafely keeps the loop alive across panics by recovering per
+// iteration, so a single bad tick doesn't kill the goroutine for the rest
+// of the process lifetime.
+func (w *AgentStreamWorker) cleanupTickSafely() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.WithField("panic", r).Error("agent stream cleanup panicked")
+		}
+	}()
+	w.cleanupStuckSessions()
 }
 
 func (w *AgentStreamWorker) cleanupStuckSessions() {
@@ -321,10 +327,6 @@ func persistAndBroadcast(
 }
 
 func serializeMessage(m *models.AgentSessionMessage) *messages.AgentMessage {
-	var ts *timestamppb.Timestamp
-	if m.CreatedAt != nil {
-		ts = timestamppb.New(*m.CreatedAt)
-	}
 	return &messages.AgentMessage{
 		ID:         m.ID.String(),
 		Role:       m.Role,
@@ -332,7 +334,7 @@ func serializeMessage(m *models.AgentSessionMessage) *messages.AgentMessage {
 		ToolCallID: m.ToolCallID,
 		ToolName:   m.ToolName,
 		ToolStatus: m.ToolStatus,
-		CreatedAt:  ts,
+		CreatedAt:  m.CreatedAt,
 	}
 }
 

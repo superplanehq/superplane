@@ -2,8 +2,7 @@ package messages
 
 import (
 	"encoding/json"
-
-	"google.golang.org/protobuf/types/known/timestamppb"
+	"time"
 )
 
 const (
@@ -50,12 +49,15 @@ type AgentSessionEventMessage struct {
 	Extra     map[string]any `json:"extra,omitempty"`
 }
 
+// AgentMessage uses time.Time so encoding/json renders RFC 3339 strings.
+// timestamppb.Timestamp would serialise as {"seconds":...,"nanos":...},
+// which is not what websocket clients expect.
 type AgentMessage struct {
-	ID         string                 `json:"id"`
-	Role       string                 `json:"role"`
-	Content    string                 `json:"content"`
-	ToolCallID string                 `json:"toolCallId,omitempty"`
-	ToolName   string                 `json:"toolName,omitempty"`
-	ToolStatus string                 `json:"toolStatus,omitempty"`
-	CreatedAt  *timestamppb.Timestamp `json:"createdAt,omitempty"`
+	ID         string     `json:"id"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	ToolCallID string     `json:"toolCallId,omitempty"`
+	ToolName   string     `json:"toolName,omitempty"`
+	ToolStatus string     `json:"toolStatus,omitempty"`
+	CreatedAt  *time.Time `json:"createdAt,omitempty"`
 }
