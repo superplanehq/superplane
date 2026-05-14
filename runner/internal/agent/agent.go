@@ -9,7 +9,6 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -223,15 +222,19 @@ func (a *Agent) logFleetHTTPWarn(op string, dur time.Duration, status int, taskI
 }
 
 func (a *Agent) execute(ctx context.Context, task *api.TaskPayload) (int, string, error) {
-	mode := models.ExecutionMode(strings.ToLower(strings.TrimSpace(task.ExecutionMode)))
-	if mode == "" {
-		mode = models.ExecutionHost
+	ex, err := a.executorFor(task)
+	if err != nil {
+		return 1, "", err
 	}
 
 	d := executionWallDuration(a.Config, task)
 	execCtx, cancel := context.WithTimeout(ctx, d)
 	defer cancel()
 
+	// Optional live-stream of stdout/stderr to CloudWatch Logs while the
+	// task runs. The buffered output returned by ex.Execute is still the
+	// source of truth for the webhook payload; CloudWatch is just for
+	// real-time observation.
 	var live io.Writer
 	var cwClose func()
 	if g := strings.TrimSpace(a.Config.CloudWatchLogGroup); g != "" {
@@ -254,21 +257,29 @@ func (a *Agent) execute(ctx context.Context, task *api.TaskPayload) (int, string
 		defer cwClose()
 	}
 
-	var exit int
-	var out string
-	var err error
-	switch mode {
-	case models.ExecutionDocker:
-		exit, out, err = a.runDocker(execCtx, task, live)
-	case models.ExecutionHost:
-		exit, out, err = a.runHost(execCtx, task, live)
-	default:
-		return 1, "", fmt.Errorf("unknown execution_mode %q", task.ExecutionMode)
-	}
-	if errors.Is(execCtx.Err(), context.DeadlineExceeded) || errors.Is(err, context.DeadlineExceeded) {
+	exit, out, runErr := ex.Execute(execCtx, task, live)
+	if errors.Is(execCtx.Err(), context.DeadlineExceeded) || errors.Is(runErr, context.DeadlineExceeded) {
 		return 124, out, errors.New("execution timed out")
 	}
-	return exit, out, err
+	return exit, out, runErr
+}
+
+func (a *Agent) executorFor(task *api.TaskPayload) (Executor, error) {
+	mode := models.ExecutionMode(strings.ToLower(strings.TrimSpace(task.ExecutionMode)))
+	if mode == "" {
+		mode = models.ExecutionHost
+	}
+	switch mode {
+	case models.ExecutionHost:
+		return &HostExecutor{MaxOutputBytes: a.Config.MaxOutputBytes}, nil
+	case models.ExecutionDocker:
+		return &DockerExecutor{
+			MaxOutputBytes: a.Config.MaxOutputBytes,
+			RunnerID:       a.Config.RunnerID,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown execution_mode %q", task.ExecutionMode)
+	}
 }
 
 func executionWallDuration(cfg Config, task *api.TaskPayload) time.Duration {
@@ -280,80 +291,6 @@ func executionWallDuration(cfg Config, task *api.TaskPayload) time.Duration {
 		sec = cfg.MaxExecutionSeconds
 	}
 	return time.Duration(sec) * time.Second
-}
-
-func (a *Agent) runHost(ctx context.Context, task *api.TaskPayload, live io.Writer) (int, string, error) {
-	if len(task.Commands) > 0 {
-		return a.runHostShellScripts(ctx, task.Commands, live)
-	}
-	if len(task.Command) == 0 {
-		return 1, "", errors.New("empty command")
-	}
-	cmd := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
-	var buf bytes.Buffer
-	if live != nil {
-		mw := io.MultiWriter(&buf, live)
-		cmd.Stdout = mw
-		cmd.Stderr = mw
-	} else {
-		cmd.Stdout = &buf
-		cmd.Stderr = &buf
-	}
-	err := cmd.Run()
-	out := truncateString(buf.String(), a.Config.MaxOutputBytes)
-	exit := 0
-	if err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			exit = ee.ExitCode()
-		} else {
-			exit = 1
-		}
-		return exit, out, err
-	}
-	return exit, out, nil
-}
-
-func (a *Agent) runHostShellScripts(ctx context.Context, scripts []string, live io.Writer) (int, string, error) {
-	return runHostShellDirectives(ctx, a.Config.MaxOutputBytes, scripts, live)
-}
-
-func (a *Agent) runDocker(ctx context.Context, task *api.TaskPayload, live io.Writer) (int, string, error) {
-	if strings.TrimSpace(task.DockerImage) == "" {
-		return 1, "", errors.New("docker_image required")
-	}
-	if len(task.Commands) > 0 {
-		return a.runDockerShellScripts(ctx, task.DockerImage, task.Commands, live)
-	}
-	args := []string{"run", "--rm", task.DockerImage}
-	args = append(args, task.Command...)
-	cmd := exec.CommandContext(ctx, "docker", args...)
-	var buf bytes.Buffer
-	if live != nil {
-		mw := io.MultiWriter(&buf, live)
-		cmd.Stdout = mw
-		cmd.Stderr = mw
-	} else {
-		cmd.Stdout = &buf
-		cmd.Stderr = &buf
-	}
-	err := cmd.Run()
-	out := truncateString(buf.String(), a.Config.MaxOutputBytes)
-	exit := 0
-	if err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) {
-			exit = ee.ExitCode()
-		} else {
-			exit = 1
-		}
-		return exit, out, err
-	}
-	return exit, out, nil
-}
-
-func (a *Agent) runDockerShellScripts(ctx context.Context, image string, scripts []string, live io.Writer) (int, string, error) {
-	return runDockerShellDirectives(ctx, a.Config.MaxOutputBytes, image, scripts, live)
 }
 
 func truncateString(s string, max int) string {
