@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/models"
 
 	_ "modernc.org/sqlite"
@@ -60,7 +61,10 @@ CREATE INDEX IF NOT EXISTS tasks_status_created ON tasks(status, created_at);
 	if err := s.ensureCommandsJSONColumn(); err != nil {
 		return err
 	}
-	return s.ensureCancelRequestedColumn()
+	if err := s.ensureCancelRequestedColumn(); err != nil {
+		return err
+	}
+	return s.ensureExecutionTimeoutColumn()
 }
 
 func (s *SQLiteStore) ensureCommandsJSONColumn() error {
@@ -89,6 +93,19 @@ func (s *SQLiteStore) ensureCancelRequestedColumn() error {
 	return err
 }
 
+func (s *SQLiteStore) ensureExecutionTimeoutColumn() error {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('tasks') WHERE name='execution_timeout_seconds'`).Scan(&n)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+	_, err = s.db.Exec(`ALTER TABLE tasks ADD COLUMN execution_timeout_seconds INTEGER`)
+	return err
+}
+
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
@@ -114,12 +131,19 @@ func (s *SQLiteStore) CreateTask(ctx context.Context, t *models.Task) error {
 		t.ExecutionMode = models.ExecutionHost
 	}
 	_, err = s.db.ExecContext(ctx, `
-INSERT INTO tasks (id, command_json, commands_json, webhook_url, status, created_at, execution_mode, docker_image, cancel_requested)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+INSERT INTO tasks (id, command_json, commands_json, webhook_url, status, created_at, execution_mode, docker_image, execution_timeout_seconds, cancel_requested)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
 		t.ID, string(cmdJSON), cmdsJSON, t.WebhookURL, string(t.Status), t.CreatedAt.Unix(),
-		string(t.ExecutionMode), nullString(t.DockerImage),
+		string(t.ExecutionMode), nullString(t.DockerImage), nullIntPtr(t.ExecutionTimeoutSeconds),
 	)
 	return err
+}
+
+func nullIntPtr(p *int) any {
+	if p == nil || *p <= 0 {
+		return nil
+	}
+	return *p
 }
 
 func nullString(s string) any {
@@ -145,20 +169,25 @@ func (s *SQLiteStore) ClaimTask(ctx context.Context, runnerID string, lease time
 	defer func() { _ = tx.Rollback() }()
 
 	now := time.Now().Unix()
-	leaseUntil := now + int64(lease.Seconds())
+	runnerLeaseEnd := now + int64(lease.Seconds())
+	defaultExec := int64(api.DefaultExecutionTimeoutSeconds)
+	buf := int64(api.LeaseBufferSeconds)
 
 	var id string
+	// NULLIF: treat 0 in DB like unset so lease matches runner (which ignores non-positive values).
 	err = tx.QueryRowContext(ctx, `
 UPDATE tasks SET
 	status = ?,
 	claimed_at = ?,
-	lease_until = ?,
+	lease_until = MAX(?, ? + COALESCE(NULLIF(execution_timeout_seconds, 0), ?) + ?),
 	runner_id = ?
 WHERE rowid = (
 	SELECT rowid FROM tasks WHERE status = ? ORDER BY created_at ASC LIMIT 1
 )
 RETURNING id`,
-		string(models.StatusClaimed), now, leaseUntil, runnerID,
+		string(models.StatusClaimed), now,
+		runnerLeaseEnd, now, defaultExec, buf,
+		runnerID,
 		string(models.StatusQueued),
 	).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -177,7 +206,7 @@ RETURNING id`,
 func (s *SQLiteStore) GetByID(ctx context.Context, id string) (*models.Task, error) {
 	row := s.db.QueryRowContext(ctx, `
 SELECT id, command_json, commands_json, webhook_url, status, created_at, claimed_at, lease_until, runner_id,
-	execution_mode, docker_image, exit_code, output, error_message, cancel_requested
+	execution_mode, docker_image, execution_timeout_seconds, exit_code, output, error_message, cancel_requested
 FROM tasks WHERE id = ?`, id)
 	return scanTask(row)
 }
@@ -189,11 +218,12 @@ func scanTask(row *sql.Row) (*models.Task, error) {
 		createdAt, claimedAt, leaseUntil      sql.NullInt64
 		runnerID, dockerImage, output, errMsg sql.NullString
 		execMode                              string
+		execTimeoutSec                        sql.NullInt64
 		exitCode                              sql.NullInt64
 		cancelReq                             int64
 	)
 	if err := row.Scan(&id, &cmdJSON, &commandsJSON, &webhook, &status, &createdAt, &claimedAt, &leaseUntil,
-		&runnerID, &execMode, &dockerImage, &exitCode, &output, &errMsg, &cancelReq); err != nil {
+		&runnerID, &execMode, &dockerImage, &execTimeoutSec, &exitCode, &output, &errMsg, &cancelReq); err != nil {
 		return nil, err
 	}
 	var cmd []string
@@ -231,6 +261,10 @@ func scanTask(row *sql.Row) (*models.Task, error) {
 	if exitCode.Valid {
 		ec := int(exitCode.Int64)
 		t.ExitCode = &ec
+	}
+	if execTimeoutSec.Valid && execTimeoutSec.Int64 > 0 {
+		v := int(execTimeoutSec.Int64)
+		t.ExecutionTimeoutSeconds = &v
 	}
 	return t, nil
 }

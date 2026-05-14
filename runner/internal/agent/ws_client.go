@@ -38,8 +38,15 @@ func fleetStreamURL(base string) (string, error) {
 	}
 }
 
+// transportWebSocket reports whether to use fleet-manager WebSocket (GET /v1/runners/stream).
+// Default is WebSocket. Set Transport to "http", "polling", or "legacy" (case-insensitive) for HTTP claim/complete.
 func transportWebSocket(c Config) bool {
-	return strings.EqualFold(strings.TrimSpace(c.Transport), "websocket")
+	switch strings.ToLower(strings.TrimSpace(c.Transport)) {
+	case "http", "polling", "legacy":
+		return false
+	default:
+		return true
+	}
 }
 
 // RunWebSocket runs the agent against fleet-manager using GET /v1/runners/stream.

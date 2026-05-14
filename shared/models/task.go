@@ -36,9 +36,11 @@ type Task struct {
 	RunnerID      string
 	ExecutionMode ExecutionMode
 	DockerImage   string
-	ExitCode      *int
-	Output        string
-	ErrorMessage  string
+	// ExecutionTimeoutSeconds when non-nil is the per-task wall-clock limit in seconds.
+	ExecutionTimeoutSeconds *int
+	ExitCode                *int
+	Output                  string
+	ErrorMessage            string
 	// CancelRequested is true while the task is claimed and a caller asked to stop it (persisted).
 	CancelRequested bool
 }

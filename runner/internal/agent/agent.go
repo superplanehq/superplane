@@ -25,11 +25,14 @@ type Config struct {
 	BaseURL  string
 	RunnerID string
 	Token    string
-	// Transport is "http" (default) or "websocket" for fleet-manager /v1/runners/stream.
+	// Transport selects fleet-manager API: default WebSocket (GET /v1/runners/stream). Set "http", "polling", or "legacy" for POST claim/complete.
 	Transport string
 	PollEmpty time.Duration
 	// MaxOutputBytes caps combined stdout+stderr stored and sent back.
 	MaxOutputBytes int
+	// MaxExecutionSeconds caps the runner's execution wall clock (0 = no cap). It does not change
+	// fleet-manager claim leases, which are derived from execution_timeout_seconds on the task (or the API default).
+	MaxExecutionSeconds int
 	// ExitAfterEachTask stops the runner process after one successful CompleteTask once fleet-manager accepts the result.
 	// Fleet-manager terminates the EC2 instance when runner_id is the instance id (see cloud-init user-data). Local env: RUNNER_TERMINATE_AFTER_EACH_TASK.
 	ExitAfterEachTask bool
@@ -255,7 +258,8 @@ func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload,
 		mode = models.ExecutionHost
 	}
 
-	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, 9*time.Minute)
+	d := executionWallDuration(a.Config, task)
+	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, d)
 	defer cancelTimeout()
 
 	execCtx, cancelExec := context.WithCancel(timeoutCtx)
@@ -337,7 +341,25 @@ func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload,
 	default:
 		return 1, "", fmt.Errorf("unknown execution_mode %q", task.ExecutionMode), false
 	}
-	return exit, out, runErr, stoppedByCancel.Load()
+
+	if stoppedByCancel.Load() {
+		return exit, out, runErr, true
+	}
+	if errors.Is(execCtx.Err(), context.DeadlineExceeded) || errors.Is(runErr, context.DeadlineExceeded) {
+		return 124, out, errors.New("execution timed out"), false
+	}
+	return exit, out, runErr, false
+}
+
+func executionWallDuration(cfg Config, task *api.TaskPayload) time.Duration {
+	sec := api.DefaultExecutionTimeoutSeconds
+	if task.ExecutionTimeoutSeconds != nil && *task.ExecutionTimeoutSeconds > 0 {
+		sec = *task.ExecutionTimeoutSeconds
+	}
+	if cfg.MaxExecutionSeconds > 0 && sec > cfg.MaxExecutionSeconds {
+		sec = cfg.MaxExecutionSeconds
+	}
+	return time.Duration(sec) * time.Second
 }
 
 func (a *Agent) runHost(ctx context.Context, task *api.TaskPayload, live io.Writer) (int, string, error) {

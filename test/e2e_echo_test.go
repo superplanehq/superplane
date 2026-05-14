@@ -106,6 +106,32 @@ func TestCommandsShareShellEnv(t *testing.T) {
 	})
 }
 
+func TestExecutionTimeoutStopsLongSleep(t *testing.T) {
+	t.Parallel()
+	sec := 2
+	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
+		return api.CreateTaskRequest{
+			Command:                 []string{"sleep", "30"},
+			WebhookURL:              wh,
+			ExecutionMode:           string(models.ExecutionHost),
+			ExecutionTimeoutSeconds: &sec,
+		}
+	}, func(t *testing.T, created api.CreateTaskResponse, payload api.WebhookPayload) {
+		if payload.TaskID != created.ID {
+			t.Errorf("webhook task_id: got %q want %q", payload.TaskID, created.ID)
+		}
+		if payload.Status != string(models.StatusFailed) {
+			t.Errorf("status: got %q want failed", payload.Status)
+		}
+		if payload.ExitCode != 124 {
+			t.Errorf("exit_code: got %d want 124", payload.ExitCode)
+		}
+		if payload.Error != "execution timed out" {
+			t.Errorf("error: got %q want execution timed out", payload.Error)
+		}
+	})
+}
+
 func runFleetWebhookE2E(t *testing.T, makeReq func(webhookURL string) api.CreateTaskRequest, check func(*testing.T, api.CreateTaskResponse, api.WebhookPayload)) {
 	t.Helper()
 

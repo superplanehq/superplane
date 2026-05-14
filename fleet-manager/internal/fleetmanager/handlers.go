@@ -88,6 +88,10 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "webhook_url required")
 		return
 	}
+	if msg := api.ValidateExecutionTimeoutSeconds(req.ExecutionTimeoutSeconds); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
 
 	mode := models.ExecutionHost
 	switch strings.ToLower(strings.TrimSpace(req.ExecutionMode)) {
@@ -118,6 +122,10 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	} else {
 		task.Command = req.Command
 		task.Commands = nil
+	}
+	if req.ExecutionTimeoutSeconds != nil {
+		v := *req.ExecutionTimeoutSeconds
+		task.ExecutionTimeoutSeconds = &v
 	}
 	if err := s.Store.CreateTask(r.Context(), task); err != nil {
 		s.Log.Error("create task", slog.Any("err", err))
@@ -190,6 +198,10 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 	if task.ExitCode != nil {
 		ec := *task.ExitCode
 		resp.ExitCode = &ec
+	}
+	if task.ExecutionTimeoutSeconds != nil {
+		v := *task.ExecutionTimeoutSeconds
+		resp.ExecutionTimeoutSeconds = &v
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
