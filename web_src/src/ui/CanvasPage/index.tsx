@@ -2226,9 +2226,7 @@ function CanvasContent({
       if (!nodeId) return;
       const targetNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
       if (!targetNode) return;
-      stateRef.current.setNodes((nodes) =>
-        nodes.map((n) => ({ ...n, selected: n.id === nodeId })),
-      );
+      stateRef.current.setNodes((nodes) => nodes.map((n) => ({ ...n, selected: n.id === nodeId })));
       fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
     };
     window.addEventListener("agent:focus-node", handler);

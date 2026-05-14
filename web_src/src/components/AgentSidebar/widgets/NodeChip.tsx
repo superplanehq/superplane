@@ -79,12 +79,7 @@ export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipPr
           ) : LucideIcon ? (
             <LucideIcon className="size-3 shrink-0" />
           ) : (
-            <span
-              className={cn(
-                "size-2 rounded-full shrink-0",
-                isTrigger ? "bg-purple-500" : "bg-blue-500",
-              )}
-            />
+            <span className={cn("size-2 rounded-full shrink-0", isTrigger ? "bg-purple-500" : "bg-blue-500")} />
           )}
           {label}
         </button>
@@ -111,8 +106,8 @@ function NodeHoverContent({
   const config = node.configuration ?? {};
 
   // Count connections
-  const incoming = edges.filter((e) => e.targetId === node.id).length;
-  const outgoing = edges.filter((e) => e.sourceId === node.id).length;
+  const incoming = (edges ?? []).filter((e) => e.targetId === node.id).length;
+  const outgoing = (edges ?? []).filter((e) => e.sourceId === node.id).length;
 
   // Extract key config summary
   const summary = getConfigSummary(node.component, config);
@@ -120,10 +115,12 @@ function NodeHoverContent({
   return (
     <div>
       {/* Header */}
-      <div className={cn(
-        "flex items-center gap-2 px-3 py-2 border-b border-slate-100",
-        isTrigger ? "bg-purple-50" : "bg-blue-50",
-      )}>
+      <div
+        className={cn(
+          "flex items-center gap-2 px-3 py-2 border-b border-slate-100",
+          isTrigger ? "bg-purple-50" : "bg-blue-50",
+        )}
+      >
         {iconSrc ? (
           <img src={iconSrc} alt="" className="size-4 object-contain shrink-0" />
         ) : NodeIcon ? (
@@ -133,7 +130,9 @@ function NodeHoverContent({
         )}
         <div className="flex-1 min-w-0">
           <p className="text-xs font-medium text-slate-900 truncate">{node.name || node.id}</p>
-          <p className="text-[10px] text-slate-500">{node.component} · {isTrigger ? "Trigger" : "Action"}</p>
+          <p className="text-[10px] text-slate-500">
+            {node.component} · {isTrigger ? "Trigger" : "Action"}
+          </p>
         </div>
       </div>
 

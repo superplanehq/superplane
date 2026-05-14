@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { ChartWidget } from "./ChartWidget";
 
 const meta: Meta<typeof ChartWidget> = {
@@ -39,9 +39,7 @@ export const ExecutionsPerNode: Story = {
       type: "bar",
       title: "Executions Per Node (Last 24h)",
       x: ["Webhook", "API Call", "Check Status", "Notify OK", "Notify Fail"],
-      series: [
-        { name: "Executions", data: [48, 48, 48, 41, 7], color: "#8b5cf6" },
-      ],
+      series: [{ name: "Executions", data: [48, 48, 48, 41, 7], color: "#8b5cf6" }],
     },
   },
 };
@@ -96,9 +94,7 @@ export const NodeFailureRate: Story = {
       type: "bar",
       title: "Node Failure Rate (%)",
       x: ["SSH Deploy", "API Health", "Slack Notify", "DB Backup", "DNS Update"],
-      series: [
-        { name: "Failure %", data: [12.5, 4.2, 1.1, 8.7, 0.3], color: "#ef4444" },
-      ],
+      series: [{ name: "Failure %", data: [12.5, 4.2, 1.1, 8.7, 0.3], color: "#ef4444" }],
     },
   },
 };

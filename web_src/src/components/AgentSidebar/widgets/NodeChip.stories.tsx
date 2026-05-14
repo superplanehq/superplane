@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/react-vite";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RichMessage } from "./RichMessage";
@@ -11,12 +11,48 @@ const CANVAS_ID = "05bb8e74-6f11-4d1c-bbfd-75d4a28303d6";
 const mockCanvas: CanvasesCanvas = {
   spec: {
     nodes: [
-      { id: "webhook-trigger", name: "Webhook Trigger", type: "TYPE_TRIGGER", component: "webhook", configuration: { authentication: "none" } },
-      { id: "call-api", name: "Call Target API", type: "TYPE_ACTION", component: "http", configuration: { method: "GET", url: "https://httpbin.org/status/200" } },
-      { id: "check-result", name: "Check API Result", type: "TYPE_ACTION", component: "if", configuration: { expression: "{{ previous().data.statusCode >= 200 && previous().data.statusCode < 300 }}" } },
-      { id: "random-wait", name: "Random Wait", type: "TYPE_ACTION", component: "wait", configuration: { duration: "30" } },
-      { id: "notify-success", name: "Notify Success", type: "TYPE_ACTION", component: "http", configuration: { method: "POST", url: "https://httpbin.org/post" } },
-      { id: "ssh-deploy", name: "SSH Deploy", type: "TYPE_ACTION", component: "ssh", configuration: { host: "192.168.1.1", username: "ubuntu" } },
+      {
+        id: "webhook-trigger",
+        name: "Webhook Trigger",
+        type: "TYPE_TRIGGER",
+        component: "webhook",
+        configuration: { authentication: "none" },
+      },
+      {
+        id: "call-api",
+        name: "Call Target API",
+        type: "TYPE_ACTION",
+        component: "http",
+        configuration: { method: "GET", url: "https://httpbin.org/status/200" },
+      },
+      {
+        id: "check-result",
+        name: "Check API Result",
+        type: "TYPE_ACTION",
+        component: "if",
+        configuration: { expression: "{{ previous().data.statusCode >= 200 && previous().data.statusCode < 300 }}" },
+      },
+      {
+        id: "random-wait",
+        name: "Random Wait",
+        type: "TYPE_ACTION",
+        component: "wait",
+        configuration: { duration: "30" },
+      },
+      {
+        id: "notify-success",
+        name: "Notify Success",
+        type: "TYPE_ACTION",
+        component: "http",
+        configuration: { method: "POST", url: "https://httpbin.org/post" },
+      },
+      {
+        id: "ssh-deploy",
+        name: "SSH Deploy",
+        type: "TYPE_ACTION",
+        component: "ssh",
+        configuration: { host: "192.168.1.1", username: "ubuntu" },
+      },
     ],
     edges: [
       { sourceId: "webhook-trigger", targetId: "call-api", channel: "default" },

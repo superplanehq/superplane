@@ -16,20 +16,10 @@ export function ConfirmWidget({ message, yes, no, onAction }: ConfirmWidgetProps
         <p className="text-sm text-amber-900">{message}</p>
       </div>
       <div className="flex gap-2">
-        <Button
-          size="sm"
-          variant="destructive"
-          className="text-xs"
-          onClick={() => onAction?.(yes)}
-        >
+        <Button size="sm" variant="destructive" className="text-xs" onClick={() => onAction?.(yes)}>
           {yes}
         </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="text-xs"
-          onClick={() => onAction?.(no)}
-        >
+        <Button size="sm" variant="outline" className="text-xs" onClick={() => onAction?.(no)}>
           {no}
         </Button>
       </div>
