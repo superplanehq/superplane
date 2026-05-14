@@ -1,4 +1,4 @@
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { parseAgentContent, type Segment } from "./parser";
@@ -57,6 +57,7 @@ function SegmentRenderer({ segment, onAction, canvasId, organizationId }: { segm
         <div className={MARKDOWN_CLASSES}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
+            urlTransform={(url) => url.startsWith("run:") ? url : defaultUrlTransform(url)}
             components={{
               a: ({ children, href }) => {
                 const runMatch = href?.match(/^run:([0-9a-f-]{36})$/);
