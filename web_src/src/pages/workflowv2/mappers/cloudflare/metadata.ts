@@ -42,3 +42,10 @@ export function getCloudflareMonitorDisplayLabel(metadata: unknown, monitorId: s
 
   return id;
 }
+
+export function getCloudflareTunnelName(metadata: unknown): string | undefined {
+  const m = metadataRecord(metadata);
+  if (!m) return undefined;
+  const raw = m.tunnelName ?? m.tunnel_name;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : undefined;
+}

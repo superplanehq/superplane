@@ -2,21 +2,18 @@ import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getStateMap } from "..";
-import { baseEventSections, cloudflareDeletedResourceExecutionDetails } from "./base";
 import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo, SubtitleContext } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { baseEventSections, getTunnelExecutionDetails } from "./base";
 
-interface DeleteLoadBalancerConfiguration {
-  loadBalancer?: string;
+interface CreateTunnelConfiguration {
+  name?: string;
+  configSrc?: string;
 }
 
-interface DeleteLoadBalancerNodeMetadata {
-  loadBalancerName?: string;
-}
-
-export const deleteLoadBalancerMapper: ComponentBaseMapper = {
+export const createTunnelMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "cloudflare";
@@ -33,7 +30,7 @@ export const deleteLoadBalancerMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails: cloudflareDeletedResourceExecutionDetails,
+  getExecutionDetails: getTunnelExecutionDetails,
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";
@@ -43,12 +40,14 @@ export const deleteLoadBalancerMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as DeleteLoadBalancerNodeMetadata | undefined;
-  const configuration = node.configuration as DeleteLoadBalancerConfiguration;
+  const configuration = node.configuration as CreateTunnelConfiguration;
 
-  const label = nodeMetadata?.loadBalancerName || configuration?.loadBalancer;
-  if (label) {
-    metadata.push({ icon: "network", label });
+  if (configuration?.name) {
+    metadata.push({ icon: "network", label: configuration.name });
+  }
+
+  if (configuration?.configSrc) {
+    metadata.push({ icon: "settings", label: configuration.configSrc });
   }
 
   return metadata;
