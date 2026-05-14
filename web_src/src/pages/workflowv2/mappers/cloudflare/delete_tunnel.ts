@@ -2,21 +2,18 @@ import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getStateMap } from "..";
-import { baseEventSections, cloudflareDeletedResourceExecutionDetails } from "./base";
 import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo, SubtitleContext } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { baseEventSections, cloudflareDeletedResourceExecutionDetails } from "./base";
+import { getCloudflareTunnelName } from "./metadata";
 
-interface DeleteLoadBalancerConfiguration {
-  loadBalancer?: string;
+interface DeleteTunnelConfiguration {
+  tunnel?: string;
 }
 
-interface DeleteLoadBalancerNodeMetadata {
-  loadBalancerName?: string;
-}
-
-export const deleteLoadBalancerMapper: ComponentBaseMapper = {
+export const deleteTunnelMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "cloudflare";
@@ -43,10 +40,9 @@ export const deleteLoadBalancerMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as DeleteLoadBalancerNodeMetadata | undefined;
-  const configuration = node.configuration as DeleteLoadBalancerConfiguration;
+  const configuration = node.configuration as DeleteTunnelConfiguration;
 
-  const label = nodeMetadata?.loadBalancerName || configuration?.loadBalancer;
+  const label = getCloudflareTunnelName(node.metadata) || configuration?.tunnel;
   if (label) {
     metadata.push({ icon: "network", label });
   }

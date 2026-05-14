@@ -92,6 +92,29 @@ export function getPoolExecutionDetails(context: ExecutionDetailsContext): Recor
   return details;
 }
 
+export function getTunnelExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  const tunnel = result?.tunnel as Record<string, unknown> | undefined;
+  if (!tunnel) return details;
+
+  details["Name"] = tunnel.name != null ? String(tunnel.name) : "-";
+  if (tunnel.status != null) {
+    details["Status"] = String(tunnel.status);
+  }
+  if (tunnel.config_src != null) {
+    details["Config source"] = String(tunnel.config_src);
+  }
+
+  return details;
+}
+
 export function getLoadBalancerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
   const details: Record<string, string> = {};
 
@@ -117,7 +140,8 @@ export function getLoadBalancerExecutionDetails(context: ExecutionDetailsContext
   return details;
 }
 
-export function deleteLoadBalancerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+/** Execution details for Cloudflare delete actions that emit `{ deleted: boolean }` on the default channel. */
+export function cloudflareDeletedResourceExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
   const details: Record<string, string> = {};
 
   if (context.execution.createdAt) {
@@ -203,6 +227,22 @@ export function getWorkerRouteExecutionDetails(context: ExecutionDetailsContext)
   }
   details["Pattern"] = route.pattern != null ? String(route.pattern) : "-";
   details["Script"] = route.script != null ? String(route.script) : "-";
+  return details;
+}
+
+export function deleteTunnelExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  if (!result) return details;
+
+  details["Deleted"] = result.deleted != null ? String(result.deleted) : "-";
+
   return details;
 }
 
