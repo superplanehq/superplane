@@ -8,10 +8,13 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/agents"
+	"github.com/superplanehq/superplane/pkg/agents/anthropic"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
+	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -93,7 +96,29 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
 )
 
-func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization) {
+func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.Signer, baseURL string) (agents.Provider, agentsActions.AgentsService) {
+	cfg := config.LoadAnthropicAgentConfig()
+	if !cfg.Enabled() {
+		log.Info("Anthropic managed agents disabled: missing ANTHROPIC_* env vars")
+		return nil, nil
+	}
+
+	provider, err := anthropic.New(anthropic.Config{
+		APIKey:        cfg.APIKey,
+		AgentID:       cfg.AgentID,
+		EnvironmentID: cfg.EnvironmentID,
+	})
+	if err != nil {
+		log.WithError(err).Warn("failed to initialise Anthropic managed agents provider")
+		return nil, nil
+	}
+
+	service := agents.NewService(provider, authService, jwtSigner, baseURL)
+	log.Info("Anthropic managed agents enabled")
+	return provider, service
+}
+
+func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization, agentProvider agents.Provider) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -182,6 +207,12 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		go w.Start(context.Background())
 	}
 
+	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
+		log.Println("Starting Agent Stream Worker")
+		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL)
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_EVENT_RETENTION_WORKER") == "yes" || os.Getenv("START_USAGE_SYNC_WORKER") == "yes" {
 		usageService, err := usage.NewServiceFromEnv()
 		if err != nil {
@@ -240,6 +271,7 @@ func startInternalAPI(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
+	agentService agentsActions.AgentsService,
 ) {
 	log.Println("Starting Internal API")
 
@@ -252,6 +284,7 @@ func startInternalAPI(
 		authService,
 		registry,
 		oidcProvider,
+		agentService,
 		lookupInternalAPIPort(),
 	)
 }
@@ -477,15 +510,17 @@ func Start() {
 
 	templates.Setup(registry)
 
+	agentProvider, agentService := buildAgentService(authService, jwtSigner, baseURL)
+
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, jwtSigner, authService, registry, oidcProvider)
+		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, jwtSigner, authService, registry, oidcProvider, agentService)
 	}
 
-	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService)
+	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService, agentProvider)
 
 	log.Println("SuperPlane is UP.")
 
