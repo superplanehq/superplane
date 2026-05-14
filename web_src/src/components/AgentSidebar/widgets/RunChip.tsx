@@ -1,8 +1,9 @@
 import { Rabbit } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import type { CanvasesCanvasRun } from "@/api-client";
+import { canvasesListRuns } from "@/api-client";
 import { RUN_STATUS_META, getRunStatus, shortId } from "@/ui/Runs/runPresentation";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
@@ -13,10 +14,10 @@ interface RunChipProps {
 }
 
 function findRunInCache(queryClient: ReturnType<typeof useQueryClient>, runId: string): CanvasesCanvasRun | undefined {
+  // Search all canvas run query caches
   const queries = queryClient.getQueriesData<{ pages?: Array<{ runs?: CanvasesCanvasRun[] }> }>({
     queryKey: ["canvas", "runs"],
   });
-
   for (const [, data] of queries) {
     if (!data?.pages) continue;
     for (const page of data.pages) {
@@ -24,7 +25,33 @@ function findRunInCache(queryClient: ReturnType<typeof useQueryClient>, runId: s
       if (found) return found;
     }
   }
-  return undefined;
+
+  // Also check our own chip cache
+  const chipData = queryClient.getQueryData<{ runs?: CanvasesCanvasRun[] }>(["agent-run-chips"]);
+  return chipData?.runs?.find((r) => r.id === runId);
+}
+
+function useRunData(canvasId: string, runId: string) {
+  const queryClient = useQueryClient();
+  const cached = findRunInCache(queryClient, runId);
+
+  // Fetch runs if not in any cache — one shared query for all chips
+  const { data } = useQuery({
+    queryKey: ["agent-run-chips", canvasId],
+    queryFn: async () => {
+      const response = await canvasesListRuns({
+        path: { canvasId },
+        query: { limit: 50 },
+        headers: { "x-organization-id": "" }, // filled by interceptor
+      });
+      return response.data ?? { runs: [] };
+    },
+    enabled: !cached,
+    staleTime: 60_000,
+  });
+
+  if (cached) return cached;
+  return data?.runs?.find((r: CanvasesCanvasRun) => r.id === runId);
 }
 
 function formatDuration(start?: string, end?: string): string {
@@ -46,8 +73,7 @@ function formatTime(date?: string): string {
 
 export function RunChip({ runId, canvasId, organizationId }: RunChipProps) {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const run = findRunInCache(queryClient, runId);
+  const run = useRunData(canvasId, runId);
   const status = run ? getRunStatus(run) : "unknown";
   const meta = RUN_STATUS_META[status];
   const StatusIcon = meta.icon;
@@ -92,7 +118,7 @@ function RunHoverContent({
   if (!run) {
     return (
       <div className="p-3 text-xs text-slate-500">
-        Run <span className="font-mono">{shortId(runId)}</span> not found in cache.
+        Run <span className="font-mono">{shortId(runId)}</span> — loading...
       </div>
     );
   }
@@ -102,7 +128,6 @@ function RunHoverContent({
 
   return (
     <div>
-      {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-100">
         <StatusIcon className="size-4 shrink-0" />
         <div className="flex-1 min-w-0">
@@ -112,7 +137,6 @@ function RunHoverContent({
         <span className={cn("inline-block h-2 w-2 shrink-0 rounded-full", meta.dotClassName)} />
       </div>
 
-      {/* Timing */}
       <div className="px-3 py-2 border-b border-slate-100 grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
         <div>
           <span className="text-slate-400">Started</span>
@@ -124,7 +148,6 @@ function RunHoverContent({
         </div>
       </div>
 
-      {/* Executions */}
       {executions.length > 0 && (
         <div className="px-3 py-2">
           <p className="text-[10px] text-slate-400 mb-1">{executions.length} node{executions.length !== 1 ? "s" : ""} executed</p>
