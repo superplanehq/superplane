@@ -10,7 +10,7 @@ import { StepsWidget } from "./StepsWidget";
 import { BannerWidget } from "./BannerWidget";
 import { MermaidWidget } from "./MermaidWidget";
 import { CodeBlockWidget } from "./CodeBlockWidget";
-import { RunChip } from "./RunChip";
+import { RunChipFromLink } from "./RunChip";
 
 const MARKDOWN_CLASSES =
   "max-w-none [&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-base [&_h1]:font-semibold [&_h1:first-child]:mt-0 " +
@@ -60,11 +60,14 @@ function SegmentRenderer({ segment, onAction, canvasId, organizationId }: { segm
             urlTransform={(url) => url.startsWith("run:") ? url : defaultUrlTransform(url)}
             components={{
               a: ({ children, href }) => {
-                const runMatch = href?.match(/^run:([0-9a-f-]{36})/);
+                const runMatch = href?.match(/^run:([0-9a-f-]{36})(?:~(.+))?/);
                 if (runMatch && canvasId && organizationId) {
+                  const label = typeof children === "string" ? children : undefined;
                   return (
-                    <RunChip
+                    <RunChipFromLink
                       runId={runMatch[1]}
+                      rawLabel={label}
+                      rawStatus={runMatch[2]}
                       canvasId={canvasId}
                       organizationId={organizationId}
                     />
