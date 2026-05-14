@@ -21,7 +21,8 @@ type Config struct {
 	APIKey        string
 	AgentID       string
 	EnvironmentID string
-	BaseURL       string // overridable for tests
+	FileIDs       []string // file IDs to attach as session resources
+	BaseURL       string   // overridable for tests
 	HTTPClient    *http.Client
 }
 

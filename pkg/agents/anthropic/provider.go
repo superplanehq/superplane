@@ -20,6 +20,7 @@ const ProviderName = "anthropic"
 type Provider struct {
 	agentID       string
 	environmentID string
+	fileIDs       []string
 	client        *Client
 }
 
@@ -37,6 +38,7 @@ func New(cfg Config) (*Provider, error) {
 	return &Provider{
 		agentID:       cfg.AgentID,
 		environmentID: cfg.EnvironmentID,
+		fileIDs:       cfg.FileIDs,
 		client:        client,
 	}, nil
 }
@@ -62,6 +64,17 @@ func (p *Provider) CreateSession(ctx context.Context, _ agents.CreateSessionOpti
 	if resp.ID == "" {
 		return nil, fmt.Errorf("anthropic: provider returned empty session id")
 	}
+	// Attach file resources to the session.
+	for _, fileID := range p.fileIDs {
+		resBody := map[string]any{
+			"type":    "file",
+			"file_id": fileID,
+		}
+		if _, err := p.client.executeHTTP(ctx, http.MethodPost, fmt.Sprintf("/sessions/%s/resources", resp.ID), resBody); err != nil {
+			log.WithError(err).WithFields(log.Fields{"session_id": resp.ID, "file_id": fileID}).Warn("anthropic: failed to attach file resource")
+		}
+	}
+
 	return &agents.CreateSessionResult{ProviderSessionID: resp.ID}, nil
 }
 
