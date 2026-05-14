@@ -1889,6 +1889,7 @@ export function WorkflowPageV2() {
       me,
       canvasMode,
       openTriggerModal,
+      organizationId,
     );
   }, [
     canvas,
@@ -1967,6 +1968,8 @@ export function WorkflowPageV2() {
       queryClient,
       me,
       "live",
+      openTriggerModal,
+      organizationId,
     );
 
     const filteredNodes = prepared.nodes.filter((node) => runNodeIds.has(node.id));
@@ -1990,6 +1993,8 @@ export function WorkflowPageV2() {
     me,
     visibleNodeExecutionsMap,
     selectedRunFullExecutions,
+    openTriggerModal,
+    organizationId,
   ]);
 
   const nodes = runCanvasData ? runCanvasData.nodes : nodesWithIntegrationStatus;
@@ -6096,6 +6101,7 @@ function prepareData(
   user?: SuperplaneMeUser | null,
   canvasMode: "live" | "edit" = "live",
   openModal?: (modal: TriggerActionModal) => void,
+  organizationId?: string,
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -6121,6 +6127,7 @@ function prepareData(
           workflowEdges,
           canvasMode,
           openModal,
+          organizationId,
         );
       })
       .map((node) => ({
@@ -6145,6 +6152,7 @@ function prepareNode(
   edges?: ComponentsEdge[],
   canvasMode: "live" | "edit" = "live",
   openModal?: (modal: TriggerActionModal) => void,
+  organizationId?: string,
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
@@ -6167,6 +6175,8 @@ function prepareNode(
         currentUser,
         edges,
         canvasMode,
+        organizationId,
+        openModal,
       });
   }
 }

@@ -1,4 +1,3 @@
-import { TimeAgo } from "@/components/TimeAgo";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { calcRelativeTimeFromDiff, resolveIcon } from "@/lib/utils";
 import { AlertTriangle, Rabbit } from "lucide-react";
@@ -11,6 +10,7 @@ import { SelectionWrapper } from "../selectionWrapper";
 import type { ComponentActionsProps } from "../types/componentActions";
 import { PayloadTooltip } from "./PayloadTooltip";
 import { SpecsTooltip } from "./SpecsTooltip";
+import { TimeAgo } from "@/components/TimeAgo";
 
 interface EventSectionDisplayProps {
   section: EventSection;

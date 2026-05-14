@@ -125,9 +125,8 @@ export type ComponentBaseContext = {
   currentUser: User | undefined;
   actions: ActionContext;
   canvasMode?: "live" | "edit";
-  /** Canvas id for API URLs (e.g. runner live logs); set when preparing canvas nodes. */
+
   canvasId?: string;
-  /** Organization scope for API calls; set when preparing canvas nodes. */
   organizationId?: string;
 };
 
@@ -204,6 +203,17 @@ export interface CustomFieldRendererContext {
   canvasMode?: "live" | "edit";
   /** Start trigger template Run uses this on the canvas (parallel to component {@link ActionContext}). */
   actions?: TriggerActionContext;
+  /**
+   * When a custom field is composed from a component mapper (e.g. runner live logs), the same
+   * {@link ActionContext} passed into {@link ComponentBaseContext.actions}.
+   */
+  componentActions?: ActionContext;
+  /** Canvas id for org-scoped API URLs when rendering on the canvas. */
+  canvasId?: string;
+  /** Organization id for org-scoped API calls when rendering on the canvas. */
+  organizationId?: string;
+  /** Latest execution id for this node from canvas prep (e.g. live log stream). */
+  latestExecutionId?: string;
 }
 
 export interface CustomFieldRenderer {
