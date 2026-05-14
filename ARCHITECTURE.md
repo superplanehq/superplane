@@ -35,6 +35,25 @@ Implementation detail (storage): use a store that supports safe concurrent claim
 
 Runners should remain **stateless** with respect to queue policy: they execute assigned work and report results; they do not decide global ordering or webhook retries.
 
+### Executor abstraction
+
+Both modes implement a small `Executor` interface (`runner/internal/agent/executor.go`) with a single `Execute(ctx, task, live)` method. The agent loop picks `HostExecutor` or `DockerExecutor` based on `task.execution_mode` and is otherwise oblivious to how the task is run; when a CloudWatch log group is configured it passes a `live io.Writer` so each executor can tee stdout/stderr to the live log stream while still returning the buffered output used by the webhook. New backends (Kubernetes, Firecracker, …) plug in as additional implementations without touching the claim/complete code paths.
+
+### Docker execution lifecycle
+
+The `DockerExecutor` follows a `pull → run -d --name → exec → stop+rm` lifecycle modeled after the docker-compose executor in [`semaphoreci/agent`](https://github.com/semaphoreci/agent) (`pkg/executors/docker_compose_executor.go`). For exec/stop orchestration alongside other backends, see `pkg/executors/shell_executor.go`. Semaphore’s interactive shell and PTY plumbing live under `pkg/shell/` (for example `pkg/shell/shell.go`); Superplane does not reuse that stack—tasks run via `docker exec` without a PTY (see runner README).
+
+1. **Pull** — `docker pull <image>` first, so a bad image or auth failure surfaces as a clean error before user code runs. When CloudWatch live streaming is configured, pull output is copied to the live log sink on **success** as well as on failure, so long pulls are visible before `docker exec` starts.
+2. **Run** — `docker run -d --entrypoint sleep --name superplane-task-<runner_id>-<task_id> <image> infinity` starts a long-lived idle container. The deterministic name lets cancellation and the orphan sweep target it reliably; including `runner_id` keeps multiple runners on the same host from stomping on each other's containers. Successful `docker run -d` diagnostics are also copied to the live writer when present (same rationale as pull).
+3. **Exec** — For argv `command`, the runner invokes `docker exec <name> <argv...>`. For multi-line `commands`, all directives are bundled into a single `docker exec <name> sh -c '<script>'` with `set -e` so env / cwd persist across lines and the script fails fast on the first non-zero exit.
+4. **Cleanup** — A deferred `docker stop --time 5 && docker rm -f` runs even when the task context is cancelled or `Execute` panics, fixing the "kill the docker CLI but the container keeps running" leak.
+
+On startup the runner additionally runs an **orphan sweep**: any `superplane-task-<runner_id>-…` container left behind by a previous crashed run (where the per-task `defer` did not get to execute) is force-removed. The sweep is filtered by this runner's id, so it never touches another runner's containers.
+
+If `docker` is not on PATH (or the daemon is unreachable) and a Docker task is claimed, the executor fails the task immediately with a `"docker not available on this runner"` error. Capability-based claim filtering (so Docker-less runners never claim Docker tasks in the first place) is a separate runner-labels concern.
+
+**Migration (fleet already on a pre–DockerExecutor runner):** If production ever used the legacy path (PTY + interactive bash inside `docker run` for multi-line `commands`), upgrading changes TTY availability, shell dialect (`bash` → POSIX `sh`), and lifecycle (`run --rm` style vs pull / long-lived container / exec). Operators and task authors should read the README “Upgrade note: Docker multi-line `commands`” and validate representative Docker tasks after deploy.
+
 ## End-to-end flows
 
 ### Submit

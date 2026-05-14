@@ -136,12 +136,6 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, sc
 	return 0, truncateString(buf.String(), max), nil
 }
 
-func runDockerShellDirectives(ctx context.Context, maxOut int, image string, scripts []string, live io.Writer) (int, string, error) {
-	args := []string{"run", "-i", "--rm", strings.TrimSpace(image), "/bin/bash", "--norc", "--noprofile", "+m", "-i"}
-	cmd := exec.CommandContext(ctx, "docker", args...)
-	return runShellPTYSession(ctx, maxOut, cmd, scripts, live)
-}
-
 func resolveBash() (string, error) {
 	if p := strings.TrimSpace(os.Getenv("RUNNER_SHELL")); p != "" {
 		if st, err := os.Stat(p); err == nil && !st.IsDir() {

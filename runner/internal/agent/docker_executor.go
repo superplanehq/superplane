@@ -1,0 +1,250 @@
+package agent
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"os/exec"
+	"regexp"
+	"strings"
+	"time"
+
+	"github.com/superplane/runner/shared/api"
+)
+
+// DockerExecutor runs a task inside a Docker container using a
+// pull -> run -d --name -> exec -> stop+rm lifecycle. Cleanup runs in a
+// deferred function so cancelled / panicked tasks do not leak containers.
+//
+// Multi-line `commands` are bundled into a single `sh -c` invocation with
+// `set -e` so env / cwd persist across directives and the script fails fast
+// on the first non-zero exit code (POSIX sh chosen over bash so minimal
+// images like alpine work out of the box; see dockerExecTask). Argv
+// (`command`) is dispatched via `docker exec <name> <argv...>`.
+//
+// `docker exec` is invoked without `-t`, so the task runs in a non-TTY
+// context. CLI tools that probe `isatty()` (color output, progress bars,
+// interactive prompts) will see stdout/stderr as a pipe rather than a
+// terminal. This is intentional and matches what callers get from `docker
+// run` without `-t`; it is also more predictable for batch / CI workloads.
+type DockerExecutor struct {
+	MaxOutputBytes int
+	RunnerID       string
+}
+
+const (
+	dockerNamePrefix       = "superplane-task-"
+	dockerStopGraceSeconds = 5
+	// dockerIdleEntrypoint keeps the container alive while we run `docker exec`
+	// against it. `sleep infinity` works on every common base image (alpine,
+	// debian, ubuntu, python:*, node:*). Images without `sleep` are not supported.
+	dockerIdleEntrypoint = "sleep"
+	dockerIdleArg        = "infinity"
+)
+
+// dockerNameUnsafe matches any byte that is NOT in Docker's allowed
+// container-name alphabet ([a-zA-Z0-9_.-]); such bytes are replaced with '_'.
+var dockerNameUnsafe = regexp.MustCompile(`[^a-zA-Z0-9_.-]`)
+
+// containerName builds the per-task container name. Including the
+// runner_id keeps multiple runners on the same host from stomping on
+// each other's containers (own and orphan-sweep).
+func containerName(runnerID, taskID string) string {
+	return dockerNamePrefix + sanitizeDockerName(runnerID) + "-" + sanitizeDockerName(taskID)
+}
+
+func sanitizeDockerName(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "x"
+	}
+	return dockerNameUnsafe.ReplaceAllString(s, "_")
+}
+
+func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, live io.Writer) (int, string, error) {
+	if strings.TrimSpace(d.RunnerID) == "" {
+		return 1, "", errors.New("runner_id required for docker execution")
+	}
+	if _, err := exec.LookPath("docker"); err != nil {
+		return 1, "", fmt.Errorf("docker not available on this runner: %w", err)
+	}
+	image := strings.TrimSpace(task.DockerImage)
+	if image == "" {
+		return 1, "", errors.New("docker_image required")
+	}
+	max := d.MaxOutputBytes
+	if max <= 0 {
+		max = 512 * 1024
+	}
+	name := containerName(d.RunnerID, task.ID)
+
+	out := &capWriter{max: max}
+
+	// Cleanup runs even when ctx is cancelled mid-task or when Phase 2 fails
+	// after the container was created. Using context.Background gives the
+	// cleanup commands time to complete after the task ctx has expired.
+	defer func() {
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		stopAndRemoveContainer(cleanupCtx, name)
+	}()
+
+	pullOut, err := captureDocker(ctx, "pull", image)
+	if err != nil {
+		out.WriteString(string(pullOut))
+		if live != nil {
+			_, _ = live.Write(pullOut)
+		}
+		return 1, out.String(), fmt.Errorf("docker pull %s: %w", image, err)
+	}
+	if live != nil && len(pullOut) > 0 {
+		_, _ = live.Write(pullOut)
+	}
+
+	runArgs := []string{
+		"run", "-d",
+		"--name", name,
+		"--entrypoint", dockerIdleEntrypoint,
+		image,
+		dockerIdleArg,
+	}
+	runOut, err := captureDocker(ctx, runArgs...)
+	if err != nil {
+		out.WriteString(string(runOut))
+		if live != nil {
+			_, _ = live.Write(runOut)
+		}
+		return 1, out.String(), fmt.Errorf("docker run -d: %w", err)
+	}
+	if live != nil && len(runOut) > 0 {
+		_, _ = live.Write(runOut)
+	}
+
+	exitCode, execOut, runErr := dockerExecTask(ctx, name, task, live)
+	out.WriteString(execOut)
+	return exitCode, out.String(), runErr
+}
+
+// dockerExecTask runs the task inside an existing container via `docker exec`.
+// For `commands`, every directive is bundled into one `sh -c` script with
+// `set -e` so env / cwd persist between lines and the script exits at the
+// first failure. POSIX `sh` is used (rather than bash) so minimal images like
+// alpine work without installing extra packages; `set -o pipefail` is omitted
+// because dash (Debian / Ubuntu `/bin/sh`) does not support it. For argv
+// `command`, the program is invoked directly.
+//
+// When live is non-nil, stdout/stderr bytes are tee'd to it in addition to
+// being captured for the returned `output` string (CloudWatch live streaming).
+func dockerExecTask(ctx context.Context, name string, task *api.TaskPayload, live io.Writer) (int, string, error) {
+	var args []string
+	switch {
+	case len(task.Commands) > 0:
+		directives := normalizeDirectiveLines(task.Commands)
+		if len(directives) == 0 {
+			return 1, "", errEmptyCommands()
+		}
+		script := "set -e\n" + strings.Join(directives, "\n") + "\n"
+		args = []string{"exec", name, "sh", "-c", script}
+	case len(task.Command) > 0:
+		args = append([]string{"exec", name}, task.Command...)
+	default:
+		return 1, "", errors.New("empty command")
+	}
+
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	var buf bytes.Buffer
+	if live != nil {
+		mw := io.MultiWriter(&buf, live)
+		cmd.Stdout = mw
+		cmd.Stderr = mw
+	} else {
+		cmd.Stdout = &buf
+		cmd.Stderr = &buf
+	}
+	err := cmd.Run()
+	if err != nil {
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return ee.ExitCode(), buf.String(), err
+		}
+		return 1, buf.String(), err
+	}
+	return 0, buf.String(), nil
+}
+
+func captureDocker(ctx context.Context, args ...string) ([]byte, error) {
+	return exec.CommandContext(ctx, "docker", args...).CombinedOutput()
+}
+
+// stopAndRemoveContainer is the cleanup path. Both calls are best-effort:
+// if the container was never created `stop` returns non-zero and we proceed;
+// `rm -f` removes it whether it is running or stopped.
+func stopAndRemoveContainer(ctx context.Context, name string) {
+	_ = exec.CommandContext(ctx, "docker",
+		"stop", "--time", fmt.Sprintf("%d", dockerStopGraceSeconds), name).Run()
+	_ = exec.CommandContext(ctx, "docker", "rm", "-f", name).Run()
+}
+
+// SweepDockerOrphans removes containers left over from previous runs of this
+// runner (e.g. after a crash or SIGKILL where the per-task defer cleanup did
+// not get a chance to run). It is a no-op when docker is not on PATH or the
+// daemon is unreachable.
+func SweepDockerOrphans(ctx context.Context, runnerID string) (removed int, err error) {
+	if strings.TrimSpace(runnerID) == "" {
+		// Avoid sanitizeDockerName("") -> "x", which would make unrelated processes
+		// share the same name prefix and orphan-sweep each other's containers.
+		return 0, nil
+	}
+	if _, lookErr := exec.LookPath("docker"); lookErr != nil {
+		return 0, nil
+	}
+	// name=^/… anchors to container names from the engine root; requires a
+	// reasonably current Docker/Moby CLI (same era as docker compose v2).
+	filter := "name=^/" + dockerNamePrefix + sanitizeDockerName(runnerID) + "-"
+	listOut, lerr := exec.CommandContext(ctx, "docker", "ps", "-aq", "--filter", filter).Output()
+	if lerr != nil {
+		return 0, lerr
+	}
+	for _, id := range strings.Fields(string(listOut)) {
+		if rerr := exec.CommandContext(ctx, "docker", "rm", "-f", id).Run(); rerr == nil {
+			removed++
+		}
+	}
+	return removed, nil
+}
+
+// capWriter accumulates string output up to max bytes, then appends a
+// truncation marker once and ignores further writes. Used to keep task
+// output under MaxOutputBytes without scanning the buffer on every append.
+type capWriter struct {
+	buf       bytes.Buffer
+	max       int
+	truncated bool
+}
+
+func (w *capWriter) WriteString(s string) {
+	if w.max <= 0 {
+		w.buf.WriteString(s)
+		return
+	}
+	if w.truncated {
+		return
+	}
+	room := w.max - w.buf.Len()
+	if room <= 0 {
+		w.truncated = true
+		w.buf.WriteString("\n…(truncated)")
+		return
+	}
+	if len(s) <= room {
+		w.buf.WriteString(s)
+		return
+	}
+	w.buf.WriteString(s[:room])
+	w.buf.WriteString("\n…(truncated)")
+	w.truncated = true
+}
+
+func (w *capWriter) String() string { return w.buf.String() }
