@@ -160,7 +160,7 @@ func Test__UpdateWorkerRoute__Execute__update(t *testing.T) {
 	}
 
 	require.NoError(t, component.Execute(ctx))
-	assert.Equal(t, "cloudflare.workerRoute.update", execState.Type)
+	assert.Equal(t, "cloudflare.workerRoute.updated", execState.Type)
 	require.Len(t, httpContext.Requests, 1)
 	assert.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
 	assert.Contains(t, httpContext.Requests[0].URL.String(), "/zones/zone-id/workers/routes/route-1")
