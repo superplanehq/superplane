@@ -105,7 +105,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
       </div>
 
       <Dialog open={expanded} onOpenChange={setExpanded}>
-        <DialogContent size="large" className="w-[90vw] h-[85vh] flex flex-col">
+        <DialogContent size="large" className="w-[90vw] max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-sm font-medium">Diagram</DialogTitle>
           </DialogHeader>
@@ -198,7 +198,7 @@ function MermaidPanZoom({ svg }: { svg: string }) {
           style={{
             transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
             transformOrigin: "center center",
-            minHeight: "60vh",
+            minHeight: "40vh",
           }}
         >
           <div
