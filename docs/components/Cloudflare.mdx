@@ -30,6 +30,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Monitor" href="#delete-monitor" description="Delete a Cloudflare load balancing health monitor" />
   <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
   <LinkCard title="Delete Pool" href="#delete-pool" description="Delete a Cloudflare Load Balancer origin pool" />
+  <LinkCard title="Delete Tunnel" href="#delete-tunnel" description="Delete a Cloudflare Tunnel and clean up its connector credentials" />
   <LinkCard title="Delete Worker" href="#delete-worker" description="Delete a Worker script from your Cloudflare account" />
   <LinkCard title="Deploy Worker" href="#deploy-worker" description="Provision a Worker if needed, upload a script version, and deploy it to traffic" />
   <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
@@ -801,6 +802,41 @@ Emits a confirmation with the account ID and pool ID of the deleted pool.
 }
 ```
 
+<a id="delete-tunnel"></a>
+
+## Delete Tunnel
+
+The Delete Tunnel component permanently removes a Cloudflare Tunnel.
+
+### Use Cases
+
+- **Teardown**: Remove tunnels when an environment is decommissioned
+- **Rotation**: Delete an old tunnel after migrating to a new one
+
+### Configuration
+
+- **Tunnel**: The tunnel ID to delete
+
+### Output
+
+Emits confirmation with the account ID and tunnel ID.
+
+> **Warning**: This operation is irreversible. Active traffic using the tunnel will fail until reconfigured.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "tunnelId": "3c683924-6802-47c9-860a-f27a66e684a2"
+  },
+  "timestamp": "2026-05-12T14:02:15.319225119Z",
+  "type": "cloudflare.tunnel.deleted"
+}
+```
+
 <a id="delete-worker"></a>
 
 ## Delete Worker
@@ -1059,6 +1095,47 @@ Returns the full pool configuration including its origins, enabled state, and he
   },
   "timestamp": "2026-05-05T05:58:40.060373991Z",
   "type": "cloudflare.pool.fetched"
+}
+```
+
+<a id="get-tunnel"></a>
+
+## Get Tunnel
+
+The Get Tunnel component fetches the current state of a Cloudflare Tunnel (cloudflared).
+
+### Use Cases
+
+- **Health and status checks**: Inspect tunnel status in a workflow
+- **Validation**: Confirm a tunnel exists before updating routes or DNS
+
+### Configuration
+
+- **Tunnel**: The tunnel ID to retrieve
+
+### Output
+
+Returns the tunnel object from the Cloudflare API (ID, name, status, config source, timestamps, and related fields).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "tunnel": {
+      "account_tag": "90ddd046218bd375f20e9f9082cc0c6d",
+      "config_src": "local",
+      "created_at": "2026-05-12T13:59:00.953876Z",
+      "id": "3c683924-6802-47c9-860a-f27a66e684a2",
+      "metadata": {},
+      "name": "my-test-tunnel",
+      "status": "active"
+    },
+    "tunnelId": "3c683924-6802-47c9-860a-f27a66e684a2"
+  },
+  "timestamp": "2026-05-12T14:01:27.023693818Z",
+  "type": "cloudflare.tunnel.fetched"
 }
 ```
 
