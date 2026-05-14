@@ -3,9 +3,41 @@ import mermaid from "mermaid";
 
 mermaid.initialize({
   startOnLoad: false,
-  theme: "neutral",
+  theme: "base",
   securityLevel: "strict",
-  fontFamily: "inherit",
+  fontFamily: "ui-sans-serif, system-ui, sans-serif",
+  themeVariables: {
+    // Primary colors — violet palette
+    primaryColor: "#ede9fe",
+    primaryTextColor: "#4c1d95",
+    primaryBorderColor: "#8b5cf6",
+
+    // Secondary — cyan
+    secondaryColor: "#ecfeff",
+    secondaryTextColor: "#164e63",
+    secondaryBorderColor: "#06b6d4",
+
+    // Tertiary — amber
+    tertiaryColor: "#fffbeb",
+    tertiaryTextColor: "#78350f",
+    tertiaryBorderColor: "#f59e0b",
+
+    // Lines and text
+    lineColor: "#94a3b8",
+    textColor: "#334155",
+
+    // Nodes
+    nodeBorder: "#8b5cf6",
+    nodeTextColor: "#1e293b",
+
+    // Flowchart
+    clusterBkg: "#f8fafc",
+    clusterBorder: "#e2e8f0",
+    defaultLinkColor: "#8b5cf6",
+
+    // Fonts
+    fontSize: "13px",
+  },
 });
 
 interface MermaidWidgetProps {
@@ -64,7 +96,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
   return (
     <div
       ref={containerRef}
-      className="my-2 overflow-x-auto [&_svg]:max-w-full [&_svg]:h-auto"
+      className="my-2 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50/50 p-3 [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:mx-auto"
       dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
