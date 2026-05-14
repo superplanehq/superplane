@@ -96,7 +96,43 @@ CREATE TABLE public.accounts (
     name character varying(255) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    installation_admin boolean DEFAULT false NOT NULL
+    installation_admin boolean DEFAULT false NOT NULL,
+    password_changed_at timestamp with time zone
+);
+
+
+--
+-- Name: agent_session_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_session_messages (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    session_id uuid NOT NULL,
+    provider_event_id text DEFAULT ''::text NOT NULL,
+    role character varying(20) NOT NULL,
+    content text DEFAULT ''::text NOT NULL,
+    tool_call_id text DEFAULT ''::text NOT NULL,
+    tool_name text DEFAULT ''::text NOT NULL,
+    tool_status character varying(20) DEFAULT ''::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: agent_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_sessions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
+    provider character varying(40) NOT NULL,
+    provider_session_id text NOT NULL,
+    status character varying(40) DEFAULT 'idle'::character varying NOT NULL,
+    last_active_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -315,27 +351,6 @@ CREATE TABLE public.installation_metadata (
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
     allow_private_network_access boolean DEFAULT false NOT NULL,
     CONSTRAINT installation_metadata_singleton CHECK ((id = 1))
-);
-
-
---
--- Name: organization_agent_settings; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.organization_agent_settings (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
-    agent_mode_enabled boolean DEFAULT false NOT NULL,
-    openai_api_key_ciphertext bytea,
-    openai_key_encryption_key_id character varying(255),
-    openai_key_last4 character varying(8),
-    openai_key_status character varying(32) DEFAULT 'not_configured'::character varying NOT NULL,
-    openai_key_validated_at timestamp without time zone,
-    openai_key_validation_error text,
-    updated_by uuid,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT organization_agent_settings_openai_key_status_check CHECK (((openai_key_status)::text = ANY ((ARRAY['not_configured'::character varying, 'valid'::character varying, 'invalid'::character varying, 'unchecked'::character varying])::text[])))
 );
 
 
@@ -754,6 +769,22 @@ ALTER TABLE ONLY public.accounts
 
 
 --
+-- Name: agent_session_messages agent_session_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_session_messages
+    ADD CONSTRAINT agent_session_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_sessions agent_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_sessions
+    ADD CONSTRAINT agent_sessions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: app_installation_requests app_installation_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -879,22 +910,6 @@ ALTER TABLE ONLY public.group_metadata
 
 ALTER TABLE ONLY public.installation_metadata
     ADD CONSTRAINT installation_metadata_pkey PRIMARY KEY (id);
-
-
---
--- Name: organization_agent_settings organization_agent_settings_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_settings
-    ADD CONSTRAINT organization_agent_settings_organization_id_key UNIQUE (organization_id);
-
-
---
--- Name: organization_agent_settings organization_agent_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_settings
-    ADD CONSTRAINT organization_agent_settings_pkey PRIMARY KEY (id);
 
 
 --
@@ -1114,6 +1129,34 @@ ALTER TABLE ONLY public.workflows
 
 
 --
+-- Name: agent_session_messages_provider_event_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX agent_session_messages_provider_event_idx ON public.agent_session_messages USING btree (session_id, provider_event_id) WHERE (provider_event_id <> ''::text);
+
+
+--
+-- Name: agent_session_messages_session_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX agent_session_messages_session_idx ON public.agent_session_messages USING btree (session_id, created_at DESC, id DESC);
+
+
+--
+-- Name: agent_sessions_provider_session_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX agent_sessions_provider_session_id_idx ON public.agent_sessions USING btree (provider, provider_session_id);
+
+
+--
+-- Name: agent_sessions_user_canvas_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USING btree (organization_id, user_id, canvas_id);
+
+
+--
 -- Name: idx_account_magic_codes_email; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1286,13 +1329,6 @@ CREATE INDEX idx_group_metadata_lookup ON public.group_metadata USING btree (gro
 --
 
 CREATE INDEX idx_node_requests_state_run_at ON public.workflow_node_requests USING btree (state, run_at) WHERE ((state)::text = 'pending'::text);
-
-
---
--- Name: idx_organization_agent_settings_organization_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_organization_agent_settings_organization_id ON public.organization_agent_settings USING btree (organization_id);
 
 
 --
@@ -1613,6 +1649,14 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
+-- Name: agent_session_messages agent_session_messages_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_session_messages
+    ADD CONSTRAINT agent_session_messages_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.agent_sessions(id) ON DELETE CASCADE;
+
+
+--
 -- Name: app_installation_requests app_installation_requests_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1738,22 +1782,6 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 ALTER TABLE ONLY public.workflow_nodes
     ADD CONSTRAINT fk_workflow_nodes_parent FOREIGN KEY (workflow_id, parent_node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
-
-
---
--- Name: organization_agent_settings organization_agent_settings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_settings
-    ADD CONSTRAINT organization_agent_settings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
-
-
---
--- Name: organization_agent_settings organization_agent_settings_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_settings
-    ADD CONSTRAINT organization_agent_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -2092,7 +2120,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260512125440	f
+20260514141043	f
 \.
 
 

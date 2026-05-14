@@ -122,10 +122,6 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbOrganization.Organizations_GetInviteLink_FullMethodName:                 {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_UpdateInviteLink_FullMethodName:              {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_ResetInviteLink_FullMethodName:               {Resource: "members", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_GetAgentSettings_FullMethodName:              {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_UpdateAgentSettings_FullMethodName:           {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_SetAgentOpenAIKey_FullMethodName:             {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
-		pbOrganization.Organizations_DeleteAgentOpenAIKey_FullMethodName:          {Resource: "org", Action: "update", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_DescribeUsage_FullMethodName:                 {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_RemoveUser_FullMethodName:                    {Resource: "members", Action: "delete", DomainType: models.DomainTypeOrganization},
 		pbOrganization.Organizations_DeleteOrganization_FullMethodName:            {Resource: "org", Action: "delete", DomainType: models.DomainTypeOrganization},
@@ -156,12 +152,9 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbIntegrations.Integrations_ListIntegrations_FullMethodName: {Resource: "org", Action: "read", DomainType: models.DomainTypeOrganization},
 
 		// Agent rules
-		pbAgents.Agents_CreateAgentChat_FullMethodName:       {Resource: "agents", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbAgents.Agents_ResumeAgentChat_FullMethodName:       {Resource: "agents", Action: "create", DomainType: models.DomainTypeOrganization},
-		pbAgents.Agents_ListAgentChats_FullMethodName:        {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbAgents.Agents_DescribeAgentChat_FullMethodName:     {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbAgents.Agents_GetCanvasAgentChat_FullMethodName:    {Resource: "agents", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbAgents.Agents_SendAgentChatMessage_FullMethodName:  {Resource: "agents", Action: "create", DomainType: models.DomainTypeOrganization},
 		pbAgents.Agents_ListAgentChatMessages_FullMethodName: {Resource: "agents", Action: "read", DomainType: models.DomainTypeOrganization},
-		pbAgents.Agents_DeleteAgentChat_FullMethodName:       {Resource: "agents", Action: "delete", DomainType: models.DomainTypeOrganization},
 
 		// Canvases rules
 		pbCanvases.Canvases_ListCanvases_FullMethodName: {Resource: "canvases", Action: "read", DomainType: models.DomainTypeOrganization},

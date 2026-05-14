@@ -61,6 +61,7 @@ func (e *EventDistributer) Start() error {
 		{messages.CanvasExchange, messages.CanvasUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasUpdated)},
 		{messages.CanvasExchange, messages.CanvasVersionUpdatedRoutingKey, e.createHandler(eventdistributer.HandleCanvasVersionUpdated)},
 		{messages.CanvasExchange, messages.CanvasDeletedRoutingKey, e.createHandler(eventdistributer.HandleCanvasDeleted)},
+		{messages.CanvasExchange, messages.AgentSessionEventRoutingKey, e.createHandler(eventdistributer.HandleAgentSessionEvent)},
 	}
 
 	// Start a consumer for each route
