@@ -35,7 +35,11 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for design detail.
 ## Requirements
 
 - Go 1.22+
-- For Docker tasks: Docker CLI on the runner host
+- For Docker tasks: Docker CLI **and a reachable Docker daemon** on the runner host. The runner uses a pull → long-lived named container → `docker exec` → `docker stop`/`rm` lifecycle (see [ARCHITECTURE.md](./ARCHITECTURE.md#docker-execution-lifecycle)). The image must include `sleep` (alpine, debian, ubuntu, python:*, node:* all satisfy this). Multi-line **`commands`** are bundled into one `sh -c` script with `set -e`, so env/cwd persist across directives and the script fails fast on the first non-zero exit. **Quoting:** each directive is a line inside a single-quoted `sh -c` argument; a raw **`'`** in a line is a classic shell-quoting footgun—avoid it in `commands` or use argv **`command`** for tricky literals. **`docker exec` is invoked without `-t`**, so the task runs in a non-TTY context: tools that detect `isatty()` (color output, progress bars, interactive prompts) will see stdout/stderr as a pipe. This is intentional — matches `docker run` without `-t`, more predictable for CI / batch workloads, and lets stdout and stderr stay distinct in captures.
+
+### Upgrade note: Docker multi-line `commands` (breaking if you relied on the old runner)
+
+Older runner builds ran multi-line **`commands`** through **`docker run` with a PTY** and **interactive bash** in the container. Current runners use **`docker pull` → `docker run -d` → `docker exec` … `sh -c '…'`** with **no PTY**. Anything that depended on a **TTY**, **bash-only** syntax (e.g. `[[ ]]`, bashisms not in POSIX `sh`), or **interactive** behavior may break or change. Prefer argv **`command`** for strict control, or adjust scripts for **`sh`**. When **CloudWatch live** logging is enabled, **`docker pull` / `docker run -d` diagnostics** are copied to the live stream on success; they are **not** included in the task **completion `output`** / webhook body (that payload remains **exec-phase** stdout/stderr only). Putting pull/run logs into the webhook would be an explicit product change.
 
 ## Build
 
