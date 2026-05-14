@@ -1,4 +1,4 @@
-import { Loader2, Send, SquareTerminal, X } from "lucide-react";
+import { ChevronRight, Loader2, Send, SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -182,9 +182,13 @@ function ChatConversation({
                 <Loader2 className="size-3 animate-spin mr-2" /> Loading older messages…
               </div>
             ) : null}
-            {messages.map((m) => (
-              <MessageRow key={m.id} message={m} sendMutation={sendMutation} chatId={chatId} />
-            ))}
+            {groupMessages(messages).map((group, i) =>
+              group.type === "tool-group" ? (
+                <ToolGroupRow key={group.messages[0].id} messages={group.messages} />
+              ) : (
+                <MessageRow key={group.message.id} message={group.message} sendMutation={sendMutation} chatId={chatId} />
+              ),
+            )}
           </>
         )}
         {showThinking ? <ThinkingRow /> : null}
@@ -287,30 +291,85 @@ function MessageRow({
   );
 }
 
+type MessageGroup =
+  | { type: "message"; message: AgentMessage }
+  | { type: "tool-group"; messages: AgentMessage[] };
+
+function groupMessages(messages: AgentMessage[]): MessageGroup[] {
+  const groups: MessageGroup[] = [];
+  let toolBuffer: AgentMessage[] = [];
+
+  function flushTools() {
+    if (toolBuffer.length > 0) {
+      groups.push({ type: "tool-group", messages: [...toolBuffer] });
+      toolBuffer = [];
+    }
+  }
+
+  for (const m of messages) {
+    if (m.role === "tool") {
+      toolBuffer.push(m);
+    } else {
+      flushTools();
+      groups.push({ type: "message", message: m });
+    }
+  }
+  flushTools();
+  return groups;
+}
+
+function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasRunning = messages.some((m) => m.toolStatus === "started");
+  const count = messages.length;
+  const label = hasRunning
+    ? `Running command${count > 1 ? ` (${count})` : ""}...`
+    : `Ran ${count} command${count !== 1 ? "s" : ""}`;
+
+  return (
+    <div
+      className={cn("text-sm py-1 text-slate-500", hasRunning && "animate-tool-glow")}
+      data-testid="agent-tool-group"
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        className="flex items-center gap-2 cursor-pointer hover:text-slate-700"
+      >
+        <SquareTerminal className="size-4 shrink-0" />
+        <span>{label}</span>
+        <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} />
+      </button>
+      {expanded && (
+        <div className="ml-6 mt-1 space-y-0.5">
+          {messages.map((m) => (
+            <ToolMessageRow key={m.id} message={m} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ToolMessageRow({ message }: { message: AgentMessage }) {
   const [expanded, setExpanded] = useState(false);
   const command = message.content;
   const canExpand = Boolean(command);
   const running = message.toolStatus === "started";
   return (
-    <div
-      className={cn("flex items-start gap-2 text-sm py-1 text-slate-500", running && "animate-tool-glow")}
-      data-testid="agent-tool-message"
-    >
-      <SquareTerminal className="size-4 shrink-0 mt-0.5" />
-      <div className="min-w-0 flex-1">
-        <button
-          type="button"
-          onClick={() => canExpand && setExpanded((prev) => !prev)}
-          disabled={!canExpand}
-          className={cn("text-left", canExpand && "cursor-pointer hover:text-slate-700")}
-        >
-          {running ? "Running command" : "Ran command"}
-        </button>
-        {expanded && command ? (
-          <div className="font-mono text-xs text-slate-400 whitespace-pre-wrap break-words mt-1">{command}</div>
-        ) : null}
-      </div>
+    <div className={cn("flex items-center gap-1.5 text-xs", running ? "text-slate-600" : "text-slate-400")}>
+      <span className="shrink-0">{running ? "▶" : "✓"}</span>
+      <button
+        type="button"
+        onClick={() => canExpand && setExpanded((prev) => !prev)}
+        disabled={!canExpand}
+        className={cn("text-left truncate", canExpand && "cursor-pointer hover:text-slate-600")}
+      >
+        {running ? "Running..." : (command ? command.split("\n")[0].substring(0, 60) : "Ran command")}
+      </button>
+      {expanded && command ? (
+        <div className="font-mono text-[10px] text-slate-400 whitespace-pre-wrap break-words mt-0.5 ml-4">{command}</div>
+      ) : null}
     </div>
   );
 }
