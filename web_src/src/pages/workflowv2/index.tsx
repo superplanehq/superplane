@@ -22,12 +22,12 @@ import type {
   CanvasesCanvasRun,
   CanvasesCanvasVersion,
   CanvasesListEventExecutionsResponse,
+  SuperplaneActionsAction,
   SuperplaneComponentsEdge as ComponentsEdge,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
   IntegrationsIntegrationDefinition,
   OrganizationsIntegration,
-  SuperplaneActionsAction,
   SuperplaneMeUser,
   TriggersTrigger,
 } from "@/api-client";
@@ -36,6 +36,7 @@ import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizat
 
 import { Button } from "@/components/ui/button";
 import { usePermissions } from "@/contexts/PermissionsContext";
+import { useComponents } from "@/hooks/useComponentData";
 import {
   canvasKeys,
   eventExecutionsQueryOptions,
@@ -50,25 +51,23 @@ import {
   useCreateCanvasVersion,
   useDeleteCanvasMemoryEntry,
   useDeleteCanvasVersion,
+  usePublishCanvasVersion,
   useEventExecutions,
   useInfiniteCanvasEvents,
-  useInfiniteCanvasLiveVersions,
   useInfiniteCanvasRuns,
-  usePublishCanvasVersion,
+  useInfiniteCanvasLiveVersions,
   useResolveCanvasChangeRequest,
   useTriggers,
   useUpdateCanvasVersion,
   useWidgets,
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
-import { useComponents } from "@/hooks/useComponentData";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { analytics } from "@/lib/analytics";
-import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 import { getColorClass } from "@/lib/colors";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -84,8 +83,8 @@ import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
-import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
+import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import { RunsSidebar } from "@/ui/RunsSidebar";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasMemoryModal } from "./CanvasMemoryModal";
@@ -96,6 +95,7 @@ import { CanvasYamlModal } from "./CanvasYamlModal";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
+import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import { prepareComponentNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
 import {
   isDraftVersion,
@@ -105,7 +105,6 @@ import {
   versionSortValue,
 } from "./lib/canvas-versions";
 import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
-import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { getVersionActionAvailability } from "./lib/version-action-state";
@@ -124,15 +123,16 @@ import {
   buildUserInfo,
   generateNodeId,
   generateUniqueNodeName,
-  getWorkflowSaveSignature,
   mapCanvasNodesToLogEntries,
   mapExecutionsToSidebarEvents,
+  mergeWorkflowLogEntries,
   mapQueueItemsToSidebarEvents,
   mapTriggerEventsToSidebarEvents,
   mapWorkflowEventsToRunLogEntries,
-  mergeWorkflowLogEntries,
+  getWorkflowSaveSignature,
   summarizeWorkflowChanges,
 } from "./utils";
+import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 function getNodeAnalyticsProps(
   node: ComponentsNode,
   availableIntegrations: IntegrationsIntegrationDefinition[],
@@ -1903,6 +1903,7 @@ export function WorkflowPageV2() {
     triggersLoading,
     componentsLoading,
     integrationsLoading,
+    organizationId,
     me,
     canvasMode,
     openTriggerModal,
@@ -1966,7 +1967,6 @@ export function WorkflowPageV2() {
       queryClient,
       me,
       "live",
-      openTriggerModal,
     );
 
     const filteredNodes = prepared.nodes.filter((node) => runNodeIds.has(node.id));
@@ -1990,7 +1990,6 @@ export function WorkflowPageV2() {
     me,
     visibleNodeExecutionsMap,
     selectedRunFullExecutions,
-    openTriggerModal,
   ]);
 
   const nodes = runCanvasData ? runCanvasData.nodes : nodesWithIntegrationStatus;

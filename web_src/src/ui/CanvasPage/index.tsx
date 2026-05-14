@@ -416,7 +416,6 @@ type EnrichedCanvasNodeCacheEntry = {
   edges: CanvasEdge[];
   isHighlighted: boolean;
   hasHighlightedNodes: boolean;
-  isEditMode: boolean;
 };
 
 type CollapsibleNodeData = {
@@ -1320,14 +1319,7 @@ function CanvasPage(props: CanvasPageProps) {
       {/* Edit existing node modal - now handled by settings sidebar */}
 
       <Dialog open={!!canvasModalRequest} onOpenChange={(isOpen) => !isOpen && closeCanvasModal()}>
-        <DialogContent
-          size={canvasModalRequest?.dialogSize === "large" ? "large" : "default"}
-          className={cn(
-            canvasModalRequest?.dialogSize === "large"
-              ? "flex max-h-[90vh] w-[min(90vw,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0"
-              : "max-w-3xl max-h-[80vh]",
-          )}
-        >
+        <DialogContent className="max-w-3xl max-h-[80vh]">
           {canvasModalRequest?.title ? <DialogTitle>{canvasModalRequest.title}</DialogTitle> : null}
           {canvasModalRequest?.description ? (
             <DialogDescription>{canvasModalRequest.description}</DialogDescription>
@@ -2491,8 +2483,7 @@ function CanvasContent({
         cachedNode.connectingFrom === connectingFrom &&
         cachedNode.edges === state.edges &&
         cachedNode.isHighlighted === isHighlighted &&
-        cachedNode.hasHighlightedNodes === hasHighlightedNodes &&
-        cachedNode.isEditMode === isEditMode;
+        cachedNode.hasHighlightedNodes === hasHighlightedNodes;
 
       if (canReuseData && cachedNode.sourceNode === node) {
         return cachedNode.node;
@@ -2525,7 +2516,6 @@ function CanvasContent({
         edges: state.edges,
         isHighlighted,
         hasHighlightedNodes,
-        isEditMode,
       });
 
       return enrichedNode;
@@ -2538,7 +2528,7 @@ function CanvasContent({
     }
 
     return enrichedNodes;
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, blockConnectingFrom, isEditMode]);
+  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, blockConnectingFrom]);
 
   const edgeTypes = useMemo(
     () => ({

@@ -135,8 +135,6 @@ export type TriggerActionModal = {
   title?: ReactNode;
   description?: ReactNode;
   content: (ctx: { close: () => void }) => ReactNode;
-  /** When `"large"`, canvas uses a wide dialog for trigger-hosted modals. */
-  dialogSize?: "default" | "large";
 };
 
 export type TriggerActionContext = {

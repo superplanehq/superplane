@@ -1,18 +1,16 @@
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCanvasId } from "@/hooks/useCanvasId";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type RunnerLiveLogStreamPanelProps = {
+export type RunnerLiveLogDialogProps = {
+  canvasMode: "live" | "edit";
   executionId: string;
 };
 
-/**
- * NDJSON runner live log stream (no outer chrome). Intended to be placed inside a dialog or other host layout.
- *
- * Organization and canvas ids are taken from the workflow URL ({@link useOrganizationId}, {@link useCanvasId}).
- */
-export function RunnerLiveLogStreamPanel({ executionId }: RunnerLiveLogStreamPanelProps) {
+function LiveLogStream({ executionId }: { executionId: string }) {
   const organizationId = useOrganizationId();
   const canvasId = useCanvasId();
   const [text, setText] = useState("");
@@ -123,5 +121,53 @@ export function RunnerLiveLogStreamPanel({ executionId }: RunnerLiveLogStreamPan
         {!error && isStreaming && !text ? <span className="text-muted-foreground">Connecting…</span> : null}
       </pre>
     </div>
+  );
+}
+
+/**
+ * Runner node “Logs” control: opens a dialog with a live NDJSON log stream.
+ * Organization and canvas ids come from the workflow URL (useOrganizationId, useCanvasId).
+ */
+export function RunnerLiveLogDialog({ canvasMode, executionId }: RunnerLiveLogDialogProps) {
+  const organizationId = useOrganizationId();
+  const canvasId = useCanvasId();
+  const [open, setOpen] = useState(false);
+
+  const canShow = canvasMode === "live" && !!organizationId && !!canvasId && !!executionId;
+  if (!canShow) {
+    return null;
+  }
+
+  return (
+    <>
+      <div className="flex justify-end border-b border-slate-950/20 px-2 py-1" data-testid="runner-live-logs">
+        <Button
+          type="button"
+          size="sm"
+          className="nodrag h-7 bg-black px-2 py-1 text-xs text-white hover:bg-black/80"
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setOpen(true);
+          }}
+        >
+          Logs
+        </Button>
+      </div>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          size="large"
+          className="flex max-h-[min(90vh,720px)] w-[min(90vw,56rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DialogHeader className="shrink-0 border-b border-gray-200 px-4 py-3 text-left">
+            <DialogTitle>Logs</DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {open ? <LiveLogStream executionId={executionId} /> : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

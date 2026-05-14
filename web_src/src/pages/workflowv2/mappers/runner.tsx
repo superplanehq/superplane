@@ -1,13 +1,9 @@
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { useCanvasId } from "@/hooks/useCanvasId";
-import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { getColorClass } from "@/lib/colors";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { RunnerLiveLogStreamPanel } from "@/ui/CanvasPage/RunnerLiveLogStreamPanel";
-import React, { useState } from "react";
+import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
+import React from "react";
 import { getTriggerRenderer } from ".";
 
 import type {
@@ -85,59 +81,6 @@ export const RUNNER_STATE_REGISTRY: EventStateRegistry = {
   getState: runnerStateFunction,
 };
 
-type RunnerLiveLogsToolbarProps = {
-  canvasMode: "live" | "edit";
-  executionId: string;
-};
-
-/**
- * Canvas-only runner logs control. Reads org/canvas from the workflow route via hooks
- * (see {@link useOrganizationId}, {@link useCanvasId}); must render as a child component, not from mapper logic.
- */
-function RunnerLiveLogsToolbar({ canvasMode, executionId }: RunnerLiveLogsToolbarProps) {
-  const organizationId = useOrganizationId();
-  const canvasId = useCanvasId();
-  const [logsOpen, setLogsOpen] = useState(false);
-
-  const canShow = canvasMode === "live" && !!organizationId && !!canvasId && !!executionId;
-  if (!canShow) {
-    return null;
-  }
-
-  return (
-    <>
-      <div className="flex justify-end border-b border-slate-950/20 px-2 py-1" data-testid="runner-live-logs">
-        <Button
-          type="button"
-          size="sm"
-          className="nodrag h-7 bg-black px-2 py-1 text-xs text-white hover:bg-black/80"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setLogsOpen(true);
-          }}
-        >
-          Logs
-        </Button>
-      </div>
-      <Dialog open={logsOpen} onOpenChange={setLogsOpen}>
-        <DialogContent
-          size="large"
-          className="flex max-h-[min(90vh,720px)] w-[min(90vw,56rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <DialogHeader className="shrink-0 border-b border-gray-200 px-4 py-3 text-left">
-            <DialogTitle>Logs</DialogTitle>
-          </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {logsOpen ? <RunnerLiveLogStreamPanel executionId={executionId} /> : null}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
 export const runnerMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -148,7 +91,7 @@ export const runnerMapper: ComponentBaseMapper = {
 
     const customField =
       lastExecution && context.canvasMode === "live"
-        ? () => <RunnerLiveLogsToolbar canvasMode={context.canvasMode ?? "live"} executionId={lastExecution.id} />
+        ? () => <RunnerLiveLogDialog canvasMode={context.canvasMode ?? "live"} executionId={lastExecution.id} />
         : undefined;
 
     return {

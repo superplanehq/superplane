@@ -1,257 +1,257 @@
-import type {
-  ComponentBaseMapper,
-  TriggerRenderer,
-  EventStateRegistry,
-  CustomFieldRenderer,
-  TriggerRendererContext,
-  TriggerEventContext,
-} from "./types";
-import type { SuperplaneComponentsNode as ComponentsNode, CanvasesCanvasNodeExecution } from "@/api-client";
-import { defaultTriggerRenderer } from "./default";
-import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
-import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
-import { noopMapper } from "./noop";
+import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { addMemoryMapper } from "./addMemory";
-import { deleteMemoryMapper } from "./deleteMemory";
-import { readMemoryMapper } from "./readMemory";
-import { updateMemoryMapper } from "./updateMemory";
-import { upsertMemoryMapper } from "./upsertMemory";
-import { ifMapper, IF_STATE_REGISTRY } from "./if";
-import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
-import { graphqlMapper, GRAPHQL_STATE_REGISTRY } from "./graphql";
-import {
-  componentMappers as semaphoreComponentMappers,
-  triggerRenderers as semaphoreTriggerRenderers,
-  eventStateRegistry as semaphoreEventStateRegistry,
-} from "./semaphore/index";
-import {
-  componentMappers as githubComponentMappers,
-  triggerRenderers as githubTriggerRenderers,
-  eventStateRegistry as githubEventStateRegistry,
-} from "./github/index";
-import {
-  componentMappers as gitlabComponentMappers,
-  triggerRenderers as gitlabTriggerRenderers,
-  eventStateRegistry as gitlabEventStateRegistry,
-} from "./gitlab/index";
-import {
-  componentMappers as pagerdutyComponentMappers,
-  triggerRenderers as pagerdutyTriggerRenderers,
-  eventStateRegistry as pagerdutyEventStateRegistry,
-} from "./pagerduty/index";
-import {
-  componentMappers as dash0ComponentMappers,
-  triggerRenderers as dash0TriggerRenderers,
-  eventStateRegistry as dash0EventStateRegistry,
-} from "./dash0/index";
-import {
-  componentMappers as daytonaComponentMappers,
-  triggerRenderers as daytonaTriggerRenderers,
-  eventStateRegistry as daytonaEventStateRegistry,
-} from "./daytona/index";
-import {
-  componentMappers as cloudflareComponentMappers,
-  triggerRenderers as cloudflareTriggerRenderers,
-  eventStateRegistry as cloudflareEventStateRegistry,
-} from "./cloudflare/index";
-import {
-  componentMappers as datadogComponentMappers,
-  triggerRenderers as datadogTriggerRenderers,
-  eventStateRegistry as datadogEventStateRegistry,
-} from "./datadog/index";
-import {
-  componentMappers as slackComponentMappers,
-  triggerRenderers as slackTriggerRenderers,
-  eventStateRegistry as slackEventStateRegistry,
-} from "./slack";
-import {
-  componentMappers as smtpComponentMappers,
-  triggerRenderers as smtpTriggerRenderers,
-  eventStateRegistry as smtpEventStateRegistry,
-} from "./smtp";
-import {
-  componentMappers as sendgridComponentMappers,
-  triggerRenderers as sendgridTriggerRenderers,
-  eventStateRegistry as sendgridEventStateRegistry,
-} from "./sendgrid";
-import {
-  componentMappers as sentryComponentMappers,
-  triggerRenderers as sentryTriggerRenderers,
-  eventStateRegistry as sentryEventStateRegistry,
-} from "./sentry/index";
-import {
-  componentMappers as renderComponentMappers,
-  triggerRenderers as renderTriggerRenderers,
-  eventStateRegistry as renderEventStateRegistry,
-} from "./render";
-import {
-  componentMappers as rootlyComponentMappers,
-  triggerRenderers as rootlyTriggerRenderers,
-  eventStateRegistry as rootlyEventStateRegistry,
-} from "./rootly/index";
-import {
-  componentMappers as incidentComponentMappers,
-  triggerRenderers as incidentTriggerRenderers,
-  eventStateRegistry as incidentEventStateRegistry,
-  customFieldRenderers as incidentCustomFieldRenderers,
-} from "./incident/index";
-import {
-  componentMappers as newrelicComponentMappers,
-  customFieldRenderers as newrelicCustomFieldRenderers,
-  triggerRenderers as newrelicTriggerRenderers,
-  eventStateRegistry as newrelicEventStateRegistry,
-} from "./newrelic/index";
-import {
-  componentMappers as firehydrantComponentMappers,
-  triggerRenderers as firehydrantTriggerRenderers,
-  eventStateRegistry as firehydrantEventStateRegistry,
-} from "./firehydrant/index";
-import {
-  componentMappers as launchdarklyComponentMappers,
-  triggerRenderers as launchdarklyTriggerRenderers,
-  eventStateRegistry as launchdarklyEventStateRegistry,
-} from "./launchdarkly/index";
 import {
   componentMappers as awsComponentMappers,
-  triggerRenderers as awsTriggerRenderers,
   eventStateRegistry as awsEventStateRegistry,
+  triggerRenderers as awsTriggerRenderers,
 } from "./aws";
-import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
-import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
-import {
-  componentMappers as jfrogArtifactoryComponentMappers,
-  triggerRenderers as jfrogArtifactoryTriggerRenderers,
-  eventStateRegistry as jfrogArtifactoryEventStateRegistry,
-} from "./jfrogArtifactory/index";
 import {
   componentMappers as azureComponentMappers,
-  triggerRenderers as azureTriggerRenderers,
   eventStateRegistry as azureEventStateRegistry,
+  triggerRenderers as azureTriggerRenderers,
 } from "./azure/index";
-import { timeGateMapper, TIME_GATE_STATE_REGISTRY } from "./timegate";
+import { triggerRenderers as bitbucketTriggerRenderers } from "./bitbucket/index";
+import {
+  componentMappers as circleCIComponentMappers,
+  eventStateRegistry as circleCIEventStateRegistry,
+  triggerRenderers as circleCITriggerRenderers,
+} from "./circleci/index";
+import {
+  componentMappers as claudeComponentMappers,
+  eventStateRegistry as claudeEventStateRegistry,
+  triggerRenderers as claudeTriggerRenderers,
+} from "./claude/index";
+import {
+  componentMappers as cloudflareComponentMappers,
+  eventStateRegistry as cloudflareEventStateRegistry,
+  triggerRenderers as cloudflareTriggerRenderers,
+} from "./cloudflare/index";
+import {
+  componentMappers as cursorComponentMappers,
+  eventStateRegistry as cursorEventStateRegistry,
+  triggerRenderers as cursorTriggerRenderers,
+} from "./cursor/index";
+import {
+  componentMappers as dash0ComponentMappers,
+  eventStateRegistry as dash0EventStateRegistry,
+  triggerRenderers as dash0TriggerRenderers,
+} from "./dash0/index";
+import {
+  componentMappers as datadogComponentMappers,
+  eventStateRegistry as datadogEventStateRegistry,
+  triggerRenderers as datadogTriggerRenderers,
+} from "./datadog/index";
+import {
+  componentMappers as daytonaComponentMappers,
+  eventStateRegistry as daytonaEventStateRegistry,
+  triggerRenderers as daytonaTriggerRenderers,
+} from "./daytona/index";
+import { defaultTriggerRenderer } from "./default";
+import { deleteMemoryMapper } from "./deleteMemory";
 import {
   componentMappers as digitaloceanComponentMappers,
-  triggerRenderers as digitaloceanTriggerRenderers,
   eventStateRegistry as digitaloceanEventStateRegistry,
+  triggerRenderers as digitaloceanTriggerRenderers,
 } from "./digitalocean/index";
 import {
   componentMappers as discordComponentMappers,
-  triggerRenderers as discordTriggerRenderers,
   eventStateRegistry as discordEventStateRegistry,
+  triggerRenderers as discordTriggerRenderers,
 } from "./discord";
 import {
-  componentMappers as telegramComponentMappers,
-  triggerRenderers as telegramTriggerRenderers,
-  eventStateRegistry as telegramEventStateRegistry,
-} from "./telegram";
+  componentMappers as dockerhubComponentMappers,
+  customFieldRenderers as dockerhubCustomFieldRenderers,
+  eventStateRegistry as dockerhubEventStateRegistry,
+  triggerRenderers as dockerhubTriggerRenderers,
+} from "./dockerhub";
 import {
-  componentMappers as octopusComponentMappers,
-  triggerRenderers as octopusTriggerRenderers,
-  eventStateRegistry as octopusEventStateRegistry,
-} from "./octopus/index";
+  componentMappers as firehydrantComponentMappers,
+  eventStateRegistry as firehydrantEventStateRegistry,
+  triggerRenderers as firehydrantTriggerRenderers,
+} from "./firehydrant/index";
 import {
-  componentMappers as teamsComponentMappers,
-  triggerRenderers as teamsTriggerRenderers,
-  eventStateRegistry as teamsEventStateRegistry,
-} from "./teams";
+  componentMappers as githubComponentMappers,
+  eventStateRegistry as githubEventStateRegistry,
+  triggerRenderers as githubTriggerRenderers,
+} from "./github/index";
 import {
-  componentMappers as openaiComponentMappers,
-  triggerRenderers as openaiTriggerRenderers,
-  eventStateRegistry as openaiEventStateRegistry,
-} from "./openai/index";
+  componentMappers as gitlabComponentMappers,
+  eventStateRegistry as gitlabEventStateRegistry,
+  triggerRenderers as gitlabTriggerRenderers,
+} from "./gitlab/index";
 import {
   componentMappers as grafanaComponentMappers,
   customFieldRenderers as grafanaCustomFieldRenderers,
-  triggerRenderers as grafanaTriggerRenderers,
   eventStateRegistry as grafanaEventStateRegistry,
+  triggerRenderers as grafanaTriggerRenderers,
 } from "./grafana/index";
-import {
-  componentMappers as circleCIComponentMappers,
-  triggerRenderers as circleCITriggerRenderers,
-  eventStateRegistry as circleCIEventStateRegistry,
-} from "./circleci/index";
+import { GRAPHQL_STATE_REGISTRY, graphqlMapper } from "./graphql";
 import {
   componentMappers as harnessComponentMappers,
-  triggerRenderers as harnessTriggerRenderers,
   eventStateRegistry as harnessEventStateRegistry,
+  triggerRenderers as harnessTriggerRenderers,
 } from "./harness";
+import { componentMappers as hetznerComponentMappers } from "./hetzner/index";
+import { HTTP_STATE_REGISTRY, httpMapper } from "./http";
+import { IF_STATE_REGISTRY, ifMapper } from "./if";
 import {
-  componentMappers as claudeComponentMappers,
-  triggerRenderers as claudeTriggerRenderers,
-  eventStateRegistry as claudeEventStateRegistry,
-} from "./claude/index";
+  componentMappers as incidentComponentMappers,
+  customFieldRenderers as incidentCustomFieldRenderers,
+  eventStateRegistry as incidentEventStateRegistry,
+  triggerRenderers as incidentTriggerRenderers,
+} from "./incident/index";
+import {
+  componentMappers as jfrogArtifactoryComponentMappers,
+  eventStateRegistry as jfrogArtifactoryEventStateRegistry,
+  triggerRenderers as jfrogArtifactoryTriggerRenderers,
+} from "./jfrogArtifactory/index";
+import {
+  componentMappers as launchdarklyComponentMappers,
+  eventStateRegistry as launchdarklyEventStateRegistry,
+  triggerRenderers as launchdarklyTriggerRenderers,
+} from "./launchdarkly/index";
 import {
   componentMappers as logfireComponentMappers,
-  triggerRenderers as logfireTriggerRenderers,
   eventStateRegistry as logfireEventStateRegistry,
+  triggerRenderers as logfireTriggerRenderers,
 } from "./logfire/index";
 import {
+  componentMappers as newrelicComponentMappers,
+  customFieldRenderers as newrelicCustomFieldRenderers,
+  eventStateRegistry as newrelicEventStateRegistry,
+  triggerRenderers as newrelicTriggerRenderers,
+} from "./newrelic/index";
+import { noopMapper } from "./noop";
+import {
+  componentMappers as octopusComponentMappers,
+  eventStateRegistry as octopusEventStateRegistry,
+  triggerRenderers as octopusTriggerRenderers,
+} from "./octopus/index";
+import {
+  componentMappers as openaiComponentMappers,
+  eventStateRegistry as openaiEventStateRegistry,
+  triggerRenderers as openaiTriggerRenderers,
+} from "./openai/index";
+import {
+  componentMappers as pagerdutyComponentMappers,
+  eventStateRegistry as pagerdutyEventStateRegistry,
+  triggerRenderers as pagerdutyTriggerRenderers,
+} from "./pagerduty/index";
+import {
   componentMappers as perplexityComponentMappers,
-  triggerRenderers as perplexityTriggerRenderers,
   eventStateRegistry as perplexityEventStateRegistry,
+  triggerRenderers as perplexityTriggerRenderers,
 } from "./perplexity/index";
 import {
   componentMappers as prometheusComponentMappers,
   customFieldRenderers as prometheusCustomFieldRenderers,
-  triggerRenderers as prometheusTriggerRenderers,
   eventStateRegistry as prometheusEventStateRegistry,
+  triggerRenderers as prometheusTriggerRenderers,
 } from "./prometheus/index";
+import { readMemoryMapper } from "./readMemory";
 import {
-  componentMappers as cursorComponentMappers,
-  triggerRenderers as cursorTriggerRenderers,
-  eventStateRegistry as cursorEventStateRegistry,
-} from "./cursor/index";
+  componentMappers as renderComponentMappers,
+  eventStateRegistry as renderEventStateRegistry,
+  triggerRenderers as renderTriggerRenderers,
+} from "./render";
+import {
+  componentMappers as rootlyComponentMappers,
+  eventStateRegistry as rootlyEventStateRegistry,
+  triggerRenderers as rootlyTriggerRenderers,
+} from "./rootly/index";
+import { scheduleCustomFieldRenderer, scheduleTriggerRenderer } from "./schedule";
+import {
+  componentMappers as semaphoreComponentMappers,
+  eventStateRegistry as semaphoreEventStateRegistry,
+  triggerRenderers as semaphoreTriggerRenderers,
+} from "./semaphore/index";
+import {
+  componentMappers as sendgridComponentMappers,
+  eventStateRegistry as sendgridEventStateRegistry,
+  triggerRenderers as sendgridTriggerRenderers,
+} from "./sendgrid";
+import {
+  componentMappers as sentryComponentMappers,
+  eventStateRegistry as sentryEventStateRegistry,
+  triggerRenderers as sentryTriggerRenderers,
+} from "./sentry/index";
+import {
+  componentMappers as slackComponentMappers,
+  eventStateRegistry as slackEventStateRegistry,
+  triggerRenderers as slackTriggerRenderers,
+} from "./slack";
+import {
+  componentMappers as smtpComponentMappers,
+  eventStateRegistry as smtpEventStateRegistry,
+  triggerRenderers as smtpTriggerRenderers,
+} from "./smtp";
 import {
   componentMappers as statuspageComponentMappers,
-  triggerRenderers as statuspageTriggerRenderers,
   eventStateRegistry as statuspageEventStateRegistry,
+  triggerRenderers as statuspageTriggerRenderers,
 } from "./statuspage";
 import {
-  componentMappers as dockerhubComponentMappers,
-  customFieldRenderers as dockerhubCustomFieldRenderers,
-  triggerRenderers as dockerhubTriggerRenderers,
-  eventStateRegistry as dockerhubEventStateRegistry,
-} from "./dockerhub";
+  componentMappers as teamsComponentMappers,
+  eventStateRegistry as teamsEventStateRegistry,
+  triggerRenderers as teamsTriggerRenderers,
+} from "./teams";
+import {
+  componentMappers as telegramComponentMappers,
+  eventStateRegistry as telegramEventStateRegistry,
+  triggerRenderers as telegramTriggerRenderers,
+} from "./telegram";
+import { TIME_GATE_STATE_REGISTRY, timeGateMapper } from "./timegate";
+import type {
+  ComponentBaseMapper,
+  CustomFieldRenderer,
+  EventStateRegistry,
+  TriggerEventContext,
+  TriggerRenderer,
+  TriggerRendererContext,
+} from "./types";
+import { updateMemoryMapper } from "./updateMemory";
+import { upsertMemoryMapper } from "./upsertMemory";
+import { webhookCustomFieldRenderer, webhookTriggerRenderer } from "./webhook";
 
 import {
-  componentMappers as honeycombComponentMappers,
-  triggerRenderers as honeycombTriggerRenderers,
-  eventStateRegistry as honeycombEventStateRegistry,
-} from "./honeycomb/index";
+  componentMappers as elasticComponentMappers,
+  eventStateRegistry as elasticEventStateRegistry,
+  triggerRenderers as elasticTriggerRenderers,
+} from "./elastic/index";
 import {
   componentMappers as gcpComponentMappers,
   customFieldRenderers as gcpCustomFieldRenderers,
-  triggerRenderers as gcpTriggerRenderers,
   eventStateRegistry as gcpEventStateRegistry,
+  triggerRenderers as gcpTriggerRenderers,
 } from "./gcp";
+import {
+  componentMappers as honeycombComponentMappers,
+  eventStateRegistry as honeycombEventStateRegistry,
+  triggerRenderers as honeycombTriggerRenderers,
+} from "./honeycomb/index";
+import {
+  componentMappers as ociComponentMappers,
+  eventStateRegistry as ociEventStateRegistry,
+  triggerRenderers as ociTriggerRenderers,
+} from "./oci/index";
 import {
   componentMappers as servicenowComponentMappers,
   customFieldRenderers as servicenowCustomFieldRenderers,
-  triggerRenderers as servicenowTriggerRenderers,
   eventStateRegistry as servicenowEventStateRegistry,
+  triggerRenderers as servicenowTriggerRenderers,
 } from "./servicenow/index";
-import {
-  componentMappers as elasticComponentMappers,
-  triggerRenderers as elasticTriggerRenderers,
-  eventStateRegistry as elasticEventStateRegistry,
-} from "./elastic/index";
-import {
-  componentMappers as ociComponentMappers,
-  triggerRenderers as ociTriggerRenderers,
-  eventStateRegistry as ociEventStateRegistry,
-} from "./oci/index";
 
-import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
-import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
-import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner.tsx";
-import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
-import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
-import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";
-import { sendEmailMapper, SEND_EMAIL_STATE_REGISTRY } from "./sendEmail";
-import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
-import { startTriggerRenderer } from "./start";
 import { buildExecutionInfo, buildNodeInfo } from "../utils";
+import { APPROVAL_STATE_REGISTRY, approvalMapper } from "./approval";
+import { FILTER_STATE_REGISTRY, filterMapper } from "./filter";
+import { MERGE_STATE_REGISTRY, mergeMapper } from "./merge";
+import { RUNNER_STATE_REGISTRY, runnerMapper } from "./runner";
 import { createSafeComponentMapper, createSafeCustomFieldRenderer, createSafeTriggerRenderer } from "./safeMappers";
+import { SEND_EMAIL_STATE_REGISTRY, sendEmailMapper } from "./sendEmail";
+import { SSH_STATE_REGISTRY, sshMapper } from "./ssh";
+import { startTriggerRenderer } from "./start";
+import { DEFAULT_STATE_REGISTRY } from "./stateRegistry";
+import { WAIT_STATE_REGISTRY, waitCustomFieldRenderer, waitMapper } from "./wait";
 
 /**
  * Registry mapping trigger names to their renderers.

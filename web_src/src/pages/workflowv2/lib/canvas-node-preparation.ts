@@ -1,22 +1,21 @@
+import type { QueryClient } from "@tanstack/react-query";
+import { Puzzle } from "lucide-react";
 import {
   canvasesInvokeNodeExecutionHook,
   canvasesInvokeNodeTriggerHook,
   type CanvasesCanvasEvent,
   type CanvasesCanvasNodeExecution,
   type CanvasesCanvasNodeQueueItem,
+  type SuperplaneActionsAction,
   type SuperplaneComponentsEdge as ComponentsEdge,
   type SuperplaneComponentsNode as ComponentsNode,
-  type SuperplaneActionsAction,
   type TriggersTrigger,
 } from "@/api-client";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
-import type { CanvasNode } from "@/ui/CanvasPage";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
-import type { QueryClient } from "@tanstack/react-query";
-import { Puzzle } from "lucide-react";
-import { getComponentBaseMapper, getTriggerRenderer } from "../mappers";
+import type { CanvasNode } from "@/ui/CanvasPage";
 import type {
   ActionContext,
   ComponentBaseMapper,
@@ -24,10 +23,9 @@ import type {
   TriggerActionModal,
   User,
 } from "../mappers/types";
+import { getComponentBaseMapper, getTriggerRenderer } from "../mappers";
 import { buildComponentFallbackCanvasNode, buildTriggerFallbackCanvasNode } from "./canvas-node-fallback";
 
-import { canvasKeys } from "@/hooks/useCanvasData";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   buildComponentDefinition,
   buildEventInfo,
@@ -36,6 +34,8 @@ import {
   buildQueueItemInfo,
   buildUserInfo,
 } from "../utils";
+import { canvasKeys } from "@/hooks/useCanvasData";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 type PrepareComponentNodeArgs = {
   nodes: ComponentsNode[];
