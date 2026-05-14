@@ -19,6 +19,12 @@ var exampleOutputCreateMonitorBytes []byte
 //go:embed example_output_delete_monitor.json
 var exampleOutputDeleteMonitorBytes []byte
 
+//go:embed example_output_get_monitor.json
+var exampleOutputGetMonitorBytes []byte
+
+//go:embed example_output_update_monitor.json
+var exampleOutputUpdateMonitorBytes []byte
+
 //go:embed example_data_on_load_balancing_health_alert.json
 var exampleDataOnLoadBalancingHealthAlertBytes []byte
 
@@ -33,6 +39,12 @@ var exampleOutputCreateMonitor map[string]any
 
 var exampleOutputDeleteMonitorOnce sync.Once
 var exampleOutputDeleteMonitor map[string]any
+
+var exampleOutputGetMonitorOnce sync.Once
+var exampleOutputGetMonitor map[string]any
+
+var exampleOutputUpdateMonitorOnce sync.Once
+var exampleOutputUpdateMonitor map[string]any
 
 var exampleDataOnLoadBalancingHealthAlertOnce sync.Once
 var exampleDataOnLoadBalancingHealthAlert map[string]any
@@ -51,6 +63,14 @@ func (c *CreateMonitor) ExampleOutput() map[string]any {
 
 func (c *DeleteMonitor) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteMonitorOnce, exampleOutputDeleteMonitorBytes, &exampleOutputDeleteMonitor)
+}
+
+func (c *GetMonitor) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetMonitorOnce, exampleOutputGetMonitorBytes, &exampleOutputGetMonitor)
+}
+
+func (c *UpdateMonitor) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateMonitorOnce, exampleOutputUpdateMonitorBytes, &exampleOutputUpdateMonitor)
 }
 
 func (t *OnLoadBalancingHealthAlert) ExampleData() map[string]any {

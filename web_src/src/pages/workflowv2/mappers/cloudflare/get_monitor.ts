@@ -10,19 +10,27 @@ import type {
 import { baseMapper, firstOutputData } from "./base";
 import { getCloudflareMonitorDisplayLabel } from "./metadata";
 
-interface DeleteMonitorConfiguration {
+interface GetMonitorConfiguration {
   monitor?: string;
-  force?: boolean;
 }
 
-interface DeleteMonitorOutput {
+interface GetMonitorOutput {
   accountId?: string;
   monitorId?: string;
-  deleted?: boolean;
-  references?: unknown[];
+  monitor?: {
+    id?: string;
+    type?: string;
+    description?: string;
+    path?: string;
+    port?: number;
+    method?: string;
+    interval?: number;
+    timeout?: number;
+    retries?: number;
+  };
 }
 
-export const deleteMonitorMapper: ComponentBaseMapper = {
+export const getMonitorMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return {
       ...baseMapper.props(context),
@@ -32,20 +40,19 @@ export const deleteMonitorMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details = baseMapper.getExecutionDetails(context) as Record<string, string>;
-    const output = firstOutputData(context.execution.outputs) as DeleteMonitorOutput | undefined;
+    const output = firstOutputData(context.execution.outputs) as GetMonitorOutput | undefined;
 
-    if (!output) {
+    if (!output?.monitor) {
       return details;
     }
 
-    details["Monitor"] = output.monitorId
-      ? getCloudflareMonitorDisplayLabel(context.node.metadata, output.monitorId)
-      : "-";
-    details["Deleted"] = output.deleted ? "Yes" : "No";
-
-    if (output.references) {
-      details["References"] = String(output.references.length);
-    }
+    const m = output.monitor;
+    if (m.description) details["Name"] = m.description;
+    if (m.type) details["Type"] = m.type.toUpperCase();
+    if (m.path) details["Path"] = m.path;
+    if (m.port != null) details["Port"] = String(m.port);
+    if (m.interval != null) details["Interval"] = `${m.interval}s`;
+    if (m.timeout != null) details["Timeout"] = `${m.timeout}s`;
 
     return details;
   },
@@ -56,19 +63,15 @@ export const deleteMonitorMapper: ComponentBaseMapper = {
 };
 
 function metadataList(node: NodeInfo): MetadataItem[] {
-  const configuration = node.configuration as DeleteMonitorConfiguration | undefined;
+  const configuration = node.configuration as GetMonitorConfiguration | undefined;
   const metadata: MetadataItem[] = [];
 
   const monitorId = configuration?.monitor?.trim();
   if (monitorId) {
     metadata.push({
-      icon: "trash-2",
+      icon: "activity",
       label: getCloudflareMonitorDisplayLabel(node.metadata, monitorId),
     });
-  }
-
-  if (configuration?.force) {
-    metadata.push({ icon: "shield-alert", label: "Force delete" });
   }
 
   return metadata;

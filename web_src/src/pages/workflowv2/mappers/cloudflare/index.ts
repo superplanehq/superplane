@@ -6,6 +6,8 @@ import { buildActionStateRegistry } from "../utils";
 import { onLoadBalancingHealthAlertTriggerRenderer } from "./on_load_balancing_health_alert";
 import { createMonitorMapper } from "./create_monitor";
 import { deleteMonitorMapper } from "./delete_monitor";
+import { getMonitorMapper } from "./get_monitor";
+import { updateMonitorMapper } from "./update_monitor";
 import { originRuleMapper } from "./origin_rule";
 import { createKVNamespaceMapper } from "./create_kv_namespace";
 import { putKVValueMapper } from "./put_kv_value";
@@ -62,6 +64,8 @@ const deployWorkerStateRegistry: EventStateRegistry = {
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createDnsRecord: baseMapper,
   createMonitor: createMonitorMapper,
+  getMonitor: getMonitorMapper,
+  updateMonitor: updateMonitorMapper,
   createOriginRule: originRuleMapper,
   updateDNSRecord: baseMapper,
   deleteDnsRecord: baseMapper,
@@ -95,6 +99,8 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createDnsRecord: buildActionStateRegistry("completed"),
   createMonitor: buildActionStateRegistry("created"),
+  getMonitor: buildActionStateRegistry("fetched"),
+  updateMonitor: buildActionStateRegistry("updated"),
   createOriginRule: buildActionStateRegistry("created"),
   updateDNSRecord: buildActionStateRegistry("completed"),
   deleteDnsRecord: buildActionStateRegistry("completed"),

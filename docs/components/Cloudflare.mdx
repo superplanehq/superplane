@@ -32,11 +32,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Deploy Worker" href="#deploy-worker" description="Provision a Worker if needed, upload a script version, and deploy it to traffic" />
   <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
   <LinkCard title="Get Load Balancer" href="#get-load-balancer" description="Retrieve a Cloudflare Load Balancer by ID" />
+  <LinkCard title="Get Monitor" href="#get-monitor" description="Retrieve a Cloudflare load balancing health monitor's configuration" />
   <LinkCard title="Get Pool" href="#get-pool" description="Retrieve a Cloudflare Load Balancer origin pool by ID" />
   <LinkCard title="Get Worker" href="#get-worker" description="Retrieve metadata and settings for a deployed Worker script" />
   <LinkCard title="Put KV Value" href="#put-kv-value" description="Write a key-value pair to a Cloudflare Workers KV namespace" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
   <LinkCard title="Update Load Balancer" href="#update-load-balancer" description="Update a Cloudflare Load Balancer's steering policy, pool weights, or session affinity" />
+  <LinkCard title="Update Monitor" href="#update-monitor" description="Update a Cloudflare load balancing health monitor's configuration" />
   <LinkCard title="Update Origin Rule" href="#update-origin-rule" description="Update an existing origin rule" />
   <LinkCard title="Update Pool" href="#update-pool" description="Update a Cloudflare Load Balancer origin pool's configuration or origin weights" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
@@ -862,6 +864,53 @@ Returns the full load balancer configuration including pools, steering policy, a
 }
 ```
 
+<a id="get-monitor"></a>
+
+## Get Monitor
+
+The Get Monitor component fetches the current configuration of a Cloudflare Load Balancing health monitor.
+
+### Use Cases
+
+- **Pre-flight validation**: Confirm a monitor exists and inspect its configuration before modifying it
+- **Audit**: Capture a snapshot of monitor settings at a point in time
+- **Workflow data**: Expose monitor configuration as payload data for downstream nodes
+
+### Configuration
+
+- **Monitor**: The health monitor to retrieve
+
+### Output
+
+Returns the full monitor configuration including type, path, port, intervals, and health thresholds.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "account_abc123",
+    "monitor": {
+      "consecutive_down": 3,
+      "consecutive_up": 2,
+      "description": "Login page monitor",
+      "expected_codes": "2xx",
+      "id": "monitor_abc123",
+      "interval": 60,
+      "method": "GET",
+      "path": "/health",
+      "port": 443,
+      "retries": 0,
+      "timeout": 5,
+      "type": "https"
+    },
+    "monitorId": "monitor_abc123"
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.monitor.fetched"
+}
+```
+
 <a id="get-pool"></a>
 
 ## Get Pool
@@ -1099,6 +1148,56 @@ Returns the updated load balancer configuration.
   },
   "timestamp": "2026-05-05T06:54:57.198268018Z",
   "type": "cloudflare.loadBalancer.updated"
+}
+```
+
+<a id="update-monitor"></a>
+
+## Update Monitor
+
+The Update Monitor component modifies an existing Cloudflare Load Balancing health monitor.
+
+### Use Cases
+
+- **Adjust thresholds**: Change health check intervals, timeouts, or consecutive up/down counts
+- **Change protocol**: Switch a monitor from HTTP to HTTPS or TCP
+- **Update endpoint**: Modify the path or port being checked
+- **Tune headers**: Add or remove request headers sent during health checks
+
+### Configuration
+
+- **Monitor**: The health monitor to update (required)
+- **Type / Description / Path / Port**: Override basic monitor settings. Only toggled fields are applied.
+- **Advanced Health Check Settings**: Override method, expected response, headers, redirect, TLS, and timing thresholds.
+
+### Output
+
+Returns the updated monitor configuration after the change is applied.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "account_abc123",
+    "monitor": {
+      "consecutive_down": 3,
+      "consecutive_up": 2,
+      "description": "Updated login page monitor",
+      "expected_codes": "2xx",
+      "id": "monitor_abc123",
+      "interval": 30,
+      "method": "GET",
+      "path": "/healthz",
+      "port": 443,
+      "retries": 2,
+      "timeout": 5,
+      "type": "https"
+    },
+    "monitorId": "monitor_abc123"
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.monitor.updated"
 }
 ```
 

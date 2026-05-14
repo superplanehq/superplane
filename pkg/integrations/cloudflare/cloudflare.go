@@ -221,6 +221,8 @@ func (c *Cloudflare) Actions() []core.Action {
 		&UpdateDNSRecord{},
 		&DeleteDNSRecord{},
 		&CreateMonitor{},
+		&GetMonitor{},
+		&UpdateMonitor{},
 		&DeleteMonitor{},
 		&DeleteOriginRule{},
 		&CreateKVNamespace{},

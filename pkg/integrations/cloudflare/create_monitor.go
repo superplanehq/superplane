@@ -597,7 +597,36 @@ func resolvedMonitorTiming(advanced CreateMonitorAdvancedSpec) (interval int, ti
 	return interval, timeout, retries
 }
 
-func validateMonitorTiming(advanced CreateMonitorAdvancedSpec) error {
+// resolvedMonitorTimingForUpdate overlays advanced timing fields onto the current monitor (or
+// create-style defaults when current is nil), matching mergeMonitorUpdate behavior.
+func resolvedMonitorTimingForUpdate(advanced CreateMonitorAdvancedSpec, current *Monitor) (interval int, timeout int, retries int) {
+	interval = defaultMonitorIntervalSeconds
+	timeout = defaultMonitorTimeoutSeconds
+	retries = defaultMonitorRetries
+	if current != nil {
+		if current.Interval != nil {
+			interval = *current.Interval
+		}
+		if current.Timeout != nil {
+			timeout = *current.Timeout
+		}
+		if current.Retries != nil {
+			retries = *current.Retries
+		}
+	}
+	if advanced.Interval != nil {
+		interval = *advanced.Interval
+	}
+	if advanced.Timeout != nil {
+		timeout = *advanced.Timeout
+	}
+	if advanced.Retries != nil {
+		retries = *advanced.Retries
+	}
+	return interval, timeout, retries
+}
+
+func validateMonitorTimingFields(advanced CreateMonitorAdvancedSpec) error {
 	if advanced.Interval != nil {
 		if *advanced.Interval < minMonitorIntervalSeconds {
 			return fmt.Errorf("interval must be at least %d seconds", minMonitorIntervalSeconds)
@@ -615,12 +644,42 @@ func validateMonitorTiming(advanced CreateMonitorAdvancedSpec) error {
 		return fmt.Errorf("retries must be between 0 and %d", maxMonitorRetries)
 	}
 
-	interval, timeout, _ := resolvedMonitorTiming(advanced)
+	return nil
+}
+
+func validateMonitorTimeoutLessThanInterval(interval, timeout int) error {
 	if timeout >= interval {
 		return fmt.Errorf("timeout (%ds) must be less than interval (%ds)", timeout, interval)
 	}
-
 	return nil
+}
+
+func validateMonitorTiming(advanced CreateMonitorAdvancedSpec) error {
+	if err := validateMonitorTimingFields(advanced); err != nil {
+		return err
+	}
+
+	interval, timeout, _ := resolvedMonitorTiming(advanced)
+	return validateMonitorTimeoutLessThanInterval(interval, timeout)
+}
+
+// validateMonitorTimingForUpdate validates advanced timing for monitor updates. When current is nil
+// (e.g. setup without integration context), the interval/timeout relationship is only checked if both
+// are explicitly set in advanced, since unresolved fields will keep the existing monitor values.
+func validateMonitorTimingForUpdate(advanced CreateMonitorAdvancedSpec, current *Monitor) error {
+	if err := validateMonitorTimingFields(advanced); err != nil {
+		return err
+	}
+
+	if current == nil {
+		if advanced.Interval != nil && advanced.Timeout != nil {
+			return validateMonitorTimeoutLessThanInterval(*advanced.Interval, *advanced.Timeout)
+		}
+		return nil
+	}
+
+	interval, timeout, _ := resolvedMonitorTimingForUpdate(advanced, current)
+	return validateMonitorTimeoutLessThanInterval(interval, timeout)
 }
 
 func monitorHeadersToMap(headers []MonitorHeader) map[string][]string {
