@@ -25,12 +25,13 @@ services:
       SWAGGER_BASE_PATH: "/app/api/swagger"
       RBAC_MODEL_PATH: "/app/rbac/rbac_model.conf"
       RBAC_ORG_POLICY_PATH: "/app/rbac/rbac_org_policy.csv"
-      # Ensure Go build cache initializes in a writable, persisted location
-      # This fixes: "failed to initialize build cache at /.cache/go-build: permission denied"
-      # and keeps the cache across container restarts (since /app is bind-mounted)
-      GOMODCACHE: "/app/tmp/go/pkg/mod"
-      GOCACHE: "/app/tmp/go-build"
-      XDG_CACHE_HOME: "/app/tmp"
+      # Keep module + build caches on the named Docker volume `go-pkg-cache:/go`, not under /app/tmp.
+      # With GOMODCACHE under the bind-mounted repo, two concurrent `go build` processes (e.g. two Air
+      # instances after interrupted `make dev.server.fg`) corrupt the same module download temp files
+      # (`rename ... .tmp: no such file or directory`), and Air reports `failed to build, error: exit status 1`.
+      GOMODCACHE: "/go/pkg/mod"
+      GOCACHE: "/go/go-build-cache"
+      XDG_CACHE_HOME: "/go/xdg-cache"
       # Lock Playwright browsers location so install and runtime match
       PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"
       START_PUBLIC_API: "yes"
@@ -85,6 +86,9 @@ services:
       AGENT_ENABLED: ${AGENT_ENABLED:-no}
       AGENT_HTTP_URL: ${AGENT_HTTP_URL:-}
       AGENT_GRPC_URL: ${AGENT_GRPC_URL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_AGENT_ID: ${ANTHROPIC_AGENT_ID:-}
+      ANTHROPIC_ENVIRONMENT_ID: ${ANTHROPIC_ENVIRONMENT_ID:-}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}

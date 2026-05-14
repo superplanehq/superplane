@@ -170,6 +170,8 @@ export interface CanvasPageProps {
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
+  unpublishedDraftUpdatedAt?: string;
+  onDiscardDraftAndStartEdit?: () => void;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -692,12 +694,10 @@ function CanvasPage(props: CanvasPageProps) {
 
   const agentState = useAgentState({
     isEditing: props.isEditing,
-    canvasVersion: props.activeCanvasVersionId,
     hideAddControls: props.hideAddControls,
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
-    onApplyAiOperations: props.onApplyAiOperations,
   });
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
@@ -1119,6 +1119,8 @@ function CanvasPage(props: CanvasPageProps) {
           runsNotificationCount={props.runsNotificationCount}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
+          unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
+          onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           isVersionControlOpen={props.isVersionControlOpen}
           onOpenVersionControl={props.onOpenVersionControl}
@@ -1630,6 +1632,8 @@ function CanvasContentHeader({
   runsNotificationCount,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
+  unpublishedDraftUpdatedAt,
+  onDiscardDraftAndStartEdit,
   showCanvasSettingsMenu,
   isVersionControlOpen,
   onOpenVersionControl,
@@ -1662,6 +1666,8 @@ function CanvasContentHeader({
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
+  unpublishedDraftUpdatedAt?: string;
+  onDiscardDraftAndStartEdit?: () => void;
   showCanvasSettingsMenu?: boolean;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
@@ -1704,6 +1710,8 @@ function CanvasContentHeader({
       runsNotificationCount={runsNotificationCount}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+      unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
+      onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
       isVersionControlOpen={isVersionControlOpen}
       onOpenVersionControl={onOpenVersionControl}
@@ -3009,6 +3017,6 @@ function CanvasContent({
   );
 }
 
-export type { AgentContext, AgentMode, BuildingBlock } from "../BuildingBlocksSidebar";
+export type { BuildingBlock } from "../BuildingBlocksSidebar";
 export type { MissingIntegration } from "../IntegrationStatusIndicator";
 export { CanvasPage };

@@ -12,7 +12,7 @@
     "lint:knip": "knip --config knip.json --include files,unlisted,binaries --no-progress",
     "lint:budget": "node scripts/check-eslint-budget.mjs",
     "lint:baseline:update": "node scripts/check-eslint-budget.mjs --update-baseline",
-    "generate:api": "openapi-ts",
+    "generate:api": "openapi-ts --silent",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",

@@ -141,6 +141,12 @@ func (h *Hub) BroadcastToWorkflow(workflowID string, message []byte) {
 	}
 }
 
+func (h *Hub) WorkflowSubscriberCount(workflowID string) int {
+	h.mutex.RLock()
+	defer h.mutex.RUnlock()
+	return len(h.workflowSubscriptions[workflowID])
+}
+
 // NewClient creates a new websocket client
 func (h *Hub) NewClient(conn *websocket.Conn, workflowID string) *Client {
 	client := &Client{
