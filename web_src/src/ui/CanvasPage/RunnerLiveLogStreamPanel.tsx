@@ -1,22 +1,17 @@
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type RunnerLiveLogModalProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+export type RunnerLiveLogStreamPanelProps = {
   organizationId: string;
   canvasId: string;
   executionId: string;
 };
 
-export function RunnerLiveLogModal({
-  open,
-  onOpenChange,
-  organizationId,
-  canvasId,
-  executionId,
-}: RunnerLiveLogModalProps) {
+/**
+ * NDJSON runner live log stream (no Dialog). For use inside {@link TriggerActionModal} content
+ * or other hosts that already provide chrome and close handling.
+ */
+export function RunnerLiveLogStreamPanel({ organizationId, canvasId, executionId }: RunnerLiveLogStreamPanelProps) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -34,7 +29,7 @@ export function RunnerLiveLogModal({
   }, [text, scrollToBottom]);
 
   useEffect(() => {
-    if (!open || !organizationId || !canvasId || !executionId) {
+    if (!organizationId || !canvasId || !executionId) {
       return;
     }
 
@@ -111,33 +106,19 @@ export function RunnerLiveLogModal({
     })();
 
     return () => ac.abort();
-  }, [open, organizationId, canvasId, executionId]);
+  }, [organizationId, canvasId, executionId]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="large" className="flex max-h-[90vh] w-[90vw] h-full flex-col gap-0 overflow-hidden p-0">
-        <DialogTitle className="sr-only">Logs</DialogTitle>
-
-        <div className="flex h-full min-h-0 flex-col">
-          <div className="flex shrink-0 items-center border-b border-gray-200 bg-white px-4 py-3 pr-12">
-            <span className="font-mono text-sm text-gray-600">Logs</span>
-          </div>
-
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
-            <pre
-              ref={scrollRef}
-              className="min-h-0 flex-1 overflow-auto p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-left text-gray-800"
-            >
-              {error ? <span className="text-destructive">{error}</span> : null}
-              {!error && !text && !isStreaming ? (
-                <span className="text-muted-foreground">No log lines yet.</span>
-              ) : null}
-              {!error && text}
-              {!error && isStreaming && !text ? <span className="text-muted-foreground">Connecting…</span> : null}
-            </pre>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div className="flex min-h-[50vh] flex-col overflow-hidden bg-slate-50">
+      <pre
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-auto p-4 font-mono text-xs leading-relaxed whitespace-pre-wrap text-left text-gray-800"
+      >
+        {error ? <span className="text-destructive">{error}</span> : null}
+        {!error && !text && !isStreaming ? <span className="text-muted-foreground">No log lines yet.</span> : null}
+        {!error && text}
+        {!error && isStreaming && !text ? <span className="text-muted-foreground">Connecting…</span> : null}
+      </pre>
+    </div>
   );
 }

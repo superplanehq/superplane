@@ -9,7 +9,5 @@ export interface ComponentActionsProps {
   onDeactivate?: () => void;
   onToggleView?: () => void;
   onDelete?: () => void;
-  /** Runner component: opens live task logs for the current execution when available. */
-  onOpenRunnerLiveLogs?: () => void;
   isCompactView?: boolean;
 }

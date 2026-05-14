@@ -39,7 +39,6 @@ function getActionProps(data: BlockProps["data"], compactView: boolean, props: P
     onDeactivate: props.onDeactivate,
     onToggleView: props.onToggleView,
     onDelete: props.onDelete,
-    onOpenRunnerLiveLogs: data.type === "component" ? props.onOpenRunnerLiveLogs : undefined,
     isCompactView: compactView,
   };
 }
@@ -214,7 +213,6 @@ export function BlockContent({
   onDeactivate,
   onToggleView,
   onDelete,
-  onOpenRunnerLiveLogs,
   showHeader,
   canvasMode,
   isCompactView,
@@ -231,7 +229,6 @@ export function BlockContent({
     onDeactivate,
     onToggleView,
     onDelete,
-    onOpenRunnerLiveLogs,
   });
 
   return renderBlockByType({

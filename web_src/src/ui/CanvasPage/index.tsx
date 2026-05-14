@@ -53,7 +53,7 @@ import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { findFreePositionInViewport } from "@/pages/workflowv2/lib/find-free-position-in-viewport";
-import { CANVAS_NODE_FALLBACK_MESSAGE, isRecord } from "@/pages/workflowv2/mappers/safeMappers";
+import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
@@ -65,7 +65,6 @@ import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventI
 import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
-import { RunnerLiveLogModal } from "./RunnerLiveLogModal";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
@@ -388,7 +387,6 @@ type CanvasNodeRendererCallbacks = {
   onToggleView: React.MutableRefObject<((nodeId: string) => void) | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
   onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
-  onOpenRunnerLiveLogs: React.MutableRefObject<((executionId: string) => void) | undefined>;
   runDisabled?: boolean;
   runDisabledTooltip?: string;
   showHeader: boolean;
@@ -522,7 +520,6 @@ function getAnnotationUpdateAction(callbacks?: CanvasNodeRendererCallbacks) {
 function buildInteractiveNodeBlockProps(
   callbacks: CanvasNodeRendererCallbacks | undefined,
   nodeId: string,
-  options?: { onOpenRunnerLiveLogs?: () => void },
 ): Omit<BlockProps, "data" | "nodeId" | "selected" | "runDisabled" | "runDisabledTooltip"> {
   if (!callbacks) {
     return {};
@@ -541,7 +538,6 @@ function buildInteractiveNodeBlockProps(
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
     onAnnotationUpdate: getAnnotationUpdateAction(callbacks),
     onAnnotationBlur: getVoidAction(callbacks.onAnnotationBlur),
-    onOpenRunnerLiveLogs: options?.onOpenRunnerLiveLogs,
   };
 }
 
@@ -549,16 +545,15 @@ function buildDefaultNodeBlockProps(args: {
   nodeId: string;
   selected?: boolean;
   callbacks?: CanvasNodeRendererCallbacks;
-  onOpenRunnerLiveLogs?: () => void;
 }): Omit<BlockProps, "data"> {
-  const { nodeId, selected, callbacks, onOpenRunnerLiveLogs } = args;
+  const { nodeId, selected, callbacks } = args;
 
   return {
     nodeId,
     selected,
     runDisabled: callbacks?.runDisabled,
     runDisabledTooltip: callbacks?.runDisabledTooltip,
-    ...buildInteractiveNodeBlockProps(callbacks, nodeId, { onOpenRunnerLiveLogs }),
+    ...buildInteractiveNodeBlockProps(callbacks, nodeId),
   };
 }
 
@@ -640,24 +635,10 @@ function areDefaultNodeRendererPropsEqual(
 const DefaultNodeRenderer = memo(function DefaultNodeRenderer(nodeProps: DefaultNodeRendererProps) {
   const { _callbacksRef, ...blockData } = nodeProps.data;
   const callbacks = _callbacksRef?.current;
-  const runnerLiveLogsExecutionId =
-    blockData.type === "component" &&
-    isRecord(blockData.component) &&
-    typeof blockData.component.runnerLiveLogsExecutionId === "string"
-      ? blockData.component.runnerLiveLogsExecutionId
-      : undefined;
-  const openRunnerLiveLogs = callbacks?.onOpenRunnerLiveLogs?.current;
-  const onOpenRunnerLiveLogs =
-    callbacks?.canvasMode === "live" && runnerLiveLogsExecutionId && openRunnerLiveLogs
-      ? () => {
-          openRunnerLiveLogs(runnerLiveLogsExecutionId);
-        }
-      : undefined;
   const blockProps = buildDefaultNodeBlockProps({
     nodeId: nodeProps.id,
     selected: nodeProps.selected,
     callbacks,
-    onOpenRunnerLiveLogs,
   });
   const fallback = <Block {...blockProps} data={createNodeRenderFallbackData(blockData)} />;
 
@@ -731,11 +712,6 @@ function CanvasPage(props: CanvasPageProps) {
   const closeCanvasModal = useCallback(() => {
     setCanvasModalRequest(null);
   }, []);
-  const [runnerLiveLogsExecutionId, setRunnerLiveLogsExecutionId] = useState<string | null>(null);
-  const openRunnerLiveLogs = useCallback((executionId: string) => {
-    setRunnerLiveLogsExecutionId(executionId);
-  }, []);
-  const runnerLiveLogsOpener = props.canvasId && props.organizationId ? openRunnerLiveLogs : undefined;
   useEffect(() => {
     props.onTriggerModalHostReady?.(openCanvasModal);
   }, [props.onTriggerModalHostReady, openCanvasModal]);
@@ -1293,7 +1269,6 @@ function CanvasPage(props: CanvasPageProps) {
               onConnectIntegration={props.onConnectIntegration}
               canCreateIntegrations={props.canCreateIntegrations}
               onLogView={props.onLogView}
-              onOpenRunnerLiveLogs={runnerLiveLogsOpener}
             />
           </ReactFlowProvider>
           {props.headerMode === "runs" ? null : (
@@ -1345,7 +1320,14 @@ function CanvasPage(props: CanvasPageProps) {
       {/* Edit existing node modal - now handled by settings sidebar */}
 
       <Dialog open={!!canvasModalRequest} onOpenChange={(isOpen) => !isOpen && closeCanvasModal()}>
-        <DialogContent className="max-w-3xl max-h-[80vh]">
+        <DialogContent
+          size={canvasModalRequest?.dialogSize === "large" ? "large" : "default"}
+          className={cn(
+            canvasModalRequest?.dialogSize === "large"
+              ? "flex max-h-[90vh] w-[min(90vw,calc(100vw-2rem))] flex-col gap-0 overflow-hidden p-0"
+              : "max-w-3xl max-h-[80vh]",
+          )}
+        >
           {canvasModalRequest?.title ? <DialogTitle>{canvasModalRequest.title}</DialogTitle> : null}
           {canvasModalRequest?.description ? (
             <DialogDescription>{canvasModalRequest.description}</DialogDescription>
@@ -1353,19 +1335,6 @@ function CanvasPage(props: CanvasPageProps) {
           {canvasModalRequest ? canvasModalRequest.content({ close: closeCanvasModal }) : null}
         </DialogContent>
       </Dialog>
-      {props.canvasId && props.organizationId ? (
-        <RunnerLiveLogModal
-          open={runnerLiveLogsExecutionId != null}
-          onOpenChange={(nextOpen) => {
-            if (!nextOpen) {
-              setRunnerLiveLogsExecutionId(null);
-            }
-          }}
-          organizationId={props.organizationId}
-          canvasId={props.canvasId}
-          executionId={runnerLiveLogsExecutionId ?? ""}
-        />
-      ) : null}
     </div>
   );
 }
@@ -1850,7 +1819,6 @@ function CanvasContent({
   onConnectIntegration,
   canCreateIntegrations,
   onLogView,
-  onOpenRunnerLiveLogs,
 }: {
   state: CanvasPageState;
   onNodeEdit: (nodeId: string) => void;
@@ -1915,7 +1883,6 @@ function CanvasContent({
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
   onLogView?: () => void;
-  onOpenRunnerLiveLogs?: (executionId: string) => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode, setViewport } = useReactFlow();
   const { zoom } = useViewport();
@@ -2144,9 +2111,6 @@ function CanvasContent({
   onAnnotationUpdateRef.current = onAnnotationUpdate;
   const onAnnotationBlurRef = useRef(onAnnotationBlur);
   onAnnotationBlurRef.current = onAnnotationBlur;
-
-  const onOpenRunnerLiveLogsRef = useRef(onOpenRunnerLiveLogs);
-  onOpenRunnerLiveLogsRef.current = onOpenRunnerLiveLogs;
 
   const handleConnect = useCallback(
     (connection: Connection) => {
@@ -2410,7 +2374,6 @@ function CanvasContent({
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
-    onOpenRunnerLiveLogs: onOpenRunnerLiveLogsRef,
     runDisabled,
     runDisabledTooltip,
     showHeader,
@@ -2428,7 +2391,6 @@ function CanvasContent({
     onToggleView: onToggleViewRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
-    onOpenRunnerLiveLogs: onOpenRunnerLiveLogsRef,
     runDisabled,
     runDisabledTooltip,
     showHeader,

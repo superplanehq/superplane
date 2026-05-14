@@ -59,8 +59,7 @@ export type ComponentActionKeys =
   | "onDuplicate"
   | "onDeactivate"
   | "onToggleView"
-  | "onDelete"
-  | "onOpenRunnerLiveLogs";
+  | "onDelete";
 
 export interface BlockProps extends ComponentActionsProps {
   data: CanvasBlockData;

@@ -20,7 +20,6 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
   onDoubleClick,
   statusBadgeColor,
   isCompactView = false,
-  onOpenRunnerLiveLogs,
 }) => {
   const Icon = React.useMemo(() => {
     return resolveIcon(iconSlug);
@@ -36,37 +35,20 @@ export const ComponentHeader: React.FC<ComponentHeaderProps> = ({
       }
       onDoubleClick={onDoubleClick}
     >
-      <div className="flex w-full min-w-0 items-center gap-2">
-        <div className="flex min-w-0 flex-1 items-center">
-          <div className="mr-2 flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden">
+      <div className="flex w-full items-center justify-between">
+        <div className="flex items-center">
+          <div className="mr-2 flex h-4 w-4 items-center justify-center overflow-hidden">
             {iconSrc ? (
               <img src={iconSrc} alt={title} className="h-4 w-4 shrink-0 object-contain" />
             ) : (
               <Icon size={16} className={iconColor} />
             )}
           </div>
-          <h2 className="min-w-0 truncate text-sm font-semibold">{title}</h2>
+          <h2 className="text-sm font-semibold">{title}</h2>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {onOpenRunnerLiveLogs ? (
-            <button
-              type="button"
-              data-testid="runner-live-logs"
-              aria-label="Open logs"
-              className="nodrag rounded-md border border-slate-200/90 bg-white/80 px-2 py-0.5 text-xs font-medium text-slate-600 shadow-none transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onOpenRunnerLiveLogs();
-              }}
-            >
-              Logs
-            </button>
-          ) : null}
-          {isCompactView && statusBadgeColor ? (
-            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${statusBadgeColor}`} aria-hidden="true" />
-          ) : null}
-        </div>
+        {isCompactView && statusBadgeColor ? (
+          <span className={`h-2.5 w-2.5 rounded-full ${statusBadgeColor}`} aria-hidden="true" />
+        ) : null}
       </div>
     </div>
   );

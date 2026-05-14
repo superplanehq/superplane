@@ -5,9 +5,9 @@ import type {
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeQueueItem,
-  SuperplaneActionsAction,
   SuperplaneComponentsEdge as ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
+  SuperplaneActionsAction,
   SuperplaneMeUser,
 } from "@/api-client";
 import { renderTimeAgo } from "@/components/TimeAgo";
@@ -197,7 +197,6 @@ export function mapExecutionsToSidebarEvents(
       nodeId: execution?.nodeId,
       originalExecution: execution,
       triggerEventId: execution.rootEvent?.id,
-      component: componentName,
     };
   });
 }

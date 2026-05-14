@@ -125,16 +125,24 @@ export type ComponentBaseContext = {
   currentUser: User | undefined;
   actions: ActionContext;
   canvasMode?: "live" | "edit";
+  /** Canvas id for API URLs (e.g. runner live logs); set when preparing canvas nodes. */
+  canvasId?: string;
+  /** Organization scope for API calls; set when preparing canvas nodes. */
+  organizationId?: string;
 };
 
 export type ActionContext = {
   invokeNodeExecutionHook: (executionId: string, hook: string, parameters: unknown) => Promise<void>;
+  /** Same host as trigger template runs: opens the canvas modal from node / mapper UI. */
+  openModal?: (modal: TriggerActionModal) => void;
 };
 
 export type TriggerActionModal = {
   title?: ReactNode;
   description?: ReactNode;
   content: (ctx: { close: () => void }) => ReactNode;
+  /** When `"large"`, canvas uses a wide dialog (e.g. runner live logs). */
+  dialogSize?: "default" | "large";
 };
 
 export type TriggerActionContext = {

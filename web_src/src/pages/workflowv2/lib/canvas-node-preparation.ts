@@ -49,6 +49,7 @@ type PrepareComponentNodeArgs = {
   currentUser?: User;
   edges?: ComponentsEdge[];
   canvasMode?: "live" | "edit";
+  openModal?: (modal: TriggerActionModal) => void;
 };
 
 type PrepareComponentBaseNodeArgs = {
@@ -62,6 +63,8 @@ type PrepareComponentBaseNodeArgs = {
   currentUser?: User;
   edges?: ComponentsEdge[];
   canvasMode?: "live" | "edit";
+  organizationId?: string;
+  openModal?: (modal: TriggerActionModal) => void;
 };
 
 type NodePosition = {
@@ -204,8 +207,19 @@ export function prepareTriggerNode(
 }
 
 export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode {
-  const { nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, canvasId, queryClient, currentUser, edges } =
-    args;
+  const {
+    nodes,
+    node,
+    components,
+    nodeExecutionsMap,
+    nodeQueueItemsMap,
+    canvasId,
+    queryClient,
+    currentUser,
+    edges,
+    organizationId,
+    openModal,
+  } = args;
   const isPlaceholder = !node.component && node.name === "New Component";
 
   if (isPlaceholder) {
@@ -223,11 +237,24 @@ export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode
     currentUser,
     edges,
     canvasMode: args.canvasMode,
+    organizationId,
+    openModal,
   });
 }
 
 export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): CanvasNode {
-  const { nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, canvasId, queryClient, currentUser } = args;
+  const {
+    nodes,
+    node,
+    components,
+    nodeExecutionsMap,
+    nodeQueueItemsMap,
+    canvasId,
+    queryClient,
+    currentUser,
+    organizationId,
+    openModal,
+  } = args;
   const executions = nodeExecutionsMap[node.id!] || [];
   const metadata = components.find((c) => c.name === node.component);
   const displayLabel = node.name || metadata?.label || node.component || "Component";
@@ -246,8 +273,10 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
       lastExecutions: executions.map((e) => buildExecutionInfo(e)),
       nodeQueueItems: nodeQueueItems?.map((q) => buildQueueItemInfo(q)),
       currentUser: buildUserInfo(currentUser),
-      actions: buildActionContext(queryClient, canvasId, node.id!),
+      actions: buildActionContext(queryClient, canvasId, node.id!, openModal),
       canvasMode: args.canvasMode,
+      canvasId,
+      organizationId,
     });
 
     if (!componentBaseProps.iconSrc) {
@@ -258,7 +287,6 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
     }
 
     const emptyStateProps = resolveComponentEmptyStateProps(componentBaseProps, node);
-    const latestRunnerExecutionId = node.component === "runner" && executions[0]?.id ? executions[0].id : undefined;
 
     return {
       id: node.id!,
@@ -274,7 +302,6 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
           error: node.errorMessage,
           warning: node.warningMessage,
           paused: !!node.paused,
-          ...(latestRunnerExecutionId ? { runnerLiveLogsExecutionId: latestRunnerExecutionId } : {}),
         },
       },
     };
@@ -284,7 +311,12 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
   }
 }
 
-function buildActionContext(queryClient: QueryClient, canvasId: string, nodeId: string): ActionContext {
+function buildActionContext(
+  queryClient: QueryClient,
+  canvasId: string,
+  nodeId: string,
+  openModal?: (modal: TriggerActionModal) => void,
+): ActionContext {
   return {
     invokeNodeExecutionHook: async (executionId: string, hookName: string, parameters: unknown) => {
       try {
@@ -307,6 +339,7 @@ function buildActionContext(queryClient: QueryClient, canvasId: string, nodeId: 
         showErrorToast(getApiErrorMessage(error, "failed to invoke hook"));
       }
     },
+    ...(openModal ? { openModal } : {}),
   };
 }
 

@@ -1,8 +1,10 @@
+import { Button } from "@/components/ui/button";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { getColorClass } from "@/lib/colors";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import type React from "react";
+import { RunnerLiveLogStreamPanel } from "@/ui/CanvasPage/RunnerLiveLogStreamPanel";
+import React from "react";
 import { getTriggerRenderer } from ".";
 
 import type {
@@ -88,6 +90,50 @@ export const runnerMapper: ComponentBaseMapper = {
     const iconSlug = context.componentDefinition.icon || "terminal";
     const iconColor = getColorClass(context.componentDefinition?.color || "blue");
 
+    const canOpenLiveLogs =
+      context.canvasMode === "live" &&
+      !!lastExecution &&
+      !!context.canvasId &&
+      !!context.organizationId &&
+      !!context.actions.openModal;
+
+    const customField =
+      canOpenLiveLogs && lastExecution
+        ? () =>
+            React.createElement(
+              "div",
+              {
+                className: "flex justify-end border-b border-slate-950/20 px-2 py-1",
+                "data-testid": "runner-live-logs",
+              },
+              React.createElement(
+                Button,
+                {
+                  type: "button",
+                  size: "sm",
+                  className: "nodrag h-7 bg-black px-2 py-1 text-xs text-white hover:bg-black/80",
+                  onClick: (e: React.MouseEvent) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const canvasId = context.canvasId!;
+                    const organizationId = context.organizationId!;
+                    context.actions.openModal!({
+                      title: "Logs",
+                      dialogSize: "large",
+                      content: () =>
+                        React.createElement(RunnerLiveLogStreamPanel, {
+                          organizationId,
+                          canvasId,
+                          executionId: lastExecution.id,
+                        }),
+                    });
+                  },
+                },
+                "Logs",
+              ),
+            )
+        : undefined;
+
     return {
       title,
       iconSlug,
@@ -99,6 +145,8 @@ export const runnerMapper: ComponentBaseMapper = {
       metadata: [],
       specs: [],
       eventStateMap: RUNNER_STATE_MAP,
+      customField,
+      customFieldPosition: "before",
     };
   },
   subtitle(context: SubtitleContext): string | React.ReactNode {
