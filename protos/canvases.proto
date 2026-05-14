@@ -421,6 +421,29 @@ service Canvases {
     };
   }
 
+  rpc GetCanvasDashboard(GetCanvasDashboardRequest) returns (GetCanvasDashboardResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/dashboard"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get canvas dashboard";
+      description: "Returns the dashboard for a canvas (panels and grid layout)";
+      tags: "Canvas";
+    };
+  }
+
+  rpc UpdateCanvasDashboard(UpdateCanvasDashboardRequest) returns (UpdateCanvasDashboardResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvases/{canvas_id}/dashboard"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update canvas dashboard";
+      description: "Replaces the dashboard for a canvas";
+      tags: "Canvas";
+    };
+  }
+
 }
 
 message ListCanvasesRequest {
@@ -1143,4 +1166,45 @@ message NotificationEmailRequested {
   repeated string groups = 7;
   repeated string roles = 8;
   google.protobuf.Timestamp timestamp = 9;
+}
+
+message DashboardPanel {
+  string id = 1;
+  string type = 2;
+  google.protobuf.Value content = 3;
+}
+
+message DashboardLayoutItem {
+  string i = 1;
+  int32 x = 2;
+  int32 y = 3;
+  int32 w = 4;
+  int32 h = 5;
+  optional int32 min_w = 6;
+  optional int32 min_h = 7;
+}
+
+message CanvasDashboard {
+  string canvas_id = 1;
+  repeated DashboardPanel panels = 2;
+  repeated DashboardLayoutItem layout = 3;
+  google.protobuf.Timestamp updated_at = 4;
+}
+
+message GetCanvasDashboardRequest {
+  string canvas_id = 1;
+}
+
+message GetCanvasDashboardResponse {
+  CanvasDashboard dashboard = 1;
+}
+
+message UpdateCanvasDashboardRequest {
+  string canvas_id = 1;
+  repeated DashboardPanel panels = 2;
+  repeated DashboardLayoutItem layout = 3;
+}
+
+message UpdateCanvasDashboardResponse {
+  CanvasDashboard dashboard = 1;
 }

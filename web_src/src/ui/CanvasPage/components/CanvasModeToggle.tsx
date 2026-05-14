@@ -1,12 +1,13 @@
 import type React from "react";
 import { cn } from "@/lib/utils";
 
-type CanvasMode = "version-live" | "version-edit" | "runs";
+type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLive: () => void;
   onSelectRuns?: () => void;
+  onSelectDashboard?: () => void;
   runsNotificationCount?: number;
   editing?: boolean;
   hasDraft?: boolean;
@@ -16,11 +17,13 @@ export function CanvasModeToggle({
   mode,
   onSelectLive,
   onSelectRuns,
+  onSelectDashboard,
   runsNotificationCount,
   editing = false,
   hasDraft = false,
 }: CanvasModeToggleProps) {
   const showRuns = !!onSelectRuns;
+  const showDashboard = !!onSelectDashboard;
   const baseTrigger =
     "h-full border-none px-3 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50";
   const canvasActiveClassName =
@@ -31,6 +34,22 @@ export function CanvasModeToggle({
   return (
     <div className="inline-flex w-auto" aria-label="Canvas view" role="group">
       <div className="flex h-8 w-fit gap-0 overflow-hidden rounded-sm border border-slate-300 bg-white/80 p-0">
+        {showDashboard ? (
+          <>
+            <ModeButton
+              isActive={mode === "dashboard"}
+              data-testid="canvas-view-mode-dashboard"
+              aria-label="Dashboard"
+              onClick={() => {
+                if (mode !== "dashboard" && onSelectDashboard) void onSelectDashboard();
+              }}
+              className={cn(baseTrigger, showRuns ? "rounded-none" : "rounded-sm rounded-bl-none rounded-tl-none")}
+            >
+              Dashboard
+            </ModeButton>
+            <div className="h-full w-px bg-slate-300"></div>
+          </>
+        ) : null}
         <ModeButton
           isActive={mode === "version-live" || mode === "version-edit"}
           activeClassName={canvasActiveClassName}
