@@ -158,7 +158,7 @@ function parseButtons(raw: string): ButtonsSegment {
 
 function parseConfirm(raw: string): ConfirmSegment {
   try {
-    const parsed = YAML.parse(raw) as Record<string, string>;
+    const parsed = YAML.load(raw) as Record<string, string>;
     return {
       type: "confirm",
       message: parsed.message || raw.trim(),
@@ -172,7 +172,7 @@ function parseConfirm(raw: string): ConfirmSegment {
 
 function parseChart(raw: string): ChartSegment {
   try {
-    const config = YAML.parse(raw) as ChartConfig;
+    const config = YAML.load(raw) as ChartConfig;
     return { type: "chart", config };
   } catch {
     return { type: "chart", config: { type: "bar", title: "Parse Error" } };
