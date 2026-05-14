@@ -34,6 +34,22 @@ export function CanvasModeToggle({
   return (
     <div className="inline-flex w-auto" aria-label="Canvas view" role="group">
       <div className="flex h-8 w-fit gap-0 overflow-hidden rounded-sm border border-slate-300 bg-white/80 p-0">
+        {showDashboard ? (
+          <>
+            <ModeButton
+              isActive={mode === "dashboard"}
+              data-testid="canvas-view-mode-dashboard"
+              aria-label="Dashboard"
+              onClick={() => {
+                if (mode !== "dashboard" && onSelectDashboard) void onSelectDashboard();
+              }}
+              className={cn(baseTrigger, showRuns ? "rounded-none" : "rounded-sm rounded-bl-none rounded-tl-none")}
+            >
+              Dashboard
+            </ModeButton>
+            <div className="h-full w-px bg-slate-300"></div>
+          </>
+        ) : null}
         <ModeButton
           isActive={mode === "version-live" || mode === "version-edit"}
           activeClassName={canvasActiveClassName}
@@ -55,22 +71,6 @@ export function CanvasModeToggle({
             ) : null}
           </span>
         </ModeButton>
-        {showDashboard ? (
-          <>
-            <div className="h-full w-px bg-slate-300"></div>
-            <ModeButton
-              isActive={mode === "dashboard"}
-              data-testid="canvas-view-mode-dashboard"
-              aria-label="Dashboard"
-              onClick={() => {
-                if (mode !== "dashboard" && onSelectDashboard) void onSelectDashboard();
-              }}
-              className={cn(baseTrigger, showRuns ? "rounded-none" : "rounded-sm rounded-bl-none rounded-tl-none")}
-            >
-              Dashboard
-            </ModeButton>
-          </>
-        ) : null}
         {showRuns ? (
           <>
             <div className="h-full w-px bg-slate-300"></div>
