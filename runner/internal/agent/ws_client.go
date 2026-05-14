@@ -95,6 +95,19 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 	}
 
 	var writeMu sync.Mutex
+
+	// Reset read deadline on every server ping so idle runners stay connected
+	// beyond the initial wsClientReadIdle window (fleet-manager pings every 30s).
+	conn.SetPingHandler(func(appData string) error {
+		_ = conn.SetReadDeadline(time.Now().Add(wsClientReadIdle))
+		writeMu.Lock()
+		defer writeMu.Unlock()
+		_ = conn.SetWriteDeadline(time.Now().Add(wsClientWriteWait))
+		return conn.WriteMessage(websocket.PongMessage, []byte(appData))
+	})
+	// Set an initial read deadline so the connection is not open-ended before the first task.
+	_ = conn.SetReadDeadline(time.Now().Add(wsClientReadIdle))
+
 	hello := wsrunner.Hello{
 		Type:         wsrunner.TypeHello,
 		RunnerID:     a.Config.RunnerID,
