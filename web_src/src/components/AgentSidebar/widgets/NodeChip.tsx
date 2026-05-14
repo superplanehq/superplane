@@ -57,6 +57,8 @@ export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipPr
 
   const handleClick = useCallback(() => {
     navigate(`/${organizationId}/canvases/${canvasId}?sidebar=1&node=${nodeId}`);
+    // Dispatch a custom event for the canvas page to zoom to the node
+    window.dispatchEvent(new CustomEvent("agent:focus-node", { detail: { nodeId } }));
   }, [navigate, organizationId, canvasId, nodeId]);
 
   const chipClassName = cn(
