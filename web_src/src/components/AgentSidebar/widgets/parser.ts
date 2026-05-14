@@ -35,10 +35,10 @@ export type ChartConfig = {
 
 // --- Parser ---
 
-const BLOCK_RE = /^:::(\w+)(?:\s+(.*))?$/;
-const BLOCK_END_RE = /^:::$/;
-const MERMAID_FENCE_START = /^```mermaid\s*$/;
-const FENCE_END = /^```\s*$/;
+const BLOCK_RE = /^\s*:::(\w+)(?:\s+(.*))?$/;
+const BLOCK_END_RE = /^\s*:::$/;
+const MERMAID_FENCE_START = /^\s*```mermaid\s*$/;
+const FENCE_END = /^\s*```\s*$/;
 
 export function parseAgentContent(content: string): Segment[] {
   if (!content) return [];
