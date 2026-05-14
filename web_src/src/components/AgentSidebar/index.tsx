@@ -328,20 +328,20 @@ function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
 
   return (
     <div
-      className={cn("text-sm py-1 text-slate-500", hasRunning && "animate-tool-glow")}
+      className={cn("text-sm py-1", hasRunning && "animate-tool-glow")}
       data-testid="agent-tool-group"
     >
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
-        className="flex items-center gap-2 cursor-pointer hover:text-slate-700"
+        className="flex items-center gap-2 cursor-pointer text-slate-700 hover:text-slate-900"
       >
         <SquareTerminal className="size-4 shrink-0" />
         <span>{label}</span>
         <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} />
       </button>
       {expanded && (
-        <div className="ml-6 mt-1 space-y-0.5">
+        <div className="mt-2 space-y-1">
           {messages.map((m) => (
             <ToolMessageRow key={m.id} message={m} />
           ))}
@@ -356,19 +356,32 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
   const command = message.content;
   const canExpand = Boolean(command);
   const running = message.toolStatus === "started";
+  const preview = command ? command.split("\n")[0].substring(0, 80) : "command";
+
   return (
-    <div className={cn("flex items-center gap-1.5 text-xs", running ? "text-slate-600" : "text-slate-400")}>
-      <span className="shrink-0">{running ? "▶" : "✓"}</span>
+    <div className="text-xs">
       <button
         type="button"
         onClick={() => canExpand && setExpanded((prev) => !prev)}
         disabled={!canExpand}
-        className={cn("text-left truncate", canExpand && "cursor-pointer hover:text-slate-600")}
+        className={cn(
+          "flex items-center gap-1.5 text-left w-full",
+          running ? "text-slate-700" : "text-slate-600",
+          canExpand && "cursor-pointer hover:text-slate-900",
+        )}
       >
-        {running ? "Running..." : (command ? command.split("\n")[0].substring(0, 60) : "Ran command")}
+        <span className="shrink-0 text-[10px]">{running ? "▶" : "✓"}</span>
+        <span className="truncate">{running ? "Running..." : preview}</span>
       </button>
       {expanded && command ? (
-        <div className="font-mono text-[10px] text-slate-400 whitespace-pre-wrap break-words mt-0.5 ml-4">{command}</div>
+        <div className="mt-1 rounded-lg border border-slate-200 bg-white overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-1 bg-slate-50 border-b border-slate-200">
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">bash</span>
+          </div>
+          <pre className="p-3 text-xs font-mono text-slate-700 whitespace-pre-wrap break-words overflow-auto max-h-[200px]">
+            {command}
+          </pre>
+        </div>
       ) : null}
     </div>
   );
