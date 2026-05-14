@@ -555,6 +555,7 @@ export function WorkflowPageV2() {
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
   const [isDashboardMode, setIsDashboardMode] = useState(() => searchParams.get("view") === "dashboard");
+  const [isDashboardAddPanelOpen, setIsDashboardAddPanelOpen] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(() => searchParams.get("run"));
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
   const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
@@ -4936,7 +4937,11 @@ export function WorkflowPageV2() {
 
   useEffect(() => {
     setIsRunsMode(searchParams.get("view") === "runs");
+    setIsDashboardMode(searchParams.get("view") === "dashboard");
     setSelectedRunId(searchParams.get("run"));
+    if (searchParams.get("view") !== "dashboard") {
+      setIsDashboardAddPanelOpen(false);
+    }
   }, [searchParams]);
 
   const handleSelectRun = useCallback(
@@ -5014,6 +5019,7 @@ export function WorkflowPageV2() {
 
   const handleExitDashboardMode = useCallback(() => {
     setIsDashboardMode(false);
+    setIsDashboardAddPanelOpen(false);
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
@@ -5706,6 +5712,8 @@ export function WorkflowPageV2() {
             readOnly={!canUpdateCanvas}
             dashboardQuery={dashboardQuery}
             updateDashboardMutation={updateDashboardMutation}
+            addPanelDialogOpen={isDashboardAddPanelOpen}
+            onAddPanelDialogOpenChange={setIsDashboardAddPanelOpen}
           />
         ) : null}
         <CanvasPage
@@ -5794,13 +5802,16 @@ export function WorkflowPageV2() {
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           onDiscardDraftAndStartEdit={handleDiscardDraftAndStartEdit}
           unpublishedDraftUpdatedAt={latestDraftVersion?.metadata?.updatedAt || latestDraftVersion?.metadata?.createdAt}
-          headerMode={isDashboardMode ? "version-live" : canvasPageHeaderMode}
+          headerMode={isDashboardMode ? "dashboard" : canvasPageHeaderMode}
           onEnterEditMode={handleEnterEditModeFromHeader}
           enterEditModeDisabled={toggleEditModeDisabled}
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
           onExitEditMode={handleExitEditModeFromHeader}
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
           onSelectDashboard={isTemplate ? undefined : handleSelectDashboardMode}
+          onDashboardAddPanel={
+            isDashboardMode && !isTemplate && canUpdateCanvas ? () => setIsDashboardAddPanelOpen(true) : undefined
+          }
           runsNotificationCount={activeRunsCount}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
@@ -6298,10 +6309,14 @@ function DashboardOverlay({
   readOnly,
   dashboardQuery,
   updateDashboardMutation,
+  addPanelDialogOpen,
+  onAddPanelDialogOpenChange,
 }: {
   readOnly: boolean;
   dashboardQuery: ReturnType<typeof useCanvasDashboard>;
   updateDashboardMutation: ReturnType<typeof useUpdateCanvasDashboard>;
+  addPanelDialogOpen: boolean;
+  onAddPanelDialogOpenChange: (open: boolean) => void;
 }) {
   const panels: DashboardPanel[] = (dashboardQuery.data?.panels || []).map((p) => ({
     id: p.id || "",
@@ -6337,6 +6352,8 @@ function DashboardOverlay({
         errorMessage={dashboardQuery.error ? String(dashboardQuery.error) : undefined}
         readOnly={readOnly}
         onChange={handleChange}
+        addPanelDialogOpen={addPanelDialogOpen}
+        onAddPanelDialogOpenChange={onAddPanelDialogOpenChange}
       />
     </div>
   );

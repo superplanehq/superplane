@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus, Loader2, LayoutDashboard, Pencil, Trash2, FileText } from "lucide-react";
+import { Plus, Loader2, LayoutGrid, Pencil, Trash2, AtSign, BarChart3, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -24,12 +24,34 @@ export interface DashboardViewProps {
   errorMessage?: string;
   readOnly: boolean;
   onChange: (next: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => void;
+  /** When provided with `onAddPanelDialogOpenChange`, the add-panel dialog is controlled by the parent (e.g. header). */
+  addPanelDialogOpen?: boolean;
+  onAddPanelDialogOpenChange?: (open: boolean) => void;
 }
 
-export function DashboardView({ panels, layout, isLoading, errorMessage, readOnly, onChange }: DashboardViewProps) {
+export function DashboardView({
+  panels,
+  layout,
+  isLoading,
+  errorMessage,
+  readOnly,
+  onChange,
+  addPanelDialogOpen: addPanelDialogOpenProp,
+  onAddPanelDialogOpenChange,
+}: DashboardViewProps) {
   const [localPanels, setLocalPanels] = useState<DashboardPanel[]>(panels);
   const [localLayout, setLocalLayout] = useState<DashboardLayoutItem[]>(layout);
   const lastPropsHashRef = useRef<string>("");
+  const [internalAddPanelOpen, setInternalAddPanelOpen] = useState(false);
+  const isAddPanelControlled = onAddPanelDialogOpenChange != null;
+  const addPanelOpen = isAddPanelControlled ? Boolean(addPanelDialogOpenProp) : internalAddPanelOpen;
+  const setAddPanelOpen = useCallback(
+    (next: boolean) => {
+      if (isAddPanelControlled) onAddPanelDialogOpenChange!(next);
+      else setInternalAddPanelOpen(next);
+    },
+    [isAddPanelControlled, onAddPanelDialogOpenChange],
+  );
 
   useEffect(() => {
     const next = JSON.stringify({ panels, layout });
@@ -63,8 +85,6 @@ export function DashboardView({ panels, layout, isLoading, errorMessage, readOnl
       if (pending) onChange(pending);
     };
   }, [onChange]);
-
-  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const handleAddPanel = useCallback(
     (name: string) => {
@@ -128,14 +148,14 @@ export function DashboardView({ panels, layout, isLoading, errorMessage, readOnl
   if (localPanels.length === 0) {
     return (
       <>
-        <EmptyState readOnly={readOnly} onAdd={() => setAddDialogOpen(true)} />
+        <EmptyState readOnly={readOnly} onAdd={() => setAddPanelOpen(true)} />
         <AddPanelDialog
-          open={addDialogOpen}
+          open={addPanelOpen}
           onConfirm={(name: string) => {
             handleAddPanel(name);
-            setAddDialogOpen(false);
+            setAddPanelOpen(false);
           }}
-          onCancel={() => setAddDialogOpen(false)}
+          onCancel={() => setAddPanelOpen(false)}
         />
       </>
     );
@@ -143,14 +163,6 @@ export function DashboardView({ panels, layout, isLoading, errorMessage, readOnl
 
   return (
     <div className="flex h-full w-full flex-col overflow-auto">
-      {!readOnly ? (
-        <div className="flex items-center justify-end px-4 pt-3 pb-1">
-          <Button size="sm" variant="default" onClick={() => setAddDialogOpen(true)} data-testid="dashboard-add-panel">
-            <Plus className="mr-1 h-3.5 w-3.5" />
-            Add panel
-          </Button>
-        </div>
-      ) : null}
       <div className="flex flex-col gap-3 px-4 py-3">
         {localPanels.map((panel) => (
           <MarkdownPanelCard
@@ -163,12 +175,12 @@ export function DashboardView({ panels, layout, isLoading, errorMessage, readOnl
         ))}
       </div>
       <AddPanelDialog
-        open={addDialogOpen}
+        open={addPanelOpen}
         onConfirm={(name: string) => {
           handleAddPanel(name);
-          setAddDialogOpen(false);
+          setAddPanelOpen(false);
         }}
-        onCancel={() => setAddDialogOpen(false)}
+        onCancel={() => setAddPanelOpen(false)}
       />
     </div>
   );
@@ -319,19 +331,43 @@ function MarkdownPanelCard({
 
 function EmptyState({ readOnly, onAdd }: { readOnly: boolean; onAdd: () => void }) {
   return (
-    <div className="flex flex-1 items-center justify-center p-8" data-testid="dashboard-empty-state">
-      <div className="flex w-full max-w-lg flex-col items-center gap-5 rounded-xl border border-dashed border-slate-300 bg-white/70 px-8 py-10 text-center shadow-sm">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
-          <LayoutDashboard className="h-7 w-7 text-slate-500" />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <h3 className="text-lg font-semibold text-slate-800">Build your dashboard</h3>
-          <p className="mx-auto max-w-md text-sm leading-relaxed text-slate-500">
-            Add markdown panels to surface important docs, links, and notes for this canvas.
+    <div className="flex flex-1 items-center justify-center p-6 sm:p-8" data-testid="dashboard-empty-state">
+      <div className="flex w-full max-w-4xl flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 shadow-sm sm:px-10">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+            <LayoutGrid className="h-7 w-7 text-slate-600" />
+          </div>
+          <h3 className="mt-5 text-xl font-semibold tracking-tight text-slate-900">Build your dashboard</h3>
+          <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
+            Dashboard panels surface the most important docs, links, and live data for this canvas. Drag panels into
+            place and resize from the bottom-right corner to lay them out the way your team works.
           </p>
         </div>
+
+        <div className="mt-8 grid w-full gap-4 sm:grid-cols-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-left shadow-sm">
+            <AtSign className="h-5 w-5 text-sky-600" aria-hidden />
+            <h4 className="mt-3 text-sm font-semibold text-slate-900">Reference nodes</h4>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">Drop in @my-node chips that show live status.</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-left shadow-sm">
+            <BarChart3 className="h-5 w-5 text-sky-600" aria-hidden />
+            <h4 className="mt-3 text-sm font-semibold text-slate-900">Show live data</h4>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              Embed canvas memory or executions with widget blocks.
+            </p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-left shadow-sm">
+            <Play className="h-5 w-5 text-sky-600" aria-hidden />
+            <h4 className="mt-3 text-sm font-semibold text-slate-900">Trigger runs</h4>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              Add Run buttons for manual triggers right in markdown.
+            </p>
+          </div>
+        </div>
+
         {!readOnly ? (
-          <Button variant="default" onClick={onAdd} data-testid="dashboard-add-first-panel">
+          <Button variant="default" className="mt-10" onClick={onAdd} data-testid="dashboard-add-first-panel">
             <Plus className="mr-1.5 h-4 w-4" />
             Add panel
           </Button>
@@ -404,14 +440,13 @@ function AddPanelDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add panel</DialogTitle>
-          <DialogDescription>Give your panel a name. This will be used as its identifier.</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-2">
           <div className="space-y-1.5">
             <Label htmlFor="panel-name">Name</Label>
             <Input
               id="panel-name"
-              placeholder="e.g. Pipeline Status"
+              placeholder="Panel name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -424,11 +459,6 @@ function AddPanelDialog({
               data-testid="add-panel-name-input"
             />
           </div>
-          {name.trim() ? (
-            <p className="text-xs text-slate-500">
-              ID: <code className="rounded bg-slate-100 px-1 py-0.5">{slug || "—"}</code>
-            </p>
-          ) : null}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onCancel}>
@@ -444,7 +474,6 @@ function AddPanelDialog({
             disabled={!isValid}
             data-testid="add-panel-confirm"
           >
-            <FileText className="mr-1.5 h-3.5 w-3.5" />
             Add
           </Button>
         </DialogFooter>

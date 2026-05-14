@@ -3,7 +3,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { GitBranch, MoreVertical, Pencil, Settings } from "lucide-react";
+import { GitBranch, MoreVertical, Pencil, Plus, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
 import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
@@ -37,6 +37,8 @@ interface HeaderProps {
   onSelectRuns?: () => void;
   onSelectDashboard?: () => void;
   runsNotificationCount?: number;
+  /** When set with `mode === "dashboard"`, shows Add panel in the secondary header. */
+  onDashboardAddPanel?: () => void;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
   publishVersionLabel?: string;
   /** When true, shows the Discard control next to Publish in version edit mode (draft differs from live). */
@@ -179,11 +181,13 @@ function SecondaryHeaderActions({
   exitEditModeDisabledTooltip,
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
+  onDashboardAddPanel,
 }: HeaderProps) {
   const showVersionControlTrigger = mode === "version-live" && !!onOpenVersionControl;
   const showEditButton = mode === "version-live" && !!onEnterEditMode;
   const showDraftDropdown =
     showEditButton && !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
+  const showDashboardAddPanel = mode === "dashboard" && !!onDashboardAddPanel;
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
@@ -235,6 +239,19 @@ function SecondaryHeaderActions({
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
         />
+      ) : null}
+
+      {showDashboardAddPanel ? (
+        <UIButton
+          type="button"
+          size="sm"
+          variant="default"
+          onClick={() => onDashboardAddPanel()}
+          data-testid="dashboard-add-panel"
+        >
+          <Plus className="mr-1 h-3.5 w-3.5" />
+          Add panel
+        </UIButton>
       ) : null}
     </div>
   );
