@@ -111,7 +111,7 @@ export function CodeBlockWidget({ code, language }: CodeBlockWidgetProps) {
       </div>
 
       <Dialog open={expanded} onOpenChange={setExpanded}>
-        <DialogContent size="large" className="w-[90vw] h-[85vh] flex flex-col">
+        <DialogContent size="large" className="w-[90vw] max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span className="text-sm font-medium">{language || "Code"}</span>
@@ -127,7 +127,7 @@ export function CodeBlockWidget({ code, language }: CodeBlockWidgetProps) {
           </DialogHeader>
           <div className="flex-1 min-h-0 rounded-lg border border-slate-200 overflow-hidden">
             <Editor
-              height="60vh"
+              height={`${Math.min(Math.max(code.split("\n").length * 19 + 20, 200), window.innerHeight * 0.7)}px`}
               width="100%"
               defaultLanguage={monacoLang}
               value={code}
