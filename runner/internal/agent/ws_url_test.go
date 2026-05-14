@@ -28,3 +28,22 @@ func TestFleetStreamURL(t *testing.T) {
 		t.Fatal("want error for non-http(s) base")
 	}
 }
+
+func TestTransportWebSocket(t *testing.T) {
+	for _, tt := range []struct {
+		transport string
+		wantWS    bool
+	}{
+		{"", true},
+		{"websocket", true},
+		{"WebSocket", true},
+		{"HTTP", false},
+		{"polling", false},
+		{"LEGACY", false},
+	} {
+		got := transportWebSocket(Config{Transport: tt.transport})
+		if got != tt.wantWS {
+			t.Errorf("transportWebSocket(%q) = %v, want %v", tt.transport, got, tt.wantWS)
+		}
+	}
+}

@@ -95,8 +95,10 @@ func envTruthy(key string) bool {
 }
 
 func transportLabel(cfg agent.Config) string {
-	if strings.EqualFold(strings.TrimSpace(cfg.Transport), "websocket") {
+	switch strings.ToLower(strings.TrimSpace(cfg.Transport)) {
+	case "http", "polling", "legacy":
+		return "http"
+	default:
 		return "websocket"
 	}
-	return "http"
 }

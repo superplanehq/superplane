@@ -27,12 +27,26 @@ func subprocessEnv(extra ...string) []string {
 // runnerSubprocessEnv is like subprocessEnv but adjusts the worker for CI builders where
 // pty.Start() succeeds yet reads on /dev/ptmx fail later (EIO), so tasks never finish and
 // webhooks time out. The pipe bundle path avoids a PTY while still exercising bash directives.
+//
+// E2e always uses RUNNER_TRANSPORT=http (POST claim/complete): these tests focus on task +
+// webhook behavior; WebSocket is covered in fleet-manager and runner unit tests. We also
+// strip any inherited RUNNER_TRANSPORT because on Linux the first duplicate env key wins,
+// so a developer shell exporting RUNNER_TRANSPORT=websocket would otherwise override a
+// trailing assignment.
 func runnerSubprocessEnv(extra ...string) []string {
 	env := subprocessEnv(extra...)
-	if os.Getenv("CI") != "" {
-		env = append(env, "RUNNER_SHELL_USE_PIPE=1")
+	var out []string
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "RUNNER_TRANSPORT=") {
+			continue
+		}
+		out = append(out, kv)
 	}
-	return env
+	out = append(out, "RUNNER_TRANSPORT=http")
+	if os.Getenv("CI") != "" {
+		out = append(out, "RUNNER_SHELL_USE_PIPE=1")
+	}
+	return out
 }
 
 // skipIfPTYUnavailable skips the test when Bash+PTY cannot run (e.g. hardened
