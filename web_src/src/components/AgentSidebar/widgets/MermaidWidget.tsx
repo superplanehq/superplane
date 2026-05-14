@@ -118,7 +118,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
 
 function MermaidPanZoom({ svg }: { svg: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(2);
+  const [scale, setScale] = useState(2.5);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
 
@@ -154,7 +154,7 @@ function MermaidPanZoom({ svg }: { svg: string }) {
   }, []);
 
   const resetView = useCallback(() => {
-    setScale(1);
+    setScale(2.5);
     setTranslate({ x: 0, y: 0 });
   }, []);
 
