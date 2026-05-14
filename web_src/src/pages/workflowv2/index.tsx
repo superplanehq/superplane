@@ -6326,7 +6326,10 @@ function DashboardOverlay({
   );
 
   return (
-    <div className="absolute inset-0 z-10 bg-slate-100 overflow-auto" data-testid="dashboard-overlay">
+    <div
+      className="absolute inset-x-0 bottom-0 z-10 overflow-auto bg-slate-100 top-[calc(2.75rem+3rem)]"
+      data-testid="dashboard-overlay"
+    >
       <DashboardView
         panels={panels}
         layout={layout}
