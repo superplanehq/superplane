@@ -167,6 +167,10 @@ export interface CanvasPageProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectRuns?: () => void;
+  onSelectLaunchpad?: () => void;
+  onSelectRepo?: () => void;
+  launchpadOverlay?: React.ReactNode;
+  repoOverlay?: React.ReactNode;
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
@@ -1118,6 +1122,8 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           onSelectRuns={props.onSelectRuns}
+          onSelectLaunchpad={props.onSelectLaunchpad}
+          onSelectRepo={props.onSelectRepo}
           runsNotificationCount={props.runsNotificationCount}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
@@ -1150,10 +1156,16 @@ function CanvasPage(props: CanvasPageProps) {
         )}
 
         {props.headerMode === "runs" ? props.runsSidebar : null}
+        {props.headerMode === "launchpad" && props.launchpadOverlay ? (
+          <div className="launchpad-canvas absolute inset-0 z-[15] overflow-hidden">{props.launchpadOverlay}</div>
+        ) : null}
+        {props.headerMode === "repo" && props.repoOverlay ? (
+          <div className="absolute inset-0 z-[15] overflow-hidden bg-white">{props.repoOverlay}</div>
+        ) : null}
 
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
-            isOpen={isBuildingBlocksSidebarOpen && props.headerMode !== "version-live" && props.headerMode !== "runs"}
+            isOpen={isBuildingBlocksSidebarOpen && props.headerMode !== "version-live" && props.headerMode !== "runs" && props.headerMode !== "launchpad" && props.headerMode !== "repo"}
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             integrations={props.integrations}
@@ -1631,6 +1643,8 @@ function CanvasContentHeader({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   onSelectRuns,
+  onSelectLaunchpad,
+  onSelectRepo,
   runsNotificationCount,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
@@ -1665,6 +1679,10 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectRuns?: () => void;
+  onSelectLaunchpad?: () => void;
+  onSelectRepo?: () => void;
+  launchpadOverlay?: React.ReactNode;
+  repoOverlay?: React.ReactNode;
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
@@ -1709,6 +1727,8 @@ function CanvasContentHeader({
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       onSelectRuns={onSelectRuns}
+      onSelectLaunchpad={onSelectLaunchpad}
+      onSelectRepo={onSelectRepo}
       runsNotificationCount={runsNotificationCount}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
@@ -3021,4 +3041,14 @@ function CanvasContent({
 
 export type { AgentContext, AgentMode, BuildingBlock } from "../BuildingBlocksSidebar";
 export type { MissingIntegration } from "../IntegrationStatusIndicator";
-export { CanvasPage };
+import { HeaderActionSlotProvider } from "./HeaderActionSlotContext";
+
+function CanvasPageWithSlotProvider(props: CanvasPageProps) {
+  return (
+    <HeaderActionSlotProvider>
+      <CanvasPage {...props} />
+    </HeaderActionSlotProvider>
+  );
+}
+
+export { CanvasPageWithSlotProvider as CanvasPage };

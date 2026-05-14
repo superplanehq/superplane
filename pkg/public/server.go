@@ -34,6 +34,8 @@ import (
 	nooptrace "go.opentelemetry.io/otel/trace/noop"
 
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/gitserver"
+	canvases "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
@@ -1362,4 +1364,89 @@ func makeOriginChecker(allowed []string) func(*http.Request) bool {
 		_, ok := set[strings.ToLower(u.Scheme+"://"+u.Host)]
 		return ok
 	}
+}
+
+// RegisterGitServer sets up the internal git HTTP server for repo-backed projects.
+func (s *Server) RegisterGitServer(reposDir string) error {
+	gitServer, err := gitserver.NewServer(reposDir)
+	if err != nil {
+		return err
+	}
+
+	// Auth: validate the Basic auth password as an API token
+	var lastValidToken string
+	gitServer.AuthFunc = func(token string) error {
+		hashedToken := crypto.HashToken(token)
+		_, err := models.FindActiveUserByTokenHash(hashedToken)
+		if err == nil {
+			lastValidToken = token
+		}
+		return err
+	}
+
+	// Registry maps slugs to canvas IDs
+	registry := gitserver.NewRegistry(reposDir)
+	gitServer.Registry = registry
+
+	// Use API sync handler that calls REST endpoints
+	baseURL := "http://localhost:" + os.Getenv("PUBLIC_API_PORT")
+	if baseURL == "http://localhost:" {
+		baseURL = "http://localhost:8000"
+	}
+
+	gitSyncToken := os.Getenv("GIT_SYNC_TOKEN")
+	syncHandler := gitserver.APISyncHandler(baseURL, func() string {
+		if lastValidToken != "" {
+			return lastValidToken
+		}
+		return gitSyncToken
+	}, registry.Resolve)
+
+	gitServer.OnPush = syncHandler.HandlePush
+
+	// Build the canvas serializer function (breaks import cycle)
+	canvasSerializer := func(canvasID string) ([]byte, error) {
+		canvasUUID, err := uuid.Parse(canvasID)
+		if err != nil {
+			return nil, err
+		}
+		canvas, err := models.FindCanvasWithoutOrgScope(canvasUUID)
+		if err != nil {
+			return nil, err
+		}
+		protoCanvas, err := canvases.SerializeCanvas(canvas, false, nil)
+		if err != nil {
+			return nil, err
+		}
+		marshaler := protojson.MarshalOptions{EmitUnpopulated: true}
+		return marshaler.Marshal(protoCanvas)
+	}
+
+	// Register reverse sync (UI edits → git commit) — reads DB directly, no token needed
+	reverseSync := gitserver.NewReverseSync(gitServer, registry)
+	reverseSync.SetCanvasSerializer(canvasSerializer)
+	gitserver.RegisterPostPublishHook(reverseSync.OnCanvasPublished)
+
+	// Auto-init git repo on canvas creation
+	gitserver.RegisterPostCreateHook(func(canvasID, orgID, canvasName string) {
+		slug := gitserver.ToSlug(canvasName)
+		go func() {
+			if err := gitServer.BootstrapFromDB(slug, canvasID, orgID); err != nil {
+				log.Errorf("gitserver: auto-init failed for %s: %v", slug, err)
+				return
+			}
+			registry.Register(slug, &gitserver.SlugToCanvasMapping{
+				CanvasID: canvasID,
+				OrgID:    orgID,
+			})
+			log.Infof("gitserver: auto-initialized repo for canvas %s (slug: %s)", canvasID, slug)
+		}()
+	})
+
+	// Register routes on the main router
+	gitServer.RegisterRoutes(s.Router)
+	gitServer.RegisterRepoAPIRoutes(s.Router)
+	gitServer.RegisterBootstrapRoute(s.Router, s.BaseURL, registry)
+	log.Infof("Git server enabled, repos at %s", reposDir)
+	return nil
 }
