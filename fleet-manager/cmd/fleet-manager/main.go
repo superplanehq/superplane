@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -39,10 +40,13 @@ func main() {
 	ws.Log = log
 	hub := fleetmanager.NewWaitHub()
 	srv := &fleetmanager.Server{
-		Store:      st,
-		Webhook:    ws,
-		Log:        log,
-		TaskNotify: hub,
+		Store:                         st,
+		Webhook:                       ws,
+		Log:                           log,
+		TaskNotify:                    hub,
+		TaskCloudWatchLogGroup:        strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_GROUP")),
+		TaskCloudWatchLogStreamPrefix: strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_STREAM_PREFIX")),
+		TaskCloudWatchRegion:          strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_REGION")),
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)

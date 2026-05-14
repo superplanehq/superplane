@@ -14,6 +14,7 @@ import (
 	"github.com/superplane/runner/fleet-manager/internal/ec2provision"
 	"github.com/superplane/runner/fleet-manager/internal/store"
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/cwstream"
 	"github.com/superplane/runner/shared/models"
 	"github.com/superplane/runner/shared/webhook"
 )
@@ -27,6 +28,13 @@ type Server struct {
 	// TaskNotify wakes WebSocket runners when a new task is enqueued; nil disables notifications.
 	TaskNotify *WaitHub
 
+	// TaskCloudWatchLogGroup when set is returned on GET /v1/tasks/{id} and completion webhooks so
+	// clients can open the matching stream in AWS. Runners must set RUNNER_CLOUDWATCH_LOG_GROUP (and matching prefix).
+	TaskCloudWatchLogGroup        string
+	TaskCloudWatchLogStreamPrefix string
+	// TaskCloudWatchRegion is optional; included in task_log.cloudwatch.region for API clients.
+	TaskCloudWatchRegion string
+
 	// EC2Launcher when EC2 hot pool is enabled; used for optional /v1/admin diagnostics.
 	EC2Launcher *ec2provision.Launcher
 
@@ -39,6 +47,14 @@ type Server struct {
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok\n"))
+}
+
+func (s *Server) taskLogForTask(taskID string) *api.TaskLogSink {
+	if g := strings.TrimSpace(s.TaskCloudWatchLogGroup); g != "" {
+		stream := cwstream.TaskLogStream(s.TaskCloudWatchLogStreamPrefix, taskID)
+		return api.TaskLogSinkCloudWatchFromParts(g, stream, s.TaskCloudWatchRegion)
+	}
+	return nil
 }
 
 func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
@@ -67,6 +83,10 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(req.WebhookURL) == "" {
 		writeError(w, http.StatusBadRequest, "webhook_url required")
+		return
+	}
+	if msg := api.ValidateExecutionTimeoutSeconds(req.ExecutionTimeoutSeconds); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
 		return
 	}
 
@@ -99,6 +119,10 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	} else {
 		task.Command = req.Command
 		task.Commands = nil
+	}
+	if req.ExecutionTimeoutSeconds != nil {
+		v := *req.ExecutionTimeoutSeconds
+		task.ExecutionTimeoutSeconds = &v
 	}
 	if err := s.Store.CreateTask(r.Context(), task); err != nil {
 		s.Log.Error("create task", slog.Any("err", err))
@@ -162,9 +186,18 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 		Output: task.Output,
 		Error:  task.ErrorMessage,
 	}
+	if g := strings.TrimSpace(s.TaskCloudWatchLogGroup); g != "" {
+		resp.CloudWatchLogGroup = g
+		resp.CloudWatchLogStream = cwstream.TaskLogStream(s.TaskCloudWatchLogStreamPrefix, task.ID)
+	}
+	resp.TaskLog = s.taskLogForTask(task.ID)
 	if task.ExitCode != nil {
 		ec := *task.ExitCode
 		resp.ExitCode = &ec
+	}
+	if task.ExecutionTimeoutSeconds != nil {
+		v := *task.ExecutionTimeoutSeconds
+		resp.ExecutionTimeoutSeconds = &v
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -249,6 +282,11 @@ func (s *Server) deliverWebhook(task *models.Task) {
 		Output:   task.Output,
 		Error:    task.ErrorMessage,
 	}
+	if g := strings.TrimSpace(s.TaskCloudWatchLogGroup); g != "" {
+		payload.CloudWatchLogGroup = g
+		payload.CloudWatchLogStream = cwstream.TaskLogStream(s.TaskCloudWatchLogStreamPrefix, task.ID)
+	}
+	payload.TaskLog = s.taskLogForTask(task.ID)
 	if err := s.Webhook.Deliver(ctx, task.WebhookURL, payload); err != nil {
 		if s.Log != nil {
 			s.Log.Warn("webhook delivery failed", slog.String("task_id", task.ID), slog.Any("err", err))

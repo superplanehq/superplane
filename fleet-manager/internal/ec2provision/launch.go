@@ -47,6 +47,10 @@ type Config struct {
 	HotInstanceCount       int    // target pending+running managed instances (from EC2_PROVISION_HOT_INSTANCE_COUNT)
 	// RunnerTerminateAfterEachTask sets RUNNER_TERMINATE_AFTER_EACH_TASK; fleet-manager terminates the EC2 instance after one task.
 	RunnerTerminateAfterEachTask bool
+	// RunnerCloudWatchLogGroup sets RUNNER_CLOUDWATCH_LOG_GROUP in EC2 user-data (optional).
+	RunnerCloudWatchLogGroup string
+	// RunnerCloudWatchLogStreamPrefix sets RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX (optional; must match TASK_CLOUDWATCH_LOG_STREAM_PREFIX on fleet-manager).
+	RunnerCloudWatchLogStreamPrefix string
 }
 
 // ErrDisabled means EC2 pool management is off (hot instance count env not set).
@@ -65,6 +69,8 @@ const (
 	envRunnerIAMProf       = "EC2_PROVISION_RUNNER_INSTANCE_PROFILE"
 	envRunnerTerminateTask = "EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK"
 	envHotCount            = "EC2_PROVISION_HOT_INSTANCE_COUNT"
+	envRunnerCWGroup       = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_GROUP"
+	envRunnerCWPrefix      = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX"
 
 	defaultInstanceType = "t3.micro"
 
@@ -139,19 +145,21 @@ func ConfigFromEnv() (Config, error) {
 		terminateAfterTask = false
 	}
 	return Config{
-		AMI:                          ami,
-		InstanceType:                 itype,
-		SubnetID:                     sub,
-		SecurityGroupIDs:             sgIDs,
-		RunnerS3URI:                  runnerS3,
-		RunnerBinaryURL:              runnerBinURL,
-		RunnerInstallAWSRegion:       region,
-		FleetManagerURL:              url,
-		RunnersAuthToken:             strings.TrimSpace(os.Getenv(envRunnersAuth)),
-		KeyName:                      strings.TrimSpace(os.Getenv(envKeyName)),
-		RunnersIAMProfName:           strings.TrimSpace(os.Getenv(envRunnerIAMProf)),
-		HotInstanceCount:             hot,
-		RunnerTerminateAfterEachTask: terminateAfterTask,
+		AMI:                             ami,
+		InstanceType:                    itype,
+		SubnetID:                        sub,
+		SecurityGroupIDs:                sgIDs,
+		RunnerS3URI:                     runnerS3,
+		RunnerBinaryURL:                 runnerBinURL,
+		RunnerInstallAWSRegion:          region,
+		FleetManagerURL:                 url,
+		RunnersAuthToken:                strings.TrimSpace(os.Getenv(envRunnersAuth)),
+		KeyName:                         strings.TrimSpace(os.Getenv(envKeyName)),
+		RunnersIAMProfName:              strings.TrimSpace(os.Getenv(envRunnerIAMProf)),
+		HotInstanceCount:                hot,
+		RunnerTerminateAfterEachTask:    terminateAfterTask,
+		RunnerCloudWatchLogGroup:        strings.TrimSpace(os.Getenv(envRunnerCWGroup)),
+		RunnerCloudWatchLogStreamPrefix: strings.TrimSpace(os.Getenv(envRunnerCWPrefix)),
 	}, nil
 }
 
@@ -276,6 +284,18 @@ func userDataScript(c Config) string {
 	b.WriteString("  if [ -n \"$RUNTOK\" ]; then printf 'AUTH_TOKEN=%s\\n' \"$RUNTOK\"; fi\n")
 	if c.RunnerTerminateAfterEachTask {
 		b.WriteString("  printf 'RUNNER_TERMINATE_AFTER_EACH_TASK=true\\n'\n")
+	}
+	if strings.TrimSpace(c.RunnerCloudWatchLogGroup) != "" {
+		fmt.Fprintf(&b, "CWGRP=%s\n", strconv.Quote(strings.TrimSpace(c.RunnerCloudWatchLogGroup)))
+		b.WriteString("  printf 'RUNNER_CLOUDWATCH_LOG_GROUP=%s\\n' \"$CWGRP\"\n")
+		if strings.TrimSpace(c.RunnerInstallAWSRegion) != "" {
+			fmt.Fprintf(&b, "CWREG=%s\n", strconv.Quote(strings.TrimSpace(c.RunnerInstallAWSRegion)))
+			b.WriteString("  printf 'RUNNER_CLOUDWATCH_REGION=%s\\n' \"$CWREG\"\n")
+		}
+	}
+	if strings.TrimSpace(c.RunnerCloudWatchLogStreamPrefix) != "" {
+		fmt.Fprintf(&b, "CWPREFIX=%s\n", strconv.Quote(strings.TrimSpace(c.RunnerCloudWatchLogStreamPrefix)))
+		b.WriteString("  printf 'RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX=%s\\n' \"$CWPREFIX\"\n")
 	}
 	b.WriteString("} > /etc/default/superplane-runner\n")
 	b.WriteString("chmod 644 /etc/default/superplane-runner\n")

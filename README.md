@@ -90,8 +90,11 @@ export AUTH_TOKEN=your-secret                  # mandatory
 | `DATABASE_PATH`      | `./fleet.db` | SQLite database file                                         |
 | `AUTH_TOKEN`         | (empty)      | If set, requires `Authorization: Bearer <token>` for `/v1/*` |
 | `REAP_INTERVAL_SEC`  | `15`         | How often to return expired leases to the queue              |
+| `TASK_CLOUDWATCH_LOG_GROUP` | (empty) | When set, `GET /v1/tasks/{id}` and completion webhooks include `cloudwatch_log_group` and `cloudwatch_log_stream` so clients can tail the same stream the runner writes to |
+| `TASK_CLOUDWATCH_LOG_STREAM_PREFIX` | (empty) | Optional; stream name is `{prefix}/{task_id}` (see `shared/cwstream`). Must match `RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX` on workers. |
+| `TASK_CLOUDWATCH_REGION` | (empty) | Optional AWS region included in **`task_log.cloudwatch.region`** for clients (e.g. your log proxy). |
 
-**Logging:** same **`http_access`** JSON lines as task-broker; **`GET /healthz`** omitted. Task completions that POST **`webhook_url`** log **`webhook_delivery`** per attempt (same shape as broker).
+**Task log descriptor:** When **`TASK_CLOUDWATCH_LOG_GROUP`** is set, `GET /v1/tasks/{id}` and completion webhooks include **`task_log`** with `{"type":"cloudwatch","cloudwatch":{"log_group_name","log_stream_name","region"}}`. Otherwise **`task_log`** is omitted. Legacy **`cloudwatch_log_group`** / **`cloudwatch_log_stream`** fields are still present when CloudWatch is enabled.
 
 Optional **EC2 hot runner pool** — set **`AWS_REGION`** (also used as **`AWS_DEFAULT_REGION`** inside user-data for **`aws s3 cp`**), **`EC2_PROVISION_HOT_INSTANCE_COUNT`**, **`EC2_PROVISION_AMI_ID`**, **`EC2_PROVISION_SUBNET_ID`**, **`EC2_PROVISION_SECURITY_GROUP_IDS`**, **`EC2_PROVISION_FLEET_MANAGER_URL`**, plus **either**:
 
@@ -99,6 +102,8 @@ Optional **EC2 hot runner pool** — set **`AWS_REGION`** (also used as **`AWS_D
 - **`EC2_PROVISION_RUNNER_BINARY_URL`** — public **http(s)** URL (**curl**).
 
 Do **not** set both.
+
+Optional: **`EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_GROUP`**, **`EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX`** — written into **`/etc/default/superplane-runner`** as **`RUNNER_CLOUDWATCH_*`** (requires the runner instance profile to allow **`logs:CreateLogGroup`**, **`logs:CreateLogStream`**, **`logs:PutLogEvents`**, **`logs:DescribeLogStreams`** on that log group).
 
 Fleet-manager **reconciles in the background** (default **60** s, **`EC2_PROVISION_RECONCILE_INTERVAL_SEC`**, minimum **15**). Optional: **`EC2_PROVISION_INSTANCE_TYPE`**, **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**, **`EC2_PROVISION_KEY_NAME`**, **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`**.
 
@@ -132,7 +137,11 @@ export DATABASE_PATH=./fleet.db
 | `RUNNER_ID`          | Optional; defaults to host name or a random id                                                         |
 | `AUTH_TOKEN`         | Optional; must match fleet-manager if set                                                              |
 | `POLL_EMPTY_MS`      | Sleep when no work (default ~1000 ms)                                                                  |
+| `RUNNER_MAX_EXECUTION_SECONDS` | Optional. Hard cap on run wall clock on **this** runner. Does **not** change fleet-manager `lease_until`, which still uses `execution_timeout_seconds` from the task (or the 9m default) plus buffer — so leases can be longer than the capped run when set. |
 | `RUNNER_TERMINATE_AFTER_EACH_TASK` | If `true`/`1`/`yes`, exit the runner process after **one** successful task (off by default locally; **on** for fleet-manager EC2 user-data unless disabled). **`runner_id`** must be the EC2 instance id (`i-…`) for **fleet-manager** to terminate the VM; termination is done by fleet-manager, not the runner binary. |
+| `RUNNER_CLOUDWATCH_LOG_GROUP` | When set, task stdout/stderr are streamed to **Amazon CloudWatch Logs** (`PutLogEvents`) on a per-task log stream (see `shared/cwstream`). Uses the default AWS credential chain (EC2 instance profile, env keys, etc.). |
+| `RUNNER_CLOUDWATCH_REGION` | Optional AWS region for the CloudWatch Logs client (defaults to the SDK default chain). |
+| `RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX` | Optional; must match **`TASK_CLOUDWATCH_LOG_STREAM_PREFIX`** on fleet-manager so **`GET /v1/tasks/{id}`** reports the correct **`cloudwatch_log_stream`**. |
 
 ```bash
 export FLEET_MANAGER_URL=http://127.0.0.1:8080

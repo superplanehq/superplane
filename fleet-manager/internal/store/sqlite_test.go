@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/models"
 )
 
@@ -119,6 +120,11 @@ func TestSQLite_ReapExpiredLeases(t *testing.T) {
 	if _, err := s.ClaimTask(ctx, "runner-1", time.Nanosecond); err != nil {
 		t.Fatal(err)
 	}
+	// Claim sets lease from max(runner, execution+buffer); force expiry for this test.
+	if _, err := s.db.ExecContext(ctx, `UPDATE tasks SET lease_until = ? WHERE id = ?`,
+		time.Now().Unix()-1, task.ID); err != nil {
+		t.Fatal(err)
+	}
 	time.Sleep(5 * time.Millisecond)
 
 	n, err := s.ReapExpiredLeases(ctx)
@@ -135,5 +141,182 @@ func TestSQLite_ReapExpiredLeases(t *testing.T) {
 	}
 	if again == nil || again.ID != task.ID {
 		t.Fatalf("expected task back in queue, got %+v", again)
+	}
+}
+
+func TestSQLite_ClaimLeaseUsesMaxOfRunnerLeaseAndExecutionWindow(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	execSec := 3600
+	task := &models.Task{
+		ID:                      uuid.NewString(),
+		Command:                 []string{"echo", "x"},
+		WebhookURL:              "https://example.com/hook",
+		Status:                  models.StatusQueued,
+		CreatedAt:               time.Now().UTC(),
+		ExecutionMode:           models.ExecutionHost,
+		ExecutionTimeoutSeconds: &execSec,
+	}
+	if err := s.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.ClaimTask(ctx, "runner-1", 10*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.LeaseUntil == nil {
+		t.Fatalf("claim: %+v", got)
+	}
+	now := time.Now().Unix()
+	runnerEnd := now + int64((10 * time.Minute).Seconds())
+	taskEnd := now + int64(execSec+api.LeaseBufferSeconds)
+	wantLease := runnerEnd
+	if taskEnd > wantLease {
+		wantLease = taskEnd
+	}
+	gotUnix := got.LeaseUntil.Unix()
+	if gotUnix < wantLease-2 || gotUnix > wantLease+5 {
+		t.Fatalf("lease_until=%d want ~%d (runnerEnd=%d taskEnd=%d)", gotUnix, wantLease, runnerEnd, taskEnd)
+	}
+}
+
+func TestSQLite_ClaimLeaseRunnerWinsWhenLongerThanExecution(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	execSec := 30
+	task := &models.Task{
+		ID:                      uuid.NewString(),
+		Command:                 []string{"echo", "x"},
+		WebhookURL:              "https://example.com/hook",
+		Status:                  models.StatusQueued,
+		CreatedAt:               time.Now().UTC(),
+		ExecutionMode:           models.ExecutionHost,
+		ExecutionTimeoutSeconds: &execSec,
+	}
+	if err := s.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.ClaimTask(ctx, "runner-1", 10*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.LeaseUntil == nil {
+		t.Fatalf("claim: %+v", got)
+	}
+	now := time.Now().Unix()
+	runnerEnd := now + int64((10 * time.Minute).Seconds())
+	taskEnd := now + int64(execSec+api.LeaseBufferSeconds)
+	wantLease := runnerEnd
+	if taskEnd > wantLease {
+		wantLease = taskEnd
+	}
+	gotUnix := got.LeaseUntil.Unix()
+	if gotUnix < wantLease-2 || gotUnix > wantLease+5 {
+		t.Fatalf("lease_until=%d want ~%d", gotUnix, wantLease)
+	}
+}
+
+func TestSQLite_ClaimLeaseUnsetExecutionUsesDefaultAndBuffer(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	task := &models.Task{
+		ID:            uuid.NewString(),
+		Command:       []string{"echo", "x"},
+		WebhookURL:    "https://example.com/hook",
+		Status:        models.StatusQueued,
+		CreatedAt:     time.Now().UTC(),
+		ExecutionMode: models.ExecutionHost,
+	}
+	if err := s.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.ClaimTask(ctx, "runner-1", 10*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.LeaseUntil == nil {
+		t.Fatalf("claim: %+v", got)
+	}
+	if got.ExecutionTimeoutSeconds != nil {
+		t.Fatalf("expected nil execution timeout in model, got %v", *got.ExecutionTimeoutSeconds)
+	}
+	now := time.Now().Unix()
+	runnerEnd := now + int64((10 * time.Minute).Seconds())
+	taskEnd := now + int64(api.DefaultExecutionTimeoutSeconds+api.LeaseBufferSeconds)
+	wantLease := runnerEnd
+	if taskEnd > wantLease {
+		wantLease = taskEnd
+	}
+	gotUnix := got.LeaseUntil.Unix()
+	if gotUnix < wantLease-2 || gotUnix > wantLease+5 {
+		t.Fatalf("lease_until=%d want ~%d (runnerEnd=%d taskEnd=%d)", gotUnix, wantLease, runnerEnd, taskEnd)
+	}
+}
+
+func TestSQLite_ExecutionTimeoutZeroInDBIgnoredForLeaseAndModel(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	task := &models.Task{
+		ID:            uuid.NewString(),
+		Command:       []string{"echo", "x"},
+		WebhookURL:    "https://example.com/hook",
+		Status:        models.StatusQueued,
+		CreatedAt:     time.Now().UTC(),
+		ExecutionMode: models.ExecutionHost,
+	}
+	if err := s.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.db.ExecContext(ctx, `UPDATE tasks SET execution_timeout_seconds = 0 WHERE id = ?`, task.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.ClaimTask(ctx, "runner-1", 2*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil || got.LeaseUntil == nil {
+		t.Fatalf("claim: %+v", got)
+	}
+	if got.ExecutionTimeoutSeconds != nil {
+		t.Fatalf("model should treat 0 as unset, got %v", *got.ExecutionTimeoutSeconds)
+	}
+	now := time.Now().Unix()
+	runnerEnd := now + int64((2 * time.Minute).Seconds())
+	taskEnd := now + int64(api.DefaultExecutionTimeoutSeconds+api.LeaseBufferSeconds)
+	wantLease := runnerEnd
+	if taskEnd > wantLease {
+		wantLease = taskEnd
+	}
+	gotUnix := got.LeaseUntil.Unix()
+	if gotUnix < wantLease-2 || gotUnix > wantLease+5 {
+		t.Fatalf("lease_until=%d want ~%d (use default+buffer not 0+buffer)", gotUnix, wantLease)
 	}
 }
