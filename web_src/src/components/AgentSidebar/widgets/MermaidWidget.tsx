@@ -1,5 +1,4 @@
 import { useEffect, useId, useRef, useState, useCallback } from "react";
-import { Maximize2 } from "lucide-react";
 import mermaid from "mermaid";
 import {
   Dialog,
@@ -91,17 +90,10 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
     <>
       <div
         ref={containerRef}
-        className="my-4 rounded-lg border border-violet-200 bg-white p-3 shadow-sm overflow-x-auto relative group [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:mx-auto"
+        onClick={() => setExpanded(true)}
+        className="my-4 rounded-lg border border-violet-200 bg-white p-3 shadow-sm overflow-x-auto cursor-pointer hover:border-violet-300 transition-colors [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:mx-auto"
       >
-        <button
-          type="button"
-          onClick={() => setExpanded(true)}
-          className="absolute top-2 right-2 p-1 rounded hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
-          aria-label="Expand diagram"
-        >
-          <Maximize2 className="size-3.5" />
-        </button>
-        <div dangerouslySetInnerHTML={{ __html: svg }} />
+        <div className="pointer-events-none" dangerouslySetInnerHTML={{ __html: svg }} />
       </div>
 
       <Dialog open={expanded} onOpenChange={setExpanded}>
@@ -118,7 +110,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
 
 function MermaidPanZoom({ svg }: { svg: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(2);
+  const [scale, setScale] = useState(2.5);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
 
@@ -154,7 +146,7 @@ function MermaidPanZoom({ svg }: { svg: string }) {
   }, []);
 
   const resetView = useCallback(() => {
-    setScale(1);
+    setScale(2.5);
     setTranslate({ x: 0, y: 0 });
   }, []);
 
