@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 	"time"
 
@@ -42,9 +41,6 @@ func TestHandleAgentSessionEvent_BroadcastsToTopicSubscribers(t *testing.T) {
 	sessionID := "11111111-1111-1111-1111-111111111111"
 	topic := eventdistributer.AgentSessionWebsocketTopic(sessionID)
 
-	// Stand up a tiny HTTP server that hands the upgraded connection to
-	// the hub on the chosen topic. This is the lightest way to verify the
-	// broadcast end-to-end without rewriting the hub.
 	upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -63,8 +59,9 @@ func TestHandleAgentSessionEvent_BroadcastsToTopicSubscribers(t *testing.T) {
 	require.NoError(t, err)
 	defer conn.Close()
 
-	// Give the hub time to register the client before we publish.
-	require.Eventually(t, func() bool { return strings.TrimSpace("ready") != "" }, time.Second, time.Millisecond)
+	require.Eventually(t, func() bool {
+		return hub.WorkflowSubscriberCount(topic) == 1
+	}, 2*time.Second, 5*time.Millisecond, "subscriber never registered on hub")
 
 	payload, err := json.Marshal(messages.AgentSessionEventMessage{
 		SessionID: sessionID,
@@ -76,19 +73,13 @@ func TestHandleAgentSessionEvent_BroadcastsToTopicSubscribers(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
+	require.NoError(t, eventdistributer.HandleAgentSessionEvent(payload, hub))
 
-	// The hub registers asynchronously, so retry the publish a few times
-	// until the subscriber is wired up.
+	conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+	_, data, err := conn.ReadMessage()
+	require.NoError(t, err)
 	var got messages.AgentSessionEventMessage
-	require.Eventually(t, func() bool {
-		_ = eventdistributer.HandleAgentSessionEvent(payload, hub)
-		conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-		_, data, err := conn.ReadMessage()
-		if err != nil {
-			return false
-		}
-		return json.Unmarshal(data, &got) == nil
-	}, 2*time.Second, 50*time.Millisecond)
+	require.NoError(t, json.Unmarshal(data, &got))
 
 	assert.Equal(t, sessionID, got.SessionID)
 	assert.Equal(t, "assistant_message", got.Event)
