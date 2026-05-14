@@ -1,8 +1,5 @@
 import { Loader2, Send, SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkBreaks from "remark-breaks";
-import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -11,6 +8,7 @@ import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
 import type { AgentMessage } from "./types";
 import type { AgentState } from "./useAgentState";
 import { useSidebarWidth } from "./useSidebarWidth";
+import { RichMessage } from "./widgets/RichMessage";
 
 export interface AgentSidebarProps {
   agentState: AgentState;
@@ -185,7 +183,7 @@ function ChatConversation({
               </div>
             ) : null}
             {messages.map((m) => (
-              <MessageRow key={m.id} message={m} />
+              <MessageRow key={m.id} message={m} sendMutation={sendMutation} chatId={chatId} />
             ))}
           </>
         )}
@@ -248,11 +246,32 @@ function ChatComposer({
   );
 }
 
-function MessageRow({ message }: { message: AgentMessage }) {
+function MessageRow({
+  message,
+  sendMutation,
+  chatId,
+}: {
+  message: AgentMessage;
+  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
+  chatId: string;
+}) {
   if (message.role === "tool") {
     return <ToolMessageRow message={message} />;
   }
   const isUser = message.role === "user";
+
+  const handleAction = useCallback(
+    async (action: string) => {
+      if (sendMutation.isPending) return;
+      try {
+        await sendMutation.mutateAsync({ chatId, content: action });
+      } catch (err) {
+        console.error("Failed to send action:", err);
+      }
+    },
+    [chatId, sendMutation],
+  );
+
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
@@ -262,7 +281,7 @@ function MessageRow({ message }: { message: AgentMessage }) {
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
-        {isUser ? message.content : <AgentMarkdown content={message.content} />}
+        {isUser ? message.content : <RichMessage content={message.content} onAction={handleAction} />}
       </div>
     </div>
   );
@@ -305,37 +324,6 @@ function ThinkingRow() {
   );
 }
 
-const AGENT_MARKDOWN_CLASSES =
-  "max-w-none [&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-base [&_h1]:font-semibold [&_h1:first-child]:mt-0 " +
-  "[&_h2]:mb-1 [&_h2]:mt-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2:first-child]:mt-0 " +
-  "[&_h3]:mb-0.5 [&_h3]:mt-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3:first-child]:mt-0 " +
-  "[&_p]:mb-2 [&_p]:leading-relaxed [&_p:last-child]:mb-0 " +
-  "[&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-0.5 " +
-  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 " +
-  "[&_code]:rounded [&_code]:bg-slate-200/70 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs " +
-  "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-200/70 [&_pre]:p-2 " +
-  "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
-  "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current";
-
-function AgentMarkdown({ content }: { content: string }) {
-  if (!content) return null;
-  return (
-    <div className={AGENT_MARKDOWN_CLASSES}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkBreaks]}
-        components={{
-          a: ({ children, href }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer">
-              {children}
-            </a>
-          ),
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
-  );
-}
 
 function statusLabel(status: string): string {
   switch (status) {
