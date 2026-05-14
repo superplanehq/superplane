@@ -248,6 +248,8 @@ type NotificationPolicyFilters struct {
 	PoolID      []string `json:"pool_id,omitempty"`
 	NewHealth   []string `json:"new_health,omitempty"`
 	EventSource []string `json:"event_source,omitempty"`
+	TunnelID    []string `json:"tunnel_id,omitempty"`
+	NewStatus   []string `json:"new_status,omitempty"`
 }
 
 type NotificationPolicyResponse struct {

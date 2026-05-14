@@ -10,6 +10,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="On Load Balancing Health Alert" href="#on-load-balancing-health-alert" description="Trigger when a Cloudflare load balancing pool or origin health state changes" />
+  <LinkCard title="On Tunnel Health" href="#on-tunnel-health" description="Trigger when a Cloudflare Tunnel health notification fires for degradation or recovery" />
 </CardGrid>
 
 ## Actions
@@ -21,6 +22,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Monitor" href="#create-monitor" description="Create a Cloudflare load balancing health monitor" />
   <LinkCard title="Create Origin Rule" href="#create-origin-rule" description="Create a rule to override the origin server for matching requests" />
   <LinkCard title="Create Pool" href="#create-pool" description="Create a Cloudflare Load Balancer origin pool" />
+  <LinkCard title="Create Tunnel" href="#create-tunnel" description="Create a new Cloudflare Tunnel (cloudflared) for secure outbound-only connectivity to Cloudflare" />
   <LinkCard title="Delete Certificate Pack" href="#delete-certificate-pack" description="Delete a custom SSL/TLS certificate pack from a Cloudflare zone" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a Cloudflare zone" />
   <LinkCard title="Delete KV Namespace" href="#delete-kv-namespace" description="Delete a Cloudflare Workers KV namespace" />
@@ -29,12 +31,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Monitor" href="#delete-monitor" description="Delete a Cloudflare load balancing health monitor" />
   <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
   <LinkCard title="Delete Pool" href="#delete-pool" description="Delete a Cloudflare Load Balancer origin pool" />
+  <LinkCard title="Delete Tunnel" href="#delete-tunnel" description="Delete a Cloudflare Tunnel and clean up its connector credentials" />
   <LinkCard title="Delete Worker" href="#delete-worker" description="Delete a Worker script from your Cloudflare account" />
   <LinkCard title="Deploy Worker" href="#deploy-worker" description="Provision a Worker if needed, upload a script version, and deploy it to traffic" />
   <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
   <LinkCard title="Get Load Balancer" href="#get-load-balancer" description="Retrieve a Cloudflare Load Balancer by ID" />
   <LinkCard title="Get Monitor" href="#get-monitor" description="Retrieve a Cloudflare load balancing health monitor's configuration" />
   <LinkCard title="Get Pool" href="#get-pool" description="Retrieve a Cloudflare Load Balancer origin pool by ID" />
+  <LinkCard title="Get Tunnel" href="#get-tunnel" description="Retrieve configuration and status for a Cloudflare Tunnel by ID" />
   <LinkCard title="Get Worker" href="#get-worker" description="Retrieve metadata and settings for a deployed Worker script" />
   <LinkCard title="Order Certificate Pack" href="#order-certificate-pack" description="Order a custom SSL/TLS certificate pack for a Cloudflare zone" />
   <LinkCard title="Purge Cache" href="#purge-cache" description="Purge cached content from the Cloudflare CDN for a zone" />
@@ -72,6 +76,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
      - Account / Load Balancing: Monitors and Pools / Edit
      - Account / Notifications / Edit
      - Account / Account Settings / Edit
+     - Account / Cloudflare Tunnel / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
    - **Account Resources**: Include the account containing your load balancers
 5. Click **Continue to summary**, then **Create Token**
@@ -79,7 +84,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Find your Cloudflare Account ID
 
-The **Account ID** is required for KV storage, load balancing monitors/pools, and health alert webhooks.
+The **Account ID** is required for KV storage, load balancing monitors/pools, Cloudflare Tunnels, and health alert webhooks.
 
 1. Open the [Cloudflare dashboard](https://dash.cloudflare.com/)
 2. Select the account that contains your load balancers
@@ -141,6 +146,57 @@ The trigger **title** still prefers an origin name, then pool name, then load ba
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "cloudflare.loadBalancing.healthAlert"
+}
+```
+
+<a id="on-tunnel-health"></a>
+
+## On Tunnel Health
+
+The On Tunnel Health trigger starts a workflow from Cloudflare `tunnel_health_event` notifications (Cloudflare Tunnel / cloudflared).
+
+### Use Cases
+
+- **Degraded or down**: React when tunnel connectivity drops below healthy thresholds
+- **Recovery**: Resume normal processing when the tunnel returns to a healthy state
+
+### Configuration
+
+- **Tunnel**: Optional. SuperPlane adds this tunnel to the Cloudflare notification policy **and** requires the webhook payload's `tunnel_id` to match (case-insensitive), so a mis-scoped or forged request is less likely to start your workflow. Leave **Tunnel** empty to accept any tunnel on the account (policy and webhook checks both allow any tunnel id present in the payload).
+
+> **Note**: Cloudflare's **Send test** notification may include a sample `tunnel_id` that does not match your real tunnel. With a tunnel selected, that test delivery will not emit until you clear the tunnel filter or use a payload that matches your tunnel id.
+
+### Webhook Setup
+
+SuperPlane provisions a Cloudflare Alerting webhook destination and a notification policy for `tunnel_health_event`. Cloudflare signs requests with the generated webhook secret and SuperPlane verifies the `cf-webhook-auth` header before emitting an event.
+
+### Workflow execution details
+
+The trigger **Payload** tab (and expressions such as `$.trigger.data`) use a merged view of the webhook JSON: fields inside `data` are combined with top-level fields (for example `alert_type`, `account_id`) so everything is available in one object.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account_id": "90ddd046-218b-d375-f20e-9f9082cc0c6d",
+    "alert_name": "tunnel_health_event",
+    "alert_type": "tunnel_health_event",
+    "dashboard_link": "dash.cloudflare.com/aBcD1234efgh567i890j1kl234567m89",
+    "name": "SuperPlane Tunnel Health Alert",
+    "new_status": "TUNNEL_STATUS_TYPE_DEGRADED",
+    "policy_id": "fe9eda012119414084b1c9ffc9a1e2c9",
+    "policy_name": "SuperPlane Tunnel Health Alert",
+    "severity": "INFO",
+    "status_reason": "status change",
+    "text": "A Cloudflare Tunnel in your account has changed its connection status.\nTunnel: tunnel-name (aBcD1234efgh567i890j1kl234567m80) \nNew status: TUNNEL_STATUS_TYPE_DEGRADED (status change)",
+    "timestamp": "2022-10-27T06:00:22Z",
+    "ts": 1778597408,
+    "tunnel_id": "aBcD1234efgh567i890j1kl234567m80",
+    "tunnel_name": "tunnel-name"
+  },
+  "timestamp": "2026-05-12T14:50:14.036687251Z",
+  "type": "cloudflare.tunnel.healthEvent"
 }
 ```
 
@@ -446,6 +502,51 @@ Returns the created origin pool with its assigned ID and full configuration.
 }
 ```
 
+<a id="create-tunnel"></a>
+
+## Create Tunnel
+
+The Create Tunnel component provisions a Cloudflare Tunnel under your account.
+
+### Use Cases
+
+- **Expose internal services**: Pair with ingress rules so private origins are reachable through Cloudflare without opening inbound firewall ports
+- **Automation**: Create tunnels as part of environment provisioning
+
+### Configuration
+
+- **Name**: A unique name for the tunnel
+- **Config source**: `cloudflare` (managed in Zero Trust) or `local` (managed via local cloudflared configuration)
+
+### Output
+
+Returns the tunnel resource from the Cloudflare API, including its ID. When Cloudflare returns a connector token, it is included in the output (treat it as a secret).
+
+> **Note**: Deleting a tunnel does not automatically remove all public hostname routes; use Cloudflare Zero Trust or DNS workflows as needed.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "tunnel": {
+      "account_tag": "90ddd046218bd375f20e9f9082cc0c6d",
+      "config_src": "cloudflare",
+      "created_at": "2026-05-12T14:40:05.379813Z",
+      "id": "432c983d-7934-47a8-923f-bfa017eef9c4",
+      "metadata": {},
+      "name": "my-test-tunnel",
+      "status": "inactive",
+      "token": "eyJhIjoiOTBkZGQwNDYyMThiZDM3NWYy...rTE0rM1hHaHhNMEVpa0QvK2RacE0xQUM1N1dHZEVHMHZxS1h4SHV1UER3PT0ifQ=="
+    },
+    "tunnelId": "432c983d-7934-47a8-923f-bfa017eef9c4"
+  },
+  "timestamp": "2026-05-12T14:40:06.391597638Z",
+  "type": "cloudflare.tunnel.created"
+}
+```
+
 <a id="delete-certificate-pack"></a>
 
 ## Delete Certificate Pack
@@ -743,6 +844,41 @@ Emits a confirmation with the account ID and pool ID of the deleted pool.
 }
 ```
 
+<a id="delete-tunnel"></a>
+
+## Delete Tunnel
+
+The Delete Tunnel component permanently removes a Cloudflare Tunnel.
+
+### Use Cases
+
+- **Teardown**: Remove tunnels when an environment is decommissioned
+- **Rotation**: Delete an old tunnel after migrating to a new one
+
+### Configuration
+
+- **Tunnel**: The tunnel ID to delete
+
+### Output
+
+Emits confirmation with the account ID and tunnel ID.
+
+> **Warning**: This operation is irreversible. Active traffic using the tunnel will fail until reconfigured.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "tunnelId": "3c683924-6802-47c9-860a-f27a66e684a2"
+  },
+  "timestamp": "2026-05-12T14:02:15.319225119Z",
+  "type": "cloudflare.tunnel.deleted"
+}
+```
+
 <a id="delete-worker"></a>
 
 ## Delete Worker
@@ -1001,6 +1137,47 @@ Returns the full pool configuration including its origins, enabled state, and he
   },
   "timestamp": "2026-05-05T05:58:40.060373991Z",
   "type": "cloudflare.pool.fetched"
+}
+```
+
+<a id="get-tunnel"></a>
+
+## Get Tunnel
+
+The Get Tunnel component fetches the current state of a Cloudflare Tunnel (cloudflared).
+
+### Use Cases
+
+- **Health and status checks**: Inspect tunnel status in a workflow
+- **Validation**: Confirm a tunnel exists before updating routes or DNS
+
+### Configuration
+
+- **Tunnel**: The tunnel ID to retrieve
+
+### Output
+
+Returns the tunnel object from the Cloudflare API (ID, name, status, config source, timestamps, and related fields).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "tunnel": {
+      "account_tag": "90ddd046218bd375f20e9f9082cc0c6d",
+      "config_src": "local",
+      "created_at": "2026-05-12T13:59:00.953876Z",
+      "id": "3c683924-6802-47c9-860a-f27a66e684a2",
+      "metadata": {},
+      "name": "my-test-tunnel",
+      "status": "active"
+    },
+    "tunnelId": "3c683924-6802-47c9-860a-f27a66e684a2"
+  },
+  "timestamp": "2026-05-12T14:01:27.023693818Z",
+  "type": "cloudflare.tunnel.fetched"
 }
 ```
 
