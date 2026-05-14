@@ -42,13 +42,28 @@ metadata:
 
 export const Buttons: Story = {
   args: {
-    content: `I can set up a few different workflow patterns for you. Which one would you like?
+    content: `I can set up a few different workflow patterns for you.
 
 :::buttons
+Which pattern would you like?
 - Webhook → API → Notify
 - Schedule → Health Check → Alert
 - GitHub Push → Deploy → Verify
 - Custom (describe your workflow)
+:::`,
+  },
+};
+
+export const DeployButtons: Story = {
+  args: {
+    content: `I've prepared the canvas. Ready to deploy.
+
+:::buttons
+Where should this be deployed?
+- DigitalOcean
+- Google Cloud
+- Hetzner
+- AWS
 :::`,
   },
 };
@@ -282,9 +297,8 @@ Overall health is excellent — 96% success rate.
 2. Consider adding retry logic to the API call
 3. Timeout could be increased from 10s to 15s
 
-What would you like to do?
-
 :::buttons
+What would you like to do?
 - Add retry to API call
 - Increase timeout
 - Show me the failing runs

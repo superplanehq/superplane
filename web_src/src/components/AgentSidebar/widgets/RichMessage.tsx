@@ -66,7 +66,7 @@ function SegmentRenderer({ segment, onAction }: { segment: Segment; onAction?: (
         </div>
       );
     case "buttons":
-      return <ButtonsWidget items={segment.items} onAction={onAction} />;
+      return <ButtonsWidget prompt={segment.prompt} items={segment.items} onAction={onAction} />;
     case "confirm":
       return <ConfirmWidget message={segment.message} yes={segment.yes} no={segment.no} onAction={onAction} />;
     case "chart":

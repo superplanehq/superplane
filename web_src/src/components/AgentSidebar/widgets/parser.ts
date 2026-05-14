@@ -3,7 +3,7 @@ import YAML from "js-yaml";
 // --- Types ---
 
 export type MarkdownSegment = { type: "markdown"; content: string };
-export type ButtonsSegment = { type: "buttons"; items: string[] };
+export type ButtonsSegment = { type: "buttons"; prompt: string; items: string[] };
 export type ConfirmSegment = { type: "confirm"; message: string; yes: string; no: string };
 export type ChartSegment = { type: "chart"; config: ChartConfig };
 export type CollapseSegment = { type: "collapse"; title: string; content: string };
@@ -140,11 +140,20 @@ function parseBlock(type: string, meta: string, raw: string): Segment | null {
 }
 
 function parseButtons(raw: string): ButtonsSegment {
-  const items = raw
-    .split("\n")
-    .map((l) => l.replace(/^[-*]\s*/, "").trim())
-    .filter(Boolean);
-  return { type: "buttons", items };
+  const lines = raw.split("\n").filter((l) => l.trim());
+  const items: string[] = [];
+  const promptLines: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^[-*]\s/.test(trimmed)) {
+      items.push(trimmed.replace(/^[-*]\s*/, "").trim());
+    } else {
+      promptLines.push(trimmed);
+    }
+  }
+
+  return { type: "buttons", prompt: promptLines.join("\n"), items };
 }
 
 function parseConfirm(raw: string): ConfirmSegment {
