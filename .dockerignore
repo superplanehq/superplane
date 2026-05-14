@@ -1,0 +1,4 @@
+tmp/
+.git/
+**/node_modules/
+agent/node_modules/
