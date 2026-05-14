@@ -4,11 +4,63 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RichMessage } from "./RichMessage";
 
 const MOCK_RUNS = [
-  { id: "78848cb6-0c52-4c69-8e47-b6631bd703ec", state: "STATE_FINISHED", result: "RESULT_PASSED" },
-  { id: "2999a5f1-1234-5678-9abc-def012345678", state: "STATE_FINISHED", result: "RESULT_FAILED" },
-  { id: "1e8cf8a2-abcd-ef01-2345-678901234567", state: "STATE_FINISHED", result: "RESULT_PASSED" },
-  { id: "366b0a12-1111-2222-3333-444455556666", state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
-  { id: "e63e35a0-5555-6666-7777-888899990000", state: "STATE_FINISHED", result: "RESULT_CANCELLED" },
+  {
+    id: "78848cb6-0c52-4c69-8e47-b6631bd703ec",
+    state: "STATE_FINISHED",
+    result: "RESULT_PASSED",
+    createdAt: "2026-05-14T19:08:57Z",
+    finishedAt: "2026-05-14T19:09:42Z",
+    executions: [
+      { nodeId: "manual-run-1234", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+      { nodeId: "random-wait-5678", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+      { nodeId: "call-api-9abc", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+      { nodeId: "check-result-def0", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+      { nodeId: "notify-success-1111", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+    ],
+  },
+  {
+    id: "2999a5f1-1234-5678-9abc-def012345678",
+    state: "STATE_FINISHED",
+    result: "RESULT_FAILED",
+    createdAt: "2026-05-14T18:55:10Z",
+    finishedAt: "2026-05-14T18:55:10Z",
+    executions: [
+      { nodeId: "manual-run-1234", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+      { nodeId: "random-wait-5678", state: "STATE_FINISHED", result: "RESULT_FAILED" },
+    ],
+  },
+  {
+    id: "1e8cf8a2-abcd-ef01-2345-678901234567",
+    state: "STATE_FINISHED",
+    result: "RESULT_PASSED",
+    createdAt: "2026-05-14T18:30:00Z",
+    finishedAt: "2026-05-14T18:30:36Z",
+    executions: [
+      { nodeId: "manual-run-1234", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+      { nodeId: "call-api-9abc", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+      { nodeId: "notify-success-1111", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+    ],
+  },
+  {
+    id: "366b0a12-1111-2222-3333-444455556666",
+    state: "STATE_STARTED",
+    result: "RESULT_UNKNOWN",
+    createdAt: "2026-05-14T20:30:00Z",
+    executions: [
+      { nodeId: "manual-run-1234", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+      { nodeId: "random-wait-5678", state: "STATE_STARTED", result: "RESULT_UNKNOWN" },
+    ],
+  },
+  {
+    id: "e63e35a0-5555-6666-7777-888899990000",
+    state: "STATE_FINISHED",
+    result: "RESULT_CANCELLED",
+    createdAt: "2026-05-14T17:00:00Z",
+    finishedAt: "2026-05-14T17:00:12Z",
+    executions: [
+      { nodeId: "manual-run-1234", state: "STATE_FINISHED", result: "RESULT_PASSED" },
+    ],
+  },
 ];
 
 function createSeededQueryClient() {
