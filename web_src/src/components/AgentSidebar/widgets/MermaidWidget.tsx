@@ -137,15 +137,22 @@ function MermaidPanZoom({ svg }: { svg: string }) {
   const [scale, setScale] = useState(1);
   const initialScaleRef = useRef(1);
   
+  // Strip inline width/height from SVG so it can scale freely
+  const scalableSvg = useMemo(() => {
+    return svg.replace(/<svg([^>]*)width="[^"]*"/, '<svg$1').replace(/<svg([^>]*)height="[^"]*"/, '<svg$1').replace(/<svg/, '<svg width="100%" height="100%"');
+  }, [svg]);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const dims = getSvgDimensions(svg);
-    if (!dims) return;
+    // Find the actual SVG element and measure it
+    const svgEl = container.querySelector('svg');
+    if (!svgEl) return;
+    const bbox = svgEl.getBBox();
     const rect = container.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
-    const fitScale = Math.min(rect.width / dims.width, rect.height / dims.height) * 0.9;
-    const clamped = Math.min(Math.max(fitScale, 0.3), 3);
+    if (bbox.width === 0 || bbox.height === 0 || rect.width === 0 || rect.height === 0) return;
+    const fitScale = Math.min(rect.width / (bbox.width + 20), rect.height / (bbox.height + 20));
+    const clamped = Math.min(Math.max(fitScale, 0.3), 5);
     initialScaleRef.current = clamped;
     setScale(clamped);
   }, [svg]);
@@ -232,8 +239,8 @@ function MermaidPanZoom({ svg }: { svg: string }) {
           }}
         >
           <div
-            className="[&_svg]:max-w-none [&_svg]:h-auto"
-            dangerouslySetInnerHTML={{ __html: svg }}
+            className="[&_svg]:max-w-none"
+            dangerouslySetInnerHTML={{ __html: scalableSvg }}
           />
         </div>
       </div>
