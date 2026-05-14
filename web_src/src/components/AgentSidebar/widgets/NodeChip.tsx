@@ -5,7 +5,21 @@ import { cn } from "@/lib/utils";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Clock, Filter, Globe, Hand, Merge, Play, Split, Terminal, Webhook, type LucideIcon } from "lucide-react";
 import type { CanvasesCanvas, SuperplaneComponentsNode } from "@/api-client";
+
+const COMPONENT_ICONS: Record<string, LucideIcon> = {
+  http: Globe,
+  wait: Clock,
+  webhook: Webhook,
+  start: Play,
+  if: Split,
+  filter: Filter,
+  ssh: Terminal,
+  approval: Hand,
+  merge: Merge,
+  schedule: Clock,
+};
 
 interface NodeChipProps {
   nodeId: string;
@@ -39,6 +53,7 @@ export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipPr
 
   const isTrigger = node?.type === "TYPE_TRIGGER";
   const iconSrc = node?.component ? getHeaderIconSrc(node.component) : undefined;
+  const LucideIcon = node?.component ? COMPONENT_ICONS[node.component] : undefined;
 
   const handleClick = useCallback(() => {
     navigate(`/${organizationId}/canvases/${canvasId}?sidebar=1&node=${nodeId}`);
@@ -59,6 +74,8 @@ export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipPr
         <button type="button" onClick={handleClick} className={chipClassName} title={`Node: ${nodeId}`}>
           {iconSrc ? (
             <img src={iconSrc} alt="" className="size-3 object-contain shrink-0" />
+          ) : LucideIcon ? (
+            <LucideIcon className="size-3 shrink-0" />
           ) : (
             <span
               className={cn(
@@ -88,6 +105,7 @@ function NodeHoverContent({
 }) {
   const isTrigger = node.type === "TYPE_TRIGGER";
   const iconSrc = node.component ? getHeaderIconSrc(node.component) : undefined;
+  const NodeIcon = node.component ? COMPONENT_ICONS[node.component] : undefined;
   const config = node.configuration ?? {};
 
   // Count connections
@@ -106,6 +124,8 @@ function NodeHoverContent({
       )}>
         {iconSrc ? (
           <img src={iconSrc} alt="" className="size-4 object-contain shrink-0" />
+        ) : NodeIcon ? (
+          <NodeIcon className="size-4 shrink-0" />
         ) : (
           <span className={cn("size-3 rounded-full shrink-0", isTrigger ? "bg-purple-400" : "bg-blue-400")} />
         )}
