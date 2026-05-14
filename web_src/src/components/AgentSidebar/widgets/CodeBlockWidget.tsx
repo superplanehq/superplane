@@ -111,7 +111,7 @@ export function CodeBlockWidget({ code, language }: CodeBlockWidgetProps) {
       </div>
 
       <Dialog open={expanded} onOpenChange={setExpanded}>
-        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col">
+        <DialogContent className="max-w-[90vw] max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span className="text-sm font-medium">{language || "Code"}</span>
