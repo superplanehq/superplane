@@ -54,6 +54,77 @@ Which pattern would you like?
   },
 };
 
+export const YAMLCodeBlock: Story = {
+  args: {
+    content: `Here's the canvas configuration:
+
+\`\`\`yaml
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: api-health-check
+  id: 05bb8e74-6f11-4d1c-bbfd-75d4a28303d6
+spec:
+  nodes:
+    - id: webhook-trigger
+      name: Receive Request
+      type: TYPE_TRIGGER
+      component: webhook
+      configuration:
+        authentication: "none"
+    - id: call-api
+      name: Call Target API
+      type: TYPE_ACTION
+      component: http
+      configuration:
+        method: GET
+        url: "https://api.example.com/health"
+        json: ""
+        successCodes: "200"
+        timeoutSeconds: 30
+\`\`\``,
+  },
+};
+
+export const BashCodeBlock: Story = {
+  args: {
+    content: `Run these commands to set up:
+
+\`\`\`bash
+curl -fsSL https://install.superplane.com/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+superplane connect https://app.superplane.com your-token-here
+superplane canvases list
+\`\`\`
+
+The CLI should now be ready to use.`,
+  },
+};
+
+export const JSONCodeBlock: Story = {
+  args: {
+    content: `The webhook payload looks like this:
+
+\`\`\`json
+{
+  "event": "push",
+  "repository": {
+    "full_name": "superplanehq/superplane",
+    "default_branch": "main"
+  },
+  "ref": "refs/heads/main",
+  "commits": [
+    {
+      "id": "abc123",
+      "message": "fix: resolve timeout issue",
+      "author": { "name": "Alex" }
+    }
+  ]
+}
+\`\`\``,
+  },
+};
+
 export const DeployButtons: Story = {
   args: {
     content: `I've prepared the canvas. Ready to deploy.
