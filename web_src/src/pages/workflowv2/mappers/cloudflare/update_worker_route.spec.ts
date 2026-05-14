@@ -116,7 +116,7 @@ describe("eventStateRegistry.updateWorkerRoute", () => {
   it("returns updated when payload type is updated", () => {
     const execution = buildExecution({
       outputs: {
-        default: [{ type: "cloudflare.workerRoute.update", timestamp: new Date().toISOString(), data: {} }],
+        default: [{ type: "cloudflare.workerRoute.updated", timestamp: new Date().toISOString(), data: {} }],
       },
     });
     expect(eventStateRegistry.updateWorkerRoute.getState(execution)).toBe("updated");

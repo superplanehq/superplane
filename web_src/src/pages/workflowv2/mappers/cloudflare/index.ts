@@ -38,7 +38,7 @@ const updateWorkerRouteStateRegistry: EventStateRegistry = {
     }
     const payloads = execution.outputs?.default as OutputPayload[] | undefined;
     const payloadType = payloads?.[0]?.type;
-    if (payloadType === "cloudflare.workerRoute.update") {
+    if (payloadType === "cloudflare.workerRoute.updated") {
       return "updated";
     }
     return "created";
