@@ -76,3 +76,22 @@ When working with database transactions, follow these rules to ensure data consi
   - The non-transaction variant should call the transaction variant: `return FindUserInTransaction(database.Conn(), ...)`
 
 **Why this matters**: Using `database.Conn()` inside transaction contexts breaks isolation, causes data inconsistency on rollback, and can lead to race conditions.
+
+## Cursor Cloud specific instructions
+
+The entire dev environment runs inside Docker containers. The VM update script installs Docker, configures `fuse-overlayfs` storage (required for nested Docker), switches to `iptables-legacy`, and starts `dockerd`. After the update script runs, all standard `make` targets are available.
+
+### Starting the environment
+
+1. `make dev.up` — builds the `app` image and starts three containers: `app`, `db` (Postgres 17.5), `rabbitmq`.
+2. `make dev.setup` — runs inside the `app` container: npm install, protobuf codegen, Go module download + build, DB create + migrate for both `superplane_dev` and `superplane_test`.
+3. `make dev.server` — starts Air (Go hot-reload) + Vite dev server inside the `app` container; blocks until the `/health` endpoint responds. UI at `http://localhost:8000`.
+
+### Key caveats
+
+- The `app` container's command is `sleep infinity` by default; `make dev.server` exec's the entrypoint script inside it. Re-running `make dev.server` is safe (it kills existing air/vite first).
+- All Go tooling (lint, test, build) runs inside the `app` container via `docker compose exec/run`. Do **not** try to run `go build` or `revive` on the host.
+- Backend tests require `DB_NAME=superplane_test` (the Makefile handles this). Targeted tests: `make test PKG_TEST_PACKAGES=./pkg/<package>`.
+- The first visit to `http://localhost:8000` triggers the owner setup wizard (`OWNER_SETUP_ENABLED=yes`). Create an account to access the dashboard.
+- If `go mod download` fails with missing files under `tmp/go/pkg/mod`, run `make dev.clean.go.cache` then `make dev.setup.go`.
+- Standard commands for lint/test/build/format are documented in the "Build, Test, and Development Commands" section above — refer there instead of duplicating.
