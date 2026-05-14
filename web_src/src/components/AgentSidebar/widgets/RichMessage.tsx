@@ -26,7 +26,8 @@ const MARKDOWN_CLASSES =
   "[&_thead]:bg-slate-50 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-700 " +
   "[&_th]:border-b [&_th]:border-slate-200 " +
   "[&_td]:px-3 [&_td]:py-1.5 [&_td]:text-slate-600 [&_td]:border-b [&_td]:border-slate-100 " +
-  "[&_tr:last-child_td]:border-b-0 [&_tr:hover]:bg-slate-50/50";
+  "[&_tbody_tr:nth-child(even)]:bg-slate-50/60 " +
+  "[&_tr:last-child_td]:border-b-0 [&_tr:hover]:bg-violet-50/50";
 
 interface RichMessageProps {
   content: string;
