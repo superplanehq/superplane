@@ -1,109 +1,53 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactFlow, ReactFlowProvider } from "@xyflow/react";
 import { RichMessage } from "./RichMessage";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import type { CanvasesCanvas } from "@/api-client";
 
+const ORG_ID = "1e880270-cb0b-4310-9479-3e01c14938aa";
+const CANVAS_ID = "05bb8e74-6f11-4d1c-bbfd-75d4a28303d6";
+
 const mockCanvas: CanvasesCanvas = {
-  metadata: {
-    id: "05bb8e74-6f11-4d1c-bbfd-75d4a28303d6",
-    name: "Test Canvas",
-  },
   spec: {
     nodes: [
-      {
-        id: "github-trigger",
-        type: "TYPE_TRIGGER",
-        label: "GitHub PR Event",
-        trigger: {
-          name: "github.pullRequestEvent",
-          title: "GitHub PR Event",
-          iconSlug: "github",
-          metadata: [
-            { key: "Repository", value: "superplane/platform" },
-            { key: "Events", value: "opened, synchronize" },
-          ],
-        },
-        position: { x: 100, y: 100 },
-      },
-      {
-        id: "slack-notify",
-        type: "TYPE_ACTION",
-        label: "Notify Team",
-        action: {
-          name: "slack.sendMessage",
-          title: "Send Message",
-          iconSlug: "slack",
-          metadata: [
-            { key: "Channel", value: "#deployments" },
-            { key: "Template", value: "PR opened" },
-          ],
-        },
-        position: { x: 100, y: 300 },
-      },
-      {
-        id: "aws-deploy",
-        type: "TYPE_ACTION",
-        label: "Deploy to AWS",
-        action: {
-          name: "aws.lambda.deployFunction",
-          title: "Deploy Lambda",
-          iconSlug: "aws",
-          metadata: [
-            { key: "Function", value: "api-handler" },
-            { key: "Region", value: "us-east-1" },
-          ],
-        },
-        position: { x: 100, y: 500 },
-      },
+      { id: "webhook-trigger", name: "Webhook Trigger", type: "TYPE_TRIGGER", component: "webhook", configuration: { authentication: "none" } },
+      { id: "call-api", name: "Call Target API", type: "TYPE_ACTION", component: "http", configuration: { method: "GET", url: "https://httpbin.org/status/200" } },
+      { id: "check-result", name: "Check API Result", type: "TYPE_ACTION", component: "if", configuration: { expression: "{{ previous().data.statusCode >= 200 && previous().data.statusCode < 300 }}" } },
+      { id: "random-wait", name: "Random Wait", type: "TYPE_ACTION", component: "wait", configuration: { duration: "30" } },
+      { id: "notify-success", name: "Notify Success", type: "TYPE_ACTION", component: "http", configuration: { method: "POST", url: "https://httpbin.org/post" } },
+      { id: "ssh-deploy", name: "SSH Deploy", type: "TYPE_ACTION", component: "ssh", configuration: { host: "192.168.1.1", username: "ubuntu" } },
     ],
-    edges: [],
+    edges: [
+      { sourceId: "webhook-trigger", targetId: "call-api", channel: "default" },
+      { sourceId: "call-api", targetId: "check-result", channel: "success" },
+      { sourceId: "check-result", targetId: "notify-success", channel: "true" },
+    ],
   },
 };
 
-// Create a query client with mock data
-const createMockQueryClient = () => {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: { retry: false },
-    },
-  });
-
-  // Pre-seed the canvas query cache
-  queryClient.setQueryData(
-    canvasKeys.detail("1e880270-cb0b-4310-9479-3e01c14938aa", "05bb8e74-6f11-4d1c-bbfd-75d4a28303d6"),
-    mockCanvas,
-  );
-
-  return queryClient;
-};
+function createSeededClient() {
+  const qc = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } });
+  qc.setQueryData(canvasKeys.detail(ORG_ID, CANVAS_ID), mockCanvas);
+  return qc;
+}
 
 const meta: Meta<typeof RichMessage> = {
   title: "AgentSidebar/NodeChips",
   component: RichMessage,
-  parameters: {
-    layout: "padded",
-  },
+  parameters: { layout: "padded" },
   decorators: [
     (Story) => {
-      const queryClient = createMockQueryClient();
+      const qc = createSeededClient();
       return (
-        <QueryClientProvider client={queryClient}>
-          <ReactFlowProvider>
-            <MemoryRouter>
-              <div className="max-w-md bg-slate-100 rounded-lg p-4">
-                <div className="bg-slate-100 rounded-lg px-3 py-2 text-sm text-slate-900">
-                  <Story />
-                </div>
+        <QueryClientProvider client={qc}>
+          <MemoryRouter>
+            <div className="max-w-md bg-slate-100 rounded-lg p-4">
+              <div className="bg-slate-100 rounded-lg px-3 py-2 text-sm text-slate-900">
+                <Story />
               </div>
-              {/* Hidden ReactFlow for context */}
-              <div style={{ display: "none" }}>
-                <ReactFlow nodes={[]} edges={[]} />
-              </div>
-            </MemoryRouter>
-          </ReactFlowProvider>
+            </div>
+          </MemoryRouter>
         </QueryClientProvider>
       );
     },
@@ -115,53 +59,44 @@ type Story = StoryObj<typeof RichMessage>;
 
 export const NodeReferences: Story = {
   args: {
-    content: `Canvas nodes:
+    content: `Check the [Webhook Trigger](node:webhook-trigger) and the [Call Target API](node:call-api) node.`,
+    canvasId: CANVAS_ID,
+    organizationId: ORG_ID,
+  },
+};
 
-- [GitHub PR Event](node:github-trigger) triggers the workflow
-- [Notify Team](node:slack-notify) sends a Slack message
-- [Deploy to AWS](node:aws-deploy) deploys the Lambda function`,
-    canvasId: "05bb8e74-6f11-4d1c-bbfd-75d4a28303d6",
-    organizationId: "1e880270-cb0b-4310-9479-3e01c14938aa",
+export const AllComponentTypes: Story = {
+  args: {
+    content: `Node types:
+
+- Trigger: [Webhook Trigger](node:webhook-trigger)
+- HTTP: [Call Target API](node:call-api)
+- If: [Check API Result](node:check-result)
+- Wait: [Random Wait](node:random-wait)
+- SSH: [SSH Deploy](node:ssh-deploy)
+- Notify: [Notify Success](node:notify-success)`,
+    canvasId: CANVAS_ID,
+    organizationId: ORG_ID,
   },
 };
 
 export const NodesInTable: Story = {
   args: {
-    content: `| Step | Node | Description |
-|------|------|-------------|
-| 1 | [GitHub PR Event](node:github-trigger) | Listens for PR events |
-| 2 | [Notify Team](node:slack-notify) | Posts to Slack |
-| 3 | [Deploy to AWS](node:aws-deploy) | Deploys function |`,
-    canvasId: "05bb8e74-6f11-4d1c-bbfd-75d4a28303d6",
-    organizationId: "1e880270-cb0b-4310-9479-3e01c14938aa",
-  },
-};
-
-export const InlineText: Story = {
-  args: {
-    content: `The workflow starts with [GitHub PR Event](node:github-trigger) which triggers [Notify Team](node:slack-notify) to send a notification, then [Deploy to AWS](node:aws-deploy) deploys the changes.`,
-    canvasId: "05bb8e74-6f11-4d1c-bbfd-75d4a28303d6",
-    organizationId: "1e880270-cb0b-4310-9479-3e01c14938aa",
-  },
-};
-
-export const MixedWithRuns: Story = {
-  args: {
-    content: `Recent activity:
-
-- [GitHub PR Event](node:github-trigger) received event
-- [run #123](run:78848cb6-0c52-4c69-8e47-b6631bd703ec~passed) completed successfully
-- [Notify Team](node:slack-notify) posted to Slack
-- [Deploy to AWS](node:aws-deploy) deployment in progress`,
-    canvasId: "05bb8e74-6f11-4d1c-bbfd-75d4a28303d6",
-    organizationId: "1e880270-cb0b-4310-9479-3e01c14938aa",
+    content: `| Node | Component | Notes |
+|------|-----------|-------|
+| [Webhook Trigger](node:webhook-trigger) | webhook | Entry point |
+| [Call Target API](node:call-api) | http | GET request |
+| [Check API Result](node:check-result) | if | Status check |
+| [Random Wait](node:random-wait) | wait | 30s delay |`,
+    canvasId: CANVAS_ID,
+    organizationId: ORG_ID,
   },
 };
 
 export const UnknownNode: Story = {
   args: {
-    content: `This [missing node](node:nonexistent-node-id) doesn't exist in the canvas.`,
-    canvasId: "05bb8e74-6f11-4d1c-bbfd-75d4a28303d6",
-    organizationId: "1e880270-cb0b-4310-9479-3e01c14938aa",
+    content: `This references a [Missing Node](node:does-not-exist) that doesn't exist on the canvas.`,
+    canvasId: CANVAS_ID,
+    organizationId: ORG_ID,
   },
 };
