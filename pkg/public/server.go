@@ -339,6 +339,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
+	s.Router.Handle(
+		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs",
+		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogStream)),
+	).Methods("GET")
+
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
@@ -466,6 +471,15 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 			Middleware(http.HandlerFunc(s.handleWebSocket)),
 	)
 
+	// Agent-session WebSocket: scoped to the session's owning user. Auth
+	// uses the same middleware; ownership is enforced inside the handler
+	// because sessions are private per user, not per organization.
+	s.Router.Handle(
+		"/ws/agents/sessions/{sessionId}",
+		middleware.OrganizationAuthMiddleware(s.jwt).
+			Middleware(http.HandlerFunc(s.handleAgentSessionWebSocket)),
+	)
+
 	//
 	// In development mode, we proxy to the Vite dev server.
 	//
@@ -571,6 +585,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	accountRoute.HandleFunc("/account", s.getAccount).Methods("GET")
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
+	accountRoute.HandleFunc("/account/password", s.changePassword).Methods("POST")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
@@ -910,6 +925,7 @@ type AccountResponse struct {
 	Email             string                `json:"email"`
 	AvatarURL         string                `json:"avatar_url"`
 	InstallationAdmin bool                  `json:"installation_admin"`
+	HasPassword       bool                  `json:"has_password"`
 	Impersonation     *AccountImpersonation `json:"impersonation,omitempty"`
 }
 
@@ -927,12 +943,20 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	hasPassword, err := accountHasPassword(account.ID)
+	if err != nil {
+		log.Errorf("Error checking password auth for account %s: %v", account.ID, err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
 	accountResponse := AccountResponse{
 		ID:                account.ID.String(),
 		Name:              account.Name,
 		Email:             account.Email,
 		AvatarURL:         getAvatarURL(providers),
 		InstallationAdmin: account.IsInstallationAdmin(),
+		HasPassword:       hasPassword,
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {

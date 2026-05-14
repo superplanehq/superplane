@@ -694,12 +694,10 @@ function CanvasPage(props: CanvasPageProps) {
 
   const agentState = useAgentState({
     isEditing: props.isEditing,
-    canvasVersion: props.activeCanvasVersionId,
     hideAddControls: props.hideAddControls,
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
-    onApplyAiOperations: props.onApplyAiOperations,
   });
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
@@ -3019,6 +3017,6 @@ function CanvasContent({
   );
 }
 
-export type { AgentContext, AgentMode, BuildingBlock } from "../BuildingBlocksSidebar";
+export type { BuildingBlock } from "../BuildingBlocksSidebar";
 export type { MissingIntegration } from "../IntegrationStatusIndicator";
 export { CanvasPage };

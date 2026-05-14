@@ -28,15 +28,19 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Monitor" href="#delete-monitor" description="Delete a Cloudflare load balancing health monitor" />
   <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
   <LinkCard title="Delete Pool" href="#delete-pool" description="Delete a Cloudflare Load Balancer origin pool" />
+  <LinkCard title="Delete Worker" href="#delete-worker" description="Delete a Worker script from your Cloudflare account" />
+  <LinkCard title="Deploy Worker" href="#deploy-worker" description="Provision a Worker if needed, upload a script version, and deploy it to traffic" />
   <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
   <LinkCard title="Get Load Balancer" href="#get-load-balancer" description="Retrieve a Cloudflare Load Balancer by ID" />
   <LinkCard title="Get Pool" href="#get-pool" description="Retrieve a Cloudflare Load Balancer origin pool by ID" />
+  <LinkCard title="Get Worker" href="#get-worker" description="Retrieve metadata and settings for a deployed Worker script" />
   <LinkCard title="Put KV Value" href="#put-kv-value" description="Write a key-value pair to a Cloudflare Workers KV namespace" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
   <LinkCard title="Update Load Balancer" href="#update-load-balancer" description="Update a Cloudflare Load Balancer's steering policy, pool weights, or session affinity" />
   <LinkCard title="Update Origin Rule" href="#update-origin-rule" description="Update an existing origin rule" />
   <LinkCard title="Update Pool" href="#update-pool" description="Update a Cloudflare Load Balancer origin pool's configuration or origin weights" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
+  <LinkCard title="Update Worker Route" href="#update-worker-route" description="Create or update a zone route that maps a URL pattern to a Worker script" />
 </CardGrid>
 
 ## Instructions
@@ -54,9 +58,12 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
      - Zone / Dynamic Redirect / Edit
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
+     - Zone / Workers Routes / Edit
+	 - Zone / Load Balancers / Edit
      - Account / Workers KV Storage / Edit
+     - Account / Workers Scripts / Edit
+     - Account / Workers / Edit
      - Account / Load Balancing: Monitors and Pools / Edit
-     - Zone / Load Balancers / Edit
      - Account / Notifications / Edit
      - Account / Account Settings / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
@@ -692,6 +699,87 @@ Emits a confirmation with the account ID and pool ID of the deleted pool.
 }
 ```
 
+<a id="delete-worker"></a>
+
+## Delete Worker
+
+The Delete Worker component removes a Worker script.
+
+### Configuration
+
+- **Worker Script**: Worker to delete (picker lists scripts for the account).
+- **Force**: When enabled, Cloudflare deletes the script even when blocked by bindings (see Cloudflare API `force` query parameter).
+
+### Output
+
+Emits the account ID and Worker Script that were deleted.
+
+> **Warning**: This operation is irreversible for the Worker script.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "workerScript": "my-worker"
+  },
+  "timestamp": "2026-05-05T12:00:00.000000000Z",
+  "type": "cloudflare.worker.deleted"
+}
+```
+
+<a id="deploy-worker"></a>
+
+## Deploy Worker
+
+The Deploy Worker component uploads a single-module Worker (`worker.js`) to a **Worker script name** in your account. When **Provision Worker if missing** is enabled (default), it first calls Cloudflare's Create Worker API so a **new** name works without a separate step. After upload, SuperPlane always creates a **deployment** so the new version serves 100% of traffic (`cloudflare.worker.deployed`).
+
+### Script source
+
+- **Inline**: paste the full contents of `worker.js` (ES module exporting `fetch`).
+- **URL**: provide an **https** URL that returns the script body (max 2 MiB).
+
+### Configuration
+
+- **Worker script name**: Name of the Worker in your account (same name used in routes and the dashboard). Used for both provisioning and upload.
+- **Provision Worker if missing** (default on): Calls `POST .../workers/workers` with the optional metadata fields in **Provision settings** when that section is visible. If the Worker already exists, the error is ignored and upload continues.
+- **Provision settings** (optional): Tags, Logpush, Observability, Subdomain, Tail consumers — sent only on the provision step when it runs; omit toggles to leave those keys out of the API request.
+- **Compatibility date** (optional): Passed to the **script upload** metadata. If omitted, SuperPlane sends a recent default so Cloudflare treats the upload as a modern module Worker.
+- **Compatibility flags** (optional): comma- or newline-separated flags for the upload metadata.
+- **Deployment message** (optional): annotation stored on the deployment.
+
+### Output
+
+Emits the account ID, script name, new version ID, and deployment object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deployment": {
+      "created_on": "2026-05-05T12:00:00Z",
+      "id": "182bd5e5-6e1a-4fe4-a799-aa6d9a6ab26e",
+      "source": "api",
+      "strategy": "percentage",
+      "versions": [
+        {
+          "percentage": 100,
+          "version_id": "18f97339-c287-4872-9bdd-e2135c07ec12"
+        }
+      ]
+    },
+    "scriptName": "my-worker",
+    "versionId": "18f97339-c287-4872-9bdd-e2135c07ec12"
+  },
+  "timestamp": "2026-05-05T12:00:00.000000000Z",
+  "type": "cloudflare.worker.deployed"
+}
+```
+
 <a id="get-kv-value"></a>
 
 ## Get KV Value
@@ -822,6 +910,52 @@ Returns the full pool configuration including its origins, enabled state, and he
   },
   "timestamp": "2026-05-05T05:58:40.060373991Z",
   "type": "cloudflare.pool.fetched"
+}
+```
+
+<a id="get-worker"></a>
+
+## Get Worker
+
+The Get Worker component loads Workers script **settings** (bindings, compatibility, usage model, etc.) and the list of **deployments** (newest first per Cloudflare).
+
+### Configuration
+
+- **Worker Script**: The Worker script in your Cloudflare account (picker lists scripts for the account).
+
+### Output
+
+Emits `settings` and `deployments` for use in later workflow steps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deployments": [
+      {
+        "created_on": "2026-05-05T12:00:00Z",
+        "id": "182bd5e5-6e1a-4fe4-a799-aa6d9a6ab26e",
+        "source": "api",
+        "strategy": "percentage",
+        "versions": [
+          {
+            "percentage": 100,
+            "version_id": "18f97339-c287-4872-9bdd-e2135c07ec12"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "bindings": [],
+      "compatibility_date": "2024-01-01",
+      "usage_model": "standard"
+    },
+    "workerScript": "my-worker"
+  },
+  "timestamp": "2026-05-05T12:00:00.000000000Z",
+  "type": "cloudflare.worker.fetched"
 }
 ```
 
@@ -1130,6 +1264,45 @@ Returns the updated redirect rule with all current configuration.
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "cloudflare.redirectRule"
+}
+```
+
+<a id="update-worker-route"></a>
+
+## Update Worker Route
+
+The Update Worker Route component manages **zone routes** for Workers.
+
+### Create vs update
+
+- Leave **Route ID** empty to **create** a new route (`POST /zones/{zone}/workers/routes`).
+- Set **Route ID** to **update** an existing route (`PUT /zones/{zone}/workers/routes/{id}`).
+
+### Configuration
+
+- **Zone**: Cloudflare zone for the route.
+- **Pattern**: URL pattern (for example `example.com/*`).
+- **Worker Script**: Worker script invoked for matching traffic (picker lists scripts for the account).
+
+### Output
+
+Emits the route id, pattern, and script returned by the Cloudflare API.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "route": {
+      "id": "023e105f4ecef8ad9ca31a8372d0c353",
+      "pattern": "example.com/*",
+      "script": "my-worker"
+    },
+    "zoneId": "023e105f4ecef8ad9ca31a8372d0c353"
+  },
+  "timestamp": "2026-05-05T12:00:00.000000000Z",
+  "type": "cloudflare.workerRoute.created"
 }
 ```
 

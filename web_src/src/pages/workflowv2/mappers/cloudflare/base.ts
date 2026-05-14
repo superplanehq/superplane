@@ -13,6 +13,18 @@ import type {
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
+export type WorkerScriptNodeMetadata = {
+  scriptDisplayName?: string;
+};
+
+/** Prefer backend-resolved display name for Worker script integration resources (value is script id). */
+export function workerScriptDisplayLabel(node: NodeInfo, scriptValue: string | undefined): string {
+  const meta = node.metadata as WorkerScriptNodeMetadata | undefined;
+  const label = meta?.scriptDisplayName?.trim();
+  if (label) return label;
+  return (scriptValue ?? "").trim();
+}
+
 export const baseMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
@@ -118,6 +130,79 @@ export function deleteLoadBalancerExecutionDetails(context: ExecutionDetailsCont
 
   details["Deleted"] = result.deleted != null ? String(result.deleted) : "-";
 
+  return details;
+}
+
+function resolveScriptLabel(data: Record<string, unknown>): string {
+  if (data.workerScript != null) return String(data.workerScript);
+  if (data.scriptName != null) return String(data.scriptName);
+  return "-";
+}
+
+export function getDeployWorkerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const data = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  if (!data) {
+    return details;
+  }
+  details["Script"] = resolveScriptLabel(data);
+  return details;
+}
+
+export function getWorkerMetadataExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const data = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  if (!data) {
+    return details;
+  }
+  details["Script"] = resolveScriptLabel(data);
+  const deployments = data.deployments as unknown[] | undefined;
+  details["Deployments"] = deployments != null ? String(deployments.length) : "-";
+  const settings = data.settings as Record<string, unknown> | undefined;
+  if (settings?.compatibility_date != null) {
+    details["Compatibility date"] = String(settings.compatibility_date);
+  }
+  return details;
+}
+
+export function getDeleteWorkerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const data = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  if (!data) {
+    return details;
+  }
+  details["Script"] = resolveScriptLabel(data);
+  if (data.deleted != null) {
+    details["Deleted"] = String(data.deleted);
+  }
+  return details;
+}
+
+export function getWorkerRouteExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (context.execution.createdAt) {
+    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
+  }
+  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
+  const data = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
+  const route = data?.route as Record<string, unknown> | undefined;
+  if (!route) {
+    return details;
+  }
+  details["Pattern"] = route.pattern != null ? String(route.pattern) : "-";
+  details["Script"] = route.script != null ? String(route.script) : "-";
   return details;
 }
 
