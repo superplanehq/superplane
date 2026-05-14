@@ -9,6 +9,7 @@ import { CollapseWidget } from "./CollapseWidget";
 import { StepsWidget } from "./StepsWidget";
 import { BannerWidget } from "./BannerWidget";
 import { MermaidWidget } from "./MermaidWidget";
+import { CodeBlockWidget } from "./CodeBlockWidget";
 
 const MARKDOWN_CLASSES =
   "max-w-none [&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-base [&_h1]:font-semibold [&_h1:first-child]:mt-0 " +
@@ -59,6 +60,17 @@ function SegmentRenderer({ segment, onAction }: { segment: Segment; onAction?: (
                   {children}
                 </a>
               ),
+              code: ({ className, children, ...props }) => {
+                const match = /language-(\w+)/.exec(className || "");
+                const codeStr = String(children).replace(/\n$/, "");
+                // Only use CodeBlockWidget for fenced code blocks (with language class)
+                if (match) {
+                  return <CodeBlockWidget code={codeStr} language={match[1]} />;
+                }
+                // Inline code
+                return <code className={className} {...props}>{children}</code>;
+              },
+              pre: ({ children }) => <>{children}</>,
             }}
           >
             {segment.content}
