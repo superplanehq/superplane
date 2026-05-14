@@ -19,6 +19,12 @@ var exampleOutputCreateMonitorBytes []byte
 //go:embed example_output_delete_monitor.json
 var exampleOutputDeleteMonitorBytes []byte
 
+//go:embed example_output_get_monitor.json
+var exampleOutputGetMonitorBytes []byte
+
+//go:embed example_output_update_monitor.json
+var exampleOutputUpdateMonitorBytes []byte
+
 //go:embed example_data_on_load_balancing_health_alert.json
 var exampleDataOnLoadBalancingHealthAlertBytes []byte
 
@@ -33,6 +39,12 @@ var exampleOutputCreateMonitor map[string]any
 
 var exampleOutputDeleteMonitorOnce sync.Once
 var exampleOutputDeleteMonitor map[string]any
+
+var exampleOutputGetMonitorOnce sync.Once
+var exampleOutputGetMonitor map[string]any
+
+var exampleOutputUpdateMonitorOnce sync.Once
+var exampleOutputUpdateMonitor map[string]any
 
 var exampleDataOnLoadBalancingHealthAlertOnce sync.Once
 var exampleDataOnLoadBalancingHealthAlert map[string]any
@@ -51,6 +63,14 @@ func (c *CreateMonitor) ExampleOutput() map[string]any {
 
 func (c *DeleteMonitor) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteMonitorOnce, exampleOutputDeleteMonitorBytes, &exampleOutputDeleteMonitor)
+}
+
+func (c *GetMonitor) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetMonitorOnce, exampleOutputGetMonitorBytes, &exampleOutputGetMonitor)
+}
+
+func (c *UpdateMonitor) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateMonitorOnce, exampleOutputUpdateMonitorBytes, &exampleOutputUpdateMonitor)
 }
 
 func (t *OnLoadBalancingHealthAlert) ExampleData() map[string]any {
@@ -235,4 +255,44 @@ var exampleOutputDeleteLoadBalancer map[string]any
 
 func (c *DeleteLoadBalancer) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteLoadBalancerOnce, exampleOutputDeleteLoadBalancerBytes, &exampleOutputDeleteLoadBalancer)
+}
+
+//go:embed example_output_deploy_worker.json
+var exampleOutputDeployWorkerBytes []byte
+
+var exampleOutputDeployWorkerOnce sync.Once
+var exampleOutputDeployWorker map[string]any
+
+func (d *DeployWorker) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeployWorkerOnce, exampleOutputDeployWorkerBytes, &exampleOutputDeployWorker)
+}
+
+//go:embed example_output_get_worker.json
+var exampleOutputGetWorkerBytes []byte
+
+var exampleOutputGetWorkerOnce sync.Once
+var exampleOutputGetWorker map[string]any
+
+func (g *GetWorker) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetWorkerOnce, exampleOutputGetWorkerBytes, &exampleOutputGetWorker)
+}
+
+//go:embed example_output_delete_worker.json
+var exampleOutputDeleteWorkerBytes []byte
+
+var exampleOutputDeleteWorkerOnce sync.Once
+var exampleOutputDeleteWorker map[string]any
+
+func (d *DeleteWorker) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteWorkerOnce, exampleOutputDeleteWorkerBytes, &exampleOutputDeleteWorker)
+}
+
+//go:embed example_output_update_worker_route.json
+var exampleOutputUpdateWorkerRouteBytes []byte
+
+var exampleOutputUpdateWorkerRouteOnce sync.Once
+var exampleOutputUpdateWorkerRoute map[string]any
+
+func (u *UpdateWorkerRoute) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateWorkerRouteOnce, exampleOutputUpdateWorkerRouteBytes, &exampleOutputUpdateWorkerRoute)
 }

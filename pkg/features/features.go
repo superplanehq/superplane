@@ -11,8 +11,13 @@ type Feature struct {
 	Released    *bool
 }
 
+// FeatureClaudeManagedAgents enables the managed-agents chat experience on a
+// per-organization basis until the integration is generally available.
+const FeatureClaudeManagedAgents = "claude_managed_agents"
+
 var registry = []Feature{
-	{ID: "runners", Label: "Runners", Description: "Sandboxed Runners"},
+	{ID: "runner", Label: "Runners", Description: "Sandboxed Runners"},
+	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas"},
 }
 
 func All() []Feature {

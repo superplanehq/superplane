@@ -29,6 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
+  <LinkCard title="Runner" href="#runner" description="Runs bash commands on a dedicated machine" />
   <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
@@ -683,6 +684,34 @@ The Read Memory component looks up values from canvas-level memory storage.
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.read"
+}
+```
+
+<a id="runner"></a>
+
+## Runner
+
+Runs bash commands on a dedicated machine.
+
+### Configuration
+- **Commands**: One or more shell commands, one per line.
+
+### Output channels
+- **Passed**: The commands finished with exit code **0**.
+- **Failed**: The commands finished with non-zero exit code.
+
+### Example Output
+
+```json
+{
+  "data": [
+    {
+      "exit_code": 0,
+      "status": "succeeded"
+    }
+  ],
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "runner.finished"
 }
 ```
 
