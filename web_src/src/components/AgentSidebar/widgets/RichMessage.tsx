@@ -60,14 +60,16 @@ function SegmentRenderer({ segment, onAction, canvasId, organizationId }: { segm
             urlTransform={(url) => url.startsWith("run:") ? url : defaultUrlTransform(url)}
             components={{
               a: ({ children, href }) => {
-                const runMatch = href?.match(/^run:([0-9a-f-]{36})$/);
+                const runMatch = href?.match(/^run:([0-9a-f-]{36})(?:\|(.+))?$/);
                 if (runMatch && canvasId && organizationId) {
+                  const label = typeof children === "string" ? children : undefined;
                   return (
                     <RunChip
                       runId={runMatch[1]}
                       canvasId={canvasId}
                       organizationId={organizationId}
-                      label={typeof children === "string" ? children : undefined}
+                      label={label}
+                      status={runMatch[2]}
                     />
                   );
                 }
