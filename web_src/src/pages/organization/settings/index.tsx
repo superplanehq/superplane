@@ -18,6 +18,7 @@ import { ServiceAccounts } from "./ServiceAccounts";
 import { ServiceAccountDetail } from "./ServiceAccountDetail";
 import { Usage } from "./Usage";
 import SuperplaneLogo from "@/assets/superplane.svg";
+import { clearCurrentOrgIdFromSessionStorage } from "@/lib/currentOrgIdFromSessionStorage";
 import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
 import {
@@ -203,7 +204,15 @@ export function OrganizationSettings() {
 
   const userLinks: NavLink[] = [
     { id: "profile", label: "Profile", href: `/${organizationId}/settings/profile`, Icon: CircleUser },
-    { id: "sign-out", label: "Sign Out", action: () => (window.location.href = "/logout"), Icon: LogOut },
+    {
+      id: "sign-out",
+      label: "Sign Out",
+      action: () => {
+        clearCurrentOrgIdFromSessionStorage();
+        window.location.href = "/logout";
+      },
+      Icon: LogOut,
+    },
   ];
 
   const isLinkActive = (link: NavLink) => {

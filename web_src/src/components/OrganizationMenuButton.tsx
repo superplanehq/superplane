@@ -1,5 +1,9 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { useAccount } from "@/contexts/AccountContext";
+import {
+  clearCurrentOrgIdFromSessionStorage,
+  getCurrentOrgIdFromSessionStorage,
+} from "@/lib/currentOrgIdFromSessionStorage";
 import { useOrganization, useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
@@ -30,6 +34,7 @@ interface OrganizationMenuButtonProps {
 }
 
 export function OrganizationMenuButton({ organizationId, className }: OrganizationMenuButtonProps) {
+  const logoOrganizationId = organizationId || getCurrentOrgIdFromSessionStorage() || undefined;
   const { account } = useAccount();
   const { data: organization } = useOrganization(organizationId || "");
   const { canAct, isLoading: permissionsLoading } = usePermissions();
@@ -152,6 +157,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
 
   const handleSignOut = () => {
     setIsMenuOpen(false);
+    clearCurrentOrgIdFromSessionStorage();
     posthog.reset();
     window.location.href = "/logout";
   };
@@ -278,7 +284,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
         )}
       </div>
       <Link
-        to={`/${organizationId}`}
+        to={logoOrganizationId ? `/${logoOrganizationId}` : "/"}
         aria-label="Go to canvases"
         className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
       >

@@ -1,7 +1,8 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import React from "react";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import React, { useEffect } from "react";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { setCurrentOrgIdToSessionStorage } from "@/lib/currentOrgIdFromSessionStorage";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -119,6 +120,14 @@ function AppRouter() {
 }
 
 function OrganizationScope() {
+  const { organizationId } = useParams<{ organizationId: string }>();
+
+  useEffect(() => {
+    if (organizationId) {
+      setCurrentOrgIdToSessionStorage(organizationId);
+    }
+  }, [organizationId]);
+
   return (
     <PermissionsProvider>
       <Outlet />

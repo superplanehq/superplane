@@ -1,5 +1,6 @@
 import { Heading } from "@/components/Heading/heading";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
+import { setCurrentOrgIdToSessionStorage } from "@/lib/currentOrgIdFromSessionStorage";
 import { Palette, Plus, User } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -196,6 +197,7 @@ const OrganizationSelect: React.FC = () => {
               <li key={org.id}>
                 <Link
                   to={`/${org.id}`}
+                  onClick={() => setCurrentOrgIdToSessionStorage(org.id)}
                   className={cn(
                     "flex items-center justify-between gap-4 rounded-md bg-white dark:bg-gray-900 px-4 py-3 shadow-sm outline outline-slate-950/10 hover:outline-slate-950/20 hover:shadow-md transition-colors cursor-pointer",
                     listRowMinHeight,
