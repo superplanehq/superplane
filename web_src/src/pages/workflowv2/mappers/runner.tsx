@@ -2,7 +2,8 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import { getColorClass } from "@/lib/colors";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import type React from "react";
+import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
+import React from "react";
 import { getTriggerRenderer } from ".";
 
 import type {
@@ -88,6 +89,11 @@ export const runnerMapper: ComponentBaseMapper = {
     const iconSlug = context.componentDefinition.icon || "terminal";
     const iconColor = getColorClass(context.componentDefinition?.color || "blue");
 
+    const customField =
+      lastExecution && context.canvasMode === "live"
+        ? () => <RunnerLiveLogDialog canvasMode={context.canvasMode ?? "live"} executionId={lastExecution.id} />
+        : undefined;
+
     return {
       title,
       iconSlug,
@@ -99,6 +105,8 @@ export const runnerMapper: ComponentBaseMapper = {
       metadata: [],
       specs: [],
       eventStateMap: RUNNER_STATE_MAP,
+      customField,
+      customFieldPosition: "before",
     };
   },
   subtitle(context: SubtitleContext): string | React.ReactNode {
