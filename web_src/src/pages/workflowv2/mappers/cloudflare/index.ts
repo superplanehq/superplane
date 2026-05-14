@@ -1,4 +1,6 @@
-import type { ComponentBaseMapper, EventStateRegistry, TriggerRenderer } from "../types";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import type { ComponentBaseMapper, EventStateRegistry, ExecutionInfo, OutputPayload, TriggerRenderer } from "../types";
+import { defaultStateFunction } from "../stateRegistry";
 import { baseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { onLoadBalancingHealthAlertTriggerRenderer } from "./on_load_balancing_health_alert";
@@ -18,6 +20,44 @@ import { createLoadBalancerMapper } from "./create_load_balancer";
 import { getLoadBalancerMapper } from "./get_load_balancer";
 import { updateLoadBalancerMapper } from "./update_load_balancer";
 import { deleteLoadBalancerMapper } from "./delete_load_balancer";
+import { deployWorkerMapper } from "./deploy_worker";
+import { getWorkerMapper } from "./get_worker";
+import { deleteWorkerMapper } from "./delete_worker";
+import { updateWorkerRouteMapper } from "./update_worker_route";
+
+const updateWorkerRouteStateRegistry: EventStateRegistry = {
+  stateMap: {
+    ...DEFAULT_EVENT_STATE_MAP,
+    created: DEFAULT_EVENT_STATE_MAP.success,
+    updated: DEFAULT_EVENT_STATE_MAP.success,
+  },
+  getState: (execution: ExecutionInfo) => {
+    const state = defaultStateFunction(execution);
+    if (state !== "success") {
+      return state;
+    }
+    const payloads = execution.outputs?.default as OutputPayload[] | undefined;
+    const payloadType = payloads?.[0]?.type;
+    if (payloadType === "cloudflare.workerRoute.updated") {
+      return "updated";
+    }
+    return "created";
+  },
+};
+
+const deployWorkerStateRegistry: EventStateRegistry = {
+  stateMap: {
+    ...DEFAULT_EVENT_STATE_MAP,
+    deployed: DEFAULT_EVENT_STATE_MAP.success,
+  },
+  getState: (execution: ExecutionInfo) => {
+    const state = defaultStateFunction(execution);
+    if (state !== "success") {
+      return state;
+    }
+    return "deployed";
+  },
+};
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createDnsRecord: baseMapper,
@@ -42,6 +82,10 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getLoadBalancer: getLoadBalancerMapper,
   updateLoadBalancer: updateLoadBalancerMapper,
   deleteLoadBalancer: deleteLoadBalancerMapper,
+  deployWorker: deployWorkerMapper,
+  getWorker: getWorkerMapper,
+  deleteWorker: deleteWorkerMapper,
+  updateWorkerRoute: updateWorkerRouteMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -71,4 +115,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getLoadBalancer: buildActionStateRegistry("fetched"),
   updateLoadBalancer: buildActionStateRegistry("updated"),
   deleteLoadBalancer: buildActionStateRegistry("deleted"),
+  deployWorker: deployWorkerStateRegistry,
+  getWorker: buildActionStateRegistry("fetched"),
+  deleteWorker: buildActionStateRegistry("deleted"),
+  updateWorkerRoute: updateWorkerRouteStateRegistry,
 };
