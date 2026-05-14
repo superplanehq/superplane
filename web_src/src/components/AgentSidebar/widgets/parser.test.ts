@@ -17,6 +17,7 @@ describe("parseAgentContent", () => {
     expect(segments).toHaveLength(1);
     expect(segments[0]).toEqual({
       type: "buttons",
+      prompt: "",
       items: ["Option A", "Option B"],
     });
   });
@@ -99,9 +100,8 @@ More text here.`;
   });
 
   it("handles collapse block", () => {
-    const content = `:::collapse
-title: Click to expand
-content: Hidden content
+    const content = `:::collapse title="Click to expand"
+Hidden content
 :::`;
     const segments = parseAgentContent(content);
     expect(segments).toHaveLength(1);

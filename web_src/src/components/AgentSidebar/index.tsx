@@ -182,11 +182,18 @@ function ChatConversation({
                 <Loader2 className="size-3 animate-spin mr-2" /> Loading older messages…
               </div>
             ) : null}
-            {groupMessages(messages).map((group, i) =>
+            {groupMessages(messages).map((group) =>
               group.type === "tool-group" ? (
                 <ToolGroupRow key={group.messages[0].id} messages={group.messages} />
               ) : (
-                <MessageRow key={group.message.id} message={group.message} sendMutation={sendMutation} chatId={chatId} canvasId={canvasId} organizationId={organizationId} />
+                <MessageRow
+                  key={group.message.id}
+                  message={group.message}
+                  sendMutation={sendMutation}
+                  chatId={chatId}
+                  canvasId={canvasId}
+                  organizationId={organizationId}
+                />
               ),
             )}
           </>
@@ -263,11 +270,6 @@ function MessageRow({
   canvasId: string;
   organizationId: string;
 }) {
-  if (message.role === "tool") {
-    return <ToolMessageRow message={message} />;
-  }
-  const isUser = message.role === "user";
-
   const handleAction = useCallback(
     async (action: string) => {
       if (sendMutation.isPending) return;
@@ -280,6 +282,11 @@ function MessageRow({
     [chatId, sendMutation],
   );
 
+  if (message.role === "tool") {
+    return <ToolMessageRow message={message} />;
+  }
+  const isUser = message.role === "user";
+
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
@@ -289,15 +296,22 @@ function MessageRow({
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
-        {isUser ? message.content : <RichMessage content={message.content} onAction={handleAction} canvasId={canvasId} organizationId={organizationId} />}
+        {isUser ? (
+          message.content
+        ) : (
+          <RichMessage
+            content={message.content}
+            onAction={handleAction}
+            canvasId={canvasId}
+            organizationId={organizationId}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-type MessageGroup =
-  | { type: "message"; message: AgentMessage }
-  | { type: "tool-group"; messages: AgentMessage[] };
+type MessageGroup = { type: "message"; message: AgentMessage } | { type: "tool-group"; messages: AgentMessage[] };
 
 function groupMessages(messages: AgentMessage[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
@@ -331,10 +345,7 @@ function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
     : `Ran ${count} command${count !== 1 ? "s" : ""}`;
 
   return (
-    <div
-      className={cn("text-sm py-1", hasRunning && "animate-tool-glow")}
-      data-testid="agent-tool-group"
-    >
+    <div className={cn("text-sm py-1", hasRunning && "animate-tool-glow")} data-testid="agent-tool-group">
       <button
         type="button"
         onClick={() => setExpanded((prev) => !prev)}
@@ -399,7 +410,6 @@ function ThinkingRow() {
     </div>
   );
 }
-
 
 function statusLabel(status: string): string {
   switch (status) {
