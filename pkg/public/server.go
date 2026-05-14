@@ -466,6 +466,15 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 			Middleware(http.HandlerFunc(s.handleWebSocket)),
 	)
 
+	// Agent-session WebSocket: scoped to the session's owning user. Auth
+	// uses the same middleware; ownership is enforced inside the handler
+	// because sessions are private per user, not per organization.
+	s.Router.Handle(
+		"/ws/agents/sessions/{sessionId}",
+		middleware.OrganizationAuthMiddleware(s.jwt).
+			Middleware(http.HandlerFunc(s.handleAgentSessionWebSocket)),
+	)
+
 	//
 	// In development mode, we proxy to the Vite dev server.
 	//
