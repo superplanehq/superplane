@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useId, useRef, useState, useCallback } from "react";
 import mermaid from "mermaid";
 import {
   Dialog,
@@ -108,24 +108,6 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
   );
 }
 
-function getSvgDimensions(svgString: string): { width: number; height: number } | null {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(svgString, "image/svg+xml");
-  const svgEl = doc.querySelector("svg");
-  if (!svgEl) return null;
-
-  // Try width/height attributes first, then viewBox
-  const w = parseFloat(svgEl.getAttribute("width") || "0");
-  const h = parseFloat(svgEl.getAttribute("height") || "0");
-  if (w > 0 && h > 0) return { width: w, height: h };
-
-  const vb = svgEl.getAttribute("viewBox");
-  if (vb) {
-    const parts = vb.split(/\s+/).map(Number);
-    if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
-      return { width: parts[2], height: parts[3] };
-    }
-  }
   return null;
 }
 
@@ -134,28 +116,9 @@ function MermaidPanZoom({ svg }: { svg: string }) {
 
 
   // Calculate initial zoom to fit SVG in the actual container once it renders
-  const [scale, setScale] = useState(1);
-  const initialScaleRef = useRef(1);
+  const [scale, setScale] = useState(2.5);
   
-  // Strip inline width/height from SVG so it can scale freely
-  const scalableSvg = useMemo(() => {
-    return svg.replace(/<svg([^>]*)width="[^"]*"/, '<svg$1').replace(/<svg([^>]*)height="[^"]*"/, '<svg$1').replace(/<svg/, '<svg width="100%" height="100%"');
-  }, [svg]);
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    // Find the actual SVG element and measure it
-    const svgEl = container.querySelector('svg');
-    if (!svgEl) return;
-    const bbox = svgEl.getBBox();
-    const rect = container.getBoundingClientRect();
-    if (bbox.width === 0 || bbox.height === 0 || rect.width === 0 || rect.height === 0) return;
-    const fitScale = Math.min(rect.width / (bbox.width + 20), rect.height / (bbox.height + 20));
-    const clamped = Math.min(Math.max(fitScale, 0.3), 5);
-    initialScaleRef.current = clamped;
-    setScale(clamped);
-  }, [svg]);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
 
@@ -191,7 +154,7 @@ function MermaidPanZoom({ svg }: { svg: string }) {
   }, []);
 
   const resetView = useCallback(() => {
-    setScale(initialScaleRef.current);
+    setScale(2.5);
     setTranslate({ x: 0, y: 0 });
   }, []);
 
@@ -239,8 +202,8 @@ function MermaidPanZoom({ svg }: { svg: string }) {
           }}
         >
           <div
-            className="[&_svg]:max-w-none"
-            dangerouslySetInnerHTML={{ __html: scalableSvg }}
+            className="[&_svg]:max-w-none [&_svg]:h-auto"
+            dangerouslySetInnerHTML={{ __html: svg }}
           />
         </div>
       </div>
