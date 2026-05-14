@@ -132,7 +132,21 @@ func (b *BrokerClient) CreateTask(commands []string, webhookURL string) (string,
 type Task struct {
 	TaskID   string `json:"task_id"`
 	Status   string `json:"status"`
-	ExitCode int    `json:"exit_code"`
+	ExitCode *int   `json:"exit_code,omitempty"`
+	Output   string `json:"output,omitempty"`
+	Error    string `json:"error,omitempty"`
+
+	TaskLog *TaskLogSink `json:"task_log,omitempty"`
+
+	CloudWatchLogGroup  string `json:"cloudwatch_log_group,omitempty"`
+	CloudWatchLogStream string `json:"cloudwatch_log_stream,omitempty"`
+}
+
+func (t *Task) effectiveExitCode() int {
+	if t == nil || t.ExitCode == nil {
+		return 0
+	}
+	return *t.ExitCode
 }
 
 func (t *Task) IsInTerminalState() bool {
