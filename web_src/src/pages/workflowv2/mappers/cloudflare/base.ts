@@ -140,7 +140,8 @@ export function getLoadBalancerExecutionDetails(context: ExecutionDetailsContext
   return details;
 }
 
-export function deleteLoadBalancerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+/** Execution details for Cloudflare delete actions that emit `{ deleted: boolean }` on the default channel. */
+export function cloudflareDeletedResourceExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
   const details: Record<string, string> = {};
 
   if (context.execution.createdAt) {
