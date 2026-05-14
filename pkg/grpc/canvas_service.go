@@ -442,10 +442,4 @@ func (s *CanvasService) UpdateCanvasLaunchpad(ctx context.Context, req *pb.Updat
 	return canvases.UpdateCanvasLaunchpad(ctx, organizationID, req.CanvasId, req.Panels, req.Layout)
 }
 
-func (s *CanvasService) InvokeNodeExecutionAction(ctx context.Context, req *pb.InvokeNodeExecutionActionBody) (*pb.InvokeNodeExecutionActionResponse, error) {
-	return &pb.InvokeNodeExecutionActionResponse{}, nil
-}
 
-func (s *CanvasService) InvokeNodeTriggerAction(ctx context.Context, req *pb.InvokeNodeTriggerActionBody) (*pb.InvokeNodeTriggerActionResponse, error) {
-	return &pb.InvokeNodeTriggerActionResponse{}, nil
-}

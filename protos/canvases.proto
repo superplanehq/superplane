@@ -442,27 +442,7 @@ service Canvases {
     };
   }
 
-  rpc InvokeNodeExecutionAction(InvokeNodeExecutionActionBody) returns (InvokeNodeExecutionActionResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/executions/{execution_id}/actions"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Invoke node execution action";
-      tags: "CanvasNode";
-    };
-  }
 
-  rpc InvokeNodeTriggerAction(InvokeNodeTriggerActionBody) returns (InvokeNodeTriggerActionResponse) {
-    option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/nodes/{node_id}/trigger-action"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Invoke node trigger action";
-      tags: "CanvasNode";
-    };
-  }
 
 }
 
@@ -1235,23 +1215,6 @@ message UpdateCanvasLaunchpadResponse {
 
 // Node action invocation
 
-message InvokeNodeExecutionActionBody {
-  string canvas_id = 1;
-  string node_id = 2;
-  string execution_id = 3;
-  string action = 4;
-  int32 index = 5;
-}
 
-message InvokeNodeTriggerActionBody {
-  string canvas_id = 1;
-  string node_id = 2;
-  google.protobuf.Struct data = 3;
-  string template_slug = 4;
-}
 
-message InvokeNodeTriggerActionResponse {
-  string event_id = 1;
-}
 
-message InvokeNodeExecutionActionResponse {}

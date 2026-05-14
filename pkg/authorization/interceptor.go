@@ -359,18 +359,6 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_InvokeNodeExecutionAction_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_InvokeNodeTriggerAction_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
 		pbCanvases.Canvases_CancelExecution_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "update",
