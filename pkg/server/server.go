@@ -107,7 +107,6 @@ func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.S
 		APIKey:        cfg.APIKey,
 		AgentID:       cfg.AgentID,
 		EnvironmentID: cfg.EnvironmentID,
-		FileIDs:       cfg.FileIDs,
 	})
 	if err != nil {
 		log.WithError(err).Warn("failed to initialise Anthropic managed agents provider")
