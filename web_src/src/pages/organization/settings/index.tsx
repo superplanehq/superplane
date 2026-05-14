@@ -435,7 +435,7 @@ export function OrganizationSettings() {
         </SidebarBody>
       </Sidebar>
 
-      <div className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-900">
+      <div className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-900 [scrollbar-gutter:stable]">
         <div className={cn("mx-auto w-full px-8 pb-8", isIntegrationSetupRoute ? "max-w-6xl" : "max-w-3xl")}>
           <div className="pt-10 pb-8">
             <h1 className="!text-2xl font-medium text-gray-900 dark:text-white">{activeMeta.title}</h1>
