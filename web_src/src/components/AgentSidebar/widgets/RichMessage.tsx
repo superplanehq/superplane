@@ -10,6 +10,7 @@ import { StepsWidget } from "./StepsWidget";
 import { BannerWidget } from "./BannerWidget";
 import { MermaidWidget } from "./MermaidWidget";
 import { CodeBlockWidget } from "./CodeBlockWidget";
+import { RunChip } from "./RunChip";
 
 const MARKDOWN_CLASSES =
   "max-w-none [&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-base [&_h1]:font-semibold [&_h1:first-child]:mt-0 " +
@@ -33,21 +34,23 @@ const MARKDOWN_CLASSES =
 interface RichMessageProps {
   content: string;
   onAction?: (text: string) => void;
+  canvasId?: string;
+  organizationId?: string;
 }
 
-export function RichMessage({ content, onAction }: RichMessageProps) {
+export function RichMessage({ content, onAction, canvasId, organizationId }: RichMessageProps) {
   const segments = parseAgentContent(content);
 
   return (
     <div>
       {segments.map((segment, i) => (
-        <SegmentRenderer key={i} segment={segment} onAction={onAction} />
+        <SegmentRenderer key={i} segment={segment} onAction={onAction} canvasId={canvasId} organizationId={organizationId} />
       ))}
     </div>
   );
 }
 
-function SegmentRenderer({ segment, onAction }: { segment: Segment; onAction?: (text: string) => void }) {
+function SegmentRenderer({ segment, onAction, canvasId, organizationId }: { segment: Segment; onAction?: (text: string) => void; canvasId?: string; organizationId?: string }) {
   switch (segment.type) {
     case "markdown":
       return (
@@ -55,11 +58,24 @@ function SegmentRenderer({ segment, onAction }: { segment: Segment; onAction?: (
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
             components={{
-              a: ({ children, href }) => (
-                <a href={href} target="_blank" rel="noopener noreferrer">
-                  {children}
-                </a>
-              ),
+              a: ({ children, href }) => {
+                const runMatch = href?.match(/^run:([0-9a-f-]{36})$/);
+                if (runMatch && canvasId && organizationId) {
+                  return (
+                    <RunChip
+                      runId={runMatch[1]}
+                      canvasId={canvasId}
+                      organizationId={organizationId}
+                      label={typeof children === "string" ? children : undefined}
+                    />
+                  );
+                }
+                return (
+                  <a href={href} target="_blank" rel="noopener noreferrer">
+                    {children}
+                  </a>
+                );
+              },
               code: ({ className, children, ...props }) => {
                 const match = /language-(\w+)/.exec(className || "");
                 const codeStr = String(children).replace(/\n$/, "");
