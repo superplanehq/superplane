@@ -26,6 +26,10 @@ import { deployWorkerMapper } from "./deploy_worker";
 import { getWorkerMapper } from "./get_worker";
 import { deleteWorkerMapper } from "./delete_worker";
 import { updateWorkerRouteMapper } from "./update_worker_route";
+import { createTunnelMapper } from "./create_tunnel";
+import { getTunnelMapper } from "./get_tunnel";
+import { deleteTunnelMapper } from "./delete_tunnel";
+import { onTunnelHealthTriggerRenderer } from "./on_tunnel_health";
 
 const updateWorkerRouteStateRegistry: EventStateRegistry = {
   stateMap: {
@@ -90,10 +94,14 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getWorker: getWorkerMapper,
   deleteWorker: deleteWorkerMapper,
   updateWorkerRoute: updateWorkerRouteMapper,
+  createTunnel: createTunnelMapper,
+  getTunnel: getTunnelMapper,
+  deleteTunnel: deleteTunnelMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onLoadBalancingHealthAlert: onLoadBalancingHealthAlertTriggerRenderer,
+  onTunnelHealth: onTunnelHealthTriggerRenderer,
 };
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -125,4 +133,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getWorker: buildActionStateRegistry("fetched"),
   deleteWorker: buildActionStateRegistry("deleted"),
   updateWorkerRoute: updateWorkerRouteStateRegistry,
+  createTunnel: buildActionStateRegistry("created"),
+  getTunnel: buildActionStateRegistry("fetched"),
+  deleteTunnel: buildActionStateRegistry("deleted"),
 };
