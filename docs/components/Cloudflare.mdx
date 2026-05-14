@@ -21,6 +21,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Monitor" href="#create-monitor" description="Create a Cloudflare load balancing health monitor" />
   <LinkCard title="Create Origin Rule" href="#create-origin-rule" description="Create a rule to override the origin server for matching requests" />
   <LinkCard title="Create Pool" href="#create-pool" description="Create a Cloudflare Load Balancer origin pool" />
+  <LinkCard title="Delete Certificate Pack" href="#delete-certificate-pack" description="Delete a custom SSL/TLS certificate pack from a Cloudflare zone" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a Cloudflare zone" />
   <LinkCard title="Delete KV Namespace" href="#delete-kv-namespace" description="Delete a Cloudflare Workers KV namespace" />
   <LinkCard title="Delete KV Value" href="#delete-kv-value" description="Delete a key from a Cloudflare Workers KV namespace" />
@@ -35,6 +36,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Monitor" href="#get-monitor" description="Retrieve a Cloudflare load balancing health monitor's configuration" />
   <LinkCard title="Get Pool" href="#get-pool" description="Retrieve a Cloudflare Load Balancer origin pool by ID" />
   <LinkCard title="Get Worker" href="#get-worker" description="Retrieve metadata and settings for a deployed Worker script" />
+  <LinkCard title="Order Certificate Pack" href="#order-certificate-pack" description="Order a custom SSL/TLS certificate pack for a Cloudflare zone" />
+  <LinkCard title="Purge Cache" href="#purge-cache" description="Purge cached content from the Cloudflare CDN for a zone" />
   <LinkCard title="Put KV Value" href="#put-kv-value" description="Write a key-value pair to a Cloudflare Workers KV namespace" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
   <LinkCard title="Update Load Balancer" href="#update-load-balancer" description="Update a Cloudflare Load Balancer's steering policy, pool weights, or session affinity" />
@@ -57,7 +60,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
      - Zone / DNS / Edit
-     - Zone / Dynamic Redirect / Edit
+     - Zone / Cache Purge / Purge
+     - Zone / SSL and Certificates / Edit
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
      - Zone / Workers Routes / Edit
@@ -439,6 +443,44 @@ Returns the created origin pool with its assigned ID and full configuration.
   },
   "timestamp": "2026-05-05T06:54:57.198268018Z",
   "type": "cloudflare.pool.created"
+}
+```
+
+<a id="delete-certificate-pack"></a>
+
+## Delete Certificate Pack
+
+The Delete Certificate Pack component removes a custom SSL/TLS certificate pack from a Cloudflare zone.
+
+### Use Cases
+
+- **Environment teardown**: Remove certificates issued for preview environments when they are decommissioned
+- **Certificate rotation**: Delete old certificate packs as part of a renewal workflow
+- **Cleanup**: Remove certificates that failed validation or are no longer needed
+
+### Configuration
+
+- **Certificate Pack**: The certificate pack to delete (shown as `zone/pack-id`). Can be set from a prior Order Certificate Pack component via an expression.
+
+### Output
+
+Emits the deleted pack ID, resolved zone ID, zone name when known from integration metadata, certificate hostnames when returned by the Cloudflare API (before deletion), and `deleted: true`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "hosts": [
+      "preview-123.example.com"
+    ],
+    "packId": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
+    "zoneId": "abc123def456abc123def456abc12345",
+    "zoneName": "example.com"
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.certificate_pack.deleted"
 }
 ```
 
@@ -1005,6 +1047,100 @@ Emits `settings` and `deployments` for use in later workflow steps.
   },
   "timestamp": "2026-05-05T12:00:00.000000000Z",
   "type": "cloudflare.worker.fetched"
+}
+```
+
+<a id="order-certificate-pack"></a>
+
+## Order Certificate Pack
+
+The Order Certificate Pack component orders an advanced SSL/TLS certificate pack for custom hostnames in a Cloudflare zone.
+
+### Use Cases
+
+- **Preview environments**: Automatically provision SSL certificates for dynamically created preview subdomains
+- **Custom domains**: Issue certificates for customer-owned domains behind Cloudflare
+- **Wildcard coverage**: Order a certificate that covers both the apex and wildcard subdomains
+
+### Configuration
+
+- **Zone**: The Cloudflare zone to issue the certificate in
+- **Hosts**: One or more hostnames the certificate should cover. Include both apex and wildcard variants (e.g., `example.com` and `*.example.com`) if needed.
+- **Certificate Authority**: The CA to use — Let's Encrypt (free, automated), Google, or SSL.com.
+- **Validation Method**: How domain ownership is verified — TXT record, HTTP file, or email.
+- **Certificate Validity Period**: How long the certificate should be valid. Available for Google and SSL.com certificates.
+- **Cloudflare Branding**: Whether to include Cloudflare branding on the certificate (optional).
+
+### Output
+
+Emits the resolved zone ID, zone name when known from integration metadata, pack ID, and the ordered certificate pack object (including covered hostnames). Status will typically be `initializing` or `pending_validation` immediately after ordering.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "pack": {
+      "certificate_authority": "lets_encrypt",
+      "hosts": [
+        "preview-123.example.com"
+      ],
+      "id": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
+      "status": "initializing",
+      "type": "advanced",
+      "validation_method": "txt"
+    },
+    "packId": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
+    "zoneId": "abc123def456abc123def456abc12345",
+    "zoneName": "example.com"
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.certificate_pack.ordered"
+}
+```
+
+<a id="purge-cache"></a>
+
+## Purge Cache
+
+The Purge Cache component clears cached content from the Cloudflare CDN.
+
+### Use Cases
+
+- **Deployments**: Immediately serve fresh content after a release without waiting for TTL expiry
+- **Hotfixes**: Force CDN edge nodes to re-fetch updated assets after a critical fix
+- **Preview environments**: Clear cache for specific preview subdomain URLs
+
+### Configuration
+
+- **Zone**: The Cloudflare zone whose cache to purge
+- **Mode**:
+  - *Everything*: Purge all cached content in the zone (equivalent to "Purge Everything" in the dashboard). Use with care — this can spike origin traffic.
+  - *Files*: Purge one or more specific URLs. Supports both plain URLs and URLs with custom cache headers.
+  - *Tags*: Purge by Cache-Tag header values (Enterprise plan only).
+  - *Hosts*: Purge all files cached under one or more hostnames (Enterprise plan only).
+  - *Prefixes*: Purge all cached assets whose URL starts with one of the provided prefixes.
+
+### Output
+
+Emits the Cloudflare purge result ID, zone ID, zone name (when known from integration metadata), and the purge scope (mode + items).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "files": [
+      "https://example.com/assets/main.css",
+      "https://example.com/assets/app.js"
+    ],
+    "id": "9a7806061c88ada191ed06f989cc3dac",
+    "mode": "files",
+    "zoneId": "abc123def456abc123def456abc12345",
+    "zoneName": "example.com"
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.cache.purged"
 }
 ```
 
