@@ -192,6 +192,54 @@ spec:
   },
 };
 
+export const SimpleTable: Story = {
+  args: {
+    content: `Here are the nodes in your canvas:
+
+| Node | Type | Component | Status |
+|------|------|-----------|--------|
+| Webhook Trigger | Trigger | webhook | Active |
+| Call API | Action | http | Active |
+| Check Status | Action | if | Active |
+| Notify Success | Action | http | Active |
+| Notify Failure | Action | http | Active |`,
+  },
+};
+
+export const RunHistoryTable: Story = {
+  args: {
+    content: `## Recent Runs
+
+Last 5 runs for this canvas:
+
+| Run ID | Started | Duration | Status | Trigger |
+|--------|---------|----------|--------|---------|
+| #1247 | 2 min ago | 3.2s | ✅ Success | Webhook |
+| #1246 | 17 min ago | 2.8s | ✅ Success | Webhook |
+| #1245 | 32 min ago | 12.1s | ❌ Failed | Webhook |
+| #1244 | 1h ago | 3.0s | ✅ Success | Schedule |
+| #1243 | 1h 15m ago | 2.9s | ✅ Success | Schedule |
+
+Run #1245 failed at the **Call API** node with a timeout error.`,
+  },
+};
+
+export const NodeComparisonTable: Story = {
+  args: {
+    content: `### Node Performance Comparison
+
+| Node | Avg Duration | Success Rate | Executions |
+|------|-------------|-------------|------------|
+| Webhook Trigger | 12ms | 100% | 1,247 |
+| Call API | 2.4s | 95.8% | 1,247 |
+| Check Status | 8ms | 100% | 1,195 |
+| Notify Success | 340ms | 99.2% | 1,142 |
+| Notify Failure | 380ms | 98.1% | 53 |
+
+The **Call API** node has the lowest success rate — consider adding retry logic.`,
+  },
+};
+
 export const MermaidDiagram: Story = {
   args: {
     content: `Here's the flow for your canvas:

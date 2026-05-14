@@ -20,7 +20,13 @@ const MARKDOWN_CLASSES =
   "[&_code]:rounded [&_code]:bg-slate-200/70 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs " +
   "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-200/70 [&_pre]:p-2 " +
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
-  "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current";
+  "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current " +
+  "[&_table]:my-2 [&_table]:w-full [&_table]:text-xs [&_table]:border-collapse " +
+  "[&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:border [&_table]:border-slate-200 " +
+  "[&_thead]:bg-slate-50 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-700 " +
+  "[&_th]:border-b [&_th]:border-slate-200 " +
+  "[&_td]:px-3 [&_td]:py-1.5 [&_td]:text-slate-600 [&_td]:border-b [&_td]:border-slate-100 " +
+  "[&_tr:last-child_td]:border-b-0 [&_tr:hover]:bg-slate-50/50";
 
 interface RichMessageProps {
   content: string;
