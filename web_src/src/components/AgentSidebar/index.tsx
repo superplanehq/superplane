@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useAgentChatMessages, useCanvasAgentChat, useSendAgentChatMessage } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
@@ -123,7 +124,9 @@ function ChatConversation({
   const wsCallbacks = useMemo(
     () => ({
       onAssistantDelta: (text: string) => setStreamingText((prev) => prev + text),
-      onPersistedMessage: () => setStreamingText(""),
+      onPersistedMessage: (msg: AgentMessage) => {
+        if (msg.role === "assistant") setStreamingText("");
+      },
       onStatusChange: (next: string, err?: string) => {
         setStatus(next || "idle");
         setError(err ?? null);
@@ -226,13 +229,13 @@ function ChatComposer({
 }) {
   return (
     <footer className="border-t border-border p-3 flex flex-col gap-2">
-      <textarea
+      <Textarea
         value={draft}
         onChange={(e) => onDraftChange(e.target.value)}
         rows={3}
         placeholder="Ask the agent…"
         data-testid="agent-input"
-        className="resize-none w-full border border-border rounded-md p-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="resize-none"
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();

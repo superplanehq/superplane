@@ -252,6 +252,28 @@ func TestService_SendMessage_InjectsPreambleOnFirstTurnOnly(t *testing.T) {
 	assert.Equal(t, "", provider.lastPreamble)
 }
 
+func TestService_SendMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{sendErr: errors.New("provider boom")}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "first")
+	require.Error(t, err)
+
+	provider.sendErr = nil
+	provider.lastPreamble = "<sentinel>"
+	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "retry")
+	require.NoError(t, err)
+	assert.Contains(t, provider.lastPreamble, "api_token:",
+		"preamble must still be injected after the previous attempt failed at the provider")
+}
+
 func TestService_SendMessage_PrivateToUser(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()

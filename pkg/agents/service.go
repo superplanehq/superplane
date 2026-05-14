@@ -49,23 +49,33 @@ func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, can
 		return nil, err
 	}
 
-	if existing, err := models.FindAgentSessionByCanvasInTransaction(database.Conn(), organizationID, userID, canvasID); err == nil {
-		return existing, nil
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("load session: %w", err)
+	existing, err := findCanvasSession(database.Conn(), organizationID, userID, canvasID)
+	if err != nil {
+		return nil, err
 	}
+	if existing != nil {
+		return existing, nil
+	}
+	return s.provisionSession(ctx, organizationID, userID, canvasID)
+}
 
+// provisionSession serialises find-or-create across replicas via a Postgres
+// advisory lock so two concurrent callers can't both provision an upstream
+// session and leak one when the unique index rejects the loser.
+func (s *Service) provisionSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
 	var session *models.AgentSession
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", ensureSessionLockKey(organizationID, userID, canvasID)).Error; err != nil {
 			return err
 		}
 
-		if found, err := models.FindAgentSessionByCanvasInTransaction(tx, organizationID, userID, canvasID); err == nil {
+		found, err := findCanvasSession(tx, organizationID, userID, canvasID)
+		if err != nil {
+			return err
+		}
+		if found != nil {
 			session = found
 			return nil
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-			return err
 		}
 
 		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{})
@@ -89,14 +99,6 @@ func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, can
 	return session, nil
 }
 
-func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
-	h := fnv.New64a()
-	h.Write(organizationID[:])
-	h.Write(userID[:])
-	h.Write(canvasID[:])
-	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
-}
-
 func (s *Service) GetSession(organizationID, userID, sessionID uuid.UUID) (*models.AgentSession, error) {
 	return models.FindAgentSessionForUser(organizationID, userID, sessionID)
 }
@@ -104,21 +106,17 @@ func (s *Service) GetSession(organizationID, userID, sessionID uuid.UUID) (*mode
 // ListMessages returns up to `limit` messages older than `beforeID` (or the
 // most recent `limit` when `beforeID` is uuid.Nil), chronologically ordered.
 func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]models.AgentSessionMessage, error) {
-	var before *models.AgentSessionMessage
-	if beforeID != uuid.Nil {
-		var anchor models.AgentSessionMessage
-		if err := database.Conn().
-			Where("session_id = ?", sessionID).
-			Where("id = ?", beforeID).
-			First(&anchor).Error; err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return nil, nil
-			}
-			return nil, err
-		}
-		before = &anchor
+	if beforeID == uuid.Nil {
+		return models.ListAgentSessionMessagesPage(sessionID, nil, limit)
 	}
-	return models.ListAgentSessionMessagesPage(sessionID, before, limit)
+	cursor, err := findCursorMessage(sessionID, beforeID)
+	if err != nil {
+		return nil, err
+	}
+	if cursor == nil {
+		return nil, nil
+	}
+	return models.ListAgentSessionMessagesPage(sessionID, cursor, limit)
 }
 
 func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string) (*models.AgentSessionMessage, error) {
@@ -131,88 +129,98 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	preamble := ""
+	preamble, err := s.buildPreambleIfFirstTurn(session, organizationID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("build preamble: %w", err)
+	}
+
+	// Send to provider BEFORE persisting the user message. If we persisted
+	// first and the provider call failed, the message count would jump from
+	// 0 to 1 and the next retry would skip the preamble — leaving the agent
+	// without its API token forever (the unique index blocks starting over).
+	if err := s.provider.SendMessage(ctx, session.ProviderSessionID, content, SendMessageOptions{ContextPreamble: preamble}); err != nil {
+		_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
+		return nil, fmt.Errorf("forward to provider: %w", err)
+	}
+
 	persisted := &models.AgentSessionMessage{
 		SessionID: sessionID,
 		Role:      models.AgentMessageRoleUser,
 		Content:   content,
 	}
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		count, err := models.CountAgentSessionMessagesInTransaction(tx, sessionID)
-		if err != nil {
-			return err
-		}
-		if count == 0 {
-			token, _, mintErr := s.mintAgentToken(organizationID.String(), userID.String(), session.CanvasID.String())
-			if mintErr != nil {
-				return mintErr
-			}
-			preamble = s.firstTurnPreamble(session, token)
-		}
-		return models.AppendAgentSessionMessageInTransaction(tx, persisted)
-	})
-	if err != nil {
+	if err := models.AppendAgentSessionMessage(persisted); err != nil {
 		return nil, fmt.Errorf("persist user message: %w", err)
-	}
-
-	if err := s.provider.SendMessage(ctx, session.ProviderSessionID, content, SendMessageOptions{ContextPreamble: preamble}); err != nil {
-		_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
-		return nil, fmt.Errorf("forward to provider: %w", err)
 	}
 
 	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusStreaming); err != nil {
 		log.WithError(err).Warn("failed to mark agent session as streaming")
 	}
 
-	if err := messages.PublishAgentStreamRequested(messages.AgentStreamRequest{
-		SessionID:      sessionID.String(),
-		OrganizationID: organizationID.String(),
-		UserID:         userID.String(),
-	}); err != nil {
-		// The provider has already accepted the message, so its response
-		// will go to a worker that no longer exists. Flip the session to
-		// failed and emit the matching event so the UI doesn't show a
-		// hung "streaming" state until the cleanup loop catches it.
-		_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
-		_ = messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
-			SessionID: sessionID.String(),
-			Event:     "session_failed",
-			Status:    models.AgentSessionStatusFailed,
-			Error:     "failed to enqueue stream",
-		})
-		log.WithError(err).Error("failed to enqueue agent stream request")
-		return nil, fmt.Errorf("enqueue stream: %w", err)
+	if err := s.enqueueStream(sessionID, organizationID, userID); err != nil {
+		return nil, err
 	}
 	return persisted, nil
 }
 
-func (s *Service) firstTurnPreamble(session *models.AgentSession, token string) string {
+func (s *Service) buildPreambleIfFirstTurn(session *models.AgentSession, organizationID, userID uuid.UUID) (string, error) {
+	count, err := models.CountAgentSessionMessagesInTransaction(database.Conn(), session.ID)
+	if err != nil {
+		return "", err
+	}
+	if count > 0 {
+		return "", nil
+	}
+	token, _, err := s.mintAgentToken(organizationID.String(), userID.String(), session.CanvasID.String())
+	if err != nil {
+		return "", err
+	}
 	return fmt.Sprintf(
 		"[SuperPlane session context]\ncanvas_id: %s\norganization_id: %s\napi_base_url: %s\napi_token: %s",
 		session.CanvasID.String(),
 		session.OrganizationID.String(),
 		s.baseURL,
 		token,
-	)
+	), nil
+}
+
+// enqueueStream wakes a worker to drive the upstream stream for the next turn.
+// On failure, the provider has already accepted the message, so we flip the
+// session to failed and notify the UI rather than leave it stuck in
+// "streaming" until the cleanup loop catches it.
+func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
+	err := messages.PublishAgentStreamRequested(messages.AgentStreamRequest{
+		SessionID:      sessionID.String(),
+		OrganizationID: organizationID.String(),
+		UserID:         userID.String(),
+	})
+	if err == nil {
+		return nil
+	}
+	_ = models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusFailed)
+	_ = messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
+		SessionID: sessionID.String(),
+		Event:     "session_failed",
+		Status:    models.AgentSessionStatusFailed,
+		Error:     "failed to enqueue stream",
+	})
+	log.WithError(err).Error("failed to enqueue agent stream request")
+	return fmt.Errorf("enqueue stream: %w", err)
 }
 
 // mintAgentToken returns a JWT scoped to one canvas to bound the blast-
 // radius if it leaks out of the agent container.
 func (s *Service) mintAgentToken(organizationID, userID, canvasID string) (string, time.Time, error) {
-	permissions := []jwt.Permission{
-		{ResourceType: "org", Action: "read"},
-		{ResourceType: "integrations", Action: "read"},
-		{ResourceType: "canvases", Action: "read", Resources: []string{canvasID}},
-		{ResourceType: "canvases", Action: "update", Resources: []string{canvasID}},
-	}
-
 	claims := jwt.ScopedTokenClaims{
 		Subject: userID,
 		OrgID:   organizationID,
 		Purpose: "agent-builder",
-		Scopes:  jwt.ScopesFromPermissions(permissions),
+		Scopes: jwt.ScopesFromPermissions([]jwt.Permission{
+			{ResourceType: "org", Action: "read"},
+			{ResourceType: "integrations", Action: "read"},
+			{ResourceType: "canvases", Action: "read", Resources: []string{canvasID}},
+			{ResourceType: "canvases", Action: "update", Resources: []string{canvasID}},
+		}),
 	}
-
 	token, err := s.jwtSigner.GenerateScopedToken(claims, agentTokenTTL)
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("mint agent token: %w", err)
@@ -220,16 +228,13 @@ func (s *Service) mintAgentToken(organizationID, userID, canvasID string) (strin
 	return token, s.clock().Add(agentTokenTTL), nil
 }
 
-// checkAgentPermission enforces the org-level baseline. Canvas-level access
-// is implicitly enforced by the caller's models.FindCanvas(orgID, canvasID)
-// — this codebase's auth model has no per-canvas RBAC layer; org members
-// see all of the org's canvases.
+// checkAgentPermission enforces the org-level baseline. Per-canvas access is
+// gated by the gRPC handler's models.FindCanvas(orgID, canvasID).
 func (s *Service) checkAgentPermission(userID, organizationID string) error {
 	checks := []struct{ resource, action string }{
 		{"agents", "create"},
 		{"canvases", "read"},
 	}
-
 	for _, c := range checks {
 		allowed, err := s.auth.CheckOrganizationPermission(userID, organizationID, c.resource, c.action)
 		if err != nil {
@@ -240,4 +245,38 @@ func (s *Service) checkAgentPermission(userID, organizationID string) error {
 		}
 	}
 	return nil
+}
+
+func findCanvasSession(tx *gorm.DB, orgID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
+	session, err := models.FindAgentSessionByCanvasInTransaction(tx, orgID, userID, canvasID)
+	if err == nil {
+		return session, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return nil, fmt.Errorf("load session: %w", err)
+}
+
+func findCursorMessage(sessionID, beforeID uuid.UUID) (*models.AgentSessionMessage, error) {
+	var anchor models.AgentSessionMessage
+	err := database.Conn().
+		Where("session_id = ?", sessionID).
+		Where("id = ?", beforeID).
+		First(&anchor).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &anchor, nil
+}
+
+func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
+	h := fnv.New64a()
+	h.Write(organizationID[:])
+	h.Write(userID[:])
+	h.Write(canvasID[:])
+	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
 }
