@@ -319,11 +319,11 @@ export const SidebarEventItem: React.FC<SidebarEventItemProps> = ({
         </div>
       </div>
 
-      {/* Hover overlay: cancel / re-emit menu */}
+      {/* Hover overlay with dropdown menu */}
       {showActionsMenu && (isHovered || isDropdownOpen) && (
         <div className="absolute top-0 right-0 h-full flex items-center bg-transparent">
           <div
-            className="h-full bg-white/50 backdrop-blur-[3px] rounded-r-md shadow-sm p-1 pt-2 flex items-start gap-0.5"
+            className="h-full bg-white/50 backdrop-blur-[3px] rounded-r-md shadow-sm p-1 pt-2"
             onClick={(e) => e.stopPropagation()}
           >
             <SidebarEventActionsMenu

@@ -61,11 +61,11 @@ import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
 import { CanvasLogSidebar, type ConsoleTab, type LogEntry } from "../CanvasLogSidebar";
 import type { EventState, EventStateMap } from "../componentBase";
 import { ComponentSidebar } from "../componentSidebar";
-import { RunnerLiveLogsModal } from "../componentSidebar/RunnerLiveLogsModal";
 import type { TabData } from "../componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "../componentSidebar/types";
 import { IntegrationStatusIndicator, type MissingIntegration } from "../IntegrationStatusIndicator";
 import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./Block";
+import { RunnerLiveLogModal } from "./RunnerLiveLogModal";
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
@@ -1325,7 +1325,6 @@ function CanvasPage(props: CanvasPageProps) {
               onTabChange={setCurrentTab}
               canvasMode={props.headerMode === "version-live" ? "live" : "edit"}
               organizationId={props.organizationId}
-              canvasId={props.canvasId}
               getCustomField={props.getCustomField}
               integrations={props.integrations}
               workflowNodes={props.workflowNodes}
@@ -1355,7 +1354,7 @@ function CanvasPage(props: CanvasPageProps) {
         </DialogContent>
       </Dialog>
       {props.canvasId && props.organizationId ? (
-        <RunnerLiveLogsModal
+        <RunnerLiveLogModal
           open={runnerLiveLogsExecutionId != null}
           onOpenChange={(nextOpen) => {
             if (!nextOpen) {
@@ -1399,7 +1398,6 @@ function Sidebar({
   onTabChange,
   canvasMode,
   organizationId,
-  canvasId,
   getCustomField,
   integrations,
   workflowNodes,
@@ -1447,7 +1445,6 @@ function Sidebar({
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
   canvasMode: "live" | "edit";
   organizationId?: string;
-  canvasId?: string;
   getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
   integrations?: OrganizationsIntegration[];
   workflowNodes?: ComponentsNode[];
@@ -1566,7 +1563,6 @@ function Sidebar({
       key={state.componentSidebar.selectedNodeId}
       isOpen={state.componentSidebar.isOpen}
       canvasMode={canvasMode}
-      canvasId={canvasId}
       onClose={onSidebarClose || state.componentSidebar.close}
       latestEvents={latestEvents}
       nextInQueueEvents={nextInQueueEvents}

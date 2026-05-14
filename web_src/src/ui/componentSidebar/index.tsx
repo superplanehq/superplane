@@ -56,8 +56,6 @@ const CREATE_INTEGRATION_DIALOG_OPTIONS: Record<
 interface ComponentSidebarProps {
   isOpen?: boolean;
   canvasMode?: "live" | "edit";
-  /** Canvas id for API calls (e.g. runner live log stream). */
-  canvasId?: string;
 
   latestEvents: SidebarEvent[];
   nextInQueueEvents: SidebarEvent[];
@@ -166,7 +164,6 @@ interface ComponentSidebarProps {
 export const ComponentSidebar = ({
   isOpen,
   canvasMode = "live",
-  canvasId: _canvasId,
   nodeId,
   iconSrc,
   iconSlug,

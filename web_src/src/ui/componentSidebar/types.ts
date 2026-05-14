@@ -19,8 +19,6 @@ export interface SidebarEvent {
   nodeId?: string;
   // Present for trigger events
   triggerEventId?: string;
-  /** Workflow component name for the execution's node (e.g. "runner"). */
-  component?: string;
   // Optional explicit kind for clarity
   kind?: "execution" | "trigger" | "queue";
 }

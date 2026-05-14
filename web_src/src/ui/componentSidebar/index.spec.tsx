@@ -37,7 +37,6 @@ vi.mock("@/components/ui/dialog", () => ({
   DialogFooter: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DialogHeader: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   DialogTitle: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
-  DialogDescription: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
 vi.mock("@/components/ui/input", () => ({

@@ -2,7 +2,7 @@ import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type RunnerLiveLogsModalProps = {
+type RunnerLiveLogModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   organizationId: string;
@@ -10,13 +10,13 @@ type RunnerLiveLogsModalProps = {
   executionId: string;
 };
 
-export function RunnerLiveLogsModal({
+export function RunnerLiveLogModal({
   open,
   onOpenChange,
   organizationId,
   canvasId,
   executionId,
-}: RunnerLiveLogsModalProps) {
+}: RunnerLiveLogModalProps) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
