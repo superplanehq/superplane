@@ -11,6 +11,7 @@ import { BannerWidget } from "./BannerWidget";
 import { MermaidWidget } from "./MermaidWidget";
 import { CodeBlockWidget } from "./CodeBlockWidget";
 import { RunChipFromLink } from "./RunChip";
+import { NodeChipFromLink } from "./NodeChip";
 
 const MARKDOWN_CLASSES =
   "max-w-none [&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-base [&_h1]:font-semibold [&_h1:first-child]:mt-0 " +
@@ -57,7 +58,7 @@ function SegmentRenderer({ segment, onAction, canvasId, organizationId }: { segm
         <div className={MARKDOWN_CLASSES}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
-            urlTransform={(url) => url.startsWith("run:") ? url : defaultUrlTransform(url)}
+            urlTransform={(url) => (url.startsWith("run:") || url.startsWith("node:")) ? url : defaultUrlTransform(url)}
             components={{
               a: ({ children, href }) => {
                 const runMatch = href?.match(/^run:([0-9a-f-]{36})(?:~(.+))?/);
@@ -73,6 +74,20 @@ function SegmentRenderer({ segment, onAction, canvasId, organizationId }: { segm
                     />
                   );
                 }
+
+                const nodeMatch = href?.match(/^node:(.+)$/);
+                if (nodeMatch && canvasId && organizationId) {
+                  const label = typeof children === "string" ? children : undefined;
+                  return (
+                    <NodeChipFromLink
+                      nodeId={nodeMatch[1]}
+                      rawLabel={label}
+                      canvasId={canvasId}
+                      organizationId={organizationId}
+                    />
+                  );
+                }
+
                 return (
                   <a href={href} target="_blank" rel="noopener noreferrer">
                     {children}
