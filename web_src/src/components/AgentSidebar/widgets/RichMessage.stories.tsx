@@ -192,6 +192,22 @@ spec:
   },
 };
 
+export const MermaidDiagram: Story = {
+  args: {
+    content: `Here's the flow for your canvas:
+
+\`\`\`mermaid
+flowchart LR
+    A[Webhook Trigger] --> B[Call API]
+    B --> C{Check Status}
+    C -->|200 OK| D[Notify Success]
+    C -->|Error| E[Notify Failure]
+\`\`\`
+
+The webhook will accept incoming requests and route them through the API health check before notifying via the appropriate channel.`,
+  },
+};
+
 export const MixedContent: Story = {
   args: {
     content: `## Analysis Complete

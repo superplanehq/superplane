@@ -7,6 +7,7 @@ export type ButtonsSegment = { type: "buttons"; items: string[] };
 export type ConfirmSegment = { type: "confirm"; message: string; yes: string; no: string };
 export type ChartSegment = { type: "chart"; config: ChartConfig };
 export type CollapseSegment = { type: "collapse"; title: string; content: string };
+export type MermaidSegment = { type: "mermaid"; content: string };
 export type StepsSegment = { type: "steps"; items: StepItem[] };
 export type SuccessSegment = { type: "success"; content: string };
 export type ErrorSegment = { type: "error"; content: string };
@@ -17,6 +18,7 @@ export type Segment =
   | ConfirmSegment
   | ChartSegment
   | CollapseSegment
+  | MermaidSegment
   | StepsSegment
   | SuccessSegment
   | ErrorSegment;
@@ -35,6 +37,8 @@ export type ChartConfig = {
 
 const BLOCK_RE = /^:::(\w+)(?:\s+(.*))?$/;
 const BLOCK_END_RE = /^:::$/;
+const MERMAID_FENCE_START = /^```mermaid\s*$/;
+const FENCE_END = /^```\s*$/;
 
 export function parseAgentContent(content: string): Segment[] {
   if (!content) return [];
@@ -66,13 +70,33 @@ export function parseAgentContent(content: string): Segment[] {
     blockLines = [];
   }
 
+  let inMermaidFence = false;
+  let mermaidLines: string[] = [];
+
   for (const line of lines) {
+    // Handle ```mermaid fenced code blocks
+    if (inMermaidFence) {
+      if (FENCE_END.test(line.trim())) {
+        flushMarkdown();
+        segments.push({ type: "mermaid", content: mermaidLines.join("\n") });
+        mermaidLines = [];
+        inMermaidFence = false;
+      } else {
+        mermaidLines.push(line);
+      }
+      continue;
+    }
+
     if (blockType) {
       if (BLOCK_END_RE.test(line.trim())) {
         flushBlock();
       } else {
         blockLines.push(line);
       }
+    } else if (MERMAID_FENCE_START.test(line.trim())) {
+      flushMarkdown();
+      inMermaidFence = true;
+      mermaidLines = [];
     } else {
       const match = line.match(BLOCK_RE);
       if (match) {
