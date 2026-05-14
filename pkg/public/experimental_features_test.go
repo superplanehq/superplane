@@ -33,7 +33,7 @@ func TestListExperimentalFeatures(t *testing.T) {
 			id, _ := f["id"].(string)
 			ids = append(ids, id)
 		}
-		assert.Contains(t, ids, "runners")
+		assert.Contains(t, ids, "runner")
 	})
 
 	t.Run("rejects unauthenticated requests", func(t *testing.T) {
