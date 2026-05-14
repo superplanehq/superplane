@@ -183,6 +183,7 @@ func (s *Server) createBrokerTask(w http.ResponseWriter, r *http.Request) {
 	up := api.CreateTaskRequest{
 		Command:                 append([]string(nil), req.Command...),
 		Commands:                append([]string(nil), req.Commands...),
+		Environment:             api.CloneEnvironment(req.Environment),
 		WebhookURL:              upstreamWebhook,
 		ExecutionMode:           req.ExecutionMode,
 		DockerImage:             req.DockerImage,
@@ -427,6 +428,9 @@ func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
 		return "invalid execution_mode"
 	}
 	if msg := api.ValidateExecutionTimeoutSeconds(req.ExecutionTimeoutSeconds); msg != "" {
+		return msg
+	}
+	if msg := api.ValidateEnvironment(req.Environment); msg != "" {
 		return msg
 	}
 	return ""

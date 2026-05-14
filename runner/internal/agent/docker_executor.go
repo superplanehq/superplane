@@ -138,19 +138,9 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 // When live is non-nil, stdout/stderr bytes are tee'd to it in addition to
 // being captured for the returned `output` string (CloudWatch live streaming).
 func dockerExecTask(ctx context.Context, name string, task *api.TaskPayload, live io.Writer) (int, string, error) {
-	var args []string
-	switch {
-	case len(task.Commands) > 0:
-		directives := normalizeDirectiveLines(task.Commands)
-		if len(directives) == 0 {
-			return 1, "", errEmptyCommands()
-		}
-		script := "set -e\n" + strings.Join(directives, "\n") + "\n"
-		args = []string{"exec", name, "sh", "-c", script}
-	case len(task.Command) > 0:
-		args = append([]string{"exec", name}, task.Command...)
-	default:
-		return 1, "", errors.New("empty command")
+	args, err := dockerExecArgs(name, task)
+	if err != nil {
+		return 1, "", err
 	}
 
 	cmd := exec.CommandContext(ctx, "docker", args...)
@@ -163,7 +153,7 @@ func dockerExecTask(ctx context.Context, name string, task *api.TaskPayload, liv
 		cmd.Stdout = &buf
 		cmd.Stderr = &buf
 	}
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
 		var ee *exec.ExitError
 		if errors.As(err, &ee) {
@@ -172,6 +162,31 @@ func dockerExecTask(ctx context.Context, name string, task *api.TaskPayload, liv
 		return 1, buf.String(), err
 	}
 	return 0, buf.String(), nil
+}
+
+func dockerExecArgs(name string, task *api.TaskPayload) ([]string, error) {
+	envArgs, err := dockerExecEnvironmentArgs(task.Environment)
+	if err != nil {
+		return nil, err
+	}
+	var args []string
+	switch {
+	case len(task.Commands) > 0:
+		directives := normalizeDirectiveLines(task.Commands)
+		if len(directives) == 0 {
+			return nil, errEmptyCommands()
+		}
+		script := "set -e\n" + strings.Join(directives, "\n") + "\n"
+		args = append([]string{"exec"}, envArgs...)
+		args = append(args, name, "sh", "-c", script)
+	case len(task.Command) > 0:
+		args = append([]string{"exec"}, envArgs...)
+		args = append(args, name)
+		args = append(args, task.Command...)
+	default:
+		return nil, errors.New("empty command")
+	}
+	return args, nil
 }
 
 func captureDocker(ctx context.Context, args ...string) ([]byte, error) {

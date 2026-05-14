@@ -1,7 +1,9 @@
 package api
 
 import (
+	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/superplane/runner/shared/models"
 )
@@ -17,6 +19,11 @@ const MaxExecutionTimeoutSecondsRequest = 86400 // 24 hours
 // (complete RPC, clock skew).
 const LeaseBufferSeconds = 90
 
+var environmentNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+// EnvironmentVariable is one task-scoped environment variable.
+type EnvironmentVariable = models.EnvironmentVariable
+
 // CreateTaskRequest is POST /v1/tasks.
 type CreateTaskRequest struct {
 	// Command is argv for one process. Omit when using Commands.
@@ -24,10 +31,12 @@ type CreateTaskRequest struct {
 	// Commands are shell directives (non-empty trimmed lines). The runner uses Bash on
 	// a PTY and sources each directive from a tempfile, stopping at the first failing
 	// directive ($? after source). Omit when using Command.
-	Commands      []string `json:"commands,omitempty"`
-	WebhookURL    string   `json:"webhook_url"`
-	ExecutionMode string   `json:"execution_mode"` // "host" | "docker"
-	DockerImage   string   `json:"docker_image,omitempty"`
+	Commands []string `json:"commands,omitempty"`
+	// Environment is sent only to runners and is not returned in status/webhook payloads.
+	Environment   []EnvironmentVariable `json:"environment,omitempty"`
+	WebhookURL    string                `json:"webhook_url"`
+	ExecutionMode string                `json:"execution_mode"` // "host" | "docker"
+	DockerImage   string                `json:"docker_image,omitempty"`
 	// ExecutionTimeoutSeconds is optional wall-clock limit for the runner execution phase (seconds).
 	// Omit to use DefaultExecutionTimeoutSeconds on the runner; if set, must be 1..MaxExecutionTimeoutSecondsRequest.
 	ExecutionTimeoutSeconds *int `json:"execution_timeout_seconds,omitempty"`
@@ -51,11 +60,12 @@ type ClaimTaskResponse struct {
 
 // TaskPayload is the task spec sent to runners.
 type TaskPayload struct {
-	ID            string   `json:"id"`
-	Command       []string `json:"command,omitempty"`
-	Commands      []string `json:"commands,omitempty"` // see CreateTaskRequest (Bash+PTY per directive on Unix)
-	ExecutionMode string   `json:"execution_mode"`
-	DockerImage   string   `json:"docker_image,omitempty"`
+	ID            string                `json:"id"`
+	Command       []string              `json:"command,omitempty"`
+	Commands      []string              `json:"commands,omitempty"` // see CreateTaskRequest (Bash+PTY per directive on Unix)
+	Environment   []EnvironmentVariable `json:"environment,omitempty"`
+	ExecutionMode string                `json:"execution_mode"`
+	DockerImage   string                `json:"docker_image,omitempty"`
 	// ExecutionTimeoutSeconds is nil when unset at create (runner uses default).
 	ExecutionTimeoutSeconds *int `json:"execution_timeout_seconds,omitempty"`
 }
@@ -76,6 +86,7 @@ func TaskPayloadFrom(t *models.Task) *TaskPayload {
 		ID:            t.ID,
 		Command:       t.Command,
 		Commands:      t.Commands,
+		Environment:   CloneEnvironment(t.Environment),
 		ExecutionMode: string(t.ExecutionMode),
 		DockerImage:   t.DockerImage,
 	}
@@ -86,6 +97,16 @@ func TaskPayloadFrom(t *models.Task) *TaskPayload {
 	return p
 }
 
+// CloneEnvironment returns a detached copy of environment variables.
+func CloneEnvironment(env []EnvironmentVariable) []EnvironmentVariable {
+	if len(env) == 0 {
+		return nil
+	}
+	out := make([]EnvironmentVariable, len(env))
+	copy(out, env)
+	return out
+}
+
 // ValidateExecutionTimeoutSeconds returns a non-empty error message if p is set but out of range.
 func ValidateExecutionTimeoutSeconds(p *int) string {
 	if p == nil {
@@ -94,6 +115,24 @@ func ValidateExecutionTimeoutSeconds(p *int) string {
 	v := *p
 	if v < 1 || v > MaxExecutionTimeoutSecondsRequest {
 		return "execution_timeout_seconds must be between 1 and " + strconv.Itoa(MaxExecutionTimeoutSecondsRequest)
+	}
+	return ""
+}
+
+// ValidateEnvironment returns a non-empty error message when task environment is invalid.
+func ValidateEnvironment(env []EnvironmentVariable) string {
+	seen := make(map[string]struct{}, len(env))
+	for _, variable := range env {
+		if !environmentNamePattern.MatchString(variable.Name) {
+			return "invalid environment variable name"
+		}
+		if _, ok := seen[variable.Name]; ok {
+			return "duplicate environment variable name"
+		}
+		seen[variable.Name] = struct{}{}
+		if strings.ContainsRune(variable.Value, '\x00') {
+			return "environment variable values cannot contain NUL bytes"
+		}
 	}
 	return ""
 }

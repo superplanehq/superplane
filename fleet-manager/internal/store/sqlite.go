@@ -61,12 +61,14 @@ CREATE INDEX IF NOT EXISTS tasks_status_created ON tasks(status, created_at);
 	if err := s.ensureCommandsJSONColumn(); err != nil {
 		return err
 	}
+	if err := s.ensureExecutionTimeoutColumn(); err != nil {
+		return err
+	}
 	if err := s.ensureCancelRequestedColumn(); err != nil {
 		return err
 	}
-	return s.ensureExecutionTimeoutColumn()
+	return s.ensureEnvironmentJSONColumn()
 }
-
 func (s *SQLiteStore) ensureCommandsJSONColumn() error {
 	var n int
 	err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('tasks') WHERE name='commands_json'`).Scan(&n)
@@ -106,6 +108,19 @@ func (s *SQLiteStore) ensureExecutionTimeoutColumn() error {
 	return err
 }
 
+func (s *SQLiteStore) ensureEnvironmentJSONColumn() error {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('tasks') WHERE name='environment_json'`).Scan(&n)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+	_, err = s.db.Exec(`ALTER TABLE tasks ADD COLUMN environment_json TEXT`)
+	return err
+}
+
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
 }
@@ -127,13 +142,21 @@ func (s *SQLiteStore) CreateTask(ctx context.Context, t *models.Task) error {
 		}
 		cmdsJSON = string(b)
 	}
+	var envJSON any
+	if len(t.Environment) > 0 {
+		b, err := json.Marshal(t.Environment)
+		if err != nil {
+			return err
+		}
+		envJSON = string(b)
+	}
 	if t.ExecutionMode == "" {
 		t.ExecutionMode = models.ExecutionHost
 	}
 	_, err = s.db.ExecContext(ctx, `
-INSERT INTO tasks (id, command_json, commands_json, webhook_url, status, created_at, execution_mode, docker_image, execution_timeout_seconds, cancel_requested)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
-		t.ID, string(cmdJSON), cmdsJSON, t.WebhookURL, string(t.Status), t.CreatedAt.Unix(),
+INSERT INTO tasks (id, command_json, commands_json, environment_json, webhook_url, status, created_at, execution_mode, docker_image, execution_timeout_seconds, cancel_requested)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+		t.ID, string(cmdJSON), cmdsJSON, envJSON, t.WebhookURL, string(t.Status), t.CreatedAt.Unix(),
 		string(t.ExecutionMode), nullString(t.DockerImage), nullIntPtr(t.ExecutionTimeoutSeconds),
 	)
 	return err
@@ -205,7 +228,7 @@ RETURNING id`,
 // GetByID returns a task by id.
 func (s *SQLiteStore) GetByID(ctx context.Context, id string) (*models.Task, error) {
 	row := s.db.QueryRowContext(ctx, `
-SELECT id, command_json, commands_json, webhook_url, status, created_at, claimed_at, lease_until, runner_id,
+SELECT id, command_json, commands_json, environment_json, webhook_url, status, created_at, claimed_at, lease_until, runner_id,
 	execution_mode, docker_image, execution_timeout_seconds, exit_code, output, error_message, cancel_requested
 FROM tasks WHERE id = ?`, id)
 	return scanTask(row)
@@ -214,7 +237,7 @@ FROM tasks WHERE id = ?`, id)
 func scanTask(row *sql.Row) (*models.Task, error) {
 	var (
 		id, cmdJSON, webhook, status          string
-		commandsJSON                          sql.NullString
+		commandsJSON, environmentJSON         sql.NullString
 		createdAt, claimedAt, leaseUntil      sql.NullInt64
 		runnerID, dockerImage, output, errMsg sql.NullString
 		execMode                              string
@@ -222,7 +245,7 @@ func scanTask(row *sql.Row) (*models.Task, error) {
 		exitCode                              sql.NullInt64
 		cancelReq                             int64
 	)
-	if err := row.Scan(&id, &cmdJSON, &commandsJSON, &webhook, &status, &createdAt, &claimedAt, &leaseUntil,
+	if err := row.Scan(&id, &cmdJSON, &commandsJSON, &environmentJSON, &webhook, &status, &createdAt, &claimedAt, &leaseUntil,
 		&runnerID, &execMode, &dockerImage, &execTimeoutSec, &exitCode, &output, &errMsg, &cancelReq); err != nil {
 		return nil, err
 	}
@@ -236,10 +259,17 @@ func scanTask(row *sql.Row) (*models.Task, error) {
 			return nil, fmt.Errorf("commands_json: %w", err)
 		}
 	}
+	var env []models.EnvironmentVariable
+	if environmentJSON.Valid && strings.TrimSpace(environmentJSON.String) != "" {
+		if err := json.Unmarshal([]byte(environmentJSON.String), &env); err != nil {
+			return nil, fmt.Errorf("environment_json: %w", err)
+		}
+	}
 	t := &models.Task{
 		ID:              id,
 		Command:         cmd,
 		Commands:        cmds,
+		Environment:     env,
 		WebhookURL:      webhook,
 		Status:          models.TaskStatus(status),
 		CreatedAt:       time.Unix(createdAt.Int64, 0).UTC(),
@@ -362,7 +392,8 @@ UPDATE tasks SET
 	exit_code = ?,
 	output = ?,
 	error_message = ?,
-	cancel_requested = 0
+	cancel_requested = 0,
+	environment_json = NULL
 WHERE id = ? AND runner_id = ? AND status = ?`,
 		string(final), exitCode, output, nullStringErr(errMsg), id, runnerID, string(models.StatusClaimed),
 	)

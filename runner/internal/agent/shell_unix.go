@@ -34,13 +34,13 @@ func usePipeShell() bool {
 	}
 }
 
-func runHostShellDirectives(ctx context.Context, maxOut int, scripts []string, live io.Writer) (int, string, error) {
+func runHostShellDirectives(ctx context.Context, maxOut int, scripts []string, env []string, live io.Writer) (int, string, error) {
 	bash, err := resolveBash()
 	if err != nil {
 		return 1, "", err
 	}
 	if usePipeShell() {
-		return runHostShellDirectivesPipe(ctx, maxOut, bash, scripts, live)
+		return runHostShellDirectivesPipe(ctx, maxOut, bash, scripts, env, live)
 	}
 	// Plain exec.Command (not CommandContext): attaching ctx to os/exec races with creack/pty on
 	// some Darwin setups; cancellation is handled inside runShellPTYSession via ctx + Process.Kill().
@@ -48,6 +48,9 @@ func runHostShellDirectives(ctx context.Context, maxOut int, scripts []string, l
 	// `/bin/bash: --: invalid option`). Keep job-control off (`+m`) for non-interactive scripts but
 	// omit `--noediting`; readline editing is irrelevant on our PTY-driven line protocol anyway.
 	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i")
+	if env != nil {
+		cmd.Env = env
+	}
 	return runShellPTYSession(ctx, maxOut, cmd, scripts, live)
 }
 
@@ -93,7 +96,7 @@ func writeDirectiveBundle(tmpRoot string, parts []string) (metaPath string, err 
 
 // runHostShellDirectivesPipe runs directives in one bash process without a PTY (same source bundle
 // semantics as the PTY path: cwd/env persist across sources).
-func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, scripts []string, live io.Writer) (int, string, error) {
+func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, scripts []string, env []string, live io.Writer) (int, string, error) {
 	parts := normalizeDirectiveLines(scripts)
 	if len(parts) == 0 {
 		return 1, "", errEmptyCommands()
@@ -110,6 +113,9 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, sc
 	}
 
 	cmd := exec.CommandContext(ctx, bash, "--norc", "--noprofile", metaPath)
+	if env != nil {
+		cmd.Env = env
+	}
 	max := maxOut
 	if max <= 0 {
 		max = 512 * 1024
