@@ -72,7 +72,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
 
   if (error) {
     return (
-      <div className="my-2 border border-red-200 bg-red-50 rounded-lg p-2">
+      <div className="my-4 border border-red-200 bg-red-50 rounded-lg p-2">
         <p className="text-xs text-red-600 font-medium">Diagram error</p>
         <pre className="text-xs text-red-500 mt-1 whitespace-pre-wrap">{content.trim()}</pre>
       </div>
@@ -81,7 +81,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
 
   if (!svg) {
     return (
-      <div className="my-2 flex items-center justify-center py-4 text-xs text-slate-400">
+      <div className="my-4 flex items-center justify-center py-4 text-xs text-slate-400">
         Rendering diagram...
       </div>
     );
@@ -91,7 +91,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
     <>
       <div
         ref={containerRef}
-        className="my-2 rounded-lg border border-violet-200 bg-white p-3 shadow-sm overflow-x-auto relative group [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:mx-auto"
+        className="my-4 rounded-lg border border-violet-200 bg-white p-3 shadow-sm overflow-x-auto relative group [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:mx-auto"
       >
         <button
           type="button"

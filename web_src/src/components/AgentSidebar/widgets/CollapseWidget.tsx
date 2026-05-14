@@ -11,7 +11,7 @@ export function CollapseWidget({ title, content }: CollapseWidgetProps) {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="my-2 border border-slate-200 rounded-lg overflow-hidden">
+    <div className="my-4 border border-slate-200 rounded-lg overflow-hidden">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}

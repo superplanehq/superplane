@@ -8,7 +8,7 @@ interface ButtonsWidgetProps {
 
 export function ButtonsWidget({ prompt, items, onAction }: ButtonsWidgetProps) {
   return (
-    <div className="my-2 rounded-lg border border-violet-200 bg-white shadow-sm overflow-hidden">
+    <div className="my-4 rounded-lg border border-violet-200 bg-white shadow-sm overflow-hidden">
       {prompt && (
         <div className="px-3 py-2 bg-violet-50 border-b border-violet-200">
           <p className="text-xs font-medium text-violet-900">{prompt}</p>
