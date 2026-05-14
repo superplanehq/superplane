@@ -132,19 +132,23 @@ function getSvgDimensions(svgString: string): { width: number; height: number } 
 function MermaidPanZoom({ svg }: { svg: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Calculate initial zoom to fit the SVG in the viewport
-  const initialScale = useMemo(() => {
-    const dims = getSvgDimensions(svg);
-    if (!dims) return 1;
-    // Assume modal viewport is roughly 85vw x 65vh
-    const vpWidth = window.innerWidth * 0.85 - 40; // padding
-    const vpHeight = window.innerHeight * 0.65 - 40;
-    const fitScale = Math.min(vpWidth / dims.width, vpHeight / dims.height);
-    // Clamp between 0.5x and 3x
-    return Math.min(Math.max(fitScale, 0.5), 3);
-  }, [svg]);
 
-  const [scale, setScale] = useState(initialScale);
+  // Calculate initial zoom to fit SVG in the actual container once it renders
+  const [scale, setScale] = useState(1);
+  const initialScaleRef = useRef(1);
+  
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const dims = getSvgDimensions(svg);
+    if (!dims) return;
+    const rect = container.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const fitScale = Math.min(rect.width / dims.width, rect.height / dims.height) * 0.9;
+    const clamped = Math.min(Math.max(fitScale, 0.3), 3);
+    initialScaleRef.current = clamped;
+    setScale(clamped);
+  }, [svg]);
   const [translate, setTranslate] = useState({ x: 0, y: 0 });
   const dragRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
 
@@ -180,9 +184,9 @@ function MermaidPanZoom({ svg }: { svg: string }) {
   }, []);
 
   const resetView = useCallback(() => {
-    setScale(initialScale);
+    setScale(initialScaleRef.current);
     setTranslate({ x: 0, y: 0 });
-  }, [initialScale]);
+  }, []);
 
   return (
     <div className="flex-1 min-h-0 flex flex-col">
@@ -211,7 +215,7 @@ function MermaidPanZoom({ svg }: { svg: string }) {
         <span>{Math.round(scale * 100)}%</span>
       </div>
       <div
-        ref={containerRef}
+        ref={(el) => { containerRef.current = el; containerRef.current = el; }}
         className="flex-1 min-h-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50/50 cursor-grab active:cursor-grabbing"
         onWheel={handleWheel}
         onMouseDown={handleMouseDown}
