@@ -3,6 +3,7 @@ import * as path from "path";
 
 const config: StorybookConfig = {
   stories: ["../src/**/*.stories.@(js|jsx|mjs|ts|tsx)"],
+  allowedHosts: true,
   addons: ["@chromatic-com/storybook", "@storybook/addon-docs", "@storybook/addon-onboarding", "@storybook/addon-a11y"],
   framework: {
     name: "@storybook/react-vite",
@@ -19,6 +20,7 @@ const config: StorybookConfig = {
     config.server = {
       ...config.server,
       strictPort: false,
+      allowedHosts: true,
     };
 
     // Add path aliases to match your main Vite config
