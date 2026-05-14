@@ -76,3 +76,26 @@ When working with database transactions, follow these rules to ensure data consi
   - The non-transaction variant should call the transaction variant: `return FindUserInTransaction(database.Conn(), ...)`
 
 **Why this matters**: Using `database.Conn()` inside transaction contexts breaks isolation, causes data inconsistency on rollback, and can lead to race conditions.
+
+## Cursor Cloud specific instructions
+
+### Environment overview
+
+The dev environment is entirely Docker-based. The VM needs Docker installed (with fuse-overlayfs storage driver and iptables-legacy for nested container support). All build, lint, test, and run commands execute inside Docker containers via `docker compose exec`.
+
+### Starting the development environment
+
+1. `make dev.up` — builds the dev-base Docker image and starts containers (app, db/PostgreSQL, rabbitmq). First run builds the image (~3-5 min); subsequent runs reuse the cached image.
+2. `make dev.setup` — installs npm deps, downloads Go modules, runs protobuf codegen, creates and migrates both `superplane_dev` and `superplane_test` databases.
+3. `make dev.server` — starts `air` (Go hot-reload) and Vite dev server inside the app container. Health check at `http://localhost:8000/health`.
+
+### Key gotchas
+
+- The `app` container starts with `sleep infinity` by default. You must explicitly run `make dev.server` to start the API + UI stack.
+- All `make` commands must be run from the `/agent/repos/superplane` directory.
+- The Docker daemon must be started manually in cloud VMs: `sudo dockerd &>/tmp/dockerd.log &` — wait ~3-4 seconds before issuing Docker commands.
+- After Docker daemon starts, ensure the socket is accessible: `sudo chmod 666 /var/run/docker.sock`.
+- Owner setup is enabled by default (`OWNER_SETUP_ENABLED=yes`). On first UI load at `http://localhost:8000`, you'll be prompted to create an admin account with email/password.
+- `BLOCK_SIGNUP=yes` is the default, so only the owner setup flow works for account creation (no open registration).
+- If `make dev.setup` fails on `go mod download` with missing files, run `make dev.clean.go.cache` then `make dev.setup.go`.
+- The `make dev.setup` Makefile target already creates and migrates both `superplane_dev` and `superplane_test` databases.
