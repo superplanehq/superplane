@@ -230,22 +230,6 @@ export function getWorkerRouteExecutionDetails(context: ExecutionDetailsContext)
   return details;
 }
 
-export function deleteTunnelExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-  const details: Record<string, string> = {};
-
-  if (context.execution.createdAt) {
-    details["Executed At"] = new Date(context.execution.createdAt).toLocaleString();
-  }
-
-  const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-  const result = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
-  if (!result) return details;
-
-  details["Deleted"] = result.deleted != null ? String(result.deleted) : "-";
-
-  return details;
-}
-
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const receivedAt = execution.createdAt ? new Date(execution.createdAt) : new Date();
   const subtitleDate = execution.updatedAt ?? execution.createdAt;
