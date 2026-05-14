@@ -24,8 +24,7 @@ const MARKDOWN_CLASSES =
   "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-200/70 [&_pre]:p-2 " +
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
   "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current " +
-  "[&_table]:my-4 [&_table]:w-full [&_table]:text-xs [&_table]:border-collapse " +
-  "[&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:border [&_table]:border-violet-200 [&_table]:bg-white [&_table]:shadow-sm " +
+  "[&_table]:w-full [&_table]:text-xs [&_table]:border-collapse " +
   "[&_thead]:bg-slate-50 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-700 " +
   "[&_th]:border-b [&_th]:border-slate-200 " +
   "[&_td]:px-3 [&_td]:py-1.5 [&_td]:text-slate-600 [&_td]:border-b [&_td]:border-slate-100 " +
@@ -105,6 +104,11 @@ function SegmentRenderer({ segment, onAction, canvasId, organizationId }: { segm
                 return <code className={className} {...props}>{children}</code>;
               },
               pre: ({ children }) => <>{children}</>,
+              table: ({ children, ...props }) => (
+                <div className="my-4 overflow-x-auto rounded-lg border border-violet-200 bg-white shadow-sm">
+                  <table {...props}>{children}</table>
+                </div>
+              ),
             }}
           >
             {segment.content}
