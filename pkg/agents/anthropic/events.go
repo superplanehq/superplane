@@ -9,12 +9,13 @@ import (
 )
 
 type anthropicEvent struct {
-	ID      string                  `json:"id"`
-	Type    string                  `json:"type"`
-	Name    string                  `json:"name"`
-	Input   json.RawMessage         `json:"input,omitempty"`
-	Content []anthropicContentBlock `json:"content"`
-	Error   *struct {
+	ID        string                  `json:"id"`
+	Type      string                  `json:"type"`
+	Name      string                  `json:"name"`
+	ToolUseID string                  `json:"tool_use_id,omitempty"`
+	Input     json.RawMessage         `json:"input,omitempty"`
+	Content   []anthropicContentBlock `json:"content"`
+	Error     *struct {
 		Message string `json:"message"`
 	} `json:"error"`
 }
@@ -37,19 +38,19 @@ func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 
 	case "agent.tool_use":
 		return agents.ProviderEvent{
-			ProviderEventID: raw.ID,
+			ProviderEventID: toolUseID(raw),
 			Type:            agents.ProviderEventToolUseStarted,
 			ToolName:        raw.Name,
-			ToolCallID:      raw.ID,
+			ToolCallID:      toolUseID(raw),
 			ToolInput:       redactSensitive(renderToolInput(raw.Input)),
 		}, true
 
 	case "agent.tool_result":
 		return agents.ProviderEvent{
-			ProviderEventID: raw.ID,
+			ProviderEventID: toolUseID(raw),
 			Type:            agents.ProviderEventToolUseFinished,
 			ToolName:        raw.Name,
-			ToolCallID:      raw.ID,
+			ToolCallID:      toolUseID(raw),
 		}, true
 
 	case "session.status_idle":
@@ -67,6 +68,18 @@ func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 	}
 
 	return agents.ProviderEvent{}, false
+}
+
+// toolUseID is the tool-call identifier shared by `agent.tool_use` and the
+// matching `agent.tool_result`. We key our DB upsert on it so the two
+// events collapse into one row (started → finished) instead of producing
+// two distinct ones. Falls back to the event id when the field is missing
+// for compatibility with stripped-down provider responses.
+func toolUseID(raw anthropicEvent) string {
+	if raw.ToolUseID != "" {
+		return raw.ToolUseID
+	}
+	return raw.ID
 }
 
 // renderToolInput prefers the `command` field for shell-style tools and

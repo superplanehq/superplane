@@ -129,20 +129,24 @@ func TestAgentStreamWorker_PersistsToolEvents(t *testing.T) {
 	assert.Equal(t, models.AgentToolStatusFinished, stored[0].ToolStatus)
 }
 
-func TestAgentStreamWorker_ClosesPreviousToolWhenNewOneStarts(t *testing.T) {
+func TestAgentStreamWorker_ParallelToolsTrackedIndependently(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 	session := mustCreateSession(t, r, canvas.ID)
 
-	// Three sequential bash calls with no tool_result events. Only the
-	// last one should still be in "started" once the worker is done.
+	// Agents commonly run tools in parallel — interleaved use/result events
+	// keyed by tool_use_id must each upsert into their own row, leaving
+	// any tool whose result hasn't arrived yet still in "started" state
+	// until the turn-end sweep catches it.
 	provider := &scriptedProvider{
 		name: testProvider,
 		events: []agents.ProviderEvent{
-			{ProviderEventID: "bash-1", Type: agents.ProviderEventToolUseStarted, ToolName: "bash", ToolCallID: "c1"},
-			{ProviderEventID: "bash-2", Type: agents.ProviderEventToolUseStarted, ToolName: "bash", ToolCallID: "c2"},
-			{ProviderEventID: "bash-3", Type: agents.ProviderEventToolUseStarted, ToolName: "bash", ToolCallID: "c3"},
+			{ProviderEventID: "toolu_1", Type: agents.ProviderEventToolUseStarted, ToolName: "bash"},
+			{ProviderEventID: "toolu_2", Type: agents.ProviderEventToolUseStarted, ToolName: "bash"},
+			{ProviderEventID: "toolu_3", Type: agents.ProviderEventToolUseStarted, ToolName: "bash"},
+			{ProviderEventID: "toolu_2", Type: agents.ProviderEventToolUseFinished, ToolName: "bash"},
+			{ProviderEventID: "toolu_1", Type: agents.ProviderEventToolUseFinished, ToolName: "bash"},
 			{Type: agents.ProviderEventTurnCompleted},
 		},
 	}
@@ -153,15 +157,17 @@ func TestAgentStreamWorker_ClosesPreviousToolWhenNewOneStarts(t *testing.T) {
 
 	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
 	require.NoError(t, err)
-	require.Len(t, stored, 3)
+	require.Len(t, stored, 3, "one row per tool_use_id, not duplicated per event")
 
+	// All three end up finished — toolu_1/2 via their explicit
+	// tool_result, toolu_3 via the turn-end sweep.
 	statuses := map[string]string{}
 	for _, m := range stored {
 		statuses[m.ProviderEventID] = m.ToolStatus
 	}
-	assert.Equal(t, models.AgentToolStatusFinished, statuses["bash-1"], "first tool must be marked finished when the second starts")
-	assert.Equal(t, models.AgentToolStatusFinished, statuses["bash-2"], "second tool must be marked finished when the third starts")
-	assert.Equal(t, models.AgentToolStatusFinished, statuses["bash-3"], "last tool flips to finished on turn end")
+	assert.Equal(t, models.AgentToolStatusFinished, statuses["toolu_1"])
+	assert.Equal(t, models.AgentToolStatusFinished, statuses["toolu_2"])
+	assert.Equal(t, models.AgentToolStatusFinished, statuses["toolu_3"], "tools without a result close on turn end")
 }
 
 func TestAgentStreamWorker_ForceClosesOpenToolsOnTurnEnd(t *testing.T) {

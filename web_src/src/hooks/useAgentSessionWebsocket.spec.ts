@@ -113,6 +113,48 @@ describe("useAgentSessionWebsocket", () => {
     expect(flatMessageIds(queryClient)).toEqual(["msg-existing", "msg-1"]);
   });
 
+  it("pushes live messages to the latest page (pages[0]) when older pages are also loaded", () => {
+    const queryClient = render({});
+    seedPages(queryClient, [
+      {
+        messages: [
+          {
+            id: "msg-latest",
+            role: "assistant",
+            content: "second",
+            toolName: "",
+            toolCallId: "",
+            toolStatus: "",
+            createdAt: null,
+          },
+        ],
+        hasMore: true,
+      },
+      {
+        messages: [
+          {
+            id: "msg-older",
+            role: "user",
+            content: "first",
+            toolName: "",
+            toolCallId: "",
+            toolStatus: "",
+            createdAt: null,
+          },
+        ],
+        hasMore: false,
+      },
+    ]);
+    emit("assistant_message", {
+      sessionId: "session-1",
+      messageId: "msg-new",
+      message: { id: "msg-new", role: "assistant", content: "third" },
+    });
+    const data = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("session-1"));
+    expect(data?.pages[0].messages.map((m) => m.id)).toEqual(["msg-latest", "msg-new"]);
+    expect(data?.pages[1].messages.map((m) => m.id)).toEqual(["msg-older"]);
+  });
+
   it("upserts tool events in place across pages", () => {
     const queryClient = render({});
     seedPages(queryClient, [{ messages: [], hasMore: false }]);

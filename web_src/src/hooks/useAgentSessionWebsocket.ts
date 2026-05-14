@@ -43,9 +43,9 @@ function handlePersistedMessage(
   callbacks.onPersistedMessage?.(data.message);
 }
 
-// The infinite cache stores oldest-first pages with the newest page LAST.
-// New messages go into the latest page; an existing message (by id) is
-// updated in place.
+// pages[0] is the latest fetch (most recent messages). Subsequent pages are
+// older batches loaded by scroll-up pagination. New live messages always
+// belong on pages[0].
 function upsertMessageInCache(queryClient: QueryClient, sessionId: string, message: AgentMessage): void {
   queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages(sessionId), (prev) => {
     if (!prev) return prev;
@@ -60,7 +60,7 @@ function upsertMessageInCache(queryClient: QueryClient, sessionId: string, messa
     if (pages.length === 0) {
       return { ...prev, pages: [{ messages: [message], hasMore: false }] };
     }
-    pages[pages.length - 1].messages.push(message);
+    pages[0].messages.push(message);
     return { ...prev, pages };
   });
 }

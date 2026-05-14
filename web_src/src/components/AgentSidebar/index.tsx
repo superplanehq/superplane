@@ -96,11 +96,28 @@ function ChatConversation({
   const [status, setStatus] = useState<string>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const messages = useMemo(() => {
-    const flat = messagesQuery.data?.pages.flatMap((p) => p.messages) ?? [];
-    return flat.filter((m) => m.role !== "tool" || (m.toolStatus !== "finished" && m.toolStatus !== "failed"));
-  }, [messagesQuery.data]);
-  const hasRunningTool = messages.some((m) => m.role === "tool");
+  // pages[0] is the latest fetch; later entries are older batches loaded
+  // via scroll-up. Reverse so chronological order falls out of flatMap.
+  const allMessages = useMemo(
+    () =>
+      messagesQuery.data?.pages
+        .slice()
+        .reverse()
+        .flatMap((p) => p.messages) ?? [],
+    [messagesQuery.data],
+  );
+  const hasRunningTool = useMemo(
+    () => allMessages.some((m) => m.role === "tool" && m.toolStatus === "started"),
+    [allMessages],
+  );
+  // While a tool is active, keep finished sibling tools visible too so the
+  // user sees the full sequence for the current turn. Once nothing is
+  // running, hide every tool row — the assistant's final response stands on
+  // its own.
+  const messages = useMemo(
+    () => (hasRunningTool ? allMessages : allMessages.filter((m) => m.role !== "tool")),
+    [allMessages, hasRunningTool],
+  );
   const showThinking = status === "streaming" && !streamingText && !hasRunningTool;
 
   const wsCallbacks = useMemo(
@@ -263,9 +280,10 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
   const [expanded, setExpanded] = useState(false);
   const command = message.content;
   const canExpand = Boolean(command);
+  const running = message.toolStatus === "started";
   return (
     <div
-      className="flex items-start gap-2 text-sm py-1 text-slate-500 animate-tool-glow"
+      className={cn("flex items-start gap-2 text-sm py-1 text-slate-500", running && "animate-tool-glow")}
       data-testid="agent-tool-message"
     >
       <SquareTerminal className="size-4 shrink-0 mt-0.5" />
@@ -276,7 +294,7 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
           disabled={!canExpand}
           className={cn("text-left", canExpand && "cursor-pointer hover:text-slate-700")}
         >
-          Running command
+          {running ? "Running command" : "Ran command"}
         </button>
         {expanded && command ? (
           <div className="font-mono text-xs text-slate-400 whitespace-pre-wrap break-words mt-1">{command}</div>
@@ -344,7 +362,7 @@ function AgentMarkdown({ content }: { content: string }) {
 function statusLabel(status: string): string {
   switch (status) {
     case "streaming":
-      return "Agent is thinking…";
+      return "Agent is working...";
     case "failed":
       return "Last turn failed";
     case "terminated":

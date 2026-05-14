@@ -168,6 +168,49 @@ func TestStreamEvents_MapsKnownTypes(t *testing.T) {
 	assert.Equal(t, agents.ProviderEventTurnCompleted, received[3].Type)
 }
 
+func TestStreamEvents_PairsToolUseAndResultByToolUseID(t *testing.T) {
+	// Tool use and its matching result have different event ids but share
+	// the same tool_use_id. The mapper must surface tool_use_id as the
+	// ProviderEventID so the worker upserts both into one DB row.
+	const sse = "data: {\"id\":\"evt_A\",\"type\":\"agent.tool_use\",\"tool_use_id\":\"toolu_1\",\"name\":\"bash\",\"input\":{\"command\":\"ls\"}}\n\n" +
+		"data: {\"id\":\"evt_B\",\"type\":\"agent.tool_result\",\"tool_use_id\":\"toolu_1\",\"name\":\"bash\"}\n\n" +
+		"data: {\"type\":\"session.status_idle\"}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+	require.Len(t, received, 3)
+	assert.Equal(t, "toolu_1", received[0].ProviderEventID, "tool_use must key on tool_use_id")
+	assert.Equal(t, "toolu_1", received[1].ProviderEventID, "tool_result must key on the same tool_use_id")
+}
+
+func TestStreamEvents_FallsBackToEventIDWhenToolUseIDMissing(t *testing.T) {
+	const sse = "data: {\"id\":\"evt_fallback\",\"type\":\"agent.tool_use\",\"name\":\"search\"}\n\n" +
+		"data: {\"type\":\"session.status_idle\"}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+	require.GreaterOrEqual(t, len(received), 1)
+	assert.Equal(t, "evt_fallback", received[0].ProviderEventID)
+}
+
 func TestStreamEvents_RedactsJWTsInToolCommands(t *testing.T) {
 	// Realistic bash command the agent writes when materialising the CLI
 	// config from the first-turn preamble. The token must be replaced.
