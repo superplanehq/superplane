@@ -186,7 +186,7 @@ function ChatConversation({
               group.type === "tool-group" ? (
                 <ToolGroupRow key={group.messages[0].id} messages={group.messages} />
               ) : (
-                <MessageRow key={group.message.id} message={group.message} sendMutation={sendMutation} chatId={chatId} />
+                <MessageRow key={group.message.id} message={group.message} sendMutation={sendMutation} chatId={chatId} canvasId={canvasId} organizationId={organizationId} />
               ),
             )}
           </>
@@ -254,10 +254,14 @@ function MessageRow({
   message,
   sendMutation,
   chatId,
+  canvasId,
+  organizationId,
 }: {
   message: AgentMessage;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   chatId: string;
+  canvasId: string;
+  organizationId: string;
 }) {
   if (message.role === "tool") {
     return <ToolMessageRow message={message} />;
@@ -285,7 +289,7 @@ function MessageRow({
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
-        {isUser ? message.content : <RichMessage content={message.content} onAction={handleAction} />}
+        {isUser ? message.content : <RichMessage content={message.content} onAction={handleAction} canvasId={canvasId} organizationId={organizationId} />}
       </div>
     </div>
   );
