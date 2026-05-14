@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { parseAgentMessage } from "./parser";
+import { parseAgentContent } from "./parser";
 
-describe("parseAgentMessage", () => {
+describe("parseAgentContent", () => {
   it("parses pure markdown", () => {
     const content = "Hello **world**";
-    const segments = parseAgentMessage(content);
+    const segments = parseAgentContent(content);
     expect(segments).toEqual([{ type: "markdown", content: "Hello **world**" }]);
   });
 
@@ -13,7 +13,7 @@ describe("parseAgentMessage", () => {
 - Option A
 - Option B
 :::`;
-    const segments = parseAgentMessage(content);
+    const segments = parseAgentContent(content);
     expect(segments).toHaveLength(1);
     expect(segments[0]).toEqual({
       type: "buttons",
@@ -27,7 +27,7 @@ message: Are you sure?
 yes: Yes
 no: No
 :::`;
-    const segments = parseAgentMessage(content);
+    const segments = parseAgentContent(content);
     expect(segments).toHaveLength(1);
     expect(segments[0]).toEqual({
       type: "confirm",
@@ -42,7 +42,7 @@ no: No
 - [x] Done step
 - [ ] Pending step
 :::`;
-    const segments = parseAgentMessage(content);
+    const segments = parseAgentContent(content);
     expect(segments).toHaveLength(1);
     expect(segments[0]).toEqual({
       type: "steps",
@@ -57,7 +57,7 @@ no: No
     const content = `:::success
 All good!
 :::`;
-    const segments = parseAgentMessage(content);
+    const segments = parseAgentContent(content);
     expect(segments).toHaveLength(1);
     expect(segments[0]).toEqual({
       type: "success",
@@ -74,7 +74,7 @@ All good!
 :::
 
 More text here.`;
-    const segments = parseAgentMessage(content);
+    const segments = parseAgentContent(content);
     expect(segments).toHaveLength(3);
     expect(segments[0].type).toBe("markdown");
     expect(segments[1].type).toBe("buttons");
@@ -85,7 +85,7 @@ More text here.`;
     const content = `:::chart
 {"type":"line","data":[{"x":1,"y":2}],"xKey":"x","yKeys":["y"]}
 :::`;
-    const segments = parseAgentMessage(content);
+    const segments = parseAgentContent(content);
     expect(segments).toHaveLength(1);
     expect(segments[0]).toEqual({
       type: "chart",
@@ -103,7 +103,7 @@ More text here.`;
 title: Click to expand
 content: Hidden content
 :::`;
-    const segments = parseAgentMessage(content);
+    const segments = parseAgentContent(content);
     expect(segments).toHaveLength(1);
     expect(segments[0]).toEqual({
       type: "collapse",
@@ -113,7 +113,7 @@ content: Hidden content
   });
 
   it("handles empty content", () => {
-    const segments = parseAgentMessage("");
+    const segments = parseAgentContent("");
     expect(segments).toEqual([]);
   });
 
@@ -122,7 +122,7 @@ content: Hidden content
 Great!
 :::
 Some text.`;
-    const segments = parseAgentMessage(content);
+    const segments = parseAgentContent(content);
     expect(segments).toHaveLength(2);
     expect(segments[0].type).toBe("success");
     expect(segments[1].type).toBe("markdown");
@@ -133,7 +133,7 @@ Some text.`;
 :::error
 Oops!
 :::`;
-    const segments = parseAgentMessage(content);
+    const segments = parseAgentContent(content);
     expect(segments).toHaveLength(2);
     expect(segments[0].type).toBe("markdown");
     expect(segments[1].type).toBe("error");
