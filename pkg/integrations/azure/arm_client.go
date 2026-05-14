@@ -52,14 +52,19 @@ func newARMClient(credential azcore.TokenCredential, subscriptionID string, logg
 
 // bearerToken obtains an OAuth2 token for the ARM management plane.
 func (c *armClient) bearerToken(ctx context.Context) (string, error) {
+	return c.bearerTokenForScope(ctx, "https://management.azure.com/.default")
+}
+
+// bearerTokenForScope obtains an OAuth2 token for the given scope.
+func (c *armClient) bearerTokenForScope(ctx context.Context, scope string) (string, error) {
 	if c.tokenFunc != nil {
 		return c.tokenFunc(ctx)
 	}
 	token, err := c.credential.GetToken(ctx, policy.TokenRequestOptions{
-		Scopes: []string{"https://management.azure.com/.default"},
+		Scopes: []string{scope},
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to get ARM token: %w", err)
+		return "", fmt.Errorf("failed to get token for scope %s: %w", scope, err)
 	}
 	return token.Token, nil
 }
