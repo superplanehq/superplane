@@ -91,7 +91,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
     <>
       <div
         ref={containerRef}
-        className="my-2 rounded-lg border border-slate-200 bg-slate-50/50 p-3 overflow-x-auto relative group [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:mx-auto"
+        className="my-2 rounded-lg border border-violet-200 bg-white p-3 shadow-sm overflow-x-auto relative group [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:mx-auto"
       >
         <button
           type="button"
