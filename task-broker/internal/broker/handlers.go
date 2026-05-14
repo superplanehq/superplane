@@ -181,11 +181,12 @@ func (s *Server) createBrokerTask(w http.ResponseWriter, r *http.Request) {
 
 	upstreamWebhook := public + "/v1/webhooks/complete/" + brokerID
 	up := api.CreateTaskRequest{
-		Command:       append([]string(nil), req.Command...),
-		Commands:      append([]string(nil), req.Commands...),
-		WebhookURL:    upstreamWebhook,
-		ExecutionMode: req.ExecutionMode,
-		DockerImage:   req.DockerImage,
+		Command:                 append([]string(nil), req.Command...),
+		Commands:                append([]string(nil), req.Commands...),
+		WebhookURL:              upstreamWebhook,
+		ExecutionMode:           req.ExecutionMode,
+		DockerImage:             req.DockerImage,
+		ExecutionTimeoutSeconds: cloneIntPtr(req.ExecutionTimeoutSeconds),
 	}
 
 	payload, err := json.Marshal(up)
@@ -283,15 +284,16 @@ func (s *Server) getBrokerTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, api.BrokerGetTaskResponse{
-		TaskID:              brokerID,
-		FleetTaskID:         row.FleetTaskID,
-		Status:              strings.TrimSpace(up.Status),
-		ExitCode:            up.ExitCode,
-		Output:              up.Output,
-		Error:               up.Error,
-		CloudWatchLogGroup:  up.CloudWatchLogGroup,
-		CloudWatchLogStream: up.CloudWatchLogStream,
-		TaskLog:             taskLog,
+		TaskID:                  brokerID,
+		FleetTaskID:             row.FleetTaskID,
+		Status:                  strings.TrimSpace(up.Status),
+		ExitCode:                up.ExitCode,
+		Output:                  up.Output,
+		Error:                   up.Error,
+		CloudWatchLogGroup:      up.CloudWatchLogGroup,
+		CloudWatchLogStream:     up.CloudWatchLogStream,
+		TaskLog:                 taskLog,
+		ExecutionTimeoutSeconds: up.ExecutionTimeoutSeconds,
 	})
 }
 
@@ -347,17 +349,27 @@ func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
 		return "command or commands required"
 	}
 	mode := sharedmodels.ExecutionMode(strings.ToLower(strings.TrimSpace(req.ExecutionMode)))
-	switch {
-	case mode == "" || mode == sharedmodels.ExecutionHost:
-		return ""
-	case mode == sharedmodels.ExecutionDocker:
+	switch mode {
+	case "", sharedmodels.ExecutionHost:
+	case sharedmodels.ExecutionDocker:
 		if strings.TrimSpace(req.DockerImage) == "" {
 			return "docker_image required for docker execution_mode"
 		}
-		return ""
 	default:
 		return "invalid execution_mode"
 	}
+	if msg := api.ValidateExecutionTimeoutSeconds(req.ExecutionTimeoutSeconds); msg != "" {
+		return msg
+	}
+	return ""
+}
+
+func cloneIntPtr(p *int) *int {
+	if p == nil {
+		return nil
+	}
+	v := *p
+	return &v
 }
 
 func (s *Server) forwardCreateTask(ctx context.Context, fleet *brokermodels.Fleet, body []byte) (fleetTaskID string, status int, respBody []byte) {
