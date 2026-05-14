@@ -1,8 +1,5 @@
-import { Loader2, Send, SquareTerminal, X } from "lucide-react";
+import { ChevronRight, Loader2, Send, SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkBreaks from "remark-breaks";
-import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -11,6 +8,7 @@ import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
 import type { AgentMessage } from "./types";
 import type { AgentState } from "./useAgentState";
 import { useSidebarWidth } from "./useSidebarWidth";
+import { RichMessage } from "./widgets/RichMessage";
 
 export interface AgentSidebarProps {
   agentState: AgentState;
@@ -184,9 +182,13 @@ function ChatConversation({
                 <Loader2 className="size-3 animate-spin mr-2" /> Loading older messages…
               </div>
             ) : null}
-            {messages.map((m) => (
-              <MessageRow key={m.id} message={m} />
-            ))}
+            {groupMessages(messages).map((group, i) =>
+              group.type === "tool-group" ? (
+                <ToolGroupRow key={group.messages[0].id} messages={group.messages} />
+              ) : (
+                <MessageRow key={group.message.id} message={group.message} sendMutation={sendMutation} chatId={chatId} canvasId={canvasId} organizationId={organizationId} />
+              ),
+            )}
           </>
         )}
         {showThinking ? <ThinkingRow /> : null}
@@ -248,11 +250,36 @@ function ChatComposer({
   );
 }
 
-function MessageRow({ message }: { message: AgentMessage }) {
+function MessageRow({
+  message,
+  sendMutation,
+  chatId,
+  canvasId,
+  organizationId,
+}: {
+  message: AgentMessage;
+  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
+  chatId: string;
+  canvasId: string;
+  organizationId: string;
+}) {
   if (message.role === "tool") {
     return <ToolMessageRow message={message} />;
   }
   const isUser = message.role === "user";
+
+  const handleAction = useCallback(
+    async (action: string) => {
+      if (sendMutation.isPending) return;
+      try {
+        await sendMutation.mutateAsync({ chatId, content: action });
+      } catch (err) {
+        console.error("Failed to send action:", err);
+      }
+    },
+    [chatId, sendMutation],
+  );
+
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
@@ -262,8 +289,68 @@ function MessageRow({ message }: { message: AgentMessage }) {
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
-        {isUser ? message.content : <AgentMarkdown content={message.content} />}
+        {isUser ? message.content : <RichMessage content={message.content} onAction={handleAction} canvasId={canvasId} organizationId={organizationId} />}
       </div>
+    </div>
+  );
+}
+
+type MessageGroup =
+  | { type: "message"; message: AgentMessage }
+  | { type: "tool-group"; messages: AgentMessage[] };
+
+function groupMessages(messages: AgentMessage[]): MessageGroup[] {
+  const groups: MessageGroup[] = [];
+  let toolBuffer: AgentMessage[] = [];
+
+  function flushTools() {
+    if (toolBuffer.length > 0) {
+      groups.push({ type: "tool-group", messages: [...toolBuffer] });
+      toolBuffer = [];
+    }
+  }
+
+  for (const m of messages) {
+    if (m.role === "tool") {
+      toolBuffer.push(m);
+    } else {
+      flushTools();
+      groups.push({ type: "message", message: m });
+    }
+  }
+  flushTools();
+  return groups;
+}
+
+function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasRunning = messages.some((m) => m.toolStatus === "started");
+  const count = messages.length;
+  const label = hasRunning
+    ? `Running command${count > 1 ? ` (${count})` : ""}...`
+    : `Ran ${count} command${count !== 1 ? "s" : ""}`;
+
+  return (
+    <div
+      className={cn("text-sm py-1", hasRunning && "animate-tool-glow")}
+      data-testid="agent-tool-group"
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        className="flex items-center gap-2 cursor-pointer text-slate-700 hover:text-slate-900"
+      >
+        <SquareTerminal className="size-4 shrink-0" />
+        <span>{label}</span>
+        <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} />
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-1">
+          {messages.map((m) => (
+            <ToolMessageRow key={m.id} message={m} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -273,25 +360,33 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
   const command = message.content;
   const canExpand = Boolean(command);
   const running = message.toolStatus === "started";
+  const preview = command ? command.split("\n")[0].substring(0, 80) : "command";
+
   return (
-    <div
-      className={cn("flex items-start gap-2 text-sm py-1 text-slate-500", running && "animate-tool-glow")}
-      data-testid="agent-tool-message"
-    >
-      <SquareTerminal className="size-4 shrink-0 mt-0.5" />
-      <div className="min-w-0 flex-1">
-        <button
-          type="button"
-          onClick={() => canExpand && setExpanded((prev) => !prev)}
-          disabled={!canExpand}
-          className={cn("text-left", canExpand && "cursor-pointer hover:text-slate-700")}
-        >
-          {running ? "Running command" : "Ran command"}
-        </button>
-        {expanded && command ? (
-          <div className="font-mono text-xs text-slate-400 whitespace-pre-wrap break-words mt-1">{command}</div>
-        ) : null}
-      </div>
+    <div className="text-xs">
+      <button
+        type="button"
+        onClick={() => canExpand && setExpanded((prev) => !prev)}
+        disabled={!canExpand}
+        className={cn(
+          "flex items-center gap-1.5 text-left w-full",
+          running ? "text-slate-700" : "text-slate-600",
+          canExpand && "cursor-pointer hover:text-slate-900",
+        )}
+      >
+        <span className="shrink-0 text-[10px]">{running ? "▶" : "✓"}</span>
+        <span className="truncate">{running ? "Running..." : preview}</span>
+      </button>
+      {expanded && command ? (
+        <div className="mt-1 rounded-lg border border-slate-200 bg-white overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-1 bg-slate-50 border-b border-slate-200">
+            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">bash</span>
+          </div>
+          <pre className="p-3 text-xs font-mono text-slate-700 whitespace-pre-wrap break-words overflow-auto max-h-[200px]">
+            {command}
+          </pre>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -305,37 +400,6 @@ function ThinkingRow() {
   );
 }
 
-const AGENT_MARKDOWN_CLASSES =
-  "max-w-none [&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-base [&_h1]:font-semibold [&_h1:first-child]:mt-0 " +
-  "[&_h2]:mb-1 [&_h2]:mt-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2:first-child]:mt-0 " +
-  "[&_h3]:mb-0.5 [&_h3]:mt-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3:first-child]:mt-0 " +
-  "[&_p]:mb-2 [&_p]:leading-relaxed [&_p:last-child]:mb-0 " +
-  "[&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-0.5 " +
-  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 " +
-  "[&_code]:rounded [&_code]:bg-slate-200/70 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs " +
-  "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-200/70 [&_pre]:p-2 " +
-  "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
-  "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current";
-
-function AgentMarkdown({ content }: { content: string }) {
-  if (!content) return null;
-  return (
-    <div className={AGENT_MARKDOWN_CLASSES}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkBreaks]}
-        components={{
-          a: ({ children, href }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer">
-              {children}
-            </a>
-          ),
-        }}
-      >
-        {content}
-      </ReactMarkdown>
-    </div>
-  );
-}
 
 function statusLabel(status: string): string {
   switch (status) {
