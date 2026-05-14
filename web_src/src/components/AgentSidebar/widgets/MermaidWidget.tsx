@@ -1,5 +1,12 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useCallback } from "react";
+import { Maximize2 } from "lucide-react";
 import mermaid from "mermaid";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 mermaid.initialize({
   startOnLoad: false,
@@ -7,35 +14,22 @@ mermaid.initialize({
   securityLevel: "strict",
   fontFamily: "ui-sans-serif, system-ui, sans-serif",
   themeVariables: {
-    // Primary colors — violet palette
     primaryColor: "#ede9fe",
     primaryTextColor: "#4c1d95",
     primaryBorderColor: "#8b5cf6",
-
-    // Secondary — cyan
     secondaryColor: "#ecfeff",
     secondaryTextColor: "#164e63",
     secondaryBorderColor: "#06b6d4",
-
-    // Tertiary — amber
     tertiaryColor: "#fffbeb",
     tertiaryTextColor: "#78350f",
     tertiaryBorderColor: "#f59e0b",
-
-    // Lines and text
     lineColor: "#94a3b8",
     textColor: "#334155",
-
-    // Nodes
     nodeBorder: "#8b5cf6",
     nodeTextColor: "#1e293b",
-
-    // Flowchart
     clusterBkg: "#f8fafc",
     clusterBorder: "#e2e8f0",
     defaultLinkColor: "#8b5cf6",
-
-    // Fonts
     fontSize: "13px",
   },
 });
@@ -49,6 +43,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,7 +60,6 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
           setError(err instanceof Error ? err.message : "Failed to render diagram");
           setSvg(null);
         }
-        // Clean up mermaid's error container
         document.getElementById(`dmermaid-${id}`)?.remove();
       }
     }
@@ -94,10 +88,125 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
   }
 
   return (
-    <div
-      ref={containerRef}
-      className="my-2 overflow-x-auto rounded-lg border border-slate-200 bg-slate-50/50 p-3 [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:mx-auto"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <>
+      <div
+        ref={containerRef}
+        className="my-2 rounded-lg border border-slate-200 bg-slate-50/50 p-3 overflow-x-auto relative group [&_svg]:max-w-full [&_svg]:h-auto [&_svg]:mx-auto"
+      >
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="absolute top-2 right-2 p-1 rounded hover:bg-slate-200/60 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+          aria-label="Expand diagram"
+        >
+          <Maximize2 className="size-3.5" />
+        </button>
+        <div dangerouslySetInnerHTML={{ __html: svg }} />
+      </div>
+
+      <Dialog open={expanded} onOpenChange={setExpanded}>
+        <DialogContent className="max-w-[90vw] max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-medium">Diagram</DialogTitle>
+          </DialogHeader>
+          <MermaidPanZoom svg={svg} />
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function MermaidPanZoom({ svg }: { svg: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ startX: number; startY: number; startTx: number; startTy: number } | null>(null);
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    setScale((prev) => Math.min(Math.max(prev * delta, 0.2), 5));
+  }, []);
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      dragRef.current = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startTx: translate.x,
+        startTy: translate.y,
+      };
+    },
+    [translate],
+  );
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!dragRef.current) return;
+    setTranslate({
+      x: dragRef.current.startTx + (e.clientX - dragRef.current.startX),
+      y: dragRef.current.startTy + (e.clientY - dragRef.current.startY),
+    });
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    dragRef.current = null;
+  }, []);
+
+  const resetView = useCallback(() => {
+    setScale(1);
+    setTranslate({ x: 0, y: 0 });
+  }, []);
+
+  return (
+    <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex items-center gap-2 mb-2 text-xs text-slate-500">
+        <button
+          type="button"
+          onClick={() => setScale((s) => Math.min(s * 1.2, 5))}
+          className="px-2 py-1 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer"
+        >
+          Zoom +
+        </button>
+        <button
+          type="button"
+          onClick={() => setScale((s) => Math.max(s * 0.8, 0.2))}
+          className="px-2 py-1 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer"
+        >
+          Zoom −
+        </button>
+        <button
+          type="button"
+          onClick={resetView}
+          className="px-2 py-1 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer"
+        >
+          Reset
+        </button>
+        <span>{Math.round(scale * 100)}%</span>
+      </div>
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50/50 cursor-grab active:cursor-grabbing"
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        <div
+          className="w-full h-full flex items-center justify-center"
+          style={{
+            transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
+            transformOrigin: "center center",
+            minHeight: "60vh",
+          }}
+        >
+          <div
+            className="[&_svg]:max-w-none [&_svg]:h-auto"
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
