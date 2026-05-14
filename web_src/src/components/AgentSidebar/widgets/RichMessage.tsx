@@ -8,6 +8,7 @@ import { ChartWidget } from "./ChartWidget";
 import { CollapseWidget } from "./CollapseWidget";
 import { StepsWidget } from "./StepsWidget";
 import { BannerWidget } from "./BannerWidget";
+import { MermaidWidget } from "./MermaidWidget";
 
 const MARKDOWN_CLASSES =
   "max-w-none [&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-base [&_h1]:font-semibold [&_h1:first-child]:mt-0 " +
@@ -65,6 +66,8 @@ function SegmentRenderer({ segment, onAction }: { segment: Segment; onAction?: (
       return <ChartWidget config={segment.config} />;
     case "collapse":
       return <CollapseWidget title={segment.title} content={segment.content} />;
+    case "mermaid":
+      return <MermaidWidget content={segment.content} />;
     case "steps":
       return <StepsWidget items={segment.items} />;
     case "success":
