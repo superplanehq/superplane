@@ -46,13 +46,3 @@ var exampleOutputDeleteIssue map[string]any
 func (c *DeleteIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteIssueOnce, exampleOutputDeleteIssueBytes, &exampleOutputDeleteIssue)
 }
-
-//go:embed example_data_on_issue.json
-var exampleDataOnIssueBytes []byte
-
-var exampleDataOnIssueOnce sync.Once
-var exampleDataOnIssue map[string]any
-
-func getExampleOnIssue() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
-}

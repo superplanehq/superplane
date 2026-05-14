@@ -39,16 +39,4 @@ export interface JiraDeletedIssue {
 
 export interface JiraNodeMetadata {
   project?: JiraProject;
-  webhookUrl?: string;
-}
-
-export interface JiraWebhookEvent {
-  webhookEvent?: string;
-  issue_event_type_name?: string;
-  user?: {
-    accountId?: string;
-    displayName?: string;
-    emailAddress?: string;
-  };
-  issue?: JiraIssue;
 }

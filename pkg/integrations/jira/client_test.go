@@ -11,79 +11,112 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-// newAuthorizedIntegration returns an IntegrationContext that has the
-// OAuth access token + cloud metadata already populated, simulating a
-// successfully-authorized integration.
+const (
+	testSiteURL  = "https://your-domain.atlassian.net"
+	testEmail    = "user@example.com"
+	testAPIToken = "test-api-token"
+)
+
+// newAuthorizedIntegration returns an IntegrationContext that has Basic Auth
+// credentials and integration metadata already populated, simulating a
+// successfully-configured integration.
 func newAuthorizedIntegration() *contexts.IntegrationContext {
-	ctx := &contexts.IntegrationContext{
+	return &contexts.IntegrationContext{
 		Configuration: map[string]any{
-			"clientId":     "client-id",
-			"clientSecret": "client-secret",
+			"siteUrl":  testSiteURL,
+			"email":    testEmail,
+			"apiToken": testAPIToken,
 		},
-		Metadata: Metadata{
-			CloudID: "cloud-123",
-			SiteURL: "https://your-domain.atlassian.net",
-		},
+		Metadata: Metadata{},
 	}
-	_ = ctx.SetSecret(OAuthAccessToken, []byte("test-access-token"))
-	return ctx
 }
 
 func newAuthorizedIntegrationWithMetadata(metadata Metadata) *contexts.IntegrationContext {
-	if metadata.CloudID == "" {
-		metadata.CloudID = "cloud-123"
-	}
-	ctx := &contexts.IntegrationContext{
+	return &contexts.IntegrationContext{
 		Configuration: map[string]any{
-			"clientId":     "client-id",
-			"clientSecret": "client-secret",
+			"siteUrl":  testSiteURL,
+			"email":    testEmail,
+			"apiToken": testAPIToken,
 		},
 		Metadata: metadata,
 	}
-	_ = ctx.SetSecret(OAuthAccessToken, []byte("test-access-token"))
-	return ctx
 }
 
 func Test__NewClient(t *testing.T) {
-	t.Run("missing access token -> error", func(t *testing.T) {
+	t.Run("missing site URL -> error", func(t *testing.T) {
 		appCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"clientId":     "client-id",
-				"clientSecret": "client-secret",
+				"email":    testEmail,
+				"apiToken": testAPIToken,
 			},
-			Metadata: Metadata{CloudID: "cloud-123"},
 		}
 
-		httpCtx := &contexts.HTTPContext{}
-		_, err := NewClient(httpCtx, appCtx)
-
+		_, err := NewClient(&contexts.HTTPContext{}, appCtx)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "missing access token")
+		assert.Contains(t, err.Error(), "site URL")
 	})
 
-	t.Run("missing cloud ID -> error", func(t *testing.T) {
+	t.Run("missing email -> error", func(t *testing.T) {
 		appCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"clientId":     "client-id",
-				"clientSecret": "client-secret",
+				"siteUrl":  testSiteURL,
+				"apiToken": testAPIToken,
 			},
 		}
-		_ = appCtx.SetSecret(OAuthAccessToken, []byte("test-token"))
 
-		httpCtx := &contexts.HTTPContext{}
-		_, err := NewClient(httpCtx, appCtx)
-
+		_, err := NewClient(&contexts.HTTPContext{}, appCtx)
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "missing Jira cloud ID")
+		assert.Contains(t, err.Error(), "email")
+	})
+
+	t.Run("missing API token -> error", func(t *testing.T) {
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl": testSiteURL,
+				"email":   testEmail,
+			},
+		}
+
+		_, err := NewClient(&contexts.HTTPContext{}, appCtx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "API token")
+	})
+
+	t.Run("empty site URL -> error", func(t *testing.T) {
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl":  "",
+				"email":    testEmail,
+				"apiToken": testAPIToken,
+			},
+		}
+
+		_, err := NewClient(&contexts.HTTPContext{}, appCtx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "missing Jira site URL")
 	})
 
 	t.Run("successful client creation", func(t *testing.T) {
-		appCtx := newAuthorizedIntegration()
-		client, err := NewClient(&contexts.HTTPContext{}, appCtx)
+		client, err := NewClient(&contexts.HTTPContext{}, newAuthorizedIntegration())
 
 		require.NoError(t, err)
-		assert.Equal(t, "test-access-token", client.Token)
-		assert.Equal(t, "cloud-123", client.CloudID)
+		assert.Equal(t, testSiteURL, client.SiteURL)
+		assert.Equal(t, testEmail, client.Email)
+		assert.Equal(t, testAPIToken, client.Token)
+	})
+
+	t.Run("trailing slash on site URL is trimmed", func(t *testing.T) {
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl":  testSiteURL + "/",
+				"email":    testEmail,
+				"apiToken": testAPIToken,
+			},
+		}
+
+		client, err := NewClient(&contexts.HTTPContext{}, appCtx)
+		require.NoError(t, err)
+		assert.Equal(t, testSiteURL, client.SiteURL)
 	})
 }
 
@@ -107,8 +140,8 @@ func Test__Client__GetCurrentUser(t *testing.T) {
 		assert.Equal(t, "123", user.AccountID)
 		assert.Equal(t, "Test User", user.DisplayName)
 		require.Len(t, httpContext.Requests, 1)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), "/ex/jira/cloud-123/rest/api/3/myself")
-		assert.Equal(t, "Bearer test-access-token", httpContext.Requests[0].Header.Get("Authorization"))
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/myself")
+		assert.True(t, strings.HasPrefix(httpContext.Requests[0].Header.Get("Authorization"), "Basic "))
 	})
 
 	t.Run("auth failure -> error", func(t *testing.T) {
@@ -150,7 +183,7 @@ func Test__Client__ListProjects(t *testing.T) {
 		require.Len(t, projects, 2)
 		assert.Equal(t, "TEST", projects[0].Key)
 		require.Len(t, httpContext.Requests, 1)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), "/ex/jira/cloud-123/rest/api/3/project")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/project")
 	})
 }
 
@@ -174,7 +207,7 @@ func Test__Client__GetIssue(t *testing.T) {
 		assert.Equal(t, "10001", issue.ID)
 		assert.Equal(t, "TEST-123", issue.Key)
 		assert.Equal(t, "Test issue", issue.Fields["summary"])
-		assert.Contains(t, httpContext.Requests[0].URL.String(), "/ex/jira/cloud-123/rest/api/3/issue/TEST-123")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/issue/TEST-123")
 	})
 
 	t.Run("issue not found -> error", func(t *testing.T) {
@@ -222,7 +255,7 @@ func Test__Client__CreateIssue(t *testing.T) {
 		assert.Equal(t, "10002", response.ID)
 		assert.Equal(t, "TEST-124", response.Key)
 		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), "/ex/jira/cloud-123/rest/api/3/issue")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/issue")
 	})
 
 	t.Run("issue creation failure -> error", func(t *testing.T) {
@@ -264,7 +297,7 @@ func Test__Client__UpdateIssue(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, http.MethodPut, httpContext.Requests[0].Method)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), "/ex/jira/cloud-123/rest/api/3/issue/TEST-1")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/issue/TEST-1")
 	})
 
 	t.Run("update error", func(t *testing.T) {
@@ -323,66 +356,6 @@ func Test__Client__DeleteIssue(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "403")
 	})
-}
-
-func Test__Client__RegisterWebhooks(t *testing.T) {
-	t.Run("registers webhook and returns ids", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"webhookRegistrationResult":[{"createdWebhookId":42}]}`)),
-				},
-			},
-		}
-
-		client, err := NewClient(httpContext, newAuthorizedIntegration())
-		require.NoError(t, err)
-
-		ids, err := client.RegisterWebhooks("https://hook.example.com", []WebhookRegistration{
-			{Events: []string{JiraEventIssueCreated}, JQLFilter: "project = TEST"},
-		})
-
-		require.NoError(t, err)
-		assert.Equal(t, []int{42}, ids)
-		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
-		assert.Contains(t, httpContext.Requests[0].URL.String(), "/ex/jira/cloud-123/rest/api/3/webhook")
-	})
-
-	t.Run("propagates registration errors", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{
-			Responses: []*http.Response{
-				{
-					StatusCode: http.StatusOK,
-					Body:       io.NopCloser(strings.NewReader(`{"webhookRegistrationResult":[{"errors":["bad jql"]}]}`)),
-				},
-			},
-		}
-
-		client, err := NewClient(httpContext, newAuthorizedIntegration())
-		require.NoError(t, err)
-
-		_, err = client.RegisterWebhooks("https://hook.example.com", []WebhookRegistration{
-			{Events: []string{JiraEventIssueCreated}, JQLFilter: "bad"},
-		})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "bad jql")
-	})
-}
-
-func Test__Client__DeleteWebhooks(t *testing.T) {
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusAccepted, Body: io.NopCloser(strings.NewReader(``))},
-		},
-	}
-
-	client, err := NewClient(httpContext, newAuthorizedIntegration())
-	require.NoError(t, err)
-
-	err = client.DeleteWebhooks([]int{42, 43})
-	require.NoError(t, err)
-	assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
 }
 
 func Test__WrapInADF(t *testing.T) {

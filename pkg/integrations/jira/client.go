@@ -2,53 +2,67 @@ package jira
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
-	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-// Client speaks to Jira Cloud through Atlassian's OAuth proxy. All endpoints
-// resolve to `https://api.atlassian.com/ex/jira/{cloudId}/rest/api/3/...`.
+// Client speaks to Jira Cloud directly using the user's site URL and Basic
+// Auth (email + API token). Endpoints resolve to `{siteUrl}/rest/api/3/...`.
 type Client struct {
-	Token   string
-	CloudID string
 	SiteURL string
+	Email   string
+	Token   string
 	http    core.HTTPContext
 }
 
 func NewClient(httpCtx core.HTTPContext, ctx core.IntegrationContext) (*Client, error) {
-	token, err := findSecret(ctx, OAuthAccessToken)
+	siteURL, err := ctx.GetConfig("siteUrl")
 	if err != nil {
-		return nil, fmt.Errorf("error getting access token: %v", err)
-	}
-	if token == "" {
-		return nil, fmt.Errorf("missing access token")
+		return nil, fmt.Errorf("error reading site URL: %v", err)
 	}
 
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.GetMetadata(), &metadata); err != nil {
-		return nil, fmt.Errorf("error decoding integration metadata: %v", err)
+	email, err := ctx.GetConfig("email")
+	if err != nil {
+		return nil, fmt.Errorf("error reading email: %v", err)
 	}
 
-	if metadata.CloudID == "" {
-		return nil, fmt.Errorf("missing Jira cloud ID — re-authorize the integration")
+	token, err := ctx.GetConfig("apiToken")
+	if err != nil {
+		return nil, fmt.Errorf("error reading API token: %v", err)
+	}
+
+	if len(siteURL) == 0 {
+		return nil, fmt.Errorf("missing Jira site URL")
+	}
+	if len(email) == 0 {
+		return nil, fmt.Errorf("missing Jira email")
+	}
+	if len(token) == 0 {
+		return nil, fmt.Errorf("missing API token")
 	}
 
 	return &Client{
-		Token:   token,
-		CloudID: metadata.CloudID,
-		SiteURL: metadata.SiteURL,
+		SiteURL: strings.TrimRight(string(siteURL), "/"),
+		Email:   string(email),
+		Token:   string(token),
 		http:    httpCtx,
 	}, nil
 }
 
 func (c *Client) apiURL(path string) string {
-	return fmt.Sprintf("%s/ex/jira/%s%s", APIBaseURL, url.PathEscape(c.CloudID), path)
+	return c.SiteURL + path
+}
+
+func (c *Client) basicAuthHeader() string {
+	creds := c.Email + ":" + c.Token
+	return "Basic " + base64.StdEncoding.EncodeToString([]byte(creds))
 }
 
 func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error) {
@@ -59,7 +73,7 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.Token)
+	req.Header.Set("Authorization", c.basicAuthHeader())
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -79,14 +93,12 @@ func (c *Client) execRequest(method, url string, body io.Reader) ([]byte, error)
 	return responseBody, nil
 }
 
-// User represents a Jira user.
 type User struct {
 	AccountID   string `json:"accountId"`
 	DisplayName string `json:"displayName"`
 	EmailAddr   string `json:"emailAddress,omitempty"`
 }
 
-// GetCurrentUser fetches the authenticated user via /rest/api/3/myself.
 func (c *Client) GetCurrentUser() (*User, error) {
 	body, err := c.execRequest(http.MethodGet, c.apiURL("/rest/api/3/myself"), nil)
 	if err != nil {
@@ -100,14 +112,12 @@ func (c *Client) GetCurrentUser() (*User, error) {
 	return &user, nil
 }
 
-// Project represents a Jira project.
 type Project struct {
 	ID   string `json:"id"`
 	Key  string `json:"key"`
 	Name string `json:"name"`
 }
 
-// ListProjects returns all projects accessible to the authenticated user.
 func (c *Client) ListProjects() ([]Project, error) {
 	body, err := c.execRequest(http.MethodGet, c.apiURL("/rest/api/3/project"), nil)
 	if err != nil {
@@ -121,7 +131,6 @@ func (c *Client) ListProjects() ([]Project, error) {
 	return projects, nil
 }
 
-// Issue represents a Jira issue.
 type Issue struct {
 	ID     string         `json:"id"`
 	Key    string         `json:"key"`
@@ -129,13 +138,11 @@ type Issue struct {
 	Fields map[string]any `json:"fields"`
 }
 
-// GetIssueOptions allows callers to request additional fields/expansions.
 type GetIssueOptions struct {
 	Fields string
 	Expand string
 }
 
-// GetIssue fetches a single issue by its key.
 func (c *Client) GetIssue(issueKey string) (*Issue, error) {
 	return c.GetIssueWithOptions(issueKey, GetIssueOptions{})
 }
@@ -166,7 +173,6 @@ func (c *Client) GetIssueWithOptions(issueKey string, opts GetIssueOptions) (*Is
 	return &issue, nil
 }
 
-// CreateIssueRequest is the request body for creating an issue.
 type CreateIssueRequest struct {
 	Fields CreateIssueFields `json:"fields"`
 }
@@ -202,7 +208,6 @@ type ADFText struct {
 	Text string `json:"text"`
 }
 
-// WrapInADF wraps plain text in a minimal ADF document.
 func WrapInADF(text string) *ADFDoc {
 	if text == "" {
 		return nil
@@ -225,7 +230,6 @@ type CreateIssueResponse struct {
 	Self string `json:"self"`
 }
 
-// CreateIssue creates a new issue.
 func (c *Client) CreateIssue(req *CreateIssueRequest) (*CreateIssueResponse, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
@@ -244,7 +248,6 @@ func (c *Client) CreateIssue(req *CreateIssueRequest) (*CreateIssueResponse, err
 	return &response, nil
 }
 
-// UpdateIssueRequest is the request body for updating an issue.
 type UpdateIssueRequest struct {
 	Fields map[string]any `json:"fields,omitempty"`
 }
@@ -253,7 +256,6 @@ type UpdateIssueOptions struct {
 	NotifyUsers *bool
 }
 
-// UpdateIssue updates an existing issue. Jira returns 204 No Content on success.
 func (c *Client) UpdateIssue(issueKey string, req *UpdateIssueRequest, opts UpdateIssueOptions) error {
 	endpoint := c.apiURL("/rest/api/3/issue/" + url.PathEscape(issueKey))
 
@@ -284,7 +286,6 @@ type DeleteIssueOptions struct {
 	DeleteSubtasks bool
 }
 
-// DeleteIssue removes an issue. Jira returns 204 No Content on success.
 func (c *Client) DeleteIssue(issueKey string, opts DeleteIssueOptions) error {
 	endpoint := c.apiURL("/rest/api/3/issue/" + url.PathEscape(issueKey))
 
@@ -297,98 +298,6 @@ func (c *Client) DeleteIssue(issueKey string, opts DeleteIssueOptions) error {
 	}
 
 	if _, err := c.execRequest(http.MethodDelete, endpoint, nil); err != nil {
-		return err
-	}
-	return nil
-}
-
-// WebhookRegistration describes a webhook to register with Jira.
-type WebhookRegistration struct {
-	Events    []string `json:"events"`
-	JQLFilter string   `json:"jqlFilter"`
-}
-
-type registerWebhooksRequest struct {
-	URL      string                `json:"url"`
-	Webhooks []WebhookRegistration `json:"webhooks"`
-}
-
-type registerWebhooksResponse struct {
-	WebhookRegistrationResult []registeredWebhook `json:"webhookRegistrationResult"`
-}
-
-type registeredWebhook struct {
-	CreatedWebhookID int      `json:"createdWebhookId,omitempty"`
-	Errors           []string `json:"errors,omitempty"`
-}
-
-// RegisterWebhooks creates dynamic webhooks against the configured Jira site.
-// Returns the IDs of the newly created webhooks.
-func (c *Client) RegisterWebhooks(webhookURL string, registrations []WebhookRegistration) ([]int, error) {
-	payload := registerWebhooksRequest{URL: webhookURL, Webhooks: registrations}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling webhook payload: %v", err)
-	}
-
-	responseBody, err := c.execRequest(http.MethodPost, c.apiURL("/rest/api/3/webhook"), bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-
-	var resp registerWebhooksResponse
-	if err := json.Unmarshal(responseBody, &resp); err != nil {
-		return nil, fmt.Errorf("error parsing webhook response: %v", err)
-	}
-
-	ids := make([]int, 0, len(resp.WebhookRegistrationResult))
-	for _, r := range resp.WebhookRegistrationResult {
-		if len(r.Errors) > 0 {
-			return ids, fmt.Errorf("webhook registration error: %v", r.Errors)
-		}
-		if r.CreatedWebhookID != 0 {
-			ids = append(ids, r.CreatedWebhookID)
-		}
-	}
-	return ids, nil
-}
-
-type deleteWebhooksRequest struct {
-	WebhookIDs []int `json:"webhookIds"`
-}
-
-// DeleteWebhooks removes the given webhook IDs.
-func (c *Client) DeleteWebhooks(ids []int) error {
-	if len(ids) == 0 {
-		return nil
-	}
-
-	payload := deleteWebhooksRequest{WebhookIDs: ids}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("error marshaling delete payload: %v", err)
-	}
-
-	if _, err := c.execRequest(http.MethodDelete, c.apiURL("/rest/api/3/webhook"), bytes.NewReader(body)); err != nil {
-		return err
-	}
-	return nil
-}
-
-// RefreshWebhooks extends the expiry of the given webhook IDs (Jira deletes
-// webhooks after 30 days unless refreshed).
-func (c *Client) RefreshWebhooks(ids []int) error {
-	if len(ids) == 0 {
-		return nil
-	}
-
-	payload := deleteWebhooksRequest{WebhookIDs: ids}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("error marshaling refresh payload: %v", err)
-	}
-
-	if _, err := c.execRequest(http.MethodPut, c.apiURL("/rest/api/3/webhook/refresh"), bytes.NewReader(body)); err != nil {
 		return err
 	}
 	return nil
