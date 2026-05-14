@@ -128,26 +128,9 @@ func (c *CreateIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("summary is required")
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	project, err := requireProject(ctx.Integration, spec.Project)
 	if err != nil {
-		return fmt.Errorf("failed to create client: %v", err)
-	}
-
-	projects, err := client.ListProjects()
-	if err != nil {
-		return fmt.Errorf("failed to list projects: %v", err)
-	}
-
-	var project *Project
-	for _, p := range projects {
-		if p.Key == spec.Project {
-			project = &p
-			break
-		}
-	}
-
-	if project == nil {
-		return fmt.Errorf("project %s not found", spec.Project)
+		return err
 	}
 
 	return ctx.Metadata.Set(NodeMetadata{Project: project})
