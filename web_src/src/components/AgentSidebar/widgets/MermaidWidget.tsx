@@ -105,7 +105,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
       </div>
 
       <Dialog open={expanded} onOpenChange={setExpanded}>
-        <DialogContent className="max-w-[90vw] max-h-[90vh] flex flex-col">
+        <DialogContent size="large" className="w-[90vw] h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="text-sm font-medium">Diagram</DialogTitle>
           </DialogHeader>
