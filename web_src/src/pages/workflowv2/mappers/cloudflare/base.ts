@@ -133,6 +133,12 @@ export function deleteLoadBalancerExecutionDetails(context: ExecutionDetailsCont
   return details;
 }
 
+function resolveScriptLabel(data: Record<string, unknown>): string {
+  if (data.workerScript != null) return String(data.workerScript);
+  if (data.scriptName != null) return String(data.scriptName);
+  return "-";
+}
+
 export function getDeployWorkerExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
   const details: Record<string, string> = {};
   if (context.execution.createdAt) {
@@ -143,9 +149,7 @@ export function getDeployWorkerExecutionDetails(context: ExecutionDetailsContext
   if (!data) {
     return details;
   }
-  const script =
-    data.workerScript != null ? String(data.workerScript) : data.scriptName != null ? String(data.scriptName) : "-";
-  details["Script"] = script;
+  details["Script"] = resolveScriptLabel(data);
   return details;
 }
 
@@ -159,9 +163,7 @@ export function getWorkerMetadataExecutionDetails(context: ExecutionDetailsConte
   if (!data) {
     return details;
   }
-  const script =
-    data.workerScript != null ? String(data.workerScript) : data.scriptName != null ? String(data.scriptName) : "-";
-  details["Script"] = script;
+  details["Script"] = resolveScriptLabel(data);
   const deployments = data.deployments as unknown[] | undefined;
   details["Deployments"] = deployments != null ? String(deployments.length) : "-";
   const settings = data.settings as Record<string, unknown> | undefined;
@@ -181,9 +183,7 @@ export function getDeleteWorkerExecutionDetails(context: ExecutionDetailsContext
   if (!data) {
     return details;
   }
-  const script =
-    data.workerScript != null ? String(data.workerScript) : data.scriptName != null ? String(data.scriptName) : "-";
-  details["Script"] = script;
+  details["Script"] = resolveScriptLabel(data);
   if (data.deleted != null) {
     details["Deleted"] = String(data.deleted);
   }
