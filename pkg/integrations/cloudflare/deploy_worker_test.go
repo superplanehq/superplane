@@ -321,7 +321,7 @@ func Test__DeployWorker__Execute(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
 				{
-					StatusCode: http.StatusOK,
+					StatusCode: http.StatusConflict,
 					Body: io.NopCloser(strings.NewReader(`{
 						"success": false,
 						"errors": [{"code": 10009, "message": "A worker with this name already exists"}]

@@ -69,25 +69,16 @@ func buildWorkerProvisionRequestBody(
 }
 
 // isWorkerProvisionConflict reports whether err indicates the Worker already exists (safe to ignore before upload).
+// We only match on HTTP 409 Conflict, which is the unambiguous signal from Cloudflare that the resource
+// already exists. Broad substring matching on error messages (e.g. "already", "duplicate") is intentionally
+// avoided because it would silently swallow unrelated errors whose messages happen to contain those words
+// (e.g. "Token already revoked", "Quota already exhausted").
 func isWorkerProvisionConflict(err error) bool {
 	var apiErr *CloudflareAPIError
 	if !errors.As(err, &apiErr) {
 		return false
 	}
-	if apiErr.StatusCode == 409 {
-		return true
-	}
-	for _, e := range apiErr.Errors {
-		em := strings.ToLower(e.Message)
-		if strings.Contains(em, "already") {
-			return true
-		}
-		if strings.Contains(em, "duplicate") {
-			return true
-		}
-	}
-	body := strings.ToLower(string(apiErr.Body))
-	return strings.Contains(body, "already exists") || strings.Contains(body, "already exist")
+	return apiErr.StatusCode == 409
 }
 
 func ensureWorkerProvisioned(c *Client, accountID string, body map[string]any) error {
