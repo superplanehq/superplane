@@ -10,7 +10,7 @@ export function StepsWidget({ items }: StepsWidgetProps) {
   const firstPending = items.findIndex((i) => !i.done);
 
   return (
-    <div className="my-2 space-y-1 rounded-lg border border-slate-200 bg-slate-50/30 p-3">
+    <div className="my-2 space-y-1 rounded-lg border border-violet-200 bg-white p-3 shadow-sm">
       {items.map((item, i) => {
         const isActive = i === firstPending;
         return (
