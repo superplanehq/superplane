@@ -1,11 +1,6 @@
 import { useEffect, useId, useRef, useState, useCallback } from "react";
 import mermaid from "mermaid";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 mermaid.initialize({
   startOnLoad: false,
@@ -80,9 +75,7 @@ export function MermaidWidget({ content }: MermaidWidgetProps) {
 
   if (!svg) {
     return (
-      <div className="my-4 flex items-center justify-center py-4 text-xs text-slate-400">
-        Rendering diagram...
-      </div>
+      <div className="my-4 flex items-center justify-center py-4 text-xs text-slate-400">Rendering diagram...</div>
     );
   }
 
@@ -193,10 +186,7 @@ function MermaidPanZoom({ svg }: { svg: string }) {
             minHeight: "40vh",
           }}
         >
-          <div
-            className="[&_svg]:max-w-none [&_svg]:h-auto"
-            dangerouslySetInnerHTML={{ __html: svg }}
-          />
+          <div className="[&_svg]:max-w-none [&_svg]:h-auto" dangerouslySetInnerHTML={{ __html: svg }} />
         </div>
       </div>
     </div>

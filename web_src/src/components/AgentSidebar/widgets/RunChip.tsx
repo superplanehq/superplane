@@ -36,15 +36,7 @@ export function RunChipFromLink({
 }) {
   const status = parseStatus(rawStatus);
   const label = rawLabel && rawLabel !== "run" ? rawLabel : `#${runId.substring(0, 8)}`;
-  return (
-    <RunChip
-      runId={runId}
-      label={label}
-      status={status}
-      canvasId={canvasId}
-      organizationId={organizationId}
-    />
-  );
+  return <RunChip runId={runId} label={label} status={status} canvasId={canvasId} organizationId={organizationId} />;
 }
 
 export function RunChip({ runId, label, status, canvasId, organizationId }: RunChipProps) {

@@ -22,9 +22,7 @@ export function CollapseWidget({ title, content }: CollapseWidgetProps) {
       </button>
       {open && (
         <div className="px-3 pb-2 border-t border-slate-100">
-          <pre className="text-xs text-slate-600 whitespace-pre-wrap break-words mt-2 font-mono">
-            {content}
-          </pre>
+          <pre className="text-xs text-slate-600 whitespace-pre-wrap break-words mt-2 font-mono">{content}</pre>
         </div>
       )}
     </div>

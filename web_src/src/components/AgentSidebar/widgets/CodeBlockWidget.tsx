@@ -1,12 +1,7 @@
 import { Check, Copy, Maximize2 } from "lucide-react";
 import { useCallback, useState } from "react";
 import Editor from "@monaco-editor/react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface CodeBlockWidgetProps {
   code: string;
@@ -76,9 +71,7 @@ export function CodeBlockWidget({ code, language }: CodeBlockWidgetProps) {
     <>
       <div className="my-4 rounded-lg border border-slate-200 overflow-hidden bg-white group">
         <div className="flex items-center justify-between px-3 py-1 bg-slate-50 border-b border-slate-200">
-          <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
-            {language || "code"}
-          </span>
+          <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">{language || "code"}</span>
           <div className="flex items-center gap-1">
             <button
               type="button"

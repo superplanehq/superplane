@@ -44,20 +44,36 @@ export function RichMessage({ content, onAction, canvasId, organizationId }: Ric
   return (
     <div>
       {segments.map((segment, i) => (
-        <SegmentRenderer key={i} segment={segment} onAction={onAction} canvasId={canvasId} organizationId={organizationId} />
+        <SegmentRenderer
+          key={i}
+          segment={segment}
+          onAction={onAction}
+          canvasId={canvasId}
+          organizationId={organizationId}
+        />
       ))}
     </div>
   );
 }
 
-function SegmentRenderer({ segment, onAction, canvasId, organizationId }: { segment: Segment; onAction?: (text: string) => void; canvasId?: string; organizationId?: string }) {
+function SegmentRenderer({
+  segment,
+  onAction,
+  canvasId,
+  organizationId,
+}: {
+  segment: Segment;
+  onAction?: (text: string) => void;
+  canvasId?: string;
+  organizationId?: string;
+}) {
   switch (segment.type) {
     case "markdown":
       return (
         <div className={MARKDOWN_CLASSES}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
-            urlTransform={(url) => (url.startsWith("run:") || url.startsWith("node:")) ? url : defaultUrlTransform(url)}
+            urlTransform={(url) => (url.startsWith("run:") || url.startsWith("node:") ? url : defaultUrlTransform(url))}
             components={{
               a: ({ children, href }) => {
                 const runMatch = href?.match(/^run:([0-9a-f-]{36})(?:~(.+))?/);
@@ -101,7 +117,11 @@ function SegmentRenderer({ segment, onAction, canvasId, organizationId }: { segm
                   return <CodeBlockWidget code={codeStr} language={match[1]} />;
                 }
                 // Inline code
-                return <code className={className} {...props}>{children}</code>;
+                return (
+                  <code className={className} {...props}>
+                    {children}
+                  </code>
+                );
               },
               pre: ({ children }) => <>{children}</>,
               table: ({ children, ...props }) => (
