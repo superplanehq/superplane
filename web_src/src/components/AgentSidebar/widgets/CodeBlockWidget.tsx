@@ -74,7 +74,7 @@ export function CodeBlockWidget({ code, language }: CodeBlockWidgetProps) {
 
   return (
     <>
-      <div className="my-2 rounded-lg border border-slate-200 overflow-hidden bg-white group">
+      <div className="my-4 rounded-lg border border-slate-200 overflow-hidden bg-white group">
         <div className="flex items-center justify-between px-3 py-1 bg-slate-50 border-b border-slate-200">
           <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">
             {language || "code"}
