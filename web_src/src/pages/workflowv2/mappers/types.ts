@@ -125,22 +125,17 @@ export type ComponentBaseContext = {
   currentUser: User | undefined;
   actions: ActionContext;
   canvasMode?: "live" | "edit";
-
-  canvasId?: string;
-  organizationId?: string;
 };
 
 export type ActionContext = {
   invokeNodeExecutionHook: (executionId: string, hook: string, parameters: unknown) => Promise<void>;
-  /** Same host as trigger template runs: opens the canvas modal from node / mapper UI. */
-  openModal?: (modal: TriggerActionModal) => void;
 };
 
 export type TriggerActionModal = {
   title?: ReactNode;
   description?: ReactNode;
   content: (ctx: { close: () => void }) => ReactNode;
-  /** When `"large"`, canvas uses a wide dialog (e.g. runner live logs). */
+  /** When `"large"`, canvas uses a wide dialog for trigger-hosted modals. */
   dialogSize?: "default" | "large";
 };
 
@@ -203,17 +198,6 @@ export interface CustomFieldRendererContext {
   canvasMode?: "live" | "edit";
   /** Start trigger template Run uses this on the canvas (parallel to component {@link ActionContext}). */
   actions?: TriggerActionContext;
-  /**
-   * When a custom field is composed from a component mapper (e.g. runner live logs), the same
-   * {@link ActionContext} passed into {@link ComponentBaseContext.actions}.
-   */
-  componentActions?: ActionContext;
-  /** Canvas id for org-scoped API URLs when rendering on the canvas. */
-  canvasId?: string;
-  /** Organization id for org-scoped API calls when rendering on the canvas. */
-  organizationId?: string;
-  /** Latest execution id for this node from canvas prep (e.g. live log stream). */
-  latestExecutionId?: string;
 }
 
 export interface CustomFieldRenderer {

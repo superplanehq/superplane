@@ -1,17 +1,20 @@
+import { useCanvasId } from "@/hooks/useCanvasId";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export type RunnerLiveLogStreamPanelProps = {
-  organizationId: string;
-  canvasId: string;
   executionId: string;
 };
 
 /**
- * NDJSON runner live log stream (no Dialog). For use inside {@link TriggerActionModal} content
- * or other hosts that already provide chrome and close handling.
+ * NDJSON runner live log stream (no outer chrome). Intended to be placed inside a dialog or other host layout.
+ *
+ * Organization and canvas ids are taken from the workflow URL ({@link useOrganizationId}, {@link useCanvasId}).
  */
-export function RunnerLiveLogStreamPanel({ organizationId, canvasId, executionId }: RunnerLiveLogStreamPanelProps) {
+export function RunnerLiveLogStreamPanel({ executionId }: RunnerLiveLogStreamPanelProps) {
+  const organizationId = useOrganizationId();
+  const canvasId = useCanvasId();
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);

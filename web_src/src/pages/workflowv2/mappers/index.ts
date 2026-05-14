@@ -243,7 +243,7 @@ import {
 
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
-import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
+import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner.tsx";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
 import { approvalMapper, APPROVAL_STATE_REGISTRY } from "./approval";
 import { mergeMapper, MERGE_STATE_REGISTRY } from "./merge";

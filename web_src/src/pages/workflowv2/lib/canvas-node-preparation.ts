@@ -1,21 +1,22 @@
-import type { QueryClient } from "@tanstack/react-query";
-import { Puzzle } from "lucide-react";
 import {
   canvasesInvokeNodeExecutionHook,
   canvasesInvokeNodeTriggerHook,
   type CanvasesCanvasEvent,
   type CanvasesCanvasNodeExecution,
   type CanvasesCanvasNodeQueueItem,
-  type SuperplaneActionsAction,
   type SuperplaneComponentsEdge as ComponentsEdge,
   type SuperplaneComponentsNode as ComponentsNode,
+  type SuperplaneActionsAction,
   type TriggersTrigger,
 } from "@/api-client";
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
 import type { CanvasNode } from "@/ui/CanvasPage";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import type { QueryClient } from "@tanstack/react-query";
+import { Puzzle } from "lucide-react";
+import { getComponentBaseMapper, getTriggerRenderer } from "../mappers";
 import type {
   ActionContext,
   ComponentBaseMapper,
@@ -23,9 +24,10 @@ import type {
   TriggerActionModal,
   User,
 } from "../mappers/types";
-import { getComponentBaseMapper, getTriggerRenderer } from "../mappers";
 import { buildComponentFallbackCanvasNode, buildTriggerFallbackCanvasNode } from "./canvas-node-fallback";
 
+import { canvasKeys } from "@/hooks/useCanvasData";
+import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import {
   buildComponentDefinition,
   buildEventInfo,
@@ -34,8 +36,6 @@ import {
   buildQueueItemInfo,
   buildUserInfo,
 } from "../utils";
-import { canvasKeys } from "@/hooks/useCanvasData";
-import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 type PrepareComponentNodeArgs = {
   nodes: ComponentsNode[];
@@ -49,7 +49,6 @@ type PrepareComponentNodeArgs = {
   currentUser?: User;
   edges?: ComponentsEdge[];
   canvasMode?: "live" | "edit";
-  openModal?: (modal: TriggerActionModal) => void;
 };
 
 type PrepareComponentBaseNodeArgs = {
@@ -63,8 +62,6 @@ type PrepareComponentBaseNodeArgs = {
   currentUser?: User;
   edges?: ComponentsEdge[];
   canvasMode?: "live" | "edit";
-  organizationId?: string;
-  openModal?: (modal: TriggerActionModal) => void;
 };
 
 type NodePosition = {
@@ -207,19 +204,8 @@ export function prepareTriggerNode(
 }
 
 export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode {
-  const {
-    nodes,
-    node,
-    components,
-    nodeExecutionsMap,
-    nodeQueueItemsMap,
-    canvasId,
-    queryClient,
-    currentUser,
-    edges,
-    organizationId,
-    openModal,
-  } = args;
+  const { nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, canvasId, queryClient, currentUser, edges } =
+    args;
   const isPlaceholder = !node.component && node.name === "New Component";
 
   if (isPlaceholder) {
@@ -237,24 +223,11 @@ export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode
     currentUser,
     edges,
     canvasMode: args.canvasMode,
-    organizationId,
-    openModal,
   });
 }
 
 export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): CanvasNode {
-  const {
-    nodes,
-    node,
-    components,
-    nodeExecutionsMap,
-    nodeQueueItemsMap,
-    canvasId,
-    queryClient,
-    currentUser,
-    organizationId,
-    openModal,
-  } = args;
+  const { nodes, node, components, nodeExecutionsMap, nodeQueueItemsMap, canvasId, queryClient, currentUser } = args;
   const executions = nodeExecutionsMap[node.id!] || [];
   const metadata = components.find((c) => c.name === node.component);
   const displayLabel = node.name || metadata?.label || node.component || "Component";
@@ -273,10 +246,8 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
       lastExecutions: executions.map((e) => buildExecutionInfo(e)),
       nodeQueueItems: nodeQueueItems?.map((q) => buildQueueItemInfo(q)),
       currentUser: buildUserInfo(currentUser),
-      actions: buildActionContext(queryClient, canvasId, node.id!, openModal),
+      actions: buildActionContext(queryClient, canvasId, node.id!),
       canvasMode: args.canvasMode,
-      canvasId,
-      organizationId,
     });
 
     if (!componentBaseProps.iconSrc) {
@@ -311,12 +282,7 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
   }
 }
 
-function buildActionContext(
-  queryClient: QueryClient,
-  canvasId: string,
-  nodeId: string,
-  openModal?: (modal: TriggerActionModal) => void,
-): ActionContext {
+function buildActionContext(queryClient: QueryClient, canvasId: string, nodeId: string): ActionContext {
   return {
     invokeNodeExecutionHook: async (executionId: string, hookName: string, parameters: unknown) => {
       try {
@@ -339,7 +305,6 @@ function buildActionContext(
         showErrorToast(getApiErrorMessage(error, "failed to invoke hook"));
       }
     },
-    ...(openModal ? { openModal } : {}),
   };
 }
 

@@ -1,17 +1,18 @@
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { useCanvasId } from "@/hooks/useCanvasId";
+import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { getColorClass } from "@/lib/colors";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { RunnerLiveLogStreamPanel } from "@/ui/CanvasPage/RunnerLiveLogStreamPanel";
-import React from "react";
+import React, { useState } from "react";
 import { getTriggerRenderer } from ".";
 
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
-  CustomFieldRenderer,
-  CustomFieldRendererContext,
   EventStateRegistry,
   ExecutionDetailsContext,
   ExecutionInfo,
@@ -84,24 +85,27 @@ export const RUNNER_STATE_REGISTRY: EventStateRegistry = {
   getState: runnerStateFunction,
 };
 
+type RunnerLiveLogsToolbarProps = {
+  canvasMode: "live" | "edit";
+  executionId: string;
+};
+
 /**
- * Canvas-only custom field for runner live logs. Not registered in {@link getCustomFieldRenderer};
- * composed from {@link runnerMapper} like start trigger uses {@link startCustomFieldRenderer}.
+ * Canvas-only runner logs control. Reads org/canvas from the workflow route via hooks
+ * (see {@link useOrganizationId}, {@link useCanvasId}); must render as a child component, not from mapper logic.
  */
-const runnerLiveLogsCustomFieldRenderer: CustomFieldRenderer = {
-  render(_node: NodeInfo, context?: CustomFieldRendererContext): React.ReactNode {
-    const mode = context?.canvasMode ?? "live";
-    const actions = context?.componentActions;
-    const canvasId = context?.canvasId;
-    const organizationId = context?.organizationId;
-    const executionId = context?.latestExecutionId;
+function RunnerLiveLogsToolbar({ canvasMode, executionId }: RunnerLiveLogsToolbarProps) {
+  const organizationId = useOrganizationId();
+  const canvasId = useCanvasId();
+  const [logsOpen, setLogsOpen] = useState(false);
 
-    const canShow = mode === "live" && !!actions?.openModal && !!canvasId && !!organizationId && !!executionId;
-    if (!canShow) {
-      return null;
-    }
+  const canShow = canvasMode === "live" && !!organizationId && !!canvasId && !!executionId;
+  if (!canShow) {
+    return null;
+  }
 
-    return (
+  return (
+    <>
       <div className="flex justify-end border-b border-slate-950/20 px-2 py-1" data-testid="runner-live-logs">
         <Button
           type="button"
@@ -110,25 +114,29 @@ const runnerLiveLogsCustomFieldRenderer: CustomFieldRenderer = {
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
-            actions.openModal!({
-              title: "Logs",
-              dialogSize: "large",
-              content: () => (
-                <RunnerLiveLogStreamPanel
-                  organizationId={organizationId!}
-                  canvasId={canvasId!}
-                  executionId={executionId!}
-                />
-              ),
-            });
+            setLogsOpen(true);
           }}
         >
           Logs
         </Button>
       </div>
-    );
-  },
-};
+      <Dialog open={logsOpen} onOpenChange={setLogsOpen}>
+        <DialogContent
+          size="large"
+          className="flex max-h-[min(90vh,720px)] w-[min(90vw,56rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DialogHeader className="shrink-0 border-b border-gray-200 px-4 py-3 text-left">
+            <DialogTitle>Logs</DialogTitle>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {logsOpen ? <RunnerLiveLogStreamPanel executionId={executionId} /> : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 export const runnerMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -139,19 +147,8 @@ export const runnerMapper: ComponentBaseMapper = {
     const iconColor = getColorClass(context.componentDefinition?.color || "blue");
 
     const customField =
-      lastExecution &&
-      context.canvasMode === "live" &&
-      context.canvasId &&
-      context.organizationId &&
-      context.actions.openModal
-        ? () =>
-            runnerLiveLogsCustomFieldRenderer.render(context.node, {
-              canvasMode: context.canvasMode,
-              componentActions: context.actions,
-              canvasId: context.canvasId,
-              organizationId: context.organizationId,
-              latestExecutionId: lastExecution.id,
-            })
+      lastExecution && context.canvasMode === "live"
+        ? () => <RunnerLiveLogsToolbar canvasMode={context.canvasMode ?? "live"} executionId={lastExecution.id} />
         : undefined;
 
     return {
