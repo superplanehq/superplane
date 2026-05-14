@@ -214,6 +214,39 @@ func Test__DeployWorker__Execute(t *testing.T) {
 		assert.Equal(t, "https://cdn.example.com/worker.js", httpContext.Requests[0].URL.String())
 	})
 
+	t.Run("url source with empty body returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("")),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "token"},
+		}
+		execState := &contexts.ExecutionStateContext{KVs: make(map[string]string)}
+
+		ctx := core.ExecutionContext{
+			Configuration: map[string]any{
+				"accountId":          "acc123",
+				"scriptName":         "w-empty",
+				"provisionIfMissing": false,
+				"source":             deployWorkerScriptSourceURL,
+				"scriptUrl":          "https://cdn.example.com/empty.js",
+			},
+			HTTP:           httpContext,
+			Integration:    integrationCtx,
+			ExecutionState: execState,
+		}
+
+		err := component.Execute(ctx)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "empty")
+	})
+
 	t.Run("provision then upload and deploy calls three endpoints", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{

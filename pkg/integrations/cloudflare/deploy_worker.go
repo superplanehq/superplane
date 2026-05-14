@@ -336,6 +336,9 @@ func (d *DeployWorker) Execute(ctx core.ExecutionContext) error {
 		if err != nil {
 			return err
 		}
+		if strings.TrimSpace(body) == "" {
+			return errors.New("script downloaded from scriptUrl is empty")
+		}
 		module = body
 	default:
 		return fmt.Errorf("source must be %q or %q", deployWorkerScriptSourceInline, deployWorkerScriptSourceURL)
