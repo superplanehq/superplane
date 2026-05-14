@@ -5703,7 +5703,7 @@ export function WorkflowPageV2() {
       <div className="relative h-full w-full">
         {isDashboardMode ? (
           <DashboardOverlay
-            readOnly={isReadOnly}
+            readOnly={!canUpdateCanvas}
             dashboardQuery={dashboardQuery}
             updateDashboardMutation={updateDashboardMutation}
           />
