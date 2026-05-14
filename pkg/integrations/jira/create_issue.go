@@ -3,6 +3,7 @@ package jira
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -19,6 +20,7 @@ type CreateIssueSpec struct {
 	IssueType   string `json:"issueType"`
 	Summary     string `json:"summary"`
 	Description string `json:"description"`
+	Status      string `json:"status"`
 }
 
 func (c *CreateIssue) Name() string {
@@ -45,16 +47,18 @@ func (c *CreateIssue) Documentation() string {
 ## Configuration
 
 - **Project**: The Jira project to create the issue in
-- **Issue Type**: The type of issue (e.g. Task, Bug, Story)
+- **Issue Type**: The type of issue (scoped to the chosen project)
 - **Summary**: The issue summary/title
 - **Description**: Optional description text
+- **Status**: Optional initial status. Jira always creates issues in the workflow's initial state, so when this is set the component executes a transition immediately after create. The status must be reachable via a transition from the initial state.
 
 ## Output
 
 Returns the created issue including:
 - **id**: The issue ID
 - **key**: The issue key (e.g. PROJ-123)
-- **self**: API URL for the issue`
+- **self**: API URL for the issue
+- **fields**: Full issue fields after any status transition`
 }
 
 func (c *CreateIssue) Icon() string {
@@ -87,10 +91,22 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 		{
 			Name:        "issueType",
 			Label:       "Issue Type",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Description: "The type of issue (e.g. Task, Bug, Story)",
-			Placeholder: "Task",
+			Placeholder: "Select an issue type",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "issueType",
+					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "summary",
@@ -106,6 +122,26 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeExpression,
 			Required:    false,
 			Description: "Optional description text",
+		},
+		{
+			Name:        "status",
+			Label:       "Initial Status",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "Move the new issue to this status via a transition (must be reachable from the workflow's initial state)",
+			Placeholder: "Leave empty to keep the workflow default",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "issueStatus",
+					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -128,29 +164,16 @@ func (c *CreateIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("summary is required")
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	project, err := requireProject(ctx.Integration, spec.Project)
 	if err != nil {
-		return fmt.Errorf("failed to create client: %v", err)
+		return err
 	}
 
-	projects, err := client.ListProjects()
-	if err != nil {
-		return fmt.Errorf("failed to list projects: %v", err)
-	}
-
-	var project *Project
-	for _, p := range projects {
-		if p.Key == spec.Project {
-			project = &p
-			break
-		}
-	}
-
-	if project == nil {
-		return fmt.Errorf("project %s not found", spec.Project)
-	}
-
-	return ctx.Metadata.Set(NodeMetadata{Project: project})
+	return ctx.Metadata.Set(NodeMetadata{
+		Project:   project,
+		IssueType: spec.IssueType,
+		Status:    spec.Status,
+	})
 }
 
 func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
@@ -173,16 +196,49 @@ func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 		},
 	}
 
-	response, err := client.CreateIssue(req)
+	created, err := client.CreateIssue(req)
 	if err != nil {
 		return fmt.Errorf("failed to create issue: %v", err)
+	}
+
+	if strings.TrimSpace(spec.Status) != "" {
+		if err := applyStatus(client, created.Key, spec.Status); err != nil {
+			return fmt.Errorf("issue %s created, but failed to apply status %q: %v", created.Key, spec.Status, err)
+		}
+	}
+
+	issue, err := client.GetIssue(created.Key)
+	if err != nil {
+		return fmt.Errorf("failed to fetch created issue: %v", err)
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		CreateIssuePayloadType,
-		[]any{response},
+		[]any{issue},
 	)
+}
+
+// applyStatus moves an issue to the requested status. It looks up available
+// transitions from the issue's current state and executes the one whose target
+// status name matches. Returns an error if no such transition exists.
+func applyStatus(client *Client, issueKey, status string) error {
+	transitions, err := client.GetIssueTransitions(issueKey)
+	if err != nil {
+		return fmt.Errorf("failed to fetch transitions: %v", err)
+	}
+
+	for _, t := range transitions {
+		if strings.EqualFold(t.To.Name, status) {
+			return client.DoTransition(issueKey, t.ID)
+		}
+	}
+
+	available := make([]string, 0, len(transitions))
+	for _, t := range transitions {
+		available = append(available, t.To.Name)
+	}
+	return fmt.Errorf("no transition available to status %q (available: %v)", status, available)
 }
 
 func (c *CreateIssue) Cancel(ctx core.ExecutionContext) error {
