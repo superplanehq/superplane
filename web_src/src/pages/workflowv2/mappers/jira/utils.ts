@@ -1,8 +1,4 @@
 import type { JiraIssue } from "./types";
-import { buildSubtitle, buildExecutionSubtitle } from "../utils";
-
-export const buildJiraSubtitle = buildSubtitle;
-export const buildJiraExecutionSubtitle = buildExecutionSubtitle;
 
 export function getIssueLabel(issue: JiraIssue | undefined): string {
   if (!issue) {
@@ -47,6 +43,10 @@ export function addFormattedTimestamp(
   details[label] = date.toLocaleString();
 }
 
+/**
+ * Standard payload-driven details for any Jira issue. Each component decides
+ * which fields to surface and may augment with execution-level data.
+ */
 export function getDetailsForIssue(issue: JiraIssue | undefined): Record<string, string> {
   if (!issue) {
     return {};
@@ -58,6 +58,7 @@ export function getDetailsForIssue(issue: JiraIssue | undefined): Record<string,
   addDetail(details, "Priority", issue.fields?.priority?.name);
   addDetail(details, "Issue Type", issue.fields?.issuetype?.name);
   addDetail(details, "Assignee", issue.fields?.assignee?.displayName);
+  addDetail(details, "Reporter", issue.fields?.reporter?.displayName);
   addDetail(details, "Project", getProjectLabel(issue));
   if (issue.fields?.labels && issue.fields.labels.length > 0) {
     details["Labels"] = issue.fields.labels.join(", ");

@@ -118,6 +118,11 @@ func Test__CreateIssue__Execute(t *testing.T) {
 					StatusCode: http.StatusCreated,
 					Body:       io.NopCloser(strings.NewReader(`{"id":"10001","key":"TEST-123","self":"https://test.atlassian.net/rest/api/3/issue/10001"}`)),
 				},
+				// post-create GetIssue fetch
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"10001","key":"TEST-123","fields":{"summary":"New task","status":{"name":"To Do"}}}`)),
+				},
 			},
 		}
 
@@ -147,6 +152,10 @@ func Test__CreateIssue__Execute(t *testing.T) {
 					StatusCode: http.StatusCreated,
 					Body:       io.NopCloser(strings.NewReader(`{"id":"10002","key":"TEST-124","self":"https://test.atlassian.net/rest/api/3/issue/10002"}`)),
 				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"10002","key":"TEST-124","fields":{"summary":"Bug report","status":{"name":"To Do"}}}`)),
+				},
 			},
 		}
 
@@ -166,6 +175,84 @@ func Test__CreateIssue__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, execCtx.Finished)
 		assert.True(t, execCtx.Passed)
+	})
+
+	t.Run("successful issue creation with status transition", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// create
+				{
+					StatusCode: http.StatusCreated,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"10003","key":"TEST-125","self":"https://test.atlassian.net/rest/api/3/issue/10003"}`)),
+				},
+				// list transitions
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"transitions":[{"id":"11","name":"Start","to":{"id":"3","name":"In Progress"}}]}`)),
+				},
+				// execute transition (204 No Content)
+				{
+					StatusCode: http.StatusNoContent,
+					Body:       io.NopCloser(strings.NewReader(``)),
+				},
+				// final get
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"10003","key":"TEST-125","fields":{"status":{"name":"In Progress"}}}`)),
+				},
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":   "TEST",
+				"issueType": "Task",
+				"summary":   "Move me",
+				"status":    "In Progress",
+			},
+			HTTP:           httpContext,
+			Integration:    newAuthorizedIntegration(),
+			ExecutionState: execCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Passed)
+		assert.Equal(t, http.MethodPost, httpContext.Requests[2].Method)
+		assert.Contains(t, httpContext.Requests[2].URL.String(), "/rest/api/3/issue/TEST-125/transitions")
+	})
+
+	t.Run("status with no matching transition -> error mentioning available targets", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusCreated,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"10004","key":"TEST-126"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"transitions":[{"id":"11","name":"Start","to":{"id":"3","name":"In Progress"}}]}`)),
+				},
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":   "TEST",
+				"issueType": "Task",
+				"summary":   "Move me",
+				"status":    "Done",
+			},
+			HTTP:           httpContext,
+			Integration:    newAuthorizedIntegration(),
+			ExecutionState: execCtx,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "TEST-126")
+		assert.Contains(t, err.Error(), "Done")
+		assert.Contains(t, err.Error(), "In Progress")
 	})
 
 	t.Run("issue creation failure -> error", func(t *testing.T) {
@@ -210,7 +297,7 @@ func Test__CreateIssue__Configuration(t *testing.T) {
 	component := CreateIssue{}
 
 	config := component.Configuration()
-	assert.Len(t, config, 4)
+	assert.Len(t, config, 5)
 
 	fieldNames := make([]string, len(config))
 	for i, f := range config {
@@ -221,10 +308,12 @@ func Test__CreateIssue__Configuration(t *testing.T) {
 	assert.Contains(t, fieldNames, "issueType")
 	assert.Contains(t, fieldNames, "summary")
 	assert.Contains(t, fieldNames, "description")
+	assert.Contains(t, fieldNames, "status")
 
+	optionalFields := map[string]bool{"description": true, "status": true}
 	for _, f := range config {
-		if f.Name == "description" {
-			assert.False(t, f.Required, "description should be optional")
+		if optionalFields[f.Name] {
+			assert.False(t, f.Required, "%s should be optional", f.Name)
 		} else {
 			assert.True(t, f.Required, "%s should be required", f.Name)
 		}

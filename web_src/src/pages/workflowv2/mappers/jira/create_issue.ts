@@ -12,9 +12,9 @@ import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { jiraComponentBaseProps } from "./base";
 import { addDetail, getIssueLabel } from "./utils";
-import type { GetIssueConfiguration, JiraIssue, JiraNodeMetadata } from "./types";
+import type { CreateIssueConfiguration, JiraIssue, JiraNodeMetadata } from "./types";
 
-export const getIssueMapper: ComponentBaseMapper = {
+export const createIssueMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return jiraComponentBaseProps(context, metadataList(context.node));
   },
@@ -31,8 +31,8 @@ export const getIssueMapper: ComponentBaseMapper = {
     addDetail(details, "Key", issue.key);
     addDetail(details, "Summary", issue.fields?.summary);
     addDetail(details, "Status", issue.fields?.status?.name);
+    addDetail(details, "Issue Type", issue.fields?.issuetype?.name);
     addDetail(details, "Assignee", issue.fields?.assignee?.displayName);
-    addDetail(details, "Priority", issue.fields?.priority?.name);
 
     return details;
   },
@@ -52,7 +52,7 @@ export const getIssueMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as JiraNodeMetadata | undefined;
-  const configuration = node.configuration as GetIssueConfiguration | undefined;
+  const configuration = node.configuration as CreateIssueConfiguration | undefined;
 
   const project = nodeMetadata?.project;
   if (project?.name || project?.key) {
@@ -61,8 +61,14 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "folder", label: configuration.project });
   }
 
-  if (configuration?.issueKey && !configuration.issueKey.includes("{{")) {
-    metadata.push({ icon: "hash", label: configuration.issueKey });
+  const issueType = nodeMetadata?.issueType || configuration?.issueType;
+  if (issueType) {
+    metadata.push({ icon: "tag", label: issueType });
+  }
+
+  const status = nodeMetadata?.status || configuration?.status;
+  if (status) {
+    metadata.push({ icon: "flag", label: status });
   }
 
   return metadata;

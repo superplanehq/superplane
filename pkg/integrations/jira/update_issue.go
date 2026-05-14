@@ -112,24 +112,55 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 		{
 			Name:        "issueType",
 			Label:       "Issue Type",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "New issue type (e.g. Task, Bug, Story)",
-			Placeholder: "Task",
+			Description: "New issue type (scoped to the project)",
+			Placeholder: "Select an issue type",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "issueType",
+					UseNameAsValue: true,
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "assignee",
 			Label:       "Assignee",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Account ID of the new assignee (use '-1' for unassigned)",
+			Description: "User to assign the issue to (leave empty to keep the current assignee)",
+			Placeholder: "Select a user",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "assignee",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "priority",
 			Label:       "Priority",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Priority name (e.g. High, Medium, Low)",
+			Description: "Priority (instance-level, applies to all projects)",
+			Placeholder: "Select a priority",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type:           "priority",
+					UseNameAsValue: true,
+				},
+			},
 		},
 		{
 			Name:        "labels",

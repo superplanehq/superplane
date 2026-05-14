@@ -1,58 +1,44 @@
 import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import { getColorClass, getBackgroundColorClass } from "@/lib/colors";
+import { getBackgroundColorClass } from "@/lib/colors";
+import { renderTimeAgo } from "@/components/TimeAgo";
 import { getState, getStateMap, getTriggerRenderer } from "..";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
+import type { ComponentBaseContext, ExecutionInfo, NodeInfo } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import type { NodeInfo, ComponentDefinition, ExecutionInfo } from "../types";
-import type { JiraNodeMetadata } from "./types";
-import { buildJiraExecutionSubtitle } from "./utils";
 
-export function baseProps(
-  nodes: NodeInfo[],
-  node: NodeInfo,
-  componentDefinition: ComponentDefinition,
-  lastExecutions: ExecutionInfo[],
-): ComponentBaseProps {
-  const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
-  const componentName = componentDefinition.name || node.componentName || "unknown";
+export function jiraComponentBaseProps(context: ComponentBaseContext, metadata: MetadataItem[]): ComponentBaseProps {
+  const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+  const componentName = context.componentDefinition.name || "jira";
 
   return {
     iconSrc: jiraIcon,
-    iconColor: getColorClass(componentDefinition.color),
-    collapsedBackground: getBackgroundColorClass(componentDefinition.color),
-    collapsed: node.isCollapsed,
-    title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
-    eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
-    metadata: metadataList(node),
+    collapsedBackground: getBackgroundColorClass(context.componentDefinition.color),
+    collapsed: context.node.isCollapsed,
+    title: context.node.name || context.componentDefinition.label || "Unnamed component",
+    eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+    metadata,
     includeEmptyState: !lastExecution,
     eventStateMap: getStateMap(componentName),
   };
 }
 
-function metadataList(node: NodeInfo): MetadataItem[] {
-  const metadata: MetadataItem[] = [];
-  const nodeMetadata = node.metadata as JiraNodeMetadata | undefined;
+export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  const rootEvent = execution.rootEvent;
+  if (!rootEvent?.id || !execution.createdAt) return [];
 
-  const project = nodeMetadata?.project;
-  if (project?.name || project?.key) {
-    metadata.push({ icon: "folder", label: project?.name || project?.key || "" });
-  }
+  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
+  if (!rootTriggerNode?.componentName) return [];
 
-  return metadata;
-}
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent! });
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
 
   return [
     {
-      receivedAt: new Date(execution.createdAt!),
+      receivedAt: new Date(execution.createdAt),
       eventTitle: title,
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
       eventState: getState(componentName)(execution),
-      eventSubtitle: buildJiraExecutionSubtitle(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId: rootEvent.id,
     },
   ];
 }

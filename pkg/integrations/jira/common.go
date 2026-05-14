@@ -9,7 +9,9 @@ import (
 
 // NodeMetadata stores metadata on action component nodes.
 type NodeMetadata struct {
-	Project *Project `json:"project,omitempty"`
+	Project   *Project `json:"project,omitempty"`
+	IssueType string   `json:"issueType,omitempty"`
+	Status    string   `json:"status,omitempty"`
 }
 
 // requireProject looks up a project by key in the integration metadata. It

@@ -358,6 +358,54 @@ func Test__Client__DeleteIssue(t *testing.T) {
 	})
 }
 
+func Test__Client__GetProjectIssueTypes(t *testing.T) {
+	t.Run("returns issue types for a project", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"issueTypes": [
+							{"id":"10001","name":"Task","subtask":false},
+							{"id":"10002","name":"Bug","subtask":false},
+							{"id":"10003","name":"Subtask","subtask":true}
+						]
+					}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		types, err := client.GetProjectIssueTypes("TEST")
+		require.NoError(t, err)
+		require.Len(t, types, 3)
+		assert.Equal(t, "Task", types[0].Name)
+		assert.Equal(t, "Bug", types[1].Name)
+		assert.True(t, types[2].Subtask)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), testSiteURL+"/rest/api/3/issue/createmeta/TEST/issuetypes")
+	})
+
+	t.Run("project not found -> error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusNotFound,
+					Body:       io.NopCloser(strings.NewReader(`{"errorMessages":["Project not found"]}`)),
+				},
+			},
+		}
+
+		client, err := NewClient(httpContext, newAuthorizedIntegration())
+		require.NoError(t, err)
+
+		_, err = client.GetProjectIssueTypes("MISSING")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "404")
+	})
+}
+
 func Test__WrapInADF(t *testing.T) {
 	t.Run("wraps text in ADF format", func(t *testing.T) {
 		result := WrapInADF("Hello world")

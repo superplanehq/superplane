@@ -131,6 +131,165 @@ func (c *Client) ListProjects() ([]Project, error) {
 	return projects, nil
 }
 
+type IssueTypeMeta struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Subtask bool   `json:"subtask"`
+}
+
+type createMetaIssueTypesResponse struct {
+	IssueTypes []IssueTypeMeta `json:"issueTypes"`
+}
+
+// GetProjectIssueTypes returns the issue types available for creating issues
+// in the given project. Uses the create-metadata endpoint which scopes the
+// list to types the user is permitted to create.
+func (c *Client) GetProjectIssueTypes(projectKey string) ([]IssueTypeMeta, error) {
+	endpoint := c.apiURL("/rest/api/3/issue/createmeta/" + url.PathEscape(projectKey) + "/issuetypes")
+
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp createMetaIssueTypesResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing issue types response: %v", err)
+	}
+	return resp.IssueTypes, nil
+}
+
+type Status struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type projectStatusesIssueType struct {
+	Statuses []Status `json:"statuses"`
+}
+
+// GetProjectStatuses returns the unique set of statuses across all issue
+// types in a project. /rest/api/3/project/{key}/statuses returns an entry
+// per issue type, each with its own status list — we flatten and dedupe by
+// status name.
+func (c *Client) GetProjectStatuses(projectKey string) ([]Status, error) {
+	endpoint := c.apiURL("/rest/api/3/project/" + url.PathEscape(projectKey) + "/statuses")
+
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var raw []projectStatusesIssueType
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("error parsing statuses response: %v", err)
+	}
+
+	seen := map[string]bool{}
+	statuses := []Status{}
+	for _, it := range raw {
+		for _, s := range it.Statuses {
+			if seen[s.Name] {
+				continue
+			}
+			seen[s.Name] = true
+			statuses = append(statuses, s)
+		}
+	}
+	return statuses, nil
+}
+
+type Transition struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	To   Status `json:"to"`
+}
+
+type transitionsResponse struct {
+	Transitions []Transition `json:"transitions"`
+}
+
+// GetIssueTransitions returns the transitions available from an issue's
+// current workflow state.
+func (c *Client) GetIssueTransitions(issueKey string) ([]Transition, error) {
+	endpoint := c.apiURL("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/transitions")
+
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp transitionsResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing transitions response: %v", err)
+	}
+	return resp.Transitions, nil
+}
+
+type doTransitionRequest struct {
+	Transition transitionID `json:"transition"`
+}
+
+type transitionID struct {
+	ID string `json:"id"`
+}
+
+// ListAssignableUsers returns the users assignable to issues in a given
+// project. /rest/api/3/user/assignable/search is paginated; we cap at 50
+// entries, which matches the picker's practical UX.
+func (c *Client) ListAssignableUsers(projectKey string) ([]User, error) {
+	query := url.Values{}
+	query.Set("project", projectKey)
+	query.Set("maxResults", "50")
+	endpoint := c.apiURL("/rest/api/3/user/assignable/search?" + query.Encode())
+
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var users []User
+	if err := json.Unmarshal(body, &users); err != nil {
+		return nil, fmt.Errorf("error parsing assignable users response: %v", err)
+	}
+	return users, nil
+}
+
+type Priority struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ListPriorities returns all priorities configured on the Jira site.
+// Priorities are instance-level, not project-scoped.
+func (c *Client) ListPriorities() ([]Priority, error) {
+	body, err := c.execRequest(http.MethodGet, c.apiURL("/rest/api/3/priority"), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var priorities []Priority
+	if err := json.Unmarshal(body, &priorities); err != nil {
+		return nil, fmt.Errorf("error parsing priorities response: %v", err)
+	}
+	return priorities, nil
+}
+
+// DoTransition advances an issue along the given workflow transition.
+func (c *Client) DoTransition(issueKey, id string) error {
+	endpoint := c.apiURL("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/transitions")
+
+	body, err := json.Marshal(doTransitionRequest{Transition: transitionID{ID: id}})
+	if err != nil {
+		return fmt.Errorf("error marshaling transition request: %v", err)
+	}
+
+	if _, err := c.execRequest(http.MethodPost, endpoint, bytes.NewReader(body)); err != nil {
+		return err
+	}
+	return nil
+}
+
 type Issue struct {
 	ID     string         `json:"id"`
 	Key    string         `json:"key"`

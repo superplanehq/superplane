@@ -19,6 +19,16 @@ type Metadata struct {
 	Projects []Project `json:"projects" mapstructure:"projects"`
 }
 
+const installationInstructions = `
+To connect Jira to SuperPlane:
+
+1. Open [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
+2. Click **Create API token**, give it a recognizable label, and copy the generated token.
+3. Paste your **Jira Site URL** into SuperPlane. For Jira Cloud, this usually looks like ` + "`https://your-domain.atlassian.net`" + `.
+4. Paste the Atlassian account **Email** that owns the API token.
+5. Paste the generated **API Token**.
+`
+
 func (j *Jira) Name() string {
 	return "jira"
 }
@@ -36,7 +46,7 @@ func (j *Jira) Description() string {
 }
 
 func (j *Jira) Instructions() string {
-	return "Create an API token at https://id.atlassian.com/manage-profile/security/api-tokens, then provide your Atlassian account email and Jira site URL (e.g. https://your-domain.atlassian.net)."
+	return installationInstructions
 }
 
 func (j *Jira) Configuration() []configuration.Field {
