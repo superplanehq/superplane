@@ -1,4 +1,5 @@
 import type { AgentState } from "@/components/AgentSidebar/useAgentState";
+import { useHeaderActionSlotNode } from "./HeaderActionSlotContext";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -184,8 +185,12 @@ function SecondaryHeaderActions({
   const showDraftDropdown =
     showEditButton && !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
 
+  // Extensible header action slot (used by Dashboard "Add panel", Repo "Clone", etc.)
+  const slotNode = useHeaderActionSlotNode();
+
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
+      {slotNode ?? null}
       {showVersionControlTrigger ? (
         <VersionControlButton
           onToggle={onOpenVersionControl}

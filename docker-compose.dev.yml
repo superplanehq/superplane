@@ -36,6 +36,9 @@ services:
       START_PUBLIC_API: "yes"
       START_INTERNAL_API: "yes"
       START_GRPC_GATEWAY: "yes"
+      ENABLE_GIT_SERVER: "yes"
+      GIT_REPOS_DIR: "/data/repos"
+      GIT_SYNC_TOKEN: "COHm8vGTQ/CGkUFQL3DK5w39ED3JaHUsn7Td/ElYMFRqSeJkGKXH6pbToEzparSU"
       START_CONSUMERS: "yes"
       PUBLIC_API_BASE_PATH: /api/v1
       START_WEB_SERVER: "yes"

@@ -3041,4 +3041,14 @@ function CanvasContent({
 
 export type { AgentContext, AgentMode, BuildingBlock } from "../BuildingBlocksSidebar";
 export type { MissingIntegration } from "../IntegrationStatusIndicator";
-export { CanvasPage };
+import { HeaderActionSlotProvider } from "./HeaderActionSlotContext";
+
+function CanvasPageWithSlotProvider(props: CanvasPageProps) {
+  return (
+    <HeaderActionSlotProvider>
+      <CanvasPage {...props} />
+    </HeaderActionSlotProvider>
+  );
+}
+
+export { CanvasPageWithSlotProvider as CanvasPage };
