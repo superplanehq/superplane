@@ -70,8 +70,8 @@ func TestAgentStreamWorker_PersistsAssistantTurn(t *testing.T) {
 	provider := &scriptedProvider{
 		name: testProvider,
 		events: []agents.ProviderEvent{
-			{Type: agents.ProviderEventAssistantMessage, Text: "Hello"},
-			{Type: agents.ProviderEventAssistantMessage, Text: ", world"},
+			{ProviderEventID: "msg-1", Type: agents.ProviderEventAssistantMessage, Text: "Hello"},
+			{ProviderEventID: "msg-2", Type: agents.ProviderEventAssistantMessage, Text: ", world"},
 			{Type: agents.ProviderEventTurnCompleted},
 		},
 	}
@@ -89,9 +89,11 @@ func TestAgentStreamWorker_PersistsAssistantTurn(t *testing.T) {
 
 	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
 	require.NoError(t, err)
-	require.Len(t, stored, 1, "the streamed text deltas must be coalesced into a single assistant message")
+	require.Len(t, stored, 2, "each assistant text block must persist as its own row so chronology lines up with interleaved tool rows")
 	assert.Equal(t, models.AgentMessageRoleAssistant, stored[0].Role)
-	assert.Equal(t, "Hello, world", stored[0].Content)
+	assert.Equal(t, "Hello", stored[0].Content)
+	assert.Equal(t, models.AgentMessageRoleAssistant, stored[1].Role)
+	assert.Equal(t, ", world", stored[1].Content)
 
 	refreshed, err := models.FindAgentSession(session.ID)
 	require.NoError(t, err)
@@ -107,7 +109,7 @@ func TestAgentStreamWorker_PersistsToolEvents(t *testing.T) {
 	provider := &scriptedProvider{
 		name: testProvider,
 		events: []agents.ProviderEvent{
-			{ProviderEventID: "tool-1", Type: agents.ProviderEventToolUseStarted, ToolName: "search", ToolCallID: "call-1"},
+			{ProviderEventID: "tool-1", Type: agents.ProviderEventToolUseStarted, ToolName: "search", ToolCallID: "call-1", ToolInput: "rg --files"},
 			{ProviderEventID: "tool-1", Type: agents.ProviderEventToolUseFinished, ToolName: "search", ToolCallID: "call-1"},
 			{Type: agents.ProviderEventTurnCompleted},
 		},
@@ -127,6 +129,8 @@ func TestAgentStreamWorker_PersistsToolEvents(t *testing.T) {
 	assert.Equal(t, models.AgentMessageRoleTool, stored[0].Role)
 	assert.Equal(t, "search", stored[0].ToolName)
 	assert.Equal(t, models.AgentToolStatusFinished, stored[0].ToolStatus)
+	assert.Equal(t, "rg --files", stored[0].Content,
+		"tool_finished must not wipe the input captured by tool_started — the UI's expandable command relies on it")
 }
 
 func TestAgentStreamWorker_ParallelToolsTrackedIndependently(t *testing.T) {

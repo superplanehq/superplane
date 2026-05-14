@@ -78,13 +78,6 @@ describe("useAgentSessionWebsocket", () => {
     expect(enabled).toBe(false);
   });
 
-  it("forwards assistant_delta payloads via onAssistantDelta", () => {
-    const onDelta = vi.fn();
-    render({ onAssistantDelta: onDelta });
-    emit("assistant_delta", { sessionId: "session-1", extra: { text: "Hello" } });
-    expect(onDelta).toHaveBeenCalledWith("Hello");
-  });
-
   it("appends an assistant_message to the newest page and fires onPersistedMessage", () => {
     const onPersisted = vi.fn();
     const queryClient = render({ onPersistedMessage: onPersisted });
@@ -195,13 +188,13 @@ describe("useAgentSessionWebsocket", () => {
   });
 
   it("ignores malformed payloads without crashing", () => {
-    const onDelta = vi.fn();
-    render({ onAssistantDelta: onDelta });
+    const onPersisted = vi.fn();
+    render({ onPersistedMessage: onPersisted });
     const [, options] = lastCall();
     const onMessage = options.onMessage as (e: MessageEvent<unknown>) => void;
     act(() => {
       onMessage(new MessageEvent("message", { data: "not-json" }));
     });
-    expect(onDelta).not.toHaveBeenCalled();
+    expect(onPersisted).not.toHaveBeenCalled();
   });
 });

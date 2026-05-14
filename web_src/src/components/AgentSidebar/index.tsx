@@ -93,13 +93,12 @@ function ChatConversation({
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
 
   const [draft, setDraft] = useState("");
-  const [streamingText, setStreamingText] = useState("");
   const [status, setStatus] = useState<string>("idle");
   const [error, setError] = useState<string | null>(null);
 
   // pages[0] is the latest fetch; later entries are older batches loaded
   // via scroll-up. Reverse so chronological order falls out of flatMap.
-  const allMessages = useMemo(
+  const messages = useMemo(
     () =>
       messagesQuery.data?.pages
         .slice()
@@ -108,25 +107,16 @@ function ChatConversation({
     [messagesQuery.data],
   );
   const hasRunningTool = useMemo(
-    () => allMessages.some((m) => m.role === "tool" && m.toolStatus === "started"),
-    [allMessages],
+    () => messages.some((m) => m.role === "tool" && m.toolStatus === "started"),
+    [messages],
   );
-  // While a tool is active, keep finished sibling tools visible too so the
-  // user sees the full sequence for the current turn. Once nothing is
-  // running, hide every tool row — the assistant's final response stands on
-  // its own.
-  const messages = useMemo(
-    () => (hasRunningTool ? allMessages : allMessages.filter((m) => m.role !== "tool")),
-    [allMessages, hasRunningTool],
-  );
-  const showThinking = status === "streaming" && !streamingText && !hasRunningTool;
+  // Thinking is just a placeholder for the gap between sending and the first
+  // assistant block landing in the cache. Once a tool starts running its own
+  // row signals activity, so we suppress Thinking to avoid double-indicators.
+  const showThinking = status === "streaming" && !hasRunningTool && messages[messages.length - 1]?.role === "user";
 
   const wsCallbacks = useMemo(
     () => ({
-      onAssistantDelta: (text: string) => setStreamingText((prev) => prev + text),
-      onPersistedMessage: (msg: AgentMessage) => {
-        if (msg.role === "assistant") setStreamingText("");
-      },
       onStatusChange: (next: string, err?: string) => {
         setStatus(next || "idle");
         setError(err ?? null);
@@ -178,7 +168,7 @@ function ChatConversation({
       return;
     }
     el.scrollTop = el.scrollHeight;
-  }, [chatId, messages.length, streamingText, showThinking]);
+  }, [chatId, messages.length, showThinking]);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -199,7 +189,6 @@ function ChatConversation({
             ))}
           </>
         )}
-        {streamingText ? <StreamingAssistantRow text={streamingText} /> : null}
         {showThinking ? <ThinkingRow /> : null}
         {error ? <p className="text-sm text-red-600 px-3 py-2">{error}</p> : null}
       </div>
@@ -312,20 +301,6 @@ function ThinkingRow() {
     <div className="flex items-center gap-2 text-sm py-1 text-slate-500 animate-tool-glow" data-testid="agent-thinking">
       <Loader2 className="size-4 shrink-0 animate-spin" />
       <span>Thinking…</span>
-    </div>
-  );
-}
-
-function StreamingAssistantRow({ text }: { text: string }) {
-  return (
-    <div className="flex justify-start">
-      <div
-        className="rounded-lg px-3 py-2 text-sm max-w-[85%] break-words bg-slate-100 text-slate-900"
-        data-testid="agent-streaming-message"
-      >
-        <AgentMarkdown content={text} />
-        <span className="inline-block w-1.5 h-3 bg-slate-500 animate-pulse ml-1 align-middle" />
-      </div>
     </div>
   );
 }

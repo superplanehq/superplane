@@ -1,4 +1,12 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type UseQueryResult } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryClient,
+  type UseQueryResult,
+} from "@tanstack/react-query";
 import {
   agentsGetCanvasAgentChat,
   agentsListAgentChatMessages,
@@ -57,7 +65,7 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
   });
 }
 
-export function useSendAgentChatMessage(organizationId: string | undefined, canvasId: string | undefined) {
+export function useSendAgentChatMessage(organizationId: string | undefined, _canvasId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ chatId, content }: { chatId: string; content: string }) => {
@@ -66,11 +74,30 @@ export function useSendAgentChatMessage(organizationId: string | undefined, canv
       );
       return fromApiMessage(response.data?.message);
     },
-    onSuccess: (_data, variables) => {
-      void queryClient.invalidateQueries({ queryKey: agentChatKeys.messages(variables.chatId) });
-      if (canvasId) {
-        void queryClient.invalidateQueries({ queryKey: agentChatKeys.forCanvas(canvasId) });
-      }
+    onSuccess: (data, variables) => {
+      if (data) upsertAgentMessageInCache(queryClient, variables.chatId, data);
     },
+  });
+}
+
+// Mutate the messages cache directly instead of invalidating. Invalidation
+// triggers a full server refetch that races with live WS upserts and makes
+// tool rows flicker mid-stream.
+export function upsertAgentMessageInCache(queryClient: QueryClient, chatId: string, message: AgentMessage): void {
+  queryClient.setQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages(chatId), (prev) => {
+    if (!prev) return prev;
+    const pages = prev.pages.map((p) => ({ ...p, messages: p.messages.slice() }));
+    for (const page of pages) {
+      const idx = page.messages.findIndex((m) => m.id === message.id);
+      if (idx !== -1) {
+        page.messages[idx] = message;
+        return { ...prev, pages };
+      }
+    }
+    if (pages.length === 0) {
+      return { ...prev, pages: [{ messages: [message], hasMore: false }] };
+    }
+    pages[0].messages.push(message);
+    return { ...prev, pages };
   });
 }

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -191,17 +190,22 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 
 	publish(messages.AgentSessionEventMessage{Event: "stream_started", Status: models.AgentSessionStatusStreaming})
 
-	var assistantBuffer strings.Builder
 	var streamErr error
 
 	err = w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
 		switch evt.Type {
 		case agents.ProviderEventAssistantMessage:
-			assistantBuffer.WriteString(evt.Text)
-			publish(messages.AgentSessionEventMessage{
-				Event: "assistant_delta",
-				Extra: map[string]any{"text": evt.Text},
-			})
+			if evt.Text == "" {
+				return nil
+			}
+			if err := persistAndBroadcast(sessionID, &models.AgentSessionMessage{
+				SessionID:       sessionID,
+				ProviderEventID: evt.ProviderEventID,
+				Role:            models.AgentMessageRoleAssistant,
+				Content:         evt.Text,
+			}, "assistant_message", publish); err != nil {
+				return err
+			}
 		case agents.ProviderEventToolUseStarted:
 			if err := persistAndBroadcast(sessionID, &models.AgentSessionMessage{
 				SessionID:       sessionID,
@@ -226,16 +230,6 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 				return err
 			}
 		case agents.ProviderEventTurnCompleted:
-			if assistantBuffer.Len() > 0 {
-				if err := persistAndBroadcast(sessionID, &models.AgentSessionMessage{
-					SessionID: sessionID,
-					Role:      models.AgentMessageRoleAssistant,
-					Content:   assistantBuffer.String(),
-				}, "assistant_message", publish); err != nil {
-					return err
-				}
-				assistantBuffer.Reset()
-			}
 			publish(messages.AgentSessionEventMessage{Event: "turn_completed", Status: models.AgentSessionStatusIdle})
 		case agents.ProviderEventSessionFailed:
 			// Don't publish here — the post-loop block owns

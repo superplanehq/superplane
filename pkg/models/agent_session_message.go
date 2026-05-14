@@ -49,6 +49,9 @@ func AppendAgentSessionMessageInTransaction(tx *gorm.DB, msg *AgentSessionMessag
 		return tx.Create(msg).Error
 	}
 
+	// Preserve the existing content when the incoming event has none — the
+	// tool_finished payload doesn't carry the input the user already saw on
+	// tool_started, and overwriting with '' wipes the expandable command.
 	return tx.Exec(`
 		INSERT INTO agent_session_messages
 			(id, session_id, provider_event_id, role, content, tool_call_id, tool_name, tool_status, created_at)
@@ -56,7 +59,7 @@ func AppendAgentSessionMessageInTransaction(tx *gorm.DB, msg *AgentSessionMessag
 		ON CONFLICT (session_id, provider_event_id)
 		WHERE provider_event_id <> ''
 		DO UPDATE SET
-			content = EXCLUDED.content,
+			content = COALESCE(NULLIF(EXCLUDED.content, ''), agent_session_messages.content),
 			tool_status = EXCLUDED.tool_status,
 			tool_name = EXCLUDED.tool_name
 	`,

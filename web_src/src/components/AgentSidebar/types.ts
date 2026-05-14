@@ -22,11 +22,6 @@ export type AgentMessage = {
 export type AgentSessionWebsocketEvent =
   | {
       sessionId: string;
-      event: "assistant_delta";
-      extra?: { text?: string } | null;
-    }
-  | {
-      sessionId: string;
       event: "assistant_message" | "tool_started" | "tool_finished";
       messageId: string;
       message: AgentMessage;
