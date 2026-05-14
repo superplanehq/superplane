@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -128,6 +129,10 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("set task id in kv: %w", err)
 	}
 
+	if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
+		return fmt.Errorf("runner execution metadata: %w", err)
+	}
+
 	return ctx.Requests.ScheduleActionCall(hookActionPoll, params, pollInterval)
 }
 
@@ -165,6 +170,11 @@ func (c *Runner) handlePoll(ctx core.ActionHookContext) error {
 		return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
 	}
 
+	sink := taskLogFromBrokerTask(task)
+	if err := mergeRunnerTaskLog(ctx.Metadata, taskID, sink); err != nil {
+		ctx.Logger.WithError(err).Warn("runner: execution metadata update failed")
+	}
+
 	if task.IsInTerminalState() {
 		return c.processTaskStatus(ctx.ExecutionState, task)
 	}
@@ -178,18 +188,33 @@ func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusInternalServerError, nil, fmt.Errorf("new broker client: %w", err)
 	}
 
+	var raw map[string]any
+	if err := json.Unmarshal(ctx.Body, &raw); err != nil {
+		raw = nil
+	}
+
 	task, err := broker.ProcessWebhook(ctx.Body)
 	if err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("process webhook: %w", err)
 	}
 
 	if !task.IsInTerminalState() {
-		ctx.Logger.WithError(err).Warn("runner: broker webhook received non-terminal state")
+		ctx.Logger.Warn("runner: broker webhook received non-terminal state")
 	}
 
 	executionCtx, err := ctx.FindExecutionByKV("task_id", task.TaskID)
 	if err != nil {
 		return http.StatusNotFound, nil, nil
+	}
+
+	sink := taskLogFromBrokerTask(task)
+	if sink == nil {
+		sink = taskLogFromRawWebhook(raw)
+	}
+	if executionCtx.Metadata != nil {
+		if err := mergeRunnerTaskLog(executionCtx.Metadata, task.TaskID, sink); err != nil {
+			ctx.Logger.WithError(err).Warn("runner: execution metadata update failed")
+		}
 	}
 
 	err = c.processTaskStatus(executionCtx.ExecutionState, task)
@@ -210,11 +235,11 @@ func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task)
 	}
 
 	channel := FailedOutputChannel
-	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.ExitCode == 0 {
+	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {
 		channel = PassedOutputChannel
 	}
 
-	out := map[string]any{"status": task.Status, "exit_code": task.ExitCode}
+	out := map[string]any{"status": task.Status, "exit_code": task.effectiveExitCode()}
 	return state.Emit(channel, RunnerFinishedEventType, []any{out})
 }
 
