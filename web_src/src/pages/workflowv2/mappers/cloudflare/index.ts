@@ -26,6 +26,10 @@ import { deployWorkerMapper } from "./deploy_worker";
 import { getWorkerMapper } from "./get_worker";
 import { deleteWorkerMapper } from "./delete_worker";
 import { updateWorkerRouteMapper } from "./update_worker_route";
+import { createTunnelMapper } from "./create_tunnel";
+import { getTunnelMapper } from "./get_tunnel";
+import { deleteTunnelMapper } from "./delete_tunnel";
+import { onTunnelHealthTriggerRenderer } from "./on_tunnel_health";
 
 const updateWorkerRouteStateRegistry: EventStateRegistry = {
   stateMap: {
@@ -60,10 +64,6 @@ const deployWorkerStateRegistry: EventStateRegistry = {
     return "deployed";
   },
 };
-import { createTunnelMapper } from "./create_tunnel";
-import { getTunnelMapper } from "./get_tunnel";
-import { deleteTunnelMapper } from "./delete_tunnel";
-import { onTunnelHealthTriggerRenderer } from "./on_tunnel_health";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createDnsRecord: baseMapper,

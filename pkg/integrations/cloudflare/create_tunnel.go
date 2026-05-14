@@ -110,6 +110,10 @@ func (c *CreateTunnel) Setup(ctx core.SetupContext) error {
 		return errors.New("name is required")
 	}
 
+	if normalizeTunnelConfigSrc(spec.ConfigSrc) == "" {
+		return fmt.Errorf("configSrc must be cloudflare or local")
+	}
+
 	return nil
 }
 
