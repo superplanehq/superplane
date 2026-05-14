@@ -296,3 +296,43 @@ var exampleOutputUpdateWorkerRoute map[string]any
 func (u *UpdateWorkerRoute) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateWorkerRouteOnce, exampleOutputUpdateWorkerRouteBytes, &exampleOutputUpdateWorkerRoute)
 }
+
+//go:embed example_output_create_tunnel.json
+var exampleOutputCreateTunnelBytes []byte
+
+var exampleOutputCreateTunnelOnce sync.Once
+var exampleOutputCreateTunnel map[string]any
+
+func (c *CreateTunnel) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateTunnelOnce, exampleOutputCreateTunnelBytes, &exampleOutputCreateTunnel)
+}
+
+//go:embed example_output_get_tunnel.json
+var exampleOutputGetTunnelBytes []byte
+
+var exampleOutputGetTunnelOnce sync.Once
+var exampleOutputGetTunnel map[string]any
+
+func (c *GetTunnel) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetTunnelOnce, exampleOutputGetTunnelBytes, &exampleOutputGetTunnel)
+}
+
+//go:embed example_output_delete_tunnel.json
+var exampleOutputDeleteTunnelBytes []byte
+
+var exampleOutputDeleteTunnelOnce sync.Once
+var exampleOutputDeleteTunnel map[string]any
+
+func (c *DeleteTunnel) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteTunnelOnce, exampleOutputDeleteTunnelBytes, &exampleOutputDeleteTunnel)
+}
+
+//go:embed example_data_on_tunnel_health.json
+var exampleDataOnTunnelHealthBytes []byte
+
+var exampleDataOnTunnelHealthOnce sync.Once
+var exampleDataOnTunnelHealth map[string]any
+
+func (t *OnTunnelHealth) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnTunnelHealthOnce, exampleDataOnTunnelHealthBytes, &exampleDataOnTunnelHealth)
+}
