@@ -36,22 +36,7 @@ func mergeExecutionMetadata(meta core.MetadataWriter, patch map[string]any) erro
 			delete(m, k)
 			continue
 		}
-		switch {
-		case k == ExecutionMetadataTaskLog:
-			if tl, ok := v.(*TaskLogSink); ok && tl != nil {
-				b, err := json.Marshal(tl)
-				if err != nil {
-					return err
-				}
-				var asMap map[string]any
-				if err := json.Unmarshal(b, &asMap); err != nil {
-					return err
-				}
-				m[k] = asMap
-			}
-		default:
-			m[k] = v
-		}
+		m[k] = v
 	}
 	return meta.Set(m)
 }
