@@ -96,3 +96,90 @@ export const CanvasTopology: Story = {
     A2 --> N1`,
   },
 };
+
+export const GitGraph: Story = {
+  args: {
+    content: `gitGraph
+    commit id: "init"
+    commit id: "add trigger"
+    branch feature/api-node
+    checkout feature/api-node
+    commit id: "add HTTP node"
+    commit id: "add error handling"
+    checkout main
+    merge feature/api-node
+    commit id: "add notifications"
+    branch fix/timeout
+    checkout fix/timeout
+    commit id: "bump timeout to 30s"
+    checkout main
+    merge fix/timeout
+    commit id: "v1.0 release" tag: "v1.0"`,
+  },
+};
+
+export const GanttChart: Story = {
+  args: {
+    content: `gantt
+    title Canvas Build Timeline
+    dateFormat YYYY-MM-DD
+    axisFormat %b %d
+
+    section Setup
+    Install CLI           :done, setup1, 2026-05-01, 1d
+    Connect to API        :done, setup2, after setup1, 1d
+
+    section Build
+    Create trigger node   :done, build1, after setup2, 2d
+    Add API health check  :done, build2, after build1, 2d
+    Add branching logic   :active, build3, after build2, 2d
+    Add notifications     :build4, after build3, 3d
+
+    section Deploy
+    Staging deploy        :deploy1, after build4, 1d
+    Production deploy     :deploy2, after deploy1, 1d`,
+  },
+};
+
+export const XYChart: Story = {
+  args: {
+    content: `xychart-beta
+    title "Run Duration by Node (ms)"
+    x-axis ["Webhook", "API Call", "If Check", "SSH Deploy", "Notify"]
+    y-axis "Duration (ms)" 0 --> 5000
+    bar [120, 2400, 50, 4200, 350]
+    line [120, 2400, 50, 4200, 350]`,
+  },
+};
+
+export const Timeline: Story = {
+  args: {
+    content: `timeline
+    title Canvas Evolution
+    section v0.1 - MVP
+      Webhook trigger : Basic HTTP listener
+      Single API call : GET health endpoint
+    section v0.2 - Branching
+      If node added : Status code routing
+      Success path : Slack notification
+      Failure path : Email alert
+    section v0.3 - Reliability
+      Retry logic : 3 attempts with backoff
+      Timeout config : 30s per node
+      SSH deploy : Remote script execution
+    section v1.0 - Production
+      Monitoring : Run analytics dashboard
+      Approvals : Manual gate before deploy
+      Scheduling : Cron-based triggers`,
+  },
+};
+
+export const PieChart: Story = {
+  args: {
+    content: `pie title Run Outcomes (Last 7 Days)
+    "Success" : 312
+    "Failed" : 28
+    "Timed Out" : 8
+    "Cancelled" : 3`,
+  },
+};
