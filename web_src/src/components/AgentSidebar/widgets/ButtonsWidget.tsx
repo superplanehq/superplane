@@ -20,7 +20,7 @@ export function ButtonsWidget({ prompt, items, onAction }: ButtonsWidgetProps) {
             key={item}
             variant="ghost"
             size="sm"
-            className="justify-start text-xs text-slate-700 hover:bg-violet-50 hover:text-violet-900 h-auto py-2 px-3 whitespace-nowrap"
+            className="justify-start text-xs text-slate-700 hover:bg-violet-50 hover:text-violet-900 h-auto py-2 px-3 text-left whitespace-normal"
             onClick={() => onAction?.(item)}
           >
             <span className="inline-flex items-center justify-center size-5 rounded bg-violet-100 text-violet-700 text-[10px] font-semibold mr-2 shrink-0">
