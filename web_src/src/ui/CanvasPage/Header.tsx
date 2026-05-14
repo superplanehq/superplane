@@ -10,7 +10,7 @@ import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
 
-type HeaderMode = "default" | "version-live" | "version-edit" | "runs";
+type HeaderMode = "default" | "dashboard" | "version-live" | "version-edit" | "runs";
 
 interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). */
@@ -34,6 +34,7 @@ interface HeaderProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
+  onSelectDashboard?: () => void;
   onSelectRuns?: () => void;
   runsNotificationCount?: number;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
@@ -119,8 +120,11 @@ function PageHeader({
 
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle =
-    props.mode === "version-live" || props.mode === "version-edit" || props.mode === "runs";
-  const canvasViewMode = props.mode === "runs" ? props.mode : "version-live";
+    props.mode === "dashboard" ||
+    props.mode === "version-live" ||
+    props.mode === "version-edit" ||
+    props.mode === "runs";
+  const canvasViewMode = props.mode === "runs" || props.mode === "dashboard" ? props.mode : "version-live";
   const editing = props.mode === "version-edit";
 
   return (
@@ -132,6 +136,7 @@ function SecondaryHeader(props: HeaderProps) {
           {showCanvasViewModeToggle && props.onExitEditMode ? (
             <CanvasModeToggle
               mode={canvasViewMode}
+              onSelectDashboard={props.onSelectDashboard}
               onSelectLive={props.onExitEditMode}
               onSelectRuns={props.onSelectRuns}
               runsNotificationCount={props.runsNotificationCount}

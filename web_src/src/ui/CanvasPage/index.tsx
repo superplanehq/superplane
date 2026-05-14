@@ -157,7 +157,7 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "runs";
+  headerMode?: "default" | "dashboard" | "version-live" | "version-edit" | "runs";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
@@ -167,6 +167,7 @@ export interface CanvasPageProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectRuns?: () => void;
+  onSelectDashboard?: () => void;
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
@@ -233,6 +234,7 @@ export interface CanvasPageProps {
   runsComponentIconMap?: Record<string, string>;
   runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   runsSidebar?: React.ReactNode;
+  dashboardOverlay?: React.ReactNode;
   onRunNodeSelect?: (nodeId: string) => void;
   onRunExecutionSelect?: (options: {
     nodeId: string;
@@ -1005,6 +1007,7 @@ function CanvasPage(props: CanvasPageProps) {
       Boolean(props.hideAddControls) ||
       props.headerMode === "version-live" ||
       props.headerMode === "runs" ||
+      props.headerMode === "dashboard" ||
       state.componentSidebar.isOpen,
     isSidebarOpen: isBuildingBlocksSidebarOpen,
     onOpen: handleBuildingBlocksShortcutOpen,
@@ -1081,14 +1084,18 @@ function CanvasPage(props: CanvasPageProps) {
 
   const canvasStateMode = props.canvasStateMode || "default";
   const showPreviewFloatingBar =
-    canvasStateMode === "previewing-previous-version" && !!props.onPreviewPreviousVersionViewDetails;
-  const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
+    props.headerMode !== "dashboard" &&
+    canvasStateMode === "previewing-previous-version" &&
+    !!props.onPreviewPreviousVersionViewDetails;
+  const showAwaitingFloatingBar =
+    props.headerMode !== "dashboard" && canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
   return (
     <div
       ref={canvasWrapperRef}
       className={cn(
         "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
+        props.headerMode === "dashboard" && "sp-canvas-live",
         props.headerMode === "version-live" && "sp-canvas-live",
         props.headerMode === "runs" && "sp-canvas-live",
       )}
@@ -1118,6 +1125,7 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           onSelectRuns={props.onSelectRuns}
+          onSelectDashboard={props.onSelectDashboard}
           runsNotificationCount={props.runsNotificationCount}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
@@ -1135,11 +1143,11 @@ function CanvasPage(props: CanvasPageProps) {
 
       {/* Main content area with sidebar and canvas */}
       <div className="flex-1 flex relative overflow-hidden">
-        {props.headerMode === "runs" ? null : props.versionControlSidebar}
+        {props.headerMode === "runs" || props.headerMode === "dashboard" ? null : props.versionControlSidebar}
 
         <AgentSidebar agentState={agentState} />
 
-        {props.headerMode === "runs" ? null : (
+        {props.headerMode === "runs" || props.headerMode === "dashboard" ? null : (
           <RightSideControls
             mode={readOnly ? "live" : "edit"}
             onSidebarOpen={handleBuildingBlocksShortcutOpen}
@@ -1153,7 +1161,12 @@ function CanvasPage(props: CanvasPageProps) {
 
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
-            isOpen={isBuildingBlocksSidebarOpen && props.headerMode !== "version-live" && props.headerMode !== "runs"}
+            isOpen={
+              isBuildingBlocksSidebarOpen &&
+              props.headerMode !== "version-live" &&
+              props.headerMode !== "runs" &&
+              props.headerMode !== "dashboard"
+            }
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             integrations={props.integrations}
@@ -1166,6 +1179,9 @@ function CanvasPage(props: CanvasPageProps) {
         )}
 
         <div className="flex-1 relative">
+          {props.headerMode === "dashboard" && props.dashboardOverlay ? (
+            <div className="absolute inset-0 z-[20] overflow-hidden bg-slate-50">{props.dashboardOverlay}</div>
+          ) : null}
           {props.runCanvasLoading && props.headerMode === "runs" ? (
             <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-50">
               <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
@@ -1270,7 +1286,7 @@ function CanvasPage(props: CanvasPageProps) {
               onLogView={props.onLogView}
             />
           </ReactFlowProvider>
-          {props.headerMode === "runs" ? null : (
+          {props.headerMode === "runs" || props.headerMode === "dashboard" ? null : (
             <Sidebar
               state={state}
               getSidebarData={props.getSidebarData}
@@ -1631,6 +1647,7 @@ function CanvasContentHeader({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   onSelectRuns,
+  onSelectDashboard,
   runsNotificationCount,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
@@ -1665,6 +1682,7 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectRuns?: () => void;
+  onSelectDashboard?: () => void;
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
@@ -1709,6 +1727,7 @@ function CanvasContentHeader({
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       onSelectRuns={onSelectRuns}
+      onSelectDashboard={onSelectDashboard}
       runsNotificationCount={runsNotificationCount}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}

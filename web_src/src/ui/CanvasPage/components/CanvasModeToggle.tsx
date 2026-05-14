@@ -1,10 +1,11 @@
 import type React from "react";
 import { cn } from "@/lib/utils";
 
-type CanvasMode = "version-live" | "version-edit" | "runs";
+type CanvasMode = "dashboard" | "version-live" | "version-edit" | "runs";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
+  onSelectDashboard?: () => void;
   onSelectLive: () => void;
   onSelectRuns?: () => void;
   runsNotificationCount?: number;
@@ -14,12 +15,14 @@ interface CanvasModeToggleProps {
 
 export function CanvasModeToggle({
   mode,
+  onSelectDashboard,
   onSelectLive,
   onSelectRuns,
   runsNotificationCount,
   editing = false,
   hasDraft = false,
 }: CanvasModeToggleProps) {
+  const showDashboard = !!onSelectDashboard;
   const showRuns = !!onSelectRuns;
   const baseTrigger =
     "h-full border-none px-3 py-1 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50";
@@ -31,6 +34,22 @@ export function CanvasModeToggle({
   return (
     <div className="inline-flex w-auto" aria-label="Canvas view" role="group">
       <div className="flex h-8 w-fit gap-0 overflow-hidden rounded-sm border border-slate-300 bg-white/80 p-0">
+        {showDashboard ? (
+          <>
+            <ModeButton
+              isActive={mode === "dashboard"}
+              data-testid="canvas-view-mode-dashboard"
+              aria-label="Dashboard"
+              onClick={() => {
+                if (mode !== "dashboard" && onSelectDashboard) void onSelectDashboard();
+              }}
+              className={cn(baseTrigger, "rounded-sm rounded-br-none rounded-tr-none")}
+            >
+              Dashboard
+            </ModeButton>
+            <div className="h-full w-px bg-slate-300"></div>
+          </>
+        ) : null}
         <ModeButton
           isActive={mode === "version-live" || mode === "version-edit"}
           activeClassName={canvasActiveClassName}
@@ -39,7 +58,16 @@ export function CanvasModeToggle({
           onClick={() => {
             if (mode !== "version-live" && mode !== "version-edit") void onSelectLive();
           }}
-          className={cn(baseTrigger, showRuns ? "rounded-none" : "rounded-sm rounded-bl-none rounded-tl-none")}
+          className={cn(
+            baseTrigger,
+            showDashboard
+              ? showRuns
+                ? "rounded-none"
+                : "rounded-sm rounded-bl-none rounded-tl-none"
+              : showRuns
+                ? "rounded-sm rounded-br-none rounded-tr-none"
+                : "rounded-sm",
+          )}
         >
           <span className="inline-flex items-center gap-1.5">
             Canvas
