@@ -230,7 +230,7 @@ func TestService_SendMessage_ReturnsPersistedUserMessage(t *testing.T) {
 	assert.Equal(t, "hello", persisted.Content)
 }
 
-func TestService_SendMessage_InjectsPreambleOnFirstTurnOnly(t *testing.T) {
+func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -245,11 +245,13 @@ func TestService_SendMessage_InjectsPreambleOnFirstTurnOnly(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String())
 	assert.Contains(t, provider.lastPreamble, "api_token:")
+	assert.Contains(t, provider.lastPreamble, "api_token_expires_at:")
 
 	provider.lastPreamble = "<sentinel>"
 	_, err = svc.SendMessage(context.Background(), r.Organization.ID, r.User, session.ID, "second")
 	require.NoError(t, err)
-	assert.Equal(t, "", provider.lastPreamble)
+	assert.Contains(t, provider.lastPreamble, "api_token:",
+		"a fresh api_token must be re-injected on every turn so the session never expires mid-conversation")
 }
 
 func TestService_SendMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing.T) {
