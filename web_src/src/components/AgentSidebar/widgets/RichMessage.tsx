@@ -23,7 +23,7 @@ const MARKDOWN_CLASSES =
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
   "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current " +
   "[&_table]:my-2 [&_table]:w-full [&_table]:text-xs [&_table]:border-collapse " +
-  "[&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:border [&_table]:border-slate-200 [&_table]:bg-slate-50/30 " +
+  "[&_table]:rounded-lg [&_table]:overflow-hidden [&_table]:border [&_table]:border-violet-200 [&_table]:bg-white [&_table]:shadow-sm " +
   "[&_thead]:bg-slate-50 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-700 " +
   "[&_th]:border-b [&_th]:border-slate-200 " +
   "[&_td]:px-3 [&_td]:py-1.5 [&_td]:text-slate-600 [&_td]:border-b [&_td]:border-slate-100 " +
