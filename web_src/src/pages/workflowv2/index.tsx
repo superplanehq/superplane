@@ -63,6 +63,7 @@ import {
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -140,6 +141,10 @@ import {
   summarizeWorkflowChanges,
 } from "./utils";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
+
+/** Experimental feature id; must match `FeatureDashboards` in pkg/features/features.go. */
+const EXPERIMENTAL_FEATURE_DASHBOARDS = "dashboards";
+
 function getNodeAnalyticsProps(
   node: ComponentsNode,
   availableIntegrations: IntegrationsIntegrationDefinition[],
@@ -205,6 +210,8 @@ export function WorkflowPageV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const dashboardsFeatureEnabled = hasExperimentalFeature(EXPERIMENTAL_FEATURE_DASHBOARDS);
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
@@ -622,7 +629,7 @@ export function WorkflowPageV2() {
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
-  const dashboardQuery = useCanvasDashboard(canvasId!, !isTemplate);
+  const dashboardQuery = useCanvasDashboard(canvasId!, !isTemplate && dashboardsFeatureEnabled);
   const updateDashboardMutation = useUpdateCanvasDashboard(canvasId!);
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
@@ -4935,14 +4942,39 @@ export function WorkflowPageV2() {
     handleCreateVersion,
   ]);
 
+  const viewParam = searchParams.get("view") ?? "";
+  const runParam = searchParams.get("run") ?? "";
+
   useEffect(() => {
-    setIsRunsMode(searchParams.get("view") === "runs");
-    setIsDashboardMode(searchParams.get("view") === "dashboard");
-    setSelectedRunId(searchParams.get("run"));
-    if (searchParams.get("view") !== "dashboard") {
+    setIsRunsMode(viewParam === "runs");
+    if (viewParam === "dashboard") {
+      if (dashboardsFeatureEnabled) {
+        setIsDashboardMode(true);
+      } else {
+        setIsDashboardMode(false);
+        setIsDashboardAddPanelOpen(false);
+        setSearchParams(
+          (current) => {
+            const next = new URLSearchParams(current);
+            if (next.get("view") !== "dashboard") {
+              return current;
+            }
+            next.delete("view");
+            return next;
+          },
+          { replace: true },
+        );
+      }
+    } else {
+      setIsDashboardMode(false);
+    }
+    setSelectedRunId(runParam || null);
+    if (viewParam !== "dashboard") {
       setIsDashboardAddPanelOpen(false);
     }
-  }, [searchParams]);
+    // setSearchParams from useSearchParams is stable; omitting avoids effect churn when its identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewParam, runParam, dashboardsFeatureEnabled]);
 
   const handleSelectRun = useCallback(
     (runId: string) => {
@@ -4998,6 +5030,9 @@ export function WorkflowPageV2() {
   }, [setSearchParams]);
 
   const handleSelectDashboardMode = useCallback(() => {
+    if (!dashboardsFeatureEnabled) {
+      return;
+    }
     if (hasEditableVersion && liveCanvasVersionId) {
       handleUseVersion(liveCanvasVersionId);
     }
@@ -5015,7 +5050,7 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [handleUseVersion, hasEditableVersion, liveCanvasVersionId, setSearchParams]);
+  }, [dashboardsFeatureEnabled, handleUseVersion, hasEditableVersion, liveCanvasVersionId, setSearchParams]);
 
   const handleExitDashboardMode = useCallback(() => {
     setIsDashboardMode(false);
@@ -5707,7 +5742,7 @@ export function WorkflowPageV2() {
   return (
     <>
       <div className="relative h-full w-full">
-        {isDashboardMode ? (
+        {isDashboardMode && dashboardsFeatureEnabled ? (
           <DashboardOverlay
             readOnly={!canUpdateCanvas}
             dashboardQuery={dashboardQuery}
@@ -5802,15 +5837,17 @@ export function WorkflowPageV2() {
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           onDiscardDraftAndStartEdit={handleDiscardDraftAndStartEdit}
           unpublishedDraftUpdatedAt={latestDraftVersion?.metadata?.updatedAt || latestDraftVersion?.metadata?.createdAt}
-          headerMode={isDashboardMode ? "dashboard" : canvasPageHeaderMode}
+          headerMode={isDashboardMode && dashboardsFeatureEnabled ? "dashboard" : canvasPageHeaderMode}
           onEnterEditMode={handleEnterEditModeFromHeader}
           enterEditModeDisabled={toggleEditModeDisabled}
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
           onExitEditMode={handleExitEditModeFromHeader}
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
-          onSelectDashboard={isTemplate ? undefined : handleSelectDashboardMode}
+          onSelectDashboard={isTemplate || !dashboardsFeatureEnabled ? undefined : handleSelectDashboardMode}
           onDashboardAddPanel={
-            isDashboardMode && !isTemplate && canUpdateCanvas ? () => setIsDashboardAddPanelOpen(true) : undefined
+            isDashboardMode && dashboardsFeatureEnabled && !isTemplate && canUpdateCanvas
+              ? () => setIsDashboardAddPanelOpen(true)
+              : undefined
           }
           runsNotificationCount={activeRunsCount}
           exitEditModeDisabled={exitEditModeDisabled}
@@ -6318,6 +6355,9 @@ function DashboardOverlay({
   addPanelDialogOpen: boolean;
   onAddPanelDialogOpenChange: (open: boolean) => void;
 }) {
+  const updateDashboardMutationRef = useRef(updateDashboardMutation);
+  updateDashboardMutationRef.current = updateDashboardMutation;
+
   const panels: DashboardPanel[] = (dashboardQuery.data?.panels || []).map((p) => ({
     id: p.id || "",
     type: p.type || "markdown",
@@ -6333,12 +6373,9 @@ function DashboardOverlay({
     ...(l.minH !== undefined ? { minH: l.minH } : {}),
   }));
 
-  const handleChange = useCallback(
-    (next: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
-      updateDashboardMutation.mutate(next);
-    },
-    [updateDashboardMutation],
-  );
+  const handleChange = useCallback((next: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
+    updateDashboardMutationRef.current.mutate(next);
+  }, []);
 
   return (
     <div
