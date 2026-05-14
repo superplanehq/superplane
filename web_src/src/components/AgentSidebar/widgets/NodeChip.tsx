@@ -1,6 +1,5 @@
 import { useCallback } from "react";
-import { useNavigate } from "react-router-dom";
-import { useReactFlow } from "@xyflow/react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { canvasKeys } from "@/hooks/useCanvasData";
@@ -37,43 +36,14 @@ export function NodeChipFromLink({
 export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const reactFlow = useReactFlow();
 
   const canvas = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
   const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
 
   const handleClick = useCallback(() => {
-    // Navigate to open sidebar
+    // Navigate to select node + open sidebar
     navigate(`/${organizationId}/canvases/${canvasId}?sidebar=1&node=${nodeId}`);
-
-    // Select the node and zoom to it
-    if (reactFlow && node) {
-      try {
-        const allNodes = reactFlow.getNodes();
-        const rfNode = allNodes.find((n) => n.id === nodeId);
-
-        if (rfNode) {
-          // Select only this node
-          reactFlow.setNodes((nodes) =>
-            nodes.map((n) => ({
-              ...n,
-              selected: n.id === nodeId,
-            })),
-          );
-
-          // Zoom to the node
-          reactFlow.fitView({
-            nodes: [rfNode],
-            duration: 500,
-            maxZoom: 1.2,
-            padding: 0.2,
-          });
-        }
-      } catch (error) {
-        console.error("Failed to focus node:", error);
-      }
-    }
-  }, [navigate, organizationId, canvasId, nodeId, reactFlow, node]);
+  }, [navigate, organizationId, canvasId, nodeId]);
 
   if (!node) {
     return (
