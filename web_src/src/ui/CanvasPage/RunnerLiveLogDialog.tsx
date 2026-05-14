@@ -10,12 +10,7 @@ export type RunnerLiveLogDialogProps = {
   executionId: string;
 };
 
-function LiveLogStream({ executionId }: { executionId: string }) {
-  const organizationId = useOrganizationId();
-  const canvasId = useCanvasId();
-  const [text, setText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
+function useScrollToBottom(text: string) {
   const scrollRef = useRef<HTMLPreElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -28,6 +23,18 @@ function LiveLogStream({ executionId }: { executionId: string }) {
   useEffect(() => {
     scrollToBottom();
   }, [text, scrollToBottom]);
+
+  return { scrollRef, scrollToBottom };
+}
+
+function useLiveLogStream(executionId: string) {
+  const organizationId = useOrganizationId();
+  const canvasId = useCanvasId();
+  const [text, setText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  const { scrollRef } = useScrollToBottom(text);
 
   useEffect(() => {
     if (!organizationId || !canvasId || !executionId) {
@@ -109,6 +116,12 @@ function LiveLogStream({ executionId }: { executionId: string }) {
     return () => ac.abort();
   }, [organizationId, canvasId, executionId]);
 
+  return { text, error, isStreaming, scrollRef };
+}
+
+function LiveLogStream({ executionId }: RunnerLiveLogDialogProps) {
+  const { text, error, isStreaming, scrollRef } = useLiveLogStream(executionId);
+
   return (
     <div className="flex min-h-[50vh] flex-col overflow-hidden bg-slate-50">
       <pre
@@ -124,10 +137,6 @@ function LiveLogStream({ executionId }: { executionId: string }) {
   );
 }
 
-/**
- * Runner node “Logs” control: opens a dialog with a live NDJSON log stream.
- * Organization and canvas ids come from the workflow URL (useOrganizationId, useCanvasId).
- */
 export function RunnerLiveLogDialog({ canvasMode, executionId }: RunnerLiveLogDialogProps) {
   const organizationId = useOrganizationId();
   const canvasId = useCanvasId();
@@ -164,7 +173,7 @@ export function RunnerLiveLogDialog({ canvasMode, executionId }: RunnerLiveLogDi
             <DialogTitle>Logs</DialogTitle>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-hidden">
-            {open ? <LiveLogStream executionId={executionId} /> : null}
+            {open ? <LiveLogStream canvasMode={canvasMode} executionId={executionId} /> : null}
           </div>
         </DialogContent>
       </Dialog>
