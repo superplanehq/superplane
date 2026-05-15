@@ -12,7 +12,7 @@ const isUpdateBaseline = process.argv.includes("--update-baseline");
 const ignoredPrefixes = ["src/api-client/", "storybook-static/", "dist/", "dist-ssr/", "node_modules/"];
 const redStart = process.env.NO_COLOR ? "" : "\x1b[31m";
 const colorEnd = process.env.NO_COLOR ? "" : "\x1b[0m";
-const disallowedComplexityDirectivePattern = /(?:\/\/|\/\*)\s*eslint-disable-next-line[^\n]*\bcomplexity\b/;
+const disallowedDisableNextLinePattern = /(?:\/\/|\/\*)\s*eslint-disable-next-line\b/;
 
 function normalizeRuleId(message) {
   if (message.ruleId) {
@@ -78,7 +78,7 @@ function extractDisallowedDirectiveIssues(results) {
 
     const lines = source.split(/\r?\n/u);
     for (const [index, line] of lines.entries()) {
-      const matchIndex = line.search(disallowedComplexityDirectivePattern);
+      const matchIndex = line.search(disallowedDisableNextLinePattern);
       if (matchIndex === -1) {
         continue;
       }
@@ -88,8 +88,8 @@ function extractDisallowedDirectiveIssues(results) {
         line: index + 1,
         column: matchIndex + 1,
         severity: "error",
-        ruleId: "no-eslint-disable-next-line-complexity",
-        message: "Disabling the complexity rule with eslint-disable-next-line is not allowed.",
+        ruleId: "no-eslint-disable-next-line",
+        message: "Using eslint-disable-next-line is not allowed.",
       });
     }
   }
