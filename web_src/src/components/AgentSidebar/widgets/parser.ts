@@ -1,0 +1,224 @@
+import YAML from "js-yaml";
+
+// --- Types ---
+
+export type MarkdownSegment = { type: "markdown"; content: string };
+export type ButtonsSegment = { type: "buttons"; prompt: string; items: string[] };
+export type ConfirmSegment = { type: "confirm"; message: string; yes: string; no: string };
+export type ChartSegment = { type: "chart"; config: ChartConfig };
+export type CollapseSegment = { type: "collapse"; title: string; content: string };
+export type MermaidSegment = { type: "mermaid"; content: string };
+export type StepsSegment = { type: "steps"; items: StepItem[] };
+export type SuccessSegment = { type: "success"; content: string };
+export type ErrorSegment = { type: "error"; content: string };
+
+export type Segment =
+  | MarkdownSegment
+  | ButtonsSegment
+  | ConfirmSegment
+  | ChartSegment
+  | CollapseSegment
+  | MermaidSegment
+  | StepsSegment
+  | SuccessSegment
+  | ErrorSegment;
+
+export type StepItem = { done: boolean; text: string };
+
+export type ChartConfig = {
+  type: "line" | "bar" | "area" | "pie";
+  title?: string;
+  x?: string[];
+  series?: { name: string; data: number[]; color?: string }[];
+  data?: { name: string; value: number; color?: string }[];
+};
+
+// --- Regex patterns ---
+
+const BLOCK_RE = /^\s*:::(\w+)(?:\s+(.*))?$/;
+const BLOCK_END_RE = /^\s*:::$/;
+const MERMAID_FENCE_START = /^\s*```mermaid\s*$/;
+const FENCE_END = /^\s*```\s*$/;
+
+// --- Parser state ---
+
+interface ParserState {
+  segments: Segment[];
+  markdownBuffer: string[];
+  blockType: string | null;
+  blockMeta: string;
+  blockLines: string[];
+  inMermaidFence: boolean;
+  mermaidLines: string[];
+}
+
+function createState(): ParserState {
+  return {
+    segments: [],
+    markdownBuffer: [],
+    blockType: null,
+    blockMeta: "",
+    blockLines: [],
+    inMermaidFence: false,
+    mermaidLines: [],
+  };
+}
+
+function flushMarkdown(state: ParserState) {
+  const text = state.markdownBuffer.join("\n").trim();
+  if (text) {
+    state.segments.push({ type: "markdown", content: text });
+  }
+  state.markdownBuffer = [];
+}
+
+function flushBlock(state: ParserState) {
+  if (!state.blockType) return;
+  const raw = state.blockLines.join("\n");
+  const segment = parseBlock(state.blockType, state.blockMeta, raw);
+  if (segment) {
+    state.segments.push(segment);
+  }
+  state.blockType = null;
+  state.blockMeta = "";
+  state.blockLines = [];
+}
+
+function processLine(state: ParserState, line: string) {
+  if (state.inMermaidFence) {
+    if (FENCE_END.test(line.trim())) {
+      flushMarkdown(state);
+      state.segments.push({ type: "mermaid", content: state.mermaidLines.join("\n") });
+      state.mermaidLines = [];
+      state.inMermaidFence = false;
+    } else {
+      state.mermaidLines.push(line);
+    }
+    return;
+  }
+
+  if (state.blockType) {
+    if (BLOCK_END_RE.test(line.trim())) {
+      flushBlock(state);
+    } else {
+      state.blockLines.push(line);
+    }
+    return;
+  }
+
+  if (MERMAID_FENCE_START.test(line.trim())) {
+    flushMarkdown(state);
+    state.inMermaidFence = true;
+    state.mermaidLines = [];
+    return;
+  }
+
+  const match = line.match(BLOCK_RE);
+  if (match) {
+    flushMarkdown(state);
+    state.blockType = match[1];
+    state.blockMeta = match[2] || "";
+  } else {
+    state.markdownBuffer.push(line);
+  }
+}
+
+// --- Public API ---
+
+export function parseAgentContent(content: string): Segment[] {
+  if (!content) return [];
+
+  const state = createState();
+  for (const line of content.split("\n")) {
+    processLine(state, line);
+  }
+
+  if (state.blockType) flushBlock(state);
+  flushMarkdown(state);
+
+  return state.segments;
+}
+
+// --- Block parsers ---
+
+function parseBlock(type: string, meta: string, raw: string): Segment | null {
+  switch (type) {
+    case "buttons":
+      return parseButtons(raw);
+    case "confirm":
+      return parseConfirm(raw);
+    case "chart":
+      return parseChart(raw);
+    case "collapse":
+      return parseCollapse(meta, raw);
+    case "steps":
+      return parseSteps(raw);
+    case "success":
+      return { type: "success", content: raw.trim() };
+    case "error":
+      return { type: "error", content: raw.trim() };
+    default:
+      return { type: "markdown", content: `:::${type} ${meta}\n${raw}\n:::` };
+  }
+}
+
+function parseButtons(raw: string): ButtonsSegment {
+  const lines = raw.split("\n").filter((l) => l.trim());
+  const items: string[] = [];
+  const promptLines: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^[-*]\s/.test(trimmed)) {
+      items.push(trimmed.replace(/^[-*]\s*/, "").trim());
+    } else {
+      promptLines.push(trimmed);
+    }
+  }
+
+  return { type: "buttons", prompt: promptLines.join("\n"), items };
+}
+
+function parseConfirm(raw: string): ConfirmSegment {
+  try {
+    const parsed = YAML.load(raw) as Record<string, string>;
+    return {
+      type: "confirm",
+      message: parsed.message || raw.trim(),
+      yes: parsed.yes || "Yes",
+      no: parsed.no || "No",
+    };
+  } catch {
+    return { type: "confirm", message: raw.trim(), yes: "Yes", no: "No" };
+  }
+}
+
+function parseChart(raw: string): ChartSegment {
+  try {
+    const config = YAML.load(raw) as ChartConfig;
+    return { type: "chart", config };
+  } catch {
+    return { type: "chart", config: { type: "bar", title: "Parse Error" } };
+  }
+}
+
+function parseCollapse(meta: string, raw: string): CollapseSegment {
+  const titleMatch = meta.match(/title="([^"]+)"/);
+  return {
+    type: "collapse",
+    title: titleMatch ? titleMatch[1] : "Details",
+    content: raw,
+  };
+}
+
+function parseSteps(raw: string): StepsSegment {
+  const items = raw
+    .split("\n")
+    .filter((l) => l.trim().startsWith("- ["))
+    .map((l) => {
+      const done = l.includes("[x]") || l.includes("[X]");
+      const text = l.replace(/^[-*]\s*\[[ xX]\]\s*/, "").trim();
+      return { done, text };
+    });
+  return { type: "steps", items };
+}
