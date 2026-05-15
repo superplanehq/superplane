@@ -241,7 +241,7 @@ function TooltipIndicator({
   );
 }
 
-function resolvePayloadKey(nameKey?: string, item?: { name?: string; dataKey?: unknown }) {
+function resolvePayloadKey(nameKey?: string, item?: { name?: string; dataKey?: string | number }) {
   return `${nameKey ?? item?.name ?? item?.dataKey ?? "value"}`;
 }
 
