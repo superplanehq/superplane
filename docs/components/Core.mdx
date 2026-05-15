@@ -701,6 +701,9 @@ Runs bash commands on a dedicated machine.
 - **Passed**: The commands finished with exit code **0**.
 - **Failed**: The commands finished with non-zero exit code.
 
+### Structured result
+When the remote task writes valid JSON to **SUPERPLANE_RESULT_FILE** before exit, that object is returned as **result** on the finished event payload (alongside **status** and **exit_code**).
+
 ### Example Output
 
 ```json
@@ -708,6 +711,9 @@ Runs bash commands on a dedicated machine.
   "data": [
     {
       "exit_code": 0,
+      "result": {
+        "example": "value"
+      },
       "status": "succeeded"
     }
   ],
