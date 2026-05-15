@@ -35,7 +35,10 @@ export function DraftActionsWidget({
         `/api/v1/canvases/${canvasId}/versions/${versionId}/publish`,
         {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-organization-id": organizationId,
+          },
           credentials: "include",
         },
       );
