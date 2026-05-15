@@ -1,15 +1,15 @@
 {
   "data": {
-    "account_id": "account_abc123",
-    "alert_type": "load_balancing_health_alert",
-    "event_source": "origin",
+    "account_name": "Acme Labs",
+    "account_tag": "9035f53656c247e895c5a6939ae8a0e0",
+    "load_balancer_id": "699d98642c564d2e855e9661899b7252",
+    "load_balancer_name": "snaketoy.acme.example",
+    "pool_id": "17b5962d775c646f3f9725cbc7a53df4",
+    "pool_name": "snaketoy-web-prod",
+    "origin_name": "snaketoy-web-1",
     "new_health": "Unhealthy",
-    "pool_id": "pool_xyz789",
-    "pool_name": "Production pool",
-    "origin_name": "api-primary",
-    "load_balancer_id": "lb_123",
-    "load_balancer_name": "api.example.com"
+    "event_source": "origin"
   },
-  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "timestamp": "2026-03-04T09:21:02.184Z",
   "type": "cloudflare.loadBalancing.healthAlert"
 }
