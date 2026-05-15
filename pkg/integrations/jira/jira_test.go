@@ -75,6 +75,10 @@ func Test__Jira__Sync(t *testing.T) {
 				},
 				{
 					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"cloudId":"35273b54-3f06-40d2-880f-dd28cf6daafa"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`[{"id":"10000","key":"TEST","name":"Test Project"}]`)),
 				},
 			},
@@ -96,6 +100,11 @@ func Test__Jira__Sync(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "ready", appCtx.State)
+
+		meta, ok := appCtx.Metadata.(Metadata)
+		require.True(t, ok)
+		assert.Equal(t, "35273b54-3f06-40d2-880f-dd28cf6daafa", meta.CloudID)
+		require.Len(t, meta.Projects, 1)
 	})
 
 	t.Run("auth failure -> error", func(t *testing.T) {
