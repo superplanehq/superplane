@@ -36,10 +36,13 @@ export function DraftActionsWidget({
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
         },
       );
       if (response.ok) {
         setPublished(true);
+      } else {
+        console.error("Publish failed:", response.status, await response.text());
       }
     } catch (err) {
       console.error("Failed to publish:", err);
