@@ -1,17 +1,17 @@
 {
-    "data": {
-        "issueId": "MXxBSXxJU1NVRXwxMjM0NTY3ODk",
-        "issueUrl": "https://one.newrelic.com/alerts-ai/issues/MXxBSXxJU1NVRXwxMjM0NTY3ODk",
-        "title": "High CPU usage on production server",
-        "priority": "CRITICAL",
-        "state": "ACTIVATED",
-        "policyName": "Production Infrastructure",
-        "conditionName": "CPU usage > 90%",
-        "accountId": 1234567,
-        "createdAt": 1704067200000,
-        "updatedAt": 1704067260000,
-        "sources": ["newrelic"]
-    },
-    "timestamp": "2026-01-19T12:00:00Z",
-    "type": "newrelic.issue"
+  "data": {
+    "issueId": "MXxBSXxJU1NVRXxhY2NvdW50fDU0NDg2OTV8MGZjY2QyMjctMzE1NS00YjY2LTk1MmYtNzQ5OWFkYjI3OWMx",
+    "issueUrl": "https://one.newrelic.com/alerts-ai/issues/MXxBSXxJU1NVRXxhY2NvdW50fDU0NDg2OTV8MGZjY2QyMjctMzE1NS00YjY2LTk1MmYtNzQ5OWFkYjI3OWMx?account=5448695",
+    "title": "snaketoy-web 5xx error rate above 5% (5m)",
+    "priority": "CRITICAL",
+    "state": "ACTIVATED",
+    "policyName": "snaketoy production health",
+    "conditionName": "snaketoy-web 5xx error rate above 5% (5m)",
+    "accountId": 5448695,
+    "createdAt": 1804512042184,
+    "updatedAt": 1804512402218,
+    "sources": ["newrelic"]
+  },
+  "timestamp": "2026-03-04T09:18:43.412Z",
+  "type": "newrelic.issue"
 }
