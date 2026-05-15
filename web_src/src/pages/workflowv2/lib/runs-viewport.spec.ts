@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getRunsFitAllDecision, prepareRunsViewportOnModeEntry } from "./runs-viewport";
+import { getRunsFitAllDecision, getRunsFitAllRequest, prepareRunsViewportOnModeEntry } from "./runs-viewport";
 
 describe("prepareRunsViewportOnModeEntry", () => {
   it("seeds runs viewport from current canvas viewport when available", () => {
@@ -88,5 +88,19 @@ describe("getRunsFitAllDecision", () => {
       shouldFitAll: false,
       skipInitialRunsFitAll: true,
     });
+  });
+});
+
+describe("getRunsFitAllRequest", () => {
+  it("returns null when runs mode is inactive", () => {
+    expect(getRunsFitAllRequest({ isRunsMode: false, runsFitAllNonce: 3 })).toBeNull();
+  });
+
+  it("returns null before any fit-all request has been issued", () => {
+    expect(getRunsFitAllRequest({ isRunsMode: true, runsFitAllNonce: 0 })).toBeNull();
+  });
+
+  it("returns nonce after an explicit fit-all request", () => {
+    expect(getRunsFitAllRequest({ isRunsMode: true, runsFitAllNonce: 2 })).toBe(2);
   });
 });

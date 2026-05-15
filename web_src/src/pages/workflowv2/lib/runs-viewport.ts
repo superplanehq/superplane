@@ -68,3 +68,16 @@ export function getRunsFitAllDecision({
     skipInitialRunsFitAll: false,
   };
 }
+
+type RunsFitAllRequestParams = {
+  isRunsMode: boolean;
+  runsFitAllNonce: number;
+};
+
+export function getRunsFitAllRequest({ isRunsMode, runsFitAllNonce }: RunsFitAllRequestParams): number | null {
+  if (!isRunsMode || runsFitAllNonce <= 0) {
+    return null;
+  }
+
+  return runsFitAllNonce;
+}

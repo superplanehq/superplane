@@ -106,7 +106,7 @@ import {
 } from "./lib/canvas-versions";
 import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
-import { getRunsFitAllDecision, prepareRunsViewportOnModeEntry } from "./lib/runs-viewport";
+import { getRunsFitAllDecision, getRunsFitAllRequest, prepareRunsViewportOnModeEntry } from "./lib/runs-viewport";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { getVersionActionAvailability } from "./lib/version-action-state";
 import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
@@ -134,6 +134,7 @@ import {
   summarizeWorkflowChanges,
 } from "./utils";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
+
 function getNodeAnalyticsProps(
   node: ComponentsNode,
   availableIntegrations: IntegrationsIntegrationDefinition[],
@@ -2031,9 +2032,9 @@ export function WorkflowPageV2() {
 
     skipNextRunsFitAllRef.current = fitDecision.skipInitialRunsFitAll;
     if (!fitDecision.shouldFitAll) return;
-
     setRunsFitAllNonce((n) => n + 1);
   }, [isRunsMode, runCanvasNodeIdsKey]);
+  const runsFitAllRequest = getRunsFitAllRequest({ isRunsMode, runsFitAllNonce });
 
   const getSidebarData = useCallback(
     (nodeId: string): SidebarData | null => {
@@ -5740,7 +5741,7 @@ export function WorkflowPageV2() {
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={isRunsMode ? runsViewportRef : viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
-          fitAllRequest={isRunsMode ? runsFitAllNonce : null}
+          fitAllRequest={runsFitAllRequest}
           runCanvasLoading={isRunsMode && !!selectedRunRootEventId && selectedRunExecutionsQuery.isLoading}
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
