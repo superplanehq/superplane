@@ -51,6 +51,42 @@ func TestContainerNameIncludesRunnerAndTask(t *testing.T) {
 	}
 }
 
+func TestDockerExecArgsIncludeEnvironmentBeforeContainerName(t *testing.T) {
+	task := &api.TaskPayload{
+		ID:      "task-env-args",
+		Command: []string{"printenv", "COMMIT_AUTHOR"},
+		Environment: []api.EnvironmentVariable{
+			{Name: "COMMIT_AUTHOR", Value: "alice@example.com"},
+			{Name: "SPECIAL", Value: "line one\nline two=ok"},
+		},
+	}
+	args, err := dockerExecArgs("container-name", task)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"exec",
+		"--env", "COMMIT_AUTHOR=alice@example.com",
+		"--env", "SPECIAL=line one\nline two=ok",
+		"container-name",
+		"printenv", "COMMIT_AUTHOR",
+	}
+	if strings.Join(args, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("args = %#v, want %#v", args, want)
+	}
+}
+
+func TestDockerExecArgsRejectInvalidEnvironment(t *testing.T) {
+	task := &api.TaskPayload{
+		ID:          "task-env-invalid",
+		Command:     []string{"true"},
+		Environment: []api.EnvironmentVariable{{Name: "BAD-NAME", Value: "x"}},
+	}
+	if _, err := dockerExecArgs("container-name", task); err == nil {
+		t.Fatal("expected invalid environment error")
+	}
+}
+
 func TestCapWriterTruncatesAfterMax(t *testing.T) {
 	w := &capWriter{max: 5}
 	w.WriteString("ab")
@@ -63,6 +99,32 @@ func TestCapWriterTruncatesAfterMax(t *testing.T) {
 	if !strings.Contains(got, "truncated") {
 		t.Errorf("expected truncation marker, got %q", got)
 	}
+}
+
+func TestDockerExecutorArgvUsesTaskEnvironment(t *testing.T) {
+	skipIfNoDocker(t)
+	t.Parallel()
+
+	d := &DockerExecutor{MaxOutputBytes: 4096, RunnerID: "test-env-argv"}
+	task := &api.TaskPayload{
+		ID:            uniqueTaskID(),
+		ExecutionMode: "docker",
+		DockerImage:   "alpine:3.20",
+		Command:       []string{"sh", "-c", `printf "%s" "$COMMIT_AUTHOR"`},
+		Environment:   []api.EnvironmentVariable{{Name: "COMMIT_AUTHOR", Value: "alice@example.com"}},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	exit, output, err := d.Execute(ctx, task, nil, "")
+	t.Logf("exit=%d output=%q err=%v", exit, output, err)
+	if err != nil || exit != 0 {
+		t.Fatalf("docker argv env: exit=%d err=%v output=%q", exit, err, output)
+	}
+	if !strings.Contains(output, "alice@example.com") {
+		t.Fatalf("expected environment value in output, got %q", output)
+	}
+	assertContainerGone(t, ctx, containerName(d.RunnerID, task.ID))
 }
 
 func TestDockerExecutorArgvSucceeds(t *testing.T) {

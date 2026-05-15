@@ -105,7 +105,7 @@ func TestHostShellDirectivesEcho(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	code, out, err := runHostShellDirectives(ctx, 128*1024, []string{`echo 'hello'`}, nil, "")
+	code, out, err := runHostShellDirectives(ctx, 128*1024, []string{`echo 'hello'`}, nil, nil, "")
 	t.Logf("code=%d out=%q err=%v", code, out, err)
 	if err != nil || code != 0 {
 		t.Fatalf("pty path (production default) failed: code=%d err=%v out=%q", code, err, out)
@@ -126,7 +126,7 @@ func TestHostShellPipeBundleEcho(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	code, out, err := runHostShellDirectives(ctx, 128*1024, []string{`echo 'hello'`}, nil, "")
+	code, out, err := runHostShellDirectives(ctx, 128*1024, []string{`echo 'hello'`}, nil, nil, "")
 	t.Logf("code=%d out=%q err=%v", code, out, err)
 	if err != nil || code != 0 {
 		t.Fatalf("pipe bundle path failed: code=%d err=%v out=%q", code, err, out)
