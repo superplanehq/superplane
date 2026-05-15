@@ -13,5 +13,9 @@
     "max-depth": 6,
     "no-eslint-disable-next-line": 6
   },
-  "updatedAt": "2026-05-15T09:07:27.755Z"
+  "maxAllowedMetricMaximumByRule": {
+    "max-lines": 5389,
+    "complexity": 332
+  },
+  "updatedAt": "2026-05-15T10:48:16.505Z"
 }
