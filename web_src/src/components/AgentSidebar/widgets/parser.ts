@@ -37,7 +37,7 @@ export type ChartConfig = {
 
 // --- Regex patterns ---
 
-const BLOCK_RE = /^\s*:::(\w+)(?:\s+(.*))?$/;
+const BLOCK_RE = /^\s*:::([\w-]+)(?:\s+(.*))?$/;
 const BLOCK_END_RE = /^\s*:::$/;
 const MERMAID_FENCE_START = /^\s*```mermaid\s*$/;
 const FENCE_END = /^\s*```\s*$/;
