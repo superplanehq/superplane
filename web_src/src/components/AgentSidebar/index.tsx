@@ -357,6 +357,7 @@ function MessageRow({
             onAction={handleAction}
             canvasId={canvasId}
             organizationId={organizationId}
+            isEditing={window.location.search.includes("version=")}
           />
         )}
       </div>
