@@ -5,7 +5,11 @@
 // the client runs the task; the client then sends type "complete" and reads type "ack" or "error".
 package wsrunner
 
-import "github.com/superplane/runner/shared/api"
+import (
+	"encoding/json"
+
+	"github.com/superplane/runner/shared/api"
+)
 
 // Message type discriminator values (JSON field "type").
 const (
@@ -38,13 +42,14 @@ type Cancel struct {
 
 // Complete is client -> server to finish a claimed task.
 type Complete struct {
-	Type     string `json:"type"`
-	TaskID   string `json:"task_id"`
-	RunnerID string `json:"runner_id"`
-	ExitCode int    `json:"exit_code"`
-	Output   string `json:"output"`
-	Error    string `json:"error,omitempty"`
-	Canceled bool   `json:"canceled,omitempty"`
+	Type     string          `json:"type"`
+	TaskID   string          `json:"task_id"`
+	RunnerID string          `json:"runner_id"`
+	ExitCode int             `json:"exit_code"`
+	Output   string          `json:"output"`
+	Error    string          `json:"error,omitempty"`
+	Canceled bool            `json:"canceled,omitempty"`
+	Result   json.RawMessage `json:"result,omitempty"`
 }
 
 // Ack is server -> client after successful complete (HTTP 204 equivalent).

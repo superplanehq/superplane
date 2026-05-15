@@ -9,6 +9,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -89,12 +91,12 @@ func (a *Agent) Run(ctx context.Context) error {
 			}
 			continue
 		}
-		exit, out, runErr, userCanceled := a.execute(ctx, base, task, nil)
+		exit, out, runErr, userCanceled, result := a.execute(ctx, base, task, nil)
 		errMsg := ""
 		if runErr != nil {
 			errMsg = runErr.Error()
 		}
-		if err := a.complete(ctx, base, task.ID, exit, out, errMsg, userCanceled); err != nil {
+		if err := a.complete(ctx, base, task.ID, exit, out, errMsg, userCanceled, result); err != nil {
 			return err
 		}
 		if a.Config.ExitAfterEachTask {
@@ -151,13 +153,14 @@ func (a *Agent) claim(ctx context.Context, base string) (*api.TaskPayload, error
 	return out.Task, nil
 }
 
-func (a *Agent) complete(ctx context.Context, base, id string, exit int, output, errMsg string, canceled bool) error {
+func (a *Agent) complete(ctx context.Context, base, id string, exit int, output, errMsg string, canceled bool, result json.RawMessage) error {
 	payload := api.CompleteTaskRequest{
 		RunnerID: a.Config.RunnerID,
 		ExitCode: exit,
 		Output:   output,
 		Error:    errMsg,
 		Canceled: canceled,
+		Result:   result,
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -251,11 +254,14 @@ func (a *Agent) getTaskStatus(ctx context.Context, base, id string) (*api.TaskSt
 	return &out, nil
 }
 
-func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload, wsPushCancel <-chan struct{}) (int, string, error, bool) {
+func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload, wsPushCancel <-chan struct{}) (int, string, error, bool, json.RawMessage) {
 	ex, err := a.executorFor(task)
 	if err != nil {
-		return 1, "", err, false
+		return 1, "", err, false, nil
 	}
+
+	resultPath := filepath.Join(os.TempDir(), "superplane-result-"+task.ID+".json")
+	_ = os.Remove(resultPath)
 
 	d := executionWallDuration(a.Config, task)
 	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, d)
@@ -333,15 +339,16 @@ func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload,
 		defer cwClose()
 	}
 
-	exit, out, runErr := ex.Execute(execCtx, task, live)
+	exit, out, runErr := ex.Execute(execCtx, task, live, resultPath)
+	result := readTaskResultFile(resultPath, a.Config.MaxOutputBytes, a.Config.Log)
 
 	if stoppedByCancel.Load() {
-		return exit, out, runErr, true
+		return exit, out, runErr, true, result
 	}
 	if errors.Is(execCtx.Err(), context.DeadlineExceeded) || errors.Is(runErr, context.DeadlineExceeded) {
-		return 124, out, errors.New("execution timed out"), false
+		return 124, out, errors.New("execution timed out"), false, result
 	}
-	return exit, out, runErr, false
+	return exit, out, runErr, false, result
 }
 
 func (a *Agent) executorFor(task *api.TaskPayload) (Executor, error) {

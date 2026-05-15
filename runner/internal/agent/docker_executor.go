@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -35,8 +36,9 @@ type DockerExecutor struct {
 }
 
 const (
-	dockerNamePrefix       = "superplane-task-"
-	dockerStopGraceSeconds = 5
+	dockerNamePrefix        = "superplane-task-"
+	dockerStopGraceSeconds  = 5
+	dockerResultMountTarget = "/mnt/superplane-result.json"
 	// dockerIdleEntrypoint keeps the container alive while we run `docker exec`
 	// against it. `sleep infinity` works on every common base image (alpine,
 	// debian, ubuntu, python:*, node:*). Images without `sleep` are not supported.
@@ -63,7 +65,7 @@ func sanitizeDockerName(s string) string {
 	return dockerNameUnsafe.ReplaceAllString(s, "_")
 }
 
-func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, live io.Writer) (int, string, error) {
+func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, live io.Writer, resultHostPath string) (int, string, error) {
 	if strings.TrimSpace(d.RunnerID) == "" {
 		return 1, "", errors.New("runner_id required for docker execution")
 	}
@@ -103,13 +105,19 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 		_, _ = live.Write(pullOut)
 	}
 
-	runArgs := []string{
-		"run", "-d",
-		"--name", name,
-		"--entrypoint", dockerIdleEntrypoint,
-		image,
-		dockerIdleArg,
+	runArgs := []string{"run", "-d", "--name", name}
+	if rp := strings.TrimSpace(resultHostPath); rp != "" {
+		f, ferr := os.OpenFile(rp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
+		if ferr != nil {
+			return 1, "", fmt.Errorf("result file: %w", ferr)
+		}
+		_ = f.Close()
+		runArgs = append(runArgs,
+			"-e", envSuperplaneResultFile+"="+dockerResultMountTarget,
+			"-v", rp+":"+dockerResultMountTarget,
+		)
 	}
+	runArgs = append(runArgs, "--entrypoint", dockerIdleEntrypoint, image, dockerIdleArg)
 	runOut, err := captureDocker(ctx, runArgs...)
 	if err != nil {
 		out.WriteString(string(runOut))

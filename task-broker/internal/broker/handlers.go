@@ -296,6 +296,7 @@ func (s *Server) getBrokerTask(w http.ResponseWriter, r *http.Request) {
 		CloudWatchLogStream:     up.CloudWatchLogStream,
 		TaskLog:                 taskLog,
 		ExecutionTimeoutSeconds: up.ExecutionTimeoutSeconds,
+		Result:                  up.Result,
 	})
 }
 
@@ -511,6 +512,7 @@ func (s *Server) webhookComplete(w http.ResponseWriter, r *http.Request) {
 		CloudWatchLogGroup:  upstream.CloudWatchLogGroup,
 		CloudWatchLogStream: upstream.CloudWatchLogStream,
 		TaskLog:             upstream.TaskLog,
+		Result:              upstream.Result,
 	}
 	if out.TaskLog == nil && strings.TrimSpace(upstream.CloudWatchLogGroup) != "" && strings.TrimSpace(upstream.CloudWatchLogStream) != "" {
 		out.TaskLog = api.TaskLogSinkCloudWatchFromParts(upstream.CloudWatchLogGroup, upstream.CloudWatchLogStream, "")

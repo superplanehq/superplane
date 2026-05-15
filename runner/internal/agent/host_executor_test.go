@@ -25,7 +25,7 @@ func TestHostExecutorArgvUsesTaskEnvironment(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	exit, output, err := (&HostExecutor{}).Execute(ctx, task, nil)
+	exit, output, err := (&HostExecutor{}).Execute(ctx, task, nil, "")
 	if err != nil || exit != 0 {
 		t.Fatalf("host argv: exit=%d err=%v output=%q", exit, err, output)
 	}
@@ -49,7 +49,7 @@ func TestHostExecutorCommandsUseTaskEnvironment(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	exit, output, err := (&HostExecutor{}).Execute(ctx, task, nil)
+	exit, output, err := (&HostExecutor{}).Execute(ctx, task, nil, "")
 	if err != nil || exit != 0 {
 		t.Fatalf("host commands: exit=%d err=%v output=%q", exit, err, output)
 	}
@@ -65,7 +65,7 @@ func TestHostExecutorRejectsInvalidEnvironment(t *testing.T) {
 		Environment: []api.EnvironmentVariable{{Name: "BAD-NAME", Value: "x"}},
 	}
 
-	exit, output, err := (&HostExecutor{}).Execute(context.Background(), task, nil)
+	exit, output, err := (&HostExecutor{}).Execute(context.Background(), task, nil, "")
 	if err == nil {
 		t.Fatalf("expected invalid environment error, exit=%d output=%q", exit, output)
 	}

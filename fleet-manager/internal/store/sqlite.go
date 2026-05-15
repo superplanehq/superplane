@@ -67,7 +67,10 @@ CREATE INDEX IF NOT EXISTS tasks_status_created ON tasks(status, created_at);
 	if err := s.ensureCancelRequestedColumn(); err != nil {
 		return err
 	}
-	return s.ensureEnvironmentJSONColumn()
+	if err := s.ensureEnvironmentJSONColumn(); err != nil {
+		return err
+	}
+	return s.ensureResultJSONColumn()
 }
 func (s *SQLiteStore) ensureCommandsJSONColumn() error {
 	var n int
@@ -118,6 +121,19 @@ func (s *SQLiteStore) ensureEnvironmentJSONColumn() error {
 		return nil
 	}
 	_, err = s.db.Exec(`ALTER TABLE tasks ADD COLUMN environment_json TEXT`)
+	return err
+}
+
+func (s *SQLiteStore) ensureResultJSONColumn() error {
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('tasks') WHERE name='result_json'`).Scan(&n)
+	if err != nil {
+		return err
+	}
+	if n > 0 {
+		return nil
+	}
+	_, err = s.db.Exec(`ALTER TABLE tasks ADD COLUMN result_json TEXT`)
 	return err
 }
 
@@ -229,24 +245,24 @@ RETURNING id`,
 func (s *SQLiteStore) GetByID(ctx context.Context, id string) (*models.Task, error) {
 	row := s.db.QueryRowContext(ctx, `
 SELECT id, command_json, commands_json, environment_json, webhook_url, status, created_at, claimed_at, lease_until, runner_id,
-	execution_mode, docker_image, execution_timeout_seconds, exit_code, output, error_message, cancel_requested
+	execution_mode, docker_image, execution_timeout_seconds, exit_code, output, result_json, error_message, cancel_requested
 FROM tasks WHERE id = ?`, id)
 	return scanTask(row)
 }
 
 func scanTask(row *sql.Row) (*models.Task, error) {
 	var (
-		id, cmdJSON, webhook, status          string
-		commandsJSON, environmentJSON         sql.NullString
-		createdAt, claimedAt, leaseUntil      sql.NullInt64
-		runnerID, dockerImage, output, errMsg sql.NullString
-		execMode                              string
-		execTimeoutSec                        sql.NullInt64
-		exitCode                              sql.NullInt64
-		cancelReq                             int64
+		id, cmdJSON, webhook, status                      string
+		commandsJSON, environmentJSON                     sql.NullString
+		createdAt, claimedAt, leaseUntil                  sql.NullInt64
+		runnerID, dockerImage, output, resultJSON, errMsg sql.NullString
+		execMode                                          string
+		execTimeoutSec                                    sql.NullInt64
+		exitCode                                          sql.NullInt64
+		cancelReq                                         int64
 	)
 	if err := row.Scan(&id, &cmdJSON, &commandsJSON, &environmentJSON, &webhook, &status, &createdAt, &claimedAt, &leaseUntil,
-		&runnerID, &execMode, &dockerImage, &execTimeoutSec, &exitCode, &output, &errMsg, &cancelReq); err != nil {
+		&runnerID, &execMode, &dockerImage, &execTimeoutSec, &exitCode, &output, &resultJSON, &errMsg, &cancelReq); err != nil {
 		return nil, err
 	}
 	var cmd []string
@@ -277,6 +293,7 @@ func scanTask(row *sql.Row) (*models.Task, error) {
 		ExecutionMode:   models.ExecutionMode(execMode),
 		DockerImage:     dockerImage.String,
 		Output:          output.String,
+		ResultJSON:      resultJSON.String,
 		ErrorMessage:    errMsg.String,
 		CancelRequested: cancelReq != 0,
 	}
@@ -376,7 +393,7 @@ UPDATE tasks SET cancel_requested = 1 WHERE id = ? AND status = ?`,
 	return nil, CancelOutcome(""), fmt.Errorf("cancel: task %s in unexpected state %s", id, t.Status)
 }
 
-func (s *SQLiteStore) CompleteTask(ctx context.Context, id, runnerID string, exitCode int, output, errMsg string, canceled bool) (*models.Task, error) {
+func (s *SQLiteStore) CompleteTask(ctx context.Context, id, runnerID string, exitCode int, output, resultJSON, errMsg string, canceled bool) (*models.Task, error) {
 	var final models.TaskStatus
 	if canceled {
 		final = models.StatusCanceled
@@ -391,11 +408,12 @@ UPDATE tasks SET
 	status = ?,
 	exit_code = ?,
 	output = ?,
+	result_json = ?,
 	error_message = ?,
 	cancel_requested = 0,
 	environment_json = NULL
 WHERE id = ? AND runner_id = ? AND status = ?`,
-		string(final), exitCode, output, nullStringErr(errMsg), id, runnerID, string(models.StatusClaimed),
+		string(final), exitCode, output, nullStringErr(resultJSON), nullStringErr(errMsg), id, runnerID, string(models.StatusClaimed),
 	)
 	if err != nil {
 		return nil, err
@@ -429,6 +447,7 @@ UPDATE tasks SET
 	runner_id = NULL,
 	exit_code = ?,
 	output = ?,
+	result_json = NULL,
 	error_message = NULL
 WHERE status = ? AND lease_until IS NOT NULL AND lease_until <= ? AND cancel_requested = 1
 RETURNING id`,

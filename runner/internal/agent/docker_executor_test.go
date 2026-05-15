@@ -116,7 +116,7 @@ func TestDockerExecutorArgvUsesTaskEnvironment(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	exit, output, err := d.Execute(ctx, task, nil)
+	exit, output, err := d.Execute(ctx, task, nil, "")
 	t.Logf("exit=%d output=%q err=%v", exit, output, err)
 	if err != nil || exit != 0 {
 		t.Fatalf("docker argv env: exit=%d err=%v output=%q", exit, err, output)
@@ -141,7 +141,7 @@ func TestDockerExecutorArgvSucceeds(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	exit, output, err := d.Execute(ctx, task, nil)
+	exit, output, err := d.Execute(ctx, task, nil, "")
 	t.Logf("exit=%d output=%q err=%v", exit, output, err)
 	if err != nil || exit != 0 {
 		t.Fatalf("docker argv: exit=%d err=%v output=%q", exit, err, output)
@@ -167,7 +167,7 @@ func TestDockerExecutorLiveWriterReceivesExecOutput(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	exit, output, err := d.Execute(ctx, task, &live)
+	exit, output, err := d.Execute(ctx, task, &live, "")
 	if err != nil || exit != 0 {
 		t.Fatalf("docker live writer: exit=%d err=%v output=%q", exit, err, output)
 	}
@@ -198,7 +198,7 @@ func TestDockerExecutorBundledCommandsShareEnv(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	exit, output, err := d.Execute(ctx, task, nil)
+	exit, output, err := d.Execute(ctx, task, nil, "")
 	t.Logf("exit=%d output=%q err=%v", exit, output, err)
 	if err != nil || exit != 0 {
 		t.Fatalf("env share: exit=%d err=%v output=%q", exit, err, output)
@@ -227,7 +227,7 @@ func TestDockerExecutorBundledCommandsFailFast(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 
-	exit, output, err := d.Execute(ctx, task, nil)
+	exit, output, err := d.Execute(ctx, task, nil, "")
 	t.Logf("exit=%d output=%q err=%v", exit, output, err)
 	if exit == 0 {
 		t.Fatalf("expected non-zero exit on `false`, got 0 (err=%v output=%q)", err, output)
@@ -255,7 +255,7 @@ func TestDockerExecutorBadImageFailsCleanly(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	exit, output, err := d.Execute(ctx, task, nil)
+	exit, output, err := d.Execute(ctx, task, nil, "")
 	t.Logf("exit=%d output=%q err=%v", exit, output, err)
 	if err == nil {
 		t.Fatalf("expected pull failure error, got nil (exit=%d output=%q)", exit, output)
@@ -276,7 +276,7 @@ func TestDockerExecutorRequiresRunnerID(t *testing.T) {
 		DockerImage: "alpine:3.20",
 		Command:     []string{"true"},
 	}
-	_, _, err := d.Execute(context.Background(), task, nil)
+	_, _, err := d.Execute(context.Background(), task, nil, "")
 	if err == nil || !strings.Contains(err.Error(), "runner_id") {
 		t.Fatalf("want runner_id required error, got %v", err)
 	}
