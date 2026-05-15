@@ -265,18 +265,29 @@ function DraftActionsBar({ messages, canvasId, organizationId }: { messages: Age
   const [, forceUpdate] = useState(0);
   const [verifiedDraft, setVerifiedDraft] = useState<boolean | null>(null);
 
-  // Listen for canvas version changes (publish/discard from editor or websocket)
+  // Listen for canvas version changes — only dismiss if version is no longer a draft
   useEffect(() => {
     const handler = (e: Event) => {
       const { versionId } = (e as CustomEvent).detail;
-      if (versionId && !dismissedVersionIds.has(versionId)) {
-        dismissedVersionIds.add(versionId);
-        forceUpdate(n => n + 1);
-      }
+      if (!versionId) return;
+      // Check if the version is still a draft before dismissing
+      fetch(`/api/v1/canvases/${canvasId}/versions/${versionId}`, {
+        headers: { "x-organization-id": organizationId },
+        credentials: "include",
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const state = data?.version?.metadata?.state;
+          if (state && state !== "STATE_DRAFT") {
+            dismissedVersionIds.add(versionId);
+            forceUpdate(n => n + 1);
+          }
+        })
+        .catch(() => {});
     };
     window.addEventListener("canvas:version-updated", handler);
     return () => window.removeEventListener("canvas:version-updated", handler);
-  }, []);
+  }, [canvasId, organizationId]);
 
   const latestDraft = useMemo(() => {
     // Only scan the latest assistant turn (stop at first user message from end)
