@@ -63,6 +63,52 @@ func Test__CloudflareWebhookHandler__Setup(t *testing.T) {
 	}, policy["filters"])
 }
 
+func Test__CloudflareWebhookHandler__Setup_TunnelHealth(t *testing.T) {
+	handler := &CloudflareWebhookHandler{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"success": true, "result": {"id": "dest456"}}`)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"success": true, "result": {"id": "policy456"}}`)),
+			},
+		},
+	}
+
+	metadata, err := handler.Setup(core.WebhookHandlerContext{
+		HTTP: httpContext,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"apiToken":  "token123",
+				"accountId": "account123",
+			},
+		},
+		Webhook: &contexts.WebhookContext{
+			URL:           "https://example.com/webhook-tunnel",
+			Configuration: OnTunnelHealthSpec{Tunnel: "tun123", NewStatus: []string{"TUNNEL_STATUS_TYPE_DOWN"}},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, CloudflareWebhookMetadata{
+		AccountID:            "account123",
+		DestinationID:        "dest456",
+		NotificationPolicyID: "policy456",
+	}, metadata)
+	require.Len(t, httpContext.Requests, 2)
+
+	var policy map[string]any
+	require.NoError(t, json.NewDecoder(httpContext.Requests[1].Body).Decode(&policy))
+	assert.Equal(t, "tunnel_health_event", policy["alert_type"])
+	assert.Equal(t, map[string]any{
+		"tunnel_id":  []any{"tun123"},
+		"new_status": []any{"TUNNEL_STATUS_TYPE_DOWN"},
+	}, policy["filters"])
+}
+
 func Test__CloudflareWebhookHandler__Cleanup(t *testing.T) {
 	handler := &CloudflareWebhookHandler{}
 	integration := &contexts.IntegrationContext{
@@ -183,6 +229,24 @@ func Test__CloudflareWebhookHandler__Cleanup(t *testing.T) {
 
 func Test__CloudflareWebhookHandler__CompareConfig(t *testing.T) {
 	handler := &CloudflareWebhookHandler{}
+
+	t.Run("tunnel health config never matches load balancing defaults", func(t *testing.T) {
+		tunnel := map[string]any{"tunnel": "", "newStatus": []string{"Down"}}
+		lb := map[string]any{"pool": "", "newHealth": []string{"Unhealthy"}, "eventSource": []string{"pool", "origin"}}
+
+		ok, err := handler.CompareConfig(tunnel, lb)
+		require.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("tunnel health legacy Down normalizes equal to API status", func(t *testing.T) {
+		a := map[string]any{"tunnel": "t1", "newStatus": []string{"Down"}}
+		b := map[string]any{"tunnel": "t1", "newStatus": []string{"TUNNEL_STATUS_TYPE_DOWN"}}
+
+		ok, err := handler.CompareConfig(a, b)
+		require.NoError(t, err)
+		assert.True(t, ok)
+	})
 
 	t.Run("same pool but different newHealth -> not equal", func(t *testing.T) {
 		a := map[string]any{"pool": "pool123", "newHealth": []string{"Unhealthy"}, "eventSource": []string{"pool"}}

@@ -27,6 +27,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Add Issue Assignee" href="#add-issue-assignee" description="Add assignees to a GitHub issue" />
   <LinkCard title="Add Issue Label" href="#add-issue-label" description="Add labels to a GitHub issue" />
   <LinkCard title="Add Reaction" href="#add-reaction" description="Add a reaction to a GitHub comment" />
+  <LinkCard title="Create Deployment" href="#create-deployment" description="Create a GitHub deployment for a ref and environment (enables the PR deployment UI)" />
+  <LinkCard title="Create Deployment Status" href="#create-deployment-status" description="Update the status of a GitHub deployment (success, failure, inactive, etc.)" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in a GitHub repository" />
   <LinkCard title="Create Issue Comment" href="#create-issue-comment" description="Add a comment to a GitHub issue or pull request" />
   <LinkCard title="Create Pull Request" href="#create-pull-request" description="Create a new pull request in a GitHub repository" />
@@ -1770,6 +1772,148 @@ Returns the created GitHub reaction object, including id, content, user, and tim
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.reaction"
+}
+```
+
+<a id="create-deployment"></a>
+
+## Create Deployment
+
+The Create Deployment component registers a deployment with GitHub for a given ref and environment. This drives the **View deployment** button and environment box on pull requests—the same surface area used by Railway, Vercel, and Netlify.
+
+### Use Cases
+
+- **Preview environments**: Create a deployment when a PR opens, then post statuses after provision/build
+- **Environment history**: Let GitHub track deployment activity per environment name
+- **Ephemeral previews**: Set **Transient environment** so GitHub treats the deployment as short-lived
+
+### Configuration
+
+- **Repository**: GitHub repository for the deployment
+- **Ref**: Branch name, tag, or commit SHA to deploy
+- **Environment**: Environment name (for example preview-pr-42)
+- **Description**: Optional deployment description
+- **Task**: Optional deployment task (GitHub default is deploy if omitted)
+- **Transient environment**: Mark as ephemeral so GitHub can auto-clean inactive deployments
+- **Production environment**: Mark as production when applicable
+- **Auto merge** (default off): Whether GitHub may auto-merge the default branch into the ref if needed
+- **Required contexts**: Status check context names that must pass before the deployment is created (same names as commit status **context**). Leave empty to skip status gating (recommended for previews, avoids HTTP 409 when CI is pending). If you list one or more contexts, only those must be green. GitHub may respond with HTTP 202 while it prepares verification; this component retries automatically for a short period
+
+### Output
+
+Emits github.deployment with the created deployment, including id for **Create Deployment Status**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "created_at": "2024-01-01T00:00:00Z",
+    "creator": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+      "events_url": "https://api.github.com/users/example-user/events{/privacy}",
+      "followers_url": "https://api.github.com/users/example-user/followers",
+      "following_url": "https://api.github.com/users/example-user/following{/other_user}",
+      "gists_url": "https://api.github.com/users/example-user/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/example-user",
+      "id": 12345678,
+      "login": "example-user",
+      "node_id": "MDQ6VXNlcjEyMzQ1Njc4",
+      "organizations_url": "https://api.github.com/users/example-user/orgs",
+      "received_events_url": "https://api.github.com/users/example-user/received_events",
+      "repos_url": "https://api.github.com/users/example-user/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/example-user/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/example-user/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/example-user"
+    },
+    "description": "Test deployment",
+    "environment": "preview-pr-1",
+    "id": 1234567890,
+    "node_id": "DE_kwDOExampleNodeId12345",
+    "payload": {},
+    "ref": "feat/example-branch",
+    "repository_url": "https://api.github.com/repos/example-org/example-repo",
+    "sha": "abc123def456abc123def456abc123def456abc1",
+    "statuses_url": "https://api.github.com/repos/example-org/example-repo/deployments/1234567890/statuses",
+    "task": "deploy",
+    "updated_at": "2024-01-01T00:00:00Z",
+    "url": "https://api.github.com/repos/example-org/example-repo/deployments/1234567890"
+  },
+  "timestamp": "2024-01-01T00:00:00.000000000Z",
+  "type": "github.deployment"
+}
+```
+
+<a id="create-deployment-status"></a>
+
+## Create Deployment Status
+
+The Create Deployment Status component posts a new status for an existing deployment. Use it after provisioning succeeds or fails, or to mark a preview as **inactive** when tearing down.
+
+### Use Cases
+
+- **Preview ready**: success with **Environment URL** for the **View deployment** link
+- **Failed build or deploy**: failure or error with **Log URL**
+- **Teardown**: inactive when the environment is removed
+
+### Configuration
+
+- **Repository**: GitHub repository
+- **Deployment ID**: Numeric deployment id (often from a prior **Create Deployment** step)
+- **State**: pending, queued, in_progress, success, failure, error, or inactive
+- **Description**: Optional status description
+- **Environment URL**: Live preview URL for **View deployment** (GitHub requires http(s); host-only values get https:// prepended)
+- **Log URL**: Link to logs (same http(s) rules; GitHub validates this like target_url)
+- **Environment**: Optional environment label override on the status
+
+### Output
+
+Emits github.deploymentStatus with the created status record.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "created_at": "2024-01-01T00:00:00Z",
+    "creator": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+      "events_url": "https://api.github.com/users/example-user/events{/privacy}",
+      "followers_url": "https://api.github.com/users/example-user/followers",
+      "following_url": "https://api.github.com/users/example-user/following{/other_user}",
+      "gists_url": "https://api.github.com/users/example-user/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/example-user",
+      "id": 12345678,
+      "login": "example-user",
+      "node_id": "MDQ6VXNlcjEyMzQ1Njc4",
+      "organizations_url": "https://api.github.com/users/example-user/orgs",
+      "received_events_url": "https://api.github.com/users/example-user/received_events",
+      "repos_url": "https://api.github.com/users/example-user/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/example-user/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/example-user/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/example-user"
+    },
+    "deployment_url": "https://api.github.com/repos/example-org/example-repo/deployments/1234567890",
+    "description": "Test deployment status check",
+    "environment": "preview-pr-1",
+    "environment_url": "https://example.com",
+    "id": 9876543210,
+    "log_url": "https://example.com",
+    "node_id": "DES_kwDOExampleNodeId12345",
+    "repository_url": "https://api.github.com/repos/example-org/example-repo",
+    "state": "success",
+    "target_url": "https://example.com",
+    "updated_at": "2024-01-01T00:00:00Z",
+    "url": "https://api.github.com/repos/example-org/example-repo/deployments/1234567890/statuses/9876543210"
+  },
+  "timestamp": "2024-01-01T00:00:00.000000000Z",
+  "type": "github.deploymentStatus"
 }
 ```
 
