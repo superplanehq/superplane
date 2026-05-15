@@ -142,6 +142,10 @@ func listAssignees(ctx core.ListResourcesContext) ([]core.IntegrationResource, e
 }
 
 func listPriorities(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	if ctx.HTTP == nil {
+		return []core.IntegrationResource{}, nil
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)

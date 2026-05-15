@@ -308,7 +308,7 @@ func buildUpdateFields(spec UpdateIssueSpec) map[string]any {
 	if spec.Assignee != nil {
 		accountID := *spec.Assignee
 		if accountID == "" || accountID == "-1" {
-			fields["assignee"] = map[string]any{"accountId": nil}
+			fields["assignee"] = nil
 		} else {
 			fields["assignee"] = map[string]any{"accountId": accountID}
 		}

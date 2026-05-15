@@ -190,6 +190,17 @@ func Test__ListResources__Priority(t *testing.T) {
 	assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/priority")
 }
 
+func Test__ListResources__Priority__MissingHTTPContext(t *testing.T) {
+	j := &Jira{}
+
+	resources, err := j.ListResources("priority", core.ListResourcesContext{
+		Integration: newAuthorizedIntegration(),
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, resources)
+}
+
 func Test__ListResources__Unknown(t *testing.T) {
 	j := &Jira{}
 	appCtx := newAuthorizedIntegration()

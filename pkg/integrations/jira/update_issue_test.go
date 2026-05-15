@@ -157,8 +157,8 @@ func Test__UpdateIssue__Execute(t *testing.T) {
 		payload := map[string]any{}
 		require.NoError(t, json.Unmarshal(body, &payload))
 		fields := payload["fields"].(map[string]any)
-		assignee := fields["assignee"].(map[string]any)
-		assert.Nil(t, assignee["accountId"])
+		assert.Contains(t, fields, "assignee")
+		assert.Nil(t, fields["assignee"])
 	})
 
 	t.Run("notifyUsers param forwarded", func(t *testing.T) {
