@@ -1,5 +1,6 @@
 import { Eye, Rocket } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -18,13 +19,14 @@ export function DraftActionsWidget({
   organizationId,
   isEditing,
 }: DraftActionsWidgetProps) {
+  const navigate = useNavigate();
   const [published, setPublished] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
   if (published) return null;
 
   const handleViewInEditor = () => {
-    window.location.href = `/${organizationId}/canvases/${canvasId}?version=${versionId}`;
+    navigate(`/${organizationId}/canvases/${canvasId}?version=${versionId}`);
   };
 
     const handlePublish = async () => {
