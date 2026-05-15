@@ -120,8 +120,8 @@ function extractRuleMetricValue(issue) {
   return null;
 }
 
-function summarizeMetricTotalsByRule(issues) {
-  const totals = {};
+function summarizeMetricMaximumsByRule(issues) {
+  const maximums = {};
 
   for (const issue of issues) {
     const metricValue = extractRuleMetricValue(issue);
@@ -129,10 +129,10 @@ function summarizeMetricTotalsByRule(issues) {
       continue;
     }
 
-    totals[issue.ruleId] = (totals[issue.ruleId] ?? 0) + metricValue;
+    maximums[issue.ruleId] = Math.max(maximums[issue.ruleId] ?? 0, metricValue);
   }
 
-  return Object.fromEntries(Object.entries(totals).sort((a, b) => b[1] - a[1]));
+  return Object.fromEntries(Object.entries(maximums).sort((a, b) => b[1] - a[1]));
 }
 
 function printRuleCountsVsBudget(currentByRule, maxAllowedByRule) {
@@ -166,7 +166,7 @@ function printRuleCountsVsBudget(currentByRule, maxAllowedByRule) {
   }
 }
 
-function printMetricTotalsVsBudget(currentByRule, maxAllowedByRule) {
+function printMetricMaximumsVsBudget(currentByRule, maxAllowedByRule) {
   const allRuleIds = new Set([
     ...Object.keys(currentByRule),
     ...Object.keys(maxAllowedByRule),
@@ -183,7 +183,7 @@ function printMetricTotalsVsBudget(currentByRule, maxAllowedByRule) {
   });
 
   if (sortedRuleIds.length === 0) {
-    console.log("- No metric totals found.");
+    console.log("- No metric maximums found.");
     return;
   }
 
@@ -214,12 +214,12 @@ function readBaseline() {
 }
 
 function writeBaseline(issues, countsByRule) {
-  const metricTotalsByRule = summarizeMetricTotalsByRule(issues);
+  const metricMaximumByRule = summarizeMetricMaximumsByRule(issues);
 
   const baseline = {
     maxAllowedTotalIssues: issues.length,
     maxAllowedByRule: countsByRule,
-    maxAllowedMetricTotalByRule: metricTotalsByRule,
+    maxAllowedMetricMaximumByRule: metricMaximumByRule,
     updatedAt: new Date().toISOString(),
   };
 
@@ -245,7 +245,7 @@ async function main() {
   const results = await eslint.lintFiles(["."]);
   const issues = [...extractIssues(results), ...extractDisallowedDirectiveIssues(results)];
   const countsByRule = summarizeByRule(issues);
-  const metricTotalsByRule = summarizeMetricTotalsByRule(issues);
+  const metricMaximumByRule = summarizeMetricMaximumsByRule(issues);
 
   if (isUpdateBaseline) {
     writeBaseline(issues, countsByRule);
@@ -260,8 +260,8 @@ async function main() {
     console.log("");
     console.log("");
     console.log("");
-    console.log("Rule metric totals vs budget:");
-    printMetricTotalsVsBudget(metricTotalsByRule, metricTotalsByRule);
+    console.log("Rule metric maximums vs budget:");
+    printMetricMaximumsVsBudget(metricMaximumByRule, metricMaximumByRule);
     console.log("");
     console.log("");
     console.log("");
@@ -272,11 +272,12 @@ async function main() {
   const baseline = readBaseline();
   const maxAllowedTotal = baseline.maxAllowedTotalIssues;
   const maxAllowedByRule = baseline.maxAllowedByRule ?? {};
-  const maxAllowedMetricTotalByRule = baseline.maxAllowedMetricTotalByRule ?? {};
+  const maxAllowedMetricMaximumByRule =
+    baseline.maxAllowedMetricMaximumByRule ?? baseline.maxAllowedMetricTotalByRule ?? {};
 
   const totalRegression = issues.length - maxAllowedTotal;
   const byRuleRegressions = findRegressions(countsByRule, maxAllowedByRule);
-  const metricRegressions = findRegressions(metricTotalsByRule, maxAllowedMetricTotalByRule);
+  const metricRegressions = findRegressions(metricMaximumByRule, maxAllowedMetricMaximumByRule);
 
   if (totalRegression > 0 || byRuleRegressions.length > 0 || metricRegressions.length > 0) {
     console.error("ESLint budget exceeded.");
@@ -294,7 +295,7 @@ async function main() {
     }
 
     if (metricRegressions.length > 0) {
-      console.error("- Rule metric total regressions:");
+      console.error("- Rule metric maximum regressions:");
       for (const regression of metricRegressions.slice(0, 20)) {
         console.error(`  - ${regression.ruleId}: ${regression.currentValue} (allowed ${regression.allowedValue})`);
       }
@@ -314,8 +315,8 @@ async function main() {
     console.error("");
     console.error("");
     console.error("");
-    console.error("Rule metric totals vs budget:");
-    printMetricTotalsVsBudget(metricTotalsByRule, maxAllowedMetricTotalByRule);
+    console.error("Rule metric maximums vs budget:");
+    printMetricMaximumsVsBudget(metricMaximumByRule, maxAllowedMetricMaximumByRule);
     console.error("");
     console.error("");
     console.error("");
@@ -333,8 +334,8 @@ async function main() {
   console.log("");
   console.log("");
   console.log("");
-  console.log("Rule metric totals vs budget:");
-  printMetricTotalsVsBudget(metricTotalsByRule, maxAllowedMetricTotalByRule);
+  console.log("Rule metric maximums vs budget:");
+  printMetricMaximumsVsBudget(metricMaximumByRule, maxAllowedMetricMaximumByRule);
   console.log("");
   console.log("");
   console.log("");
