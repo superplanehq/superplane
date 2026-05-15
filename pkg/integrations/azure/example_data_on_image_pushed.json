@@ -2,40 +2,40 @@
   "type": "azure.image.pushed",
   "data": {
     "id": "831e1650-001e-001b-66ab-eeb76e069631",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.ContainerRegistry/registries/myregistry",
-    "subject": "myregistry.azurecr.io/myrepository:v1.2.3",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.ContainerRegistry/registries/acmeprodacr",
+    "subject": "snaketoy-web:v1.5.0",
     "eventType": "Microsoft.ContainerRegistry.ImagePushed",
-    "eventTime": "2026-03-16T10:00:00Z",
+    "eventTime": "2026-03-01T11:42:18.842Z",
     "dataVersion": "1.0",
     "metadataVersion": "1",
     "data": {
       "id": "831e1650-001e-001b-66ab-eeb76e069631",
-      "timestamp": "2026-03-16T10:00:00Z",
+      "timestamp": "2026-03-01T11:42:18.842Z",
       "action": "push",
       "target": {
         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-        "size": 1234567,
-        "digest": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-        "length": 1234567,
-        "repository": "myrepository",
-        "tag": "v1.2.3",
-        "url": "https://myregistry.azurecr.io/v2/myrepository/manifests/sha256:abcdef1234567890"
+        "size": 1248,
+        "digest": "sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7",
+        "length": 1248,
+        "repository": "snaketoy-web",
+        "tag": "v1.5.0",
+        "url": "https://acmeprodacr.azurecr.io/v2/snaketoy-web/manifests/sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7"
       },
       "request": {
-        "id": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
-        "addr": "203.0.113.0:49926",
-        "host": "myregistry.azurecr.io",
+        "id": "5f87d1a3-2c1f-4ab0-8f55-8f4c2b4a5c76",
+        "addr": "203.0.113.42:49926",
+        "host": "acmeprodacr.azurecr.io",
         "method": "PUT",
-        "useragent": "docker/20.10.7"
+        "useragent": "docker/24.0.7 go/go1.21.4 git-commit/311b9ff os/linux arch/amd64 UpstreamClient(Docker-Client/24.0.7 \\(linux\\))"
       },
       "actor": {
-        "name": "myuser"
+        "name": "renato-dev"
       },
       "source": {
-        "addr": "myregistry.azurecr.io",
+        "addr": "agent-pool-1.westeurope.azurecr.io:49932",
         "instanceID": "a29a591f-f89c-4f8d-b061-3c5d73d4756c"
       }
     }
   },
-  "timestamp": "2026-03-16T10:00:00Z"
+  "timestamp": "2026-03-01T11:42:19.412Z"
 }

@@ -2,23 +2,27 @@
   "type": "azure.blob.deleted",
   "data": {
     "id": "afc359b4-001e-001b-66ab-eeb76e069631",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Storage/storageAccounts/mystorageaccount",
-    "subject": "/blobServices/default/containers/mycontainer/blobs/path/to/myfile.csv",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Storage/storageAccounts/acmeprodstor",
+    "subject": "/blobServices/default/containers/releases/blobs/snaketoy/v1.4.0/build.zip",
     "eventType": "Microsoft.Storage.BlobDeleted",
-    "eventTime": "2026-03-16T11:00:00Z",
-    "dataVersion": "",
+    "eventTime": "2026-03-08T08:14:02.318Z",
+    "dataVersion": "5",
     "metadataVersion": "1",
     "data": {
       "api": "DeleteBlob",
-      "clientRequestId": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
-      "requestId": "d1e6b5a4-0001-0035-4a7b-2e5c4f000000",
-      "eTag": "0x8D4BCC2E4835CD0",
-      "contentType": "text/csv",
-      "contentLength": 0,
+      "clientRequestId": "6e98f2b4-3d2a-5cb1-9f66-9f5d3c5b6d87",
+      "requestId": "e2f7c6b5-0001-0035-5b8c-3f6d50000001",
+      "eTag": "0x8DC3E1A4F2C8B17",
+      "contentType": "application/zip",
+      "contentLength": 246851,
       "blobType": "BlockBlob",
-      "url": "https://mystorageaccount.blob.core.windows.net/mycontainer/path/to/myfile.csv",
-      "sequencer": "00000000000004420000000000028964"
+      "url": "https://acmeprodstor.blob.core.windows.net/releases/snaketoy/v1.4.0/build.zip",
+      "sequencer": "00000000000004420000000000028964",
+      "identity": "renato-dev@acme.example",
+      "storageDiagnostics": {
+        "batchId": "9e2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+      }
     }
   },
-  "timestamp": "2026-03-16T11:00:00Z"
+  "timestamp": "2026-03-08T08:14:02.984Z"
 }
