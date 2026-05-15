@@ -162,6 +162,12 @@
     :versions: []
     :when: 2026-05-13 00:00:00.000000000 Z
 - - :approve
+  - robust-predicates
+  - :who: SuperPlane maintainers
+    :why: The Unlicense; transitive mermaid/d3 geometry dependency, permissive and compatible with Apache-2.0.
+    :versions: []
+    :when: 2026-05-15 00:00:00.000000000 Z
+- - :approve
   - tar
   - :who: SuperPlane maintainers
     :why: BlueOak-1.0.0; permissive license compatible with Apache-2.0.
