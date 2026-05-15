@@ -63,6 +63,7 @@ import {
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -86,6 +87,9 @@ import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import { RunsSidebar } from "@/ui/RunsSidebar";
+import { DashboardOverlay } from "./dashboard/DashboardOverlay";
+import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
+import { useCanvasDashboard, useUpdateCanvasDashboard } from "@/hooks/useCanvasData";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasMemoryModal } from "./CanvasMemoryModal";
 import { CanvasPageModals } from "./CanvasPageModals";
@@ -133,6 +137,10 @@ import {
   summarizeWorkflowChanges,
 } from "./utils";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
+
+/** Experimental feature id; must match `FeatureDashboards` in pkg/features/features.go. */
+const EXPERIMENTAL_FEATURE_DASHBOARDS = "dashboards";
+
 function getNodeAnalyticsProps(
   node: ComponentsNode,
   availableIntegrations: IntegrationsIntegrationDefinition[],
@@ -198,6 +206,18 @@ export function WorkflowPageV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const dashboardsFeatureEnabled = hasExperimentalFeature(EXPERIMENTAL_FEATURE_DASHBOARDS);
+  const {
+    isRunsMode,
+    setIsRunsMode,
+    isDashboardMode,
+    setIsDashboardMode,
+    isDashboardAddPanelOpen,
+    setIsDashboardAddPanelOpen,
+    selectedRunId,
+    setSelectedRunId,
+  } = useWorkflowViewSearchParams(searchParams, setSearchParams, dashboardsFeatureEnabled);
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
@@ -546,8 +566,6 @@ export function WorkflowPageV2() {
   );
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
-  const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(() => searchParams.get("run"));
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
   const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
@@ -613,6 +631,8 @@ export function WorkflowPageV2() {
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
+  const dashboardQuery = useCanvasDashboard(canvasId!, !isTemplate && dashboardsFeatureEnabled);
+  const updateDashboardMutation = useUpdateCanvasDashboard(canvasId!);
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
@@ -4924,11 +4944,6 @@ export function WorkflowPageV2() {
     handleCreateVersion,
   ]);
 
-  useEffect(() => {
-    setIsRunsMode(searchParams.get("view") === "runs");
-    setSelectedRunId(searchParams.get("run"));
-  }, [searchParams]);
-
   const handleSelectRun = useCallback(
     (runId: string) => {
       setSelectedRunId(runId);
@@ -4946,7 +4961,7 @@ export function WorkflowPageV2() {
         { replace: true },
       );
     },
-    [setSearchParams],
+    [setIsRunsMode, setSearchParams, setSelectedRunId],
   );
 
   const handleSelectRunsMode = useCallback(() => {
@@ -4965,7 +4980,7 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [handleUseVersion, hasEditableVersion, liveCanvasVersionId, setSearchParams]);
+  }, [handleUseVersion, hasEditableVersion, liveCanvasVersionId, setIsRunsMode, setSearchParams]);
 
   const handleExitRunsMode = useCallback(() => {
     setIsRunsMode(false);
@@ -4980,9 +4995,59 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [setSearchParams]);
+  }, [setIsRunsMode, setSearchParams, setSelectedRunId]);
+
+  const handleSelectDashboardMode = useCallback(() => {
+    if (!dashboardsFeatureEnabled) {
+      return;
+    }
+    if (hasEditableVersion && liveCanvasVersionId) {
+      handleUseVersion(liveCanvasVersionId);
+    }
+    setIsDashboardMode(true);
+    setIsRunsMode(false);
+    setSelectedRunId(null);
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.set("view", "dashboard");
+        next.delete("run");
+        next.delete("sidebar");
+        next.delete("node");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [
+    dashboardsFeatureEnabled,
+    handleUseVersion,
+    hasEditableVersion,
+    liveCanvasVersionId,
+    setIsDashboardMode,
+    setIsRunsMode,
+    setSearchParams,
+    setSelectedRunId,
+  ]);
+
+  const handleExitDashboardMode = useCallback(() => {
+    setIsDashboardMode(false);
+    setIsDashboardAddPanelOpen(false);
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("view");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setIsDashboardAddPanelOpen, setIsDashboardMode, setSearchParams]);
 
   const handleEnterEditModeFromHeader = useCallback(async () => {
+    if (isDashboardMode) {
+      handleExitDashboardMode();
+      await handleToggleEditMode();
+      return;
+    }
     if (isRunsMode) {
       setIsRunsMode(false);
       setSelectedRunId(null);
@@ -5000,15 +5065,27 @@ export function WorkflowPageV2() {
       return;
     }
     await handleToggleEditMode();
-  }, [handleToggleEditMode, isRunsMode, setSearchParams]);
+  }, [
+    handleExitDashboardMode,
+    handleToggleEditMode,
+    isDashboardMode,
+    isRunsMode,
+    setIsRunsMode,
+    setSearchParams,
+    setSelectedRunId,
+  ]);
 
   const handleExitEditModeFromHeader = useCallback(async () => {
+    if (isDashboardMode) {
+      handleExitDashboardMode();
+      return;
+    }
     if (isRunsMode) {
       handleExitRunsMode();
       return;
     }
     await handleToggleEditMode();
-  }, [handleExitRunsMode, handleToggleEditMode, isRunsMode]);
+  }, [handleExitDashboardMode, handleExitRunsMode, handleToggleEditMode, isDashboardMode, isRunsMode]);
 
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
@@ -5052,6 +5129,7 @@ export function WorkflowPageV2() {
     selectedRun,
     selectedRunId,
     setSearchParams,
+    setSelectedRunId,
   ]);
 
   useEffect(() => {
@@ -5605,7 +5683,12 @@ export function WorkflowPageV2() {
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftGraphDiffVersusLive,
   });
   const activeRunsCount = runsData.runs.filter((run) => run.state === "STATE_STARTED").length;
-  const headerMode = isRunsMode ? "runs" : canvasMode === "edit" ? "version-edit" : "version-live";
+  const canvasPageHeaderMode = isRunsMode ? "runs" : canvasMode === "edit" ? "version-edit" : "version-live";
+  const headerMode = isDashboardMode && dashboardsFeatureEnabled ? "dashboard" : canvasPageHeaderMode;
+  const onDashboardAddPanel =
+    isDashboardMode && dashboardsFeatureEnabled && !isTemplate && canUpdateCanvas
+      ? () => setIsDashboardAddPanelOpen(true)
+      : undefined;
   const hasUnpublishedDraftChanges =
     !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftGraphDiffVersusLive;
   const canvasStateMode = hasEditableVersion
@@ -5650,6 +5733,15 @@ export function WorkflowPageV2() {
   return (
     <>
       <div className="relative h-full w-full">
+        {isDashboardMode && dashboardsFeatureEnabled ? (
+          <DashboardOverlay
+            readOnly={!canUpdateCanvas}
+            dashboardQuery={dashboardQuery}
+            updateDashboardMutation={updateDashboardMutation}
+            addPanelDialogOpen={isDashboardAddPanelOpen}
+            onAddPanelDialogOpenChange={setIsDashboardAddPanelOpen}
+          />
+        ) : null}
         <CanvasPage
           key={canvasRenderKey}
           // Persist right sidebar in query params
@@ -5742,6 +5834,8 @@ export function WorkflowPageV2() {
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
           onExitEditMode={handleExitEditModeFromHeader}
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
+          onSelectDashboard={isTemplate || !dashboardsFeatureEnabled ? undefined : handleSelectDashboardMode}
+          onDashboardAddPanel={onDashboardAddPanel}
           runsNotificationCount={activeRunsCount}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
