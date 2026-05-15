@@ -3940,14 +3940,123 @@ The Run Workflow component triggers a GitHub Actions workflow and waits for it t
 ```json
 {
   "data": {
-    "workflow_run": {
-      "conclusion": "success",
-      "html_url": "https://github.com/acme/widgets/actions/runs/9001",
-      "id": 9001,
-      "status": "completed"
-    }
+    "actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/87654321?v=4",
+      "gravatar_id": "",
+      "html_url": "https://github.com/renatodev",
+      "id": 87654321,
+      "login": "renatodev",
+      "node_id": "MDQ6VXNlcjg3NjU0MzIx",
+      "site_admin": false,
+      "type": "User",
+      "url": "https://api.github.com/users/renatodev"
+    },
+    "artifacts_url": "https://api.github.com/repos/acme-labs/snaketoy/actions/runs/12345678901/artifacts",
+    "cancel_url": "https://api.github.com/repos/acme-labs/snaketoy/actions/runs/12345678901/cancel",
+    "check_suite_id": 11223344556,
+    "check_suite_node_id": "CS_kwDOBb1AaA0000000",
+    "check_suite_url": "https://api.github.com/repos/acme-labs/snaketoy/check-suites/11223344556",
+    "conclusion": "success",
+    "created_at": "2026-03-10T14:22:11Z",
+    "event": "push",
+    "head_branch": "main",
+    "head_commit": {
+      "author": {
+        "email": "renato.dev@acme.example",
+        "name": "Renato Dev"
+      },
+      "committer": {
+        "email": "noreply@example.com",
+        "name": "GitHub"
+      },
+      "id": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+      "message": "feat: add lightweight metrics endpoint (#42)\n\nAdds a basic /metrics handler with a minimal gauge.",
+      "timestamp": "2026-03-10T14:22:11+01:00",
+      "tree_id": "7a8b9c0d1e2f3a4b5c6d7e8f90123456789abcde"
+    },
+    "head_repository": {
+      "description": "A toy snake game service",
+      "fork": false,
+      "full_name": "acme-labs/snaketoy",
+      "html_url": "https://github.com/acme-labs/snaketoy",
+      "id": 987654321,
+      "name": "snaketoy",
+      "node_id": "R_kgDOAbCdEf",
+      "owner": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+        "gravatar_id": "",
+        "html_url": "https://github.com/acme-labs",
+        "id": 12345678,
+        "login": "acme-labs",
+        "node_id": "O_kgDOBb1AaA",
+        "site_admin": false,
+        "type": "Organization",
+        "url": "https://api.github.com/users/acme-labs"
+      },
+      "private": false,
+      "url": "https://api.github.com/repos/acme-labs/snaketoy"
+    },
+    "head_sha": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+    "html_url": "https://github.com/acme-labs/snaketoy/actions/runs/12345678901",
+    "id": 12345678901,
+    "jobs_url": "https://api.github.com/repos/acme-labs/snaketoy/actions/runs/12345678901/jobs",
+    "logs_url": "https://api.github.com/repos/acme-labs/snaketoy/actions/runs/12345678901/logs",
+    "name": "CI",
+    "node_id": "WFR_kwLOBb1AaA123456789",
+    "path": ".github/workflows/ci.yml",
+    "pull_requests": [],
+    "referenced_workflows": [],
+    "repository": {
+      "clone_url": "https://github.com/acme-labs/snaketoy.git",
+      "created_at": "2024-05-10T12:00:00Z",
+      "default_branch": "main",
+      "description": "A toy snake game service",
+      "fork": false,
+      "full_name": "acme-labs/snaketoy",
+      "git_url": "git://github.com/acme-labs/snaketoy.git",
+      "html_url": "https://github.com/acme-labs/snaketoy",
+      "id": 987654321,
+      "name": "snaketoy",
+      "node_id": "R_kgDOAbCdEf",
+      "owner": {
+        "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+        "gravatar_id": "",
+        "html_url": "https://github.com/acme-labs",
+        "id": 12345678,
+        "login": "acme-labs",
+        "node_id": "O_kgDOBb1AaA",
+        "site_admin": false,
+        "type": "Organization",
+        "url": "https://api.github.com/users/acme-labs"
+      },
+      "private": false,
+      "pushed_at": "2026-03-10T14:22:11Z",
+      "ssh_url": "git@github.com:acme-labs/snaketoy.git",
+      "updated_at": "2026-03-10T13:50:00Z",
+      "url": "https://api.github.com/repos/acme-labs/snaketoy"
+    },
+    "rerun_url": "https://api.github.com/repos/acme-labs/snaketoy/actions/runs/12345678901/rerun",
+    "run_attempt": 1,
+    "run_number": 42,
+    "run_started_at": "2026-03-10T14:22:11Z",
+    "status": "completed",
+    "triggering_actor": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/87654321?v=4",
+      "gravatar_id": "",
+      "html_url": "https://github.com/renatodev",
+      "id": 87654321,
+      "login": "renatodev",
+      "node_id": "MDQ6VXNlcjg3NjU0MzIx",
+      "site_admin": false,
+      "type": "User",
+      "url": "https://api.github.com/users/renatodev"
+    },
+    "updated_at": "2026-03-10T14:25:30Z",
+    "url": "https://api.github.com/repos/acme-labs/snaketoy/actions/runs/12345678901",
+    "workflow_id": 9876543,
+    "workflow_url": "https://api.github.com/repos/acme-labs/snaketoy/actions/workflows/9876543"
   },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "timestamp": "2026-03-10T14:25:30Z",
   "type": "github.workflow.finished"
 }
 ```
