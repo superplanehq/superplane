@@ -1,6 +1,5 @@
 import { Eye, Rocket } from "lucide-react";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -26,7 +25,8 @@ export function DraftActionsWidget({
   if (published) return null;
 
   const handleViewInEditor = () => {
-    navigate(`/${organizationId}/canvases/${canvasId}?version=${versionId}`);
+    // Dispatch custom event for canvas page to switch to this version
+    window.dispatchEvent(new CustomEvent("agent:view-version", { detail: { versionId } }));
   };
 
     const handlePublish = async () => {

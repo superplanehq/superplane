@@ -4899,6 +4899,16 @@ export function WorkflowPageV2() {
     ],
   );
 
+  // Listen for agent sidebar "See in Editor" requests
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { versionId } = (e as CustomEvent).detail;
+      if (versionId) handleUseVersion(versionId);
+    };
+    window.addEventListener("agent:view-version", handler);
+    return () => window.removeEventListener("agent:view-version", handler);
+  }, [handleUseVersion]);
+
   const handleToggleEditMode = useCallback(async () => {
     if (!organizationId || !canvasId) {
       return;
