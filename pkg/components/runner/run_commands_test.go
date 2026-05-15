@@ -235,3 +235,42 @@ func TestRunnerExecuteFailsWhenSecretCannotBeResolved(t *testing.T) {
 func secretRef(secret, key string) configuration.SecretKeyRef {
 	return configuration.SecretKeyRef{Secret: secret, Key: key}
 }
+
+func TestRunnerProcessTaskStatusIncludesResult(t *testing.T) {
+	t.Parallel()
+
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	exit := 0
+	task := &Task{
+		Status:   "succeeded",
+		ExitCode: &exit,
+		Result:   json.RawMessage(`{"items":[1,2],"ok":true}`),
+	}
+	require.NoError(t, (&Runner{}).processTaskStatus(state, task))
+	require.Equal(t, PassedOutputChannel, state.Channel)
+
+	wrapped := state.Payloads[0].(map[string]any)
+	data := wrapped["data"].(map[string]any)
+	assert.Equal(t, "succeeded", data["status"])
+	assert.Equal(t, 0, data["exit_code"])
+	result := data["result"].(map[string]any)
+	assert.Equal(t, true, result["ok"])
+	assert.Equal(t, []any{float64(1), float64(2)}, result["items"])
+}
+
+func TestRunnerProcessTaskStatusOmitsInvalidResult(t *testing.T) {
+	t.Parallel()
+
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	exit := 0
+	task := &Task{
+		Status:   "succeeded",
+		ExitCode: &exit,
+		Result:   json.RawMessage(`not-json`),
+	}
+	require.NoError(t, (&Runner{}).processTaskStatus(state, task))
+	wrapped := state.Payloads[0].(map[string]any)
+	data := wrapped["data"].(map[string]any)
+	_, ok := data["result"]
+	assert.False(t, ok)
+}
