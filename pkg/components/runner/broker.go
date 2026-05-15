@@ -138,11 +138,12 @@ func (b *BrokerClient) CreateTask(commands []string, webhookURL string, environm
 
 // Task is the broker task payload (GET /v1/tasks/:id and webhook body).
 type Task struct {
-	TaskID   string `json:"task_id"`
-	Status   string `json:"status"`
-	ExitCode *int   `json:"exit_code,omitempty"`
-	Output   string `json:"output,omitempty"`
-	Error    string `json:"error,omitempty"`
+	TaskID   string          `json:"task_id"`
+	Status   string          `json:"status"`
+	ExitCode *int            `json:"exit_code,omitempty"`
+	Output   string          `json:"output,omitempty"`
+	Error    string          `json:"error,omitempty"`
+	Result   json.RawMessage `json:"result,omitempty"`
 
 	TaskLog *TaskLogSink `json:"task_log,omitempty"`
 

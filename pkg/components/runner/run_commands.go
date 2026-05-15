@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -50,7 +51,11 @@ func (c *Runner) ExampleOutput() map[string]any {
 	return map[string]any{
 		"type":      RunnerFinishedEventType,
 		"timestamp": "2026-01-16T17:56:16.680755501Z",
-		"data":      []any{map[string]any{"status": "succeeded", "exit_code": 0}},
+		"data": []any{map[string]any{
+			"status":    "succeeded",
+			"exit_code": 0,
+			"result":    map[string]any{"example": "value"},
+		}},
 	}
 }
 
@@ -75,6 +80,9 @@ func (c *Runner) Documentation() string {
 ## Output channels
 - **Passed**: The commands finished with exit code **0**.
 - **Failed**: The commands finished with non-zero exit code.
+
+## Structured result
+When the remote task writes valid JSON to **SUPERPLANE_RESULT_FILE** before exit, that object is returned as **result** on the finished event payload (alongside **status** and **exit_code**).
 `
 }
 
@@ -326,7 +334,22 @@ func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task)
 	}
 
 	out := map[string]any{"status": task.Status, "exit_code": task.effectiveExitCode()}
+	if v := brokerResultAsAny(task.Result); v != nil {
+		out["result"] = v
+	}
 	return state.Emit(channel, RunnerFinishedEventType, []any{out})
+}
+
+func brokerResultAsAny(raw json.RawMessage) any {
+	b := bytes.TrimSpace(raw)
+	if len(b) == 0 || !json.Valid(b) {
+		return nil
+	}
+	var v any
+	if err := json.Unmarshal(b, &v); err != nil {
+		return nil
+	}
+	return v
 }
 
 func (c *Runner) Cancel(ctx core.ExecutionContext) error { return nil }
