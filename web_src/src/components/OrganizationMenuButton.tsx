@@ -277,13 +277,20 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
           </div>
         )}
       </div>
-      <Link
-        to={`/${organizationId}`}
-        aria-label="Go to canvases"
-        className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
-      >
-        <img src={SuperplaneLogo} alt="SuperPlane" className="h-7 w-7" />
-      </Link>
+      <SuperplaneLogoButton organizationId={organizationId} />
     </div>
   );
 }
+
+const SuperplaneLogoButton = ({ organizationId }: { organizationId?: string }) => {
+  const buttonText = organizationId ? "Go to canvases" : "Select organization"
+
+  return <Link
+    to={`/${organizationId || ''}`}
+    aria-label={buttonText}
+    title={buttonText}
+    className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
+  >
+    <img src={SuperplaneLogo} alt="SuperPlane" className="h-7 w-7" />
+  </Link>;
+};
