@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
@@ -465,4 +466,986 @@ func (c *Client) DeleteIssue(issueKey string, opts DeleteIssueOptions) error {
 		return err
 	}
 	return nil
+}
+
+// IssueSearchHit is one element from GET /rest/api/3/search.
+type IssueSearchHit struct {
+	ID     string         `json:"id"`
+	Key    string         `json:"key"`
+	Fields map[string]any `json:"fields"`
+}
+
+type issueSearchAPIResponse struct {
+	StartAt    int              `json:"startAt"`
+	MaxResults int              `json:"maxResults"`
+	Total      int              `json:"total"`
+	Issues     []IssueSearchHit `json:"issues"`
+}
+
+type jiraSearchPOSTBody struct {
+	JQL        string   `json:"jql"`
+	StartAt    int      `json:"startAt"`
+	MaxResults int      `json:"maxResults"`
+	Fields     []string `json:"fields"`
+}
+
+func (c *Client) searchIssuesPage(jql string, startAt, maxResults int) (issueSearchAPIResponse, error) {
+	var empty issueSearchAPIResponse
+	if maxResults <= 0 {
+		maxResults = 50
+	}
+	if maxResults > 100 {
+		maxResults = 100
+	}
+
+	body := jiraSearchPOSTBody{
+		JQL:        jql,
+		StartAt:    startAt,
+		MaxResults: maxResults,
+		Fields:     []string{"summary"},
+	}
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return empty, fmt.Errorf("marshal search body: %w", err)
+	}
+
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	u := fmt.Sprintf("%s/rest/api/3/search", base)
+	responseBody, err := c.execRequest(http.MethodPost, u, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return empty, err
+	}
+
+	var resp issueSearchAPIResponse
+	if err := json.Unmarshal(responseBody, &resp); err != nil {
+		return empty, fmt.Errorf("parse search response: %w", err)
+	}
+	if resp.Issues == nil {
+		resp.Issues = []IssueSearchHit{}
+	}
+
+	return resp, nil
+}
+
+// SearchIssues runs a JQL search and returns the first page of issues (maxResults is capped at 100).
+func (c *Client) SearchIssues(jql string, maxResults int) ([]IssueSearchHit, error) {
+	resp, err := c.searchIssuesPage(jql, 0, maxResults)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Issues, nil
+}
+
+// SearchIssuesUpTo pages through POST /rest/api/3/search until maxIssues are collected, a page is
+// short, or Jira reports no further results. Jira caps each request at 100 issues; busy service
+// projects often need more than one page so incident pickers are not dominated by recently
+// updated non-incident work.
+func (c *Client) SearchIssuesUpTo(jql string, maxIssues int) ([]IssueSearchHit, error) {
+	if maxIssues <= 0 {
+		maxIssues = 500
+	}
+	const pageCap = 100
+
+	var out []IssueSearchHit
+	startAt := 0
+	for len(out) < maxIssues {
+		pageMax := pageCap
+		if remain := maxIssues - len(out); remain < pageMax {
+			pageMax = remain
+		}
+		if pageMax <= 0 {
+			break
+		}
+
+		resp, err := c.searchIssuesPage(jql, startAt, pageMax)
+		if err != nil {
+			return nil, err
+		}
+
+		out = append(out, resp.Issues...)
+		if len(resp.Issues) == 0 {
+			break
+		}
+		startAt += len(resp.Issues)
+		if len(resp.Issues) < pageMax {
+			break
+		}
+		if resp.Total > 0 && startAt >= resp.Total {
+			break
+		}
+	}
+
+	return out, nil
+}
+
+// CustomerRequestListed is one row from GET /rest/servicedeskapi/request (Jira Service Management).
+type CustomerRequestListed struct {
+	IssueKey string `json:"issueKey"`
+	Summary  string `json:"summary"`
+}
+
+type pagedCustomerRequests struct {
+	Values     []CustomerRequestListed `json:"values"`
+	IsLastPage bool                    `json:"isLastPage"`
+}
+
+// ListCustomerRequestsByServiceDesk pages through customer requests for a service desk.
+// Agents often see JSM work here even when Jira platform issue search returns no rows for the same project.
+func (c *Client) ListCustomerRequestsByServiceDesk(serviceDeskID string, maxTotal int) ([]CustomerRequestListed, error) {
+	serviceDeskID = strings.TrimSpace(serviceDeskID)
+	if serviceDeskID == "" {
+		return nil, fmt.Errorf("service desk id is required")
+	}
+	if maxTotal <= 0 {
+		maxTotal = 500
+	}
+
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	const limit = 100
+	var out []CustomerRequestListed
+	start := 0
+	for len(out) < maxTotal {
+		q := url.Values{}
+		q.Set("serviceDeskId", serviceDeskID)
+		q.Set("start", strconv.Itoa(start))
+		q.Set("limit", strconv.Itoa(limit))
+
+		u := fmt.Sprintf("%s/rest/servicedeskapi/request?%s", base, q.Encode())
+		responseBody, err := c.execRequest(http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page pagedCustomerRequests
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, fmt.Errorf("parse customer requests: %w", err)
+		}
+		if page.Values == nil {
+			page.Values = []CustomerRequestListed{}
+		}
+
+		for _, row := range page.Values {
+			out = append(out, row)
+			if len(out) >= maxTotal {
+				break
+			}
+		}
+		if len(out) >= maxTotal {
+			break
+		}
+		if page.IsLastPage || len(page.Values) == 0 {
+			break
+		}
+		start += len(page.Values)
+	}
+
+	return out, nil
+}
+
+func jqlQuotedProjectKey(projectKey string) string {
+	escaped := strings.ReplaceAll(projectKey, `\`, `\\`)
+	return strings.ReplaceAll(escaped, `"`, `\"`)
+}
+
+const atlassianIncidentAPIHost = "https://api.atlassian.com"
+
+type tenantInfoResponse struct {
+	CloudID string `json:"cloudId"`
+}
+
+// FetchCloudID returns the Atlassian cloud id for the configured Jira site (required for the JSM Incidents API).
+func (c *Client) FetchCloudID() (string, error) {
+	tenantURL := strings.TrimSuffix(c.SiteURL, "/") + "/_edge/tenant_info"
+	responseBody, err := c.execRequest(http.MethodGet, tenantURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("fetch tenant_info: %w", err)
+	}
+
+	var info tenantInfoResponse
+	if err := json.Unmarshal(responseBody, &info); err != nil {
+		return "", fmt.Errorf("parse tenant_info: %w", err)
+	}
+	if info.CloudID == "" {
+		return "", fmt.Errorf("tenant_info response missing cloudId")
+	}
+	return info.CloudID, nil
+}
+
+// ServiceDesk is returned by GET /rest/servicedeskapi/servicedesk (Jira Service Management).
+type ServiceDesk struct {
+	ID          string `json:"id"`
+	ProjectName string `json:"projectName"`
+	ProjectKey  string `json:"projectKey"`
+}
+
+// RequestType is returned by GET /rest/servicedeskapi/servicedesk/{id}/requesttype (use expand=practice for the practice field).
+type RequestType struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Practice string `json:"practice,omitempty"`
+}
+
+type pagedServiceDesks struct {
+	Values     []ServiceDesk `json:"values"`
+	IsLastPage bool          `json:"isLastPage"`
+}
+
+// ListServiceDesks returns service desks the authenticated user can access.
+func (c *Client) ListServiceDesks() ([]ServiceDesk, error) {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	var out []ServiceDesk
+	start := 0
+	const pageSize = 50
+	for range 20 {
+		u := fmt.Sprintf("%s/rest/servicedeskapi/servicedesk?start=%d&limit=%d", base, start, pageSize)
+		responseBody, err := c.execRequest(http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page pagedServiceDesks
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, fmt.Errorf("parse service desks: %w", err)
+		}
+
+		out = append(out, page.Values...)
+		if page.IsLastPage || len(page.Values) == 0 {
+			break
+		}
+		start += len(page.Values)
+	}
+
+	return out, nil
+}
+
+type pagedRequestTypes struct {
+	Values     []RequestType `json:"values"`
+	IsLastPage bool          `json:"isLastPage"`
+}
+
+// ListRequestTypes returns customer request types for a service desk.
+func (c *Client) ListRequestTypes(serviceDeskID string) ([]RequestType, error) {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	var out []RequestType
+	start := 0
+	const pageSize = 50
+	for range 20 {
+		q := url.Values{}
+		q.Set("start", strconv.Itoa(start))
+		q.Set("limit", strconv.Itoa(pageSize))
+		q.Add("expand", "practice")
+		u := fmt.Sprintf(
+			"%s/rest/servicedeskapi/servicedesk/%s/requesttype?%s",
+			base,
+			url.PathEscape(serviceDeskID),
+			q.Encode(),
+		)
+		responseBody, err := c.execRequest(http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page pagedRequestTypes
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, fmt.Errorf("parse request types: %w", err)
+		}
+
+		out = append(out, page.Values...)
+		if page.IsLastPage || len(page.Values) == 0 {
+			break
+		}
+		start += len(page.Values)
+	}
+
+	return filterRequestTypesForIncidentsAPI(out), nil
+}
+
+// IsIncidentManagementRequestPractice reports whether a JSM request type's `practice` field
+// corresponds to the Incident management work category. The JSM Incidents REST API rejects
+// create calls when the request type is not in that category.
+func IsIncidentManagementRequestPractice(practice string) bool {
+	p := strings.TrimSpace(practice)
+	if p == "" {
+		return false
+	}
+
+	low := strings.ToLower(p)
+	if strings.Contains(low, "post-incident") || strings.Contains(low, "post incident") {
+		return false
+	}
+	if strings.Contains(low, "incident management") {
+		return true
+	}
+
+	u := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(p, "-", "_"), " ", "_"), ".", "_"))
+	switch u {
+	case "ITSM_INCIDENT", "INCIDENT_MANAGEMENT", "INCIDENT", "MANAGE_INCIDENTS", "IM":
+		return true
+	}
+	if strings.Contains(u, "INCIDENT_MANAGEMENT") {
+		return true
+	}
+	if u == "INCIDENT" || strings.HasSuffix(u, "_INCIDENT") {
+		return true
+	}
+	if strings.Contains(u, "INCIDENT") && strings.Contains(u, "MANAGEMENT") {
+		return true
+	}
+	return false
+}
+
+func filterRequestTypesForIncidentsAPI(all []RequestType) []RequestType {
+	hasPractice := false
+	for _, rt := range all {
+		if strings.TrimSpace(rt.Practice) != "" {
+			hasPractice = true
+			break
+		}
+	}
+	if !hasPractice {
+		return all
+	}
+
+	out := make([]RequestType, 0, len(all))
+	for _, rt := range all {
+		p := strings.TrimSpace(rt.Practice)
+		if p == "" {
+			continue
+		}
+		if IsIncidentManagementRequestPractice(p) {
+			out = append(out, rt)
+		}
+	}
+	if len(out) == 0 {
+		return all
+	}
+	return out
+}
+
+// RequestTypeField is returned by GET .../requesttype/{id}/field.
+type RequestTypeField struct {
+	FieldID     string                  `json:"fieldId"`
+	Name        string                  `json:"name"`
+	Required    bool                    `json:"required"`
+	ValidValues []RequestTypeFieldValue `json:"validValues"`
+}
+
+// RequestTypeFieldValue is an allowed option on a request type field.
+type RequestTypeFieldValue struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
+type requestTypeFieldsResponse struct {
+	RequestTypeFields []RequestTypeField `json:"requestTypeFields"`
+}
+
+// ListRequestTypeFields returns fields for a service desk request type (including hidden fields).
+func (c *Client) ListRequestTypeFields(serviceDeskID, requestTypeID string) ([]RequestTypeField, error) {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	u := fmt.Sprintf(
+		"%s/rest/servicedeskapi/servicedesk/%s/requesttype/%s/field",
+		base,
+		url.PathEscape(serviceDeskID),
+		url.PathEscape(requestTypeID),
+	)
+	responseBody, err := c.execRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	var out requestTypeFieldsResponse
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("parse request type fields: %w", err)
+	}
+	return out.RequestTypeFields, nil
+}
+
+type customFieldOptionsPage struct {
+	Values     []customFieldOption `json:"values"`
+	IsLast     bool                `json:"isLast"`
+	StartAt    int                 `json:"startAt"`
+	MaxResults int                 `json:"maxResults"`
+}
+
+type customFieldOption struct {
+	ID       string `json:"id"`
+	Value    string `json:"value"`
+	Disabled bool   `json:"disabled,omitempty"`
+}
+
+type JiraFieldInfo struct {
+	ID     string         `json:"id"`
+	Name   string         `json:"name"`
+	Custom bool           `json:"custom"`
+	Schema map[string]any `json:"schema,omitempty"`
+}
+
+type customFieldContext struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	IsGlobalContext bool     `json:"isGlobalContext"`
+	ProjectIDs      []string `json:"projectIds,omitempty"`
+}
+
+type customFieldContextsPage struct {
+	Values     []customFieldContext `json:"values"`
+	IsLast     bool                 `json:"isLast"`
+	StartAt    int                  `json:"startAt"`
+	MaxResults int                  `json:"maxResults"`
+}
+
+type createMetaResponse struct {
+	Projects []createMetaProject `json:"projects"`
+}
+
+type createMetaProject struct {
+	IssueTypes []createMetaIssueType `json:"issuetypes"`
+}
+
+type createMetaIssueType struct {
+	ID     string                     `json:"id"`
+	Name   string                     `json:"name"`
+	Fields map[string]createMetaField `json:"fields"`
+}
+
+type createMetaField struct {
+	Name          string                   `json:"name"`
+	AllowedValues []createMetaAllowedValue `json:"allowedValues"`
+}
+
+type createMetaAllowedValue struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type createMetaIssueTypesOnlyResponse struct {
+	IssueTypes []createMetaIssueTypeRef `json:"issueTypes"`
+}
+
+type createMetaIssueTypeRef struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type createMetaIssueTypeFieldsResponse struct {
+	Fields map[string]createMetaField `json:"fields"`
+}
+
+// ListCustomFieldOptions returns select options for a Jira field on Cloud using best-effort fallbacks.
+func (c *Client) ListCustomFieldOptions(fieldID, projectKey, fieldLabel string) []RequestTypeFieldValue {
+	fieldID = strings.TrimSpace(fieldID)
+	fieldLabel = strings.TrimSpace(fieldLabel)
+	projectKey = strings.TrimSpace(projectKey)
+
+	if projectKey != "" && fieldLabel != "" {
+		if opts, _ := c.listFieldAllowedValuesFromCreateMeta(projectKey, fieldLabel); len(opts) > 0 {
+			return opts
+		}
+	}
+
+	if fieldID != "" {
+		if opts := c.listCustomFieldOptionsDirect(fieldID); len(opts) > 0 {
+			return opts
+		}
+		if strings.HasPrefix(fieldID, "customfield_") {
+			if opts := c.listCustomFieldOptionsFromContexts(fieldID); len(opts) > 0 {
+				return opts
+			}
+		}
+	}
+
+	return nil
+}
+
+func (c *Client) listCustomFieldOptionsDirect(fieldID string) []RequestTypeFieldValue {
+	if !strings.HasPrefix(fieldID, "customfield_") {
+		return nil
+	}
+
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	var out []RequestTypeFieldValue
+	startAt := 0
+	const pageSize = 100
+
+	for range 20 {
+		u := fmt.Sprintf(
+			"%s/rest/api/3/field/%s/option?startAt=%d&maxResults=%d",
+			base,
+			url.PathEscape(fieldID),
+			startAt,
+			pageSize,
+		)
+		body, status, err := c.execRequestWithStatus(http.MethodGet, u, nil)
+		if err != nil || status == http.StatusNotFound {
+			return out
+		}
+		if status < 200 || status >= 300 {
+			return out
+		}
+
+		var page customFieldOptionsPage
+		if err := json.Unmarshal(body, &page); err != nil {
+			return out
+		}
+
+		out = append(out, pageValuesToFieldOptions(page.Values)...)
+
+		if page.IsLast || len(page.Values) == 0 {
+			break
+		}
+		startAt += len(page.Values)
+	}
+
+	return out
+}
+
+func (c *Client) listCustomFieldOptionsFromContexts(fieldID string) []RequestTypeFieldValue {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	var contexts []customFieldContext
+	startAt := 0
+	const pageSize = 50
+
+	for range 20 {
+		u := fmt.Sprintf(
+			"%s/rest/api/3/field/%s/context?startAt=%d&maxResults=%d",
+			base,
+			url.PathEscape(fieldID),
+			startAt,
+			pageSize,
+		)
+		body, status, err := c.execRequestWithStatus(http.MethodGet, u, nil)
+		if err != nil || status == http.StatusNotFound {
+			return nil
+		}
+		if status < 200 || status >= 300 {
+			return nil
+		}
+
+		var page customFieldContextsPage
+		if err := json.Unmarshal(body, &page); err != nil {
+			return nil
+		}
+		contexts = append(contexts, page.Values...)
+		if page.IsLast || len(page.Values) == 0 {
+			break
+		}
+		startAt += len(page.Values)
+	}
+
+	ordered := orderFieldContexts(contexts, "")
+	for _, ctx := range ordered {
+		if opts := c.listCustomFieldOptionsForContext(fieldID, ctx.ID); len(opts) > 0 {
+			return opts
+		}
+	}
+	return nil
+}
+
+func orderFieldContexts(contexts []customFieldContext, projectID string) []customFieldContext {
+	if projectID == "" {
+		return contexts
+	}
+	var matched, global, rest []customFieldContext
+	for _, ctx := range contexts {
+		switch {
+		case contextIncludesProject(ctx, projectID):
+			matched = append(matched, ctx)
+		case ctx.IsGlobalContext:
+			global = append(global, ctx)
+		default:
+			rest = append(rest, ctx)
+		}
+	}
+	out := make([]customFieldContext, 0, len(contexts))
+	out = append(out, matched...)
+	out = append(out, global...)
+	out = append(out, rest...)
+	return out
+}
+
+func contextIncludesProject(ctx customFieldContext, projectID string) bool {
+	for _, id := range ctx.ProjectIDs {
+		if id == projectID {
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Client) listCustomFieldOptionsForContext(fieldID, contextID string) []RequestTypeFieldValue {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	var out []RequestTypeFieldValue
+	startAt := 0
+	const pageSize = 100
+
+	for range 20 {
+		u := fmt.Sprintf(
+			"%s/rest/api/3/field/%s/context/%s/option?startAt=%d&maxResults=%d",
+			base,
+			url.PathEscape(fieldID),
+			url.PathEscape(contextID),
+			startAt,
+			pageSize,
+		)
+		body, status, err := c.execRequestWithStatus(http.MethodGet, u, nil)
+		if err != nil || status == http.StatusNotFound {
+			return out
+		}
+		if status < 200 || status >= 300 {
+			return out
+		}
+
+		var page customFieldOptionsPage
+		if err := json.Unmarshal(body, &page); err != nil {
+			return out
+		}
+
+		out = append(out, pageValuesToFieldOptions(page.Values)...)
+
+		if page.IsLast || len(page.Values) == 0 {
+			break
+		}
+		startAt += len(page.Values)
+	}
+
+	return out
+}
+
+func pageValuesToFieldOptions(values []customFieldOption) []RequestTypeFieldValue {
+	out := make([]RequestTypeFieldValue, 0, len(values))
+	for _, opt := range values {
+		if opt.Disabled {
+			continue
+		}
+		id := strings.TrimSpace(opt.ID)
+		label := strings.TrimSpace(opt.Value)
+		if id == "" && label == "" {
+			continue
+		}
+		if id == "" {
+			id = label
+		}
+		if label == "" {
+			label = id
+		}
+		out = append(out, RequestTypeFieldValue{Label: label, Value: id})
+	}
+	return out
+}
+
+// ListFields returns all fields visible to the integration (Jira REST API v3).
+func (c *Client) ListFields() ([]JiraFieldInfo, error) {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	body, err := c.execRequest(http.MethodGet, base+"/rest/api/3/field", nil)
+	if err != nil {
+		return nil, err
+	}
+	var fields []JiraFieldInfo
+	if err := json.Unmarshal(body, &fields); err != nil {
+		return nil, fmt.Errorf("parse fields: %w", err)
+	}
+	return fields, nil
+}
+
+// FindGlobalFieldByLabel finds a field id by display name (e.g. "Urgency").
+func FindGlobalFieldByLabel(fields []JiraFieldInfo, fieldLabel string) *JiraFieldInfo {
+	want := strings.ToLower(strings.TrimSpace(fieldLabel))
+	var contains []JiraFieldInfo
+
+	for i := range fields {
+		f := &fields[i]
+		nameLower := strings.ToLower(strings.TrimSpace(f.Name))
+		if nameLower == want {
+			return f
+		}
+		if strings.Contains(nameLower, want) {
+			contains = append(contains, *f)
+		}
+	}
+
+	if len(contains) == 0 {
+		return nil
+	}
+
+	best := &contains[0]
+	bestScore := globalFieldMatchScore(best.Name, want)
+	for i := 1; i < len(contains); i++ {
+		score := globalFieldMatchScore(contains[i].Name, want)
+		if score > bestScore {
+			bestScore = score
+			best = &contains[i]
+		}
+	}
+	return best
+}
+
+func globalFieldMatchScore(name, want string) int {
+	nameLower := strings.ToLower(strings.TrimSpace(name))
+	switch {
+	case nameLower == want:
+		return 50
+	case strings.HasPrefix(nameLower, want+" "), strings.HasPrefix(nameLower, want+"-"):
+		return 40
+	case strings.HasPrefix(nameLower, want):
+		return 30
+	default:
+		return 10
+	}
+}
+
+func (c *Client) listFieldAllowedValuesFromCreateMeta(projectKey, fieldLabel string) ([]RequestTypeFieldValue, string) {
+	if opts, id := c.listFieldAllowedValuesFromCreateMetaModern(projectKey, fieldLabel); len(opts) > 0 {
+		return opts, id
+	}
+	return c.listFieldAllowedValuesFromCreateMetaLegacy(projectKey, fieldLabel)
+}
+
+func (c *Client) listFieldAllowedValuesFromCreateMetaModern(projectKey, fieldLabel string) ([]RequestTypeFieldValue, string) {
+	projectKey = strings.TrimSpace(projectKey)
+	if projectKey == "" {
+		return nil, ""
+	}
+
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	issueTypesURL := fmt.Sprintf("%s/rest/api/3/issue/createmeta/%s/issuetypes", base, url.PathEscape(projectKey))
+	body, status, err := c.execRequestWithStatus(http.MethodGet, issueTypesURL, nil)
+	if err != nil || status < 200 || status >= 300 {
+		return nil, ""
+	}
+
+	var issueTypesResp createMetaIssueTypesOnlyResponse
+	if err := json.Unmarshal(body, &issueTypesResp); err != nil {
+		return nil, ""
+	}
+
+	for _, issueType := range issueTypesResp.IssueTypes {
+		issueTypeID := strings.TrimSpace(issueType.ID)
+		if issueTypeID == "" {
+			continue
+		}
+		fieldsURL := fmt.Sprintf(
+			"%s/rest/api/3/issue/createmeta/%s/issuetypes/%s",
+			base,
+			url.PathEscape(projectKey),
+			url.PathEscape(issueTypeID),
+		)
+		fieldsBody, fieldsStatus, fieldsErr := c.execRequestWithStatus(http.MethodGet, fieldsURL, nil)
+		if fieldsErr != nil || fieldsStatus < 200 || fieldsStatus >= 300 {
+			continue
+		}
+		var fieldsResp createMetaIssueTypeFieldsResponse
+		if err := json.Unmarshal(fieldsBody, &fieldsResp); err != nil {
+			continue
+		}
+		if opts, fieldID := allowedValuesFromCreateMetaFields(fieldsResp.Fields, fieldLabel); len(opts) > 0 {
+			return opts, fieldID
+		}
+	}
+	return nil, ""
+}
+
+func (c *Client) listFieldAllowedValuesFromCreateMetaLegacy(projectKey, fieldLabel string) ([]RequestTypeFieldValue, string) {
+	projectKey = strings.TrimSpace(projectKey)
+	if projectKey == "" {
+		return nil, ""
+	}
+
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	q := url.Values{}
+	q.Set("projectKeys", projectKey)
+	q.Set("expand", "projects.issuetypes.fields")
+	u := fmt.Sprintf("%s/rest/api/3/issue/createmeta?%s", base, q.Encode())
+
+	body, status, err := c.execRequestWithStatus(http.MethodGet, u, nil)
+	if err != nil || status < 200 || status >= 300 {
+		return nil, ""
+	}
+
+	var meta createMetaResponse
+	if err := json.Unmarshal(body, &meta); err != nil {
+		return nil, ""
+	}
+
+	for _, project := range meta.Projects {
+		for _, issueType := range project.IssueTypes {
+			if opts, fieldID := allowedValuesFromCreateMetaFields(issueType.Fields, fieldLabel); len(opts) > 0 {
+				return opts, fieldID
+			}
+		}
+	}
+	return nil, ""
+}
+
+func allowedValuesFromCreateMetaFields(fields map[string]createMetaField, fieldLabel string) ([]RequestTypeFieldValue, string) {
+	want := strings.ToLower(strings.TrimSpace(fieldLabel))
+	for fieldID, field := range fields {
+		nameLower := strings.ToLower(strings.TrimSpace(field.Name))
+		if fieldLabel != "" && nameLower != want && !strings.Contains(nameLower, want) {
+			continue
+		}
+		if len(field.AllowedValues) == 0 {
+			continue
+		}
+		out := make([]RequestTypeFieldValue, 0, len(field.AllowedValues))
+		for _, av := range field.AllowedValues {
+			id := strings.TrimSpace(av.ID)
+			label := strings.TrimSpace(av.Name)
+			if label == "" {
+				label = strings.TrimSpace(av.Value)
+			}
+			if id == "" && label == "" {
+				continue
+			}
+			if id == "" {
+				id = label
+			}
+			if label == "" {
+				label = id
+			}
+			out = append(out, RequestTypeFieldValue{Label: label, Value: id})
+		}
+		if len(out) > 0 {
+			return out, fieldID
+		}
+	}
+	return nil, ""
+}
+
+func (c *Client) execRequestWithStatus(method, requestURL string, body io.Reader) ([]byte, int, error) {
+	req, err := http.NewRequest(method, requestURL, body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error building request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", c.basicAuthHeader())
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("error executing request: %v", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, res.StatusCode, fmt.Errorf("error reading body: %v", err)
+	}
+
+	return responseBody, res.StatusCode, nil
+}
+
+// GetRequestType returns one request type, optionally expanded (always requests expand=practice).
+func (c *Client) GetRequestType(serviceDeskID, requestTypeID string) (*RequestType, error) {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	q := url.Values{}
+	q.Add("expand", "practice")
+	u := fmt.Sprintf(
+		"%s/rest/servicedeskapi/servicedesk/%s/requesttype/%s?%s",
+		base,
+		url.PathEscape(serviceDeskID),
+		url.PathEscape(requestTypeID),
+		q.Encode(),
+	)
+	responseBody, err := c.execRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	var rt RequestType
+	if err := json.Unmarshal(responseBody, &rt); err != nil {
+		return nil, fmt.Errorf("parse request type: %w", err)
+	}
+	return &rt, nil
+}
+
+// CreateIncidentAPIRequest is the JSON body for JSM Incidents POST /v1/incident.
+type CreateIncidentAPIRequest struct {
+	ServiceDeskID string         `json:"serviceDeskId"`
+	RequestTypeID string         `json:"requestTypeId"`
+	Fields        map[string]any `json:"fields"`
+	Update        map[string]any `json:"update,omitempty"`
+	AlertIDs      []string       `json:"alertIds,omitempty"`
+}
+
+// CreateIncidentAPIResponse is returned when an incident is created successfully.
+type CreateIncidentAPIResponse struct {
+	ID   string `json:"id"`
+	Key  string `json:"key"`
+	Self string `json:"self"`
+}
+
+func (c *Client) incidentAPIURL(cloudID, pathSuffix string) string {
+	return fmt.Sprintf("%s/jsm/incidents/cloudId/%s/v1%s", atlassianIncidentAPIHost, cloudID, pathSuffix)
+}
+
+// CreateIncident creates an incident via the JSM Incidents API.
+func (c *Client) CreateIncident(cloudID string, req *CreateIncidentAPIRequest) (*CreateIncidentAPIResponse, error) {
+	u := c.incidentAPIURL(cloudID, "/incident")
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal create incident body: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, u, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var out CreateIncidentAPIResponse
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("parse create incident response: %w", err)
+	}
+
+	return &out, nil
+}
+
+// GetIncident returns the incident from the JSM Incidents API (issueID must be the numeric Jira issue id).
+func (c *Client) GetIncident(cloudID, issueID string) (map[string]any, error) {
+	u := c.incidentAPIURL(cloudID, fmt.Sprintf("/incident/%s", url.PathEscape(issueID)))
+	responseBody, err := c.execRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var out map[string]any
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("parse get incident response: %w", err)
+	}
+
+	return out, nil
+}
+
+// DeleteIncident deletes an incident via the JSM Incidents API.
+func (c *Client) DeleteIncident(cloudID, issueID string) error {
+	u := c.incidentAPIURL(cloudID, fmt.Sprintf("/incident/%s", url.PathEscape(issueID)))
+	_, err := c.execRequest(http.MethodDelete, u, nil)
+	return err
+}
+
+// ResolveNumericIssueID returns the numeric issue id for the Incidents API path. If ref is all digits it is
+// returned unchanged; otherwise ref is treated as an issue key and resolved with the Jira platform REST API.
+func (c *Client) ResolveNumericIssueID(ref string) (string, error) {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return "", fmt.Errorf("issue reference is required")
+	}
+	if isNumericIssueRef(ref) {
+		return ref, nil
+	}
+
+	issue, err := c.GetIssue(ref)
+	if err != nil {
+		return "", fmt.Errorf("resolve issue key %q: %w", ref, err)
+	}
+	return issue.ID, nil
+}
+
+func isNumericIssueRef(s string) bool {
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
 }
