@@ -420,9 +420,9 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
   const canExpand = Boolean(command);
   const preview = command ? command.split("\n")[0].substring(0, 80) : "command";
 
-  // Auto-expand when command starts running
+  // Auto-expand when command starts running, collapse when it finishes
   useEffect(() => {
-    if (running) setExpanded(true);
+    setExpanded(running);
   }, [running]);
 
   return (
