@@ -138,7 +138,7 @@ func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]mode
 	return models.ListAgentSessionMessagesPage(sessionID, cursor, limit)
 }
 
-func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string) (*models.AgentSessionMessage, error) {
+func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error) {
 	if content == "" {
 		return nil, fmt.Errorf("message content is required")
 	}
@@ -148,7 +148,12 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	preamble, err := s.buildPreamble(session, organizationID, userID)
+	agentMode := "operator"
+	if len(mode) > 0 && mode[0] != "" {
+		agentMode = mode[0]
+	}
+
+	preamble, err := s.buildPreamble(session, organizationID, userID, agentMode)
 	if err != nil {
 		return nil, fmt.Errorf("build preamble: %w", err)
 	}
@@ -177,12 +182,12 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	return persisted, nil
 }
 
-func (s *Service) buildPreamble(session *models.AgentSession, organizationID, userID uuid.UUID) (string, error) {
+func (s *Service) buildPreamble(session *models.AgentSession, organizationID, userID uuid.UUID, mode string) (string, error) {
 	token, expiresAt, err := s.mintAgentToken(organizationID.String(), userID.String(), session.CanvasID.String())
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(
+	base := fmt.Sprintf(
 		preambleTemplate,
 		session.CanvasID.String(),
 		session.OrganizationID.String(),
@@ -191,7 +196,8 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 		expiresAt.UTC().Format(time.RFC3339),
 		session.CanvasID.String(),
 		session.CanvasID.String(),
-	), nil
+	)
+	return base + "\n\n" + modeInstructions(mode), nil
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -287,3 +293,34 @@ func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
 	h.Write(canvasID[:])
 	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
 }
+
+func modeInstructions(mode string) string {
+	switch mode {
+	case "builder":
+		return builderModeInstructions
+	default:
+		return operatorModeInstructions
+	}
+}
+
+const builderModeInstructions = `[Agent Mode: BUILDER]
+You are in Builder mode. Your job is to modify the canvas based on the user's request.
+
+Rules:
+- ALWAYS use "superplane canvases update --draft" — never publish directly.
+- After a successful draft update, tell the user their draft is ready and include the version ID so they can review it in the editor.
+- You can add, remove, or modify nodes and edges.
+- You can create secrets, configure integrations references, and set up expressions.
+- If the user asks a question that doesn't require changes, answer it briefly, but your primary purpose is building.
+- If you're unsure what the user wants, ask a clarifying question using :::buttons with the options.`
+
+const operatorModeInstructions = `[Agent Mode: OPERATOR]
+You are in Operator mode. Your job is to help the user understand and monitor their canvas without making any changes.
+
+Rules:
+- NEVER modify the canvas. No creates, no updates, no deletes.
+- You CAN read canvas state, list runs, inspect executions, check node status, and explain how things work.
+- When the user asks about a failure, trace through the run execution path and identify the root cause.
+- If the user asks you to make a change, tell them to switch to Builder mode: "Switch to Builder mode to make that change."
+- Use charts, tables, and mermaid diagrams to visualize run data and canvas topology when helpful.
+- Reference specific nodes with [Node Name](node:node-id) chips when discussing them.`

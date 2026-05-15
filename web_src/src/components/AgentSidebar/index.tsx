@@ -1,4 +1,4 @@
-import { ChevronRight, Loader2, Send, SquareTerminal, X } from "lucide-react";
+import { ChevronRight, Hammer, Loader2, Monitor, Send, SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,6 +7,7 @@ import { useAgentChatMessages, useCanvasAgentChat, useSendAgentChatMessage } fro
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
 import type { AgentMessage } from "./types";
 import type { AgentState } from "./useAgentState";
+import type { AgentMode } from "./useAgentState";
 import { useSidebarWidth } from "./useSidebarWidth";
 import { RichMessage } from "./widgets/RichMessage";
 
@@ -29,21 +30,22 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
   const organizationId = agentState.organizationId ?? "";
   const chatQuery = useCanvasAgentChat(canvasId, organizationId, agentState.isAgentSidebarOpen);
   const chatId = chatQuery.data?.id ?? null;
+  const [isAgentBusy, setIsAgentBusy] = useState(false);
 
   return (
-    <SidebarShell onClose={agentState.closeSidebar}>
+    <SidebarShell onClose={agentState.closeSidebar} agentMode={agentState.agentMode} onModeSwitch={agentState.switchAgentMode} disabled={isAgentBusy}>
       {chatQuery.isLoading || !chatId ? (
         <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin mr-2" /> Loading…
         </div>
       ) : (
-        <ChatConversation chatId={chatId} canvasId={canvasId} organizationId={organizationId} />
+        <ChatConversation chatId={chatId} canvasId={canvasId} organizationId={organizationId} agentMode={agentState.agentMode} onBusyChange={setIsAgentBusy} />
       )}
     </SidebarShell>
   );
 }
 
-function SidebarShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+function SidebarShell({ children, onClose, agentMode, onModeSwitch, disabled }: { children: React.ReactNode; onClose: () => void; agentMode: AgentMode; onModeSwitch: (mode: AgentMode) => void; disabled?: boolean }) {
   const { sidebarRef, width, isResizing, handleMouseDown } = useSidebarWidth();
   return (
     <aside
@@ -54,6 +56,7 @@ function SidebarShell({ children, onClose }: { children: React.ReactNode; onClos
     >
       <header className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border shrink-0 min-w-0">
         <h2 className="text-base font-medium min-w-0 flex-1 truncate">Agent</h2>
+        <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={disabled} />
         <button
           type="button"
           onClick={onClose}
@@ -78,14 +81,53 @@ function SidebarShell({ children, onClose }: { children: React.ReactNode; onClos
   );
 }
 
+function ModeToggle({ mode, onSwitch, disabled }: { mode: AgentMode; onSwitch: (mode: AgentMode) => void; disabled?: boolean }) {
+  return (
+    <div className={cn("flex items-center bg-slate-100 rounded-md p-0.5 gap-0.5", disabled && "opacity-50 pointer-events-none")} data-testid="agent-mode-toggle">
+      <button
+        type="button"
+        onClick={() => onSwitch("builder")}
+        disabled={disabled}
+        className={cn(
+          "flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors",
+          mode === "builder" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500 hover:text-slate-700",
+        )}
+        aria-label="Builder mode"
+        data-testid="agent-mode-builder"
+      >
+        <Hammer size={12} />
+        Builder
+      </button>
+      <button
+        type="button"
+        onClick={() => onSwitch("operator")}
+        disabled={disabled}
+        className={cn(
+          "flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors",
+          mode === "operator" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500 hover:text-slate-700",
+        )}
+        aria-label="Operator mode"
+        data-testid="agent-mode-operator"
+      >
+        <Monitor size={12} />
+        Operator
+      </button>
+    </div>
+  );
+}
+
 function ChatConversation({
   chatId,
   canvasId,
   organizationId,
+  agentMode,
+  onBusyChange,
 }: {
   chatId: string;
   canvasId: string;
   organizationId: string;
+  agentMode: AgentMode;
+  onBusyChange: (busy: boolean) => void;
 }) {
   const messagesQuery = useAgentChatMessages(chatId, organizationId, true);
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
@@ -93,6 +135,11 @@ function ChatConversation({
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<string>("idle");
   const [error, setError] = useState<string | null>(null);
+
+  // Report busy state to parent for mode toggle lock
+  useEffect(() => {
+    onBusyChange(status === "streaming");
+  }, [status, onBusyChange]);
 
   // pages[0] is the latest fetch; later entries are older batches loaded
   // via scroll-up. Reverse so chronological order falls out of flatMap.
@@ -130,11 +177,11 @@ function ChatConversation({
     setDraft("");
     setError(null);
     try {
-      await sendMutation.mutateAsync({ chatId, content: value });
+      await sendMutation.mutateAsync({ chatId, content: value, mode: agentMode });
     } catch (err) {
       setError(err instanceof Error ? err.message : "failed to send message");
     }
-  }, [chatId, draft, sendMutation]);
+  }, [chatId, draft, sendMutation, agentMode]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const previousScrollHeight = useRef<number | null>(null);
