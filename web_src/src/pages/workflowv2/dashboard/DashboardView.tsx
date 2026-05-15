@@ -1,21 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Plus, Loader2, LayoutGrid, Pencil, Trash2, AtSign, BarChart3, Play } from "lucide-react";
+import { useCallback, useState } from "react";
+import { Plus, Loader2, LayoutGrid, AtSign, BarChart3, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { DashboardPanel, DashboardLayoutItem } from "@/hooks/useCanvasData";
-import { WorkflowMarkdownPreview } from "../WorkflowMarkdownPreview";
 
-const SAVE_DEBOUNCE_MS = 500;
+import { MarkdownPanelCard } from "./MarkdownPanelCard";
+import { useDashboardPanelState } from "./useDashboardPanelState";
 
 export interface DashboardViewProps {
   panels: DashboardPanel[];
@@ -39,9 +31,6 @@ export function DashboardView({
   addPanelDialogOpen: addPanelDialogOpenProp,
   onAddPanelDialogOpenChange,
 }: DashboardViewProps) {
-  const [localPanels, setLocalPanels] = useState<DashboardPanel[]>(panels);
-  const [localLayout, setLocalLayout] = useState<DashboardLayoutItem[]>(layout);
-  const lastPropsHashRef = useRef<string>("");
   const [internalAddPanelOpen, setInternalAddPanelOpen] = useState(false);
   const isAddPanelControlled = onAddPanelDialogOpenChange != null;
   const addPanelOpen = isAddPanelControlled ? Boolean(addPanelDialogOpenProp) : internalAddPanelOpen;
@@ -53,80 +42,16 @@ export function DashboardView({
     [isAddPanelControlled, onAddPanelDialogOpenChange],
   );
 
-  useEffect(() => {
-    const next = JSON.stringify({ panels, layout });
-    if (next !== lastPropsHashRef.current) {
-      lastPropsHashRef.current = next;
-      setLocalPanels(panels);
-      setLocalLayout(layout);
-    }
-  }, [panels, layout]);
-
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingRef = useRef<{ panels: DashboardPanel[]; layout: DashboardLayoutItem[] } | null>(null);
-  const queueSave = useCallback(
-    (nextPanels: DashboardPanel[], nextLayout: DashboardLayoutItem[]) => {
-      pendingRef.current = { panels: nextPanels, layout: nextLayout };
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => {
-        const pending = pendingRef.current;
-        if (!pending) return;
-        onChange(pending);
-        pendingRef.current = null;
-      }, SAVE_DEBOUNCE_MS);
-    },
-    [onChange],
+  const { localPanels, handleAddPanel, handleDeletePanel, handlePanelContentChange } = useDashboardPanelState(
+    panels,
+    layout,
+    onChange,
   );
 
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      const pending = pendingRef.current;
-      if (pending) onChange(pending);
-    };
-  }, [onChange]);
-
-  const handleAddPanel = useCallback(
-    (name: string) => {
-      const slug = name
-        .toLowerCase()
-        .trim()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "");
-      const id = slug || `panel-${Math.random().toString(36).slice(2, 10)}`;
-      const newPanel: DashboardPanel = { id, type: "markdown", content: { body: "" } };
-      const maxBottom = localLayout.reduce((acc, item) => Math.max(acc, item.y + item.h), 0);
-      const newLayoutItem: DashboardLayoutItem = { i: id, x: 0, y: maxBottom, w: 12, h: 6, minW: 2, minH: 2 };
-      const nextPanels = [...localPanels, newPanel];
-      const nextLayout = [...localLayout, newLayoutItem];
-      setLocalPanels(nextPanels);
-      setLocalLayout(nextLayout);
-      queueSave(nextPanels, nextLayout);
-    },
-    [localLayout, localPanels, queueSave],
-  );
-
-  const handleDeletePanel = useCallback(
-    (id: string) => {
-      const nextPanels = localPanels.filter((p) => p.id !== id);
-      const nextLayout = localLayout.filter((l) => l.i !== id);
-      setLocalPanels(nextPanels);
-      setLocalLayout(nextLayout);
-      queueSave(nextPanels, nextLayout);
-    },
-    [localLayout, localPanels, queueSave],
-  );
-
-  const handlePanelContentChange = useCallback(
-    (id: string, content: Record<string, unknown>) => {
-      const nextPanels = localPanels.map((p) => (p.id === id ? { ...p, content } : p));
-      setLocalPanels(nextPanels);
-      queueSave(nextPanels, localLayout);
-    },
-    [localLayout, localPanels, queueSave],
-  );
+  const confirmAddPanel = (name: string) => {
+    handleAddPanel(name);
+    setAddPanelOpen(false);
+  };
 
   if (errorMessage) {
     return (
@@ -149,14 +74,7 @@ export function DashboardView({
     return (
       <>
         <EmptyState readOnly={readOnly} onAdd={() => setAddPanelOpen(true)} />
-        <AddPanelDialog
-          open={addPanelOpen}
-          onConfirm={(name: string) => {
-            handleAddPanel(name);
-            setAddPanelOpen(false);
-          }}
-          onCancel={() => setAddPanelOpen(false)}
-        />
+        <AddPanelDialog open={addPanelOpen} onConfirm={confirmAddPanel} onCancel={() => setAddPanelOpen(false)} />
       </>
     );
   }
@@ -174,158 +92,8 @@ export function DashboardView({
           />
         ))}
       </div>
-      <AddPanelDialog
-        open={addPanelOpen}
-        onConfirm={(name: string) => {
-          handleAddPanel(name);
-          setAddPanelOpen(false);
-        }}
-        onCancel={() => setAddPanelOpen(false)}
-      />
+      <AddPanelDialog open={addPanelOpen} onConfirm={confirmAddPanel} onCancel={() => setAddPanelOpen(false)} />
     </div>
-  );
-}
-
-function MarkdownPanelCard({
-  panel,
-  readOnly,
-  onDelete,
-  onChange,
-}: {
-  panel: DashboardPanel;
-  readOnly: boolean;
-  onDelete: () => void;
-  onChange: (content: Record<string, unknown>) => void;
-}) {
-  const [isEditing, setIsEditing] = useState(false);
-  const body = typeof panel.content?.body === "string" ? (panel.content.body as string) : "";
-  const [draft, setDraft] = useState(body);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-
-  useEffect(() => {
-    if (!isEditing) setDraft(body);
-  }, [body, isEditing]);
-
-  useEffect(() => {
-    if (isEditing) textareaRef.current?.focus();
-  }, [isEditing]);
-
-  const commit = () => {
-    if (!isEditing) return;
-    setIsEditing(false);
-    if (draft !== body) onChange({ body: draft });
-  };
-
-  const cancel = () => {
-    setIsEditing(false);
-    setDraft(body);
-  };
-
-  if (isEditing && !readOnly) {
-    return (
-      <div className="flex flex-col gap-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-3 py-1.5">
-          <span className="text-xs font-medium text-slate-500">{panel.id}</span>
-        </div>
-        <Textarea
-          ref={textareaRef}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              e.preventDefault();
-              cancel();
-            }
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-              e.preventDefault();
-              commit();
-            }
-          }}
-          placeholder="Write **markdown** here..."
-          className="min-h-[120px] resize-none rounded-none border-0 bg-transparent font-mono text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-          data-testid="dashboard-markdown-editor"
-        />
-        <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/50 px-3 py-1.5">
-          <span className="text-[11px] text-slate-500">
-            <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">Esc</kbd> cancel &middot;{" "}
-            <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">Cmd+Enter</kbd> save
-          </span>
-          <div className="flex items-center gap-1">
-            <Button type="button" size="sm" variant="ghost" onClick={cancel}>
-              Cancel
-            </Button>
-            <Button type="button" size="sm" onClick={commit} data-testid="dashboard-markdown-save">
-              Save
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="group/panel relative flex flex-col gap-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-3 py-1.5">
-          <span className="text-xs font-medium text-slate-500">{panel.id}</span>
-          {!readOnly ? (
-            <div className="flex items-center gap-0.5 opacity-0 transition-opacity group-hover/panel:opacity-100">
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                onClick={() => setIsEditing(true)}
-                aria-label="Edit panel"
-                className="h-6 w-6 text-slate-500 hover:text-slate-700"
-                data-testid="dashboard-edit-panel"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                onClick={() => setConfirmingDelete(true)}
-                aria-label="Delete panel"
-                className="h-6 w-6 text-slate-500 hover:bg-red-50 hover:text-red-600"
-                data-testid="dashboard-delete-panel"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          ) : null}
-        </div>
-        {body.trim() ? (
-          <div
-            className="px-4 py-3"
-            onDoubleClick={readOnly ? undefined : () => setIsEditing(true)}
-            data-testid="dashboard-markdown-view"
-          >
-            <WorkflowMarkdownPreview content={body} />
-          </div>
-        ) : (
-          <button
-            type="button"
-            onClick={readOnly ? undefined : () => setIsEditing(true)}
-            disabled={readOnly}
-            className="flex h-24 w-full flex-col items-center justify-center gap-1.5 bg-transparent text-slate-400 transition-colors hover:bg-sky-50/40 hover:text-sky-600 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-slate-400"
-            data-testid="dashboard-markdown-empty"
-          >
-            <Pencil className="h-4 w-4" />
-            <span className="text-sm">{readOnly ? "Empty panel" : "Click to edit"}</span>
-          </button>
-        )}
-      </div>
-      <DeleteConfirmDialog
-        open={confirmingDelete}
-        onClose={() => setConfirmingDelete(false)}
-        onConfirm={() => {
-          setConfirmingDelete(false);
-          onDelete();
-        }}
-      />
-    </>
   );
 }
 
@@ -374,37 +142,6 @@ function EmptyState({ readOnly, onAdd }: { readOnly: boolean; onAdd: () => void 
         ) : null}
       </div>
     </div>
-  );
-}
-
-function DeleteConfirmDialog({
-  open,
-  onClose,
-  onConfirm,
-}: {
-  open: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <Dialog open={open} onOpenChange={(next) => (next ? null : onClose())}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Delete this panel?</DialogTitle>
-          <DialogDescription>
-            This panel and its contents will be removed from the dashboard. The content is not recoverable.
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter>
-          <Button type="button" variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="button" variant="destructive" onClick={onConfirm} data-testid="dashboard-delete-confirm">
-            Delete panel
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 

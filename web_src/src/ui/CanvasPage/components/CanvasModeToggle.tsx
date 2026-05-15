@@ -34,21 +34,13 @@ export function CanvasModeToggle({
   return (
     <div className="inline-flex w-auto" aria-label="Canvas view" role="group">
       <div className="flex h-8 w-fit gap-0 overflow-hidden rounded-sm border border-slate-300 bg-white/80 p-0">
-        {showDashboard ? (
-          <>
-            <ModeButton
-              isActive={mode === "dashboard"}
-              data-testid="canvas-view-mode-dashboard"
-              aria-label="Dashboard"
-              onClick={() => {
-                if (mode !== "dashboard" && onSelectDashboard) void onSelectDashboard();
-              }}
-              className={cn(baseTrigger, showRuns ? "rounded-none" : "rounded-sm rounded-bl-none rounded-tl-none")}
-            >
-              Dashboard
-            </ModeButton>
-            <div className="h-full w-px bg-slate-300"></div>
-          </>
+        {showDashboard && onSelectDashboard ? (
+          <DashboardModeTab
+            mode={mode}
+            onSelectDashboard={onSelectDashboard}
+            showRuns={showRuns}
+            baseTrigger={baseTrigger}
+          />
         ) : null}
         <ModeButton
           isActive={mode === "version-live" || mode === "version-edit"}
@@ -71,31 +63,81 @@ export function CanvasModeToggle({
             ) : null}
           </span>
         </ModeButton>
-        {showRuns ? (
-          <>
-            <div className="h-full w-px bg-slate-300"></div>
-            <ModeButton
-              isActive={mode === "runs"}
-              data-testid="canvas-view-mode-runs"
-              aria-label="Runs"
-              onClick={() => {
-                if (mode !== "runs" && onSelectRuns) void onSelectRuns();
-              }}
-              className={cn(baseTrigger, "rounded-sm rounded-bl-none rounded-tl-none")}
-            >
-              <span className="inline-flex items-center gap-1.5">
-                Runs
-                {runsNotificationCount != null && runsNotificationCount > 0 ? (
-                  <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-medium leading-none text-white">
-                    {runsNotificationCount > 99 ? "99+" : runsNotificationCount}
-                  </span>
-                ) : null}
-              </span>
-            </ModeButton>
-          </>
+        {showRuns && onSelectRuns ? (
+          <RunsModeTab
+            mode={mode}
+            onSelectRuns={onSelectRuns}
+            runsNotificationCount={runsNotificationCount}
+            baseTrigger={baseTrigger}
+          />
         ) : null}
       </div>
     </div>
+  );
+}
+
+function DashboardModeTab({
+  mode,
+  onSelectDashboard,
+  showRuns,
+  baseTrigger,
+}: {
+  mode: CanvasMode;
+  onSelectDashboard: () => void;
+  showRuns: boolean;
+  baseTrigger: string;
+}) {
+  return (
+    <>
+      <ModeButton
+        isActive={mode === "dashboard"}
+        data-testid="canvas-view-mode-dashboard"
+        aria-label="Dashboard"
+        onClick={() => {
+          if (mode !== "dashboard") void onSelectDashboard();
+        }}
+        className={cn(baseTrigger, showRuns ? "rounded-none" : "rounded-sm rounded-bl-none rounded-tl-none")}
+      >
+        Dashboard
+      </ModeButton>
+      <div className="h-full w-px bg-slate-300" />
+    </>
+  );
+}
+
+function RunsModeTab({
+  mode,
+  onSelectRuns,
+  runsNotificationCount,
+  baseTrigger,
+}: {
+  mode: CanvasMode;
+  onSelectRuns: () => void;
+  runsNotificationCount?: number;
+  baseTrigger: string;
+}) {
+  return (
+    <>
+      <div className="h-full w-px bg-slate-300" />
+      <ModeButton
+        isActive={mode === "runs"}
+        data-testid="canvas-view-mode-runs"
+        aria-label="Runs"
+        onClick={() => {
+          if (mode !== "runs") void onSelectRuns();
+        }}
+        className={cn(baseTrigger, "rounded-sm rounded-bl-none rounded-tl-none")}
+      >
+        <span className="inline-flex items-center gap-1.5">
+          Runs
+          {runsNotificationCount != null && runsNotificationCount > 0 ? (
+            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-600 px-1 text-[10px] font-medium leading-none text-white">
+              {runsNotificationCount > 99 ? "99+" : runsNotificationCount}
+            </span>
+          ) : null}
+        </span>
+      </ModeButton>
+    </>
   );
 }
 

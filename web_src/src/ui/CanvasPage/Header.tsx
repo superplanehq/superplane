@@ -200,21 +200,15 @@ function SecondaryHeaderActions({
         />
       ) : null}
 
-      {showEditButton ? (
-        showDraftDropdown ? (
-          <EnterEditDraftDropdown
-            onContinueEditing={onEnterEditMode}
-            onDiscardAndStartEdit={onDiscardDraftAndStartEdit!}
-            updatedAt={unpublishedDraftUpdatedAt}
-          />
-        ) : (
-          <EnterEditButton
-            onClick={onEnterEditMode}
-            disabled={!!enterEditModeDisabled}
-            disabledTooltip={enterEditModeDisabledTooltip}
-          />
-        )
-      ) : null}
+      <LiveModeEditControls
+        showEditButton={showEditButton}
+        showDraftDropdown={showDraftDropdown}
+        onEnterEditMode={onEnterEditMode}
+        enterEditModeDisabled={enterEditModeDisabled}
+        enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+        onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
+        unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
+      />
 
       {mode === "default" && onSave && !saveButtonHidden ? (
         <SaveButton
@@ -254,6 +248,48 @@ function SecondaryHeaderActions({
         </UIButton>
       ) : null}
     </div>
+  );
+}
+
+function LiveModeEditControls({
+  showEditButton,
+  showDraftDropdown,
+  onEnterEditMode,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
+  onDiscardDraftAndStartEdit,
+  unpublishedDraftUpdatedAt,
+}: Pick<
+  HeaderProps,
+  | "onEnterEditMode"
+  | "enterEditModeDisabled"
+  | "enterEditModeDisabledTooltip"
+  | "onDiscardDraftAndStartEdit"
+  | "unpublishedDraftUpdatedAt"
+> & {
+  showEditButton: boolean;
+  showDraftDropdown: boolean;
+}) {
+  if (!showEditButton || !onEnterEditMode) {
+    return null;
+  }
+
+  if (showDraftDropdown && onDiscardDraftAndStartEdit) {
+    return (
+      <EnterEditDraftDropdown
+        onContinueEditing={onEnterEditMode}
+        onDiscardAndStartEdit={onDiscardDraftAndStartEdit}
+        updatedAt={unpublishedDraftUpdatedAt}
+      />
+    );
+  }
+
+  return (
+    <EnterEditButton
+      onClick={onEnterEditMode}
+      disabled={!!enterEditModeDisabled}
+      disabledTooltip={enterEditModeDisabledTooltip}
+    />
   );
 }
 
