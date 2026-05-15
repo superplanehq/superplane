@@ -235,6 +235,7 @@ function ChatConversation({
                   chatId={chatId}
                   canvasId={canvasId}
                   organizationId={organizationId}
+                  agentMode={agentMode}
                 />
               ),
             )}
@@ -404,18 +405,20 @@ function MessageRow({
   chatId,
   canvasId,
   organizationId,
+  agentMode,
 }: {
   message: AgentMessage;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   chatId: string;
   canvasId: string;
   organizationId: string;
+  agentMode: AgentMode;
 }) {
   const handleAction = useCallback(
     async (action: string) => {
       if (sendMutation.isPending) return;
       try {
-        await sendMutation.mutateAsync({ chatId, content: action });
+        await sendMutation.mutateAsync({ chatId, content: action, mode: agentMode });
       } catch (err) {
         console.error("Failed to send action:", err);
       }
