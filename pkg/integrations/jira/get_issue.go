@@ -45,7 +45,7 @@ func (c *GetIssue) Documentation() string {
 ## Configuration
 
 - **Project**: The Jira project the issue belongs to
-- **Issue Key**: The issue key (e.g. ` + "`PROJ-123`" + `) or an expression resolving to one
+- **Issue Key**: The issue key (e.g. ` + "`PROJ-123`" + `)
 - **Expand**: Optional comma-separated Jira expand values, such as ` + "`renderedFields,names`" + `
 
 ## Output

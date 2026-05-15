@@ -51,7 +51,7 @@ func (c *UpdateIssue) Documentation() string {
 ## Configuration
 
 - **Project**: The Jira project the issue belongs to
-- **Issue Key**: The issue key (e.g. ` + "`PROJ-123`" + `) or an expression resolving to one
+- **Issue Key**: The issue key (e.g. ` + "`PROJ-123`" + `)
 - **Summary**, **Description**, **Issue Type**, **Assignee**, **Priority**, **Labels**: Optional fields to update. At least one must be supplied.
 - **Notify Users**: Whether to send notification emails (defaults to Jira's behaviour)
 

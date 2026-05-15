@@ -225,9 +225,9 @@ func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create issue: %v", err)
 	}
 
-	if strings.TrimSpace(spec.Status) != "" {
-		if err := applyStatus(client, created.Key, spec.Status); err != nil {
-			return fmt.Errorf("issue %s created, but failed to apply status %q: %v", created.Key, spec.Status, err)
+	if status := strings.TrimSpace(spec.Status); status != "" {
+		if err := applyStatus(client, created.Key, status); err != nil {
+			return fmt.Errorf("issue %s created, but failed to apply status %q: %v", created.Key, status, err)
 		}
 	}
 

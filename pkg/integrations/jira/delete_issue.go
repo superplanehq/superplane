@@ -50,7 +50,7 @@ func (c *DeleteIssue) Documentation() string {
 ## Configuration
 
 - **Project**: The Jira project the issue belongs to
-- **Issue Key**: The issue key (e.g. ` + "`PROJ-123`" + `) or an expression resolving to one
+- **Issue Key**: The issue key (e.g. ` + "`PROJ-123`" + `)
 - **Delete Subtasks**: Also delete the issue's subtasks (Jira returns an error if subtasks exist and this is false)
 
 ## Output
@@ -88,7 +88,7 @@ func (c *DeleteIssue) Configuration() []configuration.Field {
 		{
 			Name:        "issueKey",
 			Label:       "Issue Key",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "The issue key (e.g. PROJ-123)",
 			Placeholder: "PROJ-123",

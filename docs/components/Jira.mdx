@@ -82,7 +82,7 @@ The Delete Issue component permanently removes an issue from Jira.
 ### Configuration
 
 - **Project**: The Jira project the issue belongs to
-- **Issue Key**: The issue key (e.g. `PROJ-123`) or an expression resolving to one
+- **Issue Key**: The issue key (e.g. `PROJ-123`)
 - **Delete Subtasks**: Also delete the issue's subtasks (Jira returns an error if subtasks exist and this is false)
 
 ### Output
@@ -118,7 +118,8 @@ The Get Issue component retrieves a Jira issue and its fields for downstream rou
 ### Configuration
 
 - **Project**: The Jira project the issue belongs to
-- **Issue Key**: The issue key (e.g. `PROJ-123`) or an expression resolving to one
+- **Issue Key**: The issue key (e.g. `PROJ-123`)
+- **Expand**: Optional comma-separated Jira expand values, such as `renderedFields,names`
 
 ### Output
 
@@ -189,7 +190,7 @@ The Update Issue component updates fields on an existing Jira issue.
 ### Configuration
 
 - **Project**: The Jira project the issue belongs to
-- **Issue Key**: The issue key (e.g. `PROJ-123`) or an expression resolving to one
+- **Issue Key**: The issue key (e.g. `PROJ-123`)
 - **Summary**, **Description**, **Issue Type**, **Assignee**, **Priority**, **Labels**: Optional fields to update. At least one must be supplied.
 - **Notify Users**: Whether to send notification emails (defaults to Jira's behaviour)
 
