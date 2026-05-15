@@ -43,6 +43,7 @@ The Create Issue component creates a new issue in Jira.
 - **Issue Type**: The type of issue (scoped to the chosen project)
 - **Summary**: The issue summary/title
 - **Description**: Optional description text
+- **Assignee**: Optional Jira user to assign the issue to
 - **Status**: Optional initial status. Jira always creates issues in the workflow's initial state, so when this is set the component executes a transition immediately after create. The status must be reachable via a transition from the initial state.
 
 ### Output
@@ -118,7 +119,6 @@ The Get Issue component retrieves a Jira issue and its fields for downstream rou
 
 - **Project**: The Jira project the issue belongs to
 - **Issue Key**: The issue key (e.g. `PROJ-123`) or an expression resolving to one
-- **Expand**: Optional comma-separated list of Jira `expand` values (e.g. `renderedFields,names`)
 
 ### Output
 
