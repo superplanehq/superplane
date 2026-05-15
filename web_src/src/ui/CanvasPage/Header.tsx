@@ -1,12 +1,13 @@
-import type { AgentState } from "@/components/AgentSidebar/useAgentState";
+import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { GitBranch, MoreVertical, Pencil, Settings } from "lucide-react";
+import { GitBranch, MoreVertical, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
-import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
+import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
 
@@ -50,7 +51,7 @@ interface HeaderProps {
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
-  agentState: AgentState;
+  toolSidebarState: CanvasToolSidebarState;
 }
 
 export function Header(props: HeaderProps) {
@@ -83,7 +84,7 @@ function PageHeader({
   const activeCanvasId = canvasIdParam || workflowId;
 
   return (
-    <div className="relative flex h-11 items-center border-b border-slate-950/15 px-3 sm:px-4">
+    <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 px-3 sm:px-4">
       <div className="relative z-10 flex min-w-0 shrink-0 items-center">
         <OrganizationMenuButton organizationId={organizationId} />
       </div>
@@ -124,8 +125,8 @@ function SecondaryHeader(props: HeaderProps) {
   const editing = props.mode === "version-edit";
 
   return (
-    <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
-      <AgentSidebarTrigger agentState={props.agentState} />
+    <div className="relative z-10 flex h-10 items-center border-b border-slate-950/15 bg-white px-4 gap-3">
+      <CanvasToolSidebarTrigger toolSidebarState={props.toolSidebarState} />
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
         <div className="pointer-events-auto">
@@ -306,7 +307,6 @@ function EnterEditButton({
       disabled={disabled}
       data-testid="canvas-edit-button"
     >
-      <Pencil className="h-3.5 w-3.5" />
       Edit
     </UIButton>
   );
@@ -379,16 +379,16 @@ function VersionControlButton({
           <UIButton
             type="button"
             variant="outline"
-            size="icon"
-            className={isOpen ? "h-8 w-8 bg-slate-200 border-slate-300" : "h-8 w-8"}
+            size="icon-xs"
+            className={cn("rounded-md", isOpen && "bg-slate-200 border-slate-300")}
             onClick={onToggle}
             aria-label={isOpen ? "Close version control" : "Open version control"}
             aria-pressed={isOpen}
           >
-            <GitBranch className="h-4 w-4" />
+            <GitBranch className="size-3.5" />
           </UIButton>
           {notificationCount > 0 ? (
-            <span className="absolute left-5 -top-1.5 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
+            <span className="absolute left-4 -top-1 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
               {notificationCount > 99 ? "99+" : notificationCount}
             </span>
           ) : null}

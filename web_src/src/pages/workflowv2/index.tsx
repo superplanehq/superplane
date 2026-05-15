@@ -5671,6 +5671,7 @@ export function WorkflowPageV2() {
           versionControlNotificationCount={pendingApprovalVersions.length}
           showBottomStatusControls={!isTemplate && !isRunsMode}
           hideAddControls={isTemplate || isRunsMode}
+          hideCanvasToolSidebar={isTemplate}
           memoryItemCount={canvasMemoryEntries.length}
           onMemoryOpen={() => setIsMemoryViewModalOpen(true)}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}

@@ -282,7 +282,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
         aria-label="Go to canvases"
         className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
       >
-        <img src={SuperplaneLogo} alt="SuperPlane" className="h-7 w-7" />
+        <img src={SuperplaneLogo} alt="SuperPlane" className="h-6 w-6" />
       </Link>
     </div>
   );
