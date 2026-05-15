@@ -197,7 +197,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	cmds := normalizeCommands(spec.Commands)
+	cmds := commandForExecution(spec.Commands)
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
