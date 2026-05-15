@@ -259,6 +259,7 @@ function ChatConversation({
 }
 
 function DraftActionsBar({ messages, canvasId, organizationId }: { messages: AgentMessage[]; canvasId: string; organizationId: string }) {
+  const [dismissed, setDismissed] = useState(false);
   const latestDraft = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
@@ -271,7 +272,7 @@ function DraftActionsBar({ messages, canvasId, organizationId }: { messages: Age
     return null;
   }, [messages]);
 
-  if (!latestDraft) return null;
+  if (!latestDraft || dismissed) return null;
 
   return (
     <div className="border-t border-violet-200 bg-violet-50/80 px-3 py-2">
@@ -281,6 +282,7 @@ function DraftActionsBar({ messages, canvasId, organizationId }: { messages: Age
         canvasId={canvasId}
         organizationId={organizationId}
         isEditing={window.location.search.includes("version=")}
+        onPublished={() => setDismissed(true)}
       />
     </div>
   );

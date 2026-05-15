@@ -9,6 +9,7 @@ export interface DraftActionsWidgetProps {
   canvasId: string;
   organizationId: string;
   isEditing: boolean;
+  onPublished?: () => void;
 }
 
 export function DraftActionsWidget({
@@ -17,6 +18,7 @@ export function DraftActionsWidget({
   canvasId,
   organizationId,
   isEditing,
+  onPublished,
 }: DraftActionsWidgetProps) {
   const [published, setPublished] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -44,6 +46,7 @@ export function DraftActionsWidget({
       );
       if (response.ok) {
         setPublished(true);
+        onPublished?.();
       } else {
         const text = await response.text();
         console.error("Publish failed:", response.status, text);
