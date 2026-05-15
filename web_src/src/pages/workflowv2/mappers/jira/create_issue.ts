@@ -11,7 +11,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { jiraComponentBaseProps } from "./base";
-import { addDetail, getIssueLabel } from "./utils";
+import { addDetail, addProjectMetadata, getIssueLabel } from "./utils";
 import type { CreateIssueConfiguration, JiraIssue, JiraNodeMetadata } from "./types";
 
 export const createIssueMapper: ComponentBaseMapper = {
@@ -54,12 +54,7 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const nodeMetadata = node.metadata as JiraNodeMetadata | undefined;
   const configuration = node.configuration as CreateIssueConfiguration | undefined;
 
-  const project = nodeMetadata?.project;
-  if (project?.name || project?.key) {
-    metadata.push({ icon: "folder", label: project?.name || project?.key || "" });
-  } else if (configuration?.project) {
-    metadata.push({ icon: "folder", label: configuration.project });
-  }
+  addProjectMetadata(metadata, nodeMetadata?.project, configuration?.project);
 
   const issueType = nodeMetadata?.issueType || configuration?.issueType;
   if (issueType) {

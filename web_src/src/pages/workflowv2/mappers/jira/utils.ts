@@ -1,4 +1,5 @@
-import type { JiraIssue } from "./types";
+import type { MetadataItem } from "@/ui/metadataList";
+import type { JiraIssue, JiraProject } from "./types";
 
 export function getIssueLabel(issue: JiraIssue | undefined): string {
   if (!issue) {
@@ -11,59 +12,36 @@ export function getIssueLabel(issue: JiraIssue | undefined): string {
   return issue.key || summary || "";
 }
 
-export function getProjectLabel(issue: JiraIssue | undefined): string | undefined {
-  const project = issue?.fields?.project;
-  if (!project) {
-    return undefined;
-  }
-  if (project.name && project.key) {
-    return `${project.name} (${project.key})`;
-  }
-  return project.name || project.key || undefined;
-}
-
 export function addDetail(details: Record<string, string>, label: string, value: string | undefined): void {
   if (value && value.trim() !== "") {
     details[label] = value;
   }
 }
 
-export function addFormattedTimestamp(
-  details: Record<string, string>,
-  label: string,
-  timestamp: string | undefined,
+export function addProjectMetadata(
+  metadata: MetadataItem[],
+  project: JiraProject | undefined,
+  configuredProject: string | undefined,
 ): void {
-  if (!timestamp) {
-    return;
+  const label = getProjectMetadataLabel(project, configuredProject);
+  if (label) {
+    metadata.push({ icon: "folder", label });
   }
-  const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) {
-    return;
-  }
-  details[label] = date.toLocaleString();
 }
 
-/**
- * Standard payload-driven details for any Jira issue. Each component decides
- * which fields to surface and may augment with execution-level data.
- */
-export function getDetailsForIssue(issue: JiraIssue | undefined): Record<string, string> {
-  if (!issue) {
-    return {};
+export function addIssueKeyMetadata(
+  metadata: MetadataItem[],
+  icon: MetadataItem["icon"],
+  issueKey: string | undefined,
+) {
+  if (issueKey && !issueKey.includes("{{")) {
+    metadata.push({ icon, label: issueKey });
   }
-  const details: Record<string, string> = {};
-  addDetail(details, "Key", issue.key);
-  addDetail(details, "Summary", issue.fields?.summary);
-  addDetail(details, "Status", issue.fields?.status?.name);
-  addDetail(details, "Priority", issue.fields?.priority?.name);
-  addDetail(details, "Issue Type", issue.fields?.issuetype?.name);
-  addDetail(details, "Assignee", issue.fields?.assignee?.displayName);
-  addDetail(details, "Reporter", issue.fields?.reporter?.displayName);
-  addDetail(details, "Project", getProjectLabel(issue));
-  if (issue.fields?.labels && issue.fields.labels.length > 0) {
-    details["Labels"] = issue.fields.labels.join(", ");
+}
+
+function getProjectMetadataLabel(project: JiraProject | undefined, configuredProject: string | undefined) {
+  if (project?.name || project?.key) {
+    return project.name || project.key;
   }
-  addFormattedTimestamp(details, "Created", issue.fields?.created);
-  addFormattedTimestamp(details, "Updated", issue.fields?.updated);
-  return details;
+  return configuredProject;
 }

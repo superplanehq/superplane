@@ -11,7 +11,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { jiraComponentBaseProps } from "./base";
-import { addDetail, getIssueLabel } from "./utils";
+import { addDetail, addIssueKeyMetadata, addProjectMetadata, getIssueLabel } from "./utils";
 import type { JiraIssue, JiraNodeMetadata, UpdateIssueConfiguration } from "./types";
 
 const FIELD_LABELS: Record<keyof UpdateIssueConfiguration, string> = {
@@ -69,16 +69,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const nodeMetadata = node.metadata as JiraNodeMetadata | undefined;
   const configuration = node.configuration as UpdateIssueConfiguration | undefined;
 
-  const project = nodeMetadata?.project;
-  if (project?.name || project?.key) {
-    metadata.push({ icon: "folder", label: project?.name || project?.key || "" });
-  } else if (configuration?.project) {
-    metadata.push({ icon: "folder", label: configuration.project });
-  }
-
-  if (configuration?.issueKey && !configuration.issueKey.includes("{{")) {
-    metadata.push({ icon: "hash", label: configuration.issueKey });
-  }
+  addProjectMetadata(metadata, nodeMetadata?.project, configuration?.project);
+  addIssueKeyMetadata(metadata, "hash", configuration?.issueKey);
 
   const updated = listUpdatedFields(configuration);
   if (updated.length > 0) {
