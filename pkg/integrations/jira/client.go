@@ -323,7 +323,8 @@ func (c *Client) ListCustomerRequestsByServiceDesk(serviceDeskID string, maxTota
 }
 
 func jqlQuotedProjectKey(projectKey string) string {
-	return strings.ReplaceAll(projectKey, `"`, `\"`)
+	escaped := strings.ReplaceAll(projectKey, `\`, `\\`)
+	return strings.ReplaceAll(escaped, `"`, `\"`)
 }
 
 // CreateIssueRequest is the request body for creating an issue.
@@ -481,7 +482,7 @@ func (c *Client) ListServiceDesks() ([]ServiceDesk, error) {
 		if page.IsLastPage || len(page.Values) == 0 {
 			break
 		}
-		start += pageSize
+		start += len(page.Values)
 	}
 
 	return out, nil
@@ -523,7 +524,7 @@ func (c *Client) ListRequestTypes(serviceDeskID string) ([]RequestType, error) {
 		if page.IsLastPage || len(page.Values) == 0 {
 			break
 		}
-		start += pageSize
+		start += len(page.Values)
 	}
 
 	return filterRequestTypesForIncidentsAPI(out), nil

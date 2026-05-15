@@ -518,6 +518,40 @@ func Test__Client__ListServiceDesksAndRequestTypes(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/servicedeskapi/servicedesk/1/requesttype")
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "expand=practice")
 	})
+
+	t.Run("list service desks paginates by returned count", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"values":[{"id":"1","projectName":"A","projectKey":"A"}],"isLastPage":false}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"values":[{"id":"2","projectName":"B","projectKey":"B"}],"isLastPage":true}`)),
+				},
+			},
+		}
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"baseUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "t",
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		desks, err := client.ListServiceDesks()
+		require.NoError(t, err)
+		require.Len(t, desks, 2)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "start=1")
+	})
+}
+
+func Test__jqlQuotedProjectKey(t *testing.T) {
+	assert.Equal(t, `IT`, jqlQuotedProjectKey("IT"))
+	assert.Equal(t, `IT\"X`, jqlQuotedProjectKey(`IT"X`))
+	assert.Equal(t, `IT\\`, jqlQuotedProjectKey(`IT\`))
+	assert.Equal(t, `a\\b\"c`, jqlQuotedProjectKey(`a\b"c`))
 }
 
 func Test__Client__IncidentsAPI(t *testing.T) {
