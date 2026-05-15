@@ -1628,3 +1628,6 @@ export const useUpdateCanvasDashboard = (canvasId: string) => {
     },
   });
 };
+
+export type CanvasDashboardQueryResult = ReturnType<typeof useCanvasDashboard>;
+export type UpdateCanvasDashboardMutationResult = ReturnType<typeof useUpdateCanvasDashboard>;

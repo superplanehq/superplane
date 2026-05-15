@@ -1,18 +1,18 @@
 import { useCallback, useRef } from "react";
 
-import {
-  useCanvasDashboard,
-  useUpdateCanvasDashboard,
-  type DashboardLayoutItem,
-  type DashboardPanel,
+import type {
+  CanvasDashboardQueryResult,
+  DashboardLayoutItem,
+  DashboardPanel,
+  UpdateCanvasDashboardMutationResult,
 } from "@/hooks/useCanvasData";
 
 import { DashboardView } from "./DashboardView";
 
 export type DashboardOverlayProps = {
   readOnly: boolean;
-  dashboardQuery: ReturnType<typeof useCanvasDashboard>;
-  updateDashboardMutation: ReturnType<typeof useUpdateCanvasDashboard>;
+  dashboardQuery: CanvasDashboardQueryResult;
+  updateDashboardMutation: UpdateCanvasDashboardMutationResult;
   addPanelDialogOpen: boolean;
   onAddPanelDialogOpenChange: (open: boolean) => void;
 };
