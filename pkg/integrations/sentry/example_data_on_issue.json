@@ -6,37 +6,48 @@
       "uuid": "7a485448-a9e2-4c85-8a3c-4f44175783c9"
     },
     "actor": {
-      "type": "user",
-      "id": "789",
-      "name": "Person"
+      "type": "application",
+      "id": "sentry",
+      "name": "Sentry"
     },
     "data": {
       "issue": {
-        "id": "123",
-        "shortId": "IPE-1",
-        "title": "Error #1: This is a test error!",
-        "culprit": "SentryCustomError(frontend/src/util)",
+        "id": "5183047291",
+        "shortId": "SNAKETOY-WEB-1F4",
+        "title": "TypeError: Cannot read properties of undefined (reading 'score')",
+        "culprit": "renderHud(snaketoy/web/src/ui/hud.ts)",
         "level": "error",
         "status": "unresolved",
         "substatus": "new",
-        "firstSeen": "2022-04-04T18:17:18.320000Z",
-        "lastSeen": "2022-04-04T18:17:18.320000Z",
-        "permalink": "https://your-org.sentry.io/issues/123/",
-        "web_url": "https://your-org.sentry.io/issues/123/",
-        "project": {
-          "id": "456",
-          "name": "ipe",
-          "slug": "ipe"
+        "platform": "javascript",
+        "type": "error",
+        "metadata": {
+          "type": "TypeError",
+          "value": "Cannot read properties of undefined (reading 'score')",
+          "filename": "snaketoy/web/src/ui/hud.ts",
+          "function": "renderHud"
         },
-        "assignedTo": {
-          "type": "user",
-          "id": "789",
-          "name": "Person"
-        }
+        "firstSeen": "2026-03-04T09:18:18.412Z",
+        "lastSeen": "2026-03-04T09:18:42.184Z",
+        "count": "12",
+        "userCount": 9,
+        "permalink": "https://acme-labs.sentry.io/issues/5183047291/",
+        "web_url": "https://acme-labs.sentry.io/issues/5183047291/",
+        "issueType": "error",
+        "issueCategory": "error",
+        "project": {
+          "id": "4108412",
+          "name": "snaketoy-web",
+          "slug": "snaketoy-web",
+          "platform": "javascript-react"
+        },
+        "assignedTo": null,
+        "isUnhandled": true,
+        "hasSeen": false
       }
     },
-    "timestamp": "2022-04-04T18:17:18.320000Z"
+    "timestamp": "2026-03-04T09:18:42.812Z"
   },
-  "timestamp": "2022-04-04T18:17:18.320000Z",
+  "timestamp": "2026-03-04T09:18:43.218Z",
   "type": "sentry.issue"
 }
