@@ -2,7 +2,7 @@ import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import { getBackgroundColorClass } from "@/lib/colors";
 import { getStateMap } from "..";
-import { baseEventSections, deleteLoadBalancerExecutionDetails } from "./base";
+import { baseEventSections, cloudflareDeletedResourceExecutionDetails } from "./base";
 import type { ComponentBaseContext, ComponentBaseMapper, NodeInfo, SubtitleContext } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
 import cloudflareIcon from "@/assets/icons/integrations/cloudflare.svg";
@@ -33,7 +33,7 @@ export const deleteLoadBalancerMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails: deleteLoadBalancerExecutionDetails,
+  getExecutionDetails: cloudflareDeletedResourceExecutionDetails,
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
     if (!context.execution.createdAt) return "";

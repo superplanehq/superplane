@@ -170,6 +170,8 @@ export interface CanvasPageProps {
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
+  unpublishedDraftUpdatedAt?: string;
+  onDiscardDraftAndStartEdit?: () => void;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -285,6 +287,10 @@ export interface CanvasPageProps {
   onTriggerModalHostReady?: (openModal: (modal: TriggerActionModal) => void) => void;
   initialSidebar?: { isOpen?: boolean; nodeId?: string | null };
   initialFocusNodeId?: string | null;
+  /** Bump this counter to fit all currently-rendered nodes into view (e.g., when run selection changes). */
+  fitAllRequest?: number | null;
+  /** Shows a loading indicator over the canvas (not the sidebar) while run executions are being fetched. */
+  runCanvasLoading?: boolean;
 
   // Full history functionality
   getAllHistoryEvents?: (nodeId: string) => SidebarEvent[];
@@ -688,12 +694,10 @@ function CanvasPage(props: CanvasPageProps) {
 
   const agentState = useAgentState({
     isEditing: props.isEditing,
-    canvasVersion: props.activeCanvasVersionId,
     hideAddControls: props.hideAddControls,
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
-    onApplyAiOperations: props.onApplyAiOperations,
   });
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
@@ -1115,6 +1119,8 @@ function CanvasPage(props: CanvasPageProps) {
           runsNotificationCount={props.runsNotificationCount}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
+          unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
+          onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           isVersionControlOpen={props.isVersionControlOpen}
           onOpenVersionControl={props.onOpenVersionControl}
@@ -1158,6 +1164,11 @@ function CanvasPage(props: CanvasPageProps) {
         )}
 
         <div className="flex-1 relative">
+          {props.runCanvasLoading && props.headerMode === "runs" ? (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-50">
+              <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+            </div>
+          ) : null}
           {showPreviewFloatingBar || showAwaitingFloatingBar ? (
             <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
               <div
@@ -1239,6 +1250,7 @@ function CanvasPage(props: CanvasPageProps) {
               logEntries={props.logEntries}
               focusRequest={props.focusRequest}
               initialFocusNodeId={props.initialFocusNodeId}
+              fitAllRequest={props.fitAllRequest}
               runsEvents={props.runsEvents}
               runsTotalCount={props.runsTotalCount}
               runsHasNextPage={props.runsHasNextPage}
@@ -1620,6 +1632,8 @@ function CanvasContentHeader({
   runsNotificationCount,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
+  unpublishedDraftUpdatedAt,
+  onDiscardDraftAndStartEdit,
   showCanvasSettingsMenu,
   isVersionControlOpen,
   onOpenVersionControl,
@@ -1652,6 +1666,8 @@ function CanvasContentHeader({
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
+  unpublishedDraftUpdatedAt?: string;
+  onDiscardDraftAndStartEdit?: () => void;
   showCanvasSettingsMenu?: boolean;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
@@ -1694,6 +1710,8 @@ function CanvasContentHeader({
       runsNotificationCount={runsNotificationCount}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+      unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
+      onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
       isVersionControlOpen={isVersionControlOpen}
       onOpenVersionControl={onOpenVersionControl}
@@ -1775,6 +1793,7 @@ function CanvasContent({
   logEntries = [],
   focusRequest,
   initialFocusNodeId,
+  fitAllRequest,
   runsEvents,
   runsTotalCount,
   runsHasNextPage,
@@ -1833,6 +1852,7 @@ function CanvasContent({
   logEntries?: LogEntry[];
   focusRequest?: FocusRequest | null;
   initialFocusNodeId?: string | null;
+  fitAllRequest?: number | null;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsTotalCount?: number;
   runsHasNextPage?: boolean;
@@ -2271,6 +2291,18 @@ function CanvasContent({
     },
     [fitView, getViewport, reportZoom, hasFitToViewRef, viewportRef, initialFocusNodeId],
   );
+
+  // Fit all currently-rendered nodes into view whenever the parent bumps `fitAllRequest`.
+  // Wait a microtask so ReactFlow has measured the just-swapped node set (e.g. switching
+  // between runs whose participating nodes have different coordinates) before fitting.
+  useEffect(() => {
+    if (fitAllRequest == null) return;
+    if (!hasFitToViewRef.current) return;
+    const id = window.setTimeout(() => {
+      fitView({ duration: 500, maxZoom: 1.0, padding: 0.2 });
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [fitAllRequest, fitView, hasFitToViewRef]);
 
   const showHeader = !isReadOnly;
 
@@ -2985,6 +3017,6 @@ function CanvasContent({
   );
 }
 
-export type { AgentContext, AgentMode, BuildingBlock } from "../BuildingBlocksSidebar";
+export type { BuildingBlock } from "../BuildingBlocksSidebar";
 export type { MissingIntegration } from "../IntegrationStatusIndicator";
 export { CanvasPage };
