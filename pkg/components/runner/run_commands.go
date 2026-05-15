@@ -206,7 +206,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	}
 
 	cmds := normalizeCommands(spec.Commands)
-	broker, err := NewBrokerClient(ctx.HTTP)
+	broker, err := NewBrokerClient()
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
 	}
@@ -253,7 +253,7 @@ func (c *Runner) handlePoll(ctx core.ActionHookContext) error {
 		return fmt.Errorf("task_id is missing from parameters")
 	}
 
-	broker, err := NewBrokerClient(ctx.HTTP)
+	broker, err := NewBrokerClient()
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
 	}
@@ -277,7 +277,7 @@ func (c *Runner) handlePoll(ctx core.ActionHookContext) error {
 }
 
 func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	broker, err := NewBrokerClient(ctx.HTTP)
+	broker, err := NewBrokerClient()
 	if err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("new broker client: %w", err)
 	}

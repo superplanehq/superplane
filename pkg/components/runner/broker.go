@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/tlsclient"
 )
 
 const (
@@ -19,13 +19,13 @@ const (
 )
 
 type BrokerClient struct {
-	httpClient core.HTTPContext
+	httpClient *http.Client
 	baseURL    string
 	fleetID    string
 	authToken  string
 }
 
-func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
+func NewBrokerClient() (*BrokerClient, error) {
 	baseURL := os.Getenv("TASK_BROKER_BASE_URL")
 	if baseURL == "" {
 		return nil, fmt.Errorf("TASK_BROKER_BASE_URL is not set")
@@ -39,6 +39,11 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 	authToken := os.Getenv("TASK_BROKER_AUTH_TOKEN")
 	if authToken == "" {
 		return nil, fmt.Errorf("TASK_BROKER_AUTH_TOKEN is not set")
+	}
+
+	httpClient, err := tlsclient.NewHTTPClientFromEnv(brokerHTTPTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("broker tls client: %w", err)
 	}
 
 	return &BrokerClient{
