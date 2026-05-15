@@ -17,6 +17,7 @@ type Jira struct{}
 type Metadata struct {
 	User     *User     `json:"user,omitempty" mapstructure:"user,omitempty"`
 	Projects []Project `json:"projects" mapstructure:"projects"`
+	CloudID  string    `json:"cloudId,omitempty" mapstructure:"cloudId,omitempty"`
 }
 
 const installationInstructions = `
@@ -84,6 +85,9 @@ func (j *Jira) Actions() []core.Action {
 		&GetIssue{},
 		&UpdateIssue{},
 		&DeleteIssue{},
+		&CreateIncident{},
+		&GetIncident{},
+		&DeleteIncident{},
 	}
 }
 
@@ -106,12 +110,17 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error verifying Jira credentials: %v", err)
 	}
 
+	cloudID, err := client.FetchCloudID()
+	if err != nil {
+		return fmt.Errorf("error resolving cloud id: %v", err)
+	}
+
 	projects, err := client.ListProjects()
 	if err != nil {
 		return fmt.Errorf("error listing projects: %v", err)
 	}
 
-	ctx.Integration.SetMetadata(Metadata{User: user, Projects: projects})
+	ctx.Integration.SetMetadata(Metadata{User: user, Projects: projects, CloudID: cloudID})
 	ctx.Integration.Ready()
 	return nil
 }
