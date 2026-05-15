@@ -695,10 +695,14 @@ Runs bash commands on a dedicated machine.
 
 ### Configuration
 - **Commands**: One or more shell commands, one per line.
+- **Environment variables**: Optional key/value pairs available during command execution. Values can be literal strings (with expression support) or organization secret keys.
 
 ### Output channels
 - **Passed**: The commands finished with exit code **0**.
 - **Failed**: The commands finished with non-zero exit code.
+
+### Structured result
+When the remote task writes valid JSON to **SUPERPLANE_RESULT_FILE** before exit, that object is returned as **result** on the finished event payload (alongside **status** and **exit_code**).
 
 ### Example Output
 
@@ -707,6 +711,9 @@ Runs bash commands on a dedicated machine.
   "data": [
     {
       "exit_code": 0,
+      "result": {
+        "example": "value"
+      },
       "status": "succeeded"
     }
   ],

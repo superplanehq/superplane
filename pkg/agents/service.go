@@ -31,7 +31,11 @@ const preambleTemplate = "[SuperPlane session context — refreshed every turn; 
 	"  - org:read\n" +
 	"  - integrations:read\n" +
 	"  - canvases:read:%s\n" +
-	"  - canvases:update:%s\n" +
+	"  - canvases:update_version:%s\n" +
+	"\n" +
+	"The canvases:update_version scope is limited to draft canvas version\n" +
+	"editing. It does not grant permission to publish versions, delete\n" +
+	"canvases, or perform live-canvas operational actions.\n" +
 	"\n" +
 	"SuperPlane has no separate `events` permission. The canvases:read\n" +
 	"scope grants every read endpoint scoped to this canvas, including:\n" +
@@ -231,7 +235,7 @@ func (s *Service) mintAgentToken(organizationID, userID, canvasID string) (strin
 			{ResourceType: "org", Action: "read"},
 			{ResourceType: "integrations", Action: "read"},
 			{ResourceType: "canvases", Action: "read", Resources: []string{canvasID}},
-			{ResourceType: "canvases", Action: "update", Resources: []string{canvasID}},
+			{ResourceType: "canvases", Action: "update_version", Resources: []string{canvasID}},
 		}),
 	}
 	token, err := s.jwtSigner.GenerateScopedToken(claims, agentTokenTTL)
