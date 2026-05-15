@@ -95,6 +95,7 @@ describe("updateIssueMapper.getExecutionDetails", () => {
           default: [
             buildOutput({
               key: "TEST-1",
+              self: "https://test.atlassian.net/rest/api/3/issue/10001",
               fields: { summary: "new summary", status: { name: "In Progress" } },
             }),
           ],
@@ -103,6 +104,7 @@ describe("updateIssueMapper.getExecutionDetails", () => {
     });
     const details = updateIssueMapper.getExecutionDetails(ctx);
     expect(details["Key"]).toBe("TEST-1");
+    expect(details["Issue URL"]).toBe("https://test.atlassian.net/browse/TEST-1");
     expect(details["Status"]).toBe("In Progress");
     expect(details["Fields Updated"]).toBe("Summary, Priority, Labels");
   });

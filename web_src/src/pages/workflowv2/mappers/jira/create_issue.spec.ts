@@ -119,6 +119,7 @@ describe("createIssueMapper.getExecutionDetails", () => {
           default: [
             buildOutput({
               key: "TEST-42",
+              self: "https://test.atlassian.net/rest/api/3/issue/10042",
               fields: {
                 summary: "New bug",
                 status: { name: "In Progress" },
@@ -132,12 +133,13 @@ describe("createIssueMapper.getExecutionDetails", () => {
     });
     const details = createIssueMapper.getExecutionDetails(ctx);
     expect(details["Key"]).toBe("TEST-42");
+    expect(details["Issue URL"]).toBe("https://test.atlassian.net/browse/TEST-42");
     expect(details["Summary"]).toBe("New bug");
     expect(details["Status"]).toBe("In Progress");
     expect(details["Issue Type"]).toBe("Bug");
     expect(details["Assignee"]).toBe("Alice");
-    // 1 timestamp + 5 fields = 6
-    expect(Object.keys(details)).toHaveLength(6);
+    // 1 timestamp + 6 fields = 7
+    expect(Object.keys(details)).toHaveLength(7);
   });
 
   it("omits missing fields rather than padding with dashes", () => {

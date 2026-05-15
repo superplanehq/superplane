@@ -12,6 +12,19 @@ export function getIssueLabel(issue: JiraIssue | undefined): string {
   return issue.key || summary || "";
 }
 
+export function getIssueUrl(issue: JiraIssue | undefined): string {
+  if (!issue?.key || !issue.self) {
+    return "";
+  }
+
+  try {
+    const url = new URL(issue.self);
+    return `${url.origin}/browse/${encodeURIComponent(issue.key)}`;
+  } catch {
+    return "";
+  }
+}
+
 export function addDetail(details: Record<string, string>, label: string, value: string | undefined): void {
   if (value && value.trim() !== "") {
     details[label] = value;

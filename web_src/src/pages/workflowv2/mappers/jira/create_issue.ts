@@ -11,7 +11,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { jiraComponentBaseProps } from "./base";
-import { addDetail, addProjectMetadata, getIssueLabel } from "./utils";
+import { addDetail, addProjectMetadata, getIssueLabel, getIssueUrl } from "./utils";
 import type { CreateIssueConfiguration, JiraIssue, JiraNodeMetadata } from "./types";
 
 export const createIssueMapper: ComponentBaseMapper = {
@@ -29,6 +29,7 @@ export const createIssueMapper: ComponentBaseMapper = {
     if (!issue) return details;
 
     addDetail(details, "Key", issue.key);
+    addDetail(details, "Issue URL", getIssueUrl(issue));
     addDetail(details, "Summary", issue.fields?.summary);
     addDetail(details, "Status", issue.fields?.status?.name);
     addDetail(details, "Issue Type", issue.fields?.issuetype?.name);

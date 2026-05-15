@@ -96,6 +96,7 @@ describe("getIssueMapper.getExecutionDetails", () => {
           default: [
             buildOutput({
               key: "TEST-7",
+              self: "https://test.atlassian.net/rest/api/3/issue/10007",
               fields: {
                 summary: "Login error",
                 status: { name: "To Do" },
@@ -111,11 +112,12 @@ describe("getIssueMapper.getExecutionDetails", () => {
     });
     const details = getIssueMapper.getExecutionDetails(ctx);
     expect(details["Key"]).toBe("TEST-7");
+    expect(details["Issue URL"]).toBe("https://test.atlassian.net/browse/TEST-7");
     expect(details["Summary"]).toBe("Login error");
     expect(details["Status"]).toBe("To Do");
     expect(details["Assignee"]).toBe("Bob");
     expect(details["Priority"]).toBe("High");
-    expect(Object.keys(details)).toHaveLength(6);
+    expect(Object.keys(details)).toHaveLength(7);
     expect(details["Project"]).toBeUndefined();
     expect(details["Labels"]).toBeUndefined();
   });
