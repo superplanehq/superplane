@@ -1,0 +1,9 @@
+{
+  "data": {
+    "result": "Request will be processed",
+    "requestId": "d383c6e9-b1e7-4b59-9c35-72f1a2187777",
+    "took": 0.195
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.created"
+}
