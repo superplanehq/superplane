@@ -107,10 +107,12 @@ func (c *DeleteMonitor) Setup(ctx core.SetupContext) error {
 		return errors.New("monitor is required")
 	}
 
-	return resolveMonitorMetadata(ctx, monitorID)
+	return resolveMonitorMetadata(ctx, monitorID, nil)
 }
 
-func resolveMonitorMetadata(ctx core.SetupContext, monitorID string) error {
+// preloaded, when non-nil, is used for node metadata instead of fetching again (e.g. Update Monitor
+// already retrieved the monitor for validation).
+func resolveMonitorMetadata(ctx core.SetupContext, monitorID string, preloaded *Monitor) error {
 	if ctx.Metadata == nil || ctx.Integration == nil || ctx.HTTP == nil {
 		return nil
 	}
@@ -128,19 +130,24 @@ func resolveMonitorMetadata(ctx core.SetupContext, monitorID string) error {
 		return nil
 	}
 
-	client, err := NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create client for monitor metadata: %w", err)
-	}
+	var monitor *Monitor
+	if preloaded != nil {
+		monitor = preloaded
+	} else {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create client for monitor metadata: %w", err)
+		}
 
-	accountID, err := accountIDForIntegration(ctx.Integration)
-	if err != nil {
-		return err
-	}
+		accountID, err := accountIDForIntegration(ctx.Integration)
+		if err != nil {
+			return err
+		}
 
-	monitor, err := client.GetMonitor(accountID, id)
-	if err != nil {
-		return fmt.Errorf("failed to fetch monitor %s for metadata: %w", id, err)
+		monitor, err = client.GetMonitor(accountID, id)
+		if err != nil {
+			return fmt.Errorf("failed to fetch monitor %s for metadata: %w", id, err)
+		}
 	}
 
 	desc := strings.TrimSpace(monitor.Description)
