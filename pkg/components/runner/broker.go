@@ -12,20 +12,31 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/tlsclient"
 )
 
 const (
 	brokerHTTPTimeout = 30 * time.Second
 )
 
+// httpDoer is a minimal interface satisfied by both *http.Client and core.HTTPContext.
+// This allows tests to inject a mock HTTP client while production uses a TLS-aware client.
+type httpDoer interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
 type BrokerClient struct {
-	httpClient core.HTTPContext
+	httpClient httpDoer
 	baseURL    string
 	fleetID    string
 	authToken  string
 }
 
-func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
+// NewBrokerClient creates a BrokerClient. In production it builds a TLS-aware
+// *http.Client from environment variables (TLS_ROOT_CA_FILE, TLS_CLIENT_CERT_FILE,
+// TLS_CLIENT_KEY_FILE, TLS_INSECURE_SKIP_VERIFY). When no TLS env vars are set
+// it falls back to the shared core.HTTPContext (which handles SSRF policy checks).
+func NewBrokerClient(fallback core.HTTPContext) (*BrokerClient, error) {
 	baseURL := os.Getenv("TASK_BROKER_BASE_URL")
 	if baseURL == "" {
 		return nil, fmt.Errorf("TASK_BROKER_BASE_URL is not set")
@@ -41,8 +52,26 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 		return nil, fmt.Errorf("TASK_BROKER_AUTH_TOKEN is not set")
 	}
 
+	// Build a TLS-aware client when any TLS env var is set; otherwise use the
+	// shared HTTP context (preserves SSRF policy checks and test mock injection).
+	cfg, err := tlsclient.ConfigFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("broker tls config: %w", err)
+	}
+
+	var doer httpDoer
+	if cfg.RootCAFile != "" || cfg.ClientCertFile != "" || cfg.InsecureSkipVerify {
+		client, err := tlsclient.NewHTTPClient(cfg, brokerHTTPTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("broker tls client: %w", err)
+		}
+		doer = client
+	} else {
+		doer = fallback
+	}
+
 	return &BrokerClient{
-		httpClient: httpClient,
+		httpClient: doer,
 		baseURL:    baseURL,
 		fleetID:    fleetID,
 		authToken:  authToken,
