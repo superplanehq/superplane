@@ -5,25 +5,47 @@
     "detail-type": "CloudWatch Alarm State Change",
     "source": "aws.cloudwatch",
     "account": "123456789012",
-    "time": "2024-11-20T20:35:33Z",
+    "time": "2026-02-10T20:35:33Z",
     "region": "us-east-1",
     "resources": [
-      "arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPUUtilization"
+      "arn:aws:cloudwatch:us-east-1:123456789012:alarm:snaketoy-web-cpu-high"
     ],
     "detail": {
-      "alarmName": "HighCPUUtilization",
-      "state": {
-        "value": "ALARM",
-        "reason": "Threshold Crossed: 1 datapoint [95.0 (20/11/24 20:34:00)] was greater than or equal to the threshold (90.0).",
-        "timestamp": "2024-11-20T20:35:33.000+0000"
+      "alarmName": "snaketoy-web-cpu-high",
+      "configuration": {
+        "description": "CPU utilization above 90% for 5 minutes on the snaketoy-web ASG",
+        "metrics": [
+          {
+            "id": "m1",
+            "metricStat": {
+              "metric": {
+                "dimensions": {
+                  "AutoScalingGroupName": "snaketoy-web-asg"
+                },
+                "name": "CPUUtilization",
+                "namespace": "AWS/EC2"
+              },
+              "period": 60,
+              "stat": "Average"
+            },
+            "returnData": true
+          }
+        ]
       },
       "previousState": {
         "value": "OK",
-        "reason": "Threshold Crossed: 1 datapoint [35.0 (20/11/24 20:29:00)] was not greater than or equal to the threshold (90.0).",
-        "timestamp": "2024-11-20T20:30:33.000+0000"
+        "reason": "Threshold Crossed: 1 datapoint [35.0 (10/02/26 20:30:00)] was not greater than or equal to the threshold (90.0).",
+        "reasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-02-10T20:30:33.842+0000\",\"startDate\":\"2026-02-10T20:25:00.000+0000\",\"statistic\":\"Average\",\"period\":60,\"recentDatapoints\":[35.0],\"threshold\":90.0}",
+        "timestamp": "2026-02-10T20:30:33.847+0000"
+      },
+      "state": {
+        "value": "ALARM",
+        "reason": "Threshold Crossed: 1 datapoint [95.0 (10/02/26 20:34:00)] was greater than or equal to the threshold (90.0).",
+        "reasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-02-10T20:35:33.218+0000\",\"startDate\":\"2026-02-10T20:30:00.000+0000\",\"statistic\":\"Average\",\"period\":60,\"recentDatapoints\":[95.0],\"threshold\":90.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-02-10T20:34:00.000+0000\",\"value\":95.0}]}",
+        "timestamp": "2026-02-10T20:35:33.412+0000"
       }
     }
   },
-  "timestamp": "2026-02-10T12:00:00Z",
+  "timestamp": "2026-02-10T20:35:34.018Z",
   "type": "aws.cloudwatch.alarm"
 }

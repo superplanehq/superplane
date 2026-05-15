@@ -73,42 +73,53 @@ This trigger uses the webhook URL configured on your Sentry internal integration
   "data": {
     "action": "created",
     "actor": {
-      "id": "789",
-      "name": "Person",
-      "type": "user"
+      "id": "sentry",
+      "name": "Sentry",
+      "type": "application"
     },
     "data": {
       "issue": {
-        "assignedTo": {
-          "id": "789",
-          "name": "Person",
-          "type": "user"
-        },
-        "culprit": "SentryCustomError(frontend/src/util)",
-        "firstSeen": "2022-04-04T18:17:18.320000Z",
-        "id": "123",
-        "lastSeen": "2022-04-04T18:17:18.320000Z",
+        "assignedTo": null,
+        "count": "12",
+        "culprit": "renderHud(snaketoy/web/src/ui/hud.ts)",
+        "firstSeen": "2026-03-04T09:18:18.412Z",
+        "hasSeen": false,
+        "id": "5183047291",
+        "isUnhandled": true,
+        "issueCategory": "error",
+        "issueType": "error",
+        "lastSeen": "2026-03-04T09:18:42.184Z",
         "level": "error",
-        "permalink": "https://your-org.sentry.io/issues/123/",
-        "project": {
-          "id": "456",
-          "name": "ipe",
-          "slug": "ipe"
+        "metadata": {
+          "filename": "snaketoy/web/src/ui/hud.ts",
+          "function": "renderHud",
+          "type": "TypeError",
+          "value": "Cannot read properties of undefined (reading 'score')"
         },
-        "shortId": "IPE-1",
+        "permalink": "https://acme-labs.sentry.io/issues/5183047291/",
+        "platform": "javascript",
+        "project": {
+          "id": "4108412",
+          "name": "snaketoy-web",
+          "platform": "javascript-react",
+          "slug": "snaketoy-web"
+        },
+        "shortId": "SNAKETOY-WEB-1F4",
         "status": "unresolved",
         "substatus": "new",
-        "title": "Error #1: This is a test error!",
-        "web_url": "https://your-org.sentry.io/issues/123/"
+        "title": "TypeError: Cannot read properties of undefined (reading 'score')",
+        "type": "error",
+        "userCount": 9,
+        "web_url": "https://acme-labs.sentry.io/issues/5183047291/"
       }
     },
     "installation": {
       "uuid": "7a485448-a9e2-4c85-8a3c-4f44175783c9"
     },
     "resource": "issue",
-    "timestamp": "2022-04-04T18:17:18.320000Z"
+    "timestamp": "2026-03-04T09:18:42.812Z"
   },
-  "timestamp": "2022-04-04T18:17:18.320000Z",
+  "timestamp": "2026-03-04T09:18:43.218Z",
   "type": "sentry.issue"
 }
 ```

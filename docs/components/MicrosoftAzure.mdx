@@ -98,23 +98,28 @@ Each blob created event includes:
     "data": {
       "api": "PutBlob",
       "blobType": "BlockBlob",
-      "clientRequestId": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
-      "contentLength": 524288,
-      "contentType": "text/csv",
-      "eTag": "0x8D4BCC2E4835CD0",
+      "clientRequestId": "5f87d1a3-2c1f-4ab0-8f55-8f4c2b4a5c76",
+      "contentLength": 248713,
+      "contentOffset": 0,
+      "contentType": "application/zip",
+      "eTag": "0x8DC3E1A4F2C8B17",
+      "identity": "$superuser",
       "requestId": "d1e6b5a4-0001-0035-4a7b-2e5c4f000000",
       "sequencer": "00000000000004420000000000028963",
-      "url": "https://mystorageaccount.blob.core.windows.net/mycontainer/path/to/myfile.csv"
+      "storageDiagnostics": {
+        "batchId": "8b1a4c7d-9e0f-2a3b-4c5d-6e7f8a9b0c1d"
+      },
+      "url": "https://acmeprodstor.blob.core.windows.net/releases/snaketoy/v1.5.0/build.zip"
     },
-    "dataVersion": "",
-    "eventTime": "2026-03-16T10:00:00Z",
+    "dataVersion": "5",
+    "eventTime": "2026-03-01T11:42:24.812Z",
     "eventType": "Microsoft.Storage.BlobCreated",
     "id": "831e1650-001e-001b-66ab-eeb76e069631",
     "metadataVersion": "1",
-    "subject": "/blobServices/default/containers/mycontainer/blobs/path/to/myfile.csv",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Storage/storageAccounts/mystorageaccount"
+    "subject": "/blobServices/default/containers/releases/blobs/snaketoy/v1.5.0/build.zip",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Storage/storageAccounts/acmeprodstor"
   },
-  "timestamp": "2026-03-16T10:00:00Z",
+  "timestamp": "2026-03-01T11:42:25.184Z",
   "type": "azure.blob.created"
 }
 ```
@@ -160,23 +165,27 @@ Each blob deleted event includes:
     "data": {
       "api": "DeleteBlob",
       "blobType": "BlockBlob",
-      "clientRequestId": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
-      "contentLength": 0,
-      "contentType": "text/csv",
-      "eTag": "0x8D4BCC2E4835CD0",
-      "requestId": "d1e6b5a4-0001-0035-4a7b-2e5c4f000000",
+      "clientRequestId": "6e98f2b4-3d2a-5cb1-9f66-9f5d3c5b6d87",
+      "contentLength": 246851,
+      "contentType": "application/zip",
+      "eTag": "0x8DC3E1A4F2C8B17",
+      "identity": "renato-dev@acme.example",
+      "requestId": "e2f7c6b5-0001-0035-5b8c-3f6d50000001",
       "sequencer": "00000000000004420000000000028964",
-      "url": "https://mystorageaccount.blob.core.windows.net/mycontainer/path/to/myfile.csv"
+      "storageDiagnostics": {
+        "batchId": "9e2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+      },
+      "url": "https://acmeprodstor.blob.core.windows.net/releases/snaketoy/v1.4.0/build.zip"
     },
-    "dataVersion": "",
-    "eventTime": "2026-03-16T11:00:00Z",
+    "dataVersion": "5",
+    "eventTime": "2026-03-08T08:14:02.318Z",
     "eventType": "Microsoft.Storage.BlobDeleted",
     "id": "afc359b4-001e-001b-66ab-eeb76e069631",
     "metadataVersion": "1",
-    "subject": "/blobServices/default/containers/mycontainer/blobs/path/to/myfile.csv",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Storage/storageAccounts/mystorageaccount"
+    "subject": "/blobServices/default/containers/releases/blobs/snaketoy/v1.4.0/build.zip",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Storage/storageAccounts/acmeprodstor"
   },
-  "timestamp": "2026-03-16T11:00:00Z",
+  "timestamp": "2026-03-08T08:14:02.984Z",
   "type": "azure.blob.deleted"
 }
 ```
@@ -223,38 +232,38 @@ Each delete event includes:
     "data": {
       "action": "delete",
       "actor": {
-        "name": "myuser"
+        "name": "renato-dev"
       },
       "id": "afc359b4-001e-001b-66ab-eeb76e069631",
       "request": {
-        "addr": "203.0.113.0:49926",
-        "host": "myregistry.azurecr.io",
-        "id": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
+        "addr": "203.0.113.42:50012",
+        "host": "acmeprodacr.azurecr.io",
+        "id": "6e98f2b4-3d2a-5cb1-9f66-9f5d3c5b6d87",
         "method": "DELETE",
-        "useragent": "docker/20.10.7"
+        "useragent": "az-cli/2.59.0 (Python 3.11.7)"
       },
       "source": {
-        "addr": "myregistry.azurecr.io",
+        "addr": "agent-pool-1.westeurope.azurecr.io:49941",
         "instanceID": "a29a591f-f89c-4f8d-b061-3c5d73d4756c"
       },
       "target": {
-        "digest": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+        "digest": "sha256:5b4d2e8f1c0a93d7b8e6f5a4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4",
         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-        "repository": "myrepository",
+        "repository": "snaketoy-web",
         "tag": "",
-        "url": "https://myregistry.azurecr.io/v2/myrepository/manifests/sha256:abcdef1234567890"
+        "url": "https://acmeprodacr.azurecr.io/v2/snaketoy-web/manifests/sha256:5b4d2e8f1c0a93d7b8e6f5a4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4"
       },
-      "timestamp": "2026-03-16T11:00:00Z"
+      "timestamp": "2026-03-08T08:14:02.318Z"
     },
     "dataVersion": "1.0",
-    "eventTime": "2026-03-16T11:00:00Z",
+    "eventTime": "2026-03-08T08:14:02.318Z",
     "eventType": "Microsoft.ContainerRegistry.ImageDeleted",
     "id": "afc359b4-001e-001b-66ab-eeb76e069631",
     "metadataVersion": "1",
-    "subject": "myregistry.azurecr.io/myrepository@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.ContainerRegistry/registries/myregistry"
+    "subject": "snaketoy-web@sha256:5b4d2e8f1c0a93d7b8e6f5a4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.ContainerRegistry/registries/acmeprodacr"
   },
-  "timestamp": "2026-03-16T11:00:00Z",
+  "timestamp": "2026-03-08T08:14:02.984Z",
   "type": "azure.image.deleted"
 }
 ```
@@ -302,40 +311,40 @@ Each push event includes:
     "data": {
       "action": "push",
       "actor": {
-        "name": "myuser"
+        "name": "renato-dev"
       },
       "id": "831e1650-001e-001b-66ab-eeb76e069631",
       "request": {
-        "addr": "203.0.113.0:49926",
-        "host": "myregistry.azurecr.io",
-        "id": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
+        "addr": "203.0.113.42:49926",
+        "host": "acmeprodacr.azurecr.io",
+        "id": "5f87d1a3-2c1f-4ab0-8f55-8f4c2b4a5c76",
         "method": "PUT",
-        "useragent": "docker/20.10.7"
+        "useragent": "docker/24.0.7 go/go1.21.4 git-commit/311b9ff os/linux arch/amd64 UpstreamClient(Docker-Client/24.0.7 \\(linux\\))"
       },
       "source": {
-        "addr": "myregistry.azurecr.io",
+        "addr": "agent-pool-1.westeurope.azurecr.io:49932",
         "instanceID": "a29a591f-f89c-4f8d-b061-3c5d73d4756c"
       },
       "target": {
-        "digest": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-        "length": 1234567,
+        "digest": "sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7",
+        "length": 1248,
         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-        "repository": "myrepository",
-        "size": 1234567,
-        "tag": "v1.2.3",
-        "url": "https://myregistry.azurecr.io/v2/myrepository/manifests/sha256:abcdef1234567890"
+        "repository": "snaketoy-web",
+        "size": 1248,
+        "tag": "v1.5.0",
+        "url": "https://acmeprodacr.azurecr.io/v2/snaketoy-web/manifests/sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7"
       },
-      "timestamp": "2026-03-16T10:00:00Z"
+      "timestamp": "2026-03-01T11:42:18.842Z"
     },
     "dataVersion": "1.0",
-    "eventTime": "2026-03-16T10:00:00Z",
+    "eventTime": "2026-03-01T11:42:18.842Z",
     "eventType": "Microsoft.ContainerRegistry.ImagePushed",
     "id": "831e1650-001e-001b-66ab-eeb76e069631",
     "metadataVersion": "1",
-    "subject": "myregistry.azurecr.io/myrepository:v1.2.3",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.ContainerRegistry/registries/myregistry"
+    "subject": "snaketoy-web:v1.5.0",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.ContainerRegistry/registries/acmeprodacr"
   },
-  "timestamp": "2026-03-16T10:00:00Z",
+  "timestamp": "2026-03-01T11:42:19.412Z",
   "type": "azure.image.pushed"
 }
 ```
@@ -412,22 +421,49 @@ No manual setup is required.
 {
   "data": {
     "data": {
+      "authorization": {
+        "action": "Microsoft.Compute/virtualMachines/deallocate/action",
+        "evidence": {
+          "principalId": "1f2e3d4c-5b6a-4798-8c2d-3e4f5a6b7c8d",
+          "principalType": "ServicePrincipal",
+          "role": "Contributor",
+          "roleAssignmentId": "1c8a4d29-3b71-4e6f-9c84-7e1f0a2b3c4d",
+          "roleAssignmentScope": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82",
+          "roleDefinitionId": "b24988ac-6180-42a0-ab88-20f7382dd24c"
+        },
+        "scope": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3"
+      },
+      "claims": {
+        "appid": "1f2e3d4c-5b6a-4798-8c2d-3e4f5a6b7c8d",
+        "appidacr": "2",
+        "aud": "https://management.azure.com",
+        "http://schemas.microsoft.com/identity/claims/objectidentifier": "1f2e3d4c-5b6a-4798-8c2d-3e4f5a6b7c8d",
+        "http://schemas.microsoft.com/identity/claims/tenantid": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "iss": "https://sts.windows.net/c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f/"
+      },
+      "correlationId": "1b4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f",
+      "httpRequest": {
+        "clientIpAddress": "13.74.108.142",
+        "clientRequestId": "8a1b9d4f-5g4i-7ed3-bi88-bi7f5e7d8f09",
+        "method": "POST",
+        "url": "https://management.azure.com/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3/deallocate?api-version=2024-03-01"
+      },
       "operationName": "Microsoft.Compute/virtualMachines/deallocate/action",
       "resourceProvider": "Microsoft.Compute",
-      "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+      "resourceUri": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3",
       "status": "Succeeded",
-      "subscriptionId": "12345678-1234-1234-1234-123456789abc",
-      "tenantId": "12345678-1234-1234-1234-123456789abc"
+      "subscriptionId": "f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82",
+      "tenantId": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f"
     },
     "dataVersion": "2",
-    "eventTime": "2026-02-11T10:30:00Z",
+    "eventTime": "2026-02-12T03:02:14.318Z",
     "eventType": "Microsoft.Resources.ResourceActionSuccess",
-    "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "id": "c3d4e5f6-a7b8-4012-cdef-123456789012",
     "metadataVersion": "1",
-    "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/deallocate",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+    "subject": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3/deallocate",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg"
   },
-  "timestamp": "2026-02-11T10:30:00Z",
+  "timestamp": "2026-02-12T03:02:14.984Z",
   "type": "azure.vm.deallocated"
 }
 ```
@@ -498,22 +534,51 @@ No manual setup is required.
 {
   "data": {
     "data": {
+      "authorization": {
+        "action": "Microsoft.Compute/virtualMachines/delete",
+        "evidence": {
+          "principalId": "9d8e7f6a-5b4c-4d3e-8f2a-1b0c9d8e7f6a",
+          "principalType": "User",
+          "role": "Owner",
+          "roleAssignmentId": "2d9b5e3a-4c82-5f7e-ad95-8f2e1b3c4d5e",
+          "roleAssignmentScope": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82",
+          "roleDefinitionId": "8e3af657-a8ff-443c-a75c-2fe8c4bcb635"
+        },
+        "scope": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-old"
+      },
+      "claims": {
+        "appid": "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
+        "aud": "https://management.azure.com",
+        "http://schemas.microsoft.com/identity/claims/objectidentifier": "9d8e7f6a-5b4c-4d3e-8f2a-1b0c9d8e7f6a",
+        "http://schemas.microsoft.com/identity/claims/tenantid": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn": "renato-dev@acme.example",
+        "ipaddr": "203.0.113.42",
+        "iss": "https://sts.windows.net/c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f/",
+        "name": "Renato Dev"
+      },
+      "correlationId": "2c5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f90",
+      "httpRequest": {
+        "clientIpAddress": "203.0.113.42",
+        "clientRequestId": "9b2c0e5g-6h5j-8fe4-cj99-cj8g6f8e9g10",
+        "method": "DELETE",
+        "url": "https://management.azure.com/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-old?api-version=2024-03-01"
+      },
       "operationName": "Microsoft.Compute/virtualMachines/delete",
       "resourceProvider": "Microsoft.Compute",
-      "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+      "resourceUri": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-old",
       "status": "Succeeded",
-      "subscriptionId": "12345678-1234-1234-1234-123456789abc",
-      "tenantId": "12345678-1234-1234-1234-123456789abc"
+      "subscriptionId": "f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82",
+      "tenantId": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f"
     },
     "dataVersion": "2",
-    "eventTime": "2026-02-11T10:30:00Z",
+    "eventTime": "2026-02-12T09:18:42.602Z",
     "eventType": "Microsoft.Resources.ResourceDeleteSuccess",
     "id": "96257b6d-17d3-49e2-8369-fb185b29e1b5",
     "metadataVersion": "1",
-    "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+    "subject": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-old",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg"
   },
-  "timestamp": "2026-02-11T10:30:00Z",
+  "timestamp": "2026-02-12T09:18:43.218Z",
   "type": "azure.vm.deleted"
 }
 ```
@@ -591,22 +656,51 @@ No manual setup is required.
 {
   "data": {
     "data": {
+      "authorization": {
+        "action": "Microsoft.Compute/virtualMachines/restart/action",
+        "evidence": {
+          "principalId": "9d8e7f6a-5b4c-4d3e-8f2a-1b0c9d8e7f6a",
+          "principalType": "User",
+          "role": "Contributor",
+          "roleAssignmentId": "1c8a4d29-3b71-4e6f-9c84-7e1f0a2b3c4d",
+          "roleAssignmentScope": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82",
+          "roleDefinitionId": "b24988ac-6180-42a0-ab88-20f7382dd24c"
+        },
+        "scope": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3"
+      },
+      "claims": {
+        "appid": "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
+        "aud": "https://management.azure.com",
+        "http://schemas.microsoft.com/identity/claims/objectidentifier": "9d8e7f6a-5b4c-4d3e-8f2a-1b0c9d8e7f6a",
+        "http://schemas.microsoft.com/identity/claims/tenantid": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn": "renato-dev@acme.example",
+        "ipaddr": "203.0.113.42",
+        "iss": "https://sts.windows.net/c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f/",
+        "name": "Renato Dev"
+      },
+      "correlationId": "0a3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e",
+      "httpRequest": {
+        "clientIpAddress": "203.0.113.42",
+        "clientRequestId": "7f09e3c5-4e3h-6dc2-ah77-ah6e4d6c7e98",
+        "method": "POST",
+        "url": "https://management.azure.com/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3/restart?api-version=2024-03-01"
+      },
       "operationName": "Microsoft.Compute/virtualMachines/restart/action",
       "resourceProvider": "Microsoft.Compute",
-      "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+      "resourceUri": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3",
       "status": "Succeeded",
-      "subscriptionId": "12345678-1234-1234-1234-123456789abc",
-      "tenantId": "12345678-1234-1234-1234-123456789abc"
+      "subscriptionId": "f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82",
+      "tenantId": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f"
     },
     "dataVersion": "2",
-    "eventTime": "2026-02-11T10:30:00Z",
+    "eventTime": "2026-02-11T16:48:24.180Z",
     "eventType": "Microsoft.Resources.ResourceActionSuccess",
-    "id": "d4e5f6a7-b8c9-0123-defa-234567890123",
+    "id": "d4e5f6a7-b8c9-4123-defa-234567890123",
     "metadataVersion": "1",
-    "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/restart",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+    "subject": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3/restart",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg"
   },
-  "timestamp": "2026-02-11T10:30:00Z",
+  "timestamp": "2026-02-11T16:48:24.821Z",
   "type": "azure.vm.restarted"
 }
 ```
@@ -680,22 +774,51 @@ No manual setup is required.
 {
   "data": {
     "data": {
+      "authorization": {
+        "action": "Microsoft.Compute/virtualMachines/start/action",
+        "evidence": {
+          "principalId": "9d8e7f6a-5b4c-4d3e-8f2a-1b0c9d8e7f6a",
+          "principalType": "User",
+          "role": "Contributor",
+          "roleAssignmentId": "1c8a4d29-3b71-4e6f-9c84-7e1f0a2b3c4d",
+          "roleAssignmentScope": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82",
+          "roleDefinitionId": "b24988ac-6180-42a0-ab88-20f7382dd24c"
+        },
+        "scope": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3"
+      },
+      "claims": {
+        "appid": "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
+        "aud": "https://management.azure.com",
+        "http://schemas.microsoft.com/identity/claims/objectidentifier": "9d8e7f6a-5b4c-4d3e-8f2a-1b0c9d8e7f6a",
+        "http://schemas.microsoft.com/identity/claims/tenantid": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn": "renato-dev@acme.example",
+        "ipaddr": "203.0.113.42",
+        "iss": "https://sts.windows.net/c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f/",
+        "name": "Renato Dev"
+      },
+      "correlationId": "8b1a4c7d-9e0f-2a3b-4c5d-6e7f8a9b0c1d",
+      "httpRequest": {
+        "clientIpAddress": "203.0.113.42",
+        "clientRequestId": "5f87d1a3-2c1f-4ab0-8f55-8f4c2b4a5c76",
+        "method": "POST",
+        "url": "https://management.azure.com/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3/start?api-version=2024-03-01"
+      },
       "operationName": "Microsoft.Compute/virtualMachines/start/action",
       "resourceProvider": "Microsoft.Compute",
-      "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+      "resourceUri": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3",
       "status": "Succeeded",
-      "subscriptionId": "12345678-1234-1234-1234-123456789abc",
-      "tenantId": "12345678-1234-1234-1234-123456789abc"
+      "subscriptionId": "f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82",
+      "tenantId": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f"
     },
     "dataVersion": "2",
-    "eventTime": "2026-02-11T10:30:00Z",
+    "eventTime": "2026-02-11T10:30:00.412Z",
     "eventType": "Microsoft.Resources.ResourceActionSuccess",
-    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "id": "a1b2c3d4-e5f6-4789-abcd-ef1234567890",
     "metadataVersion": "1",
-    "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/start",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+    "subject": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3/start",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg"
   },
-  "timestamp": "2026-02-11T10:30:00Z",
+  "timestamp": "2026-02-11T10:30:01.218Z",
   "type": "azure.vm.started"
 }
 ```
@@ -771,22 +894,51 @@ No manual setup is required.
 {
   "data": {
     "data": {
+      "authorization": {
+        "action": "Microsoft.Compute/virtualMachines/powerOff/action",
+        "evidence": {
+          "principalId": "9d8e7f6a-5b4c-4d3e-8f2a-1b0c9d8e7f6a",
+          "principalType": "User",
+          "role": "Contributor",
+          "roleAssignmentId": "1c8a4d29-3b71-4e6f-9c84-7e1f0a2b3c4d",
+          "roleAssignmentScope": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82",
+          "roleDefinitionId": "b24988ac-6180-42a0-ab88-20f7382dd24c"
+        },
+        "scope": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3"
+      },
+      "claims": {
+        "appid": "04b07795-8ddb-461a-bbee-02f9e1bf7b46",
+        "aud": "https://management.azure.com",
+        "http://schemas.microsoft.com/identity/claims/objectidentifier": "9d8e7f6a-5b4c-4d3e-8f2a-1b0c9d8e7f6a",
+        "http://schemas.microsoft.com/identity/claims/tenantid": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f",
+        "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn": "renato-dev@acme.example",
+        "ipaddr": "203.0.113.42",
+        "iss": "https://sts.windows.net/c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f/",
+        "name": "Renato Dev"
+      },
+      "correlationId": "9e2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d",
+      "httpRequest": {
+        "clientIpAddress": "203.0.113.42",
+        "clientRequestId": "6e98f2b4-3d2g-5cb1-9g66-9g5d3c5b6d87",
+        "method": "POST",
+        "url": "https://management.azure.com/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3/powerOff?api-version=2024-03-01"
+      },
       "operationName": "Microsoft.Compute/virtualMachines/powerOff/action",
       "resourceProvider": "Microsoft.Compute",
-      "resourceUri": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01",
+      "resourceUri": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3",
       "status": "Succeeded",
-      "subscriptionId": "12345678-1234-1234-1234-123456789abc",
-      "tenantId": "12345678-1234-1234-1234-123456789abc"
+      "subscriptionId": "f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82",
+      "tenantId": "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f"
     },
     "dataVersion": "2",
-    "eventTime": "2026-02-11T10:30:00Z",
+    "eventTime": "2026-02-11T22:14:08.512Z",
     "eventType": "Microsoft.Resources.ResourceActionSuccess",
-    "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "id": "b2c3d4e5-f6a7-4801-bcde-f12345678901",
     "metadataVersion": "1",
-    "subject": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Compute/virtualMachines/my-vm-01/powerOff",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc"
+    "subject": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Compute/virtualMachines/snaketoy-runner-3/powerOff",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg"
   },
-  "timestamp": "2026-02-11T10:30:00Z",
+  "timestamp": "2026-02-11T22:14:09.018Z",
   "type": "azure.vm.stopped"
 }
 ```

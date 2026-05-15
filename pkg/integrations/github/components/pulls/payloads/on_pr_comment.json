@@ -10,7 +10,6 @@
       "issue_url": "https://api.github.com/repos/acme-labs/snaketoy/issues/42",
       "node_id": "IC_kwDOQ7c2jM7zXq2R",
       "performed_via_github_app": null,
-      "pin": null,
       "reactions": {
         "+1": 2,
         "-1": 0,
@@ -43,8 +42,7 @@
         "starred_url": "https://api.github.com/users/jules-ramirez/starred{/owner}{/repo}",
         "subscriptions_url": "https://api.github.com/users/jules-ramirez/subscriptions",
         "type": "User",
-        "url": "https://api.github.com/users/jules-ramirez",
-        "user_view_type": "public"
+        "url": "https://api.github.com/users/jules-ramirez"
       }
     },
     "issue": {
@@ -122,8 +120,7 @@
         "starred_url": "https://api.github.com/users/renato-dev/starred{/owner}{/repo}",
         "subscriptions_url": "https://api.github.com/users/renato-dev/subscriptions",
         "type": "User",
-        "url": "https://api.github.com/users/renato-dev",
-        "user_view_type": "public"
+        "url": "https://api.github.com/users/renato-dev"
       }
     },
     "repository": {
@@ -141,6 +138,7 @@
       "contents_url": "https://api.github.com/repos/acme-labs/snaketoy/contents/{+path}",
       "contributors_url": "https://api.github.com/repos/acme-labs/snaketoy/contributors",
       "created_at": "2024-08-11T13:09:40Z",
+      "custom_properties": {},
       "default_branch": "main",
       "deployments_url": "https://api.github.com/repos/acme-labs/snaketoy/deployments",
       "description": "A tiny snake fangame written in JavaScript + HTML5 canvas",
@@ -161,7 +159,6 @@
       "has_issues": true,
       "has_pages": false,
       "has_projects": true,
-      "has_pull_requests": true,
       "has_wiki": true,
       "homepage": "https://acme.example/snaketoy",
       "hooks_url": "https://api.github.com/repos/acme-labs/snaketoy/hooks",
@@ -208,11 +205,9 @@
         "starred_url": "https://api.github.com/users/acme-labs/starred{/owner}{/repo}",
         "subscriptions_url": "https://api.github.com/users/acme-labs/subscriptions",
         "type": "Organization",
-        "url": "https://api.github.com/users/acme-labs",
-        "user_view_type": "public"
+        "url": "https://api.github.com/users/acme-labs"
       },
       "private": false,
-      "pull_request_creation_policy": "all",
       "pulls_url": "https://api.github.com/repos/acme-labs/snaketoy/pulls{/number}",
       "pushed_at": "2026-02-25T18:13:58Z",
       "releases_url": "https://api.github.com/repos/acme-labs/snaketoy/releases{/id}",
@@ -226,7 +221,11 @@
       "svn_url": "https://github.com/acme-labs/snaketoy",
       "tags_url": "https://api.github.com/repos/acme-labs/snaketoy/tags",
       "teams_url": "https://api.github.com/repos/acme-labs/snaketoy/teams",
-      "topics": ["game", "canvas", "javascript"],
+      "topics": [
+        "game",
+        "canvas",
+        "javascript"
+      ],
       "trees_url": "https://api.github.com/repos/acme-labs/snaketoy/git/trees{/sha}",
       "updated_at": "2026-02-12T09:41:27Z",
       "url": "https://api.github.com/repos/acme-labs/snaketoy",
@@ -253,8 +252,7 @@
       "starred_url": "https://api.github.com/users/acme-ci/starred{/owner}{/repo}",
       "subscriptions_url": "https://api.github.com/users/acme-ci/subscriptions",
       "type": "User",
-      "url": "https://api.github.com/users/acme-ci",
-      "user_view_type": "public"
+      "url": "https://api.github.com/users/acme-ci"
     }
   },
   "timestamp": "2026-02-25T18:14:31.384219122Z",

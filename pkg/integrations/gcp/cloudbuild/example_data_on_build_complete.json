@@ -1,13 +1,120 @@
 {
   "data": {
-    "id": "12345678-abcd-1234-5678-abcdef012345",
-    "projectId": "my-project",
+    "id": "9f3a2b1c-7d2e-4a8f-bc91-1a2b3c4d5e6f",
+    "name": "projects/acme-prod-12348/locations/us-central1/builds/9f3a2b1c-7d2e-4a8f-bc91-1a2b3c4d5e6f",
+    "projectId": "acme-prod-12348",
     "status": "SUCCESS",
-    "buildTriggerId": "abcdefgh-1234-5678-abcd-123456789012",
-    "logUrl": "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
-    "createTime": "2025-01-01T00:00:00Z",
-    "finishTime": "2025-01-01T00:05:00Z"
+    "buildTriggerId": "21f8c0a4-3e2b-4d18-9c5a-7b1d8e0f4a92",
+    "logUrl": "https://console.cloud.google.com/cloud-build/builds;region=us-central1/9f3a2b1c-7d2e-4a8f-bc91-1a2b3c4d5e6f?project=acme-prod-12348",
+    "logsBucket": "gs://1093872310984.cloudbuild-logs.googleusercontent.com",
+    "createTime": "2026-03-01T11:36:08.412Z",
+    "startTime": "2026-03-01T11:36:14.810Z",
+    "finishTime": "2026-03-01T11:42:24.512Z",
+    "queueTtl": "3600s",
+    "timeout": "1200s",
+    "tags": ["push-main", "release-v1.5.0"],
+    "substitutions": {
+      "BRANCH_NAME": "main",
+      "COMMIT_SHA": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+      "REPO_NAME": "snaketoy",
+      "REVISION_ID": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+      "SHORT_SHA": "4f9c2e1",
+      "TRIGGER_NAME": "snaketoy-main-push",
+      "_DEPLOY_REGION": "us-central1",
+      "_IMAGE_TAG": "v1.5.0"
+    },
+    "source": {
+      "gitSource": {
+        "url": "https://github.com/acme-labs/snaketoy",
+        "revision": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01"
+      }
+    },
+    "sourceProvenance": {
+      "resolvedRepoSource": {
+        "projectId": "acme-prod-12348",
+        "repoName": "github_acme-labs_snaketoy",
+        "commitSha": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01"
+      }
+    },
+    "options": {
+      "machineType": "E2_HIGHCPU_8",
+      "substitutionOption": "ALLOW_LOOSE",
+      "logging": "CLOUD_LOGGING_ONLY",
+      "dynamicSubstitutions": true,
+      "pool": {}
+    },
+    "steps": [
+      {
+        "id": "build",
+        "name": "gcr.io/cloud-builders/docker",
+        "args": [
+          "build",
+          "-t",
+          "us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web:v1.5.0",
+          "-t",
+          "us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web:4f9c2e1",
+          "."
+        ],
+        "status": "SUCCESS",
+        "timing": {
+          "startTime": "2026-03-01T11:36:24.110Z",
+          "endTime": "2026-03-01T11:39:48.740Z"
+        },
+        "pullTiming": {
+          "startTime": "2026-03-01T11:36:14.810Z",
+          "endTime": "2026-03-01T11:36:24.108Z"
+        }
+      },
+      {
+        "id": "push",
+        "name": "gcr.io/cloud-builders/docker",
+        "args": [
+          "push",
+          "--all-tags",
+          "us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web"
+        ],
+        "status": "SUCCESS",
+        "timing": {
+          "startTime": "2026-03-01T11:39:49.012Z",
+          "endTime": "2026-03-01T11:42:18.230Z"
+        }
+      }
+    ],
+    "results": {
+      "buildStepImages": ["sha256:c3a1f2b8e914...", "sha256:c3a1f2b8e914..."],
+      "buildStepOutputs": ["", ""],
+      "images": [
+        {
+          "name": "us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web:v1.5.0",
+          "digest": "sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7",
+          "pushTiming": {
+            "startTime": "2026-03-01T11:39:49.012Z",
+            "endTime": "2026-03-01T11:42:18.230Z"
+          }
+        }
+      ]
+    },
+    "timing": {
+      "BUILD": {
+        "startTime": "2026-03-01T11:36:14.810Z",
+        "endTime": "2026-03-01T11:42:18.231Z"
+      },
+      "FETCHSOURCE": {
+        "startTime": "2026-03-01T11:36:09.142Z",
+        "endTime": "2026-03-01T11:36:14.760Z"
+      },
+      "PUSH": {
+        "startTime": "2026-03-01T11:39:49.012Z",
+        "endTime": "2026-03-01T11:42:18.232Z"
+      }
+    },
+    "artifacts": {
+      "images": [
+        "us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web:v1.5.0"
+      ]
+    },
+    "serviceAccount": "projects/acme-prod-12348/serviceAccounts/cloudbuild@acme-prod-12348.iam.gserviceaccount.com"
   },
-  "timestamp": "2025-01-01T00:05:00Z",
+  "timestamp": "2026-03-01T11:42:24.984Z",
   "type": "gcp.cloudbuild.build"
 }

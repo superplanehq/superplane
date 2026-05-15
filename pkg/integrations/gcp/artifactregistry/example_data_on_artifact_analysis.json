@@ -1,21 +1,59 @@
 {
   "data": {
-    "name": "projects/my-project/occurrences/vuln-001",
-    "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
-    "noteName": "projects/goog-vulnz/notes/CVE-2023-1234",
+    "name": "projects/acme-prod-12348/occurrences/4f1c0a92-b8d4-4c7a-9e2f-1a8b0d3e5c14",
+    "resourceUri": "https://us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web@sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7",
+    "noteName": "projects/goog-vulnz/notes/CVE-2023-0464",
     "kind": "VULNERABILITY",
+    "createTime": "2026-03-01T11:46:08.412Z",
+    "updateTime": "2026-03-01T11:46:08.412Z",
     "vulnerability": {
+      "type": "OS",
       "severity": "HIGH",
       "cvssScore": 7.5,
+      "cvssv3": {
+        "baseScore": 7.5,
+        "exploitabilityScore": 3.9,
+        "impactScore": 3.6,
+        "attackVector": "ATTACK_VECTOR_NETWORK",
+        "attackComplexity": "ATTACK_COMPLEXITY_LOW",
+        "privilegesRequired": "PRIVILEGES_REQUIRED_NONE",
+        "userInteraction": "USER_INTERACTION_NONE",
+        "scope": "SCOPE_UNCHANGED",
+        "confidentialityImpact": "IMPACT_NONE",
+        "integrityImpact": "IMPACT_NONE",
+        "availabilityImpact": "IMPACT_HIGH"
+      },
       "packageIssue": [
         {
-          "affectedPackage": "libssl1.1",
-          "affectedVersion": {"name": "1.1.1n-0+deb11u3", "kind": "NORMAL"},
-          "fixedVersion": {"name": "1.1.1n-0+deb11u5", "kind": "NORMAL"}
+          "affectedCpeUri": "cpe:/o:debian:debian_linux:12",
+          "affectedPackage": "libssl3",
+          "affectedVersion": {
+            "name": "3.0.11-1~deb12u2",
+            "kind": "NORMAL"
+          },
+          "fixedCpeUri": "cpe:/o:debian:debian_linux:12",
+          "fixedPackage": "libssl3",
+          "fixedVersion": {
+            "name": "3.0.13-1~deb12u1",
+            "kind": "NORMAL"
+          },
+          "fixAvailable": true,
+          "packageType": "OS",
+          "effectiveSeverity": "HIGH"
         }
-      ]
+      ],
+      "shortDescription": "CVE-2023-0464",
+      "longDescription": "OpenSSL vulnerability affecting certificate policy checks.",
+      "relatedUrls": [
+        {
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2023-0464",
+          "label": "More Info"
+        }
+      ],
+      "effectiveSeverity": "HIGH",
+      "fixAvailable": true
     }
   },
-  "timestamp": "2025-01-01T00:00:00Z",
+  "timestamp": "2026-03-01T11:46:09.218Z",
   "type": "gcp.artifactregistry.artifact.analysis"
 }

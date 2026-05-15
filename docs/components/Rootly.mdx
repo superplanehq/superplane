@@ -55,20 +55,43 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
 {
   "data": {
     "event": "incident.created",
+    "event_id": "b5e7c1f4-8a92-4c0e-bd44-1c1f8c0a3d2e",
     "incident": {
-      "id": "abc123-def456",
+      "environments": [
+        "production"
+      ],
+      "groups": [
+        "platform"
+      ],
+      "id": "8a4f7b3c-1d2e-4f60-8192-a3b4c5d6e7f8",
+      "kind": "normal",
+      "labels": {
+        "region": "eu-west-1",
+        "team": "platform"
+      },
       "mitigated_at": null,
       "resolved_at": null,
+      "sequential_id": 218,
+      "services": [
+        "snaketoy-web"
+      ],
       "severity": "sev2",
-      "started_at": "2026-01-19T12:00:00Z",
+      "slug": "snaketoy-web-5xx-spike-eu-west-1",
+      "started_at": "2026-03-04T09:18:42.184Z",
       "status": "started",
-      "summary": "The API response times have increased significantly across all endpoints.",
-      "title": "API latency spike detected",
-      "url": "https://app.rootly.com/incidents/abc123-def456"
-    }
+      "summary": "snaketoy-web is returning 5xx for ~8% of requests in eu-west-1.",
+      "title": "snaketoy-web 5xx spike (eu-west-1)",
+      "url": "https://acme-labs.rootly.com/account/incidents/8a4f7b3c-1d2e-4f60-8192-a3b4c5d6e7f8",
+      "user": {
+        "email": "renato.dev@acme.example",
+        "id": "12345",
+        "name": "Renato Dev"
+      }
+    },
+    "issued_at": "2026-03-04T09:18:42.612Z"
   },
-  "timestamp": "2026-01-19T12:00:00Z",
-  "type": "rootly.onIncident"
+  "timestamp": "2026-03-04T09:18:42.812Z",
+  "type": "rootly.incident.created"
 }
 ```
 
@@ -122,33 +145,33 @@ This trigger automatically sets up a Rootly webhook endpoint when configured. Th
 ```json
 {
   "data": {
-    "created_at": "2026-02-22T09:46:23.868-08:00",
-    "event": "Investigation started, will update accordingly",
+    "created_at": "2026-03-04T09:21:18.412-08:00",
+    "event": "Investigation started; rolling back snaketoy-web to 1.4.1",
     "event_id": "b3065ca8-69a6-4781-b6b4-94d6f0317ccf",
-    "event_raw": "Investigation started, will update accordingly",
+    "event_raw": "Investigation started; rolling back snaketoy-web to 1.4.1",
     "event_type": "incident_event.created",
-    "id": "56f7b488-e3c5-4091-9bb4-cf132007f98c",
+    "id": "f3a5b1c8-2d4e-4f60-8192-a3b4c5d6e7f8",
     "incident": {
-      "id": "64c39fde-1626-4f78-874e-9db91c0639d3",
+      "id": "8a4f7b3c-1d2e-4f60-8192-a3b4c5d6e7f8",
       "services": [
-        "UI - User Profile Block"
+        "snaketoy-web"
       ],
       "severity": "sev2",
       "status": "mitigated",
       "teams": [
-        "Customer Relations"
+        "platform"
       ],
-      "title": "new remake from main"
+      "title": "snaketoy-web 5xx spike (eu-west-1)"
     },
-    "incident_id": "64c39fde-1626-4f78-874e-9db91c0639d3",
-    "issued_at": "2026-02-22T09:46:24.018-08:00",
+    "incident_id": "8a4f7b3c-1d2e-4f60-8192-a3b4c5d6e7f8",
+    "issued_at": "2026-03-04T09:21:18.612-08:00",
     "kind": "event",
-    "occurred_at": "2026-02-22T09:46:23.868-08:00",
+    "occurred_at": "2026-03-04T09:21:18.412-08:00",
     "source": "web",
-    "updated_at": "2026-02-22T09:46:23.868-08:00",
+    "updated_at": "2026-03-04T09:21:18.412-08:00",
     "visibility": "internal"
   },
-  "timestamp": "2026-02-22T17:46:40.603539728Z",
+  "timestamp": "2026-03-04T17:21:18.812Z",
   "type": "rootly.onIncidentTimelineEvent"
 }
 ```
