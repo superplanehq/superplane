@@ -22,13 +22,20 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 	if max <= 0 {
 		max = 512 * 1024
 	}
+	env, err := processEnvironment(task.Environment)
+	if err != nil {
+		return 1, "", err
+	}
 	if len(task.Commands) > 0 {
-		return runHostShellDirectives(ctx, max, task.Commands, live)
+		return runHostShellDirectives(ctx, max, task.Commands, env, live)
 	}
 	if len(task.Command) == 0 {
 		return 1, "", errors.New("empty command")
 	}
 	cmd := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
+	if env != nil {
+		cmd.Env = env
+	}
 	var buf bytes.Buffer
 	if live != nil {
 		mw := io.MultiWriter(&buf, live)
@@ -38,7 +45,7 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 		cmd.Stdout = &buf
 		cmd.Stderr = &buf
 	}
-	err := cmd.Run()
+	err = cmd.Run()
 	out := truncateString(buf.String(), max)
 	exit := 0
 	if err != nil {

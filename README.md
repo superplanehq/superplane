@@ -35,7 +35,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for design detail.
 ## Requirements
 
 - Go 1.22+
-- For Docker tasks: Docker CLI **and a reachable Docker daemon** on the runner host. The runner uses a pull → long-lived named container → `docker exec` → `docker stop`/`rm` lifecycle (see [ARCHITECTURE.md](./ARCHITECTURE.md#docker-execution-lifecycle)). The image must include `sleep` (alpine, debian, ubuntu, python:*, node:* all satisfy this). Multi-line **`commands`** are bundled into one `sh -c` script with `set -e`, so env/cwd persist across directives and the script fails fast on the first non-zero exit. **Quoting:** each directive is a line inside a single-quoted `sh -c` argument; a raw **`'`** in a line is a classic shell-quoting footgun—avoid it in `commands` or use argv **`command`** for tricky literals. **`docker exec` is invoked without `-t`**, so the task runs in a non-TTY context: tools that detect `isatty()` (color output, progress bars, interactive prompts) will see stdout/stderr as a pipe. This is intentional — matches `docker run` without `-t`, more predictable for CI / batch workloads, and lets stdout and stderr stay distinct in captures.
+- For Docker tasks: Docker CLI **and a reachable Docker daemon** on the runner host. The runner uses a pull → long-lived named container → `docker exec` → `docker stop`/`rm` lifecycle (see [ARCHITECTURE.md](./ARCHITECTURE.md#docker-execution-lifecycle)). The image must include `sleep` (alpine, debian, ubuntu, python:*, node:* all satisfy this). Multi-line **`commands`** are bundled into one `sh -c` script with `set -e`, so env/cwd persist across directives and the script fails fast on the first non-zero exit. Task **`environment`** entries are passed to the `docker exec` process, not to the idle `docker run` container. **Quoting:** each directive is a line inside a single-quoted `sh -c` argument; a raw **`'`** in a line is a classic shell-quoting footgun—avoid it in `commands` or use argv **`command`** for tricky literals. **`docker exec` is invoked without `-t`**, so the task runs in a non-TTY context: tools that detect `isatty()` (color output, progress bars, interactive prompts) will see stdout/stderr as a pipe. This is intentional — matches `docker run` without `-t`, more predictable for CI / batch workloads, and lets stdout and stderr stay distinct in captures.
 
 ### Upgrade note: Docker multi-line `commands` (breaking if you relied on the old runner)
 
@@ -162,12 +162,12 @@ export AUTH_TOKEN= # if fleet-manager uses it
 ## HTTP API — fleet-manager (v1)
 
 - `GET /healthz` — liveness
-- `POST /v1/tasks` — enqueue: **`command`** (argv for one process) **or** **`commands`** (string lines concatenated into one `sh -c` script so `export` / `cd` persist), **`webhook_url`**, optional `execution_mode` / `docker_image`
+- `POST /v1/tasks` — enqueue: **`command`** (argv for one process) **or** **`commands`** (string lines concatenated into one `sh -c` script so `export` / `cd` persist), **`webhook_url`**, optional `environment` (`[{ "name", "value" }]`), optional `execution_mode` / `docker_image`
 - `GET /v1/runners/stream` — runner WebSocket (default worker transport)
 - `POST /v1/tasks/claim` — runner pulls the next task (HTTP transport)
 - `POST /v1/tasks/{id}/complete` — runner reports result (HTTP transport)
 
-When the broker is **not** in the path, fleet-manager POSTs the completion **webhook** to `webhook_url` with `task_id`, `status`, `exit_code`, `output`, optional `error` (no `fleet_task_id`).
+When the broker is **not** in the path, fleet-manager POSTs the completion **webhook** to `webhook_url` with `task_id`, `status`, `exit_code`, `output`, optional `error` (no `fleet_task_id`). Task `environment` values are execution-only and are not returned by status or webhook payloads.
 
 ## End-to-end with the broker
 
@@ -183,7 +183,8 @@ When the broker is **not** in the path, fleet-manager POSTs the completion **web
 curl -X POST http://127.0.0.1:8080/v1/tasks \
   -H 'Content-Type: application/json' \
   -d '{
-    "commands": ["echo hello", "echo done"],
+    "commands": ["echo hello", "echo \"$COMMIT_AUTHOR\""],
+    "environment": [{"name": "COMMIT_AUTHOR", "value": "alice@example.com"}],
     "webhook_url": "https://example.com/your-hook"
   }'
 ```
@@ -209,7 +210,8 @@ curl -X POST http://127.0.0.1:8081/v1/tasks \
   -H "Authorization: Bearer ${BROKER_TOKEN}" \
   -d '{
     "fleet_id": "aws-standard-1",
-    "commands": ["export A=1", "echo $A"],
+    "commands": ["echo \"$COMMIT_AUTHOR\""],
+    "environment": [{"name": "COMMIT_AUTHOR", "value": "alice@example.com"}],
     "webhook_url": "https://example.com/your-hook"
   }'
 ```

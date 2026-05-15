@@ -38,7 +38,7 @@ func TestRunnerStream_HappyPath(t *testing.T) {
 	ts := httptest.NewServer(NewRouter(srv, RouterOptions{}))
 	defer ts.Close()
 
-	body := `{"commands":["echo hello"],"webhook_url":"https://example.com/hook"}`
+	body := `{"commands":["echo hello"],"environment":[{"name":"COMMIT_AUTHOR","value":"alice@example.com"}],"webhook_url":"https://example.com/hook"}`
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, ts.URL+"/v1/tasks", bytes.NewReader([]byte(body)))
 	if err != nil {
 		t.Fatal(err)
@@ -71,6 +71,9 @@ func TestRunnerStream_HappyPath(t *testing.T) {
 	}
 	if taskMsg.Type != wsrunner.TypeTask || taskMsg.Task == nil || taskMsg.Task.ID == "" {
 		t.Fatalf("task payload: %+v", taskMsg)
+	}
+	if len(taskMsg.Task.Environment) != 1 || taskMsg.Task.Environment[0].Name != "COMMIT_AUTHOR" || taskMsg.Task.Environment[0].Value != "alice@example.com" {
+		t.Fatalf("task environment: %#v", taskMsg.Task.Environment)
 	}
 
 	comp := wsrunner.Complete{

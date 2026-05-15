@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"path/filepath"
 	"testing"
 	"time"
@@ -94,6 +95,136 @@ func TestSQLite_CreateCommandsRoundTrip(t *testing.T) {
 	}
 	if len(got.Command) != 0 {
 		t.Fatalf("command argv should be empty, got %#v", got.Command)
+	}
+}
+
+func TestSQLite_CreateEnvironmentRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	task := &models.Task{
+		ID:         uuid.NewString(),
+		Command:    []string{"sh", "-c", "printf %s \"$COMMIT_AUTHOR\""},
+		WebhookURL: "https://example.com/hook",
+		Status:     models.StatusQueued,
+		CreatedAt:  time.Now().UTC().Truncate(time.Second),
+		Environment: []models.EnvironmentVariable{
+			{Name: "COMMIT_AUTHOR", Value: "alice@example.com"},
+			{Name: "SPECIAL", Value: "line one\nline two=ok"},
+		},
+		ExecutionMode: models.ExecutionHost,
+	}
+	if err := s.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := s.ClaimTask(ctx, "runner-1", 5*time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil {
+		t.Fatal("expected task")
+	}
+	if len(got.Environment) != 2 {
+		t.Fatalf("environment: %#v", got.Environment)
+	}
+	if got.Environment[0].Name != "COMMIT_AUTHOR" || got.Environment[0].Value != "alice@example.com" {
+		t.Fatalf("first env: %#v", got.Environment[0])
+	}
+	if got.Environment[1].Name != "SPECIAL" || got.Environment[1].Value != "line one\nline two=ok" {
+		t.Fatalf("second env: %#v", got.Environment[1])
+	}
+}
+
+func TestSQLite_CompleteClearsEnvironment(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	task := &models.Task{
+		ID:            uuid.NewString(),
+		Command:       []string{"echo", "hi"},
+		WebhookURL:    "https://example.com/hook",
+		Status:        models.StatusQueued,
+		CreatedAt:     time.Now().UTC().Truncate(time.Second),
+		ExecutionMode: models.ExecutionHost,
+		Environment:   []models.EnvironmentVariable{{Name: "SECRET_TOKEN", Value: "secret-value"}},
+	}
+	if err := s.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ClaimTask(ctx, "runner-1", 5*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+
+	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 0, "hello\n", "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(done.Environment) != 0 {
+		t.Fatalf("terminal task should not return environment, got %#v", done.Environment)
+	}
+
+	var envJSON sql.NullString
+	if err := s.db.QueryRowContext(ctx, `SELECT environment_json FROM tasks WHERE id = ?`, task.ID).Scan(&envJSON); err != nil {
+		t.Fatal(err)
+	}
+	if envJSON.Valid {
+		t.Fatalf("environment_json should be NULL after completion, got %q", envJSON.String)
+	}
+}
+
+func TestSQLite_MigrateAddsEnvironmentColumn(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = db.Exec(`
+CREATE TABLE tasks (
+	id TEXT PRIMARY KEY,
+	command_json TEXT NOT NULL,
+	commands_json TEXT,
+	webhook_url TEXT NOT NULL,
+	status TEXT NOT NULL,
+	created_at INTEGER NOT NULL,
+	claimed_at INTEGER,
+	lease_until INTEGER,
+	runner_id TEXT,
+	execution_mode TEXT NOT NULL DEFAULT 'host',
+	docker_image TEXT,
+	execution_timeout_seconds INTEGER,
+	exit_code INTEGER,
+	output TEXT,
+	error_message TEXT
+);
+`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = db.Close()
+
+	s, err := OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	var n int
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('tasks') WHERE name='environment_json'`).Scan(&n); err != nil {
+		t.Fatal(err)
+	}
+	if n != 1 {
+		t.Fatalf("environment_json column count = %d, want 1", n)
 	}
 }
 

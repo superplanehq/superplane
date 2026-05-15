@@ -106,6 +106,31 @@ func TestCommandsShareShellEnv(t *testing.T) {
 	})
 }
 
+func TestTaskEnvironmentVariables(t *testing.T) {
+	t.Parallel()
+	const value = "alice@example.com line=ok"
+	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
+		return api.CreateTaskRequest{
+			Command:     []string{"sh", "-c", `printf "%s" "$COMMIT_AUTHOR"`},
+			WebhookURL:  wh,
+			Environment: []api.EnvironmentVariable{{Name: "COMMIT_AUTHOR", Value: value}},
+		}
+	}, func(t *testing.T, created api.CreateTaskResponse, payload api.WebhookPayload) {
+		if payload.TaskID != created.ID {
+			t.Errorf("webhook task_id: got %q want %q", payload.TaskID, created.ID)
+		}
+		if payload.Status != string(models.StatusSucceeded) {
+			t.Errorf("status: got %q want %q", payload.Status, models.StatusSucceeded)
+		}
+		if payload.ExitCode != 0 {
+			t.Errorf("exit_code: got %d want 0", payload.ExitCode)
+		}
+		if payload.Output != value {
+			t.Errorf("environment value output got %q want %q", payload.Output, value)
+		}
+	})
+}
+
 func TestExecutionTimeoutStopsLongSleep(t *testing.T) {
 	t.Parallel()
 	sec := 2

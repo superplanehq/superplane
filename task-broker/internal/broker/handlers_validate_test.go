@@ -86,3 +86,30 @@ func TestValidateCreateTaskPayload_dockerRequiresImage(t *testing.T) {
 		t.Fatal("expected docker_image error")
 	}
 }
+
+func TestValidateCreateTaskPayload_environment(t *testing.T) {
+	t.Run("valid environment", func(t *testing.T) {
+		req := &api.CreateTaskRequest{
+			Command:    []string{"echo"},
+			WebhookURL: "https://x/h",
+			Environment: []api.EnvironmentVariable{
+				{Name: "COMMIT_AUTHOR", Value: "alice@example.com"},
+				{Name: "EMPTY_OK", Value: ""},
+			},
+		}
+		if got := validateCreateTaskPayload(req); got != "" {
+			t.Fatalf("got %q", got)
+		}
+	})
+
+	t.Run("invalid environment", func(t *testing.T) {
+		req := &api.CreateTaskRequest{
+			Command:     []string{"echo"},
+			WebhookURL:  "https://x/h",
+			Environment: []api.EnvironmentVariable{{Name: "BAD-NAME", Value: "x"}},
+		}
+		if got := validateCreateTaskPayload(req); got == "" {
+			t.Fatal("expected environment error")
+		}
+	})
+}

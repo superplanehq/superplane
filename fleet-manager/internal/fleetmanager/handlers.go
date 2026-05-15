@@ -92,6 +92,10 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, msg)
 		return
 	}
+	if msg := api.ValidateEnvironment(req.Environment); msg != "" {
+		writeError(w, http.StatusBadRequest, msg)
+		return
+	}
 
 	mode := models.ExecutionHost
 	switch strings.ToLower(strings.TrimSpace(req.ExecutionMode)) {
@@ -115,6 +119,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:     time.Now().UTC(),
 		ExecutionMode: mode,
 		DockerImage:   req.DockerImage,
+		Environment:   api.CloneEnvironment(req.Environment),
 	}
 	if hasShell {
 		task.Commands = normalizedCmds

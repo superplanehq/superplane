@@ -27,7 +27,9 @@ type Task struct {
 	// Command is argv for a single process when Commands is empty (legacy).
 	Command []string
 	// Commands are shell directives when non-empty (Bash+PTY sourcing per line on workers).
-	Commands      []string
+	Commands []string
+	// Environment is a task-scoped process environment sent only to runners.
+	Environment   []EnvironmentVariable
 	WebhookURL    string
 	Status        TaskStatus
 	CreatedAt     time.Time
@@ -43,4 +45,10 @@ type Task struct {
 	ErrorMessage            string
 	// CancelRequested is true while the task is claimed and a caller asked to stop it (persisted).
 	CancelRequested bool
+}
+
+// EnvironmentVariable is one task-scoped environment variable.
+type EnvironmentVariable struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
