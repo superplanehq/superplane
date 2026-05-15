@@ -66,6 +66,8 @@ type CompleteTaskRequest struct {
 	ExitCode int    `json:"exit_code"`
 	Output   string `json:"output"`
 	Error    string `json:"error,omitempty"`
+	// Canceled when true means the runner stopped the task due to caller cancel (terminal status canceled).
+	Canceled bool `json:"canceled,omitempty"`
 }
 
 // TaskPayloadFrom maps models.Task to TaskPayload.
@@ -113,17 +115,25 @@ type WebhookPayload struct {
 
 // TaskStatusResponse is GET fleet-manager /v1/tasks/{id}.
 type TaskStatusResponse struct {
-	ID       string `json:"id"`
-	Status   string `json:"status"`
-	ExitCode *int   `json:"exit_code,omitempty"`
-	Output   string `json:"output,omitempty"`
-	Error    string `json:"error,omitempty"`
+	ID              string `json:"id"`
+	Status          string `json:"status"`
+	ExitCode        *int   `json:"exit_code,omitempty"`
+	Output          string `json:"output,omitempty"`
+	Error           string `json:"error,omitempty"`
+	CancelRequested bool   `json:"cancel_requested,omitempty"`
 	// CloudWatchLogGroup and CloudWatchLogStream are set when fleet-manager is configured
 	// with TASK_CLOUDWATCH_LOG_GROUP so clients can tail logs in AWS (runner must use the same group/prefix).
 	CloudWatchLogGroup      string       `json:"cloudwatch_log_group,omitempty"`
 	CloudWatchLogStream     string       `json:"cloudwatch_log_stream,omitempty"`
 	TaskLog                 *TaskLogSink `json:"task_log,omitempty"`
 	ExecutionTimeoutSeconds *int         `json:"execution_timeout_seconds,omitempty"`
+}
+
+// CancelTaskResponse is POST fleet-manager /v1/tasks/{id}/cancel.
+type CancelTaskResponse struct {
+	ID     string `json:"id"`
+	State  string `json:"state"`  // already_terminal | canceled | cancel_requested
+	Status string `json:"status"` // task status after the operation
 }
 
 // BrokerGetTaskResponse is GET task-broker /v1/tasks/{broker_task_id}.
@@ -134,6 +144,7 @@ type BrokerGetTaskResponse struct {
 	ExitCode                *int         `json:"exit_code,omitempty"`
 	Output                  string       `json:"output,omitempty"`
 	Error                   string       `json:"error,omitempty"`
+	CancelRequested         bool         `json:"cancel_requested,omitempty"`
 	CloudWatchLogGroup      string       `json:"cloudwatch_log_group,omitempty"`
 	CloudWatchLogStream     string       `json:"cloudwatch_log_stream,omitempty"`
 	TaskLog                 *TaskLogSink `json:"task_log,omitempty"`

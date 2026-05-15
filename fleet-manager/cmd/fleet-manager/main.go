@@ -39,11 +39,13 @@ func main() {
 	ws := webhook.DefaultSender()
 	ws.Log = log
 	hub := fleetmanager.NewWaitHub()
+	cancelHub := fleetmanager.NewRunnerCancelHub()
 	srv := &fleetmanager.Server{
 		Store:                         st,
 		Webhook:                       ws,
 		Log:                           log,
 		TaskNotify:                    hub,
+		RunnerCancel:                  cancelHub,
 		TaskCloudWatchLogGroup:        strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_GROUP")),
 		TaskCloudWatchLogStreamPrefix: strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_STREAM_PREFIX")),
 		TaskCloudWatchRegion:          strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_REGION")),
@@ -111,13 +113,20 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				n, err := st.ReapExpiredLeases(context.Background())
+				requeued, canceledTasks, err := st.ReapExpiredLeases(context.Background())
 				if err != nil {
 					log.Warn("reap leases", slog.Any("err", err))
 					continue
 				}
-				if n > 0 {
-					log.Info("reaped expired task leases", slog.Int64("count", n))
+				for _, task := range canceledTasks {
+					t := task
+					go srv.DeliverWebhook(t)
+				}
+				if requeued > 0 {
+					log.Info("reaped expired task leases", slog.Int64("count", requeued))
+				}
+				if len(canceledTasks) > 0 {
+					log.Info("finalized canceled tasks after lease expiry", slog.Int("count", len(canceledTasks)))
 				}
 			}
 		}

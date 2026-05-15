@@ -42,6 +42,7 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 			r.Post("/tasks", s.createBrokerTask)
 			r.Get("/tasks/{id}/live-logs", s.getBrokerTaskLiveLogs)
 			r.Get("/tasks/{id}", s.getBrokerTask)
+			r.Post("/tasks/{id}/cancel", s.cancelBrokerTask)
 		})
 	})
 
