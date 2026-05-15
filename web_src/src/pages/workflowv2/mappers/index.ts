@@ -123,6 +123,7 @@ import {
   triggerRenderers as jfrogArtifactoryTriggerRenderers,
   eventStateRegistry as jfrogArtifactoryEventStateRegistry,
 } from "./jfrogArtifactory/index";
+import { componentMappers as jiraComponentMappers, eventStateRegistry as jiraEventStateRegistry } from "./jira/index";
 import {
   componentMappers as azureComponentMappers,
   triggerRenderers as azureTriggerRenderers,
@@ -320,6 +321,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   cursor: cursorComponentMappers,
   hetzner: hetznerComponentMappers,
   jfrogArtifactory: jfrogArtifactoryComponentMappers,
+  jira: jiraComponentMappers,
   statuspage: statuspageComponentMappers,
   dockerhub: dockerhubComponentMappers,
   honeycomb: honeycombComponentMappers,
@@ -412,6 +414,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   azure: azureEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
+  jira: jiraEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
   honeycomb: honeycombEventStateRegistry,
   harness: harnessEventStateRegistry,
