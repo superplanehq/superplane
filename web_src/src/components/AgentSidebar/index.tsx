@@ -279,8 +279,10 @@ function DraftActionsBar({ messages, canvasId, organizationId }: { messages: Age
   }, []);
 
   const latestDraft = useMemo(() => {
+    // Only scan the latest assistant turn (stop at first user message from end)
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
+      if (msg.role === "user") break;
       if (msg.role !== "assistant") continue;
       const segments = parseAgentContent(msg.content);
       for (const seg of segments) {
