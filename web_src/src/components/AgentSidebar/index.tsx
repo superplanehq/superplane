@@ -10,6 +10,8 @@ import type { AgentState } from "./useAgentState";
 import type { AgentMode } from "./useAgentState";
 import { useSidebarWidth } from "./useSidebarWidth";
 import { RichMessage } from "./widgets/RichMessage";
+import { parseAgentContent } from "./widgets/parser";
+import { DraftActionsWidget } from "./widgets/DraftActionsWidget";
 
 export interface AgentSidebarProps {
   agentState: AgentState;
@@ -241,6 +243,7 @@ function ChatConversation({
         {showThinking ? <ThinkingRow /> : null}
         {error ? <p className="text-sm text-red-600 px-3 py-2">{error}</p> : null}
       </div>
+      <DraftActionsBar messages={messages} canvasId={canvasId} organizationId={organizationId} />
       <ChatComposer
         draft={draft}
         onDraftChange={setDraft}
@@ -250,6 +253,34 @@ function ChatConversation({
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
         modeDisabled={status === "streaming"}
+      />
+    </div>
+  );
+}
+
+function DraftActionsBar({ messages, canvasId, organizationId }: { messages: AgentMessage[]; canvasId: string; organizationId: string }) {
+  const latestDraft = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.role !== "assistant") continue;
+      const segments = parseAgentContent(msg.content);
+      for (const seg of segments) {
+        if (seg.type === "draft-actions") return seg;
+      }
+    }
+    return null;
+  }, [messages]);
+
+  if (!latestDraft) return null;
+
+  return (
+    <div className="border-t border-violet-200 bg-violet-50/80 px-3 py-2">
+      <DraftActionsWidget
+        versionId={latestDraft.versionId}
+        message={latestDraft.message}
+        canvasId={canvasId}
+        organizationId={organizationId}
+        isEditing={window.location.search.includes("version=")}
       />
     </div>
   );

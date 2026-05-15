@@ -48,8 +48,9 @@ export function DraftActionsWidget({
   };
 
   return (
-    <div className="flex items-center gap-2 mt-2 p-2 rounded-lg border border-violet-200 bg-violet-50/50">
-      {message && <span className="text-xs text-slate-600 flex-1">{message}</span>}
+    <div className="flex items-center gap-2">
+      {message && <span className="text-xs text-slate-600 flex-1 truncate">{message}</span>}
+      {!message && <span className="text-xs text-slate-600 flex-1">Draft ready</span>}
       {!isEditing && (
         <Button
           variant="outline"

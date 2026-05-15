@@ -157,14 +157,7 @@ function SegmentRenderer({
     case "error":
       return <BannerWidget variant="error" content={segment.content} />;
     case "draft-actions":
-      return (
-        <DraftActionsWidget
-          versionId={segment.versionId}
-          message={segment.message}
-          canvasId={canvasId}
-          organizationId={organizationId}
-          isEditing={isEditing}
-        />
-      );
+      // Rendered externally as DraftActionsBar, not inline
+      return null;
   }
 }
