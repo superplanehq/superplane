@@ -1,0 +1,18 @@
+{
+  "data": {
+    "alertId": "e0caa0ce-d52f-4500-81b9-d592d06970b6",
+    "operations": ["patchMessage", "acknowledge"],
+    "patchMessage": {
+      "result": "Request will be processed",
+      "requestId": "abc-1",
+      "took": 0.1
+    },
+    "acknowledge": {
+      "result": "Request will be processed",
+      "requestId": "abc-2",
+      "took": 0.1
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.updated"
+}
