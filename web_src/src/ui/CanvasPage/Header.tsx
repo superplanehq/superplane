@@ -3,14 +3,14 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { GitBranch, MoreVertical, Pencil, Settings } from "lucide-react";
+import { GitBranch, MoreVertical, Pencil, Plus, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "../button";
 import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
 
-type HeaderMode = "default" | "version-live" | "version-edit" | "runs";
+type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard";
 
 interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). */
@@ -35,7 +35,10 @@ interface HeaderProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectRuns?: () => void;
+  onSelectDashboard?: () => void;
   runsNotificationCount?: number;
+  /** When set with `mode === "dashboard"`, shows Add panel in the secondary header. */
+  onDashboardAddPanel?: () => void;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
   publishVersionLabel?: string;
   /** When true, shows the Discard control next to Publish in version edit mode (draft differs from live). */
@@ -119,8 +122,11 @@ function PageHeader({
 
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle =
-    props.mode === "version-live" || props.mode === "version-edit" || props.mode === "runs";
-  const canvasViewMode = props.mode === "runs" ? props.mode : "version-live";
+    props.mode === "version-live" ||
+    props.mode === "version-edit" ||
+    props.mode === "runs" ||
+    props.mode === "dashboard";
+  const canvasViewMode = props.mode === "runs" ? "runs" : props.mode === "dashboard" ? "dashboard" : "version-live";
   const editing = props.mode === "version-edit";
 
   return (
@@ -134,6 +140,7 @@ function SecondaryHeader(props: HeaderProps) {
               mode={canvasViewMode}
               onSelectLive={props.onExitEditMode}
               onSelectRuns={props.onSelectRuns}
+              onSelectDashboard={props.onSelectDashboard}
               runsNotificationCount={props.runsNotificationCount}
               editing={editing}
               hasDraft={!!props.hasUnpublishedDraftChanges}
@@ -174,11 +181,13 @@ function SecondaryHeaderActions({
   exitEditModeDisabledTooltip,
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
+  onDashboardAddPanel,
 }: HeaderProps) {
   const showVersionControlTrigger = mode === "version-live" && !!onOpenVersionControl;
   const showEditButton = mode === "version-live" && !!onEnterEditMode;
   const showDraftDropdown =
     showEditButton && !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
+  const showDashboardAddPanel = mode === "dashboard" && !!onDashboardAddPanel;
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
@@ -230,6 +239,19 @@ function SecondaryHeaderActions({
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
         />
+      ) : null}
+
+      {showDashboardAddPanel ? (
+        <UIButton
+          type="button"
+          size="sm"
+          variant="default"
+          onClick={() => onDashboardAddPanel()}
+          data-testid="dashboard-add-panel"
+        >
+          <Plus className="mr-1 h-3.5 w-3.5" />
+          Add panel
+        </UIButton>
       ) : null}
     </div>
   );
