@@ -265,7 +265,7 @@ function TooltipPayloadRow({
   tooltipLabel,
   formatter,
 }: {
-  item: RechartsPrimitive.Payload<TooltipValueType, TooltipNameType>;
+  item: NonNullable<RechartsPrimitive.DefaultTooltipContentProps<TooltipValueType, TooltipNameType>["payload"]>[number];
   index: number;
   config: ChartConfig;
   nameKey?: string;
