@@ -18,7 +18,6 @@ export function DraftActionsWidget({
   organizationId,
   isEditing,
 }: DraftActionsWidgetProps) {
-  const navigate = useNavigate();
   const [published, setPublished] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
