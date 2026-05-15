@@ -51,6 +51,10 @@ go build -o bin/runner ./runner/cmd/runner
 go build -o bin/task-broker ./task-broker/cmd/task-broker
 ```
 
+### Local dev
+
+Use **separate terminals**: **`make fleet-manager`**, **`make task-broker`**, then **`make register-local-fleet`**, then **`make runner`** (optional **`N=3`** runner processes; default **`N=1`**). **`make local-dev-help`** lists this. Defaults (`LOCAL_*`, **`LOCAL_STACK_AUTH_TOKEN`**, **`LOCAL_RUNNER_*`**, **`N`**) are in the **`Makefile`**; override on the command line when needed. Enqueue on the broker with **`Authorization: Bearer dev-local-token`** and **`"fleet_id":"local"`** (unless you changed **`LOCAL_STACK_AUTH_TOKEN`** / **`LOCAL_FLEET_ID`**).
+
 ## Run task-broker
 
 The broker needs a URL that **downstream fleet-manager** instances can POST to when a task completes (typically your public/load-balanced origin).
