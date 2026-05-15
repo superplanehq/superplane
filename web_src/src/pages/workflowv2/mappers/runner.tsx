@@ -19,6 +19,20 @@ import type {
 
 import { stringOrDash } from "./utils";
 
+function formatRunnerExecutionResult(value: unknown): string {
+  if (value === undefined || value === null) {
+    return "-";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
 const RUNNER_STATE_MAP: EventStateMap = {
   ...DEFAULT_EVENT_STATE_MAP,
   passed: DEFAULT_EVENT_STATE_MAP.success,
@@ -120,6 +134,7 @@ export const runnerMapper: ComponentBaseMapper = {
 
     details["status"] = stringOrDash(payload.status);
     details["exit_code"] = stringOrDash(payload.exit_code);
+    details["result"] = formatRunnerExecutionResult(payload.result);
     return details;
   },
 };
