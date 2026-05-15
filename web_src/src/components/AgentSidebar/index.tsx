@@ -30,22 +30,21 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
   const organizationId = agentState.organizationId ?? "";
   const chatQuery = useCanvasAgentChat(canvasId, organizationId, agentState.isAgentSidebarOpen);
   const chatId = chatQuery.data?.id ?? null;
-  const [isAgentBusy, setIsAgentBusy] = useState(false);
 
   return (
-    <SidebarShell onClose={agentState.closeSidebar} agentMode={agentState.agentMode} onModeSwitch={agentState.switchAgentMode} disabled={isAgentBusy}>
+    <SidebarShell onClose={agentState.closeSidebar}>
       {chatQuery.isLoading || !chatId ? (
         <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin mr-2" /> Loading…
         </div>
       ) : (
-        <ChatConversation chatId={chatId} canvasId={canvasId} organizationId={organizationId} agentMode={agentState.agentMode} onBusyChange={setIsAgentBusy} />
+        <ChatConversation chatId={chatId} canvasId={canvasId} organizationId={organizationId} agentMode={agentState.agentMode} onModeSwitch={agentState.switchAgentMode} />
       )}
     </SidebarShell>
   );
 }
 
-function SidebarShell({ children, onClose, agentMode, onModeSwitch, disabled }: { children: React.ReactNode; onClose: () => void; agentMode: AgentMode; onModeSwitch: (mode: AgentMode) => void; disabled?: boolean }) {
+function SidebarShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   const { sidebarRef, width, isResizing, handleMouseDown } = useSidebarWidth();
   return (
     <aside
@@ -56,7 +55,6 @@ function SidebarShell({ children, onClose, agentMode, onModeSwitch, disabled }: 
     >
       <header className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border shrink-0 min-w-0">
         <h2 className="text-base font-medium min-w-0 flex-1 truncate">Agent</h2>
-        <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={disabled} />
         <button
           type="button"
           onClick={onClose}
@@ -121,13 +119,13 @@ function ChatConversation({
   canvasId,
   organizationId,
   agentMode,
-  onBusyChange,
+  onModeSwitch,
 }: {
   chatId: string;
   canvasId: string;
   organizationId: string;
   agentMode: AgentMode;
-  onBusyChange: (busy: boolean) => void;
+  onModeSwitch: (mode: AgentMode) => void;
 }) {
   const messagesQuery = useAgentChatMessages(chatId, organizationId, true);
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
@@ -135,11 +133,6 @@ function ChatConversation({
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<string>("idle");
   const [error, setError] = useState<string | null>(null);
-
-  // Report busy state to parent for mode toggle lock
-  useEffect(() => {
-    onBusyChange(status === "streaming");
-  }, [status, onBusyChange]);
 
   // pages[0] is the latest fetch; later entries are older batches loaded
   // via scroll-up. Reverse so chronological order falls out of flatMap.
@@ -254,6 +247,9 @@ function ChatConversation({
         onSend={handleSend}
         sending={sendMutation.isPending}
         statusLabel={statusLabel(status)}
+        agentMode={agentMode}
+        onModeSwitch={onModeSwitch}
+        modeDisabled={status === "streaming"}
       />
     </div>
   );
@@ -265,12 +261,18 @@ function ChatComposer({
   onSend,
   sending,
   statusLabel,
+  agentMode,
+  onModeSwitch,
+  modeDisabled,
 }: {
   draft: string;
   onDraftChange: (value: string) => void;
   onSend: () => void;
   sending: boolean;
   statusLabel: string;
+  agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
+  modeDisabled?: boolean;
 }) {
   return (
     <footer className="border-t border-border p-3 flex flex-col gap-2">
@@ -289,7 +291,11 @@ function ChatComposer({
         }}
       />
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{statusLabel}</span>
+        {statusLabel === "Ready" ? (
+          <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} />
+        ) : (
+          <span className="text-xs text-muted-foreground">{statusLabel}</span>
+        )}
         <Button
           type="button"
           onClick={onSend}
