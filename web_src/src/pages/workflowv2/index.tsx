@@ -4961,7 +4961,7 @@ export function WorkflowPageV2() {
         { replace: true },
       );
     },
-    [setSearchParams],
+    [setIsRunsMode, setSearchParams, setSelectedRunId],
   );
 
   const handleSelectRunsMode = useCallback(() => {
@@ -4980,7 +4980,7 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [handleUseVersion, hasEditableVersion, liveCanvasVersionId, setSearchParams]);
+  }, [handleUseVersion, hasEditableVersion, liveCanvasVersionId, setIsRunsMode, setSearchParams]);
 
   const handleExitRunsMode = useCallback(() => {
     setIsRunsMode(false);
@@ -4995,7 +4995,7 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [setSearchParams]);
+  }, [setIsRunsMode, setSearchParams, setSelectedRunId]);
 
   const handleSelectDashboardMode = useCallback(() => {
     if (!dashboardsFeatureEnabled) {
@@ -5018,7 +5018,16 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [dashboardsFeatureEnabled, handleUseVersion, hasEditableVersion, liveCanvasVersionId, setSearchParams]);
+  }, [
+    dashboardsFeatureEnabled,
+    handleUseVersion,
+    hasEditableVersion,
+    liveCanvasVersionId,
+    setIsDashboardMode,
+    setIsRunsMode,
+    setSearchParams,
+    setSelectedRunId,
+  ]);
 
   const handleExitDashboardMode = useCallback(() => {
     setIsDashboardMode(false);
@@ -5031,7 +5040,7 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [setSearchParams]);
+  }, [setIsDashboardAddPanelOpen, setIsDashboardMode, setSearchParams]);
 
   const handleEnterEditModeFromHeader = useCallback(async () => {
     if (isDashboardMode) {
@@ -5056,7 +5065,15 @@ export function WorkflowPageV2() {
       return;
     }
     await handleToggleEditMode();
-  }, [handleExitDashboardMode, handleToggleEditMode, isDashboardMode, isRunsMode, setSearchParams]);
+  }, [
+    handleExitDashboardMode,
+    handleToggleEditMode,
+    isDashboardMode,
+    isRunsMode,
+    setIsRunsMode,
+    setSearchParams,
+    setSelectedRunId,
+  ]);
 
   const handleExitEditModeFromHeader = useCallback(async () => {
     if (isDashboardMode) {
@@ -5112,6 +5129,7 @@ export function WorkflowPageV2() {
     selectedRun,
     selectedRunId,
     setSearchParams,
+    setSelectedRunId,
   ]);
 
   useEffect(() => {
