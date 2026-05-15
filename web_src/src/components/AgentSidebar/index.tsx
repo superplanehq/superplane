@@ -258,8 +258,11 @@ function ChatConversation({
   );
 }
 
+// Track published version IDs outside component to survive remounts
+const publishedVersionIds = new Set<string>();
+
 function DraftActionsBar({ messages, canvasId, organizationId }: { messages: AgentMessage[]; canvasId: string; organizationId: string }) {
-  const [publishedVersionIds, setPublishedVersionIds] = useState<Set<string>>(new Set());
+  const [, forceUpdate] = useState(0);
   const latestDraft = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
@@ -270,7 +273,7 @@ function DraftActionsBar({ messages, canvasId, organizationId }: { messages: Age
       }
     }
     return null;
-  }, [messages, publishedVersionIds]);
+  }, [messages]);
 
   if (!latestDraft) return null;
 
@@ -282,7 +285,7 @@ function DraftActionsBar({ messages, canvasId, organizationId }: { messages: Age
         canvasId={canvasId}
         organizationId={organizationId}
         isEditing={window.location.search.includes("version=")}
-        onPublished={() => setPublishedVersionIds(prev => new Set(prev).add(latestDraft.versionId))}
+        onPublished={() => { publishedVersionIds.add(latestDraft.versionId); forceUpdate(n => n + 1); }}
       />
     </div>
   );
