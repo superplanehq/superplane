@@ -59,6 +59,42 @@ Returns the created issue including:
 ```json
 {
   "data": {
+    "fields": {
+      "assignee": {
+        "accountId": "5b10a2844c20165700ede21g",
+        "displayName": "Alice Example",
+        "emailAddress": "alice@example.com"
+      },
+      "created": "2026-01-19T12:00:00.000+0000",
+      "issuetype": {
+        "name": "Bug"
+      },
+      "labels": [
+        "backend",
+        "p1"
+      ],
+      "priority": {
+        "name": "High"
+      },
+      "project": {
+        "id": "10000",
+        "key": "PROJ",
+        "name": "Proj"
+      },
+      "reporter": {
+        "accountId": "5b10ac8d82e05b22cc7d4ef5",
+        "displayName": "Bob Example"
+      },
+      "status": {
+        "name": "To Do",
+        "statusCategory": {
+          "key": "new",
+          "name": "To Do"
+        }
+      },
+      "summary": "Investigate timeout on checkout flow",
+      "updated": "2026-01-19T12:00:00.000+0000"
+    },
     "id": "10001",
     "key": "PROJ-123",
     "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"

@@ -16,12 +16,12 @@ const CreateIssuePayloadType = "jira.issue"
 type CreateIssue struct{}
 
 type CreateIssueSpec struct {
-	Project     string `json:"project"`
-	IssueType   string `json:"issueType"`
-	Summary     string `json:"summary"`
-	Description string `json:"description"`
-	Assignee    string `json:"assignee"`
-	Status      string `json:"status"`
+	Project     string `json:"project" mapstructure:"project"`
+	IssueType   string `json:"issueType" mapstructure:"issueType"`
+	Summary     string `json:"summary" mapstructure:"summary"`
+	Description string `json:"description" mapstructure:"description"`
+	Assignee    string `json:"assignee" mapstructure:"assignee"`
+	Status      string `json:"status" mapstructure:"status"`
 }
 
 func (c *CreateIssue) Name() string {
