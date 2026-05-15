@@ -28,7 +28,6 @@ interface NodeChipProps {
   organizationId: string;
 }
 
-// eslint-disable-next-line complexity
 export function NodeChipFromLink({
   nodeId,
   rawLabel,
@@ -44,7 +43,21 @@ export function NodeChipFromLink({
   return <NodeChip nodeId={nodeId} label={label} canvasId={canvasId} organizationId={organizationId} />;
 }
 
-// eslint-disable-next-line complexity
+function getChipStyle(node?: SuperplaneComponentsNode) {
+  if (!node) return "bg-slate-100 text-slate-600 ring-slate-300";
+  return node.type === "TYPE_TRIGGER"
+    ? "bg-purple-100 text-purple-700 ring-purple-300 hover:bg-purple-200"
+    : "bg-blue-100 text-blue-700 ring-blue-300 hover:bg-blue-200";
+}
+
+function NodeIconInline({ component, isTrigger }: { component?: string; isTrigger: boolean }) {
+  const iconSrc = component ? getHeaderIconSrc(component) : undefined;
+  const Icon = component ? COMPONENT_ICONS[component] : undefined;
+  if (iconSrc) return <img src={iconSrc} alt="" className="size-3 object-contain shrink-0" />;
+  if (Icon) return <Icon className="size-3 shrink-0" />;
+  return <span className={cn("size-2 rounded-full shrink-0", isTrigger ? "bg-purple-500" : "bg-blue-500")} />;
+}
+
 export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -52,37 +65,26 @@ export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipPr
   const canvas = queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId));
   const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
   const edges = canvas?.spec?.edges ?? [];
-
   const isTrigger = node?.type === "TYPE_TRIGGER";
-  const iconSrc = node?.component ? getHeaderIconSrc(node.component) : undefined;
-  const LucideIcon = node?.component ? COMPONENT_ICONS[node.component] : undefined;
 
   const handleClick = useCallback(() => {
     navigate(`/${organizationId}/canvases/${canvasId}?sidebar=1&node=${nodeId}`);
-    // Dispatch a custom event for the canvas page to zoom to the node
     window.dispatchEvent(new CustomEvent("agent:focus-node", { detail: { nodeId } }));
   }, [navigate, organizationId, canvasId, nodeId]);
-
-  const chipClassName = cn(
-    "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset transition-colors cursor-pointer align-middle whitespace-nowrap",
-    node
-      ? isTrigger
-        ? "bg-purple-100 text-purple-700 ring-purple-300 hover:bg-purple-200"
-        : "bg-blue-100 text-blue-700 ring-blue-300 hover:bg-blue-200"
-      : "bg-slate-100 text-slate-600 ring-slate-300",
-  );
 
   return (
     <HoverCard openDelay={200} closeDelay={100}>
       <HoverCardTrigger asChild>
-        <button type="button" onClick={handleClick} className={chipClassName} title={`Node: ${nodeId}`}>
-          {iconSrc ? (
-            <img src={iconSrc} alt="" className="size-3 object-contain shrink-0" />
-          ) : LucideIcon ? (
-            <LucideIcon className="size-3 shrink-0" />
-          ) : (
-            <span className={cn("size-2 rounded-full shrink-0", isTrigger ? "bg-purple-500" : "bg-blue-500")} />
+        <button
+          type="button"
+          onClick={handleClick}
+          className={cn(
+            "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset transition-colors cursor-pointer align-middle whitespace-nowrap",
+            getChipStyle(node),
           )}
+          title={`Node: ${nodeId}`}
+        >
+          <NodeIconInline component={node?.component} isTrigger={isTrigger} />
           {label}
         </button>
       </HoverCardTrigger>
