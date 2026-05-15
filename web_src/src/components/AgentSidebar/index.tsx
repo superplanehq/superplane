@@ -337,7 +337,7 @@ function groupMessages(messages: AgentMessage[]): MessageGroup[] {
 }
 
 function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const hasRunning = messages.some((m) => m.toolStatus === "started");
   const count = messages.length;
   const label = hasRunning
@@ -367,7 +367,7 @@ function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
 }
 
 function ToolMessageRow({ message }: { message: AgentMessage }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const command = message.content;
   const canExpand = Boolean(command);
   const running = message.toolStatus === "started";
