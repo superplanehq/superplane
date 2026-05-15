@@ -33,90 +33,113 @@ export type ChartConfig = {
   data?: { name: string; value: number; color?: string }[];
 };
 
-// --- Parser ---
+// --- Regex patterns ---
 
 const BLOCK_RE = /^\s*:::(\w+)(?:\s+(.*))?$/;
 const BLOCK_END_RE = /^\s*:::$/;
 const MERMAID_FENCE_START = /^\s*```mermaid\s*$/;
 const FENCE_END = /^\s*```\s*$/;
 
+// --- Parser state ---
+
+interface ParserState {
+  segments: Segment[];
+  markdownBuffer: string[];
+  blockType: string | null;
+  blockMeta: string;
+  blockLines: string[];
+  inMermaidFence: boolean;
+  mermaidLines: string[];
+}
+
+function createState(): ParserState {
+  return {
+    segments: [],
+    markdownBuffer: [],
+    blockType: null,
+    blockMeta: "",
+    blockLines: [],
+    inMermaidFence: false,
+    mermaidLines: [],
+  };
+}
+
+function flushMarkdown(state: ParserState) {
+  const text = state.markdownBuffer.join("\n").trim();
+  if (text) {
+    state.segments.push({ type: "markdown", content: text });
+  }
+  state.markdownBuffer = [];
+}
+
+function flushBlock(state: ParserState) {
+  if (!state.blockType) return;
+  const raw = state.blockLines.join("\n");
+  const segment = parseBlock(state.blockType, state.blockMeta, raw);
+  if (segment) {
+    state.segments.push(segment);
+  }
+  state.blockType = null;
+  state.blockMeta = "";
+  state.blockLines = [];
+}
+
+function processLine(state: ParserState, line: string) {
+  if (state.inMermaidFence) {
+    if (FENCE_END.test(line.trim())) {
+      flushMarkdown(state);
+      state.segments.push({ type: "mermaid", content: state.mermaidLines.join("\n") });
+      state.mermaidLines = [];
+      state.inMermaidFence = false;
+    } else {
+      state.mermaidLines.push(line);
+    }
+    return;
+  }
+
+  if (state.blockType) {
+    if (BLOCK_END_RE.test(line.trim())) {
+      flushBlock(state);
+    } else {
+      state.blockLines.push(line);
+    }
+    return;
+  }
+
+  if (MERMAID_FENCE_START.test(line.trim())) {
+    flushMarkdown(state);
+    state.inMermaidFence = true;
+    state.mermaidLines = [];
+    return;
+  }
+
+  const match = line.match(BLOCK_RE);
+  if (match) {
+    flushMarkdown(state);
+    state.blockType = match[1];
+    state.blockMeta = match[2] || "";
+  } else {
+    state.markdownBuffer.push(line);
+  }
+}
+
+// --- Public API ---
+
 export function parseAgentContent(content: string): Segment[] {
   if (!content) return [];
 
-  const lines = content.split("\n");
-  const segments: Segment[] = [];
-  let markdownBuffer: string[] = [];
-  let blockType: string | null = null;
-  let blockMeta = "";
-  let blockLines: string[] = [];
-
-  function flushMarkdown() {
-    const text = markdownBuffer.join("\n").trim();
-    if (text) {
-      segments.push({ type: "markdown", content: text });
-    }
-    markdownBuffer = [];
+  const state = createState();
+  for (const line of content.split("\n")) {
+    processLine(state, line);
   }
 
-  function flushBlock() {
-    if (!blockType) return;
-    const raw = blockLines.join("\n");
-    const segment = parseBlock(blockType, blockMeta, raw);
-    if (segment) {
-      segments.push(segment);
-    }
-    blockType = null;
-    blockMeta = "";
-    blockLines = [];
-  }
+  if (state.blockType) flushBlock(state);
+  flushMarkdown(state);
 
-  let inMermaidFence = false;
-  let mermaidLines: string[] = [];
-
-  for (const line of lines) {
-    // Handle ```mermaid fenced code blocks
-    if (inMermaidFence) {
-      if (FENCE_END.test(line.trim())) {
-        flushMarkdown();
-        segments.push({ type: "mermaid", content: mermaidLines.join("\n") });
-        mermaidLines = [];
-        inMermaidFence = false;
-      } else {
-        mermaidLines.push(line);
-      }
-      continue;
-    }
-
-    if (blockType) {
-      if (BLOCK_END_RE.test(line.trim())) {
-        flushBlock();
-      } else {
-        blockLines.push(line);
-      }
-    } else if (MERMAID_FENCE_START.test(line.trim())) {
-      flushMarkdown();
-      inMermaidFence = true;
-      mermaidLines = [];
-    } else {
-      const match = line.match(BLOCK_RE);
-      if (match) {
-        flushMarkdown();
-        blockType = match[1];
-        blockMeta = match[2] || "";
-      } else {
-        markdownBuffer.push(line);
-      }
-    }
-  }
-
-  // Handle unclosed blocks gracefully
-  if (blockType) {
-    flushBlock();
-  }
-  flushMarkdown();
-
-  return segments;
+  return state.segments;
 }
+
+// --- Block parsers ---
 
 function parseBlock(type: string, meta: string, raw: string): Segment | null {
   switch (type) {
