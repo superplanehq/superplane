@@ -1,24 +1,56 @@
 {
   "type": "slack.app.mention",
-  "data":{
-    "token": "XXYYZZ",
-    "team_id": "T123ABC456",
-    "api_app_id": "A123ABC456",
+  "data": {
+    "token": "verification-token-redacted",
+    "team_id": "T01ACMELABS",
+    "context_team_id": "T01ACMELABS",
+    "context_enterprise_id": null,
+    "api_app_id": "A07SUPERPLANE",
     "event": {
-        "type": "app_mention",
-        "user": "U061F7AUR",
-        "text": "<@U0LAN0Z89> is it everything a river should be?",
-        "ts": "1515449522.000016",
-        "channel": "C123ABC456",
-        "event_ts": "1515449522000016"
+      "type": "app_mention",
+      "user": "U02RENATODEV",
+      "text": "<@U07SUPERBOT> please rerun the snaketoy-web canary",
+      "ts": "1804512042.000400",
+      "team": "1804512042",
+      "channel": "C03SNAKETOY",
+      "event_ts": "1804512042.000400",
+      "blocks": [
+        {
+          "type": "rich_text",
+          "block_id": "Bk0",
+          "elements": [
+            {
+              "type": "rich_text_section",
+              "elements": [
+                {
+                  "type": "user",
+                  "user_id": "U07SUPERBOT"
+                },
+                {
+                  "type": "text",
+                  "text": " please rerun the snaketoy-web canary"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "client_msg_id": "8b1a4c7d-9e0f-2a3b-4c5d-6e7f8a9b0c1d"
     },
     "type": "event_callback",
-    "authed_users": [
-        "U123ABC456",
-        "U222222222"
+    "event_id": "Ev08SNAKETOY01",
+    "event_time": 1804512042,
+    "authorizations": [
+      {
+        "enterprise_id": null,
+        "team_id": "T01ACMELABS",
+        "user_id": "U07SUPERBOT",
+        "is_bot": true,
+        "is_enterprise_install": false
+      }
     ],
-    "event_id": "Ev123ABC456",
-    "event_time": 123456789
+    "is_ext_shared_channel": false,
+    "event_context": "4-eyJldCI6ImFwcF9tZW50aW9uIiwidGlkIjoiVDAxQUNNRUxBQlMiLCJhaWQiOiJBMDdTVVBFUlBMQU5FIn0"
   },
-  "timestamp": "2026-01-19T12:00:00Z"
+  "timestamp": "2026-03-04T09:18:42.184Z"
 }
