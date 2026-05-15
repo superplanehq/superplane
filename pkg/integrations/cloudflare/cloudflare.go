@@ -106,6 +106,31 @@ func resolveWorkerScriptMetadata(ctx core.SetupContext, accountID, scriptID stri
 	return ctx.Metadata.Set(meta)
 }
 
+type TunnelNodeMetadata struct {
+	TunnelName string `json:"tunnelName"`
+}
+
+func resolveTunnelMetadata(ctx core.SetupContext, accountID, tunnelID string) error {
+	meta := TunnelNodeMetadata{}
+	if strings.Contains(tunnelID, "{{") || strings.Contains(accountID, "{{") {
+		meta.TunnelName = tunnelID
+	} else {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create client: %w", err)
+		}
+		tunnel, err := client.GetCFDTunnel(accountID, tunnelID)
+		if err != nil {
+			return fmt.Errorf("failed to get tunnel: %w", err)
+		}
+		meta.TunnelName = tunnel.Name
+		if meta.TunnelName == "" {
+			meta.TunnelName = tunnelID
+		}
+	}
+	return ctx.Metadata.Set(meta)
+}
+
 func resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error {
 	meta := PoolNodeMetadata{}
 	if strings.Contains(poolID, "{{") || strings.Contains(accountID, "{{") {
@@ -161,7 +186,8 @@ func (c *Cloudflare) Instructions() string {
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
      - Zone / DNS / Edit
-     - Zone / Dynamic Redirect / Edit
+     - Zone / Cache Purge / Purge
+     - Zone / SSL and Certificates / Edit
      - Zone / Single Redirect / Edit
      - Zone / Origin Rules / Edit
      - Zone / Workers Routes / Edit
@@ -172,6 +198,7 @@ func (c *Cloudflare) Instructions() string {
      - Account / Load Balancing: Monitors and Pools / Edit
      - Account / Notifications / Edit
      - Account / Account Settings / Edit
+     - Account / Cloudflare Tunnel / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
    - **Account Resources**: Include the account containing your load balancers
 5. Click **Continue to summary**, then **Create Token**
@@ -179,7 +206,7 @@ func (c *Cloudflare) Instructions() string {
 
 ## Find your Cloudflare Account ID
 
-The **Account ID** is required for KV storage, load balancing monitors/pools, and health alert webhooks.
+The **Account ID** is required for KV storage, load balancing monitors/pools, Cloudflare Tunnels, and health alert webhooks.
 
 1. Open the [Cloudflare dashboard](https://dash.cloudflare.com/)
 2. Select the account that contains your load balancers
@@ -206,7 +233,7 @@ func (c *Cloudflare) Configuration() []configuration.Field {
 			Label:       "Account ID",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Cloudflare account ID. Required for KV storage, load balancing monitors/pools, and alerting webhooks.",
+			Description: "Cloudflare account ID. Required for KV storage, load balancing monitors/pools, Cloudflare Tunnels, and alerting webhooks.",
 			Placeholder: "e.g. 01a7362d577a6c3019a474fd6f485823",
 		},
 	}
@@ -221,6 +248,8 @@ func (c *Cloudflare) Actions() []core.Action {
 		&UpdateDNSRecord{},
 		&DeleteDNSRecord{},
 		&CreateMonitor{},
+		&GetMonitor{},
+		&UpdateMonitor{},
 		&DeleteMonitor{},
 		&DeleteOriginRule{},
 		&CreateKVNamespace{},
@@ -232,6 +261,9 @@ func (c *Cloudflare) Actions() []core.Action {
 		&UpdatePool{},
 		&GetPool{},
 		&DeletePool{},
+		&PurgeCache{},
+		&OrderCertificatePack{},
+		&DeleteCertificatePack{},
 		&CreateLoadBalancer{},
 		&GetLoadBalancer{},
 		&UpdateLoadBalancer{},
@@ -240,12 +272,16 @@ func (c *Cloudflare) Actions() []core.Action {
 		&GetWorker{},
 		&DeleteWorker{},
 		&UpdateWorkerRoute{},
+		&CreateTunnel{},
+		&GetTunnel{},
+		&DeleteTunnel{},
 	}
 }
 
 func (c *Cloudflare) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnLoadBalancingHealthAlert{},
+		&OnTunnelHealth{},
 	}
 }
 
@@ -512,6 +548,35 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 		}
 		return resources, nil
 
+	case "certificate_pack":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		metadata := Metadata{}
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+			return nil, fmt.Errorf("failed to decode application metadata: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, zone := range metadata.Zones {
+			packs, err := client.ListCertificatePacks(zone.ID)
+			if err != nil {
+				ctx.Logger.WithError(err).WithField("zone_id", zone.ID).WithField("zone_name", zone.Name).Warn("failed to list certificate packs for zone, skipping")
+				continue
+			}
+
+			for _, pack := range packs {
+				resources = append(resources, core.IntegrationResource{
+					Type: resourceType,
+					Name: certificatePackResourceName(zone.Name, pack),
+					ID:   fmt.Sprintf("%s/%s", zone.ID, pack.ID),
+				})
+			}
+		}
+		return resources, nil
+
 	case "load_balancer":
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
@@ -572,6 +637,42 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 			})
 		}
 		return resources, nil
+
+	case "tunnel":
+		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			accountID = accountIDFromIntegration(ctx.Integration)
+		}
+		if accountID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		tunnels, err := client.ListCFDTunnels(accountID)
+		if err != nil {
+			return nil, fmt.Errorf("error listing tunnels: %w", err)
+		}
+
+		var out []core.IntegrationResource
+		for _, t := range tunnels {
+			if t.ID == "" {
+				continue
+			}
+			name := t.Name
+			if name == "" {
+				name = t.ID
+			}
+			out = append(out, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   t.ID,
+			})
+		}
+		return out, nil
 
 	default:
 		return []core.IntegrationResource{}, nil

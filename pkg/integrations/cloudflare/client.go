@@ -109,6 +109,37 @@ func newCloudflareAPIError(statusCode int, responseBody []byte) *CloudflareAPIEr
 	return apiError
 }
 
+type PurgeCacheRequest struct {
+	PurgeEverything bool     `json:"purge_everything,omitempty"`
+	Files           []string `json:"files,omitempty"`
+	Tags            []string `json:"tags,omitempty"`
+	Hosts           []string `json:"hosts,omitempty"`
+	Prefixes        []string `json:"prefixes,omitempty"`
+}
+
+type PurgeCacheResult struct {
+	ID string `json:"id,omitempty"`
+}
+
+type CertificatePack struct {
+	ID                   string   `json:"id,omitempty"`
+	CertificateAuthority string   `json:"certificate_authority,omitempty"`
+	Hosts                []string `json:"hosts,omitempty"`
+	Status               string   `json:"status,omitempty"`
+	Type                 string   `json:"type,omitempty"`
+	ValidationMethod     string   `json:"validation_method,omitempty"`
+	ValidityDays         int      `json:"validity_days,omitempty"`
+}
+
+type OrderCertificatePackRequest struct {
+	CertificateAuthority string   `json:"certificate_authority"`
+	Hosts                []string `json:"hosts"`
+	Type                 string   `json:"type"`
+	ValidationMethod     string   `json:"validation_method"`
+	ValidityDays         *int     `json:"validity_days,omitempty"`
+	CloudflareBranding   *bool    `json:"cloudflare_branding,omitempty"`
+}
+
 // Zone represents a Cloudflare zone
 type Zone struct {
 	ID     string `json:"id"`
@@ -217,6 +248,8 @@ type NotificationPolicyFilters struct {
 	PoolID      []string `json:"pool_id,omitempty"`
 	NewHealth   []string `json:"new_health,omitempty"`
 	EventSource []string `json:"event_source,omitempty"`
+	TunnelID    []string `json:"tunnel_id,omitempty"`
+	NewStatus   []string `json:"new_status,omitempty"`
 }
 
 type NotificationPolicyResponse struct {
@@ -381,6 +414,35 @@ func (c *Client) ListMonitorReferences(accountID, monitorID string) ([]MonitorRe
 	}
 
 	return response.Result, nil
+}
+
+func (c *Client) UpdateMonitor(accountID, monitorID string, req CreateMonitorRequest) (*Monitor, error) {
+	url := fmt.Sprintf("%s/accounts/%s/load_balancers/monitors/%s", c.BaseURL, accountID, monitorID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPut, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool    `json:"success"`
+		Result  Monitor `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
 }
 
 func (c *Client) ListPools(accountID string) ([]Pool, error) {
@@ -1502,6 +1564,111 @@ func (c *Client) UpdatePool(accountID, poolID string, req UpdatePoolRequest) (*P
 	}
 
 	return &response.Result, nil
+}
+
+func (c *Client) PurgeCache(zoneID string, req PurgeCacheRequest) (*PurgeCacheResult, error) {
+	url := fmt.Sprintf("%s/zones/%s/purge_cache", c.BaseURL, zoneID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool             `json:"success"`
+		Result  PurgeCacheResult `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+func (c *Client) OrderCertificatePack(zoneID string, req OrderCertificatePackRequest) (*CertificatePack, error) {
+	url := fmt.Sprintf("%s/zones/%s/ssl/certificate_packs/order", c.BaseURL, zoneID)
+
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, url, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool            `json:"success"`
+		Result  CertificatePack `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return &response.Result, nil
+}
+
+func (c *Client) DeleteCertificatePack(zoneID, packID string) error {
+	url := fmt.Sprintf("%s/zones/%s/ssl/certificate_packs/%s", c.BaseURL, zoneID, packID)
+
+	responseBody, err := c.execRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	var response struct {
+		Success bool `json:"success"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return fmt.Errorf("API returned success=false")
+	}
+
+	return nil
+}
+
+func (c *Client) ListCertificatePacks(zoneID string) ([]CertificatePack, error) {
+	url := fmt.Sprintf("%s/zones/%s/ssl/certificate_packs", c.BaseURL, zoneID)
+
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Success bool              `json:"success"`
+		Result  []CertificatePack `json:"result"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("API returned success=false")
+	}
+
+	return response.Result, nil
 }
 
 // ---- Load Balancer types ----
