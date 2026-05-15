@@ -92,29 +92,61 @@ Each event contains the full Container Analysis Occurrence resource, including `
 ```json
 {
   "data": {
+    "createTime": "2026-03-01T11:46:08.412Z",
     "kind": "VULNERABILITY",
-    "name": "projects/my-project/occurrences/vuln-001",
-    "noteName": "projects/goog-vulnz/notes/CVE-2023-1234",
-    "resourceUri": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123",
+    "name": "projects/acme-prod-12348/occurrences/4f1c0a92-b8d4-4c7a-9e2f-1a8b0d3e5c14",
+    "noteName": "projects/goog-vulnz/notes/CVE-2023-0464",
+    "resourceUri": "https://us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web@sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7",
+    "updateTime": "2026-03-01T11:46:08.412Z",
     "vulnerability": {
       "cvssScore": 7.5,
+      "cvssv3": {
+        "attackComplexity": "ATTACK_COMPLEXITY_LOW",
+        "attackVector": "ATTACK_VECTOR_NETWORK",
+        "availabilityImpact": "IMPACT_HIGH",
+        "baseScore": 7.5,
+        "confidentialityImpact": "IMPACT_NONE",
+        "exploitabilityScore": 3.9,
+        "impactScore": 3.6,
+        "integrityImpact": "IMPACT_NONE",
+        "privilegesRequired": "PRIVILEGES_REQUIRED_NONE",
+        "scope": "SCOPE_UNCHANGED",
+        "userInteraction": "USER_INTERACTION_NONE"
+      },
+      "effectiveSeverity": "HIGH",
+      "fixAvailable": true,
+      "longDescription": "OpenSSL vulnerability affecting certificate policy checks.",
       "packageIssue": [
         {
-          "affectedPackage": "libssl1.1",
+          "affectedCpeUri": "cpe:/o:debian:debian_linux:12",
+          "affectedPackage": "libssl3",
           "affectedVersion": {
             "kind": "NORMAL",
-            "name": "1.1.1n-0+deb11u3"
+            "name": "3.0.11-1~deb12u2"
           },
+          "effectiveSeverity": "HIGH",
+          "fixAvailable": true,
+          "fixedCpeUri": "cpe:/o:debian:debian_linux:12",
+          "fixedPackage": "libssl3",
           "fixedVersion": {
             "kind": "NORMAL",
-            "name": "1.1.1n-0+deb11u5"
-          }
+            "name": "3.0.13-1~deb12u1"
+          },
+          "packageType": "OS"
         }
       ],
-      "severity": "HIGH"
+      "relatedUrls": [
+        {
+          "label": "More Info",
+          "url": "https://nvd.nist.gov/vuln/detail/CVE-2023-0464"
+        }
+      ],
+      "severity": "HIGH",
+      "shortDescription": "CVE-2023-0464",
+      "type": "OS"
     }
   },
-  "timestamp": "2025-01-01T00:00:00Z",
+  "timestamp": "2026-03-01T11:46:09.218Z",
   "type": "gcp.artifactregistry.artifact.analysis"
 }
 ```
@@ -155,10 +187,10 @@ Each event contains:
 {
   "data": {
     "action": "INSERT",
-    "digest": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123def456",
-    "tag": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image:latest"
+    "digest": "https://us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web@sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7",
+    "tag": "https://us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web:v1.5.0"
   },
-  "timestamp": "2025-01-01T00:00:00Z",
+  "timestamp": "2026-03-01T11:42:31.084Z",
   "type": "gcp.artifactregistry.artifact.push"
 }
 ```
@@ -196,15 +228,131 @@ Each event contains the full Cloud Build resource, including `id`, `status` (SUC
 ```json
 {
   "data": {
-    "buildTriggerId": "abcdefgh-1234-5678-abcd-123456789012",
-    "createTime": "2025-01-01T00:00:00Z",
-    "finishTime": "2025-01-01T00:05:00Z",
-    "id": "12345678-abcd-1234-5678-abcdef012345",
-    "logUrl": "https://console.cloud.google.com/cloud-build/builds/12345678-abcd-1234-5678-abcdef012345",
-    "projectId": "my-project",
-    "status": "SUCCESS"
+    "artifacts": {
+      "images": [
+        "us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web:v1.5.0"
+      ]
+    },
+    "buildTriggerId": "21f8c0a4-3e2b-4d18-9c5a-7b1d8e0f4a92",
+    "createTime": "2026-03-01T11:36:08.412Z",
+    "finishTime": "2026-03-01T11:42:24.512Z",
+    "id": "9f3a2b1c-7d2e-4a8f-bc91-1a2b3c4d5e6f",
+    "logUrl": "https://console.cloud.google.com/cloud-build/builds;region=us-central1/9f3a2b1c-7d2e-4a8f-bc91-1a2b3c4d5e6f?project=acme-prod-12348",
+    "logsBucket": "gs://1093872310984.cloudbuild-logs.googleusercontent.com",
+    "name": "projects/acme-prod-12348/locations/us-central1/builds/9f3a2b1c-7d2e-4a8f-bc91-1a2b3c4d5e6f",
+    "options": {
+      "dynamicSubstitutions": true,
+      "logging": "CLOUD_LOGGING_ONLY",
+      "machineType": "E2_HIGHCPU_8",
+      "pool": {},
+      "substitutionOption": "ALLOW_LOOSE"
+    },
+    "projectId": "acme-prod-12348",
+    "queueTtl": "3600s",
+    "results": {
+      "buildStepImages": [
+        "sha256:c3a1f2b8e914...",
+        "sha256:c3a1f2b8e914..."
+      ],
+      "buildStepOutputs": [
+        "",
+        ""
+      ],
+      "images": [
+        {
+          "digest": "sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7",
+          "name": "us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web:v1.5.0",
+          "pushTiming": {
+            "endTime": "2026-03-01T11:42:18.230Z",
+            "startTime": "2026-03-01T11:39:49.012Z"
+          }
+        }
+      ]
+    },
+    "serviceAccount": "projects/acme-prod-12348/serviceAccounts/cloudbuild@acme-prod-12348.iam.gserviceaccount.com",
+    "source": {
+      "gitSource": {
+        "revision": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+        "url": "https://github.com/acme-labs/snaketoy"
+      }
+    },
+    "sourceProvenance": {
+      "resolvedRepoSource": {
+        "commitSha": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+        "projectId": "acme-prod-12348",
+        "repoName": "github_acme-labs_snaketoy"
+      }
+    },
+    "startTime": "2026-03-01T11:36:14.810Z",
+    "status": "SUCCESS",
+    "steps": [
+      {
+        "args": [
+          "build",
+          "-t",
+          "us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web:v1.5.0",
+          "-t",
+          "us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web:4f9c2e1",
+          "."
+        ],
+        "id": "build",
+        "name": "gcr.io/cloud-builders/docker",
+        "pullTiming": {
+          "endTime": "2026-03-01T11:36:24.108Z",
+          "startTime": "2026-03-01T11:36:14.810Z"
+        },
+        "status": "SUCCESS",
+        "timing": {
+          "endTime": "2026-03-01T11:39:48.740Z",
+          "startTime": "2026-03-01T11:36:24.110Z"
+        }
+      },
+      {
+        "args": [
+          "push",
+          "--all-tags",
+          "us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web"
+        ],
+        "id": "push",
+        "name": "gcr.io/cloud-builders/docker",
+        "status": "SUCCESS",
+        "timing": {
+          "endTime": "2026-03-01T11:42:18.230Z",
+          "startTime": "2026-03-01T11:39:49.012Z"
+        }
+      }
+    ],
+    "substitutions": {
+      "BRANCH_NAME": "main",
+      "COMMIT_SHA": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+      "REPO_NAME": "snaketoy",
+      "REVISION_ID": "4f9c2e1a7b3d45c0d1e9f23456789abcdeffed01",
+      "SHORT_SHA": "4f9c2e1",
+      "TRIGGER_NAME": "snaketoy-main-push",
+      "_DEPLOY_REGION": "us-central1",
+      "_IMAGE_TAG": "v1.5.0"
+    },
+    "tags": [
+      "push-main",
+      "release-v1.5.0"
+    ],
+    "timeout": "1200s",
+    "timing": {
+      "BUILD": {
+        "endTime": "2026-03-01T11:42:18.231Z",
+        "startTime": "2026-03-01T11:36:14.810Z"
+      },
+      "FETCHSOURCE": {
+        "endTime": "2026-03-01T11:36:14.760Z",
+        "startTime": "2026-03-01T11:36:09.142Z"
+      },
+      "PUSH": {
+        "endTime": "2026-03-01T11:42:18.232Z",
+        "startTime": "2026-03-01T11:39:49.012Z"
+      }
+    }
   },
-  "timestamp": "2025-01-01T00:05:00Z",
+  "timestamp": "2026-03-01T11:42:24.984Z",
   "type": "gcp.cloudbuild.build"
 }
 ```
@@ -239,19 +387,115 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
 {
   "data": {
     "data": {
+      "insertId": "1k1z9d4d3vkc",
+      "logName": "projects/acme-prod-12348/logs/cloudaudit.googleapis.com%2Factivity",
+      "operation": {
+        "first": true,
+        "id": "operation-1741080522104-617f9b3a8c4d2-2f84b1a7-3e2b5d18",
+        "producer": "compute.googleapis.com"
+      },
       "protoPayload": {
+        "@type": "type.googleapis.com/google.cloud.audit.AuditLog",
+        "authenticationInfo": {
+          "principalEmail": "renato-dev@acme.example",
+          "principalSubject": "user:renato-dev@acme.example"
+        },
+        "authorizationInfo": [
+          {
+            "granted": true,
+            "permission": "compute.instances.create",
+            "resource": "projects/acme-prod-12348/zones/us-central1-a/instances/snaketoy-runner-3",
+            "resourceAttributes": {}
+          }
+        ],
         "methodName": "v1.compute.instances.insert",
-        "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
-        "serviceName": "compute.googleapis.com"
-      }
+        "request": {
+          "@type": "type.googleapis.com/compute.instances.insert",
+          "disks": [
+            {
+              "autoDelete": true,
+              "boot": true,
+              "initializeParams": {
+                "diskSizeGb": "20",
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12"
+              }
+            }
+          ],
+          "labels": {
+            "env": "prod",
+            "service": "snaketoy"
+          },
+          "machineType": "projects/acme-prod-12348/zones/us-central1-a/machineTypes/e2-standard-2",
+          "name": "snaketoy-runner-3",
+          "networkInterfaces": [
+            {
+              "accessConfigs": [
+                {
+                  "name": "External NAT",
+                  "type": "ONE_TO_ONE_NAT"
+                }
+              ],
+              "network": "projects/acme-prod-12348/global/networks/default",
+              "subnetwork": "projects/acme-prod-12348/regions/us-central1/subnetworks/default"
+            }
+          ],
+          "tags": {
+            "items": [
+              "snaketoy",
+              "runner"
+            ]
+          }
+        },
+        "requestMetadata": {
+          "callerIp": "203.0.113.42",
+          "callerSuppliedUserAgent": "google-cloud-sdk gcloud/472.0.0 command/gcloud.compute.instances.create",
+          "destinationAttributes": {},
+          "requestAttributes": {
+            "auth": {},
+            "time": "2026-03-04T09:18:41.928Z"
+          }
+        },
+        "resourceLocation": {
+          "currentLocations": [
+            "us-central1-a"
+          ]
+        },
+        "resourceName": "projects/acme-prod-12348/zones/us-central1-a/instances/snaketoy-runner-3",
+        "response": {
+          "@type": "type.googleapis.com/operation",
+          "id": "8273102983712301921",
+          "insertTime": "2026-03-04T01:18:42.034-08:00",
+          "name": "operation-1741080522104-617f9b3a8c4d2-2f84b1a7-3e2b5d18",
+          "operationType": "insert",
+          "progress": 0,
+          "selfLink": "https://www.googleapis.com/compute/v1/projects/acme-prod-12348/zones/us-central1-a/operations/operation-1741080522104-617f9b3a8c4d2-2f84b1a7-3e2b5d18",
+          "status": "RUNNING",
+          "targetId": "5128371029834102910",
+          "targetLink": "https://www.googleapis.com/compute/v1/projects/acme-prod-12348/zones/us-central1-a/instances/snaketoy-runner-3",
+          "user": "renato-dev@acme.example"
+        },
+        "serviceName": "compute.googleapis.com",
+        "status": {}
+      },
+      "receiveTimestamp": "2026-03-04T09:18:42.834Z",
+      "resource": {
+        "labels": {
+          "instance_id": "5128371029834102910",
+          "project_id": "acme-prod-12348",
+          "zone": "us-central1-a"
+        },
+        "type": "gce_instance"
+      },
+      "severity": "NOTICE",
+      "timestamp": "2026-03-04T09:18:42.114Z"
     },
-    "logName": "projects/my-project/logs/cloudaudit.googleapis.com%2Factivity",
+    "logName": "projects/acme-prod-12348/logs/cloudaudit.googleapis.com%2Factivity",
     "methodName": "v1.compute.instances.insert",
-    "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
+    "resourceName": "projects/acme-prod-12348/zones/us-central1-a/instances/snaketoy-runner-3",
     "serviceName": "compute.googleapis.com",
-    "timestamp": "2025-02-14T12:00:00Z"
+    "timestamp": "2026-03-04T09:18:42.114Z"
   },
-  "timestamp": "2025-02-14T12:00:00Z",
+  "timestamp": "2026-03-04T09:18:42.910Z",
   "type": "gcp.compute.vmInstance"
 }
 ```
@@ -294,13 +538,36 @@ Each event contains the decoded message payload plus Pub/Sub metadata:
 {
   "data": {
     "attributes": {
-      "eventType": "order.created"
+      "eventType": "order.created",
+      "schemaVersion": "1.2",
+      "source": "checkout-api",
+      "tenant": "acme-prod-12348"
     },
-    "data": "{\"event\":\"order.created\",\"orderId\":\"ord_abc123\"}",
-    "messageId": "1234567890",
-    "publishTime": "2025-01-01T00:00:00Z"
+    "data": {
+      "createdAt": "2026-03-04T09:41:17Z",
+      "currency": "USD",
+      "customerId": "cus_7d2e9f1a",
+      "event": "order.created",
+      "items": [
+        {
+          "quantity": 2,
+          "sku": "SNK-PLUSH-RED",
+          "unitPriceCents": 1499
+        },
+        {
+          "quantity": 1,
+          "sku": "SNK-STICKER-PACK",
+          "unitPriceCents": 499
+        }
+      ],
+      "orderId": "ord_8f3a2b1c",
+      "region": "us-central1",
+      "totalCents": 3497
+    },
+    "messageId": "10812304798321094",
+    "publishTime": "2026-03-04T09:41:18.502Z"
   },
-  "timestamp": "2025-01-01T00:00:00Z",
+  "timestamp": "2026-03-04T09:41:18.612Z",
   "type": "gcp.pubsub.message"
 }
 ```

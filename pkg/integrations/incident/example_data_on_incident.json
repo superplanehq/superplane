@@ -3,23 +3,59 @@
   "data": {
     "event_type": "public_incident.incident_created_v2",
     "incident": {
-      "id": "01FDAG4SAP5TYPT98WGR2N7W91",
-      "name": "Our database is sad",
-      "summary": "Our database is really really sad, and we don't know why yet.",
-      "reference": "INC-123",
-      "permalink": "https://app.incident.io/incidents/123",
+      "id": "01HF8K2TYRXG4PQA5NW7B9C0D1",
+      "name": "snaketoy-web 5xx spike (eu-west-1)",
+      "summary": "snaketoy-web is returning 5xx for ~8% of requests in eu-west-1. Investigating origin pool snaketoy-web-prod.",
+      "reference": "INC-218",
+      "permalink": "https://acme-labs.app.incident.io/incidents/218",
       "visibility": "public",
-      "created_at": "2021-08-17T13:28:57.801578Z",
-      "updated_at": "2021-08-17T13:28:57.801578Z",
+      "created_at": "2026-03-04T09:18:42.184Z",
+      "updated_at": "2026-03-04T09:18:42.184Z",
+      "creator": {
+        "user": {
+          "id": "01HF8GTNH7K9V3X2P5R8B6Q4D2",
+          "name": "Renato Dev",
+          "email": "renato.dev@acme.example"
+        }
+      },
       "severity": {
-        "id": "01FCNDV6P870EA6S7TK1DSYDG0",
-        "name": "Minor"
+        "id": "01HF8GTNH7K9V3X2P5R8B6Q4D3",
+        "name": "Major",
+        "rank": 2,
+        "description": "Significant impact to production users."
       },
       "incident_status": {
-        "id": "01FCNDV6P870EA6S7TK1DSYD5H",
-        "name": "Triage"
-      }
+        "id": "01HF8GTNH7K9V3X2P5R8B6Q4D4",
+        "name": "Triage",
+        "category": "triage",
+        "rank": 1
+      },
+      "incident_type": {
+        "id": "01HF8GTNH7K9V3X2P5R8B6Q4D5",
+        "name": "Production outage"
+      },
+      "mode": "real",
+      "call_url": null,
+      "slack_channel_id": "C03SNAKETOYWEB",
+      "slack_channel_name": "inc-218-snaketoy-web-5xx-spike-eu-west-1",
+      "slack_team_id": "T01ACMELABS",
+      "incident_role_assignments": [
+        {
+          "role": {
+            "id": "01HF8GTNH7K9V3X2P5R8B6Q4D6",
+            "name": "Lead",
+            "shortform": "lead",
+            "role_type": "lead"
+          },
+          "assignee": {
+            "id": "01HF8GTNH7K9V3X2P5R8B6Q4D2",
+            "name": "Renato Dev",
+            "email": "renato.dev@acme.example"
+          }
+        }
+      ],
+      "custom_field_entries": []
     }
   },
-  "timestamp": "2026-01-19T12:00:00Z"
+  "timestamp": "2026-03-04T09:18:42.812Z"
 }

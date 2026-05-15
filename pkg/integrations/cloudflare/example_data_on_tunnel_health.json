@@ -1,21 +1,23 @@
 {
   "data": {
-    "account_id": "90ddd046-218b-d375-f20e-9f9082cc0c6d",
+    "account_id": "9035f53656c247e895c5a6939ae8a0e0",
+    "alert_correlation_id": "000eaa907ed24e78946d3a93adb2ae57",
+    "alert_event": "ALERT_STATE_EVENT_START",
     "alert_name": "tunnel_health_event",
     "alert_type": "tunnel_health_event",
-    "dashboard_link": "dash.cloudflare.com/aBcD1234efgh567i890j1kl234567m89",
-    "name": "SuperPlane Tunnel Health Alert",
+    "dashboard_link": "https://dash.cloudflare.com/9035f53656c247e895c5a6939ae8a0e0/networks/tunnels/cfd_tunnel/3a8f2b9c-7d2e-4a8f-bc91-1a2b3c4d5e6f",
+    "name": "snaketoy-runner-3 tunnel health",
     "new_status": "TUNNEL_STATUS_TYPE_DEGRADED",
     "policy_id": "fe9eda012119414084b1c9ffc9a1e2c9",
-    "policy_name": "SuperPlane Tunnel Health Alert",
+    "policy_name": "snaketoy-runner-3 tunnel health",
     "severity": "INFO",
     "status_reason": "status change",
-    "text": "A Cloudflare Tunnel in your account has changed its connection status.\nTunnel: tunnel-name (aBcD1234efgh567i890j1kl234567m80) \nNew status: TUNNEL_STATUS_TYPE_DEGRADED (status change)",
-    "timestamp": "2022-10-27T06:00:22Z",
-    "ts": 1778597408,
-    "tunnel_id": "aBcD1234efgh567i890j1kl234567m80",
-    "tunnel_name": "tunnel-name"
+    "text": "A Cloudflare Tunnel in your account has changed its connection status.\nTunnel: snaketoy-runner-3 (3a8f2b9c-7d2e-4a8f-bc91-1a2b3c4d5e6f) \nNew status: TUNNEL_STATUS_TYPE_DEGRADED (status change)",
+    "timestamp": "2026-03-04T09:18:42.184Z",
+    "ts": 1804512042,
+    "tunnel_id": "3a8f2b9c-7d2e-4a8f-bc91-1a2b3c4d5e6f",
+    "tunnel_name": "snaketoy-runner-3"
   },
-  "timestamp": "2026-05-12T14:50:14.036687251Z",
+  "timestamp": "2026-03-04T09:18:42.984Z",
   "type": "cloudflare.tunnel.healthEvent"
 }

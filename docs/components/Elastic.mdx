@@ -86,23 +86,19 @@ Each received alert emits the parsed JSON body sent by Kibana directly as the ev
 ```json
 {
   "data": {
-    "context": {
-      "message": "Error rate exceeded threshold: 15%",
-      "threshold": 10,
-      "value": 15
-    },
     "eventType": "alert_fired",
-    "ruleId": "abc-123",
-    "ruleName": "High error rate detected",
+    "ruleId": "f7c3a201-8b2d-4e9f-a1c5-3e2b1a4d5c6f",
+    "ruleName": "snaketoy-web 5xx error rate above 5% (5m)",
     "severity": "critical",
     "spaceId": "default",
     "status": "active",
     "tags": [
-      "infrastructure",
-      "prod"
+      "env:prod",
+      "service:snaketoy-web",
+      "severity:high"
     ]
   },
-  "timestamp": "2026-03-12T09:00:00Z",
+  "timestamp": "2026-03-04T09:18:42.184Z",
   "type": "elastic.alert"
 }
 ```
@@ -147,20 +143,21 @@ The trigger emits the full case details including id, title, status, severity, v
 ```json
 {
   "data": {
-    "createdAt": "2026-03-12T09:00:00.000Z",
-    "description": "Elevated error rate detected in production.",
+    "createdAt": "2026-03-04T09:21:02.184Z",
+    "description": "Started receiving alerts at 09:18 UTC for sustained 5xx error rates on /api/v1/score. Upstream timeouts observed after the v1.5.0 rollout. Rolling back the canary while we investigate.",
     "id": "3c0a2b10-4e5f-11ee-be56-0242ac120002",
     "severity": "high",
     "status": "in-progress",
     "tags": [
-      "production",
+      "env:prod",
+      "service:snaketoy-web",
       "incident"
     ],
-    "title": "Production incident",
-    "updatedAt": "2026-03-12T10:00:00.000Z",
-    "version": "WzE3LDFd"
+    "title": "snaketoy-web 5xx spike — investigating upstream timeouts",
+    "updatedAt": "2026-03-04T09:42:18.821Z",
+    "version": "WzE3MiwxXQ=="
   },
-  "timestamp": "2026-03-12T10:00:00Z",
+  "timestamp": "2026-03-04T09:42:19.218Z",
   "type": "elastic.case.status.changed"
 }
 ```
@@ -208,15 +205,30 @@ The webhook acts as a signal. When it fires, SuperPlane queries Elasticsearch fo
 ```json
 {
   "data": {
-    "id": "doc-1",
-    "index": "workflow-audit",
+    "id": "8f3a2b1c7d2e9f1a8b0d3e5c14a7b9c2",
+    "index": "logs-snaketoy.web-default-2026.03.04",
     "source": {
-      "@timestamp": "2026-03-12T09:00:00Z",
-      "message": "deployment started",
-      "service": "api"
+      "@timestamp": "2026-03-04T09:18:41.928Z",
+      "client.ip": "203.0.113.42",
+      "host.hostname": "snaketoy-runner-3",
+      "http.request.method": "POST",
+      "http.response.status_code": 504,
+      "labels": {
+        "deployment.id": "rel-v1.5.0",
+        "region": "us-central1"
+      },
+      "log.level": "ERROR",
+      "message": "request failed: upstream timeout after 30s",
+      "service.environment": "production",
+      "service.name": "snaketoy-web",
+      "service.version": "1.5.0",
+      "span.id": "8aab2c14b5e7d12a",
+      "trace.id": "9c2f1b03a8e1d647c2d4e9af3120cd5e",
+      "url.path": "/api/v1/score",
+      "user_agent.original": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36"
     }
   },
-  "timestamp": "2026-03-12T09:00:00Z",
+  "timestamp": "2026-03-04T09:18:42.512Z",
   "type": "elastic.document.indexed"
 }
 ```

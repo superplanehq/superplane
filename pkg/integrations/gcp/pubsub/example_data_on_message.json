@@ -1,12 +1,35 @@
 {
   "data": {
-    "messageId": "1234567890",
-    "publishTime": "2025-01-01T00:00:00Z",
-    "data": "{\"event\":\"order.created\",\"orderId\":\"ord_abc123\"}",
+    "messageId": "10812304798321094",
+    "publishTime": "2026-03-04T09:41:18.502Z",
+    "data": {
+      "event": "order.created",
+      "orderId": "ord_8f3a2b1c",
+      "customerId": "cus_7d2e9f1a",
+      "items": [
+        {
+          "sku": "SNK-PLUSH-RED",
+          "quantity": 2,
+          "unitPriceCents": 1499
+        },
+        {
+          "sku": "SNK-STICKER-PACK",
+          "quantity": 1,
+          "unitPriceCents": 499
+        }
+      ],
+      "totalCents": 3497,
+      "currency": "USD",
+      "region": "us-central1",
+      "createdAt": "2026-03-04T09:41:17Z"
+    },
     "attributes": {
-      "eventType": "order.created"
+      "eventType": "order.created",
+      "schemaVersion": "1.2",
+      "source": "checkout-api",
+      "tenant": "acme-prod-12348"
     }
   },
-  "timestamp": "2025-01-01T00:00:00Z",
+  "timestamp": "2026-03-04T09:41:18.612Z",
   "type": "gcp.pubsub.message"
 }

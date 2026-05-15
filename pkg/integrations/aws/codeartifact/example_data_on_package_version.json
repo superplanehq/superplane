@@ -5,20 +5,20 @@
     "detail-type": "CodeArtifact Package Version State Change",
     "source": "aws.codeartifact",
     "account": "123456789012",
-    "time": "2024-11-20T20:35:33Z",
+    "time": "2026-03-04T14:25:30Z",
     "region": "us-east-1",
     "resources": [
-      "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/example-repo"
+      "arn:aws:codeartifact:us-east-1:123456789012:repository/acme-labs/internal-npm"
     ],
     "detail": {
-      "domainName": "example-domain",
+      "domainName": "acme-labs",
       "domainOwner": "123456789012",
-      "repositoryName": "example-repo",
-      "repositoryAdministrator": "arn:aws:sts::123456789012:assumed-role/ExampleRole/example-user",
+      "repositoryName": "internal-npm",
+      "repositoryAdministrator": "arn:aws:sts::123456789012:assumed-role/snaketoy-publisher-role/renato-dev",
       "packageFormat": "npm",
-      "packageNamespace": null,
-      "packageName": "@scope/example-package",
-      "packageVersion": "1.2.3",
+      "packageNamespace": "acme-labs",
+      "packageName": "snaketoy-web",
+      "packageVersion": "1.5.0",
       "packageVersionState": "Published",
       "packageVersionRevision": "E30D52B451F42F41",
       "changes": {
@@ -33,6 +33,6 @@
       "eventDeduplicationId": "5f87d1a3-2c1f-4ab0-8f55-8f4c2b4a5c76"
     }
   },
-  "timestamp": "2026-03-10T14:25:30.31254162Z",
+  "timestamp": "2026-03-04T14:25:31.142Z",
   "type": "aws.codeartifact.package.version"
 }

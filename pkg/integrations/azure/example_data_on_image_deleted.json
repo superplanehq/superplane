@@ -2,38 +2,38 @@
   "type": "azure.image.deleted",
   "data": {
     "id": "afc359b4-001e-001b-66ab-eeb76e069631",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.ContainerRegistry/registries/myregistry",
-    "subject": "myregistry.azurecr.io/myrepository@sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.ContainerRegistry/registries/acmeprodacr",
+    "subject": "snaketoy-web@sha256:5b4d2e8f1c0a93d7b8e6f5a4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4",
     "eventType": "Microsoft.ContainerRegistry.ImageDeleted",
-    "eventTime": "2026-03-16T11:00:00Z",
+    "eventTime": "2026-03-08T08:14:02.318Z",
     "dataVersion": "1.0",
     "metadataVersion": "1",
     "data": {
       "id": "afc359b4-001e-001b-66ab-eeb76e069631",
-      "timestamp": "2026-03-16T11:00:00Z",
+      "timestamp": "2026-03-08T08:14:02.318Z",
       "action": "delete",
       "target": {
         "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-        "digest": "sha256:abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-        "repository": "myrepository",
+        "digest": "sha256:5b4d2e8f1c0a93d7b8e6f5a4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4",
+        "repository": "snaketoy-web",
         "tag": "",
-        "url": "https://myregistry.azurecr.io/v2/myrepository/manifests/sha256:abcdef1234567890"
+        "url": "https://acmeprodacr.azurecr.io/v2/snaketoy-web/manifests/sha256:5b4d2e8f1c0a93d7b8e6f5a4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4"
       },
       "request": {
-        "id": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
-        "addr": "203.0.113.0:49926",
-        "host": "myregistry.azurecr.io",
+        "id": "6e98f2b4-3d2a-5cb1-9f66-9f5d3c5b6d87",
+        "addr": "203.0.113.42:50012",
+        "host": "acmeprodacr.azurecr.io",
         "method": "DELETE",
-        "useragent": "docker/20.10.7"
+        "useragent": "az-cli/2.59.0 (Python 3.11.7)"
       },
       "actor": {
-        "name": "myuser"
+        "name": "renato-dev"
       },
       "source": {
-        "addr": "myregistry.azurecr.io",
+        "addr": "agent-pool-1.westeurope.azurecr.io:49941",
         "instanceID": "a29a591f-f89c-4f8d-b061-3c5d73d4756c"
       }
     }
   },
-  "timestamp": "2026-03-16T11:00:00Z"
+  "timestamp": "2026-03-08T08:14:02.984Z"
 }

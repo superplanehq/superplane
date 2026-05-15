@@ -1,28 +1,28 @@
 {
   "data": {
-    "account": "123456789012",
-    "detail": {
-      "execution-id": "00000000-0000-0000-0000-000000000001",
-      "execution-trigger": {
-        "trigger-detail": "arn:aws:sts::123456789012:assumed-role/superplane-demo-role/SuperPlane-00000000-0000-0000-0000-000000000000",
-        "trigger-type": "StartPipelineExecution"
-      },
-      "pipeline": "demo-pipeline",
-      "pipeline-execution-attempt": 1,
-      "start-time": "2026-02-24T15:21:42.016Z",
-      "state": "STARTED",
-      "version": 1
-    },
+    "version": "0",
+    "id": "8b1a4c7d-9e0f-2a3b-4c5d-6e7f8a9b0c1d",
     "detail-type": "CodePipeline Pipeline Execution State Change",
-    "id": "00000000-0000-0000-0000-000000000002",
+    "source": "aws.codepipeline",
+    "account": "123456789012",
+    "time": "2026-02-24T15:21:42Z",
     "region": "us-east-1",
     "resources": [
-      "arn:aws:codepipeline:us-east-1:123456789012:demo-pipeline"
+      "arn:aws:codepipeline:us-east-1:123456789012:snaketoy-deploy"
     ],
-    "source": "aws.codepipeline",
-    "time": "2026-02-24T15:21:42Z",
-    "version": "0"
+    "detail": {
+      "pipeline": "snaketoy-deploy",
+      "execution-id": "21f8c0a4-3e2b-4d18-9c5a-7b1d8e0f4a92",
+      "start-time": "2026-02-24T15:21:42.016Z",
+      "execution-trigger": {
+        "trigger-type": "StartPipelineExecution",
+        "trigger-detail": "arn:aws:sts::123456789012:assumed-role/snaketoy-deploy-role/renato-dev"
+      },
+      "state": "STARTED",
+      "version": 1.0,
+      "pipeline-execution-attempt": 1.0
+    }
   },
-  "timestamp": "2026-02-24T15:21:52.212Z",
+  "timestamp": "2026-02-24T15:21:42.984Z",
   "type": "aws.codepipeline.pipeline"
 }

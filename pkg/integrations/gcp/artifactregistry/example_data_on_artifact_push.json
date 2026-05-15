@@ -1,9 +1,9 @@
 {
   "data": {
     "action": "INSERT",
-    "digest": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image@sha256:abc123def456",
-    "tag": "https://us-central1-docker.pkg.dev/my-project/my-repo/my-image:latest"
+    "digest": "https://us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web@sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7",
+    "tag": "https://us-central1-docker.pkg.dev/acme-prod-12348/containers/snaketoy-web:v1.5.0"
   },
-  "timestamp": "2025-01-01T00:00:00Z",
+  "timestamp": "2026-03-01T11:42:31.084Z",
   "type": "gcp.artifactregistry.artifact.push"
 }
