@@ -17,18 +17,19 @@ type HostExecutor struct {
 	MaxOutputBytes int
 }
 
-func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live io.Writer) (int, string, error) {
+func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live io.Writer, resultHostPath string) (int, string, error) {
 	max := h.MaxOutputBytes
 	if max <= 0 {
 		max = 512 * 1024
 	}
 	if len(task.Commands) > 0 {
-		return runHostShellDirectives(ctx, max, task.Commands, live)
+		return runHostShellDirectives(ctx, max, task.Commands, live, resultHostPath)
 	}
 	if len(task.Command) == 0 {
 		return 1, "", errors.New("empty command")
 	}
 	cmd := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
+	setResultEnv(cmd, resultHostPath)
 	var buf bytes.Buffer
 	if live != nil {
 		mw := io.MultiWriter(&buf, live)

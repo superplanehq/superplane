@@ -34,13 +34,13 @@ func usePipeShell() bool {
 	}
 }
 
-func runHostShellDirectives(ctx context.Context, maxOut int, scripts []string, live io.Writer) (int, string, error) {
+func runHostShellDirectives(ctx context.Context, maxOut int, scripts []string, live io.Writer, resultHostPath string) (int, string, error) {
 	bash, err := resolveBash()
 	if err != nil {
 		return 1, "", err
 	}
 	if usePipeShell() {
-		return runHostShellDirectivesPipe(ctx, maxOut, bash, scripts, live)
+		return runHostShellDirectivesPipe(ctx, maxOut, bash, scripts, live, resultHostPath)
 	}
 	// Plain exec.Command (not CommandContext): attaching ctx to os/exec races with creack/pty on
 	// some Darwin setups; cancellation is handled inside runShellPTYSession via ctx + Process.Kill().
@@ -48,7 +48,7 @@ func runHostShellDirectives(ctx context.Context, maxOut int, scripts []string, l
 	// `/bin/bash: --: invalid option`). Keep job-control off (`+m`) for non-interactive scripts but
 	// omit `--noediting`; readline editing is irrelevant on our PTY-driven line protocol anyway.
 	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i")
-	return runShellPTYSession(ctx, maxOut, cmd, scripts, live)
+	return runShellPTYSession(ctx, maxOut, cmd, scripts, live, resultHostPath)
 }
 
 type cappedShellWriter struct {
@@ -93,7 +93,7 @@ func writeDirectiveBundle(tmpRoot string, parts []string) (metaPath string, err 
 
 // runHostShellDirectivesPipe runs directives in one bash process without a PTY (same source bundle
 // semantics as the PTY path: cwd/env persist across sources).
-func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, scripts []string, live io.Writer) (int, string, error) {
+func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, scripts []string, live io.Writer, resultHostPath string) (int, string, error) {
 	parts := normalizeDirectiveLines(scripts)
 	if len(parts) == 0 {
 		return 1, "", errEmptyCommands()
@@ -110,6 +110,7 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, sc
 	}
 
 	cmd := exec.CommandContext(ctx, bash, "--norc", "--noprofile", metaPath)
+	setResultEnv(cmd, resultHostPath)
 	max := maxOut
 	if max <= 0 {
 		max = 512 * 1024
@@ -235,11 +236,13 @@ func killShellProcess(shellCmd *exec.Cmd) {
 	_ = shellCmd.Process.Kill()
 }
 
-func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, directives []string, live io.Writer) (_ int, out string, err error) {
+func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, directives []string, live io.Writer, resultHostPath string) (_ int, out string, err error) {
 	parts := normalizeDirectiveLines(directives)
 	if len(parts) == 0 {
 		return 1, "", errEmptyCommands()
 	}
+
+	setResultEnv(shellCmd, resultHostPath)
 
 	bootMarker := fmt.Sprintf("bootready-%d", time.Now().UnixNano())
 

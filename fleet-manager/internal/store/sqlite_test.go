@@ -44,7 +44,7 @@ func TestSQLite_CreateClaimComplete(t *testing.T) {
 		t.Fatalf("claim state: %+v", got)
 	}
 
-	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 0, "hello\n", "", false)
+	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 0, "hello\n", "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,6 +58,46 @@ func TestSQLite_CreateClaimComplete(t *testing.T) {
 	}
 	if empty != nil {
 		t.Fatalf("expected no task, got %+v", empty)
+	}
+}
+
+func TestSQLite_ResultJSONRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+	s, err := OpenSQLite(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+
+	task := &models.Task{
+		ID:            uuid.NewString(),
+		Command:       []string{"echo", "hi"},
+		WebhookURL:    "https://example.com/hook",
+		Status:        models.StatusQueued,
+		CreatedAt:     time.Now().UTC().Truncate(time.Second),
+		ExecutionMode: models.ExecutionHost,
+	}
+	if err := s.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ClaimTask(ctx, "runner-1", 5*time.Minute); err != nil {
+		t.Fatal(err)
+	}
+	payload := `{"answer":42}`
+	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 0, "hello\n", payload, "", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if done.ResultJSON != payload {
+		t.Fatalf("ResultJSON: got %q want %q", done.ResultJSON, payload)
+	}
+	reloaded, err := s.GetByID(ctx, task.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.ResultJSON != payload {
+		t.Fatalf("reload ResultJSON: got %q want %q", reloaded.ResultJSON, payload)
 	}
 }
 
@@ -395,7 +435,7 @@ func TestSQLite_CancelClaimedThenCompleteCanceled(t *testing.T) {
 		t.Fatal("expected cancel_requested")
 	}
 
-	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 130, "stopped\n", "", true)
+	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 130, "stopped\n", "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

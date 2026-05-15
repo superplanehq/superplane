@@ -203,6 +203,9 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 		v := *task.ExecutionTimeoutSeconds
 		resp.ExecutionTimeoutSeconds = &v
 	}
+	if strings.TrimSpace(task.ResultJSON) != "" {
+		resp.Result = json.RawMessage(task.ResultJSON)
+	}
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -284,7 +287,11 @@ func (s *Server) cancelTask(w http.ResponseWriter, r *http.Request) {
 // completeTaskCore runs Store.CompleteTask, delivers the webhook, and schedules optional EC2 termination.
 // On conflict (wrong runner / bad state), err message contains "not found" or "wrong runner" for HTTP 409 mapping.
 func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, req api.CompleteTaskRequest) (*models.Task, error) {
-	task, err := s.Store.CompleteTask(ctx, taskID, runnerID, req.ExitCode, req.Output, req.Error, req.Canceled)
+	resultJSON := ""
+	if len(req.Result) > 0 {
+		resultJSON = string(req.Result)
+	}
+	task, err := s.Store.CompleteTask(ctx, taskID, runnerID, req.ExitCode, req.Output, resultJSON, req.Error, req.Canceled)
 	if err != nil {
 		return nil, err
 	}
@@ -332,6 +339,9 @@ func (s *Server) DeliverWebhook(task *models.Task) {
 		payload.CloudWatchLogStream = cwstream.TaskLogStream(s.TaskCloudWatchLogStreamPrefix, task.ID)
 	}
 	payload.TaskLog = s.taskLogForTask(task.ID)
+	if strings.TrimSpace(task.ResultJSON) != "" {
+		payload.Result = json.RawMessage(task.ResultJSON)
+	}
 	if err := s.Webhook.Deliver(ctx, task.WebhookURL, payload); err != nil {
 		if s.Log != nil {
 			s.Log.Warn("webhook delivery failed", slog.String("task_id", task.ID), slog.Any("err", err))

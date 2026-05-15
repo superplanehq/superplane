@@ -40,7 +40,9 @@ type Task struct {
 	ExecutionTimeoutSeconds *int
 	ExitCode                *int
 	Output                  string
-	ErrorMessage            string
+	// ResultJSON is optional structured JSON from the runner (SUPERPLANE_RESULT_FILE).
+	ResultJSON   string
+	ErrorMessage string
 	// CancelRequested is true while the task is claimed and a caller asked to stop it (persisted).
 	CancelRequested bool
 }

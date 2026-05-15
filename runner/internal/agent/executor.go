@@ -20,5 +20,5 @@ import (
 // for the returned `output` string (used by the agent for CloudWatch live
 // log streaming).
 type Executor interface {
-	Execute(ctx context.Context, task *api.TaskPayload, live io.Writer) (exit int, output string, err error)
+	Execute(ctx context.Context, task *api.TaskPayload, live io.Writer, resultHostPath string) (exit int, output string, err error)
 }

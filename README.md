@@ -155,15 +155,17 @@ export AUTH_TOKEN= # if fleet-manager uses it
 
 **Logging:** Default transport logs **`fleet_manager_ws`** for stream lifecycle; HTTP transport logs **`fleet_manager_http`** for **`claim_task`**/**`complete_task`**: **`op`**, **`http_status`**, **`dur`**, **`runner_id`**, **`task_id`** (when known); failures use **`Warn`** with **`err`**.
 
+**Structured task result:** The runner exports **`SUPERPLANE_RESULT_FILE`** to each task pointing at a host temp file (`superplane-result-<task_id>.json`). Write valid JSON there before exit; the runner reads it after execution and sends **`result`** on **`POST /v1/tasks/{id}/complete`**. **`GET /v1/tasks/{id}`**, completion webhooks, and broker **`GET /v1/tasks/{id}`** include **`result`** when present. Missing, empty, invalid JSON, or payload over **`MaxOutputBytes`** → **`result`** omitted. **`execution_mode: docker`:** the same variable inside the container is **`/mnt/superplane-result.json`** (bind-mounted from that host path).
+
 ## HTTP API — fleet-manager (v1)
 
 - `GET /healthz` — liveness
 - `POST /v1/tasks` — enqueue: **`command`** (argv for one process) **or** **`commands`** (string lines concatenated into one `sh -c` script so `export` / `cd` persist), **`webhook_url`**, optional `execution_mode` / `docker_image`
 - `GET /v1/runners/stream` — runner WebSocket (default worker transport)
 - `POST /v1/tasks/claim` — runner pulls the next task (HTTP transport)
-- `POST /v1/tasks/{id}/complete` — runner reports result (HTTP transport)
+- `POST /v1/tasks/{id}/complete` — runner reports result (HTTP transport); body may include optional **`result`** (JSON) from **`SUPERPLANE_RESULT_FILE**
 
-When the broker is **not** in the path, fleet-manager POSTs the completion **webhook** to `webhook_url` with `task_id`, `status`, `exit_code`, `output`, optional `error` (no `fleet_task_id`).
+When the broker is **not** in the path, fleet-manager POSTs the completion **webhook** to `webhook_url` with `task_id`, `status`, `exit_code`, `output`, optional `error`, optional `result` (no `fleet_task_id`).
 
 ## End-to-end with the broker
 

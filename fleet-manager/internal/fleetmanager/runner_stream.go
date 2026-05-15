@@ -170,6 +170,7 @@ func (s *Server) runnerStreamOneTask(conn *websocket.Conn, ctx context.Context, 
 			Output:   comp.Output,
 			Error:    comp.Error,
 			Canceled: comp.Canceled,
+			Result:   comp.Result,
 		}
 		_, cerr := s.completeTaskCore(ctx, task.ID, compRunnerID, req)
 		if cerr != nil {
