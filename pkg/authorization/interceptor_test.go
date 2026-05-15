@@ -7,9 +7,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 )
 
 func TestDefaultResourceResolver(t *testing.T) {
@@ -195,6 +200,36 @@ func TestMetadataScopedTokenPermissions(t *testing.T) {
 		assert.Equal(t, "read", permissions[0].Action)
 		assert.Equal(t, []string{"canvas-123"}, permissions[0].Resources)
 	})
+}
+
+func TestAgentRoutesRequireManagedAgentsFeature(t *testing.T) {
+	interceptor := NewAuthorizationInterceptor(nil)
+	routes := []string{
+		pbAgents.Agents_GetCanvasAgentChat_FullMethodName,
+		pbAgents.Agents_SendAgentChatMessage_FullMethodName,
+		pbAgents.Agents_ListAgentChatMessages_FullMethodName,
+	}
+
+	for _, route := range routes {
+		rule, ok := interceptor.rules[route]
+		require.True(t, ok)
+		assert.Equal(t, []string{features.FeatureClaudeManagedAgents}, rule.RequiredExperimentalFeatures)
+	}
+}
+
+func TestCheckRequiredExperimentalFeatures(t *testing.T) {
+	rule := AuthorizationRule{
+		RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
+	}
+
+	err := checkRequiredExperimentalFeatures(&models.Organization{}, rule)
+	require.Error(t, err)
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+
+	err = checkRequiredExperimentalFeatures(&models.Organization{
+		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{features.FeatureClaudeManagedAgents},
+	}, rule)
+	require.NoError(t, err)
 }
 
 func marshalScopes(t *testing.T, scopes []string) string {
