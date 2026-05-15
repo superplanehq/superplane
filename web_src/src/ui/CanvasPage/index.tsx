@@ -157,7 +157,7 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "runs";
+  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "dashboard";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
@@ -167,6 +167,9 @@ export interface CanvasPageProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectRuns?: () => void;
+  onSelectDashboard?: () => void;
+  /** Opens the canvas dashboard add-panel dialog when `headerMode` is `dashboard`. */
+  onDashboardAddPanel?: () => void;
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
@@ -1002,6 +1005,7 @@ function CanvasPage(props: CanvasPageProps) {
       readOnly ||
       Boolean(props.hideAddControls) ||
       props.headerMode === "version-live" ||
+      props.headerMode === "dashboard" ||
       props.headerMode === "runs" ||
       state.componentSidebar.isOpen,
     isSidebarOpen: isBuildingBlocksSidebarOpen,
@@ -1087,7 +1091,7 @@ function CanvasPage(props: CanvasPageProps) {
       ref={canvasWrapperRef}
       className={cn(
         "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
-        props.headerMode === "version-live" && "sp-canvas-live",
+        (props.headerMode === "version-live" || props.headerMode === "dashboard") && "sp-canvas-live",
         props.headerMode === "runs" && "sp-canvas-live",
       )}
     >
@@ -1116,6 +1120,8 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           onSelectRuns={props.onSelectRuns}
+          onSelectDashboard={props.onSelectDashboard}
+          onDashboardAddPanel={props.onDashboardAddPanel}
           runsNotificationCount={props.runsNotificationCount}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
@@ -1144,6 +1150,7 @@ function CanvasPage(props: CanvasPageProps) {
             onAddNote={handleAddNote}
             onMemoryOpen={props.onMemoryOpen}
             onYamlOpen={props.onYamlOpen}
+            showMemoryButton={props.headerMode !== "dashboard"}
           />
         )}
 
@@ -1151,7 +1158,12 @@ function CanvasPage(props: CanvasPageProps) {
 
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
-            isOpen={isBuildingBlocksSidebarOpen && props.headerMode !== "version-live" && props.headerMode !== "runs"}
+            isOpen={
+              isBuildingBlocksSidebarOpen &&
+              props.headerMode !== "version-live" &&
+              props.headerMode !== "dashboard" &&
+              props.headerMode !== "runs"
+            }
             onToggle={handleSidebarToggle}
             blocks={props.buildingBlocks || []}
             integrations={props.integrations}
@@ -1295,7 +1307,7 @@ function CanvasPage(props: CanvasPageProps) {
               configurationSaveMode={props.configurationSaveMode}
               currentTab={currentTab}
               onTabChange={setCurrentTab}
-              canvasMode={props.headerMode === "version-live" ? "live" : "edit"}
+              canvasMode={props.headerMode === "version-live" || props.headerMode === "dashboard" ? "live" : "edit"}
               organizationId={props.organizationId}
               getCustomField={props.getCustomField}
               integrations={props.integrations}
@@ -1629,6 +1641,8 @@ function CanvasContentHeader({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   onSelectRuns,
+  onSelectDashboard,
+  onDashboardAddPanel,
   runsNotificationCount,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
@@ -1663,6 +1677,8 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectRuns?: () => void;
+  onSelectDashboard?: () => void;
+  onDashboardAddPanel?: () => void;
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
@@ -1707,6 +1723,8 @@ function CanvasContentHeader({
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       onSelectRuns={onSelectRuns}
+      onSelectDashboard={onSelectDashboard}
+      onDashboardAddPanel={onDashboardAddPanel}
       runsNotificationCount={runsNotificationCount}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
@@ -1929,7 +1947,7 @@ function CanvasContent({
     return saved ? parseInt(saved, 10) : 320;
   });
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
-  const isLiveMode = headerMode === "version-live";
+  const isLiveMode = headerMode === "version-live" || headerMode === "dashboard";
   const isEditMode = headerMode === "version-edit";
 
   useEffect(() => {
@@ -2200,6 +2218,20 @@ function CanvasContent({
     );
     fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
   }, [focusRequest, fitView]);
+
+  // Listen for agent sidebar node chip clicks to zoom to nodes
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const nodeId = (e as CustomEvent).detail?.nodeId;
+      if (!nodeId) return;
+      const targetNode = stateRef.current.nodes?.find((n) => n.id === nodeId);
+      if (!targetNode) return;
+      stateRef.current.setNodes((nodes) => nodes.map((n) => ({ ...n, selected: n.id === nodeId })));
+      fitView({ nodes: [targetNode], duration: 500, maxZoom: 1.2 });
+    };
+    window.addEventListener("agent:focus-node", handler);
+    return () => window.removeEventListener("agent:focus-node", handler);
+  }, [fitView]);
 
   useEffect(() => {
     return () => {

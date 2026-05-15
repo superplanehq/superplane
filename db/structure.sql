@@ -230,6 +230,18 @@ CREATE TABLE public.blueprints (
 
 
 --
+-- Name: canvas_dashboards; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.canvas_dashboards (
+    canvas_id uuid NOT NULL,
+    panels jsonb DEFAULT '[]'::jsonb NOT NULL,
+    layout jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: canvas_folders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -838,6 +850,14 @@ ALTER TABLE ONLY public.blueprints
 
 ALTER TABLE ONLY public.blueprints
     ADD CONSTRAINT blueprints_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: canvas_dashboards canvas_dashboards_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_dashboards
+    ADD CONSTRAINT canvas_dashboards_pkey PRIMARY KEY (canvas_id);
 
 
 --
@@ -1713,6 +1733,14 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
+-- Name: canvas_dashboards canvas_dashboards_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_dashboards
+    ADD CONSTRAINT canvas_dashboards_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
 -- Name: canvas_folders canvas_folders_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2120,7 +2148,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260514141043	f
+20260515120000	f
 \.
 
 
