@@ -263,13 +263,13 @@ const dismissedVersionIds = new Set<string>();
 
 function DraftActionsBar({ messages, canvasId, organizationId }: { messages: AgentMessage[]; canvasId: string; organizationId: string }) {
   const [, forceUpdate] = useState(0);
+  const [verifiedDraft, setVerifiedDraft] = useState<boolean | null>(null);
 
   // Listen for canvas version changes (publish/discard from editor or websocket)
   useEffect(() => {
     const handler = (e: Event) => {
       const { versionId } = (e as CustomEvent).detail;
       if (versionId && !dismissedVersionIds.has(versionId)) {
-        // Version was updated (published/discarded) — check if it's one we're showing
         dismissedVersionIds.add(versionId);
         forceUpdate(n => n + 1);
       }
@@ -292,7 +292,31 @@ function DraftActionsBar({ messages, canvasId, organizationId }: { messages: Age
     return null;
   }, [messages]);
 
-  if (!latestDraft) return null;
+  // Verify the version is still a draft on mount / when version changes
+  useEffect(() => {
+    if (!latestDraft) {
+      setVerifiedDraft(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/v1/canvases/${canvasId}/versions/${latestDraft.versionId}`, {
+      headers: { "x-organization-id": organizationId },
+      credentials: "include",
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled) return;
+        const isDraft = data?.version?.metadata?.state === "STATE_DRAFT";
+        if (!isDraft) {
+          dismissedVersionIds.add(latestDraft.versionId);
+        }
+        setVerifiedDraft(isDraft);
+      })
+      .catch(() => { if (!cancelled) setVerifiedDraft(false); });
+    return () => { cancelled = true; };
+  }, [latestDraft?.versionId, canvasId, organizationId]);
+
+  if (!latestDraft || verifiedDraft === false || verifiedDraft === null) return null;
 
   return (
     <div className="border-t border-violet-200 bg-violet-50/80 px-3 py-2">
