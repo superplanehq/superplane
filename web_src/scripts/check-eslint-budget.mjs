@@ -12,6 +12,7 @@ const isUpdateBaseline = process.argv.includes("--update-baseline");
 const ignoredPrefixes = ["src/api-client/", "storybook-static/", "dist/", "dist-ssr/", "node_modules/"];
 const redStart = process.env.NO_COLOR ? "" : "\x1b[31m";
 const colorEnd = process.env.NO_COLOR ? "" : "\x1b[0m";
+const disallowedComplexityDirectivePattern = /(?:\/\/|\/\*)\s*eslint-disable-next-line[^\n]*\bcomplexity\b/;
 
 function normalizeRuleId(message) {
   if (message.ruleId) {
@@ -49,6 +50,46 @@ function extractIssues(results) {
         severity: message.severity === 2 ? "error" : "warning",
         ruleId: normalizeRuleId(message),
         message: message.message,
+      });
+    }
+  }
+
+  return issues;
+}
+
+function extractDisallowedDirectiveIssues(results) {
+  const issues = [];
+
+  for (const result of results) {
+    const filePath = toRelativeFilePath(result.filePath);
+    const isIgnoredPath = ignoredPrefixes.some((prefix) => filePath.startsWith(prefix));
+    const isStorybookStoryFile = filePath.endsWith(".stories.tsx");
+    const isStorybookSupportFile = filePath.includes("/storybooks/");
+    if (isIgnoredPath || isStorybookStoryFile || isStorybookSupportFile) {
+      continue;
+    }
+
+    let source;
+    try {
+      source = fs.readFileSync(result.filePath, "utf8");
+    } catch {
+      continue;
+    }
+
+    const lines = source.split(/\r?\n/u);
+    for (const [index, line] of lines.entries()) {
+      const matchIndex = line.search(disallowedComplexityDirectivePattern);
+      if (matchIndex === -1) {
+        continue;
+      }
+
+      issues.push({
+        filePath,
+        line: index + 1,
+        column: matchIndex + 1,
+        severity: "error",
+        ruleId: "no-eslint-disable-next-line-complexity",
+        message: "Disabling the complexity rule with eslint-disable-next-line is not allowed.",
       });
     }
   }
@@ -139,7 +180,7 @@ function findRegressions(currentByRule, baselineByRule) {
 async function main() {
   const eslint = new ESLint({ cwd: webRoot });
   const results = await eslint.lintFiles(["."]);
-  const issues = extractIssues(results);
+  const issues = [...extractIssues(results), ...extractDisallowedDirectiveIssues(results)];
   const countsByRule = summarizeByRule(issues);
 
   if (isUpdateBaseline) {
