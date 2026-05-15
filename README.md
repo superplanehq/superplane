@@ -6,7 +6,7 @@ use such as Git, CI/CD, observability, incident response, infra, and notificatio
 
 ![SuperPlane screenshot](./screenshot.png)
 
-## Project status
+## Project status.
 
 <p>
   <a href="https://superplanehq.semaphoreci.com/projects/superplane"><img src="https://superplanehq.semaphoreci.com/badges/superplane/branches/main.svg?style=shields" alt="CI Status on Semaphore" /></a>
