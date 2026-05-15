@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 /**
@@ -17,6 +17,9 @@ export function useWorkflowViewSearchParams(
   const viewParam = searchParams.get("view") ?? "";
   const runParam = searchParams.get("run") ?? "";
 
+  const setSearchParamsRef = useRef(setSearchParams);
+  setSearchParamsRef.current = setSearchParams;
+
   useEffect(() => {
     setIsRunsMode(viewParam === "runs");
     if (viewParam === "dashboard") {
@@ -25,7 +28,7 @@ export function useWorkflowViewSearchParams(
       } else {
         setIsDashboardMode(false);
         setIsDashboardAddPanelOpen(false);
-        setSearchParams(
+        setSearchParamsRef.current(
           (current) => {
             const next = new URLSearchParams(current);
             if (next.get("view") !== "dashboard") {
@@ -44,8 +47,6 @@ export function useWorkflowViewSearchParams(
     if (viewParam !== "dashboard") {
       setIsDashboardAddPanelOpen(false);
     }
-    // setSearchParams from useSearchParams is stable; omitting avoids effect churn when its identity changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewParam, runParam, dashboardsFeatureEnabled]);
 
   return {
