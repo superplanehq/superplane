@@ -341,7 +341,7 @@ function MessageRow({
   const isUser = message.role === "user";
 
   return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+    <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       <div
         className={cn(
           "rounded-lg px-3 py-2 text-sm max-w-[85%] break-words",
@@ -360,6 +360,9 @@ function MessageRow({
           />
         )}
       </div>
+      {message.createdAt && (
+        <span className="text-[10px] text-slate-400 mt-0.5 px-1">{formatTime(message.createdAt)}</span>
+      )}
     </div>
   );
 }
@@ -480,4 +483,9 @@ function statusLabel(status: string): string {
     default:
       return "Ready";
   }
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
