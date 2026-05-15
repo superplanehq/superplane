@@ -2,32 +2,67 @@
   "type": "launchdarkly.flag.updateOn",
   "data": {
     "kind": "flag",
-    "name": "Another Toggle Feature",
-    "description": "",
-    "titleVerb": "turned off the flag",
-    "title": "John Doe turned off the flag Another Toggle Feature in Test",
-    "date": 1771939563356,
+    "name": "snaketoy-canary-rollout",
+    "description": "Gradual rollout of the snaketoy-web v1.4.x canary",
+    "shortDescription": "Turned on snaketoy-canary-rollout in production",
+    "titleVerb": "turned on the flag",
+    "title": "Renato Dev turned on the flag snaketoy-canary-rollout in Production",
+    "date": 1804512042184,
     "accesses": [
       {
         "action": "updateOn",
-        "resource": "proj/default:env/test:flag/another-toggle-feature"
+        "resource": "proj/snaketoy:env/production:flag/snaketoy-canary-rollout"
       }
     ],
     "member": {
-      "email": "user@example.com",
-      "firstName": "John",
-      "lastName": "Doe"
+      "_links": {
+        "parent": {
+          "href": "/api/v2/members",
+          "type": "application/json"
+        },
+        "self": {
+          "href": "/api/v2/members/64a7e3c1d2b8f00012abcdef",
+          "type": "application/json"
+        }
+      },
+      "_id": "64a7e3c1d2b8f00012abcdef",
+      "email": "renato.dev@acme.example",
+      "firstName": "Renato",
+      "lastName": "Dev"
     },
     "target": {
-      "name": "Another Toggle Feature",
+      "_links": {
+        "canonical": {
+          "href": "/api/v2/flags/snaketoy/snaketoy-canary-rollout",
+          "type": "application/json"
+        },
+        "site": {
+          "href": "/snaketoy/production/features/snaketoy-canary-rollout",
+          "type": "text/html"
+        }
+      },
+      "name": "snaketoy-canary-rollout",
       "resources": [
-        "proj/default:env/test:flag/another-toggle-feature"
+        "proj/snaketoy:env/production:flag/snaketoy-canary-rollout"
       ]
     },
     "parent": {
-      "name": "Test",
-      "resource": "proj/default:env/test"
-    }
+      "_links": {
+        "canonical": {
+          "href": "/api/v2/projects/snaketoy/environments/production",
+          "type": "application/json"
+        },
+        "site": {
+          "href": "/snaketoy/production",
+          "type": "text/html"
+        }
+      },
+      "name": "Production",
+      "resource": "proj/snaketoy:env/production"
+    },
+    "projectKey": "snaketoy",
+    "environmentKey": "production",
+    "flagKey": "snaketoy-canary-rollout"
   },
-  "timestamp": "2026-02-24T12:00:00Z"
+  "timestamp": "2026-03-04T09:18:42.612Z"
 }
