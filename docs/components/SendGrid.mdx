@@ -65,17 +65,25 @@ Each event includes fields such as `event`, `email`, `timestamp`, `sg_event_id`,
 ```json
 {
   "data": {
+    "asm_group_id": 31415,
     "category": [
-      "order-confirmation"
+      "snaketoy",
+      "release-notification"
     ],
-    "email": "recipient@example.com",
+    "cert_err": 0,
+    "email": "renato.dev@acme.example",
     "event": "delivered",
-    "response": "250 OK",
-    "sg_event_id": "ZGVmYXVsdC1ldmVudC1pZA",
-    "sg_message_id": "YWJjMTIzX2RlZmF1bHRfbXNnX2lk",
-    "timestamp": 1700000000
+    "ip": "168.245.1.42",
+    "response": "250 2.0.0 OK 1804512042 m4-20020a05683043c00b007a1c33afa56fsi5821216otv.18 - gsmtp",
+    "sg_event_id": "rbtnWrG1DVDGGGFHFyun0A==",
+    "sg_message_id": "14c5d75ce93.dfd.64b469.filter0001.16648.5515E0B88.0",
+    "sg_template_id": "d-2fb09dee44a747f0a7da78ce728ba51b",
+    "sg_template_name": "snaketoy-release-notification",
+    "smtp-id": "\u003c14c5d75ce93.dfd.64b469@ismtpd-01.acme.example\u003e",
+    "timestamp": 1804512042,
+    "tls": 1
   },
-  "timestamp": "2026-02-04T12:00:00Z",
+  "timestamp": "2026-03-04T09:18:42.812Z",
   "type": "sendgrid.email.event"
 }
 ```

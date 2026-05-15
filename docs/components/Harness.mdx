@@ -57,19 +57,34 @@ If no pipeline is selected, or webhook delivery is unavailable in your Harness a
 {
   "data": {
     "eventType": "PIPELINE_END",
-    "executionId": "3y9YlBC9SrOn6W7bPT5nCw",
-    "pipelineIdentifier": "deploy_prod",
+    "executionId": "U2x4LhpKQqGn7W8cQX6oDx",
+    "pipelineIdentifier": "snaketoy_web_deploy_prod",
     "raw": {
       "data": {
-        "pipelineIdentifier": "deploy_prod",
-        "planExecutionId": "3y9YlBC9SrOn6W7bPT5nCw",
-        "status": "FAILED"
+        "accountIdentifier": "Bx4QvwJgRkSp9xUk1Pq6Zw",
+        "endTs": 1804512042412,
+        "executionUrl": "https://app.harness.io/ng/account/Bx4QvwJgRkSp9xUk1Pq6Zw/cd/orgs/acme_labs/projects/snaketoy/pipelines/snaketoy_web_deploy_prod/executions/U2x4LhpKQqGn7W8cQX6oDx/pipeline",
+        "orgIdentifier": "acme_labs",
+        "pipelineIdentifier": "snaketoy_web_deploy_prod",
+        "pipelineName": "snaketoy-web deploy (prod)",
+        "planExecutionId": "U2x4LhpKQqGn7W8cQX6oDx",
+        "projectIdentifier": "snaketoy",
+        "startTs": 1804511442184,
+        "status": "SUCCESS",
+        "triggerInfo": {
+          "triggerType": "WEBHOOK",
+          "triggeredBy": {
+            "email": "renato.dev@acme.example",
+            "identifier": "renato-dev"
+          }
+        },
+        "triggerType": "WEBHOOK"
       },
       "eventType": "PIPELINE_END"
     },
-    "status": "failed"
+    "status": "succeeded"
   },
-  "timestamp": "2026-02-12T18:45:55Z",
+  "timestamp": "2026-03-04T09:18:42.412Z",
   "type": "harness.pipeline.completed"
 }
 ```

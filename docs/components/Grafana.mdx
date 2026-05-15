@@ -89,24 +89,58 @@ The trigger emits the full Grafana webhook payload, including:
     "alerts": [
       {
         "annotations": {
-          "summary": "Error rate above threshold"
+          "description": "Current 5xx rate is 8.4% (threshold: 5%). Top status: 504 (62% of failures).",
+          "runbook_url": "https://runbooks.acme.example/snaketoy/5xx-spike",
+          "summary": "snaketoy-web 5xx rate above 5% for 5 minutes"
         },
+        "dashboardURL": "https://grafana.acme.example/d/snaketoy-overview",
+        "endsAt": "0001-01-01T00:00:00Z",
+        "fingerprint": "9c2f1b03a8e1d647",
+        "generatorURL": "https://grafana.acme.example/alerting/grafana/dec3lc8jq2lcgx/view",
         "labels": {
-          "alertname": "HighErrorRate",
-          "service": "api"
+          "alertname": "snaketoy-web 5xx error rate",
+          "grafana_folder": "Production",
+          "service": "snaketoy-web",
+          "severity": "critical",
+          "team": "platform"
         },
-        "status": "firing"
+        "panelURL": "https://grafana.acme.example/d/snaketoy-overview?viewPanel=12",
+        "silenceURL": "https://grafana.acme.example/alerting/silence/new?alertmanager=grafana\u0026matcher=alertname%3Dsnaketoy-web+5xx+error+rate",
+        "startsAt": "2026-03-04T09:18:42.184Z",
+        "status": "firing",
+        "values": {
+          "B": 0.084,
+          "C": 1
+        }
       }
     ],
-    "commonLabels": {
-      "alertname": "HighErrorRate"
+    "commonAnnotations": {
+      "runbook_url": "https://runbooks.acme.example/snaketoy/5xx-spike",
+      "summary": "snaketoy-web 5xx rate above 5% for 5 minutes"
     },
-    "externalURL": "http://grafana.local",
-    "ruleUid": "alert_rule_uid",
+    "commonLabels": {
+      "alertname": "snaketoy-web 5xx error rate",
+      "grafana_folder": "Production",
+      "service": "snaketoy-web",
+      "severity": "critical",
+      "team": "platform"
+    },
+    "externalURL": "https://grafana.acme.example",
+    "groupKey": "{}/{alertname=\"snaketoy-web 5xx error rate\"}",
+    "groupLabels": {
+      "alertname": "snaketoy-web 5xx error rate"
+    },
+    "message": "**Firing**\n\nValue: B=0.084, C=1\nLabels:\n - alertname = snaketoy-web 5xx error rate\n - service = snaketoy-web\n - severity = critical\nAnnotations:\n - summary = snaketoy-web 5xx rate above 5% for 5 minutes\n",
+    "orgId": 1,
+    "receiver": "superplane",
+    "ruleUid": "dec3lc8jq2lcgx",
+    "state": "alerting",
     "status": "firing",
-    "title": "High error rate"
+    "title": "[FIRING:1] snaketoy-web 5xx error rate Production critical",
+    "truncatedAlerts": 0,
+    "version": "1"
   },
-  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "timestamp": "2026-03-04T09:18:43.018Z",
   "type": "grafana.alert.firing"
 }
 ```

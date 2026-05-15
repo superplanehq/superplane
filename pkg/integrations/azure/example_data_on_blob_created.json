@@ -2,23 +2,28 @@
   "type": "azure.blob.created",
   "data": {
     "id": "831e1650-001e-001b-66ab-eeb76e069631",
-    "topic": "/subscriptions/12345678-1234-1234-1234-123456789abc/resourceGroups/my-rg/providers/Microsoft.Storage/storageAccounts/mystorageaccount",
-    "subject": "/blobServices/default/containers/mycontainer/blobs/path/to/myfile.csv",
+    "topic": "/subscriptions/f8e7d6c5-b4a3-4291-8f76-3e5d1c0b9a82/resourceGroups/acme-prod-rg/providers/Microsoft.Storage/storageAccounts/acmeprodstor",
+    "subject": "/blobServices/default/containers/releases/blobs/snaketoy/v1.5.0/build.zip",
     "eventType": "Microsoft.Storage.BlobCreated",
-    "eventTime": "2026-03-16T10:00:00Z",
-    "dataVersion": "",
+    "eventTime": "2026-03-01T11:42:24.812Z",
+    "dataVersion": "5",
     "metadataVersion": "1",
     "data": {
       "api": "PutBlob",
-      "clientRequestId": "6d6cef9a-a602-4a23-bc26-91bb68a2bf74",
+      "clientRequestId": "5f87d1a3-2c1f-4ab0-8f55-8f4c2b4a5c76",
       "requestId": "d1e6b5a4-0001-0035-4a7b-2e5c4f000000",
-      "eTag": "0x8D4BCC2E4835CD0",
-      "contentType": "text/csv",
-      "contentLength": 524288,
+      "eTag": "0x8DC3E1A4F2C8B17",
+      "contentType": "application/zip",
+      "contentLength": 248713,
+      "contentOffset": 0,
       "blobType": "BlockBlob",
-      "url": "https://mystorageaccount.blob.core.windows.net/mycontainer/path/to/myfile.csv",
-      "sequencer": "00000000000004420000000000028963"
+      "url": "https://acmeprodstor.blob.core.windows.net/releases/snaketoy/v1.5.0/build.zip",
+      "sequencer": "00000000000004420000000000028963",
+      "identity": "$superuser",
+      "storageDiagnostics": {
+        "batchId": "8b1a4c7d-9e0f-2a3b-4c5d-6e7f8a9b0c1d"
+      }
     }
   },
-  "timestamp": "2026-03-16T10:00:00Z"
+  "timestamp": "2026-03-01T11:42:25.184Z"
 }

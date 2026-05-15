@@ -62,25 +62,61 @@ incident.io does not provide an API to register webhook endpoints. After adding 
   "data": {
     "event_type": "public_incident.incident_created_v2",
     "incident": {
-      "created_at": "2021-08-17T13:28:57.801578Z",
-      "id": "01FDAG4SAP5TYPT98WGR2N7W91",
+      "call_url": null,
+      "created_at": "2026-03-04T09:18:42.184Z",
+      "creator": {
+        "user": {
+          "email": "renato.dev@acme.example",
+          "id": "01HF8GTNH7K9V3X2P5R8B6Q4D2",
+          "name": "Renato Dev"
+        }
+      },
+      "custom_field_entries": [],
+      "id": "01HF8K2TYRXG4PQA5NW7B9C0D1",
+      "incident_role_assignments": [
+        {
+          "assignee": {
+            "email": "renato.dev@acme.example",
+            "id": "01HF8GTNH7K9V3X2P5R8B6Q4D2",
+            "name": "Renato Dev"
+          },
+          "role": {
+            "id": "01HF8GTNH7K9V3X2P5R8B6Q4D6",
+            "name": "Lead",
+            "role_type": "lead",
+            "shortform": "lead"
+          }
+        }
+      ],
       "incident_status": {
-        "id": "01FCNDV6P870EA6S7TK1DSYD5H",
-        "name": "Triage"
+        "category": "triage",
+        "id": "01HF8GTNH7K9V3X2P5R8B6Q4D4",
+        "name": "Triage",
+        "rank": 1
       },
-      "name": "Our database is sad",
-      "permalink": "https://app.incident.io/incidents/123",
-      "reference": "INC-123",
+      "incident_type": {
+        "id": "01HF8GTNH7K9V3X2P5R8B6Q4D5",
+        "name": "Production outage"
+      },
+      "mode": "real",
+      "name": "snaketoy-web 5xx spike (eu-west-1)",
+      "permalink": "https://acme-labs.app.incident.io/incidents/218",
+      "reference": "INC-218",
       "severity": {
-        "id": "01FCNDV6P870EA6S7TK1DSYDG0",
-        "name": "Minor"
+        "description": "Significant impact to production users.",
+        "id": "01HF8GTNH7K9V3X2P5R8B6Q4D3",
+        "name": "Major",
+        "rank": 2
       },
-      "summary": "Our database is really really sad, and we don't know why yet.",
-      "updated_at": "2021-08-17T13:28:57.801578Z",
+      "slack_channel_id": "C03SNAKETOYWEB",
+      "slack_channel_name": "inc-218-snaketoy-web-5xx-spike-eu-west-1",
+      "slack_team_id": "T01ACMELABS",
+      "summary": "snaketoy-web is returning 5xx for ~8% of requests in eu-west-1. Investigating origin pool snaketoy-web-prod.",
+      "updated_at": "2026-03-04T09:18:42.184Z",
       "visibility": "public"
     }
   },
-  "timestamp": "2026-01-19T12:00:00Z",
+  "timestamp": "2026-03-04T09:18:42.812Z",
   "type": "incident.incident.created"
 }
 ```

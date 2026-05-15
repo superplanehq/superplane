@@ -51,27 +51,36 @@ When the trigger fires, SuperPlane receives the webhook and starts a workflow ex
 {
   "data": {
     "alert_type": "on_true",
-    "description": "production environment:\nCurrent value greater than threshold value (5)",
+    "description": "Production environment:\nCurrent value greater than threshold value (5)",
     "id": "kQjkatCVK6M",
     "is_test": false,
-    "name": "High Error Rate",
+    "name": "snaketoy-web 5xx error rate",
     "operator": "greater than",
     "result_groups": [
       {
-        "Group": {},
-        "Result": 8.5
+        "Group": {
+          "service.name": "snaketoy-web"
+        },
+        "Result": 8.4
       }
     ],
-    "result_groups_triggered": [],
-    "result_url": "https://ui.honeycomb.io/myteam/environments/production/datasets/api-production/result/p3o2dvAhYxx/a/z5rYVCoNUZz?utm_content=view_graph\u0026utm_medium=Trigger\u0026utm_source=webhook",
+    "result_groups_triggered": [
+      {
+        "Group": {
+          "service.name": "snaketoy-web"
+        },
+        "Result": 8.4
+      }
+    ],
+    "result_url": "https://ui.honeycomb.io/acme-labs/environments/production/datasets/snaketoy-web/result/p3o2dvAhYxx/a/z5rYVCoNUZz?utm_content=view_graph\u0026utm_medium=Trigger\u0026utm_source=webhook",
     "status": "TRIGGERED",
-    "summary": "Triggered: High Error Rate",
+    "summary": "Triggered: snaketoy-web 5xx error rate",
     "threshold": 5,
-    "trigger_description": "API error rate has exceeded the acceptable threshold",
-    "trigger_url": "https://ui.honeycomb.io/myteam/environments/production/datasets/api-production/triggers/kQjkatCVK6M?utm_content=edit_trigger\u0026utm_medium=Trigger\u0026utm_source=webhook",
+    "trigger_description": "snaketoy-web 5xx error rate has exceeded the acceptable threshold",
+    "trigger_url": "https://ui.honeycomb.io/acme-labs/environments/production/datasets/snaketoy-web/triggers/kQjkatCVK6M?utm_content=edit_trigger\u0026utm_medium=Trigger\u0026utm_source=webhook",
     "version": "v0.1.0"
   },
-  "timestamp": "2024-01-15T10:30:00Z",
+  "timestamp": "2026-03-04T09:18:42.812Z",
   "type": "honeycomb.alert.fired"
 }
 ```

@@ -1,27 +1,29 @@
 {
   "data": {
-    "message_id": 1234,
+    "message_id": 4218,
     "from": {
-      "id": 111222333,
+      "id": 247813965,
       "is_bot": false,
-      "first_name": "John",
-      "username": "johndoe"
+      "first_name": "Renato",
+      "last_name": "Dev",
+      "username": "renato_dev",
+      "language_code": "en"
     },
     "chat": {
-      "id": -9876543210,
-      "type": "group",
-      "title": "My Group"
+      "id": -1002041835217,
+      "type": "supergroup",
+      "title": "Acme Labs — snaketoy releases"
     },
-    "text": "@mybot hello!",
+    "date": 1804512042,
+    "text": "@superplane_bot please rerun the snaketoy-web canary",
     "entities": [
       {
         "type": "mention",
         "offset": 0,
-        "length": 6
+        "length": 16
       }
-    ],
-    "date": 1737028800
+    ]
   },
-  "timestamp": "2026-01-16T12:00:00.000Z",
+  "timestamp": "2026-03-04T09:18:42.812Z",
   "type": "telegram.message.mention"
 }

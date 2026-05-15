@@ -1,15 +1,15 @@
 {
   "data": {
-    "createdAt": "2026-03-12T09:00:00.000Z",
-    "description": "Elevated error rate detected in production.",
     "id": "3c0a2b10-4e5f-11ee-be56-0242ac120002",
-    "severity": "high",
+    "title": "snaketoy-web 5xx spike — investigating upstream timeouts",
     "status": "in-progress",
-    "tags": ["production", "incident"],
-    "title": "Production incident",
-    "updatedAt": "2026-03-12T10:00:00.000Z",
-    "version": "WzE3LDFd"
+    "severity": "high",
+    "version": "WzE3MiwxXQ==",
+    "tags": ["env:prod", "service:snaketoy-web", "incident"],
+    "description": "Started receiving alerts at 09:18 UTC for sustained 5xx error rates on /api/v1/score. Upstream timeouts observed after the v1.5.0 rollout. Rolling back the canary while we investigate.",
+    "createdAt": "2026-03-04T09:21:02.184Z",
+    "updatedAt": "2026-03-04T09:42:18.821Z"
   },
-  "timestamp": "2026-03-12T10:00:00Z",
+  "timestamp": "2026-03-04T09:42:19.218Z",
   "type": "elastic.case.status.changed"
 }

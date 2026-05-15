@@ -101,15 +101,37 @@ Each alarm event includes:
   "data": {
     "account": "123456789012",
     "detail": {
-      "alarmName": "HighCPUUtilization",
+      "alarmName": "snaketoy-web-cpu-high",
+      "configuration": {
+        "description": "CPU utilization above 90% for 5 minutes on the snaketoy-web ASG",
+        "metrics": [
+          {
+            "id": "m1",
+            "metricStat": {
+              "metric": {
+                "dimensions": {
+                  "AutoScalingGroupName": "snaketoy-web-asg"
+                },
+                "name": "CPUUtilization",
+                "namespace": "AWS/EC2"
+              },
+              "period": 60,
+              "stat": "Average"
+            },
+            "returnData": true
+          }
+        ]
+      },
       "previousState": {
-        "reason": "Threshold Crossed: 1 datapoint [35.0 (20/11/24 20:29:00)] was not greater than or equal to the threshold (90.0).",
-        "timestamp": "2024-11-20T20:30:33.000+0000",
+        "reason": "Threshold Crossed: 1 datapoint [35.0 (10/02/26 20:30:00)] was not greater than or equal to the threshold (90.0).",
+        "reasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-02-10T20:30:33.842+0000\",\"startDate\":\"2026-02-10T20:25:00.000+0000\",\"statistic\":\"Average\",\"period\":60,\"recentDatapoints\":[35.0],\"threshold\":90.0}",
+        "timestamp": "2026-02-10T20:30:33.847+0000",
         "value": "OK"
       },
       "state": {
-        "reason": "Threshold Crossed: 1 datapoint [95.0 (20/11/24 20:34:00)] was greater than or equal to the threshold (90.0).",
-        "timestamp": "2024-11-20T20:35:33.000+0000",
+        "reason": "Threshold Crossed: 1 datapoint [95.0 (10/02/26 20:34:00)] was greater than or equal to the threshold (90.0).",
+        "reasonData": "{\"version\":\"1.0\",\"queryDate\":\"2026-02-10T20:35:33.218+0000\",\"startDate\":\"2026-02-10T20:30:00.000+0000\",\"statistic\":\"Average\",\"period\":60,\"recentDatapoints\":[95.0],\"threshold\":90.0,\"evaluatedDatapoints\":[{\"timestamp\":\"2026-02-10T20:34:00.000+0000\",\"value\":95.0}]}",
+        "timestamp": "2026-02-10T20:35:33.412+0000",
         "value": "ALARM"
       }
     },
@@ -117,13 +139,13 @@ Each alarm event includes:
     "id": "2f1ecf5c-8bc9-4b7d-9e76-8df420e8e1a7",
     "region": "us-east-1",
     "resources": [
-      "arn:aws:cloudwatch:us-east-1:123456789012:alarm:HighCPUUtilization"
+      "arn:aws:cloudwatch:us-east-1:123456789012:alarm:snaketoy-web-cpu-high"
     ],
     "source": "aws.cloudwatch",
-    "time": "2024-11-20T20:35:33Z",
+    "time": "2026-02-10T20:35:33Z",
     "version": "0"
   },
-  "timestamp": "2026-02-10T12:00:00Z",
+  "timestamp": "2026-02-10T20:35:34.018Z",
   "type": "aws.cloudwatch.alarm"
 }
 ```
@@ -154,31 +176,31 @@ The On Package Version trigger starts a workflow execution when a package versio
         "metadataUpdated": false,
         "statusChanged": true
       },
-      "domainName": "example-domain",
+      "domainName": "acme-labs",
       "domainOwner": "123456789012",
       "eventDeduplicationId": "5f87d1a3-2c1f-4ab0-8f55-8f4c2b4a5c76",
       "operationType": "Created",
       "packageFormat": "npm",
-      "packageName": "@scope/example-package",
-      "packageNamespace": null,
-      "packageVersion": "1.2.3",
+      "packageName": "snaketoy-web",
+      "packageNamespace": "acme-labs",
+      "packageVersion": "1.5.0",
       "packageVersionRevision": "E30D52B451F42F41",
       "packageVersionState": "Published",
-      "repositoryAdministrator": "arn:aws:sts::123456789012:assumed-role/ExampleRole/example-user",
-      "repositoryName": "example-repo",
+      "repositoryAdministrator": "arn:aws:sts::123456789012:assumed-role/snaketoy-publisher-role/renato-dev",
+      "repositoryName": "internal-npm",
       "sequenceNumber": 1
     },
     "detail-type": "CodeArtifact Package Version State Change",
     "id": "d9e9ff4a-3514-3d2c-b6b8-1fb5e0b9d3b2",
     "region": "us-east-1",
     "resources": [
-      "arn:aws:codeartifact:us-east-1:123456789012:repository/example-domain/example-repo"
+      "arn:aws:codeartifact:us-east-1:123456789012:repository/acme-labs/internal-npm"
     ],
     "source": "aws.codeartifact",
-    "time": "2024-11-20T20:35:33Z",
+    "time": "2026-03-04T14:25:30Z",
     "version": "0"
   },
-  "timestamp": "2026-03-10T14:25:30.31254162Z",
+  "timestamp": "2026-03-04T14:25:31.142Z",
   "type": "aws.codeartifact.package.version"
 }
 ```
@@ -215,28 +237,28 @@ Each event includes:
   "data": {
     "account": "123456789012",
     "detail": {
-      "execution-id": "00000000-0000-0000-0000-000000000001",
+      "execution-id": "21f8c0a4-3e2b-4d18-9c5a-7b1d8e0f4a92",
       "execution-trigger": {
-        "trigger-detail": "arn:aws:sts::123456789012:assumed-role/superplane-demo-role/SuperPlane-00000000-0000-0000-0000-000000000000",
+        "trigger-detail": "arn:aws:sts::123456789012:assumed-role/snaketoy-deploy-role/renato-dev",
         "trigger-type": "StartPipelineExecution"
       },
-      "pipeline": "demo-pipeline",
+      "pipeline": "snaketoy-deploy",
       "pipeline-execution-attempt": 1,
       "start-time": "2026-02-24T15:21:42.016Z",
       "state": "STARTED",
       "version": 1
     },
     "detail-type": "CodePipeline Pipeline Execution State Change",
-    "id": "00000000-0000-0000-0000-000000000002",
+    "id": "8b1a4c7d-9e0f-2a3b-4c5d-6e7f8a9b0c1d",
     "region": "us-east-1",
     "resources": [
-      "arn:aws:codepipeline:us-east-1:123456789012:demo-pipeline"
+      "arn:aws:codepipeline:us-east-1:123456789012:snaketoy-deploy"
     ],
     "source": "aws.codepipeline",
     "time": "2026-02-24T15:21:42Z",
     "version": "0"
   },
-  "timestamp": "2026-02-24T15:21:52.212Z",
+  "timestamp": "2026-02-24T15:21:42.984Z",
   "type": "aws.codepipeline.pipeline"
 }
 ```
@@ -272,7 +294,9 @@ Each AMI state event includes:
   "data": {
     "account": "123456789012",
     "detail": {
+      "ErrorMessage": "",
       "ImageId": "ami-07f0e4f3e9c123abc",
+      "RequestId": "7b6c5d4e-9f8a-41c2-b3d4-e5f60718293a",
       "State": "available"
     },
     "detail-type": "EC2 AMI State Change",
@@ -285,7 +309,7 @@ Each AMI state event includes:
     "time": "2026-02-10T12:10:00Z",
     "version": "0"
   },
-  "timestamp": "2026-02-10T12:10:01Z",
+  "timestamp": "2026-02-10T12:10:01.482Z",
   "type": "aws.ec2.image"
 }
 ```
@@ -322,23 +346,20 @@ Each image push event includes:
     "account": "123456789012",
     "detail": {
       "action-type": "PUSH",
-      "image-digest": "sha256:2c26b46b68ffc68ff99b453c1d30413413422f1642f0e2b8c7b8a0b8a96a909e",
-      "image-tag": "latest",
-      "repository-arn": "arn:aws:ecr:us-east-1:123456789012:repository/my-repo",
-      "repository-name": "my-repo",
+      "image-digest": "sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7",
+      "image-tag": "v1.5.0",
+      "repository-name": "snaketoy-web",
       "result": "SUCCESS"
     },
     "detail-type": "ECR Image Action",
-    "id": "c1b45a2c-9c3f-4c52-bc98-5ea31ce17692",
+    "id": "13cde686-328b-6117-af20-0e5566167482",
     "region": "us-east-1",
-    "resources": [
-      "arn:aws:ecr:us-east-1:123456789012:repository/my-repo"
-    ],
+    "resources": [],
     "source": "aws.ecr",
-    "time": "2024-01-01T12:00:00Z",
+    "time": "2026-03-01T11:42:18Z",
     "version": "0"
   },
-  "timestamp": "2026-02-03T12:00:00Z",
+  "timestamp": "2026-03-01T11:42:18.421Z",
   "type": "aws.ecr.image.push"
 }
 ```
@@ -380,25 +401,32 @@ Each image scan event includes:
     "account": "123456789012",
     "detail": {
       "finding-severity-counts": {
-        "CRITICAL": 10,
-        "MEDIUM": 9
+        "CRITICAL": 1,
+        "HIGH": 4,
+        "INFORMATIONAL": 8,
+        "LOW": 23,
+        "MEDIUM": 12,
+        "UNDEFINED": 0
       },
-      "image-digest": "sha256:7f5b2640fe6fb4f46592dfd3410c4a79dac4f89e4782432e0378abcd1234",
-      "image-tags": [],
-      "repository-name": "my-repo",
+      "image-digest": "sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7",
+      "image-tags": [
+        "v1.5.0",
+        "latest"
+      ],
+      "repository-name": "snaketoy-web",
       "scan-status": "COMPLETE"
     },
     "detail-type": "ECR Image Scan",
-    "id": "df8b66c7-62c7-4b8a-9a6b-6ad7d6d8b3a2",
+    "id": "85fc3613-e913-7fc4-a80c-a3753e4aa9ae",
     "region": "us-east-1",
     "resources": [
-      "arn:aws:ecr:us-east-1:123456789012:repository/my-repo"
+      "arn:aws:ecr:us-east-1:123456789012:repository/snaketoy-web"
     ],
     "source": "aws.ecr",
-    "time": "2024-01-01T12:00:00Z",
+    "time": "2026-03-01T11:46:22Z",
     "version": "0"
   },
-  "timestamp": "2026-03-10T14:25:30.31254162Z",
+  "timestamp": "2026-03-01T11:46:23.018Z",
   "type": "aws.ecr.image.scan"
 }
 ```
@@ -424,29 +452,32 @@ During setup, SuperPlane creates a webhook endpoint for this trigger and subscri
 ```json
 {
   "data": {
-    "account": "123456789012",
-    "detail": {
-      "message": "{\"orderId\":\"ord_123\",\"status\":\"created\"}",
-      "messageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
-      "subject": "order.created",
-      "timestamp": "2026-01-10T10:00:00Z",
-      "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events"
-    },
-    "message": "{\"orderId\":\"ord_123\",\"status\":\"created\"}",
-    "messageAttributes": {
+    "Message": "{\"orderId\":\"ord_8f3a2b1c\",\"customerId\":\"cus_7d2e9f1a\",\"status\":\"created\",\"totalCents\":3497,\"currency\":\"USD\",\"createdAt\":\"2026-01-10T10:00:00Z\"}",
+    "MessageAttributes": {
       "eventType": {
         "Type": "String",
         "Value": "order.created"
+      },
+      "schemaVersion": {
+        "Type": "String",
+        "Value": "1.2"
+      },
+      "tenant": {
+        "Type": "String",
+        "Value": "acme-prod-12348"
       }
     },
-    "messageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
-    "region": "us-east-1",
-    "subject": "order.created",
-    "timestamp": "2026-01-10T10:00:00Z",
-    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
-    "type": "Notification"
+    "MessageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
+    "Signature": "EXAMPLEpH+..0OoH2YgFHc7yqf3SfWaHJ1sV2lxwRkKlvN6yc1jYdQfA3Bws1eRgTC2vH+rSE5e7H7YmL3nN5XAvXwjz0CQpjPbUsVqf1ZdfUdsW8HJ7T0YZGrlH5q4qYf5e6kQ4mE/dqGd4r2Y0mFZ6e6dq3PsR7Hc=",
+    "SignatureVersion": "1",
+    "SigningCertURL": "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-9c6465fa7f48f5cacd23014631ec1136.pem",
+    "Subject": "order.created",
+    "Timestamp": "2026-01-10T10:00:00.984Z",
+    "TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+    "Type": "Notification",
+    "UnsubscribeURL": "https://sns.us-east-1.amazonaws.com/?Action=Unsubscribe\u0026SubscriptionArn=arn:aws:sns:us-east-1:123456789012:orders-events:11a2b3c4-5d6e-7f80-91a2-b3c4d5e6f708"
   },
-  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "timestamp": "2026-01-10T10:00:02.124Z",
   "type": "aws.sns.topic.message"
 }
 ```
