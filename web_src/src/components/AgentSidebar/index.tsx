@@ -258,18 +258,33 @@ function ChatConversation({
   );
 }
 
-// Track published version IDs outside component to survive remounts
-const publishedVersionIds = new Set<string>();
+// Track published/discarded version IDs outside component to survive remounts
+const dismissedVersionIds = new Set<string>();
 
 function DraftActionsBar({ messages, canvasId, organizationId }: { messages: AgentMessage[]; canvasId: string; organizationId: string }) {
   const [, forceUpdate] = useState(0);
+
+  // Listen for canvas version changes (publish/discard from editor or websocket)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { versionId } = (e as CustomEvent).detail;
+      if (versionId && !dismissedVersionIds.has(versionId)) {
+        // Version was updated (published/discarded) — check if it's one we're showing
+        dismissedVersionIds.add(versionId);
+        forceUpdate(n => n + 1);
+      }
+    };
+    window.addEventListener("canvas:version-updated", handler);
+    return () => window.removeEventListener("canvas:version-updated", handler);
+  }, []);
+
   const latestDraft = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg.role !== "assistant") continue;
       const segments = parseAgentContent(msg.content);
       for (const seg of segments) {
-        if (seg.type === "draft-actions" && !publishedVersionIds.has(seg.versionId)) return seg;
+        if (seg.type === "draft-actions" && !dismissedVersionIds.has(seg.versionId)) return seg;
       }
     }
     return null;
@@ -285,7 +300,7 @@ function DraftActionsBar({ messages, canvasId, organizationId }: { messages: Age
         canvasId={canvasId}
         organizationId={organizationId}
         isEditing={window.location.search.includes("version=")}
-        onPublished={() => { publishedVersionIds.add(latestDraft.versionId); forceUpdate(n => n + 1); }}
+        onPublished={() => { dismissedVersionIds.add(latestDraft.versionId); forceUpdate(n => n + 1); }}
       />
     </div>
   );

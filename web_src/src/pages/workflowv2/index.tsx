@@ -2296,6 +2296,8 @@ export function WorkflowPageV2() {
       }
 
       if (eventName === "canvas_version_updated") {
+        // Notify agent sidebar draft-actions bar
+        window.dispatchEvent(new CustomEvent("canvas:version-updated", { detail: { canvasId, versionId: payload.versionId } }));
         invalidateCanvasVersionData(canvasId);
         if (activeCanvasVersionId && payload.versionId === activeCanvasVersionId) {
           if (hasPendingLocalCanvasState) {
