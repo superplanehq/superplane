@@ -259,20 +259,20 @@ function ChatConversation({
 }
 
 function DraftActionsBar({ messages, canvasId, organizationId }: { messages: AgentMessage[]; canvasId: string; organizationId: string }) {
-  const [dismissed, setDismissed] = useState(false);
+  const [publishedVersionIds, setPublishedVersionIds] = useState<Set<string>>(new Set());
   const latestDraft = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
       const msg = messages[i];
       if (msg.role !== "assistant") continue;
       const segments = parseAgentContent(msg.content);
       for (const seg of segments) {
-        if (seg.type === "draft-actions") return seg;
+        if (seg.type === "draft-actions" && !publishedVersionIds.has(seg.versionId)) return seg;
       }
     }
     return null;
-  }, [messages]);
+  }, [messages, publishedVersionIds]);
 
-  if (!latestDraft || dismissed) return null;
+  if (!latestDraft) return null;
 
   return (
     <div className="border-t border-violet-200 bg-violet-50/80 px-3 py-2">
@@ -282,7 +282,7 @@ function DraftActionsBar({ messages, canvasId, organizationId }: { messages: Age
         canvasId={canvasId}
         organizationId={organizationId}
         isEditing={window.location.search.includes("version=")}
-        onPublished={() => setDismissed(true)}
+        onPublished={() => setPublishedVersionIds(prev => new Set(prev).add(latestDraft.versionId))}
       />
     </div>
   );

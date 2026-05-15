@@ -30,7 +30,7 @@ export function DraftActionsWidget({
     window.dispatchEvent(new CustomEvent("agent:view-version", { detail: { versionId } }));
   };
 
-    const handlePublish = async () => {
+  const handlePublish = async () => {
     setPublishing(true);
     try {
       const response = await fetch(
