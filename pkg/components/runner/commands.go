@@ -29,23 +29,6 @@ func normalizeCommands(commands string) []string {
 	return out
 }
 
-func commandForExecution(commands string) []string {
-	lines := normalizeCommands(commands)
-	if len(lines) == 0 {
-		return nil
-	}
-
-	out := make([]string, 0, len(lines))
-	for _, command := range lines {
-		out = append(out, fmt.Sprintf("printf '$ %%s\\n' %s\n%s", bashSingleQuotedLiteral(command), command))
-	}
-	return out
-}
-
-func bashSingleQuotedLiteral(value string) string {
-	return "'" + strings.ReplaceAll(value, "'", `'\''`) + "'"
-}
-
 func validateCommands(commands string) error {
 	lines := normalizeCommands(commands)
 	if len(lines) == 0 {

@@ -31,18 +31,6 @@ func TestNormalizeCommands(t *testing.T) {
 	}
 }
 
-func TestCommandForExecution(t *testing.T) {
-	t.Parallel()
-
-	got := commandForExecution("echo a\n echo 'b' \n")
-	want := []string{
-		"printf '$ %s\\n' 'echo a'\necho a",
-		"printf '$ %s\\n' 'echo '\\''b'\\'''\necho 'b'",
-	}
-	require.Equal(t, want, got)
-	require.Nil(t, commandForExecution("\n \n"))
-}
-
 func TestValidateEnvironment(t *testing.T) {
 	t.Parallel()
 
@@ -175,7 +163,7 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	require.NoError(t, json.Unmarshal(body, &req))
 
 	assert.Equal(t, "fleet-1", req.FleetID)
-	assert.Equal(t, []string{"printf '$ %s\\n' 'echo hello'\necho hello"}, req.Commands)
+	assert.Equal(t, []string{"echo hello"}, req.Commands)
 	assert.Equal(t, "host", req.ExecutionMode)
 	assert.Equal(t, []BrokerEnvironmentVariable{
 		{Name: "COMMIT_AUTHOR", Value: "alice@example.com"},
