@@ -62,6 +62,10 @@ func listIssueTypes(ctx core.ListResourcesContext) ([]core.IntegrationResource, 
 		return []core.IntegrationResource{}, nil
 	}
 
+	if ctx.HTTP == nil {
+		return []core.IntegrationResource{}, nil
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
@@ -89,6 +93,10 @@ func listIssueStatuses(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 		return []core.IntegrationResource{}, nil
 	}
 
+	if ctx.HTTP == nil {
+		return []core.IntegrationResource{}, nil
+	}
+
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
@@ -113,6 +121,10 @@ func listIssueStatuses(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 func listAssignees(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	projectKey := ctx.Parameters["project"]
 	if projectKey == "" || strings.Contains(projectKey, "{{") {
+		return []core.IntegrationResource{}, nil
+	}
+
+	if ctx.HTTP == nil {
 		return []core.IntegrationResource{}, nil
 	}
 
