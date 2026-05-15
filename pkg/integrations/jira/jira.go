@@ -79,6 +79,10 @@ func (j *Jira) Actions() []core.Action {
 		&CreateIncident{},
 		&GetIncident{},
 		&DeleteIncident{},
+		&CreateAlert{},
+		&GetAlert{},
+		&DeleteAlert{},
+		&UpdateAlert{},
 	}
 }
 

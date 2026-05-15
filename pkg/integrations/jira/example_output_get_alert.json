@@ -1,0 +1,12 @@
+{
+    "data": {
+        "id": "e0caa0ce-d52f-4500-81b9-d592d06970b6",
+        "tinyId": "1234",
+        "message": "The CPU usage on Server XYZ has exceeded 80%.",
+        "status": "open",
+        "priority": "P2",
+        "acknowledged": false
+    },
+    "timestamp": "2026-01-19T12:00:00Z",
+     "type": "jira.alert.fetched"
+}
