@@ -30,6 +30,10 @@ func UpdateCanvasDashboard(ctx context.Context, organizationID, canvasID string,
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "canvas not found")
 		}
+		log.WithError(err).
+			WithField("canvas_id", canvasUUID.String()).
+			WithField("organization_id", orgUUID.String()).
+			Error("failed to load canvas for dashboard update")
 		return nil, status.Error(codes.Internal, "failed to load canvas")
 	}
 
@@ -63,6 +67,9 @@ func UpdateCanvasDashboard(ctx context.Context, organizationID, canvasID string,
 
 	serialized, err := serializeCanvasDashboard(saved)
 	if err != nil {
+		log.WithError(err).
+			WithField("canvas_id", canvasUUID.String()).
+			Error("failed to serialize canvas dashboard")
 		return nil, status.Error(codes.Internal, "failed to serialize canvas dashboard")
 	}
 

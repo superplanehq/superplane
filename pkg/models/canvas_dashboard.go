@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -40,7 +41,7 @@ func (CanvasDashboard) TableName() string {
 func FindCanvasDashboardInTransaction(tx *gorm.DB, canvasID uuid.UUID) (*CanvasDashboard, error) {
 	var record CanvasDashboard
 	err := tx.Where("canvas_id = ?", canvasID).First(&record).Error
-	if err == gorm.ErrRecordNotFound {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return &CanvasDashboard{
 			CanvasID: canvasID,
 			Panels:   datatypes.NewJSONType([]DashboardPanel{}),
