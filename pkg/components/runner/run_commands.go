@@ -29,8 +29,16 @@ func init() {
 
 type Runner struct{}
 
+type EnvironmentVariable struct {
+	Name        string                     `json:"name" mapstructure:"name"`
+	ValueSource string                     `json:"valueSource" mapstructure:"valueSource"`
+	Value       *string                    `json:"value,omitempty" mapstructure:"value"`
+	Secret      configuration.SecretKeyRef `json:"secret,omitempty" mapstructure:"secret"`
+}
+
 type Spec struct {
-	Commands string `json:"commands" mapstructure:"commands"`
+	Commands    string                `json:"commands" mapstructure:"commands"`
+	Environment []EnvironmentVariable `json:"environment,omitempty" mapstructure:"environment"`
 }
 
 func (c *Runner) Name() string  { return "runner" }
@@ -62,6 +70,7 @@ func (c *Runner) Documentation() string {
 
 ## Configuration
 - **Commands**: One or more shell commands, one per line.
+- **Environment variables**: Optional key/value pairs available during command execution. Values can be literal strings (with expression support) or organization secret keys.
 
 ## Output channels
 - **Passed**: The commands finished with exit code **0**.
@@ -79,6 +88,66 @@ func (c *Runner) Configuration() []configuration.Field {
 			Placeholder: "echo \"Hello, World!\"",
 			Description: "One or more shell commands, one per line",
 		},
+		{
+			Name:        "environment",
+			Label:       "Environment variables",
+			Type:        configuration.FieldTypeList,
+			Required:    false,
+			Description: "Optional key/value pairs available to the commands",
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel: "Variable",
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+						Schema: []configuration.Field{
+							{
+								Name:        "name",
+								Label:       "Name",
+								Type:        configuration.FieldTypeString,
+								Description: "Environment variable name (letters, numbers, underscore)",
+								Placeholder: "e.g. COMMIT_AUTHOR",
+								Required:    true,
+							},
+							{
+								Name:        "valueSource",
+								Label:       "Value source",
+								Type:        configuration.FieldTypeSelect,
+								Description: "Where this variable value comes from",
+								Required:    true,
+								Default:     EnvironmentValueSourceLiteral,
+								TypeOptions: &configuration.TypeOptions{
+									Select: &configuration.SelectTypeOptions{
+										Options: []configuration.FieldOption{
+											{Label: "Literal value", Value: EnvironmentValueSourceLiteral},
+											{Label: "Secret key", Value: EnvironmentValueSourceSecret},
+										},
+									},
+								},
+							},
+							{
+								Name:                 "value",
+								Label:                "Value",
+								Type:                 configuration.FieldTypeString,
+								Description:          "Literal value. Supports expressions such as {{ previous().data.author.email }}",
+								Placeholder:          "e.g. production",
+								Required:             false,
+								VisibilityConditions: []configuration.VisibilityCondition{{Field: "valueSource", Values: []string{EnvironmentValueSourceLiteral}}},
+								RequiredConditions:   []configuration.RequiredCondition{{Field: "valueSource", Values: []string{EnvironmentValueSourceLiteral}}},
+							},
+							{
+								Name:                 "secret",
+								Label:                "Secret key",
+								Type:                 configuration.FieldTypeSecretKey,
+								Description:          "Stored credential key to use as the variable value",
+								Required:             false,
+								VisibilityConditions: []configuration.VisibilityCondition{{Field: "valueSource", Values: []string{EnvironmentValueSourceSecret}}},
+								RequiredConditions:   []configuration.RequiredCondition{{Field: "valueSource", Values: []string{EnvironmentValueSourceSecret}}},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -89,6 +158,10 @@ func (c *Runner) Setup(ctx core.SetupContext) error {
 	}
 
 	if err := validateCommands(spec.Commands); err != nil {
+		return err
+	}
+
+	if err := validateEnvironment(spec.Environment); err != nil {
 		return err
 	}
 
@@ -106,6 +179,19 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("decode configuration: %w", err)
 	}
 
+	if err := validateCommands(spec.Commands); err != nil {
+		return err
+	}
+
+	if err := validateEnvironment(spec.Environment); err != nil {
+		return err
+	}
+
+	environment, err := resolveEnvironment(ctx.Secrets, spec.Environment)
+	if err != nil {
+		return err
+	}
+
 	webhookURL, err := ctx.Webhook.Setup()
 	if err != nil {
 		return fmt.Errorf("webhook setup: %w", err)
@@ -117,7 +203,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("new broker client: %w", err)
 	}
 
-	taskID, err := broker.CreateTask(cmds, webhookURL)
+	taskID, err := broker.CreateTask(cmds, webhookURL, environment)
 	if err != nil {
 		return fmt.Errorf("create task: %w", err)
 	}
