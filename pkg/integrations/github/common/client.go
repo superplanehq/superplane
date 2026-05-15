@@ -172,6 +172,14 @@ func (c *Client) CreateStatus(ctx context.Context, repository string, sha string
 	return c.underlying.Repositories.CreateStatus(ctx, c.owner, repository, sha, status)
 }
 
+func (c *Client) CreateDeployment(ctx context.Context, repository string, request *github.DeploymentRequest) (*github.Deployment, *github.Response, error) {
+	return c.underlying.Repositories.CreateDeployment(ctx, c.owner, repository, request)
+}
+
+func (c *Client) CreateDeploymentStatus(ctx context.Context, repository string, deploymentID int64, request *github.DeploymentStatusRequest) (*github.DeploymentStatus, *github.Response, error) {
+	return c.underlying.Repositories.CreateDeploymentStatus(ctx, c.owner, repository, deploymentID, request)
+}
+
 func (c *Client) CreateWorkflowDispatchEvent(ctx context.Context, repository string, workflowFile string, request github.CreateWorkflowDispatchEventRequest) (*github.WorkflowDispatchRunDetails, *github.Response, error) {
 	return c.underlying.Actions.CreateWorkflowDispatchEventByFileName(ctx, c.owner, repository, workflowFile, request)
 }
