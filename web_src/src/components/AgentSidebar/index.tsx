@@ -414,11 +414,16 @@ function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
 }
 
 function ToolMessageRow({ message }: { message: AgentMessage }) {
-  const [expanded, setExpanded] = useState(true);
+  const running = message.toolStatus === "started";
+  const [expanded, setExpanded] = useState(running);
   const command = message.content;
   const canExpand = Boolean(command);
-  const running = message.toolStatus === "started";
   const preview = command ? command.split("\n")[0].substring(0, 80) : "command";
+
+  // Auto-expand when command starts running
+  useEffect(() => {
+    if (running) setExpanded(true);
+  }, [running]);
 
   return (
     <div className="text-xs">
