@@ -173,7 +173,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		},
 		pbCanvases.Canvases_CreateCanvasVersion_FullMethodName: {
 			Resource:         "canvases",
-			Action:           "update",
+			Action:           "update_version",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
@@ -191,13 +191,13 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		},
 		pbCanvases.Canvases_UpdateCanvasVersion_FullMethodName: {
 			Resource:         "canvases",
-			Action:           "update",
+			Action:           "update_version",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
 		pbCanvases.Canvases_ApplyCanvasVersionChangeset_FullMethodName: {
 			Resource:         "canvases",
-			Action:           "update",
+			Action:           "update_version",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
@@ -209,13 +209,13 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		},
 		pbCanvases.Canvases_DeleteCanvasVersion_FullMethodName: {
 			Resource:         "canvases",
-			Action:           "update",
+			Action:           "update_version",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
 		pbCanvases.Canvases_PublishCanvasVersion_FullMethodName: {
 			Resource:         "canvases",
-			Action:           "update",
+			Action:           "publish",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
@@ -239,7 +239,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		},
 		pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName: {
 			Resource:         "canvases",
-			Action:           "update",
+			Action:           "publish",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
