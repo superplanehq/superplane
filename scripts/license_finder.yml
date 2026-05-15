@@ -189,7 +189,7 @@
     :when: 2025-12-23 15:02:58.461300000 Z
 - - :approve
   - robust-predicates
-  - :who: bender-rodriguez-unit1
+  - :who: Aleksandar Mitrovic
     :why: "The Unlicense (public domain); transitive dependency of mermaid via d3-delaunay. Compatible with Apache-2.0 project license."
     :versions: []
     :when: 2026-05-14 22:55:00.000000000 Z
