@@ -1,12 +1,18 @@
 {
   "data": {
-    "alertId": "alt_123",
-    "alertName": "Latency spike",
+    "alertId": "alt_01HYP5K9R7C8VNXM2D6BTFQ3GH",
+    "alertName": "snaketoy-web p95 latency",
     "eventType": "firing",
     "severity": "warning",
-    "message": "p95 latency exceeded threshold",
-    "url": "https://logfire-us.pydantic.dev/my-org/my-project/alerts/alt_123"
+    "message": "snaketoy-web p95 latency exceeded 800ms for 5 minutes (current: 1240ms)",
+    "url": "https://logfire-us.pydantic.dev/acme-labs/snaketoy/alerts/alt_01HYP5K9R7C8VNXM2D6BTFQ3GH",
+    "projectName": "snaketoy",
+    "organizationName": "acme-labs",
+    "query": "service.name = \"snaketoy-web\" | percentile(duration_ms, 95)",
+    "threshold": 800,
+    "value": 1240,
+    "triggeredAt": "2026-03-04T09:18:42.184Z"
   },
-  "timestamp": "2026-03-23T12:00:00.000000000Z",
+  "timestamp": "2026-03-04T09:18:42.612Z",
   "type": "logfire.alert.received"
 }
