@@ -106,6 +106,7 @@ import {
 } from "./lib/canvas-versions";
 import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
 import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
+import { getRunsFitAllDecision, getRunsFitAllRequest, prepareRunsViewportOnModeEntry } from "./lib/runs-viewport";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { getVersionActionAvailability } from "./lib/version-action-state";
 import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
@@ -133,6 +134,7 @@ import {
   summarizeWorkflowChanges,
 } from "./utils";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
+
 function getNodeAnalyticsProps(
   node: ComponentsNode,
   availableIntegrations: IntegrationsIntegrationDefinition[],
@@ -711,6 +713,7 @@ export function WorkflowPageV2() {
   const viewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
   const runsViewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
   const lastRunsViewportKeyRef = useRef<string | null>(null);
+  const skipNextRunsFitAllRef = useRef(false);
 
   // Track unsaved changes on the canvas
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -1997,8 +2000,18 @@ export function WorkflowPageV2() {
   const runsViewportKey = isRunsMode ? "runs" : null;
 
   if (lastRunsViewportKeyRef.current !== runsViewportKey) {
-    runsHasFitToViewRef.current = false;
-    runsViewportRef.current = undefined;
+    if (isRunsMode) {
+      const modeEntryViewport = prepareRunsViewportOnModeEntry({
+        currentCanvasViewport: viewportRef.current,
+        existingRunsViewport: runsViewportRef.current,
+        hasFitToView: runsHasFitToViewRef.current,
+      });
+
+      runsViewportRef.current = modeEntryViewport.runsViewport;
+      runsHasFitToViewRef.current = modeEntryViewport.hasFitToView;
+      skipNextRunsFitAllRef.current = modeEntryViewport.seededFromCanvasViewport;
+    }
+
     lastRunsViewportKeyRef.current = runsViewportKey;
   }
 
@@ -2011,10 +2024,17 @@ export function WorkflowPageV2() {
   }, [isRunsMode, runCanvasData]);
 
   useEffect(() => {
-    if (!isRunsMode) return;
-    if (!runCanvasNodeIdsKey) return;
+    const fitDecision = getRunsFitAllDecision({
+      isRunsMode,
+      runCanvasNodeIdsKey,
+      skipInitialRunsFitAll: skipNextRunsFitAllRef.current,
+    });
+
+    skipNextRunsFitAllRef.current = fitDecision.skipInitialRunsFitAll;
+    if (!fitDecision.shouldFitAll) return;
     setRunsFitAllNonce((n) => n + 1);
   }, [isRunsMode, runCanvasNodeIdsKey]);
+  const runsFitAllRequest = getRunsFitAllRequest({ isRunsMode, runsFitAllNonce });
 
   const getSidebarData = useCallback(
     (nodeId: string): SidebarData | null => {
@@ -5721,7 +5741,7 @@ export function WorkflowPageV2() {
           isSidebarOpenRef={isSidebarOpenRef}
           viewportRef={isRunsMode ? runsViewportRef : viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
-          fitAllRequest={isRunsMode ? runsFitAllNonce : null}
+          fitAllRequest={runsFitAllRequest}
           runCanvasLoading={isRunsMode && !!selectedRunRootEventId && selectedRunExecutionsQuery.isLoading}
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
