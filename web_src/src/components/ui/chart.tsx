@@ -1,6 +1,6 @@
 import * as React from "react";
 import * as RechartsPrimitive from "recharts";
-import type { TooltipValueType } from "recharts";
+import type { TooltipPayloadEntry, TooltipValueType } from "recharts";
 
 import { cn } from "@/lib/utils";
 
@@ -9,6 +9,9 @@ const THEMES = { light: "", dark: ".dark" } as const;
 
 const INITIAL_DIMENSION = { width: 320, height: 200 } as const;
 type TooltipNameType = number | string;
+type TooltipContentProps = RechartsPrimitive.DefaultTooltipContentProps<TooltipValueType, TooltipNameType>;
+type TooltipPayloadItem = TooltipPayloadEntry<TooltipValueType, TooltipNameType>;
+type TooltipPayloadItems = readonly TooltipPayloadItem[];
 
 export type ChartConfig = Record<
   string,
@@ -105,7 +108,7 @@ const ChartTooltip = RechartsPrimitive.Tooltip;
 
 function resolveTooltipLabelValue(
   config: ChartConfig,
-  payload: { dataKey?: string; name?: string }[],
+  payload: TooltipPayloadItems,
   labelKey?: string,
   label?: React.ReactNode,
 ) {
@@ -117,10 +120,10 @@ function resolveTooltipLabelValue(
 
 function renderTooltipLabel(opts: {
   hideLabel?: boolean;
-  payload?: { dataKey?: string; name?: string }[];
+  payload?: TooltipPayloadItems;
   labelKey?: string;
   label?: React.ReactNode;
-  labelFormatter?: (value: React.ReactNode, payload: unknown[]) => React.ReactNode;
+  labelFormatter?: TooltipContentProps["labelFormatter"];
   labelClassName?: string;
   config: ChartConfig;
 }) {
@@ -204,6 +207,7 @@ function ChartTooltipContent({
               nestLabel={nestLabel}
               tooltipLabel={tooltipLabel}
               formatter={formatter}
+              tooltipPayload={payload}
             />
           ))}
       </div>
@@ -241,7 +245,7 @@ function TooltipIndicator({
   );
 }
 
-function resolvePayloadKey(nameKey?: string, item?: { name?: string; dataKey?: string | number }) {
+function resolvePayloadKey(nameKey?: string, item?: { name?: TooltipNameType; dataKey?: unknown }) {
   return `${nameKey ?? item?.name ?? item?.dataKey ?? "value"}`;
 }
 
@@ -264,8 +268,9 @@ function TooltipPayloadRow({
   nestLabel,
   tooltipLabel,
   formatter,
+  tooltipPayload,
 }: {
-  item: NonNullable<RechartsPrimitive.DefaultTooltipContentProps<TooltipValueType, TooltipNameType>["payload"]>[number];
+  item: TooltipPayloadItem;
   index: number;
   config: ChartConfig;
   nameKey?: string;
@@ -274,7 +279,8 @@ function TooltipPayloadRow({
   hideIndicator?: boolean;
   nestLabel: boolean;
   tooltipLabel: React.ReactNode;
-  formatter?: RechartsPrimitive.DefaultTooltipContentProps<TooltipValueType, TooltipNameType>["formatter"];
+  formatter?: TooltipContentProps["formatter"];
+  tooltipPayload: TooltipPayloadItems;
 }) {
   const key = resolvePayloadKey(nameKey, item);
   const itemConfig = getPayloadConfigFromPayload(config, item, key);
@@ -288,7 +294,7 @@ function TooltipPayloadRow({
       )}
     >
       {formatter && item?.value !== undefined && item.name ? (
-        formatter(item.value, item.name, item, index, item.payload)
+        formatter(item.value, item.name, item, index, tooltipPayload)
       ) : (
         <>
           <TooltipIndicator
