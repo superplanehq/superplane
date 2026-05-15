@@ -1,6 +1,24 @@
 DOCKER_SERVICES := fleet-manager task-broker runner
 
+# Local dev defaults (override: make runner LOCAL_FLEET_URL=http://host.docker.internal:8080)
+LOCAL_TMP ?= /tmp
+LOCAL_FLEET_DB ?= $(LOCAL_TMP)/superplane-fleet-local.db
+LOCAL_BROKER_DB ?= $(LOCAL_TMP)/superplane-broker-local.db
+LOCAL_FLEET_LISTEN ?= :8080
+LOCAL_BROKER_LISTEN ?= :8081
+LOCAL_FLEET_URL ?= http://127.0.0.1:8080
+LOCAL_BROKER_URL ?= http://127.0.0.1:8081
+LOCAL_BROKER_PUBLIC_URL ?= http://127.0.0.1:8081
+LOCAL_STACK_AUTH_TOKEN ?= dev-local-token
+LOCAL_FLEET_ID ?= local
+LOCAL_RUNNER_TRANSPORT ?= http
+LOCAL_RUNNER_SHELL_USE_PIPE ?= 1
+
+# Number of runner processes for `make runner` (default 1).
+N ?= 1
+
 .PHONY: build test fmt docker-build docker-build-fleet-manager docker-build-task-broker docker-build-runner docker-publish-ghcr runner-linux-amd64 runner-publish-s3
+.PHONY: fleet-manager task-broker runner register-local-fleet local-dev-help
 
 build:
 	go build -o bin/fleet-manager ./fleet-manager/cmd/fleet-manager
@@ -9,6 +27,45 @@ build:
 
 test:
 	go test ./...
+
+local-dev-help:
+	@echo "Local dev (separate terminals):"
+	@echo "  make fleet-manager"
+	@echo "  make task-broker"
+	@echo "  make register-local-fleet"
+	@echo "  make runner N=3"
+	@echo "Defaults are LOCAL_* / LOCAL_STACK_* / LOCAL_RUNNER_* / N in the Makefile (override on the command line)."
+
+# Long-running: run in its own terminal.
+fleet-manager: build
+	DATABASE_PATH=$(LOCAL_FLEET_DB) LISTEN_ADDR=$(LOCAL_FLEET_LISTEN) AUTH_TOKEN= ./bin/fleet-manager
+
+# Long-running: run in its own terminal.
+task-broker: build
+	DATABASE_PATH=$(LOCAL_BROKER_DB) LISTEN_ADDR=$(LOCAL_BROKER_LISTEN) \
+		BROKER_PUBLIC_URL=$(LOCAL_BROKER_PUBLIC_URL) AUTH_TOKEN=$(LOCAL_STACK_AUTH_TOKEN) ./bin/task-broker
+
+# After fleet-manager + task-broker are listening; registers LOCAL_FLEET_ID → LOCAL_FLEET_URL on the broker.
+register-local-fleet:
+	curl -fsS -X POST "$(LOCAL_BROKER_URL)/v1/fleets" \
+		-H "Content-Type: application/json" \
+		-H "Authorization: Bearer $(LOCAL_STACK_AUTH_TOKEN)" \
+		-d '{"id":"$(LOCAL_FLEET_ID)","base_url":"$(LOCAL_FLEET_URL)"}'
+
+# Blocks until all N runner processes exit. N=1 is one foreground-equivalent worker.
+runner: build
+	@set -e; n="$(N)"; i=1; \
+	while [ "$$i" -le "$$n" ]; do \
+	  ( cd "$(CURDIR)" && \
+	    FLEET_MANAGER_URL="$(LOCAL_FLEET_URL)" \
+	    RUNNER_TRANSPORT="$(LOCAL_RUNNER_TRANSPORT)" \
+	    RUNNER_SHELL_USE_PIPE="$(LOCAL_RUNNER_SHELL_USE_PIPE)" \
+	    RUNNER_ID="runner-$$i" \
+	    AUTH_TOKEN= \
+	    exec ./bin/runner ) & \
+	  i=$$((i+1)); \
+	done; \
+	wait
 
 fmt:
 	gofmt -w fleet-manager runner shared task-broker
