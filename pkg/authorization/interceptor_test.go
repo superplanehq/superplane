@@ -46,6 +46,33 @@ func TestCanvasResourceResolver(t *testing.T) {
 	})
 }
 
+func TestCanvasAuthorizationRulesSeparateDraftAndLiveActions(t *testing.T) {
+	interceptor := NewAuthorizationInterceptor(nil)
+
+	tests := []struct {
+		method string
+		action string
+	}{
+		{pbCanvases.Canvases_CreateCanvasVersion_FullMethodName, "update_version"},
+		{pbCanvases.Canvases_UpdateCanvasVersion_FullMethodName, "update_version"},
+		{pbCanvases.Canvases_ApplyCanvasVersionChangeset_FullMethodName, "update_version"},
+		{pbCanvases.Canvases_DeleteCanvasVersion_FullMethodName, "update_version"},
+		{pbCanvases.Canvases_PublishCanvasVersion_FullMethodName, "publish"},
+		{pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName, "publish"},
+		{pbCanvases.Canvases_UpdateCanvas_FullMethodName, "update"},
+		{pbCanvases.Canvases_DeleteCanvas_FullMethodName, "delete"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.method, func(t *testing.T) {
+			rule, ok := interceptor.rules[tt.method]
+			require.True(t, ok)
+			assert.Equal(t, "canvases", rule.Resource)
+			assert.Equal(t, tt.action, rule.Action)
+		})
+	}
+}
+
 func TestHasRequiredScopedTokenPermission(t *testing.T) {
 	ruleWithDefaultResolver := AuthorizationRule{
 		Resource:         "canvases",
