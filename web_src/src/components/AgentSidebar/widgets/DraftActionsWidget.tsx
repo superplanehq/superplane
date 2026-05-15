@@ -42,7 +42,9 @@ export function DraftActionsWidget({
       if (response.ok) {
         setPublished(true);
       } else {
-        console.error("Publish failed:", response.status, await response.text());
+        const text = await response.text();
+        console.error("Publish failed:", response.status, text);
+        alert(`Publish failed (${response.status}): ${text}`);
       }
     } catch (err) {
       console.error("Failed to publish:", err);
