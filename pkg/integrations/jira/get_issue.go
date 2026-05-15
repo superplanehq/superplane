@@ -18,7 +18,6 @@ type GetIssue struct{}
 type GetIssueSpec struct {
 	Project  string `json:"project" mapstructure:"project"`
 	IssueKey string `json:"issueKey" mapstructure:"issueKey"`
-	Expand   string `json:"expand,omitempty" mapstructure:"expand"`
 }
 
 func (c *GetIssue) Name() string {
@@ -46,7 +45,6 @@ func (c *GetIssue) Documentation() string {
 
 - **Project**: The Jira project the issue belongs to
 - **Issue Key**: The issue key (e.g. ` + "`PROJ-123`" + `) or an expression resolving to one
-- **Expand**: Optional comma-separated list of Jira ` + "`expand`" + ` values (e.g. ` + "`renderedFields,names`" + `)
 
 ## Output
 
@@ -83,18 +81,10 @@ func (c *GetIssue) Configuration() []configuration.Field {
 		{
 			Name:        "issueKey",
 			Label:       "Issue Key",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "The issue key (e.g. PROJ-123)",
 			Placeholder: "PROJ-123",
-		},
-		{
-			Name:        "expand",
-			Label:       "Expand",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "Optional comma-separated list of Jira `expand` values",
-			Placeholder: "renderedFields,names",
 		},
 	}
 }
@@ -113,7 +103,7 @@ func (c *GetIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("issueKey is required")
 	}
 
-	project, err := requireProject(ctx.Integration, spec.Project)
+	project, err := requireProject(ctx.HTTP, ctx.Integration, spec.Project)
 	if err != nil {
 		return err
 	}
@@ -136,9 +126,7 @@ func (c *GetIssue) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to create client: %v", err)
 	}
 
-	issue, err := client.GetIssueWithOptions(strings.TrimSpace(spec.IssueKey), GetIssueOptions{
-		Expand: strings.TrimSpace(spec.Expand),
-	})
+	issue, err := client.GetIssueWithOptions(strings.TrimSpace(spec.IssueKey), GetIssueOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to get issue: %v", err)
 	}

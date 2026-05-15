@@ -118,7 +118,7 @@ func (c *DeleteIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("issueKey is required")
 	}
 
-	project, err := requireProject(ctx.Integration, spec.Project)
+	project, err := requireProject(ctx.HTTP, ctx.Integration, spec.Project)
 	if err != nil {
 		return err
 	}

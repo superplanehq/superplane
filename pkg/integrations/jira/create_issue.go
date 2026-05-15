@@ -20,6 +20,7 @@ type CreateIssueSpec struct {
 	IssueType   string `json:"issueType"`
 	Summary     string `json:"summary"`
 	Description string `json:"description"`
+	Assignee    string `json:"assignee"`
 	Status      string `json:"status"`
 }
 
@@ -50,6 +51,7 @@ func (c *CreateIssue) Documentation() string {
 - **Issue Type**: The type of issue (scoped to the chosen project)
 - **Summary**: The issue summary/title
 - **Description**: Optional description text
+- **Assignee**: Optional Jira user to assign the issue to
 - **Status**: Optional initial status. Jira always creates issues in the workflow's initial state, so when this is set the component executes a transition immediately after create. The status must be reachable via a transition from the initial state.
 
 ## Output
@@ -111,7 +113,7 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 		{
 			Name:        "summary",
 			Label:       "Summary",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "The issue summary/title",
 			Placeholder: "Issue summary",
@@ -119,9 +121,28 @@ func (c *CreateIssue) Configuration() []configuration.Field {
 		{
 			Name:        "description",
 			Label:       "Description",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "Optional description text",
+		},
+		{
+			Name:        "assignee",
+			Label:       "Assignee",
+			Type:        configuration.FieldTypeIntegrationResource,
+			Required:    false,
+			Description: "User to assign the new issue to",
+			Placeholder: "Leave empty to keep the project default",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "assignee",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "project",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "project"},
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "status",
@@ -164,7 +185,7 @@ func (c *CreateIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("summary is required")
 	}
 
-	project, err := requireProject(ctx.Integration, spec.Project)
+	project, err := requireProject(ctx.HTTP, ctx.Integration, spec.Project)
 	if err != nil {
 		return err
 	}
@@ -194,6 +215,9 @@ func (c *CreateIssue) Execute(ctx core.ExecutionContext) error {
 			Summary:     spec.Summary,
 			Description: WrapInADF(spec.Description),
 		},
+	}
+	if strings.TrimSpace(spec.Assignee) != "" {
+		req.Fields.Assignee = &UserRef{AccountID: strings.TrimSpace(spec.Assignee)}
 	}
 
 	created, err := client.CreateIssue(req)

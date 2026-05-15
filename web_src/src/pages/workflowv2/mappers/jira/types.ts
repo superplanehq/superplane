@@ -52,6 +52,7 @@ export interface CreateIssueConfiguration {
   issueType?: string;
   summary?: string;
   description?: string;
+  assignee?: string;
   status?: string;
 }
 

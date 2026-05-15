@@ -26,20 +26,34 @@ func (j *Jira) ListResources(resourceType string, ctx core.ListResourcesContext)
 }
 
 func listProjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	if ctx.HTTP != nil {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err == nil {
+			projects, err := client.ListProjects()
+			if err == nil {
+				return projectResources(projects), nil
+			}
+		}
+	}
+
 	metadata := Metadata{}
 	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to decode metadata: %w", err)
 	}
 
-	resources := make([]core.IntegrationResource, 0, len(metadata.Projects))
-	for _, project := range metadata.Projects {
+	return projectResources(metadata.Projects), nil
+}
+
+func projectResources(projects []Project) []core.IntegrationResource {
+	resources := make([]core.IntegrationResource, 0, len(projects))
+	for _, project := range projects {
 		resources = append(resources, core.IntegrationResource{
 			Type: "project",
 			Name: fmt.Sprintf("%s (%s)", project.Name, project.Key),
 			ID:   project.Key,
 		})
 	}
-	return resources, nil
+	return resources
 }
 
 func listIssueTypes(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {

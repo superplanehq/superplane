@@ -14,15 +14,31 @@ type NodeMetadata struct {
 	Status    string   `json:"status,omitempty"`
 }
 
-// requireProject looks up a project by key in the integration metadata. It
-// returns an error if the project is not present.
-func requireProject(integration core.IntegrationContext, projectKey string) (*Project, error) {
+func requireProject(httpCtx core.HTTPContext, integration core.IntegrationContext, projectKey string) (*Project, error) {
+	if httpCtx != nil {
+		client, err := NewClient(httpCtx, integration)
+		if err == nil {
+			projects, err := client.ListProjects()
+			if err == nil {
+				return findProject(projects, projectKey)
+			}
+		}
+	}
+
+	return requireProjectFromMetadata(integration, projectKey)
+}
+
+func requireProjectFromMetadata(integration core.IntegrationContext, projectKey string) (*Project, error) {
 	metadata := Metadata{}
 	if err := mapstructure.Decode(integration.GetMetadata(), &metadata); err != nil {
 		return nil, fmt.Errorf("failed to decode integration metadata: %w", err)
 	}
 
-	for _, project := range metadata.Projects {
+	return findProject(metadata.Projects, projectKey)
+}
+
+func findProject(projects []Project, projectKey string) (*Project, error) {
+	for _, project := range projects {
 		if project.Key == projectKey {
 			p := project
 			return &p, nil

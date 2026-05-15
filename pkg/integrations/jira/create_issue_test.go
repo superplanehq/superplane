@@ -1,6 +1,7 @@
 package jira
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -177,6 +178,46 @@ func Test__CreateIssue__Execute(t *testing.T) {
 		assert.True(t, execCtx.Passed)
 	})
 
+	t.Run("successful issue creation with assignee", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusCreated,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"10003","key":"TEST-125","self":"https://test.atlassian.net/rest/api/3/issue/10003"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"10003","key":"TEST-125","fields":{"summary":"Assigned task","assignee":{"accountId":"acct-123","displayName":"Alice"}}}`)),
+				},
+			},
+		}
+
+		execCtx := &contexts.ExecutionStateContext{}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":   "TEST",
+				"issueType": "Task",
+				"summary":   "Assigned task",
+				"assignee":  "acct-123",
+			},
+			HTTP:           httpContext,
+			Integration:    newAuthorizedIntegration(),
+			ExecutionState: execCtx,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, execCtx.Passed)
+
+		body, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+
+		var request map[string]any
+		require.NoError(t, json.Unmarshal(body, &request))
+		fields := request["fields"].(map[string]any)
+		assignee := fields["assignee"].(map[string]any)
+		assert.Equal(t, "acct-123", assignee["accountId"])
+	})
+
 	t.Run("successful issue creation with status transition", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
@@ -297,7 +338,7 @@ func Test__CreateIssue__Configuration(t *testing.T) {
 	component := CreateIssue{}
 
 	config := component.Configuration()
-	assert.Len(t, config, 5)
+	assert.Len(t, config, 6)
 
 	fieldNames := make([]string, len(config))
 	for i, f := range config {
@@ -308,9 +349,10 @@ func Test__CreateIssue__Configuration(t *testing.T) {
 	assert.Contains(t, fieldNames, "issueType")
 	assert.Contains(t, fieldNames, "summary")
 	assert.Contains(t, fieldNames, "description")
+	assert.Contains(t, fieldNames, "assignee")
 	assert.Contains(t, fieldNames, "status")
 
-	optionalFields := map[string]bool{"description": true, "status": true}
+	optionalFields := map[string]bool{"description": true, "assignee": true, "status": true}
 	for _, f := range config {
 		if optionalFields[f.Name] {
 			assert.False(t, f.Required, "%s should be optional", f.Name)

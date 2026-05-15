@@ -32,6 +32,29 @@ func Test__ListResources__Project(t *testing.T) {
 	assert.Contains(t, resources[0].Name, "Test Project")
 }
 
+func Test__ListResources__Project__FetchesLiveProjects(t *testing.T) {
+	j := &Jira{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`[{"id":"10033","key":"SUP","name":"Superdent"}]`)),
+			},
+		},
+	}
+
+	resources, err := j.ListResources("project", core.ListResourcesContext{
+		HTTP:        httpContext,
+		Integration: newAuthorizedIntegrationWithMetadata(Metadata{}),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, resources, 1)
+	assert.Equal(t, "SUP", resources[0].ID)
+	assert.Equal(t, "Superdent (SUP)", resources[0].Name)
+	assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/project")
+}
+
 func Test__ListResources__IssueType(t *testing.T) {
 	j := &Jira{}
 

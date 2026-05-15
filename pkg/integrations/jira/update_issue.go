@@ -90,7 +90,7 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 		{
 			Name:        "issueKey",
 			Label:       "Issue Key",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "The issue key (e.g. PROJ-123)",
 			Placeholder: "PROJ-123",
@@ -98,14 +98,14 @@ func (c *UpdateIssue) Configuration() []configuration.Field {
 		{
 			Name:        "summary",
 			Label:       "Summary",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "New issue summary",
 		},
 		{
 			Name:        "description",
 			Label:       "Description",
-			Type:        configuration.FieldTypeExpression,
+			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Description: "New issue description (plain text; will be wrapped in ADF)",
 		},
@@ -207,7 +207,7 @@ func (c *UpdateIssue) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("at least one field to update must be provided")
 	}
 
-	project, err := requireProject(ctx.Integration, spec.Project)
+	project, err := requireProject(ctx.HTTP, ctx.Integration, spec.Project)
 	if err != nil {
 		return err
 	}

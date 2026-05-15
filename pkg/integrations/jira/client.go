@@ -341,10 +341,15 @@ type CreateIssueFields struct {
 	IssueType   IssueType  `json:"issuetype"`
 	Summary     string     `json:"summary"`
 	Description *ADFDoc    `json:"description,omitempty"`
+	Assignee    *UserRef   `json:"assignee,omitempty"`
 }
 
 type ProjectRef struct {
 	Key string `json:"key"`
+}
+
+type UserRef struct {
+	AccountID string `json:"accountId"`
 }
 
 type IssueType struct {
