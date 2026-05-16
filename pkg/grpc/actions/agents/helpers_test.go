@@ -30,6 +30,10 @@ func (s *stubService) SendMessage(ctx context.Context, o, u, id uuid.UUID, conte
 	return s.sendMessage(ctx, o, u, id, content)
 }
 
+func (s *stubService) InterruptSession(ctx context.Context, o, u, id uuid.UUID) error {
+	return nil
+}
+
 func now() *time.Time {
 	t := time.Now()
 	return &t

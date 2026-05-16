@@ -58,6 +58,17 @@ service Agents {
       tags: "Agent";
     };
   }
+
+  rpc InterruptAgentChat(InterruptAgentChatRequest) returns (InterruptAgentChatResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/agents/chats/{chat_id}/interrupt"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Interrupt agent execution";
+      description: "Sends a user.interrupt event to stop the agent mid-execution.";
+      tags: "Agent";
+    };
+  }
 }
 
 message GetCanvasAgentChatRequest {
@@ -89,6 +100,12 @@ message SendAgentChatMessageRequest {
 message SendAgentChatMessageResponse {
   AgentChatMessage message = 1;
 }
+
+message InterruptAgentChatRequest {
+  string chat_id = 1;
+}
+
+message InterruptAgentChatResponse {}
 
 message AgentChatInfo {
   string id = 1;

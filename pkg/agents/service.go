@@ -142,6 +142,17 @@ func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]mode
 	return models.ListAgentSessionMessagesPage(sessionID, cursor, limit)
 }
 
+func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error {
+	session, err := s.GetSession(organizationID, userID, sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+	if err := s.provider.InterruptSession(ctx, session.ProviderSessionID); err != nil {
+		return fmt.Errorf("interrupt: %w", err)
+	}
+	return nil
+}
+
 func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error) {
 	if content == "" {
 		return nil, fmt.Errorf("message content is required")

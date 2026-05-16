@@ -178,6 +178,18 @@ function ChatConversation({
     }
   }, [chatId, draft, sendMutation, agentMode]);
 
+  const handleStop = useCallback(async () => {
+    try {
+      await fetch(`/api/v1/agents/chats/${chatId}/interrupt`, {
+        method: "POST",
+        headers: { "x-organization-id": organizationId },
+        credentials: "include",
+      });
+    } catch (err) {
+      console.error("Failed to interrupt:", err);
+    }
+  }, [chatId, organizationId]);
+
   const scrollRef = useRef<HTMLDivElement>(null);
   const previousScrollHeight = useRef<number | null>(null);
 
@@ -249,7 +261,8 @@ function ChatConversation({
         draft={draft}
         onDraftChange={setDraft}
         onSend={handleSend}
-        sending={sendMutation.isPending}
+        onStop={handleStop}
+        sending={status === "streaming"}
         statusLabel={statusLabel(status)}
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
@@ -348,6 +361,7 @@ function ChatComposer({
   draft,
   onDraftChange,
   onSend,
+  onStop,
   sending,
   statusLabel,
   agentMode,
@@ -357,6 +371,7 @@ function ChatComposer({
   draft: string;
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  onStop: () => void;
   sending: boolean;
   statusLabel: string;
   agentMode: AgentMode;
@@ -375,7 +390,7 @@ function ChatComposer({
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
-            onSend();
+            if (!sending) onSend();
           }
         }}
       />
@@ -385,15 +400,28 @@ function ChatComposer({
         ) : (
           <span className="text-xs text-muted-foreground">{statusLabel}</span>
         )}
-        <Button
-          type="button"
-          onClick={onSend}
-          disabled={!draft.trim() || sending}
-          data-testid="agent-send-message-button"
-        >
-          {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-          Send
-        </Button>
+        {sending ? (
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={onStop}
+            data-testid="agent-stop-button"
+            className="gap-1"
+          >
+            <div className="size-3 rounded-sm bg-white animate-pulse" />
+            Stop
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            onClick={onSend}
+            disabled={!draft.trim()}
+            data-testid="agent-send-message-button"
+          >
+            <Send className="size-4" />
+            Send
+          </Button>
+        )}
       </div>
     </footer>
   );
