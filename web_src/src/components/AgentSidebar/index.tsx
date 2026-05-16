@@ -302,7 +302,7 @@ function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutat
             forceUpdate(n => n + 1);
             sendMutation.mutateAsync({
               chatId,
-              content: `[User discarded draft version ${versionId}. Changes were NOT applied.]`,
+              content: `[System: User discarded draft version ${versionId}. Changes were NOT applied. The canvas is unchanged from the last published version.]`,
               mode: agentMode,
             }).catch(() => {});
             return null;
@@ -317,7 +317,7 @@ function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutat
             forceUpdate(n => n + 1);
             sendMutation.mutateAsync({
               chatId,
-              content: `[User published draft version ${versionId}. Changes are now live.]`,
+              content: `[System: User published draft version ${versionId}. Changes are now live. Re-read the canvas to see the current state.]`,
               mode: agentMode,
             }).catch(() => {});
           } else if (state && state !== "STATE_DRAFT") {
@@ -487,9 +487,9 @@ function MessageRow({
   }
 
   // System notification messages (draft published/discarded)
-  const isSystemNotification = message.role === "user" && message.content.startsWith("[User ");
+  const isSystemNotification = message.role === "user" && message.content.startsWith("[System: ");
   if (isSystemNotification) {
-    const text = message.content.replace(/^\[|\]$/g, "");
+    const text = message.content.replace(/^\[System: |\]$/g, "");
     return (
       <div className="flex justify-center">
         <span className="text-[11px] text-slate-400 italic px-2">{text}</span>

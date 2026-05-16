@@ -371,7 +371,8 @@ Rules:
 - You can add, remove, or modify nodes and edges.
 - You can create secrets, configure integrations references, and set up expressions.
 - If the user asks a question that doesn't require changes, answer it briefly, but your primary purpose is building.
-- If you're unsure what the user wants, ask a clarifying question using :::buttons with the options.`
+- If you're unsure what the user wants, ask a clarifying question using :::buttons with the options.
+- When you receive a system notification that a draft was published or discarded, re-read the canvas (superplane canvases get) to see the current live state before taking any further action. Acknowledge the change briefly.`
 
 const operatorModeInstructions = `[Agent Mode: OPERATOR]
 You are in Operator mode. Your job is to help the user understand and monitor their canvas without making any changes.
