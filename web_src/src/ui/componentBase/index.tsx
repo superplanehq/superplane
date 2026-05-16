@@ -194,7 +194,7 @@ export interface EventSection {
   receivedAt?: Date;
   eventId: string;
   eventState?: EventState;
-  eventTitle?: string;
+  eventTitle?: string | React.ReactNode;
   eventSubtitle?: string | React.ReactNode;
   handleComponent?: React.ReactNode;
 }

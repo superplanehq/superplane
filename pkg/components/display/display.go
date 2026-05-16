@@ -200,8 +200,17 @@ func expressionErrorResult(err error) Result {
 }
 
 func mergeDisplayResult(existing any, result Result) map[string]any {
-	metadata := map[string]any{}
-	_ = mapstructure.Decode(existing, &metadata)
+	metadata, ok := existing.(map[string]any)
+	if !ok || metadata == nil {
+		metadata = map[string]any{}
+	} else {
+		merged := make(map[string]any, len(metadata)+1)
+		for k, v := range metadata {
+			merged[k] = v
+		}
+		metadata = merged
+	}
+
 	metadata["display_result"] = map[string]any{
 		"value": result.Value,
 		"color": result.Color,

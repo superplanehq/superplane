@@ -13,6 +13,33 @@ import (
 func Test__Display__Execute(t *testing.T) {
 	component := &Display{}
 
+	t.Run("stores display result when execution metadata is a nil map", func(t *testing.T) {
+		stateCtx := &contexts.ExecutionStateContext{}
+		var nilMetadata map[string]any
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: nilMetadata,
+		}
+
+		ctx := core.ExecutionContext{
+			Configuration:  map[string]any{"value": "Hello"},
+			ExecutionState: stateCtx,
+			Metadata:       metadataCtx,
+		}
+
+		err := component.Execute(ctx)
+		assert.NoError(t, err)
+		assert.True(t, stateCtx.Passed)
+		metadata := metadataCtx.Metadata.(map[string]any)
+		assert.Equal(
+			t,
+			map[string]any{
+				"value": "Hello",
+				"color": DefaultColor,
+			},
+			metadata["display_result"],
+		)
+	})
+
 	t.Run("stores resolved value and default color, then emits passthrough payload", func(t *testing.T) {
 		stateCtx := &contexts.ExecutionStateContext{}
 		metadataCtx := &contexts.MetadataContext{

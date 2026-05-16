@@ -43,11 +43,11 @@ export const displayMapper: ComponentBaseMapper = {
         context.componentDefinition.label ||
         context.componentDefinition.name ||
         "Unnamed component",
-      eventSections: lastExecution ? getDisplayEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution
+        ? getDisplayEventSections(context.nodes, lastExecution, componentName, displayResult, muted)
+        : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
-      customField: getDisplayBadgeField(displayResult, muted),
-      customFieldPosition: "before",
     };
   },
 
@@ -69,7 +69,7 @@ export const displayMapper: ComponentBaseMapper = {
   },
 };
 
-function getDisplayBadgeField(result: DisplayResult, muted: boolean): React.ReactNode {
+function renderDisplayBadge(result: DisplayResult, muted: boolean): React.ReactNode {
   if (!result.value) {
     return null;
   }
@@ -79,14 +79,12 @@ function getDisplayBadgeField(result: DisplayResult, muted: boolean): React.Reac
   const displayValue = truncate(result.value, DISPLAY_BADGE_MAX_CHARS);
 
   return (
-    <div className="px-2 py-2 border-b border-slate-950/20">
-      <span
-        title={result.value}
-        className={`inline-flex max-w-full items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${badgeClasses} ${muted ? "opacity-60" : ""}`}
-      >
-        <span className="truncate">{displayValue}</span>
-      </span>
-    </div>
+    <span
+      title={result.value}
+      className={`inline-flex max-w-full items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${badgeClasses} ${muted ? "opacity-60" : ""}`}
+    >
+      <span className="truncate">{displayValue}</span>
+    </span>
   );
 }
 
@@ -115,17 +113,24 @@ function truncate(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
-function getDisplayEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+function getDisplayEventSections(
+  nodes: NodeInfo[],
+  execution: ExecutionInfo,
+  componentName: string,
+  displayResult: DisplayResult,
+  muted: boolean,
+): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
+  const displayBadge = renderDisplayBadge(displayResult, muted);
 
   return [
     {
       receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
+      eventTitle: displayBadge ?? title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
       eventId: execution.rootEvent!.id!,
