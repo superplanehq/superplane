@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -136,6 +137,22 @@ func TestUpdateFromFile(t *testing.T) {
 	require.NoError(t, cmd.Execute(got.ctx))
 	require.Equal(t, "engineers", seen.Group.Metadata.Name)
 	require.Equal(t, "FromFile", seen.Group.Spec.DisplayName)
+	require.Equal(t, "org_viewer", seen.Group.Spec.Role)
+}
+
+func TestUpdateFromStdin(t *testing.T) {
+	var seen updateBody
+	server := newUpdateServer(t, &seen)
+
+	cmd, got := newUpdateContext(t, server, map[string]string{
+		"file": "-",
+	})
+	got.ctx.Cmd.SetIn(strings.NewReader(groupFileYAML))
+
+	require.NoError(t, cmd.Execute(got.ctx))
+	require.Equal(t, "engineers", seen.Group.Metadata.Name)
+	require.Equal(t, "Engineers", seen.Group.Spec.DisplayName)
+	require.Equal(t, "Engineering team", seen.Group.Spec.Description)
 	require.Equal(t, "org_viewer", seen.Group.Spec.Role)
 }
 
