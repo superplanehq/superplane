@@ -84,6 +84,21 @@ func (p *Provider) SendMessage(ctx context.Context, providerSessionID, message s
 	return nil
 }
 
+func (p *Provider) InterruptSession(ctx context.Context, providerSessionID string) error {
+	if providerSessionID == "" {
+		return fmt.Errorf("anthropic: provider session id is required")
+	}
+	body := map[string]any{
+		"events": []map[string]any{
+			{"type": "user.interrupt"},
+		},
+	}
+	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/events", body); err != nil {
+		return fmt.Errorf("anthropic: interrupt session: %w", err)
+	}
+	return nil
+}
+
 func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, onEvent func(agents.ProviderEvent) error) error {
 	if providerSessionID == "" {
 		return fmt.Errorf("anthropic: provider session id is required")

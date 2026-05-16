@@ -15,6 +15,7 @@ type stubService struct {
 	getSession    func(uuid.UUID, uuid.UUID, uuid.UUID) (*models.AgentSession, error)
 	listMessages  func(uuid.UUID, uuid.UUID, int) ([]models.AgentSessionMessage, error)
 	sendMessage   func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string) (*models.AgentSessionMessage, error)
+	interruptErr  error
 }
 
 func (s *stubService) EnsureSession(ctx context.Context, o, u, c uuid.UUID) (*models.AgentSession, error) {
@@ -26,8 +27,12 @@ func (s *stubService) GetSession(o, u, id uuid.UUID) (*models.AgentSession, erro
 func (s *stubService) ListMessages(id, before uuid.UUID, limit int) ([]models.AgentSessionMessage, error) {
 	return s.listMessages(id, before, limit)
 }
-func (s *stubService) SendMessage(ctx context.Context, o, u, id uuid.UUID, content string) (*models.AgentSessionMessage, error) {
+func (s *stubService) SendMessage(ctx context.Context, o, u, id uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error) {
 	return s.sendMessage(ctx, o, u, id, content)
+}
+
+func (s *stubService) InterruptSession(ctx context.Context, o, u, id uuid.UUID) error {
+	return s.interruptErr
 }
 
 func now() *time.Time {

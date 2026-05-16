@@ -166,6 +166,12 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
 		},
+		pbAgents.Agents_InterruptAgentChat_FullMethodName: {
+			Resource:                     "agents",
+			Action:                       "create",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
+		},
 		pbAgents.Agents_ListAgentChatMessages_FullMethodName: {
 			Resource:                     "agents",
 			Action:                       "read",
