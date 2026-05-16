@@ -1,4 +1,4 @@
-import { Eye, Rocket } from "lucide-react";
+import { Eye, Rocket, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,7 @@ export interface DraftActionsWidgetProps {
   canvasId: string;
   organizationId: string;
   isEditing: boolean;
-  onPublished?: () => void;
+  onDismiss?: () => void;
 }
 
 export function DraftActionsWidget({
@@ -18,46 +18,43 @@ export function DraftActionsWidget({
   canvasId,
   organizationId,
   isEditing,
-  onPublished,
+  onDismiss,
 }: DraftActionsWidgetProps) {
-  const [published, setPublished] = useState(false);
-  const [publishing, setPublishing] = useState(false);
-
-  if (published) return null;
+  const [busy, setBusy] = useState<"publish" | "discard" | null>(null);
 
   const handleViewInEditor = () => {
-    // Dispatch custom event for canvas page to switch to this version
     window.dispatchEvent(new CustomEvent("agent:view-version", { detail: { versionId } }));
   };
 
-  const handlePublish = async () => {
-    setPublishing(true);
+  const callApi = async (method: string, url: string, action: "publish" | "discard") => {
+    setBusy(action);
     try {
-      const response = await fetch(
-        `/api/v1/canvases/${canvasId}/versions/${versionId}/publish`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "x-organization-id": organizationId,
-          },
-          credentials: "include",
+      const response = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "x-organization-id": organizationId,
         },
-      );
+        credentials: "include",
+      });
       if (response.ok) {
-        setPublished(true);
-        onPublished?.();
+        onDismiss?.();
       } else {
         const text = await response.text();
-        console.error("Publish failed:", response.status, text);
-        alert(`Publish failed (${response.status}): ${text}`);
+        console.error(`${action} failed:`, response.status, text);
       }
     } catch (err) {
-      console.error("Failed to publish:", err);
+      console.error(`Failed to ${action}:`, err);
     } finally {
-      setPublishing(false);
+      setBusy(null);
     }
   };
+
+  const handlePublish = () =>
+    callApi("PATCH", `/api/v1/canvases/${canvasId}/versions/${versionId}/publish`, "publish");
+
+  const handleDiscard = () =>
+    callApi("DELETE", `/api/v1/canvases/${canvasId}/versions/${versionId}`, "discard");
 
   return (
     <div className="flex items-center gap-2">
@@ -69,20 +66,31 @@ export function DraftActionsWidget({
           size="sm"
           onClick={handleViewInEditor}
           className="text-xs h-7 gap-1"
+          disabled={busy !== null}
         >
           <Eye size={12} />
           See in Editor
         </Button>
       )}
       <Button
+        variant="outline"
+        size="sm"
+        onClick={handleDiscard}
+        disabled={busy !== null}
+        className="text-xs h-7 gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+      >
+        <Trash2 size={12} />
+        {busy === "discard" ? "Discarding..." : "Discard"}
+      </Button>
+      <Button
         variant="default"
         size="sm"
         onClick={handlePublish}
-        disabled={publishing}
+        disabled={busy !== null}
         className={cn("text-xs h-7 gap-1 bg-violet-600 hover:bg-violet-700")}
       >
         <Rocket size={12} />
-        {publishing ? "Publishing..." : "Publish"}
+        {busy === "publish" ? "Publishing..." : "Publish"}
       </Button>
     </div>
   );

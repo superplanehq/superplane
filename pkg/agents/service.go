@@ -201,7 +201,8 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
-	return base + "\n\n" + modeInstructions(mode), nil
+	draftStatus := getDraftStatus(session.CanvasID)
+	return base + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -296,6 +297,32 @@ func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
 	h.Write(userID[:])
 	h.Write(canvasID[:])
 	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
+}
+
+func getDraftStatus(canvasID uuid.UUID) string {
+	versions, err := models.ListCanvasVersions(canvasID)
+	if err != nil {
+		log.WithError(err).Warn("failed to list canvas versions for draft status")
+		return "[Draft Status]\nUnable to determine draft status."
+	}
+	var drafts []models.CanvasVersion
+	for _, v := range versions {
+		if v.State == models.CanvasVersionStateDraft {
+			drafts = append(drafts, v)
+		}
+	}
+	if len(drafts) == 0 {
+		return "[Draft Status]\nNo active drafts. All previous drafts have been published or discarded."
+	}
+	result := "[Draft Status]\n"
+	for _, d := range drafts {
+		created := "unknown"
+		if d.CreatedAt != nil {
+			created = d.CreatedAt.UTC().Format(time.RFC3339)
+		}
+		result += fmt.Sprintf("- Active draft: version %s (created %s)\n", d.ID.String(), created)
+	}
+	return result
 }
 
 func modeInstructions(mode string) string {

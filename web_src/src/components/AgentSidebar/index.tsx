@@ -338,7 +338,7 @@ function DraftActionsBar({ messages, canvasId, organizationId }: { messages: Age
         canvasId={canvasId}
         organizationId={organizationId}
         isEditing={window.location.search.includes("version=")}
-        onPublished={() => { dismissedVersionIds.add(latestDraft.versionId); forceUpdate(n => n + 1); }}
+        onDismiss={() => { dismissedVersionIds.add(latestDraft.versionId); forceUpdate(n => n + 1); }}
       />
     </div>
   );
