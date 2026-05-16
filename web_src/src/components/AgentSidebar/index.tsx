@@ -178,7 +178,9 @@ function ChatConversation({
     }
   }, [chatId, draft, sendMutation, agentMode]);
 
+  const [stopping, setStopping] = useState(false);
   const handleStop = useCallback(async () => {
+    setStopping(true);
     try {
       await fetch(`/api/v1/agents/chats/${chatId}/interrupt`, {
         method: "POST",
@@ -187,8 +189,14 @@ function ChatConversation({
       });
     } catch (err) {
       console.error("Failed to interrupt:", err);
+      setStopping(false);
     }
   }, [chatId, organizationId]);
+
+  // Reset stopping state when agent finishes
+  useEffect(() => {
+    if (status !== "streaming") setStopping(false);
+  }, [status]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const previousScrollHeight = useRef<number | null>(null);
@@ -263,6 +271,7 @@ function ChatConversation({
         onSend={handleSend}
         onStop={handleStop}
         sending={status === "streaming"}
+        stopping={stopping}
         statusLabel={statusLabel(status)}
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
@@ -391,6 +400,7 @@ function ChatComposer({
   onSend,
   onStop,
   sending,
+  stopping,
   statusLabel,
   agentMode,
   onModeSwitch,
@@ -401,6 +411,7 @@ function ChatComposer({
   onSend: () => void;
   onStop: () => void;
   sending: boolean;
+  stopping?: boolean;
   statusLabel: string;
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
@@ -433,11 +444,16 @@ function ChatComposer({
             type="button"
             variant="destructive"
             onClick={onStop}
+            disabled={stopping}
             data-testid="agent-stop-button"
             className="gap-1"
           >
-            <div className="size-3 rounded-sm bg-white animate-pulse" />
-            Stop
+            {stopping ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <div className="size-3 rounded-sm bg-white animate-pulse" />
+            )}
+            {stopping ? "Stopping..." : "Stop"}
           </Button>
         ) : (
           <Button
