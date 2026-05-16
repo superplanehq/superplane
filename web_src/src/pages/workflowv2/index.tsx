@@ -2296,6 +2296,10 @@ export function WorkflowPageV2() {
       }
 
       if (eventName === "canvas_version_updated") {
+        // Notify agent sidebar draft-actions bar
+        window.dispatchEvent(
+          new CustomEvent("canvas:version-updated", { detail: { canvasId, versionId: payload.versionId } }),
+        );
         invalidateCanvasVersionData(canvasId);
         if (activeCanvasVersionId && payload.versionId === activeCanvasVersionId) {
           if (hasPendingLocalCanvasState) {
@@ -4898,6 +4902,16 @@ export function WorkflowPageV2() {
       handleUseVersion,
     ],
   );
+
+  // Listen for agent sidebar "See in Editor" requests
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { versionId } = (e as CustomEvent).detail;
+      if (versionId) handleUseVersion(versionId);
+    };
+    window.addEventListener("agent:view-version", handler);
+    return () => window.removeEventListener("agent:view-version", handler);
+  }, [handleUseVersion]);
 
   const handleToggleEditMode = useCallback(async () => {
     if (!organizationId || !canvasId) {
