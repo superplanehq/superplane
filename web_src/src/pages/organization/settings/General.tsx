@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { Trash2 } from "lucide-react";
 import { useParams } from "react-router-dom";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -12,6 +12,8 @@ import { PermissionTooltip } from "@/components/PermissionGate";
 import { Switch } from "@/ui/switch";
 import { usePermissions } from "@/contexts/PermissionsContext";
 import { isChangeManagementSettingsEnabled } from "@/lib/env";
+import { DirectEmailInviteSettingsCard } from "./components/DirectEmailInviteSettingsCard";
+import { OAuthInvitationSettingsCard } from "./components/OAuthInvitationSettingsCard";
 
 interface GeneralProps {
   organization: OrganizationsOrganization;
@@ -49,11 +51,7 @@ export function General({ organization }: GeneralProps) {
 
     try {
       setSaveMessage(null);
-
-      await updateOrganizationMutation.mutateAsync({
-        name: name,
-      });
-
+      await updateOrganizationMutation.mutateAsync({ name: name });
       setSaveMessage("Organization updated successfully");
       setTimeout(() => setSaveMessage(null), 3000);
     } catch {
@@ -92,9 +90,7 @@ export function General({ organization }: GeneralProps) {
     setChangeManagementMessage(null);
 
     try {
-      await updateOrganizationMutation.mutateAsync({
-        changeManagementEnabled: enabled,
-      });
+      await updateOrganizationMutation.mutateAsync({ changeManagementEnabled: enabled });
       setChangeManagementMessage(`Change management ${enabled ? "enabled" : "disabled"}`);
       setTimeout(() => setChangeManagementMessage(null), 3000);
     } catch {
@@ -103,6 +99,8 @@ export function General({ organization }: GeneralProps) {
       setTimeout(() => setChangeManagementMessage(null), 3000);
     }
   };
+
+  const orgId = organizationId || "";
 
   return (
     <div className="space-y-6 pt-6 text-left">
@@ -118,7 +116,7 @@ export function General({ organization }: GeneralProps) {
             id="organization-name-input"
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
             className="max-w-sm"
             disabled={!canUpdateOrg}
           />
@@ -146,6 +144,22 @@ export function General({ organization }: GeneralProps) {
           </div>
         </Field>
       </Fieldset>
+
+      <OAuthInvitationSettingsCard
+        organization={organization}
+        organizationId={orgId}
+        canUpdateOrg={canUpdateOrg}
+        permissionsLoading={permissionsLoading}
+        updateOrganizationMutation={updateOrganizationMutation}
+      />
+
+      <DirectEmailInviteSettingsCard
+        organization={organization}
+        organizationId={orgId}
+        canUpdateOrg={canUpdateOrg}
+        permissionsLoading={permissionsLoading}
+        updateOrganizationMutation={updateOrganizationMutation}
+      />
 
       {isChangeManagementSettingsEnabled() ? (
         <PermissionTooltip
@@ -237,7 +251,7 @@ export function General({ organization }: GeneralProps) {
                 id="delete-organization-confirmation-input"
                 type="text"
                 value={deleteConfirmation}
-                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setDeleteConfirmation(e.target.value)}
                 placeholder={organization.metadata?.name || "Organization name"}
                 className="max-w-sm"
                 disabled={!canDeleteOrg}
