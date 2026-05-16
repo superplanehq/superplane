@@ -100,6 +100,21 @@ func UpdateAgentSessionStatus(sessionID uuid.UUID, status string) error {
 	return UpdateAgentSessionStatusInTransaction(database.Conn(), sessionID, status)
 }
 
+func DeleteAgentSessionsForCanvasInTransaction(tx *gorm.DB, organizationID, canvasID uuid.UUID) error {
+	return tx.
+		Where("organization_id = ?", organizationID).
+		Where("canvas_id = ?", canvasID).
+		Delete(&AgentSession{}).
+		Error
+}
+
+func DeleteAgentSessionsForOrganizationInTransaction(tx *gorm.DB, organizationID uuid.UUID) error {
+	return tx.
+		Where("organization_id = ?", organizationID).
+		Delete(&AgentSession{}).
+		Error
+}
+
 // FailStuckStreamingSessions marks any session in "streaming" state whose
 // last update predates cutoff as failed and returns the affected rows so
 // the caller can fan out session_failed events.

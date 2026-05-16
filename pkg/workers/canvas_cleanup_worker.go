@@ -146,6 +146,10 @@ func (w *CanvasCleanupWorker) processCanvas(tx *gorm.DB, canvas models.Canvas) e
 	}
 
 	w.logger.Infof("Processed %d nodes from canvas %s (deleted %d resources, %d nodes remaining)", nodesProcessed, canvas.ID, totalResourcesDeleted, remainingNodesCount)
+	if err := models.DeleteAgentSessionsForCanvasInTransaction(tx, canvas.OrganizationID, canvas.ID); err != nil {
+		return fmt.Errorf("delete canvas agent sessions: %w", err)
+	}
+
 	if err := tx.Unscoped().Delete(&canvas).Error; err != nil {
 		return fmt.Errorf("failed to delete canvas: %w", err)
 	}
