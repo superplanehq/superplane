@@ -348,11 +348,11 @@ func (c *CurrentContext) GetActiveCanvas() string {
 }
 
 func (c *CurrentContext) SetActiveCanvas(canvasID string) error {
-	c.context.Canvas = &canvasID
 	if c.readOnly {
 		return fmt.Errorf("cannot set active canvas when using %s and %s; pass --canvas-id instead", EnvURL, EnvToken)
 	}
 
+	c.context.Canvas = &canvasID
 	_, err := UpsertContext(c.context)
 	return err
 }

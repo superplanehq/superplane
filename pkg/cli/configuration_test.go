@@ -310,6 +310,7 @@ func TestEnvironmentContextOverridesConfiguredContext(t *testing.T) {
 	err = config.SetActiveCanvas("canvas-from-env-run")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "pass --canvas-id")
+	require.Empty(t, config.GetActiveCanvas())
 
 	current, ok := GetCurrentContext()
 	require.True(t, ok)
