@@ -2296,6 +2296,9 @@ export function WorkflowPageV2() {
       }
 
       if (eventName === "canvas_version_updated") {
+        window.dispatchEvent(
+          new CustomEvent("canvas:version-updated", { detail: { canvasId, versionId: payload.versionId } }),
+        );
         invalidateCanvasVersionData(canvasId);
         if (activeCanvasVersionId && payload.versionId === activeCanvasVersionId) {
           if (hasPendingLocalCanvasState) {
@@ -4898,6 +4901,15 @@ export function WorkflowPageV2() {
       handleUseVersion,
     ],
   );
+
+  useEffect(() => {
+    const h = (e: Event) => {
+      const { versionId } = (e as CustomEvent).detail;
+      if (versionId) handleUseVersion(versionId);
+    };
+    window.addEventListener("agent:view-version", h);
+    return () => window.removeEventListener("agent:view-version", h);
+  }, [handleUseVersion]);
 
   const handleToggleEditMode = useCallback(async () => {
     if (!organizationId || !canvasId) {
