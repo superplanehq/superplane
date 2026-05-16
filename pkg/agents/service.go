@@ -306,13 +306,24 @@ func getDraftStatus(canvasID uuid.UUID) string {
 		return "[Draft Status]\nUnable to determine draft status."
 	}
 	var drafts []models.CanvasVersion
-	for _, v := range versions {
+	var latestPublished *models.CanvasVersion
+	for i, v := range versions {
 		if v.State == models.CanvasVersionStateDraft {
 			drafts = append(drafts, v)
 		}
+		if v.State == models.CanvasVersionStatePublished && v.PublishedAt != nil {
+			if latestPublished == nil || v.PublishedAt.After(*latestPublished.PublishedAt) {
+				latestPublished = &versions[i]
+			}
+		}
 	}
 	if len(drafts) == 0 {
-		return "[Draft Status]\nNo active drafts. All previous drafts have been published or discarded."
+		// Tell the agent whether the last version was published or discarded
+		if latestPublished != nil && time.Since(*latestPublished.PublishedAt) < 10*time.Minute {
+			return fmt.Sprintf("[Draft Status]\nNo active drafts. The last draft was published as version %s at %s. Your changes are live.",
+				latestPublished.ID.String(), latestPublished.PublishedAt.UTC().Format(time.RFC3339))
+		}
+		return "[Draft Status]\nNo active drafts. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
 	}
 	result := "[Draft Status]\n"
 	for _, d := range drafts {
