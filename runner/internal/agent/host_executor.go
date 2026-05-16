@@ -6,6 +6,8 @@ import (
 	"errors"
 	"io"
 	"os/exec"
+	"strings"
+	"time"
 
 	"github.com/superplane/runner/shared/api"
 )
@@ -46,6 +48,8 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 		cmd.Stdout = &buf
 		cmd.Stderr = &buf
 	}
+	writeLiveLogCommandStart(live, 0, strings.Join(task.Command, " "))
+	startedAt := time.Now()
 	err = cmd.Run()
 	out := truncateString(buf.String(), max)
 	exit := 0
@@ -56,7 +60,9 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 		} else {
 			exit = 1
 		}
+		writeLiveLogCommandEnd(live, 0, exit, time.Since(startedAt))
 		return exit, out, err
 	}
+	writeLiveLogCommandEnd(live, 0, exit, time.Since(startedAt))
 	return exit, out, nil
 }

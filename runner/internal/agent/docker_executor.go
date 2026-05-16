@@ -3,12 +3,14 @@ package agent
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -130,8 +132,16 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 		_, _ = live.Write(runOut)
 	}
 
+	singleCommandText, hasSingleCommand := dockerSingleCommandText(task)
+	if hasSingleCommand {
+		writeLiveLogCommandStart(live, 0, singleCommandText)
+	}
+	startedAt := time.Now()
 	exitCode, execOut, runErr := dockerExecTask(ctx, name, task, live)
-	out.WriteString(execOut)
+	if hasSingleCommand {
+		writeLiveLogCommandEnd(live, 0, exitCode, time.Since(startedAt))
+	}
+	out.WriteString(stripLiveLogControlLines(execOut))
 	return exitCode, out.String(), runErr
 }
 
@@ -184,7 +194,7 @@ func dockerExecArgs(name string, task *api.TaskPayload) ([]string, error) {
 		if len(directives) == 0 {
 			return nil, errEmptyCommands()
 		}
-		script := "set -e\n" + strings.Join(directives, "\n") + "\n"
+		script := dockerCommandsScript(directives)
 		args = append([]string{"exec"}, envArgs...)
 		args = append(args, name, "sh", "-c", script)
 	case len(task.Command) > 0:
@@ -195,6 +205,103 @@ func dockerExecArgs(name string, task *api.TaskPayload) ([]string, error) {
 		return nil, errors.New("empty command")
 	}
 	return args, nil
+}
+
+func dockerSingleCommandText(task *api.TaskPayload) (string, bool) {
+	if len(task.Commands) > 0 || len(task.Command) == 0 {
+		return "", false
+	}
+	return strings.TrimSpace(strings.Join(task.Command, " ")), true
+}
+
+func dockerCommandsScript(directives []string) string {
+	var script strings.Builder
+	script.WriteString("set -e\n")
+	script.WriteString("sp_now_ms() {\n")
+	script.WriteString("  __sp_now=\"$(date +%s%3N 2>/dev/null || true)\"\n")
+	script.WriteString("  case \"$__sp_now\" in\n")
+	script.WriteString("    ''|*[!0-9]*) __sp_now=\"$(date +%s)000\" ;;\n")
+	script.WriteString("  esac\n")
+	script.WriteString("  printf '%s\\n' \"$__sp_now\"\n")
+	script.WriteString("}\n")
+
+	for i, directive := range directives {
+		startRecord, _ := json.Marshal(liveLogCommandStartRecord{
+			Type:  "cmd_start",
+			Index: i,
+			Text:  directive,
+		})
+		script.WriteString("printf '%s\\n' ")
+		script.WriteString(shellSingleQuote(string(startRecord)))
+		script.WriteString("\n")
+		script.WriteString("__sp_cmd_start=\"$(sp_now_ms)\"\n")
+		script.WriteString("if {\n")
+		script.WriteString(directive)
+		script.WriteString("\n}; then\n")
+		script.WriteString("  __sp_cmd_exit=0\n")
+		script.WriteString("else\n")
+		script.WriteString("  __sp_cmd_exit=$?\n")
+		script.WriteString("fi\n")
+		script.WriteString("__sp_cmd_end=\"$(sp_now_ms)\"\n")
+		script.WriteString("__sp_cmd_duration=$((__sp_cmd_end - __sp_cmd_start))\n")
+		script.WriteString("if [ \"$__sp_cmd_duration\" -lt 0 ]; then __sp_cmd_duration=0; fi\n")
+		script.WriteString("if [ \"$__sp_cmd_exit\" -eq 0 ]; then __sp_cmd_status=passed; else __sp_cmd_status=failed; fi\n")
+		script.WriteString(`printf '{"type":"cmd_end","index":`)
+		script.WriteString(strconv.Itoa(i))
+		script.WriteString(`,"status":"%s","duration_ms":%s}\n' "$__sp_cmd_status" "$__sp_cmd_duration"` + "\n")
+		script.WriteString("if [ \"$__sp_cmd_exit\" -ne 0 ]; then exit \"$__sp_cmd_exit\"; fi\n")
+	}
+
+	return script.String()
+}
+
+func shellSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
+}
+
+func stripLiveLogControlLines(output string) string {
+	if output == "" {
+		return output
+	}
+	parts := strings.SplitAfter(output, "\n")
+	var cleaned strings.Builder
+	for _, part := range parts {
+		line := strings.TrimSuffix(part, "\n")
+		if isLiveLogControlLine(line) {
+			continue
+		}
+		cleaned.WriteString(part)
+	}
+	return cleaned.String()
+}
+
+func isLiveLogControlLine(line string) bool {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return false
+	}
+	var envelope struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal([]byte(line), &envelope); err != nil {
+		return false
+	}
+	switch envelope.Type {
+	case "cmd_start":
+		var rec liveLogCommandStartRecord
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			return false
+		}
+		return rec.Index >= 0
+	case "cmd_end":
+		var rec liveLogCommandEndRecord
+		if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			return false
+		}
+		return rec.Index >= 0 && rec.DurationMS >= 0 && (rec.Status == liveLogCommandPassed || rec.Status == liveLogCommandFailed)
+	default:
+		return false
+	}
 }
 
 func captureDocker(ctx context.Context, args ...string) ([]byte, error) {
