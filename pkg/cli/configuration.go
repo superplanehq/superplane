@@ -2,11 +2,17 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
 	"github.com/spf13/viper"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+)
+
+const (
+	EnvURL   = "SUPERPLANE_URL"
+	EnvToken = "SUPERPLANE_TOKEN"
 )
 
 type ConfigContext struct {
@@ -69,6 +75,40 @@ func GetContexts() []ConfigContext {
 	}
 
 	return normalized
+}
+
+func GetEnvironmentContext() (ConfigContext, bool) {
+	context, ok, err := environmentContext()
+	if err != nil {
+		return ConfigContext{}, false
+	}
+
+	return context, ok
+}
+
+func ValidateEnvironmentContext() error {
+	_, _, err := environmentContext()
+	return err
+}
+
+func environmentContext() (ConfigContext, bool, error) {
+	rawURL, urlSet := os.LookupEnv(EnvURL)
+	rawToken, tokenSet := os.LookupEnv(EnvToken)
+	if !urlSet && !tokenSet {
+		return ConfigContext{}, false, nil
+	}
+
+	url := normalizeBaseURL(rawURL)
+	token := strings.TrimSpace(rawToken)
+	if url == "" || token == "" {
+		return ConfigContext{}, false, fmt.Errorf("%s and %s must both be set to use environment CLI authentication", EnvURL, EnvToken)
+	}
+
+	return ConfigContext{
+		URL:          url,
+		Organization: "environment",
+		APIToken:     token,
+	}, true, nil
 }
 
 func GetCurrentContext() (ConfigContext, bool) {
@@ -287,11 +327,16 @@ func findMatchingContextIndex(contexts []ConfigContext, context ConfigContext) i
  * which uses the current context as the source for operations..
  */
 type CurrentContext struct {
-	context ConfigContext
+	context  ConfigContext
+	readOnly bool
 }
 
 func NewCurrentContext(context ConfigContext) core.ConfigContext {
 	return &CurrentContext{context: context}
+}
+
+func NewEnvironmentContext(context ConfigContext) core.ConfigContext {
+	return &CurrentContext{context: context, readOnly: true}
 }
 
 func (c *CurrentContext) GetActiveCanvas() string {
@@ -303,6 +348,10 @@ func (c *CurrentContext) GetActiveCanvas() string {
 }
 
 func (c *CurrentContext) SetActiveCanvas(canvasID string) error {
+	if c.readOnly {
+		return fmt.Errorf("cannot set active canvas when using %s and %s; pass --canvas-id instead", EnvURL, EnvToken)
+	}
+
 	c.context.Canvas = &canvasID
 	_, err := UpsertContext(c.context)
 	return err
