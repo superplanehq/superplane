@@ -11,6 +11,7 @@ export type MermaidSegment = { type: "mermaid"; content: string };
 export type StepsSegment = { type: "steps"; items: StepItem[] };
 export type SuccessSegment = { type: "success"; content: string };
 export type ErrorSegment = { type: "error"; content: string };
+export type DraftActionsSegment = { type: "draft-actions"; versionId: string; message?: string };
 
 export type Segment =
   | MarkdownSegment
@@ -21,7 +22,8 @@ export type Segment =
   | MermaidSegment
   | StepsSegment
   | SuccessSegment
-  | ErrorSegment;
+  | ErrorSegment
+  | DraftActionsSegment;
 
 export type StepItem = { done: boolean; text: string };
 
@@ -35,7 +37,7 @@ export type ChartConfig = {
 
 // --- Regex patterns ---
 
-const BLOCK_RE = /^\s*:::(\w+)(?:\s+(.*))?$/;
+const BLOCK_RE = /^\s*:::([\w-]+)(?:\s+(.*))?$/;
 const BLOCK_END_RE = /^\s*:::$/;
 const MERMAID_FENCE_START = /^\s*```mermaid\s*$/;
 const FENCE_END = /^\s*```\s*$/;
@@ -157,6 +159,8 @@ function parseBlock(type: string, meta: string, raw: string): Segment | null {
       return { type: "success", content: raw.trim() };
     case "error":
       return { type: "error", content: raw.trim() };
+    case "draft-actions":
+      return parseDraftActions(raw, meta);
     default:
       return { type: "markdown", content: `:::${type} ${meta}\n${raw}\n:::` };
   }
@@ -221,4 +225,22 @@ function parseSteps(raw: string): StepsSegment {
       return { done, text };
     });
   return { type: "steps", items };
+}
+
+function parseDraftActions(raw: string, meta: string): DraftActionsSegment {
+  // Try YAML body first
+  try {
+    const parsed = YAML.load(raw) as Record<string, unknown>;
+    if (parsed && typeof parsed === "object") {
+      return {
+        type: "draft-actions",
+        versionId: String(parsed.versionId ?? parsed.version_id ?? meta.trim()),
+        message: parsed.message ? String(parsed.message) : undefined,
+      };
+    }
+  } catch {
+    // fall through
+  }
+  // Fallback: version ID from meta or raw content
+  return { type: "draft-actions", versionId: (meta || raw).trim(), message: undefined };
 }
