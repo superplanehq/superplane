@@ -142,15 +142,24 @@ div.monaco-editor {
   animation: tool-glow 1.4s ease-in-out infinite;
 }
 
-@keyframes pulse-border {
-  0%, 100% {
-    box-shadow: 0 0 0 0 currentColor;
+@keyframes rotate-border {
+  0% {
+    box-shadow: 2px 0 0 0 currentColor, 0 2px 0 0 transparent, -2px 0 0 0 transparent, 0 -2px 0 0 transparent;
+  }
+  25% {
+    box-shadow: 2px 0 0 0 transparent, 0 2px 0 0 currentColor, -2px 0 0 0 transparent, 0 -2px 0 0 transparent;
   }
   50% {
-    box-shadow: 0 0 0 2px currentColor;
+    box-shadow: 2px 0 0 0 transparent, 0 2px 0 0 transparent, -2px 0 0 0 currentColor, 0 -2px 0 0 transparent;
+  }
+  75% {
+    box-shadow: 2px 0 0 0 transparent, 0 2px 0 0 transparent, -2px 0 0 0 transparent, 0 -2px 0 0 currentColor;
+  }
+  100% {
+    box-shadow: 2px 0 0 0 currentColor, 0 2px 0 0 transparent, -2px 0 0 0 transparent, 0 -2px 0 0 transparent;
   }
 }
 
 .animate-pulse-border {
-  animation: pulse-border 1.5s ease-in-out infinite;
+  animation: rotate-border 1.2s linear infinite;
 }

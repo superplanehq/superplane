@@ -63,7 +63,7 @@ export function ModeToggle({
             aria-label={`${config.label} mode`}
             data-testid={`agent-mode-${key}`}
           >
-            <Icon size={12} className={cn(isActive && streaming && "animate-spin")} />
+            <Icon size={12} />
             {config.label}
           </button>
         );
