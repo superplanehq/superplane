@@ -159,6 +159,21 @@ func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, 
 	return nil
 }
 
+func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error {
+	session, err := s.GetSession(organizationID, userID, sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+	if err := s.provider.DefineOutcome(ctx, session.ProviderSessionID, DefineOutcomeOptions{
+		Description:   description,
+		Rubric:        rubric,
+		MaxIterations: maxIterations,
+	}); err != nil {
+		return fmt.Errorf("define outcome: %w", err)
+	}
+	return nil
+}
+
 func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error) {
 	if content == "" {
 		return nil, fmt.Errorf("message content is required")

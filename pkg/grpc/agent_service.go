@@ -72,3 +72,11 @@ func (s *AgentsService) InterruptAgentChat(ctx context.Context, req *pb.Interrup
 	}
 	return agentsActions.InterruptAgentChat(ctx, s.service, orgID, userID, req)
 }
+
+func (s *AgentsService) DefineAgentOutcome(ctx context.Context, req *pb.DefineAgentOutcomeRequest) (*pb.DefineAgentOutcomeResponse, error) {
+	orgID, userID, err := s.requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return agentsActions.DefineAgentOutcome(ctx, s.service, orgID, userID, req)
+}

@@ -20,6 +20,7 @@ type AgentsService interface {
 	ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]models.AgentSessionMessage, error)
 	SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error)
 	InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error
+	DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error
 }
 
 func parseOrgUser(orgID, userID string) (org, user uuid.UUID, err error) {

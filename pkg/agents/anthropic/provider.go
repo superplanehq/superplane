@@ -103,6 +103,29 @@ func (p *Provider) InterruptSession(ctx context.Context, providerSessionID strin
 	return nil
 }
 
+func (p *Provider) DefineOutcome(ctx context.Context, providerSessionID string, opts agents.DefineOutcomeOptions) error {
+	if providerSessionID == "" {
+		return fmt.Errorf("anthropic: provider session id is required")
+	}
+
+	event := map[string]any{
+		"type":        "user.define_outcome",
+		"description": opts.Description,
+		"rubric":      map[string]string{"type": "text", "content": opts.Rubric},
+	}
+	if opts.MaxIterations > 0 {
+		event["max_iterations"] = opts.MaxIterations
+	}
+
+	body := map[string]any{
+		"events": []map[string]any{event},
+	}
+	if _, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions/"+providerSessionID+"/events", body); err != nil {
+		return fmt.Errorf("anthropic: define outcome: %w", err)
+	}
+	return nil
+}
+
 func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, onEvent func(agents.ProviderEvent) error) error {
 	if providerSessionID == "" {
 		return fmt.Errorf("anthropic: provider session id is required")

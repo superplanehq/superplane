@@ -6,6 +6,7 @@ import {
   useAgentChatMessages,
   useCanvasAgentChat,
   useInterruptAgentChat,
+  useDefineAgentOutcome,
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
@@ -112,6 +113,7 @@ function ChatConversation({
   const messagesQuery = useAgentChatMessages(chatId, organizationId, true);
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
   const interruptMutation = useInterruptAgentChat(organizationId);
+  const outcomeMutation = useDefineAgentOutcome(organizationId);
 
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<string>("idle");
@@ -163,6 +165,26 @@ function ChatConversation({
     interruptMutation.mutate({ chatId });
   }, [chatId, interruptMutation]);
 
+  const handleStartBuilding = useCallback(
+    async (rubric: { title: string; criteria: string[] }) => {
+      onModeSwitch("builder");
+      const rubricText = `# ${rubric.title}\n\n${rubric.criteria.map((c) => `- ${c}`).join("\n")}`;
+      try {
+        await outcomeMutation.mutateAsync({
+          chatId,
+          description: `Build a canvas based on this plan: ${rubric.title}`,
+          rubric: rubricText,
+          maxIterations: 5,
+        });
+      } catch (err) {
+        console.error("Failed to define outcome:", err);
+        // Fallback: send as regular message in builder mode
+        await sendMutation.mutateAsync({ chatId, content: `Start building based on this plan:\n\n${rubricText}`, mode: "builder" });
+      }
+    },
+    [chatId, onModeSwitch, outcomeMutation, sendMutation],
+  );
+
   const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
 
   return (
@@ -191,6 +213,8 @@ function ChatConversation({
                   canvasId={canvasId}
                   organizationId={organizationId}
                   agentMode={agentMode}
+                  onModeSwitch={onModeSwitch}
+                  onStartBuilding={handleStartBuilding}
                 />
               ),
             )}
@@ -271,6 +295,8 @@ function MessageRow({
   canvasId,
   organizationId,
   agentMode,
+  onModeSwitch,
+  onStartBuilding,
 }: {
   message: AgentMessage;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
@@ -278,6 +304,8 @@ function MessageRow({
   canvasId: string;
   organizationId: string;
   agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
+  onStartBuilding: (rubric: { title: string; criteria: string[] }) => void;
 }) {
   const handleAction = useCallback(
     async (action: string) => {
@@ -322,6 +350,7 @@ function MessageRow({
           <RichMessage
             content={message.content}
             onAction={handleAction}
+            onStartBuilding={onStartBuilding}
             canvasId={canvasId}
             organizationId={organizationId}
           />
