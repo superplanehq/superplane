@@ -1,4 +1,4 @@
-import { ChevronRight, Loader2, Send, SquareTerminal, X } from "lucide-react";
+import { ChevronRight, Hammer, Loader2, Monitor, Send, SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -7,8 +7,11 @@ import { useAgentChatMessages, useCanvasAgentChat, useSendAgentChatMessage } fro
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
 import type { AgentMessage } from "./types";
 import type { AgentState } from "./useAgentState";
+import type { AgentMode } from "./useAgentState";
 import { useSidebarWidth } from "./useSidebarWidth";
 import { RichMessage } from "./widgets/RichMessage";
+import { parseAgentContent } from "./widgets/parser";
+import { DraftActionsWidget } from "./widgets/DraftActionsWidget";
 
 export interface AgentSidebarProps {
   agentState: AgentState;
@@ -37,7 +40,7 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
           <Loader2 className="size-4 animate-spin mr-2" /> Loading…
         </div>
       ) : (
-        <ChatConversation chatId={chatId} canvasId={canvasId} organizationId={organizationId} />
+        <ChatConversation chatId={chatId} canvasId={canvasId} organizationId={organizationId} agentMode={agentState.agentMode} onModeSwitch={agentState.switchAgentMode} />
       )}
     </SidebarShell>
   );
@@ -78,14 +81,53 @@ function SidebarShell({ children, onClose }: { children: React.ReactNode; onClos
   );
 }
 
+function ModeToggle({ mode, onSwitch, disabled }: { mode: AgentMode; onSwitch: (mode: AgentMode) => void; disabled?: boolean }) {
+  return (
+    <div className={cn("flex items-center bg-slate-100 rounded-md p-0.5 gap-0.5", disabled && "opacity-50 pointer-events-none")} data-testid="agent-mode-toggle">
+      <button
+        type="button"
+        onClick={() => onSwitch("builder")}
+        disabled={disabled}
+        className={cn(
+          "flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors",
+          mode === "builder" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500 hover:text-slate-700",
+        )}
+        aria-label="Builder mode"
+        data-testid="agent-mode-builder"
+      >
+        <Hammer size={12} />
+        Builder
+      </button>
+      <button
+        type="button"
+        onClick={() => onSwitch("operator")}
+        disabled={disabled}
+        className={cn(
+          "flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors",
+          mode === "operator" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500 hover:text-slate-700",
+        )}
+        aria-label="Operator mode"
+        data-testid="agent-mode-operator"
+      >
+        <Monitor size={12} />
+        Operator
+      </button>
+    </div>
+  );
+}
+
 function ChatConversation({
   chatId,
   canvasId,
   organizationId,
+  agentMode,
+  onModeSwitch,
 }: {
   chatId: string;
   canvasId: string;
   organizationId: string;
+  agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
 }) {
   const messagesQuery = useAgentChatMessages(chatId, organizationId, true);
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
@@ -130,11 +172,11 @@ function ChatConversation({
     setDraft("");
     setError(null);
     try {
-      await sendMutation.mutateAsync({ chatId, content: value });
+      await sendMutation.mutateAsync({ chatId, content: value, mode: agentMode });
     } catch (err) {
       setError(err instanceof Error ? err.message : "failed to send message");
     }
-  }, [chatId, draft, sendMutation]);
+  }, [chatId, draft, sendMutation, agentMode]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const previousScrollHeight = useRef<number | null>(null);
@@ -193,6 +235,7 @@ function ChatConversation({
                   chatId={chatId}
                   canvasId={canvasId}
                   organizationId={organizationId}
+                  agentMode={agentMode}
                 />
               ),
             )}
@@ -201,12 +244,101 @@ function ChatConversation({
         {showThinking ? <ThinkingRow /> : null}
         {error ? <p className="text-sm text-red-600 px-3 py-2">{error}</p> : null}
       </div>
+      <DraftActionsBar messages={messages} canvasId={canvasId} organizationId={organizationId} />
       <ChatComposer
         draft={draft}
         onDraftChange={setDraft}
         onSend={handleSend}
         sending={sendMutation.isPending}
         statusLabel={statusLabel(status)}
+        agentMode={agentMode}
+        onModeSwitch={onModeSwitch}
+        modeDisabled={status === "streaming"}
+      />
+    </div>
+  );
+}
+
+// Track published/discarded version IDs outside component to survive remounts
+const dismissedVersionIds = new Set<string>();
+
+function DraftActionsBar({ messages, canvasId, organizationId }: { messages: AgentMessage[]; canvasId: string; organizationId: string }) {
+  const [, forceUpdate] = useState(0);
+  const [verifiedDraft, setVerifiedDraft] = useState<boolean | null>(null);
+
+  // Listen for canvas version changes — only dismiss if version is no longer a draft
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { versionId } = (e as CustomEvent).detail;
+      if (!versionId) return;
+      // Check if the version is still a draft before dismissing
+      fetch(`/api/v1/canvases/${canvasId}/versions/${versionId}`, {
+        headers: { "x-organization-id": organizationId },
+        credentials: "include",
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          const state = data?.version?.metadata?.state;
+          if (state && state !== "STATE_DRAFT") {
+            dismissedVersionIds.add(versionId);
+            forceUpdate(n => n + 1);
+          }
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("canvas:version-updated", handler);
+    return () => window.removeEventListener("canvas:version-updated", handler);
+  }, [canvasId, organizationId]);
+
+  const latestDraft = useMemo(() => {
+    // Only scan the latest assistant turn (stop at first user message from end)
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.role === "user") break;
+      if (msg.role !== "assistant") continue;
+      const segments = parseAgentContent(msg.content);
+      for (const seg of segments) {
+        if (seg.type === "draft-actions" && !dismissedVersionIds.has(seg.versionId)) return seg;
+      }
+    }
+    return null;
+  }, [messages]);
+
+  // Verify the version is still a draft on mount / when version changes
+  useEffect(() => {
+    if (!latestDraft) {
+      setVerifiedDraft(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/v1/canvases/${canvasId}/versions/${latestDraft.versionId}`, {
+      headers: { "x-organization-id": organizationId },
+      credentials: "include",
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled) return;
+        const isDraft = data?.version?.metadata?.state === "STATE_DRAFT";
+        if (!isDraft) {
+          dismissedVersionIds.add(latestDraft.versionId);
+        }
+        setVerifiedDraft(isDraft);
+      })
+      .catch(() => { if (!cancelled) setVerifiedDraft(false); });
+    return () => { cancelled = true; };
+  }, [latestDraft?.versionId, canvasId, organizationId]);
+
+  if (!latestDraft || verifiedDraft === false || verifiedDraft === null) return null;
+
+  return (
+    <div className="border-t border-violet-200 bg-violet-50/80 px-3 py-2">
+      <DraftActionsWidget
+        versionId={latestDraft.versionId}
+        message={latestDraft.message}
+        canvasId={canvasId}
+        organizationId={organizationId}
+        isEditing={window.location.search.includes("version=")}
+        onDismiss={() => { dismissedVersionIds.add(latestDraft.versionId); forceUpdate(n => n + 1); }}
       />
     </div>
   );
@@ -218,12 +350,18 @@ function ChatComposer({
   onSend,
   sending,
   statusLabel,
+  agentMode,
+  onModeSwitch,
+  modeDisabled,
 }: {
   draft: string;
   onDraftChange: (value: string) => void;
   onSend: () => void;
   sending: boolean;
   statusLabel: string;
+  agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
+  modeDisabled?: boolean;
 }) {
   return (
     <footer className="border-t border-border p-3 flex flex-col gap-2">
@@ -242,7 +380,11 @@ function ChatComposer({
         }}
       />
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{statusLabel}</span>
+        {statusLabel === "Ready" ? (
+          <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} />
+        ) : (
+          <span className="text-xs text-muted-foreground">{statusLabel}</span>
+        )}
         <Button
           type="button"
           onClick={onSend}
@@ -263,18 +405,20 @@ function MessageRow({
   chatId,
   canvasId,
   organizationId,
+  agentMode,
 }: {
   message: AgentMessage;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   chatId: string;
   canvasId: string;
   organizationId: string;
+  agentMode: AgentMode;
 }) {
   const handleAction = useCallback(
     async (action: string) => {
       if (sendMutation.isPending) return;
       try {
-        await sendMutation.mutateAsync({ chatId, content: action });
+        await sendMutation.mutateAsync({ chatId, content: action, mode: agentMode });
       } catch (err) {
         console.error("Failed to send action:", err);
       }
@@ -288,7 +432,7 @@ function MessageRow({
   const isUser = message.role === "user";
 
   return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+    <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       <div
         className={cn(
           "rounded-lg px-3 py-2 text-sm max-w-[85%] break-words",
@@ -304,9 +448,13 @@ function MessageRow({
             onAction={handleAction}
             canvasId={canvasId}
             organizationId={organizationId}
+            isEditing={window.location.search.includes("version=")}
           />
         )}
       </div>
+      {message.createdAt && (
+        <span className="text-[10px] text-slate-400 mt-0.5 px-1">{formatTime(message.createdAt)}</span>
+      )}
     </div>
   );
 }
@@ -367,11 +515,16 @@ function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
 }
 
 function ToolMessageRow({ message }: { message: AgentMessage }) {
-  const [expanded, setExpanded] = useState(true);
+  const running = message.toolStatus === "started";
+  const [expanded, setExpanded] = useState(running);
   const command = message.content;
   const canExpand = Boolean(command);
-  const running = message.toolStatus === "started";
   const preview = command ? command.split("\n")[0].substring(0, 80) : "command";
+
+  // Auto-expand when command starts running, collapse when it finishes
+  useEffect(() => {
+    setExpanded(running);
+  }, [running]);
 
   return (
     <div className="text-xs">
@@ -422,4 +575,9 @@ function statusLabel(status: string): string {
     default:
       return "Ready";
   }
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }

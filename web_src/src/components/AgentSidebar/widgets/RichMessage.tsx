@@ -10,6 +10,7 @@ import { StepsWidget } from "./StepsWidget";
 import { BannerWidget } from "./BannerWidget";
 import { MermaidWidget } from "./MermaidWidget";
 import { CodeBlockWidget } from "./CodeBlockWidget";
+import { DraftActionsWidget } from "./DraftActionsWidget";
 import { RunChipFromLink } from "./RunChip";
 import { NodeChipFromLink } from "./NodeChip";
 
@@ -36,9 +37,10 @@ interface RichMessageProps {
   onAction?: (text: string) => void;
   canvasId?: string;
   organizationId?: string;
+  isEditing?: boolean;
 }
 
-export function RichMessage({ content, onAction, canvasId, organizationId }: RichMessageProps) {
+export function RichMessage({ content, onAction, canvasId, organizationId, isEditing }: RichMessageProps) {
   const segments = parseAgentContent(content);
 
   return (
@@ -50,6 +52,7 @@ export function RichMessage({ content, onAction, canvasId, organizationId }: Ric
           onAction={onAction}
           canvasId={canvasId}
           organizationId={organizationId}
+          isEditing={isEditing}
         />
       ))}
     </div>
@@ -61,11 +64,13 @@ function SegmentRenderer({
   onAction,
   canvasId,
   organizationId,
+  isEditing,
 }: {
   segment: Segment;
   onAction?: (text: string) => void;
   canvasId?: string;
   organizationId?: string;
+  isEditing?: boolean;
 }) {
   switch (segment.type) {
     case "markdown":
@@ -151,5 +156,8 @@ function SegmentRenderer({
       return <BannerWidget variant="success" content={segment.content} />;
     case "error":
       return <BannerWidget variant="error" content={segment.content} />;
+    case "draft-actions":
+      // Rendered externally as DraftActionsBar, not inline
+      return null;
   }
 }
