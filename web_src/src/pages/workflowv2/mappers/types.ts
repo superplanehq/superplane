@@ -98,6 +98,7 @@ export interface NodeInfo {
   name: string;
   componentName: string;
   isCollapsed: boolean;
+  paused?: boolean;
   configuration?: unknown;
   metadata?: unknown;
 }
