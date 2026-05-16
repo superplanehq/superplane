@@ -1,0 +1,30 @@
+# docker-compose.agent2.yml
+# Override to replace Python agent with Go agent2 (Anthropic Managed Agents).
+# Usage: docker compose -f docker-compose.dev.yml -f docker-compose.agent2.yml up
+#
+# Required: set ANTHROPIC_API_KEY and ANTHROPIC_AGENT_ID in agent2/.env
+
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: agent2/Dockerfile
+    working_dir: /app
+    env_file:
+      - agent2/.env
+    environment:
+      GRPC_PORT: 50061
+      HTTP_PORT: 8090
+      DB_URL: "postgres://${DB_USERNAME:-postgres}:${DB_PASSWORD:-the-cake-is-a-lie}@db:5432/${DB_NAME:-agents_dev}?sslmode=disable"
+      JWT_SECRET: "1234567890abcdefghijklmnopqrstuv"
+    command: ["/usr/local/bin/agent2"]
+    ports:
+      - ${AGENT_HTTP_PORT:-8090}:8090
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    depends_on:
+      db:
+        condition: service_healthy
