@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -16,6 +17,9 @@ import (
 
 const (
 	brokerHTTPTimeout = 30 * time.Second
+
+	cancel409MaxAttempts  = 3
+	cancel409RetryBackoff = 200 * time.Millisecond
 )
 
 type BrokerClient struct {
@@ -43,7 +47,7 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 
 	return &BrokerClient{
 		httpClient: httpClient,
-		baseURL:    baseURL,
+		baseURL:    strings.TrimRight(strings.TrimSpace(baseURL), "/"),
 		fleetID:    fleetID,
 		authToken:  authToken,
 	}, nil
@@ -159,14 +163,101 @@ func (t *Task) effectiveExitCode() int {
 }
 
 func (t *Task) IsInTerminalState() bool {
-	return t.Status == "succeeded" || t.Status == "failed"
+	switch strings.ToLower(strings.TrimSpace(t.Status)) {
+	case "succeeded", "failed", "canceled", "cancelled":
+		return true
+	default:
+		return false
+	}
+}
+
+type brokerErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// CancelTaskResponse is the JSON body from POST /v1/tasks/{id}/cancel on success (HTTP 200).
+type CancelTaskResponse struct {
+	ID     string `json:"id"`
+	State  string `json:"state"`
+	Status string `json:"status"`
+}
+
+func readBrokerErrorMessage(body []byte) string {
+	var w brokerErrorResponse
+	if err := json.Unmarshal(body, &w); err == nil && strings.TrimSpace(w.Error) != "" {
+		return w.Error
+	}
+	return strings.TrimSpace(string(body))
+}
+
+// CancelTask requests cancellation for the broker-scoped task id (same id as POST /v1/tasks returns).
+// HTTP 404 from the broker is treated as success (no-op). Transient HTTP 409 responses are retried.
+func (b *BrokerClient) CancelTask(brokerTaskID string) (*CancelTaskResponse, error) {
+	brokerTaskID = strings.TrimSpace(brokerTaskID)
+	if brokerTaskID == "" {
+		return nil, fmt.Errorf("broker task id is empty")
+	}
+
+	cancelPath := b.baseURL + "/v1/tasks/" + url.PathEscape(brokerTaskID) + "/cancel"
+
+	var lastConflictErr error
+	for attempt := 0; attempt < cancel409MaxAttempts; attempt++ {
+		if attempt > 0 {
+			time.Sleep(cancel409RetryBackoff)
+		}
+
+		httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
+		httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodPost, cancelPath, http.NoBody)
+		if err != nil {
+			cancel()
+			return nil, fmt.Errorf("new request: %w", err)
+		}
+		httpReq.Header.Set("Authorization", "Bearer "+b.authToken)
+
+		resp, err := b.httpClient.Do(httpReq)
+		cancel()
+		if err != nil {
+			return nil, fmt.Errorf("broker request: %w", err)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("read response body: %w", err)
+		}
+
+		switch resp.StatusCode {
+		case http.StatusOK:
+			var out CancelTaskResponse
+			if err := json.Unmarshal(body, &out); err != nil {
+				return nil, fmt.Errorf("unmarshal cancel task response: %w", err)
+			}
+			return &out, nil
+		case http.StatusNotFound:
+			return nil, nil
+		case http.StatusConflict:
+			lastConflictErr = fmt.Errorf(
+				"broker cancel conflict (task not yet assigned upstream): status=%d body=%s",
+				resp.StatusCode,
+				readBrokerErrorMessage(body),
+			)
+		default:
+			return nil, fmt.Errorf(
+				"broker rejected cancel: status=%d body=%s",
+				resp.StatusCode,
+				readBrokerErrorMessage(body),
+			)
+		}
+	}
+
+	return nil, fmt.Errorf("broker cancel: exceeded retries: %w", lastConflictErr)
 }
 
 func (b *BrokerClient) FetchTaskStatus(taskID string) (*Task, error) {
 	httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
 	defer cancel()
 
-	httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodGet, b.baseURL+"/v1/tasks/"+taskID, nil)
+	httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodGet, b.baseURL+"/v1/tasks/"+url.PathEscape(taskID), nil)
 	if err != nil {
 		return nil, fmt.Errorf("new request: %w", err)
 	}
