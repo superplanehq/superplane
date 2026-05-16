@@ -1,4 +1,4 @@
-import { Hammer, Monitor } from "lucide-react";
+import { Compass, Hammer, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AgentMode } from "./useAgentState";
 
@@ -32,6 +32,20 @@ export function ModeToggle({
       >
         <Hammer size={12} />
         Builder
+      </button>
+      <button
+        type="button"
+        onClick={() => onSwitch("architect")}
+        disabled={disabled}
+        className={cn(
+          "flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors",
+          mode === "architect" ? "bg-white text-violet-700 shadow-sm" : "text-slate-500 hover:text-slate-700",
+        )}
+        aria-label="Architect mode"
+        data-testid="agent-mode-architect"
+      >
+        <Compass size={12} />
+        Architect
       </button>
       <button
         type="button"

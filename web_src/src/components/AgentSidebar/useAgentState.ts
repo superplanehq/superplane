@@ -6,7 +6,7 @@ const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
 const CANVAS_AGENT_SIDEBAR_STORAGE_KEY = "canvasAgentSidebarOpen";
 const CANVAS_AGENT_MODE_STORAGE_KEY = "canvasAgentMode";
 
-export type AgentMode = "builder" | "operator";
+export type AgentMode = "builder" | "operator" | "architect";
 
 function readInitialAgentSidebarOpen(): boolean {
   if (typeof window === "undefined") return false;
@@ -21,7 +21,8 @@ function readInitialAgentMode(): AgentMode {
   if (typeof window === "undefined") return "operator";
   try {
     const stored = window.localStorage.getItem(CANVAS_AGENT_MODE_STORAGE_KEY);
-    return stored === "builder" ? "builder" : "operator";
+    if (stored === "builder" || stored === "architect") return stored;
+    return "operator";
   } catch {
     return "operator";
   }

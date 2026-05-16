@@ -12,6 +12,8 @@ export type StepsSegment = { type: "steps"; items: StepItem[] };
 export type SuccessSegment = { type: "success"; content: string };
 export type ErrorSegment = { type: "error"; content: string };
 export type DraftActionsSegment = { type: "draft-actions"; versionId: string; message?: string };
+export type SurveySegment = { type: "survey"; questions: { prompt: string; options: string[]; hasInput?: boolean }[] };
+export type RubricSegment = { type: "rubric"; title: string; criteria: { text: string }[] };
 
 export type Segment =
   | MarkdownSegment
@@ -23,7 +25,9 @@ export type Segment =
   | StepsSegment
   | SuccessSegment
   | ErrorSegment
-  | DraftActionsSegment;
+  | DraftActionsSegment
+  | SurveySegment
+  | RubricSegment;
 
 export type StepItem = { done: boolean; text: string };
 
@@ -159,6 +163,10 @@ function parseBlock(type: string, meta: string, raw: string): Segment | null {
       return { type: "success", content: raw.trim() };
     case "error":
       return { type: "error", content: raw.trim() };
+    case "survey":
+      return parseSurvey(raw);
+    case "rubric":
+      return parseRubric(meta, raw);
     case "draft-actions":
       return parseDraftActions(raw, meta);
     default:
@@ -243,4 +251,61 @@ function parseDraftActions(raw: string, meta: string): DraftActionsSegment {
   }
   // Fallback: version ID from meta or raw content
   return { type: "draft-actions", versionId: (meta || raw).trim(), message: undefined };
+}
+
+function parseSurvey(raw: string): SurveySegment {
+  const questions: { prompt: string; options: string[]; hasInput?: boolean }[] = [];
+  let currentPrompt = "";
+  let currentOptions: string[] = [];
+  let hasInput = false;
+
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    if (/^[-*]\s/.test(trimmed)) {
+      const option = trimmed.replace(/^[-*]\s*/, "").trim();
+      if (option.toLowerCase() === "[input]" || option.toLowerCase() === "[custom]") {
+        hasInput = true;
+      } else {
+        currentOptions.push(option);
+      }
+    } else {
+      // New question - flush previous
+      if (currentPrompt && (currentOptions.length || hasInput)) {
+        questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
+      }
+      currentPrompt = trimmed;
+      currentOptions = [];
+      hasInput = false;
+    }
+  }
+  // Flush last question
+  if (currentPrompt && (currentOptions.length || hasInput)) {
+    questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
+  }
+
+  return { type: "survey", questions };
+}
+
+function parseRubric(meta: string, raw: string): RubricSegment {
+  const lines = raw.split("\n").filter((l) => l.trim());
+  const criteria: { text: string }[] = [];
+  let title = meta.trim();
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^[-*✦•]\s/.test(trimmed)) {
+      criteria.push({ text: trimmed.replace(/^[-*✦•]\s*/, "").trim() });
+    } else if (/^\d+[.)]\s/.test(trimmed)) {
+      criteria.push({ text: trimmed.replace(/^\d+[.)]\s*/, "").trim() });
+    } else if (!title) {
+      title = trimmed;
+    } else {
+      // Treat as a criterion anyway
+      criteria.push({ text: trimmed });
+    }
+  }
+
+  return { type: "rubric", title: title || "Build Plan", criteria };
 }

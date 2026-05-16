@@ -10,6 +10,8 @@ import { StepsWidget } from "./StepsWidget";
 import { BannerWidget } from "./BannerWidget";
 import { MermaidWidget } from "./MermaidWidget";
 import { CodeBlockWidget } from "./CodeBlockWidget";
+import { SurveyWidget } from "./SurveyWidget";
+import { RubricWidget } from "./RubricWidget";
 import { RunChipFromLink } from "./RunChip";
 import { NodeChipFromLink } from "./NodeChip";
 
@@ -147,6 +149,10 @@ function SegmentRenderer({
       return <MermaidWidget content={segment.content} />;
     case "steps":
       return <StepsWidget items={segment.items} />;
+    case "survey":
+      return <SurveyWidget questions={segment.questions} onAction={onAction} />;
+    case "rubric":
+      return <RubricWidget title={segment.title} criteria={segment.criteria} onAction={onAction} />;
     case "success":
       return <BannerWidget variant="success" content={segment.content} />;
     case "error":

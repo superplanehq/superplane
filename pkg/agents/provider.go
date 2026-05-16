@@ -32,6 +32,7 @@ type ProviderEvent struct {
 
 type CreateSessionOptions struct {
 	InitialContext string
+	Title          string
 }
 
 type CreateSessionResult struct {
