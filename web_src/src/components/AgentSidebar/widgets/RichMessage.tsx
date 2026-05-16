@@ -151,5 +151,8 @@ function SegmentRenderer({
       return <BannerWidget variant="success" content={segment.content} />;
     case "error":
       return <BannerWidget variant="error" content={segment.content} />;
+    case "draft-actions":
+      // Rendered externally as DraftActionsBar, not inline
+      return null;
   }
 }

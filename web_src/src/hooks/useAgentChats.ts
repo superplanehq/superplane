@@ -68,14 +68,27 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
 export function useSendAgentChatMessage(organizationId: string | undefined, _canvasId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ chatId, content }: { chatId: string; content: string }) => {
+    mutationFn: async ({ chatId, content, mode }: { chatId: string; content: string; mode?: string }) => {
       const response = await agentsSendAgentChatMessage(
-        withOrganizationHeader({ organizationId, path: { chatId }, body: { content } }),
+        withOrganizationHeader({ organizationId, path: { chatId }, body: { content, mode } }),
       );
       return fromApiMessage(response.data?.message);
     },
     onSuccess: (data, variables) => {
       if (data) upsertAgentMessageInCache(queryClient, variables.chatId, data);
+    },
+  });
+}
+
+export function useInterruptAgentChat(organizationId: string | undefined) {
+  return useMutation({
+    mutationFn: async ({ chatId }: { chatId: string }) => {
+      const res = await fetch(`/api/v1/agents/chats/${chatId}/interrupt`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": organizationId ?? "" },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`Interrupt failed: ${res.status}`);
     },
   });
 }

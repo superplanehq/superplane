@@ -36,6 +36,8 @@ func (b *blockingProvider) SendMessage(context.Context, string, string, agents.S
 	return nil
 }
 
+func (b *blockingProvider) InterruptSession(context.Context, string) error { return nil }
+
 func (b *blockingProvider) StreamEvents(context.Context, string, func(agents.ProviderEvent) error) error {
 	return nil
 }
@@ -69,6 +71,10 @@ func (f *fakeProvider) SendMessage(_ context.Context, _ string, _ string, opts a
 	f.sendCalled++
 	f.lastPreamble = opts.ContextPreamble
 	return f.sendErr
+}
+
+func (f *fakeProvider) InterruptSession(_ context.Context, _ string) error {
+	return nil
 }
 
 func (f *fakeProvider) StreamEvents(_ context.Context, _ string, _ func(agents.ProviderEvent) error) error {
