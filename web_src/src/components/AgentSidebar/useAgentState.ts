@@ -4,6 +4,9 @@ import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 // Keep in sync with pkg/features/features.go.
 const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
 const CANVAS_AGENT_SIDEBAR_STORAGE_KEY = "canvasAgentSidebarOpen";
+const CANVAS_AGENT_MODE_STORAGE_KEY = "canvasAgentMode";
+
+export type AgentMode = "builder" | "operator";
 
 function readInitialAgentSidebarOpen(): boolean {
   if (typeof window === "undefined") return false;
@@ -11,6 +14,16 @@ function readInitialAgentSidebarOpen(): boolean {
     return window.localStorage.getItem(CANVAS_AGENT_SIDEBAR_STORAGE_KEY) === "true";
   } catch {
     return false;
+  }
+}
+
+function readInitialAgentMode(): AgentMode {
+  if (typeof window === "undefined") return "operator";
+  try {
+    const stored = window.localStorage.getItem(CANVAS_AGENT_MODE_STORAGE_KEY);
+    return stored === "builder" ? "builder" : "operator";
+  } catch {
+    return "operator";
   }
 }
 
@@ -33,6 +46,7 @@ export function useAgentState({
   const featureEnabled = hasFeature(FEATURE_CLAUDE_MANAGED_AGENTS);
 
   const [isAgentSidebarOpen, setIsAgentSidebarOpen] = useState(readInitialAgentSidebarOpen);
+  const [agentMode, setAgentMode] = useState<AgentMode>(readInitialAgentMode);
 
   const persistOpen = useCallback((open: boolean) => {
     if (typeof window === "undefined") return;
@@ -52,6 +66,13 @@ export function useAgentState({
     });
   }, [persistOpen]);
 
+  const switchAgentMode = useCallback((mode: AgentMode) => {
+    setAgentMode(mode);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(CANVAS_AGENT_MODE_STORAGE_KEY, mode);
+    }
+  }, []);
+
   // The agent is read-only-safe: a user can still ask questions about a
   // published canvas without editing it. Only the feature flag and the
   // canvas-creation-mode flag (hideAddControls) gate the sidebar entirely.
@@ -70,6 +91,8 @@ export function useAgentState({
     showAgentSidebarToggle,
     handleAgentSidebarToggle,
     closeSidebar,
+    agentMode,
+    switchAgentMode,
   };
 }
 
