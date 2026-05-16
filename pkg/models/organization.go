@@ -187,7 +187,7 @@ func CreateOrganizationInTransaction(tx *gorm.DB, name, description string) (*Or
 	organization := Organization{
 		Name:                             name,
 		Description:                      description,
-		AllowedProviders:                 datatypes.JSONSlice[string]{ProviderGitHub},
+		AllowedProviders:                 datatypes.JSONSlice[string]{ProviderGitHub, ProviderGoogle},
 		AllowDirectEmailInviteCompletion: true,
 		ChangeManagementEnabled:          false,
 		EnabledExperimentalFeatures:      datatypes.JSONSlice[string]{},
