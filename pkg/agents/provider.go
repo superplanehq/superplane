@@ -16,7 +16,8 @@ const (
 	ProviderEventToolUseFinished   ProviderEventType = "tool_use_finished"
 	ProviderEventTurnCompleted     ProviderEventType = "turn_completed"
 	ProviderEventSessionFailed     ProviderEventType = "session_failed"
-	ProviderEventOutcomeEvaluation ProviderEventType = "outcome_evaluation"
+	ProviderEventOutcomeEvaluation      ProviderEventType = "outcome_evaluation"
+	ProviderEventOutcomeEvaluationStart ProviderEventType = "outcome_evaluation_start"
 )
 
 type ProviderEvent struct {

@@ -74,6 +74,14 @@ func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 			ErrorMessage: msg,
 		}, true
 
+	case "span.outcome_evaluation_start":
+		return agents.ProviderEvent{
+			Type: agents.ProviderEventOutcomeEvaluationStart,
+			OutcomeResult: &agents.OutcomeEvaluation{
+				Iteration: raw.Iteration,
+			},
+		}, true
+
 	case "span.outcome_evaluation_end":
 		eval := &agents.OutcomeEvaluation{
 			Iteration: raw.Iteration,
