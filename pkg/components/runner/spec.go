@@ -52,7 +52,16 @@ func decodeRunnerSpec(raw any) (Spec, error) {
 	if err := dec.Decode(raw); err != nil {
 		return Spec{}, fmt.Errorf("decode runner configuration: %w", err)
 	}
+	applyRunnerSpecDefaults(&spec)
 	return spec, nil
+}
+
+// applyRunnerSpecDefaults fills in values for nodes created before newer Runner fields existed.
+// configuration.ValidateConfiguration does not apply Field.Default, so those fields stay optional at the schema level.
+func applyRunnerSpecDefaults(spec *Spec) {
+	if strings.TrimSpace(spec.ExecutionMode) == "" {
+		spec.ExecutionMode = ExecutionModeHost
+	}
 }
 
 func normalizeExecutionMode(mode string) string {

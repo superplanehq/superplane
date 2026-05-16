@@ -118,11 +118,7 @@ describe("runnerConfigurationDetails", () => {
         "Timeout (seconds)": "45",
       },
     ],
-    [
-      "non-object configuration",
-      null,
-      {},
-    ],
+    ["non-object configuration", null, {}],
   ] as const)("case: %s", (_label, configuration, expected) => {
     expect(runnerConfigurationDetails(configuration)).toEqual(expected);
   });

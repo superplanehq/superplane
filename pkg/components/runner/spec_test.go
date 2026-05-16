@@ -35,6 +35,10 @@ func TestValidateRunnerSpec(t *testing.T) {
 	if err := validateRunnerSpec(Spec{Commands: "echo hi", ExecutionMode: ExecutionModeHost}); err != nil {
 		t.Fatalf("valid host spec: %v", err)
 	}
+	// Legacy persisted config: commands only (no execution_mode / execution_timeout_seconds keys).
+	if err := validateRunnerSpec(Spec{Commands: "echo hi"}); err != nil {
+		t.Fatalf("valid legacy host spec (empty execution_mode): %v", err)
+	}
 	if err := validateRunnerSpec(Spec{
 		Commands:          "echo hi",
 		ExecutionMode:     ExecutionModeDocker,
@@ -126,6 +130,30 @@ func TestDecodeRunnerSpec_WeakTypes(t *testing.T) {
 	}
 	if err := validateRunnerSpec(spec); err != nil {
 		t.Fatalf("validate after decode: %v", err)
+	}
+}
+
+func TestValidateConfigurationRunnerLegacyPreExecutionFields(t *testing.T) {
+	t.Parallel()
+	r := &Runner{}
+	legacy := map[string]any{
+		"commands": "echo hi",
+	}
+	if err := configuration.ValidateConfiguration(r.Configuration(), legacy); err != nil {
+		t.Fatalf("ValidateConfiguration legacy runner: %v", err)
+	}
+	spec, err := decodeRunnerSpec(legacy)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if spec.ExecutionMode != ExecutionModeHost {
+		t.Fatalf("execution_mode default: got %q want %q", spec.ExecutionMode, ExecutionModeHost)
+	}
+	if spec.ExecutionTimeoutSeconds != 0 {
+		t.Fatalf("timeout default: got %d want 0", spec.ExecutionTimeoutSeconds)
+	}
+	if err := validateRunnerSpec(spec); err != nil {
+		t.Fatalf("validateRunnerSpec legacy: %v", err)
 	}
 }
 

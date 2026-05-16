@@ -96,7 +96,7 @@ func (c *Runner) Configuration() []configuration.Field {
 			Name:        "execution_mode",
 			Label:       "Execution mode",
 			Type:        configuration.FieldTypeSelect,
-			Required:    true,
+			Required:    false, // legacy nodes omit this; defaults applied in decodeRunnerSpec / normalizeExecutionMode
 			Default:     ExecutionModeHost,
 			Description: "Where the shell commands run: on the runner machine, or inside a container.",
 			TypeOptions: &configuration.TypeOptions{
@@ -226,7 +226,7 @@ func (c *Runner) Configuration() []configuration.Field {
 			Name:        "execution_timeout_seconds",
 			Label:       "Execution timeout (seconds)",
 			Type:        configuration.FieldTypeNumber,
-			Required:    true,
+			Required:    false, // legacy nodes omit this; 0 means broker default
 			Default:     0,
 			Description: "Hard time limit for the whole task, including image pull and command run. Use 0 for the broker default.",
 			TypeOptions: &configuration.TypeOptions{
