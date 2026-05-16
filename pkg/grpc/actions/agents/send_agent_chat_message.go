@@ -25,7 +25,7 @@ func SendAgentChatMessage(ctx context.Context, svc AgentsService, orgID, userID 
 		return nil, status.Error(codes.InvalidArgument, "content is required")
 	}
 
-	persisted, err := svc.SendMessage(ctx, org, user, chatID, req.Content)
+	persisted, err := svc.SendMessage(ctx, org, user, chatID, req.Content, req.Mode)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "agent chat not found")
