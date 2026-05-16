@@ -36,11 +36,12 @@ const MARKDOWN_CLASSES =
 interface RichMessageProps {
   content: string;
   onAction?: (text: string) => void;
+  onStartBuilding?: (rubric: { title: string; criteria: string[] }) => void;
   canvasId?: string;
   organizationId?: string;
 }
 
-export function RichMessage({ content, onAction, canvasId, organizationId }: RichMessageProps) {
+export function RichMessage({ content, onAction, onStartBuilding, canvasId, organizationId }: RichMessageProps) {
   const segments = parseAgentContent(content);
 
   return (
@@ -50,6 +51,7 @@ export function RichMessage({ content, onAction, canvasId, organizationId }: Ric
           key={i}
           segment={segment}
           onAction={onAction}
+          onStartBuilding={onStartBuilding}
           canvasId={canvasId}
           organizationId={organizationId}
         />
@@ -61,11 +63,13 @@ export function RichMessage({ content, onAction, canvasId, organizationId }: Ric
 function SegmentRenderer({
   segment,
   onAction,
+  onStartBuilding,
   canvasId,
   organizationId,
 }: {
   segment: Segment;
   onAction?: (text: string) => void;
+  onStartBuilding?: (rubric: { title: string; criteria: string[] }) => void;
   canvasId?: string;
   organizationId?: string;
 }) {
@@ -152,7 +156,7 @@ function SegmentRenderer({
     case "survey":
       return <SurveyWidget questions={segment.questions} onAction={onAction} />;
     case "rubric":
-      return <RubricWidget title={segment.title} criteria={segment.criteria} onAction={onAction} />;
+      return <RubricWidget title={segment.title} criteria={segment.criteria} onAction={onAction} onStartBuilding={onStartBuilding} />;
     case "success":
       return <BannerWidget variant="success" content={segment.content} />;
     case "error":

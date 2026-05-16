@@ -10,9 +10,10 @@ interface RubricWidgetProps {
   title: string;
   criteria: RubricCriterion[];
   onAction?: (text: string) => void;
+  onStartBuilding?: (rubric: { title: string; criteria: string[] }) => void;
 }
 
-export function RubricWidget({ title, criteria, onAction }: RubricWidgetProps) {
+export function RubricWidget({ title, criteria, onAction, onStartBuilding }: RubricWidgetProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -21,7 +22,11 @@ export function RubricWidget({ title, criteria, onAction }: RubricWidgetProps) {
   const visibleCriteria = expanded ? criteria : criteria.slice(0, PREVIEW_COUNT);
 
   function handleStartBuilding() {
-    onAction?.("Start building based on this plan");
+    if (onStartBuilding) {
+      onStartBuilding({ title, criteria: criteria.map((c) => c.text) });
+    } else {
+      onAction?.("Start building based on this plan");
+    }
   }
 
   return (

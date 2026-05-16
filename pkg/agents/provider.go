@@ -11,11 +11,12 @@ import (
 type ProviderEventType string
 
 const (
-	ProviderEventAssistantMessage ProviderEventType = "assistant_message"
-	ProviderEventToolUseStarted   ProviderEventType = "tool_use_started"
-	ProviderEventToolUseFinished  ProviderEventType = "tool_use_finished"
-	ProviderEventTurnCompleted    ProviderEventType = "turn_completed"
-	ProviderEventSessionFailed    ProviderEventType = "session_failed"
+	ProviderEventAssistantMessage  ProviderEventType = "assistant_message"
+	ProviderEventToolUseStarted    ProviderEventType = "tool_use_started"
+	ProviderEventToolUseFinished   ProviderEventType = "tool_use_finished"
+	ProviderEventTurnCompleted     ProviderEventType = "turn_completed"
+	ProviderEventSessionFailed     ProviderEventType = "session_failed"
+	ProviderEventOutcomeEvaluation ProviderEventType = "outcome_evaluation"
 )
 
 type ProviderEvent struct {
@@ -26,13 +27,26 @@ type ProviderEvent struct {
 	ToolCallID      string
 	// ToolInput is a human-readable rendering of the tool's invocation
 	// (e.g. the shell command for bash, or compact JSON for other tools).
-	ToolInput    string
-	ErrorMessage string
+	ToolInput       string
+	ErrorMessage    string
+	OutcomeResult   *OutcomeEvaluation
+}
+
+type OutcomeEvaluation struct {
+	Iteration int
+	Passed    bool
+	Feedback  string
 }
 
 type CreateSessionOptions struct {
 	InitialContext string
 	Title          string
+}
+
+type DefineOutcomeOptions struct {
+	Description   string
+	Rubric        string
+	MaxIterations int
 }
 
 type CreateSessionResult struct {
@@ -51,6 +65,7 @@ type Provider interface {
 	CreateSession(ctx context.Context, opts CreateSessionOptions) (*CreateSessionResult, error)
 	SendMessage(ctx context.Context, providerSessionID, message string, opts SendMessageOptions) error
 	InterruptSession(ctx context.Context, providerSessionID string) error
+	DefineOutcome(ctx context.Context, providerSessionID string, opts DefineOutcomeOptions) error
 	// StreamEvents blocks until the provider closes the stream, ctx is
 	// cancelled, or onEvent errors. Implementations must not call onEvent
 	// after returning.

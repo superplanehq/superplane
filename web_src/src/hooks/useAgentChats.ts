@@ -114,3 +114,17 @@ export function upsertAgentMessageInCache(queryClient: QueryClient, chatId: stri
     return { ...prev, pages };
   });
 }
+
+export function useDefineAgentOutcome(organizationId: string | undefined) {
+  return useMutation({
+    mutationFn: async ({ chatId, description, rubric, maxIterations }: { chatId: string; description: string; rubric: string; maxIterations?: number }) => {
+      const res = await fetch(`/api/v1/agents/chats/${chatId}/outcome`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-organization-id": organizationId ?? "" },
+        credentials: "include",
+        body: JSON.stringify({ chat_id: chatId, description, rubric, max_iterations: maxIterations || 3 }),
+      });
+      if (!res.ok) throw new Error(`Define outcome failed: ${res.status}`);
+    },
+  });
+}
