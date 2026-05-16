@@ -45,6 +45,21 @@ func CreateNodeExecutionKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeI
 	return tx.Create(&rec).Error
 }
 
+// FindLatestNodeExecutionKVValueInTransaction returns the value from the newest
+// row for this execution and key (by created_at, then id).
+func FindLatestNodeExecutionKVValueInTransaction(tx *gorm.DB, executionID uuid.UUID, key string) (string, error) {
+	var rec CanvasNodeExecutionKV
+	err := tx.
+		Where("execution_id = ? AND key = ?", executionID, key).
+		Order("created_at DESC, id DESC").
+		Limit(1).
+		First(&rec).Error
+	if err != nil {
+		return "", err
+	}
+	return rec.Value, nil
+}
+
 func FirstNodeExecutionByKVInTransaction(tx *gorm.DB, workflowID uuid.UUID, nodeID, key, value string) (*CanvasNodeExecution, error) {
 	var execution CanvasNodeExecution
 
