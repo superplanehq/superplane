@@ -174,7 +174,7 @@ function ChatConversation({
           chatId,
           description: `Build a canvas based on this plan: ${rubric.title}`,
           rubric: rubricText,
-          maxIterations: 5,
+          maxIterations: 3,
         });
       } catch (err) {
         console.error("Failed to define outcome:", err);
@@ -187,9 +187,15 @@ function ChatConversation({
 
   const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
 
+  const modeBgClass = {
+    builder: "bg-orange-50/30",
+    architect: "bg-blue-50/30",
+    operator: "bg-emerald-50/30",
+  }[agentMode] || "";
+
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2" data-testid="agent-chat-messages">
+      <div ref={scrollRef} className={cn("flex-1 min-h-0 overflow-y-auto p-3 space-y-2 transition-colors duration-300", modeBgClass)} data-testid="agent-chat-messages">
         {messagesQuery.isLoading ? (
           <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
             <Loader2 className="size-4 animate-spin mr-2" /> Loading…
