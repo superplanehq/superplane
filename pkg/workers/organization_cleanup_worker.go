@@ -155,6 +155,10 @@ func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, organizatio
 		return nil
 	}
 
+	if err := models.DeleteAgentSessionsForOrganizationInTransaction(tx, organization.ID); err != nil {
+		return fmt.Errorf("delete organization agent sessions: %w", err)
+	}
+
 	if err := models.DeleteMetadataForOrganization(tx, models.DomainTypeOrganization, organization.ID.String()); err != nil {
 		return fmt.Errorf("delete organization role metadata: %w", err)
 	}

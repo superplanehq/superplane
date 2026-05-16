@@ -14,6 +14,49 @@ import (
 	"gorm.io/gorm"
 )
 
+func createAgentSessionWithMessage(t *testing.T, organizationID, userID, canvasID uuid.UUID) *models.AgentSession {
+	t.Helper()
+
+	session := &models.AgentSession{
+		OrganizationID:    organizationID,
+		UserID:            userID,
+		CanvasID:          canvasID,
+		Provider:          "test",
+		ProviderSessionID: "provider-session-" + uuid.NewString(),
+		Status:            models.AgentSessionStatusIdle,
+	}
+
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		if err := models.CreateAgentSessionInTransaction(tx, session); err != nil {
+			return err
+		}
+
+		return models.AppendAgentSessionMessageInTransaction(tx, &models.AgentSessionMessage{
+			SessionID: session.ID,
+			Role:      models.AgentMessageRoleUser,
+			Content:   "hello",
+		})
+	}))
+
+	return session
+}
+
+func countAgentSessions(t *testing.T, sessionID uuid.UUID) int64 {
+	t.Helper()
+
+	var count int64
+	require.NoError(t, database.Conn().Model(&models.AgentSession{}).Where("id = ?", sessionID).Count(&count).Error)
+	return count
+}
+
+func countAgentSessionMessages(t *testing.T, sessionID uuid.UUID) int64 {
+	t.Helper()
+
+	var count int64
+	require.NoError(t, database.Conn().Model(&models.AgentSessionMessage{}).Where("session_id = ?", sessionID).Count(&count).Error)
+	return count
+}
+
 func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
@@ -44,6 +87,8 @@ func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 		},
 		[]models.Edge{},
 	)
+
+	session := createAgentSessionWithMessage(t, r.Organization.ID, r.User, canvas.ID)
 
 	// Create associated data
 	event1 := support.EmitCanvasEventForNode(t, canvas.ID, "node-1", "default", nil)
@@ -92,6 +137,8 @@ func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	// Verify KV and request exist
 	support.VerifyNodeExecutionKVCount(t, canvas.ID, 1)
 	support.VerifyNodeRequestCount(t, canvas.ID, 1)
+	assert.Equal(t, int64(1), countAgentSessions(t, session.ID))
+	assert.Equal(t, int64(1), countAgentSessionMessages(t, session.ID))
 
 	//
 	// Soft delete the canvas using the new soft delete method
@@ -153,6 +200,9 @@ func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	// KV and request should be deleted
 	support.VerifyNodeExecutionKVCount(t, canvas.ID, 0)
 	support.VerifyNodeRequestCount(t, canvas.ID, 0)
+
+	assert.Equal(t, int64(0), countAgentSessions(t, session.ID))
+	assert.Equal(t, int64(0), countAgentSessionMessages(t, session.ID))
 }
 
 func Test__CanvasCleanupWorker_ProcessesWorkflowFromSoftDeletedOrganization(t *testing.T) {
