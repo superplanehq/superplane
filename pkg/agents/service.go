@@ -142,7 +142,18 @@ func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]mode
 	return models.ListAgentSessionMessagesPage(sessionID, cursor, limit)
 }
 
-func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string) (*models.AgentSessionMessage, error) {
+func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error {
+	session, err := s.GetSession(organizationID, userID, sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+	if err := s.provider.InterruptSession(ctx, session.ProviderSessionID); err != nil {
+		return fmt.Errorf("interrupt: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error) {
 	if content == "" {
 		return nil, fmt.Errorf("message content is required")
 	}
@@ -152,7 +163,12 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	preamble, err := s.buildPreamble(session, organizationID, userID)
+	agentMode := "operator"
+	if len(mode) > 0 && mode[0] != "" {
+		agentMode = mode[0]
+	}
+
+	preamble, err := s.buildPreamble(session, organizationID, userID, agentMode)
 	if err != nil {
 		return nil, fmt.Errorf("build preamble: %w", err)
 	}
@@ -181,12 +197,12 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	return persisted, nil
 }
 
-func (s *Service) buildPreamble(session *models.AgentSession, organizationID, userID uuid.UUID) (string, error) {
+func (s *Service) buildPreamble(session *models.AgentSession, organizationID, userID uuid.UUID, mode string) (string, error) {
 	token, expiresAt, err := s.mintAgentToken(organizationID.String(), userID.String(), session.CanvasID.String())
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(
+	base := fmt.Sprintf(
 		preambleTemplate,
 		session.CanvasID.String(),
 		session.OrganizationID.String(),
@@ -195,7 +211,9 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 		expiresAt.UTC().Format(time.RFC3339),
 		session.CanvasID.String(),
 		session.CanvasID.String(),
-	), nil
+	)
+	draftStatus := getDraftStatus(session.CanvasID)
+	return base + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -291,3 +309,80 @@ func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
 	h.Write(canvasID[:])
 	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
 }
+
+func getDraftStatus(canvasID uuid.UUID) string {
+	// Only load the versions we need — drafts and the most recent published.
+	// TODO: add scoped queries (e.g. ListDraftVersions) to avoid loading all versions.
+	versions, err := models.ListCanvasVersions(canvasID)
+	if err != nil {
+		log.WithError(err).Warn("failed to list canvas versions for draft status")
+		return "[Draft Status]\nUnable to determine draft status."
+	}
+	var drafts []models.CanvasVersion
+	var latestPublished *models.CanvasVersion
+	for i, v := range versions {
+		if v.State == models.CanvasVersionStateDraft {
+			drafts = append(drafts, v)
+		}
+		if v.State == models.CanvasVersionStatePublished && v.PublishedAt != nil {
+			if latestPublished == nil || v.PublishedAt.After(*latestPublished.PublishedAt) {
+				latestPublished = &versions[i]
+			}
+		}
+	}
+	if len(drafts) == 0 {
+		// Tell the agent whether the last version was published or discarded
+		if latestPublished != nil && time.Since(*latestPublished.PublishedAt) < 10*time.Minute {
+			return fmt.Sprintf("[Draft Status]\nNo active drafts. The last draft was published as version %s at %s. Your changes are live.",
+				latestPublished.ID.String(), latestPublished.PublishedAt.UTC().Format(time.RFC3339))
+		}
+		return "[Draft Status]\nNo active drafts. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
+	}
+	result := "[Draft Status]\n"
+	for _, d := range drafts {
+		created := "unknown"
+		if d.CreatedAt != nil {
+			created = d.CreatedAt.UTC().Format(time.RFC3339)
+		}
+		result += fmt.Sprintf("- Active draft: version %s (created %s)\n", d.ID.String(), created)
+	}
+	return result
+}
+
+func modeInstructions(mode string) string {
+	switch mode {
+	case "builder":
+		return builderModeInstructions
+	default:
+		return operatorModeInstructions
+	}
+}
+
+const builderModeInstructions = `[Agent Mode: BUILDER]
+You are in Builder mode. Your job is to modify the canvas based on the user's request.
+
+Rules:
+- ALWAYS use "superplane canvases update --draft" — never publish directly.
+- After a successful draft update, output a :::draft-actions block with the version ID so the user can review or publish:
+
+  :::draft-actions
+  versionId: <the-version-uuid-from-cli-output>
+  message: Draft ready — added retry logic to Call Target API
+  :::
+
+- You can add, remove, or modify nodes and edges.
+- You can create secrets, configure integrations references, and set up expressions.
+- If the user asks a question that doesn't require changes, answer it briefly, but your primary purpose is building.
+- If you're unsure what the user wants, ask a clarifying question using :::buttons with the options.
+- When you receive a system notification that a draft was published or discarded, re-read the canvas (superplane canvases get) to see the current live state before taking any further action. Acknowledge the change briefly.`
+
+const operatorModeInstructions = `[Agent Mode: OPERATOR]
+You are in Operator mode. Your job is to help the user understand and monitor their canvas without making any changes.
+
+Rules:
+- NEVER modify the canvas. No creates, no updates, no deletes.
+- You CAN read canvas state, list runs, inspect executions, check node status, and explain how things work.
+- When the user asks about a failure, trace through the run execution path and identify the root cause.
+- If the user asks you to make a change, tell them to switch to Builder mode: "Switch to Builder mode to make that change."
+- Use charts, tables, and mermaid diagrams to visualize run data and canvas topology when helpful.
+- Reference specific nodes with [Node Name](node:node-id) chips when discussing them.`
