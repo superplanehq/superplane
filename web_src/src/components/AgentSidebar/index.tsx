@@ -286,20 +286,41 @@ function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutat
   const [, forceUpdate] = useState(0);
   const [verifiedDraft, setVerifiedDraft] = useState<boolean | null>(null);
 
-  // Listen for canvas version changes — only dismiss if version is no longer a draft
+  // Listen for canvas version changes — dismiss bar + notify agent
   useEffect(() => {
     const handler = (e: Event) => {
       const { versionId } = (e as CustomEvent).detail;
-      if (!versionId) return;
-      // Check if the version is still a draft before dismissing
+      if (!versionId || dismissedVersionIds.has(versionId)) return;
       fetch(`/api/v1/canvases/${canvasId}/versions/${versionId}`, {
         headers: { "x-organization-id": organizationId },
         credentials: "include",
       })
-        .then(r => r.ok ? r.json() : null)
+        .then(r => {
+          if (!r.ok) {
+            // 404 = version was deleted (discarded)
+            dismissedVersionIds.add(versionId);
+            forceUpdate(n => n + 1);
+            sendMutation.mutateAsync({
+              chatId,
+              content: `[User discarded draft version ${versionId}. Changes were NOT applied.]`,
+              mode: agentMode,
+            }).catch(() => {});
+            return null;
+          }
+          return r.json();
+        })
         .then(data => {
+          if (!data) return;
           const state = data?.version?.metadata?.state;
-          if (state && state !== "STATE_DRAFT") {
+          if (state === "STATE_PUBLISHED") {
+            dismissedVersionIds.add(versionId);
+            forceUpdate(n => n + 1);
+            sendMutation.mutateAsync({
+              chatId,
+              content: `[User published draft version ${versionId}. Changes are now live.]`,
+              mode: agentMode,
+            }).catch(() => {});
+          } else if (state && state !== "STATE_DRAFT") {
             dismissedVersionIds.add(versionId);
             forceUpdate(n => n + 1);
           }
@@ -308,7 +329,7 @@ function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutat
     };
     window.addEventListener("canvas:version-updated", handler);
     return () => window.removeEventListener("canvas:version-updated", handler);
-  }, [canvasId, organizationId]);
+  }, [canvasId, organizationId, chatId, sendMutation, agentMode]);
 
   const latestDraft = useMemo(() => {
     // Only scan the latest assistant turn (stop at first user message from end)
@@ -359,7 +380,6 @@ function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutat
         organizationId={organizationId}
         isEditing={window.location.search.includes("version=")}
         onDismiss={() => { dismissedVersionIds.add(latestDraft.versionId); forceUpdate(n => n + 1); }}
-        onNotify={(msg) => { sendMutation.mutateAsync({ chatId, content: msg, mode: agentMode }).catch(() => {}); }}
       />
     </div>
   );
