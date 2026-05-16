@@ -182,14 +182,16 @@ function ChatConversation({
   const handleStop = useCallback(async () => {
     setStopping(true);
     try {
-      await fetch(`/api/v1/agents/chats/${chatId}/interrupt`, {
+      const res = await fetch(`/api/v1/agents/chats/${chatId}/interrupt`, {
         method: "POST",
-        headers: { "x-organization-id": organizationId },
+        headers: { "Content-Type": "application/json", "x-organization-id": organizationId },
         credentials: "include",
       });
+      if (!res.ok) console.error("Interrupt failed:", res.status);
     } catch (err) {
       console.error("Failed to interrupt:", err);
-      setStopping(false);
+    } finally {
+      // Don't reset here — wait for streaming to actually stop
     }
   }, [chatId, organizationId]);
 
@@ -281,9 +283,6 @@ function ChatConversation({
   );
 }
 
-// Track published/discarded version IDs outside component to survive remounts
-const dismissedVersionIds = new Set<string>();
-
 function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutation, agentMode }: {
   messages: AgentMessage[];
   canvasId: string;
@@ -293,13 +292,14 @@ function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutat
   agentMode: AgentMode;
 }) {
   const [, forceUpdate] = useState(0);
+  const dismissedVersionIds = useRef(new Set<string>());
   const [verifiedDraft, setVerifiedDraft] = useState<boolean | null>(null);
 
   // Listen for canvas version changes — dismiss bar + notify agent
   useEffect(() => {
     const handler = (e: Event) => {
       const { versionId } = (e as CustomEvent).detail;
-      if (!versionId || dismissedVersionIds.has(versionId)) return;
+      if (!versionId || dismissedVersionIds.current.has(versionId)) return;
       fetch(`/api/v1/canvases/${canvasId}/versions/${versionId}`, {
         headers: { "x-organization-id": organizationId },
         credentials: "include",
@@ -307,7 +307,7 @@ function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutat
         .then(r => {
           if (!r.ok) {
             // 404 = version was deleted (discarded)
-            dismissedVersionIds.add(versionId);
+            dismissedVersionIds.current.add(versionId);
             forceUpdate(n => n + 1);
             sendMutation.mutateAsync({
               chatId,
@@ -322,7 +322,7 @@ function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutat
           if (!data) return;
           const state = data?.version?.metadata?.state;
           if (state === "STATE_PUBLISHED") {
-            dismissedVersionIds.add(versionId);
+            dismissedVersionIds.current.add(versionId);
             forceUpdate(n => n + 1);
             sendMutation.mutateAsync({
               chatId,
@@ -330,7 +330,7 @@ function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutat
               mode: agentMode,
             }).catch(() => {});
           } else if (state && state !== "STATE_DRAFT") {
-            dismissedVersionIds.add(versionId);
+            dismissedVersionIds.current.add(versionId);
             forceUpdate(n => n + 1);
           }
         })
@@ -348,7 +348,7 @@ function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutat
       if (msg.role !== "assistant") continue;
       const segments = parseAgentContent(msg.content);
       for (const seg of segments) {
-        if (seg.type === "draft-actions" && !dismissedVersionIds.has(seg.versionId)) return seg;
+        if (seg.type === "draft-actions" && !dismissedVersionIds.current.has(seg.versionId)) return seg;
       }
     }
     return null;
@@ -370,7 +370,7 @@ function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutat
         if (cancelled) return;
         const isDraft = data?.version?.metadata?.state === "STATE_DRAFT";
         if (!isDraft) {
-          dismissedVersionIds.add(latestDraft.versionId);
+          dismissedVersionIds.current.add(latestDraft.versionId);
         }
         setVerifiedDraft(isDraft);
       })
@@ -388,7 +388,7 @@ function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutat
         canvasId={canvasId}
         organizationId={organizationId}
         isEditing={window.location.search.includes("version=")}
-        onDismiss={() => { dismissedVersionIds.add(latestDraft.versionId); forceUpdate(n => n + 1); }}
+        onDismiss={() => { dismissedVersionIds.current.add(latestDraft.versionId); forceUpdate(n => n + 1); }}
       />
     </div>
   );
@@ -503,9 +503,10 @@ function MessageRow({
   }
 
   // System notification messages (draft published/discarded)
-  const isSystemNotification = message.role === "user" && message.content.startsWith("[System: ");
+  // TODO: use a dedicated message type/role instead of content prefix detection
+  const isSystemNotification = message.role === "user" && /^\[System: .+\]$/.test(message.content.trim());
   if (isSystemNotification) {
-    const text = message.content.replace(/^\[System: |\]$/g, "");
+    const text = message.content.trim().slice(9, -1); // strip "[System: " and "]"
     return (
       <div className="flex justify-center">
         <span className="text-[11px] text-slate-400 italic px-2">{text}</span>

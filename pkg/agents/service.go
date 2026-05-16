@@ -311,6 +311,8 @@ func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
 }
 
 func getDraftStatus(canvasID uuid.UUID) string {
+	// Only load the versions we need — drafts and the most recent published.
+	// TODO: add scoped queries (e.g. ListDraftVersions) to avoid loading all versions.
 	versions, err := models.ListCanvasVersions(canvasID)
 	if err != nil {
 		log.WithError(err).Warn("failed to list canvas versions for draft status")
