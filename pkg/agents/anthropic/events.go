@@ -18,6 +18,14 @@ type anthropicEvent struct {
 	Error     *struct {
 		Message string `json:"message"`
 	} `json:"error"`
+	// Outcome evaluation fields
+	Iteration  int    `json:"iteration,omitempty"`
+	Passed     bool   `json:"passed,omitempty"`
+	Feedback   string `json:"feedback,omitempty"`
+	Evaluation *struct {
+		Passed   bool   `json:"passed"`
+		Feedback string `json:"feedback"`
+	} `json:"evaluation,omitempty"`
 }
 
 type anthropicContentBlock struct {
@@ -64,6 +72,30 @@ func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 		return agents.ProviderEvent{
 			Type:         agents.ProviderEventSessionFailed,
 			ErrorMessage: msg,
+		}, true
+
+	case "span.outcome_evaluation_start":
+		return agents.ProviderEvent{
+			Type: agents.ProviderEventOutcomeEvaluationStart,
+			OutcomeResult: &agents.OutcomeEvaluation{
+				Iteration: raw.Iteration,
+			},
+		}, true
+
+	case "span.outcome_evaluation_end":
+		eval := &agents.OutcomeEvaluation{
+			Iteration: raw.Iteration,
+		}
+		if raw.Evaluation != nil {
+			eval.Passed = raw.Evaluation.Passed
+			eval.Feedback = raw.Evaluation.Feedback
+		} else {
+			eval.Passed = raw.Passed
+			eval.Feedback = raw.Feedback
+		}
+		return agents.ProviderEvent{
+			Type:          agents.ProviderEventOutcomeEvaluation,
+			OutcomeResult: eval,
 		}, true
 	}
 
