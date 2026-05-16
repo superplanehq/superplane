@@ -1,14 +1,26 @@
-import { ChevronRight, Loader2, Send, SquareTerminal, X } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { ChevronRight, Loader2, SquareTerminal, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useAgentChatMessages, useCanvasAgentChat, useSendAgentChatMessage } from "@/hooks/useAgentChats";
+import {
+  useAgentChatMessages,
+  useCanvasAgentChat,
+  useInterruptAgentChat,
+  useDefineAgentOutcome,
+  useSendAgentChatMessage,
+} from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
 import type { AgentMessage } from "./types";
 import type { AgentState } from "./useAgentState";
+import type { AgentMode } from "./useAgentState";
 import { useSidebarWidth } from "./useSidebarWidth";
 import { RichMessage } from "./widgets/RichMessage";
+import { DraftActionsWidget } from "./widgets/DraftActionsWidget";
+import { ChatComposer } from "./ChatComposer";
+import { useDraftActions } from "./useDraftActions";
+import { useChatScroll } from "./useChatScroll";
+import { isSystemNotification, formatSystemNotification } from "./systemMessages";
+import { OutcomeProgressWidget, type OutcomeState, type OutcomePhase } from "./widgets/OutcomeProgressWidget";
 
 export interface AgentSidebarProps {
   agentState: AgentState;
@@ -37,7 +49,13 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
           <Loader2 className="size-4 animate-spin mr-2" /> Loading…
         </div>
       ) : (
-        <ChatConversation chatId={chatId} canvasId={canvasId} organizationId={organizationId} />
+        <ChatConversation
+          chatId={chatId}
+          canvasId={canvasId}
+          organizationId={organizationId}
+          agentMode={agentState.agentMode}
+          onModeSwitch={agentState.switchAgentMode}
+        />
       )}
     </SidebarShell>
   );
@@ -82,17 +100,26 @@ function ChatConversation({
   chatId,
   canvasId,
   organizationId,
+  agentMode,
+  onModeSwitch,
 }: {
   chatId: string;
   canvasId: string;
   organizationId: string;
+  agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
 }) {
+  const [searchParams] = useSearchParams();
+  const isEditing = searchParams.has("version");
   const messagesQuery = useAgentChatMessages(chatId, organizationId, true);
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
+  const interruptMutation = useInterruptAgentChat(organizationId);
+  const outcomeMutation = useDefineAgentOutcome(organizationId);
 
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<string>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [outcomeState, setOutcomeState] = useState<OutcomeState | null>(null);
 
   // pages[0] is the latest fetch; later entries are older batches loaded
   // via scroll-up. Reverse so chronological order falls out of flatMap.
@@ -113,11 +140,61 @@ function ChatConversation({
   // row signals activity, so we suppress Thinking to avoid double-indicators.
   const showThinking = status === "streaming" && !hasRunningTool && messages[messages.length - 1]?.role === "user";
 
+  const outcomeRef = useRef(outcomeState);
+  outcomeRef.current = outcomeState;
+
   const wsCallbacks = useMemo(
     () => ({
       onStatusChange: (next: string, err?: string) => {
         setStatus(next || "idle");
         setError(err ?? null);
+        // When turn completes and we have an active outcome, mark as building next iteration
+        if (next === "idle" && outcomeRef.current && outcomeRef.current.phase !== "passed" && outcomeRef.current.phase !== "exhausted") {
+          setOutcomeState((prev) => prev ? { ...prev, phase: "building" as OutcomePhase } : null);
+        }
+      },
+      onOutcomeEvent: (phase: "start" | "end", evaluation: { iteration: number; passed?: boolean; feedback?: string }) => {
+        setOutcomeState((prev) => {
+          if (!prev) return prev;
+          if (phase === "start") {
+            return {
+              ...prev,
+              iteration: evaluation.iteration,
+              phase: "grading" as OutcomePhase,
+              criteria: prev.criteria.map((c) => ({
+                ...c,
+                status: "evaluating" as const,
+              })),
+            };
+          }
+          // phase === "end"
+          if (evaluation.passed) {
+            return {
+              ...prev,
+              iteration: evaluation.iteration,
+              phase: "passed" as OutcomePhase,
+              criteria: prev.criteria.map((c) => ({ ...c, status: "passed" as const })),
+            };
+          }
+          // Failed — parse feedback to match criteria
+          const feedbackLines = (evaluation.feedback ?? "").split("\n").filter(Boolean);
+          const updatedCriteria = prev.criteria.map((c) => {
+            const matchingFeedback = feedbackLines.find(
+              (f) => f.toLowerCase().includes(c.text.toLowerCase().slice(0, 20)),
+            );
+            if (matchingFeedback && (matchingFeedback.includes("❌") || matchingFeedback.includes("fail") || matchingFeedback.includes("not"))) {
+              return { ...c, status: "failed" as const, feedback: matchingFeedback };
+            }
+            return { ...c, status: "passed" as const, feedback: undefined };
+          });
+          const isExhausted = evaluation.iteration >= prev.maxIterations;
+          return {
+            ...prev,
+            iteration: evaluation.iteration,
+            phase: isExhausted ? "exhausted" as OutcomePhase : "failed" as OutcomePhase,
+            criteria: updatedCriteria,
+          };
+        });
       },
     }),
     [],
@@ -130,43 +207,46 @@ function ChatConversation({
     setDraft("");
     setError(null);
     try {
-      await sendMutation.mutateAsync({ chatId, content: value });
+      await sendMutation.mutateAsync({ chatId, content: value, mode: agentMode });
     } catch (err) {
       setError(err instanceof Error ? err.message : "failed to send message");
     }
-  }, [chatId, draft, sendMutation]);
+  }, [chatId, draft, sendMutation, agentMode]);
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const previousScrollHeight = useRef<number | null>(null);
+  const handleStop = useCallback(() => {
+    interruptMutation.mutate({ chatId });
+  }, [chatId, interruptMutation]);
 
-  // Load older pages when the user scrolls to the top. We snapshot the
-  // pre-fetch scrollHeight so we can restore the scroll position after the
-  // new page lands (otherwise the chat jumps to the top).
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      if (el.scrollTop > 24) return;
-      if (!messagesQuery.hasNextPage || messagesQuery.isFetchingNextPage) return;
-      previousScrollHeight.current = el.scrollHeight;
-      void messagesQuery.fetchNextPage();
-    };
-    el.addEventListener("scroll", onScroll);
-    return () => el.removeEventListener("scroll", onScroll);
-  }, [messagesQuery]);
+  const handleStartBuilding = useCallback(
+    async (rubric: { title: string; criteria: string[] }) => {
+      onModeSwitch("builder");
+      const rubricText = `# ${rubric.title}\n\n${rubric.criteria.map((c) => `- ${c}`).join("\n")}`;
+      // Initialize outcome progress widget
+      setOutcomeState({
+        title: rubric.title,
+        criteria: rubric.criteria.map((c) => ({ text: c, status: "pending" })),
+        iteration: 1,
+        maxIterations: 3,
+        phase: "building",
+      });
+      try {
+        await outcomeMutation.mutateAsync({
+          chatId,
+          description: `Build a canvas based on this plan: ${rubric.title}`,
+          rubric: rubricText,
+          maxIterations: 3,
+        });
+      } catch (err) {
+        console.error("Failed to define outcome:", err);
+        setOutcomeState(null);
+        // Fallback: send as regular message in builder mode
+        await sendMutation.mutateAsync({ chatId, content: `Start building based on this plan:\n\n${rubricText}`, mode: "builder" });
+      }
+    },
+    [chatId, onModeSwitch, outcomeMutation, sendMutation],
+  );
 
-  // Always land at the bottom in one paint. useLayoutEffect runs before the
-  // browser paints, so there's no animation to interrupt.
-  useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (previousScrollHeight.current !== null) {
-      el.scrollTop = el.scrollHeight - previousScrollHeight.current;
-      previousScrollHeight.current = null;
-      return;
-    }
-    el.scrollTop = el.scrollHeight;
-  }, [chatId, messages.length, showThinking]);
+  const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -193,6 +273,9 @@ function ChatConversation({
                   chatId={chatId}
                   canvasId={canvasId}
                   organizationId={organizationId}
+                  agentMode={agentMode}
+                  onModeSwitch={onModeSwitch}
+                  onStartBuilding={handleStartBuilding}
                 />
               ),
             )}
@@ -201,59 +284,73 @@ function ChatConversation({
         {showThinking ? <ThinkingRow /> : null}
         {error ? <p className="text-sm text-red-600 px-3 py-2">{error}</p> : null}
       </div>
+      {outcomeState && (
+        <div className="px-3 py-2 border-t border-slate-200">
+          <OutcomeProgressWidget state={outcomeState} />
+        </div>
+      )}
+      <DraftActionsBar
+        messages={messages}
+        canvasId={canvasId}
+        organizationId={organizationId}
+        chatId={chatId}
+        sendMutation={sendMutation}
+        agentMode={agentMode}
+        isEditing={isEditing}
+      />
       <ChatComposer
         draft={draft}
         onDraftChange={setDraft}
         onSend={handleSend}
-        sending={sendMutation.isPending}
+        onStop={handleStop}
+        sending={status === "streaming"}
+        stopping={interruptMutation.isPending}
         statusLabel={statusLabel(status)}
+        agentMode={agentMode}
+        onModeSwitch={onModeSwitch}
+        modeDisabled={status === "streaming"}
       />
     </div>
   );
 }
 
-function ChatComposer({
-  draft,
-  onDraftChange,
-  onSend,
-  sending,
-  statusLabel,
+function DraftActionsBar({
+  messages,
+  canvasId,
+  organizationId,
+  chatId,
+  sendMutation,
+  agentMode,
+  isEditing,
 }: {
-  draft: string;
-  onDraftChange: (value: string) => void;
-  onSend: () => void;
-  sending: boolean;
-  statusLabel: string;
+  messages: AgentMessage[];
+  canvasId: string;
+  organizationId: string;
+  chatId: string;
+  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
+  agentMode: AgentMode;
+  isEditing: boolean;
 }) {
+  const { latestDraft, dismiss } = useDraftActions({
+    messages,
+    canvasId,
+    organizationId,
+    chatId,
+    sendMutation,
+    agentMode,
+  });
+  if (!latestDraft) return null;
   return (
-    <footer className="border-t border-border p-3 flex flex-col gap-2">
-      <Textarea
-        value={draft}
-        onChange={(e) => onDraftChange(e.target.value)}
-        rows={3}
-        placeholder="Ask the agent…"
-        data-testid="agent-input"
-        className="resize-none"
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            onSend();
-          }
-        }}
+    <div className="border-t border-violet-200 bg-violet-50/80 px-3 py-2">
+      <DraftActionsWidget
+        versionId={latestDraft.versionId}
+        message={latestDraft.message}
+        canvasId={canvasId}
+        organizationId={organizationId}
+        isEditing={isEditing}
+        onDismiss={dismiss}
       />
-      <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{statusLabel}</span>
-        <Button
-          type="button"
-          onClick={onSend}
-          disabled={!draft.trim() || sending}
-          data-testid="agent-send-message-button"
-        >
-          {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
-          Send
-        </Button>
-      </div>
-    </footer>
+    </div>
   );
 }
 
@@ -263,32 +360,49 @@ function MessageRow({
   chatId,
   canvasId,
   organizationId,
+  agentMode,
+  onModeSwitch,
+  onStartBuilding,
 }: {
   message: AgentMessage;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   chatId: string;
   canvasId: string;
   organizationId: string;
+  agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
+  onStartBuilding: (rubric: { title: string; criteria: string[] }) => void;
 }) {
   const handleAction = useCallback(
     async (action: string) => {
       if (sendMutation.isPending) return;
       try {
-        await sendMutation.mutateAsync({ chatId, content: action });
+        await sendMutation.mutateAsync({ chatId, content: action, mode: agentMode });
       } catch (err) {
         console.error("Failed to send action:", err);
       }
     },
-    [chatId, sendMutation],
+    [chatId, sendMutation, agentMode],
   );
 
   if (message.role === "tool") {
     return <ToolMessageRow message={message} />;
   }
+
+  // System notification messages (draft published/discarded)
+  if (message.role === "system" || (message.role === "user" && isSystemNotification(message.content))) {
+    const text = message.role === "system" ? formatSystemNotification(message.content) : message.content;
+    return (
+      <div className="flex justify-center">
+        <span className="text-[11px] text-slate-400 italic px-2">{text}</span>
+      </div>
+    );
+  }
+
   const isUser = message.role === "user";
 
   return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+    <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       <div
         className={cn(
           "rounded-lg px-3 py-2 text-sm max-w-[85%] break-words",
@@ -302,11 +416,15 @@ function MessageRow({
           <RichMessage
             content={message.content}
             onAction={handleAction}
+            onStartBuilding={onStartBuilding}
             canvasId={canvasId}
             organizationId={organizationId}
           />
         )}
       </div>
+      {message.createdAt && (
+        <span className="text-[10px] text-slate-400 mt-0.5 px-1">{formatTime(message.createdAt)}</span>
+      )}
     </div>
   );
 }
@@ -367,11 +485,16 @@ function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
 }
 
 function ToolMessageRow({ message }: { message: AgentMessage }) {
-  const [expanded, setExpanded] = useState(true);
+  const running = message.toolStatus === "started";
+  const [expanded, setExpanded] = useState(running);
   const command = message.content;
   const canExpand = Boolean(command);
-  const running = message.toolStatus === "started";
   const preview = command ? command.split("\n")[0].substring(0, 80) : "command";
+
+  // Auto-expand when command starts running, collapse when it finishes
+  useEffect(() => {
+    setExpanded(running);
+  }, [running]);
 
   return (
     <div className="text-xs">
@@ -422,4 +545,9 @@ function statusLabel(status: string): string {
     default:
       return "Ready";
   }
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
