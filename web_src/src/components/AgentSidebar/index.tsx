@@ -256,7 +256,7 @@ function ChatConversation({
         {showThinking ? <ThinkingRow /> : null}
         {error ? <p className="text-sm text-red-600 px-3 py-2">{error}</p> : null}
       </div>
-      <DraftActionsBar messages={messages} canvasId={canvasId} organizationId={organizationId} />
+      <DraftActionsBar messages={messages} canvasId={canvasId} organizationId={organizationId} chatId={chatId} sendMutation={sendMutation} agentMode={agentMode} />
       <ChatComposer
         draft={draft}
         onDraftChange={setDraft}
@@ -275,7 +275,14 @@ function ChatConversation({
 // Track published/discarded version IDs outside component to survive remounts
 const dismissedVersionIds = new Set<string>();
 
-function DraftActionsBar({ messages, canvasId, organizationId }: { messages: AgentMessage[]; canvasId: string; organizationId: string }) {
+function DraftActionsBar({ messages, canvasId, organizationId, chatId, sendMutation, agentMode }: {
+  messages: AgentMessage[];
+  canvasId: string;
+  organizationId: string;
+  chatId: string;
+  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
+  agentMode: AgentMode;
+}) {
   const [, forceUpdate] = useState(0);
   const [verifiedDraft, setVerifiedDraft] = useState<boolean | null>(null);
 
@@ -352,6 +359,7 @@ function DraftActionsBar({ messages, canvasId, organizationId }: { messages: Age
         organizationId={organizationId}
         isEditing={window.location.search.includes("version=")}
         onDismiss={() => { dismissedVersionIds.add(latestDraft.versionId); forceUpdate(n => n + 1); }}
+        onNotify={(msg) => { sendMutation.mutateAsync({ chatId, content: msg, mode: agentMode }).catch(() => {}); }}
       />
     </div>
   );
@@ -457,6 +465,18 @@ function MessageRow({
   if (message.role === "tool") {
     return <ToolMessageRow message={message} />;
   }
+
+  // System notification messages (draft published/discarded)
+  const isSystemNotification = message.role === "user" && message.content.startsWith("[User ");
+  if (isSystemNotification) {
+    const text = message.content.replace(/^\[|\]$/g, "");
+    return (
+      <div className="flex justify-center">
+        <span className="text-[11px] text-slate-400 italic px-2">{text}</span>
+      </div>
+    );
+  }
+
   const isUser = message.role === "user";
 
   return (

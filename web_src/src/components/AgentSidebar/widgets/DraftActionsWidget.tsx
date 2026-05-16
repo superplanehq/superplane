@@ -10,6 +10,7 @@ export interface DraftActionsWidgetProps {
   organizationId: string;
   isEditing: boolean;
   onDismiss?: () => void;
+  onNotify?: (message: string) => void;
 }
 
 export function DraftActionsWidget({
@@ -19,6 +20,7 @@ export function DraftActionsWidget({
   organizationId,
   isEditing,
   onDismiss,
+  onNotify,
 }: DraftActionsWidgetProps) {
   const [busy, setBusy] = useState<"publish" | "discard" | null>(null);
 
@@ -39,6 +41,11 @@ export function DraftActionsWidget({
       });
       if (response.ok) {
         onDismiss?.();
+        if (action === "publish") {
+          onNotify?.(`[User published draft version ${versionId}. Changes are now live.]`);
+        } else {
+          onNotify?.(`[User discarded draft version ${versionId}. Changes were NOT applied.]`);
+        }
       } else {
         const text = await response.text();
         console.error(`${action} failed:`, response.status, text);
