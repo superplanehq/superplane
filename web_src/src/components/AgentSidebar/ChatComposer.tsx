@@ -28,14 +28,8 @@ export function ChatComposer({
   onModeSwitch: (mode: AgentMode) => void;
   modeDisabled?: boolean;
 }) {
-  const footerBg = {
-    builder: "bg-orange-50 border-orange-200",
-    architect: "bg-blue-50 border-blue-200",
-    operator: "bg-emerald-50 border-emerald-200",
-  }[agentMode] || "";
-
   return (
-    <footer className={cn("border-t p-3 flex flex-col gap-2 transition-colors duration-300", footerBg)}>
+    <footer className="border-t border-border p-3 flex flex-col gap-2">
       <Textarea
         value={draft}
         onChange={(e) => onDraftChange(e.target.value)}
