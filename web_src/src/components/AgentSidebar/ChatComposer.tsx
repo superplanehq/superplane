@@ -44,11 +44,7 @@ export function ChatComposer({
         }}
       />
       <div className="flex items-center justify-between">
-        {statusLabel === "Ready" ? (
-          <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} />
-        ) : (
-          <span className="text-xs text-muted-foreground">{statusLabel}</span>
-        )}
+        <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} streaming={sending} />
         {sending ? (
           <Button
             type="button"

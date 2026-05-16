@@ -171,6 +171,14 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 	}); err != nil {
 		return fmt.Errorf("define outcome: %w", err)
 	}
+
+	// Mark session as streaming and start the stream worker to pick up events
+	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusStreaming); err != nil {
+		log.WithError(err).Warn("failed to mark agent session as streaming")
+	}
+	if err := s.enqueueStream(sessionID, organizationID, userID); err != nil {
+		log.WithError(err).Warn("failed to enqueue stream after define outcome")
+	}
 	return nil
 }
 
@@ -399,7 +407,8 @@ Rules:
 - You can create secrets, configure integrations references, and set up expressions.
 - If the user asks a question that doesn't require changes, answer it briefly, but your primary purpose is building.
 - If you're unsure what the user wants, ask a clarifying question using :::buttons with the options.
-- When you receive a system notification that a draft was published or discarded, re-read the canvas (superplane canvases get) to see the current live state before taking any further action. Acknowledge the change briefly.`
+- When you receive a system notification that a draft was published or discarded, re-read the canvas (superplane canvases get) to see the current live state before taking any further action. Acknowledge the change briefly.
+- After completing all outcome criteria successfully, ALWAYS output a :::draft-actions block with the version ID so the user can review and publish the final result.`
 
 const operatorModeInstructions = `[Agent Mode: OPERATOR]
 You are in Operator mode. Your job is to help the user understand and monitor their canvas without making any changes.
@@ -418,7 +427,7 @@ You are in Architect mode. Your job is to help the user plan what to build befor
 Rules:
 - NEVER modify the canvas. No creates, no updates, no deletes. You are planning only.
 - Ask clarifying questions to understand what the user wants to achieve.
-- When asking ONE question with options, use :::buttons
+- When asking ONE question with options, use :::buttons (buttons are clickable options ONLY — no [input] fields, no free text)
 - When asking MULTIPLE questions at once, use :::survey (user answers all, then submits together):
 
 :::survey
@@ -447,4 +456,13 @@ The [input] marker adds a free-text field so users can type a custom answer.
 - If the user wants changes, update the plan and present it again.
 - Keep iterating until the user is satisfied with the plan.
 - Do NOT start building. Your output is the plan, not the implementation.
-- If the user asks you to make changes, tell them: "Switch to Builder mode to start implementing this plan."`
+- If the user asks you to make changes, tell them: "Switch to Builder mode to start implementing this plan."
+
+Plan Quality Requirements:
+Every rubric you produce MUST include these verification criteria at the end:
+- All nodes have valid configuration (no warnings from canvases get)
+- All nodes are connected through correct output channels (e.g. success/failure for HTTP, true/false for if, found/notFound for readMemory)
+- Canvas passes validation with zero errors
+- Draft version created successfully and ready for user to publish and test
+
+These verification steps ensure the grader can confirm the canvas is correctly configured, not just that nodes were created.`
