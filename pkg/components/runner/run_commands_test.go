@@ -274,3 +274,187 @@ func TestRunnerProcessTaskStatusOmitsInvalidResult(t *testing.T) {
 	_, ok := data["result"]
 	assert.False(t, ok)
 }
+
+func TestTaskIsInTerminalState(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		status string
+		want   bool
+	}{
+		{"succeeded", true},
+		{"Succeeded", true},
+		{"failed", true},
+		{"canceled", true},
+		{"cancelled", true},
+		{"claimed", false},
+		{"queued", false},
+		{"pending", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.status, func(t *testing.T) {
+			t.Parallel()
+			task := &Task{Status: tt.status}
+			assert.Equal(t, tt.want, task.IsInTerminalState())
+		})
+	}
+}
+
+func TestRunnerProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
+	t.Parallel()
+
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	exit := 130
+	task := &Task{
+		Status:   "canceled",
+		ExitCode: &exit,
+	}
+	require.NoError(t, (&Runner{}).processTaskStatus(state, task))
+	require.Equal(t, FailedOutputChannel, state.Channel)
+}
+
+func TestBrokerCancelTaskSuccess(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"fleet-1","state":"canceled","status":"canceled"}`))},
+		},
+	}
+
+	broker, err := NewBrokerClient(httpContext)
+	require.NoError(t, err)
+
+	out, err := broker.CancelTask("broker-task-99")
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, "canceled", out.State)
+	require.Len(t, httpContext.Requests, 1)
+	assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
+	assert.Equal(t, "/v1/tasks/broker-task-99/cancel", httpContext.Requests[0].URL.Path)
+	assert.Equal(t, "Bearer token-1", httpContext.Requests[0].Header.Get("Authorization"))
+}
+
+func TestBrokerCancelTask404Noop(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusNotFound, Body: io.NopCloser(strings.NewReader(`{"error":"task not found"}`))},
+		},
+	}
+
+	broker, err := NewBrokerClient(httpContext)
+	require.NoError(t, err)
+
+	out, err := broker.CancelTask("missing")
+	require.NoError(t, err)
+	assert.Nil(t, out)
+}
+
+func TestBrokerCancelTask409RetriesThenSucceeds(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusConflict, Body: io.NopCloser(strings.NewReader(`{"error":"task not yet assigned upstream"}`))},
+			{StatusCode: http.StatusConflict, Body: io.NopCloser(strings.NewReader(`{"error":"task not yet assigned upstream"}`))},
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"f1","state":"cancel_requested","status":"claimed"}`))},
+		},
+	}
+
+	broker, err := NewBrokerClient(httpContext)
+	require.NoError(t, err)
+
+	out, err := broker.CancelTask("t1")
+	require.NoError(t, err)
+	require.NotNil(t, out)
+	assert.Equal(t, "cancel_requested", out.State)
+	require.Len(t, httpContext.Requests, 3)
+}
+
+func TestBrokerCancelTaskEmptyID(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	broker, err := NewBrokerClient(&contexts.HTTPContext{})
+	require.NoError(t, err)
+
+	_, err = broker.CancelTask("   ")
+	require.ErrorContains(t, err, "broker task id is empty")
+}
+
+func TestRunnerCancelCallsBroker(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"id":"up-1","state":"already_terminal","status":"succeeded"}`))},
+		},
+	}
+
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{"task_id": "broker-42"}}
+	err := (&Runner{}).Cancel(core.ExecutionContext{
+		HTTP:           httpContext,
+		ExecutionState: state,
+	})
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+	assert.Equal(t, "/v1/tasks/broker-42/cancel", httpContext.Requests[0].URL.Path)
+}
+
+func TestRunnerCancelNoTaskID(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext := &contexts.HTTPContext{}
+	err := (&Runner{}).Cancel(core.ExecutionContext{
+		HTTP:           httpContext,
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, httpContext.Requests)
+}
+
+func TestRunnerCancelSkipsWhenBrokerNotConfigured(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "")
+
+	httpContext := &contexts.HTTPContext{}
+	err := (&Runner{}).Cancel(core.ExecutionContext{
+		HTTP:           httpContext,
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{"task_id": "x"}},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, httpContext.Requests)
+}
+
+func TestRunnerCancelReturnsErrorOnBroker502(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusBadGateway, Body: io.NopCloser(strings.NewReader(`{"error":"upstream task missing"}`))},
+		},
+	}
+
+	err := (&Runner{}).Cancel(core.ExecutionContext{
+		HTTP:           httpContext,
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{"task_id": "t"}},
+	})
+	require.Error(t, err)
+	require.ErrorContains(t, err, "runner cancel:")
+	require.ErrorContains(t, err, "502")
+}
