@@ -29,7 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Merge" href="#merge" description="Merge multiple upstream inputs and forward" />
   <LinkCard title="No Operation" href="#no-operation" description="Just pass events through without any additional processing" />
   <LinkCard title="Read Memory" href="#read-memory" description="Find values from canvas memory by namespace and field matches" />
-  <LinkCard title="Runner" href="#runner" description="Runs bash commands on a dedicated machine" />
+  <LinkCard title="Runner" href="#runner" description="Runs shell commands on a fleet runner (host or Docker container)" />
   <LinkCard title="Send Email Notification" href="#send-email-notification" description="Send an email notification using the system email provider" />
   <LinkCard title="SSH Command" href="#ssh-command" description="Run one or more commands on a remote host via SSH. Authenticate using an organization Secret (SSH key or password)." />
   <LinkCard title="Time Gate" href="#time-gate" description="Route events based on active days and time windows, with optional excluded dates" />
@@ -691,9 +691,17 @@ The Read Memory component looks up values from canvas-level memory storage.
 
 ## Runner
 
-Runs bash commands on a dedicated machine.
+Runs shell commands on a fleet runner.
+
+### Execution
+- **Host**: Commands run directly on the runner machine (Bash with a PTY).
+- **Docker**: Commands run inside a container started from **Docker image**. The runner pulls the image, starts a long-lived container, and executes your script via `docker exec`. The image must include a usable `sleep` (common base images do).
 
 ### Configuration
+- **Execution mode**: Host (default) or Docker.
+- **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
+- **Custom container image**: Shown only for **Other**; use a normal reference (`my.registry.example.com/org/repo:1.2.3` or `debian:bookworm-slim@sha256:…`). Private registries require the runner to be configured with registry credentials.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Leave at **0** to use the broker default.
 - **Commands**: One or more shell commands, one per line.
 - **Environment variables**: Optional key/value pairs available during command execution. Values can be literal strings (with expression support) or organization secret keys.
 
@@ -702,7 +710,7 @@ Runs bash commands on a dedicated machine.
 - **Failed**: The commands finished with non-zero exit code.
 
 ### Structured result
-When the remote task writes valid JSON to **SUPERPLANE_RESULT_FILE** before exit, that object is returned as **result** on the finished event payload (alongside **status** and **exit_code**).
+If the completed broker task includes valid JSON in **result**, SuperPlane includes it on the `runner.finished` event payload next to **status** and **exit_code** (the exact shape depends on your runner / task implementation).
 
 ### Example Output
 
