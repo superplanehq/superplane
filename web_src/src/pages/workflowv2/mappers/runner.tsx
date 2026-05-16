@@ -19,18 +19,59 @@ import type {
 
 import { stringOrDash } from "./utils";
 
-function formatRunnerExecutionResult(value: unknown): string {
-  if (value === undefined || value === null) {
-    return "-";
+const EXECUTION_MODE_DOCKER = "docker";
+const DOCKER_IMAGE_PRESET_CUSTOM = "custom";
+
+/** Mirrors `resolvedDockerImageRef` in pkg/components/runner/spec.go for execution summaries. */
+function resolvedContainerImageRef(c: Record<string, unknown>): string {
+  const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
+  if (rawMode !== EXECUTION_MODE_DOCKER) {
+    return "";
   }
-  if (typeof value === "string") {
-    return value;
+  const preset = typeof c.docker_image_preset === "string" ? c.docker_image_preset.trim() : "";
+  const custom = typeof c.docker_image === "string" ? c.docker_image.trim() : "";
+  if (!preset) {
+    return custom;
   }
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value);
+  if (preset === DOCKER_IMAGE_PRESET_CUSTOM) {
+    return custom;
   }
+  return preset;
+}
+
+/** Exported for tests; mirrors runner node configuration shown in execution details. */
+export function runnerConfigurationDetails(configuration: unknown): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (!configuration || typeof configuration !== "object") {
+    return details;
+  }
+  const c = configuration as Record<string, unknown>;
+  const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
+  if (rawMode === EXECUTION_MODE_DOCKER) {
+    details["Execution mode"] = "Docker";
+  } else {
+    details["Execution mode"] = "Host";
+  }
+  const image = resolvedContainerImageRef(c);
+  if (image) {
+    details["Container image"] = image;
+  }
+  const timeoutRaw = c.execution_timeout_seconds;
+  if (typeof timeoutRaw === "number" && Number.isFinite(timeoutRaw)) {
+    if (timeoutRaw > 0) {
+      details["Timeout (seconds)"] = String(Math.trunc(timeoutRaw));
+    } else if (timeoutRaw === 0) {
+      details["Timeout (seconds)"] = "Broker default (0)";
+    }
+  } else if (typeof timeoutRaw === "string") {
+    const t = timeoutRaw.trim();
+    if (t === "0") {
+      details["Timeout (seconds)"] = "Broker default (0)";
+    } else if (t !== "") {
+      details["Timeout (seconds)"] = t;
+    }
+  }
+  return details;
 }
 
 const RUNNER_STATE_MAP: EventStateMap = {
@@ -128,13 +169,16 @@ export const runnerMapper: ComponentBaseMapper = {
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
-    const details: Record<string, string> = {};
+    const details: Record<string, string> = {
+      ...runnerConfigurationDetails(context.node.configuration),
+    };
     const payload = firstRunnerPayload(context.execution);
-    if (!payload) return details;
+    if (!payload) {
+      return details;
+    }
 
-    details["status"] = stringOrDash(payload.status);
-    details["exit_code"] = stringOrDash(payload.exit_code);
-    details["result"] = formatRunnerExecutionResult(payload.result);
+    details["Status"] = stringOrDash(payload.status);
+    details["Exit code"] = stringOrDash(payload.exit_code);
     return details;
   },
 };
