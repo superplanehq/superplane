@@ -49,6 +49,7 @@ type Provider interface {
 	Name() string
 	CreateSession(ctx context.Context, opts CreateSessionOptions) (*CreateSessionResult, error)
 	SendMessage(ctx context.Context, providerSessionID, message string, opts SendMessageOptions) error
+	InterruptSession(ctx context.Context, providerSessionID string) error
 	// StreamEvents blocks until the provider closes the stream, ctx is
 	// cancelled, or onEvent errors. Implementations must not call onEvent
 	// after returning.
