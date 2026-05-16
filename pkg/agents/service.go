@@ -104,7 +104,8 @@ func (s *Service) provisionSession(ctx context.Context, organizationID, userID, 
 			return nil
 		}
 
-		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{})
+		title := sessionTitle(organizationID, canvasID)
+		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{Title: title})
 		if err != nil {
 			return fmt.Errorf("create provider session: %w", err)
 		}
@@ -340,10 +341,24 @@ func getDraftStatus(canvasID uuid.UUID) string {
 	return result
 }
 
+func sessionTitle(organizationID, canvasID uuid.UUID) string {
+	org, err := models.FindOrganizationByID(organizationID.String())
+	if err != nil {
+		return ""
+	}
+	canvas, err := models.FindCanvas(organizationID, canvasID)
+	if err != nil {
+		return org.Name
+	}
+	return org.Name + " - " + canvas.Name
+}
+
 func modeInstructions(mode string) string {
 	switch mode {
 	case "builder":
 		return builderModeInstructions
+	case "architect":
+		return architectModeInstructions
 	default:
 		return operatorModeInstructions
 	}
@@ -377,3 +392,40 @@ Rules:
 - If the user asks you to make a change, tell them to switch to Builder mode: "Switch to Builder mode to make that change."
 - Use charts, tables, and mermaid diagrams to visualize run data and canvas topology when helpful.
 - Reference specific nodes with [Node Name](node:node-id) chips when discussing them.`
+
+const architectModeInstructions = `[Agent Mode: ARCHITECT]
+You are in Architect mode. Your job is to help the user plan what to build before any changes are made.
+
+Rules:
+- NEVER modify the canvas. No creates, no updates, no deletes. You are planning only.
+- Ask clarifying questions to understand what the user wants to achieve.
+- When asking ONE question with options, use :::buttons
+- When asking MULTIPLE questions at once, use :::survey (user answers all, then submits together):
+
+:::survey
+First question?
+- Option A
+- Option B
+- [input]
+
+Second question?
+- Option X
+- Option Y
+:::
+
+The [input] marker adds a free-text field so users can type a custom answer.
+
+- When you have enough information, produce a structured build plan using the :::rubric widget:
+
+:::rubric Build Plan Title
+- First criterion (specific and verifiable)
+- Second criterion
+- Third criterion
+:::
+
+- Each criterion should be specific and verifiable (e.g. "GitHub push trigger on main branch" not "set up a trigger").
+- Present the plan and ask the user to confirm or request changes.
+- If the user wants changes, update the plan and present it again.
+- Keep iterating until the user is satisfied with the plan.
+- Do NOT start building. Your output is the plan, not the implementation.
+- If the user asks you to make changes, tell them: "Switch to Builder mode to start implementing this plan."`

@@ -43,10 +43,13 @@ func New(cfg Config) (*Provider, error) {
 
 func (p *Provider) Name() string { return ProviderName }
 
-func (p *Provider) CreateSession(ctx context.Context, _ agents.CreateSessionOptions) (*agents.CreateSessionResult, error) {
+func (p *Provider) CreateSession(ctx context.Context, opts agents.CreateSessionOptions) (*agents.CreateSessionResult, error) {
 	body := map[string]any{
 		"agent":          p.agentID,
 		"environment_id": p.environmentID,
+	}
+	if opts.Title != "" {
+		body["title"] = opts.Title
 	}
 	data, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions", body)
 	if err != nil {
