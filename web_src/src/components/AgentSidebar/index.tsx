@@ -1,5 +1,5 @@
 import { ChevronRight, Loader2, SquareTerminal, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -20,6 +20,7 @@ import { ChatComposer } from "./ChatComposer";
 import { useDraftActions } from "./useDraftActions";
 import { useChatScroll } from "./useChatScroll";
 import { isSystemNotification, formatSystemNotification } from "./systemMessages";
+import { OutcomeProgressWidget, type OutcomeState, type OutcomePhase } from "./widgets/OutcomeProgressWidget";
 
 export interface AgentSidebarProps {
   agentState: AgentState;
@@ -123,6 +124,7 @@ function ChatConversation({
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<string>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [outcomeState, setOutcomeState] = useState<OutcomeState | null>(null);
 
   // pages[0] is the latest fetch; later entries are older batches loaded
   // via scroll-up. Reverse so chronological order falls out of flatMap.
@@ -143,11 +145,61 @@ function ChatConversation({
   // row signals activity, so we suppress Thinking to avoid double-indicators.
   const showThinking = status === "streaming" && !hasRunningTool && messages[messages.length - 1]?.role === "user";
 
+  const outcomeRef = useRef(outcomeState);
+  outcomeRef.current = outcomeState;
+
   const wsCallbacks = useMemo(
     () => ({
       onStatusChange: (next: string, err?: string) => {
         setStatus(next || "idle");
         setError(err ?? null);
+        // When turn completes and we have an active outcome, mark as building next iteration
+        if (next === "idle" && outcomeRef.current && outcomeRef.current.phase !== "passed" && outcomeRef.current.phase !== "exhausted") {
+          setOutcomeState((prev) => prev ? { ...prev, phase: "building" as OutcomePhase } : null);
+        }
+      },
+      onOutcomeEvent: (phase: "start" | "end", evaluation: { iteration: number; passed?: boolean; feedback?: string }) => {
+        setOutcomeState((prev) => {
+          if (!prev) return prev;
+          if (phase === "start") {
+            return {
+              ...prev,
+              iteration: evaluation.iteration,
+              phase: "grading" as OutcomePhase,
+              criteria: prev.criteria.map((c) => ({
+                ...c,
+                status: "evaluating" as const,
+              })),
+            };
+          }
+          // phase === "end"
+          if (evaluation.passed) {
+            return {
+              ...prev,
+              iteration: evaluation.iteration,
+              phase: "passed" as OutcomePhase,
+              criteria: prev.criteria.map((c) => ({ ...c, status: "passed" as const })),
+            };
+          }
+          // Failed — parse feedback to match criteria
+          const feedbackLines = (evaluation.feedback ?? "").split("\n").filter(Boolean);
+          const updatedCriteria = prev.criteria.map((c) => {
+            const matchingFeedback = feedbackLines.find(
+              (f) => f.toLowerCase().includes(c.text.toLowerCase().slice(0, 20)),
+            );
+            if (matchingFeedback && (matchingFeedback.includes("❌") || matchingFeedback.includes("fail") || matchingFeedback.includes("not"))) {
+              return { ...c, status: "failed" as const, feedback: matchingFeedback };
+            }
+            return { ...c, status: "passed" as const, feedback: undefined };
+          });
+          const isExhausted = evaluation.iteration >= prev.maxIterations;
+          return {
+            ...prev,
+            iteration: evaluation.iteration,
+            phase: isExhausted ? "exhausted" as OutcomePhase : "failed" as OutcomePhase,
+            criteria: updatedCriteria,
+          };
+        });
       },
     }),
     [],
@@ -174,6 +226,14 @@ function ChatConversation({
     async (rubric: { title: string; criteria: string[] }) => {
       onModeSwitch("builder");
       const rubricText = `# ${rubric.title}\n\n${rubric.criteria.map((c) => `- ${c}`).join("\n")}`;
+      // Initialize outcome progress widget
+      setOutcomeState({
+        title: rubric.title,
+        criteria: rubric.criteria.map((c) => ({ text: c, status: "pending" })),
+        iteration: 1,
+        maxIterations: 3,
+        phase: "building",
+      });
       try {
         await outcomeMutation.mutateAsync({
           chatId,
@@ -183,6 +243,7 @@ function ChatConversation({
         });
       } catch (err) {
         console.error("Failed to define outcome:", err);
+        setOutcomeState(null);
         // Fallback: send as regular message in builder mode
         await sendMutation.mutateAsync({ chatId, content: `Start building based on this plan:\n\n${rubricText}`, mode: "builder" });
       }
@@ -228,6 +289,11 @@ function ChatConversation({
         {showThinking ? <ThinkingRow /> : null}
         {error ? <p className="text-sm text-red-600 px-3 py-2">{error}</p> : null}
       </div>
+      {outcomeState && (
+        <div className="px-3 py-2 border-t border-slate-200">
+          <OutcomeProgressWidget state={outcomeState} />
+        </div>
+      )}
       <DraftActionsBar
         messages={messages}
         canvasId={canvasId}
