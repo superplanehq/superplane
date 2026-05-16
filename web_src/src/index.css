@@ -141,3 +141,16 @@ div.monaco-editor {
 .animate-tool-glow {
   animation: tool-glow 1.4s ease-in-out infinite;
 }
+
+@keyframes pulse-border {
+  0%, 100% {
+    box-shadow: 0 0 0 0 currentColor;
+  }
+  50% {
+    box-shadow: 0 0 0 2px currentColor;
+  }
+}
+
+.animate-pulse-border {
+  animation: pulse-border 1.5s ease-in-out infinite;
+}

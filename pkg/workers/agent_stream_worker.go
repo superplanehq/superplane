@@ -231,6 +231,22 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 			}
 		case agents.ProviderEventTurnCompleted:
 			publish(messages.AgentSessionEventMessage{Event: "turn_completed", Status: models.AgentSessionStatusIdle})
+		case agents.ProviderEventOutcomeEvaluation:
+			if evt.OutcomeResult != nil {
+				var content string
+				if evt.OutcomeResult.Passed {
+					content = fmt.Sprintf(":::success\n✅ Outcome evaluation passed (iteration %d)\n:::", evt.OutcomeResult.Iteration)
+				} else {
+					content = fmt.Sprintf(":::error\n❌ Outcome evaluation failed (iteration %d)\n\n%s\n:::", evt.OutcomeResult.Iteration, evt.OutcomeResult.Feedback)
+				}
+				if err := persistAndBroadcast(sessionID, &models.AgentSessionMessage{
+					SessionID: sessionID,
+					Role:      models.AgentMessageRoleAssistant,
+					Content:   content,
+				}, "assistant_message", publish); err != nil {
+					return err
+				}
+			}
 		case agents.ProviderEventSessionFailed:
 			// Don't publish here — the post-loop block owns
 			// session_failed broadcasting so it stays single-source.
