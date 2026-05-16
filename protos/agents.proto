@@ -82,6 +82,8 @@ message ListAgentChatMessagesResponse {
 message SendAgentChatMessageRequest {
   string chat_id = 1;
   string content = 2;
+  // Agent mode: "builder" or "operator". Controls agent behavior.
+  string mode = 3;
 }
 
 message SendAgentChatMessageResponse {

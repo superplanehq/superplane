@@ -26,7 +26,7 @@ func (s *stubService) GetSession(o, u, id uuid.UUID) (*models.AgentSession, erro
 func (s *stubService) ListMessages(id, before uuid.UUID, limit int) ([]models.AgentSessionMessage, error) {
 	return s.listMessages(id, before, limit)
 }
-func (s *stubService) SendMessage(ctx context.Context, o, u, id uuid.UUID, content string) (*models.AgentSessionMessage, error) {
+func (s *stubService) SendMessage(ctx context.Context, o, u, id uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error) {
 	return s.sendMessage(ctx, o, u, id, content)
 }
 
