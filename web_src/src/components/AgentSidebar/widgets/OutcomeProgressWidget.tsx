@@ -51,6 +51,10 @@ function StatusIcon({ status }: { status: CriterionStatus }) {
 
 export function OutcomeProgressWidget({ state }: { state: OutcomeState }) {
   const [expandedCriterion, setExpandedCriterion] = useState<number | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const VISIBLE_COUNT = 3;
+  const visibleCriteria = showAll ? state.criteria : state.criteria.slice(0, VISIBLE_COUNT);
+  const hiddenCount = state.criteria.length - VISIBLE_COUNT;
 
   return (
     <div
@@ -75,7 +79,7 @@ export function OutcomeProgressWidget({ state }: { state: OutcomeState }) {
 
       {/* Criteria list */}
       <div className="divide-y divide-slate-100">
-        {state.criteria.map((criterion, i) => {
+        {visibleCriteria.map((criterion, i) => {
           const hasFeedback = criterion.status === "failed" && criterion.feedback;
           const isExpanded = expandedCriterion === i;
           return (
@@ -106,6 +110,26 @@ export function OutcomeProgressWidget({ state }: { state: OutcomeState }) {
             </div>
           );
         })}
+        {hiddenCount > 0 && !showAll && (
+          <button
+            type="button"
+            onClick={() => setShowAll(true)}
+            className="flex items-center gap-1 px-3 py-1.5 w-full text-left text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+          >
+            <ChevronDown size={12} />
+            +{hiddenCount} more
+          </button>
+        )}
+        {showAll && hiddenCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowAll(false)}
+            className="flex items-center gap-1 px-3 py-1.5 w-full text-left text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-50"
+          >
+            <ChevronUp size={12} />
+            Show less
+          </button>
+        )}
       </div>
     </div>
   );

@@ -43,7 +43,7 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
   const chatId = chatQuery.data?.id ?? null;
 
   return (
-    <SidebarShell onClose={agentState.closeSidebar} agentMode={agentState.agentMode}>
+    <SidebarShell onClose={agentState.closeSidebar}>
       {chatQuery.isLoading || !chatId ? (
         <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
           <Loader2 className="size-4 animate-spin mr-2" /> Loading…
@@ -61,13 +61,8 @@ function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
   );
 }
 
-function SidebarShell({ children, onClose, agentMode }: { children: React.ReactNode; onClose: () => void; agentMode?: AgentMode }) {
+function SidebarShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   const { sidebarRef, width, isResizing, handleMouseDown } = useSidebarWidth();
-  const headerBg = {
-    builder: "bg-orange-50 border-orange-200",
-    architect: "bg-blue-50 border-blue-200",
-    operator: "bg-emerald-50 border-emerald-200",
-  }[agentMode ?? "builder"] || "";
   return (
     <aside
       ref={sidebarRef}
@@ -75,7 +70,7 @@ function SidebarShell({ children, onClose, agentMode }: { children: React.ReactN
       className="relative border-r border-border shrink-0 h-full z-21 flex flex-col overflow-hidden bg-white"
       style={{ width }}
     >
-      <header className={cn("flex items-center justify-between gap-3 px-4 py-2.5 border-b shrink-0 min-w-0 transition-colors duration-300", headerBg)}>
+      <header className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border shrink-0 min-w-0">
         <h2 className="text-base font-medium min-w-0 flex-1 truncate">Agent</h2>
         <button
           type="button"
