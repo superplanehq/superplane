@@ -36,7 +36,7 @@ export function getNextCronExecution(cronExpression: string, fromTime: Date): Da
     let iterations = 0;
 
     while (iterations < maxIterations) {
-      if (cronMatches(minute, hour, day, month, weekday, nextTime)) {
+      if (cronMatches({minute, hour, day, month, weekday, date: nextTime})) {
         return nextTime;
       }
 
@@ -50,34 +50,40 @@ export function getNextCronExecution(cronExpression: string, fromTime: Date): Da
   }
 }
 
-function cronMatches(minute: string, hour: string, day: string, month: string, weekday: string, date: Date): boolean {
+interface CronMatchesParams {
+  minute: string;
+  hour: string;
+  day: string;
+  month: string;
+  weekday: string;
+  date: Date;
+}
+
+function cronMatches(params: CronMatchesParams) : boolean {
   // Check minute (0-59)
-  if (!matchesCronField(minute, date.getMinutes(), 0, 59)) return false;
+  if (!matchesCronField(params.minute, params.date.getMinutes(), 0, 59)) return false;
 
   // Check hour (0-23)
-  if (!matchesCronField(hour, date.getHours(), 0, 23)) return false;
+  if (!matchesCronField(params.hour, params.date.getHours(), 0, 23)) return false;
 
   // Check month (1-12, but JS Date uses 0-11)
-  if (!matchesCronField(month, date.getMonth() + 1, 1, 12)) return false;
+  if (!matchesCronField(params.month, params.date.getMonth() + 1, 1, 12)) return false;
 
   // Handle day of month vs day of week logic
-  const dayMatches = matchesCronField(day, date.getDate(), 1, 31);
-  const weekdayMatches = matchesCronField(weekday, date.getDay(), 0, 6);
+  const dayMatches = matchesCronField(params.day, params.date.getDate(), 1, 31);
+  const weekdayMatches = matchesCronField(params.weekday, params.date.getDay(), 0, 6);
 
-  // If both day and weekday are wildcards, match
-  if (day === "*" && weekday === "*") {
+  if (params.day === "*" && params.weekday === "*") {
+    // If both day and weekday are wildcards, match
     return true;
-  }
-  // If only day is wildcard, check weekday
-  else if (day === "*") {
+  } else if (params.day === "*") {
+    // If only day is wildcard, check weekday
     return weekdayMatches;
-  }
-  // If only weekday is wildcard, check day
-  else if (weekday === "*") {
+  } else if (params.weekday === "*") {
+    // If only weekday is wildcard, check day
     return dayMatches;
-  }
-  // If both are specified, either can match (OR logic)
-  else {
+  } else {
+    // If both are specified, either can match (OR logic)
     return dayMatches || weekdayMatches;
   }
 }
