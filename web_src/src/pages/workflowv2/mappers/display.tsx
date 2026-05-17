@@ -12,7 +12,7 @@ import type {
 } from "./types";
 
 type DisplayResult = {
-  value?: string;
+  message?: string;
   color?: string;
 };
 
@@ -53,12 +53,12 @@ export const displayMapper: ComponentBaseMapper = {
 
   getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
     const result = resolveDisplayResult(context.execution);
-    if (!result.value) {
+    if (!result.message) {
       return {};
     }
 
     return {
-      Value: result.value,
+      Message: result.message,
       Color: normalizeDisplayColor(result.color),
     };
   },
@@ -69,14 +69,14 @@ function Message({ lastExecution }: { lastExecution: ExecutionInfo | null }): Re
     return null;
   }
 
-  const value = lastExecution?.metadata?.display_result?.value;
-  if (!value) {
+  const message = lastExecution?.metadata?.display_result?.message;
+  if (!message) {
     return null;
   }
 
   return (
     <div className="px-2 py-1.5 text-left text-base max-h-20 truncate">
-      <pre>{value}</pre>
+      <pre>{message}</pre>
     </div>
   );
 }
@@ -84,9 +84,9 @@ function Message({ lastExecution }: { lastExecution: ExecutionInfo | null }): Re
 function resolveDisplayResult(execution: ExecutionInfo | null): DisplayResult {
   const metadata = execution?.metadata as { display_result?: DisplayResult } | undefined;
   const fromMetadata = metadata?.display_result;
-  if (fromMetadata?.value) {
+  if (fromMetadata?.message) {
     return {
-      value: String(fromMetadata.value),
+      message: String(fromMetadata.message),
       color: normalizeDisplayColor(fromMetadata.color),
     };
   }

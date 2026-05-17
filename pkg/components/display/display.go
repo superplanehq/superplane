@@ -26,13 +26,13 @@ func init() {
 type Display struct{}
 
 type Spec struct {
-	Value string `json:"value"`
-	Color string `json:"color"`
+	Message string `json:"message"`
+	Color   string `json:"color"`
 }
 
 type Result struct {
-	Value string `json:"value"`
-	Color string `json:"color"`
+	Message string `json:"message"`
+	Color   string `json:"color"`
 }
 
 func (c *Display) Name() string {
@@ -44,24 +44,24 @@ func (c *Display) Label() string {
 }
 
 func (c *Display) Description() string {
-	return "Render a value and color badge from the latest execution"
+	return "Render a message and color badge from the latest execution"
 }
 
 func (c *Display) Documentation() string {
-	return `The Display component resolves a value and a color from the current run payload and stores the result in execution metadata for canvas rendering.
+	return `The Display component resolves a message and a color from the current run payload and stores the result in execution metadata for canvas rendering.
 
 ## Behavior
 
-1. Resolves **Value** against the run payload (supports ` + "`{{ ... }}`" + ` expressions)
+1. Resolves **Message** against the run payload (supports ` + "`{{ ... }}`" + ` expressions)
 2. Resolves **Color** against the run payload (supports ` + "`{{ ... }}`" + ` expressions)
-3. Stores ` + "`display_result`" + ` in execution metadata as {value, color}
+3. Stores ` + "`display_result`" + ` in execution metadata as {message, color}
 4. Emits the incoming payload to the default output channel unchanged
 
 ## Error Handling
 
 Expression errors never fail the run. If resolving either field fails, the component stores:
 
-- ` + "`value`" + `: ` + "`[expression error: <message>]`" + `
+- ` + "`message`" + `: ` + "`[expression error: <message>]`" + `
 - ` + "`color`" + `: ` + "`gray`" + `
 
 ## Supported Colors
@@ -92,8 +92,8 @@ func (c *Display) OutputChannels(configuration any) []core.OutputChannel {
 func (c *Display) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "value",
-			Label:       "Value",
+			Name:        "message",
+			Label:       "Message",
 			Type:        configuration.FieldTypeText,
 			Description: "Text to display. Supports {{ }} expressions.",
 			Required:    true,
@@ -116,15 +116,15 @@ func (c *Display) Execute(ctx core.ExecutionContext) error {
 	}
 
 	displayResult := Result{
-		Value: spec.Value,
-		Color: DefaultColor,
+		Message: spec.Message,
+		Color:   DefaultColor,
 	}
 
-	value, err := resolveField(ctx.Expressions, spec.Value)
+	message, err := resolveField(ctx.Expressions, spec.Message)
 	if err != nil {
 		displayResult = expressionErrorResult(err)
 	} else {
-		displayResult.Value = value
+		displayResult.Message = message
 		colorInput := strings.TrimSpace(spec.Color)
 		if colorInput == "" {
 			colorInput = DefaultColor
@@ -194,8 +194,8 @@ func normalizeColor(value string) string {
 
 func expressionErrorResult(err error) Result {
 	return Result{
-		Value: fmt.Sprintf("[expression error: %s]", err.Error()),
-		Color: DefaultColor,
+		Message: fmt.Sprintf("[expression error: %s]", err.Error()),
+		Color:   DefaultColor,
 	}
 }
 
@@ -212,8 +212,8 @@ func mergeDisplayResult(existing any, result Result) map[string]any {
 	}
 
 	metadata["display_result"] = map[string]any{
-		"value": result.Value,
-		"color": result.Color,
+		"message": result.Message,
+		"color":   result.Color,
 	}
 	return metadata
 }

@@ -21,7 +21,7 @@ func Test__Display__Execute(t *testing.T) {
 		}
 
 		ctx := core.ExecutionContext{
-			Configuration:  map[string]any{"value": "Hello"},
+			Configuration:  map[string]any{"message": "Hello"},
 			ExecutionState: stateCtx,
 			Metadata:       metadataCtx,
 		}
@@ -33,8 +33,8 @@ func Test__Display__Execute(t *testing.T) {
 		assert.Equal(
 			t,
 			map[string]any{
-				"value": "Hello",
-				"color": DefaultColor,
+				"message": "Hello",
+				"color":   DefaultColor,
 			},
 			metadata["display_result"],
 		)
@@ -55,7 +55,7 @@ func Test__Display__Execute(t *testing.T) {
 
 		ctx := core.ExecutionContext{
 			Data:           input,
-			Configuration:  map[string]any{"value": "Build completed"},
+			Configuration:  map[string]any{"message": "Build completed"},
 			ExecutionState: stateCtx,
 			Metadata:       metadataCtx,
 		}
@@ -75,8 +75,8 @@ func Test__Display__Execute(t *testing.T) {
 		assert.Equal(
 			t,
 			map[string]any{
-				"value": "Build completed",
-				"color": DefaultColor,
+				"message": "Build completed",
+				"color":   DefaultColor,
 			},
 			metadata["display_result"],
 		)
@@ -88,8 +88,8 @@ func Test__Display__Execute(t *testing.T) {
 
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
-				"value": "{{ $['Node'].data.message }}",
-				"color": "{{ $['Node'].data.color }}",
+				"message": "{{ $['Node'].data.message }}",
+				"color":   "{{ $['Node'].data.color }}",
 			},
 			ExecutionState: stateCtx,
 			Metadata:       metadataCtx,
@@ -111,8 +111,8 @@ func Test__Display__Execute(t *testing.T) {
 		assert.Equal(
 			t,
 			map[string]any{
-				"value": "Release Ready",
-				"color": "green",
+				"message": "Release Ready",
+				"color":   "green",
 			},
 			metadata["display_result"],
 		)
@@ -124,8 +124,8 @@ func Test__Display__Execute(t *testing.T) {
 
 		ctx := core.ExecutionContext{
 			Configuration: map[string]any{
-				"value": "{{ $['missing'].data.value }}",
-				"color": "{{ $['missing'].data.color }}",
+				"message": "{{ $['missing'].data.value }}",
+				"color":   "{{ $['missing'].data.color }}",
 			},
 			ExecutionState: stateCtx,
 			Metadata:       metadataCtx,
@@ -144,8 +144,8 @@ func Test__Display__Execute(t *testing.T) {
 		assert.Equal(
 			t,
 			map[string]any{
-				"value": "[expression error: node missing not found]",
-				"color": DefaultColor,
+				"message": "[expression error: node missing not found]",
+				"color":   DefaultColor,
 			},
 			metadata["display_result"],
 		)

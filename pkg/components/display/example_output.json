@@ -1,6 +1,6 @@
 {
   "data": {
-    "status": "all systems nominal"
+    "message": "Hello, World!"
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "display.executed"
