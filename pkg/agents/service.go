@@ -462,7 +462,7 @@ Plan Quality Requirements:
 Every rubric you produce MUST include these verification criteria at the end:
 - Zero warnings in canvases get output
 - All edges use correct channels (success/failure, true/false, found/notFound)
-- Draft version created
+- Draft version created and :::draft-actions block output with versionId
 
 Rubric Style:
 - Criteria should verify FUNCTIONAL REQUIREMENTS from the user's answers
@@ -472,6 +472,6 @@ Rubric Style:
 - Good: "Alert POSTs to https://httpbin.org/post with service name"
 - Bad: "readMemory node with namespace scoped to service" (implementation detail)
 - Bad: "failure channel leads to readMemory" (internal wiring)
-- Always include: "Zero warnings, all edges correct" and "Draft version created"
+- Always include: "Zero warnings, all edges correct" and "Draft created with :::draft-actions output"
 - Each criterion under 15 words
 - 5-7 criteria total`

@@ -20,6 +20,7 @@ export function useDraftActions({
   sendMutation,
   agentMode,
   outcomePassed,
+  onVersionPublished,
 }: {
   messages: AgentMessage[];
   canvasId: string;
@@ -28,6 +29,7 @@ export function useDraftActions({
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   agentMode: AgentMode;
   outcomePassed?: boolean;
+  onVersionPublished?: () => void;
 }): { latestDraft: DraftActionsSegment | null; dismiss: () => void } {
   const [, forceUpdate] = useState(0);
   const dismissedVersionIds = useRef(new Set<string>());
@@ -52,7 +54,9 @@ export function useDraftActions({
         .then((r) => {
           if (!r.ok) {
             dismissedVersionIds.current.add(versionId);
+            setAutoDetectedDraft(null);
             forceUpdate((n) => n + 1);
+            onVersionPublished?.();
             notifyAgent(
               createSystemMessage(
                 `User discarded draft version ${versionId}. Changes were NOT applied. The canvas is unchanged from the last published version.`,
@@ -67,7 +71,9 @@ export function useDraftActions({
           const state = data?.version?.metadata?.state;
           if (state === "STATE_PUBLISHED") {
             dismissedVersionIds.current.add(versionId);
+            setAutoDetectedDraft(null);
             forceUpdate((n) => n + 1);
+            onVersionPublished?.();
             notifyAgent(
               createSystemMessage(
                 `User published draft version ${versionId}. Changes are now live. Re-read the canvas to see the current state.`,
@@ -82,7 +88,7 @@ export function useDraftActions({
     };
     window.addEventListener("canvas:version-updated", handler);
     return () => window.removeEventListener("canvas:version-updated", handler);
-  }, [canvasId, organizationId, notifyAgent]);
+  }, [canvasId, organizationId, notifyAgent, onVersionPublished]);
 
   const latestDraft = useMemo(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
