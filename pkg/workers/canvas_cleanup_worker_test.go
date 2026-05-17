@@ -1,18 +1,45 @@
 package workers
 
 import (
+	"context"
+	"errors"
 	"testing"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
+
+type cleanupProvider struct {
+	deleted []string
+	err     error
+}
+
+func (p *cleanupProvider) Name() string { return "test" }
+
+func (p *cleanupProvider) CreateSession(context.Context, agents.CreateSessionOptions) (*agents.CreateSessionResult, error) {
+	return nil, errors.New("not used")
+}
+
+func (p *cleanupProvider) SendMessage(context.Context, string, string, agents.SendMessageOptions) error {
+	return errors.New("not used")
+}
+
+func (p *cleanupProvider) StreamEvents(context.Context, string, func(agents.ProviderEvent) error) error {
+	return errors.New("not used")
+}
+
+func (p *cleanupProvider) DeleteSession(_ context.Context, providerSessionID string) error {
+	p.deleted = append(p.deleted, providerSessionID)
+	return p.err
+}
 
 func createAgentSessionWithMessage(t *testing.T, organizationID, userID, canvasID uuid.UUID) *models.AgentSession {
 	t.Helper()
@@ -60,7 +87,8 @@ func countAgentSessionMessages(t *testing.T, sessionID uuid.UUID) int64 {
 func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewCanvasCleanupWorker()
+	cleaner := &cleanupProvider{}
+	worker := NewCanvasCleanupWorker(cleaner)
 
 	//
 	// Create a canvas with nodes, events, executions, and queue items
@@ -203,6 +231,32 @@ func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 
 	assert.Equal(t, int64(0), countAgentSessions(t, session.ID))
 	assert.Equal(t, int64(0), countAgentSessionMessages(t, session.ID))
+	assert.Contains(t, cleaner.deleted, session.ProviderSessionID)
+}
+
+func Test__CanvasCleanupWorker_ProviderCleanupFailureDoesNotBlockDatabaseCleanup(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	cleaner := &cleanupProvider{err: errors.New("provider unavailable")}
+	worker := NewCanvasCleanupWorker(cleaner)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+	session := createAgentSessionWithMessage(t, r.Organization.ID, r.User, canvas.ID)
+
+	require.NoError(t, canvas.SoftDelete())
+	deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("deleted_at", deletedAtOutsideGracePeriod).Error)
+
+	deletedCanvas, err := models.FindUnscopedCanvas(canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, worker.LockAndProcessCanvas(*deletedCanvas))
+
+	var canvasCount int64
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Count(&canvasCount).Error)
+	assert.Equal(t, int64(0), canvasCount)
+	assert.Equal(t, int64(0), countAgentSessions(t, session.ID))
+	assert.Equal(t, int64(0), countAgentSessionMessages(t, session.ID))
+	assert.Contains(t, cleaner.deleted, session.ProviderSessionID)
 }
 
 func Test__CanvasCleanupWorker_ProcessesWorkflowFromSoftDeletedOrganization(t *testing.T) {

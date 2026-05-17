@@ -84,7 +84,8 @@ func Test__OrganizationCleanupWorker_GracePeriod(t *testing.T) {
 		r2 := support.Setup(t)
 		defer r2.Close()
 
-		worker := NewOrganizationCleanupWorker()
+		cleaner := &cleanupProvider{}
+		worker := NewOrganizationCleanupWorker(cleaner)
 		canvas, _ := support.CreateCanvas(t, r2.Organization.ID, r2.User, []models.CanvasNode{}, []models.Edge{})
 		orphanSession := createAgentSessionWithMessage(t, r2.Organization.ID, r2.User, uuid.New())
 
@@ -112,5 +113,6 @@ func Test__OrganizationCleanupWorker_GracePeriod(t *testing.T) {
 
 		assert.Equal(t, int64(0), countAgentSessions(t, orphanSession.ID))
 		assert.Equal(t, int64(0), countAgentSessionMessages(t, orphanSession.ID))
+		assert.Contains(t, cleaner.deleted, orphanSession.ProviderSessionID)
 	})
 }

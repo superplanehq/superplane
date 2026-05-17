@@ -134,6 +134,36 @@ func TestSendMessage_RequiresSessionID(t *testing.T) {
 	require.Error(t, p.SendMessage(context.Background(), "", "hi", agents.SendMessageOptions{}))
 }
 
+func TestDeleteSession_SendsCorrectRequest(t *testing.T) {
+	var capturedHeaders http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, http.MethodDelete, r.Method)
+		assert.Equal(t, "/sessions/sesn_abc", r.URL.Path)
+		capturedHeaders = r.Header.Clone()
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	require.NoError(t, p.DeleteSession(context.Background(), "sesn_abc"))
+	assert.Equal(t, "test-key", capturedHeaders.Get("x-api-key"))
+	assert.Equal(t, managedAgentsBeta, capturedHeaders.Get("anthropic-beta"))
+}
+
+func TestDeleteSession_PropagatesAPIError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		_, _ = w.Write([]byte(`{"error":"running"}`))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.DeleteSession(context.Background(), "sesn_abc")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "409")
+}
+
 func TestStreamEvents_MapsKnownTypes(t *testing.T) {
 	const sse = "data: {\"id\":\"e1\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"Hello\"}]}\n\n" +
 		"data: {\"id\":\"e2\",\"type\":\"agent.tool_use\",\"name\":\"bash\",\"input\":{\"command\":\"ls -la\"}}\n\n" +
