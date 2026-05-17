@@ -1,3 +1,13 @@
+interface RequestOptions {
+  organizationId?: string;
+  headers?: Headers | Record<string, string>;
+  [key: string]: unknown;
+}
+
+interface RequestOptionsWithHeaders extends Omit<RequestOptions, "organizationId"> {
+  headers: Record<string, string>;
+}
+
 const getOrganizationIdFromUrl = (): string | null => {
   const pathSegments = window.location.pathname.split("/");
 
@@ -9,7 +19,7 @@ const getOrganizationIdFromUrl = (): string | null => {
   return null;
 };
 
-export function withOrganizationHeader(options: any = {}): any {
+export function withOrganizationHeader(options: RequestOptions = {}): RequestOptionsWithHeaders {
   // Prefer an explicit organizationId (e.g. from route params) over window.location
   // because window.location can be stale during router transitions.
   const organizationId = options?.organizationId ?? getOrganizationIdFromUrl();

@@ -10,6 +10,7 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	apps "github.com/superplanehq/superplane/pkg/cli/commands/apps"
 	canvases "github.com/superplanehq/superplane/pkg/cli/commands/canvases"
 	events "github.com/superplanehq/superplane/pkg/cli/commands/events"
 	executions "github.com/superplanehq/superplane/pkg/cli/commands/executions"
@@ -57,6 +58,7 @@ func init() {
 	RootCmd.PersistentFlags().StringVarP(&OutputFormat, "output", "o", "", "output format: text|json|yaml (overrides config output)")
 
 	options := defaultBindOptions()
+	RootCmd.AddCommand(apps.NewCommand(options))
 	RootCmd.AddCommand(canvases.NewCommand(options))
 	RootCmd.AddCommand(executions.NewCommand(options))
 	RootCmd.AddCommand(events.NewCommand(options))
