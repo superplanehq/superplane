@@ -1,15 +1,14 @@
+import { renderTimeAgo } from "@/components/TimeAgo";
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type React from "react";
+import { getStateMap } from ".";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
   ExecutionInfo,
-  NodeInfo,
   SubtitleContext,
 } from "./types";
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
-import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from ".";
-import { renderTimeAgo } from "@/components/TimeAgo";
 
 type DisplayResult = {
   value?: string;
@@ -32,20 +31,15 @@ export const displayMapper: ComponentBaseMapper = {
     const componentName = context.componentDefinition.name || "display";
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const displayResult = resolveDisplayResult(lastExecution);
-    const muted = !!context.node.paused || !lastExecution;
+    const title =
+      context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component";
 
     return {
       iconSlug: context.componentDefinition.icon || "tag",
       collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
-      title:
-        context.node.name ||
-        context.componentDefinition.label ||
-        context.componentDefinition.name ||
-        "Unnamed component",
-      eventSections: lastExecution
-        ? getDisplayEventSections(context.nodes, lastExecution, componentName, displayResult, muted)
-        : undefined,
+      title,
+      eventSections: lastExecution ? getDisplayEventSections(displayResult.value ?? "") : undefined,
       includeEmptyState: !lastExecution,
       eventStateMap: getStateMap(componentName),
     };
@@ -68,25 +62,6 @@ export const displayMapper: ComponentBaseMapper = {
     };
   },
 };
-
-function renderDisplayBadge(result: DisplayResult, muted: boolean): React.ReactNode {
-  if (!result.value) {
-    return null;
-  }
-
-  const color = normalizeDisplayColor(result.color);
-  const badgeClasses = DISPLAY_BADGE_CLASSES[color] || DISPLAY_BADGE_CLASSES.gray;
-  const displayValue = truncate(result.value, DISPLAY_BADGE_MAX_CHARS);
-
-  return (
-    <span
-      title={result.value}
-      className={`inline-flex max-w-full items-center rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${badgeClasses} ${muted ? "opacity-60" : ""}`}
-    >
-      <span className="truncate">{displayValue}</span>
-    </span>
-  );
-}
 
 function resolveDisplayResult(execution: ExecutionInfo | null): DisplayResult {
   const metadata = execution?.metadata as { display_result?: DisplayResult } | undefined;
@@ -113,27 +88,13 @@ function truncate(value: string, maxLength: number): string {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
-function getDisplayEventSections(
-  nodes: NodeInfo[],
-  execution: ExecutionInfo,
-  componentName: string,
-  displayResult: DisplayResult,
-  muted: boolean,
-): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
-  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
-  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
-  const displayBadge = renderDisplayBadge(displayResult, muted);
+function getDisplayEventSections(value: string): EventSection[] {
+  const message = truncate(value, DISPLAY_BADGE_MAX_CHARS);
 
   return [
     {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: displayBadge ?? title,
-      eventSubtitle,
-      eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
+      eventTitle: <pre>{message}</pre>,
+      eventId: "",
     },
   ];
 }
