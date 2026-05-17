@@ -31,7 +31,7 @@ export const displayMapper: ComponentBaseMapper = {
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 
-  getExecutionDetails(_context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(_context: ExecutionDetailsContext): Record<string, string> {
     return {};
   },
 };

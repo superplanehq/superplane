@@ -140,6 +140,15 @@ export interface CategorySectionProps {
   onBlockClick?: (block: BuildingBlock) => void;
 }
 
+type IntegrationState = "ready" | "error" | "pending" | "notConfigured";
+
+const INTEGRATION_STATE_COLOR: Record<IntegrationState, string> = {
+  ready: "text-green-500",
+  error: "text-red-500",
+  pending: "text-amber-600",
+  notConfigured: "text-gray-500",
+};
+
 export function CategorySection({
   category,
   integrations,
@@ -152,8 +161,6 @@ export function CategorySection({
   dragPreviewRef,
   onBlockClick,
 }: CategorySectionProps) {
-  const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-
   const sortedBlocks = filterBlocksInCategory(category, searchTerm, typeFilter);
 
   const isCoreCategory = category.name === "Core";
@@ -169,35 +176,8 @@ export function CategorySection({
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
   const categoryIconSrc = integrationName === "smtp" ? undefined : getIntegrationIconSrc(integrationName);
 
-  const normalizedIntegrationName = normalizeIntegrationName(firstBlock?.integrationName);
-  const matchingIntegrationStates = normalizedIntegrationName
-    ? integrations
-        .filter(
-          (integration) =>
-            normalizeIntegrationName(integration.metadata?.integrationName) === normalizedIntegrationName,
-        )
-        .map((integration) => integration.status?.state)
-    : [];
-
-  const integrationState =
-    category.name === "Core" || category.name === "Memory" || category.name === "Debugging"
-      ? "ready"
-      : matchingIntegrationStates.includes("ready")
-        ? "ready"
-        : matchingIntegrationStates.includes("error")
-          ? "error"
-          : matchingIntegrationStates.includes("pending")
-            ? "pending"
-            : undefined;
-
-  const integrationStatusColorClass =
-    integrationState === "ready"
-      ? "text-green-500"
-      : integrationState === "error"
-        ? "text-red-500"
-        : integrationState === "pending"
-          ? "text-amber-600"
-          : "text-gray-500";
+  const integrationState = resolveIntegrationState(category, integrations, firstBlock);
+  const integrationStatusColorClass = INTEGRATION_STATE_COLOR[integrationState];
 
   let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
   if (category.name === "Core") {
@@ -260,4 +240,38 @@ export function CategorySection({
       )}
     </details>
   );
+}
+
+function resolveIntegrationState(
+  category: BuildingBlockCategory,
+  integrations: OrganizationsIntegration[],
+  firstBlock: BuildingBlock,
+): IntegrationState {
+  if (category.name === "Core" || category.name === "Memory" || category.name === "Debugging") {
+    return "ready";
+  }
+
+  const name = normalizeIntegrationName(firstBlock?.integrationName);
+
+  const matchingIntegrationStates = integrations
+    .filter((integration) => normalizeIntegrationName(integration.metadata?.integrationName) === name)
+    .map((integration) => integration.status?.state);
+
+  if (matchingIntegrationStates.includes("ready")) {
+    return "ready";
+  }
+
+  if (matchingIntegrationStates.includes("error")) {
+    return "error";
+  }
+
+  if (matchingIntegrationStates.includes("pending")) {
+    return "pending";
+  }
+
+  return "notConfigured";
+}
+
+function normalizeIntegrationName(value?: string) {
+  return (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
