@@ -196,14 +196,14 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" || os.Getenv("START_CANVAS_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Canvas Cleanup Worker")
 
-		w := workers.NewCanvasCleanupWorker()
+		w := workers.NewCanvasCleanupWorker(agentProvider)
 		go w.Start(context.Background())
 	}
 
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 
-		w := workers.NewOrganizationCleanupWorker()
+		w := workers.NewOrganizationCleanupWorker(agentProvider)
 		go w.Start(context.Background())
 	}
 

@@ -84,6 +84,25 @@ func FindAgentSessionByCanvasInTransaction(tx *gorm.DB, organizationID, userID, 
 	return &session, nil
 }
 
+func ListAgentSessionsForCanvasInTransaction(tx *gorm.DB, organizationID, canvasID uuid.UUID) ([]AgentSession, error) {
+	var sessions []AgentSession
+	err := tx.
+		Where("organization_id = ?", organizationID).
+		Where("canvas_id = ?", canvasID).
+		Find(&sessions).
+		Error
+	return sessions, err
+}
+
+func ListAgentSessionsForOrganizationInTransaction(tx *gorm.DB, organizationID uuid.UUID) ([]AgentSession, error) {
+	var sessions []AgentSession
+	err := tx.
+		Where("organization_id = ?", organizationID).
+		Find(&sessions).
+		Error
+	return sessions, err
+}
+
 func UpdateAgentSessionStatusInTransaction(tx *gorm.DB, sessionID uuid.UUID, status string) error {
 	now := time.Now()
 	return tx.Model(&AgentSession{}).
@@ -98,6 +117,21 @@ func UpdateAgentSessionStatusInTransaction(tx *gorm.DB, sessionID uuid.UUID, sta
 
 func UpdateAgentSessionStatus(sessionID uuid.UUID, status string) error {
 	return UpdateAgentSessionStatusInTransaction(database.Conn(), sessionID, status)
+}
+
+func DeleteAgentSessionsForCanvasInTransaction(tx *gorm.DB, organizationID, canvasID uuid.UUID) error {
+	return tx.
+		Where("organization_id = ?", organizationID).
+		Where("canvas_id = ?", canvasID).
+		Delete(&AgentSession{}).
+		Error
+}
+
+func DeleteAgentSessionsForOrganizationInTransaction(tx *gorm.DB, organizationID uuid.UUID) error {
+	return tx.
+		Where("organization_id = ?", organizationID).
+		Delete(&AgentSession{}).
+		Error
 }
 
 // FailStuckStreamingSessions marks any session in "streaming" state whose
