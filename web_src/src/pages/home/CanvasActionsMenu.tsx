@@ -5,10 +5,11 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { useDeleteCanvas } from "@/hooks/useCanvasData";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Trash2, Wand2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { CanvasFolderSubmenu } from "./CanvasFolderSubmenu";
 import type { CanvasCardData, CanvasFolderData } from "./types";
+import { ConvertToAppDialog } from "@/pages/apps/ConvertToAppDialog";
 
 interface CanvasActionsMenuProps {
   canvas: CanvasCardData;
@@ -30,6 +31,13 @@ export function CanvasActionsMenu({
   permissionsLoading,
 }: CanvasActionsMenuProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isConvertOpen, setIsConvertOpen] = useState(false);
+
+  const openConvertToApp = (event: MouseEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsConvertOpen(true);
+  };
   const deleteCanvasMutation = useDeleteCanvas(organizationId);
   const canManage = canUpdateCanvases || canDeleteCanvases;
 
@@ -113,6 +121,13 @@ export function CanvasActionsMenu({
                 canUpdateCanvases={canUpdateCanvases}
               />
 
+              <PermissionTooltip allowed={canUpdateCanvases} message="You don't have permission to convert canvases.">
+                <DropdownMenuItem onClick={openConvertToApp} disabled={!canUpdateCanvases}>
+                  <Wand2 size={16} />
+                  Convert to App
+                </DropdownMenuItem>
+              </PermissionTooltip>
+
               <PermissionTooltip allowed={canDeleteCanvases} message="You don't have permission to delete canvases.">
                 <DropdownMenuItem onClick={openDialog} disabled={!canDeleteCanvases}>
                   <Trash2 size={16} />
@@ -123,6 +138,14 @@ export function CanvasActionsMenu({
           </DropdownMenu>
         )}
       </div>
+
+      {isConvertOpen && (
+        <ConvertToAppDialog
+          canvas={canvas}
+          isOpen={isConvertOpen}
+          onClose={() => setIsConvertOpen(false)}
+        />
+      )}
 
       <Dialog open={isDialogOpen} onClose={closeDialog} size="lg" className="text-left">
         <DialogTitle className="text-gray-800 dark:text-red-100">Delete "{canvas.name}"?</DialogTitle>
