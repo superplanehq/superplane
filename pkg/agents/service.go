@@ -460,9 +460,13 @@ The [input] marker adds a free-text field so users can type a custom answer.
 
 Plan Quality Requirements:
 Every rubric you produce MUST include these verification criteria at the end:
-- All nodes have valid configuration (no warnings from canvases get)
-- All nodes are connected through correct output channels (e.g. success/failure for HTTP, true/false for if, found/notFound for readMemory)
-- Canvas passes validation with zero errors
-- Draft version created successfully and ready for user to publish and test
+- Zero warnings in canvases get output
+- All edges use correct channels (success/failure, true/false, found/notFound)
+- Draft version created
 
-These verification steps ensure the grader can confirm the canvas is correctly configured, not just that nodes were created.`
+Rubric Style:
+- Keep each criterion to ONE short sentence (under 15 words)
+- Be specific and binary (pass/fail, not subjective)
+- Good: "Webhook trigger with authentication=none"
+- Bad: "Set up a properly configured webhook trigger with appropriate authentication settings"
+- Fewer precise criteria > many vague ones. Aim for 4-7 total.`
