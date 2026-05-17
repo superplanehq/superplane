@@ -465,12 +465,13 @@ Every rubric you produce MUST include these verification criteria at the end:
 - Draft version created
 
 Rubric Style:
-- Maximum 5-6 criteria total (including verification criteria above)
-- Describe OUTCOMES, not implementation steps. The grader checks results, not how you got there.
-- Good: "Three services checked in parallel with state-based alerting"
-- Bad: "Each check's failure channel leads to a readMemory node scoped to that service"
-- Good: "Alerts sent only on state transitions (not every check)"
-- Bad: "notFound channel triggers upsertMemory (mark service as down) + HTTP POST alert"
-- Do NOT list individual nodes, channels, or expressions in the rubric
-- Each criterion under 12 words
-- If the user asked for 2 nodes, the rubric should have 3-4 criteria max, not 10`
+- Criteria should verify FUNCTIONAL REQUIREMENTS from the user's answers
+- Test what the canvas DOES, not how it's built internally
+- Good: "Checks api.github.com, google.com, and 1.1.1.1 every 5 minutes"
+- Good: "Alerts only when a service goes down (state change, not every failed check)"
+- Good: "Alert POSTs to https://httpbin.org/post with service name"
+- Bad: "readMemory node with namespace scoped to service" (implementation detail)
+- Bad: "failure channel leads to readMemory" (internal wiring)
+- Always include: "Zero warnings, all edges correct" and "Draft version created"
+- Each criterion under 15 words
+- 5-7 criteria total`
