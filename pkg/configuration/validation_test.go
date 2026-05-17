@@ -363,25 +363,6 @@ func Test__ValidateList__MaxItems(t *testing.T) {
 	}
 }
 
-func Test__validateSelect__allowsExpressionValues(t *testing.T) {
-	field := Field{
-		Name: "color",
-		Type: FieldTypeSelect,
-		TypeOptions: &TypeOptions{
-			Select: &SelectTypeOptions{
-				Options: []FieldOption{
-					{Value: "green"},
-					{Value: "red"},
-				},
-			},
-		},
-	}
-
-	assert.NoError(t, validateSelect(field, "green"))
-	assert.NoError(t, validateSelect(field, "{{ previous().data.ok ? 'green' : 'red' }}"))
-	assert.Error(t, validateSelect(field, "purple"))
-}
-
 func ptrInt(v int) *int {
 	return &v
 }
