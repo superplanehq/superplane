@@ -298,7 +298,13 @@ export const ConfigurationFieldRenderer = ({
         return <BooleanFieldRenderer {...commonProps} />;
 
       case "select":
-        return <SelectFieldRenderer {...commonProps} />;
+        return (
+          <SelectFieldRenderer
+            {...commonProps}
+            labelRightRef={allowExpressions ? labelRightRef : undefined}
+            labelRightReady={allowExpressions ? labelRightReady : false}
+          />
+        );
 
       case "multi-select":
         return <MultiSelectFieldRenderer {...commonProps} />;

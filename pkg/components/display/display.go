@@ -81,11 +81,12 @@ func (c *Display) Configuration() []configuration.Field {
 			Required:    true,
 		},
 		{
-			Name:     "color",
-			Label:    "Color",
-			Type:     configuration.FieldTypeSelect,
-			Required: true,
-			Default:  "gray",
+			Name:        "color",
+			Label:       "Color",
+			Type:        configuration.FieldTypeSelect,
+			Description: "Background color of the display. One of gray, green, red, yellow or blue.",
+			Required:    true,
+			Default:     "gray",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{

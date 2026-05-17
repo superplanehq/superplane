@@ -160,6 +160,10 @@ func validateSelect(field Field, value any) error {
 		return nil
 	}
 
+	if ExpressionPlaceholderRegex.MatchString(selected) {
+		return nil
+	}
+
 	valid := slices.ContainsFunc(options.Options, func(opt FieldOption) bool {
 		return opt.Value == selected
 	})

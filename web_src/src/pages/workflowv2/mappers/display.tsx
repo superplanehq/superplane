@@ -67,12 +67,7 @@ function Message({ lastExecution }: { lastExecution: ExecutionInfo | null }): Re
     return null;
   }
 
-  const color = metadata["color"] as string | undefined;
-  if (!color) {
-    return null;
-  }
-
-  const colorClass = getBackgroundColorClass(color);
+  const colorClass = getBackgroundColorClass(normalizeDisplayColor(metadata["color"] as string | undefined));
 
   return (
     <div className={`px-2 py-1.5 text-left text-base max-h-20 truncate ${colorClass}`}>
@@ -81,19 +76,22 @@ function Message({ lastExecution }: { lastExecution: ExecutionInfo | null }): Re
   );
 }
 
+const DISPLAY_COLORS = new Set(["green", "yellow", "red", "blue", "gray"]);
+
 function resolveDisplayResult(execution: ExecutionInfo | null): DisplayResult {
-  const metadata = execution?.metadata as { display_result?: DisplayResult } | undefined;
-  const fromMetadata = metadata?.display_result;
-  if (fromMetadata?.message) {
-    return {
-      message: String(fromMetadata.message),
-      color: normalizeDisplayColor(fromMetadata.color),
-    };
+  const metadata = execution?.metadata as Record<string, unknown> | undefined;
+  const message = metadata?.message;
+  if (typeof message !== "string" || !message) {
+    return {};
   }
-  return {};
+
+  return {
+    message,
+    color: normalizeDisplayColor(typeof metadata?.color === "string" ? metadata.color : undefined),
+  };
 }
 
 function normalizeDisplayColor(color?: string): string {
-  const normalized = (color || DISPLAY_BADGE_DEFAULT_COLOR).toLowerCase().trim();
-  return DISPLAY_BADGE_CLASSES[normalized] ? normalized : DISPLAY_BADGE_DEFAULT_COLOR;
+  const normalized = (color || "gray").toLowerCase().trim();
+  return DISPLAY_COLORS.has(normalized) ? normalized : "gray";
 }
