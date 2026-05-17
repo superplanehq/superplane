@@ -221,6 +221,13 @@ function ChatConversation({
   );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
+  // Clear outcome widget when canvas version is published or discarded
+  useEffect(() => {
+    const handler = () => setOutcomeState(null);
+    window.addEventListener("canvas:version-updated", handler);
+    return () => window.removeEventListener("canvas:version-updated", handler);
+  }, [setOutcomeState]);
+
   const handleSend = useCallback(async () => {
     const value = draft.trim();
     if (!value || sendMutation.isPending) return;
