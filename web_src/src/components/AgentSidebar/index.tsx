@@ -221,12 +221,27 @@ function ChatConversation({
   );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
-  // Clear outcome widget when canvas version is published or discarded
+  // Clear outcome widget when canvas version is published or discarded (not on draft creation)
   useEffect(() => {
-    const handler = () => setOutcomeState(null);
+    const handler = (e: Event) => {
+      const { versionId } = (e as CustomEvent).detail ?? {};
+      if (!versionId) return;
+      fetch(`/api/v1/canvases/${canvasId}/versions/${versionId}`, {
+        headers: { "x-organization-id": organizationId },
+        credentials: "include",
+      })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data) => {
+          const state = data?.version?.metadata?.state;
+          if (state === "STATE_PUBLISHED" || !data) {
+            setOutcomeState(null);
+          }
+        })
+        .catch(() => {});
+    };
     window.addEventListener("canvas:version-updated", handler);
     return () => window.removeEventListener("canvas:version-updated", handler);
-  }, [setOutcomeState]);
+  }, [canvasId, organizationId, setOutcomeState]);
 
   const handleSend = useCallback(async () => {
     const value = draft.trim();
