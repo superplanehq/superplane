@@ -1,179 +1,126 @@
+import type { IntegrationsIntegrationDefinition, SuperplaneActionsAction, TriggersTrigger } from "@/api-client";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
 import type { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSidebar";
-import type { TriggersTrigger, SuperplaneActionsAction, IntegrationsIntegrationDefinition } from "@/api-client";
+
+export function flattenBuildingBlocks(categories: BuildingBlockCategory[]): BuildingBlock[] {
+  return categories.flatMap((c) => c.blocks);
+}
+
+export function buildBuildingBlockCategories(
+  triggers: TriggersTrigger[],
+  components: SuperplaneActionsAction[],
+  integrations: IntegrationsIntegrationDefinition[],
+): BuildingBlockCategory[] {
+  return [
+    core(triggers, components),
+    debugging(triggers, components),
+    memory(triggers, components),
+    ...buildIntegrationCategories(integrations),
+  ];
+}
+
+function core(triggers: TriggersTrigger[], components: SuperplaneActionsAction[]): BuildingBlockCategory {
+  return {
+    name: "Core",
+    blocks: [
+      ...triggers.filter((t) => isCoreComponent(t)).map((t) => toTriggerBlock(t)),
+      ...components.filter((c) => isCoreComponent(c)).map((c) => toComponentBlock(c)),
+    ],
+  };
+}
+
+function debugging(triggers: TriggersTrigger[], components: SuperplaneActionsAction[]): BuildingBlockCategory {
+  return {
+    name: "Debugging",
+    blocks: [
+      ...triggers.filter((t) => isDebuggingBlock(t)).map((t) => toTriggerBlock(t)),
+      ...components.filter((c) => isDebuggingBlock(c)).map((c) => toComponentBlock(c)),
+    ],
+  };
+}
+
+function memory(triggers: TriggersTrigger[], components: SuperplaneActionsAction[]): BuildingBlockCategory {
+  return {
+    name: "Memory",
+    blocks: [
+      ...triggers.filter((t) => isMemoryBlock(t)).map((t) => toTriggerBlock(t)),
+      ...components.filter((c) => isMemoryBlock(c)).map((c) => toComponentBlock(c)),
+    ],
+  };
+}
+
+function buildIntegrationCategories(integrations: IntegrationsIntegrationDefinition[]): BuildingBlockCategory[] {
+  return integrations.map((i) => buildIntegrationCategory(i)).filter((c) => !!c);
+}
+
+function buildIntegrationCategory(integration: IntegrationsIntegrationDefinition): BuildingBlockCategory | null {
+  const blocks: BuildingBlock[] = [];
+  if (!integration.capabilities) {
+    return null;
+  }
+
+  const triggers = triggersFromCapabilities(integration.capabilities);
+  if (triggers) {
+    triggers.forEach((t) => {
+      blocks.push(toTriggerBlock(t, integration.name));
+    });
+  }
+
+  const actions = actionsFromCapabilities(integration.capabilities);
+  if (actions) {
+    actions.forEach((c) => {
+      blocks.push(toComponentBlock(c, integration.name));
+    });
+  }
+
+  if (blocks.length === 0) {
+    return null;
+  }
+
+  return {
+    name: integration.label || "Unknown Integration",
+    blocks,
+  };
+}
+
+function toTriggerBlock(trigger: TriggersTrigger, integrationName?: string): BuildingBlock {
+  return {
+    name: trigger.name!,
+    label: trigger.label,
+    description: trigger.description,
+    type: "trigger",
+    configuration: trigger.configuration,
+    icon: trigger.icon,
+    color: trigger.color,
+    integrationName: integrationName,
+  };
+}
+
+function toComponentBlock(component: SuperplaneActionsAction, integrationName?: string): BuildingBlock {
+  return {
+    name: component.name!,
+    label: component.label,
+    description: component.description,
+    type: "component",
+    outputChannels: component.outputChannels,
+    configuration: component.configuration,
+    icon: component.icon,
+    color: component.color,
+    integrationName: integrationName,
+  };
+}
 
 const MEMORY_COMPONENT_NAMES = new Set(["addmemory", "readmemory", "updatememory", "deletememory", "upsertmemory"]);
 const DEBUGGING_COMPONENT_NAMES = new Set(["noop", "display"]);
 
-function isMemoryBlock(block: BuildingBlock): boolean {
-  return MEMORY_COMPONENT_NAMES.has((block.name || "").toLowerCase());
+function isMemoryBlock(component: { name?: string }): boolean {
+  return MEMORY_COMPONENT_NAMES.has((component.name || "").toLowerCase());
 }
 
-function isDebuggingBlock(block: BuildingBlock): boolean {
-  return block.type === "component" && DEBUGGING_COMPONENT_NAMES.has((block.name || "").toLowerCase());
+function isDebuggingBlock(component: { name?: string }): boolean {
+  return DEBUGGING_COMPONENT_NAMES.has((component.name || "").toLowerCase());
 }
 
-// Build categories of building blocks from live data
-export function buildBuildingBlockCategories(
-  triggers: TriggersTrigger[],
-  components: SuperplaneActionsAction[],
-  availableIntegrations: IntegrationsIntegrationDefinition[],
-): BuildingBlockCategory[] {
-  const deprecatedTriggerNames = new Set(["github", "semaphore"]);
-  const deprecatedComponentNames = new Set(["semaphore"]);
-  const filteredTriggers = triggers.filter((trigger) => !deprecatedTriggerNames.has(trigger.name ?? ""));
-  const filteredComponents = components.filter((component) => !deprecatedComponentNames.has(component.name ?? ""));
-
-  // Combine triggers and components into a single "Core" category
-  const coreBlocks: BuildingBlock[] = [
-    ...filteredTriggers.map((t): BuildingBlock => {
-      const block: BuildingBlock = {
-        name: t.name!,
-        label: t.label,
-        description: t.description,
-        type: "trigger",
-        configuration: t.configuration,
-        icon: t.icon,
-        color: t.color,
-      };
-
-      return block;
-    }),
-    ...filteredComponents.map((c): BuildingBlock => {
-      const block: BuildingBlock = {
-        name: c.name!,
-        label: c.label,
-        description: c.description,
-        type: "component",
-        outputChannels: c.outputChannels,
-        configuration: c.configuration,
-        icon: c.icon,
-        color: c.color,
-      };
-
-      return block;
-    }),
-  ];
-
-  const liveCategories: BuildingBlockCategory[] = [
-    {
-      name: "Core",
-      blocks: coreBlocks,
-    },
-  ];
-
-  // Add a category for each available application with its components and triggers
-  availableIntegrations.forEach((integration) => {
-    const blocks: BuildingBlock[] = [];
-    if (!integration.capabilities) {
-      return;
-    }
-
-    const triggers = triggersFromCapabilities(integration.capabilities);
-    if (triggers) {
-      triggers.forEach((t) => {
-        const block: BuildingBlock = {
-          name: t.name!,
-          label: t.label,
-          description: t.description,
-          type: "trigger",
-          configuration: t.configuration,
-          icon: t.icon,
-          color: t.color,
-          integrationName: integration.name,
-        };
-
-        blocks.push(block);
-      });
-    }
-
-    const actions = actionsFromCapabilities(integration.capabilities);
-    if (actions) {
-      actions.forEach((c) => {
-        const block: BuildingBlock = {
-          name: c.name!,
-          label: c.label,
-          description: c.description,
-          type: "component",
-          outputChannels: c.outputChannels,
-          configuration: c.configuration,
-          icon: c.icon,
-          color: c.color,
-          integrationName: integration.name,
-        };
-
-        blocks.push(block);
-      });
-    }
-
-    // Only add the category if there are blocks (label is normalized in useAvailableIntegrations)
-    if (blocks.length > 0) {
-      liveCategories.push({
-        name: integration.label || "Unknown Integration",
-        blocks,
-      });
-    }
-  });
-
-  // Move debugging and memory blocks into dedicated sidebar categories.
-  const debuggingBlocksByKey = new Map<string, BuildingBlock>();
-  const memoryBlocksByKey = new Map<string, BuildingBlock>();
-  const categoriesWithoutDedicated = liveCategories
-    .map((category) => {
-      const remainingBlocks: BuildingBlock[] = [];
-      category.blocks.forEach((block) => {
-        if (isDebuggingBlock(block)) {
-          debuggingBlocksByKey.set(`${block.type}:${block.name}`, block);
-          return;
-        }
-        if (isMemoryBlock(block)) {
-          memoryBlocksByKey.set(`${block.type}:${block.name}`, block);
-          return;
-        }
-        remainingBlocks.push(block);
-      });
-
-      return {
-        ...category,
-        blocks: remainingBlocks,
-      };
-    })
-    .filter((category) => category.blocks.length > 0);
-
-  const debuggingCategory: BuildingBlockCategory | null =
-    debuggingBlocksByKey.size > 0
-      ? {
-          name: "Debugging",
-          blocks: Array.from(debuggingBlocksByKey.values()),
-        }
-      : null;
-
-  const memoryCategory: BuildingBlockCategory | null =
-    memoryBlocksByKey.size > 0
-      ? {
-          name: "Memory",
-          blocks: Array.from(memoryBlocksByKey.values()),
-        }
-      : null;
-
-  const coreCategory = categoriesWithoutDedicated.find((category) => category.name === "Core");
-  const integrationCategories = categoriesWithoutDedicated.filter((category) => category.name !== "Core");
-
-  const orderedCategories: BuildingBlockCategory[] = [];
-  if (coreCategory) {
-    orderedCategories.push(coreCategory);
-  }
-  if (debuggingCategory) {
-    orderedCategories.push(debuggingCategory);
-  }
-  if (memoryCategory) {
-    orderedCategories.push(memoryCategory);
-  }
-  orderedCategories.push(...integrationCategories);
-
-  return orderedCategories;
-}
-
-export function flattenBuildingBlocks(categories: BuildingBlockCategory[]): BuildingBlock[] {
-  return categories.flatMap((c) => c.blocks);
+function isCoreComponent(component: { name?: string }): boolean {
+  return !isMemoryBlock(component) && !isDebuggingBlock(component);
 }
