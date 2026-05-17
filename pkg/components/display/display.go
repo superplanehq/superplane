@@ -74,7 +74,7 @@ Expression errors never fail the run. If resolving either field fails, the compo
 }
 
 func (c *Display) Icon() string {
-	return "tag"
+	return "monitor"
 }
 
 func (c *Display) Color() string {

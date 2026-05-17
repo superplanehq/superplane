@@ -1356,7 +1356,6 @@ export function buildNodeInfo(node: ComponentsNode): NodeInfo {
     name: node.name || "",
     componentName: node.component || "",
     isCollapsed: node.isCollapsed || false,
-    paused: !!node.paused,
     configuration: node.configuration,
     metadata: node.metadata,
   };
