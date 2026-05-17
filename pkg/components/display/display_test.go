@@ -1,7 +1,6 @@
 package display
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,153 +12,74 @@ import (
 func Test__Display__Execute(t *testing.T) {
 	component := &Display{}
 
-	t.Run("stores display result when execution metadata is a nil map", func(t *testing.T) {
-		stateCtx := &contexts.ExecutionStateContext{}
-		var nilMetadata map[string]any
-		metadataCtx := &contexts.MetadataContext{
-			Metadata: nilMetadata,
-		}
-
-		ctx := core.ExecutionContext{
-			Configuration:  map[string]any{"message": "Hello"},
-			ExecutionState: stateCtx,
-			Metadata:       metadataCtx,
-		}
-
-		err := component.Execute(ctx)
-		assert.NoError(t, err)
-		assert.True(t, stateCtx.Passed)
-		metadata := metadataCtx.Metadata.(map[string]any)
-		assert.Equal(
-			t,
-			map[string]any{
-				"message": "Hello",
-				"color":   DefaultColor,
-			},
-			metadata["display_result"],
-		)
-	})
-
-	t.Run("stores resolved value and default color, then emits passthrough payload", func(t *testing.T) {
-		stateCtx := &contexts.ExecutionStateContext{}
-		metadataCtx := &contexts.MetadataContext{
-			Metadata: map[string]any{
-				"existing": "value",
-			},
-		}
-		input := map[string]any{
-			"source": map[string]any{
-				"message": "ok",
-			},
-		}
-
-		ctx := core.ExecutionContext{
-			Data:           input,
-			Configuration:  map[string]any{"message": "Build completed"},
-			ExecutionState: stateCtx,
-			Metadata:       metadataCtx,
-		}
-
-		err := component.Execute(ctx)
-		assert.NoError(t, err)
-		assert.True(t, stateCtx.Passed)
-		assert.True(t, stateCtx.Finished)
-		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
-		assert.Equal(t, PayloadType, stateCtx.Type)
-		assert.Len(t, stateCtx.Payloads, 1)
-		payload := stateCtx.Payloads[0].(map[string]any)
-		assert.Equal(t, input, payload["data"])
-
-		metadata := metadataCtx.Metadata.(map[string]any)
-		assert.Equal(t, "value", metadata["existing"])
-		assert.Equal(
-			t,
-			map[string]any{
-				"message": "Build completed",
-				"color":   DefaultColor,
-			},
-			metadata["display_result"],
-		)
-	})
-
-	t.Run("resolves expression templates for value and color", func(t *testing.T) {
+	t.Run("stores message and color in execution metadata", func(t *testing.T) {
 		stateCtx := &contexts.ExecutionStateContext{}
 		metadataCtx := &contexts.MetadataContext{}
 
-		ctx := core.ExecutionContext{
+		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"message": "{{ $['Node'].data.message }}",
-				"color":   "{{ $['Node'].data.color }}",
-			},
-			ExecutionState: stateCtx,
-			Metadata:       metadataCtx,
-			Expressions: &displayTestExpressionContext{
-				outputs: map[string]any{
-					"$['Node'].data.message": "Release Ready",
-					"$['Node'].data.color":   "green",
-				},
-			},
-		}
-
-		err := component.Execute(ctx)
-		assert.NoError(t, err)
-		assert.True(t, stateCtx.Passed)
-		assert.True(t, stateCtx.Finished)
-		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
-		assert.Equal(t, PayloadType, stateCtx.Type)
-		metadata := metadataCtx.Metadata.(map[string]any)
-		assert.Equal(
-			t,
-			map[string]any{
-				"message": "Release Ready",
+				"message": "Hello",
 				"color":   "green",
 			},
-			metadata["display_result"],
-		)
+			ExecutionState: stateCtx,
+			Metadata:       metadataCtx,
+		})
+
+		assert.NoError(t, err)
+		assert.True(t, stateCtx.Passed)
+
+		result, ok := metadataCtx.Metadata.(DisplayExecutionResult)
+		assert.True(t, ok)
+		assert.Equal(t, DisplayExecutionResult{Message: "Hello", Color: "green"}, result)
 	})
 
-	t.Run("expression errors never fail execution and store fallback result", func(t *testing.T) {
+	t.Run("emits display.executed on the default channel", func(t *testing.T) {
 		stateCtx := &contexts.ExecutionStateContext{}
 		metadataCtx := &contexts.MetadataContext{}
 
-		ctx := core.ExecutionContext{
+		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
-				"message": "{{ $['missing'].data.value }}",
-				"color":   "{{ $['missing'].data.color }}",
+				"message": "Build completed",
+				"color":   "gray",
 			},
 			ExecutionState: stateCtx,
 			Metadata:       metadataCtx,
-			Expressions: &contexts.ExpressionContext{
-				Error: fmt.Errorf("node missing not found"),
-			},
-		}
+		})
 
-		err := component.Execute(ctx)
 		assert.NoError(t, err)
 		assert.True(t, stateCtx.Passed)
 		assert.True(t, stateCtx.Finished)
 		assert.Equal(t, core.DefaultOutputChannel.Name, stateCtx.Channel)
-		assert.Equal(t, PayloadType, stateCtx.Type)
-		metadata := metadataCtx.Metadata.(map[string]any)
-		assert.Equal(
-			t,
-			map[string]any{
-				"message": "[expression error: node missing not found]",
-				"color":   DefaultColor,
-			},
-			metadata["display_result"],
-		)
+		assert.Equal(t, "display.executed", stateCtx.Type)
+		assert.Len(t, stateCtx.Payloads, 1)
+
+		payload := stateCtx.Payloads[0].(map[string]any)
+		assert.Equal(t, map[string]any{}, payload["data"])
+
+		result, ok := metadataCtx.Metadata.(DisplayExecutionResult)
+		assert.True(t, ok)
+		assert.Equal(t, DisplayExecutionResult{Message: "Build completed", Color: "gray"}, result)
 	})
-}
 
-type displayTestExpressionContext struct {
-	outputs map[string]any
-}
+	t.Run("replaces prior execution metadata", func(t *testing.T) {
+		stateCtx := &contexts.ExecutionStateContext{}
+		metadataCtx := &contexts.MetadataContext{
+			Metadata: map[string]any{"existing": "value"},
+		}
 
-func (c *displayTestExpressionContext) Run(expression string) (any, error) {
-	if output, ok := c.outputs[expression]; ok {
-		return output, nil
-	}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"message": "Done",
+				"color":   "blue",
+			},
+			ExecutionState: stateCtx,
+			Metadata:       metadataCtx,
+		})
 
-	return nil, fmt.Errorf("unexpected expression: %s", expression)
+		assert.NoError(t, err)
+
+		result, ok := metadataCtx.Metadata.(DisplayExecutionResult)
+		assert.True(t, ok)
+		assert.Equal(t, DisplayExecutionResult{Message: "Done", Color: "blue"}, result)
+	})
 }
