@@ -221,28 +221,6 @@ function ChatConversation({
   );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
-  // Clear outcome widget when canvas version is published or discarded (not on draft creation)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { versionId } = (e as CustomEvent).detail ?? {};
-      if (!versionId) return;
-      fetch(`/api/v1/canvases/${canvasId}/versions/${versionId}`, {
-        headers: { "x-organization-id": organizationId },
-        credentials: "include",
-      })
-        .then((r) => r.ok ? r.json() : null)
-        .then((data) => {
-          const state = data?.version?.metadata?.state;
-          if (state === "STATE_PUBLISHED" || !data) {
-            setOutcomeState(null);
-          }
-        })
-        .catch(() => {});
-    };
-    window.addEventListener("canvas:version-updated", handler);
-    return () => window.removeEventListener("canvas:version-updated", handler);
-  }, [canvasId, organizationId, setOutcomeState]);
-
   const handleSend = useCallback(async () => {
     const value = draft.trim();
     if (!value || sendMutation.isPending) return;
@@ -340,6 +318,7 @@ function ChatConversation({
         agentMode={agentMode}
         isEditing={isEditing}
         outcomePassed={outcomeState?.phase === "passed"}
+        onVersionPublished={() => setOutcomeState(null)}
       />
       <ChatComposer
         draft={draft}
@@ -366,6 +345,7 @@ function DraftActionsBar({
   agentMode,
   isEditing,
   outcomePassed,
+  onVersionPublished,
 }: {
   messages: AgentMessage[];
   canvasId: string;
@@ -375,6 +355,7 @@ function DraftActionsBar({
   agentMode: AgentMode;
   isEditing: boolean;
   outcomePassed?: boolean;
+  onVersionPublished?: () => void;
 }) {
   const { latestDraft, dismiss } = useDraftActions({
     messages,
@@ -384,6 +365,7 @@ function DraftActionsBar({
     sendMutation,
     agentMode,
     outcomePassed,
+    onVersionPublished,
   });
   if (!latestDraft) return null;
   return (
