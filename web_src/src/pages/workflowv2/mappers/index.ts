@@ -11,6 +11,7 @@ import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
 import { noopMapper } from "./noop";
+import { displayMapper } from "./display";
 import { addMemoryMapper } from "./addMemory";
 import { deleteMemoryMapper } from "./deleteMemory";
 import { readMemoryMapper } from "./readMemory";
@@ -265,6 +266,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
+  display: displayMapper,
   addMemory: addMemoryMapper,
   deleteMemory: deleteMemoryMapper,
   readMemory: readMemoryMapper,
