@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -412,8 +412,16 @@ CREATE TABLE public.organizations (
     usage_retention_window_days integer,
     usage_limits_synced_at timestamp with time zone,
     change_management_enabled boolean DEFAULT false NOT NULL,
+    allow_direct_email_invite_completion boolean DEFAULT true NOT NULL,
     enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL
 );
+
+
+--
+-- Name: COLUMN organizations.allow_direct_email_invite_completion; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.organizations.allow_direct_email_invite_completion IS 'When false, pending email invitations are not auto-accepted after non-OAuth sign-in (e.g. email and password).';
 
 
 --
@@ -2129,7 +2137,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2165,7 +2173,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2184,7 +2192,7 @@ SET row_security = off;
 --
 
 COPY public.data_migrations (version, dirty) FROM stdin;
-20260417035041	f
+20260516153621	f
 \.
 
 
