@@ -2,8 +2,6 @@ ARG UBUNTU_VERSION=22.04
 ARG GO_VERSION=1.26.2
 ARG PLAYWRIGHT_GO_VERSION=v0.5200.1
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
-ARG PROTO_MODULES=authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents,usage
-ARG REST_API_PROTO_MODULES=authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Development stage with tools installed.
@@ -66,8 +64,6 @@ CMD [ "/bin/bash",  "-c", "sleep infinity" ]
 FROM dev-base AS builder
 
 ARG BASE_URL=https://app.superplane.com
-ARG PROTO_MODULES
-ARG REST_API_PROTO_MODULES
 
 WORKDIR /app
 COPY pkg /app/pkg
@@ -79,13 +75,9 @@ COPY db/data_migrations /app/db/data_migrations
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY web_src /app/web_src
 COPY protos /app/protos
-COPY scripts/protoc.sh /app/scripts/protoc.sh
-COPY scripts/protoc_gateway.sh /app/scripts/protoc_gateway.sh
 COPY api/swagger /app/api/swagger
 COPY rbac /app/rbac
 COPY templates /app/templates
-RUN /app/scripts/protoc.sh "${PROTO_MODULES}" && \
-  /app/scripts/protoc_gateway.sh "${REST_API_PROTO_MODULES}"
 RUN rm -rf build && go build -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
