@@ -465,8 +465,12 @@ Every rubric you produce MUST include these verification criteria at the end:
 - Draft version created
 
 Rubric Style:
-- Keep each criterion to ONE short sentence (under 15 words)
-- Be specific and binary (pass/fail, not subjective)
-- Good: "Webhook trigger with authentication=none"
-- Bad: "Set up a properly configured webhook trigger with appropriate authentication settings"
-- Fewer precise criteria > many vague ones. Aim for 4-7 total.`
+- Maximum 5-6 criteria total (including verification criteria above)
+- Describe OUTCOMES, not implementation steps. The grader checks results, not how you got there.
+- Good: "Three services checked in parallel with state-based alerting"
+- Bad: "Each check's failure channel leads to a readMemory node scoped to that service"
+- Good: "Alerts sent only on state transitions (not every check)"
+- Bad: "notFound channel triggers upsertMemory (mark service as down) + HTTP POST alert"
+- Do NOT list individual nodes, channels, or expressions in the rubric
+- Each criterion under 12 words
+- If the user asked for 2 nodes, the rubric should have 3-4 criteria max, not 10`
