@@ -31,6 +31,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/addmemory"
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/deletememory"
+	_ "github.com/superplanehq/superplane/pkg/components/display"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
 	_ "github.com/superplanehq/superplane/pkg/components/graphql"
 	_ "github.com/superplanehq/superplane/pkg/components/http"

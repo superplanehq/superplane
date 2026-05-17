@@ -22,4 +22,18 @@ describe("buildBuildingBlockCategories", () => {
     expect(categories[0]?.name).toBe("Core");
     expect(categories[0]?.blocks.map((block) => block.name)).toEqual(["deploy"]);
   });
+
+  it("orders categories as Core, Debugging, then Memory", () => {
+    const categories = buildBuildingBlockCategories(
+      [],
+      [
+        { name: "deploy", label: "Deploy" },
+        { name: "display", label: "Display" },
+        { name: "addmemory", label: "Add Memory" },
+      ],
+      [],
+    );
+
+    expect(categories.map((category) => category.name)).toEqual(["Core", "Debugging", "Memory"]);
+  });
 });
