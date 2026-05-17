@@ -25,6 +25,24 @@ export function oauthSavedPolicySummary(providers: string[] | undefined) {
   return `Saved: only ${joined} can complete pending email invitations.`;
 }
 
+export function createOauthRestrictChangeHandler(opts: {
+  oauthGithub: boolean;
+  oauthGoogle: boolean;
+  setOauthRestrictProviders: (value: boolean) => void;
+  setOauthGithub: (value: boolean) => void;
+  setOauthGoogle: (value: boolean) => void;
+  setOauthSelectionError: (value: string | null) => void;
+}) {
+  return (checked: boolean) => {
+    opts.setOauthRestrictProviders(checked);
+    opts.setOauthSelectionError(null);
+    if (checked && !opts.oauthGithub && !opts.oauthGoogle) {
+      opts.setOauthGithub(true);
+      opts.setOauthGoogle(true);
+    }
+  };
+}
+
 export function oauthProvidersToSave(restrict: boolean, github: boolean, google: boolean): string[] {
   if (!restrict) {
     return [];

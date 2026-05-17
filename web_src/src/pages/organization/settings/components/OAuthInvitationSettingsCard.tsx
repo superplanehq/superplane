@@ -27,9 +27,18 @@ export function OAuthInvitationSettingsCard({
   permissionsLoading,
   updateOrganizationMutation,
 }: OAuthInvitationSettingsCardProps) {
-  const [oauthRestrictProviders, setOauthRestrictProviders] = useState(false);
-  const [oauthGithub, setOauthGithub] = useState(true);
-  const [oauthGoogle, setOauthGoogle] = useState(true);
+  const [oauthRestrictProviders, setOauthRestrictProviders] = useState(() => {
+    const d = oauthDraftFromAllowedProviders(organization.spec?.allowedOauthProviders?.providers);
+    return d.restrict;
+  });
+  const [oauthGithub, setOauthGithub] = useState(() => {
+    const d = oauthDraftFromAllowedProviders(organization.spec?.allowedOauthProviders?.providers);
+    return d.github;
+  });
+  const [oauthGoogle, setOauthGoogle] = useState(() => {
+    const d = oauthDraftFromAllowedProviders(organization.spec?.allowedOauthProviders?.providers);
+    return d.google;
+  });
   const [oauthMessage, setOauthMessage] = useState<string | null>(null);
   const [oauthSelectionError, setOauthSelectionError] = useState<string | null>(null);
 
