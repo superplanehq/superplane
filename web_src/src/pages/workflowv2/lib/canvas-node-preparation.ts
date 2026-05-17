@@ -14,7 +14,7 @@ import {
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import type {
   ActionContext,

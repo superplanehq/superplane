@@ -3,7 +3,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { countNodesByType, extractIntegrations, getTemplateTags } from "@/pages/canvas/templateMetadata";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
