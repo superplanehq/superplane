@@ -1,5 +1,5 @@
 import { ChevronRight, Loader2, SquareTerminal, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -119,7 +119,23 @@ function ChatConversation({
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<string>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [outcomeState, setOutcomeState] = useState<OutcomeState | null>(null);
+  const [outcomeState, setOutcomeStateRaw] = useState<OutcomeState | null>(() => {
+    try {
+      const stored = sessionStorage.getItem(`outcome-${chatId}`);
+      return stored ? JSON.parse(stored) : null;
+    } catch { return null; }
+  });
+  const setOutcomeState = useCallback((update: OutcomeState | null | ((prev: OutcomeState | null) => OutcomeState | null)) => {
+    setOutcomeStateRaw((prev) => {
+      const next = typeof update === "function" ? update(prev) : update;
+      if (next) {
+        sessionStorage.setItem(`outcome-${chatId}`, JSON.stringify(next));
+      } else {
+        sessionStorage.removeItem(`outcome-${chatId}`);
+      }
+      return next;
+    });
+  }, [chatId]);
 
   // pages[0] is the latest fetch; later entries are older batches loaded
   // via scroll-up. Reverse so chronological order falls out of flatMap.
@@ -140,18 +156,17 @@ function ChatConversation({
   // row signals activity, so we suppress Thinking to avoid double-indicators.
   const showThinking = status === "streaming" && !hasRunningTool && messages[messages.length - 1]?.role === "user";
 
-  const outcomeRef = useRef(outcomeState);
-  outcomeRef.current = outcomeState;
-
   const wsCallbacks = useMemo(
     () => ({
+      onPersistedMessage: (message: AgentMessage) => {
+        // Clear outcome widget when draft is published or discarded
+        if (message.content?.includes("published") || message.content?.includes("discarded")) {
+          setOutcomeState(null);
+        }
+      },
       onStatusChange: (next: string, err?: string) => {
         setStatus(next || "idle");
         setError(err ?? null);
-        // When turn completes and we have an active outcome, mark as building next iteration
-        if (next === "idle" && outcomeRef.current && outcomeRef.current.phase !== "passed" && outcomeRef.current.phase !== "exhausted") {
-          setOutcomeState((prev) => prev ? { ...prev, phase: "building" as OutcomePhase } : null);
-        }
       },
       onOutcomeEvent: (phase: "start" | "end", evaluation: { iteration: number; passed?: boolean; feedback?: string }) => {
         setOutcomeState((prev) => {
@@ -176,23 +191,35 @@ function ChatConversation({
               criteria: prev.criteria.map((c) => ({ ...c, status: "passed" as const })),
             };
           }
-          // Failed — parse feedback to match criteria
-          const feedbackLines = (evaluation.feedback ?? "").split("\n").filter(Boolean);
+          // Failed — try to match feedback lines to criteria
+          const feedback = evaluation.feedback ?? "";
+          const feedbackLower = feedback.toLowerCase();
           const updatedCriteria = prev.criteria.map((c) => {
-            const matchingFeedback = feedbackLines.find(
-              (f) => f.toLowerCase().includes(c.text.toLowerCase().slice(0, 20)),
+            // Check if this criterion is mentioned in feedback as failing
+            const criterionWords = c.text.toLowerCase().split(/\s+/).filter(w => w.length > 3).slice(0, 3);
+            const mentionedInFeedback = criterionWords.some(w => feedbackLower.includes(w));
+            const isNegative = mentionedInFeedback && (
+              feedbackLower.includes("❌") || feedbackLower.includes("fail") ||
+              feedbackLower.includes("missing") || feedbackLower.includes("not ") ||
+              feedbackLower.includes("incorrect") || feedbackLower.includes("wrong")
             );
-            if (matchingFeedback && (matchingFeedback.includes("❌") || matchingFeedback.includes("fail") || matchingFeedback.includes("not"))) {
-              return { ...c, status: "failed" as const, feedback: matchingFeedback };
+            if (mentionedInFeedback && isNegative) {
+              return { ...c, status: "failed" as const, feedback };
             }
+            // If not mentioned negatively, assume passed
             return { ...c, status: "passed" as const, feedback: undefined };
           });
+          // If no criteria were marked failed but overall failed, mark all as failed
+          const anyFailed = updatedCriteria.some(c => c.status === "failed");
+          const finalCriteria = anyFailed ? updatedCriteria : updatedCriteria.map(c => ({
+            ...c, status: "failed" as const, feedback,
+          }));
           const isExhausted = evaluation.iteration >= prev.maxIterations;
           return {
             ...prev,
             iteration: evaluation.iteration,
             phase: isExhausted ? "exhausted" as OutcomePhase : "failed" as OutcomePhase,
-            criteria: updatedCriteria,
+            criteria: finalCriteria,
           };
         });
       },

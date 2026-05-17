@@ -242,6 +242,11 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 			}
 		case agents.ProviderEventOutcomeEvaluation:
 			if evt.OutcomeResult != nil {
+				log.WithFields(log.Fields{
+					"iteration": evt.OutcomeResult.Iteration,
+					"passed":    evt.OutcomeResult.Passed,
+					"feedback":  evt.OutcomeResult.Feedback,
+				}).Debug("outcome evaluation result")
 				publish(messages.AgentSessionEventMessage{
 					Event: "outcome_evaluation_end",
 					Extra: map[string]any{
