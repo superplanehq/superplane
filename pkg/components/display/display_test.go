@@ -82,4 +82,25 @@ func Test__Display__Execute(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, DisplayExecutionResult{Message: "Done", Color: "blue"}, result)
 	})
+
+	t.Run("uses color_expression when color mode is calculate_color", func(t *testing.T) {
+		stateCtx := &contexts.ExecutionStateContext{}
+		metadataCtx := &contexts.MetadataContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"message":          "Status",
+				"color":            "calculate_color",
+				"color_expression": "red",
+			},
+			ExecutionState: stateCtx,
+			Metadata:       metadataCtx,
+		})
+
+		assert.NoError(t, err)
+
+		result, ok := metadataCtx.Metadata.(DisplayExecutionResult)
+		assert.True(t, ok)
+		assert.Equal(t, DisplayExecutionResult{Message: "Status", Color: "red"}, result)
+	})
 }

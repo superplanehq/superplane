@@ -3,6 +3,7 @@ package display
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -11,6 +12,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
+const calculateColorValue = "calculate_color"
+const defaultDisplayColor = "gray"
+
 func init() {
 	registry.RegisterAction("display", &Display{})
 }
@@ -18,8 +22,9 @@ func init() {
 type Display struct{}
 
 type Spec struct {
-	Message string `json:"message"`
-	Color   string `json:"color"`
+	Message         string `json:"message" mapstructure:"message"`
+	Color           string `json:"color" mapstructure:"color"`
+	ColorExpression string `json:"color_expression" mapstructure:"color_expression"`
 }
 
 type Result struct {
@@ -148,7 +153,7 @@ func (c *Display) Execute(ctx core.ExecutionContext) error {
 
 	displayExecutionResult := DisplayExecutionResult{
 		Message: spec.Message,
-		Color:   spec.Color,
+		Color:   resolveDisplayColor(spec),
 	}
 
 	if err := ctx.Metadata.Set(displayExecutionResult); err != nil {
@@ -188,4 +193,22 @@ func (c *Display) Hooks() []core.Hook {
 
 func (c *Display) HandleHook(ctx core.ActionHookContext) error {
 	return nil
+}
+
+func resolveDisplayColor(spec Spec) string {
+	if spec.Color != calculateColorValue {
+		return normalizeDisplayColor(spec.Color)
+	}
+
+	return normalizeDisplayColor(spec.ColorExpression)
+}
+
+func normalizeDisplayColor(color string) string {
+	normalized := strings.ToLower(strings.TrimSpace(color))
+	switch normalized {
+	case "green", "yellow", "red", "blue", "gray":
+		return normalized
+	default:
+		return defaultDisplayColor
+	}
 }
