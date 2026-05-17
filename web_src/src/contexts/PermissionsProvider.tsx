@@ -2,13 +2,13 @@ import React, { useCallback, useMemo } from "react";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { useMe } from "@/hooks/useMe";
 
-import { PermissionsContext } from "./permissionsContext";
+import { PermissionsContext } from "./permissionsContextState";
 
 interface PermissionsProviderProps {
   children: React.ReactNode;
 }
 
-export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ children }) => {
+export function PermissionsProvider({ children }: PermissionsProviderProps) {
   const organizationId = useOrganizationId();
   const { data: me, isLoading: meLoading } = useMe();
 
@@ -40,4 +40,4 @@ export const PermissionsProvider: React.FC<PermissionsProviderProps> = ({ childr
   return (
     <PermissionsContext.Provider value={{ permissions, isLoading, canAct }}>{children}</PermissionsContext.Provider>
   );
-};
+}

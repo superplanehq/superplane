@@ -7,9 +7,9 @@ import "./App.css";
 
 // Import pages
 import AuthGuard from "./components/AuthGuard";
-import { AccountProvider } from "./contexts/AccountContext";
+import { AccountProvider } from "./contexts/AccountProvider";
 import { useAccount } from "./contexts/useAccount";
-import { PermissionsProvider } from "./contexts/PermissionsContext";
+import { PermissionsProvider } from "./contexts/PermissionsProvider";
 import { RequirePermission } from "./components/PermissionGate";
 import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";

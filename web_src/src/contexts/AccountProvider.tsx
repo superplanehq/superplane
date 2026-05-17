@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { posthog } from "@/posthog";
 
-import { AccountContext, type AccountContextType } from "./accountContext";
+import { AccountContext, type AccountContextType } from "./accountContextState";
 
 interface AccountProviderProps {
   children: React.ReactNode;
 }
 
-export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) => {
+export function AccountProvider({ children }: AccountProviderProps) {
   const [account, setAccount] = useState<AccountContextType["account"]>(null);
   const [loading, setLoading] = useState(true);
   const [setupRequired, setSetupRequired] = useState(false);
@@ -50,4 +50,4 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
   }, []);
 
   return <AccountContext.Provider value={{ account, loading, setupRequired }}>{children}</AccountContext.Provider>;
-};
+}
