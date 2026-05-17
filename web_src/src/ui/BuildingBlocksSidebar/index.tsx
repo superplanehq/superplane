@@ -176,7 +176,11 @@ function OpenBuildingBlocksSidebar({
         return aOrder - bOrder;
       }
 
-      if (showConnectedIntegrationsOnTop && aOrder === integrationCategoryOrder && bOrder === integrationCategoryOrder) {
+      if (
+        showConnectedIntegrationsOnTop &&
+        aOrder === integrationCategoryOrder &&
+        bOrder === integrationCategoryOrder
+      ) {
         const aIntegrationName = a.blocks.find((block) => block.integrationName)?.integrationName;
         const bIntegrationName = b.blocks.find((block) => block.integrationName)?.integrationName;
 
