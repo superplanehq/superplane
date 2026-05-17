@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { useDeleteRole, useOrganizationRoles } from "../../../hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { showErrorToast } from "@/lib/toast";
 

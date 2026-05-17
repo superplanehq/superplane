@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAccount } from "../../contexts/AccountContext";
+import { useAccount } from "../../contexts/useAccount";
 
 type AuthConfig = {
   providers: string[];

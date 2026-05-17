@@ -1,6 +1,6 @@
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
-import { useAccount } from "@/contexts/AccountContext";
+import { useAccount } from "@/contexts/useAccount";
 import { showErrorToast } from "@/lib/toast";
 import { Eye } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";

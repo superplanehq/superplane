@@ -10,7 +10,7 @@ import { useDeleteOrganization, useUpdateOrganization } from "../../../hooks/use
 import { LoadingButton } from "@/components/ui/loading-button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Switch } from "@/ui/switch";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { isChangeManagementSettingsEnabled } from "@/lib/env";
 
 interface GeneralProps {

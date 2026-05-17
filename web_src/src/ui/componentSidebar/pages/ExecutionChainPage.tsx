@@ -14,7 +14,7 @@ import type {
 import type { EventState, EventStateMap } from "../../componentBase";
 import type { ChildExecution } from "@/ui/chainItem";
 import { getExecutionDetails } from "@/pages/workflowv2/mappers";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { analytics } from "@/lib/analytics";
 
 function buildExecutionTabData(
