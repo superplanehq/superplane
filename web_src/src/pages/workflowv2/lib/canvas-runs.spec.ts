@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasEventWithExecutions, CanvasesCanvasNodeExecutionRef } from "@/api-client";
 import { makeComponentsNode } from "@/test/factories";
-import { filterRunEvents, getAggregateStatus } from "./canvas-runs";
+import { filterRunEvents, getAggregateStatus, shouldRefitRunsViewport } from "./canvas-runs";
 
 function makeExecutionRef(overrides: Partial<CanvasesCanvasNodeExecutionRef> = {}): CanvasesCanvasNodeExecutionRef {
   return {
@@ -201,5 +201,51 @@ describe("filterRunEvents", () => {
     });
 
     expect(filterRunEvents([failedEvent, completedEvent], nodes, "errors", "run checks")).toEqual([failedEvent]);
+  });
+});
+
+describe("shouldRefitRunsViewport", () => {
+  it("does not refit outside runs mode or before a run has nodes", () => {
+    expect(
+      shouldRefitRunsViewport({
+        isRunsMode: false,
+        runCanvasNodeIdsKey: "node-1",
+        previousRunCanvasNodeIdsKey: null,
+      }),
+    ).toBe(false);
+    expect(
+      shouldRefitRunsViewport({
+        isRunsMode: true,
+        runCanvasNodeIdsKey: "",
+        previousRunCanvasNodeIdsKey: null,
+      }),
+    ).toBe(false);
+  });
+
+  it("refits the first run and runs with a different node set", () => {
+    expect(
+      shouldRefitRunsViewport({
+        isRunsMode: true,
+        runCanvasNodeIdsKey: "node-1|node-2",
+        previousRunCanvasNodeIdsKey: null,
+      }),
+    ).toBe(true);
+    expect(
+      shouldRefitRunsViewport({
+        isRunsMode: true,
+        runCanvasNodeIdsKey: "node-2|node-3",
+        previousRunCanvasNodeIdsKey: "node-1|node-2",
+      }),
+    ).toBe(true);
+  });
+
+  it("keeps the current viewport when re-entering the same run node set", () => {
+    expect(
+      shouldRefitRunsViewport({
+        isRunsMode: true,
+        runCanvasNodeIdsKey: "node-1|node-2",
+        previousRunCanvasNodeIdsKey: "node-1|node-2",
+      }),
+    ).toBe(false);
   });
 });

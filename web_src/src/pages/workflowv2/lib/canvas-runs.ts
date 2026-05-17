@@ -183,6 +183,22 @@ export function findNode(nodes: ComponentsNode[], nodeId: string | undefined): C
   return nodes.find((n) => n.id === nodeId) || nodes.find((n) => n.id === baseNodeId);
 }
 
+export function shouldRefitRunsViewport({
+  isRunsMode,
+  runCanvasNodeIdsKey,
+  previousRunCanvasNodeIdsKey,
+}: {
+  isRunsMode: boolean;
+  runCanvasNodeIdsKey: string | null;
+  previousRunCanvasNodeIdsKey: string | null;
+}) {
+  if (!isRunsMode || !runCanvasNodeIdsKey) {
+    return false;
+  }
+
+  return runCanvasNodeIdsKey !== previousRunCanvasNodeIdsKey;
+}
+
 export function mergeQueueItemsWithEvents(
   events: CanvasesCanvasEventWithExecutions[],
   nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
