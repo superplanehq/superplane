@@ -61,35 +61,6 @@ export function Roles({ organizationId }: RolesProps) {
     }
   };
 
-  const getSortedData = (data: RolesRole[]) => {
-    const defaultOrder = ["org_admin", "org_owner", "org_viewer"];
-    const defaultOrderIndex = new Map(defaultOrder.map((role, index) => [role, index]));
-    const defaultRoles: RolesRole[] = [];
-    const customRoles: RolesRole[] = [];
-
-    data.forEach((role) => {
-      if (isDefaultRole(role.metadata?.name)) {
-        defaultRoles.push(role);
-      } else {
-        customRoles.push(role);
-      }
-    });
-
-    const sortedCustomRoles = [...customRoles].sort((a, b) => {
-      const aValue = (a.spec?.displayName || a.metadata?.name || "").toLowerCase();
-      const bValue = (b.spec?.displayName || b.metadata?.name || "").toLowerCase();
-      return aValue.localeCompare(bValue);
-    });
-
-    const sortedDefaultRoles = [...defaultRoles].sort((a, b) => {
-      const aIndex = defaultOrderIndex.get(a.metadata?.name || "") ?? Number.MAX_SAFE_INTEGER;
-      const bIndex = defaultOrderIndex.get(b.metadata?.name || "") ?? Number.MAX_SAFE_INTEGER;
-      return aIndex - bIndex;
-    });
-
-    return [...sortedCustomRoles, ...sortedDefaultRoles];
-  };
-
   const isDefaultRole = (roleName: string | undefined) => {
     if (!roleName) return false;
     const defaultRoles = ["org_viewer", "org_admin", "org_owner"];
@@ -97,6 +68,35 @@ export function Roles({ organizationId }: RolesProps) {
   };
 
   const filteredAndSortedRoles = useMemo(() => {
+    const getSortedData = (data: RolesRole[]) => {
+      const defaultOrder = ["org_admin", "org_owner", "org_viewer"];
+      const defaultOrderIndex = new Map(defaultOrder.map((role, index) => [role, index]));
+      const defaultRoles: RolesRole[] = [];
+      const customRoles: RolesRole[] = [];
+
+      data.forEach((role) => {
+        if (isDefaultRole(role.metadata?.name)) {
+          defaultRoles.push(role);
+        } else {
+          customRoles.push(role);
+        }
+      });
+
+      const sortedCustomRoles = [...customRoles].sort((a, b) => {
+        const aValue = (a.spec?.displayName || a.metadata?.name || "").toLowerCase();
+        const bValue = (b.spec?.displayName || b.metadata?.name || "").toLowerCase();
+        return aValue.localeCompare(bValue);
+      });
+
+      const sortedDefaultRoles = [...defaultRoles].sort((a, b) => {
+        const aIndex = defaultOrderIndex.get(a.metadata?.name || "") ?? Number.MAX_SAFE_INTEGER;
+        const bIndex = defaultOrderIndex.get(b.metadata?.name || "") ?? Number.MAX_SAFE_INTEGER;
+        return aIndex - bIndex;
+      });
+
+      return [...sortedCustomRoles, ...sortedDefaultRoles];
+    };
+
     return getSortedData(roles);
   }, [roles]);
 
