@@ -114,9 +114,9 @@ export function OAuthInvitationSettingsPanel({
             OAuth providers for email invitations
           </Label>
           <p className="text-sm text-gray-500 dark:text-gray-400 max-w-prose">
-            Applies when someone signs in with GitHub or Google and has a pending email invitation to this
-            organization. Turn the switch on to allow only the providers you select; turn it off to allow any
-            configured OAuth provider.
+            Applies when someone signs in with GitHub or Google and has a pending email invitation to this organization.
+            Turn the switch on to allow only the providers you select; turn it off to allow any configured OAuth
+            provider.
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-prose">
             Continue with email and password sign-in (when your installation allows them) are configured in the section
