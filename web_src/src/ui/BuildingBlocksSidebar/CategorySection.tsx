@@ -180,7 +180,7 @@ export function CategorySection({
     : [];
 
   const integrationState =
-    category.name === "Core" || category.name === "Memory"
+    category.name === "Core" || category.name === "Memory" || category.name === "Debugging"
       ? "ready"
       : matchingIntegrationStates.includes("ready")
         ? "ready"
@@ -202,6 +202,8 @@ export function CategorySection({
   let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
   if (category.name === "Core") {
     CategoryIcon = resolveIcon("zap");
+  } else if (category.name === "Debugging") {
+    CategoryIcon = resolveIcon("bug");
   } else if (category.name === "Memory") {
     CategoryIcon = resolveIcon("database");
   } else if (integrationName === "smtp") {

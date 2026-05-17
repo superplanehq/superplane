@@ -3,9 +3,14 @@ import type { BuildingBlock, BuildingBlockCategory } from "./BuildingBlocksSideb
 import type { TriggersTrigger, SuperplaneActionsAction, IntegrationsIntegrationDefinition } from "@/api-client";
 
 const MEMORY_COMPONENT_NAMES = new Set(["addmemory", "readmemory", "updatememory", "deletememory", "upsertmemory"]);
+const DEBUGGING_COMPONENT_NAMES = new Set(["noop", "display"]);
 
 function isMemoryBlock(block: BuildingBlock): boolean {
   return MEMORY_COMPONENT_NAMES.has((block.name || "").toLowerCase());
+}
+
+function isDebuggingBlock(block: BuildingBlock): boolean {
+  return block.type === "component" && DEBUGGING_COMPONENT_NAMES.has((block.name || "").toLowerCase());
 }
 
 // Build categories of building blocks from live data
@@ -110,37 +115,63 @@ export function buildBuildingBlockCategories(
     }
   });
 
-  // Move all memory blocks to a dedicated "memory" category.
+  // Move debugging and memory blocks into dedicated sidebar categories.
+  const debuggingBlocksByKey = new Map<string, BuildingBlock>();
   const memoryBlocksByKey = new Map<string, BuildingBlock>();
-  const categoriesWithoutMemory = liveCategories
+  const categoriesWithoutDedicated = liveCategories
     .map((category) => {
-      const nonMemoryBlocks: BuildingBlock[] = [];
+      const remainingBlocks: BuildingBlock[] = [];
       category.blocks.forEach((block) => {
+        if (isDebuggingBlock(block)) {
+          debuggingBlocksByKey.set(`${block.type}:${block.name}`, block);
+          return;
+        }
         if (isMemoryBlock(block)) {
           memoryBlocksByKey.set(`${block.type}:${block.name}`, block);
           return;
         }
-        nonMemoryBlocks.push(block);
+        remainingBlocks.push(block);
       });
 
       return {
         ...category,
-        blocks: nonMemoryBlocks,
+        blocks: remainingBlocks,
       };
     })
     .filter((category) => category.blocks.length > 0);
 
-  const memoryCategory: BuildingBlockCategory[] =
-    memoryBlocksByKey.size > 0
-      ? [
-          {
-            name: "Memory",
-            blocks: Array.from(memoryBlocksByKey.values()),
-          },
-        ]
-      : [];
+  const debuggingCategory: BuildingBlockCategory | null =
+    debuggingBlocksByKey.size > 0
+      ? {
+          name: "Debugging",
+          blocks: Array.from(debuggingBlocksByKey.values()),
+        }
+      : null;
 
-  return [...categoriesWithoutMemory, ...memoryCategory];
+  const memoryCategory: BuildingBlockCategory | null =
+    memoryBlocksByKey.size > 0
+      ? {
+          name: "Memory",
+          blocks: Array.from(memoryBlocksByKey.values()),
+        }
+      : null;
+
+  const coreCategory = categoriesWithoutDedicated.find((category) => category.name === "Core");
+  const integrationCategories = categoriesWithoutDedicated.filter((category) => category.name !== "Core");
+
+  const orderedCategories: BuildingBlockCategory[] = [];
+  if (coreCategory) {
+    orderedCategories.push(coreCategory);
+  }
+  if (debuggingCategory) {
+    orderedCategories.push(debuggingCategory);
+  }
+  if (memoryCategory) {
+    orderedCategories.push(memoryCategory);
+  }
+  orderedCategories.push(...integrationCategories);
+
+  return orderedCategories;
 }
 
 export function flattenBuildingBlocks(categories: BuildingBlockCategory[]): BuildingBlock[] {
