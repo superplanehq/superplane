@@ -7,10 +7,11 @@ import { useScrollToBottom } from "./useScrollToBottom";
 export function useLiveLogStream(executionId: string) {
   const organizationId = useOrganizationId();
   const canvasId = useCanvasId();
-  const [text, setText] = useState("");
+  const [lines, setLines] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
 
+  const text = lines.join("");
   const { scrollRef } = useScrollToBottom(text);
 
   useEffect(() => {
@@ -18,7 +19,7 @@ export function useLiveLogStream(executionId: string) {
       return;
     }
 
-    setText("");
+    setLines([]);
     setError(null);
     setIsStreaming(true);
 
@@ -27,7 +28,7 @@ export function useLiveLogStream(executionId: string) {
     (async () => {
       try {
         await stream.pump({
-          onLogLine: (t) => setText((prev) => prev + t),
+          onLogLine: (t) => setLines((ls) => [...ls, t]),
           onStreamError: (m) => setError(m),
         });
       } catch (e) {
@@ -43,5 +44,5 @@ export function useLiveLogStream(executionId: string) {
     return () => stream.stop();
   }, [organizationId, canvasId, executionId]);
 
-  return { text, error, isStreaming, scrollRef };
+  return { lines, text, error, isStreaming, scrollRef };
 }
