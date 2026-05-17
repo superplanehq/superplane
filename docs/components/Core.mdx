@@ -22,6 +22,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Add Memory" href="#add-memory" description="Add a namespaced JSON value to canvas memory" />
   <LinkCard title="Approval" href="#approval" description="Collect approvals on events" />
   <LinkCard title="Delete Memory" href="#delete-memory" description="Delete values from canvas memory by namespace and field matches" />
+  <LinkCard title="Display" href="#display" description="Display a debug message from the latest execution" />
   <LinkCard title="Filter" href="#filter" description="Filter events based on their content" />
   <LinkCard title="GraphQL Request" href="#graph-ql-request" description="Send a GraphQL query to an HTTP endpoint (GraphQL over JSON POST)" />
   <LinkCard title="HTTP Request" href="#http-request" description="Make HTTP requests" />
@@ -360,6 +361,30 @@ The Delete Memory component removes memory rows from canvas-level memory storage
   },
   "timestamp": "2026-02-28T00:00:00Z",
   "type": "memory.deleted"
+}
+```
+
+<a id="display"></a>
+
+## Display
+
+The Display component displays a debug message from the latest execution.
+
+### Use Cases
+
+- **Debugging**: Display a message from the latest execution to help debug the workflow.
+- **Notifications**: Display a message from the latest execution to notify the user.
+- **Logging**: Display a message from the latest execution to log the workflow.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "message": "Hello, World!"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "display.executed"
 }
 ```
 
