@@ -19,6 +19,7 @@ export function useDraftActions({
   chatId,
   sendMutation,
   agentMode,
+  outcomePassed,
 }: {
   messages: AgentMessage[];
   canvasId: string;
@@ -26,6 +27,7 @@ export function useDraftActions({
   chatId: string;
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   agentMode: AgentMode;
+  outcomePassed?: boolean;
 }): { latestDraft: DraftActionsSegment | null; dismiss: () => void } {
   const [, forceUpdate] = useState(0);
   const dismissedVersionIds = useRef(new Set<string>());
@@ -95,14 +97,45 @@ export function useDraftActions({
     return null;
   }, [messages]);
 
+  // Auto-detect draft when outcome passes but agent didn't output :::draft-actions
+  const [autoDetectedDraft, setAutoDetectedDraft] = useState<DraftActionsSegment | null>(null);
+  useEffect(() => {
+    if (!outcomePassed || latestDraft) {
+      setAutoDetectedDraft(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/v1/canvases/${canvasId}/versions`, {
+      headers: { "x-organization-id": organizationId },
+      credentials: "include",
+    })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (cancelled) return;
+        const versions = data?.versions ?? [];
+        const draft = versions.find((v: { metadata?: { state?: string } }) => v?.metadata?.state === "STATE_DRAFT");
+        if (draft?.metadata?.id && !dismissedVersionIds.current.has(draft.metadata.id)) {
+          setAutoDetectedDraft({
+            type: "draft-actions",
+            versionId: draft.metadata.id,
+            message: "Outcome complete — draft ready to publish",
+          });
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [outcomePassed, latestDraft, canvasId, organizationId]);
+
+  const effectiveDraft = latestDraft ?? autoDetectedDraft;
+
   // Verify the version is still a draft on mount / when version changes
   useEffect(() => {
-    if (!latestDraft) {
+    if (!effectiveDraft) {
       setVerifiedDraft(null);
       return;
     }
     let cancelled = false;
-    fetch(`/api/v1/canvases/${canvasId}/versions/${latestDraft.versionId}`, {
+    fetch(`/api/v1/canvases/${canvasId}/versions/${effectiveDraft.versionId}`, {
       headers: { "x-organization-id": organizationId },
       credentials: "include",
     })
@@ -110,7 +143,7 @@ export function useDraftActions({
       .then((data) => {
         if (cancelled) return;
         const isDraft = data?.version?.metadata?.state === "STATE_DRAFT";
-        if (!isDraft) dismissedVersionIds.current.add(latestDraft.versionId);
+        if (!isDraft) dismissedVersionIds.current.add(effectiveDraft.versionId);
         setVerifiedDraft(isDraft);
       })
       .catch(() => {
@@ -119,15 +152,16 @@ export function useDraftActions({
     return () => {
       cancelled = true;
     };
-  }, [latestDraft, canvasId, organizationId]);
+  }, [effectiveDraft, canvasId, organizationId]);
 
   const dismiss = useCallback(() => {
-    if (latestDraft) {
-      dismissedVersionIds.current.add(latestDraft.versionId);
+    if (effectiveDraft) {
+      dismissedVersionIds.current.add(effectiveDraft.versionId);
+      setAutoDetectedDraft(null);
       forceUpdate((n) => n + 1);
     }
-  }, [latestDraft]);
+  }, [effectiveDraft]);
 
-  const verified = !latestDraft || verifiedDraft === false || verifiedDraft === null ? null : latestDraft;
+  const verified = !effectiveDraft || verifiedDraft === false || verifiedDraft === null ? null : effectiveDraft;
   return { latestDraft: verified, dismiss };
 }

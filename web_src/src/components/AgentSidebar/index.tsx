@@ -317,6 +317,7 @@ function ChatConversation({
         sendMutation={sendMutation}
         agentMode={agentMode}
         isEditing={isEditing}
+        outcomePassed={outcomeState?.phase === "passed"}
       />
       <ChatComposer
         draft={draft}
@@ -342,6 +343,7 @@ function DraftActionsBar({
   sendMutation,
   agentMode,
   isEditing,
+  outcomePassed,
 }: {
   messages: AgentMessage[];
   canvasId: string;
@@ -350,6 +352,7 @@ function DraftActionsBar({
   sendMutation: ReturnType<typeof useSendAgentChatMessage>;
   agentMode: AgentMode;
   isEditing: boolean;
+  outcomePassed?: boolean;
 }) {
   const { latestDraft, dismiss } = useDraftActions({
     messages,
@@ -358,6 +361,7 @@ function DraftActionsBar({
     chatId,
     sendMutation,
     agentMode,
+    outcomePassed,
   });
   if (!latestDraft) return null;
   return (
