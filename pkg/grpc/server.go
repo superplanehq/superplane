@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
+	pbApps "github.com/superplanehq/superplane/pkg/protos/apps"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -158,6 +159,9 @@ func RunServer(
 	pbServiceAccounts.RegisterServiceAccountsServer(grpcServer, serviceAccountsService)
 
 	pbAgents.RegisterAgentsServer(grpcServer, NewAgentsService(agentService))
+
+	appsService := NewAppsService(registry)
+	pbApps.RegisterAppsServer(grpcServer, appsService)
 
 	reflection.Register(grpcServer)
 
