@@ -8,7 +8,7 @@ import type {
   NodeInfo,
   StateFunction,
   SubtitleContext,
-} from "./types";
+} from "../types";
 import type {
   ComponentBaseProps,
   ComponentBaseSpec,
@@ -18,10 +18,11 @@ import type {
 } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import { getColorClass } from "@/lib/colors";
-import { getTriggerRenderer, getState, getStateMap } from ".";
-import { calcRelativeTimeFromDiff } from "@/lib/utils";
+import { getTriggerRenderer, getState, getStateMap } from "..";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { PushThroughHandler } from "@/pages/workflowv2/components/PushThroughHandler";
+
+import { TimeGateCountdown } from "./countdown";
 
 interface Configuration {
   days?: string[];
@@ -289,47 +290,6 @@ function getTimeGateEventSubtitle(execution: ExecutionInfo, componentName: strin
 
   return timeAgo || undefined;
 }
-
-const TimeGateCountdown: React.FC<{ nextValidTime: string; timeAgo?: string | React.ReactNode }> = ({
-  nextValidTime,
-  timeAgo,
-}) => {
-  const nextRunTime = React.useMemo(() => new Date(nextValidTime), [nextValidTime]);
-  const [timeLeft, setTimeLeft] = React.useState<number>(() => nextRunTime.getTime() - Date.now());
-
-  React.useEffect(() => {
-    if (Number.isNaN(nextRunTime.getTime())) {
-      return;
-    }
-
-    const update = () => {
-      setTimeLeft(nextRunTime.getTime() - Date.now());
-    };
-
-    update();
-    const interval = setInterval(update, 1000);
-    return () => clearInterval(interval);
-  }, [nextRunTime]);
-
-  if (Number.isNaN(nextRunTime.getTime())) {
-    return <span>{timeAgo || ""}</span>;
-  }
-
-  const timeLeftText = timeLeft > 0 ? calcRelativeTimeFromDiff(timeLeft) : "Ready to run";
-  return (
-    <span>
-      Runs in {timeLeftText}
-      {timeAgo ? (
-        <>
-          {" · "}
-          {timeAgo}
-        </>
-      ) : (
-        ""
-      )}
-    </span>
-  );
-};
 
 function isTimeGatePushedThrough(execution: ExecutionInfo): boolean {
   if (!execution.updatedAt) {

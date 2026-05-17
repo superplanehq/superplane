@@ -7,13 +7,14 @@ import type {
   NodeInfo,
   OutputPayload,
   SubtitleContext,
-} from "./types";
+} from "../types";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import React from "react";
 import type { MetadataItem } from "@/ui/metadataList";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { renderTimeAgo, renderWithTimeAgo } from "@/components/TimeAgo";
-import { getTriggerRenderer } from ".";
+import { getTriggerRenderer } from "..";
+
+import { RecipientsLabel } from "./recipientsLabel";
 
 const SEND_EMAIL_EVENT_STATE_MAP: EventStateMap = {
   triggered: {
@@ -181,34 +182,6 @@ export const sendEmailMapper: ComponentBaseMapper = {
     return details;
   },
 };
-
-function RecipientsLabel({ recipients }: { recipients: SendEmailConfiguration["recipients"] }) {
-  if (!recipients || recipients.length === 0) {
-    return null;
-  }
-
-  const count = recipients.length;
-  const label = `${count} recipient${count > 1 ? "s" : ""}`;
-
-  const counts = { user: 0, role: 0, group: 0 };
-  for (const r of recipients) {
-    if (r.type in counts) counts[r.type as keyof typeof counts]++;
-  }
-
-  const parts: string[] = [];
-  if (counts.user > 0) parts.push(`${counts.user} user${counts.user > 1 ? "s" : ""}`);
-  if (counts.role > 0) parts.push(`${counts.role} role${counts.role > 1 ? "s" : ""}`);
-  if (counts.group > 0) parts.push(`${counts.group} group${counts.group > 1 ? "s" : ""}`);
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="cursor-default underline underline-offset-3 decoration-dotted decoration-1">{label}</span>
-      </TooltipTrigger>
-      <TooltipContent side="bottom">{parts.join(", ")}</TooltipContent>
-    </Tooltip>
-  );
-}
 
 function getSendEmailMetadata(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as SendEmailConfiguration;

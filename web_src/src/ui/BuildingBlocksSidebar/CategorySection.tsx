@@ -4,7 +4,7 @@ import { resolveIcon } from "@/lib/utils";
 import { ChevronRight, GripVerticalIcon, Plug } from "lucide-react";
 import { useState } from "react";
 import { toTestId } from "../../lib/testID";
-import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIcons";
+import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIconMaps";
 import { filterBlocksInCategory, type TypeFilter } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
