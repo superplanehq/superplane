@@ -2,6 +2,7 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
 import { getStateMap } from ".";
+import { getBackgroundColorClass } from "../../../lib/colors";
 
 import type {
   ComponentBaseContext,
@@ -15,16 +16,6 @@ type DisplayResult = {
   message?: string;
   color?: string;
 };
-
-const DISPLAY_BADGE_CLASSES: Record<string, string> = {
-  green: "bg-emerald-100 text-emerald-800 ring-emerald-200",
-  yellow: "bg-yellow-100 text-yellow-800 ring-yellow-200",
-  red: "bg-red-100 text-red-800 ring-red-200",
-  blue: "bg-blue-100 text-blue-800 ring-blue-200",
-  gray: "bg-gray-100 text-gray-700 ring-gray-200",
-};
-
-const DISPLAY_BADGE_DEFAULT_COLOR = "gray";
 
 export const displayMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
@@ -69,14 +60,23 @@ function Message({ lastExecution }: { lastExecution: ExecutionInfo | null }): Re
     return null;
   }
 
-  const message = lastExecution?.metadata?.display_result?.message;
+  const metadata = lastExecution?.metadata as Record<string, unknown>;
+
+  const message = metadata["message"] as string | undefined;
   if (!message) {
     return null;
   }
 
+  const color = metadata["color"] as string | undefined;
+  if (!color) {
+    return null;
+  }
+
+  const colorClass = getBackgroundColorClass(color);
+
   return (
-    <div className="px-2 py-1.5 text-left text-base max-h-20 truncate">
-      <pre>{message}</pre>
+    <div className={`px-2 py-1.5 text-left text-base max-h-20 truncate ${colorClass}`}>
+      <pre className="break-all whitespace-pre-wrap">{message}</pre>
     </div>
   );
 }

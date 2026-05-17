@@ -3,8 +3,6 @@ package display
 import (
 	"fmt"
 	"net/http"
-	"regexp"
-	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -13,14 +11,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
-const ComponentName = "display"
-const PayloadType = "display.executed"
-const DefaultColor = "gray"
-
-var expressionRegex = regexp.MustCompile(`\{\{(.*?)\}\}`)
-
 func init() {
-	registry.RegisterAction(ComponentName, &Display{})
+	registry.RegisterAction("display", &Display{})
 }
 
 type Display struct{}
@@ -36,7 +28,7 @@ type Result struct {
 }
 
 func (c *Display) Name() string {
-	return ComponentName
+	return "display"
 }
 
 func (c *Display) Label() string {
@@ -44,33 +36,23 @@ func (c *Display) Label() string {
 }
 
 func (c *Display) Description() string {
-	return "Render a message and color badge from the latest execution"
+	return "Display a debug message from the latest execution"
 }
 
 func (c *Display) Documentation() string {
-	return `The Display component resolves a message and a color from the current run payload and stores the result in execution metadata for canvas rendering.
+	return `The Display component displays a debug message from the latest execution.
 
-## Behavior
+## Use Cases
 
-1. Resolves **Message** against the run payload (supports ` + "`{{ ... }}`" + ` expressions)
-2. Resolves **Color** against the run payload (supports ` + "`{{ ... }}`" + ` expressions)
-3. Stores ` + "`display_result`" + ` in execution metadata as {message, color}
-4. Emits the incoming payload to the default output channel unchanged
+- **Debugging**: Display a message from the latest execution to help debug the workflow.
+- **Notifications**: Display a message from the latest execution to notify the user.
+- **Logging**: Display a message from the latest execution to log the workflow.
 
-## Error Handling
+## Examples
 
-Expression errors never fail the run. If resolving either field fails, the component stores:
-
-- ` + "`message`" + `: ` + "`[expression error: <message>]`" + `
-- ` + "`color`" + `: ` + "`gray`" + `
-
-## Supported Colors
-
-- ` + "`green`" + `
-- ` + "`yellow`" + `
-- ` + "`red`" + `
-- ` + "`blue`" + `
-- ` + "`gray`" + ` (default)`
+- ` + "`{{ $['Build'].data.status }}`" + `: Display the status of the build.
+- ` + "`{{ previous().data.result == 'success' ? 'green' : 'red' }}`" + `: Display as green if the previous node succeeded, otherwise red.
+`
 }
 
 func (c *Display) Icon() string {
@@ -99,14 +81,49 @@ func (c *Display) Configuration() []configuration.Field {
 			Required:    true,
 		},
 		{
-			Name:        "color",
-			Label:       "Color",
-			Type:        configuration.FieldTypeText,
-			Description: "Color for the badge (green, yellow, red, blue, gray). Supports {{ }} expressions.",
-			Required:    false,
-			Default:     DefaultColor,
+			Name:     "color",
+			Label:    "Color",
+			Type:     configuration.FieldTypeSelect,
+			Required: true,
+			Default:  "gray",
+			TypeOptions: &configuration.TypeOptions{
+				Select: &configuration.SelectTypeOptions{
+					Options: []configuration.FieldOption{
+						{
+							Label:       "Gray",
+							Value:       "gray",
+							Description: "Gray background color.",
+						},
+						{
+							Label:       "Green",
+							Value:       "green",
+							Description: "Green background color.",
+						},
+						{
+							Label:       "Red",
+							Value:       "red",
+							Description: "Red background color.",
+						},
+						{
+							Label:       "Yellow",
+							Value:       "yellow",
+							Description: "Yellow background color.",
+						},
+						{
+							Label:       "Blue",
+							Value:       "blue",
+							Description: "Blue background color.",
+						},
+					},
+				},
+			},
 		},
 	}
+}
+
+type DisplayExecutionResult struct {
+	Message string `json:"message"`
+	Color   string `json:"color"`
 }
 
 func (c *Display) Execute(ctx core.ExecutionContext) error {
@@ -115,107 +132,20 @@ func (c *Display) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	displayResult := Result{
+	displayExecutionResult := DisplayExecutionResult{
 		Message: spec.Message,
-		Color:   DefaultColor,
+		Color:   spec.Color,
 	}
 
-	message, err := resolveField(ctx.Expressions, spec.Message)
-	if err != nil {
-		displayResult = expressionErrorResult(err)
-	} else {
-		displayResult.Message = message
-		colorInput := strings.TrimSpace(spec.Color)
-		if colorInput == "" {
-			colorInput = DefaultColor
-		}
-
-		color, colorErr := resolveField(ctx.Expressions, colorInput)
-		if colorErr != nil {
-			displayResult = expressionErrorResult(colorErr)
-		} else {
-			displayResult.Color = normalizeColor(color)
-		}
-	}
-
-	if err := ctx.Metadata.Set(mergeDisplayResult(ctx.Metadata.Get(), displayResult)); err != nil {
+	if err := ctx.Metadata.Set(displayExecutionResult); err != nil {
 		return err
 	}
 
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
-		PayloadType,
-		[]any{ctx.Data},
+		"display.executed",
+		[]any{map[string]any{}},
 	)
-}
-
-func resolveField(expressions core.ExpressionContext, input string) (string, error) {
-	if !expressionRegex.MatchString(input) {
-		return input, nil
-	}
-
-	if expressions == nil {
-		return "", fmt.Errorf("expression context is not available")
-	}
-
-	var expressionErr error
-	result := expressionRegex.ReplaceAllStringFunc(input, func(match string) string {
-		matches := expressionRegex.FindStringSubmatch(match)
-		if len(matches) != 2 {
-			return match
-		}
-
-		expression := strings.TrimSpace(matches[1])
-		value, err := expressions.Run(expression)
-		if err != nil {
-			expressionErr = err
-			return ""
-		}
-
-		return fmt.Sprintf("%v", value)
-	})
-
-	if expressionErr != nil {
-		return "", expressionErr
-	}
-
-	return result, nil
-}
-
-func normalizeColor(value string) string {
-	normalized := strings.ToLower(strings.TrimSpace(value))
-	switch normalized {
-	case "green", "yellow", "red", "blue", "gray":
-		return normalized
-	default:
-		return DefaultColor
-	}
-}
-
-func expressionErrorResult(err error) Result {
-	return Result{
-		Message: fmt.Sprintf("[expression error: %s]", err.Error()),
-		Color:   DefaultColor,
-	}
-}
-
-func mergeDisplayResult(existing any, result Result) map[string]any {
-	metadata, ok := existing.(map[string]any)
-	if !ok || metadata == nil {
-		metadata = map[string]any{}
-	} else {
-		merged := make(map[string]any, len(metadata)+1)
-		for k, v := range metadata {
-			merged[k] = v
-		}
-		metadata = merged
-	}
-
-	metadata["display_result"] = map[string]any{
-		"message": result.Message,
-		"color":   result.Color,
-	}
-	return metadata
 }
 
 func (c *Display) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
