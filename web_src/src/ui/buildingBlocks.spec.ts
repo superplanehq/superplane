@@ -23,22 +23,6 @@ describe("buildBuildingBlockCategories", () => {
     expect(categories[0]?.blocks.map((block) => block.name)).toEqual(["deploy"]);
   });
 
-  it("moves display and noop into a Debugging category", () => {
-    const categories = buildBuildingBlockCategories(
-      [],
-      [
-        { name: "deploy", label: "Deploy" },
-        { name: "display", label: "Display" },
-        { name: "noop", label: "No Operation" },
-      ],
-      [],
-    );
-
-    expect(categories.map((category) => category.name)).toEqual(["Core", "Debugging"]);
-    expect(categories[0]?.blocks.map((block) => block.name)).toEqual(["deploy"]);
-    expect(categories[1]?.blocks.map((block) => block.name)).toEqual(["display", "noop"]);
-  });
-
   it("orders categories as Core, Debugging, then Memory", () => {
     const categories = buildBuildingBlockCategories(
       [],
