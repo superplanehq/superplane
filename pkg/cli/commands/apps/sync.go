@@ -32,9 +32,10 @@ func (c *syncCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
+		syncState := app.GetSyncState()
 		_, err := fmt.Fprintf(stdout, "App %q synced (status: %s)\n",
 			nameOrID,
-			app.GetSyncState().GetStatus(),
+			syncState.GetStatus(),
 		)
 		return err
 	})

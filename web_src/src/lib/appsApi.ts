@@ -84,10 +84,7 @@ function getOrganizationIdFromUrl(): string | null {
   return null;
 }
 
-async function apiFetch<T>(
-  url: string,
-  options: RequestInit & { organizationId?: string } = {},
-): Promise<T> {
+async function apiFetch<T>(url: string, options: RequestInit & { organizationId?: string } = {}): Promise<T> {
   const { organizationId, ...fetchOptions } = options;
   const orgId = organizationId ?? getOrganizationIdFromUrl();
 
@@ -140,10 +137,7 @@ export async function syncApp(appId: string, organizationId: string): Promise<{ 
   });
 }
 
-export async function getAppDashboard(
-  appId: string,
-  organizationId: string,
-): Promise<{ dashboard: AppsDashboard }> {
+export async function getAppDashboard(appId: string, organizationId: string): Promise<{ dashboard: AppsDashboard }> {
   return apiFetch(`/api/v1/apps/${appId}/dashboard`, { organizationId });
 }
 
@@ -159,25 +153,15 @@ export async function updateAppDashboard(
   });
 }
 
-export async function getAppCanvas(
-  appId: string,
-  organizationId: string,
-): Promise<{ canvas: AppsCanvas }> {
+export async function getAppCanvas(appId: string, organizationId: string): Promise<{ canvas: AppsCanvas }> {
   return apiFetch(`/api/v1/apps/${appId}/canvas`, { organizationId });
 }
 
-export async function listAppDocs(
-  appId: string,
-  organizationId: string,
-): Promise<{ docs: AppsAppDoc[] }> {
+export async function listAppDocs(appId: string, organizationId: string): Promise<{ docs: AppsAppDoc[] }> {
   return apiFetch(`/api/v1/apps/${appId}/docs`, { organizationId });
 }
 
-export async function getAppDoc(
-  appId: string,
-  path: string,
-  organizationId: string,
-): Promise<{ doc: AppsAppDoc }> {
+export async function getAppDoc(appId: string, path: string, organizationId: string): Promise<{ doc: AppsAppDoc }> {
   return apiFetch(`/api/v1/apps/${appId}/docs/${encodeURIComponent(path)}`, { organizationId });
 }
 

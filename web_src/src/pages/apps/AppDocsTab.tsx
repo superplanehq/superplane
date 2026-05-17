@@ -100,7 +100,12 @@ export function AppDocsTab({ appId, readOnly = false }: AppDocsTabProps) {
                 <div className="flex items-center gap-2">
                   {isEditing ? (
                     <>
-                      <Button variant="outline" size="sm" onClick={handleCancelEdit} disabled={updateDocMutation.isPending}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelEdit}
+                        disabled={updateDocMutation.isPending}
+                      >
                         Cancel
                       </Button>
                       <Button size="sm" onClick={handleSave} disabled={updateDocMutation.isPending}>

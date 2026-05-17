@@ -172,9 +172,7 @@ function AppCard({ app, organizationId, formatDate, canUpdateApps, canDeleteApps
         )}
 
         <div className="flex items-center justify-between">
-          <span className="text-xs text-muted-foreground">
-            Created {formatDate(app.metadata?.createdAt)}
-          </span>
+          <span className="text-xs text-muted-foreground">Created {formatDate(app.metadata?.createdAt)}</span>
           {app.syncState && (
             <div className="relative z-10">
               <SyncIndicator app={app} />

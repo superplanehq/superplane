@@ -55,33 +55,19 @@ export function AppActionsMenu({
     <div onClick={stopPropagation}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 w-7 p-0"
-            aria-label="App actions"
-            onClick={stopPropagation}
-          >
+          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" aria-label="App actions" onClick={stopPropagation}>
             <MoreVertical className="h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onClick={openDelete}
-            className="text-red-600 focus:text-red-600"
-            disabled={!canDeleteApps}
-          >
+          <DropdownMenuItem onClick={openDelete} className="text-red-600 focus:text-red-600" disabled={!canDeleteApps}>
             <Trash2 className="h-4 w-4 mr-2" />
             Delete App
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <DeleteAppDialog
-        app={app}
-        isOpen={isDeleteOpen}
-        onClose={() => setIsDeleteOpen(false)}
-      />
+      <DeleteAppDialog app={app} isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} />
     </div>
   );
 }

@@ -65,11 +65,7 @@ export function DeleteAppDialog({ app, isOpen, onClose, redirectOnDelete = false
         <Button variant="outline" onClick={handleClose} disabled={deleteMutation.isPending}>
           Cancel
         </Button>
-        <Button
-          variant="destructive"
-          onClick={handleDelete}
-          disabled={!isConfirmed || deleteMutation.isPending}
-        >
+        <Button variant="destructive" onClick={handleDelete} disabled={!isConfirmed || deleteMutation.isPending}>
           {deleteMutation.isPending ? "Deleting…" : "Delete App"}
         </Button>
       </DialogActions>

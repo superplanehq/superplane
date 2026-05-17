@@ -29,9 +29,6 @@ func findAppIDByNameOrSlug(ctx core.CommandContext, nameOrSlug string) (string, 
 
 	for _, app := range response.GetApps() {
 		metadata := app.GetMetadata()
-		if metadata == nil {
-			continue
-		}
 
 		if metadata.GetDisplayName() == nameOrSlug || metadata.GetSlug() == nameOrSlug {
 			matchID = metadata.GetId()

@@ -94,10 +94,7 @@ export function AppShellPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => setIsDeleteOpen(true)}
-                className="text-red-600 focus:text-red-600"
-              >
+              <DropdownMenuItem onClick={() => setIsDeleteOpen(true)} className="text-red-600 focus:text-red-600">
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete App
               </DropdownMenuItem>
@@ -134,25 +131,14 @@ export function AppShellPage() {
 
       {/* Tab content */}
       <div className="flex-1 overflow-hidden">
-        {activeTab === "dashboard" && (
-          <AppDashboardTab appId={appId} readOnly={!canUpdate} />
-        )}
-        {activeTab === "canvas" && (
-          <AppCanvasTab />
-        )}
-        {activeTab === "docs" && (
-          <AppDocsTab appId={appId} readOnly={!canUpdate} />
-        )}
+        {activeTab === "dashboard" && <AppDashboardTab appId={appId} readOnly={!canUpdate} />}
+        {activeTab === "canvas" && <AppCanvasTab />}
+        {activeTab === "docs" && <AppDocsTab appId={appId} readOnly={!canUpdate} />}
       </div>
 
       {/* Delete dialog */}
       {isDeleteOpen && (
-        <DeleteAppDialog
-          app={app}
-          isOpen={isDeleteOpen}
-          onClose={() => setIsDeleteOpen(false)}
-          redirectOnDelete
-        />
+        <DeleteAppDialog app={app} isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} redirectOnDelete />
       )}
     </div>
   );

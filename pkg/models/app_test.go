@@ -15,10 +15,10 @@ import (
 
 // helpers
 
-func createTestApp(t *testing.T, orgID uuid.UUID, slug string) *models.App {
+func createTestApp(t *testing.T, orgID uuid.UUID, createdBy uuid.UUID, slug string) *models.App {
 	t.Helper()
 	now := time.Now()
-	userID := uuid.New()
+	userID := createdBy
 	app := &models.App{
 		ID:             uuid.New(),
 		OrganizationID: orgID,
@@ -75,7 +75,7 @@ func Test__App__CreateApp(t *testing.T) {
 
 	t.Run("slug uniqueness constraint prevents duplicate slugs", func(t *testing.T) {
 		slug := "testorg-dupslug"
-		app1 := createTestApp(t, r.Organization.ID, slug)
+		app1 := createTestApp(t, r.Organization.ID, r.User, slug)
 		require.NotNil(t, app1)
 
 		now := time.Now()
@@ -100,7 +100,7 @@ func Test__App__FindApp(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("returns app when found", func(t *testing.T) {
-		app := createTestApp(t, r.Organization.ID, "testorg-findme")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-findme")
 
 		found, err := models.FindApp(r.Organization.ID, app.ID)
 		require.NoError(t, err)
@@ -114,14 +114,14 @@ func Test__App__FindApp(t *testing.T) {
 
 	t.Run("does not return app from different organization", func(t *testing.T) {
 		otherOrg := support.CreateOrganization(t, r, r.User)
-		app := createTestApp(t, r.Organization.ID, "testorg-wrongorg")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-wrongorg")
 
 		_, err := models.FindApp(otherOrg.ID, app.ID)
 		assert.Error(t, err)
 	})
 
 	t.Run("does not return soft-deleted app", func(t *testing.T) {
-		app := createTestApp(t, r.Organization.ID, "testorg-softdel")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-softdel")
 		require.NoError(t, app.SoftDelete())
 
 		_, err := models.FindApp(r.Organization.ID, app.ID)
@@ -135,7 +135,7 @@ func Test__App__FindAppInTransaction(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("finds app within a transaction", func(t *testing.T) {
-		app := createTestApp(t, r.Organization.ID, "testorg-txfind")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-txfind")
 
 		var found *models.App
 		err := database.Conn().Transaction(func(tx *gorm.DB) error {
@@ -155,7 +155,7 @@ func Test__App__FindAppBySlug(t *testing.T) {
 
 	t.Run("returns app by slug", func(t *testing.T) {
 		slug := "testorg-byslug"
-		app := createTestApp(t, r.Organization.ID, slug)
+		app := createTestApp(t, r.Organization.ID, r.User, slug)
 
 		found, err := models.FindAppBySlug(r.Organization.ID, slug)
 		require.NoError(t, err)
@@ -169,7 +169,7 @@ func Test__App__FindAppBySlug(t *testing.T) {
 
 	t.Run("returns error for slug in different organization", func(t *testing.T) {
 		slug := "testorg-slugdifforg"
-		createTestApp(t, r.Organization.ID, slug)
+		createTestApp(t, r.Organization.ID, r.User, slug)
 		otherOrg := support.CreateOrganization(t, r, r.User)
 
 		_, err := models.FindAppBySlug(otherOrg.ID, slug)
@@ -189,9 +189,9 @@ func Test__App__ListApps(t *testing.T) {
 	})
 
 	t.Run("returns all apps for organization", func(t *testing.T) {
-		createTestApp(t, r.Organization.ID, "testorg-list1")
-		createTestApp(t, r.Organization.ID, "testorg-list2")
-		createTestApp(t, r.Organization.ID, "testorg-list3")
+		createTestApp(t, r.Organization.ID, r.User, "testorg-list1")
+		createTestApp(t, r.Organization.ID, r.User, "testorg-list2")
+		createTestApp(t, r.Organization.ID, r.User, "testorg-list3")
 
 		apps, err := models.ListApps(r.Organization.ID.String())
 		require.NoError(t, err)
@@ -200,7 +200,7 @@ func Test__App__ListApps(t *testing.T) {
 
 	t.Run("does not return apps from other organizations", func(t *testing.T) {
 		otherOrg := support.CreateOrganization(t, r, r.User)
-		createTestApp(t, otherOrg.ID, "otherorg-app")
+		createTestApp(t, otherOrg.ID, r.User, "otherorg-app")
 
 		apps, err := models.ListApps(r.Organization.ID.String())
 		require.NoError(t, err)
@@ -212,8 +212,8 @@ func Test__App__ListApps(t *testing.T) {
 
 	t.Run("does not return soft-deleted apps", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
-		app1 := createTestApp(t, r.Organization.ID, "testorg-nodel")
-		app2 := createTestApp(t, r.Organization.ID, "testorg-deleted")
+		app1 := createTestApp(t, r.Organization.ID, r.User, "testorg-nodel")
+		app2 := createTestApp(t, r.Organization.ID, r.User, "testorg-deleted")
 		require.NoError(t, app2.SoftDelete())
 
 		apps, err := models.ListApps(r.Organization.ID.String())
@@ -224,8 +224,8 @@ func Test__App__ListApps(t *testing.T) {
 
 	t.Run("orders apps by created_at ascending", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
-		a := createTestApp(t, r.Organization.ID, "testorg-order-a")
-		b := createTestApp(t, r.Organization.ID, "testorg-order-b")
+		a := createTestApp(t, r.Organization.ID, r.User, "testorg-order-a")
+		b := createTestApp(t, r.Organization.ID, r.User, "testorg-order-b")
 
 		apps, err := models.ListApps(r.Organization.ID.String())
 		require.NoError(t, err)
@@ -241,7 +241,7 @@ func Test__App__UpdateApp(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("persists changes to app", func(t *testing.T) {
-		app := createTestApp(t, r.Organization.ID, "testorg-update")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-update")
 
 		app.DisplayName = "Updated Name"
 		app.Description = "Updated desc"
@@ -262,7 +262,7 @@ func Test__App__UpdateApp(t *testing.T) {
 	})
 
 	t.Run("sets updated_at timestamp", func(t *testing.T) {
-		app := createTestApp(t, r.Organization.ID, "testorg-updatedts")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-updatedts")
 		originalUpdated := app.UpdatedAt
 
 		// Ensure at least 1ms passes
@@ -284,7 +284,7 @@ func Test__App__SoftDelete(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("soft-deleted app is not returned by FindApp", func(t *testing.T) {
-		app := createTestApp(t, r.Organization.ID, "testorg-softdelete")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-softdelete")
 		require.NoError(t, app.SoftDelete())
 
 		_, err := models.FindApp(r.Organization.ID, app.ID)
@@ -293,7 +293,7 @@ func Test__App__SoftDelete(t *testing.T) {
 
 	t.Run("soft-deleted app is not returned by ListApps", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
-		app := createTestApp(t, r.Organization.ID, "testorg-listdel")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-listdel")
 		require.NoError(t, app.SoftDelete())
 
 		apps, err := models.ListApps(r.Organization.ID.String())
@@ -315,7 +315,7 @@ func Test__App__IsAppSlugTaken(t *testing.T) {
 
 	t.Run("returns true when slug exists", func(t *testing.T) {
 		slug := "testorg-takenslug"
-		createTestApp(t, r.Organization.ID, slug)
+		createTestApp(t, r.Organization.ID, r.User, slug)
 
 		taken, err := models.IsAppSlugTaken(slug)
 		require.NoError(t, err)
@@ -324,7 +324,7 @@ func Test__App__IsAppSlugTaken(t *testing.T) {
 
 	t.Run("soft-deleted apps still hold the slug", func(t *testing.T) {
 		slug := "testorg-delslug"
-		app := createTestApp(t, r.Organization.ID, slug)
+		app := createTestApp(t, r.Organization.ID, r.User, slug)
 		require.NoError(t, app.SoftDelete())
 
 		taken, err := models.IsAppSlugTaken(slug)
@@ -340,7 +340,7 @@ func Test__AppDoc__UpsertAndFind(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("creates a new doc", func(t *testing.T) {
-		app := createTestApp(t, r.Organization.ID, "testorg-doc-create")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-doc-create")
 		now := time.Now()
 		doc := &models.AppDoc{
 			ID:        uuid.New(),
@@ -360,7 +360,7 @@ func Test__AppDoc__UpsertAndFind(t *testing.T) {
 	})
 
 	t.Run("updates existing doc on conflict", func(t *testing.T) {
-		app := createTestApp(t, r.Organization.ID, "testorg-doc-update")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-doc-update")
 		now := time.Now()
 		doc := &models.AppDoc{
 			ID:        uuid.New(),
@@ -394,7 +394,7 @@ func Test__AppDoc__UpsertAndFind(t *testing.T) {
 	})
 
 	t.Run("FindAppDocByPath returns doc", func(t *testing.T) {
-		app := createTestApp(t, r.Organization.ID, "testorg-doc-bypath")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-doc-bypath")
 		now := time.Now()
 		doc := &models.AppDoc{
 			ID:        uuid.New(),
@@ -412,7 +412,7 @@ func Test__AppDoc__UpsertAndFind(t *testing.T) {
 	})
 
 	t.Run("FindAppDocByPath returns error when not found", func(t *testing.T) {
-		app := createTestApp(t, r.Organization.ID, "testorg-doc-notfound")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-doc-notfound")
 		_, err := models.FindAppDocByPath(app.ID, "docs/missing.md")
 		assert.Error(t, err)
 	})
@@ -422,14 +422,14 @@ func Test__AppDoc__FindAppDocsByAppID(t *testing.T) {
 	r := support.Setup(t)
 
 	t.Run("returns empty list when no docs exist", func(t *testing.T) {
-		app := createTestApp(t, r.Organization.ID, "testorg-docs-empty")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-docs-empty")
 		docs, err := models.FindAppDocsByAppID(app.ID)
 		require.NoError(t, err)
 		assert.Empty(t, docs)
 	})
 
 	t.Run("returns all docs for app ordered by path", func(t *testing.T) {
-		app := createTestApp(t, r.Organization.ID, "testorg-docs-list")
+		app := createTestApp(t, r.Organization.ID, r.User, "testorg-docs-list")
 		now := time.Now()
 		for _, path := range []string{"docs/z.md", "docs/a.md", "docs/m.md"} {
 			p := path
@@ -453,8 +453,8 @@ func Test__AppDoc__FindAppDocsByAppID(t *testing.T) {
 
 	t.Run("only returns docs for the given app", func(t *testing.T) {
 		require.NoError(t, database.TruncateTables())
-		app1 := createTestApp(t, r.Organization.ID, "testorg-docs-app1")
-		app2 := createTestApp(t, r.Organization.ID, "testorg-docs-app2")
+		app1 := createTestApp(t, r.Organization.ID, r.User, "testorg-docs-app1")
+		app2 := createTestApp(t, r.Organization.ID, r.User, "testorg-docs-app2")
 		now := time.Now()
 
 		_, err := models.UpsertAppDoc(database.Conn(), &models.AppDoc{

@@ -113,7 +113,9 @@ export function CreateAppDialog({ isOpen, onClose }: CreateAppDialogProps) {
   return (
     <Dialog size="md" open={isOpen} onClose={handleClose}>
       <DialogTitle>Create App</DialogTitle>
-      <DialogDescription>Create a new App with a blank scaffold. A Code Storage repository will be provisioned automatically.</DialogDescription>
+      <DialogDescription>
+        Create a new App with a blank scaffold. A Code Storage repository will be provisioned automatically.
+      </DialogDescription>
       <DialogBody>
         <div className="space-y-4">
           <Field>
@@ -158,9 +160,7 @@ export function CreateAppDialog({ isOpen, onClose }: CreateAppDialogProps) {
             />
           </Field>
 
-          {submitError && (
-            <p className="text-sm text-red-500">{submitError}</p>
-          )}
+          {submitError && <p className="text-sm text-red-500">{submitError}</p>}
         </div>
       </DialogBody>
       <DialogActions>

@@ -91,8 +91,8 @@ export function ConvertToAppDialog({ canvas, isOpen, onClose }: ConvertToAppDial
     <Dialog size="md" open={isOpen} onClose={handleClose}>
       <DialogTitle>Convert to App</DialogTitle>
       <DialogDescription>
-        Convert <strong>{canvas.name}</strong> to a SuperPlane App. The canvas YAML and dashboard will be exported to
-        a new Code Storage repository.
+        Convert <strong>{canvas.name}</strong> to a SuperPlane App. The canvas YAML and dashboard will be exported to a
+        new Code Storage repository.
       </DialogDescription>
       <DialogBody>
         <div className="space-y-4">
