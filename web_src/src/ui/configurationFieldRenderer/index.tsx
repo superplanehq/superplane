@@ -181,7 +181,7 @@ export const ConfigurationFieldRenderer = ({
       message: error,
       type: "validation_rule" as const,
     }));
-  }, [field, value, allValues, validationErrors, enableRealtimeValidation]);
+  }, [field, value, validationErrors, enableRealtimeValidation]);
 
   // Get field-specific validation errors
   const fieldErrors = React.useMemo(() => {
