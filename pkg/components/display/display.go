@@ -47,11 +47,6 @@ func (c *Display) Documentation() string {
 - **Debugging**: Display a message from the latest execution to help debug the workflow.
 - **Notifications**: Display a message from the latest execution to notify the user.
 - **Logging**: Display a message from the latest execution to log the workflow.
-
-## Examples
-
-- ` + "`{{ $['Build'].data.status }}`" + `: Display the status of the build.
-- ` + "`{{ previous().data.result == 'success' ? 'green' : 'red' }}`" + `: Display as green if the previous node succeeded, otherwise red.
 `
 }
 
@@ -84,7 +79,7 @@ func (c *Display) Configuration() []configuration.Field {
 			Name:        "color",
 			Label:       "Color",
 			Type:        configuration.FieldTypeSelect,
-			Description: "Background color of the display. One of gray, green, red, yellow or blue.",
+			Description: "Background color of the display.",
 			Required:    true,
 			Default:     "gray",
 			TypeOptions: &configuration.TypeOptions{
@@ -115,8 +110,26 @@ func (c *Display) Configuration() []configuration.Field {
 							Value:       "blue",
 							Description: "Blue background color.",
 						},
+						{
+							Label:       "Calculate color",
+							Value:       "calculate_color",
+							Description: "Calculate background color using {{ }} expressions.",
+						},
 					},
 				},
+			},
+		},
+		{
+			Name:        "color_expression",
+			Label:       "Color Expression",
+			Type:        configuration.FieldTypeString,
+			Placeholder: "{{ previous().data.result == 'success' ? 'green' : 'red' }}",
+			Required:    false,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "color", Values: []string{"calculate_color"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "color", Values: []string{"calculate_color"}},
 			},
 		},
 	}

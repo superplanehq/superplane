@@ -1,4 +1,3 @@
-import type { RefObject } from "react";
 import type { AuthorizationDomainType, ConfigurationField } from "../../api-client";
 
 export interface ValidationError {
@@ -22,6 +21,4 @@ export interface FieldRendererProps {
   autocompleteExampleObj?: Record<string, unknown> | null;
   allowExpressions?: boolean;
   excludedSuggestions?: string[];
-  labelRightRef?: RefObject<HTMLDivElement | null>;
-  labelRightReady?: boolean;
 }

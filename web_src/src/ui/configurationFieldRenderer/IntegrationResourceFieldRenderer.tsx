@@ -8,7 +8,6 @@ import type { ConfigurationField } from "../../api-client";
 import { useIntegrationResources } from "@/hooks/useIntegrations";
 import { toTestId } from "@/lib/testID";
 import { type RefObject, useEffect, useMemo, useState } from "react";
-import { isExpressionValue } from "./expressionValue";
 
 interface IntegrationResourceFieldRendererProps {
   field: ConfigurationField;
@@ -28,6 +27,20 @@ type SelectOption = {
   label: string;
   value: string;
 };
+
+/**
+ * Detect if value looks like a wrapped expression (e.g. {{ $["node-name"].value }}).
+ * Requires both {{ and }} so fixed IDs (e.g. channel IDs) are not misclassified.
+ * Aligns with AutoCompleteInput wrapped expression detection.
+ */
+function isExpressionValue(value: string | string[] | undefined): boolean {
+  if (value == null) return false;
+  const str = Array.isArray(value) ? value[0] : value;
+  if (typeof str !== "string") return false;
+  const trimmed = str.trim();
+  if (!trimmed.length) return false;
+  return /\{\{[\s\S]*?\}\}/.test(trimmed);
+}
 
 export const IntegrationResourceFieldRenderer = ({
   field,
