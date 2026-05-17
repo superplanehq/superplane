@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { cn } from "@/lib/utils";
 import { getUsageLimitNotice } from "@/lib/usageLimits";
 import { Text } from "../../components/Text/text";
-import { useAccount } from "../../contexts/AccountContext";
+import { useAccount } from "../../contexts/useAccount";
 
 interface Organization {
   id: string;

@@ -1,6 +1,6 @@
 import { Heading } from "@/components/Heading/heading";
 import { NotFoundPage } from "@/components/NotFoundPage";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";

@@ -1,27 +1,8 @@
-import React, { createContext, useCallback, useContext, useMemo } from "react";
-import { type AuthorizationPermission } from "@/api-client";
+import React, { useCallback, useMemo } from "react";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { useMe } from "@/hooks/useMe";
 
-interface PermissionsContextType {
-  permissions: AuthorizationPermission[];
-  isLoading: boolean;
-  canAct: (resource: string, action: string) => boolean;
-}
-
-const PermissionsContext = createContext<PermissionsContextType>({
-  permissions: [],
-  isLoading: false,
-  canAct: () => false,
-});
-
-export const usePermissions = () => {
-  const context = useContext(PermissionsContext);
-  if (!context) {
-    throw new Error("usePermissions must be used within a PermissionsProvider");
-  }
-  return context;
-};
+import { PermissionsContext } from "./permissionsContext";
 
 interface PermissionsProviderProps {
   children: React.ReactNode;
