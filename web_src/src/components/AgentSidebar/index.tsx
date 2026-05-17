@@ -167,6 +167,35 @@ function ChatConversation({
       onStatusChange: (next: string, err?: string) => {
         setStatus(next || "idle");
         setError(err ?? null);
+        // When session goes idle after grading, check if outcome is done
+        if (next === "idle") {
+          setOutcomeState((prev) => {
+            if (!prev) return prev;
+            if (prev.phase === "grading") {
+              // Grading just finished and session went idle = passed
+              return { ...prev, phase: "passed" as OutcomePhase, criteria: prev.criteria.map(c => ({ ...c, status: "passed" as const })) };
+            }
+            return prev;
+          });
+        }
+        // When streaming starts after grading ended = failed, agent is fixing
+        if (next === "streaming") {
+          setOutcomeState((prev) => {
+            if (!prev) return prev;
+            if (prev.phase === "grading" || prev.phase === "passed") {
+              // If we thought it passed but agent is working again = it failed
+              const nextIteration = prev.iteration + 1;
+              const isExhausted = nextIteration > prev.maxIterations;
+              return {
+                ...prev,
+                iteration: nextIteration,
+                phase: isExhausted ? "exhausted" as OutcomePhase : "building" as OutcomePhase,
+                criteria: prev.criteria.map(c => ({ ...c, status: "pending" as const, feedback: undefined })),
+              };
+            }
+            return prev;
+          });
+        }
       },
       onOutcomeEvent: (phase: "start" | "end", evaluation: { iteration: number; passed?: boolean; feedback?: string }) => {
         setOutcomeState((prev) => {
@@ -174,7 +203,7 @@ function ChatConversation({
           if (phase === "start") {
             return {
               ...prev,
-              iteration: evaluation.iteration,
+              iteration: evaluation.iteration > 0 ? evaluation.iteration : prev.iteration,
               phase: "grading" as OutcomePhase,
               criteria: prev.criteria.map((c) => ({
                 ...c,
@@ -182,45 +211,9 @@ function ChatConversation({
               })),
             };
           }
-          // phase === "end"
-          if (evaluation.passed) {
-            return {
-              ...prev,
-              iteration: evaluation.iteration,
-              phase: "passed" as OutcomePhase,
-              criteria: prev.criteria.map((c) => ({ ...c, status: "passed" as const })),
-            };
-          }
-          // Failed — try to match feedback lines to criteria
-          const feedback = evaluation.feedback ?? "";
-          const feedbackLower = feedback.toLowerCase();
-          const updatedCriteria = prev.criteria.map((c) => {
-            // Check if this criterion is mentioned in feedback as failing
-            const criterionWords = c.text.toLowerCase().split(/\s+/).filter(w => w.length > 3).slice(0, 3);
-            const mentionedInFeedback = criterionWords.some(w => feedbackLower.includes(w));
-            const isNegative = mentionedInFeedback && (
-              feedbackLower.includes("❌") || feedbackLower.includes("fail") ||
-              feedbackLower.includes("missing") || feedbackLower.includes("not ") ||
-              feedbackLower.includes("incorrect") || feedbackLower.includes("wrong")
-            );
-            if (mentionedInFeedback && isNegative) {
-              return { ...c, status: "failed" as const, feedback };
-            }
-            // If not mentioned negatively, assume passed
-            return { ...c, status: "passed" as const, feedback: undefined };
-          });
-          // If no criteria were marked failed but overall failed, mark all as failed
-          const anyFailed = updatedCriteria.some(c => c.status === "failed");
-          const finalCriteria = anyFailed ? updatedCriteria : updatedCriteria.map(c => ({
-            ...c, status: "failed" as const, feedback,
-          }));
-          const isExhausted = evaluation.iteration >= prev.maxIterations;
-          return {
-            ...prev,
-            iteration: evaluation.iteration,
-            phase: isExhausted ? "exhausted" as OutcomePhase : "failed" as OutcomePhase,
-            criteria: finalCriteria,
-          };
+          // phase === "end" — Anthropic doesn't send passed/feedback in SSE events
+          // We detect pass/fail from subsequent session status changes instead
+          return prev;
         });
       },
     }),
