@@ -1,0 +1,286 @@
+syntax = "proto3";
+
+package Superplane.Apps;
+
+import "canvases.proto";
+import "google/protobuf/timestamp.proto";
+import "google/api/annotations.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/superplanehq/superplane/pkg/protos/apps";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+  info: {
+    title: "SuperPlane Apps API";
+    version: "1.0";
+    description: "API for SuperPlane Apps";
+    contact: {
+      name: "API Support";
+      email: "support@superplane.com";
+    };
+  };
+  schemes: HTTPS;
+  schemes: HTTP;
+  consumes: "application/json";
+  produces: "application/json";
+};
+
+service Apps {
+  rpc ListApps(ListAppsRequest) returns (ListAppsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/apps"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List apps";
+      description: "Returns a list of all apps in the organization";
+      tags: "App";
+    };
+  }
+
+  rpc DescribeApp(DescribeAppRequest) returns (DescribeAppResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/apps/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Describe app";
+      description: "Returns an app by ID";
+      tags: "App";
+    };
+  }
+
+  rpc CreateApp(CreateAppRequest) returns (CreateAppResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/apps"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create app";
+      description: "Creates a new app with a blank scaffold";
+      tags: "App";
+    };
+  }
+
+  rpc DeleteApp(DeleteAppRequest) returns (DeleteAppResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/apps/{id}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete app";
+      description: "Deletes an app and its Code Storage repository";
+      tags: "App";
+    };
+  }
+
+  rpc SyncApp(SyncAppRequest) returns (SyncAppResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/apps/{id}/sync"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Sync app";
+      description: "Pulls the latest commit from the default branch and materializes it";
+      tags: "App";
+    };
+  }
+
+  rpc GetAppDashboard(GetAppDashboardRequest) returns (GetAppDashboardResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/apps/{app_id}/dashboard"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get app dashboard";
+      description: "Returns the dashboard for an app";
+      tags: "AppDashboard";
+    };
+  }
+
+  rpc UpdateAppDashboard(UpdateAppDashboardRequest) returns (UpdateAppDashboardResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/apps/{app_id}/dashboard"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update app dashboard";
+      description: "Updates the dashboard for an app and commits to Git";
+      tags: "AppDashboard";
+    };
+  }
+
+  rpc GetAppCanvas(GetAppCanvasRequest) returns (GetAppCanvasResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/apps/{app_id}/canvas"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get app canvas";
+      description: "Returns the canvas associated with an app";
+      tags: "AppCanvas";
+    };
+  }
+
+  rpc ListAppDocs(ListAppDocsRequest) returns (ListAppDocsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/apps/{app_id}/docs"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List app docs";
+      description: "Returns the tree of documentation files for an app";
+      tags: "AppDoc";
+    };
+  }
+
+  rpc GetAppDoc(GetAppDocRequest) returns (GetAppDocResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/apps/{app_id}/docs/{path}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get app doc";
+      description: "Returns a single documentation file by path";
+      tags: "AppDoc";
+    };
+  }
+
+  rpc UpdateAppDoc(UpdateAppDocRequest) returns (UpdateAppDocResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/apps/{app_id}/docs/{path}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update app doc";
+      description: "Creates or updates a documentation file and commits to Git";
+      tags: "AppDoc";
+    };
+  }
+}
+
+// ─── App message ─────────────────────────────────────────────────────────────
+
+message App {
+  message Metadata {
+    string id = 1;
+    string organization_id = 2;
+    string display_name = 3;
+    string slug = 4;
+    string description = 5;
+    string canvas_id = 6;
+    google.protobuf.Timestamp created_at = 7;
+    google.protobuf.Timestamp updated_at = 8;
+    string created_by_id = 9;
+  }
+
+  message SyncState {
+    string status = 1;
+    string error = 2;
+    string live_commit_sha = 3;
+    string edit_session_branch = 4;
+    string default_branch = 5;
+    string code_storage_remote_url = 6;
+    string code_storage_repo_id = 7;
+  }
+
+  Metadata metadata = 1;
+  SyncState sync_state = 2;
+}
+
+// ─── AppDoc message ──────────────────────────────────────────────────────────
+
+message AppDoc {
+  string id = 1;
+  string app_id = 2;
+  string path = 3;
+  string content = 4;
+  string sha = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+// ─── RPC request/response messages ──────────────────────────────────────────
+
+message ListAppsRequest {}
+
+message ListAppsResponse {
+  repeated App apps = 1;
+}
+
+message DescribeAppRequest {
+  string id = 1;
+}
+
+message DescribeAppResponse {
+  App app = 1;
+}
+
+message CreateAppRequest {
+  string display_name = 1;
+  string app_slug = 2;
+  string description = 3;
+}
+
+message CreateAppResponse {
+  App app = 1;
+}
+
+message DeleteAppRequest {
+  string id = 1;
+}
+
+message DeleteAppResponse {}
+
+message SyncAppRequest {
+  string id = 1;
+}
+
+message SyncAppResponse {
+  App app = 1;
+}
+
+message GetAppDashboardRequest {
+  string app_id = 1;
+}
+
+message GetAppDashboardResponse {
+  Superplane.Canvases.CanvasDashboard dashboard = 1;
+}
+
+message UpdateAppDashboardRequest {
+  string app_id = 1;
+  repeated Superplane.Canvases.DashboardPanel panels = 2;
+  repeated Superplane.Canvases.DashboardLayoutItem layout = 3;
+}
+
+message UpdateAppDashboardResponse {
+  Superplane.Canvases.CanvasDashboard dashboard = 1;
+}
+
+message GetAppCanvasRequest {
+  string app_id = 1;
+}
+
+message GetAppCanvasResponse {
+  Superplane.Canvases.Canvas canvas = 1;
+}
+
+message ListAppDocsRequest {
+  string app_id = 1;
+}
+
+message ListAppDocsResponse {
+  repeated AppDoc docs = 1;
+}
+
+message GetAppDocRequest {
+  string app_id = 1;
+  string path = 2;
+}
+
+message GetAppDocResponse {
+  AppDoc doc = 1;
+}
+
+message UpdateAppDocRequest {
+  string app_id = 1;
+  string path = 2;
+  string content = 3;
+}
+
+message UpdateAppDocResponse {
+  AppDoc doc = 1;
+}

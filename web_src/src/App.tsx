@@ -21,6 +21,8 @@ import { TemplatesPage } from "./pages/canvas/TemplatesPage";
 import { HomePage } from "./pages/home";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
+import { AppsListPage } from "./pages/apps/AppsListPage";
+import { AppShellPage } from "./pages/apps/AppShellPage";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
 import AdminLayout from "./pages/admin/AdminLayout";
 import OrganizationsListAdmin from "./pages/admin/OrganizationsList";
@@ -103,6 +105,8 @@ function AppRouter() {
                   element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
                 />
                 <Route path="canvases/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
+                <Route path="apps" element={withAuthAndPermission(AppsListPage, "apps", "read")} />
+                <Route path="apps/:appId" element={withAuthAndPermission(AppShellPage, "apps", "read")} />
                 <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
                 <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
