@@ -282,6 +282,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	}
 
 	cmds := normalizeCommands(spec.Commands)
+	brokerCommands := commandsWithLogHeaders(cmds)
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
@@ -289,7 +290,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 
 	mode := normalizeExecutionMode(spec.ExecutionMode)
 	params := CreateTaskParams{
-		Commands:       cmds,
+		Commands:       brokerCommands,
 		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  mode,

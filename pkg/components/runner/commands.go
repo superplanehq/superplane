@@ -29,6 +29,22 @@ func normalizeCommands(commands string) []string {
 	return out
 }
 
+func commandsWithLogHeaders(commands []string) []string {
+	out := make([]string, 0, len(commands))
+	for _, command := range commands {
+		out = append(out, commandWithLogHeader(command))
+	}
+	return out
+}
+
+func commandWithLogHeader(command string) string {
+	return fmt.Sprintf("printf '%%s\\n' %s >&2\n%s", shellQuote("+ "+command), command)
+}
+
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", `'"'"'`) + "'"
+}
+
 func validateCommands(commands string) error {
 	lines := normalizeCommands(commands)
 	if len(lines) == 0 {
