@@ -2,12 +2,17 @@ ARG GO_VERSION=1.26.2
 ARG UBUNTU_VERSION=22.04
 ARG BUILDER_IMAGE="ubuntu:${UBUNTU_VERSION}"
 ARG RUNNER_IMAGE="ubuntu:${UBUNTU_VERSION}"
+ARG PROTO_MODULES=authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents,usage
+ARG REST_API_PROTO_MODULES=authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Base stage with build dependencies (mirrors root Dockerfile's base).
 # ----------------------------------------------------------------------------------------------------------------------
 
 FROM ${BUILDER_IMAGE} AS base
+
+ARG PROTO_MODULES
+ARG REST_API_PROTO_MODULES
 
 WORKDIR /tmp
 
@@ -25,6 +30,9 @@ RUN bash scripts/install-nodejs.sh
 RUN bash scripts/install-postgresql-client.sh
 RUN bash scripts/install-gomigrate.sh
 RUN bash scripts/install-protoc.sh
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.6 && \
+  go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.6.0 && \
+  go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@v2.26.3
 
 WORKDIR /app
 
@@ -36,9 +44,13 @@ COPY db/migrations /app/db/migrations
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 COPY web_src web_src
 COPY protos protos
+COPY scripts/protoc.sh scripts/protoc.sh
+COPY scripts/protoc_gateway.sh scripts/protoc_gateway.sh
 COPY api/swagger api/swagger
 COPY rbac rbac
 COPY templates templates
+RUN scripts/protoc.sh "${PROTO_MODULES}" && \
+  scripts/protoc_gateway.sh "${REST_API_PROTO_MODULES}"
 
 WORKDIR /app
 
