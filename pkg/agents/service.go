@@ -28,6 +28,10 @@ const preambleTemplate = "[SuperPlane session context — refreshed every turn; 
 	"api_token: %s\n" +
 	"api_token_expires_at: %s\n" +
 	"\n" +
+	"[CLI Setup — run this FIRST before any superplane commands]\n" +
+	"superplane connect %s %s\n" +
+	"Do NOT manually write ~/.superplane.yaml — always use superplane connect.\n" +
+	"\n" +
 	"api_token scopes (exact strings on the JWT):\n" +
 	"  - org:read\n" +
 	"  - integrations:read\n" +
@@ -238,6 +242,8 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 		s.baseURL,
 		token,
 		expiresAt.UTC().Format(time.RFC3339),
+		s.baseURL,
+		token,
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
