@@ -11,7 +11,7 @@ import { buildEventInfo } from "@/pages/workflowv2/utils";
 import { computeDuration, getAggregateStatus, resolveNodeIconSlug } from "@/pages/workflowv2/lib/canvas-runs";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RUNS_CONSOLE_BADGE_COL } from "./constants";
 import { StatusBadge } from "./StatusBadge";
 import { NodeIcon } from "./NodeIcon";

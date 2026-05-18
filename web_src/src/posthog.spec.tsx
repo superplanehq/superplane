@@ -24,7 +24,7 @@ vi.mock("@/hooks/useOrganizationData", () => ({
   useOrganizationUsage: () => ({ data: null, error: null }),
 }));
 
-vi.mock("@/contexts/PermissionsContext", () => ({
+vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({ canAct: () => true, isLoading: false }),
 }));
 
@@ -32,7 +32,7 @@ vi.mock("@/lib/env", () => ({
   isUsagePageForced: () => false,
 }));
 
-import { AccountProvider } from "@/contexts/AccountContext";
+import { AccountProvider } from "@/contexts/AccountProvider";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 
 const mockAccount = {

@@ -10,7 +10,7 @@ import { useDeleteOrganization, useUpdateOrganization } from "../../../hooks/use
 import { LoadingButton } from "@/components/ui/loading-button";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { Switch } from "@/ui/switch";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { isChangeManagementSettingsEnabled } from "@/lib/env";
 
 interface GeneralProps {
@@ -32,6 +32,7 @@ export function General({ organization }: GeneralProps) {
   );
 
   const updateOrganizationMutation = useUpdateOrganization(organizationId || "");
+  const updateChangeManagementMutation = useUpdateOrganization(organizationId || "");
   const deleteOrganizationMutation = useDeleteOrganization(organizationId || "");
   const canUpdateOrg = canAct("org", "update");
   const canDeleteOrg = canAct("org", "delete");
@@ -92,11 +93,13 @@ export function General({ organization }: GeneralProps) {
     setChangeManagementMessage(null);
 
     try {
-      await updateOrganizationMutation.mutateAsync({
+      await updateChangeManagementMutation.mutateAsync({
         changeManagementEnabled: enabled,
       });
-      setChangeManagementMessage(`Change management ${enabled ? "enabled" : "disabled"}`);
-      setTimeout(() => setChangeManagementMessage(null), 3000);
+      if (enabled) {
+        setChangeManagementMessage("Change management enabled");
+        setTimeout(() => setChangeManagementMessage(null), 3000);
+      }
     } catch {
       setChangeManagementEnabled(previous);
       setChangeManagementMessage("Failed to update change management");
@@ -180,7 +183,7 @@ export function General({ organization }: GeneralProps) {
                   id="organization-change-management-switch"
                   checked={changeManagementEnabled}
                   onCheckedChange={handleChangeManagementToggle}
-                  disabled={updateOrganizationMutation.isPending || !canUpdateOrg}
+                  disabled={updateChangeManagementMutation.isPending || !canUpdateOrg}
                   aria-label="Toggle change management"
                 />
               </div>

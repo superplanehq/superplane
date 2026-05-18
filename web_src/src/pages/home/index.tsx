@@ -7,8 +7,8 @@ import { CreateCanvasModal } from "../../components/CreateCanvasModal";
 import { Heading } from "../../components/Heading/heading";
 import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
-import { useAccount } from "../../contexts/AccountContext";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { useAccount } from "../../contexts/useAccount";
+import { usePermissions } from "@/contexts/usePermissions";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import {
   CANVAS_FOLDER_COLORS,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { buildNodeMap, buildRunPresentation, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { loadPersistedFilters, savePersistedFilters } from "./filterPersistence";
 import type { TriggerOption } from "./RunFiltersPopover";

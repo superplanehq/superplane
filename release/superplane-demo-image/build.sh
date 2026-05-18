@@ -18,6 +18,13 @@ ARCH="$2"
 
 IMAGE_REPO="${DEMO_IMAGE_REPO:-ghcr.io/superplanehq/superplane-demo}"
 
+if [ ! -f "pkg/protos/me/me.pb.go" ] || [ ! -f "pkg/protos/me/me.pb.gw.go" ]; then
+  echo "Generating protobuf files"
+  make dev.up
+  make pb.gen.models
+  make pb.gen.gateway
+fi
+
 echo "Building SuperPlane demo image (${IMAGE_REPO})"
 
 docker buildx build \
