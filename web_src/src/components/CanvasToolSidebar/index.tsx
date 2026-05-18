@@ -1,11 +1,29 @@
-import { ArrowUp, ChevronRight, Loader2, SquareTerminal } from "lucide-react";
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Bot, ChevronRight, Loader2, SquareTerminal } from "lucide-react";
+import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { AgentMode } from "@/components/AgentSidebar/agentMode";
+import { ChatComposer } from "@/components/AgentSidebar/ChatComposer";
+import { isSystemNotification, formatSystemNotification } from "@/components/AgentSidebar/systemMessages";
+import { useChatScroll } from "@/components/AgentSidebar/useChatScroll";
+import { useDraftActions } from "@/components/AgentSidebar/useDraftActions";
+import { DraftActionsWidget } from "@/components/AgentSidebar/widgets/DraftActionsWidget";
+import {
+  OutcomeProgressWidget,
+  type OutcomeState,
+  type OutcomePhase,
+  type IterationEntry,
+  type GradingEntry,
+} from "@/components/AgentSidebar/widgets/OutcomeProgressWidget";
+import type { RubricCategory } from "@/components/AgentSidebar/widgets/parser";
 import { RichMessage } from "@/components/AgentSidebar/widgets/RichMessage";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
-import { useAgentChatMessages, useCanvasAgentChat, useSendAgentChatMessage } from "@/hooks/useAgentChats";
+import {
+  useAgentChatMessages,
+  useCanvasAgentChat,
+  useDefineAgentOutcome,
+  useInterruptAgentChat,
+  useSendAgentChatMessage,
+} from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
+import { cn } from "@/lib/utils";
 import { EmptyToolTab } from "./EmptyToolTab";
 import { SidebarShell } from "./SidebarShell";
 import { ToolTabsHeader } from "./ToolTabsHeader";
@@ -15,7 +33,14 @@ import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 const TAB_AGENT = "agent",
   TAB_RUNS = "runs",
   TAB_VERSIONS = "versions";
+
 type CanvasToolSidebarMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard";
+
+type OutcomeEvaluationPayload = {
+  iteration: number;
+  result?: string;
+  explanation?: string;
+};
 
 export interface CanvasToolSidebarProps {
   toolSidebarState: CanvasToolSidebarState;
@@ -38,8 +63,9 @@ export function CanvasToolSidebar({
   onToggleVersionControl,
   versionsContent,
 }: CanvasToolSidebarProps) {
-  if (!toolSidebarState.showToolSidebarToggle || !toolSidebarState.isToolSidebarOpen || !toolSidebarState.canvasId)
+  if (!toolSidebarState.showToolSidebarToggle || !toolSidebarState.isToolSidebarOpen || !toolSidebarState.canvasId) {
     return null;
+  }
 
   return (
     <OpenCanvasToolSidebar
@@ -115,7 +141,9 @@ function OpenCanvasToolSidebar({
         }
         return;
       }
+
       if (mode === "runs") onExitRunsMode?.();
+
       if (nextTab === TAB_VERSIONS) {
         if (!isVersionControlOpen) {
           toolSidebarState.openToolSidebar();
@@ -123,6 +151,7 @@ function OpenCanvasToolSidebar({
         }
         return;
       }
+
       if (isVersionControlOpen) onToggleVersionControl?.();
     },
     [isVersionControlOpen, mode, onExitRunsMode, onSelectRuns, onToggleVersionControl, toolSidebarState],
@@ -158,7 +187,73 @@ function OpenCanvasToolSidebar({
   );
 }
 
-function AgentTabPanel({ toolSidebarState }: CanvasToolSidebarProps) {
+function applyOutcomeStart(prev: OutcomeState): OutcomeState {
+  const updatedLog = [...prev.log];
+  const lastEntry = updatedLog[updatedLog.length - 1];
+
+  if (lastEntry && "phase" in lastEntry && (lastEntry as IterationEntry).phase === "building") {
+    updatedLog[updatedLog.length - 1] = { phase: "finished" };
+  }
+
+  updatedLog.push({ phase: "grading" });
+  return {
+    ...prev,
+    phase: "grading" as OutcomePhase,
+    log: updatedLog,
+  };
+}
+
+function updateGradingLog(log: OutcomeState["log"], evaluation: OutcomeEvaluationPayload): OutcomeState["log"] {
+  const updatedLog = [...log];
+
+  for (let index = updatedLog.length - 1; index >= 0; index--) {
+    const entry = updatedLog[index] as GradingEntry;
+    if (entry.phase !== "grading") {
+      continue;
+    }
+
+    updatedLog[index] = {
+      phase: evaluation.result === "satisfied" ? "satisfied" : "needs_revision",
+      explanation: evaluation.explanation,
+    };
+    break;
+  }
+
+  return updatedLog;
+}
+
+function applyOutcomeEnd(prev: OutcomeState, evaluation: OutcomeEvaluationPayload): OutcomeState {
+  if (!evaluation.result) {
+    return prev;
+  }
+
+  const updatedLog = updateGradingLog(prev.log, evaluation);
+
+  switch (evaluation.result) {
+    case "satisfied":
+      return { ...prev, phase: "passed" as OutcomePhase, log: updatedLog };
+    case "max_iterations_reached":
+      return { ...prev, phase: "exhausted" as OutcomePhase, log: updatedLog };
+    case "failed":
+    case "interrupted":
+      return { ...prev, phase: "failed" as OutcomePhase, log: updatedLog };
+  }
+
+  const nextIteration = prev.iteration + 1;
+  if (nextIteration > prev.maxIterations) {
+    return { ...prev, phase: "exhausted" as OutcomePhase, log: updatedLog };
+  }
+
+  updatedLog.push({ phase: "building" });
+  return {
+    ...prev,
+    iteration: nextIteration,
+    phase: "building" as OutcomePhase,
+    log: updatedLog,
+  };
+}
+
+function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasToolSidebarState }) {
   const canvasId = toolSidebarState.canvasId ?? "";
   const organizationId = toolSidebarState.organizationId ?? "";
   const chatQuery = useCanvasAgentChat(canvasId, organizationId, toolSidebarState.isToolSidebarOpen);
@@ -171,23 +266,63 @@ function AgentTabPanel({ toolSidebarState }: CanvasToolSidebarProps) {
       </div>
     );
   }
-  return <ChatConversation chatId={chatId} canvasId={canvasId} organizationId={organizationId} />;
+
+  return (
+    <ChatConversation
+      chatId={chatId}
+      canvasId={canvasId}
+      organizationId={organizationId}
+      agentMode={toolSidebarState.agentMode}
+      onModeSwitch={toolSidebarState.switchAgentMode}
+      isEditing={toolSidebarState.isEditing}
+    />
+  );
 }
 
 function ChatConversation({
   chatId,
   canvasId,
   organizationId,
+  agentMode,
+  onModeSwitch,
+  isEditing,
 }: {
   chatId: string;
   canvasId: string;
   organizationId: string;
+  agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
+  isEditing: boolean;
 }) {
   const messagesQuery = useAgentChatMessages(chatId, organizationId, true);
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
+  const interruptMutation = useInterruptAgentChat(organizationId);
+  const outcomeMutation = useDefineAgentOutcome(organizationId);
 
   const [status, setStatus] = useState<string>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [outcomeState, setOutcomeStateRaw] = useState<OutcomeState | null>(() => {
+    try {
+      const stored = sessionStorage.getItem(`outcome-${chatId}`);
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  const setOutcomeState = useCallback(
+    (update: OutcomeState | null | ((prev: OutcomeState | null) => OutcomeState | null)) => {
+      setOutcomeStateRaw((prev) => {
+        const next = typeof update === "function" ? update(prev) : update;
+        if (next) {
+          sessionStorage.setItem(`outcome-${chatId}`, JSON.stringify(next));
+        } else {
+          sessionStorage.removeItem(`outcome-${chatId}`);
+        }
+        return next;
+      });
+    },
+    [chatId],
+  );
 
   const messages = useMemo(
     () =>
@@ -205,65 +340,96 @@ function ChatConversation({
 
   const wsCallbacks = useMemo(
     () => ({
+      onPersistedMessage: (message: AgentMessage) => {
+        if (message.content?.includes("published") || message.content?.includes("discarded")) {
+          setOutcomeState(null);
+        }
+      },
       onStatusChange: (next: string, err?: string) => {
         setStatus(next || "idle");
         setError(err ?? null);
       },
+      onOutcomeEvent: (phase: "start" | "end", evaluation: OutcomeEvaluationPayload) => {
+        setOutcomeState((prev) => {
+          if (!prev) return prev;
+          return phase === "start" ? applyOutcomeStart(prev) : applyOutcomeEnd(prev, evaluation);
+        });
+      },
     }),
-    [],
+    [setOutcomeState],
   );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
-  const sendContent = useCallback(
+  const handleSend = useCallback(
     async (content: string) => {
-      const value = content.trim();
-      if (!value || sendMutation.isPending) return false;
+      if (!content.trim() || sendMutation.isPending) return;
       setError(null);
-      try {
-        await sendMutation.mutateAsync({ chatId, content: value });
-        return true;
-      } catch (err) {
+      await sendMutation.mutateAsync({ chatId, content, mode: agentMode }).catch((err) => {
         setError(err instanceof Error ? err.message : "failed to send message");
-        return false;
-      }
+        throw err;
+      });
     },
-    [chatId, sendMutation],
+    [agentMode, chatId, sendMutation],
   );
 
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const previousScrollHeight = useRef<number | null>(null);
+  const handleStop = useCallback(() => {
+    interruptMutation.mutate({ chatId });
+  }, [chatId, interruptMutation]);
 
-  useEffect(() => {
-    const element = scrollRef.current;
-    if (!element) return;
+  const handleQuickAction = useCallback(
+    async (action: string) => {
+      if (sendMutation.isPending) return;
+      try {
+        await sendMutation.mutateAsync({ chatId, content: action, mode: agentMode });
+      } catch {
+        // Keep the current transcript unchanged when quick actions fail.
+      }
+    },
+    [agentMode, chatId, sendMutation],
+  );
 
-    const onScroll = () => {
-      if (element.scrollTop > 24) return;
-      if (!messagesQuery.hasNextPage || messagesQuery.isFetchingNextPage) return;
-      previousScrollHeight.current = element.scrollHeight;
-      void messagesQuery.fetchNextPage();
-    };
+  const handleStartBuilding = useCallback(
+    async (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
+      const rubricText =
+        rubric.categories && rubric.categories.length > 0
+          ? `# ${rubric.title}\n\n${rubric.categories.map((category) => `## ${category.heading}\n${category.criteria.map((criterion) => `- ${criterion.text}`).join("\n")}`).join("\n\n")}`
+          : `# ${rubric.title}\n\n${rubric.criteria.map((criterion) => `- ${criterion}`).join("\n")}`;
 
-    element.addEventListener("scroll", onScroll);
-    return () => element.removeEventListener("scroll", onScroll);
-  }, [messagesQuery]);
+      setOutcomeState({
+        title: rubric.title,
+        criteria: rubric.criteria.map((criterion) => ({ text: criterion })),
+        categories: rubric.categories,
+        iteration: 1,
+        maxIterations: 3,
+        phase: "building",
+        log: [{ phase: "building" }],
+      });
 
-  useLayoutEffect(() => {
-    const element = scrollRef.current;
-    if (!element) return;
-    if (previousScrollHeight.current !== null) {
-      element.scrollTop = element.scrollHeight - previousScrollHeight.current;
-      previousScrollHeight.current = null;
-      return;
-    }
-    element.scrollTop = element.scrollHeight;
-  }, [chatId, messages.length, showThinking]);
+      try {
+        await outcomeMutation.mutateAsync({
+          chatId,
+          description: `Build a canvas based on this plan: ${rubric.title}`,
+          rubric: rubricText,
+          maxIterations: 3,
+        });
+      } catch {
+        setOutcomeState(null);
+        await sendMutation.mutateAsync({
+          chatId,
+          content: `Start building based on this plan:\n\n${rubricText}`,
+          mode: "builder",
+        });
+      }
+    },
+    [chatId, outcomeMutation, sendMutation, setOutcomeState],
+  );
 
+  const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
   const messageGroups = useMemo(() => groupMessages(messages), [messages]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div ref={scrollRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3" data-testid="agent-chat-messages">
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3" data-testid="agent-chat-messages">
         {messagesQuery.isLoading ? (
           <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
             <Loader2 className="mr-2 size-4 animate-spin" /> Loading…
@@ -278,13 +444,16 @@ function ChatConversation({
             {messageGroups.map((group) =>
               group.type === "tool-group" ? (
                 <ToolGroupRow key={group.messages[0].id} messages={group.messages} />
+              ) : group.type === "subagent-group" ? (
+                <SubagentCard key={group.messages[0].id} messages={group.messages} />
               ) : (
                 <MessageRow
                   key={group.message.id}
                   message={group.message}
                   canvasId={canvasId}
                   organizationId={organizationId}
-                  onAction={sendContent}
+                  onAction={handleQuickAction}
+                  onStartBuilding={handleStartBuilding}
                 />
               ),
             )}
@@ -293,86 +462,87 @@ function ChatConversation({
         {showThinking ? <ThinkingRow /> : null}
         {error ? <p className="px-3 py-2 text-sm text-red-600">{error}</p> : null}
       </div>
+
+      {outcomeState ? (
+        <div className="border-t border-slate-200 px-3 py-2">
+          <OutcomeProgressWidget state={outcomeState} onDismiss={() => setOutcomeState(null)} />
+        </div>
+      ) : null}
+
+      <DraftActionsBar
+        messages={messages}
+        canvasId={canvasId}
+        organizationId={organizationId}
+        chatId={chatId}
+        sendMutation={sendMutation}
+        agentMode={agentMode}
+        isEditing={isEditing}
+        outcomePassed={outcomeState?.phase === "passed"}
+        onVersionPublished={() => setOutcomeState(null)}
+      />
+
       <ChatComposer
-        key={chatId}
-        onSend={sendContent}
-        sending={sendMutation.isPending}
+        onSend={handleSend}
+        onStop={handleStop}
+        sending={status === "streaming"}
+        stopping={interruptMutation.isPending}
         statusLabel={statusLabel(status)}
+        agentMode={agentMode}
+        onModeSwitch={onModeSwitch}
+        modeDisabled={
+          status === "streaming" ||
+          (outcomeState != null && outcomeState.phase !== "passed" && outcomeState.phase !== "exhausted")
+        }
       />
     </div>
   );
 }
 
-function ChatComposer({
-  onSend,
-  sending,
-  statusLabel,
+function DraftActionsBar({
+  messages,
+  canvasId,
+  organizationId,
+  chatId,
+  sendMutation,
+  agentMode,
+  isEditing,
+  outcomePassed,
+  onVersionPublished,
 }: {
-  onSend: (content: string) => Promise<boolean>;
-  sending: boolean;
-  statusLabel: string;
+  messages: AgentMessage[];
+  canvasId: string;
+  organizationId: string;
+  chatId: string;
+  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
+  agentMode: AgentMode;
+  isEditing: boolean;
+  outcomePassed?: boolean;
+  onVersionPublished?: () => void;
 }) {
-  const [draft, setDraft] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const canSend = Boolean(draft.trim()) && !sending && !isSending;
-  const handleSend = useCallback(async () => {
-    if (!canSend) return;
-    const valueToSend = draft;
-    setDraft("");
-    setIsSending(true);
-    try {
-      const ok = await onSend(valueToSend);
-      if (!ok) {
-        setDraft((nextDraft) => (nextDraft.trim() ? nextDraft : valueToSend));
-      }
-    } finally {
-      setIsSending(false);
-    }
-  }, [canSend, draft, onSend]);
+  const { latestDraft, dismiss } = useDraftActions({
+    messages,
+    canvasId,
+    organizationId,
+    chatId,
+    sendMutation,
+    agentMode,
+    outcomePassed,
+    onVersionPublished,
+  });
+
+  if (!latestDraft) return null;
 
   return (
-    <footer className="border-t border-slate-950/15 px-3 pb-3">
-      <Textarea
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        rows={1}
-        placeholder="Ask the agent…"
-        data-testid="agent-input"
-        className={cn(
-          "min-h-9 w-full resize-none border-0 bg-transparent px-0 py-2 text-sm shadow-none",
-          "outline-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none",
-          "placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
-          "text-[rgba(10,10,10,1)] dark:bg-transparent",
-        )}
-        onKeyDown={(e) => {
-          if (e.key !== "Enter") return;
-          const nativeEvent = e.nativeEvent;
-          if ("isComposing" in nativeEvent && nativeEvent.isComposing) return;
-          if (e.shiftKey) return;
-          e.preventDefault();
-          void handleSend();
-        }}
+    <div className="border-t border-violet-200 bg-violet-50/80 px-3 py-2">
+      <DraftActionsWidget
+        versionId={latestDraft.versionId}
+        message={latestDraft.message}
+        canvasId={canvasId}
+        organizationId={organizationId}
+        isEditing={isEditing}
+        onDismiss={dismiss}
       />
-      <div className="flex items-center justify-between gap-2 pt-1">
-        <span className="min-w-0 flex-1 text-xs text-muted-foreground">{statusLabel}</span>
-        <Button
-          type="button"
-          variant="default"
-          size="icon"
-          className="size-7 shrink-0 rounded-full"
-          onClick={() => void handleSend()}
-          disabled={!canSend}
-          aria-label="Send message"
-          data-testid="agent-send-message-button"
-        >
-          {sending ? (
-            <Loader2 className="size-3.5 animate-spin" aria-hidden />
-          ) : (
-            <ArrowUp className="size-3.5" aria-hidden />
-          )}
-        </Button>
-      </div>
-    </footer>
+    </div>
   );
 }
 
@@ -381,28 +551,35 @@ const MessageRow = memo(function MessageRow({
   canvasId,
   organizationId,
   onAction,
+  onStartBuilding,
 }: {
   message: AgentMessage;
   canvasId: string;
   organizationId: string;
-  onAction: (content: string) => Promise<boolean>;
+  onAction: (action: string) => Promise<void>;
+  onStartBuilding: (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => void;
 }) {
-  const handleAction = useCallback((action: string) => onAction(action), [onAction]);
-
   if (message.role === "tool") {
     return <ToolMessageRow message={message} />;
+  }
+
+  if (message.role === "system" || (message.role === "user" && isSystemNotification(message.content))) {
+    const text = message.role === "system" ? formatSystemNotification(message.content) : message.content;
+    return (
+      <div className="flex justify-center">
+        <span className="px-2 text-[11px] italic text-slate-400">{text}</span>
+      </div>
+    );
   }
 
   const isUser = message.role === "user";
 
   return (
-    <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
+    <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       <div
         className={cn(
-          "break-words text-sm",
-          isUser
-            ? "max-w-[85%] rounded-lg bg-slate-100 px-3 py-2 whitespace-pre-wrap text-slate-900"
-            : "max-w-[720px] text-slate-900",
+          "max-w-[85%] break-words rounded-lg px-3 py-2 text-sm",
+          isUser ? "bg-violet-600 text-white whitespace-pre-wrap" : "bg-slate-100 text-slate-900",
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
@@ -411,21 +588,29 @@ const MessageRow = memo(function MessageRow({
         ) : (
           <RichMessage
             content={message.content}
-            onAction={handleAction}
+            onAction={onAction}
+            onStartBuilding={onStartBuilding}
             canvasId={canvasId}
             organizationId={organizationId}
           />
         )}
       </div>
+      {message.createdAt ? (
+        <span className="mt-0.5 px-1 text-[10px] text-slate-400">{formatTime(message.createdAt)}</span>
+      ) : null}
     </div>
   );
 });
 
-type MessageGroup = { type: "message"; message: AgentMessage } | { type: "tool-group"; messages: AgentMessage[] };
+type MessageGroup =
+  | { type: "message"; message: AgentMessage }
+  | { type: "tool-group"; messages: AgentMessage[] }
+  | { type: "subagent-group"; messages: AgentMessage[] };
 
 function groupMessages(messages: AgentMessage[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
   let toolBuffer: AgentMessage[] = [];
+  let subagentBuffer: AgentMessage[] = [];
 
   function flushTools() {
     if (toolBuffer.length > 0) {
@@ -434,17 +619,105 @@ function groupMessages(messages: AgentMessage[]): MessageGroup[] {
     }
   }
 
-  for (const message of messages) {
-    if (message.role === "tool") {
-      toolBuffer.push(message);
-    } else {
-      flushTools();
-      groups.push({ type: "message", message });
+  function flushSubagents() {
+    if (subagentBuffer.length > 0) {
+      groups.push({ type: "subagent-group", messages: [...subagentBuffer] });
+      subagentBuffer = [];
     }
   }
 
+  for (const message of messages) {
+    if (message.role === "tool" && message.toolName?.startsWith("subagent:")) {
+      flushTools();
+      if (shouldStartNewSubagentGroup(subagentBuffer, message)) {
+        flushSubagents();
+      }
+      subagentBuffer.push(message);
+      continue;
+    }
+
+    if (message.role === "tool") {
+      flushSubagents();
+      toolBuffer.push(message);
+      continue;
+    }
+
+    flushTools();
+    flushSubagents();
+    groups.push({ type: "message", message });
+  }
+
   flushTools();
+  flushSubagents();
   return groups;
+}
+
+function shouldStartNewSubagentGroup(buffer: AgentMessage[], message: AgentMessage): boolean {
+  if (buffer.length === 0) {
+    return false;
+  }
+
+  if (buffer[0]?.toolName !== message.toolName) {
+    return true;
+  }
+
+  const hasStarted = buffer.some((entry) => entry.toolStatus === "started");
+  const hasFinished = buffer.some((entry) => entry.toolStatus === "finished");
+
+  if (hasStarted && hasFinished) {
+    return true;
+  }
+
+  if (message.toolStatus === "started" && hasStarted) {
+    return true;
+  }
+
+  if (message.toolStatus === "finished" && hasFinished) {
+    return true;
+  }
+
+  return false;
+}
+
+function SubagentCard({ messages }: { messages: AgentMessage[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const sent = messages.find((message) => message.toolStatus === "started");
+  const received = messages.find((message) => message.toolStatus === "finished");
+  const isRunning = Boolean(sent) && !received;
+  const agentName = (sent?.toolName || received?.toolName || "subagent:").replace("subagent:", "");
+  const question = sent?.content || "";
+  const response = received?.content || "";
+
+  return (
+    <div className="py-1 text-sm" data-testid="subagent-card">
+      <button
+        type="button"
+        onClick={() => setExpanded((current) => !current)}
+        className="flex cursor-pointer items-center gap-2 text-slate-700 hover:text-slate-900"
+      >
+        <Bot className="size-4 shrink-0" />
+        <span>{agentName}</span>
+        <span className={cn("text-[10px] font-medium", isRunning ? "text-blue-600" : "text-emerald-600")}>
+          {isRunning ? "Working…" : "Done"}
+        </span>
+        <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} />
+      </button>
+      {expanded ? (
+        <div className="mt-2 space-y-2 pl-6">
+          {question ? (
+            <p className="text-xs italic text-slate-500">
+              "{question.length > 200 ? `${question.slice(0, 200)}…` : question}"
+            </p>
+          ) : null}
+          {response ? (
+            <div className="max-h-60 overflow-y-auto">
+              <p className="whitespace-pre-wrap text-xs text-slate-700">{response}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
@@ -459,7 +732,7 @@ function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
     <div className={cn("py-1 text-sm", hasRunning && "animate-tool-glow")} data-testid="agent-tool-group">
       <button
         type="button"
-        onClick={() => setExpanded((previous) => !previous)}
+        onClick={() => setExpanded((current) => !current)}
         className="flex cursor-pointer items-center gap-2 text-slate-700 hover:text-slate-900"
       >
         <SquareTerminal className="size-4 shrink-0" />
@@ -478,17 +751,21 @@ function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
 }
 
 function ToolMessageRow({ message }: { message: AgentMessage }) {
-  const [expanded, setExpanded] = useState(true);
+  const running = message.toolStatus === "started";
+  const [expanded, setExpanded] = useState(running);
   const command = message.content;
   const canExpand = Boolean(command);
-  const running = message.toolStatus === "started";
   const preview = command ? command.split("\n")[0].substring(0, 80) : "command";
+
+  useEffect(() => {
+    setExpanded(running);
+  }, [running]);
 
   return (
     <div className="text-xs" data-testid="agent-tool-message">
       <button
         type="button"
-        onClick={() => canExpand && setExpanded((previous) => !previous)}
+        onClick={() => canExpand && setExpanded((current) => !current)}
         disabled={!canExpand}
         className={cn(
           "flex w-full items-center gap-1.5 text-left",
@@ -533,4 +810,9 @@ function statusLabel(status: string): string {
     default:
       return "Ready";
   }
+}
+
+function formatTime(iso: string): string {
+  const date = new Date(iso);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
