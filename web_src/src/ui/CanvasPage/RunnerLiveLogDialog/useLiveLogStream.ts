@@ -1,47 +1,134 @@
 import { useCanvasId } from "@/hooks/useCanvasId";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { LiveLogStream } from "./liveLogStream";
+import type { CommandSection, LogState } from "./types";
 import { useScrollToBottom } from "./useScrollToBottom";
+
+const initialLogState: LogState = {
+  sections: [],
+  orphanLines: [],
+  error: null,
+  isStreaming: false,
+};
+
+function appendLineToLatestSection(state: LogState, text: string): LogState {
+  if (state.sections.length === 0) {
+    return {
+      ...state,
+      orphanLines: [...state.orphanLines, text],
+    };
+  }
+
+  const nextSections = [...state.sections];
+  const lastSectionIndex = nextSections.length - 1;
+  nextSections[lastSectionIndex] = {
+    ...nextSections[lastSectionIndex],
+    lines: [...nextSections[lastSectionIndex].lines, text],
+  };
+  return {
+    ...state,
+    sections: nextSections,
+  };
+}
+
+function pushCommandSection(state: LogState, index: number, text: string): LogState {
+  const section: CommandSection = {
+    index,
+    text,
+    lines: [],
+    status: "running",
+    duration_ms: null,
+    collapsed: false,
+  };
+
+  return {
+    ...state,
+    sections: [...state.sections, section],
+  };
+}
+
+function completeCommandSection(
+  state: LogState,
+  index: number,
+  status: "passed" | "failed",
+  durationMs: number,
+): LogState {
+  const nextSections = state.sections.map((section) => {
+    if (section.index !== index) {
+      return section;
+    }
+    return {
+      ...section,
+      status,
+      duration_ms: durationMs,
+      collapsed: status === "passed",
+    };
+  });
+
+  return {
+    ...state,
+    sections: nextSections,
+  };
+}
 
 export function useLiveLogStream(executionId: string) {
   const organizationId = useOrganizationId();
   const canvasId = useCanvasId();
-  const [text, setText] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
+  const [state, setState] = useState<LogState>(initialLogState);
 
-  const { scrollRef } = useScrollToBottom(text);
+  const scrollTrigger = useMemo(() => {
+    const lineCount = state.sections.reduce((count, section) => count + section.lines.length, 0);
+    return `${state.sections.length}:${state.orphanLines.length}:${lineCount}`;
+  }, [state.sections, state.orphanLines]);
+
+  const { scrollRef } = useScrollToBottom(scrollTrigger);
+
+  const toggleSection = useCallback((index: number) => {
+    setState((prev) => ({
+      ...prev,
+      sections: prev.sections.map((section) => {
+        if (section.index !== index || section.status !== "passed") {
+          return section;
+        }
+        return {
+          ...section,
+          collapsed: !section.collapsed,
+        };
+      }),
+    }));
+  }, []);
 
   useEffect(() => {
     if (!organizationId || !canvasId || !executionId) {
       return;
     }
 
-    setText("");
-    setError(null);
-    setIsStreaming(true);
+    setState({ ...initialLogState, isStreaming: true });
 
     const stream = new LiveLogStream(organizationId, canvasId, executionId);
 
     (async () => {
       try {
         await stream.pump({
-          onLogLine: (t) => setText((prev) => prev + t),
-          onStreamError: (m) => setError(m),
+          onLogLine: (t) => setState((prev) => appendLineToLatestSection(prev, t)),
+          onStreamError: (m) => setState((prev) => ({ ...prev, error: m })),
+          onCmdStart: (index, text) => setState((prev) => pushCommandSection(prev, index, text)),
+          onCmdEnd: (index, status, durationMs) =>
+            setState((prev) => completeCommandSection(prev, index, status, durationMs)),
         });
       } catch (e) {
         if ((e as Error).name === "AbortError") {
           return;
         }
-        setError((e as Error).message);
+        setState((prev) => ({ ...prev, error: (e as Error).message }));
       } finally {
-        setIsStreaming(false);
+        setState((prev) => ({ ...prev, isStreaming: false }));
       }
     })();
 
     return () => stream.stop();
   }, [organizationId, canvasId, executionId]);
 
-  return { text, error, isStreaming, scrollRef };
+  return { ...state, toggleSection, scrollRef };
 }
