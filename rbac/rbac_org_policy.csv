@@ -5,9 +5,14 @@ p,/roles/org_viewer,/org/*,roles,read
 p,/roles/org_viewer,/org/*,groups,read
 p,/roles/org_viewer,/org/*,members,read
 p,/roles/org_viewer,/org/*,canvases,read
+p,/roles/org_viewer,/org/*,apps,read
 p,/roles/org_viewer,/org/*,blueprints,read
 p,/roles/org_viewer,/org/*,service_accounts,read
 p,/roles/org_viewer,/org/*,agents,read
+p,/roles/org_admin,/org/*,apps,create
+p,/roles/org_admin,/org/*,apps,update
+p,/roles/org_admin,/org/*,apps,delete
+p,/roles/org_admin,/org/*,apps,sync
 p,/roles/org_admin,/org/*,canvases,create
 p,/roles/org_admin,/org/*,canvases,update
 p,/roles/org_admin,/org/*,canvases,update_version
