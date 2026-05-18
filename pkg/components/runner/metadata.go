@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/runners"
 )
 
 const (
@@ -12,15 +13,9 @@ const (
 	ExecutionMetadataTaskLog      = "runner_task_log"
 )
 
-// TaskLogSink matches the task-broker / fleet-manager JSON shape for CloudWatch-backed live logs.
-type TaskLogSink struct {
-	Type       string `json:"type"`
-	CloudWatch *struct {
-		LogGroupName  string `json:"log_group_name"`
-		LogStreamName string `json:"log_stream_name"`
-		Region        string `json:"region,omitempty"`
-	} `json:"cloudwatch,omitempty"`
-}
+// TaskLogSink matches the fleet-manager JSON shape for CloudWatch-backed live logs.
+// Kept as an alias to runners.FleetTaskLog for public API compatibility.
+type TaskLogSink = runners.FleetTaskLog
 
 func mergeExecutionMetadata(meta core.MetadataWriter, patch map[string]any) error {
 	if meta == nil {
@@ -66,7 +61,7 @@ func mergeRunnerTaskLog(meta core.MetadataWriter, brokerTaskID string, sink *Tas
 	return mergeExecutionMetadata(meta, patch)
 }
 
-func taskLogFromBrokerTask(t *Task) *TaskLogSink {
+func taskLogFromFleetTask(t *runners.FleetTask) *TaskLogSink {
 	if t == nil {
 		return nil
 	}
@@ -110,9 +105,9 @@ func taskLogFromRawWebhook(raw map[string]any) *TaskLogSink {
 	}
 	g, _ := raw["cloudwatch_log_group"].(string)
 	s, _ := raw["cloudwatch_log_stream"].(string)
-	t := &Task{
+	t := &runners.FleetTask{
 		CloudWatchLogGroup:  g,
 		CloudWatchLogStream: s,
 	}
-	return taskLogFromBrokerTask(t)
+	return taskLogFromFleetTask(t)
 }

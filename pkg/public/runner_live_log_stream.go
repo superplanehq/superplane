@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/runners"
 )
 
 func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Request) {
@@ -91,20 +92,22 @@ func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	base := strings.TrimRight(strings.TrimSpace(os.Getenv("TASK_BROKER_BASE_URL")), "/")
-	token := strings.TrimSpace(os.Getenv("TASK_BROKER_AUTH_TOKEN"))
-	if base == "" || token == "" {
+	fleetURL, authToken, err := resolveFleetForExecution(executionID)
+	if err != nil || fleetURL == "" {
 		http.Error(w, "Live logs are not configured on this installation", http.StatusServiceUnavailable)
 		return
 	}
-	upstream := base + "/v1/tasks/" + url.PathEscape(brokerTaskID) + "/live-logs"
+
+	upstream := strings.TrimRight(fleetURL, "/") + "/v1/tasks/" + url.PathEscape(brokerTaskID) + "/live-logs"
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstream, nil)
 	if err != nil {
 		http.Error(w, "Bad gateway", http.StatusBadGateway)
 		return
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	if authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+authToken)
+	}
 	req.Header.Set("Accept", "application/x-ndjson")
 	// Avoid upstream gzip; it adds latency and can buffer small NDJSON chunks.
 	req.Header.Set("Accept-Encoding", "identity")
@@ -157,4 +160,24 @@ func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
+}
+
+// resolveFleetForExecution looks up the fleet URL and auth token for a given execution.
+// It first tries to find a runner_task record linked to the execution (new architecture).
+// If none exists it falls back to the legacy TASK_BROKER_* env vars.
+func resolveFleetForExecution(executionID uuid.UUID) (fleetURL, authToken string, err error) {
+	store := runners.NewPostgresStore()
+
+	task, taskErr := store.FindTaskByExecutionID(executionID)
+	if taskErr == nil {
+		fleet, fleetErr := store.FindFleet(task.FleetID)
+		if fleetErr == nil {
+			return fleet.FleetURL, fleet.AuthToken, nil
+		}
+	}
+
+	// Fall back to legacy env vars.
+	base := strings.TrimRight(strings.TrimSpace(os.Getenv("TASK_BROKER_BASE_URL")), "/")
+	token := strings.TrimSpace(os.Getenv("TASK_BROKER_AUTH_TOKEN"))
+	return base, token, nil
 }

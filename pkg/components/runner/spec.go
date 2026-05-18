@@ -37,7 +37,11 @@ type Spec struct {
 	ExecutionMode           string                `mapstructure:"execution_mode"`
 	DockerImagePreset       string                `mapstructure:"docker_image_preset"`
 	DockerImage             string                `mapstructure:"docker_image"`
-	ExecutionTimeoutSeconds int                   `mapstructure:"execution_timeout_seconds"` // 0 = omit (broker default)
+	ExecutionTimeoutSeconds int                   `mapstructure:"execution_timeout_seconds"` // 0 = omit (fleet default)
+
+	// FleetID selects a specific registered runner fleet by UUID.
+	// When empty the runner falls back to the legacy TASK_BROKER_* env vars.
+	FleetID string `mapstructure:"fleet_id"`
 }
 
 func decodeRunnerSpec(raw any) (Spec, error) {
