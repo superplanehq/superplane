@@ -242,8 +242,6 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 		s.baseURL,
 		token,
 		expiresAt.UTC().Format(time.RFC3339),
-		s.baseURL,
-		token,
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
