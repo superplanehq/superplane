@@ -18,6 +18,18 @@ type anthropicEvent struct {
 	Error     *struct {
 		Message string `json:"message"`
 	} `json:"error"`
+	// Outcome evaluation fields (from Anthropic SSE stream)
+	Iteration   int    `json:"iteration,omitempty"`
+	Result      string `json:"result,omitempty"`      // "satisfied", "needs_revision", etc.
+	Explanation string `json:"explanation,omitempty"` // grader's prose verdict
+
+	// Multi-agent thread fields
+	AgentName           string `json:"agent_name,omitempty"`
+	FromAgentName       string `json:"from_agent_name,omitempty"`
+	ToAgentName         string `json:"to_agent_name,omitempty"`
+	SessionThreadID     string `json:"session_thread_id,omitempty"`
+	FromSessionThreadID string `json:"from_session_thread_id,omitempty"`
+	ToSessionThreadID   string `json:"to_session_thread_id,omitempty"`
 }
 
 type anthropicContentBlock struct {
@@ -30,44 +42,85 @@ type anthropicContentBlock struct {
 func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 	switch raw.Type {
 	case "agent.message":
-		return agents.ProviderEvent{
-			ProviderEventID: raw.ID,
-			Type:            agents.ProviderEventAssistantMessage,
-			Text:            redactSensitive(joinText(raw.Content)),
-		}, true
-
+		return assistantMessageEvent(raw), true
 	case "agent.tool_use":
-		return agents.ProviderEvent{
-			ProviderEventID: toolUseID(raw),
-			Type:            agents.ProviderEventToolUseStarted,
-			ToolName:        raw.Name,
-			ToolCallID:      toolUseID(raw),
-			ToolInput:       redactSensitive(renderToolInput(raw.Input)),
-		}, true
-
+		return toolEvent(raw, agents.ProviderEventToolUseStarted), true
 	case "agent.tool_result":
-		return agents.ProviderEvent{
-			ProviderEventID: toolUseID(raw),
-			Type:            agents.ProviderEventToolUseFinished,
-			ToolName:        raw.Name,
-			ToolCallID:      toolUseID(raw),
-		}, true
-
+		return toolEvent(raw, agents.ProviderEventToolUseFinished), true
 	case "session.status_idle":
 		return agents.ProviderEvent{Type: agents.ProviderEventTurnCompleted}, true
-
 	case "session.status_terminated", "session.error":
-		msg := "agent session terminated"
-		if raw.Error != nil && raw.Error.Message != "" {
-			msg = raw.Error.Message
-		}
-		return agents.ProviderEvent{
-			Type:         agents.ProviderEventSessionFailed,
-			ErrorMessage: msg,
-		}, true
+		return sessionFailedEvent(raw), true
+	case "span.outcome_evaluation_start":
+		return outcomeEvaluationStartEvent(raw), true
+	case "agent.thread_message_sent":
+		return threadMessageEvent(raw, agents.ProviderEventThreadMessageSent, raw.ToAgentName, raw.ToSessionThreadID), true
+	case "agent.thread_message_received":
+		return threadMessageEvent(raw, agents.ProviderEventThreadMessageReceived, raw.FromAgentName, raw.FromSessionThreadID), true
+	case "span.outcome_evaluation_end":
+		return outcomeEvaluationEndEvent(raw), true
 	}
 
 	return agents.ProviderEvent{}, false
+}
+
+func assistantMessageEvent(raw anthropicEvent) agents.ProviderEvent {
+	return agents.ProviderEvent{
+		ProviderEventID: raw.ID,
+		Type:            agents.ProviderEventAssistantMessage,
+		Text:            redactSensitive(joinText(raw.Content)),
+	}
+}
+
+func toolEvent(raw anthropicEvent, eventType agents.ProviderEventType) agents.ProviderEvent {
+	return agents.ProviderEvent{
+		ProviderEventID: toolUseID(raw),
+		Type:            eventType,
+		ToolName:        raw.Name,
+		ToolCallID:      toolUseID(raw),
+		ToolInput:       redactSensitive(renderToolInput(raw.Input)),
+	}
+}
+
+func sessionFailedEvent(raw anthropicEvent) agents.ProviderEvent {
+	msg := "agent session terminated"
+	if raw.Error != nil && raw.Error.Message != "" {
+		msg = raw.Error.Message
+	}
+	return agents.ProviderEvent{
+		Type:         agents.ProviderEventSessionFailed,
+		ErrorMessage: msg,
+	}
+}
+
+func outcomeEvaluationStartEvent(raw anthropicEvent) agents.ProviderEvent {
+	return agents.ProviderEvent{
+		Type: agents.ProviderEventOutcomeEvaluationStart,
+		OutcomeResult: &agents.OutcomeEvaluation{
+			Iteration: raw.Iteration,
+		},
+	}
+}
+
+func outcomeEvaluationEndEvent(raw anthropicEvent) agents.ProviderEvent {
+	return agents.ProviderEvent{
+		Type: agents.ProviderEventOutcomeEvaluation,
+		OutcomeResult: &agents.OutcomeEvaluation{
+			Iteration:   raw.Iteration,
+			Result:      raw.Result,
+			Explanation: raw.Explanation,
+		},
+	}
+}
+
+func threadMessageEvent(raw anthropicEvent, eventType agents.ProviderEventType, agentName, threadID string) agents.ProviderEvent {
+	return agents.ProviderEvent{
+		ProviderEventID: raw.ID,
+		Type:            eventType,
+		Text:            redactSensitive(joinText(raw.Content)),
+		AgentName:       agentName,
+		ThreadID:        threadID,
+	}
 }
 
 // toolUseID is the tool-call identifier shared by `agent.tool_use` and the

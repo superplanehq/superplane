@@ -34,6 +34,12 @@ func (p *scriptedProvider) CreateSession(context.Context, agents.CreateSessionOp
 func (p *scriptedProvider) SendMessage(context.Context, string, string, agents.SendMessageOptions) error {
 	return errors.New("not used")
 }
+func (p *scriptedProvider) InterruptSession(context.Context, string) error {
+	return errors.New("not used")
+}
+func (p *scriptedProvider) DefineOutcome(context.Context, string, agents.DefineOutcomeOptions) error {
+	return errors.New("not used")
+}
 func (p *scriptedProvider) StreamEvents(ctx context.Context, _ string, cb func(agents.ProviderEvent) error) error {
 	for _, e := range p.events {
 		if err := cb(e); err != nil {
