@@ -14,6 +14,8 @@ const { captureException, fitViewMock, getNodesMock, reactFlowPropsRef } = vi.ho
       onConnectStart?: (...args: unknown[]) => unknown;
       onConnectEnd?: (...args: unknown[]) => unknown;
       onPaneClick?: (...args: unknown[]) => unknown;
+      onEdgeMouseEnter?: (...args: unknown[]) => unknown;
+      onEdgeMouseLeave?: (...args: unknown[]) => unknown;
     },
   },
 }));

@@ -71,6 +71,7 @@ import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
+import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
 import { RightSideControls } from "./RightSideControls";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
@@ -428,26 +429,6 @@ type EnrichedCanvasNodeCacheEntry = {
   hasHighlightedNodes: boolean;
   runParticipantKey: string;
 };
-
-function isCanvasNodeHighlighted({
-  nodeId,
-  edgeHoverActive,
-  highlightedNodeIds,
-  runDimActive,
-  runParticipantSet,
-}: {
-  nodeId: string;
-  edgeHoverActive: boolean;
-  highlightedNodeIds: Set<string>;
-  runDimActive: boolean;
-  runParticipantSet: Set<string> | null;
-}) {
-  if (edgeHoverActive) {
-    return highlightedNodeIds.has(nodeId);
-  }
-
-  return runDimActive && (runParticipantSet?.has(nodeId) ?? false);
-}
 
 function canReuseEnrichedNodeData({
   cachedNode,
@@ -2593,6 +2574,12 @@ function CanvasContent({
         runDimActive,
         runParticipantSet,
       });
+      const shouldBlankBody = shouldBlankCanvasNodeBody({
+        nodeId: node.id,
+        edgeHoverActive,
+        runDimActive,
+        runParticipantSet,
+      });
       const cachedNode = enrichedNodeCacheRef.current.get(node.id);
       const canReuseData = canReuseEnrichedNodeData({
         cachedNode,
@@ -2621,7 +2608,7 @@ function CanvasContent({
               _allEdges: state.edges,
               _isHighlighted: isHighlighted,
               _hasHighlightedNodes: hasHighlightedNodes,
-              _dimBodyBelowHeader: runDimActive && !isHighlighted,
+              _dimBodyBelowHeader: shouldBlankBody,
             };
       const enrichedNode: ReactFlowNode = {
         ...node,
