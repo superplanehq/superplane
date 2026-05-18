@@ -36,6 +36,12 @@ const TAB_AGENT = "agent",
 
 type CanvasToolSidebarMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard";
 
+type OutcomeEvaluationPayload = {
+  iteration: number;
+  result?: string;
+  explanation?: string;
+};
+
 export interface CanvasToolSidebarProps {
   toolSidebarState: CanvasToolSidebarState;
   mode?: CanvasToolSidebarMode;
@@ -181,6 +187,72 @@ function OpenCanvasToolSidebar({
   );
 }
 
+function applyOutcomeStart(prev: OutcomeState): OutcomeState {
+  const updatedLog = [...prev.log];
+  const lastEntry = updatedLog[updatedLog.length - 1];
+
+  if (lastEntry && "phase" in lastEntry && (lastEntry as IterationEntry).phase === "building") {
+    updatedLog[updatedLog.length - 1] = { phase: "finished" };
+  }
+
+  updatedLog.push({ phase: "grading" });
+  return {
+    ...prev,
+    phase: "grading" as OutcomePhase,
+    log: updatedLog,
+  };
+}
+
+function updateGradingLog(log: OutcomeState["log"], evaluation: OutcomeEvaluationPayload): OutcomeState["log"] {
+  const updatedLog = [...log];
+
+  for (let index = updatedLog.length - 1; index >= 0; index--) {
+    const entry = updatedLog[index] as GradingEntry;
+    if (entry.phase !== "grading") {
+      continue;
+    }
+
+    updatedLog[index] = {
+      phase: evaluation.result === "satisfied" ? "satisfied" : "needs_revision",
+      explanation: evaluation.explanation,
+    };
+    break;
+  }
+
+  return updatedLog;
+}
+
+function applyOutcomeEnd(prev: OutcomeState, evaluation: OutcomeEvaluationPayload): OutcomeState {
+  if (!evaluation.result) {
+    return prev;
+  }
+
+  const updatedLog = updateGradingLog(prev.log, evaluation);
+
+  switch (evaluation.result) {
+    case "satisfied":
+      return { ...prev, phase: "passed" as OutcomePhase, log: updatedLog };
+    case "max_iterations_reached":
+      return { ...prev, phase: "exhausted" as OutcomePhase, log: updatedLog };
+    case "failed":
+    case "interrupted":
+      return { ...prev, phase: "failed" as OutcomePhase, log: updatedLog };
+  }
+
+  const nextIteration = prev.iteration + 1;
+  if (nextIteration > prev.maxIterations) {
+    return { ...prev, phase: "exhausted" as OutcomePhase, log: updatedLog };
+  }
+
+  updatedLog.push({ phase: "building" });
+  return {
+    ...prev,
+    iteration: nextIteration,
+    phase: "building" as OutcomePhase,
+    log: updatedLog,
+  };
+}
+
 function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasToolSidebarState }) {
   const canvasId = toolSidebarState.canvasId ?? "";
   const organizationId = toolSidebarState.organizationId ?? "";
@@ -278,58 +350,10 @@ function ChatConversation({
         setStatus(next || "idle");
         setError(err ?? null);
       },
-      onOutcomeEvent: (
-        phase: "start" | "end",
-        evaluation: { iteration: number; result?: string; explanation?: string },
-      ) => {
+      onOutcomeEvent: (phase: "start" | "end", evaluation: OutcomeEvaluationPayload) => {
         setOutcomeState((prev) => {
           if (!prev) return prev;
-          if (phase === "start") {
-            const updatedLog = [...prev.log];
-            const lastEntry = updatedLog[updatedLog.length - 1];
-            if (lastEntry && "phase" in lastEntry && (lastEntry as IterationEntry).phase === "building") {
-              updatedLog[updatedLog.length - 1] = { phase: "finished" };
-            }
-            updatedLog.push({ phase: "grading" });
-            return {
-              ...prev,
-              phase: "grading" as OutcomePhase,
-              log: updatedLog,
-            };
-          }
-
-          if (!evaluation.result) {
-            return prev;
-          }
-
-          const updatedLog = [...prev.log];
-          for (let index = updatedLog.length - 1; index >= 0; index--) {
-            const entry = updatedLog[index] as GradingEntry;
-            if (entry.phase === "grading") {
-              updatedLog[index] = {
-                phase: evaluation.result === "satisfied" ? "satisfied" : "needs_revision",
-                explanation: evaluation.explanation,
-              };
-              break;
-            }
-          }
-
-          if (evaluation.result === "satisfied") {
-            return { ...prev, phase: "passed" as OutcomePhase, log: updatedLog };
-          }
-
-          const nextIteration = prev.iteration + 1;
-          if (nextIteration > prev.maxIterations) {
-            return { ...prev, phase: "exhausted" as OutcomePhase, log: updatedLog };
-          }
-
-          updatedLog.push({ phase: "building" });
-          return {
-            ...prev,
-            iteration: nextIteration,
-            phase: "building" as OutcomePhase,
-            log: updatedLog,
-          };
+          return phase === "start" ? applyOutcomeStart(prev) : applyOutcomeEnd(prev, evaluation);
         });
       },
     }),
@@ -614,6 +638,9 @@ function groupMessages(messages: AgentMessage[]): MessageGroup[] {
   for (const message of messages) {
     if (message.role === "tool" && message.toolName?.startsWith("subagent:")) {
       flushTools();
+      if (shouldStartNewSubagentGroup(subagentBuffer, message)) {
+        flushSubagents();
+      }
       subagentBuffer.push(message);
       continue;
     }
@@ -632,6 +659,33 @@ function groupMessages(messages: AgentMessage[]): MessageGroup[] {
   flushTools();
   flushSubagents();
   return groups;
+}
+
+function shouldStartNewSubagentGroup(buffer: AgentMessage[], message: AgentMessage): boolean {
+  if (buffer.length === 0) {
+    return false;
+  }
+
+  if (buffer[0]?.toolName !== message.toolName) {
+    return true;
+  }
+
+  const hasStarted = buffer.some((entry) => entry.toolStatus === "started");
+  const hasFinished = buffer.some((entry) => entry.toolStatus === "finished");
+
+  if (hasStarted && hasFinished) {
+    return true;
+  }
+
+  if (message.toolStatus === "started" && hasStarted) {
+    return true;
+  }
+
+  if (message.toolStatus === "finished" && hasFinished) {
+    return true;
+  }
+
+  return false;
 }
 
 function SubagentCard({ messages }: { messages: AgentMessage[] }) {
