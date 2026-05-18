@@ -312,6 +312,23 @@ func (s *TestSession) AssertDisabled(q queries.Query) {
 	}
 }
 
+func (s *TestSession) WaitUntilEnabled(q queries.Query) {
+	s.t.Logf("Waiting for %q to become enabled", q.Describe())
+
+	el := q.Run(s)
+	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
+
+	for time.Now().Before(deadline) {
+		disabled, err := el.IsDisabled()
+		if err == nil && !disabled {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	s.t.Fatalf("timed out waiting for %q to become enabled", q.Describe())
+}
+
 func (s *TestSession) PressKey(key string) {
 	s.t.Logf("Pressing key %q", key)
 
@@ -378,6 +395,34 @@ func (s *TestSession) AssertURLContains(part string) {
 	if !strings.Contains(current, part) {
 		s.t.Fatalf("expected URL to contain %q, got %q", part, current)
 	}
+}
+
+func (s *TestSession) WaitForURLContains(part string) {
+	s.t.Logf("Waiting for URL to contain %q", part)
+
+	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if strings.Contains(s.page.URL(), part) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	s.t.Fatalf("timed out waiting for URL to contain %q, last URL was %q", part, s.page.URL())
+}
+
+func (s *TestSession) WaitForURLNotContains(part string) {
+	s.t.Logf("Waiting for URL to stop containing %q", part)
+
+	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if !strings.Contains(s.page.URL(), part) {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	s.t.Fatalf("timed out waiting for URL to stop containing %q, last URL was %q", part, s.page.URL())
 }
 
 // WaitForBrowserPath polls until the URL path (ignoring query and fragment) equals expectedPath

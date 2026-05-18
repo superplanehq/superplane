@@ -95,24 +95,9 @@ func (s *canvasChangeRequestSteps) setOrganizationChangeManagementInDB(enabled b
 }
 
 func (s *canvasChangeRequestSteps) enterEditMode() {
-	editButton := q.TestID("canvas-edit-button").Run(s.session)
-	deadline := time.Now().Add(15 * time.Second)
-
-	for {
-		disabled, err := editButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			break
-		}
-
-		if time.Now().After(deadline) {
-			s.t.Fatalf("edit button did not become enabled")
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	editButton := q.TestID("canvas-edit-button")
+	s.session.WaitUntilEnabled(editButton)
+	s.session.Click(editButton)
 	s.session.AssertVisible(q.Locator(`header button:has-text("Propose Change")`))
 }
 
@@ -129,22 +114,7 @@ func (s *canvasChangeRequestSteps) addNoopNode(name string, pos models.Position)
 }
 
 func (s *canvasChangeRequestSteps) waitForProposeChangeReady() {
-	deadline := time.Now().Add(8 * time.Second)
-	propose := s.headerProposeChangeButton()
-
-	for {
-		disabled, err := propose.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			return
-		}
-
-		if time.Now().After(deadline) {
-			s.t.Fatalf("expected draft to be saved (Propose Change enabled) before proposing change")
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
+	s.session.WaitUntilEnabled(q.Locator(`header button:has-text("Propose Change")`))
 }
 
 func (s *canvasChangeRequestSteps) proposeChange() {
@@ -153,24 +123,9 @@ func (s *canvasChangeRequestSteps) proposeChange() {
 }
 
 func (s *canvasChangeRequestSteps) createChangeRequest() {
-	createButton := q.Locator(`button:has-text("Create")`).Run(s.session)
-	deadline := time.Now().Add(8 * time.Second)
-
-	for {
-		disabled, err := createButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			break
-		}
-
-		if time.Now().After(deadline) {
-			s.t.Fatalf("create change request button did not become enabled")
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	s.session.Click(q.Locator(`button:has-text("Create")`))
+	createButton := q.Locator(`button:has-text("Create")`)
+	s.session.WaitUntilEnabled(createButton)
+	s.session.Click(createButton)
 	s.session.AssertText("Change request created")
 
 	s.assertChangeRequestStatusInDB(models.CanvasChangeRequestStatusOpen)
@@ -181,12 +136,11 @@ func (s *canvasChangeRequestSteps) openCreatedChangeRequestFromList() {
 	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Versions")`))
 	s.session.AssertText("Versions")
 
-	// Pending rows are tagged in CanvasVersionControlSidebar (data-testid) so we do not rely on
-	// accessible-name collisions between pending and live "Preview v1" rows or on :has() CSS support.
-	// "View details" only mounts after liveVersions[0] exists (VersionRow previousVersion); CI can need >15s.
+	// Pending rows and their details button are tagged so the test does not depend on
+	// accessible-name collisions between pending/live preview rows or on generic tooltip buttons.
 	previewRow := s.session.Page().GetByTestId("canvas-pending-change-request-version-row")
 	require.NoError(s.t, previewRow.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
-	viewDetails := previewRow.Locator(`[aria-label="View details"]`)
+	viewDetails := s.session.Page().GetByTestId("canvas-pending-change-request-view-details-button")
 	require.NoError(s.t, viewDetails.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
 	require.NoError(s.t, viewDetails.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 
