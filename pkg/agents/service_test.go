@@ -257,6 +257,7 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	assert.Contains(t, provider.lastPreamble, canvas.ID.String())
 	assert.Contains(t, provider.lastPreamble, "api_token:")
 	assert.Contains(t, provider.lastPreamble, "api_token_expires_at:")
+	assert.Contains(t, provider.lastPreamble, "SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...")
 	assert.Contains(t, provider.lastPreamble, "  - canvases:update_version:"+canvas.ID.String())
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:publish:"+canvas.ID.String())

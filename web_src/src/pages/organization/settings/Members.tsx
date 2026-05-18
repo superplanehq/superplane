@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { Avatar } from "../../../components/Avatar/avatar";
 import { Badge } from "../../../components/Badge/badge";
 import { Icon } from "../../../components/Icon";

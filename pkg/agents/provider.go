@@ -73,4 +73,9 @@ type Provider interface {
 	StreamEvents(ctx context.Context, providerSessionID string, onEvent func(ProviderEvent) error) error
 }
 
+type ProviderSessionCleaner interface {
+	Name() string
+	DeleteSession(ctx context.Context, providerSessionID string) error
+}
+
 var ErrSessionAlreadyTerminated = errors.New("agent session already terminated")

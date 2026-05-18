@@ -1,6 +1,6 @@
 import type { CanvasesCanvasNodeQueueItem, SuperplaneComponentsNode } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { resolveNodeIconSlug } from "@/pages/workflowv2/lib/canvas-runs";
 import { cn } from "@/lib/utils";
 import { handleKeyboardActivation } from "@/lib/utils";

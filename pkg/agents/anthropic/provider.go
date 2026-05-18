@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -136,6 +137,18 @@ func (p *Provider) StreamEvents(ctx context.Context, providerSessionID string, o
 	}
 	defer body.Close()
 	return forwardSSE(ctx, body, onEvent)
+}
+
+func (p *Provider) DeleteSession(ctx context.Context, providerSessionID string) error {
+	if providerSessionID == "" {
+		return fmt.Errorf("anthropic: provider session id is required")
+	}
+
+	if _, err := p.client.executeHTTP(ctx, http.MethodDelete, "/sessions/"+url.PathEscape(providerSessionID), nil); err != nil {
+		return fmt.Errorf("anthropic: delete session: %w", err)
+	}
+
+	return nil
 }
 
 func withPreamble(message, preamble string) string {

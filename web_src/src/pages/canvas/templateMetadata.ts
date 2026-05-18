@@ -1,5 +1,5 @@
 import type { SuperplaneComponentsNode } from "@/api-client";
-import { INTEGRATION_APP_LOGO_MAP } from "@/ui/componentSidebar/integrationIcons";
+import { INTEGRATION_APP_LOGO_MAP } from "@/ui/componentSidebar/integrationIconMaps";
 
 const TEMPLATE_TAG_MAP: Record<string, string[]> = {
   "Incident Router": ["Incident Management", "AI"],

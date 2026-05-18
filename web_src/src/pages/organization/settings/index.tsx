@@ -8,7 +8,7 @@ import { CreateGroupPage } from "./CreateGroupPage";
 import { CreateRolePage } from "./CreateRolePage";
 import { Profile } from "./Profile";
 import { useOrganization } from "../../../hooks/useOrganizationData";
-import { useAccount } from "../../../contexts/AccountContext";
+import { useAccount } from "../../../contexts/useAccount";
 import { useParams } from "react-router-dom";
 import { Members } from "./Members";
 import { Integrations } from "./Integrations";
@@ -36,7 +36,7 @@ import {
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { PermissionTooltip, RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { IntegrationDetailsRoute } from "./components/IntegrationDetailsRoute";
