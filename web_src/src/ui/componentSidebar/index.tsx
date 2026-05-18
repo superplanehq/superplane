@@ -330,16 +330,6 @@ export const ComponentSidebar = ({
     setConfigureIntegrationId(integrationId);
   }, []);
 
-  // Listen for agent sidebar configure-integration events
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const { instanceId } = (e as CustomEvent).detail;
-      if (instanceId) setConfigureIntegrationId(instanceId);
-    };
-    window.addEventListener("agent:configure-integration", handler);
-    return () => window.removeEventListener("agent:configure-integration", handler);
-  }, []);
-
   const handleCloseConfigureIntegrationDialog = useCallback(() => {
     setConfigureIntegrationId(null);
     setConfigureIntegrationName("");

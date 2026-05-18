@@ -2987,19 +2987,17 @@ export function WorkflowPageV2() {
   useEffect(() => {
     const handler = (e: Event) => {
       const { integrationName, instanceId } = (e as CustomEvent).detail;
-      if (instanceId) {
-        // Existing instance — open configure dialog in ComponentSidebar
-        window.dispatchEvent(
-          new CustomEvent("agent:configure-integration", { detail: { instanceId } }),
-        );
+      if (instanceId && organizationId) {
+        // Existing instance — open settings in new tab so user stays on canvas
+        window.open(`/${organizationId}/settings/integrations/${instanceId}`, "_blank");
       } else if (integrationName) {
-        // No instance — open create dialog
+        // No instance — open create dialog (modal, stays on page)
         setIntegrationDialogName(integrationName);
       }
     };
     window.addEventListener("agent:open-integration", handler);
     return () => window.removeEventListener("agent:open-integration", handler);
-  }, []);
+  }, [organizationId]);
 
   const handleIntegrationCreated = useCallback(
     async (integrationId: string, instanceName: string) => {
