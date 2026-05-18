@@ -27,15 +27,11 @@ function dispatchAgentEvent(
     case "stream_started":
     case "turn_completed":
     case "session_failed":
-      callbacks.onStatusChange?.(data.status ?? "", data.error);
+      handleStatusEvent(data, callbacks);
       return;
     case "outcome_evaluation_start":
     case "outcome_evaluation_end":
-      callbacks.onOutcomeEvent?.(outcomePhase(data.event), {
-        iteration: data.extra?.iteration ?? 0,
-        result: data.extra?.result,
-        explanation: data.extra?.explanation,
-      });
+      handleOutcomeEvent(data, callbacks);
       return;
   }
 }
@@ -53,6 +49,24 @@ function handlePersistedMessage(
     upsertAgentMessageInCache(queryClient, data.sessionId, data.message);
   }
   callbacks.onPersistedMessage?.(data.message);
+}
+
+function handleStatusEvent(data: { status?: string; error?: string }, callbacks: AgentStreamCallbacks): void {
+  callbacks.onStatusChange?.(data.status ?? "", data.error);
+}
+
+function handleOutcomeEvent(
+  data: {
+    event: "outcome_evaluation_start" | "outcome_evaluation_end";
+    extra?: { iteration?: number; result?: string; explanation?: string };
+  },
+  callbacks: AgentStreamCallbacks,
+): void {
+  callbacks.onOutcomeEvent?.(outcomePhase(data.event), {
+    iteration: data.extra?.iteration ?? 0,
+    result: data.extra?.result,
+    explanation: data.extra?.explanation,
+  });
 }
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/agents/sessions/`;
