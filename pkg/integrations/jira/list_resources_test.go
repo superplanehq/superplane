@@ -150,7 +150,7 @@ func Test__ListResources__Assignee(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "project=TEST")
 	})
 
-	t.Run("missing project -> empty list, no API call", func(t *testing.T) {
+	t.Run("missing project and metadata -> empty list, no API call", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{}
 		resources, err := j.ListResources("assignee", core.ListResourcesContext{
 			HTTP:        httpContext,
@@ -159,6 +159,30 @@ func Test__ListResources__Assignee(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, resources)
 		assert.Empty(t, httpContext.Requests)
+	})
+
+	t.Run("missing project uses first synced project from metadata", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`[
+						{"accountId":"acct-1","displayName":"Alice"}
+					]`)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("assignee", core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: newAuthorizedIntegrationWithMetadata(Metadata{
+				Projects: []Project{{Key: "SYNC", Name: "Synced"}},
+			}),
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "acct-1", resources[0].ID)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "project=SYNC")
 	})
 }
 

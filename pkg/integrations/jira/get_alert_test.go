@@ -17,11 +17,27 @@ func Test__GetAlert__Setup(t *testing.T) {
 	require.ErrorContains(t, component.Setup(core.SetupContext{
 		Integration:   jiraTestIntegration(),
 		Configuration: map[string]any{},
-	}), "alertId is required")
+	}), "alert is required")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"id":"e0caa0ce-d52f-4500-81b9-d592d06970b6","message":"CPU","tinyId":"42"}`)),
+			},
+		},
+	}
+	meta := &contexts.MetadataContext{}
 	require.NoError(t, component.Setup(core.SetupContext{
 		Integration:   jiraTestIntegration(),
-		Configuration: map[string]any{"alertId": " e0caa0ce-d52f-4500-81b9-d592d06970b6 "},
+		Configuration: map[string]any{"alert": " e0caa0ce-d52f-4500-81b9-d592d06970b6 "},
+		HTTP:          httpContext,
+		Metadata:      meta,
 	}))
+	picker, ok := meta.Metadata.(OpsAlertPickerMetadata)
+	require.True(t, ok)
+	require.NotEmpty(t, picker.AlertLabel)
+	require.Contains(t, picker.AlertLabel, "CPU")
 }
 
 func Test__GetAlert__Execute(t *testing.T) {
@@ -36,7 +52,7 @@ func Test__GetAlert__Execute(t *testing.T) {
 	}
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
-		Configuration:  map[string]any{"alertId": "e0caa0ce-d52f-4500-81b9-d592d06970b6"},
+		Configuration:  map[string]any{"alert": "e0caa0ce-d52f-4500-81b9-d592d06970b6"},
 		HTTP:           httpContext,
 		Integration:    jiraTestIntegration(),
 		ExecutionState: execCtx,

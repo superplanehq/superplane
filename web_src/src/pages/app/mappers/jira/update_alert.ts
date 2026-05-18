@@ -12,10 +12,10 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { jiraBaseEventSections } from "./base";
+import { jiraBaseEventSections, buildOpsAlertReferenceMetadata, opsAlertCoreExecutionPayloadDetails } from "./base";
 
 interface UpdateAlertConfiguration {
-  alertId?: string;
+  alert?: string;
 }
 
 export const updateAlertMapper: ComponentBaseMapper = {
@@ -42,13 +42,7 @@ export const updateAlertMapper: ComponentBaseMapper = {
     }
     const outputs = context.execution.outputs as { default?: Array<{ data?: unknown }> } | undefined;
     const data = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
-    if (!data) {
-      return details;
-    }
-    const ops = data.operations;
-    if (Array.isArray(ops)) {
-      details["Operations"] = ops.map(String).join(", ");
-    }
+    Object.assign(details, opsAlertCoreExecutionPayloadDetails(data));
     return details;
   },
 
@@ -58,11 +52,23 @@ export const updateAlertMapper: ComponentBaseMapper = {
   },
 };
 
+interface UpdateAlertNodeMeta {
+  updateSummaries?: string[];
+}
+
 function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as UpdateAlertConfiguration;
-  const meta: MetadataItem[] = [];
-  if (configuration?.alertId) {
-    meta.push({ icon: "hash", label: configuration.alertId });
+  const items = buildOpsAlertReferenceMetadata(node, configuration?.alert);
+
+  const nodeMeta = node.metadata as UpdateAlertNodeMeta | undefined;
+  const summaries = nodeMeta?.updateSummaries;
+  if (Array.isArray(summaries) && summaries.length > 0) {
+    for (const raw of summaries) {
+      const line = typeof raw === "string" ? raw.trim() : "";
+      if (line !== "") {
+        items.push({ icon: "corner-down-right", label: line });
+      }
+    }
   }
-  return meta;
+  return items;
 }

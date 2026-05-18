@@ -38,15 +38,29 @@ function buildDetailsCtx(execution: Partial<ExecutionInfo>): ExecutionDetailsCon
 }
 
 describe("updateAlertMapper", () => {
-  it("getExecutionDetails lists operations", () => {
+  it("getExecutionDetails mirrors core Ops alert GET fields without tiny id", () => {
     const details = updateAlertMapper.getExecutionDetails(
       buildDetailsCtx({
         outputs: {
-          default: [{ data: { operations: ["patchMessage", "acknowledge"] } }],
+          default: [
+            {
+              data: {
+                message: "after",
+                description: "desc-after",
+                status: "open",
+                priority: "P2",
+                tinyId: "12",
+              },
+            },
+          ],
         },
       }),
     );
-    expect(details["Operations"]).toBe("patchMessage, acknowledge");
+    expect(details.Message).toBe("after");
+    expect(details.Description).toBe("desc-after");
+    expect(details.Status).toBe("open");
+    expect(details.Priority).toBe("P2");
+    expect(details["Tiny ID"]).toBeUndefined();
   });
 
   it("eventStateRegistry maps success to updated", () => {

@@ -12,10 +12,10 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { jiraBaseEventSections } from "./base";
+import { jiraBaseEventSections, buildOpsAlertReferenceMetadata, opsAlertCoreExecutionPayloadDetails } from "./base";
 
 interface GetAlertConfiguration {
-  alertId?: string;
+  alert?: string;
 }
 
 export const getAlertMapper: ComponentBaseMapper = {
@@ -42,23 +42,7 @@ export const getAlertMapper: ComponentBaseMapper = {
     }
     const outputs = context.execution.outputs as { default?: Array<{ data?: unknown }> } | undefined;
     const data = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
-    if (!data) {
-      return details;
-    }
-    if (data.message != null) {
-      details["Message"] = String(data.message);
-    }
-    if (data.status != null) {
-      details["Status"] = String(data.status);
-    }
-    const priority = data.priority;
-    if (priority != null) {
-      details["Priority"] = String(priority);
-    }
-    const tinyId = data.tinyId;
-    if (tinyId != null) {
-      details["Tiny ID"] = String(tinyId);
-    }
+    Object.assign(details, opsAlertCoreExecutionPayloadDetails(data));
     return details;
   },
 
@@ -70,9 +54,5 @@ export const getAlertMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as GetAlertConfiguration;
-  const meta: MetadataItem[] = [];
-  if (configuration?.alertId) {
-    meta.push({ icon: "hash", label: configuration.alertId });
-  }
-  return meta;
+  return buildOpsAlertReferenceMetadata(node, configuration?.alert);
 }
