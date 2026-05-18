@@ -1,6 +1,6 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { GitBranch, Pencil, Plus } from "lucide-react";
+import { FileCode, GitBranch, Pencil, Plus } from "lucide-react";
 
 import { Button } from "../button";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
@@ -34,12 +34,15 @@ export function SecondaryHeaderActions({
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
   onDashboardAddPanel,
+  onDashboardOpenYaml,
+  dashboardYamlReadOnly,
 }: HeaderProps) {
   const showVersionControlTrigger = mode === "version-live" && !!onOpenVersionControl;
   const showEditButton = mode === "version-live" && !!onEnterEditMode;
   const showDraftDropdown =
     showEditButton && !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
   const showDashboardAddPanel = mode === "dashboard" && !!onDashboardAddPanel;
+  const showDashboardYaml = mode === "dashboard" && !!onDashboardOpenYaml;
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
@@ -85,6 +88,29 @@ export function SecondaryHeaderActions({
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
         />
+      ) : null}
+
+      {showDashboardYaml ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <UIButton
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onDashboardOpenYaml!()}
+              data-testid="dashboard-yaml-button"
+              aria-label={dashboardYamlReadOnly ? "View YAML" : "View / Import YAML"}
+            >
+              <FileCode className="mr-1 h-3.5 w-3.5" />
+              YAML
+            </UIButton>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">
+            {dashboardYamlReadOnly
+              ? "View the dashboard as YAML"
+              : "View, copy, download, or import this dashboard as YAML"}
+          </TooltipContent>
+        </Tooltip>
       ) : null}
 
       {showDashboardAddPanel ? (

@@ -30,7 +30,12 @@ import type {
   SuperplaneMeUser,
   TriggersTrigger,
 } from "@/api-client";
-import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvasesUpdateNodePause } from "@/api-client";
+import {
+  canvasesApplyCanvasVersionChangeset,
+  canvasesInvokeNodeTriggerHook,
+  canvasesReemitTriggerEvent,
+  canvasesUpdateNodePause,
+} from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { Button } from "@/components/ui/button";
@@ -86,6 +91,8 @@ import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPr
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import { RunsSidebar } from "@/ui/RunsSidebar";
 import { DashboardOverlay } from "./dashboard/DashboardOverlay";
+import { buildDashboardTriggerParameters } from "./dashboard/dashboardTriggerParameters";
+import { deriveDashboardNodeStatuses } from "./dashboard/deriveNodeStatuses";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useCanvasDashboard, useUpdateCanvasDashboard } from "@/hooks/useCanvasData";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
@@ -214,6 +221,8 @@ export function WorkflowPageV2() {
     setIsDashboardMode,
     isDashboardAddPanelOpen,
     setIsDashboardAddPanelOpen,
+    isDashboardYamlOpen,
+    setIsDashboardYamlOpen,
     selectedRunId,
     setSelectedRunId,
   } = useWorkflowViewSearchParams(searchParams, setSearchParams, dashboardsFeatureEnabled);
@@ -1137,6 +1146,60 @@ export function WorkflowPageV2() {
   const visibleNodeExecutionsMap = useMemo(
     () => (isViewingLiveVersion ? nodeExecutionsMap : {}),
     [isViewingLiveVersion, nodeExecutionsMap],
+  );
+  const dashboardNodeStatuses = useMemo(
+    () => deriveDashboardNodeStatuses(visibleNodeExecutionsMap),
+    [visibleNodeExecutionsMap],
+  );
+  /**
+   * Manual-run handler used by the Dashboard (Node panel "Run" button and
+   * Table row actions of kind "trigger"). Fires the named trigger hook
+   * (default "run") and refreshes the affected node's execution feed so
+   * the dashboard updates immediately.
+   *
+   * The hook payload is derived from the referenced node's `configuration`
+   * because trigger hooks have type-specific required parameters: for a
+   * Start trigger, `run` requires `{ template, payload }`. We default to
+   * the first template defined on the node so the dashboard's Run button
+   * works out of the box, mirroring what users see when they click Run
+   * on the trigger card in the canvas view. Nodes without templates fall
+   * through to an empty parameter object and the API surfaces a clear
+   * error if the hook requires additional fields.
+   *
+   * Permission gating happens at the gRPC interceptor level
+   * (`canvases:update` → `InvokeNodeTriggerHook`); the UI also disables
+   * the buttons when `canRunNodes` is false.
+   */
+  const handleDashboardTriggerNode = useCallback(
+    async (nodeId: string, options?: { templateName?: string; triggerName?: string }) => {
+      if (!canvasId) return;
+      const hookName = "run";
+      // `triggerName` is kept as a backwards-compatible alias for dashboard
+      // row-action YAML created before this handler grew the clearer
+      // `templateName` option. For the Start trigger, the hook is always
+      // `run`; the template is passed inside `parameters`.
+      const templateName = options?.templateName ?? options?.triggerName;
+      const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
+      const parameters = buildDashboardTriggerParameters(node, hookName, templateName);
+      try {
+        await canvasesInvokeNodeTriggerHook(
+          withOrganizationHeader({
+            path: { canvasId, nodeId, hookName },
+            body: { parameters },
+          }),
+        );
+        showSuccessToast("Triggered node");
+        // Refresh both the per-node execution feed (used by the Runs sidebar
+        // and node-status derivation) and the canvas-wide infinite events
+        // query that powers Dashboard table / chart / number panels.
+        queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecution(canvasId, nodeId) });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteEvents(canvasId) });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteRuns(canvasId) });
+      } catch (error) {
+        showErrorToast(getApiErrorMessage(error, "Failed to trigger node"));
+      }
+    },
+    [canvasId, canvas, queryClient],
   );
   const visibleNodeQueueItemsMap = useMemo(
     () => (isViewingLiveVersion ? nodeQueueItemsMap : {}),
@@ -5037,6 +5100,7 @@ export function WorkflowPageV2() {
   const handleExitDashboardMode = useCallback(() => {
     setIsDashboardMode(false);
     setIsDashboardAddPanelOpen(false);
+    setIsDashboardYamlOpen(false);
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
@@ -5045,7 +5109,7 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [setIsDashboardAddPanelOpen, setIsDashboardMode, setSearchParams]);
+  }, [setIsDashboardAddPanelOpen, setIsDashboardYamlOpen, setIsDashboardMode, setSearchParams]);
 
   const handleEnterEditModeFromHeader = useCallback(async () => {
     if (isDashboardMode) {
@@ -5694,6 +5758,11 @@ export function WorkflowPageV2() {
     isDashboardMode && dashboardsFeatureEnabled && !isTemplate && canUpdateCanvas
       ? () => setIsDashboardAddPanelOpen(true)
       : undefined;
+  // YAML is openable in dashboard mode for everyone (read-only viewers see a
+  // download-only modal). The button itself is hidden outside dashboard mode.
+  const onDashboardOpenYaml =
+    isDashboardMode && dashboardsFeatureEnabled ? () => setIsDashboardYamlOpen(true) : undefined;
+  const dashboardYamlReadOnly = !canUpdateCanvas || isTemplate || canvasDeletedRemotely;
   const hasUnpublishedDraftChanges =
     !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftGraphDiffVersusLive;
   const canvasStateMode = hasEditableVersion
@@ -5740,11 +5809,21 @@ export function WorkflowPageV2() {
       <div className="relative h-full w-full">
         {isDashboardMode && dashboardsFeatureEnabled ? (
           <DashboardOverlay
-            readOnly={!canUpdateCanvas}
+            readOnly={!canUpdateCanvas || isTemplate || canvasDeletedRemotely}
+            canImportYaml={canUpdateCanvas && !isTemplate && !canvasDeletedRemotely}
+            canRunNodes={canUpdateCanvas && !isTemplate && !canvasDeletedRemotely}
             dashboardQuery={dashboardQuery}
             updateDashboardMutation={updateDashboardMutation}
             addPanelDialogOpen={isDashboardAddPanelOpen}
             onAddPanelDialogOpenChange={setIsDashboardAddPanelOpen}
+            yamlModalOpen={isDashboardYamlOpen}
+            onYamlModalOpenChange={setIsDashboardYamlOpen}
+            canvasId={canvasId || undefined}
+            canvasName={canvas?.metadata?.name || undefined}
+            organizationId={organizationId || undefined}
+            canvasNodes={canvasNodes}
+            nodeStatuses={dashboardNodeStatuses}
+            onTriggerNode={handleDashboardTriggerNode}
           />
         ) : null}
         <CanvasPage
@@ -5841,6 +5920,8 @@ export function WorkflowPageV2() {
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
           onSelectDashboard={isTemplate || !dashboardsFeatureEnabled ? undefined : handleSelectDashboardMode}
           onDashboardAddPanel={onDashboardAddPanel}
+          onDashboardOpenYaml={onDashboardOpenYaml}
+          dashboardYamlReadOnly={dashboardYamlReadOnly}
           runsNotificationCount={activeRunsCount}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}

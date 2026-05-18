@@ -12,6 +12,7 @@ export function useWorkflowViewSearchParams(
   const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
   const [isDashboardMode, setIsDashboardMode] = useState(() => searchParams.get("view") === "dashboard");
   const [isDashboardAddPanelOpen, setIsDashboardAddPanelOpen] = useState(false);
+  const [isDashboardYamlOpen, setIsDashboardYamlOpen] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(() => searchParams.get("run"));
 
   const viewParam = searchParams.get("view") ?? "";
@@ -28,6 +29,7 @@ export function useWorkflowViewSearchParams(
       } else {
         setIsDashboardMode(false);
         setIsDashboardAddPanelOpen(false);
+        setIsDashboardYamlOpen(false);
         setSearchParamsRef.current(
           (current) => {
             const next = new URLSearchParams(current);
@@ -46,6 +48,7 @@ export function useWorkflowViewSearchParams(
     setSelectedRunId(runParam || null);
     if (viewParam !== "dashboard") {
       setIsDashboardAddPanelOpen(false);
+      setIsDashboardYamlOpen(false);
     }
   }, [viewParam, runParam, dashboardsFeatureEnabled]);
 
@@ -56,6 +59,8 @@ export function useWorkflowViewSearchParams(
     setIsDashboardMode,
     isDashboardAddPanelOpen,
     setIsDashboardAddPanelOpen,
+    isDashboardYamlOpen,
+    setIsDashboardYamlOpen,
     selectedRunId,
     setSelectedRunId,
   };

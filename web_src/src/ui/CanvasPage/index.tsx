@@ -170,6 +170,10 @@ export interface CanvasPageProps {
   onSelectDashboard?: () => void;
   /** Opens the canvas dashboard add-panel dialog when `headerMode` is `dashboard`. */
   onDashboardAddPanel?: () => void;
+  /** Opens the dashboard YAML modal when `headerMode` is `dashboard`. */
+  onDashboardOpenYaml?: () => void;
+  /** Whether the dashboard YAML modal will open in read-only mode (no apply). */
+  dashboardYamlReadOnly?: boolean;
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
@@ -1111,6 +1115,8 @@ function CanvasPage(props: CanvasPageProps) {
           onSelectRuns={props.onSelectRuns}
           onSelectDashboard={props.onSelectDashboard}
           onDashboardAddPanel={props.onDashboardAddPanel}
+          onDashboardOpenYaml={props.onDashboardOpenYaml}
+          dashboardYamlReadOnly={props.dashboardYamlReadOnly}
           runsNotificationCount={props.runsNotificationCount}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
@@ -1625,6 +1631,8 @@ function CanvasContentHeader({
   onSelectRuns,
   onSelectDashboard,
   onDashboardAddPanel,
+  onDashboardOpenYaml,
+  dashboardYamlReadOnly,
   runsNotificationCount,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
@@ -1661,6 +1669,8 @@ function CanvasContentHeader({
   onSelectRuns?: () => void;
   onSelectDashboard?: () => void;
   onDashboardAddPanel?: () => void;
+  onDashboardOpenYaml?: () => void;
+  dashboardYamlReadOnly?: boolean;
   runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
@@ -1707,6 +1717,8 @@ function CanvasContentHeader({
       onSelectRuns={onSelectRuns}
       onSelectDashboard={onSelectDashboard}
       onDashboardAddPanel={onDashboardAddPanel}
+      onDashboardOpenYaml={onDashboardOpenYaml}
+      dashboardYamlReadOnly={dashboardYamlReadOnly}
       runsNotificationCount={runsNotificationCount}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
