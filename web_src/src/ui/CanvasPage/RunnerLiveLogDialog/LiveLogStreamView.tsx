@@ -45,6 +45,9 @@ function CommandSectionView({ section, onToggle }: { section: CommandSection; on
 function CommandSectionHeader({ section, onToggle }: { section: CommandSection; onToggle: (index: number) => void }) {
   const isCollapsed = section.status === "passed" && section.collapsed;
 
+  const openChevron = <ChevronRight className="size-4" />;
+  const closedChevron = <ChevronDown className="size-4" />;
+
   return (
     <button
       type="button"
@@ -52,8 +55,8 @@ function CommandSectionHeader({ section, onToggle }: { section: CommandSection; 
       onClick={() => onToggle(section.index)}
     >
       <div className="flex items-center gap-2">
-        <span>{isCollapsed ? <ChevronRight className="size-4" /> : <ChevronDown className="size-4" />}</span>
-        <span className="font-semibold">{section.text}</span>
+        <span>{isCollapsed ? openChevron : closedChevron}</span>
+        <span className="font-medium text-gray-900">{section.text}</span>
       </div>
 
       <div className="flex items-center gap-2">

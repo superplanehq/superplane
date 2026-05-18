@@ -139,15 +139,11 @@ export const RUNNER_STATE_REGISTRY: EventStateRegistry = {
 export const runnerMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const title =
-      context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component";
+    const componentDef = context.componentDefinition;
+    const title = context.node.name || componentDef.label || componentDef.name || "Unnamed component";
     const iconSlug = context.componentDefinition.icon || "terminal";
     const iconColor = getColorClass(context.componentDefinition?.color || "blue");
-
-    const customField =
-      lastExecution && context.canvasMode === "live"
-        ? () => <RunnerLiveLogDialog canvasMode={context.canvasMode ?? "live"} executionId={lastExecution.id} />
-        : undefined;
+    const canvasMode = context.canvasMode ?? "live";
 
     return {
       title,
@@ -160,7 +156,7 @@ export const runnerMapper: ComponentBaseMapper = {
       metadata: [],
       specs: [],
       eventStateMap: RUNNER_STATE_MAP,
-      customField,
+      customField: <RunnerLiveLogDialog title={title} canvasMode={canvasMode} execution={lastExecution} />,
       customFieldPosition: "after",
     };
   },

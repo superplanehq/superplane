@@ -1,18 +1,17 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useCanvasId } from "@/hooks/useCanvasId";
-import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { ScrollText } from "lucide-react";
 import { useCallback, useState } from "react";
 import { LiveLogStreamView } from "./LiveLogStreamView";
 import type { RunnerLiveLogDialogProps } from "./types";
 
-export function RunnerLiveLogDialog({ canvasMode, executionId }: RunnerLiveLogDialogProps) {
-  const organizationId = useOrganizationId();
-  const canvasId = useCanvasId();
+export function RunnerLiveLogDialog({ title, canvasMode, execution }: RunnerLiveLogDialogProps) {
   const [open, setOpen] = useState(false);
 
-  const canShow = canvasMode === "live" && !!organizationId && !!canvasId && !!executionId;
-  if (!canShow) {
+  if (!execution) {
+    return null;
+  }
+
+  if (canvasMode !== "live") {
     return null;
   }
 
@@ -27,6 +26,7 @@ export function RunnerLiveLogDialog({ canvasMode, executionId }: RunnerLiveLogDi
       <div className="flex items-center justify-center gap-1 cursor-pointer py-1.5" onClick={handleOpen}>
         <ScrollText className="h-4 w-4" /> View logs
       </div>
+
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           size="90vw"
@@ -34,11 +34,11 @@ export function RunnerLiveLogDialog({ canvasMode, executionId }: RunnerLiveLogDi
           onClick={(e) => e.stopPropagation()}
         >
           <DialogHeader className="shrink-0 border-b border-gray-200 px-4 py-3 text-left">
-            <DialogTitle>Logs</DialogTitle>
+            <DialogTitle className="text-sm font-medium">{title}</DialogTitle>
           </DialogHeader>
 
           <div className="min-h-0 flex-1 overflow-hidden bg-slate-50">
-            <LiveLogStreamView executionId={executionId} />
+            <LiveLogStreamView executionId={execution.id} />
           </div>
         </DialogContent>
       </Dialog>

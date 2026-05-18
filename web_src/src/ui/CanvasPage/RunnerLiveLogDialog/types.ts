@@ -1,6 +1,9 @@
+import { ExecutionInfo } from "../../../pages/workflowv2/mappers/types";
+
 export type RunnerLiveLogDialogProps = {
+  title: string;
   canvasMode: "live" | "edit";
-  executionId: string;
+  execution: ExecutionInfo | null;
 };
 
 export type LiveLogRecord =
