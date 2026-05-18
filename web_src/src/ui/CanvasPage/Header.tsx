@@ -45,10 +45,6 @@ export interface HeaderProps {
   onDiscardDraftAndStartEdit?: () => void;
   /** Canvas settings route requires `canvases:update`; hide the menu when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
-  isVersionControlOpen?: boolean;
-  onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
   toolSidebarState: CanvasToolSidebarState;
 }
 

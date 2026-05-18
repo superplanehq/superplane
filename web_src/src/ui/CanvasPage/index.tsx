@@ -187,11 +187,8 @@ export interface CanvasPageProps {
   showCanvasSettingsMenu?: boolean;
   onYamlOpen: () => void;
   onMemoryOpen: () => void;
-  versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
   hideAddControls?: boolean;
@@ -241,6 +238,7 @@ export interface CanvasPageProps {
   runsComponentIconMap?: Record<string, string>;
   runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   toolSidebarRunsContent?: React.ReactNode;
+  toolSidebarVersionsContent?: React.ReactNode;
   onRunNodeSelect?: (nodeId: string) => void;
   onRunExecutionSelect?: (options: {
     nodeId: string;
@@ -1134,10 +1132,6 @@ function CanvasPage(props: CanvasPageProps) {
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
           onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
-          isVersionControlOpen={props.isVersionControlOpen}
-          onOpenVersionControl={props.onOpenVersionControl}
-          versionControlButtonTooltip={props.versionControlButtonTooltip}
-          versionControlNotificationCount={props.versionControlNotificationCount}
           toolSidebarState={toolSidebarState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
@@ -1145,14 +1139,15 @@ function CanvasPage(props: CanvasPageProps) {
 
       {/* Main content area with sidebar and canvas */}
       <div className="flex-1 flex relative overflow-hidden">
-        {props.headerMode === "runs" ? null : props.versionControlSidebar}
-
         <CanvasToolSidebar
           toolSidebarState={toolSidebarState}
           mode={props.headerMode}
           onSelectRuns={handleSelectRuns}
           onExitRunsMode={props.onExitRunsMode}
           runsContent={props.toolSidebarRunsContent}
+          isVersionControlOpen={props.isVersionControlOpen}
+          onToggleVersionControl={props.onOpenVersionControl}
+          versionsContent={props.toolSidebarVersionsContent}
         />
 
         {props.headerMode === "runs" ? null : (
@@ -1649,10 +1644,6 @@ function CanvasContentHeader({
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
   showCanvasSettingsMenu,
-  isVersionControlOpen,
-  onOpenVersionControl,
-  versionControlButtonTooltip,
-  versionControlNotificationCount,
   toolSidebarState,
 }: {
   state: CanvasPageState;
@@ -1683,10 +1674,6 @@ function CanvasContentHeader({
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   showCanvasSettingsMenu?: boolean;
-  isVersionControlOpen?: boolean;
-  onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
   toolSidebarState: CanvasToolSidebarState;
 }) {
   const stateRef = useRef(state);
@@ -1727,10 +1714,6 @@ function CanvasContentHeader({
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
-      isVersionControlOpen={isVersionControlOpen}
-      onOpenVersionControl={onOpenVersionControl}
-      versionControlButtonTooltip={versionControlButtonTooltip}
-      versionControlNotificationCount={versionControlNotificationCount}
       toolSidebarState={toolSidebarState}
     />
   );

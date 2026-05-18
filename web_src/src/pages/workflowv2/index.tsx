@@ -32,6 +32,7 @@ import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvas
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { Button } from "@/components/ui/button";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
+import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useComponents } from "@/hooks/useComponentData";
 import {
@@ -89,7 +90,6 @@ import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasMemoryModal } from "./CanvasMemoryModal";
 import { CanvasPageModals } from "./CanvasPageModals";
-import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { CanvasYamlModal } from "./CanvasYamlModal";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
@@ -4999,6 +4999,10 @@ export function WorkflowPageV2() {
     );
   }, [setIsRunsMode, setSearchParams, setSelectedRunId]);
 
+  const handleToggleVersionControl = useCallback(() => {
+    setIsVersionControlOpen((prev) => !prev);
+  }, []);
+
   const handleSelectDashboardMode = useCallback(() => {
     if (!dashboardsFeatureEnabled) {
       return;
@@ -5766,9 +5770,7 @@ export function WorkflowPageV2() {
           awaitingApprovalBanner={awaitingApprovalBanner}
           showCanvasSettingsMenu={canUpdateCanvas}
           isVersionControlOpen={isVersionControlOpen}
-          onOpenVersionControl={!hasEditableVersion ? () => setIsVersionControlOpen((prev) => !prev) : undefined}
-          versionControlButtonTooltip={isVersionControlOpen ? "Close versions" : "Open versions"}
-          versionControlNotificationCount={pendingApprovalVersions.length}
+          onOpenVersionControl={!hasEditableVersion ? handleToggleVersionControl : undefined}
           showBottomStatusControls={!isTemplate && !isRunsMode}
           hideAddControls={isTemplate || isRunsMode}
           hideCanvasToolSidebar={isTemplate}
@@ -5903,13 +5905,9 @@ export function WorkflowPageV2() {
               />
             ) : null
           }
-          focusRequest={focusRequest}
-          onExecutionChainHandled={handleExecutionChainHandled}
-          versionControlSidebar={
+          toolSidebarVersionsContent={
             !hasEditableVersion ? (
-              <CanvasVersionControlSidebar
-                isOpen={isVersionControlOpen}
-                onToggle={setIsVersionControlOpen}
+              <VersionsTabPanel
                 liveCanvasVersionId={liveCanvasVersionId}
                 selectedCanvasVersion={selectedCanvasVersion}
                 pendingApprovalVersions={pendingApprovalVersions}
@@ -5926,8 +5924,10 @@ export function WorkflowPageV2() {
                 changeRequestApprovalConfig={liveCanvas?.spec?.changeManagement}
                 rejectedVersions={rejectedVersions}
               />
-            ) : undefined
+            ) : null
           }
+          focusRequest={focusRequest}
+          onExecutionChainHandled={handleExecutionChainHandled}
         />
         {isDraftCanvasLoading ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">

@@ -1,4 +1,4 @@
-import { ArrowUp, ChevronRight, Loader2, SquareTerminal, X } from "lucide-react";
+import { ArrowUp, ChevronRight, Loader2, SquareTerminal } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { RichMessage } from "@/components/AgentSidebar/widgets/RichMessage";
 import { Button } from "@/components/ui/button";
@@ -6,13 +6,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useAgentChatMessages, useCanvasAgentChat, useSendAgentChatMessage } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
+import { EmptyToolTab } from "./EmptyToolTab";
+import { SidebarShell } from "./SidebarShell";
+import { ToolTabsHeader } from "./ToolTabsHeader";
 import type { AgentMessage } from "./types";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
-import { useSidebarWidth } from "./useSidebarWidth";
 
-const TAB_AGENT = "agent";
-const TAB_RUNS = "runs";
-const TAB_VERSIONS = "versions";
+const TAB_AGENT = "agent",
+  TAB_RUNS = "runs",
+  TAB_VERSIONS = "versions";
 type CanvasToolSidebarMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard";
 
 export interface CanvasToolSidebarProps {
@@ -21,6 +23,9 @@ export interface CanvasToolSidebarProps {
   onSelectRuns?: () => void;
   onExitRunsMode?: () => void;
   runsContent?: ReactNode;
+  isVersionControlOpen?: boolean;
+  onToggleVersionControl?: () => void;
+  versionsContent?: ReactNode;
 }
 
 export function CanvasToolSidebar({
@@ -29,6 +34,9 @@ export function CanvasToolSidebar({
   onSelectRuns,
   onExitRunsMode,
   runsContent,
+  isVersionControlOpen,
+  onToggleVersionControl,
+  versionsContent,
 }: CanvasToolSidebarProps) {
   if (!toolSidebarState.showToolSidebarToggle || !toolSidebarState.isToolSidebarOpen || !toolSidebarState.canvasId)
     return null;
@@ -40,6 +48,9 @@ export function CanvasToolSidebar({
       onSelectRuns={onSelectRuns}
       onExitRunsMode={onExitRunsMode}
       runsContent={runsContent}
+      isVersionControlOpen={isVersionControlOpen}
+      onToggleVersionControl={onToggleVersionControl}
+      versionsContent={versionsContent}
     />
   );
 }
@@ -50,22 +61,34 @@ function OpenCanvasToolSidebar({
   onSelectRuns,
   onExitRunsMode,
   runsContent,
+  isVersionControlOpen,
+  onToggleVersionControl,
+  versionsContent,
 }: CanvasToolSidebarProps) {
   const showRunsTab = Boolean(onSelectRuns || mode === "runs" || runsContent);
-  const [activeTab, setActiveTab] = useState(() => (mode === "runs" && showRunsTab ? TAB_RUNS : TAB_AGENT));
+  const showVersionsTab = Boolean(onToggleVersionControl || isVersionControlOpen || versionsContent);
+  const [activeTab, setActiveTab] = useState(() => {
+    if (mode === "runs" && showRunsTab) return TAB_RUNS;
+    if (isVersionControlOpen && showVersionsTab) return TAB_VERSIONS;
+    return TAB_AGENT;
+  });
 
   useEffect(() => {
     if (mode === "runs" && showRunsTab) {
       setActiveTab(TAB_RUNS);
       return;
     }
-    setActiveTab((currentTab) => (currentTab === TAB_RUNS ? TAB_AGENT : currentTab));
-  }, [mode, showRunsTab]);
+    if (isVersionControlOpen && showVersionsTab) {
+      setActiveTab(TAB_VERSIONS);
+      return;
+    }
+    setActiveTab((currentTab) => (currentTab === TAB_RUNS || currentTab === TAB_VERSIONS ? TAB_AGENT : currentTab));
+  }, [isVersionControlOpen, mode, showRunsTab, showVersionsTab]);
 
   const tabs = [
     { value: TAB_AGENT, label: "Agent" },
     ...(showRunsTab ? ([{ value: TAB_RUNS, label: "Runs" }] as const) : []),
-    { value: TAB_VERSIONS, label: "Versions" },
+    ...(showVersionsTab ? ([{ value: TAB_VERSIONS, label: "Versions" }] as const) : []),
   ] as const;
 
   const handleTabSelect = useCallback(
@@ -73,6 +96,7 @@ function OpenCanvasToolSidebar({
       setActiveTab(nextTab);
 
       if (nextTab === TAB_RUNS) {
+        if (isVersionControlOpen) onToggleVersionControl?.();
         if (mode !== "runs") {
           toolSidebarState.openToolSidebar();
           onSelectRuns?.();
@@ -80,42 +104,27 @@ function OpenCanvasToolSidebar({
         return;
       }
       if (mode === "runs") onExitRunsMode?.();
+      if (nextTab === TAB_VERSIONS) {
+        if (!isVersionControlOpen) {
+          toolSidebarState.openToolSidebar();
+          onToggleVersionControl?.();
+        }
+        return;
+      }
+      if (isVersionControlOpen) onToggleVersionControl?.();
     },
-    [mode, onExitRunsMode, onSelectRuns, toolSidebarState],
+    [isVersionControlOpen, mode, onExitRunsMode, onSelectRuns, onToggleVersionControl, toolSidebarState],
   );
 
   return (
     <SidebarShell>
       <div className="flex min-h-0 flex-1 flex-col gap-0">
-        <div className="flex h-10 min-h-10 shrink-0 items-center border-b border-slate-950/15 px-4">
-          <div className="flex min-w-0 flex-1 flex-row items-stretch" role="tablist" aria-label="Canvas tools">
-            {tabs.map(({ value, label }) => (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={activeTab === value}
-                onClick={() => handleTabSelect(value)}
-                className={cn(
-                  "mr-4 mb-[-1px] flex items-center border-b text-[13px] font-medium transition-colors",
-                  activeTab === value
-                    ? "border-gray-700 text-gray-800 dark:border-blue-600 dark:text-blue-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={toolSidebarState.closeToolSidebar}
-            aria-label="Close sidebar"
-            className="ml-2 inline-flex size-6 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
+        <ToolTabsHeader
+          tabs={tabs}
+          activeTab={activeTab}
+          onSelectTab={(value) => handleTabSelect(value as typeof TAB_AGENT | typeof TAB_RUNS | typeof TAB_VERSIONS)}
+          onClose={toolSidebarState.closeToolSidebar}
+        />
 
         {activeTab === TAB_AGENT ? (
           <div className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden" role="tabpanel">
@@ -129,16 +138,12 @@ function OpenCanvasToolSidebar({
         ) : null}
         {activeTab === TAB_VERSIONS ? (
           <div className="m-0 flex min-h-0 flex-1 flex-col" role="tabpanel">
-            <EmptyToolTab />
+            {versionsContent ?? <EmptyToolTab />}
           </div>
         ) : null}
       </div>
     </SidebarShell>
   );
-}
-
-function EmptyToolTab() {
-  return <div className="min-h-0 flex-1" aria-hidden />;
 }
 
 function AgentTabPanel({ toolSidebarState }: CanvasToolSidebarProps) {
@@ -155,30 +160,6 @@ function AgentTabPanel({ toolSidebarState }: CanvasToolSidebarProps) {
     );
   }
   return <ChatConversation chatId={chatId} canvasId={canvasId} organizationId={organizationId} />;
-}
-
-function SidebarShell({ children }: { children: ReactNode }) {
-  const { sidebarRef, width, isResizing, handleMouseDown } = useSidebarWidth();
-  return (
-    <aside
-      ref={sidebarRef}
-      data-testid="canvas-tool-sidebar"
-      className="relative z-21 flex h-full shrink-0 flex-col border-r border-border bg-white"
-      style={{ width }}
-    >
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
-      <div
-        onMouseDown={handleMouseDown}
-        className={cn(
-          "absolute top-0 right-0 bottom-0 z-10 w-1 translate-x-1/2 cursor-col-resize bg-transparent transition-colors duration-150 ease-out delay-0",
-          "hover:delay-300 hover:bg-slate-950/10",
-          isResizing && "bg-slate-950/10 delay-0",
-        )}
-        aria-hidden
-        data-testid="canvas-tool-sidebar-resize-handle"
-      />
-    </aside>
-  );
 }
 
 function ChatConversation({

@@ -73,4 +73,44 @@ describe("CanvasToolSidebar", () => {
     expect(onExitRunsMode).toHaveBeenCalledTimes(1);
     expect(screen.getByPlaceholderText("Ask the agent…")).toBeInTheDocument();
   });
+
+  it("enters versions from the versions tab", () => {
+    const onToggleVersionControl = vi.fn();
+
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={makeToolSidebarState()}
+        mode="version-live"
+        isVersionControlOpen={false}
+        onToggleVersionControl={onToggleVersionControl}
+        versionsContent={<div>Versions content</div>}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("tab", { name: "Versions" }));
+
+    expect(onToggleVersionControl).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Versions content")).toBeInTheDocument();
+  });
+
+  it("exits versions when switching back to the agent tab", () => {
+    const onToggleVersionControl = vi.fn();
+
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={makeToolSidebarState()}
+        mode="version-live"
+        isVersionControlOpen={true}
+        onToggleVersionControl={onToggleVersionControl}
+        versionsContent={<div>Versions content</div>}
+      />,
+    );
+
+    expect(screen.getByText("Versions content")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Agent" }));
+
+    expect(onToggleVersionControl).toHaveBeenCalledTimes(1);
+    expect(screen.getByPlaceholderText("Ask the agent…")).toBeInTheDocument();
+  });
 });
