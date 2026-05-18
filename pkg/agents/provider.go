@@ -11,11 +11,11 @@ import (
 type ProviderEventType string
 
 const (
-	ProviderEventAssistantMessage  ProviderEventType = "assistant_message"
-	ProviderEventToolUseStarted    ProviderEventType = "tool_use_started"
-	ProviderEventToolUseFinished   ProviderEventType = "tool_use_finished"
-	ProviderEventTurnCompleted     ProviderEventType = "turn_completed"
-	ProviderEventSessionFailed     ProviderEventType = "session_failed"
+	ProviderEventAssistantMessage       ProviderEventType = "assistant_message"
+	ProviderEventToolUseStarted         ProviderEventType = "tool_use_started"
+	ProviderEventToolUseFinished        ProviderEventType = "tool_use_finished"
+	ProviderEventTurnCompleted          ProviderEventType = "turn_completed"
+	ProviderEventSessionFailed          ProviderEventType = "session_failed"
 	ProviderEventOutcomeEvaluation      ProviderEventType = "outcome_evaluation"
 	ProviderEventOutcomeEvaluationStart ProviderEventType = "outcome_evaluation_start"
 )
@@ -28,9 +28,9 @@ type ProviderEvent struct {
 	ToolCallID      string
 	// ToolInput is a human-readable rendering of the tool's invocation
 	// (e.g. the shell command for bash, or compact JSON for other tools).
-	ToolInput       string
-	ErrorMessage    string
-	OutcomeResult   *OutcomeEvaluation
+	ToolInput     string
+	ErrorMessage  string
+	OutcomeResult *OutcomeEvaluation
 }
 
 type OutcomeEvaluation struct {

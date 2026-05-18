@@ -37,7 +37,9 @@ func (b *blockingProvider) SendMessage(context.Context, string, string, agents.S
 }
 
 func (b *blockingProvider) InterruptSession(context.Context, string) error { return nil }
-func (b *blockingProvider) DefineOutcome(_ context.Context, _ string, _ agents.DefineOutcomeOptions) error { return nil }
+func (b *blockingProvider) DefineOutcome(_ context.Context, _ string, _ agents.DefineOutcomeOptions) error {
+	return nil
+}
 
 func (b *blockingProvider) StreamEvents(context.Context, string, func(agents.ProviderEvent) error) error {
 	return nil
