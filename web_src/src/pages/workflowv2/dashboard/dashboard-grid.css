@@ -1,0 +1,58 @@
+/* Dashboard grid styling — layered on top of react-grid-layout defaults. */
+
+.dashboard-grid {
+  position: relative;
+}
+
+.dashboard-grid .dashboard-grid-item {
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dashboard-grid .dashboard-grid-item > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
+/* Resize handle indicator in the bottom-right corner of each tile. */
+.dashboard-grid .react-resizable-handle {
+  background-image: none;
+  background-color: transparent;
+  width: 14px;
+  height: 14px;
+  bottom: 2px;
+  right: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease-in-out;
+}
+
+.dashboard-grid .react-grid-item:hover .react-resizable-handle {
+  opacity: 1;
+}
+
+.dashboard-grid .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 6px;
+  height: 6px;
+  border-right: 2px solid rgb(100, 116, 139); /* slate-500 */
+  border-bottom: 2px solid rgb(100, 116, 139);
+}
+
+/* Drag preview / placeholder. */
+.dashboard-grid .react-grid-placeholder {
+  background-color: rgb(186, 230, 253); /* sky-200 */
+  opacity: 0.5;
+  border-radius: 0.5rem;
+}
+
+/* Active drag/resize indicator. */
+.dashboard-grid .react-grid-item.react-draggable-dragging,
+.dashboard-grid .react-grid-item.resizing {
+  z-index: 30;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.18);
+}
