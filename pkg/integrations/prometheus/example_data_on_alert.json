@@ -1,33 +1,44 @@
 {
   "data": {
-    "annotations": {
-      "description": "Demo alert from local Prometheus setup",
-      "summary": "SuperPlane test alert is firing"
+    "status": "firing",
+    "labels": {
+      "alertname": "SnaketoyWeb5xxRate",
+      "service": "snaketoy-web",
+      "severity": "critical",
+      "team": "platform",
+      "env": "production",
+      "instance": "snaketoy-web-1.eu-west-1.acme.example:9090",
+      "job": "snaketoy-web"
     },
-    "commonAnnotations": {
-      "description": "Demo alert from local Prometheus setup",
-      "summary": "SuperPlane test alert is firing"
+    "annotations": {
+      "summary": "snaketoy-web 5xx rate above 5% (5m)",
+      "description": "snaketoy-web 5xx rate is 8.4% (threshold: 5%)",
+      "runbook_url": "https://runbooks.acme.example/snaketoy/5xx-spike"
+    },
+    "startsAt": "2026-03-04T09:13:42.184Z",
+    "endsAt": "0001-01-01T00:00:00Z",
+    "generatorURL": "https://prometheus.acme.example/graph?g0.expr=sum%28rate%28snaketoy_http_requests_total%7Bcode%3D~%225..%22%7D%5B5m%5D%29%29+%2F+sum%28rate%28snaketoy_http_requests_total%5B5m%5D%29%29+%3E+0.05&g0.tab=1",
+    "fingerprint": "9c2f1b03a8e1d647",
+    "receiver": "superplane",
+    "groupKey": "{}:{alertname=\"SnaketoyWeb5xxRate\",service=\"snaketoy-web\"}",
+    "groupLabels": {
+      "alertname": "SnaketoyWeb5xxRate",
+      "service": "snaketoy-web"
     },
     "commonLabels": {
-      "alertname": "SuperplaneTestAlert",
-      "severity": "warning"
+      "alertname": "SnaketoyWeb5xxRate",
+      "service": "snaketoy-web",
+      "severity": "critical",
+      "team": "platform",
+      "env": "production"
     },
-    "endsAt": "0001-01-01T00:00:00Z",
-    "externalURL": "http://localhost:9093",
-    "fingerprint": "aac3b474e2c0658c",
-    "generatorURL": "http://fd66aa456472:9090/graph?g0.expr=vector%281%29&g0.tab=1",
-    "groupKey": "{}:{alertname=\"SuperplaneTestAlert\"}",
-    "groupLabels": {
-      "alertname": "SuperplaneTestAlert"
+    "commonAnnotations": {
+      "summary": "snaketoy-web 5xx rate above 5% (5m)",
+      "description": "snaketoy-web 5xx rate is 8.4% (threshold: 5%)",
+      "runbook_url": "https://runbooks.acme.example/snaketoy/5xx-spike"
     },
-    "labels": {
-      "alertname": "SuperplaneTestAlert",
-      "severity": "warning"
-    },
-    "receiver": "superplane",
-    "startsAt": "2026-02-12T16:08:39Z",
-    "status": "firing"
+    "externalURL": "https://alertmanager.acme.example"
   },
-  "timestamp": "2026-02-12T16:18:03.362582388Z",
+  "timestamp": "2026-03-04T09:18:42.612Z",
   "type": "prometheus.alert"
 }

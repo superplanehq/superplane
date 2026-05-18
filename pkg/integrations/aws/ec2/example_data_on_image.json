@@ -11,10 +11,12 @@
       "arn:aws:ec2:us-east-1::image/ami-07f0e4f3e9c123abc"
     ],
     "detail": {
+      "RequestId": "7b6c5d4e-9f8a-41c2-b3d4-e5f60718293a",
       "ImageId": "ami-07f0e4f3e9c123abc",
-      "State": "available"
+      "State": "available",
+      "ErrorMessage": ""
     }
   },
-  "timestamp": "2026-02-10T12:10:01Z",
+  "timestamp": "2026-02-10T12:10:01.482Z",
   "type": "aws.ec2.image"
 }

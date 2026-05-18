@@ -2,26 +2,53 @@
   "data": {
     "type": "workflow-completed",
     "id": "3888f21b-eaa7-38e3-8f3d-75a63bba8895",
-    "happened_at": "2021-09-01T22:49:34.317Z",
+    "happened_at": "2026-03-04T09:18:42.317Z",
+    "webhook": {
+      "id": "9b6a7f5c-1234-4abc-8def-0123456789ab",
+      "name": "snaketoy-web webhook"
+    },
     "workflow": {
       "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
       "name": "build-test-deploy",
       "status": "success",
-      "created_at": "2021-09-01T22:49:03.616Z",
-      "stopped_at": "2021-09-01T22:49:34.170Z",
-      "url": "https://app.circleci.com/pipelines/github/username/repo/130/workflows/fda08377-fe7e-46b1-8992-3a7aaecac9c3"
+      "created_at": "2026-03-04T09:14:03.616Z",
+      "stopped_at": "2026-03-04T09:18:34.170Z",
+      "url": "https://app.circleci.com/pipelines/github/acme-labs/snaketoy/130/workflows/fda08377-fe7e-46b1-8992-3a7aaecac9c3"
     },
     "pipeline": {
       "id": "1285fe1d-d3a6-44fc-8886-8979558254c4",
       "number": 130,
-      "created_at": "2021-09-01T22:49:03.544Z"
+      "created_at": "2026-03-04T09:14:03.544Z",
+      "trigger": {
+        "type": "webhook",
+        "received_at": "2026-03-04T09:14:03.412Z"
+      },
+      "vcs": {
+        "provider_name": "github",
+        "origin_repository_url": "https://github.com/acme-labs/snaketoy",
+        "target_repository_url": "https://github.com/acme-labs/snaketoy",
+        "revision": "8f4c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f607182",
+        "commit": {
+          "subject": "Bump snaketoy-web to 1.4.2",
+          "body": "",
+          "author": {
+            "name": "Renato Dev",
+            "email": "renato.dev@acme.example"
+          }
+        },
+        "branch": "main"
+      }
     },
     "project": {
       "id": "84996744-a854-4f5e-aea3-04e2851dc1d2",
-      "name": "repo",
-      "slug": "github/username/repo"
+      "name": "snaketoy",
+      "slug": "gh/acme-labs/snaketoy"
+    },
+    "organization": {
+      "id": "01940f4a-0d8e-7c1c-9a3b-1c2d3e4f5061",
+      "name": "acme-labs"
     }
   },
-  "timestamp": "2021-09-01T22:49:34.317Z",
+  "timestamp": "2026-03-04T09:18:42.812Z",
   "type": "circleci.workflow.completed"
 }

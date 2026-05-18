@@ -1,24 +1,21 @@
 {
   "data": {
     "version": "0",
-    "id": "c1b45a2c-9c3f-4c52-bc98-5ea31ce17692",
+    "id": "13cde686-328b-6117-af20-0e5566167482",
     "detail-type": "ECR Image Action",
     "source": "aws.ecr",
     "account": "123456789012",
-    "time": "2024-01-01T12:00:00Z",
+    "time": "2026-03-01T11:42:18Z",
     "region": "us-east-1",
-    "resources": [
-      "arn:aws:ecr:us-east-1:123456789012:repository/my-repo"
-    ],
+    "resources": [],
     "detail": {
-      "repository-name": "my-repo",
-      "image-tag": "latest",
-      "image-digest": "sha256:2c26b46b68ffc68ff99b453c1d30413413422f1642f0e2b8c7b8a0b8a96a909e",
-      "action-type": "PUSH",
       "result": "SUCCESS",
-      "repository-arn": "arn:aws:ecr:us-east-1:123456789012:repository/my-repo"
+      "repository-name": "snaketoy-web",
+      "image-digest": "sha256:9c2f1b03a8e1d647c2d4e9af3120cd5e8aab2c14b5e7d12a91f0b4c8e6d3a2f7",
+      "action-type": "PUSH",
+      "image-tag": "v1.5.0"
     }
   },
-  "timestamp": "2026-02-03T12:00:00Z",
+  "timestamp": "2026-03-01T11:42:18.421Z",
   "type": "aws.ecr.image.push"
 }

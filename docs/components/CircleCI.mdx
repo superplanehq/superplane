@@ -61,29 +61,56 @@ This trigger automatically sets up a CircleCI webhook when configured. The webho
 ```json
 {
   "data": {
-    "happened_at": "2021-09-01T22:49:34.317Z",
+    "happened_at": "2026-03-04T09:18:42.317Z",
     "id": "3888f21b-eaa7-38e3-8f3d-75a63bba8895",
+    "organization": {
+      "id": "01940f4a-0d8e-7c1c-9a3b-1c2d3e4f5061",
+      "name": "acme-labs"
+    },
     "pipeline": {
-      "created_at": "2021-09-01T22:49:03.544Z",
+      "created_at": "2026-03-04T09:14:03.544Z",
       "id": "1285fe1d-d3a6-44fc-8886-8979558254c4",
-      "number": 130
+      "number": 130,
+      "trigger": {
+        "received_at": "2026-03-04T09:14:03.412Z",
+        "type": "webhook"
+      },
+      "vcs": {
+        "branch": "main",
+        "commit": {
+          "author": {
+            "email": "renato.dev@acme.example",
+            "name": "Renato Dev"
+          },
+          "body": "",
+          "subject": "Bump snaketoy-web to 1.4.2"
+        },
+        "origin_repository_url": "https://github.com/acme-labs/snaketoy",
+        "provider_name": "github",
+        "revision": "8f4c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f607182",
+        "target_repository_url": "https://github.com/acme-labs/snaketoy"
+      }
     },
     "project": {
       "id": "84996744-a854-4f5e-aea3-04e2851dc1d2",
-      "name": "repo",
-      "slug": "github/username/repo"
+      "name": "snaketoy",
+      "slug": "gh/acme-labs/snaketoy"
     },
     "type": "workflow-completed",
+    "webhook": {
+      "id": "9b6a7f5c-1234-4abc-8def-0123456789ab",
+      "name": "snaketoy-web webhook"
+    },
     "workflow": {
-      "created_at": "2021-09-01T22:49:03.616Z",
+      "created_at": "2026-03-04T09:14:03.616Z",
       "id": "fda08377-fe7e-46b1-8992-3a7aaecac9c3",
       "name": "build-test-deploy",
       "status": "success",
-      "stopped_at": "2021-09-01T22:49:34.170Z",
-      "url": "https://app.circleci.com/pipelines/github/username/repo/130/workflows/fda08377-fe7e-46b1-8992-3a7aaecac9c3"
+      "stopped_at": "2026-03-04T09:18:34.170Z",
+      "url": "https://app.circleci.com/pipelines/github/acme-labs/snaketoy/130/workflows/fda08377-fe7e-46b1-8992-3a7aaecac9c3"
     }
   },
-  "timestamp": "2021-09-01T22:49:34.317Z",
+  "timestamp": "2026-03-04T09:18:42.812Z",
   "type": "circleci.workflow.completed"
 }
 ```

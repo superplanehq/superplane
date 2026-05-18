@@ -1,18 +1,109 @@
 {
-  "type": "gcp.compute.vmInstance",
   "data": {
     "serviceName": "compute.googleapis.com",
     "methodName": "v1.compute.instances.insert",
-    "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
-    "logName": "projects/my-project/logs/cloudaudit.googleapis.com%2Factivity",
-    "timestamp": "2025-02-14T12:00:00Z",
+    "resourceName": "projects/acme-prod-12348/zones/us-central1-a/instances/snaketoy-runner-3",
+    "logName": "projects/acme-prod-12348/logs/cloudaudit.googleapis.com%2Factivity",
+    "timestamp": "2026-03-04T09:18:42.114Z",
     "data": {
       "protoPayload": {
+        "@type": "type.googleapis.com/google.cloud.audit.AuditLog",
+        "status": {},
+        "authenticationInfo": {
+          "principalEmail": "renato-dev@acme.example",
+          "principalSubject": "user:renato-dev@acme.example"
+        },
+        "requestMetadata": {
+          "callerIp": "203.0.113.42",
+          "callerSuppliedUserAgent": "google-cloud-sdk gcloud/472.0.0 command/gcloud.compute.instances.create",
+          "requestAttributes": {
+            "time": "2026-03-04T09:18:41.928Z",
+            "auth": {}
+          },
+          "destinationAttributes": {}
+        },
+        "serviceName": "compute.googleapis.com",
         "methodName": "v1.compute.instances.insert",
-        "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
-        "serviceName": "compute.googleapis.com"
-      }
+        "authorizationInfo": [
+          {
+            "resource": "projects/acme-prod-12348/zones/us-central1-a/instances/snaketoy-runner-3",
+            "permission": "compute.instances.create",
+            "granted": true,
+            "resourceAttributes": {}
+          }
+        ],
+        "resourceName": "projects/acme-prod-12348/zones/us-central1-a/instances/snaketoy-runner-3",
+        "request": {
+          "@type": "type.googleapis.com/compute.instances.insert",
+          "name": "snaketoy-runner-3",
+          "machineType": "projects/acme-prod-12348/zones/us-central1-a/machineTypes/e2-standard-2",
+          "tags": {
+            "items": ["snaketoy", "runner"]
+          },
+          "disks": [
+            {
+              "boot": true,
+              "autoDelete": true,
+              "initializeParams": {
+                "diskSizeGb": "20",
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12"
+              }
+            }
+          ],
+          "networkInterfaces": [
+            {
+              "network": "projects/acme-prod-12348/global/networks/default",
+              "subnetwork": "projects/acme-prod-12348/regions/us-central1/subnetworks/default",
+              "accessConfigs": [
+                {
+                  "name": "External NAT",
+                  "type": "ONE_TO_ONE_NAT"
+                }
+              ]
+            }
+          ],
+          "labels": {
+            "env": "prod",
+            "service": "snaketoy"
+          }
+        },
+        "response": {
+          "@type": "type.googleapis.com/operation",
+          "id": "8273102983712301921",
+          "name": "operation-1741080522104-617f9b3a8c4d2-2f84b1a7-3e2b5d18",
+          "operationType": "insert",
+          "targetId": "5128371029834102910",
+          "targetLink": "https://www.googleapis.com/compute/v1/projects/acme-prod-12348/zones/us-central1-a/instances/snaketoy-runner-3",
+          "user": "renato-dev@acme.example",
+          "status": "RUNNING",
+          "progress": 0,
+          "insertTime": "2026-03-04T01:18:42.034-08:00",
+          "selfLink": "https://www.googleapis.com/compute/v1/projects/acme-prod-12348/zones/us-central1-a/operations/operation-1741080522104-617f9b3a8c4d2-2f84b1a7-3e2b5d18"
+        },
+        "resourceLocation": {
+          "currentLocations": ["us-central1-a"]
+        }
+      },
+      "insertId": "1k1z9d4d3vkc",
+      "resource": {
+        "type": "gce_instance",
+        "labels": {
+          "instance_id": "5128371029834102910",
+          "project_id": "acme-prod-12348",
+          "zone": "us-central1-a"
+        }
+      },
+      "timestamp": "2026-03-04T09:18:42.114Z",
+      "severity": "NOTICE",
+      "logName": "projects/acme-prod-12348/logs/cloudaudit.googleapis.com%2Factivity",
+      "operation": {
+        "id": "operation-1741080522104-617f9b3a8c4d2-2f84b1a7-3e2b5d18",
+        "producer": "compute.googleapis.com",
+        "first": true
+      },
+      "receiveTimestamp": "2026-03-04T09:18:42.834Z"
     }
   },
-  "timestamp": "2025-02-14T12:00:00Z"
+  "timestamp": "2026-03-04T09:18:42.910Z",
+  "type": "gcp.compute.vmInstance"
 }

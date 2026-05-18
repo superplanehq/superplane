@@ -1,27 +1,30 @@
 {
   "data": {
-    "type": "Notification",
-    "messageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
-    "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
-    "subject": "order.created",
-    "message": "{\"orderId\":\"ord_123\",\"status\":\"created\"}",
-    "timestamp": "2026-01-10T10:00:00Z",
-    "region": "us-east-1",
-    "account": "123456789012",
-    "messageAttributes": {
+    "Type": "Notification",
+    "MessageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
+    "TopicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+    "Subject": "order.created",
+    "Message": "{\"orderId\":\"ord_8f3a2b1c\",\"customerId\":\"cus_7d2e9f1a\",\"status\":\"created\",\"totalCents\":3497,\"currency\":\"USD\",\"createdAt\":\"2026-01-10T10:00:00Z\"}",
+    "Timestamp": "2026-01-10T10:00:00.984Z",
+    "SignatureVersion": "1",
+    "Signature": "EXAMPLEpH+..0OoH2YgFHc7yqf3SfWaHJ1sV2lxwRkKlvN6yc1jYdQfA3Bws1eRgTC2vH+rSE5e7H7YmL3nN5XAvXwjz0CQpjPbUsVqf1ZdfUdsW8HJ7T0YZGrlH5q4qYf5e6kQ4mE/dqGd4r2Y0mFZ6e6dq3PsR7Hc=",
+    "SigningCertURL": "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-9c6465fa7f48f5cacd23014631ec1136.pem",
+    "UnsubscribeURL": "https://sns.us-east-1.amazonaws.com/?Action=Unsubscribe&SubscriptionArn=arn:aws:sns:us-east-1:123456789012:orders-events:11a2b3c4-5d6e-7f80-91a2-b3c4d5e6f708",
+    "MessageAttributes": {
       "eventType": {
         "Type": "String",
         "Value": "order.created"
+      },
+      "schemaVersion": {
+        "Type": "String",
+        "Value": "1.2"
+      },
+      "tenant": {
+        "Type": "String",
+        "Value": "acme-prod-12348"
       }
-    },
-    "detail": {
-      "messageId": "95df01b4-ee98-5cb9-9903-4c221d41eb5e",
-      "topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
-      "subject": "order.created",
-      "message": "{\"orderId\":\"ord_123\",\"status\":\"created\"}",
-      "timestamp": "2026-01-10T10:00:00Z"
     }
   },
-  "timestamp": "2026-01-10T10:00:02.000000000Z",
+  "timestamp": "2026-01-10T10:00:02.124Z",
   "type": "aws.sns.topic.message"
 }
