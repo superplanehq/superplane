@@ -2,7 +2,7 @@
 title: "Jira"
 ---
 
-Manage and react to issues in Jira
+Manage issues in Jira
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
@@ -10,7 +10,20 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Jira" />
+  <LinkCard title="Delete Issue" href="#delete-issue" description="Delete a Jira issue" />
+  <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Jira issue by its key" />
+  <LinkCard title="Update Issue" href="#update-issue" description="Update fields on a Jira issue" />
 </CardGrid>
+
+## Instructions
+
+To connect Jira to SuperPlane:
+
+1. Open [Atlassian API tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
+2. Click **Create API token**, give it a recognizable label, and copy the generated token.
+3. Paste your **Jira Site URL** into SuperPlane. For Jira Cloud, this usually looks like `https://your-domain.atlassian.net`.
+4. Paste the Atlassian account **Email** that owns the API token.
+5. Paste the generated **API Token**.
 
 <a id="create-issue"></a>
 
@@ -27,9 +40,11 @@ The Create Issue component creates a new issue in Jira.
 ### Configuration
 
 - **Project**: The Jira project to create the issue in
-- **Issue Type**: The type of issue (e.g. Task, Bug, Story)
+- **Issue Type**: The type of issue (scoped to the chosen project)
 - **Summary**: The issue summary/title
 - **Description**: Optional description text
+- **Assignee**: Optional Jira user to assign the issue to
+- **Status**: Optional initial status. Jira always creates issues in the workflow's initial state, so when this is set the component executes a transition immediately after create. The status must be reachable via a transition from the initial state.
 
 ### Output
 
@@ -37,17 +52,225 @@ Returns the created issue including:
 - **id**: The issue ID
 - **key**: The issue key (e.g. PROJ-123)
 - **self**: API URL for the issue
+- **fields**: Full issue fields after any status transition
 
 ### Example Output
 
 ```json
 {
   "data": {
+    "fields": {
+      "assignee": {
+        "accountId": "5b10a2844c20165700ede21g",
+        "displayName": "Alice Example",
+        "emailAddress": "alice@example.com"
+      },
+      "created": "2026-01-19T12:00:00.000+0000",
+      "issuetype": {
+        "name": "Bug"
+      },
+      "labels": [
+        "backend",
+        "p1"
+      ],
+      "priority": {
+        "name": "High"
+      },
+      "project": {
+        "id": "10000",
+        "key": "PROJ",
+        "name": "Proj"
+      },
+      "reporter": {
+        "accountId": "5b10ac8d82e05b22cc7d4ef5",
+        "displayName": "Bob Example"
+      },
+      "status": {
+        "name": "To Do",
+        "statusCategory": {
+          "key": "new",
+          "name": "To Do"
+        }
+      },
+      "summary": "Investigate timeout on checkout flow",
+      "updated": "2026-01-19T12:00:00.000+0000"
+    },
     "id": "10001",
     "key": "PROJ-123",
     "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
   },
   "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.issue"
+}
+```
+
+<a id="delete-issue"></a>
+
+## Delete Issue
+
+The Delete Issue component permanently removes an issue from Jira.
+
+### Use Cases
+
+- **Cleanup**: remove placeholder or duplicate issues created by automated flows
+- **CRUD completion**: pair with create/update flows for full lifecycle management
+
+### Configuration
+
+- **Project**: The Jira project the issue belongs to
+- **Issue Key**: The issue key (e.g. `PROJ-123`)
+- **Delete Subtasks**: Also delete the issue's subtasks (Jira returns an error if subtasks exist and this is false)
+
+### Output
+
+Returns the deleted issue's `id` and `key`, plus `deleted: true`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "id": "10001",
+    "key": "PROJ-123"
+  },
+  "timestamp": "2026-01-19T13:00:00Z",
+  "type": "jira.issueDeleted"
+}
+```
+
+<a id="get-issue"></a>
+
+## Get Issue
+
+The Get Issue component retrieves a Jira issue and its fields for downstream routing and inspection.
+
+### Use Cases
+
+- **Routing decisions**: inspect status, assignee, labels, or priority before branching
+- **Escalation context**: include issue details in notifications or downstream tickets
+- **Cross-tool sync**: enrich workflows that mirror Jira state into other systems
+
+### Configuration
+
+- **Project**: The Jira project the issue belongs to
+- **Issue Key**: The issue key (e.g. `PROJ-123`)
+- **Expand**: Optional comma-separated Jira expand values, such as `renderedFields,names`
+
+### Output
+
+Returns the Jira issue object including `id`, `key`, `self` and the full `fields` map.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "fields": {
+      "assignee": {
+        "accountId": "5b10a2844c20165700ede21g",
+        "displayName": "Alice Example",
+        "emailAddress": "alice@example.com"
+      },
+      "created": "2026-01-19T12:00:00.000+0000",
+      "issuetype": {
+        "name": "Bug"
+      },
+      "labels": [
+        "backend",
+        "p1"
+      ],
+      "priority": {
+        "name": "High"
+      },
+      "project": {
+        "id": "10000",
+        "key": "PROJ",
+        "name": "Proj"
+      },
+      "reporter": {
+        "accountId": "5b10ac8d82e05b22cc7d4ef5",
+        "displayName": "Bob Example"
+      },
+      "status": {
+        "name": "In Progress",
+        "statusCategory": {
+          "key": "indeterminate",
+          "name": "In Progress"
+        }
+      },
+      "summary": "Investigate timeout on checkout flow",
+      "updated": "2026-01-19T12:30:00.000+0000"
+    },
+    "id": "10001",
+    "key": "PROJ-123",
+    "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.issue"
+}
+```
+
+<a id="update-issue"></a>
+
+## Update Issue
+
+The Update Issue component updates fields on an existing Jira issue.
+
+### Use Cases
+
+- **Automated triage**: change status, priority, or assignee when a workflow processes the issue
+- **Cross-tool sync**: mirror state from another system into Jira
+- **Bulk relabeling**: apply labels based on workflow inputs
+
+### Configuration
+
+- **Project**: The Jira project the issue belongs to
+- **Issue Key**: The issue key (e.g. `PROJ-123`)
+- **Summary**, **Description**, **Issue Type**, **Assignee**, **Priority**, **Labels**: Optional fields to update. At least one must be supplied.
+- **Notify Users**: Whether to send notification emails (defaults to Jira's behaviour)
+
+### Output
+
+Returns the updated Jira issue as fetched after the update.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "fields": {
+      "assignee": {
+        "accountId": "5b10a2844c20165700ede21g",
+        "displayName": "Alice Example"
+      },
+      "issuetype": {
+        "name": "Bug"
+      },
+      "labels": [
+        "backend",
+        "p1",
+        "in-review"
+      ],
+      "priority": {
+        "name": "Medium"
+      },
+      "project": {
+        "id": "10000",
+        "key": "PROJ",
+        "name": "Proj"
+      },
+      "status": {
+        "name": "In Review"
+      },
+      "summary": "Investigate timeout on checkout flow (updated)",
+      "updated": "2026-01-19T12:45:00.000+0000"
+    },
+    "id": "10001",
+    "key": "PROJ-123",
+    "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+  },
+  "timestamp": "2026-01-19T12:45:00Z",
   "type": "jira.issue"
 }
 ```
