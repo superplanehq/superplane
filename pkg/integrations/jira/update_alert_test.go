@@ -19,26 +19,61 @@ func Test__UpdateAlert__Setup(t *testing.T) {
 	t.Run("no operations", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration:   base,
-			Configuration: map[string]any{"alertId": "x"},
+			Configuration: map[string]any{"alert": "x"},
+			Metadata:      &contexts.MetadataContext{},
 		})
 		require.ErrorContains(t, err, "at least one update")
 	})
 
-	t.Run("existing note id without body", func(t *testing.T) {
+	t.Run("patch existing note missing body", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Integration:   base,
-			Configuration: map[string]any{"alertId": "x", "existingNoteId": "n1"},
+			Integration: base,
+			Configuration: map[string]any{
+				"alert": "x",
+				"patchExistingNote": map[string]any{
+					"noteId": "n1",
+					"note":   "",
+				},
+			},
+			Metadata: &contexts.MetadataContext{},
 		})
-		require.ErrorContains(t, err, "existingNote is required")
+		require.ErrorContains(t, err, "requires both Note ID and Note text")
 	})
 
 	t.Run("valid acknowledge only", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Integration: base,
 			Configuration: map[string]any{
-				"alertId":          "x",
+				"alert":            "x",
 				"acknowledgeAlert": true,
 			},
+			Metadata: &contexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
+
+	t.Run("assign without assignee", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Integration: base,
+			Configuration: map[string]any{
+				"alert":         "x",
+				"setAssignment": true,
+				"assignee":      "",
+			},
+			Metadata: &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "assignee is required")
+	})
+
+	t.Run("new note keyed as null does not block other operations", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Integration: base,
+			Configuration: map[string]any{
+				"alert":            "x",
+				"newNote":          nil,
+				"acknowledgeAlert": true,
+			},
+			Metadata: &contexts.MetadataContext{},
 		})
 		require.NoError(t, err)
 	})
@@ -56,6 +91,16 @@ func Test__UpdateAlert__Execute__combined(t *testing.T) {
 				Body:       io.NopCloser(strings.NewReader(`{"id":"note-new","note":"hello"}`)),
 			},
 			{StatusCode: http.StatusAccepted, Body: io.NopCloser(strings.NewReader(`{"requestId":"ack"}`))},
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(
+					`{"processedAt":"2026-05-01T00:00:00Z","alertId":"","isSuccess":true}`,
+				)),
+			},
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"id":"alert-1","message":"after"}`)),
+			},
 		},
 	}
 	execCtx := &contexts.ExecutionStateContext{}
@@ -64,23 +109,28 @@ func Test__UpdateAlert__Execute__combined(t *testing.T) {
 		HTTP:           httpContext,
 		ExecutionState: execCtx,
 		Configuration: map[string]any{
-			"alertId":          "alert-1",
+			"alert":            "alert-1",
+			"setDescription":   true,
 			"description":      "desc",
+			"setMessage":       true,
 			"message":          "msg",
+			"setPriority":      true,
+			"priority":         "P2",
 			"newNote":          "hello",
 			"acknowledgeAlert": true,
-			"priority":         "P2",
 		},
 	})
 	require.NoError(t, err)
 	assert.Equal(t, UpdateJiraAlertPayloadType, execCtx.Type)
-	require.Len(t, httpContext.Requests, 5)
+	require.Len(t, httpContext.Requests, 7)
 	assert.Equal(t, http.MethodPatch, httpContext.Requests[0].Method)
 	assert.Contains(t, httpContext.Requests[0].URL.String(), "/description")
 	assert.Contains(t, httpContext.Requests[1].URL.String(), "/message")
 	assert.Contains(t, httpContext.Requests[2].URL.String(), "/priority")
 	assert.Contains(t, httpContext.Requests[3].URL.String(), "/notes")
 	assert.Contains(t, httpContext.Requests[4].URL.String(), "/acknowledge")
+	assert.Contains(t, httpContext.Requests[5].URL.String(), "/requests/")
+	assert.Contains(t, httpContext.Requests[6].URL.String(), "/alert-1")
 
 	descBody, err := io.ReadAll(httpContext.Requests[0].Body)
 	require.NoError(t, err)
@@ -93,8 +143,13 @@ func Test__UpdateAlert__Execute__combined(t *testing.T) {
 	assert.Contains(t, string(prBody), "P2")
 }
 
-func Test__validateUpdateAlertHasOperations__priorityNone(t *testing.T) {
-	err := validateUpdateAlertHasOperations(UpdateAlertSpec{AlertID: "x", Priority: "__none__"})
-	require.Error(t, err)
-	require.NoError(t, validateUpdateAlertHasOperations(UpdateAlertSpec{AlertID: "x", Priority: "P3"}))
+func Test__validateUpdateAlertConfigurable__priorityWhenEnabled(t *testing.T) {
+	cfg := map[string]any{
+		"setPriority": true,
+		"setMessage":  true,
+	}
+	err := validateUpdateAlertConfigurable(cfg, UpdateAlertSpec{Alert: "x", Message: "m", Priority: "__none__"})
+	require.ErrorContains(t, err, `choose a concrete priority`)
+
+	require.NoError(t, validateUpdateAlertConfigurable(cfg, UpdateAlertSpec{Alert: "x", Message: "m", Priority: "P3"}))
 }

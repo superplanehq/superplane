@@ -10,7 +10,7 @@ function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
     name: "Get alert",
     componentName: "jira.getAlert",
     isCollapsed: false,
-    configuration: { alertId: "a1" },
+    configuration: { alert: "a1" },
     metadata: {},
     ...overrides,
   };
@@ -38,18 +38,29 @@ function buildDetailsCtx(execution: Partial<ExecutionInfo>): ExecutionDetailsCon
 }
 
 describe("getAlertMapper", () => {
-  it("getExecutionDetails surfaces status, message, priority, tiny id", () => {
+  it("getExecutionDetails surfaces core alert fields incl. description without tiny id", () => {
     const details = getAlertMapper.getExecutionDetails(
       buildDetailsCtx({
         outputs: {
-          default: [{ data: { message: "m1", status: "open", priority: "P2", tinyId: "42" } }],
+          default: [
+            {
+              data: {
+                message: "m1",
+                description: "d1",
+                status: "open",
+                priority: "P2",
+                tinyId: "42",
+              },
+            },
+          ],
         },
       }),
     );
     expect(details.Message).toBe("m1");
+    expect(details.Description).toBe("d1");
     expect(details.Status).toBe("open");
     expect(details.Priority).toBe("P2");
-    expect(details["Tiny ID"]).toBe("42");
+    expect(details["Tiny ID"]).toBeUndefined();
   });
 
   it("eventStateRegistry maps success to fetched", () => {

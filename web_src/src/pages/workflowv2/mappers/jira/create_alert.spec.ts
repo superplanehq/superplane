@@ -38,7 +38,7 @@ function buildDetailsCtx(execution: Partial<ExecutionInfo>): ExecutionDetailsCon
 }
 
 describe("createAlertMapper", () => {
-  it("getExecutionDetails surfaces request id", () => {
+  it("getExecutionDetails surfaces core alert payload fields", () => {
     const details = createAlertMapper.getExecutionDetails(
       buildDetailsCtx({
         outputs: {
@@ -46,14 +46,21 @@ describe("createAlertMapper", () => {
             {
               type: "jira.alert.created",
               timestamp: new Date().toISOString(),
-              data: { requestId: "r-1", result: "queued" },
+              data: {
+                message: "Disk full",
+                description: "Boot volume",
+                status: "open",
+                priority: "P2",
+              },
             },
           ],
         },
       }),
     );
-    expect(details["Request ID"]).toBe("r-1");
-    expect(details["Result"]).toBe("queued");
+    expect(details.Message).toBe("Disk full");
+    expect(details.Description).toBe("Boot volume");
+    expect(details.Status).toBe("open");
+    expect(details.Priority).toBe("P2");
   });
 
   it("eventStateRegistry maps success to created", () => {

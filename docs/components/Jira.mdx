@@ -15,6 +15,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Delete Heartbeat" href="#delete-heartbeat" description="Delete a Jira Service Management Operations heartbeat" />
   <LinkCard title="Delete Incident" href="#delete-incident" description="Delete a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Delete Issue" href="#delete-issue" description="Delete a Jira issue" />
+  <LinkCard title="Get Alert" href="#get-alert" description="Fetch a Jira Service Management Ops alert by alert id" />
   <LinkCard title="Get Incident" href="#get-incident" description="Fetch a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Jira issue by its key" />
   <LinkCard title="Ping Heartbeat" href="#ping-heartbeat" description="Send a ping to a Jira Service Management Operations heartbeat" />
@@ -331,6 +332,55 @@ Returns the deleted issue's `id` and `key`, plus `deleted: true`.
   },
   "timestamp": "2026-01-19T13:00:00Z",
   "type": "jira.issueDeleted"
+}
+```
+
+<a id="get-alert"></a>
+
+## Get Alert
+
+The Get Alert component returns full alert details from Jira Service Management.
+
+### Configuration
+
+- **Alert**: Pick a recent Ops alert from the integration resource list (same as Update / Delete Alert).
+
+### Output
+
+Payload type **jira.alert.fetched** with the alert object (message, status, priority, responders, tags, etc.).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "acknowledged": false,
+    "actions": [],
+    "alias": "alias",
+    "count": 3,
+    "createdAt": "2026-01-19T12:00:00Z",
+    "description": "description",
+    "entity": "entity",
+    "extraProperties": {},
+    "id": "20bfb3c4-ded8-4123-b9d2-c7840a0d4589-1779115726660",
+    "integrationName": "",
+    "integrationType": "",
+    "lastOccuredAt": "2026-01-19T12:00:00Z",
+    "message": "message",
+    "owner": "",
+    "priority": "P2",
+    "responders": [],
+    "seen": false,
+    "services": [],
+    "snoozed": false,
+    "source": "source",
+    "status": "open",
+    "tags": [],
+    "tinyId": "3",
+    "updatedAt": "2026-01-19T12:00:00Z"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.fetched"
 }
 ```
 

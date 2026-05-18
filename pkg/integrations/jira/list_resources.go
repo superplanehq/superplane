@@ -195,58 +195,54 @@ func listIssues(ctx core.ListResourcesContext) ([]core.IntegrationResource, erro
 		return nil, fmt.Errorf("search issues: %w", err)
 	}
 
-	resources := make([]core.IntegrationResource, 0, len(hits))
-	for _, hit := range hits {
-		if strings.TrimSpace(hit.Key) == "" {
-			continue
-		}
-		name := hit.Key
-		if hit.Fields != nil {
-			if s, ok := hit.Fields["summary"].(string); ok && strings.TrimSpace(s) != "" {
-				name = fmt.Sprintf("%s (%s)", strings.TrimSpace(s), hit.Key)
-			}
-		}
-		resources = append(resources, core.IntegrationResource{
-			Type: "issue",
-			Name: name,
-			ID:   hit.Key,
-		})
-	}
-	return resources, nil
-}
-
-func listIssuesFromServiceDesk(client *Client, projectKey string) ([]core.IntegrationResource, bool) {
-	desks, err := client.ListServiceDesks()
-	if err != nil {
-		return nil, false
-	}
-
-	for _, desk := range desks {
-		if !strings.EqualFold(strings.TrimSpace(desk.ProjectKey), projectKey) {
-			continue
-		}
-		rows, err := client.ListCustomerRequestsByServiceDesk(desk.ID, 500)
-		if err != nil || len(rows) == 0 {
-			break
-		}
-		resources := make([]core.IntegrationResource, 0, len(rows))
-		for _, row := range rows {
-			if strings.TrimSpace(row.IssueKey) == "" {
+		resources := make([]core.IntegrationResource, 0, len(hits))
+		for _, hit := range hits {
+			if strings.TrimSpace(hit.Key) == "" {
 				continue
 			}
-			name := row.IssueKey
-			if s := strings.TrimSpace(row.Summary); s != "" {
-				name = fmt.Sprintf("%s (%s)", s, row.IssueKey)
+			name := hit.Key
+			if hit.Fields != nil {
+				if s, ok := hit.Fields["summary"].(string); ok && strings.TrimSpace(s) != "" {
+					name = fmt.Sprintf("%s (%s)", strings.TrimSpace(s), hit.Key)
+				}
 			}
 			resources = append(resources, core.IntegrationResource{
-				Type: "issue",
+				Type: resourceType,
 				Name: name,
-				ID:   row.IssueKey,
+				ID:   hit.Key,
 			})
 		}
-		return resources, true
+		return resources, nil
+	case "alert":
+		cloudID, err := cloudIDFromIntegration(ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("cloud id required for Ops alerts: %w", err)
+		}
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+		rows, err := client.ListOpsAlerts(cloudID, 100)
+		if err != nil {
+			return nil, fmt.Errorf("list Ops alerts: %w", err)
+		}
+		out := make([]core.IntegrationResource, 0, len(rows))
+		for _, row := range rows {
+			rawID := strings.TrimSpace(opsAlertStringField(row, "id"))
+			if rawID == "" {
+				continue
+			}
+			name := opsAlertIntegrationResourceLabel(row, rawID)
+			out = append(out, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   rawID,
+			})
+		}
+		return out, nil
+	default:
+		return []core.IntegrationResource{}, nil
 	}
-	return nil, false
 }
 
 func listProjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -342,9 +338,27 @@ func listIssueStatuses(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 	return resources, nil
 }
 
+func assigneeProjectKey(ctx core.ListResourcesContext) string {
+	projectKey := strings.TrimSpace(ctx.Parameters["project"])
+	if projectKey != "" && !strings.Contains(projectKey, "{{") {
+		return projectKey
+	}
+
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return ""
+	}
+	for _, p := range metadata.Projects {
+		if k := strings.TrimSpace(p.Key); k != "" {
+			return k
+		}
+	}
+	return ""
+}
+
 func listAssignees(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	projectKey := ctx.Parameters["project"]
-	if projectKey == "" || strings.Contains(projectKey, "{{") {
+	projectKey := assigneeProjectKey(ctx)
+	if projectKey == "" {
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -595,4 +609,23 @@ func resolveServiceDeskProjectKey(client *Client, serviceDeskID string) string {
 		}
 	}
 	return ""
+}
+
+func opsAlertIntegrationResourceLabel(row map[string]any, alertID string) string {
+	msg := strings.TrimSpace(opsAlertStringField(row, "message"))
+	if msg != "" && len(msg) > 80 {
+		msg = msg[:77] + "..."
+	}
+	tiny := strings.TrimSpace(opsAlertStringField(row, "tinyId"))
+
+	switch {
+	case msg != "" && tiny != "":
+		return fmt.Sprintf("%s #%s", msg, tiny)
+	case msg != "":
+		return msg
+	case tiny != "":
+		return fmt.Sprintf("#%s", tiny)
+	default:
+		return alertID
+	}
 }
