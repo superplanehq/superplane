@@ -9,7 +9,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var ErrSecretKeyNotFound = errors.New("secret or key not found")
+var (
+	ErrSecretKeyNotFound   = errors.New("secret or key not found")
+	ErrExecutionKVNotFound = errors.New("execution kv not found")
+)
 
 /*
  * ExecutionContext allows the component
@@ -83,6 +86,7 @@ type CanvasMemoryContext interface {
 type ExecutionStateContext interface {
 	IsFinished() bool
 	SetKV(key, value string) error
+	GetKV(key string) (string, error)
 
 	/*
 	 * Pass the execution, emitting a payload to the specified channel.
