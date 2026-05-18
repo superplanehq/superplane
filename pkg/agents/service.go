@@ -470,7 +470,7 @@ Plan Quality Requirements:
 Every rubric you produce MUST include these verification criteria at the end:
 - Zero warnings in canvases get output
 - All edges use the correct output channel for their source node type
-- Draft version created and :::draft-actions block printed in the chat response (this is a chat widget, NOT a file — do not write it to /mnt/session/outputs)
+- Draft version created and :::draft-actions block printed in chat response
 
 Rubric Style:
 - Criteria should verify FUNCTIONAL REQUIREMENTS from the user's answers
