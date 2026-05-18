@@ -2,8 +2,13 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { cn } from "@/lib/utils";
 
 interface IntegrationButtonProps {
-  /** Integration definition name (e.g. "github", "cloudflare", "aws.lambda") */
-  integrationName: string;
+  /**
+   * Integration reference string from the markdown link href.
+   * Formats:
+   *   "github"          - integration definition name (opens create/connect dialog)
+   *   "dash0:dash-2"    - definition:instanceName (opens specific instance config)
+   */
+  integrationRef: string;
   /** Display label (from markdown link text) */
   label?: string;
 }
@@ -12,15 +17,18 @@ interface IntegrationButtonProps {
  * Renders an integration reference as a clickable button with the vendor icon.
  * Dispatches a CustomEvent so the parent page can open the integration dialog.
  *
- * Agent outputs: [GitHub](integration:github)
+ * Agent outputs:
+ *   [GitHub](integration:github)           -> connect/create dialog for GitHub
+ *   [dash-2](integration:dash0:dash-2)     -> configure specific instance "dash-2"
  */
-export function IntegrationButton({ integrationName, label }: IntegrationButtonProps) {
-  const displayName = label || formatIntegrationName(integrationName);
+export function IntegrationButton({ integrationRef, label }: IntegrationButtonProps) {
+  const { integrationName, instanceName } = parseRef(integrationRef);
+  const displayName = label || instanceName || formatIntegrationName(integrationName);
 
   function handleClick() {
     window.dispatchEvent(
       new CustomEvent("agent:open-integration", {
-        detail: { integrationName },
+        detail: { integrationName, instanceName },
       }),
     );
   }
@@ -37,12 +45,23 @@ export function IntegrationButton({ integrationName, label }: IntegrationButtonP
         "transition-all cursor-pointer",
         "align-middle",
       )}
-      title={`Open ${displayName} integration`}
+      title={instanceName ? `Configure ${displayName}` : `Connect ${displayName}`}
     >
       <IntegrationIcon integrationName={integrationName} className="h-4 w-4" size={16} />
       <span>{displayName}</span>
     </button>
   );
+}
+
+function parseRef(ref: string): { integrationName: string; instanceName?: string } {
+  // "dash0:dash-2" -> { integrationName: "dash0", instanceName: "dash-2" }
+  // "github"       -> { integrationName: "github" }
+  const colonIdx = ref.indexOf(":");
+  if (colonIdx === -1) return { integrationName: ref };
+  return {
+    integrationName: ref.slice(0, colonIdx),
+    instanceName: ref.slice(colonIdx + 1),
+  };
 }
 
 /** Capitalize and clean up integration names for display */

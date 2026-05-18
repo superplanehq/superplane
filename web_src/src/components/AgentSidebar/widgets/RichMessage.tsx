@@ -102,7 +102,7 @@ function SegmentRenderer({
                   const label = typeof children === "string" ? children : undefined;
                   return (
                     <IntegrationButton
-                      integrationName={integrationMatch[1]}
+                      integrationRef={integrationMatch[1]}
                       label={label}
                     />
                   );
