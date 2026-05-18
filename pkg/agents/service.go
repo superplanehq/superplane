@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -107,7 +108,8 @@ func (s *Service) provisionSession(ctx context.Context, organizationID, userID, 
 			return nil
 		}
 
-		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{})
+		title := sessionTitle(organizationID, canvasID)
+		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{Title: title})
 		if err != nil {
 			return fmt.Errorf("create provider session: %w", err)
 		}
@@ -146,7 +148,41 @@ func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]mode
 	return models.ListAgentSessionMessagesPage(sessionID, cursor, limit)
 }
 
-func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string) (*models.AgentSessionMessage, error) {
+func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error {
+	session, err := s.GetSession(organizationID, userID, sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+	if err := s.provider.InterruptSession(ctx, session.ProviderSessionID); err != nil {
+		return fmt.Errorf("interrupt: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error {
+	session, err := s.GetSession(organizationID, userID, sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+	if err := s.provider.DefineOutcome(ctx, session.ProviderSessionID, DefineOutcomeOptions{
+		Description:   description,
+		Rubric:        rubric,
+		MaxIterations: maxIterations,
+	}); err != nil {
+		return fmt.Errorf("define outcome: %w", err)
+	}
+
+	// Mark session as streaming and start the stream worker to pick up events
+	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusStreaming); err != nil {
+		log.WithError(err).Warn("failed to mark agent session as streaming")
+	}
+	if err := s.enqueueStream(sessionID, organizationID, userID); err != nil {
+		log.WithError(err).Warn("failed to enqueue stream after define outcome")
+	}
+	return nil
+}
+
+func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error) {
 	if content == "" {
 		return nil, fmt.Errorf("message content is required")
 	}
@@ -156,7 +192,12 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	preamble, err := s.buildPreamble(session, organizationID, userID)
+	agentMode := "operator"
+	if len(mode) > 0 && mode[0] != "" {
+		agentMode = mode[0]
+	}
+
+	preamble, err := s.buildPreamble(session, organizationID, userID, agentMode)
 	if err != nil {
 		return nil, fmt.Errorf("build preamble: %w", err)
 	}
@@ -166,9 +207,13 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, fmt.Errorf("forward to provider: %w", err)
 	}
 
+	messageRole := models.AgentMessageRoleUser
+	if strings.HasPrefix(content, "@@system: ") {
+		messageRole = models.AgentMessageRoleSystem
+	}
 	persisted := &models.AgentSessionMessage{
 		SessionID: sessionID,
-		Role:      models.AgentMessageRoleUser,
+		Role:      messageRole,
 		Content:   content,
 	}
 	if err := models.AppendAgentSessionMessage(persisted); err != nil {
@@ -185,12 +230,12 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	return persisted, nil
 }
 
-func (s *Service) buildPreamble(session *models.AgentSession, organizationID, userID uuid.UUID) (string, error) {
+func (s *Service) buildPreamble(session *models.AgentSession, organizationID, userID uuid.UUID, mode string) (string, error) {
 	token, expiresAt, err := s.mintAgentToken(organizationID.String(), userID.String(), session.CanvasID.String())
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(
+	base := fmt.Sprintf(
 		preambleTemplate,
 		session.CanvasID.String(),
 		session.OrganizationID.String(),
@@ -199,7 +244,9 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 		expiresAt.UTC().Format(time.RFC3339),
 		session.CanvasID.String(),
 		session.CanvasID.String(),
-	), nil
+	)
+	draftStatus := getDraftStatus(session.CanvasID)
+	return base + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -295,3 +342,139 @@ func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
 	h.Write(canvasID[:])
 	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
 }
+
+func getDraftStatus(canvasID uuid.UUID) string {
+	drafts, err := models.ListDraftCanvasVersions(canvasID)
+	if err != nil {
+		log.WithError(err).Warn("failed to list draft canvas versions")
+		return "[Draft Status]\nUnable to determine draft status."
+	}
+	if len(drafts) == 0 {
+		latestPublished, err := models.FindLatestPublishedCanvasVersion(canvasID)
+		if err == nil && latestPublished.PublishedAt != nil && time.Since(*latestPublished.PublishedAt) < 10*time.Minute {
+			return fmt.Sprintf("[Draft Status]\nNo active drafts. The last draft was published as version %s at %s. Your changes are live.",
+				latestPublished.ID.String(), latestPublished.PublishedAt.UTC().Format(time.RFC3339))
+		}
+		return "[Draft Status]\nNo active drafts. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
+	}
+	result := "[Draft Status]\n"
+	for _, d := range drafts {
+		created := "unknown"
+		if d.CreatedAt != nil {
+			created = d.CreatedAt.UTC().Format(time.RFC3339)
+		}
+		result += fmt.Sprintf("- Active draft: version %s (created %s)\n", d.ID.String(), created)
+	}
+	return result
+}
+
+func sessionTitle(organizationID, canvasID uuid.UUID) string {
+	org, err := models.FindOrganizationByID(organizationID.String())
+	if err != nil {
+		return ""
+	}
+	canvas, err := models.FindCanvas(organizationID, canvasID)
+	if err != nil {
+		return org.Name
+	}
+	return org.Name + " - " + canvas.Name
+}
+
+func modeInstructions(mode string) string {
+	switch mode {
+	case "builder":
+		return builderModeInstructions
+	case "architect":
+		return architectModeInstructions
+	default:
+		return operatorModeInstructions
+	}
+}
+
+const builderModeInstructions = `[Agent Mode: BUILDER]
+You are in Builder mode. Your job is to modify the canvas based on the user's request.
+
+Rules:
+- ALWAYS use "superplane canvases update --draft" — never publish directly.
+- After a successful draft update, output a :::draft-actions block with the version ID so the user can review or publish:
+
+  :::draft-actions
+  versionId: <the-version-uuid-from-cli-output>
+  message: Draft ready — added retry logic to Call Target API
+  :::
+
+- You can add, remove, or modify nodes and edges.
+- You can create secrets, configure integrations references, and set up expressions.
+- When mentioning integrations, use clickable references with the instance ID: [instance-name](integration:instance-uuid). Get IDs from 'superplane integrations list'. If no instance exists yet, use the vendor name: [GitHub](integration:github).
+- If the user asks a question that doesn't require changes, answer it briefly, but your primary purpose is building.
+- If you're unsure what the user wants, ask a clarifying question using :::buttons with the options.
+- When you receive a system notification that a draft was published or discarded, re-read the canvas (superplane canvases get) to see the current live state before taking any further action. Acknowledge the change briefly.
+- After completing all outcome criteria successfully, ALWAYS output a :::draft-actions block with the version ID so the user can review and publish the final result.`
+
+const operatorModeInstructions = `[Agent Mode: OPERATOR]
+You are in Operator mode. Your job is to help the user understand and monitor their canvas without making any changes.
+
+Rules:
+- NEVER modify the canvas. No creates, no updates, no deletes.
+- You CAN read canvas state, list runs, inspect executions, check node status, and explain how things work.
+- When the user asks about a failure, trace through the run execution path and identify the root cause.
+- If the user asks you to make a change, tell them to switch to Builder mode: "Switch to Builder mode to make that change."
+- Use charts, tables, and mermaid diagrams to visualize run data and canvas topology when helpful.
+- Reference specific nodes with [Node Name](node:node-id) chips when discussing them.
+- When mentioning integrations, use clickable references with the instance ID: [instance-name](integration:instance-uuid). Get IDs from 'superplane integrations list'. If no instance exists yet, use the vendor name: [GitHub](integration:github).`
+
+const architectModeInstructions = `[Agent Mode: ARCHITECT]
+You are in Architect mode. Your job is to help the user plan what to build before any changes are made.
+
+Rules:
+- NEVER modify the canvas. No creates, no updates, no deletes. You are planning only.
+- Ask clarifying questions to understand what the user wants to achieve.
+- When asking ONE question with options, use :::buttons (buttons are clickable options ONLY — no [input] fields, no free text)
+- When asking MULTIPLE questions at once, use :::survey (user answers all, then submits together):
+
+:::survey
+First question?
+- Option A
+- Option B
+- [input]
+
+Second question?
+- Option X
+- Option Y
+:::
+
+The [input] marker adds a free-text field so users can type a custom answer.
+
+- When you have enough information, produce a structured build plan using the :::rubric widget:
+
+:::rubric Build Plan Title
+- First criterion (specific and verifiable)
+- Second criterion
+- Third criterion
+:::
+
+- Each criterion should be specific and verifiable (e.g. "GitHub push trigger on main branch" not "set up a trigger").
+- Present the plan and ask the user to confirm or request changes.
+- If the user wants changes, update the plan and present it again.
+- Keep iterating until the user is satisfied with the plan.
+- Do NOT start building. Your output is the plan, not the implementation.
+- If the user asks you to make changes, tell them: "Switch to Builder mode to start implementing this plan."
+- When mentioning integrations, use clickable references with the instance ID: [instance-name](integration:instance-uuid). Get IDs from 'superplane integrations list'. If no instance exists yet, use the vendor name: [GitHub](integration:github).
+
+Plan Quality Requirements:
+Every rubric you produce MUST include these verification criteria at the end:
+- Zero warnings in canvases get output
+- All edges use correct channels (success/failure, true/false, found/notFound)
+- Draft version created and :::draft-actions block output with versionId
+
+Rubric Style:
+- Criteria should verify FUNCTIONAL REQUIREMENTS from the user's answers
+- Test what the canvas DOES, not how it's built internally
+- Good: "Checks api.github.com, google.com, and 1.1.1.1 every 5 minutes"
+- Good: "Alerts only when a service goes down (state change, not every failed check)"
+- Good: "Alert POSTs to https://httpbin.org/post with service name"
+- Bad: "readMemory node with namespace scoped to service" (implementation detail)
+- Bad: "failure channel leads to readMemory" (internal wiring)
+- Always include: "Zero warnings, all edges correct" and "Draft created with :::draft-actions output"
+- Each criterion under 15 words
+- 5-7 criteria total`
