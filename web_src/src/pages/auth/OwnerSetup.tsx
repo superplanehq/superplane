@@ -10,6 +10,7 @@ const OWNER_SETUP_SURVEY_NAME = "Owner Setup Survey";
 
 const OwnerSetup: React.FC = () => {
   const [email, setEmail] = useState("");
+  const [organizationName, setOrganizationName] = useState("Demo");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
@@ -115,6 +116,7 @@ const OwnerSetup: React.FC = () => {
         credentials: "include",
         body: JSON.stringify({
           email: email.trim(),
+          organization_name: organizationName.trim(),
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           password,
@@ -233,6 +235,7 @@ const OwnerSetup: React.FC = () => {
         {step === "owner" && (
           <OwnerStep
             email={email}
+            organizationName={organizationName}
             firstName={firstName}
             lastName={lastName}
             password={password}
@@ -241,6 +244,7 @@ const OwnerSetup: React.FC = () => {
             error={error}
             fieldErrors={fieldErrors}
             onEmailChange={setEmail}
+            onOrganizationNameChange={setOrganizationName}
             onFirstNameChange={setFirstName}
             onLastNameChange={setLastName}
             onPasswordChange={setPassword}

@@ -24,6 +24,7 @@ type SetupOwnerRequest struct {
 	FirstName                 string `json:"first_name"`
 	LastName                  string `json:"last_name"`
 	Password                  string `json:"password"`
+	OrganizationName          string `json:"organization_name"`
 	SMTPEnabled               bool   `json:"smtp_enabled"`
 	SMTPHost                  string `json:"smtp_host"`
 	SMTPPort                  int    `json:"smtp_port"`
@@ -60,6 +61,10 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 	if req.Email == "" || req.FirstName == "" || req.LastName == "" || req.Password == "" {
 		http.Error(w, "All fields are required", http.StatusBadRequest)
 		return
+	}
+
+	if req.OrganizationName == "" {
+		req.OrganizationName = "Demo"
 	}
 
 	if req.SMTPEnabled {
@@ -110,7 +115,7 @@ func (s *Server) setupOwner(w http.ResponseWriter, r *http.Request) {
 			return err
 		}
 
-		organization, err = models.CreateOrganizationInTransaction(tx, "Demo", "")
+		organization, err = models.CreateOrganizationInTransaction(tx, req.OrganizationName, "")
 		if err != nil {
 			return err
 		}

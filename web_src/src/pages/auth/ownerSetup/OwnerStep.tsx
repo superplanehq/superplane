@@ -8,6 +8,7 @@ import { ErrorBanner } from "./ErrorBanner";
 
 type OwnerStepProps = {
   email: string;
+  organizationName: string;
   firstName: string;
   lastName: string;
   password: string;
@@ -16,6 +17,7 @@ type OwnerStepProps = {
   error: string | null;
   fieldErrors: Record<string, string>;
   onEmailChange: (value: string) => void;
+  onOrganizationNameChange: (value: string) => void;
   onFirstNameChange: (value: string) => void;
   onLastNameChange: (value: string) => void;
   onPasswordChange: (value: string) => void;
@@ -25,6 +27,7 @@ type OwnerStepProps = {
 
 export const OwnerStep: React.FC<OwnerStepProps> = ({
   email,
+  organizationName,
   firstName,
   lastName,
   password,
@@ -33,6 +36,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
   error,
   fieldErrors,
   onEmailChange,
+  onOrganizationNameChange,
   onFirstNameChange,
   onLastNameChange,
   onPasswordChange,
@@ -47,6 +51,24 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
     </div>
     <form onSubmit={onNext} className="space-y-4">
       <ErrorBanner message={error} />
+      <div>
+        <Label className="mb-2 block text-left">
+          Organization Name
+        </Label>
+        <InputGroup>
+          <Input
+            type="text"
+            value={organizationName}
+            onChange={(event) => onOrganizationNameChange(event.target.value)}
+            placeholder="Acme Inc."
+            autoComplete="organization"
+            className={fieldErrors.organizationName ? "border-red-500" : ""}
+          />
+        </InputGroup>
+        {fieldErrors.organizationName && (
+          <p className="mt-1 text-xs text-red-600 dark:text-red-400">{fieldErrors.organizationName}</p>
+        )}
+      </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
           <Label className="mb-2 block text-left">
