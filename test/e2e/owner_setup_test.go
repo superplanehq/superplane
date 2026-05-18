@@ -148,6 +148,7 @@ func (s *ownerSetupSteps) finishOwnerSetupWithoutSMTP() {
 }
 
 func (s *ownerSetupSteps) fillInOwnerDetails(email, firstName, lastName, password string) {
+	s.session.FillIn(q.Locator(`input[placeholder="Acme Inc."]`), "Test Org")
 	s.session.FillIn(q.Locator(`input[type="email"]`), email)
 	s.session.FillIn(q.Locator(`input[placeholder="First name"]`), firstName)
 	s.session.FillIn(q.Locator(`input[placeholder="Last name"]`), lastName)
@@ -227,8 +228,8 @@ func (s *ownerSetupSteps) assertOwnerAndOrganizationCreated() {
 	assert.NoError(s.t, err, "count organizations")
 	assert.Equal(s.t, int64(1), accountsCount, "expected exactly one account to be created")
 
-	org, err := models.FindOrganizationByName("Demo")
-	assert.NoError(s.t, err, "find organization Demo")
+	org, err := models.FindOrganizationByName("Test Org")
+	assert.NoError(s.t, err, "find organization Test Org")
 
 	s.orgID = org.ID.String()
 }

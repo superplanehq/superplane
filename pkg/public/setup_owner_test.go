@@ -43,6 +43,7 @@ func TestSetupOwnerPersistsInstallationNetworkSettings(t *testing.T) {
 		FirstName:                 "Owner",
 		LastName:                  "User",
 		Password:                  "Password1",
+		OrganizationName:          "Test Org",
 		AllowPrivateNetworkAccess: true,
 	})
 	require.NoError(t, err)
