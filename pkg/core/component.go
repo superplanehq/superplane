@@ -86,9 +86,6 @@ type CanvasMemoryContext interface {
 type ExecutionStateContext interface {
 	IsFinished() bool
 	SetKV(key, value string) error
-
-	// GetKV returns the latest stored value for key for this execution, or
-	// ErrExecutionKVNotFound when no row exists.
 	GetKV(key string) (string, error)
 
 	/*

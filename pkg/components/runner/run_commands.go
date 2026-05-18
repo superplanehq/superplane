@@ -440,9 +440,6 @@ func brokerResultAsAny(raw json.RawMessage) any {
 }
 
 func (c *Runner) Cancel(ctx core.ExecutionContext) error {
-	if ctx.ExecutionState == nil {
-		return nil
-	}
 	if ctx.ExecutionState.IsFinished() {
 		return nil
 	}
@@ -452,29 +449,18 @@ func (c *Runner) Cancel(ctx core.ExecutionContext) error {
 		if errors.Is(err, core.ErrExecutionKVNotFound) {
 			return nil
 		}
-		return fmt.Errorf("runner cancel: get task_id kv: %w", err)
+		return fmt.Errorf("get task_id kv: %w", err)
 	}
 
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
-		if ctx.Logger != nil {
-			ctx.Logger.WithError(err).Debug("runner: cancel skipped, task broker not configured")
-		}
-		return nil
+		return err
 	}
 
-	out, err := broker.CancelTask(taskID)
-	if err != nil {
-		return fmt.Errorf("runner cancel: %w", err)
-	}
-	if out != nil && ctx.Logger != nil {
-		ctx.Logger.Infof(
-			"runner: broker cancel accepted fleet_task_id=%s state=%s status=%s",
-			out.ID,
-			out.State,
-			out.Status,
-		)
+	if err := broker.CancelTask(taskID); err != nil {
+		return fmt.Errorf("cancel task: %w", err)
 	}
 	return nil
 }
+
 func (c *Runner) Cleanup(ctx core.SetupContext) error { return nil }
