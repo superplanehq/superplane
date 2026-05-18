@@ -1,4 +1,4 @@
-import { ChevronRight, Loader2, SquareTerminal, X } from "lucide-react";
+import { Bot, ChevronRight, Loader2, SquareTerminal, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -306,6 +306,8 @@ function ChatConversation({
             {groupMessages(messages).map((group) =>
               group.type === "tool-group" ? (
                 <ToolGroupRow key={group.messages[0].id} messages={group.messages} />
+              ) : group.type === "subagent-group" ? (
+                <SubagentCard key={group.messages[0].id} messages={group.messages} />
               ) : (
                 <MessageRow
                   key={group.message.id}
@@ -478,11 +480,15 @@ function MessageRow({
   );
 }
 
-type MessageGroup = { type: "message"; message: AgentMessage } | { type: "tool-group"; messages: AgentMessage[] };
+type MessageGroup =
+  | { type: "message"; message: AgentMessage }
+  | { type: "tool-group"; messages: AgentMessage[] }
+  | { type: "subagent-group"; messages: AgentMessage[] };
 
 function groupMessages(messages: AgentMessage[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
   let toolBuffer: AgentMessage[] = [];
+  let subagentBuffer: AgentMessage[] = [];
 
   function flushTools() {
     if (toolBuffer.length > 0) {
@@ -491,16 +497,68 @@ function groupMessages(messages: AgentMessage[]): MessageGroup[] {
     }
   }
 
+  function flushSubagent() {
+    if (subagentBuffer.length > 0) {
+      groups.push({ type: "subagent-group", messages: [...subagentBuffer] });
+      subagentBuffer = [];
+    }
+  }
+
   for (const m of messages) {
-    if (m.role === "tool") {
+    if (m.role === "tool" && m.toolName?.startsWith("subagent:")) {
+      flushTools();
+      subagentBuffer.push(m);
+    } else if (m.role === "tool") {
+      flushSubagent();
       toolBuffer.push(m);
     } else {
       flushTools();
+      flushSubagent();
       groups.push({ type: "message", message: m });
     }
   }
   flushTools();
+  flushSubagent();
   return groups;
+}
+
+function SubagentCard({ messages }: { messages: AgentMessage[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const sent = messages.find((m) => m.toolStatus === "started");
+  const received = messages.find((m) => m.toolStatus === "finished");
+  const isRunning = sent && !received;
+  const agentName = (sent?.toolName || received?.toolName || "subagent:").replace("subagent:", "");
+  const question = sent?.content || "";
+  const response = received?.content || "";
+
+  return (
+    <div className="text-sm py-1" data-testid="subagent-card">
+      <button
+        type="button"
+        onClick={() => setExpanded((prev) => !prev)}
+        className="flex items-center gap-2 cursor-pointer text-slate-700 hover:text-slate-900"
+      >
+        <Bot className="size-4 shrink-0" />
+        <span>{agentName}</span>
+        <span className={cn("text-[10px] font-medium", isRunning ? "text-blue-600" : "text-emerald-600")}>
+          {isRunning ? "Working\u2026" : "Done"}
+        </span>
+        <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} />
+      </button>
+      {expanded && (
+        <div className="mt-2 space-y-2 pl-6">
+          {question && (
+            <p className="text-xs text-slate-500 italic">"{question.length > 200 ? question.slice(0, 200) + "\u2026" : question}"</p>
+          )}
+          {response && (
+            <div className="max-h-60 overflow-y-auto">
+              <p className="text-xs text-slate-700 whitespace-pre-wrap">{response}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {

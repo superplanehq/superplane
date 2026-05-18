@@ -251,6 +251,28 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 					},
 				})
 			}
+		case agents.ProviderEventThreadMessageSent:
+			if err := persistAndBroadcast(sessionID, &models.AgentSessionMessage{
+				SessionID:       sessionID,
+				ProviderEventID: evt.ProviderEventID,
+				Role:            models.AgentMessageRoleTool,
+				ToolName:        "subagent:" + evt.AgentName,
+				ToolStatus:      models.AgentToolStatusStarted,
+				Content:         evt.Text,
+			}, "tool_started", publish); err != nil {
+				return err
+			}
+		case agents.ProviderEventThreadMessageReceived:
+			if err := persistAndBroadcast(sessionID, &models.AgentSessionMessage{
+				SessionID:       sessionID,
+				ProviderEventID: evt.ProviderEventID,
+				Role:            models.AgentMessageRoleTool,
+				ToolName:        "subagent:" + evt.AgentName,
+				ToolStatus:      models.AgentToolStatusFinished,
+				Content:         evt.Text,
+			}, "tool_finished", publish); err != nil {
+				return err
+			}
 		case agents.ProviderEventSessionFailed:
 			// Don't publish here — the post-loop block owns
 			// session_failed broadcasting so it stays single-source.

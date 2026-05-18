@@ -18,6 +18,8 @@ const (
 	ProviderEventSessionFailed          ProviderEventType = "session_failed"
 	ProviderEventOutcomeEvaluation      ProviderEventType = "outcome_evaluation"
 	ProviderEventOutcomeEvaluationStart ProviderEventType = "outcome_evaluation_start"
+	ProviderEventThreadMessageSent      ProviderEventType = "thread_message_sent"
+	ProviderEventThreadMessageReceived  ProviderEventType = "thread_message_received"
 )
 
 type ProviderEvent struct {
@@ -31,6 +33,10 @@ type ProviderEvent struct {
 	ToolInput     string
 	ErrorMessage  string
 	OutcomeResult *OutcomeEvaluation
+
+	// Multi-agent thread fields
+	AgentName string
+	ThreadID  string
 }
 
 type OutcomeEvaluation struct {

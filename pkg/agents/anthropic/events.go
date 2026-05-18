@@ -22,6 +22,14 @@ type anthropicEvent struct {
 	Iteration   int    `json:"iteration,omitempty"`
 	Result      string `json:"result,omitempty"`      // "satisfied", "needs_revision", etc.
 	Explanation string `json:"explanation,omitempty"` // grader's prose verdict
+
+	// Multi-agent thread fields
+	AgentName           string `json:"agent_name,omitempty"`
+	FromAgentName       string `json:"from_agent_name,omitempty"`
+	ToAgentName         string `json:"to_agent_name,omitempty"`
+	SessionThreadID     string `json:"session_thread_id,omitempty"`
+	FromSessionThreadID string `json:"from_session_thread_id,omitempty"`
+	ToSessionThreadID   string `json:"to_session_thread_id,omitempty"`
 }
 
 type anthropicContentBlock struct {
@@ -76,6 +84,24 @@ func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 			OutcomeResult: &agents.OutcomeEvaluation{
 				Iteration: raw.Iteration,
 			},
+		}, true
+
+	case "agent.thread_message_sent":
+		return agents.ProviderEvent{
+			ProviderEventID: raw.ID,
+			Type:            agents.ProviderEventThreadMessageSent,
+			Text:            redactSensitive(joinText(raw.Content)),
+			AgentName:       raw.ToAgentName,
+			ThreadID:        raw.ToSessionThreadID,
+		}, true
+
+	case "agent.thread_message_received":
+		return agents.ProviderEvent{
+			ProviderEventID: raw.ID,
+			Type:            agents.ProviderEventThreadMessageReceived,
+			Text:            redactSensitive(joinText(raw.Content)),
+			AgentName:       raw.FromAgentName,
+			ThreadID:        raw.FromSessionThreadID,
 		}, true
 
 	case "span.outcome_evaluation_end":
