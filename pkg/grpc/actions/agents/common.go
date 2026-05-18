@@ -18,7 +18,9 @@ type AgentsService interface {
 	EnsureSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error)
 	GetSession(organizationID, userID, sessionID uuid.UUID) (*models.AgentSession, error)
 	ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]models.AgentSessionMessage, error)
-	SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string) (*models.AgentSessionMessage, error)
+	SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error)
+	InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error
+	DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error
 }
 
 func parseOrgUser(orgID, userID string) (org, user uuid.UUID, err error) {
