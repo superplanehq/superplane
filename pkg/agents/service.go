@@ -315,23 +315,46 @@ func getDraftStatus(canvasID uuid.UUID) string {
 		log.WithError(err).Warn("failed to list draft canvas versions")
 		return "[Draft Status]\nUnable to determine draft status."
 	}
-	if len(drafts) == 0 {
-		latestPublished, err := models.FindLatestPublishedCanvasVersion(canvasID)
-		if err == nil && latestPublished.PublishedAt != nil && time.Since(*latestPublished.PublishedAt) < 10*time.Minute {
-			return fmt.Sprintf("[Draft Status]\nNo active drafts. The last draft was published as version %s at %s. Your changes are live.",
-				latestPublished.ID.String(), latestPublished.PublishedAt.UTC().Format(time.RFC3339))
+
+	if len(drafts) > 0 {
+		result := "[Draft Status]\n"
+		for _, draft := range drafts {
+			result += fmt.Sprintf(
+				"- Active draft: version %s (created %s)\n",
+				draft.ID.String(),
+				draftCreatedAt(draft),
+			)
 		}
-		return "[Draft Status]\nNo active drafts. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
+		return result
 	}
-	result := "[Draft Status]\n"
-	for _, d := range drafts {
-		created := "unknown"
-		if d.CreatedAt != nil {
-			created = d.CreatedAt.UTC().Format(time.RFC3339)
-		}
-		result += fmt.Sprintf("- Active draft: version %s (created %s)\n", d.ID.String(), created)
+
+	latestPublished, err := models.FindLatestPublishedCanvasVersion(canvasID)
+	if err != nil {
+		return noActiveDraftStatus
 	}
-	return result
+	if !wasRecentlyPublished(latestPublished.PublishedAt) {
+		return noActiveDraftStatus
+	}
+
+	return fmt.Sprintf(
+		"[Draft Status]\nNo active drafts. The last draft was published as version %s at %s. Your changes are live.",
+		latestPublished.ID.String(),
+		latestPublished.PublishedAt.UTC().Format(time.RFC3339),
+	)
+}
+
+const noActiveDraftStatus = "[Draft Status]\nNo active drafts. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
+
+func draftCreatedAt(draft models.CanvasVersion) string {
+	if draft.CreatedAt == nil {
+		return "unknown"
+	}
+
+	return draft.CreatedAt.UTC().Format(time.RFC3339)
+}
+
+func wasRecentlyPublished(publishedAt *time.Time) bool {
+	return publishedAt != nil && time.Since(*publishedAt) < 10*time.Minute
 }
 
 func sessionTitle(organizationID, canvasID uuid.UUID) string {
