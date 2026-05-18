@@ -3,8 +3,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
-import { RUN_STATUS_FILTER_OPTIONS, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeIcon } from "@/ui/Runs/RunNodeIcon";
+import { RUN_STATUS_FILTER_OPTIONS, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { Filter } from "lucide-react";
 
 export interface TriggerOption {

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AgentMessage } from "./types";
-import type { AgentMode } from "./useAgentState";
+import type { AgentMode } from "./agentMode";
 import { parseAgentContent, type DraftActionsSegment } from "./widgets/parser";
 import { createSystemMessage } from "./systemMessages";
+import type { AgentMessage } from "@/components/CanvasToolSidebar/types";
 import type { useSendAgentChatMessage } from "@/hooks/useAgentChats";
 
 /**

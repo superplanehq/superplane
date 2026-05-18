@@ -12,7 +12,8 @@ import {
   agentsListAgentChatMessages,
   agentsSendAgentChatMessage,
 } from "@/api-client/sdk.gen";
-import { fromApiChat, fromApiMessage, type AgentChat, type AgentMessage } from "@/components/AgentSidebar/types";
+import type { AgentMode } from "@/components/AgentSidebar/agentMode";
+import { fromApiChat, fromApiMessage, type AgentChat, type AgentMessage } from "@/components/CanvasToolSidebar/types";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 export const agentChatKeys = {
@@ -22,6 +23,11 @@ export const agentChatKeys = {
 };
 
 const PAGE_SIZE = 50;
+const agentModeToApiMode = {
+  builder: "MODE_BUILDER",
+  operator: "MODE_OPERATOR",
+  architect: "MODE_ARCHITECT",
+} as const;
 
 export function useCanvasAgentChat(
   canvasId: string | undefined,
@@ -68,9 +74,13 @@ export function useAgentChatMessages(chatId: string | null, organizationId: stri
 export function useSendAgentChatMessage(organizationId: string | undefined, _canvasId: string | undefined) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ chatId, content, mode }: { chatId: string; content: string; mode?: string }) => {
+    mutationFn: async ({ chatId, content, mode }: { chatId: string; content: string; mode?: AgentMode }) => {
       const response = await agentsSendAgentChatMessage(
-        withOrganizationHeader({ organizationId, path: { chatId }, body: { content, mode } }),
+        withOrganizationHeader({
+          organizationId,
+          path: { chatId },
+          body: { content, mode: mode ? agentModeToApiMode[mode] : undefined },
+        }),
       );
       return fromApiMessage(response.data?.message);
     },

@@ -2,7 +2,7 @@ import { Loader2, Send } from "lucide-react";
 // import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import type { AgentMode } from "./useAgentState";
+import type { AgentMode } from "./agentMode";
 import { ModeToggle } from "./ModeToggle";
 
 export function ChatComposer({

@@ -37,7 +37,11 @@ const MARKDOWN_CLASSES =
 interface RichMessageProps {
   content: string;
   onAction?: (text: string) => void;
-  onStartBuilding?: (rubric: { title: string; criteria: string[]; categories?: import("./parser").RubricCategory[] }) => void;
+  onStartBuilding?: (rubric: {
+    title: string;
+    criteria: string[];
+    categories?: import("./parser").RubricCategory[];
+  }) => void;
   canvasId?: string;
   organizationId?: string;
 }
@@ -70,7 +74,11 @@ function SegmentRenderer({
 }: {
   segment: Segment;
   onAction?: (text: string) => void;
-  onStartBuilding?: (rubric: { title: string; criteria: string[]; categories?: import("./parser").RubricCategory[] }) => void;
+  onStartBuilding?: (rubric: {
+    title: string;
+    criteria: string[];
+    categories?: import("./parser").RubricCategory[];
+  }) => void;
   canvasId?: string;
   organizationId?: string;
 }) {
@@ -80,7 +88,11 @@ function SegmentRenderer({
         <div className={MARKDOWN_CLASSES}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
-            urlTransform={(url) => (url.startsWith("run:") || url.startsWith("node:") || url.startsWith("integration:") ? url : defaultUrlTransform(url))}
+            urlTransform={(url) =>
+              url.startsWith("run:") || url.startsWith("node:") || url.startsWith("integration:")
+                ? url
+                : defaultUrlTransform(url)
+            }
             components={{
               a: ({ children, href }) => {
                 const runMatch = href?.match(/^run:([0-9a-f-]{36})(?:~(.+))?/);
@@ -100,12 +112,7 @@ function SegmentRenderer({
                 const integrationMatch = href?.match(/^integration:(.+)$/);
                 if (integrationMatch) {
                   const label = typeof children === "string" ? children : undefined;
-                  return (
-                    <IntegrationButton
-                      integrationRef={integrationMatch[1]}
-                      label={label}
-                    />
-                  );
+                  return <IntegrationButton integrationRef={integrationMatch[1]} label={label} />;
                 }
 
                 const nodeMatch = href?.match(/^node:(.+)$/);

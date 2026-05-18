@@ -37,8 +37,8 @@ export type AgentSessionWebsocketEvent =
       event: "outcome_evaluation_start" | "outcome_evaluation_end";
       extra?: {
         iteration?: number;
-        passed?: boolean;
-        feedback?: string;
+        result?: string;
+        explanation?: string;
       };
     };
 

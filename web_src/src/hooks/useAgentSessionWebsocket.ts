@@ -2,7 +2,7 @@ import { useCallback, useRef } from "react";
 import useWebSocket from "react-use-websocket";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { upsertAgentMessageInCache } from "./useAgentChats";
-import type { AgentMessage, AgentSessionWebsocketEvent } from "@/components/AgentSidebar/types";
+import type { AgentMessage, AgentSessionWebsocketEvent } from "@/components/CanvasToolSidebar/types";
 
 function parseAgentEvent(event: MessageEvent<unknown>): AgentSessionWebsocketEvent | null {
   try {
@@ -27,11 +27,10 @@ function dispatchAgentEvent(
   }
   if (data.event === "outcome_evaluation_start" || data.event === "outcome_evaluation_end") {
     const phase = data.event === "outcome_evaluation_start" ? "start" : "end";
-    const extra = (data as { extra?: { iteration?: number; result?: string; explanation?: string } }).extra;
     callbacks.onOutcomeEvent?.(phase, {
-      iteration: extra?.iteration ?? 0,
-      result: extra?.result,
-      explanation: extra?.explanation,
+      iteration: data.extra?.iteration ?? 0,
+      result: data.extra?.result,
+      explanation: data.extra?.explanation,
     });
   }
 }

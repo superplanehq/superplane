@@ -51,8 +51,11 @@ type CreateSessionOptions struct {
 }
 
 type DefineOutcomeOptions struct {
-	Description   string
-	Rubric        string
+	// Description is the user-visible goal the provider should work toward.
+	Description string
+	// Rubric is the grader-facing checklist evaluated after each iteration.
+	Rubric string
+	// MaxIterations caps the provider's autonomous build/evaluate loop.
 	MaxIterations int
 }
 
@@ -72,6 +75,7 @@ type Provider interface {
 	CreateSession(ctx context.Context, opts CreateSessionOptions) (*CreateSessionResult, error)
 	SendMessage(ctx context.Context, providerSessionID, message string, opts SendMessageOptions) error
 	InterruptSession(ctx context.Context, providerSessionID string) error
+	// DefineOutcome starts a rubric-driven execution loop on the provider side.
 	DefineOutcome(ctx context.Context, providerSessionID string, opts DefineOutcomeOptions) error
 	// StreamEvents blocks until the provider closes the stream, ctx is
 	// cancelled, or onEvent errors. Implementations must not call onEvent

@@ -83,6 +83,13 @@ service Agents {
   }
 }
 
+enum AgentMode {
+  MODE_UNSPECIFIED = 0;
+  MODE_BUILDER = 1;
+  MODE_OPERATOR = 2;
+  MODE_ARCHITECT = 3;
+}
+
 message GetCanvasAgentChatRequest {
   string canvas_id = 1;
 }
@@ -105,8 +112,8 @@ message ListAgentChatMessagesResponse {
 message SendAgentChatMessageRequest {
   string chat_id = 1;
   string content = 2;
-  // Agent mode: "builder" or "operator". Controls agent behavior.
-  string mode = 3;
+  // Controls whether the agent should build, answer questions, or plan.
+  AgentMode mode = 3;
 }
 
 message SendAgentChatMessageResponse {

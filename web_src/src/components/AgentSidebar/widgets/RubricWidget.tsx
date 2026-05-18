@@ -66,11 +66,10 @@ export function RubricWidget({ title, criteria, categories, onAction, onStartBui
               </div>
             ))}
 
-          {expanded && hasCategories && (
-            <CategorizedList categories={categories} />
-          )}
+          {expanded && hasCategories && <CategorizedList categories={categories} />}
 
-          {expanded && !hasCategories &&
+          {expanded &&
+            !hasCategories &&
             criteria.map((c, i) => (
               <div key={i} className="flex items-start gap-2 py-0.5">
                 <span className="text-violet-400 text-xs mt-0.5 shrink-0">✦</span>
@@ -151,13 +150,7 @@ export function RubricWidget({ title, criteria, categories, onAction, onStartBui
   );
 }
 
-function CategorizedList({
-  categories,
-  showNumbers,
-}: {
-  categories: RubricCategory[];
-  showNumbers?: boolean;
-}) {
+function CategorizedList({ categories, showNumbers }: { categories: RubricCategory[]; showNumbers?: boolean }) {
   let globalIndex = 0;
   return (
     <div className="space-y-3">

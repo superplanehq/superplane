@@ -50,9 +50,7 @@ export function IntegrationButton({ integrationRef, label }: IntegrationButtonPr
     }
 
     // Vendor name reference — find the definition
-    const def = availableQuery.data?.find(
-      (d: { name?: string }) => d.name === integrationRef,
-    );
+    const def = availableQuery.data?.find((d: { name?: string }) => d.name === integrationRef);
     return {
       integrationName: integrationRef,
       instanceName: "",
@@ -63,7 +61,10 @@ export function IntegrationButton({ integrationRef, label }: IntegrationButtonPr
   }, [isUUID, integrationRef, connectedQuery.data, availableQuery.data]);
 
   const displayName =
-    label || resolved.instanceName || (resolved as { definitionLabel?: string }).definitionLabel || formatIntegrationName(resolved.integrationName || integrationRef);
+    label ||
+    resolved.instanceName ||
+    (resolved as { definitionLabel?: string }).definitionLabel ||
+    formatIntegrationName(resolved.integrationName || integrationRef);
 
   const isConnected = resolved.state === "ready";
   const isPending = resolved.state === "pending";
@@ -94,20 +95,22 @@ export function IntegrationButton({ integrationRef, label }: IntegrationButtonPr
         isConnected && "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300",
         isPending && "border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300",
         isError && "border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300",
-        !isConnected && !isPending && !isError && "border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300",
+        !isConnected &&
+          !isPending &&
+          !isError &&
+          "border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300",
       )}
       title={
-        isConnected ? `Connected: ${displayName}`
-        : isPending ? `Pending: ${displayName}`
-        : isError ? `Error: ${displayName}`
-        : `Connect ${displayName}`
+        isConnected
+          ? `Connected: ${displayName}`
+          : isPending
+            ? `Pending: ${displayName}`
+            : isError
+              ? `Error: ${displayName}`
+              : `Connect ${displayName}`
       }
     >
-      <IntegrationIcon
-        integrationName={resolved.integrationName || integrationRef}
-        className="h-4 w-4"
-        size={16}
-      />
+      <IntegrationIcon integrationName={resolved.integrationName || integrationRef} className="h-4 w-4" size={16} />
       <span>{displayName}</span>
       {isConnected && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
       {isPending && <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}

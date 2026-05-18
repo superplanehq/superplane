@@ -14,7 +14,12 @@ export type ErrorSegment = { type: "error"; content: string };
 export type DraftActionsSegment = { type: "draft-actions"; versionId: string; message?: string };
 export type SurveySegment = { type: "survey"; questions: { prompt: string; options: string[]; hasInput?: boolean }[] };
 export type RubricCategory = { heading: string; criteria: { text: string }[] };
-export type RubricSegment = { type: "rubric"; title: string; criteria: { text: string }[]; categories?: RubricCategory[] };
+export type RubricSegment = {
+  type: "rubric";
+  title: string;
+  criteria: { text: string }[];
+  categories?: RubricCategory[];
+};
 
 export type Segment =
   | MarkdownSegment

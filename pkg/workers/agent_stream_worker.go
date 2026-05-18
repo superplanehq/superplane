@@ -193,92 +193,7 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 	var streamErr error
 
 	err = w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
-		switch evt.Type {
-		case agents.ProviderEventAssistantMessage:
-			if evt.Text == "" {
-				return nil
-			}
-			if err := persistAndBroadcast(sessionID, &models.AgentSessionMessage{
-				SessionID:       sessionID,
-				ProviderEventID: evt.ProviderEventID,
-				Role:            models.AgentMessageRoleAssistant,
-				Content:         evt.Text,
-			}, "assistant_message", publish); err != nil {
-				return err
-			}
-		case agents.ProviderEventToolUseStarted:
-			if err := persistAndBroadcast(sessionID, &models.AgentSessionMessage{
-				SessionID:       sessionID,
-				ProviderEventID: evt.ProviderEventID,
-				Role:            models.AgentMessageRoleTool,
-				ToolCallID:      evt.ToolCallID,
-				ToolName:        evt.ToolName,
-				ToolStatus:      models.AgentToolStatusStarted,
-				Content:         evt.ToolInput,
-			}, "tool_started", publish); err != nil {
-				return err
-			}
-		case agents.ProviderEventToolUseFinished:
-			if err := persistAndBroadcast(sessionID, &models.AgentSessionMessage{
-				SessionID:       sessionID,
-				ProviderEventID: evt.ProviderEventID,
-				Role:            models.AgentMessageRoleTool,
-				ToolCallID:      evt.ToolCallID,
-				ToolName:        evt.ToolName,
-				ToolStatus:      models.AgentToolStatusFinished,
-			}, "tool_finished", publish); err != nil {
-				return err
-			}
-		case agents.ProviderEventTurnCompleted:
-			publish(messages.AgentSessionEventMessage{Event: "turn_completed", Status: models.AgentSessionStatusIdle})
-		case agents.ProviderEventOutcomeEvaluationStart:
-			if evt.OutcomeResult != nil {
-				publish(messages.AgentSessionEventMessage{
-					Event: "outcome_evaluation_start",
-					Extra: map[string]any{
-						"iteration": evt.OutcomeResult.Iteration,
-					},
-				})
-			}
-		case agents.ProviderEventOutcomeEvaluation:
-			if evt.OutcomeResult != nil {
-				publish(messages.AgentSessionEventMessage{
-					Event: "outcome_evaluation_end",
-					Extra: map[string]any{
-						"iteration":   evt.OutcomeResult.Iteration,
-						"result":      evt.OutcomeResult.Result,
-						"explanation": evt.OutcomeResult.Explanation,
-					},
-				})
-			}
-		case agents.ProviderEventThreadMessageSent:
-			if err := persistAndBroadcast(sessionID, &models.AgentSessionMessage{
-				SessionID:       sessionID,
-				ProviderEventID: evt.ProviderEventID,
-				Role:            models.AgentMessageRoleTool,
-				ToolName:        "subagent:" + evt.AgentName,
-				ToolStatus:      models.AgentToolStatusStarted,
-				Content:         evt.Text,
-			}, "tool_started", publish); err != nil {
-				return err
-			}
-		case agents.ProviderEventThreadMessageReceived:
-			if err := persistAndBroadcast(sessionID, &models.AgentSessionMessage{
-				SessionID:       sessionID,
-				ProviderEventID: evt.ProviderEventID,
-				Role:            models.AgentMessageRoleTool,
-				ToolName:        "subagent:" + evt.AgentName,
-				ToolStatus:      models.AgentToolStatusFinished,
-				Content:         evt.Text,
-			}, "tool_finished", publish); err != nil {
-				return err
-			}
-		case agents.ProviderEventSessionFailed:
-			// Don't publish here — the post-loop block owns
-			// session_failed broadcasting so it stays single-source.
-			streamErr = fmt.Errorf("provider reported session failed: %s", evt.ErrorMessage)
-		}
-		return nil
+		return handleProviderEvent(sessionID, evt, publish, &streamErr)
 	})
 
 	if streamErr == nil && err != nil && !isContextCancel(err) {
@@ -302,6 +217,115 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 		log.WithError(err).Warn("agent stream: failed to mark session idle")
 	}
 	return nil
+}
+
+func handleProviderEvent(
+	sessionID uuid.UUID,
+	evt agents.ProviderEvent,
+	publish func(messages.AgentSessionEventMessage),
+	streamErr *error,
+) error {
+	switch evt.Type {
+	case agents.ProviderEventAssistantMessage:
+		return persistAssistantEvent(sessionID, evt, publish)
+	case agents.ProviderEventToolUseStarted:
+		return persistToolEvent(sessionID, evt, models.AgentToolStatusStarted, evt.ToolInput, "tool_started", publish)
+	case agents.ProviderEventToolUseFinished:
+		return persistToolEvent(sessionID, evt, models.AgentToolStatusFinished, "", "tool_finished", publish)
+	case agents.ProviderEventTurnCompleted:
+		publish(messages.AgentSessionEventMessage{Event: "turn_completed", Status: models.AgentSessionStatusIdle})
+	case agents.ProviderEventOutcomeEvaluationStart:
+		publishOutcomeEvaluationStart(evt, publish)
+	case agents.ProviderEventOutcomeEvaluation:
+		publishOutcomeEvaluationEnd(evt, publish)
+	case agents.ProviderEventThreadMessageSent:
+		return persistSubagentEvent(sessionID, evt, models.AgentToolStatusStarted, "tool_started", publish)
+	case agents.ProviderEventThreadMessageReceived:
+		return persistSubagentEvent(sessionID, evt, models.AgentToolStatusFinished, "tool_finished", publish)
+	case agents.ProviderEventSessionFailed:
+		// Don't publish here — the post-loop block owns
+		// session_failed broadcasting so it stays single-source.
+		*streamErr = fmt.Errorf("provider reported session failed: %s", evt.ErrorMessage)
+	}
+	return nil
+}
+
+func persistAssistantEvent(
+	sessionID uuid.UUID,
+	evt agents.ProviderEvent,
+	publish func(messages.AgentSessionEventMessage),
+) error {
+	if evt.Text == "" {
+		return nil
+	}
+	return persistAndBroadcast(sessionID, &models.AgentSessionMessage{
+		SessionID:       sessionID,
+		ProviderEventID: evt.ProviderEventID,
+		Role:            models.AgentMessageRoleAssistant,
+		Content:         evt.Text,
+	}, "assistant_message", publish)
+}
+
+func persistToolEvent(
+	sessionID uuid.UUID,
+	evt agents.ProviderEvent,
+	status string,
+	content string,
+	eventName string,
+	publish func(messages.AgentSessionEventMessage),
+) error {
+	return persistAndBroadcast(sessionID, &models.AgentSessionMessage{
+		SessionID:       sessionID,
+		ProviderEventID: evt.ProviderEventID,
+		Role:            models.AgentMessageRoleTool,
+		ToolCallID:      evt.ToolCallID,
+		ToolName:        evt.ToolName,
+		ToolStatus:      status,
+		Content:         content,
+	}, eventName, publish)
+}
+
+func publishOutcomeEvaluationStart(evt agents.ProviderEvent, publish func(messages.AgentSessionEventMessage)) {
+	if evt.OutcomeResult == nil {
+		return
+	}
+	publish(messages.AgentSessionEventMessage{
+		Event: "outcome_evaluation_start",
+		Extra: map[string]any{
+			"iteration": evt.OutcomeResult.Iteration,
+		},
+	})
+}
+
+func publishOutcomeEvaluationEnd(evt agents.ProviderEvent, publish func(messages.AgentSessionEventMessage)) {
+	if evt.OutcomeResult == nil {
+		return
+	}
+	publish(messages.AgentSessionEventMessage{
+		Event: "outcome_evaluation_end",
+		Extra: map[string]any{
+			"iteration":   evt.OutcomeResult.Iteration,
+			"result":      evt.OutcomeResult.Result,
+			"explanation": evt.OutcomeResult.Explanation,
+		},
+	})
+}
+
+func persistSubagentEvent(
+	sessionID uuid.UUID,
+	evt agents.ProviderEvent,
+	status string,
+	eventName string,
+	publish func(messages.AgentSessionEventMessage),
+) error {
+	return persistAndBroadcast(sessionID, &models.AgentSessionMessage{
+		SessionID:       sessionID,
+		ProviderEventID: evt.ProviderEventID,
+		Role:            models.AgentMessageRoleTool,
+		ToolName:        "subagent:" + evt.AgentName,
+		ToolStatus:      status,
+		Content:         evt.Text,
+	}, eventName, publish)
 }
 
 // closeOpenTools is the safety net for providers that emit tool_use but not

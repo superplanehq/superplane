@@ -134,7 +134,11 @@ export function OutcomeProgressWidget({ state, onDismiss }: { state: OutcomeStat
                 <span
                   className={cn(
                     "text-xs",
-                    gradEntry.phase === "satisfied" ? "text-emerald-700" : gradEntry.phase === "needs_revision" ? "text-red-700" : "text-amber-700",
+                    gradEntry.phase === "satisfied"
+                      ? "text-emerald-700"
+                      : gradEntry.phase === "needs_revision"
+                        ? "text-red-700"
+                        : "text-amber-700",
                   )}
                 >
                   {gradEntry.phase === "grading"
@@ -174,7 +178,11 @@ export function OutcomeProgressWidget({ state, onDismiss }: { state: OutcomeStat
                 <ClipboardList size={16} className="text-violet-600" />
                 <h2 className="text-sm font-semibold text-slate-900">{state.title}</h2>
               </div>
-              <button type="button" onClick={() => setRubricOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button
+                type="button"
+                onClick={() => setRubricOpen(false)}
+                className="text-slate-400 hover:text-slate-600"
+              >
                 <X size={16} />
               </button>
             </div>
@@ -218,38 +226,39 @@ export function OutcomeProgressWidget({ state, onDismiss }: { state: OutcomeStat
       )}
 
       {/* Explanation modal */}
-      {explanationOpen !== null && (() => {
-        const entry = state.log?.[explanationOpen] as GradingEntry;
-        if (!entry?.explanation) return null;
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col mx-4">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                <h2 className="text-sm font-semibold text-slate-900">Grading Result</h2>
-                <button
-                  type="button"
-                  onClick={() => setExplanationOpen(null)}
-                  className="text-slate-400 hover:text-slate-600"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <div className="overflow-y-auto p-4 flex-1">
-                <p className="text-sm text-slate-700 whitespace-pre-wrap">{entry.explanation}</p>
-              </div>
-              <div className="px-4 py-3 border-t border-slate-200 flex justify-end">
-                <button
-                  type="button"
-                  onClick={() => setExplanationOpen(null)}
-                  className="text-xs text-slate-500 hover:text-slate-700"
-                >
-                  Close
-                </button>
+      {explanationOpen !== null &&
+        (() => {
+          const entry = state.log?.[explanationOpen] as GradingEntry;
+          if (!entry?.explanation) return null;
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+              <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col mx-4">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+                  <h2 className="text-sm font-semibold text-slate-900">Grading Result</h2>
+                  <button
+                    type="button"
+                    onClick={() => setExplanationOpen(null)}
+                    className="text-slate-400 hover:text-slate-600"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="overflow-y-auto p-4 flex-1">
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{entry.explanation}</p>
+                </div>
+                <div className="px-4 py-3 border-t border-slate-200 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setExplanationOpen(null)}
+                    className="text-xs text-slate-500 hover:text-slate-700"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
     </>
   );
 }

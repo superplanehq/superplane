@@ -76,10 +76,7 @@ export function ConfigureIntegrationDialog({
 
   return (
     <Dialog open={!!integrationId} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent
-        className="sm:max-w-2xl max-h-[80vh] overflow-y-auto"
-        showCloseButton={!updateMutation.isPending}
-      >
+      <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto" showCloseButton={!updateMutation.isPending}>
         {isLoading ? (
           <div className="flex justify-center items-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-gray-500" />
@@ -180,12 +177,7 @@ export function ConfigureIntegrationDialog({
                 >
                   Save
                 </LoadingButton>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onClose}
-                  disabled={updateMutation.isPending}
-                >
+                <Button type="button" variant="outline" onClick={onClose} disabled={updateMutation.isPending}>
                   Cancel
                 </Button>
               </DialogFooter>

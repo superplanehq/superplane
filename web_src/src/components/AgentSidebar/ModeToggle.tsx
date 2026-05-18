@@ -1,6 +1,6 @@
 import { Compass, Hammer, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { AgentMode } from "./useAgentState";
+import type { AgentMode } from "./agentMode";
 
 const modeConfig = {
   builder: {

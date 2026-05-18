@@ -26,4 +26,3 @@ coverage-go.out
 /web_src/src/api-client/
 /api/swagger/*
 !/api/swagger/swagger-ui.html
-/server

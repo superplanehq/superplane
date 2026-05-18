@@ -1,99 +1,209 @@
-import { Bot, ChevronRight, Loader2, SquareTerminal, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { cn } from "@/lib/utils";
+import { Bot, ChevronRight, Loader2, SquareTerminal } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { AgentMode } from "@/components/AgentSidebar/agentMode";
+import { ChatComposer } from "@/components/AgentSidebar/ChatComposer";
+import { isSystemNotification, formatSystemNotification } from "@/components/AgentSidebar/systemMessages";
+import { useChatScroll } from "@/components/AgentSidebar/useChatScroll";
+import { useDraftActions } from "@/components/AgentSidebar/useDraftActions";
+import { DraftActionsWidget } from "@/components/AgentSidebar/widgets/DraftActionsWidget";
+import {
+  OutcomeProgressWidget,
+  type OutcomeState,
+  type OutcomePhase,
+  type IterationEntry,
+  type GradingEntry,
+} from "@/components/AgentSidebar/widgets/OutcomeProgressWidget";
+import type { RubricCategory } from "@/components/AgentSidebar/widgets/parser";
+import { RichMessage } from "@/components/AgentSidebar/widgets/RichMessage";
 import {
   useAgentChatMessages,
   useCanvasAgentChat,
-  useInterruptAgentChat,
   useDefineAgentOutcome,
+  useInterruptAgentChat,
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
+import { cn } from "@/lib/utils";
+import { EmptyToolTab } from "./EmptyToolTab";
+import { SidebarShell } from "./SidebarShell";
+import { ToolTabsHeader } from "./ToolTabsHeader";
 import type { AgentMessage } from "./types";
-import type { AgentState } from "./useAgentState";
-import type { AgentMode } from "./useAgentState";
-import { useSidebarWidth } from "./useSidebarWidth";
-import { RichMessage } from "./widgets/RichMessage";
-import { DraftActionsWidget } from "./widgets/DraftActionsWidget";
-import { ChatComposer } from "./ChatComposer";
-import { useDraftActions } from "./useDraftActions";
-import { useChatScroll } from "./useChatScroll";
-import { isSystemNotification, formatSystemNotification } from "./systemMessages";
-import { OutcomeProgressWidget, type OutcomeState, type OutcomePhase, type IterationEntry, type GradingEntry } from "./widgets/OutcomeProgressWidget";
-import type { RubricCategory } from "./widgets/parser";
+import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
-export interface AgentSidebarProps {
-  agentState: AgentState;
+const TAB_AGENT = "agent",
+  TAB_RUNS = "runs",
+  TAB_VERSIONS = "versions";
+
+type CanvasToolSidebarMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard";
+
+export interface CanvasToolSidebarProps {
+  toolSidebarState: CanvasToolSidebarState;
+  mode?: CanvasToolSidebarMode;
+  onSelectRuns?: () => void;
+  onExitRunsMode?: () => void;
+  runsContent?: ReactNode;
+  isVersionControlOpen?: boolean;
+  onToggleVersionControl?: () => void;
+  versionsContent?: ReactNode;
 }
 
-export function AgentSidebar({ agentState }: AgentSidebarProps) {
-  if (!agentState.showAgentSidebarToggle || !agentState.isAgentSidebarOpen) {
+export function CanvasToolSidebar({
+  toolSidebarState,
+  mode = "default",
+  onSelectRuns,
+  onExitRunsMode,
+  runsContent,
+  isVersionControlOpen,
+  onToggleVersionControl,
+  versionsContent,
+}: CanvasToolSidebarProps) {
+  if (!toolSidebarState.showToolSidebarToggle || !toolSidebarState.isToolSidebarOpen || !toolSidebarState.canvasId) {
     return null;
   }
-  if (!agentState.canvasId) {
-    return null;
-  }
-  return <OpenAgentSidebar agentState={agentState} />;
-}
-
-function OpenAgentSidebar({ agentState }: AgentSidebarProps) {
-  const canvasId = agentState.canvasId ?? "";
-  const organizationId = agentState.organizationId ?? "";
-  const chatQuery = useCanvasAgentChat(canvasId, organizationId, agentState.isAgentSidebarOpen);
-  const chatId = chatQuery.data?.id ?? null;
 
   return (
-    <SidebarShell onClose={agentState.closeSidebar}>
-      {chatQuery.isLoading || !chatId ? (
-        <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin mr-2" /> Loading…
-        </div>
-      ) : (
-        <ChatConversation
-          chatId={chatId}
-          canvasId={canvasId}
-          organizationId={organizationId}
-          agentMode={agentState.agentMode}
-          onModeSwitch={agentState.switchAgentMode}
+    <OpenCanvasToolSidebar
+      toolSidebarState={toolSidebarState}
+      mode={mode}
+      onSelectRuns={onSelectRuns}
+      onExitRunsMode={onExitRunsMode}
+      runsContent={runsContent}
+      isVersionControlOpen={isVersionControlOpen}
+      onToggleVersionControl={onToggleVersionControl}
+      versionsContent={versionsContent}
+    />
+  );
+}
+
+function OpenCanvasToolSidebar({
+  toolSidebarState,
+  mode = "default",
+  onSelectRuns,
+  onExitRunsMode,
+  runsContent,
+  isVersionControlOpen,
+  onToggleVersionControl,
+  versionsContent,
+}: CanvasToolSidebarProps) {
+  const showRunsTab = Boolean(onSelectRuns || mode === "runs" || runsContent);
+  const showVersionsTab = Boolean(onToggleVersionControl || isVersionControlOpen || versionsContent);
+  const [activeTab, setActiveTab] = useState(() => {
+    if (mode === "runs" && showRunsTab) return TAB_RUNS;
+    if (isVersionControlOpen && showVersionsTab) return TAB_VERSIONS;
+    return TAB_AGENT;
+  });
+
+  useEffect(() => {
+    if (mode === "runs" && showRunsTab) {
+      setActiveTab(TAB_RUNS);
+      return;
+    }
+    if (isVersionControlOpen && showVersionsTab) {
+      setActiveTab(TAB_VERSIONS);
+      return;
+    }
+    setActiveTab((currentTab) => (currentTab === TAB_RUNS || currentTab === TAB_VERSIONS ? TAB_AGENT : currentTab));
+  }, [isVersionControlOpen, mode, showRunsTab, showVersionsTab]);
+
+  const tabs = [
+    { value: TAB_AGENT, label: "Agent" },
+    ...(showRunsTab ? ([{ value: TAB_RUNS, label: "Runs" }] as const) : []),
+    ...(showVersionsTab ? ([{ value: TAB_VERSIONS, label: "Versions" }] as const) : []),
+  ] as const;
+
+  const handleClose = useCallback(() => {
+    if (activeTab === TAB_RUNS) {
+      onExitRunsMode?.();
+    }
+
+    if (activeTab === TAB_VERSIONS && isVersionControlOpen) {
+      onToggleVersionControl?.();
+    }
+
+    toolSidebarState.closeToolSidebar();
+  }, [activeTab, isVersionControlOpen, onExitRunsMode, onToggleVersionControl, toolSidebarState]);
+
+  const handleTabSelect = useCallback(
+    (nextTab: typeof TAB_AGENT | typeof TAB_RUNS | typeof TAB_VERSIONS) => {
+      setActiveTab(nextTab);
+
+      if (nextTab === TAB_RUNS) {
+        if (isVersionControlOpen) onToggleVersionControl?.();
+        if (mode !== "runs") {
+          toolSidebarState.openToolSidebar();
+          onSelectRuns?.();
+        }
+        return;
+      }
+
+      if (mode === "runs") onExitRunsMode?.();
+
+      if (nextTab === TAB_VERSIONS) {
+        if (!isVersionControlOpen) {
+          toolSidebarState.openToolSidebar();
+          onToggleVersionControl?.();
+        }
+        return;
+      }
+
+      if (isVersionControlOpen) onToggleVersionControl?.();
+    },
+    [isVersionControlOpen, mode, onExitRunsMode, onSelectRuns, onToggleVersionControl, toolSidebarState],
+  );
+
+  return (
+    <SidebarShell>
+      <div className="flex min-h-0 flex-1 flex-col gap-0">
+        <ToolTabsHeader
+          tabs={tabs}
+          activeTab={activeTab}
+          onSelectTab={(value) => handleTabSelect(value as typeof TAB_AGENT | typeof TAB_RUNS | typeof TAB_VERSIONS)}
+          onClose={handleClose}
         />
-      )}
+
+        {activeTab === TAB_AGENT ? (
+          <div className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden" role="tabpanel">
+            <AgentTabPanel toolSidebarState={toolSidebarState} />
+          </div>
+        ) : null}
+        {activeTab === TAB_RUNS ? (
+          <div className="m-0 flex min-h-0 flex-1 flex-col" role="tabpanel">
+            {runsContent ?? <EmptyToolTab />}
+          </div>
+        ) : null}
+        {activeTab === TAB_VERSIONS ? (
+          <div className="m-0 flex min-h-0 flex-1 flex-col" role="tabpanel">
+            {versionsContent ?? <EmptyToolTab />}
+          </div>
+        ) : null}
+      </div>
     </SidebarShell>
   );
 }
 
-function SidebarShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  const { sidebarRef, width, isResizing, handleMouseDown } = useSidebarWidth();
+function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasToolSidebarState }) {
+  const canvasId = toolSidebarState.canvasId ?? "";
+  const organizationId = toolSidebarState.organizationId ?? "";
+  const chatQuery = useCanvasAgentChat(canvasId, organizationId, toolSidebarState.isToolSidebarOpen);
+  const chatId = chatQuery.data?.id ?? null;
+
+  if (chatQuery.isLoading || !chatId) {
+    return (
+      <div className="flex flex-1 items-center justify-center py-8 text-sm text-muted-foreground">
+        <Loader2 className="mr-2 size-4 animate-spin" /> Loading…
+      </div>
+    );
+  }
+
   return (
-    <aside
-      ref={sidebarRef}
-      data-testid="agent-sidebar"
-      className="relative border-r border-border shrink-0 h-full z-21 flex flex-col overflow-hidden bg-white"
-      style={{ width }}
-    >
-      <header className="flex items-center justify-between gap-3 px-4 py-2.5 border-b border-border shrink-0 min-w-0">
-        <h2 className="text-base font-medium min-w-0 flex-1 truncate">Agent</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close SuperPlane Agent"
-          data-testid="close-agent-sidebar-button"
-          className="z-40 w-6 h-6 hover:bg-slate-950/5 rounded-md flex items-center justify-center cursor-pointer text-muted-foreground"
-        >
-          <X size={16} />
-        </button>
-      </header>
-      <div className="flex flex-1 flex-col min-h-0">{children}</div>
-      <div
-        onMouseDown={handleMouseDown}
-        className={cn(
-          "absolute right-0 top-0 bottom-0 w-1.5 -mr-0.5 cursor-ew-resize hover:bg-violet-300/40",
-          isResizing && "bg-violet-400/60",
-        )}
-        aria-hidden
-        data-testid="agent-sidebar-resize-handle"
-      />
-    </aside>
+    <ChatConversation
+      chatId={chatId}
+      canvasId={canvasId}
+      organizationId={organizationId}
+      agentMode={toolSidebarState.agentMode}
+      onModeSwitch={toolSidebarState.switchAgentMode}
+      isEditing={toolSidebarState.isEditing}
+    />
   );
 }
 
@@ -103,15 +213,15 @@ function ChatConversation({
   organizationId,
   agentMode,
   onModeSwitch,
+  isEditing,
 }: {
   chatId: string;
   canvasId: string;
   organizationId: string;
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
+  isEditing: boolean;
 }) {
-  const [searchParams] = useSearchParams();
-  const isEditing = searchParams.has("version");
   const messagesQuery = useAgentChatMessages(chatId, organizationId, true);
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
   const interruptMutation = useInterruptAgentChat(organizationId);
@@ -143,29 +253,23 @@ function ChatConversation({
     [chatId],
   );
 
-  // pages[0] is the latest fetch; later entries are older batches loaded
-  // via scroll-up. Reverse so chronological order falls out of flatMap.
   const messages = useMemo(
     () =>
       messagesQuery.data?.pages
         .slice()
         .reverse()
-        .flatMap((p) => p.messages) ?? [],
+        .flatMap((page) => page.messages) ?? [],
     [messagesQuery.data],
   );
   const hasRunningTool = useMemo(
-    () => messages.some((m) => m.role === "tool" && m.toolStatus === "started"),
+    () => messages.some((message) => message.role === "tool" && message.toolStatus === "started"),
     [messages],
   );
-  // Thinking is just a placeholder for the gap between sending and the first
-  // assistant block landing in the cache. Once a tool starts running its own
-  // row signals activity, so we suppress Thinking to avoid double-indicators.
   const showThinking = status === "streaming" && !hasRunningTool && messages[messages.length - 1]?.role === "user";
 
   const wsCallbacks = useMemo(
     () => ({
       onPersistedMessage: (message: AgentMessage) => {
-        // Clear outcome widget when draft is published or discarded
         if (message.content?.includes("published") || message.content?.includes("discarded")) {
           setOutcomeState(null);
         }
@@ -181,9 +285,7 @@ function ChatConversation({
         setOutcomeState((prev) => {
           if (!prev) return prev;
           if (phase === "start") {
-            // Grading started — update log with grading entry
             const updatedLog = [...prev.log];
-            // Mark last iteration as finished
             const lastEntry = updatedLog[updatedLog.length - 1];
             if (lastEntry && "phase" in lastEntry && (lastEntry as IterationEntry).phase === "building") {
               updatedLog[updatedLog.length - 1] = { phase: "finished" };
@@ -195,42 +297,43 @@ function ChatConversation({
               log: updatedLog,
             };
           }
-          // phase === "end" — now we get result + explanation from SSE
-          if (evaluation.result) {
-            const updatedLog = [...prev.log];
-            // Update the last grading entry with result
-            for (let i = updatedLog.length - 1; i >= 0; i--) {
-              const entry = updatedLog[i] as GradingEntry;
-              if (entry.phase === "grading") {
-                updatedLog[i] = {
-                  phase: evaluation.result === "satisfied" ? "satisfied" : "needs_revision",
-                  explanation: evaluation.explanation,
-                };
-                break;
-              }
-            }
-            if (evaluation.result === "satisfied") {
-              return { ...prev, phase: "passed" as OutcomePhase, log: updatedLog };
-            }
-            // Needs revision — add next iteration
-            const nextIteration = prev.iteration + 1;
-            const isExhausted = nextIteration > prev.maxIterations;
-            if (isExhausted) {
-              return { ...prev, phase: "exhausted" as OutcomePhase, log: updatedLog };
-            }
-            updatedLog.push({ phase: "building" });
-            return {
-              ...prev,
-              iteration: nextIteration,
-              phase: "building" as OutcomePhase,
-              log: updatedLog,
-            };
+
+          if (!evaluation.result) {
+            return prev;
           }
-          return prev;
+
+          const updatedLog = [...prev.log];
+          for (let index = updatedLog.length - 1; index >= 0; index--) {
+            const entry = updatedLog[index] as GradingEntry;
+            if (entry.phase === "grading") {
+              updatedLog[index] = {
+                phase: evaluation.result === "satisfied" ? "satisfied" : "needs_revision",
+                explanation: evaluation.explanation,
+              };
+              break;
+            }
+          }
+
+          if (evaluation.result === "satisfied") {
+            return { ...prev, phase: "passed" as OutcomePhase, log: updatedLog };
+          }
+
+          const nextIteration = prev.iteration + 1;
+          if (nextIteration > prev.maxIterations) {
+            return { ...prev, phase: "exhausted" as OutcomePhase, log: updatedLog };
+          }
+
+          updatedLog.push({ phase: "building" });
+          return {
+            ...prev,
+            iteration: nextIteration,
+            phase: "building" as OutcomePhase,
+            log: updatedLog,
+          };
         });
       },
     }),
-    [],
+    [setOutcomeState],
   );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
@@ -244,7 +347,7 @@ function ChatConversation({
     } catch (err) {
       setError(err instanceof Error ? err.message : "failed to send message");
     }
-  }, [chatId, draft, sendMutation, agentMode]);
+  }, [agentMode, chatId, draft, sendMutation]);
 
   const handleStop = useCallback(() => {
     interruptMutation.mutate({ chatId });
@@ -252,20 +355,21 @@ function ChatConversation({
 
   const handleStartBuilding = useCallback(
     async (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
-      // Format rubric text with categories if present
-      const rubricText = rubric.categories && rubric.categories.length > 0
-        ? `# ${rubric.title}\n\n${rubric.categories.map((cat) => `## ${cat.heading}\n${cat.criteria.map((c) => `- ${c.text}`).join("\n")}`).join("\n\n")}`
-        : `# ${rubric.title}\n\n${rubric.criteria.map((c) => `- ${c}`).join("\n")}`;
-      // Initialize outcome progress widget
+      const rubricText =
+        rubric.categories && rubric.categories.length > 0
+          ? `# ${rubric.title}\n\n${rubric.categories.map((category) => `## ${category.heading}\n${category.criteria.map((criterion) => `- ${criterion.text}`).join("\n")}`).join("\n\n")}`
+          : `# ${rubric.title}\n\n${rubric.criteria.map((criterion) => `- ${criterion}`).join("\n")}`;
+
       setOutcomeState({
         title: rubric.title,
-        criteria: rubric.criteria.map((c) => ({ text: c })),
+        criteria: rubric.criteria.map((criterion) => ({ text: criterion })),
         categories: rubric.categories,
         iteration: 1,
         maxIterations: 3,
         phase: "building",
         log: [{ phase: "building" }],
       });
+
       try {
         await outcomeMutation.mutateAsync({
           chatId,
@@ -273,10 +377,8 @@ function ChatConversation({
           rubric: rubricText,
           maxIterations: 3,
         });
-      } catch (err) {
-        console.error("Failed to define outcome:", err);
+      } catch {
         setOutcomeState(null);
-        // Fallback: send as regular message in builder mode
         await sendMutation.mutateAsync({
           chatId,
           content: `Start building based on this plan:\n\n${rubricText}`,
@@ -284,26 +386,27 @@ function ChatConversation({
         });
       }
     },
-    [chatId, onModeSwitch, outcomeMutation, sendMutation],
+    [chatId, outcomeMutation, sendMutation, setOutcomeState],
   );
 
   const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
+  const messageGroups = useMemo(() => groupMessages(messages), [messages]);
 
   return (
-    <div className="flex flex-col flex-1 min-h-0">
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2" data-testid="agent-chat-messages">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3" data-testid="agent-chat-messages">
         {messagesQuery.isLoading ? (
           <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-            <Loader2 className="size-4 animate-spin mr-2" /> Loading…
+            <Loader2 className="mr-2 size-4 animate-spin" /> Loading…
           </div>
         ) : (
           <>
             {messagesQuery.isFetchingNextPage ? (
               <div className="flex items-center justify-center py-2 text-xs text-muted-foreground">
-                <Loader2 className="size-3 animate-spin mr-2" /> Loading older messages…
+                <Loader2 className="mr-2 size-3 animate-spin" /> Loading older messages…
               </div>
             ) : null}
-            {groupMessages(messages).map((group) =>
+            {messageGroups.map((group) =>
               group.type === "tool-group" ? (
                 <ToolGroupRow key={group.messages[0].id} messages={group.messages} />
               ) : group.type === "subagent-group" ? (
@@ -317,7 +420,6 @@ function ChatConversation({
                   canvasId={canvasId}
                   organizationId={organizationId}
                   agentMode={agentMode}
-                  onModeSwitch={onModeSwitch}
                   onStartBuilding={handleStartBuilding}
                 />
               ),
@@ -325,13 +427,15 @@ function ChatConversation({
           </>
         )}
         {showThinking ? <ThinkingRow /> : null}
-        {error ? <p className="text-sm text-red-600 px-3 py-2">{error}</p> : null}
+        {error ? <p className="px-3 py-2 text-sm text-red-600">{error}</p> : null}
       </div>
-      {outcomeState && (
-        <div className="px-3 py-2 border-t border-slate-200">
+
+      {outcomeState ? (
+        <div className="border-t border-slate-200 px-3 py-2">
           <OutcomeProgressWidget state={outcomeState} onDismiss={() => setOutcomeState(null)} />
         </div>
-      )}
+      ) : null}
+
       <DraftActionsBar
         messages={messages}
         canvasId={canvasId}
@@ -343,6 +447,7 @@ function ChatConversation({
         outcomePassed={outcomeState?.phase === "passed"}
         onVersionPublished={() => setOutcomeState(null)}
       />
+
       <ChatComposer
         draft={draft}
         onDraftChange={setDraft}
@@ -353,7 +458,10 @@ function ChatConversation({
         statusLabel={statusLabel(status)}
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
-        modeDisabled={status === "streaming" || (outcomeState != null && outcomeState.phase !== "passed" && outcomeState.phase !== "exhausted")}
+        modeDisabled={
+          status === "streaming" ||
+          (outcomeState != null && outcomeState.phase !== "passed" && outcomeState.phase !== "exhausted")
+        }
       />
     </div>
   );
@@ -390,7 +498,9 @@ function DraftActionsBar({
     outcomePassed,
     onVersionPublished,
   });
+
   if (!latestDraft) return null;
+
   return (
     <div className="border-t border-violet-200 bg-violet-50/80 px-3 py-2">
       <DraftActionsWidget
@@ -412,7 +522,6 @@ function MessageRow({
   canvasId,
   organizationId,
   agentMode,
-  onModeSwitch: _onModeSwitch,
   onStartBuilding,
 }: {
   message: AgentMessage;
@@ -421,7 +530,6 @@ function MessageRow({
   canvasId: string;
   organizationId: string;
   agentMode: AgentMode;
-  onModeSwitch: (mode: AgentMode) => void;
   onStartBuilding: (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => void;
 }) {
   const handleAction = useCallback(
@@ -429,23 +537,22 @@ function MessageRow({
       if (sendMutation.isPending) return;
       try {
         await sendMutation.mutateAsync({ chatId, content: action, mode: agentMode });
-      } catch (err) {
-        console.error("Failed to send action:", err);
+      } catch {
+        // Keep the current transcript unchanged when quick actions fail.
       }
     },
-    [chatId, sendMutation, agentMode],
+    [agentMode, chatId, sendMutation],
   );
 
   if (message.role === "tool") {
     return <ToolMessageRow message={message} />;
   }
 
-  // System notification messages (draft published/discarded)
   if (message.role === "system" || (message.role === "user" && isSystemNotification(message.content))) {
     const text = message.role === "system" ? formatSystemNotification(message.content) : message.content;
     return (
       <div className="flex justify-center">
-        <span className="text-[11px] text-slate-400 italic px-2">{text}</span>
+        <span className="px-2 text-[11px] italic text-slate-400">{text}</span>
       </div>
     );
   }
@@ -456,7 +563,7 @@ function MessageRow({
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       <div
         className={cn(
-          "rounded-lg px-3 py-2 text-sm max-w-[85%] break-words",
+          "max-w-[85%] break-words rounded-lg px-3 py-2 text-sm",
           isUser ? "bg-violet-600 text-white whitespace-pre-wrap" : "bg-slate-100 text-slate-900",
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
@@ -473,9 +580,9 @@ function MessageRow({
           />
         )}
       </div>
-      {message.createdAt && (
-        <span className="text-[10px] text-slate-400 mt-0.5 px-1">{formatTime(message.createdAt)}</span>
-      )}
+      {message.createdAt ? (
+        <span className="mt-0.5 px-1 text-[10px] text-slate-400">{formatTime(message.createdAt)}</span>
+      ) : null}
     </div>
   );
 }
@@ -497,96 +604,103 @@ function groupMessages(messages: AgentMessage[]): MessageGroup[] {
     }
   }
 
-  function flushSubagent() {
+  function flushSubagents() {
     if (subagentBuffer.length > 0) {
       groups.push({ type: "subagent-group", messages: [...subagentBuffer] });
       subagentBuffer = [];
     }
   }
 
-  for (const m of messages) {
-    if (m.role === "tool" && m.toolName?.startsWith("subagent:")) {
+  for (const message of messages) {
+    if (message.role === "tool" && message.toolName?.startsWith("subagent:")) {
       flushTools();
-      subagentBuffer.push(m);
-    } else if (m.role === "tool") {
-      flushSubagent();
-      toolBuffer.push(m);
-    } else {
-      flushTools();
-      flushSubagent();
-      groups.push({ type: "message", message: m });
+      subagentBuffer.push(message);
+      continue;
     }
+
+    if (message.role === "tool") {
+      flushSubagents();
+      toolBuffer.push(message);
+      continue;
+    }
+
+    flushTools();
+    flushSubagents();
+    groups.push({ type: "message", message });
   }
+
   flushTools();
-  flushSubagent();
+  flushSubagents();
   return groups;
 }
 
 function SubagentCard({ messages }: { messages: AgentMessage[] }) {
   const [expanded, setExpanded] = useState(false);
-  const sent = messages.find((m) => m.toolStatus === "started");
-  const received = messages.find((m) => m.toolStatus === "finished");
-  const isRunning = sent && !received;
+  const sent = messages.find((message) => message.toolStatus === "started");
+  const received = messages.find((message) => message.toolStatus === "finished");
+  const isRunning = Boolean(sent) && !received;
   const agentName = (sent?.toolName || received?.toolName || "subagent:").replace("subagent:", "");
   const question = sent?.content || "";
   const response = received?.content || "";
 
   return (
-    <div className="text-sm py-1" data-testid="subagent-card">
+    <div className="py-1 text-sm" data-testid="subagent-card">
       <button
         type="button"
-        onClick={() => setExpanded((prev) => !prev)}
-        className="flex items-center gap-2 cursor-pointer text-slate-700 hover:text-slate-900"
+        onClick={() => setExpanded((current) => !current)}
+        className="flex cursor-pointer items-center gap-2 text-slate-700 hover:text-slate-900"
       >
         <Bot className="size-4 shrink-0" />
         <span>{agentName}</span>
         <span className={cn("text-[10px] font-medium", isRunning ? "text-blue-600" : "text-emerald-600")}>
-          {isRunning ? "Working\u2026" : "Done"}
+          {isRunning ? "Working…" : "Done"}
         </span>
         <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} />
       </button>
-      {expanded && (
+      {expanded ? (
         <div className="mt-2 space-y-2 pl-6">
-          {question && (
-            <p className="text-xs text-slate-500 italic">"{question.length > 200 ? question.slice(0, 200) + "\u2026" : question}"</p>
-          )}
-          {response && (
+          {question ? (
+            <p className="text-xs italic text-slate-500">
+              "{question.length > 200 ? `${question.slice(0, 200)}…` : question}"
+            </p>
+          ) : null}
+          {response ? (
             <div className="max-h-60 overflow-y-auto">
-              <p className="text-xs text-slate-700 whitespace-pre-wrap">{response}</p>
+              <p className="whitespace-pre-wrap text-xs text-slate-700">{response}</p>
             </div>
-          )}
+          ) : null}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
 
 function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
   const [expanded, setExpanded] = useState(true);
-  const hasRunning = messages.some((m) => m.toolStatus === "started");
+  const hasRunning = messages.some((message) => message.toolStatus === "started");
   const count = messages.length;
   const label = hasRunning
     ? `Running command${count > 1 ? ` (${count})` : ""}...`
     : `Ran ${count} command${count !== 1 ? "s" : ""}`;
 
   return (
-    <div className={cn("text-sm py-1", hasRunning && "animate-tool-glow")} data-testid="agent-tool-group">
+    <div className={cn("py-1 text-sm", hasRunning && "animate-tool-glow")} data-testid="agent-tool-group">
       <button
         type="button"
-        onClick={() => setExpanded((prev) => !prev)}
-        className="flex items-center gap-2 cursor-pointer text-slate-700 hover:text-slate-900"
+        onClick={() => setExpanded((current) => !current)}
+        className="flex cursor-pointer items-center gap-2 text-slate-700 hover:text-slate-900"
       >
         <SquareTerminal className="size-4 shrink-0" />
         <span>{label}</span>
         <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} />
       </button>
-      {expanded && (
+      {expanded ? (
         <div className="mt-2 space-y-1">
-          {messages.map((m) => (
-            <ToolMessageRow key={m.id} message={m} />
+          {messages.map((message) => (
+            <ToolMessageRow key={message.id} message={message} />
           ))}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -598,19 +712,18 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
   const canExpand = Boolean(command);
   const preview = command ? command.split("\n")[0].substring(0, 80) : "command";
 
-  // Auto-expand when command starts running, collapse when it finishes
   useEffect(() => {
     setExpanded(running);
   }, [running]);
 
   return (
-    <div className="text-xs">
+    <div className="text-xs" data-testid="agent-tool-message">
       <button
         type="button"
-        onClick={() => canExpand && setExpanded((prev) => !prev)}
+        onClick={() => canExpand && setExpanded((current) => !current)}
         disabled={!canExpand}
         className={cn(
-          "flex items-center gap-1.5 text-left w-full",
+          "flex w-full items-center gap-1.5 text-left",
           running ? "text-slate-700" : "text-slate-600",
           canExpand && "cursor-pointer hover:text-slate-900",
         )}
@@ -619,11 +732,11 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
         <span className="truncate">{running ? "Running..." : preview}</span>
       </button>
       {expanded && command ? (
-        <div className="mt-1 rounded-lg border border-slate-200 bg-white overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-1 bg-slate-50 border-b border-slate-200">
-            <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">bash</span>
+        <div className="mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">bash</span>
           </div>
-          <pre className="p-3 text-xs font-mono text-slate-700 whitespace-pre-wrap break-words overflow-auto max-h-[200px]">
+          <pre className="max-h-[200px] overflow-auto break-words whitespace-pre-wrap p-3 font-mono text-xs text-slate-700">
             {command}
           </pre>
         </div>
@@ -634,7 +747,7 @@ function ToolMessageRow({ message }: { message: AgentMessage }) {
 
 function ThinkingRow() {
   return (
-    <div className="flex items-center gap-2 text-sm py-1 text-slate-500 animate-tool-glow" data-testid="agent-thinking">
+    <div className="flex animate-tool-glow items-center gap-2 py-1 text-sm text-slate-500" data-testid="agent-thinking">
       <Loader2 className="size-4 shrink-0 animate-spin" />
       <span>Thinking…</span>
     </div>
@@ -655,6 +768,6 @@ function statusLabel(status: string): string {
 }
 
 function formatTime(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const date = new Date(iso);
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }

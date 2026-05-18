@@ -8,6 +8,7 @@ import type { Predicate } from "../utils";
 
 interface GithubConfiguration {
   refs: Predicate[];
+  paths?: string[];
 }
 
 /**
@@ -44,7 +45,7 @@ export const onPushTriggerRenderer: TriggerRenderer = {
       iconSrc: githubIcon,
       iconColor: getColorClass(definition.color),
       collapsedBackground: getBackgroundColorClass(definition.color),
-      metadata: createGithubMetadataItems(metadata?.repository?.name, configuration?.refs),
+      metadata: createGithubMetadataItems(metadata?.repository?.name, configuration?.refs, configuration?.paths),
     };
 
     if (lastEvent) {
