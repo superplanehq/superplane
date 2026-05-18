@@ -33,6 +33,10 @@ func Test__Jira__Sync(t *testing.T) {
 				},
 				{
 					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"cloudId":"35273b54-3f06-40d2-880f-dd28cf6daafa"}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
 					Body:       io.NopCloser(strings.NewReader(`[{"id":"10000","key":"TEST","name":"Test Project"}]`)),
 				},
 			},
@@ -46,11 +50,14 @@ func Test__Jira__Sync(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Equal(t, "ready", appCtx.State)
-		md := appCtx.Metadata.(Metadata)
-		require.NotNil(t, md.User)
-		assert.Equal(t, "acct-1", md.User.AccountID)
-		require.Len(t, md.Projects, 1)
-		assert.Equal(t, "TEST", md.Projects[0].Key)
+
+		meta, ok := appCtx.Metadata.(Metadata)
+		require.True(t, ok)
+		require.NotNil(t, meta.User)
+		assert.Equal(t, "acct-1", meta.User.AccountID)
+		assert.Equal(t, "35273b54-3f06-40d2-880f-dd28cf6daafa", meta.CloudID)
+		require.Len(t, meta.Projects, 1)
+		assert.Equal(t, "TEST", meta.Projects[0].Key)
 	})
 
 	t.Run("invalid credentials -> error", func(t *testing.T) {
