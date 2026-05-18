@@ -308,11 +308,21 @@ function ChatComposer({
   statusLabel: string;
 }) {
   const [draft, setDraft] = useState("");
-  const canSend = Boolean(draft.trim()) && !sending;
+  const [isSending, setIsSending] = useState(false);
+  const canSend = Boolean(draft.trim()) && !sending && !isSending;
   const handleSend = useCallback(async () => {
     if (!canSend) return;
-    const ok = await onSend(draft);
-    if (ok) setDraft("");
+    const valueToSend = draft;
+    setDraft("");
+    setIsSending(true);
+    try {
+      const ok = await onSend(valueToSend);
+      if (!ok) {
+        setDraft((nextDraft) => (nextDraft.trim() ? nextDraft : valueToSend));
+      }
+    } finally {
+      setIsSending(false);
+    }
   }, [canSend, draft, onSend]);
 
   return (
