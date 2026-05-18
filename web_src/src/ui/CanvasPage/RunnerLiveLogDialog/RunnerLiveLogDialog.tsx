@@ -29,15 +29,16 @@ export function RunnerLiveLogDialog({ canvasMode, executionId }: RunnerLiveLogDi
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
-          size="large"
-          className="flex max-h-[min(90vh,720px)] w-[min(90vw,56rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-none"
+          size="90vw"
+          className="flex flex-col gap-0 overflow-hidden p-0"
           onClick={(e) => e.stopPropagation()}
         >
           <DialogHeader className="shrink-0 border-b border-gray-200 px-4 py-3 text-left">
             <DialogTitle>Logs</DialogTitle>
           </DialogHeader>
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {open ? <LiveLogStreamView executionId={executionId} /> : null}
+
+          <div className="min-h-0 flex-1 overflow-hidden bg-slate-50">
+            <LiveLogStreamView executionId={executionId} />
           </div>
         </DialogContent>
       </Dialog>
