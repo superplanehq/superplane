@@ -51,7 +51,7 @@ func (c *CreateAlert) Description() string {
 }
 
 func (c *CreateAlert) Documentation() string {
-	return `The Create Alert component opens a new alert using the [Jira Service Management Ops Alerts REST API](https://developer.atlassian.com/cloud/jira/service-desk-ops/rest/v2/api-group-alerts/).
+	return `The Create Alert component opens a new alert on Jira Service Management.
 
 ## Use Cases
 
@@ -69,7 +69,11 @@ func (c *CreateAlert) Documentation() string {
 
 ## Output
 
-Returns the API **SuccessResponse** (for example **requestId**) while the alert is processed asynchronously.
+After the Ops API accepts create, SuperPlane waits for asynchronous processing via the alerts **request status** API, then **GET**s the resulting alert.
+
+The payload matches **Get Alert** (full Ops alert JSON: **id**, **message**, **status**, etc.).
+
+If Jira delays processing beyond the polling window the step fails — use **Get Alert** with the Ops request id noted in logs if Atlassian exposes it.
 
 ## Notes
 
@@ -286,10 +290,24 @@ func (c *CreateAlert) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to create alert: %w", err)
 	}
+	if strings.TrimSpace(resp.RequestID) == "" {
+		return fmt.Errorf("create alert API accepted the request but returned no requestId for async tracking")
+	}
+	resolvedID, err := client.ResolveAlertIDAfterOpsRequest(cloudID, resp.RequestID, "")
+	if err != nil {
+		return fmt.Errorf("failed to resolve created alert after async processing: %w", err)
+	}
+	alertDetails, err := client.GetOpsAlert(cloudID, resolvedID)
+	if err != nil {
+		return fmt.Errorf("failed to load created alert: %w", err)
+	}
+	if err := validateCreatedOpsAlertMatchesSpec(spec, alertDetails); err != nil {
+		return err
+	}
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		CreateJiraAlertPayloadType,
-		[]any{resp},
+		[]any{alertDetails},
 	)
 }
 
@@ -315,6 +333,33 @@ func (c *CreateAlert) Hooks() []core.Hook {
 
 func (c *CreateAlert) HandleHook(ctx core.ActionHookContext) error {
 	return nil
+}
+
+// validateCreatedOpsAlertMatchesSpec ensures the alert returned after create matches what we asked for.
+// Jira Ops deduplicates open alerts by alias, which can surface an existing alert instead of a new one.
+func validateCreatedOpsAlertMatchesSpec(spec CreateAlertSpec, alert map[string]any) error {
+	wantMsg := strings.TrimSpace(spec.Message)
+	gotMsg := strings.TrimSpace(opsAlertStringField(alert, "message"))
+	if wantMsg == "" || gotMsg == wantMsg {
+		return nil
+	}
+
+	wantAlias := strings.TrimSpace(spec.Alias)
+	gotAlias := strings.TrimSpace(opsAlertStringField(alert, "alias"))
+	if wantAlias != "" && gotAlias == wantAlias {
+		return fmt.Errorf(
+			"Jira Ops did not create a new alert: an open alert with alias %q already exists (its message is %q, not %q). Use a unique alias or close the existing alert",
+			wantAlias,
+			gotMsg,
+			wantMsg,
+		)
+	}
+
+	return fmt.Errorf(
+		"loaded alert message %q does not match the requested message %q; creation may have failed or returned a different alert",
+		gotMsg,
+		wantMsg,
+	)
 }
 
 func opsCreateAlertRequestFromSpec(spec CreateAlertSpec) *OpsCreateAlertRequest {

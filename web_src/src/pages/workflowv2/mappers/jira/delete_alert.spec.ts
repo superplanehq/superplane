@@ -38,16 +38,18 @@ function buildDetailsCtx(execution: Partial<ExecutionInfo>): ExecutionDetailsCon
 }
 
 describe("deleteAlertMapper", () => {
-  it("getExecutionDetails surfaces alert id and request id", () => {
+  it("getExecutionDetails surfaces executed at and deleted flag", () => {
+    const createdAt = "2026-01-15T10:00:00.000Z";
     const details = deleteAlertMapper.getExecutionDetails(
       buildDetailsCtx({
+        createdAt,
         outputs: {
-          default: [{ data: { alertId: "a9", requestId: "req-del" } }],
+          default: [{ data: { deleted: true, alertId: "a9", requestId: "req-del" } }],
         },
       }),
     );
-    expect(details["Alert ID"]).toBe("a9");
-    expect(details["Request ID"]).toBe("req-del");
+    expect(details["Executed At"]).toBe(new Date(createdAt).toLocaleString());
+    expect(details.Deleted).toBe("Yes");
   });
 
   it("eventStateRegistry maps success to deleted", () => {

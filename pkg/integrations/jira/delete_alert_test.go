@@ -24,7 +24,7 @@ func Test__DeleteAlert__Execute(t *testing.T) {
 	}
 	execCtx := &contexts.ExecutionStateContext{}
 	err := component.Execute(core.ExecutionContext{
-		Configuration:  map[string]any{"alertId": "dead-beef"},
+		Configuration:  map[string]any{"alert": "dead-beef"},
 		HTTP:           httpContext,
 		Integration:    jiraTestIntegration(),
 		ExecutionState: execCtx,

@@ -12,7 +12,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { jiraBaseEventSections } from "./base";
+import { jiraBaseEventSections, opsAlertCoreExecutionPayloadDetails } from "./base";
 
 interface CreateAlertConfiguration {
   message?: string;
@@ -43,15 +43,7 @@ export const createAlertMapper: ComponentBaseMapper = {
     }
     const outputs = context.execution.outputs as { default?: Array<{ data?: unknown }> } | undefined;
     const data = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
-    if (!data) {
-      return details;
-    }
-    if (data.requestId != null) {
-      details["Request ID"] = String(data.requestId);
-    }
-    if (data.result != null) {
-      details["Result"] = String(data.result);
-    }
+    Object.assign(details, opsAlertCoreExecutionPayloadDetails(data));
     return details;
   },
 

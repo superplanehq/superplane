@@ -17,18 +17,15 @@ type UpdateAlert struct{}
 
 // UpdateAlertSpec applies one or more optional Ops alert mutations in a single workflow step.
 type UpdateAlertSpec struct {
-	AlertID string `json:"alertId" mapstructure:"alertId"`
-
-	Description string `json:"description,omitempty" mapstructure:"description"`
-	Message     string `json:"message,omitempty" mapstructure:"message"`
-	Priority    string `json:"priority,omitempty" mapstructure:"priority"`
-
-	NewNote        string `json:"newNote,omitempty" mapstructure:"newNote"`
-	ExistingNoteID string `json:"existingNoteId,omitempty" mapstructure:"existingNoteId"`
-	ExistingNote   string `json:"existingNote,omitempty" mapstructure:"existingNote"`
-
-	AcknowledgeAlert bool `json:"acknowledgeAlert,omitempty" mapstructure:"acknowledgeAlert"`
-	CloseAlert       bool `json:"closeAlert,omitempty" mapstructure:"closeAlert"`
+	Alert            string         `json:"alert" mapstructure:"alert"`
+	Description      string         `json:"description,omitempty" mapstructure:"description"`
+	Message          string         `json:"message,omitempty" mapstructure:"message"`
+	Priority         string         `json:"priority,omitempty" mapstructure:"priority"`
+	Assignee         string         `json:"assignee,omitempty" mapstructure:"assignee"`
+	NewNote          string         `json:"newNote,omitempty" mapstructure:"newNote"`
+	PatchNote        map[string]any `json:"patchExistingNote,omitempty" mapstructure:"patchExistingNote"`
+	AcknowledgeAlert bool           `json:"acknowledgeAlert,omitempty" mapstructure:"acknowledgeAlert"`
+	CloseAlert       bool           `json:"closeAlert,omitempty" mapstructure:"closeAlert"`
 }
 
 func (c *UpdateAlert) Name() string {
@@ -40,25 +37,26 @@ func (c *UpdateAlert) Label() string {
 }
 
 func (c *UpdateAlert) Description() string {
-	return "Update, add a note to, acknowledge, or close a Jira Service Management Ops alert"
+	return "Update, assign, add a note to, acknowledge, or close a Jira Service Management Ops alert"
 }
 
 func (c *UpdateAlert) Documentation() string {
-	return `The Update Alert component runs one or more [Jira Service Management Ops Alerts API](https://developer.atlassian.com/cloud/jira/service-desk-ops/rest/v2/api-group-alerts/) operations on the same alert.
+	return `The Update Alert component runs updates on alerts on Jira Service Management.
 
-All fields except **Alert id** are optional; choose any combination your workflow needs.
+Toggle each optional subsection you need; untouched sections are not sent to Jira.
 
-## Optional mutations
+## Optional updates
 
-- **Description** → PATCH alert description  
-- **Message** → PATCH alert message  
-- **Priority** → PATCH priority (omit with "Don't set")  
-- **New note** → POST a new note  
-- **Existing note id** + **Existing note** → PATCH that note  
-- **Acknowledge alert** → POST acknowledge  
-- **Close alert** → POST close
+- **Description** → updates alert description  
+- **Message** → updates alert message  
+- **Priority** → updates alert priority (omit with "Don't set")  
+- **Assignment** → assigns the alert to a Jira user (Atlassian account ID from the assignee picker)
+- **New note** → adds a new note  
+- **Update existing note** → updates existing note with nested **note id** + **note** text  
+- **Acknowledge alert** → acknowledges alert  
+- **Close alert** → closes alert
 
-Mutations run in the order above. Many endpoints return asynchronously (HTTP 202); the emitted payload lists what was invoked and copies of API acknowledgement objects when returned.`
+After updates, SuperPlane polls the **last asynchronous** Ops response (when applicable) and emits a fresh **GET alert** payload like **Get Alert**.`
 }
 
 func (c *UpdateAlert) Icon() string {
@@ -73,36 +71,73 @@ func (c *UpdateAlert) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{core.DefaultOutputChannel}
 }
 
+func visWhen(field string) []configuration.VisibilityCondition {
+	return []configuration.VisibilityCondition{{Field: field, Values: []string{"true"}}}
+}
+
 func (c *UpdateAlert) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "alertId",
-			Label:       "Alert ID",
-			Type:        configuration.FieldTypeString,
+			Name:        "alert",
+			Label:       "Alert",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Jira Ops alert id",
+			Description: "Ops alerts recently returned by List alerts (refresh the picker after new alerts appear)",
+			Placeholder: "Select an alert",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "alert",
+				},
+			},
 		},
 		{
-			Name:        "description",
-			Label:       "Description",
-			Type:        configuration.FieldTypeText,
+			Name:        "setDescription",
+			Label:       "Change description",
+			Type:        configuration.FieldTypeBool,
 			Required:    false,
-			Description: "When set, PATCH the alert description to this text",
+			Default:     false,
+			Description: "Enables updating the Ops alert description",
 		},
 		{
-			Name:        "message",
-			Label:       "Message",
-			Type:        configuration.FieldTypeString,
-			Required:    false,
-			Description: "When set, PATCH the alert message",
+			Name:                 "description",
+			Label:                "Description",
+			Type:                 configuration.FieldTypeText,
+			Required:             false,
+			Description:          "New description text applied when Change description is on",
+			VisibilityConditions: visWhen("setDescription"),
 		},
 		{
-			Name:        "priority",
-			Label:       "Priority",
-			Type:        configuration.FieldTypeSelect,
+			Name:        "setMessage",
+			Label:       "Change message",
+			Type:        configuration.FieldTypeBool,
 			Required:    false,
-			Default:     "__none__",
-			Description: "When set, PATCH alert priority",
+			Default:     false,
+			Description: "Enables updating the alert message",
+		},
+		{
+			Name:                 "message",
+			Label:                "Message",
+			Type:                 configuration.FieldTypeString,
+			Required:             false,
+			Description:          "Replacement message applied when Change message is on",
+			VisibilityConditions: visWhen("setMessage"),
+		},
+		{
+			Name:        "setPriority",
+			Label:       "Change priority",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Enables updating Ops alert priority",
+		},
+		{
+			Name:                 "priority",
+			Label:                "Priority",
+			Type:                 configuration.FieldTypeSelect,
+			Required:             false,
+			Default:              "__none__",
+			Description:          "Priority applied when Change priority is on",
+			VisibilityConditions: visWhen("setPriority"),
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
@@ -117,25 +152,63 @@ func (c *UpdateAlert) Configuration() []configuration.Field {
 			},
 		},
 		{
+			Name:        "setAssignment",
+			Label:       "Assign alert",
+			Type:        configuration.FieldTypeBool,
+			Required:    false,
+			Default:     false,
+			Description: "Enable assigning the Ops alert via the assign API",
+		},
+		{
+			Name:                 "assignee",
+			Label:                "Assignee",
+			Type:                 configuration.FieldTypeIntegrationResource,
+			Required:             false,
+			Description:          "User to assign the alert to when Assign alert is enabled",
+			Placeholder:          "Select a user",
+			VisibilityConditions: visWhen("setAssignment"),
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "assignee",
+				},
+			},
+		},
+		{
 			Name:        "newNote",
 			Label:       "New note",
 			Type:        configuration.FieldTypeText,
 			Required:    false,
-			Description: "When set, POST a new note with this text",
+			Togglable:   true,
+			Description: "When enabled, creates a note with this text",
 		},
 		{
-			Name:        "existingNoteId",
-			Label:       "Existing note ID",
-			Type:        configuration.FieldTypeString,
+			Name:        "patchExistingNote",
+			Label:       "Update existing note",
+			Type:        configuration.FieldTypeObject,
 			Required:    false,
-			Description: "When updating a note, the note id from Jira (use with Existing note)",
-		},
-		{
-			Name:        "existingNote",
-			Label:       "Existing note",
-			Type:        configuration.FieldTypeText,
-			Required:    false,
-			Description: "New text when patching the note identified by Existing note ID",
+			Togglable:   true,
+			Default:     map[string]any{"noteId": "", "note": ""},
+			Description: "When enabled, updates the note identified by note id using the provided text",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:        "noteId",
+							Label:       "Note ID",
+							Type:        configuration.FieldTypeString,
+							Required:    true,
+							Description: "Id of the Ops alert note to update",
+						},
+						{
+							Name:        "note",
+							Label:       "Note",
+							Type:        configuration.FieldTypeText,
+							Required:    true,
+							Description: "Replacement note text",
+						},
+					},
+				},
+			},
 		},
 		{
 			Name:        "acknowledgeAlert",
@@ -143,7 +216,8 @@ func (c *UpdateAlert) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
 			Default:     false,
-			Description: "When enabled, POST acknowledge on this alert",
+			Togglable:   true,
+			Description: "When enabled, acknowledges the alert before other async steps complete",
 		},
 		{
 			Name:        "closeAlert",
@@ -151,7 +225,8 @@ func (c *UpdateAlert) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeBool,
 			Required:    false,
 			Default:     false,
-			Description: "When enabled, POST close on this alert",
+			Togglable:   true,
+			Description: "When enabled, closes an alert",
 		},
 	}
 }
@@ -161,38 +236,151 @@ func (c *UpdateAlert) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if _, err := cloudIDFromIntegration(ctx.Integration); err != nil {
+	cloudID, err := cloudIDFromIntegration(ctx.Integration)
+	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(spec.AlertID) == "" {
-		return fmt.Errorf("alertId is required")
+	alertKey := strings.TrimSpace(spec.Alert)
+	if alertKey == "" {
+		return fmt.Errorf("alert is required")
 	}
-	noteID := strings.TrimSpace(spec.ExistingNoteID)
-	noteBody := strings.TrimSpace(spec.ExistingNote)
-	switch {
-	case noteID != "" && noteBody == "":
-		return fmt.Errorf("existingNote is required when existingNoteId is set")
-	case noteBody != "" && noteID == "":
-		return fmt.Errorf("existingNoteId is required when updating an existing note; use New note to append")
-	}
-	if err := validateUpdateAlertHasOperations(spec); err != nil {
+	cfg := ConfigurationAsSliceMap(ctx.Configuration)
+
+	if err := validateUpdateAlertConfigurable(cfg, spec); err != nil {
 		return err
 	}
+
+	summaries := buildUpdateAlertConfiguredSummaries(cfg, spec)
+	meta := UpdateAlertNodeMetadata{UpdateSummaries: summaries}
+
+	if ctx.HTTP != nil {
+		client, cerr := NewClient(ctx.HTTP, ctx.Integration)
+		if cerr == nil {
+			if row, gerr := client.GetOpsAlert(cloudID, alertKey); gerr == nil {
+				meta.AlertLabel = opsAlertIntegrationResourceLabel(row, alertKey)
+			}
+		}
+	}
+
+	return ctx.Metadata.Set(meta)
+}
+
+func validateUpdateAlertConfigurable(cfg map[string]any, spec UpdateAlertSpec) error {
+	count := len(buildUpdateAlertConfiguredSummaries(cfg, spec))
+	if count == 0 {
+		return fmt.Errorf(
+			"enable at least one update: description, message, priority, assign, new note, existing note patch, acknowledge, or close",
+		)
+	}
+
+	if isTruthy(cfg, "setDescription") {
+		if strings.TrimSpace(spec.Description) == "" {
+			return fmt.Errorf("description cannot be empty when Change description is enabled")
+		}
+	}
+	if isTruthy(cfg, "setMessage") {
+		if strings.TrimSpace(spec.Message) == "" {
+			return fmt.Errorf("message cannot be empty when Change message is enabled")
+		}
+	}
+	if isTruthy(cfg, "setPriority") {
+		p := strings.TrimSpace(spec.Priority)
+		if p == "" || p == "__none__" {
+			return fmt.Errorf(`choose a concrete priority level or disable "Change priority"`)
+		}
+	}
+
+	if isTruthy(cfg, "setAssignment") {
+		if strings.TrimSpace(spec.Assignee) == "" {
+			return fmt.Errorf("assignee is required when Assign alert is enabled")
+		}
+	}
+
+	if cfgSectionEnabled(cfg, "newNote") {
+		if strings.TrimSpace(spec.NewNote) == "" {
+			return fmt.Errorf("new note cannot be empty when enabled")
+		}
+	}
+
+	if cfgSectionEnabled(cfg, "patchExistingNote") {
+		sub := ConfigurationAsSliceMap(spec.PatchNote)
+		if len(sub) == 0 {
+			return fmt.Errorf("update existing note requires note id and text when enabled")
+		}
+		noteID := strings.TrimSpace(opsAlertStringField(sub, "noteId"))
+		body := strings.TrimSpace(opsAlertStringField(sub, "note"))
+		if noteID == "" || body == "" {
+			return fmt.Errorf("update existing note requires both Note ID and Note text when enabled")
+		}
+	}
+
 	return nil
 }
 
-func validateUpdateAlertHasOperations(spec UpdateAlertSpec) error {
-	hasPriority := strings.TrimSpace(spec.Priority) != "" && strings.TrimSpace(spec.Priority) != "__none__"
-	if strings.TrimSpace(spec.Description) != "" ||
-		strings.TrimSpace(spec.Message) != "" ||
-		hasPriority ||
-		strings.TrimSpace(spec.NewNote) != "" ||
-		(strings.TrimSpace(spec.ExistingNoteID) != "" && strings.TrimSpace(spec.ExistingNote) != "") ||
-		spec.AcknowledgeAlert ||
-		spec.CloseAlert {
+func isTruthy(cfg map[string]any, key string) bool {
+	raw, ok := cfg[key]
+	if !ok {
+		return false
+	}
+	switch v := raw.(type) {
+	case bool:
+		return v
+	case string:
+		return strings.EqualFold(strings.TrimSpace(v), "true")
+	default:
+		return false
+	}
+}
+
+func cfgSectionEnabled(cfg map[string]any, key string) bool {
+	if cfg == nil {
+		return false
+	}
+	raw, ok := cfg[key]
+	return ok && raw != nil
+}
+
+func buildUpdateAlertConfiguredSummaries(cfg map[string]any, spec UpdateAlertSpec) []string {
+	if cfg == nil {
 		return nil
 	}
-	return fmt.Errorf("choose at least one update: description, message, priority, new note, note update, acknowledge, or close")
+	var summaries []string
+	if isTruthy(cfg, "setDescription") {
+		summaries = append(summaries, "Description update")
+	}
+	if isTruthy(cfg, "setMessage") {
+		summaries = append(summaries, "Message update")
+	}
+	if isTruthy(cfg, "setPriority") {
+		p := strings.TrimSpace(spec.Priority)
+		if p != "" && p != "__none__" {
+			summaries = append(summaries, fmt.Sprintf("Priority → %s", p))
+		}
+	}
+	if isTruthy(cfg, "setAssignment") {
+		summaries = append(summaries, "Assign user")
+	}
+	if cfgSectionEnabled(cfg, "newNote") {
+		summaries = append(summaries, "Add note")
+	}
+	if cfgSectionEnabled(cfg, "patchExistingNote") {
+		sub := ConfigurationAsSliceMap(spec.PatchNote)
+		if len(sub) > 0 {
+			id := strings.TrimSpace(opsAlertStringField(sub, "noteId"))
+			if id != "" {
+				summaries = append(summaries, fmt.Sprintf("Note patch (%s)", id))
+			} else {
+				summaries = append(summaries, "Existing note patch")
+			}
+		}
+	}
+	if cfgSectionEnabled(cfg, "acknowledgeAlert") && spec.AcknowledgeAlert {
+		summaries = append(summaries, "Acknowledge")
+	}
+	if cfgSectionEnabled(cfg, "closeAlert") && spec.CloseAlert {
+		summaries = append(summaries, "Close")
+	}
+	return summaries
 }
 
 func (c *UpdateAlert) Execute(ctx core.ExecutionContext) error {
@@ -200,9 +388,12 @@ func (c *UpdateAlert) Execute(ctx core.ExecutionContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if err := validateUpdateAlertHasOperations(spec); err != nil {
+
+	cfg := ConfigurationAsSliceMap(ctx.Configuration)
+	if err := validateUpdateAlertConfigurable(cfg, spec); err != nil {
 		return err
 	}
+
 	cloudID, err := cloudIDFromIntegration(ctx.Integration)
 	if err != nil {
 		return err
@@ -211,73 +402,102 @@ func (c *UpdateAlert) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
-	alertID := strings.TrimSpace(spec.AlertID)
+	alertKey := strings.TrimSpace(spec.Alert)
 
-	var operations []string
-	result := map[string]any{"alertId": alertID}
+	var lastAsync *OpsAsyncSuccessResponse
 
-	if s := strings.TrimSpace(spec.Description); s != "" {
-		r, err := client.PatchOpsAlertDescription(cloudID, alertID, s)
-		if err != nil {
+	applyAsync := func(r *OpsAsyncSuccessResponse, callErr error) error {
+		if callErr != nil {
+			return callErr
+		}
+		if r != nil && strings.TrimSpace(r.RequestID) != "" {
+			lastAsync = r
+		}
+		return nil
+	}
+
+	if isTruthy(cfg, "setDescription") {
+		r, err := client.PatchOpsAlertDescription(cloudID, alertKey, strings.TrimSpace(spec.Description))
+		if err := applyAsync(r, err); err != nil {
 			return fmt.Errorf("patch description: %w", err)
 		}
-		operations = append(operations, "patchDescription")
-		result["patchDescription"] = r
 	}
-	if s := strings.TrimSpace(spec.Message); s != "" {
-		r, err := client.PatchOpsAlertMessage(cloudID, alertID, s)
-		if err != nil {
+	if isTruthy(cfg, "setMessage") {
+		r, err := client.PatchOpsAlertMessage(cloudID, alertKey, strings.TrimSpace(spec.Message))
+		if err := applyAsync(r, err); err != nil {
 			return fmt.Errorf("patch message: %w", err)
 		}
-		operations = append(operations, "patchMessage")
-		result["patchMessage"] = r
 	}
-	if p := strings.TrimSpace(spec.Priority); p != "" && p != "__none__" {
-		r, err := client.PatchOpsAlertPriority(cloudID, alertID, p)
-		if err != nil {
-			return fmt.Errorf("patch priority: %w", err)
+	if isTruthy(cfg, "setPriority") {
+		p := strings.TrimSpace(spec.Priority)
+		if p != "" && p != "__none__" {
+			r, err := client.PatchOpsAlertPriority(cloudID, alertKey, p)
+			if err := applyAsync(r, err); err != nil {
+				return fmt.Errorf("patch priority: %w", err)
+			}
 		}
-		operations = append(operations, "patchPriority")
-		result["patchPriority"] = r
 	}
-	if s := strings.TrimSpace(spec.NewNote); s != "" {
-		note, err := client.AddOpsAlertNote(cloudID, alertID, s)
-		if err != nil {
-			return fmt.Errorf("add note: %w", err)
+	if isTruthy(cfg, "setAssignment") {
+		aid := strings.TrimSpace(spec.Assignee)
+		if aid != "" {
+			r, err := client.AssignOpsAlert(cloudID, alertKey, aid)
+			if err := applyAsync(r, err); err != nil {
+				return fmt.Errorf("assign alert: %w", err)
+			}
 		}
-		operations = append(operations, "addNote")
-		result["addNote"] = note
 	}
-	if nid := strings.TrimSpace(spec.ExistingNoteID); nid != "" {
-		note, err := client.PatchOpsAlertNote(cloudID, alertID, nid, strings.TrimSpace(spec.ExistingNote))
-		if err != nil {
-			return fmt.Errorf("patch note: %w", err)
+	if cfgSectionEnabled(cfg, "newNote") {
+		noteResp, noteErr := client.AddOpsAlertNote(cloudID, alertKey, strings.TrimSpace(spec.NewNote))
+		if noteErr != nil {
+			return fmt.Errorf("add note: %w", noteErr)
 		}
-		operations = append(operations, "patchNote")
-		result["patchNote"] = note
+		_ = noteResp // synchronous 200; does not contribute to polling
 	}
-	if spec.AcknowledgeAlert {
-		r, err := client.AcknowledgeOpsAlert(cloudID, alertID)
-		if err != nil {
+	if cfgSectionEnabled(cfg, "patchExistingNote") {
+		sub := ConfigurationAsSliceMap(spec.PatchNote)
+		nid := strings.TrimSpace(opsAlertStringField(sub, "noteId"))
+		body := strings.TrimSpace(opsAlertStringField(sub, "note"))
+		if nid != "" && body != "" {
+			noteResp, noteErr := client.PatchOpsAlertNote(cloudID, alertKey, nid, body)
+			if noteErr != nil {
+				return fmt.Errorf("patch note: %w", noteErr)
+			}
+			_ = noteResp
+		}
+	}
+	if cfgSectionEnabled(cfg, "acknowledgeAlert") && spec.AcknowledgeAlert {
+		r, err := client.AcknowledgeOpsAlert(cloudID, alertKey)
+		if err := applyAsync(r, err); err != nil {
 			return fmt.Errorf("acknowledge: %w", err)
 		}
-		operations = append(operations, "acknowledge")
-		result["acknowledge"] = r
 	}
-	if spec.CloseAlert {
-		r, err := client.CloseOpsAlert(cloudID, alertID)
-		if err != nil {
+	if cfgSectionEnabled(cfg, "closeAlert") && spec.CloseAlert {
+		r, err := client.CloseOpsAlert(cloudID, alertKey)
+		if err := applyAsync(r, err); err != nil {
 			return fmt.Errorf("close: %w", err)
 		}
-		operations = append(operations, "close")
-		result["close"] = r
 	}
 
-	result["operations"] = operations
+	pollReqID := ""
+	if lastAsync != nil {
+		pollReqID = lastAsync.RequestID
+	}
+
+	if pollReqID != "" {
+		if _, err := client.ResolveAlertIDAfterOpsRequest(cloudID, pollReqID, alertKey); err != nil {
+			return fmt.Errorf("wait for async Ops processing: %w", err)
+		}
+	}
+
+	fresh, err := client.GetOpsAlert(cloudID, alertKey)
+	if err != nil {
+		return fmt.Errorf("failed to reload alert after updates: %w", err)
+	}
+
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		UpdateJiraAlertPayloadType,
-		[]any{result},
+		[]any{fresh},
 	)
 }
 

@@ -1,10 +1,10 @@
 {
-    "data": {
-        "deleted": true,
-        "alertId": "e0caa0ce-d52f-4500-81b9-d592d06970b6",
-        "requestId": "d383c6e9-b1e7-4b59-9c35-72f1a2187777",
-        "result": "Request will be processed"
-    },
-    "timestamp": "2026-01-19T12:00:00Z",
-    "type": "jira.alert.deleted"
+  "data": {
+    "alertId": "439aa701-7cd6-4549-8992-d06650561222-1779166598474",
+    "deleted": true,
+    "requestId": "82e59857-e111-44a3-9f72-013783b94f52",
+    "result": "Request will be processed"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.deleted"
 }

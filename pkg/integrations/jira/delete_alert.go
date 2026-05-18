@@ -16,7 +16,7 @@ const DeleteJiraAlertPayloadType = "jira.alert.deleted"
 type DeleteAlert struct{}
 
 type DeleteAlertSpec struct {
-	AlertID string `json:"alertId" mapstructure:"alertId"`
+	Alert string `json:"alert" mapstructure:"alert"`
 }
 
 func (c *DeleteAlert) Name() string {
@@ -32,13 +32,13 @@ func (c *DeleteAlert) Description() string {
 }
 
 func (c *DeleteAlert) Documentation() string {
-	return `The Delete Alert component removes an alert via the [Jira Service Management Ops Alerts REST API](https://developer.atlassian.com/cloud/jira/service-desk-ops/rest/v2/api-group-alerts/).
+	return `The Delete Alert component removes an alert from Jira Service Management.
 
 Deletion is processed asynchronously like other mutating Ops operations.
 
 ## Configuration
 
-- **Alert id**: The Ops alert id to delete.
+- **Alert**: Pick the Ops alert to delete from the integration resource list.
 
 ## Output
 
@@ -60,11 +60,17 @@ func (c *DeleteAlert) OutputChannels(configuration any) []core.OutputChannel {
 func (c *DeleteAlert) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "alertId",
-			Label:       "Alert ID",
-			Type:        configuration.FieldTypeString,
+			Name:        "alert",
+			Label:       "Alert",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Jira Ops alert id to delete",
+			Description: "Ops alert to delete (from List alerts)",
+			Placeholder: "Select an alert",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "alert",
+				},
+			},
 		},
 	}
 }
@@ -74,12 +80,28 @@ func (c *DeleteAlert) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if _, err := cloudIDFromIntegration(ctx.Integration); err != nil {
+	cloudID, err := cloudIDFromIntegration(ctx.Integration)
+	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(spec.AlertID) == "" {
-		return fmt.Errorf("alertId is required")
+	alertKey := strings.TrimSpace(spec.Alert)
+	if alertKey == "" {
+		return fmt.Errorf("alert is required")
 	}
+
+	if ctx.HTTP != nil {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create client: %w", err)
+		}
+		if row, gerr := client.GetOpsAlert(cloudID, alertKey); gerr == nil {
+			label := opsAlertIntegrationResourceLabel(row, alertKey)
+			if err := ctx.Metadata.Set(OpsAlertPickerMetadata{AlertLabel: label}); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -96,13 +118,13 @@ func (c *DeleteAlert) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
-	apiResp, err := client.DeleteOpsAlert(cloudID, spec.AlertID)
+	apiResp, err := client.DeleteOpsAlert(cloudID, strings.TrimSpace(spec.Alert))
 	if err != nil {
 		return fmt.Errorf("failed to delete alert: %w", err)
 	}
 	payload := map[string]any{
 		"deleted":   true,
-		"alertId":   strings.TrimSpace(spec.AlertID),
+		"alertId":   strings.TrimSpace(spec.Alert),
 		"requestId": apiResp.RequestID,
 		"result":    apiResp.Result,
 	}

@@ -16,7 +16,7 @@ const GetJiraAlertPayloadType = "jira.alert.fetched"
 type GetAlert struct{}
 
 type GetAlertSpec struct {
-	AlertID string `json:"alertId" mapstructure:"alertId"`
+	Alert string `json:"alert" mapstructure:"alert"`
 }
 
 func (c *GetAlert) Name() string {
@@ -32,11 +32,11 @@ func (c *GetAlert) Description() string {
 }
 
 func (c *GetAlert) Documentation() string {
-	return `The Get Alert component returns full alert details from the [Jira Service Management Ops Alerts REST API](https://developer.atlassian.com/cloud/jira/service-desk-ops/rest/v2/api-group-alerts/).
+	return `The Get Alert component returns full alert details from Jira Service Management.
 
 ## Configuration
 
-- **Alert id**: The Ops alert **id** (UUID) from Jira Service Management.
+- **Alert**: Pick a recent Ops alert from the integration resource list (same as Update / Delete Alert).
 
 ## Output
 
@@ -58,12 +58,17 @@ func (c *GetAlert) OutputChannels(configuration any) []core.OutputChannel {
 func (c *GetAlert) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "alertId",
-			Label:       "Alert ID",
-			Type:        configuration.FieldTypeString,
+			Name:        "alert",
+			Label:       "Alert",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Jira Ops alert id",
-			Placeholder: "e.g. e0caa0ce-d52f-4500-81b9-d592d06970b6",
+			Description: "Ops alerts from List alerts (refresh the picker after new alerts appear)",
+			Placeholder: "Select an alert",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "alert",
+				},
+			},
 		},
 	}
 }
@@ -73,12 +78,28 @@ func (c *GetAlert) Setup(ctx core.SetupContext) error {
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
-	if _, err := cloudIDFromIntegration(ctx.Integration); err != nil {
+	cloudID, err := cloudIDFromIntegration(ctx.Integration)
+	if err != nil {
 		return err
 	}
-	if strings.TrimSpace(spec.AlertID) == "" {
-		return fmt.Errorf("alertId is required")
+	alertKey := strings.TrimSpace(spec.Alert)
+	if alertKey == "" {
+		return fmt.Errorf("alert is required")
 	}
+
+	if ctx.HTTP != nil {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create client: %w", err)
+		}
+		if row, gerr := client.GetOpsAlert(cloudID, alertKey); gerr == nil {
+			label := opsAlertIntegrationResourceLabel(row, alertKey)
+			if err := ctx.Metadata.Set(OpsAlertPickerMetadata{AlertLabel: label}); err != nil {
+				return err
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -95,7 +116,7 @@ func (c *GetAlert) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
-	alert, err := client.GetOpsAlert(cloudID, spec.AlertID)
+	alert, err := client.GetOpsAlert(cloudID, strings.TrimSpace(spec.Alert))
 	if err != nil {
 		return fmt.Errorf("failed to get alert: %w", err)
 	}

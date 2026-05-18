@@ -12,10 +12,10 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import jiraIcon from "@/assets/icons/integrations/jira.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
-import { jiraBaseEventSections } from "./base";
+import { jiraBaseEventSections, buildOpsAlertReferenceMetadata } from "./base";
 
 interface DeleteAlertConfiguration {
-  alertId?: string;
+  alert?: string;
 }
 
 export const deleteAlertMapper: ComponentBaseMapper = {
@@ -42,14 +42,8 @@ export const deleteAlertMapper: ComponentBaseMapper = {
     }
     const outputs = context.execution.outputs as { default?: Array<{ data?: unknown }> } | undefined;
     const data = outputs?.default?.[0]?.data as Record<string, unknown> | undefined;
-    if (!data) {
-      return details;
-    }
-    if (data.requestId != null) {
-      details["Request ID"] = String(data.requestId);
-    }
-    if (data.alertId != null) {
-      details["Alert ID"] = String(data.alertId);
+    if (data?.deleted != null) {
+      details.Deleted = data.deleted === true ? "Yes" : "No";
     }
     return details;
   },
@@ -62,9 +56,5 @@ export const deleteAlertMapper: ComponentBaseMapper = {
 
 function metadataList(node: NodeInfo): MetadataItem[] {
   const configuration = node.configuration as DeleteAlertConfiguration;
-  const meta: MetadataItem[] = [];
-  if (configuration?.alertId) {
-    meta.push({ icon: "hash", label: configuration.alertId });
-  }
-  return meta;
+  return buildOpsAlertReferenceMetadata(node, configuration?.alert);
 }
