@@ -4,6 +4,8 @@ import type { OrganizationsOrganization } from "@/api-client/types.gen";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import {
   oauthDraftFromAllowedProviders,
+  oauthDraftFromProvidersKey,
+  oauthProvidersKey,
   oauthProvidersListEqual,
   oauthProvidersToSave,
   oauthSavedPolicySummary,
@@ -42,13 +44,15 @@ export function OAuthInvitationSettingsCard({
   const [oauthMessage, setOauthMessage] = useState<string | null>(null);
   const [oauthSelectionError, setOauthSelectionError] = useState<string | null>(null);
 
+  const serverOauthKey = oauthProvidersKey(organization.spec?.allowedOauthProviders?.providers);
+
   useEffect(() => {
-    const d = oauthDraftFromAllowedProviders(organization.spec?.allowedOauthProviders?.providers);
+    const d = oauthDraftFromProvidersKey(serverOauthKey);
     setOauthRestrictProviders(d.restrict);
     setOauthGithub(d.github);
     setOauthGoogle(d.google);
     setOauthSelectionError(null);
-  }, [organization.spec?.allowedOauthProviders?.providers]);
+  }, [serverOauthKey]);
 
   const serverOauthList = organization.spec?.allowedOauthProviders?.providers ?? [];
   const draftOauthList = oauthProvidersToSave(oauthRestrictProviders, oauthGithub, oauthGoogle);

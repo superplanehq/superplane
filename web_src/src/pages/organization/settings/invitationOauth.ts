@@ -6,6 +6,16 @@ export function oauthDraftFromAllowedProviders(providers: string[] | undefined) 
   return { restrict: true, github: list.includes("github"), google: list.includes("google") };
 }
 
+/** Stable primitive for React effect deps (same providers, new array reference => same key). */
+export function oauthProvidersKey(providers: string[] | undefined): string {
+  const list = providers ?? [];
+  return [...list].sort().join(",");
+}
+
+export function oauthDraftFromProvidersKey(key: string) {
+  return oauthDraftFromAllowedProviders(key === "" ? [] : key.split(","));
+}
+
 export function oauthProvidersListEqual(a: string[], b: string[]) {
   if (a.length !== b.length) {
     return false;
