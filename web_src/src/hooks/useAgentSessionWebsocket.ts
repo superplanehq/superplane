@@ -25,6 +25,15 @@ function dispatchAgentEvent(
   if (data.event === "stream_started" || data.event === "turn_completed" || data.event === "session_failed") {
     callbacks.onStatusChange?.(data.status ?? "", data.error);
   }
+  if (data.event === "outcome_evaluation_start" || data.event === "outcome_evaluation_end") {
+    const phase = data.event === "outcome_evaluation_start" ? "start" : "end";
+    const extra = (data as { extra?: { iteration?: number; result?: string; explanation?: string } }).extra;
+    callbacks.onOutcomeEvent?.(phase, {
+      iteration: extra?.iteration ?? 0,
+      result: extra?.result,
+      explanation: extra?.explanation,
+    });
+  }
 }
 
 function handlePersistedMessage(
@@ -40,9 +49,16 @@ function handlePersistedMessage(
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/agents/sessions/`;
 
+export type OutcomeEvaluation = {
+  iteration: number;
+  result?: string;
+  explanation?: string;
+};
+
 export type AgentStreamCallbacks = {
   onPersistedMessage?: (message: AgentMessage) => void;
   onStatusChange?: (status: string, error?: string) => void;
+  onOutcomeEvent?: (event: "start" | "end", evaluation: OutcomeEvaluation) => void;
 };
 
 export function useAgentSessionWebsocket(
