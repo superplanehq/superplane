@@ -328,7 +328,7 @@ function ChatConversation({
       </div>
       {outcomeState && (
         <div className="px-3 py-2 border-t border-slate-200">
-          <OutcomeProgressWidget state={outcomeState} />
+          <OutcomeProgressWidget state={outcomeState} onDismiss={() => setOutcomeState(null)} />
         </div>
       )}
       <DraftActionsBar

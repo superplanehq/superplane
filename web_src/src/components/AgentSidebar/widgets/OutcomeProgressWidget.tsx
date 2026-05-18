@@ -47,7 +47,7 @@ const phaseColor: Record<OutcomePhase, string> = {
   exhausted: "text-red-600",
 };
 
-export function OutcomeProgressWidget({ state }: { state: OutcomeState }) {
+export function OutcomeProgressWidget({ state, onDismiss }: { state: OutcomeState; onDismiss?: () => void }) {
   const [rubricOpen, setRubricOpen] = useState(false);
   const [explanationOpen, setExplanationOpen] = useState<number | null>(null);
 
@@ -67,6 +67,16 @@ export function OutcomeProgressWidget({ state }: { state: OutcomeState }) {
             <span className="text-sm font-medium truncate">🎯 {state.title}</span>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {onDismiss && (state.phase === "passed" || state.phase === "exhausted") && (
+              <button
+                type="button"
+                onClick={onDismiss}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+                title="Dismiss"
+              >
+                <X size={14} />
+              </button>
+            )}
             <span className={cn("text-xs font-medium", phaseColor[state.phase])}>
               {(state.phase === "building" || state.phase === "grading") && (
                 <Loader2 size={10} className="inline animate-spin mr-1" />
