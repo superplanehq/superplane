@@ -2,8 +2,8 @@ import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } fr
 import { TimeAgo } from "@/components/TimeAgo";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
-import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
 import { RunNodeIcon } from "@/ui/Runs/RunNodeIcon";
+import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
 import { Link as LinkIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -38,11 +38,10 @@ export function RunRow({
       tabIndex={0}
       onClick={() => run.id && onSelectRun(run.id)}
       onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          if (run.id) {
-            onSelectRun(run.id);
-          }
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        if (run.id) {
+          onSelectRun(run.id);
         }
       }}
       className={cn(

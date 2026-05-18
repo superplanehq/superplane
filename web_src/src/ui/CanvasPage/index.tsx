@@ -47,8 +47,11 @@ import type {
   OrganizationsIntegration,
   TriggersTrigger,
 } from "@/api-client";
-import { AgentSidebar } from "@/components/AgentSidebar";
-import { useAgentState, type AgentState } from "@/components/AgentSidebar/useAgentState";
+import { CanvasToolSidebar } from "@/components/CanvasToolSidebar";
+import {
+  useCanvasToolSidebarState,
+  type CanvasToolSidebarState,
+} from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
@@ -167,10 +170,10 @@ export interface CanvasPageProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectRuns?: () => void;
+  onExitRunsMode?: () => void;
   onSelectDashboard?: () => void;
   /** Opens the canvas dashboard add-panel dialog when `headerMode` is `dashboard`. */
   onDashboardAddPanel?: () => void;
-  runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
@@ -184,14 +187,13 @@ export interface CanvasPageProps {
   showCanvasSettingsMenu?: boolean;
   onYamlOpen: () => void;
   onMemoryOpen: () => void;
-  versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
   hideAddControls?: boolean;
+  /** Hide the Agent / Runs / Versions left panel toggle (templates only); runs view keeps the tool sidebar visible. */
+  hideCanvasToolSidebar?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -235,7 +237,8 @@ export interface CanvasPageProps {
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
   runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
-  runsSidebar?: React.ReactNode;
+  toolSidebarRunsContent?: React.ReactNode;
+  toolSidebarVersionsContent?: React.ReactNode;
   onRunNodeSelect?: (nodeId: string) => void;
   onRunExecutionSelect?: (options: {
     nodeId: string;
@@ -695,13 +698,40 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
-  const agentState = useAgentState({
+  const forceEnableToolSidebar = Boolean(
+    props.onSelectRuns ||
+      props.onOpenVersionControl ||
+      props.toolSidebarRunsContent ||
+      props.toolSidebarVersionsContent ||
+      props.headerMode === "runs" ||
+      props.isVersionControlOpen,
+  );
+  const toolSidebarState = useCanvasToolSidebarState({
     isEditing: props.isEditing,
-    hideAddControls: props.hideAddControls,
+    forceEnable: forceEnableToolSidebar,
+    hideCanvasToolSidebar: props.hideCanvasToolSidebar ?? false,
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
   });
+  const { isToolSidebarOpen, openToolSidebar } = toolSidebarState;
+  const previousHeaderModeRef = useRef<CanvasPageProps["headerMode"] | undefined>(undefined);
+
+  useEffect(() => {
+    if (props.headerMode === "runs" && previousHeaderModeRef.current !== "runs" && !isToolSidebarOpen)
+      openToolSidebar();
+
+    previousHeaderModeRef.current = props.headerMode;
+  }, [isToolSidebarOpen, openToolSidebar, props.headerMode]);
+
+  useEffect(() => {
+    if (props.isVersionControlOpen && !isToolSidebarOpen) openToolSidebar();
+  }, [isToolSidebarOpen, openToolSidebar, props.isVersionControlOpen]);
+
+  const handleSelectRuns = () => {
+    openToolSidebar();
+    props.onSelectRuns?.();
+  };
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
@@ -1108,29 +1138,30 @@ function CanvasPage(props: CanvasPageProps) {
           onExitEditMode={props.onExitEditMode}
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-          onSelectRuns={props.onSelectRuns}
           onSelectDashboard={props.onSelectDashboard}
           onDashboardAddPanel={props.onDashboardAddPanel}
-          runsNotificationCount={props.runsNotificationCount}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
           onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
-          isVersionControlOpen={props.isVersionControlOpen}
-          onOpenVersionControl={props.onOpenVersionControl}
-          versionControlButtonTooltip={props.versionControlButtonTooltip}
-          versionControlNotificationCount={props.versionControlNotificationCount}
-          agentState={agentState}
+          toolSidebarState={toolSidebarState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
 
       {/* Main content area with sidebar and canvas */}
       <div className="flex-1 flex relative overflow-hidden">
-        {props.headerMode === "runs" ? null : props.versionControlSidebar}
-
-        <AgentSidebar agentState={agentState} />
+        <CanvasToolSidebar
+          toolSidebarState={toolSidebarState}
+          mode={props.headerMode}
+          onSelectRuns={handleSelectRuns}
+          onExitRunsMode={props.onExitRunsMode}
+          runsContent={props.toolSidebarRunsContent}
+          isVersionControlOpen={props.isVersionControlOpen}
+          onToggleVersionControl={props.onOpenVersionControl}
+          versionsContent={props.toolSidebarVersionsContent}
+        />
 
         {props.headerMode === "runs" ? null : (
           <RightSideControls
@@ -1142,9 +1173,6 @@ function CanvasPage(props: CanvasPageProps) {
             showMemoryButton={props.headerMode !== "dashboard"}
           />
         )}
-
-        {props.headerMode === "runs" ? props.runsSidebar : null}
-
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
             isOpen={
@@ -1622,20 +1650,14 @@ function CanvasContentHeader({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  onSelectRuns,
   onSelectDashboard,
   onDashboardAddPanel,
-  runsNotificationCount,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
   showCanvasSettingsMenu,
-  isVersionControlOpen,
-  onOpenVersionControl,
-  versionControlButtonTooltip,
-  versionControlNotificationCount,
-  agentState,
+  toolSidebarState,
 }: {
   state: CanvasPageState;
   canvasName: string;
@@ -1658,20 +1680,14 @@ function CanvasContentHeader({
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  onSelectRuns?: () => void;
   onSelectDashboard?: () => void;
   onDashboardAddPanel?: () => void;
-  runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   showCanvasSettingsMenu?: boolean;
-  isVersionControlOpen?: boolean;
-  onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
-  agentState: AgentState;
+  toolSidebarState: CanvasToolSidebarState;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1704,20 +1720,14 @@ function CanvasContentHeader({
       onExitEditMode={onExitEditMode}
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-      onSelectRuns={onSelectRuns}
       onSelectDashboard={onSelectDashboard}
       onDashboardAddPanel={onDashboardAddPanel}
-      runsNotificationCount={runsNotificationCount}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
-      isVersionControlOpen={isVersionControlOpen}
-      onOpenVersionControl={onOpenVersionControl}
-      versionControlButtonTooltip={versionControlButtonTooltip}
-      versionControlNotificationCount={versionControlNotificationCount}
-      agentState={agentState}
+      toolSidebarState={toolSidebarState}
     />
   );
 }
