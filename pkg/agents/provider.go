@@ -48,6 +48,7 @@ type OutcomeEvaluation struct {
 type CreateSessionOptions struct {
 	InitialContext string
 	Title          string
+	VaultIDs       []string
 }
 
 type DefineOutcomeOptions struct {
