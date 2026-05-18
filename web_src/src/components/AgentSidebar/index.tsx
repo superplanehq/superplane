@@ -252,7 +252,6 @@ function ChatConversation({
 
   const handleStartBuilding = useCallback(
     async (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
-      onModeSwitch("builder");
       // Format rubric text with categories if present
       const rubricText = rubric.categories && rubric.categories.length > 0
         ? `# ${rubric.title}\n\n${rubric.categories.map((cat) => `## ${cat.heading}\n${cat.criteria.map((c) => `- ${c.text}`).join("\n")}`).join("\n\n")}`
@@ -352,7 +351,7 @@ function ChatConversation({
         statusLabel={statusLabel(status)}
         agentMode={agentMode}
         onModeSwitch={onModeSwitch}
-        modeDisabled={status === "streaming"}
+        modeDisabled={status === "streaming" || (outcomeState != null && outcomeState.phase !== "passed" && outcomeState.phase !== "exhausted")}
       />
     </div>
   );
