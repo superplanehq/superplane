@@ -424,3 +424,259 @@ func Test__WrapInADF(t *testing.T) {
 		assert.Nil(t, result)
 	})
 }
+
+func Test__Client__FetchCloudID(t *testing.T) {
+	t.Run("successful tenant_info", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"cloudId":"abc-123"}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl":  "https://test.atlassian.net",
+				"email":    "test@example.com",
+				"apiToken": "test-token",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		id, err := client.FetchCloudID()
+		require.NoError(t, err)
+		assert.Equal(t, "abc-123", id)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/_edge/tenant_info")
+	})
+}
+
+func Test__Client__ListServiceDesksAndRequestTypes(t *testing.T) {
+	t.Run("list service desks", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"values":[{"id":"1","projectName":"SD","projectKey":"SD"}],"isLastPage":true}`)),
+				},
+			},
+		}
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "t",
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		desks, err := client.ListServiceDesks()
+		require.NoError(t, err)
+		require.Len(t, desks, 1)
+		assert.Equal(t, "1", desks[0].ID)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/servicedeskapi/servicedesk?")
+	})
+
+	t.Run("list request types for desk", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"values":[{"id":"10","name":"Incident","practice":"ITSM_INCIDENT"}],"isLastPage":true}`)),
+				},
+			},
+		}
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "t",
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		rts, err := client.ListRequestTypes("1")
+		require.NoError(t, err)
+		require.Len(t, rts, 1)
+		assert.Equal(t, "10", rts[0].ID)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/servicedeskapi/servicedesk/1/requesttype")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "expand=practice")
+	})
+
+	t.Run("list service desks paginates by returned count", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"values":[{"id":"1","projectName":"A","projectKey":"A"}],"isLastPage":false}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"values":[{"id":"2","projectName":"B","projectKey":"B"}],"isLastPage":true}`)),
+				},
+			},
+		}
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "t",
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		desks, err := client.ListServiceDesks()
+		require.NoError(t, err)
+		require.Len(t, desks, 2)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "start=1")
+	})
+}
+
+func Test__jqlQuotedProjectKey(t *testing.T) {
+	assert.Equal(t, `IT`, jqlQuotedProjectKey("IT"))
+	assert.Equal(t, `IT\"X`, jqlQuotedProjectKey(`IT"X`))
+	assert.Equal(t, `IT\\`, jqlQuotedProjectKey(`IT\`))
+	assert.Equal(t, `a\\b\"c`, jqlQuotedProjectKey(`a\b"c`))
+}
+
+func Test__IsIncidentManagementRequestPractice(t *testing.T) {
+	t.Parallel()
+	assert.True(t, IsIncidentManagementRequestPractice("ITSM_INCIDENT"))
+	assert.True(t, IsIncidentManagementRequestPractice("INCIDENT_MANAGEMENT"))
+	assert.True(t, IsIncidentManagementRequestPractice("Incident management"))
+	assert.True(t, IsIncidentManagementRequestPractice("  incident_management  "))
+	assert.False(t, IsIncidentManagementRequestPractice(""))
+	assert.False(t, IsIncidentManagementRequestPractice("SERVICE_REQUEST"))
+	assert.False(t, IsIncidentManagementRequestPractice("POST_INCIDENT_REVIEW"))
+	assert.False(t, IsIncidentManagementRequestPractice("Post-incident review"))
+	assert.False(t, IsIncidentManagementRequestPractice("ITSM_POST_INCIDENT"))
+}
+
+func Test__Client__IncidentsAPI(t *testing.T) {
+	cloudID := "35273b54-3f06-40d2-880f-dd28cf6daafa"
+
+	t.Run("create incident", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusCreated,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"10050","key":"ITSM-30","self":"https://test.atlassian.net/rest/api/3/issue/10050"}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl":  "https://test.atlassian.net",
+				"email":    "test@example.com",
+				"apiToken": "test-token",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		resp, err := client.CreateIncident(cloudID, &CreateIncidentAPIRequest{
+			ServiceDeskID: "6",
+			RequestTypeID: "75",
+			Fields:        map[string]any{"summary": "Outage"},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "ITSM-30", resp.Key)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "api.atlassian.com/jsm/incidents/cloudId/"+cloudID+"/v1/incident")
+	})
+
+	t.Run("get incident", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"summary":"Sev1","priority":{"name":"High","id":"1"}}`)),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl":  "https://test.atlassian.net",
+				"email":    "test@example.com",
+				"apiToken": "test-token",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		dto, err := client.GetIncident(cloudID, "10050")
+		require.NoError(t, err)
+		assert.Equal(t, "Sev1", dto["summary"])
+		require.Len(t, httpContext.Requests, 1)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/v1/incident/10050")
+	})
+
+	t.Run("delete incident", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusNoContent,
+					Body:       io.NopCloser(strings.NewReader("")),
+				},
+			},
+		}
+
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl":  "https://test.atlassian.net",
+				"email":    "test@example.com",
+				"apiToken": "test-token",
+			},
+		}
+
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		err = client.DeleteIncident(cloudID, "10050")
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+	})
+}
+
+func Test__Client__ResolveNumericIssueID(t *testing.T) {
+	t.Run("numeric passthrough", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{Responses: []*http.Response{}}
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "t",
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		id, err := client.ResolveNumericIssueID(" 10050 ")
+		require.NoError(t, err)
+		assert.Equal(t, "10050", id)
+		assert.Len(t, httpContext.Requests, 0)
+	})
+
+	t.Run("resolve by key", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"999","key":"ITSM-1","self":"x","fields":{}}`)),
+				},
+			},
+		}
+		appCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"siteUrl": "https://test.atlassian.net", "email": "a@b.com", "apiToken": "t",
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		id, err := client.ResolveNumericIssueID("ITSM-1")
+		require.NoError(t, err)
+		assert.Equal(t, "999", id)
+	})
+}
