@@ -47,8 +47,11 @@ import type {
   OrganizationsIntegration,
   TriggersTrigger,
 } from "@/api-client";
-import { AgentSidebar } from "@/components/AgentSidebar";
-import { useAgentState, type AgentState } from "@/components/AgentSidebar/useAgentState";
+import { CanvasToolSidebar } from "@/components/CanvasToolSidebar";
+import {
+  useCanvasToolSidebarState,
+  type CanvasToolSidebarState,
+} from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
@@ -192,6 +195,8 @@ export interface CanvasPageProps {
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
   hideAddControls?: boolean;
+  /** Hide the Agent / Runs / Versions left panel toggle (templates only); runs view keeps the tool sidebar visible. */
+  hideCanvasToolSidebar?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -695,9 +700,9 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
-  const agentState = useAgentState({
+  const toolSidebarState = useCanvasToolSidebarState({
     isEditing: props.isEditing,
-    hideAddControls: props.hideAddControls,
+    hideCanvasToolSidebar: props.hideCanvasToolSidebar ?? false,
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
@@ -1121,7 +1126,7 @@ function CanvasPage(props: CanvasPageProps) {
           onOpenVersionControl={props.onOpenVersionControl}
           versionControlButtonTooltip={props.versionControlButtonTooltip}
           versionControlNotificationCount={props.versionControlNotificationCount}
-          agentState={agentState}
+          toolSidebarState={toolSidebarState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
@@ -1130,7 +1135,7 @@ function CanvasPage(props: CanvasPageProps) {
       <div className="flex-1 flex relative overflow-hidden">
         {props.headerMode === "runs" ? null : props.versionControlSidebar}
 
-        <AgentSidebar agentState={agentState} />
+        <CanvasToolSidebar toolSidebarState={toolSidebarState} />
 
         {props.headerMode === "runs" ? null : (
           <RightSideControls
@@ -1635,7 +1640,7 @@ function CanvasContentHeader({
   onOpenVersionControl,
   versionControlButtonTooltip,
   versionControlNotificationCount,
-  agentState,
+  toolSidebarState,
 }: {
   state: CanvasPageState;
   canvasName: string;
@@ -1671,7 +1676,7 @@ function CanvasContentHeader({
   onOpenVersionControl?: () => void;
   versionControlButtonTooltip?: string;
   versionControlNotificationCount?: number;
-  agentState: AgentState;
+  toolSidebarState: CanvasToolSidebarState;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1717,7 +1722,7 @@ function CanvasContentHeader({
       onOpenVersionControl={onOpenVersionControl}
       versionControlButtonTooltip={versionControlButtonTooltip}
       versionControlNotificationCount={versionControlNotificationCount}
-      agentState={agentState}
+      toolSidebarState={toolSidebarState}
     />
   );
 }

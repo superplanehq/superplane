@@ -30,17 +30,13 @@ export function CanvasModeToggle({
     editing || hasDraft
       ? "bg-amber-50 text-amber-800 shadow-none ring-1 ring-inset ring-amber-200"
       : "bg-sky-50 text-sky-700 shadow-none";
+  const canvasShapeClassName = getCanvasShapeClassName(showDashboard, showRuns);
 
   return (
     <div className="inline-flex w-auto" aria-label="Canvas view" role="group">
       <div className="flex h-8 w-fit gap-0 overflow-hidden rounded-sm border border-slate-300 bg-white/80 p-0">
         {showDashboard && onSelectDashboard ? (
-          <DashboardModeTab
-            mode={mode}
-            onSelectDashboard={onSelectDashboard}
-            showRuns={showRuns}
-            baseTrigger={baseTrigger}
-          />
+          <DashboardModeTab mode={mode} onSelectDashboard={onSelectDashboard} baseTrigger={baseTrigger} />
         ) : null}
         <ModeButton
           isActive={mode === "version-live" || mode === "version-edit"}
@@ -50,7 +46,7 @@ export function CanvasModeToggle({
           onClick={() => {
             if (mode !== "version-live" && mode !== "version-edit") void onSelectLive();
           }}
-          className={cn(baseTrigger, showRuns ? "rounded-none" : "rounded-sm rounded-bl-none rounded-tl-none")}
+          className={cn(baseTrigger, canvasShapeClassName)}
         >
           <span className="inline-flex items-center gap-1.5">
             Canvas
@@ -76,15 +72,20 @@ export function CanvasModeToggle({
   );
 }
 
+function getCanvasShapeClassName(showDashboard: boolean, showRuns: boolean) {
+  if (showDashboard && showRuns) return "rounded-none";
+  if (showDashboard) return "rounded-l-none rounded-r-sm";
+  if (showRuns) return "rounded-l-sm rounded-r-none";
+  return "rounded-sm";
+}
+
 function DashboardModeTab({
   mode,
   onSelectDashboard,
-  showRuns,
   baseTrigger,
 }: {
   mode: CanvasMode;
   onSelectDashboard: () => void;
-  showRuns: boolean;
   baseTrigger: string;
 }) {
   return (
@@ -96,7 +97,7 @@ function DashboardModeTab({
         onClick={() => {
           if (mode !== "dashboard") void onSelectDashboard();
         }}
-        className={cn(baseTrigger, showRuns ? "rounded-none" : "rounded-sm rounded-bl-none rounded-tl-none")}
+        className={cn(baseTrigger, "rounded-l-sm rounded-r-none")}
       >
         Dashboard
       </ModeButton>
@@ -126,7 +127,7 @@ function RunsModeTab({
         onClick={() => {
           if (mode !== "runs") void onSelectRuns();
         }}
-        className={cn(baseTrigger, "rounded-sm rounded-bl-none rounded-tl-none")}
+        className={cn(baseTrigger, "rounded-l-none rounded-r-sm")}
       >
         <span className="inline-flex items-center gap-1.5">
           Runs

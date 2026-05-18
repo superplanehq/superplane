@@ -11,7 +11,6 @@ import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-
 import type {
   CanvasChangesetChange,
   CanvasesCanvas,
@@ -40,6 +39,7 @@ import {
   canvasKeys,
   useActOnCanvasChangeRequest,
   useCanvas,
+  useCanvasDashboard,
   useCanvasChangeRequests,
   useCanvasMemoryEntries,
   useCanvasVersion,
@@ -56,6 +56,7 @@ import {
   useInfiniteCanvasLiveVersions,
   useResolveCanvasChangeRequest,
   useTriggers,
+  useUpdateCanvasDashboard,
   useUpdateCanvasVersion,
   useWidgets,
 } from "@/hooks/useCanvasData";
@@ -87,7 +88,6 @@ import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import { RunsSidebar } from "@/ui/RunsSidebar";
 import { DashboardOverlay } from "./dashboard/DashboardOverlay";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
-import { useCanvasDashboard, useUpdateCanvasDashboard } from "@/hooks/useCanvasData";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasMemoryModal } from "./CanvasMemoryModal";
 import { CanvasPageModals } from "./CanvasPageModals";
@@ -605,8 +605,7 @@ export function WorkflowPageV2() {
   // such as "pushed through" from execution.outputs, which selectedRun.executions
   // (lightweight refs) don't carry. The same query backs RunNodeDetailModal, so the
   // payload tab also opens without a follow-up fetch.
-  const selectedRunRootEventId = selectedRun?.rootEvent?.id ?? null;
-  const selectedRunExecutionsQuery = useEventExecutions(canvasId!, selectedRunRootEventId);
+  const selectedRunExecutionsQuery = useEventExecutions(canvasId!, selectedRun?.rootEvent?.id ?? null);
   const selectedRunFullExecutions = selectedRunExecutionsQuery.data?.executions;
   const canvasEventsResponse = infiniteEventsQuery.data?.pages?.[0];
   const componentIconMap = useMemo(() => {
@@ -5688,8 +5687,15 @@ export function WorkflowPageV2() {
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftGraphDiffVersusLive,
   });
   const activeRunsCount = runsData.runs.filter((run) => run.state === "STATE_STARTED").length;
-  const canvasPageHeaderMode = isRunsMode ? "runs" : canvasMode === "edit" ? "version-edit" : "version-live";
-  const headerMode = isDashboardMode && dashboardsFeatureEnabled ? "dashboard" : canvasPageHeaderMode;
+  const headerMode = isDashboardMode
+    ? dashboardsFeatureEnabled
+      ? "dashboard"
+      : "version-live"
+    : isRunsMode
+      ? "runs"
+      : canvasMode === "edit"
+        ? "version-edit"
+        : "version-live";
   const onDashboardAddPanel =
     isDashboardMode && dashboardsFeatureEnabled && !isTemplate && canUpdateCanvas
       ? () => setIsDashboardAddPanelOpen(true)
@@ -5768,6 +5774,7 @@ export function WorkflowPageV2() {
           versionControlNotificationCount={pendingApprovalVersions.length}
           showBottomStatusControls={!isTemplate && !isRunsMode}
           hideAddControls={isTemplate || isRunsMode}
+          hideCanvasToolSidebar={isTemplate}
           memoryItemCount={canvasMemoryEntries.length}
           onMemoryOpen={() => setIsMemoryViewModalOpen(true)}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
@@ -5819,7 +5826,7 @@ export function WorkflowPageV2() {
           viewportRef={isRunsMode ? runsViewportRef : viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
           fitAllRequest={isRunsMode ? runsFitAllNonce : null}
-          runCanvasLoading={isRunsMode && !!selectedRunRootEventId && selectedRunExecutionsQuery.isLoading}
+          runCanvasLoading={isRunsMode && !!selectedRun?.rootEvent?.id && selectedRunExecutionsQuery.isLoading}
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}

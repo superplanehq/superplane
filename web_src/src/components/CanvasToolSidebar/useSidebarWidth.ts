@@ -1,22 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export const AGENT_SIDEBAR_WIDTH_STORAGE_KEY = "agent-sidebar-width";
-export const AGENT_SIDEBAR_MIN_WIDTH = 320;
-export const AGENT_SIDEBAR_MAX_WIDTH = 720;
-export const AGENT_SIDEBAR_DEFAULT_WIDTH = 380;
+/** Persists user-adjusted sidebar width; value kept for backward compatibility. */
+export const CANVAS_TOOL_SIDEBAR_WIDTH_STORAGE_KEY = "agent-sidebar-width";
+export const CANVAS_TOOL_SIDEBAR_MIN_WIDTH = 320;
+export const CANVAS_TOOL_SIDEBAR_MAX_WIDTH = 720;
+export const CANVAS_TOOL_SIDEBAR_DEFAULT_WIDTH = 380;
 
 export function useSidebarWidth() {
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(() => {
-    const saved = typeof window !== "undefined" ? localStorage.getItem(AGENT_SIDEBAR_WIDTH_STORAGE_KEY) : null;
+    const saved = typeof window !== "undefined" ? localStorage.getItem(CANVAS_TOOL_SIDEBAR_WIDTH_STORAGE_KEY) : null;
     const parsed = saved ? parseInt(saved, 10) : NaN;
-    if (!Number.isFinite(parsed)) return AGENT_SIDEBAR_DEFAULT_WIDTH;
-    return Math.max(AGENT_SIDEBAR_MIN_WIDTH, Math.min(AGENT_SIDEBAR_MAX_WIDTH, parsed));
+    if (!Number.isFinite(parsed)) return CANVAS_TOOL_SIDEBAR_DEFAULT_WIDTH;
+    return Math.max(CANVAS_TOOL_SIDEBAR_MIN_WIDTH, Math.min(CANVAS_TOOL_SIDEBAR_MAX_WIDTH, parsed));
   });
   const [isResizing, setIsResizing] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem(AGENT_SIDEBAR_WIDTH_STORAGE_KEY, String(width));
+    localStorage.setItem(CANVAS_TOOL_SIDEBAR_WIDTH_STORAGE_KEY, String(width));
   }, [width]);
 
   const handleMouseDown = useCallback((event: React.MouseEvent) => {
@@ -30,7 +31,10 @@ export function useSidebarWidth() {
     const handleMouseMove = (event: MouseEvent) => {
       const rect = sidebarRef.current?.getBoundingClientRect();
       const left = rect?.left ?? 0;
-      const nextWidth = Math.max(AGENT_SIDEBAR_MIN_WIDTH, Math.min(AGENT_SIDEBAR_MAX_WIDTH, event.clientX - left));
+      const nextWidth = Math.max(
+        CANVAS_TOOL_SIDEBAR_MIN_WIDTH,
+        Math.min(CANVAS_TOOL_SIDEBAR_MAX_WIDTH, event.clientX - left),
+      );
       setWidth(nextWidth);
     };
 
@@ -38,7 +42,7 @@ export function useSidebarWidth() {
 
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
-    document.body.style.cursor = "ew-resize";
+    document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
 
     return () => {
