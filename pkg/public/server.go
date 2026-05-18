@@ -371,7 +371,8 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 
 	// MCP endpoint - no middleware, auth is handled inside the handler via JWT
-	mcpHandler := mcp.NewHandler(s.jwt, s.registry)
+	mcpStaticToken := os.Getenv("MCP_STATIC_TOKEN")
+	mcpHandler := mcp.NewHandler(s.jwt, s.registry, mcpStaticToken)
 	s.Router.Handle("/mcp", mcpHandler).Methods("POST")
 
 	return nil

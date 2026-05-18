@@ -46,14 +46,16 @@ type rpcError struct {
 }
 
 type Handler struct {
-	jwt      *jwt.Signer
-	registry *registry.Registry
+	jwt         *jwt.Signer
+	registry    *registry.Registry
+	staticToken string // Static bearer token for vault-based MCP auth
 }
 
-func NewHandler(jwtSigner *jwt.Signer, reg *registry.Registry) *Handler {
+func NewHandler(jwtSigner *jwt.Signer, reg *registry.Registry, staticToken string) *Handler {
 	return &Handler{
-		jwt:      jwtSigner,
-		registry: reg,
+		jwt:         jwtSigner,
+		registry:    reg,
+		staticToken: staticToken,
 	}
 }
 
@@ -84,20 +86,29 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract and validate JWT token
+	// Extract and validate bearer token
 	token, err := getBearerToken(r)
 	if err != nil {
 		h.writeError(w, req.ID, InvalidRequest, "Unauthorized: missing or invalid token", nil)
 		return
 	}
 
-	claims, err := h.jwt.ValidateAndGetClaims(token)
-	if err != nil {
-		h.writeError(w, req.ID, InvalidRequest, "Unauthorized: invalid token", nil)
-		return
+	var claims map[string]interface{}
+
+	// Try static token first (vault-based MCP auth)
+	if h.staticToken != "" && token == h.staticToken {
+		// Static token valid — claims come from tool params instead
+		claims = map[string]interface{}{}
+	} else {
+		// Fall back to JWT validation
+		claims, err = h.jwt.ValidateAndGetClaims(token)
+		if err != nil {
+			h.writeError(w, req.ID, InvalidRequest, "Unauthorized: invalid token", nil)
+			return
+		}
 	}
 
-	// Extract org_id and user_id from claims
+	// Extract org_id and user_id from claims (may be empty for static token)
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, "claims", claims)
 

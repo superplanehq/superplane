@@ -10,7 +10,17 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gopkg.in/yaml.v3"
+	"time"
 )
+
+
+// safeTime returns a formatted time string or empty string for nil pointers
+func safeTime(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.UTC().Format(time.RFC3339)
+}
 
 // handleCanvasGet retrieves a canvas and returns it in YAML or JSON format
 func handleCanvasGet(ctx context.Context, reg *registry.Registry, args map[string]interface{}) (interface{}, error) {
@@ -58,8 +68,8 @@ func handleCanvasGet(ctx context.Context, reg *registry.Registry, args map[strin
 		"organization_id": canvas.OrganizationID.String(),
 		"name":           canvas.Name,
 		"description":    canvas.Description,
-		"created_at":     canvas.CreatedAt,
-		"updated_at":     canvas.UpdatedAt,
+		"created_at":     safeTime(canvas.CreatedAt),
+		"updated_at":     safeTime(canvas.UpdatedAt),
 		"version": map[string]interface{}{
 			"id":                        liveVersion.ID.String(),
 			"state":                     liveVersion.State,
@@ -68,8 +78,8 @@ func handleCanvasGet(ctx context.Context, reg *registry.Registry, args map[strin
 			"change_management_enabled": liveVersion.ChangeManagementEnabled,
 			"nodes":                     liveVersion.Nodes,
 			"edges":                     liveVersion.Edges,
-			"created_at":                liveVersion.CreatedAt,
-			"updated_at":                liveVersion.UpdatedAt,
+			"created_at":                safeTime(liveVersion.CreatedAt),
+			"updated_at":                safeTime(liveVersion.UpdatedAt),
 		},
 	}
 
@@ -145,8 +155,8 @@ func handleCanvasListVersions(ctx context.Context, args map[string]interface{}) 
 			"id":         v.ID.String(),
 			"state":      v.State,
 			"name":       v.Name,
-			"created_at": v.CreatedAt,
-			"updated_at": v.UpdatedAt,
+			"created_at": safeTime(v.CreatedAt),
+			"updated_at": safeTime(v.UpdatedAt),
 		}
 		if v.PublishedAt != nil {
 			versionList[i]["published_at"] = v.PublishedAt
@@ -200,8 +210,8 @@ func handleIntegrationsList(ctx context.Context, args map[string]interface{}) (i
 			"installation_name": integration.InstallationName,
 			"state":             integration.State,
 			"state_description": integration.StateDescription,
-			"created_at":        integration.CreatedAt,
-			"updated_at":        integration.UpdatedAt,
+			"created_at":        safeTime(integration.CreatedAt),
+			"updated_at":        safeTime(integration.UpdatedAt),
 		}
 	}
 
