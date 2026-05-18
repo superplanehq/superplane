@@ -2,25 +2,25 @@ import React, { useMemo } from "react";
 import { AutoCompleteSelect } from "@/components/AutoCompleteSelect/AutoCompleteSelect";
 import type { FieldRendererProps } from "./types";
 
+const MONTHS = [
+  { value: 1, label: "January" },
+  { value: 2, label: "February" },
+  { value: 3, label: "March" },
+  { value: 4, label: "April" },
+  { value: 5, label: "May" },
+  { value: 6, label: "June" },
+  { value: 7, label: "July" },
+  { value: 8, label: "August" },
+  { value: 9, label: "September" },
+  { value: 10, label: "October" },
+  { value: 11, label: "November" },
+  { value: 12, label: "December" },
+];
+
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
 export const DayInYearFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange, hasError }) => {
   const currentValue = (value as string) ?? (field.defaultValue as string) ?? "";
-
-  const months = [
-    { value: 1, label: "January" },
-    { value: 2, label: "February" },
-    { value: 3, label: "March" },
-    { value: 4, label: "April" },
-    { value: 5, label: "May" },
-    { value: 6, label: "June" },
-    { value: 7, label: "July" },
-    { value: 8, label: "August" },
-    { value: 9, label: "September" },
-    { value: 10, label: "October" },
-    { value: 11, label: "November" },
-    { value: 12, label: "December" },
-  ];
-
-  const daysInMonth = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
   const parseValue = (val: string): { month: number | undefined; day: number | undefined } => {
     if (!val) return { month: undefined, day: undefined };
@@ -48,7 +48,7 @@ export const DayInYearFieldRenderer: React.FC<FieldRendererProps> = ({ field, va
   const { month: currentMonth, day: currentDay } = parseValue(currentValue);
 
   const monthOptions = useMemo(() => {
-    return months.map((month) => ({
+    return MONTHS.map((month) => ({
       value: month.value.toString(),
       label: month.label,
     }));
@@ -57,7 +57,7 @@ export const DayInYearFieldRenderer: React.FC<FieldRendererProps> = ({ field, va
   const dayOptions = useMemo(() => {
     if (!currentMonth) return [];
 
-    const maxDays = daysInMonth[currentMonth - 1];
+    const maxDays = DAYS_IN_MONTH[currentMonth - 1];
     return Array.from({ length: maxDays }, (_, i) => {
       const day = i + 1;
       return {
@@ -70,7 +70,7 @@ export const DayInYearFieldRenderer: React.FC<FieldRendererProps> = ({ field, va
   const handleMonthChange = (monthStr: string) => {
     const month = parseInt(monthStr, 10);
     if (currentDay) {
-      const maxDays = daysInMonth[month - 1];
+      const maxDays = DAYS_IN_MONTH[month - 1];
       const day = Math.min(currentDay, maxDays);
       const formattedValue = `${month.toString().padStart(2, "0")}/${day.toString().padStart(2, "0")}`;
       onChange(formattedValue);

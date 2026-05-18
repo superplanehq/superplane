@@ -1,7 +1,7 @@
 import { Heading } from "@/components/Heading/heading";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Palette, Plus, User } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -48,22 +48,7 @@ const OrganizationSelect: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
-    if (accountLoading) {
-      return;
-    }
-
-    if (!account) {
-      const redirectParam = encodeURIComponent(`${location.pathname}${location.search}`);
-      navigate(`/login?redirect=${redirectParam}`, { replace: true });
-      setLoading(false);
-      return;
-    }
-
-    fetchOrganizations();
-  }, [account, accountLoading, location.pathname, location.search, navigate]);
-
-  const fetchOrganizations = async () => {
+  const fetchOrganizations = useCallback(async () => {
     if (!account) {
       setLoading(false);
       return;
@@ -98,7 +83,22 @@ const OrganizationSelect: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [account]);
+
+  useEffect(() => {
+    if (accountLoading) {
+      return;
+    }
+
+    if (!account) {
+      const redirectParam = encodeURIComponent(`${location.pathname}${location.search}`);
+      navigate(`/login?redirect=${redirectParam}`, { replace: true });
+      setLoading(false);
+      return;
+    }
+
+    fetchOrganizations();
+  }, [account, accountLoading, location.pathname, location.search, navigate, fetchOrganizations]);
 
   const createOrganizationDisabled = organizationCreationStatus?.allowed === false;
   const createOrganizationTooltip =
