@@ -40,6 +40,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const logoTarget = organizationId ? `/${organizationId}` : "/";
 
   const handleMenuButtonClick = () => {
     setIsMenuOpen((prev) => !prev);
@@ -277,13 +278,19 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
           </div>
         )}
       </div>
-      <Link
-        to={`/${organizationId}`}
-        aria-label="Go to canvases"
-        className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
-      >
-        <img src={SuperplaneLogo} alt="SuperPlane" className="h-7 w-7" />
-      </Link>
+      {organizationId ? (
+        <Link
+          to={logoTarget}
+          aria-label={organizationId ? "Go to canvases" : "Go to SuperPlane home"}
+          className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
+        >
+          <img src={SuperplaneLogo} alt="SuperPlane" className="h-7 w-7" />
+        </Link>
+      ) : (
+        <span aria-current="page" className="flex h-8 items-center rounded-md px-2">
+          <img src={SuperplaneLogo} alt="SuperPlane" className="h-7 w-7" />
+        </span>
+      )}
     </div>
   );
 }
