@@ -18,6 +18,10 @@ type anthropicEvent struct {
 	Error     *struct {
 		Message string `json:"message"`
 	} `json:"error"`
+	// Outcome evaluation fields (from Anthropic SSE stream)
+	Iteration   int    `json:"iteration,omitempty"`
+	Result      string `json:"result,omitempty"`      // "satisfied", "needs_revision", etc.
+	Explanation string `json:"explanation,omitempty"` // grader's prose verdict
 }
 
 type anthropicContentBlock struct {
@@ -64,6 +68,24 @@ func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 		return agents.ProviderEvent{
 			Type:         agents.ProviderEventSessionFailed,
 			ErrorMessage: msg,
+		}, true
+
+	case "span.outcome_evaluation_start":
+		return agents.ProviderEvent{
+			Type: agents.ProviderEventOutcomeEvaluationStart,
+			OutcomeResult: &agents.OutcomeEvaluation{
+				Iteration: raw.Iteration,
+			},
+		}, true
+
+	case "span.outcome_evaluation_end":
+		return agents.ProviderEvent{
+			Type: agents.ProviderEventOutcomeEvaluation,
+			OutcomeResult: &agents.OutcomeEvaluation{
+				Iteration:   raw.Iteration,
+				Result:      raw.Result,
+				Explanation: raw.Explanation,
+			},
 		}, true
 	}
 
