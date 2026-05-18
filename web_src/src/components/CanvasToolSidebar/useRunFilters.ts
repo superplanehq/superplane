@@ -19,17 +19,19 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
 
   const nodeMap = useMemo(() => buildNodeMap(workflowNodes), [workflowNodes]);
 
-  const triggerOptions = useMemo<TriggerOption[]>(() => {
-    return workflowNodes
-      .filter((node) => node.id && node.type === "TYPE_TRIGGER")
-      .map((node) => ({
-        id: node.id!,
-        name: node.name || node.component || "Trigger",
-        iconSrc: getHeaderIconSrc(node.component),
-        iconSlug: node.component ? componentIconMap[node.component] : undefined,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [workflowNodes, componentIconMap]);
+  const triggerOptions = useMemo<TriggerOption[]>(
+    () =>
+      workflowNodes
+        .filter((node) => node.id && node.type === "TYPE_TRIGGER")
+        .map((node) => ({
+          id: node.id!,
+          name: node.name || node.component || "Trigger",
+          iconSrc: getHeaderIconSrc(node.component),
+          iconSlug: node.component ? componentIconMap[node.component] : undefined,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [workflowNodes, componentIconMap],
+  );
 
   useEffect(() => {
     onStatusFiltersChange?.(Array.from(selectedStatuses));
@@ -38,10 +40,10 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
 
   useEffect(() => {
     if (triggerOptions.length === 0) return;
-    const valid = new Set(triggerOptions.map((option) => option.id));
-    setSelectedTriggerIds((prev) => {
-      const next = new Set(Array.from(prev).filter((id) => valid.has(id)));
-      return next.size === prev.size ? prev : next;
+    const validTriggerIds = new Set(triggerOptions.map((option) => option.id));
+    setSelectedTriggerIds((currentTriggerIds) => {
+      const nextTriggerIds = new Set(Array.from(currentTriggerIds).filter((id) => validTriggerIds.has(id)));
+      return nextTriggerIds.size === currentTriggerIds.size ? currentTriggerIds : nextTriggerIds;
     });
   }, [triggerOptions]);
 
@@ -49,29 +51,29 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
 
   const filteredRuns = useMemo(() => {
     const query = search.trim().toLowerCase();
+
     return decoratedRuns.filter(({ run, status, haystack }) => {
       if (query && !haystack.includes(query)) return false;
-      if (selectedStatuses.size > 0) {
-        if (status === "unknown" || !selectedStatuses.has(status)) return false;
-      }
+      if (selectedStatuses.size > 0 && (status === "unknown" || !selectedStatuses.has(status))) return false;
+
       if (selectedTriggerIds.size > 0) {
         const triggerNodeId = run.rootEvent?.nodeId;
         if (!triggerNodeId || !selectedTriggerIds.has(triggerNodeId)) return false;
       }
+
       return true;
     });
   }, [decoratedRuns, search, selectedStatuses, selectedTriggerIds]);
 
-  const orderedRuns = useMemo(() => {
-    const active = filteredRuns.filter((run) => run.status === "running");
-    const rest = filteredRuns.filter((run) => run.status !== "running");
-    return { active, rest };
-  }, [filteredRuns]);
+  const orderedRuns = useMemo(
+    () => ({
+      active: filteredRuns.filter((run) => run.status === "running"),
+      rest: filteredRuns.filter((run) => run.status !== "running"),
+    }),
+    [filteredRuns],
+  );
 
-  const hasSearch = search.trim().length > 0;
-  const hasTriggerFilter = selectedTriggerIds.size > 0;
-  const hasStatusFilter = selectedStatuses.size > 0;
-  const hasAnyFilter = hasSearch || hasTriggerFilter || hasStatusFilter;
+  const hasAnyFilter = search.trim().length > 0 || selectedTriggerIds.size > 0 || selectedStatuses.size > 0;
 
   const clearFilters = useCallback(() => {
     setSearch("");
@@ -80,25 +82,22 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
   }, []);
 
   const toggleStatus = useCallback((status: RunStatusFilter) => {
-    setSelectedStatuses((prev) => {
-      const next = new Set(prev);
-      if (next.has(status)) next.delete(status);
-      else next.add(status);
-      return next;
+    setSelectedStatuses((currentStatuses) => {
+      const nextStatuses = new Set(currentStatuses);
+      if (nextStatuses.has(status)) nextStatuses.delete(status);
+      else nextStatuses.add(status);
+      return nextStatuses;
     });
   }, []);
 
   const toggleTrigger = useCallback((triggerId: string) => {
-    setSelectedTriggerIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(triggerId)) next.delete(triggerId);
-      else next.add(triggerId);
-      return next;
+    setSelectedTriggerIds((currentTriggerIds) => {
+      const nextTriggerIds = new Set(currentTriggerIds);
+      if (nextTriggerIds.has(triggerId)) nextTriggerIds.delete(triggerId);
+      else nextTriggerIds.add(triggerId);
+      return nextTriggerIds;
     });
   }, []);
-
-  const clearStatuses = useCallback(() => setSelectedStatuses(new Set()), []);
-  const clearTriggers = useCallback(() => setSelectedTriggerIds(new Set()), []);
 
   return {
     search,
@@ -112,7 +111,7 @@ export function useRunFilters({ runs, workflowNodes, componentIconMap, onStatusF
     clearFilters,
     toggleStatus,
     toggleTrigger,
-    clearStatuses,
-    clearTriggers,
+    clearStatuses: () => setSelectedStatuses(new Set()),
+    clearTriggers: () => setSelectedTriggerIds(new Set()),
   };
 }
