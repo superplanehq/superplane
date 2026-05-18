@@ -7,6 +7,7 @@ export function renderCanvasNodeCustomField({
   node,
   configuration,
   context,
+  applyConfigurationPatch,
 }: {
   renderer: CustomFieldRenderer;
   node: ComponentsNode;
@@ -14,14 +15,17 @@ export function renderCanvasNodeCustomField({
   context?: {
     integration?: OrganizationsIntegration;
   };
+  applyConfigurationPatch?: (patch: Record<string, unknown>) => void;
 }) {
   const nodeWithConfiguration = {
     ...node,
     configuration: configuration ?? node.configuration,
   };
 
-  return renderer.render(
-    buildNodeInfo(nodeWithConfiguration),
-    context && Object.keys(context).length > 0 ? context : undefined,
-  );
+  const mergedContext =
+    applyConfigurationPatch || (context && Object.keys(context).length > 0)
+      ? { ...(context ?? {}), ...(applyConfigurationPatch ? { applyConfigurationPatch } : {}) }
+      : undefined;
+
+  return renderer.render(buildNodeInfo(nodeWithConfiguration), mergedContext);
 }

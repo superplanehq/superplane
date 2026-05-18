@@ -426,6 +426,7 @@ export function createSafeCustomFieldRenderer(
   rendererName: string,
 ): CustomFieldRenderer {
   return {
+    position: renderer.position,
     render(node, context) {
       try {
         return sanitizeReactNodeValue(renderer.render(node, context));

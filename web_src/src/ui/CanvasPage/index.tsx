@@ -54,6 +54,7 @@ import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { findFreePositionInViewport } from "@/pages/workflowv2/lib/find-free-position-in-viewport";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
+import type { SettingsCustomField } from "@/pages/workflowv2/mappers/types";
 import { Sentry } from "@/sentry";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
@@ -217,7 +218,7 @@ export interface CanvasPageProps {
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
   ) => void;
   onAnnotationBlur?: () => void;
-  getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
+  getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => SettingsCustomField | null;
   onNodeClick?: (nodeId: string) => void;
   onSave?: (nodes: CanvasNode[]) => void;
   integrations?: OrganizationsIntegration[];
@@ -1405,7 +1406,7 @@ function Sidebar({
   onTabChange?: (tab: "latest" | "settings" | "docs") => void;
   canvasMode: "live" | "edit";
   organizationId?: string;
-  getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => (() => React.ReactNode) | null;
+  getCustomField?: (nodeId: string, integration?: OrganizationsIntegration) => SettingsCustomField | null;
   integrations?: OrganizationsIntegration[];
   workflowNodes?: ComponentsNode[];
   components?: SuperplaneActionsAction[];

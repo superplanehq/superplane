@@ -18,7 +18,7 @@ import { readMemoryMapper } from "./readMemory";
 import { updateMemoryMapper } from "./updateMemory";
 import { upsertMemoryMapper } from "./upsertMemory";
 import { ifMapper, IF_STATE_REGISTRY } from "./if";
-import { httpMapper, HTTP_STATE_REGISTRY } from "./http";
+import { httpMapper, HTTP_STATE_REGISTRY, httpCustomFieldRenderer } from "./http";
 import { graphqlMapper, GRAPHQL_STATE_REGISTRY } from "./graphql";
 import {
   componentMappers as semaphoreComponentMappers,
@@ -440,6 +440,7 @@ const customFieldRenderers: Record<string, CustomFieldRenderer> = {
   schedule: scheduleCustomFieldRenderer,
   wait: waitCustomFieldRenderer,
   webhook: webhookCustomFieldRenderer,
+  http: httpCustomFieldRenderer,
 };
 
 const appCustomFieldRenderers: Record<string, Record<string, CustomFieldRenderer>> = {

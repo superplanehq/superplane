@@ -196,6 +196,8 @@ export interface CustomFieldRendererContext {
   canvasMode?: "live" | "edit";
   /** Start trigger template Run uses this on the canvas (parallel to component {@link ActionContext}). */
   actions?: TriggerActionContext;
+  /** Push a partial configuration patch back into the settings form. Only set when rendered in the sidebar. */
+  applyConfigurationPatch?: (patch: Record<string, unknown>) => void;
 }
 
 export interface CustomFieldRenderer {
@@ -206,6 +208,21 @@ export interface CustomFieldRenderer {
    * @returns React node to render
    */
   render(node: NodeInfo, context?: CustomFieldRendererContext): ReactNode;
+  /** Settings-tab placement relative to the configuration fields. Defaults to "after". */
+  position?: "before" | "after";
+}
+
+/**
+ * Shape returned by `getCustomField` for the settings sidebar. Bundles the
+ * placement preference together with a closure that re-renders with the
+ * latest configuration and an optional apply-patch callback.
+ */
+export interface SettingsCustomField {
+  position: "before" | "after";
+  render(
+    configuration?: Record<string, unknown>,
+    applyConfigurationPatch?: (patch: Record<string, unknown>) => void,
+  ): ReactNode;
 }
 
 export interface OutputPayload {

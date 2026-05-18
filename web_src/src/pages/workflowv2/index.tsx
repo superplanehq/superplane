@@ -5408,14 +5408,19 @@ export function WorkflowPageV2() {
         context.integration = integration;
       }
 
-      // Return a function that takes the current configuration
-      return (configuration?: Record<string, unknown>) => {
-        return renderCanvasNodeCustomField({
-          renderer,
-          node,
-          configuration,
-          context: Object.keys(context).length > 0 ? context : undefined,
-        });
+      return {
+        position: renderer.position ?? "after",
+        render: (
+          configuration?: Record<string, unknown>,
+          applyConfigurationPatch?: (patch: Record<string, unknown>) => void,
+        ) =>
+          renderCanvasNodeCustomField({
+            renderer,
+            node,
+            configuration,
+            context: Object.keys(context).length > 0 ? context : undefined,
+            applyConfigurationPatch,
+          }),
       };
     },
     [canvasNodesById],
