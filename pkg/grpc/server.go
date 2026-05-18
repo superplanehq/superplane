@@ -110,7 +110,6 @@ func RunServer(
 
 	organizationService := NewOrganizationService(
 		authService,
-		encryptor,
 		registry,
 		oidcProvider,
 		baseURL,

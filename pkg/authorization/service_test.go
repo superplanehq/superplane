@@ -35,11 +35,11 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Should have all canvas permissions (inherited from admin)
-		actions := []string{"read", "create", "update", "delete"}
+		actions := []string{"read", "create", "update", "update_version", "publish", "delete"}
 		for _, action := range actions {
 			allowed, err := r.AuthService.CheckOrganizationPermission(userID, orgID, canvasPath, action)
 			require.NoError(t, err)
-			assert.True(t, allowed, "Org owner should have %s permission for workflows", action)
+			assert.True(t, allowed, "Org owner should have %s permission for canvases", action)
 		}
 
 		// Should have user management permissions (inherited from admin)
@@ -71,11 +71,11 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 		require.NoError(t, err)
 
 		// Should have canvas management permissions
-		actions := []string{"read", "create", "update", "delete"}
+		actions := []string{"read", "create", "update", "update_version", "publish", "delete"}
 		for _, action := range actions {
 			allowed, err := r.AuthService.CheckOrganizationPermission(adminID, orgID, canvasPath, action)
 			require.NoError(t, err)
-			assert.True(t, allowed, "Org admin should have %s permission for workflows", action)
+			assert.True(t, allowed, "Org admin should have %s permission for canvases", action)
 		}
 
 		// Should have user management permissions
@@ -111,12 +111,12 @@ func Test__AuthService_OrganizationPermissions(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, allowed)
 
-		// Should not have canvas create/update/delete permissions
-		actions := []string{"create", "update", "delete"}
+		// Should not have canvas create/update/publish/delete permissions
+		actions := []string{"create", "update", "update_version", "publish", "delete"}
 		for _, action := range actions {
 			allowed, err := r.AuthService.CheckOrganizationPermission(viewerID, orgID, canvasPath, action)
 			require.NoError(t, err)
-			assert.False(t, allowed, "Org viewer should not have %s permission for workflows", action)
+			assert.False(t, allowed, "Org viewer should not have %s permission for canvases", action)
 		}
 
 		// Should not have user management permissions

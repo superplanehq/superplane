@@ -1,11 +1,13 @@
 package cloudflare
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -162,5 +164,51 @@ func Test__Cloudflare__ListResources(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Empty(t, resources)
+	})
+
+	t.Run("certificate pack list logs zone errors and continues", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"success":false,"errors":[{"message":"temporary failure"}]}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"success": true,
+						"result": [{"id": "pack-123", "hosts": ["app.example.com"]}]
+					}`)),
+				},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "token123"},
+			Metadata: Metadata{
+				Zones: []Zone{
+					{ID: "zone-failing", Name: "failing.example.com"},
+					{ID: "zone-working", Name: "working.example.com"},
+				},
+			},
+		}
+		var logs bytes.Buffer
+		logger := logrus.New()
+		logger.SetOutput(&logs)
+		logger.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true})
+
+		resources, err := c.ListResources("certificate_pack", core.ListResourcesContext{
+			Logger:      logrus.NewEntry(logger),
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "certificate_pack", resources[0].Type)
+		assert.Equal(t, "working.example.com - app.example.com", resources[0].Name)
+		assert.Equal(t, "zone-working/pack-123", resources[0].ID)
+		assert.Contains(t, logs.String(), "failed to list certificate packs for zone, skipping")
+		assert.Contains(t, logs.String(), "zone-failing")
+		assert.Contains(t, logs.String(), "failing.example.com")
 	})
 }

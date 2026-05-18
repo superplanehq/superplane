@@ -55,8 +55,11 @@ vi.mock("@/lib/utils", () => ({
   resolveIcon: () => () => <div data-testid="resolved-icon" />,
 }));
 
-vi.mock("@/ui/componentSidebar/integrationIcons", () => ({
+vi.mock("@/ui/componentSidebar/integrationIconMaps", () => ({
   getHeaderIconSrc: () => undefined,
+}));
+
+vi.mock("@/ui/componentSidebar/integrationIcons", () => ({
   IntegrationIcon: () => <div data-testid="integration-icon" />,
 }));
 

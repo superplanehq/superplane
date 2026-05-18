@@ -1,8 +1,6 @@
-import { ArrowUp, Loader2, SquareTerminal } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkBreaks from "remark-breaks";
-import remarkGfm from "remark-gfm";
+import { ArrowUp, ChevronRight, Loader2, SquareTerminal, X } from "lucide-react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { RichMessage } from "@/components/AgentSidebar/widgets/RichMessage";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -42,28 +40,34 @@ function OpenCanvasToolSidebar({ toolSidebarState }: CanvasToolSidebarProps) {
   return (
     <SidebarShell>
       <div className="flex min-h-0 flex-1 flex-col gap-0">
-        <div
-          className="flex h-10 min-h-10 shrink-0 flex-row items-stretch border-b border-slate-950/15 px-4"
-          role="tablist"
-          aria-label="Canvas tools"
-        >
-          {tabs.map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === value}
-              onClick={() => setActiveTab(value)}
-              className={cn(
-                "mr-4 mb-[-1px] flex items-center border-b text-[13px] font-medium transition-colors",
-                activeTab === value
-                  ? "border-gray-700 text-gray-800 dark:border-blue-600 dark:text-blue-400"
-                  : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300",
-              )}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex h-10 min-h-10 shrink-0 items-center border-b border-slate-950/15 px-4">
+          <div className="flex min-w-0 flex-1 flex-row items-stretch" role="tablist" aria-label="Canvas tools">
+            {tabs.map(({ value, label }) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={activeTab === value}
+                onClick={() => setActiveTab(value)}
+                className={cn(
+                  "mr-4 mb-[-1px] flex items-center border-b text-[13px] font-medium transition-colors",
+                  activeTab === value
+                    ? "border-gray-700 text-gray-800 dark:border-blue-600 dark:text-blue-400"
+                    : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={toolSidebarState.closeToolSidebar}
+            aria-label="Close sidebar"
+            className="ml-2 inline-flex size-6 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="size-4" />
+          </button>
         </div>
 
         {activeTab === TAB_AGENT ? (
@@ -106,7 +110,7 @@ function AgentTabPanel({ toolSidebarState }: CanvasToolSidebarProps) {
   return <ChatConversation chatId={chatId} canvasId={canvasId} organizationId={organizationId} />;
 }
 
-function SidebarShell({ children }: { children: React.ReactNode }) {
+function SidebarShell({ children }: { children: ReactNode }) {
   const { sidebarRef, width, isResizing, handleMouseDown } = useSidebarWidth();
   return (
     <aside
@@ -151,11 +155,11 @@ function ChatConversation({
       messagesQuery.data?.pages
         .slice()
         .reverse()
-        .flatMap((p) => p.messages) ?? [],
+        .flatMap((page) => page.messages) ?? [],
     [messagesQuery.data],
   );
   const hasRunningTool = useMemo(
-    () => messages.some((m) => m.role === "tool" && m.toolStatus === "started"),
+    () => messages.some((message) => message.role === "tool" && message.toolStatus === "started"),
     [messages],
   );
   const showThinking = status === "streaming" && !hasRunningTool && messages[messages.length - 1]?.role === "user";
@@ -187,27 +191,29 @@ function ChatConversation({
   const previousScrollHeight = useRef<number | null>(null);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
+    const element = scrollRef.current;
+    if (!element) return;
+
     const onScroll = () => {
-      if (el.scrollTop > 24) return;
+      if (element.scrollTop > 24) return;
       if (!messagesQuery.hasNextPage || messagesQuery.isFetchingNextPage) return;
-      previousScrollHeight.current = el.scrollHeight;
+      previousScrollHeight.current = element.scrollHeight;
       void messagesQuery.fetchNextPage();
     };
-    el.addEventListener("scroll", onScroll);
-    return () => el.removeEventListener("scroll", onScroll);
+
+    element.addEventListener("scroll", onScroll);
+    return () => element.removeEventListener("scroll", onScroll);
   }, [messagesQuery]);
 
   useLayoutEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
+    const element = scrollRef.current;
+    if (!element) return;
     if (previousScrollHeight.current !== null) {
-      el.scrollTop = el.scrollHeight - previousScrollHeight.current;
+      element.scrollTop = element.scrollHeight - previousScrollHeight.current;
       previousScrollHeight.current = null;
       return;
     }
-    el.scrollTop = el.scrollHeight;
+    element.scrollTop = element.scrollHeight;
   }, [chatId, messages.length, showThinking]);
 
   return (
@@ -224,9 +230,20 @@ function ChatConversation({
                 <Loader2 className="mr-2 size-3 animate-spin" /> Loading older messages…
               </div>
             ) : null}
-            {messages.map((m) => (
-              <MessageRow key={m.id} message={m} />
-            ))}
+            {groupMessages(messages).map((group) =>
+              group.type === "tool-group" ? (
+                <ToolGroupRow key={group.messages[0].id} messages={group.messages} />
+              ) : (
+                <MessageRow
+                  key={group.message.id}
+                  message={group.message}
+                  sendMutation={sendMutation}
+                  chatId={chatId}
+                  canvasId={canvasId}
+                  organizationId={organizationId}
+                />
+              ),
+            )}
           </>
         )}
         {showThinking ? <ThinkingRow /> : null}
@@ -257,6 +274,7 @@ function ChatComposer({
   statusLabel: string;
 }) {
   const canSend = Boolean(draft.trim()) && !sending;
+
   return (
     <footer className="border-t border-slate-950/15 px-3 pb-3">
       <Textarea
@@ -273,8 +291,8 @@ function ChatComposer({
         )}
         onKeyDown={(e) => {
           if (e.key !== "Enter") return;
-          const native = e.nativeEvent;
-          if ("isComposing" in native && native.isComposing) return;
+          const nativeEvent = e.nativeEvent;
+          if ("isComposing" in nativeEvent && nativeEvent.isComposing) return;
           if (e.shiftKey) return;
           e.preventDefault();
           if (!canSend) return;
@@ -304,11 +322,37 @@ function ChatComposer({
   );
 }
 
-function MessageRow({ message }: { message: AgentMessage }) {
+function MessageRow({
+  message,
+  sendMutation,
+  chatId,
+  canvasId,
+  organizationId,
+}: {
+  message: AgentMessage;
+  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
+  chatId: string;
+  canvasId: string;
+  organizationId: string;
+}) {
+  const handleAction = useCallback(
+    async (action: string) => {
+      if (sendMutation.isPending) return;
+      try {
+        await sendMutation.mutateAsync({ chatId, content: action });
+      } catch (err) {
+        console.error("Failed to send action:", err);
+      }
+    },
+    [chatId, sendMutation],
+  );
+
   if (message.role === "tool") {
     return <ToolMessageRow message={message} />;
   }
+
   const isUser = message.role === "user";
+
   return (
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
@@ -320,36 +364,109 @@ function MessageRow({ message }: { message: AgentMessage }) {
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
-        {isUser ? message.content : <AgentMarkdown content={message.content} />}
+        {isUser ? (
+          message.content
+        ) : (
+          <RichMessage
+            content={message.content}
+            onAction={handleAction}
+            canvasId={canvasId}
+            organizationId={organizationId}
+          />
+        )}
       </div>
     </div>
   );
 }
 
+type MessageGroup = { type: "message"; message: AgentMessage } | { type: "tool-group"; messages: AgentMessage[] };
+
+function groupMessages(messages: AgentMessage[]): MessageGroup[] {
+  const groups: MessageGroup[] = [];
+  let toolBuffer: AgentMessage[] = [];
+
+  function flushTools() {
+    if (toolBuffer.length > 0) {
+      groups.push({ type: "tool-group", messages: [...toolBuffer] });
+      toolBuffer = [];
+    }
+  }
+
+  for (const message of messages) {
+    if (message.role === "tool") {
+      toolBuffer.push(message);
+    } else {
+      flushTools();
+      groups.push({ type: "message", message });
+    }
+  }
+
+  flushTools();
+  return groups;
+}
+
+function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
+  const [expanded, setExpanded] = useState(true);
+  const hasRunning = messages.some((message) => message.toolStatus === "started");
+  const count = messages.length;
+  const label = hasRunning
+    ? `Running command${count > 1 ? ` (${count})` : ""}...`
+    : `Ran ${count} command${count !== 1 ? "s" : ""}`;
+
+  return (
+    <div className={cn("py-1 text-sm", hasRunning && "animate-tool-glow")} data-testid="agent-tool-group">
+      <button
+        type="button"
+        onClick={() => setExpanded((previous) => !previous)}
+        className="flex cursor-pointer items-center gap-2 text-slate-700 hover:text-slate-900"
+      >
+        <SquareTerminal className="size-4 shrink-0" />
+        <span>{label}</span>
+        <ChevronRight className={cn("size-3 transition-transform", expanded && "rotate-90")} />
+      </button>
+      {expanded ? (
+        <div className="mt-2 space-y-1">
+          {messages.map((message) => (
+            <ToolMessageRow key={message.id} message={message} />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function ToolMessageRow({ message }: { message: AgentMessage }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const command = message.content;
   const canExpand = Boolean(command);
   const running = message.toolStatus === "started";
+  const preview = command ? command.split("\n")[0].substring(0, 80) : "command";
+
   return (
-    <div
-      className={cn("flex items-start gap-2 py-1 text-sm text-slate-500", running && "animate-tool-glow")}
-      data-testid="agent-tool-message"
-    >
-      <SquareTerminal className="mt-0.5 size-4 shrink-0" />
-      <div className="min-w-0 flex-1">
-        <button
-          type="button"
-          onClick={() => canExpand && setExpanded((prev) => !prev)}
-          disabled={!canExpand}
-          className={cn("text-left", canExpand && "cursor-pointer hover:text-slate-700")}
-        >
-          {running ? "Running command" : "Ran command"}
-        </button>
-        {expanded && command ? (
-          <div className="mt-1 font-mono text-xs break-words whitespace-pre-wrap text-slate-400">{command}</div>
-        ) : null}
-      </div>
+    <div className="text-xs" data-testid="agent-tool-message">
+      <button
+        type="button"
+        onClick={() => canExpand && setExpanded((previous) => !previous)}
+        disabled={!canExpand}
+        className={cn(
+          "flex w-full items-center gap-1.5 text-left",
+          running ? "text-slate-700" : "text-slate-600",
+          canExpand && "cursor-pointer hover:text-slate-900",
+        )}
+      >
+        <span className="shrink-0 text-[10px]">{running ? "▶" : "✓"}</span>
+        <span className="truncate">{running ? "Running..." : preview}</span>
+      </button>
+      {expanded && command ? (
+        <div className="mt-1 overflow-hidden rounded-lg border border-slate-200 bg-white">
+          <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-1">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">bash</span>
+          </div>
+          <pre className="max-h-[200px] overflow-auto break-words whitespace-pre-wrap p-3 font-mono text-xs text-slate-700">
+            {command}
+          </pre>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -359,54 +476,6 @@ function ThinkingRow() {
     <div className="flex animate-tool-glow items-center gap-2 py-1 text-sm text-slate-500" data-testid="agent-thinking">
       <Loader2 className="size-4 shrink-0 animate-spin" />
       <span>Thinking…</span>
-    </div>
-  );
-}
-
-const AGENT_MARKDOWN_CLASSES =
-  "max-w-none [&_h1]:mb-2 [&_h1]:mt-1.5 [&_h1]:text-base [&_h1]:font-semibold [&_h1:first-child]:mt-0 " +
-  "[&_h2]:mb-2 [&_h2]:mt-2.5 [&_h2]:text-sm [&_h2]:font-semibold [&_h2:first-child]:mt-0 " +
-  "[&_h3]:mb-1.5 [&_h3]:mt-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3:first-child]:mt-0 " +
-  "[&_p]:mb-2.5 [&_p]:leading-relaxed [&_p:last-child]:mb-0 " +
-  "[&_ol]:mt-1.5 [&_ol]:mb-3 [&_ol]:ml-5 [&_ol]:list-decimal [&_ul]:mt-1.5 [&_ul]:mb-3 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-1.5 " +
-  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 " +
-  "[&_code]:rounded [&_code]:bg-slate-200/70 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs " +
-  "[&_pre]:my-2 [&_pre]:overflow-auto [&_pre]:rounded [&_pre]:bg-slate-200/70 [&_pre]:p-2 " +
-  "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
-  "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current " +
-  "[&_strong]:font-semibold [&_b]:font-semibold";
-
-function AgentMarkdown({ content }: { content: string }) {
-  if (!content) return null;
-  return (
-    <div className={AGENT_MARKDOWN_CLASSES}>
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkBreaks]}
-        components={{
-          a: ({ children, href }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer">
-              {children}
-            </a>
-          ),
-          table: ({ children }) => (
-            <div className="my-3 w-full max-w-full overflow-x-auto border-y border-slate-200 bg-white">
-              <table
-                className={cn(
-                  "w-full min-w-[12rem] border-collapse text-sm leading-snug text-slate-900",
-                  "[&_th]:border-b [&_th]:border-slate-200 [&_th]:bg-slate-100 [&_th]:px-3 [&_th]:py-1.5 [&_th]:text-left [&_th]:font-semibold",
-                  "[&_td]:border-b [&_td]:border-slate-200 [&_td]:px-3 [&_td]:py-1.5 [&_td]:align-top",
-                  "[&_tbody_tr:last-child_td]:border-b-0 [&_tbody_tr:last-child_th]:border-b-0",
-                  "[&_tbody_tr:nth-child(even)]:bg-slate-50/60",
-                )}
-              >
-                {children}
-              </table>
-            </div>
-          ),
-        }}
-      >
-        {content}
-      </ReactMarkdown>
     </div>
   );
 }

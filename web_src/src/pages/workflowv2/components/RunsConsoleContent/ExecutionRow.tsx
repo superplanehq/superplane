@@ -10,7 +10,7 @@ import {
   resolveExecutionDisplayStatus,
   resolveNodeIconSlug,
 } from "@/pages/workflowv2/lib/canvas-runs";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 
 export function ExecutionRow({
   execution,
