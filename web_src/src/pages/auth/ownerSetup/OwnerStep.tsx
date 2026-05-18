@@ -49,7 +49,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
       <h4 className="mb-1 text-xl font-medium text-gray-800 dark:text-white">Set up owner account</h4>
       <Text className="text-gray-800 dark:text-gray-300">Create an account for this SuperPlane instance.</Text>
     </div>
-    <form onSubmit={onNext} className="space-y-4">
+    <form onSubmit={onNext} noValidate className="space-y-4">
       <ErrorBanner message={error} />
       <div>
         <Label className="mb-2 block text-left">
