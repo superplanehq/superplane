@@ -10,8 +10,11 @@ import { StepsWidget } from "./StepsWidget";
 import { BannerWidget } from "./BannerWidget";
 import { MermaidWidget } from "./MermaidWidget";
 import { CodeBlockWidget } from "./CodeBlockWidget";
+import { SurveyWidget } from "./SurveyWidget";
+import { RubricWidget } from "./RubricWidget";
 import { RunChipFromLink } from "./RunChip";
 import { NodeChipFromLink } from "./NodeChip";
+import { IntegrationButton } from "./IntegrationButton";
 
 const MARKDOWN_CLASSES =
   "max-w-none [&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-base [&_h1]:font-semibold [&_h1:first-child]:mt-0 " +
@@ -34,11 +37,12 @@ const MARKDOWN_CLASSES =
 interface RichMessageProps {
   content: string;
   onAction?: (text: string) => void;
+  onStartBuilding?: (rubric: { title: string; criteria: string[] }) => void;
   canvasId?: string;
   organizationId?: string;
 }
 
-export function RichMessage({ content, onAction, canvasId, organizationId }: RichMessageProps) {
+export function RichMessage({ content, onAction, onStartBuilding, canvasId, organizationId }: RichMessageProps) {
   const segments = parseAgentContent(content);
 
   return (
@@ -48,6 +52,7 @@ export function RichMessage({ content, onAction, canvasId, organizationId }: Ric
           key={i}
           segment={segment}
           onAction={onAction}
+          onStartBuilding={onStartBuilding}
           canvasId={canvasId}
           organizationId={organizationId}
         />
@@ -59,11 +64,13 @@ export function RichMessage({ content, onAction, canvasId, organizationId }: Ric
 function SegmentRenderer({
   segment,
   onAction,
+  onStartBuilding,
   canvasId,
   organizationId,
 }: {
   segment: Segment;
   onAction?: (text: string) => void;
+  onStartBuilding?: (rubric: { title: string; criteria: string[] }) => void;
   canvasId?: string;
   organizationId?: string;
 }) {
@@ -73,7 +80,7 @@ function SegmentRenderer({
         <div className={MARKDOWN_CLASSES}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
-            urlTransform={(url) => (url.startsWith("run:") || url.startsWith("node:") ? url : defaultUrlTransform(url))}
+            urlTransform={(url) => (url.startsWith("run:") || url.startsWith("node:") || url.startsWith("integration:") ? url : defaultUrlTransform(url))}
             components={{
               a: ({ children, href }) => {
                 const runMatch = href?.match(/^run:([0-9a-f-]{36})(?:~(.+))?/);
@@ -86,6 +93,17 @@ function SegmentRenderer({
                       rawStatus={runMatch[2]}
                       canvasId={canvasId}
                       organizationId={organizationId}
+                    />
+                  );
+                }
+
+                const integrationMatch = href?.match(/^integration:(.+)$/);
+                if (integrationMatch) {
+                  const label = typeof children === "string" ? children : undefined;
+                  return (
+                    <IntegrationButton
+                      integrationName={integrationMatch[1]}
+                      label={label}
                     />
                   );
                 }
@@ -147,9 +165,23 @@ function SegmentRenderer({
       return <MermaidWidget content={segment.content} />;
     case "steps":
       return <StepsWidget items={segment.items} />;
+    case "survey":
+      return <SurveyWidget questions={segment.questions} onAction={onAction} />;
+    case "rubric":
+      return (
+        <RubricWidget
+          title={segment.title}
+          criteria={segment.criteria}
+          onAction={onAction}
+          onStartBuilding={onStartBuilding}
+        />
+      );
     case "success":
       return <BannerWidget variant="success" content={segment.content} />;
     case "error":
       return <BannerWidget variant="error" content={segment.content} />;
+    case "draft-actions":
+      // Rendered externally as DraftActionsBar, not inline
+      return null;
   }
 }
