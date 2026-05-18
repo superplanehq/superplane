@@ -9,8 +9,11 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a Jira Service Management incident via the Incidents API" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Jira" />
+  <LinkCard title="Delete Incident" href="#delete-incident" description="Delete a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Delete Issue" href="#delete-issue" description="Delete a Jira issue" />
+  <LinkCard title="Get Incident" href="#get-incident" description="Fetch a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Jira issue by its key" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update fields on a Jira issue" />
 </CardGrid>
@@ -24,6 +27,58 @@ To connect Jira to SuperPlane:
 3. Paste your **Jira Site URL** into SuperPlane. For Jira Cloud, this usually looks like `https://your-domain.atlassian.net`.
 4. Paste the Atlassian account **Email** that owns the API token.
 5. Paste the generated **API Token**.
+
+<a id="create-incident"></a>
+
+## Create Incident
+
+The Create Incident component opens a new incident in Jira Service Management.
+
+### Use Cases
+
+- **Alert-driven incidents**: Create an incident from a monitoring or ticketing workflow
+- **Cross-tool orchestration**: Open a JSM incident when another system reports an outage
+- **Responder assignment**: Pass responders and other fields supported by your service desk
+
+### Configuration
+
+- **Service desk**: Choose a Jira Service Management service desk (from your site via the JSM API)
+- **Request type**: Choose a request type on that service desk (lists after a service desk is selected)
+- **Summary** (required): Short title for the incident; sent as the Jira **summary** field (Jira requires this). You can set this directly, or supply summary only via **Additional fields**.
+- **Description** (optional): Plain text stored as Jira description (Atlassian Document Format).
+- **Due date** (optional): Jira **duedate** (use your site date format, typically YYYY-MM-DD).
+- **Priority** (optional): Jira priority **name** (for example Medium).
+- **Impact** (optional): Impact level from your Jira request type (options load after service desk and request type are selected).
+- **Urgency** (optional): Urgency level from your Jira request type (options load after service desk and request type are selected).
+- **Original estimate** (optional): Jira **timetracking.originalEstimate** (for example 2h, 1d).
+- **Custom fields** (optional): List of Jira field ids with JSON values—for affected services, pending reason, or any customfield_*; the value must be valid JSON (object or string) as Jira expects for that field type.
+- **Additional fields** (optional): JSON object merged into the API **fields** map (same pattern as other integrations such as Honeycomb **Fields JSON**).
+- **Update** (optional): JSON object for the Incidents API **update** property.
+- **Alert IDs** (optional): List of alert id strings to associate with the incident.
+
+### Output
+
+Returns **id** (numeric issue id), **key** (e.g. ITSM-30), and **self** (issue REST URL) from the create response.
+
+### Notes
+
+- Requires a Jira Cloud site with Jira Service Management and a synced SuperPlane Jira integration (cloud id is resolved automatically).
+- **Request types** must belong to Jira's **Incident management** work category; other request types (for example service requests) are hidden from the picker when Jira returns a practice field on request types. If your site uses an unrecognized practice value, contact support with a sample from GET /rest/servicedeskapi/servicedesk/&lbrace;serviceDeskId&rbrace;/requesttype/&lbrace;requestTypeId&rbrace; with expand=practice.
+- Field ids such as responders are site-specific; use **Custom fields** or **Additional fields** with values that match your JSM configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "10050",
+    "key": "ITSM-30",
+    "self": "https://your-domain.atlassian.net/rest/api/3/issue/10050"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.incident.created"
+}
+```
 
 <a id="create-issue"></a>
 
@@ -104,6 +159,38 @@ Returns the created issue including:
 }
 ```
 
+<a id="delete-incident"></a>
+
+## Delete Incident
+
+The Delete Incident component removes an incident from Jira Service Management.
+
+### Use Cases
+
+- **Automated cleanup**: Remove incidents created during tests or erroneous automation
+- **Lifecycle workflows**: Delete when a duplicate or mistaken incident is closed upstream
+
+### Configuration
+
+- **Project** (optional): Narrows the issue picker to one Jira project (up to 500 most recently updated issues in that project).
+- **Issue**: The incident issue to delete (issue key from Jira search).
+
+### Output
+
+Confirms deletion with **deleted** set to true.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.incident.deleted"
+}
+```
+
 <a id="delete-issue"></a>
 
 ## Delete Issue
@@ -136,6 +223,42 @@ Returns the deleted issue's `id` and `key`, plus `deleted: true`.
   },
   "timestamp": "2026-01-19T13:00:00Z",
   "type": "jira.issueDeleted"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+The Get Incident component returns incident details from Jira Service Management.
+
+### Use Cases
+
+- **Enrichment**: Load incident DTO after an issue webhook or workflow step
+- **Status checks**: Read priority, status, responders, and affected services from JSM
+
+### Configuration
+
+- **Project** (optional): When set, the issue picker lists issues in that project (by project key), paged from Jira search (up to 500, most recently updated first). Leave empty to list issues updated in roughly the last 90 days across projects you can access (same cap and ordering).
+- **Issue**: Choose an issue by key (from Jira search). The stored value is the issue key; numeric ids still work when they are saved as the issue reference.
+
+### Output
+
+Payload type jira.incident.fetched with the incident object returned by Atlassian (summary, reporter, priority, status, responders, etc.).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "priority": {
+      "id": "1",
+      "name": "High"
+    },
+    "summary": "Example incident"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.incident.fetched"
 }
 ```
 

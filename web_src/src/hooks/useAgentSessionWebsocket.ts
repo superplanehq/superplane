@@ -2,7 +2,7 @@ import { useCallback, useRef } from "react";
 import useWebSocket from "react-use-websocket";
 import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { upsertAgentMessageInCache } from "./useAgentChats";
-import type { AgentMessage, AgentSessionWebsocketEvent } from "@/components/AgentSidebar/types";
+import type { AgentMessage, AgentSessionWebsocketEvent } from "@/components/CanvasToolSidebar/types";
 
 function parseAgentEvent(event: MessageEvent<unknown>): AgentSessionWebsocketEvent | null {
   try {

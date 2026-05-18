@@ -1,12 +1,10 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
-import { cn } from "@/lib/utils";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunsList } from "./RunsList";
 import { RunsToolbar } from "./RunsToolbar";
-import { useResizableSidebar } from "./useResizableSidebar";
 import { useRunFilters } from "./useRunFilters";
 
-interface RunsSidebarProps {
+export interface RunsTabPanelProps {
   runs: CanvasesCanvasRun[];
   selectedRunId: string | null;
   onSelectRun: (runId: string) => void;
@@ -22,7 +20,7 @@ interface RunsSidebarProps {
   onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
 }
 
-export function RunsSidebar({
+export function RunsTabPanel({
   runs,
   selectedRunId,
   onSelectRun,
@@ -36,8 +34,7 @@ export function RunsSidebar({
   componentIconMap = {},
   totalCount,
   onStatusFiltersChange,
-}: RunsSidebarProps) {
-  const { sidebarRef, width, isResizing, handleMouseDown } = useResizableSidebar();
+}: RunsTabPanelProps) {
   const {
     search,
     setSearch,
@@ -55,12 +52,7 @@ export function RunsSidebar({
   } = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
 
   return (
-    <div
-      ref={sidebarRef}
-      data-testid="runs-sidebar"
-      className="relative flex shrink-0 flex-col border-r border-slate-200 bg-white"
-      style={{ width: `${width}px`, minWidth: `${width}px`, maxWidth: `${width}px` }}
-    >
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-10 shrink-0 items-center border-b border-slate-200 px-3">
         <span className="text-sm font-medium text-gray-700">Runs</span>
         {totalCount != null && totalCount > 0 ? (
@@ -80,7 +72,7 @@ export function RunsSidebar({
         onClearTriggers={clearTriggers}
       />
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <RunsList
           runs={runs}
           filteredRuns={filteredRuns}
@@ -108,24 +100,6 @@ export function RunsSidebar({
           </button>
         </div>
       ) : null}
-
-      <div
-        onMouseDown={handleMouseDown}
-        className={cn(
-          "absolute right-0 top-0 bottom-0 z-30 flex w-4 cursor-ew-resize items-center justify-center transition-colors hover:bg-gray-100 group",
-          isResizing && "bg-blue-50",
-        )}
-        style={{ marginRight: "-8px" }}
-        aria-label="Resize runs sidebar"
-        role="separator"
-      >
-        <div
-          className={cn(
-            "h-14 w-2 rounded-full bg-gray-300 transition-colors group-hover:bg-gray-800",
-            isResizing && "bg-blue-500",
-          )}
-        />
-      </div>
     </div>
   );
 }
