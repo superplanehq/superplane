@@ -3,30 +3,34 @@ import { cn } from "../../../lib/utils";
 import type { CommandSection } from "./types";
 import { useLiveLogStream } from "./useLiveLogStream";
 
-function formatDuration(durationMs: number): string {
-  // Less than 1 second
-  if (durationMs < 1000) {
-    return `00:00`;
-  }
+export function LiveLogStreamView({ executionId }: { executionId: string }) {
+  const { sections, orphanLines, error, toggleSection, scrollRef } = useLiveLogStream(executionId);
+  const hasAnyLogs = orphanLines.length > 0 || sections.length > 0;
 
-  // Less than 1 minute
-  if (durationMs < 60_000) {
-    const seconds = Math.floor(durationMs / 1000);
-    return `00:${seconds.toString().padStart(2, "0")}`;
-  }
+  return (
+    <div className="flex flex-col overflow-hidden bg-store-50">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
+        {error ? <ErrorMessage /> : null}
+        {!error && !hasAnyLogs ? <NoLogsMessage /> : null}
 
-  // Less than 1 hour
-  if (durationMs < 3_600_000) {
-    const minutes = Math.floor(durationMs / 60_000);
-    const seconds = Math.floor((durationMs % 60_000) / 1000);
-    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-  }
+        {sections.map((section) => (
+          <CommandSectionView key={`${section.index}-${section.text}`} section={section} onToggle={toggleSection} />
+        ))}
+      </div>
+    </div>
+  );
+}
 
-  // More than 1 hour
-  const hours = Math.floor(durationMs / 3_600_000);
-  const minutes = Math.floor((durationMs % 3_600_000) / 60_000);
-  const seconds = Math.floor((durationMs % 60_000) / 1000);
-  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+function NoLogsMessage() {
+  return <div className="px-4 py-3 text-left text-muted-foreground">No log lines yet.</div>;
+}
+
+function ErrorMessage() {
+  return (
+    <div className="px-4 py-3 text-left text-destructive">
+      Something went wrong while fetching logs. Please try again later.
+    </div>
+  );
 }
 
 function CommandSectionView({ section, onToggle }: { section: CommandSection; onToggle: (index: number) => void }) {
@@ -93,37 +97,28 @@ function StatusBadge({ status }: { status: CommandSection["status"] }) {
   );
 }
 
-export function LiveLogStreamView({ executionId }: { executionId: string }) {
-  const { sections, orphanLines, error, isStreaming, toggleSection, scrollRef } = useLiveLogStream(executionId);
-  const hasAnyLogs = orphanLines.length > 0 || sections.length > 0;
+function formatDuration(durationMs: number): string {
+  // Less than 1 second
+  if (durationMs < 1000) {
+    return `00:00`;
+  }
 
-  return (
-    <div className="flex flex-col overflow-hidden bg-store-50">
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
-        {error ? (
-          <div className="px-4 py-3 text-left text-destructive">
-            Something went wrong while fetching logs. Please try again later.
-          </div>
-        ) : null}
+  // Less than 1 minute
+  if (durationMs < 60_000) {
+    const seconds = Math.floor(durationMs / 1000);
+    return `00:${seconds.toString().padStart(2, "0")}`;
+  }
 
-        {!error && !hasAnyLogs && !isStreaming ? (
-          <div className="p-4 text-left text-muted-foreground">No log lines yet.</div>
-        ) : null}
+  // Less than 1 hour
+  if (durationMs < 3_600_000) {
+    const minutes = Math.floor(durationMs / 60_000);
+    const seconds = Math.floor((durationMs % 60_000) / 1000);
+    return `${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  }
 
-        {!error && !hasAnyLogs && isStreaming ? (
-          <div className="p-4 text-left text-muted-foreground">Connecting…</div>
-        ) : null}
-
-        {orphanLines.length > 0 ? (
-          <pre className="overflow-auto bg-slate-900 px-4 py-2 text-left font-mono text-xs leading-relaxed whitespace-pre-wrap text-gray-300">
-            {orphanLines.join("")}
-          </pre>
-        ) : null}
-
-        {sections.map((section) => (
-          <CommandSectionView key={`${section.index}-${section.text}`} section={section} onToggle={toggleSection} />
-        ))}
-      </div>
-    </div>
-  );
+  // More than 1 hour
+  const hours = Math.floor(durationMs / 3_600_000);
+  const minutes = Math.floor((durationMs % 3_600_000) / 60_000);
+  const seconds = Math.floor((durationMs % 60_000) / 1000);
+  return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
 }
