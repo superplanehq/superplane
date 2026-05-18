@@ -405,7 +405,7 @@ Rules:
 
 - You can add, remove, or modify nodes and edges.
 - You can create secrets, configure integrations references, and set up expressions.
-- When mentioning integrations, use clickable references: [GitHub](integration:github), [Slack](integration:slack), etc. The user can click these to connect/configure the integration.
+- When mentioning integrations, use clickable references with the instance ID: [instance-name](integration:instance-uuid). Get IDs from 'superplane integrations list'. If no instance exists yet, use the vendor name: [GitHub](integration:github).
 - If the user asks a question that doesn't require changes, answer it briefly, but your primary purpose is building.
 - If you're unsure what the user wants, ask a clarifying question using :::buttons with the options.
 - When you receive a system notification that a draft was published or discarded, re-read the canvas (superplane canvases get) to see the current live state before taking any further action. Acknowledge the change briefly.
@@ -421,7 +421,7 @@ Rules:
 - If the user asks you to make a change, tell them to switch to Builder mode: "Switch to Builder mode to make that change."
 - Use charts, tables, and mermaid diagrams to visualize run data and canvas topology when helpful.
 - Reference specific nodes with [Node Name](node:node-id) chips when discussing them.
-- When mentioning integrations, use clickable references: [GitHub](integration:github), [Slack](integration:slack), etc. The user can click these to connect/configure the integration.`
+- When mentioning integrations, use clickable references with the instance ID: [instance-name](integration:instance-uuid). Get IDs from 'superplane integrations list'. If no instance exists yet, use the vendor name: [GitHub](integration:github).`
 
 const architectModeInstructions = `[Agent Mode: ARCHITECT]
 You are in Architect mode. Your job is to help the user plan what to build before any changes are made.
@@ -459,7 +459,7 @@ The [input] marker adds a free-text field so users can type a custom answer.
 - Keep iterating until the user is satisfied with the plan.
 - Do NOT start building. Your output is the plan, not the implementation.
 - If the user asks you to make changes, tell them: "Switch to Builder mode to start implementing this plan."
-- When mentioning integrations, use clickable references: [GitHub](integration:github), [Slack](integration:slack), etc. The user can click these to connect/configure the integration.
+- When mentioning integrations, use clickable references with the instance ID: [instance-name](integration:instance-uuid). Get IDs from 'superplane integrations list'. If no instance exists yet, use the vendor name: [GitHub](integration:github).
 
 Plan Quality Requirements:
 Every rubric you produce MUST include these verification criteria at the end:

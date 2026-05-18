@@ -1,34 +1,80 @@
 import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { cn } from "@/lib/utils";
+import { useConnectedIntegrations, useAvailableIntegrations } from "@/hooks/useIntegrations";
+import { useParams } from "react-router-dom";
+import { useMemo } from "react";
 
 interface IntegrationButtonProps {
   /**
-   * Integration reference string from the markdown link href.
-   * Formats:
-   *   "github"          - integration definition name (opens create/connect dialog)
-   *   "dash0:dash-2"    - definition:instanceName (opens specific instance config)
+   * Integration reference from the markdown link href.
+   * Can be:
+   *   - A UUID (instance ID): "791ee6d1-5399-47f0-aba2-08a8d2915cc9"
+   *   - A vendor name: "github" (for connect-new flow)
    */
   integrationRef: string;
-  /** Display label (from markdown link text) */
+  /** Display label override (from markdown link text) */
   label?: string;
 }
 
 /**
  * Renders an integration reference as a clickable button with the vendor icon.
+ * Resolves instance ID → name + icon from connected integrations.
  * Dispatches a CustomEvent so the parent page can open the integration dialog.
  *
  * Agent outputs:
+ *   [Dash0](integration:791ee6d1-...)     -> resolved button for specific instance
  *   [GitHub](integration:github)           -> connect/create dialog for GitHub
- *   [dash-2](integration:dash0:dash-2)     -> configure specific instance "dash-2"
  */
 export function IntegrationButton({ integrationRef, label }: IntegrationButtonProps) {
-  const { integrationName, instanceName } = parseRef(integrationRef);
-  const displayName = label || instanceName || formatIntegrationName(integrationName);
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(integrationRef);
+
+  const connectedQuery = useConnectedIntegrations(organizationId ?? "", { enabled: isUUID });
+  const availableQuery = useAvailableIntegrations({ enabled: !isUUID });
+
+  const resolved = useMemo(() => {
+    if (isUUID) {
+      const instance = connectedQuery.data?.find(
+        (i: { metadata?: { id?: string } }) => i.metadata?.id === integrationRef,
+      );
+      if (instance) {
+        return {
+          integrationName: instance.metadata?.integrationName ?? "",
+          instanceName: instance.metadata?.name ?? "",
+          instanceId: integrationRef,
+          state: instance.status?.state ?? "unknown",
+        };
+      }
+      // UUID not found — still show a fallback
+      return { integrationName: "", instanceName: "", instanceId: integrationRef, state: "unknown" };
+    }
+
+    // Vendor name reference — find the definition
+    const def = availableQuery.data?.find(
+      (d: { name?: string }) => d.name === integrationRef,
+    );
+    return {
+      integrationName: integrationRef,
+      instanceName: "",
+      instanceId: "",
+      state: "",
+      definitionLabel: def?.label,
+    };
+  }, [isUUID, integrationRef, connectedQuery.data, availableQuery.data]);
+
+  const displayName =
+    label || resolved.instanceName || (resolved as { definitionLabel?: string }).definitionLabel || formatIntegrationName(resolved.integrationName || integrationRef);
+
+  const isConnected = resolved.state === "ready";
 
   function handleClick() {
     window.dispatchEvent(
       new CustomEvent("agent:open-integration", {
-        detail: { integrationName, instanceName },
+        detail: {
+          integrationName: resolved.integrationName || integrationRef,
+          instanceId: resolved.instanceId,
+          instanceName: resolved.instanceName,
+        },
       }),
     );
   }
@@ -39,39 +85,33 @@ export function IntegrationButton({ integrationRef, label }: IntegrationButtonPr
       onClick={handleClick}
       className={cn(
         "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md",
-        "border border-slate-200 bg-white shadow-sm",
-        "text-xs font-medium text-slate-700",
-        "hover:bg-slate-50 hover:border-slate-300 hover:shadow",
-        "transition-all cursor-pointer",
-        "align-middle",
+        "border bg-white shadow-sm",
+        "text-xs font-medium",
+        "hover:shadow transition-all cursor-pointer align-middle",
+        isConnected
+          ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300"
+          : "border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300",
       )}
-      title={instanceName ? `Configure ${displayName}` : `Connect ${displayName}`}
+      title={isConnected ? `Connected: ${displayName}` : `Connect ${displayName}`}
     >
-      <IntegrationIcon integrationName={integrationName} className="h-4 w-4" size={16} />
+      <IntegrationIcon
+        integrationName={resolved.integrationName || integrationRef}
+        className="h-4 w-4"
+        size={16}
+      />
       <span>{displayName}</span>
+      {isConnected && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
     </button>
   );
 }
 
-function parseRef(ref: string): { integrationName: string; instanceName?: string } {
-  // "dash0:dash-2" -> { integrationName: "dash0", instanceName: "dash-2" }
-  // "github"       -> { integrationName: "github" }
-  const colonIdx = ref.indexOf(":");
-  if (colonIdx === -1) return { integrationName: ref };
-  return {
-    integrationName: ref.slice(0, colonIdx),
-    instanceName: ref.slice(colonIdx + 1),
-  };
-}
-
 /** Capitalize and clean up integration names for display */
 function formatIntegrationName(name: string): string {
-  // Handle dotted names like "aws.lambda" -> "AWS Lambda"
   return name
     .split(".")
     .map((part) => {
-      if (part.length <= 3) return part.toUpperCase(); // aws -> AWS, sqs -> SQS
-      return part.charAt(0).toUpperCase() + part.slice(1); // github -> Github
+      if (part.length <= 3) return part.toUpperCase();
+      return part.charAt(0).toUpperCase() + part.slice(1);
     })
     .join(" ");
 }
