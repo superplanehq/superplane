@@ -26,7 +26,7 @@ func safeTime(t *time.Time) string {
 	return t.UTC().Format(time.RFC3339)
 }
 
-// handleCanvasGet retrieves a canvas and returns it in YAML or JSON format
+// handleCanvasGet retrieves a canvas using the CLI for consistent YAML format.
 func handleCanvasGet(ctx context.Context, reg *registry.Registry, args map[string]interface{}) (interface{}, error) {
 	canvasID, ok := args["canvas_id"].(string)
 	if !ok || canvasID == "" {
@@ -43,74 +43,82 @@ func handleCanvasGet(ctx context.Context, reg *registry.Registry, args map[strin
 		format = f
 	}
 
-	// Parse UUIDs
-	canvasUUID, err := uuid.Parse(canvasID)
-	if err != nil {
+	// Validate UUIDs
+	if _, err := uuid.Parse(canvasID); err != nil {
 		return nil, fmt.Errorf("invalid canvas_id: %w", err)
 	}
-
-	orgUUID, err := uuid.Parse(orgID)
-	if err != nil {
+	if _, err := uuid.Parse(orgID); err != nil {
 		return nil, fmt.Errorf("invalid org_id: %w", err)
 	}
 
-	// Fetch canvas
-	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
+	// Mint JWT for CLI auth
+	authToken := ""
+	if bt, ok := ctx.Value("bearer_token").(string); ok {
+		authToken = bt
+	}
+	if signer, ok := ctx.Value("jwt_signer").(*jwt.Signer); ok && signer != nil {
+		if _, verr := signer.ValidateAndGetClaims(authToken); verr != nil {
+			orgUUID, _ := uuid.Parse(orgID)
+			canvasUUID, _ := uuid.Parse(canvasID)
+			if canvas, err := models.FindCanvas(orgUUID, canvasUUID); err == nil && canvas.CreatedBy != nil {
+				claims := jwt.ScopedTokenClaims{
+					Subject: canvas.CreatedBy.String(),
+					OrgID:   orgID,
+					Purpose: "mcp-canvas-get",
+					Scopes: jwt.ScopesFromPermissions([]jwt.Permission{
+						{ResourceType: "org", Action: "read"},
+						{ResourceType: "canvases", Action: "read", Resources: []string{canvasID}},
+					}),
+				}
+				if minted, merr := signer.GenerateScopedToken(claims, 5*time.Minute); merr == nil {
+					authToken = minted
+				}
+			}
+		}
+	}
+
+	// Use CLI for consistent output format
+	cliBin := "/tmp/sp-cli"
+	if _, err := os.Stat(cliBin); os.IsNotExist(err) {
+		cliBin = "superplane"
+	}
+
+	outputFlag := "-o"
+	outputFormat := format
+	if format == "" {
+		outputFormat = "yaml"
+	}
+
+	// Try draft first, fall back to live
+	cmd := exec.CommandContext(ctx, cliBin, "canvases", "get", canvasID, "--draft", outputFlag, outputFormat)
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("SUPERPLANE_URL=http://localhost:8000"),
+		fmt.Sprintf("SUPERPLANE_TOKEN=%s", authToken),
+	)
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("canvas not found: %w", err)
+		// Try without --draft
+		cmd = exec.CommandContext(ctx, cliBin, "canvases", "get", canvasID, outputFlag, outputFormat)
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("SUPERPLANE_URL=http://localhost:8000"),
+			fmt.Sprintf("SUPERPLANE_TOKEN=%s", authToken),
+		)
+		output, err = cmd.CombinedOutput()
+		if err != nil {
+			return nil, fmt.Errorf("canvas get failed: %s", string(output))
+		}
 	}
 
-	// Fetch live version
-	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(database.Conn(), canvas)
-	if err != nil {
-		return nil, fmt.Errorf("failed to fetch live canvas version: %w", err)
-	}
-
-	// Build canvas data structure
-	canvasData := map[string]interface{}{
-		"id":              canvas.ID.String(),
-		"organization_id": canvas.OrganizationID.String(),
-		"name":            canvas.Name,
-		"description":     canvas.Description,
-		"created_at":      safeTime(canvas.CreatedAt),
-		"updated_at":      safeTime(canvas.UpdatedAt),
-		"version": map[string]interface{}{
-			"id":                        liveVersion.ID.String(),
-			"state":                     liveVersion.State,
-			"name":                      liveVersion.Name,
-			"description":               liveVersion.Description,
-			"change_management_enabled": liveVersion.ChangeManagementEnabled,
-			"nodes":                     liveVersion.Nodes,
-			"edges":                     liveVersion.Edges,
-			"created_at":                safeTime(liveVersion.CreatedAt),
-			"updated_at":                safeTime(liveVersion.UpdatedAt),
-		},
-	}
-
-	// Serialize to requested format
-	var outputBytes []byte
-	var contentType string
-
-	switch format {
-	case "json":
-		outputBytes, err = json.MarshalIndent(canvasData, "", "  ")
+	contentType := "text/yaml"
+	if format == "json" {
 		contentType = "application/json"
-	case "yaml":
-		outputBytes, err = yaml.Marshal(canvasData)
-		contentType = "application/x-yaml"
-	default:
-		return nil, fmt.Errorf("unsupported format: %s (use 'yaml' or 'json')", format)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize canvas: %w", err)
 	}
 
 	return map[string]interface{}{
 		"content": []map[string]interface{}{
 			{
 				"type":     "text",
-				"text":     string(outputBytes),
+				"text":     string(output),
 				"mimeType": contentType,
 			},
 		},
