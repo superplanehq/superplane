@@ -698,8 +698,17 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
+  const forceEnableToolSidebar = Boolean(
+    props.onSelectRuns ||
+      props.onOpenVersionControl ||
+      props.toolSidebarRunsContent ||
+      props.toolSidebarVersionsContent ||
+      props.headerMode === "runs" ||
+      props.isVersionControlOpen,
+  );
   const toolSidebarState = useCanvasToolSidebarState({
     isEditing: props.isEditing,
+    forceEnable: forceEnableToolSidebar,
     hideCanvasToolSidebar: props.hideCanvasToolSidebar ?? false,
     readOnly,
     canvasId: props.canvasId,
@@ -714,6 +723,10 @@ function CanvasPage(props: CanvasPageProps) {
 
     previousHeaderModeRef.current = props.headerMode;
   }, [isToolSidebarOpen, openToolSidebar, props.headerMode]);
+
+  useEffect(() => {
+    if (props.isVersionControlOpen && !isToolSidebarOpen) openToolSidebar();
+  }, [isToolSidebarOpen, openToolSidebar, props.isVersionControlOpen]);
 
   const handleSelectRuns = () => {
     openToolSidebar();

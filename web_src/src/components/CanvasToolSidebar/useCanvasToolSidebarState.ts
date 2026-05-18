@@ -22,6 +22,8 @@ export type UseCanvasToolSidebarStateOptions = {
   organizationId?: string;
   /** When true (e.g. template canvas picker), hides the tool sidebar toggle and clears open state. */
   hideCanvasToolSidebar?: boolean;
+  /** Keeps the tool sidebar available even when managed agents are disabled (runs/versions flows). */
+  forceEnable?: boolean;
 };
 
 export function useCanvasToolSidebarState({
@@ -30,6 +32,7 @@ export function useCanvasToolSidebarState({
   canvasId,
   organizationId,
   hideCanvasToolSidebar,
+  forceEnable = false,
 }: UseCanvasToolSidebarStateOptions) {
   const { has: hasFeature } = useExperimentalFeature(organizationId);
   const featureEnabled = hasFeature(FEATURE_CLAUDE_MANAGED_AGENTS);
@@ -60,10 +63,10 @@ export function useCanvasToolSidebarState({
   }, [persistOpen]);
 
   useEffect(() => {
-    if (!featureEnabled || hideCanvasToolSidebar) closeToolSidebar();
-  }, [featureEnabled, hideCanvasToolSidebar, closeToolSidebar]);
+    if ((!featureEnabled && !forceEnable) || hideCanvasToolSidebar) closeToolSidebar();
+  }, [featureEnabled, forceEnable, hideCanvasToolSidebar, closeToolSidebar]);
 
-  const showToolSidebarToggle = featureEnabled && !hideCanvasToolSidebar;
+  const showToolSidebarToggle = (featureEnabled || forceEnable) && !hideCanvasToolSidebar;
 
   return {
     canvasId,
