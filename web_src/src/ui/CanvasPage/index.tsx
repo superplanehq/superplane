@@ -714,7 +714,7 @@ function CanvasPage(props: CanvasPageProps) {
   }, []);
   useEffect(() => {
     props.onTriggerModalHostReady?.(openCanvasModal);
-  }, [props.onTriggerModalHostReady, openCanvasModal]);
+  }, [props, openCanvasModal]);
   useEffect(() => {
     if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
       return;
@@ -752,18 +752,7 @@ function CanvasPage(props: CanvasPageProps) {
         props.onEdit(nodeId);
       }
     },
-    [
-      props.workflowNodes,
-      props.getNodeEditData,
-      props.onEdit,
-      state.componentSidebar.isOpen,
-      state.componentSidebar.selectedNodeId,
-      state.componentSidebar.open,
-      state.componentSidebar.close,
-      setTemplateNodeId,
-      setIsBuildingBlocksSidebarOpen,
-      setCurrentTab,
-    ],
+    [props, state.componentSidebar, setTemplateNodeId, setIsBuildingBlocksSidebarOpen, setCurrentTab],
   );
 
   // Get editing data for the currently selected node
@@ -781,7 +770,7 @@ function CanvasPage(props: CanvasPageProps) {
         props.onNodeDelete(nodeId);
       }
     },
-    [props.onNodeDelete],
+    [props],
   );
 
   const handleConnectionDropInEmptySpace = useCallback(
@@ -918,7 +907,7 @@ function CanvasPage(props: CanvasPageProps) {
       configuration: {},
       position,
     });
-  }, [props, state.nodes, props.viewportRef, readOnly]);
+  }, [props, state.nodes, readOnly]);
 
   const handleBuildingBlockDrop = useCallback(
     async (block: BuildingBlock, position?: { x: number; y: number }) => {
@@ -1023,7 +1012,7 @@ function CanvasPage(props: CanvasPageProps) {
       }
       return result;
     },
-    [editingNodeData?.nodeId, props.onNodeConfigurationSave, props.configurationSaveMode, state.componentSidebar.close],
+    [editingNodeData?.nodeId, props, state.componentSidebar],
   );
 
   const canvasNodesForToggle = state.nodes;
@@ -1496,14 +1485,7 @@ function Sidebar({
     }
 
     return null;
-  }, [
-    editingNodeData?.blockName,
-    editingNodeData?.displayLabel,
-    editingNodeData?.integrationName,
-    editingNodeData?.integrationLabel,
-    components,
-    triggers,
-  ]);
+  }, [editingNodeData, components, triggers]);
 
   if (!sidebarData) {
     return null;

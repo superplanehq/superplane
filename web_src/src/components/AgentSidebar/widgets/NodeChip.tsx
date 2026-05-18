@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { canvasKeys } from "@/hooks/useCanvasData";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Clock, Filter, Globe, Hand, Merge, Play, Split, Terminal, Webhook, type LucideIcon } from "lucide-react";
 import type { CanvasesCanvas, SuperplaneComponentsNode } from "@/api-client";

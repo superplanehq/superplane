@@ -61,11 +61,11 @@ vi.mock("@/components/CreateCanvasModal", () => ({
   CreateCanvasModal: () => null,
 }));
 
-vi.mock("@/contexts/AccountContext", () => ({
+vi.mock("@/contexts/useAccount", () => ({
   useAccount: () => ({ account: { id: "user-1", name: "Ada Lovelace" } }),
 }));
 
-vi.mock("@/contexts/PermissionsContext", () => ({
+vi.mock("@/contexts/usePermissions", () => ({
   usePermissions: () => ({
     canAct: () => true,
     isLoading: false,

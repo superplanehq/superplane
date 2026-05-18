@@ -1,47 +1,14 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { posthog } from "@/posthog";
 
-interface AccountImpersonation {
-  active: boolean;
-  user_name?: string;
-}
-
-interface Account {
-  id: string;
-  name: string;
-  email: string;
-  avatar_url: string;
-  installation_admin: boolean;
-  has_password: boolean;
-  impersonation?: AccountImpersonation;
-}
-
-interface AccountContextType {
-  account: Account | null;
-  loading: boolean;
-  setupRequired: boolean;
-}
-
-const AccountContext = createContext<AccountContextType>({
-  account: null,
-  loading: true,
-  setupRequired: false,
-});
-
-export const useAccount = () => {
-  const context = useContext(AccountContext);
-  if (!context) {
-    throw new Error("useAccount must be used within an AccountProvider");
-  }
-  return context;
-};
+import { AccountContext, type AccountContextType } from "./accountContextState";
 
 interface AccountProviderProps {
   children: React.ReactNode;
 }
 
-export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) => {
-  const [account, setAccount] = useState<Account | null>(null);
+export function AccountProvider({ children }: AccountProviderProps) {
+  const [account, setAccount] = useState<AccountContextType["account"]>(null);
   const [loading, setLoading] = useState(true);
   const [setupRequired, setSetupRequired] = useState(false);
 
@@ -83,4 +50,4 @@ export const AccountProvider: React.FC<AccountProviderProps> = ({ children }) =>
   }, []);
 
   return <AccountContext.Provider value={{ account, loading, setupRequired }}>{children}</AccountContext.Provider>;
-};
+}
