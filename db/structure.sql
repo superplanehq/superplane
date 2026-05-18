@@ -209,6 +209,46 @@ CREATE TABLE public.app_installations (
 
 
 --
+-- Name: app_docs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.app_docs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    app_id uuid NOT NULL,
+    path text NOT NULL,
+    content text DEFAULT ''::text NOT NULL,
+    sha text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: apps; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.apps (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid NOT NULL,
+    display_name text NOT NULL,
+    slug text NOT NULL,
+    description text DEFAULT ''::text NOT NULL,
+    canvas_id uuid,
+    code_storage_repo_id text DEFAULT ''::text NOT NULL,
+    code_storage_remote_url text DEFAULT ''::text NOT NULL,
+    default_branch text DEFAULT 'main'::text NOT NULL,
+    live_commit_sha text DEFAULT ''::text NOT NULL,
+    edit_session_branch text,
+    sync_status text DEFAULT 'ok'::text NOT NULL,
+    sync_error text,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    deleted_at timestamp with time zone
+);
+
+
+--
 -- Name: blueprints; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -845,6 +885,38 @@ ALTER TABLE ONLY public.blueprints
 
 
 --
+-- Name: app_docs app_docs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_docs
+    ADD CONSTRAINT app_docs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: app_docs app_docs_app_id_path_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_docs
+    ADD CONSTRAINT app_docs_app_id_path_key UNIQUE (app_id, path);
+
+
+--
+-- Name: apps apps_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.apps
+    ADD CONSTRAINT apps_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: apps apps_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.apps
+    ADD CONSTRAINT apps_slug_key UNIQUE (slug);
+
+
+--
 -- Name: blueprints blueprints_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1279,6 +1351,34 @@ CREATE UNIQUE INDEX idx_app_installations_org_name_unique ON public.app_installa
 --
 
 CREATE INDEX idx_app_installations_organization_id ON public.app_installations USING btree (organization_id);
+
+
+--
+-- Name: idx_app_docs_app_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_app_docs_app_id ON public.app_docs USING btree (app_id);
+
+
+--
+-- Name: idx_apps_canvas_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_apps_canvas_id ON public.apps USING btree (canvas_id);
+
+
+--
+-- Name: idx_apps_deleted_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_apps_deleted_at ON public.apps USING btree (deleted_at);
+
+
+--
+-- Name: idx_apps_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_apps_organization_id ON public.apps USING btree (organization_id);
 
 
 --
@@ -1730,6 +1830,38 @@ ALTER TABLE ONLY public.app_installation_subscriptions
 
 ALTER TABLE ONLY public.app_installations
     ADD CONSTRAINT app_installations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: app_docs app_docs_app_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.app_docs
+    ADD CONSTRAINT app_docs_app_id_fkey FOREIGN KEY (app_id) REFERENCES public.apps(id) ON DELETE CASCADE;
+
+
+--
+-- Name: apps apps_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.apps
+    ADD CONSTRAINT apps_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE SET NULL;
+
+
+--
+-- Name: apps apps_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.apps
+    ADD CONSTRAINT apps_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.accounts(id) ON DELETE SET NULL;
+
+
+--
+-- Name: apps apps_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.apps
+    ADD CONSTRAINT apps_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
 
 
 --
