@@ -5,21 +5,21 @@ import type { AgentMode } from "./useAgentState";
 const modeConfig = {
   builder: {
     icon: Hammer,
-    label: "Builder",
+    label: "Build",
     activeText: "text-orange-700",
     activeBg: "bg-orange-50 border-orange-300",
     activeShadow: "shadow-sm shadow-orange-100",
   },
   architect: {
     icon: Compass,
-    label: "Architect",
+    label: "Plan",
     activeText: "text-blue-700",
     activeBg: "bg-blue-50 border-blue-300",
     activeShadow: "shadow-sm shadow-blue-100",
   },
   operator: {
     icon: Monitor,
-    label: "Operator",
+    label: "Ask",
     activeText: "text-emerald-700",
     activeBg: "bg-emerald-50 border-emerald-300",
     activeShadow: "shadow-sm shadow-emerald-100",
