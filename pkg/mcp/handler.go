@@ -198,6 +198,28 @@ func (h *Handler) handleToolsList(ctx context.Context, params json.RawMessage) (
 			},
 		},
 		{
+			"name":        "canvas_update",
+			"description": "Update a canvas draft version with new YAML content",
+			"inputSchema": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"canvas_id": map[string]interface{}{
+						"type":        "string",
+						"description": "The ID of the canvas to update",
+					},
+					"org_id": map[string]interface{}{
+						"type":        "string",
+						"description": "The organization ID that owns the canvas",
+					},
+					"yaml_content": map[string]interface{}{
+						"type":        "string",
+						"description": "Full canvas YAML content",
+					},
+				},
+				"required": []string{"canvas_id", "org_id", "yaml_content"},
+			},
+		},
+		{
 			"name":        "integrations_list",
 			"description": "List all integrations for an organization",
 			"inputSchema": map[string]interface{}{
@@ -209,6 +231,102 @@ func (h *Handler) handleToolsList(ctx context.Context, params json.RawMessage) (
 					},
 				},
 				"required": []string{"org_id"},
+			},
+		},
+		{
+			"name":        "integrations_get",
+			"description": "Get details for a specific integration instance",
+			"inputSchema": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"integration_id": map[string]interface{}{
+						"type":        "string",
+						"description": "The integration ID",
+					},
+					"org_id": map[string]interface{}{
+						"type":        "string",
+						"description": "The organization ID",
+					},
+				},
+				"required": []string{"integration_id", "org_id"},
+			},
+		},
+		{
+			"name":        "index_search",
+			"description": "Search the component registry for triggers and actions",
+			"inputSchema": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"query": map[string]interface{}{
+						"type":        "string",
+						"description": "Search query string",
+					},
+					"type": map[string]interface{}{
+						"type":        "string",
+						"description": "Optional filter: 'trigger' or 'action'",
+						"enum":        []string{"trigger", "action"},
+					},
+				},
+				"required": []string{"query"},
+			},
+		},
+		{
+			"name":        "index_get_schema",
+			"description": "Get full schema for a specific component (trigger or action)",
+			"inputSchema": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"component_name": map[string]interface{}{
+						"type":        "string",
+						"description": "Component name (e.g. 'http', 'github.onPush')",
+					},
+				},
+				"required": []string{"component_name"},
+			},
+		},
+		{
+			"name":        "runs_list",
+			"description": "List recent runs for a canvas",
+			"inputSchema": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"canvas_id": map[string]interface{}{
+						"type":        "string",
+						"description": "The canvas ID",
+					},
+					"org_id": map[string]interface{}{
+						"type":        "string",
+						"description": "The organization ID",
+					},
+					"limit": map[string]interface{}{
+						"type":        "number",
+						"description": "Maximum number of runs to return (default 10)",
+						"default":     10,
+					},
+				},
+				"required": []string{"canvas_id", "org_id"},
+			},
+		},
+		{
+			"name":        "run_get",
+			"description": "Get details for a specific canvas run",
+			"inputSchema": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"run_id": map[string]interface{}{
+						"type":        "string",
+						"description": "The run ID",
+					},
+					"canvas_id": map[string]interface{}{
+						"type":        "string",
+						"description": "The canvas ID",
+					},
+					"org_id": map[string]interface{}{
+						"type":        "string",
+						"description": "The organization ID",
+					},
+				},
+				"required": []string{"run_id", "canvas_id", "org_id"},
 			},
 		},
 	}
@@ -234,8 +352,20 @@ func (h *Handler) handleToolsCall(ctx context.Context, params json.RawMessage) (
 		return handleCanvasGet(ctx, h.registry, callReq.Arguments)
 	case "canvas_list_versions":
 		return handleCanvasListVersions(ctx, callReq.Arguments)
+	case "canvas_update":
+		return handleCanvasUpdate(ctx, callReq.Arguments)
 	case "integrations_list":
 		return handleIntegrationsList(ctx, callReq.Arguments)
+	case "integrations_get":
+		return handleIntegrationsGet(ctx, callReq.Arguments)
+	case "index_search":
+		return handleIndexSearch(ctx, h.registry, callReq.Arguments)
+	case "index_get_schema":
+		return handleIndexGetSchema(ctx, h.registry, callReq.Arguments)
+	case "runs_list":
+		return handleRunsList(ctx, callReq.Arguments)
+	case "run_get":
+		return handleRunGet(ctx, callReq.Arguments)
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", callReq.Name)
 	}

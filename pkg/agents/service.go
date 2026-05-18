@@ -28,9 +28,10 @@ const preambleTemplate = "[SuperPlane session context — refreshed every turn; 
 	"api_token: %s\n" +
 	"api_token_expires_at: %s\n" +
 	"\n" +
-	"When using the SuperPlane CLI, pass these refreshed values through\n" +
-	"environment variables instead of running `superplane connect`:\n" +
-	"  SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...\n" +
+	"Use SuperPlane MCP tools (canvas_get, canvas_update, integrations_list, etc.) instead of CLI.\n" +
+	"Pass canvas_id and organization_id from this context to MCP tool arguments.\n" +
+	"Only use CLI as fallback if MCP doesn't cover the operation.\n" +
+	"If using CLI: SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...\n" +
 	"\n" +
 	"api_token scopes (exact strings on the JWT):\n" +
 	"  - org:read\n" +
