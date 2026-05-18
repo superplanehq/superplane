@@ -1,7 +1,7 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { cn } from "@/lib/utils";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
 import { RunNodeIcon } from "@/ui/Runs/RunNodeIcon";
 import { Link as LinkIcon } from "lucide-react";

@@ -73,6 +73,64 @@ type PoolNodeMetadata struct {
 	PoolName string `json:"poolName"`
 }
 
+// WorkerScriptNodeMetadata stores a display label for Worker script integration resources (picker value is script ID).
+type WorkerScriptNodeMetadata struct {
+	ScriptDisplayName string `json:"scriptDisplayName"`
+}
+
+func resolveWorkerScriptMetadata(ctx core.SetupContext, accountID, scriptID string) error {
+	meta := WorkerScriptNodeMetadata{}
+	if strings.Contains(scriptID, "{{") || strings.Contains(accountID, "{{") {
+		meta.ScriptDisplayName = scriptID
+		return ctx.Metadata.Set(meta)
+	}
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to create client: %w", err)
+	}
+	scripts, err := client.ListWorkerScripts(accountID)
+	if err != nil {
+		return fmt.Errorf("failed to list worker scripts: %w", err)
+	}
+	for _, s := range scripts {
+		if s.ID == scriptID {
+			name := s.Name
+			if name == "" {
+				name = s.ID
+			}
+			meta.ScriptDisplayName = name
+			return ctx.Metadata.Set(meta)
+		}
+	}
+	meta.ScriptDisplayName = scriptID
+	return ctx.Metadata.Set(meta)
+}
+
+type TunnelNodeMetadata struct {
+	TunnelName string `json:"tunnelName"`
+}
+
+func resolveTunnelMetadata(ctx core.SetupContext, accountID, tunnelID string) error {
+	meta := TunnelNodeMetadata{}
+	if strings.Contains(tunnelID, "{{") || strings.Contains(accountID, "{{") {
+		meta.TunnelName = tunnelID
+	} else {
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return fmt.Errorf("failed to create client: %w", err)
+		}
+		tunnel, err := client.GetCFDTunnel(accountID, tunnelID)
+		if err != nil {
+			return fmt.Errorf("failed to get tunnel: %w", err)
+		}
+		meta.TunnelName = tunnel.Name
+		if meta.TunnelName == "" {
+			meta.TunnelName = tunnelID
+		}
+	}
+	return ctx.Metadata.Set(meta)
+}
+
 func resolvePoolMetadata(ctx core.SetupContext, accountID, poolID string) error {
 	meta := PoolNodeMetadata{}
 	if strings.Contains(poolID, "{{") || strings.Contains(accountID, "{{") {
@@ -124,14 +182,21 @@ To connect Cloudflare to SuperPlane:
 1. In the [Cloudflare dashboard](https://dash.cloudflare.com/), open the account you want to connect, then go to **Manage Account → Account API Tokens** and click **Create Token → Create Custom Token**. Creating an account-owned token requires **Super Administrator** access on the Cloudflare account.
 2. Name the token and keep the first policy scoped to **Entire Account**. Select these permissions:
    - **Developer Platform** → **Workers KV Storage** → **Edit**
+   - **Developer Platform** → **Workers Scripts** → **Edit**
+   - **Developer Platform** → **Workers** → **Edit**
    - **Network Services** → **Account Load Balancers** → **Edit**
    - **Network Services** → **Load Balancing: Monitors and Pools** → **Edit**
    - **Account & Billing** → **Notifications** → **Edit**
+   - **Account & Billing** → **Account Settings** → **Edit**
+   - **Cloudflare One** → **Cloudflare Tunnel** → **Edit**
 3. Click **Add policy**. In the new policy, change the scope dropdown from **Entire Account** to **All Domains** or **Specified Domains** for only the domains SuperPlane should manage. The DNS and zone rows below are only available after switching this policy to a domain scope:
    - **DNS & Zones** → **Zone** → **Read**
    - **DNS & Zones** → **DNS** → **Edit**
+   - **Caching** → **Cache Purge** → **Purge**
+   - **SSL and Certificates** → **SSL and Certificates** → **Edit**
    - **Rules & Configuration** → **Dynamic URL Redirects** → **Edit**
    - **Rules & Configuration** → **Origin** → **Edit**
+   - **Developer Platform** → **Workers Routes** → **Edit**
    - **Network Services** → **Zone Load Balancers** → **Edit**
 4. Optionally set an expiration date, review, create the token, and paste the generated token below. Cloudflare only shows the token once.
 5. Copy the **Account ID** from the same account's home page right sidebar and paste it into **Account ID** below.
@@ -153,7 +218,7 @@ func (c *Cloudflare) Configuration() []configuration.Field {
 			Label:       "Account ID",
 			Type:        configuration.FieldTypeString,
 			Required:    false,
-			Description: "Cloudflare account ID. Required for KV storage, load balancing monitors/pools, and alerting webhooks.",
+			Description: "Cloudflare account ID. Required for KV storage, load balancing monitors/pools, Cloudflare Tunnels, and alerting webhooks.",
 			Placeholder: "e.g. 01a7362d577a6c3019a474fd6f485823",
 		},
 	}
@@ -168,6 +233,8 @@ func (c *Cloudflare) Actions() []core.Action {
 		&UpdateDNSRecord{},
 		&DeleteDNSRecord{},
 		&CreateMonitor{},
+		&GetMonitor{},
+		&UpdateMonitor{},
 		&DeleteMonitor{},
 		&DeleteOriginRule{},
 		&CreateKVNamespace{},
@@ -179,16 +246,27 @@ func (c *Cloudflare) Actions() []core.Action {
 		&UpdatePool{},
 		&GetPool{},
 		&DeletePool{},
+		&PurgeCache{},
+		&OrderCertificatePack{},
+		&DeleteCertificatePack{},
 		&CreateLoadBalancer{},
 		&GetLoadBalancer{},
 		&UpdateLoadBalancer{},
 		&DeleteLoadBalancer{},
+		&DeployWorker{},
+		&GetWorker{},
+		&DeleteWorker{},
+		&UpdateWorkerRoute{},
+		&CreateTunnel{},
+		&GetTunnel{},
+		&DeleteTunnel{},
 	}
 }
 
 func (c *Cloudflare) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnLoadBalancingHealthAlert{},
+		&OnTunnelHealth{},
 	}
 }
 
@@ -455,6 +533,35 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 		}
 		return resources, nil
 
+	case "certificate_pack":
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		metadata := Metadata{}
+		if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+			return nil, fmt.Errorf("failed to decode application metadata: %w", err)
+		}
+
+		var resources []core.IntegrationResource
+		for _, zone := range metadata.Zones {
+			packs, err := client.ListCertificatePacks(zone.ID)
+			if err != nil {
+				ctx.Logger.WithError(err).WithField("zone_id", zone.ID).WithField("zone_name", zone.Name).Warn("failed to list certificate packs for zone, skipping")
+				continue
+			}
+
+			for _, pack := range packs {
+				resources = append(resources, core.IntegrationResource{
+					Type: resourceType,
+					Name: certificatePackResourceName(zone.Name, pack),
+					ID:   fmt.Sprintf("%s/%s", zone.ID, pack.ID),
+				})
+			}
+		}
+		return resources, nil
+
 	case "load_balancer":
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
@@ -482,6 +589,75 @@ func (c *Cloudflare) ListResources(resourceType string, ctx core.ListResourcesCo
 			}
 		}
 		return resources, nil
+
+	case "workerScript":
+		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			accountID = accountIDFromIntegration(ctx.Integration)
+		}
+		if accountID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		scripts, err := client.ListWorkerScripts(accountID)
+		if err != nil {
+			return nil, fmt.Errorf("error listing worker scripts: %w", err)
+		}
+
+		resources := make([]core.IntegrationResource, 0, len(scripts))
+		for _, s := range scripts {
+			name := s.Name
+			if name == "" {
+				name = s.ID
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   s.ID,
+			})
+		}
+		return resources, nil
+
+	case "tunnel":
+		accountID := ctx.Parameters["accountId"]
+		if accountID == "" {
+			accountID = accountIDFromIntegration(ctx.Integration)
+		}
+		if accountID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+
+		tunnels, err := client.ListCFDTunnels(accountID)
+		if err != nil {
+			return nil, fmt.Errorf("error listing tunnels: %w", err)
+		}
+
+		var out []core.IntegrationResource
+		for _, t := range tunnels {
+			if t.ID == "" {
+				continue
+			}
+			name := t.Name
+			if name == "" {
+				name = t.ID
+			}
+			out = append(out, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   t.ID,
+			})
+		}
+		return out, nil
 
 	default:
 		return []core.IntegrationResource{}, nil

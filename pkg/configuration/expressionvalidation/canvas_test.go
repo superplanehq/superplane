@@ -162,6 +162,37 @@ func TestValidateNodeExpressions_NestedPaths(t *testing.T) {
 		assertOneError(t, errs, "items[2].url", "syntax error")
 	})
 
+	t.Run("runner environment literal value in list object", func(t *testing.T) {
+		fields := []configuration.Field{
+			{
+				Name: "environment",
+				Type: configuration.FieldTypeList,
+				TypeOptions: &configuration.TypeOptions{
+					List: &configuration.ListTypeOptions{
+						ItemDefinition: &configuration.ListItemDefinition{
+							Type: configuration.FieldTypeObject,
+							Schema: []configuration.Field{
+								{Name: "name", Type: configuration.FieldTypeString},
+								{Name: "valueSource", Type: configuration.FieldTypeString},
+								{Name: "value", Type: configuration.FieldTypeString},
+							},
+						},
+					},
+				},
+			},
+		}
+		errs := validateNodeExpressions("n1", "Runner", map[string]any{
+			"environment": []any{
+				map[string]any{
+					"name":        "COMMIT_AUTHOR",
+					"valueSource": "literal",
+					"value":       "{{ $['Missing'].data.author.email }}",
+				},
+			},
+		}, fields, knownSet("Commit"))
+		assertOneError(t, errs, "environment[0].value", "unknown node reference 'Missing'")
+	})
+
 	t.Run("list of strings", func(t *testing.T) {
 		fields := []configuration.Field{
 			{

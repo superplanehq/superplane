@@ -39,10 +39,10 @@ function toCheckboxOptionId(fieldName: string, optionValue: string): string {
 }
 
 export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, onChange }) => {
-  const multiSelectOptions = field.typeOptions?.multiSelect?.options ?? [];
   const useCheckboxes = field.typeOptions?.multiSelect?.useCheckboxes === true;
 
   const comboboxOptions: SelectOption[] = useMemo(() => {
+    const multiSelectOptions = field.typeOptions?.multiSelect?.options ?? [];
     const options: SelectOption[] = [];
     for (const opt of multiSelectOptions) {
       if (!opt.value) {
@@ -58,7 +58,7 @@ export const MultiSelectFieldRenderer: React.FC<FieldRendererProps> = ({ field, 
     }
 
     return options;
-  }, [multiSelectOptions]);
+  }, [field.typeOptions?.multiSelect?.options]);
 
   const defaultValues = useMemo(() => parseMultiSelectValues(field.defaultValue), [field.defaultValue]);
 

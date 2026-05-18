@@ -1,4 +1,4 @@
-import { useAccount } from "@/contexts/AccountContext";
+import { useAccount } from "@/contexts/useAccount";
 import React from "react";
 
 const ImpersonationBanner: React.FC = () => {

@@ -31,6 +31,8 @@ import {
   canvasesListChildExecutions,
   canvasesListNodeQueueItems,
   canvasesListNodeEvents,
+  canvasesGetCanvasDashboard,
+  canvasesUpdateCanvasDashboard,
   triggersListTriggers,
   triggersDescribeTrigger,
   widgetsListWidgets,
@@ -125,7 +127,24 @@ export const canvasKeys = {
   nodeQueueItemHistory: (canvasId: string, nodeId: string) =>
     [...canvasKeys.nodeQueueItems(), "infinite", canvasId, nodeId] as const,
   canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
+  dashboard: (canvasId: string) => [...canvasKeys.all, "dashboard", canvasId] as const,
 };
+
+export interface DashboardPanel {
+  id: string;
+  type: string;
+  content: Record<string, unknown>;
+}
+
+export interface DashboardLayoutItem {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  minH?: number;
+}
 
 export const CANVAS_FOLDER_COLORS = ["blue", "green", "purple", "yellow", "slate", "orange"] as const;
 export type CanvasFolderColor = (typeof CANVAS_FOLDER_COLORS)[number];
@@ -1560,3 +1579,55 @@ export const useInfiniteNodeQueueItems = (canvasId: string, nodeId: string, enab
     refetchOnWindowFocus: false,
   });
 };
+
+export const useCanvasDashboard = (canvasId: string, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: canvasKeys.dashboard(canvasId),
+    queryFn: async () => {
+      const response = await canvasesGetCanvasDashboard(
+        withOrganizationHeader({
+          path: { canvasId },
+        }),
+      );
+      return response.data?.dashboard;
+    },
+    enabled: enabled && !!canvasId,
+    staleTime: 30_000,
+  });
+};
+
+export const useUpdateCanvasDashboard = (canvasId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
+      const response = await canvasesUpdateCanvasDashboard(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: {
+            panels: input.panels.map((p) => ({
+              id: p.id,
+              type: p.type,
+              content: p.content,
+            })),
+            layout: input.layout.map((l) => ({
+              i: l.i,
+              x: l.x,
+              y: l.y,
+              w: l.w,
+              h: l.h,
+              ...(l.minW !== undefined ? { minW: l.minW } : {}),
+              ...(l.minH !== undefined ? { minH: l.minH } : {}),
+            })),
+          },
+        }),
+      );
+      return response.data?.dashboard;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(canvasKeys.dashboard(canvasId), data);
+    },
+  });
+};
+
+export type CanvasDashboardQueryResult = ReturnType<typeof useCanvasDashboard>;
+export type UpdateCanvasDashboardMutationResult = ReturnType<typeof useUpdateCanvasDashboard>;

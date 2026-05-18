@@ -3,7 +3,7 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { countNodesByType, extractIntegrations, getTemplateTags } from "@/pages/canvas/templateMetadata";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import type { QueryClient } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
@@ -21,7 +21,6 @@ import type {
   CanvasesCanvasNodeQueueItem,
   CanvasesCanvasRun,
   CanvasesCanvasVersion,
-  CanvasesListEventExecutionsResponse,
   SuperplaneActionsAction,
   SuperplaneComponentsEdge as ComponentsEdge,
   ComponentsIntegrationRef,
@@ -35,11 +34,10 @@ import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvas
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 
 import { Button } from "@/components/ui/button";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useComponents } from "@/hooks/useComponentData";
 import {
   canvasKeys,
-  eventExecutionsQueryOptions,
   useActOnCanvasChangeRequest,
   useCanvas,
   useCanvasChangeRequests,
@@ -63,6 +61,7 @@ import {
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
+import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -86,6 +85,9 @@ import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import { RunsSidebar } from "@/ui/RunsSidebar";
+import { DashboardOverlay } from "./dashboard/DashboardOverlay";
+import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
+import { useCanvasDashboard, useUpdateCanvasDashboard } from "@/hooks/useCanvasData";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasMemoryModal } from "./CanvasMemoryModal";
 import { CanvasPageModals } from "./CanvasPageModals";
@@ -113,6 +115,7 @@ import { resolveExecutionErrors } from "./mappers/dash0";
 import type { TriggerActionModal, User } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasYaml } from "./useCanvasYaml";
+import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import {
   buildCanvasStatusLogEntry,
@@ -133,6 +136,10 @@ import {
   summarizeWorkflowChanges,
 } from "./utils";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
+
+/** Experimental feature id; must match `FeatureDashboards` in pkg/features/features.go. */
+const EXPERIMENTAL_FEATURE_DASHBOARDS = "dashboards";
+
 function getNodeAnalyticsProps(
   node: ComponentsNode,
   availableIntegrations: IntegrationsIntegrationDefinition[],
@@ -198,6 +205,18 @@ export function WorkflowPageV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
+  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
+  const dashboardsFeatureEnabled = hasExperimentalFeature(EXPERIMENTAL_FEATURE_DASHBOARDS);
+  const {
+    isRunsMode,
+    setIsRunsMode,
+    isDashboardMode,
+    setIsDashboardMode,
+    isDashboardAddPanelOpen,
+    setIsDashboardAddPanelOpen,
+    selectedRunId,
+    setSelectedRunId,
+  } = useWorkflowViewSearchParams(searchParams, setSearchParams, dashboardsFeatureEnabled);
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
@@ -242,10 +261,9 @@ export function WorkflowPageV2() {
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
   const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);
   const { data: canvasChangeRequests = [] } = useCanvasChangeRequests(organizationId!, canvasId!);
-  const paginatedVersionPages = canvasLiveVersionsQuery.data?.pages || [];
   const paginatedVersions = useMemo(
-    () => paginatedVersionPages.flatMap((page) => page?.versions || []),
-    [paginatedVersionPages],
+    () => (canvasLiveVersionsQuery.data?.pages || []).flatMap((page) => page?.versions || []),
+    [canvasLiveVersionsQuery.data?.pages],
   );
   const liveCanvasVersion = useMemo(() => {
     const publishedVersions = paginatedVersions.filter(isPublishedVersion);
@@ -546,8 +564,6 @@ export function WorkflowPageV2() {
   );
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
-  const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
-  const [selectedRunId, setSelectedRunId] = useState<string | null>(() => searchParams.get("run"));
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
   const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
@@ -613,6 +629,8 @@ export function WorkflowPageV2() {
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
 
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
+  const dashboardQuery = useCanvasDashboard(canvasId!, !isTemplate && dashboardsFeatureEnabled);
+  const updateDashboardMutation = useUpdateCanvasDashboard(canvasId!);
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
@@ -1094,6 +1112,7 @@ export function WorkflowPageV2() {
     nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>;
     nodeEventsMap: Record<string, CanvasesCanvasEvent[]>;
   }>(() => {
+    void storeVersion;
     const executionsMap: Record<string, CanvasesCanvasNodeExecution[]> = {};
     const queueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]> = {};
     const eventsMap: Record<string, CanvasesCanvasEvent[]> = {};
@@ -1119,8 +1138,14 @@ export function WorkflowPageV2() {
     () => (isViewingLiveVersion ? nodeExecutionsMap : {}),
     [isViewingLiveVersion, nodeExecutionsMap],
   );
-  const visibleNodeQueueItemsMap = isViewingLiveVersion ? nodeQueueItemsMap : {};
-  const visibleNodeEventsMap = isViewingLiveVersion ? nodeEventsMap : {};
+  const visibleNodeQueueItemsMap = useMemo(
+    () => (isViewingLiveVersion ? nodeQueueItemsMap : {}),
+    [isViewingLiveVersion, nodeQueueItemsMap],
+  );
+  const visibleNodeEventsMap = useMemo(
+    () => (isViewingLiveVersion ? nodeEventsMap : {}),
+    [isViewingLiveVersion, nodeEventsMap],
+  );
 
   // Execution chain data utilities for lazy loading
   const { loadExecutionChain } = useExecutionChainData(canvasId!, queryClient, canvas ?? undefined);
@@ -1903,7 +1928,6 @@ export function WorkflowPageV2() {
     triggersLoading,
     componentsLoading,
     integrationsLoading,
-    organizationId,
     me,
     canvasMode,
     openTriggerModal,
@@ -3459,6 +3483,7 @@ export function WorkflowPageV2() {
       canvas,
       organizationId,
       canvasId,
+      queryClient,
       handleSaveWorkflow,
       applyAutoLayoutOnAddedNode,
       isReadOnly,
@@ -4924,11 +4949,6 @@ export function WorkflowPageV2() {
     handleCreateVersion,
   ]);
 
-  useEffect(() => {
-    setIsRunsMode(searchParams.get("view") === "runs");
-    setSelectedRunId(searchParams.get("run"));
-  }, [searchParams]);
-
   const handleSelectRun = useCallback(
     (runId: string) => {
       setSelectedRunId(runId);
@@ -4946,7 +4966,7 @@ export function WorkflowPageV2() {
         { replace: true },
       );
     },
-    [setSearchParams],
+    [setIsRunsMode, setSearchParams, setSelectedRunId],
   );
 
   const handleSelectRunsMode = useCallback(() => {
@@ -4965,7 +4985,7 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [handleUseVersion, hasEditableVersion, liveCanvasVersionId, setSearchParams]);
+  }, [handleUseVersion, hasEditableVersion, liveCanvasVersionId, setIsRunsMode, setSearchParams]);
 
   const handleExitRunsMode = useCallback(() => {
     setIsRunsMode(false);
@@ -4980,9 +5000,59 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [setSearchParams]);
+  }, [setIsRunsMode, setSearchParams, setSelectedRunId]);
+
+  const handleSelectDashboardMode = useCallback(() => {
+    if (!dashboardsFeatureEnabled) {
+      return;
+    }
+    if (hasEditableVersion && liveCanvasVersionId) {
+      handleUseVersion(liveCanvasVersionId);
+    }
+    setIsDashboardMode(true);
+    setIsRunsMode(false);
+    setSelectedRunId(null);
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.set("view", "dashboard");
+        next.delete("run");
+        next.delete("sidebar");
+        next.delete("node");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [
+    dashboardsFeatureEnabled,
+    handleUseVersion,
+    hasEditableVersion,
+    liveCanvasVersionId,
+    setIsDashboardMode,
+    setIsRunsMode,
+    setSearchParams,
+    setSelectedRunId,
+  ]);
+
+  const handleExitDashboardMode = useCallback(() => {
+    setIsDashboardMode(false);
+    setIsDashboardAddPanelOpen(false);
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        next.delete("view");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setIsDashboardAddPanelOpen, setIsDashboardMode, setSearchParams]);
 
   const handleEnterEditModeFromHeader = useCallback(async () => {
+    if (isDashboardMode) {
+      handleExitDashboardMode();
+      await handleToggleEditMode();
+      return;
+    }
     if (isRunsMode) {
       setIsRunsMode(false);
       setSelectedRunId(null);
@@ -5000,15 +5070,27 @@ export function WorkflowPageV2() {
       return;
     }
     await handleToggleEditMode();
-  }, [handleToggleEditMode, isRunsMode, setSearchParams]);
+  }, [
+    handleExitDashboardMode,
+    handleToggleEditMode,
+    isDashboardMode,
+    isRunsMode,
+    setIsRunsMode,
+    setSearchParams,
+    setSelectedRunId,
+  ]);
 
   const handleExitEditModeFromHeader = useCallback(async () => {
+    if (isDashboardMode) {
+      handleExitDashboardMode();
+      return;
+    }
     if (isRunsMode) {
       handleExitRunsMode();
       return;
     }
     await handleToggleEditMode();
-  }, [handleExitRunsMode, handleToggleEditMode, isRunsMode]);
+  }, [handleExitDashboardMode, handleExitRunsMode, handleToggleEditMode, isDashboardMode, isRunsMode]);
 
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
@@ -5052,6 +5134,7 @@ export function WorkflowPageV2() {
     selectedRun,
     selectedRunId,
     setSearchParams,
+    setSelectedRunId,
   ]);
 
   useEffect(() => {
@@ -5335,7 +5418,7 @@ export function WorkflowPageV2() {
         });
       };
     },
-    [canvas],
+    [canvasNodesById],
   );
 
   const { yamlPayload, handleYamlViewCopy, handleYamlViewDownload } = useCanvasYaml({
@@ -5605,7 +5688,12 @@ export function WorkflowPageV2() {
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftGraphDiffVersusLive,
   });
   const activeRunsCount = runsData.runs.filter((run) => run.state === "STATE_STARTED").length;
-  const headerMode = isRunsMode ? "runs" : canvasMode === "edit" ? "version-edit" : "version-live";
+  const canvasPageHeaderMode = isRunsMode ? "runs" : canvasMode === "edit" ? "version-edit" : "version-live";
+  const headerMode = isDashboardMode && dashboardsFeatureEnabled ? "dashboard" : canvasPageHeaderMode;
+  const onDashboardAddPanel =
+    isDashboardMode && dashboardsFeatureEnabled && !isTemplate && canUpdateCanvas
+      ? () => setIsDashboardAddPanelOpen(true)
+      : undefined;
   const hasUnpublishedDraftChanges =
     !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftGraphDiffVersusLive;
   const canvasStateMode = hasEditableVersion
@@ -5650,6 +5738,15 @@ export function WorkflowPageV2() {
   return (
     <>
       <div className="relative h-full w-full">
+        {isDashboardMode && dashboardsFeatureEnabled ? (
+          <DashboardOverlay
+            readOnly={!canUpdateCanvas}
+            dashboardQuery={dashboardQuery}
+            updateDashboardMutation={updateDashboardMutation}
+            addPanelDialogOpen={isDashboardAddPanelOpen}
+            onAddPanelDialogOpenChange={setIsDashboardAddPanelOpen}
+          />
+        ) : null}
         <CanvasPage
           key={canvasRenderKey}
           // Persist right sidebar in query params
@@ -5742,6 +5839,8 @@ export function WorkflowPageV2() {
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
           onExitEditMode={handleExitEditModeFromHeader}
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
+          onSelectDashboard={isTemplate || !dashboardsFeatureEnabled ? undefined : handleSelectDashboardMode}
+          onDashboardAddPanel={onDashboardAddPanel}
           runsNotificationCount={activeRunsCount}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
@@ -5961,62 +6060,6 @@ export function WorkflowPageV2() {
   );
 }
 
-function useExecutionChainData(workflowId: string, queryClient: QueryClient, workflow?: CanvasesCanvas) {
-  const loadExecutionChain = useCallback(
-    async (
-      eventId: string,
-      nodeId?: string,
-      currentExecution?: Record<string, unknown>,
-      forceReload = false,
-    ): Promise<CanvasesCanvasNodeExecution[]> => {
-      const queryOptions = eventExecutionsQueryOptions(workflowId, eventId);
-
-      let allExecutions: CanvasesCanvasNodeExecution[] = [];
-
-      if (!forceReload) {
-        const cachedData = queryClient.getQueryData(queryOptions.queryKey);
-        if (cachedData) {
-          allExecutions = (cachedData as CanvasesListEventExecutionsResponse)?.executions || [];
-        }
-      }
-
-      if (allExecutions.length === 0) {
-        const options = forceReload ? { ...queryOptions, staleTime: 0 } : queryOptions;
-        const data = await queryClient.fetchQuery(options);
-        allExecutions = (data as CanvasesListEventExecutionsResponse)?.executions || [];
-      }
-
-      // Apply topological filtering - the logic you wanted back!
-      if (!allExecutions.length || !workflow || !nodeId) return allExecutions;
-
-      const currentExecutionTime = currentExecution?.createdAt
-        ? new Date(currentExecution.createdAt as string).getTime()
-        : Date.now();
-      const nodesBefore = getNodesBeforeTarget(nodeId, workflow);
-      nodesBefore.add(nodeId); // Include current node
-
-      const executionsUpToCurrent = allExecutions.filter((exec) => {
-        const execTime = exec.createdAt ? new Date(exec.createdAt).getTime() : 0;
-        const isNodeBefore = nodesBefore.has(exec.nodeId || "");
-        const isBeforeCurrentTime = execTime <= currentExecutionTime;
-        return isNodeBefore && isBeforeCurrentTime;
-      });
-
-      // Sort the filtered executions by creation time to get chronological order
-      executionsUpToCurrent.sort((a, b) => {
-        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-        return timeA - timeB;
-      });
-
-      return executionsUpToCurrent;
-    },
-    [workflowId, queryClient, workflow],
-  );
-
-  return { loadExecutionChain };
-}
-
 // Merge a run's lightweight execution ref with the matching full execution (preferred from the
 // prefetched event-executions query, falling back to the live store), so mappers receive metadata
 // (approval records) and outputs (wait/timegate "pushed through" detection).
@@ -6034,54 +6077,6 @@ function hydrateRunExecution(
     ...(full?.outputs && { outputs: full.outputs }),
     rootEvent,
   } as CanvasesCanvasNodeExecution;
-}
-
-// Helper function to build topological path to find all nodes that should execute before the given target node
-function getNodesBeforeTarget(targetNodeId: string, workflow: CanvasesCanvas): Set<string> {
-  const nodesBefore = new Set<string>();
-  if (!workflow?.spec?.edges) return nodesBefore;
-
-  // Build adjacency list for the workflow graph
-  const adjacencyList: Record<string, string[]> = {};
-  workflow.spec.edges.forEach((edge) => {
-    if (!edge.sourceId || !edge.targetId) return;
-    if (!adjacencyList[edge.sourceId]) {
-      adjacencyList[edge.sourceId] = [];
-    }
-    adjacencyList[edge.sourceId].push(edge.targetId);
-  });
-
-  // DFS to find all nodes that can reach the target
-  const visited = new Set<string>();
-  const canReachTarget = (nodeId: string): boolean => {
-    if (visited.has(nodeId)) return false; // Avoid cycles
-    if (nodeId === targetNodeId) return true;
-
-    visited.add(nodeId);
-    const neighbors = adjacencyList[nodeId] || [];
-    const canReach = neighbors.some((neighbor) => canReachTarget(neighbor));
-    visited.delete(nodeId); // Allow revisiting in different paths
-
-    return canReach;
-  };
-
-  // Check all nodes to see which ones can reach the target
-  const allNodeIds = new Set<string>();
-  workflow.spec.edges?.forEach((edge) => {
-    if (edge.sourceId) allNodeIds.add(edge.sourceId);
-    if (edge.targetId) allNodeIds.add(edge.targetId);
-  });
-  workflow.spec.nodes?.forEach((node) => {
-    if (node.id) allNodeIds.add(node.id);
-  });
-
-  allNodeIds.forEach((nodeId) => {
-    if (canReachTarget(nodeId)) {
-      nodesBefore.add(nodeId);
-    }
-  });
-
-  return nodesBefore;
 }
 
 function prepareData(
