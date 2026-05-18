@@ -23,7 +23,24 @@ export function jiraComponentBaseProps(context: ComponentBaseContext, metadata: 
 }
 
 export function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  return jiraBaseEventSections(nodes, execution, componentName);
+  const rootEvent = execution.rootEvent;
+  if (!rootEvent?.id || !execution.createdAt) return [];
+
+  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
+  if (!rootTriggerNode?.componentName) return [];
+
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
+
+  return [
+    {
+      receivedAt: new Date(execution.createdAt),
+      eventTitle: title,
+      eventSubtitle: renderTimeAgo(new Date(execution.createdAt)),
+      eventState: getState(componentName)(execution),
+      eventId: rootEvent.id,
+    },
+  ];
 }
 
 export function jiraBaseEventSections(
