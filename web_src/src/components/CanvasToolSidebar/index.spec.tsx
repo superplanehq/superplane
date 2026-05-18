@@ -1,14 +1,36 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasToolSidebar } from ".";
+
+const richMessageRenderSpy = vi.fn();
 
 vi.mock("@/hooks/useAgentChats", () => ({
   useCanvasAgentChat: () => ({ data: { id: "chat-1" }, isLoading: false }),
   useAgentChatMessages: () => ({
-    data: { pages: [] },
+    data: {
+      pages: [
+        {
+          hasMore: false,
+          messages: [
+            {
+              id: "m-1",
+              role: "assistant",
+              content: "Hello from the agent",
+              toolName: "",
+              toolCallId: "",
+              toolStatus: "",
+              createdAt: null,
+            },
+          ],
+        },
+      ],
+      pageParams: [""],
+    },
     isLoading: false,
     hasNextPage: false,
     isFetchingNextPage: false,
+    fetchNextPage: vi.fn(async () => undefined),
   }),
   useSendAgentChatMessage: () => ({ isPending: false, mutateAsync: vi.fn() }),
 }));
@@ -18,7 +40,10 @@ vi.mock("@/hooks/useAgentSessionWebsocket", () => ({
 }));
 
 vi.mock("@/components/AgentSidebar/widgets/RichMessage", () => ({
-  RichMessage: ({ content }: { content: string }) => <div>{content}</div>,
+  RichMessage: ({ content }: { content: string }) => {
+    richMessageRenderSpy();
+    return <div data-testid="rich-message">{content}</div>;
+  },
 }));
 
 function makeToolSidebarState() {
@@ -36,6 +61,10 @@ function makeToolSidebarState() {
 }
 
 describe("CanvasToolSidebar", () => {
+  beforeEach(() => {
+    richMessageRenderSpy.mockClear();
+  });
+
   it("enters runs mode from the runs tab", () => {
     const onSelectRuns = vi.fn();
 
@@ -151,5 +180,19 @@ describe("CanvasToolSidebar", () => {
 
     expect(onToggleVersionControl).toHaveBeenCalledTimes(1);
     expect(toolSidebarState.closeToolSidebar).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not re-render agent messages while typing in the composer", async () => {
+    const user = userEvent.setup();
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+
+    // Initial message render.
+    expect(await screen.findByTestId("rich-message")).toHaveTextContent("Hello from the agent");
+    expect(richMessageRenderSpy).toHaveBeenCalledTimes(1);
+
+    // Typing only updates local composer state, so the message list should not re-render.
+    await user.type(screen.getByTestId("agent-input"), "typing...");
+    expect(richMessageRenderSpy).toHaveBeenCalledTimes(1);
   });
 });
