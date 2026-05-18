@@ -91,6 +91,18 @@ function OpenCanvasToolSidebar({
     ...(showVersionsTab ? ([{ value: TAB_VERSIONS, label: "Versions" }] as const) : []),
   ] as const;
 
+  const handleClose = useCallback(() => {
+    if (activeTab === TAB_RUNS) {
+      onExitRunsMode?.();
+    }
+
+    if (activeTab === TAB_VERSIONS && isVersionControlOpen) {
+      onToggleVersionControl?.();
+    }
+
+    toolSidebarState.closeToolSidebar();
+  }, [activeTab, isVersionControlOpen, onExitRunsMode, onToggleVersionControl, toolSidebarState]);
+
   const handleTabSelect = useCallback(
     (nextTab: typeof TAB_AGENT | typeof TAB_RUNS | typeof TAB_VERSIONS) => {
       setActiveTab(nextTab);
@@ -123,7 +135,7 @@ function OpenCanvasToolSidebar({
           tabs={tabs}
           activeTab={activeTab}
           onSelectTab={(value) => handleTabSelect(value as typeof TAB_AGENT | typeof TAB_RUNS | typeof TAB_VERSIONS)}
-          onClose={toolSidebarState.closeToolSidebar}
+          onClose={handleClose}
         />
 
         {activeTab === TAB_AGENT ? (

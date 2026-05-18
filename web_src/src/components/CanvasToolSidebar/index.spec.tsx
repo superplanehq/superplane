@@ -113,4 +113,43 @@ describe("CanvasToolSidebar", () => {
     expect(onToggleVersionControl).toHaveBeenCalledTimes(1);
     expect(screen.getByPlaceholderText("Ask the agent…")).toBeInTheDocument();
   });
+
+  it("exits runs mode before closing the sidebar from the runs tab", () => {
+    const toolSidebarState = makeToolSidebarState();
+    const onExitRunsMode = vi.fn();
+
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={toolSidebarState}
+        mode="runs"
+        onExitRunsMode={onExitRunsMode}
+        runsContent={<div>Runs content</div>}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Close sidebar" }));
+
+    expect(onExitRunsMode).toHaveBeenCalledTimes(1);
+    expect(toolSidebarState.closeToolSidebar).toHaveBeenCalledTimes(1);
+  });
+
+  it("exits versions before closing the sidebar from the versions tab", () => {
+    const toolSidebarState = makeToolSidebarState();
+    const onToggleVersionControl = vi.fn();
+
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={toolSidebarState}
+        mode="version-live"
+        isVersionControlOpen={true}
+        onToggleVersionControl={onToggleVersionControl}
+        versionsContent={<div>Versions content</div>}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Close sidebar" }));
+
+    expect(onToggleVersionControl).toHaveBeenCalledTimes(1);
+    expect(toolSidebarState.closeToolSidebar).toHaveBeenCalledTimes(1);
+  });
 });
