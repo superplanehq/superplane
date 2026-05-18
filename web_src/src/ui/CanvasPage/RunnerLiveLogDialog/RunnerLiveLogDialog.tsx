@@ -1,8 +1,8 @@
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCanvasId } from "@/hooks/useCanvasId";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
-import { useState } from "react";
+import { ScrollText } from "lucide-react";
+import { useCallback, useState } from "react";
 import { LiveLogStreamView } from "./LiveLogStreamView";
 import type { RunnerLiveLogDialogProps } from "./types";
 
@@ -16,21 +16,16 @@ export function RunnerLiveLogDialog({ canvasMode, executionId }: RunnerLiveLogDi
     return null;
   }
 
+  const handleOpen = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpen(true);
+  }, []);
+
   return (
     <>
-      <div className="flex justify-end border-b border-slate-950/20 px-2 py-1" data-testid="runner-live-logs">
-        <Button
-          type="button"
-          size="sm"
-          className="nodrag h-7 bg-black px-2 py-1 text-xs text-white hover:bg-black/80"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setOpen(true);
-          }}
-        >
-          Logs
-        </Button>
+      <div className="flex items-center justify-center gap-1 cursor-pointer py-1.5" onClick={handleOpen}>
+        <ScrollText className="h-4 w-4" /> View logs
       </div>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent

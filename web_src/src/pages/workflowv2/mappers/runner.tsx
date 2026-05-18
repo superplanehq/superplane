@@ -1,8 +1,8 @@
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { getColorClass } from "@/lib/colors";
+import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 import React from "react";
 import { getTriggerRenderer } from ".";
 
@@ -161,7 +161,7 @@ export const runnerMapper: ComponentBaseMapper = {
       specs: [],
       eventStateMap: RUNNER_STATE_MAP,
       customField,
-      customFieldPosition: "before",
+      customFieldPosition: "after",
     };
   },
   subtitle(context: SubtitleContext): string | React.ReactNode {
