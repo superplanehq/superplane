@@ -176,8 +176,7 @@ func (c *Cloudflare) Description() string {
 }
 
 func (c *Cloudflare) Instructions() string {
-	return `
-To connect Cloudflare to SuperPlane:
+	return `To connect Cloudflare to SuperPlane:
 
 1. In the [Cloudflare dashboard](https://dash.cloudflare.com/), open the account you want to connect, then go to **Manage Account → Account API Tokens** and click **Create Token → Create Custom Token**. Creating an account-owned token requires **Super Administrator** access on the Cloudflare account.
 2. Name the token and keep the first policy scoped to **Entire Account**. Select these permissions:
@@ -199,8 +198,7 @@ To connect Cloudflare to SuperPlane:
    - **Developer Platform** → **Workers Routes** → **Edit**
    - **Network Services** → **Zone Load Balancers** → **Edit**
 4. Optionally set an expiration date, review, create the token, and paste the generated token below. Cloudflare only shows the token once.
-5. Copy the **Account ID** from the same account's home page right sidebar and paste it into **Account ID** below.
-`
+5. Copy the **Account ID** from the same account's home page right sidebar and paste it into **Account ID** below.`
 }
 
 func (c *Cloudflare) Configuration() []configuration.Field {
