@@ -115,7 +115,7 @@ export function useDraftActions({
       headers: { "x-organization-id": organizationId },
       credentials: "include",
     })
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled) return;
         const versions = data?.versions ?? [];
@@ -129,7 +129,9 @@ export function useDraftActions({
         }
       })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [outcomePassed, latestDraft, canvasId, organizationId]);
 
   const effectiveDraft = latestDraft ?? autoDetectedDraft;

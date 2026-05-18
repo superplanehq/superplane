@@ -1,5 +1,5 @@
 import { Loader2, Send } from "lucide-react";
-import { cn } from "@/lib/utils";
+// import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { AgentMode } from "./useAgentState";
@@ -12,7 +12,7 @@ export function ChatComposer({
   onStop,
   sending,
   stopping,
-  statusLabel,
+  statusLabel: _statusLabel,
   agentMode,
   onModeSwitch,
   modeDisabled,

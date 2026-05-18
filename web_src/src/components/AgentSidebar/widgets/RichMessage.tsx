@@ -156,7 +156,14 @@ function SegmentRenderer({
     case "survey":
       return <SurveyWidget questions={segment.questions} onAction={onAction} />;
     case "rubric":
-      return <RubricWidget title={segment.title} criteria={segment.criteria} onAction={onAction} onStartBuilding={onStartBuilding} />;
+      return (
+        <RubricWidget
+          title={segment.title}
+          criteria={segment.criteria}
+          onAction={onAction}
+          onStartBuilding={onStartBuilding}
+        />
+      );
     case "success":
       return <BannerWidget variant="success" content={segment.content} />;
     case "error":

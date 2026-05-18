@@ -96,11 +96,12 @@ export function OutcomeProgressWidget({ state }: { state: OutcomeState }) {
               >
                 <StatusIcon status={criterion.status} />
                 <span className="text-xs text-slate-700 flex-1">{criterion.text}</span>
-                {hasFeedback && (
-                  isExpanded
-                    ? <ChevronUp size={12} className="text-slate-400 shrink-0" />
-                    : <ChevronDown size={12} className="text-slate-400 shrink-0" />
-                )}
+                {hasFeedback &&
+                  (isExpanded ? (
+                    <ChevronUp size={12} className="text-slate-400 shrink-0" />
+                  ) : (
+                    <ChevronDown size={12} className="text-slate-400 shrink-0" />
+                  ))}
               </button>
               {hasFeedback && isExpanded && (
                 <div className="px-3 pb-2 pl-8">
@@ -116,8 +117,7 @@ export function OutcomeProgressWidget({ state }: { state: OutcomeState }) {
             onClick={() => setShowAll(true)}
             className="flex items-center gap-1 px-3 py-1.5 w-full text-left text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-50"
           >
-            <ChevronDown size={12} />
-            +{hiddenCount} more
+            <ChevronDown size={12} />+{hiddenCount} more
           </button>
         )}
         {showAll && hiddenCount > 0 && (

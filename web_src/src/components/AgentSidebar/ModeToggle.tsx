@@ -38,10 +38,7 @@ export function ModeToggle({
   streaming?: boolean;
 }) {
   return (
-    <div
-      className="flex items-center bg-slate-100 rounded-md p-0.5 gap-0.5"
-      data-testid="agent-mode-toggle"
-    >
+    <div className="flex items-center bg-slate-100 rounded-md p-0.5 gap-0.5" data-testid="agent-mode-toggle">
       {(Object.keys(modeConfig) as AgentMode[]).map((key) => {
         const config = modeConfig[key];
         const Icon = config.icon;

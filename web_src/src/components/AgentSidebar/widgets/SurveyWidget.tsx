@@ -63,11 +63,7 @@ export function SurveyWidget({ questions, onAction }: SurveyWidgetProps) {
             onClick={() => setCurrentIndex(i)}
             className={cn(
               "size-2 rounded-full transition-colors",
-              i === currentIndex
-                ? "bg-violet-600"
-                : answers[i] !== null
-                  ? "bg-violet-300"
-                  : "bg-slate-200",
+              i === currentIndex ? "bg-violet-600" : answers[i] !== null ? "bg-violet-300" : "bg-slate-200",
             )}
             aria-label={`Question ${i + 1}`}
           />
@@ -143,11 +139,7 @@ export function SurveyWidget({ questions, onAction }: SurveyWidgetProps) {
         </Button>
 
         {isLast ? (
-          <Button
-            size="sm"
-            className="text-xs h-7 bg-violet-600 hover:bg-violet-700 text-white"
-            onClick={handleSubmit}
-          >
+          <Button size="sm" className="text-xs h-7 bg-violet-600 hover:bg-violet-700 text-white" onClick={handleSubmit}>
             Continue →
           </Button>
         ) : (
