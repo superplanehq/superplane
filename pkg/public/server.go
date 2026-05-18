@@ -567,6 +567,14 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/.well-known/jwks.json", s.handleOIDCJWKS).Methods("GET")
 
 	//
+	// Runner task completion webhook (called by fleet-manager) — registered before
+	// the generic /{webhookID} route so Gorilla mux matches it first.
+	//
+	publicRoute.
+		HandleFunc(s.BasePath+"/webhooks/runner/complete/{runnerTaskID}", s.HandleRunnerTaskComplete).
+		Methods("POST")
+
+	//
 	// Webhook endpoints for triggers
 	//
 	publicRoute.
@@ -607,6 +615,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/impersonate/status", s.impersonationStatus).Methods("GET")
 	adminRoute.HandleFunc("/accounts/{accountId}/promote", s.promoteAdmin).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/demote", s.demoteAdmin).Methods("POST")
+	adminRoute.HandleFunc("/runner/fleets", s.adminRegisterFleet).Methods("POST")
+	adminRoute.HandleFunc("/runner/fleets", s.adminListFleets).Methods("GET")
+	adminRoute.HandleFunc("/runner/fleets/{fleetId}", s.adminDeleteFleet).Methods("DELETE")
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
