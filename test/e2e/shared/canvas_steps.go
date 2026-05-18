@@ -32,45 +32,19 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 // EnterEditMode clicks the Edit button in the header to create a draft version.
 // This must be called before making any canvas changes.
 func (s *CanvasSteps) EnterEditMode() {
-	editButton := q.TestID("canvas-edit-button").Run(s.session)
-
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		disabled, err := editButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			break
-		}
-		if time.Now().After(deadline) {
-			s.t.Fatalf("edit button did not become enabled")
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	require.NoError(s.t, editButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.Sleep(500)
+	editButton := q.TestID("canvas-edit-button")
+	s.session.WaitUntilEnabled(editButton)
+	s.session.Click(editButton)
+	s.waitForCurrentDraft()
 }
 
 // Publish clicks the Publish button in the header to publish the current draft version.
 // This should be called after making and saving canvas changes.
 func (s *CanvasSteps) Publish() {
-	publishButton := q.Locator(`header button:has-text("Publish")`).Run(s.session)
-
-	deadline := time.Now().Add(15 * time.Second)
-	for {
-		disabled, err := publishButton.IsDisabled()
-		require.NoError(s.t, err)
-		if !disabled {
-			break
-		}
-		if time.Now().After(deadline) {
-			s.t.Fatalf("publish button did not become enabled")
-		}
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	require.NoError(s.t, publishButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.Sleep(1000)
+	publishButton := q.Locator(`header button:has-text("Publish")`)
+	s.session.WaitUntilEnabled(publishButton)
+	s.session.Click(publishButton)
+	s.waitForPublishedVersion()
 }
 
 // FindCurrentDraft returns the current draft version for this canvas, or nil if none exists.
@@ -85,6 +59,47 @@ func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
 	}
 
 	return nil
+}
+
+func (s *CanvasSteps) waitForCurrentDraft() {
+	deadline := time.Now().Add(15 * time.Second)
+
+	for time.Now().Before(deadline) {
+		if s.FindCurrentDraft() != nil {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	s.t.Fatalf("draft version was not created")
+}
+
+func (s *CanvasSteps) waitForPublishedVersion() {
+	deadline := time.Now().Add(15 * time.Second)
+
+	for time.Now().Before(deadline) {
+		versions, err := models.ListCanvasVersions(s.WorkflowID)
+		require.NoError(s.t, err)
+
+		hasDraft := false
+		hasLive := false
+		for _, version := range versions {
+			if version.State == models.CanvasVersionStateDraft {
+				hasDraft = true
+			}
+			if version.State == models.CanvasVersionStatePublished {
+				hasLive = true
+			}
+		}
+
+		if !hasDraft && hasLive {
+			return
+		}
+
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	s.t.Fatalf("published version did not become live")
 }
 
 func (s *CanvasSteps) Create() {

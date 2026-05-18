@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight, Ellipsis, GitBranch } from "lucide-react";
-import type { KeyboardEvent as ReactKeyboardEvent } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import type { CanvasVersionNodeDiffContext } from "@/pages/workflowv2/CanvasVersionNodeDiffDialog";
 import { getChangeRequestReviewPhase } from "@/pages/workflowv2/changeRequestReviewActions";
@@ -112,6 +112,7 @@ export function VersionsTabPanel({
                     <VersionRow
                       key={`pending-${versionID || item.changeRequest.metadata?.id || "unknown"}`}
                       rowTestId="canvas-pending-change-request-version-row"
+                      detailsButtonTestId="canvas-pending-change-request-view-details-button"
                       version={item.version}
                       changeRequest={item.changeRequest}
                       changeRequestApprovalConfig={changeRequestApprovalConfig}
@@ -236,6 +237,7 @@ function VersionRow({
   isCurrentLive = false,
   isFirstCanvasVersion = false,
   rowTestId,
+  detailsButtonTestId,
   onUseVersion,
   onViewDiff,
 }: {
@@ -248,6 +250,7 @@ function VersionRow({
   isCurrentLive?: boolean;
   isFirstCanvasVersion?: boolean;
   rowTestId?: string;
+  detailsButtonTestId?: string;
   onUseVersion: (versionID: string) => void;
   onViewDiff: (
     version: CanvasesCanvasVersion,
@@ -323,30 +326,46 @@ function VersionRow({
           </p>
         </div>
         {previousVersion ? (
-          <div className="flex items-center gap-1.5">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="h-7 w-7 hover:bg-black/5 dark:hover:bg-black/5"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onViewDiff(version, previousVersion, changeRequest);
-                    }}
-                    aria-label="View details"
-                  >
-                    <Ellipsis className="h-4 w-4" />
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top">View details</TooltipContent>
-            </Tooltip>
-          </div>
+          <VersionDetailsButton
+            testId={detailsButtonTestId}
+            onClick={(event) => {
+              event.stopPropagation();
+              onViewDiff(version, previousVersion, changeRequest);
+            }}
+          />
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function VersionDetailsButton({
+  testId,
+  onClick,
+}: {
+  testId?: string;
+  onClick: (event: ReactKeyboardEvent<HTMLButtonElement> | ReactMouseEvent<HTMLButtonElement>) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="h-7 w-7 hover:bg-black/5 dark:hover:bg-black/5"
+              data-testid={testId}
+              onClick={onClick}
+              aria-label="View details"
+            >
+              <Ellipsis className="h-4 w-4" />
+            </Button>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent side="top">View details</TooltipContent>
+      </Tooltip>
     </div>
   );
 }

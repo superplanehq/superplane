@@ -2,7 +2,6 @@ package e2e
 
 import (
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
@@ -67,12 +66,12 @@ func (s *runsViewSteps) whenIVisitRunsView() {
 
 func (s *runsViewSteps) thenTheFinishedRunIsVisible() {
 	require.NotNil(s.t, s.run, "expected run to be created")
+	s.session.WaitForURLContains("view=runs")
+	s.session.WaitForURLContains("run=" + s.run.ID.String())
 	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
 	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Runs")`))
 	s.session.AssertVisible(q.TestID("node-start-header"))
 	s.session.AssertVisible(q.TestID("node-output-header"))
-	s.session.AssertURLContains("view=runs")
-	s.session.AssertURLContains("run=" + s.run.ID.String())
 	s.session.AssertText("Start")
 	s.session.AssertText("Output")
 	s.session.AssertText("SUCCESS")
@@ -101,20 +100,8 @@ func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
 }
 
 func (s *runsViewSteps) thenEditModeIsVisible() {
-	deadline := time.Now().Add(15 * time.Second)
-
-	for time.Now().Before(deadline) {
-		url := s.session.Page().URL()
-		if !strings.Contains(url, "view=runs") && !strings.Contains(url, "run="+s.run.ID.String()) {
-			return
-		}
-
-		time.Sleep(200 * time.Millisecond)
-	}
-
-	url := s.session.Page().URL()
-	require.NotContains(s.t, url, "view=runs")
-	require.NotContains(s.t, url, "run="+s.run.ID.String())
+	s.session.WaitForURLNotContains("view=runs")
+	s.session.WaitForURLNotContains("run=" + s.run.ID.String())
 }
 
 func (s *runsViewSteps) waitForFinishedRun() *models.CanvasRun {
