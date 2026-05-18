@@ -46,6 +46,21 @@ function buildNonReadyIntegrationMap(integrations: OrganizationsIntegration[]) {
   return map;
 }
 
+function stripNodeWarnings(
+  node: CanvasNode,
+  data: Record<string, unknown>,
+  field: "component" | "trigger" | "composite",
+): CanvasNode {
+  const value = data[field];
+  if (!value || typeof value !== "object") {
+    return node;
+  }
+
+  const record = value as Record<string, unknown>;
+  const { error: _err, warning: _warn, ...rest } = record;
+  return { ...node, data: { ...data, [field]: rest } };
+}
+
 export function stripCanvasNodeSetupWarningsForRunsView(nodes: CanvasNode[]): CanvasNode[] {
   return nodes.map((node) => {
     const data = node.data as Record<string, unknown> | undefined;
@@ -55,33 +70,15 @@ export function stripCanvasNodeSetupWarningsForRunsView(nodes: CanvasNode[]): Ca
 
     const type = data.type;
     if (type === "component") {
-      const component = data.component;
-      if (!component || typeof component !== "object") {
-        return node;
-      }
-      const c = component as Record<string, unknown>;
-      const { error: _err, warning: _warn, ...rest } = c;
-      return { ...node, data: { ...data, component: rest } };
+      return stripNodeWarnings(node, data, "component");
     }
 
     if (type === "trigger") {
-      const trigger = data.trigger;
-      if (!trigger || typeof trigger !== "object") {
-        return node;
-      }
-      const t = trigger as Record<string, unknown>;
-      const { error: _err, warning: _warn, ...rest } = t;
-      return { ...node, data: { ...data, trigger: rest } };
+      return stripNodeWarnings(node, data, "trigger");
     }
 
     if (type === "composite") {
-      const composite = data.composite;
-      if (!composite || typeof composite !== "object") {
-        return node;
-      }
-      const c = composite as Record<string, unknown>;
-      const { error: _err, warning: _warn, ...rest } = c;
-      return { ...node, data: { ...data, composite: rest } };
+      return stripNodeWarnings(node, data, "composite");
     }
 
     return node;

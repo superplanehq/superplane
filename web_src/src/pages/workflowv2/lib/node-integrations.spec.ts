@@ -191,4 +191,25 @@ describe("stripCanvasNodeSetupWarningsForRunsView", () => {
     expect(trigger.error).toBeUndefined();
     expect(trigger.warning).toBeUndefined();
   });
+
+  it("removes composite error and warning", () => {
+    const nodes = [
+      {
+        id: "n3",
+        position: { x: 0, y: 0 },
+        data: {
+          type: "composite",
+          label: "C",
+          state: "pending",
+          composite: { title: "Nested", error: "Bad", warning: "Hmm" },
+        },
+      } as CanvasNode,
+    ];
+
+    const result = stripCanvasNodeSetupWarningsForRunsView(nodes);
+    const composite = (result[0].data as { composite: Record<string, unknown> }).composite;
+    expect(composite.error).toBeUndefined();
+    expect(composite.warning).toBeUndefined();
+    expect(composite.title).toBe("Nested");
+  });
 });
