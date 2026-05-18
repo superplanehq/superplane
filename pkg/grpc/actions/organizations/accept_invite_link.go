@@ -1,3 +1,11 @@
+// Package organizations implements org APIs including invite links.
+//
+// AcceptInviteLinkWithUsage joins an authenticated account to an org via a shareable invite link.
+// It intentionally does not evaluate AllowedProviders: that field gates OAuth completion of
+// pending *email* invitations (see authentication.Handler.acceptInvitation). If product
+// requires the same OAuth restriction for invite links, that needs an explicit design (e.g.
+// inferring provider from linked account providers) and is not implied by the email-invite path.
+
 package organizations
 
 import (
