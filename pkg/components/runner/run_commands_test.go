@@ -8,13 +8,44 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/runners"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
+
+// mockStore is a test-only in-memory implementation of fleetStore.
+type mockStore struct {
+	fleet *runners.RunnerFleet
+	tasks []*runners.RunnerTask
+}
+
+func (m *mockStore) FindFleet(id uuid.UUID) (*runners.RunnerFleet, error) {
+	return m.fleet, nil
+}
+
+func (m *mockStore) CreateTask(id uuid.UUID, fleetID uuid.UUID, fleetTaskID string, executionID uuid.UUID) (*runners.RunnerTask, error) {
+	t := &runners.RunnerTask{ID: id, FleetID: fleetID, FleetTaskID: fleetTaskID, ExecutionID: executionID}
+	m.tasks = append(m.tasks, t)
+	return t, nil
+}
+
+func testFleet() *runners.RunnerFleet {
+	return &runners.RunnerFleet{
+		ID:        uuid.New(),
+		Name:      "fleet-1",
+		FleetURL:  "https://broker.example",
+		AuthToken: "token-1",
+	}
+}
+
+func testRunner(fleet *runners.RunnerFleet) *Runner {
+	return &Runner{store: &mockStore{fleet: fleet}}
+}
 
 func TestNormalizeCommands(t *testing.T) {
 	t.Parallel()
@@ -112,11 +143,8 @@ func TestValidateEnvironment(t *testing.T) {
 	}
 }
 
-func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-
+func TestRunnerExecuteSendsEnvironmentToFleet(t *testing.T) {
+	fleet := testFleet()
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-123"}`))},
@@ -125,10 +153,12 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	requests := &contexts.RequestContext{}
-	component := &Runner{}
+	component := testRunner(fleet)
 
 	err := component.Execute(core.ExecutionContext{
+		ID: uuid.New(),
 		Configuration: map[string]any{
+			"fleet_id": fleet.ID.String(),
 			"commands": "echo hello",
 			"environment": []map[string]any{
 				{
@@ -159,13 +189,13 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	body, err := io.ReadAll(httpContext.Requests[0].Body)
 	require.NoError(t, err)
 
-	var req brokerCreateTaskRequest
+	var req runners.FleetCreateTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
 
 	assert.Equal(t, "fleet-1", req.FleetID)
 	assert.Equal(t, []string{"echo hello"}, req.Commands)
 	assert.Equal(t, "host", req.ExecutionMode)
-	assert.Equal(t, []BrokerEnvironmentVariable{
+	assert.Equal(t, []runners.FleetEnvironmentVariable{
 		{Name: "COMMIT_AUTHOR", Value: "alice@example.com"},
 		{Name: "API_TOKEN", Value: "secret'value;$PATH"},
 	}, req.Environment)
@@ -174,18 +204,16 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 }
 
 func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-
+	fleet := testFleet()
 	httpContext := &contexts.HTTPContext{
 		Responses: []*http.Response{
 			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-123"}`))},
 		},
 	}
 
-	err := (&Runner{}).Execute(core.ExecutionContext{
-		Configuration:  map[string]any{"commands": "echo hello"},
+	err := testRunner(fleet).Execute(core.ExecutionContext{
+		ID:             uuid.New(),
+		Configuration:  map[string]any{"fleet_id": fleet.ID.String(), "commands": "echo hello"},
 		HTTP:           httpContext,
 		Webhook:        &contexts.NodeWebhookContext{},
 		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
@@ -201,14 +229,13 @@ func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
 }
 
 func TestRunnerExecuteFailsWhenSecretCannotBeResolved(t *testing.T) {
-	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
-	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
-	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
-
+	fleet := testFleet()
 	httpContext := &contexts.HTTPContext{}
 
-	err := (&Runner{}).Execute(core.ExecutionContext{
+	err := testRunner(fleet).Execute(core.ExecutionContext{
+		ID: uuid.New(),
 		Configuration: map[string]any{
+			"fleet_id": fleet.ID.String(),
 			"commands": "echo hello",
 			"environment": []map[string]any{
 				{
@@ -241,7 +268,7 @@ func TestRunnerProcessTaskStatusIncludesResult(t *testing.T) {
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	exit := 0
-	task := &Task{
+	task := &runners.FleetTask{
 		Status:   "succeeded",
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"items":[1,2],"ok":true}`),
@@ -263,7 +290,7 @@ func TestRunnerProcessTaskStatusOmitsInvalidResult(t *testing.T) {
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	exit := 0
-	task := &Task{
+	task := &runners.FleetTask{
 		Status:   "succeeded",
 		ExitCode: &exit,
 		Result:   json.RawMessage(`not-json`),
