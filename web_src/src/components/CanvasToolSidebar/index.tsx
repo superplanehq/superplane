@@ -293,7 +293,12 @@ function ChatConversation({
         {showThinking ? <ThinkingRow /> : null}
         {error ? <p className="px-3 py-2 text-sm text-red-600">{error}</p> : null}
       </div>
-      <ChatComposer key={chatId} onSend={sendContent} sending={sendMutation.isPending} statusLabel={statusLabel(status)} />
+      <ChatComposer
+        key={chatId}
+        onSend={sendContent}
+        sending={sendMutation.isPending}
+        statusLabel={statusLabel(status)}
+      />
     </div>
   );
 }
