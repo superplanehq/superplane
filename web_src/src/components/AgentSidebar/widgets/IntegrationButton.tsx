@@ -66,6 +66,9 @@ export function IntegrationButton({ integrationRef, label }: IntegrationButtonPr
     label || resolved.instanceName || (resolved as { definitionLabel?: string }).definitionLabel || formatIntegrationName(resolved.integrationName || integrationRef);
 
   const isConnected = resolved.state === "ready";
+  const isPending = resolved.state === "pending";
+  const isError = resolved.state === "error";
+  const isVendorOnly = !isUUID;
 
   function handleClick() {
     window.dispatchEvent(
@@ -85,14 +88,20 @@ export function IntegrationButton({ integrationRef, label }: IntegrationButtonPr
       onClick={handleClick}
       className={cn(
         "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md",
-        "border bg-white shadow-sm",
+        "border bg-white",
         "text-xs font-medium",
-        "hover:shadow transition-all cursor-pointer align-middle",
-        isConnected
-          ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300"
-          : "border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300",
+        "transition-all cursor-pointer align-middle",
+        isConnected && "border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300",
+        isPending && "border-amber-200 text-amber-700 hover:bg-amber-50 hover:border-amber-300",
+        isError && "border-red-200 text-red-700 hover:bg-red-50 hover:border-red-300",
+        !isConnected && !isPending && !isError && "border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300",
       )}
-      title={isConnected ? `Connected: ${displayName}` : `Connect ${displayName}`}
+      title={
+        isConnected ? `Connected: ${displayName}`
+        : isPending ? `Pending: ${displayName}`
+        : isError ? `Error: ${displayName}`
+        : `Connect ${displayName}`
+      }
     >
       <IntegrationIcon
         integrationName={resolved.integrationName || integrationRef}
@@ -101,6 +110,9 @@ export function IntegrationButton({ integrationRef, label }: IntegrationButtonPr
       />
       <span>{displayName}</span>
       {isConnected && <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />}
+      {isPending && <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />}
+      {isError && <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />}
+      {isVendorOnly && <span className="text-[10px] leading-none text-slate-400 font-bold shrink-0">+</span>}
     </button>
   );
 }
