@@ -566,4 +566,3 @@ func Test__requestTypeFieldResources__createmetaFallback(t *testing.T) {
 	require.Len(t, resources, 1)
 	assert.Equal(t, "5", resources[0].ID)
 }
-

@@ -158,7 +158,7 @@ func (c *CreateIncident) Configuration() []configuration.Field {
 			Label:       "Due date",
 			Type:        configuration.FieldTypeDate,
 			Required:    false,
-			Description: "Optional Jira due date (YYYY-MM-DD for Cloud)",
+			Description: "Optional Jira due date",
 		},
 		{
 			Name:        "priority",

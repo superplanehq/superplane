@@ -9,12 +9,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Incident" href="#create-incident" description="Create a Jira Service Management incident via the Incidents API" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Jira" />
+  <LinkCard title="Delete Incident" href="#delete-incident" description="Delete a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Delete Issue" href="#delete-issue" description="Delete a Jira issue" />
+  <LinkCard title="Get Incident" href="#get-incident" description="Fetch a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Jira issue by its key" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update fields on a Jira issue" />
-  <LinkCard title="Delete Incident" href="#delete-incident" description="Delete a Jira Service Management incident by issue id or issue key" />
-  <LinkCard title="Get Incident" href="#get-incident" description="Fetch a Jira Service Management incident by issue id or issue key" />
 </CardGrid>
 
 ## Instructions
@@ -78,77 +79,6 @@ Returns **id** (numeric issue id), **key** (e.g. ITSM-30), and **self** (issue R
   "type": "jira.incident.created"
 }
 ```
-
-
-<a id="delete-incident"></a>
-
-## Delete Incident
-
-The Delete Incident component removes an incident using the [JSM Incidents REST API](https://developer.atlassian.com/cloud/incidents/rest/api-group-incident/).
-
-### Use Cases
-
-- **Automated cleanup**: Remove incidents created during tests or erroneous automation
-- **Lifecycle workflows**: Delete when a duplicate or mistaken incident is closed upstream
-
-### Configuration
-
-- **Project** (optional): Narrows the issue picker to one Jira project (up to 500 most recently updated issues in that project).
-- **Issue**: The incident issue to delete (issue key from Jira search).
-
-### Output
-
-Confirms deletion with **deleted** set to true.
-
-### Example Output
-
-```json
-{
-  "data": {
-    "deleted": true
-  },
-  "timestamp": "2026-01-19T12:00:00Z",
-  "type": "jira.incident.deleted"
-}
-```
-
-
-<a id="get-incident"></a>
-
-## Get Incident
-
-The Get Incident component returns incident details from the [JSM Incidents REST API](https://developer.atlassian.com/cloud/incidents/rest/api-group-incident/).
-
-### Use Cases
-
-- **Enrichment**: Load incident DTO after an issue webhook or workflow step
-- **Status checks**: Read priority, status, responders, and affected services from JSM
-
-### Configuration
-
-- **Project** (optional): When set, the issue picker lists issues in that project (by project key), paged from Jira search (up to 500, most recently updated first). Leave empty to list issues updated in roughly the last 90 days across projects you can access (same cap and ordering).
-- **Issue**: Choose an issue by key (from Jira search). The stored value is the issue key; numeric ids still work when they are saved as the issue reference.
-
-### Output
-
-Payload type jira.incident.fetched with the incident object returned by Atlassian (summary, reporter, priority, status, responders, etc.).
-
-### Example Output
-
-```json
-{
-  "data": {
-    "priority": {
-      "id": "1",
-      "name": "High"
-    },
-    "summary": "Example incident"
-  },
-  "timestamp": "2026-01-19T12:00:00Z",
-  "type": "jira.incident.fetched"
-}
-```
-
 
 <a id="create-issue"></a>
 
@@ -229,6 +159,38 @@ Returns the created issue including:
 }
 ```
 
+<a id="delete-incident"></a>
+
+## Delete Incident
+
+The Delete Incident component removes an incident using the [JSM Incidents REST API](https://developer.atlassian.com/cloud/incidents/rest/api-group-incident/).
+
+### Use Cases
+
+- **Automated cleanup**: Remove incidents created during tests or erroneous automation
+- **Lifecycle workflows**: Delete when a duplicate or mistaken incident is closed upstream
+
+### Configuration
+
+- **Project** (optional): Narrows the issue picker to one Jira project (up to 500 most recently updated issues in that project).
+- **Issue**: The incident issue to delete (issue key from Jira search).
+
+### Output
+
+Confirms deletion with **deleted** set to true.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.incident.deleted"
+}
+```
+
 <a id="delete-issue"></a>
 
 ## Delete Issue
@@ -261,6 +223,42 @@ Returns the deleted issue's `id` and `key`, plus `deleted: true`.
   },
   "timestamp": "2026-01-19T13:00:00Z",
   "type": "jira.issueDeleted"
+}
+```
+
+<a id="get-incident"></a>
+
+## Get Incident
+
+The Get Incident component returns incident details from the [JSM Incidents REST API](https://developer.atlassian.com/cloud/incidents/rest/api-group-incident/).
+
+### Use Cases
+
+- **Enrichment**: Load incident DTO after an issue webhook or workflow step
+- **Status checks**: Read priority, status, responders, and affected services from JSM
+
+### Configuration
+
+- **Project** (optional): When set, the issue picker lists issues in that project (by project key), paged from Jira search (up to 500, most recently updated first). Leave empty to list issues updated in roughly the last 90 days across projects you can access (same cap and ordering).
+- **Issue**: Choose an issue by key (from Jira search). The stored value is the issue key; numeric ids still work when they are saved as the issue reference.
+
+### Output
+
+Payload type jira.incident.fetched with the incident object returned by Atlassian (summary, reporter, priority, status, responders, etc.).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "priority": {
+      "id": "1",
+      "name": "High"
+    },
+    "summary": "Example incident"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.incident.fetched"
 }
 ```
 
