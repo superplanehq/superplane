@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { persistAgentMode, readInitialAgentMode, type AgentMode } from "@/components/AgentSidebar/agentMode";
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 
 // Keep in sync with pkg/features/features.go.
@@ -38,6 +39,7 @@ export function useCanvasToolSidebarState({
   const featureEnabled = hasFeature(FEATURE_CLAUDE_MANAGED_AGENTS);
 
   const [isToolSidebarOpen, setIsToolSidebarOpen] = useState(readInitialToolSidebarOpen);
+  const [agentMode, setAgentMode] = useState<AgentMode>(readInitialAgentMode);
 
   const persistOpen = useCallback((open: boolean) => {
     if (typeof window === "undefined") return;
@@ -62,6 +64,11 @@ export function useCanvasToolSidebarState({
     });
   }, [persistOpen]);
 
+  const switchAgentMode = useCallback((mode: AgentMode) => {
+    setAgentMode(mode);
+    persistAgentMode(mode);
+  }, []);
+
   useEffect(() => {
     if ((!featureEnabled && !forceEnable) || hideCanvasToolSidebar) closeToolSidebar();
   }, [featureEnabled, forceEnable, hideCanvasToolSidebar, closeToolSidebar]);
@@ -78,6 +85,8 @@ export function useCanvasToolSidebarState({
     handleToolSidebarToggle,
     openToolSidebar,
     closeToolSidebar,
+    agentMode,
+    switchAgentMode,
   };
 }
 
