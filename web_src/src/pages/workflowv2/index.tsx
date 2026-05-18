@@ -78,6 +78,7 @@ import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
+import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import { RunsSidebar } from "@/ui/RunsSidebar";
@@ -2984,20 +2985,22 @@ export function WorkflowPageV2() {
   }, []);
 
   // Listen for agent sidebar integration button clicks
+  const [agentConfigureIntegrationId, setAgentConfigureIntegrationId] = useState<string | null>(null);
+
   useEffect(() => {
     const handler = (e: Event) => {
       const { integrationName, instanceId } = (e as CustomEvent).detail;
-      if (instanceId && organizationId) {
-        // Existing instance — open settings in new tab so user stays on canvas
-        window.open(`/${organizationId}/settings/integrations/${instanceId}`, "_blank");
+      if (instanceId) {
+        // Existing instance — open configure modal
+        setAgentConfigureIntegrationId(instanceId);
       } else if (integrationName) {
-        // No instance — open create dialog (modal, stays on page)
+        // No instance — open create dialog
         setIntegrationDialogName(integrationName);
       }
     };
     window.addEventListener("agent:open-integration", handler);
     return () => window.removeEventListener("agent:open-integration", handler);
-  }, [organizationId]);
+  }, []);
 
   const handleIntegrationCreated = useCallback(
     async (integrationId: string, instanceName: string) => {
@@ -6057,6 +6060,11 @@ export function WorkflowPageV2() {
         initialConfiguration={
           integrationDialogPendingInstance?.spec?.configuration as Record<string, unknown> | undefined
         }
+      />
+      <ConfigureIntegrationDialog
+        integrationId={agentConfigureIntegrationId}
+        organizationId={organizationId ?? ""}
+        onClose={() => setAgentConfigureIntegrationId(null)}
       />
     </>
   );
