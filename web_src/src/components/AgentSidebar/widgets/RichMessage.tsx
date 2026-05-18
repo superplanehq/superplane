@@ -37,7 +37,7 @@ const MARKDOWN_CLASSES =
 interface RichMessageProps {
   content: string;
   onAction?: (text: string) => void;
-  onStartBuilding?: (rubric: { title: string; criteria: string[] }) => void;
+  onStartBuilding?: (rubric: { title: string; criteria: string[]; categories?: import("./parser").RubricCategory[] }) => void;
   canvasId?: string;
   organizationId?: string;
 }
@@ -70,7 +70,7 @@ function SegmentRenderer({
 }: {
   segment: Segment;
   onAction?: (text: string) => void;
-  onStartBuilding?: (rubric: { title: string; criteria: string[] }) => void;
+  onStartBuilding?: (rubric: { title: string; criteria: string[]; categories?: import("./parser").RubricCategory[] }) => void;
   canvasId?: string;
   organizationId?: string;
 }) {
@@ -172,6 +172,7 @@ function SegmentRenderer({
         <RubricWidget
           title={segment.title}
           criteria={segment.criteria}
+          categories={segment.categories}
           onAction={onAction}
           onStartBuilding={onStartBuilding}
         />

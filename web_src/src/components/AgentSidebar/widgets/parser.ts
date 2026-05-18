@@ -13,7 +13,8 @@ export type SuccessSegment = { type: "success"; content: string };
 export type ErrorSegment = { type: "error"; content: string };
 export type DraftActionsSegment = { type: "draft-actions"; versionId: string; message?: string };
 export type SurveySegment = { type: "survey"; questions: { prompt: string; options: string[]; hasInput?: boolean }[] };
-export type RubricSegment = { type: "rubric"; title: string; criteria: { text: string }[] };
+export type RubricCategory = { heading: string; criteria: { text: string }[] };
+export type RubricSegment = { type: "rubric"; title: string; criteria: { text: string }[]; categories?: RubricCategory[] };
 
 export type Segment =
   | MarkdownSegment
@@ -290,9 +291,43 @@ function parseSurvey(raw: string): SurveySegment {
 
 function parseRubric(meta: string, raw: string): RubricSegment {
   const lines = raw.split("\n").filter((l) => l.trim());
-  const criteria: { text: string }[] = [];
   let title = meta.trim();
 
+  // Check if the rubric has category headings (## Heading)
+  const hasCategories = lines.some((l) => /^#{2,3}\s/.test(l.trim()));
+
+  if (hasCategories) {
+    const categories: RubricCategory[] = [];
+    const uncategorized: { text: string }[] = [];
+    let currentCategory: RubricCategory | null = null;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (/^#{2,3}\s/.test(trimmed)) {
+        // New category heading
+        if (currentCategory) categories.push(currentCategory);
+        currentCategory = { heading: trimmed.replace(/^#{2,3}\s*/, "").trim(), criteria: [] };
+      } else if (/^[-*✦•]\s/.test(trimmed)) {
+        const criterion = { text: trimmed.replace(/^[-*✦•]\s*/, "").trim() };
+        if (currentCategory) currentCategory.criteria.push(criterion);
+        else uncategorized.push(criterion);
+      } else if (/^\d+[.)]\s/.test(trimmed)) {
+        const criterion = { text: trimmed.replace(/^\d+[.)]\s*/, "").trim() };
+        if (currentCategory) currentCategory.criteria.push(criterion);
+        else uncategorized.push(criterion);
+      } else if (!title) {
+        title = trimmed;
+      }
+    }
+    if (currentCategory) categories.push(currentCategory);
+
+    // Flatten all criteria for backward compat (used by outcome grading)
+    const allCriteria = [...uncategorized, ...categories.flatMap((c) => c.criteria)];
+    return { type: "rubric", title: title || "Build Plan", criteria: allCriteria, categories };
+  }
+
+  // Flat rubric (no categories)
+  const criteria: { text: string }[] = [];
   for (const line of lines) {
     const trimmed = line.trim();
     if (/^[-*✦•]\s/.test(trimmed)) {
@@ -302,7 +337,6 @@ function parseRubric(meta: string, raw: string): RubricSegment {
     } else if (!title) {
       title = trimmed;
     } else {
-      // Treat as a criterion anyway
       criteria.push({ text: trimmed });
     }
   }

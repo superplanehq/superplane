@@ -20,7 +20,8 @@ import { ChatComposer } from "./ChatComposer";
 import { useDraftActions } from "./useDraftActions";
 import { useChatScroll } from "./useChatScroll";
 import { isSystemNotification, formatSystemNotification } from "./systemMessages";
-import { OutcomeProgressWidget, type OutcomeState, type OutcomePhase } from "./widgets/OutcomeProgressWidget";
+import { OutcomeProgressWidget, type OutcomeState, type OutcomePhase, type OutcomeCategory } from "./widgets/OutcomeProgressWidget";
+import type { RubricCategory } from "./widgets/parser";
 
 export interface AgentSidebarProps {
   agentState: AgentState;
@@ -250,13 +251,26 @@ function ChatConversation({
   }, [chatId, interruptMutation]);
 
   const handleStartBuilding = useCallback(
-    async (rubric: { title: string; criteria: string[] }) => {
+    async (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
       onModeSwitch("builder");
-      const rubricText = `# ${rubric.title}\n\n${rubric.criteria.map((c) => `- ${c}`).join("\n")}`;
+      // Format rubric text with categories if present
+      const rubricText = rubric.categories && rubric.categories.length > 0
+        ? `# ${rubric.title}\n\n${rubric.categories.map((cat) => `## ${cat.heading}\n${cat.criteria.map((c) => `- ${c.text}`).join("\n")}`).join("\n\n")}`
+        : `# ${rubric.title}\n\n${rubric.criteria.map((c) => `- ${c}`).join("\n")}`;
+      // Build outcome categories with indices
+      let outcomeCategories: OutcomeCategory[] | undefined;
+      if (rubric.categories && rubric.categories.length > 0) {
+        let idx = 0;
+        outcomeCategories = rubric.categories.map((cat) => {
+          const indices = cat.criteria.map(() => idx++);
+          return { heading: cat.heading, criteriaIndices: indices };
+        });
+      }
       // Initialize outcome progress widget
       setOutcomeState({
         title: rubric.title,
         criteria: rubric.criteria.map((c) => ({ text: c, status: "pending" })),
+        categories: outcomeCategories,
         iteration: 1,
         maxIterations: 3,
         phase: "building",
@@ -415,7 +429,7 @@ function MessageRow({
   organizationId: string;
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
-  onStartBuilding: (rubric: { title: string; criteria: string[] }) => void;
+  onStartBuilding: (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => void;
 }) {
   const handleAction = useCallback(
     async (action: string) => {

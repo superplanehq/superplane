@@ -448,11 +448,16 @@ The [input] marker adds a free-text field so users can type a custom answer.
 - When you have enough information, produce a structured build plan using the :::rubric widget:
 
 :::rubric Build Plan Title
+## Category Name
 - First criterion (specific and verifiable)
 - Second criterion
+
+## Another Category
 - Third criterion
+- Fourth criterion
 :::
 
+Group criteria into categories using ## headings. Each category groups related requirements.
 - Each criterion should be specific and verifiable (e.g. "GitHub push trigger on main branch" not "set up a trigger").
 - Present the plan and ask the user to confirm or request changes.
 - If the user wants changes, update the plan and present it again.
