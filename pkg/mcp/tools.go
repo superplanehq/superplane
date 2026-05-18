@@ -281,9 +281,35 @@ func handleCanvasUpdate(ctx context.Context, args map[string]interface{}) (inter
 
 	// Ensure YAML has proper apiVersion/kind/metadata structure
 	if !strings.Contains(yamlContent, "apiVersion:") {
-		// Wrap raw content
-		yamlContent = fmt.Sprintf("apiVersion: v1\nkind: Canvas\nmetadata:\n  id: %s\n  name: %s\nspec:\n%s",
-			canvasID, canvas.Name, yamlContent)
+		// Parse the raw YAML and re-wrap it properly
+		var rawData map[string]interface{}
+		if err := yaml.Unmarshal([]byte(yamlContent), &rawData); err != nil {
+			return nil, fmt.Errorf("invalid YAML: %w", err)
+		}
+
+		name := canvas.Name
+		if n, ok := rawData["name"].(string); ok && n != "" {
+			name = n
+		}
+
+		wrapped := map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Canvas",
+			"metadata": map[string]interface{}{
+				"id":   canvasID,
+				"name": name,
+			},
+			"spec": map[string]interface{}{
+				"nodes": rawData["nodes"],
+				"edges": rawData["edges"],
+			},
+		}
+
+		yamlBytes, err := yaml.Marshal(wrapped)
+		if err != nil {
+			return nil, fmt.Errorf("failed to wrap YAML: %w", err)
+		}
+		yamlContent = string(yamlBytes)
 	}
 
 	if _, err := tmpFile.WriteString(yamlContent); err != nil {
