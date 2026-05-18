@@ -12,7 +12,7 @@ import {
   agentsListAgentChatMessages,
   agentsSendAgentChatMessage,
 } from "@/api-client/sdk.gen";
-import { fromApiChat, fromApiMessage, type AgentChat, type AgentMessage } from "@/components/AgentSidebar/types";
+import { fromApiChat, fromApiMessage, type AgentChat, type AgentMessage } from "@/components/CanvasToolSidebar/types";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
 export const agentChatKeys = {

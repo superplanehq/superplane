@@ -4,14 +4,12 @@ import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { countNodesByType, extractIntegrations, getTemplateTags } from "@/pages/canvas/templateMetadata";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
-import type { QueryClient } from "@tanstack/react-query";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-
 import type {
   CanvasChangesetChange,
   CanvasesCanvas,
@@ -32,14 +30,16 @@ import type {
 } from "@/api-client";
 import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
-
 import { Button } from "@/components/ui/button";
+import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
+import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useComponents } from "@/hooks/useComponentData";
 import {
   canvasKeys,
   useActOnCanvasChangeRequest,
   useCanvas,
+  useCanvasDashboard,
   useCanvasChangeRequests,
   useCanvasMemoryEntries,
   useCanvasVersion,
@@ -56,6 +56,7 @@ import {
   useInfiniteCanvasLiveVersions,
   useResolveCanvasChangeRequest,
   useTriggers,
+  useUpdateCanvasDashboard,
   useUpdateCanvasVersion,
   useWidgets,
 } from "@/hooks/useCanvasData";
@@ -84,14 +85,11 @@ import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
-import { RunsSidebar } from "@/ui/RunsSidebar";
 import { DashboardOverlay } from "./dashboard/DashboardOverlay";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
-import { useCanvasDashboard, useUpdateCanvasDashboard } from "@/hooks/useCanvasData";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasMemoryModal } from "./CanvasMemoryModal";
 import { CanvasPageModals } from "./CanvasPageModals";
-import { CanvasVersionControlSidebar } from "./CanvasVersionControlSidebar";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { CanvasYamlModal } from "./CanvasYamlModal";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
@@ -605,8 +603,7 @@ export function WorkflowPageV2() {
   // such as "pushed through" from execution.outputs, which selectedRun.executions
   // (lightweight refs) don't carry. The same query backs RunNodeDetailModal, so the
   // payload tab also opens without a follow-up fetch.
-  const selectedRunRootEventId = selectedRun?.rootEvent?.id ?? null;
-  const selectedRunExecutionsQuery = useEventExecutions(canvasId!, selectedRunRootEventId);
+  const selectedRunExecutionsQuery = useEventExecutions(canvasId!, selectedRun?.rootEvent?.id ?? null);
   const selectedRunFullExecutions = selectedRunExecutionsQuery.data?.executions;
   const canvasEventsResponse = infiniteEventsQuery.data?.pages?.[0];
   const componentIconMap = useMemo(() => {
@@ -5002,6 +4999,10 @@ export function WorkflowPageV2() {
     );
   }, [setIsRunsMode, setSearchParams, setSelectedRunId]);
 
+  const handleToggleVersionControl = useCallback(() => {
+    setIsVersionControlOpen((prev) => !prev);
+  }, []);
+
   const handleSelectDashboardMode = useCallback(() => {
     if (!dashboardsFeatureEnabled) {
       return;
@@ -5687,9 +5688,15 @@ export function WorkflowPageV2() {
     isPreparingVersionAction,
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftGraphDiffVersusLive,
   });
-  const activeRunsCount = runsData.runs.filter((run) => run.state === "STATE_STARTED").length;
-  const canvasPageHeaderMode = isRunsMode ? "runs" : canvasMode === "edit" ? "version-edit" : "version-live";
-  const headerMode = isDashboardMode && dashboardsFeatureEnabled ? "dashboard" : canvasPageHeaderMode;
+  const headerMode = isDashboardMode
+    ? dashboardsFeatureEnabled
+      ? "dashboard"
+      : "version-live"
+    : isRunsMode
+      ? "runs"
+      : canvasMode === "edit"
+        ? "version-edit"
+        : "version-live";
   const onDashboardAddPanel =
     isDashboardMode && dashboardsFeatureEnabled && !isTemplate && canUpdateCanvas
       ? () => setIsDashboardAddPanelOpen(true)
@@ -5763,11 +5770,10 @@ export function WorkflowPageV2() {
           awaitingApprovalBanner={awaitingApprovalBanner}
           showCanvasSettingsMenu={canUpdateCanvas}
           isVersionControlOpen={isVersionControlOpen}
-          onOpenVersionControl={!hasEditableVersion ? () => setIsVersionControlOpen((prev) => !prev) : undefined}
-          versionControlButtonTooltip={isVersionControlOpen ? "Close versions" : "Open versions"}
-          versionControlNotificationCount={pendingApprovalVersions.length}
+          onOpenVersionControl={!hasEditableVersion ? handleToggleVersionControl : undefined}
           showBottomStatusControls={!isTemplate && !isRunsMode}
           hideAddControls={isTemplate || isRunsMode}
+          hideCanvasToolSidebar={isTemplate}
           memoryItemCount={canvasMemoryEntries.length}
           onMemoryOpen={() => setIsMemoryViewModalOpen(true)}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
@@ -5819,7 +5825,7 @@ export function WorkflowPageV2() {
           viewportRef={isRunsMode ? runsViewportRef : viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
           fitAllRequest={isRunsMode ? runsFitAllNonce : null}
-          runCanvasLoading={isRunsMode && !!selectedRunRootEventId && selectedRunExecutionsQuery.isLoading}
+          runCanvasLoading={isRunsMode && !!selectedRun?.rootEvent?.id && selectedRunExecutionsQuery.isLoading}
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
@@ -5839,9 +5845,9 @@ export function WorkflowPageV2() {
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
           onExitEditMode={handleExitEditModeFromHeader}
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
+          onExitRunsMode={handleExitRunsMode}
           onSelectDashboard={isTemplate || !dashboardsFeatureEnabled ? undefined : handleSelectDashboardMode}
           onDashboardAddPanel={onDashboardAddPanel}
-          runsNotificationCount={activeRunsCount}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
@@ -5880,9 +5886,9 @@ export function WorkflowPageV2() {
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
           onNodeClick={isRunsMode ? handleRunCanvasNodeClick : undefined}
-          runsSidebar={
+          toolSidebarRunsContent={
             isRunsMode ? (
-              <RunsSidebar
+              <RunsTabPanel
                 runs={runsData.runs}
                 selectedRunId={selectedRunId}
                 onSelectRun={handleSelectRun}
@@ -5899,13 +5905,9 @@ export function WorkflowPageV2() {
               />
             ) : null
           }
-          focusRequest={focusRequest}
-          onExecutionChainHandled={handleExecutionChainHandled}
-          versionControlSidebar={
+          toolSidebarVersionsContent={
             !hasEditableVersion ? (
-              <CanvasVersionControlSidebar
-                isOpen={isVersionControlOpen}
-                onToggle={setIsVersionControlOpen}
+              <VersionsTabPanel
                 liveCanvasVersionId={liveCanvasVersionId}
                 selectedCanvasVersion={selectedCanvasVersion}
                 pendingApprovalVersions={pendingApprovalVersions}
@@ -5922,8 +5924,10 @@ export function WorkflowPageV2() {
                 changeRequestApprovalConfig={liveCanvas?.spec?.changeManagement}
                 rejectedVersions={rejectedVersions}
               />
-            ) : undefined
+            ) : null
           }
+          focusRequest={focusRequest}
+          onExecutionChainHandled={handleExecutionChainHandled}
         />
         {isDraftCanvasLoading ? (
           <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-[1px]">
