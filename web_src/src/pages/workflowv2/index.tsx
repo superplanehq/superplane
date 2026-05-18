@@ -2986,12 +2986,18 @@ export function WorkflowPageV2() {
   // Listen for agent sidebar integration button clicks
   useEffect(() => {
     const handler = (e: Event) => {
-      const { integrationName } = (e as CustomEvent).detail;
-      if (integrationName) setIntegrationDialogName(integrationName);
+      const { integrationName, instanceId } = (e as CustomEvent).detail;
+      if (instanceId && organizationId) {
+        // Existing instance — navigate to its settings page
+        navigate(`/${organizationId}/settings/integrations/${instanceId}`);
+      } else if (integrationName) {
+        // No instance — open connect dialog
+        setIntegrationDialogName(integrationName);
+      }
     };
     window.addEventListener("agent:open-integration", handler);
     return () => window.removeEventListener("agent:open-integration", handler);
-  }, []);
+  }, [organizationId, navigate]);
 
   const handleIntegrationCreated = useCallback(
     async (integrationId: string, instanceName: string) => {
