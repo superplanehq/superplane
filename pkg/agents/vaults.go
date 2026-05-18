@@ -142,7 +142,13 @@ func (vm *VaultManager) updateVaultCredential(ctx context.Context, vaultID, cred
 		},
 	}
 
-	return vm.doAnthropicRequest(ctx, "PUT", fmt.Sprintf("/vaults/%s/credentials/%s", vaultID, credentialID), body, nil)
+	// Delete old credential and create new one (update not supported)
+	_ = vm.doAnthropicRequest(ctx, "DELETE", fmt.Sprintf("/vaults/%s/credentials/%s", vaultID, credentialID), nil, nil)
+	var resp struct{ ID string `json:"id"` }
+	if err := vm.doAnthropicRequest(ctx, "POST", fmt.Sprintf("/vaults/%s/credentials", vaultID), body, &resp); err != nil {
+		return err
+	}
+	return nil
 }
 
 // doAnthropicRequest is a helper for calling the Anthropic API.

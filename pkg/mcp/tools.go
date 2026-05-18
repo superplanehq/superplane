@@ -2,7 +2,10 @@ package mcp
 
 import (
 	"context"
+	"bytes"
 	"encoding/json"
+	"net/http"
+	"io"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -272,15 +275,77 @@ func handleCanvasUpdate(ctx context.Context, args map[string]interface{}) (inter
 		return nil, fmt.Errorf("invalid YAML content: %w", err)
 	}
 
-	// This is a simplified update handler that validates the YAML
-	// Full implementation would parse and update the draft version
-	// using similar logic to pkg/grpc/actions/canvases/update_canvas_version.go
+	// Call our own API to create/update the draft version.
+	// The API expects the YAML to have apiVersion/kind/metadata/spec structure.
+	// If the agent sends raw nodes/edges, wrap them.
+	apiURL := fmt.Sprintf("http://localhost:8000/api/v1/canvases/%s/versions", canvasID)
+
+	// Ensure YAML has proper structure
+	if _, hasApiVersion := canvasData["apiVersion"]; !hasApiVersion {
+		// Wrap raw canvas data in proper structure
+		wrapped := map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Canvas",
+			"metadata": map[string]interface{}{
+				"id":   canvasID,
+				"name": canvasData["name"],
+			},
+			"spec": map[string]interface{}{
+				"nodes": canvasData["nodes"],
+				"edges": canvasData["edges"],
+			},
+		}
+		yamlBytes, err := yaml.Marshal(wrapped)
+		if err != nil {
+			return nil, fmt.Errorf("failed to re-serialize YAML: %w", err)
+		}
+		yamlContent = string(yamlBytes)
+	}
+
+	// Build the update request
+	updateBody := map[string]interface{}{
+		"yaml":  yamlContent,
+		"draft": true,
+	}
+	bodyBytes, err := json.Marshal(updateBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal update body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "PUT", apiURL, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-organization-id", orgID)
+	if bearerToken, ok := ctx.Value("bearer_token").(string); ok && bearerToken != "" {
+		req.Header.Set("Authorization", "Bearer "+bearerToken)
+	}
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("update API call failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("canvas update failed (HTTP %d): %s", resp.StatusCode, string(respBody))
+	}
+
+	var updateResp map[string]interface{}
+	json.Unmarshal(respBody, &updateResp)
 
 	result := map[string]interface{}{
 		"success":   true,
 		"canvas_id": canvas.ID.String(),
-		"message":   "Canvas update would be applied to draft version",
-		"warnings":  []string{},
+		"message":   "Draft version created/updated",
+		"response":  updateResp,
 	}
 
 	output, err := json.MarshalIndent(result, "", "  ")
