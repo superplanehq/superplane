@@ -501,4 +501,3 @@ func resolveServiceDeskProjectKey(client *Client, serviceDeskID string) string {
 	}
 	return ""
 }
-
