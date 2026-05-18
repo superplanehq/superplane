@@ -18,14 +18,10 @@ type anthropicEvent struct {
 	Error     *struct {
 		Message string `json:"message"`
 	} `json:"error"`
-	// Outcome evaluation fields
-	Iteration  int    `json:"iteration,omitempty"`
-	Passed     bool   `json:"passed,omitempty"`
-	Feedback   string `json:"feedback,omitempty"`
-	Evaluation *struct {
-		Passed   bool   `json:"passed"`
-		Feedback string `json:"feedback"`
-	} `json:"evaluation,omitempty"`
+	// Outcome evaluation fields (from Anthropic SSE stream)
+	Iteration   int    `json:"iteration,omitempty"`
+	Result      string `json:"result,omitempty"`      // "satisfied", "needs_revision", etc.
+	Explanation string `json:"explanation,omitempty"` // grader's prose verdict
 }
 
 type anthropicContentBlock struct {
@@ -83,19 +79,13 @@ func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
 		}, true
 
 	case "span.outcome_evaluation_end":
-		eval := &agents.OutcomeEvaluation{
-			Iteration: raw.Iteration,
-		}
-		if raw.Evaluation != nil {
-			eval.Passed = raw.Evaluation.Passed
-			eval.Feedback = raw.Evaluation.Feedback
-		} else {
-			eval.Passed = raw.Passed
-			eval.Feedback = raw.Feedback
-		}
 		return agents.ProviderEvent{
-			Type:          agents.ProviderEventOutcomeEvaluation,
-			OutcomeResult: eval,
+			Type: agents.ProviderEventOutcomeEvaluation,
+			OutcomeResult: &agents.OutcomeEvaluation{
+				Iteration:   raw.Iteration,
+				Result:      raw.Result,
+				Explanation: raw.Explanation,
+			},
 		}, true
 	}
 

@@ -27,11 +27,11 @@ function dispatchAgentEvent(
   }
   if (data.event === "outcome_evaluation_start" || data.event === "outcome_evaluation_end") {
     const phase = data.event === "outcome_evaluation_start" ? "start" : "end";
-    const extra = (data as { extra?: { iteration?: number; passed?: boolean; feedback?: string } }).extra;
+    const extra = (data as { extra?: { iteration?: number; result?: string; explanation?: string } }).extra;
     callbacks.onOutcomeEvent?.(phase, {
       iteration: extra?.iteration ?? 0,
-      passed: extra?.passed,
-      feedback: extra?.feedback,
+      result: extra?.result,
+      explanation: extra?.explanation,
     });
   }
 }
@@ -51,8 +51,8 @@ const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "w
 
 export type OutcomeEvaluation = {
   iteration: number;
-  passed?: boolean;
-  feedback?: string;
+  result?: string;
+  explanation?: string;
 };
 
 export type AgentStreamCallbacks = {

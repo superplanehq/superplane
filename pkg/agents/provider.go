@@ -34,9 +34,9 @@ type ProviderEvent struct {
 }
 
 type OutcomeEvaluation struct {
-	Iteration int
-	Passed    bool
-	Feedback  string
+	Iteration   int
+	Result      string // "satisfied", "needs_revision", "max_iterations_reached", "failed", "interrupted"
+	Explanation string // grader's prose verdict
 }
 
 type CreateSessionOptions struct {

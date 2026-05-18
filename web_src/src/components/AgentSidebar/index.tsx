@@ -20,7 +20,7 @@ import { ChatComposer } from "./ChatComposer";
 import { useDraftActions } from "./useDraftActions";
 import { useChatScroll } from "./useChatScroll";
 import { isSystemNotification, formatSystemNotification } from "./systemMessages";
-import { OutcomeProgressWidget, type OutcomeState, type OutcomePhase, type OutcomeCategory } from "./widgets/OutcomeProgressWidget";
+import { OutcomeProgressWidget, type OutcomeState, type OutcomePhase, type IterationEntry, type GradingEntry } from "./widgets/OutcomeProgressWidget";
 import type { RubricCategory } from "./widgets/parser";
 
 export interface AgentSidebarProps {
@@ -173,59 +173,59 @@ function ChatConversation({
       onStatusChange: (next: string, err?: string) => {
         setStatus(next || "idle");
         setError(err ?? null);
-        // When session goes idle after grading, check if outcome is done
-        if (next === "idle") {
-          setOutcomeState((prev) => {
-            if (!prev) return prev;
-            if (prev.phase === "grading") {
-              // Grading just finished and session went idle = passed
-              return {
-                ...prev,
-                phase: "passed" as OutcomePhase,
-                criteria: prev.criteria.map((c) => ({ ...c, status: "passed" as const })),
-              };
-            }
-            return prev;
-          });
-        }
-        // When streaming starts after grading ended = failed, agent is fixing
-        if (next === "streaming") {
-          setOutcomeState((prev) => {
-            if (!prev) return prev;
-            if (prev.phase === "grading" || prev.phase === "passed") {
-              // If we thought it passed but agent is working again = it failed
-              const nextIteration = prev.iteration + 1;
-              const isExhausted = nextIteration > prev.maxIterations;
-              return {
-                ...prev,
-                iteration: nextIteration,
-                phase: isExhausted ? ("exhausted" as OutcomePhase) : ("building" as OutcomePhase),
-                criteria: prev.criteria.map((c) => ({ ...c, status: "pending" as const, feedback: undefined })),
-              };
-            }
-            return prev;
-          });
-        }
       },
       onOutcomeEvent: (
         phase: "start" | "end",
-        evaluation: { iteration: number; passed?: boolean; feedback?: string },
+        evaluation: { iteration: number; result?: string; explanation?: string },
       ) => {
         setOutcomeState((prev) => {
           if (!prev) return prev;
           if (phase === "start") {
+            // Grading started — update log with grading entry
+            const updatedLog = [...prev.log];
+            // Mark last iteration as finished
+            const lastEntry = updatedLog[updatedLog.length - 1];
+            if (lastEntry && "phase" in lastEntry && (lastEntry as IterationEntry).phase === "building") {
+              updatedLog[updatedLog.length - 1] = { phase: "finished" };
+            }
+            updatedLog.push({ phase: "grading" });
             return {
               ...prev,
-              iteration: evaluation.iteration > 0 ? evaluation.iteration : prev.iteration,
               phase: "grading" as OutcomePhase,
-              criteria: prev.criteria.map((c) => ({
-                ...c,
-                status: "evaluating" as const,
-              })),
+              log: updatedLog,
             };
           }
-          // phase === "end" — Anthropic doesn't send passed/feedback in SSE events
-          // We detect pass/fail from subsequent session status changes instead
+          // phase === "end" — now we get result + explanation from SSE
+          if (evaluation.result) {
+            const updatedLog = [...prev.log];
+            // Update the last grading entry with result
+            for (let i = updatedLog.length - 1; i >= 0; i--) {
+              const entry = updatedLog[i] as GradingEntry;
+              if (entry.phase === "grading") {
+                updatedLog[i] = {
+                  phase: evaluation.result === "satisfied" ? "satisfied" : "needs_revision",
+                  explanation: evaluation.explanation,
+                };
+                break;
+              }
+            }
+            if (evaluation.result === "satisfied") {
+              return { ...prev, phase: "passed" as OutcomePhase, log: updatedLog };
+            }
+            // Needs revision — add next iteration
+            const nextIteration = prev.iteration + 1;
+            const isExhausted = nextIteration > prev.maxIterations;
+            if (isExhausted) {
+              return { ...prev, phase: "exhausted" as OutcomePhase, log: updatedLog };
+            }
+            updatedLog.push({ phase: "building" });
+            return {
+              ...prev,
+              iteration: nextIteration,
+              phase: "building" as OutcomePhase,
+              log: updatedLog,
+            };
+          }
           return prev;
         });
       },
@@ -257,23 +257,15 @@ function ChatConversation({
       const rubricText = rubric.categories && rubric.categories.length > 0
         ? `# ${rubric.title}\n\n${rubric.categories.map((cat) => `## ${cat.heading}\n${cat.criteria.map((c) => `- ${c.text}`).join("\n")}`).join("\n\n")}`
         : `# ${rubric.title}\n\n${rubric.criteria.map((c) => `- ${c}`).join("\n")}`;
-      // Build outcome categories with indices
-      let outcomeCategories: OutcomeCategory[] | undefined;
-      if (rubric.categories && rubric.categories.length > 0) {
-        let idx = 0;
-        outcomeCategories = rubric.categories.map((cat) => {
-          const indices = cat.criteria.map(() => idx++);
-          return { heading: cat.heading, criteriaIndices: indices };
-        });
-      }
       // Initialize outcome progress widget
       setOutcomeState({
         title: rubric.title,
-        criteria: rubric.criteria.map((c) => ({ text: c, status: "pending" })),
-        categories: outcomeCategories,
+        criteria: rubric.criteria.map((c) => ({ text: c })),
+        categories: rubric.categories,
         iteration: 1,
         maxIterations: 3,
         phase: "building",
+        log: [{ phase: "building" }],
       });
       try {
         await outcomeMutation.mutateAsync({

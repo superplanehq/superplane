@@ -245,9 +245,9 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 				publish(messages.AgentSessionEventMessage{
 					Event: "outcome_evaluation_end",
 					Extra: map[string]any{
-						"iteration": evt.OutcomeResult.Iteration,
-						"passed":    evt.OutcomeResult.Passed,
-						"feedback":  evt.OutcomeResult.Feedback,
+						"iteration":   evt.OutcomeResult.Iteration,
+						"result":      evt.OutcomeResult.Result,
+						"explanation": evt.OutcomeResult.Explanation,
 					},
 				})
 			}
