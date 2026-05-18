@@ -538,6 +538,19 @@ func Test__jqlQuotedProjectKey(t *testing.T) {
 	assert.Equal(t, `a\\b\"c`, jqlQuotedProjectKey(`a\b"c`))
 }
 
+func Test__IsIncidentManagementRequestPractice(t *testing.T) {
+	t.Parallel()
+	assert.True(t, IsIncidentManagementRequestPractice("ITSM_INCIDENT"))
+	assert.True(t, IsIncidentManagementRequestPractice("INCIDENT_MANAGEMENT"))
+	assert.True(t, IsIncidentManagementRequestPractice("Incident management"))
+	assert.True(t, IsIncidentManagementRequestPractice("  incident_management  "))
+	assert.False(t, IsIncidentManagementRequestPractice(""))
+	assert.False(t, IsIncidentManagementRequestPractice("SERVICE_REQUEST"))
+	assert.False(t, IsIncidentManagementRequestPractice("POST_INCIDENT_REVIEW"))
+	assert.False(t, IsIncidentManagementRequestPractice("Post-incident review"))
+	assert.False(t, IsIncidentManagementRequestPractice("ITSM_POST_INCIDENT"))
+}
+
 func Test__Client__IncidentsAPI(t *testing.T) {
 	cloudID := "35273b54-3f06-40d2-880f-dd28cf6daafa"
 

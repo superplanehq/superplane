@@ -33,7 +33,7 @@ func (c *DeleteIncident) Description() string {
 }
 
 func (c *DeleteIncident) Documentation() string {
-	return `The Delete Incident component removes an incident using the [JSM Incidents REST API](https://developer.atlassian.com/cloud/incidents/rest/api-group-incident/).
+	return `The Delete Incident component removes an incident from Jira Service Management.
 
 ## Use Cases
 

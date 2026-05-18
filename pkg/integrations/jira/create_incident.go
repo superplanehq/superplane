@@ -56,7 +56,7 @@ func (c *CreateIncident) Description() string {
 }
 
 func (c *CreateIncident) Documentation() string {
-	return `The Create Incident component opens a new incident in Jira Service Management using the [JSM Incidents REST API](https://developer.atlassian.com/cloud/incidents/rest/api-group-incident/).
+	return `The Create Incident component opens a new incident in Jira Service Management.
 
 ## Use Cases
 
