@@ -70,6 +70,7 @@ import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
 import { RightSideControls } from "./RightSideControls";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
+import { useDeleteShortcut } from "./useDeleteShortcut";
 import type { CanvasPageState } from "./useCanvasState";
 import { useCanvasState } from "./useCanvasState";
 import type { TriggerActionModal } from "@/pages/workflowv2/mappers/types";
@@ -1874,7 +1875,7 @@ function CanvasContent({
   canCreateIntegrations?: boolean;
   onLogView?: () => void;
 }) {
-  const { fitView, screenToFlowPosition, getViewport, getInternalNode, setViewport } = useReactFlow();
+  const { fitView, screenToFlowPosition, getViewport, getInternalNode, getNodes, setViewport } = useReactFlow();
   const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
 
@@ -1991,6 +1992,36 @@ function CanvasContent({
     onChange: useCallback(({ nodes }: { nodes: ReactFlowNode[] }) => {
       setMultiSelectedNodes(nodes.length >= 2 ? nodes : []);
     }, []),
+  });
+
+  const handleDeleteShortcut = useCallback(() => {
+    if (!onNodesDelete && !onNodeDelete) return;
+    // Read directly from React Flow's internal store — `stateRef.current.nodes`
+    // lags by one render cycle, so a fast click+Delete would miss the selection.
+    const selectedNodes = getNodes().filter((n) => n.selected);
+    if (selectedNodes.length === 0) return;
+    const message =
+      selectedNodes.length === 1
+        ? "Are you sure you want to delete this component? This action cannot be undone."
+        : `Are you sure you want to delete the ${selectedNodes.length} selected components? This action cannot be undone.`;
+    if (!window.confirm(message)) {
+      return;
+    }
+    const nodeIds = selectedNodes.map((n) => n.id);
+    if (onNodesDelete) {
+      onNodesDelete(nodeIds);
+    } else {
+      for (const id of nodeIds) {
+        onNodeDelete?.(id);
+      }
+    }
+    stateRef.current.setNodes((nodes) => nodes.map((node) => ({ ...node, selected: false })));
+    setMultiSelectedNodes([]);
+  }, [getNodes, onNodesDelete, onNodeDelete]);
+
+  useDeleteShortcut({
+    disabled: isReadOnly || !isEditMode || (!onNodesDelete && !onNodeDelete),
+    onDelete: handleDeleteShortcut,
   });
 
   const multiSelectedNodeIds = useMemo(() => new Set(multiSelectedNodes.map((n) => n.id)), [multiSelectedNodes]);
@@ -2968,7 +2999,7 @@ function CanvasContent({
                                 event.stopPropagation();
                                 if (
                                   !window.confirm(
-                                    "Are you sure you want to delete the selected nodes? This action cannot be undone.",
+                                    `Are you sure you want to delete the ${multiSelectedNodes.length} selected components? This action cannot be undone.`,
                                   )
                                 ) {
                                   return;

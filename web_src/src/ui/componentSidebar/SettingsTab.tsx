@@ -480,7 +480,6 @@ export function SettingsTab({
             value={currentNodeName}
             onChange={(e) => setCurrentNodeName(e.target.value)}
             placeholder="Enter a name for this node"
-            autoFocus
             className="shadow-none"
             disabled={isReadOnly}
           />
