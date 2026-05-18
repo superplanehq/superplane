@@ -1,6 +1,6 @@
 import { useCanvasId } from "@/hooks/useCanvasId";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { LiveLogStream } from "./liveLogStream";
 import type { CommandSection, LogState } from "./types";
 import { useScrollToBottom } from "./useScrollToBottom";
@@ -77,7 +77,12 @@ export function useLiveLogStream(executionId: string) {
   const canvasId = useCanvasId();
   const [state, setState] = useState<LogState>(initialLogState);
 
-  const { scrollRef } = useScrollToBottom(state);
+  const scrollTrigger = useMemo(() => {
+    const lineCount = state.sections.reduce((count, section) => count + section.lines.length, 0);
+    return `${state.sections.length}:${state.orphanLines.length}:${lineCount}`;
+  }, [state.sections, state.orphanLines]);
+
+  const { scrollRef } = useScrollToBottom(scrollTrigger);
 
   const toggleSection = useCallback((index: number) => {
     setState((prev) => ({
@@ -109,7 +114,8 @@ export function useLiveLogStream(executionId: string) {
           onLogLine: (t) => setState((prev) => appendLineToLatestSection(prev, t)),
           onStreamError: (m) => setState((prev) => ({ ...prev, error: m })),
           onCmdStart: (index, text) => setState((prev) => pushCommandSection(prev, index, text)),
-          onCmdEnd: (index, status, durationMs) => setState((prev) => completeCommandSection(prev, index, status, durationMs)),
+          onCmdEnd: (index, status, durationMs) =>
+            setState((prev) => completeCommandSection(prev, index, status, durationMs)),
         });
       } catch (e) {
         if ((e as Error).name === "AbortError") {
