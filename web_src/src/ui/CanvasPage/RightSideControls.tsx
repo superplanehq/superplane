@@ -11,6 +11,8 @@ export type RightSideControlsProps = {
   onYamlOpen: () => void;
   onMemoryOpen: () => void;
   memoryItemCount?: number;
+  /** When false, the canvas memory control is hidden (e.g. dashboard or runs surface). */
+  showMemoryButton?: boolean;
 };
 
 export const RightSideControls = memo(function RightSideControls(props: RightSideControlsProps) {
@@ -21,12 +23,10 @@ export const RightSideControls = memo(function RightSideControls(props: RightSid
   );
 });
 
-function LiveCanvasButtons({ onMemoryOpen }: RightSideControlsProps) {
-  return (
-    <>
-      <ControlButton tooltip="Canvas memory" onClick={onMemoryOpen} testId="open-memory-button" icon={<Database />} />
-    </>
-  );
+function LiveCanvasButtons({ onMemoryOpen, showMemoryButton = true }: RightSideControlsProps) {
+  return showMemoryButton ? (
+    <ControlButton tooltip="Canvas memory" onClick={onMemoryOpen} testId="open-memory-button" icon={<Database />} />
+  ) : null;
 }
 
 function EditCanvasButtons({ onSidebarOpen, onAddNote, onYamlOpen }: RightSideControlsProps) {

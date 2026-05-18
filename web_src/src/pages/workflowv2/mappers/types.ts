@@ -1,6 +1,6 @@
 import type {
-  CanvasNodeExecutionResult,
   CanvasNodeExecutionResultReason,
+  CanvasesCanvasNodeExecutionResult,
   CanvasesCanvasNodeExecutionState,
   OrganizationsIntegration,
 } from "@/api-client";
@@ -76,7 +76,7 @@ export type ExecutionInfo = {
   createdAt: string;
   updatedAt: string;
   state: CanvasesCanvasNodeExecutionState;
-  result: CanvasNodeExecutionResult;
+  result: CanvasesCanvasNodeExecutionResult;
   resultReason: CanvasNodeExecutionResultReason;
   resultMessage: string;
   metadata: unknown;

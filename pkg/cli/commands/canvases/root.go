@@ -8,9 +8,12 @@ import (
 
 func NewCommand(options core.BindOptions) *cobra.Command {
 	root := &cobra.Command{
-		Use:     "canvases",
-		Short:   "Manage canvases",
-		Long:    core.AgentSkillsHelp(),
+		Use:   "canvases",
+		Short: "Manage canvases",
+		Long: core.AgentSkillsHelp() + `
+
+Canvas URL pattern: {baseURL}/{organizationId}/canvases/{canvasId}
+(e.g. https://app.superplane.com/<organization-id>/canvases/<canvas-id>)`,
 		Aliases: []string{"canvas"},
 	}
 

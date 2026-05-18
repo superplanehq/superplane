@@ -147,13 +147,16 @@ func TruncateTables() error {
 			installation_metadata,
 			blueprints,
 			workflows,
+			workflow_runs,
 			workflow_nodes,
 			workflow_events,
 			workflow_node_execution_kvs,
 			workflow_node_executions,
 			workflow_node_queue_items,
 			workflow_node_requests,
-			webhooks
+			webhooks,
+			agent_sessions,
+			agent_session_messages
 		restart identity cascade;
 	`).Error
 }

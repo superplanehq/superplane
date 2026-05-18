@@ -14,7 +14,7 @@ import {
 import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import type {
   ActionContext,
@@ -88,7 +88,7 @@ function buildPreparedTriggerCanvasNode(args: {
   position: NodePosition;
   canvasMode?: "live" | "edit";
   canvasId: string;
-  openModal: (modal: TriggerActionModal) => void;
+  openModal?: (modal: TriggerActionModal) => void;
 }): CanvasNode {
   const {
     node,
@@ -107,7 +107,7 @@ function buildPreparedTriggerCanvasNode(args: {
     definition: buildComponentDefinition(triggerMetadata),
     lastEvent: buildEventInfo(lastEvent),
     canvasMode,
-    actions: buildTriggerActionContext(canvasId, node.id!, openModal),
+    actions: openModal ? buildTriggerActionContext(canvasId, node.id!, openModal) : undefined,
   });
 
   return {
@@ -180,7 +180,7 @@ export function prepareTriggerNode(
   triggers: TriggersTrigger[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   canvasMode: "live" | "edit" = "live",
-  options: { canvasId: string; openModal: (modal: TriggerActionModal) => void },
+  options: { canvasId: string; openModal?: (modal: TriggerActionModal) => void },
 ): CanvasNode {
   const triggerMetadata = triggers.find((t) => t.name === node.component);
   const displayLabel = getTriggerDisplayLabel(node, triggerMetadata);

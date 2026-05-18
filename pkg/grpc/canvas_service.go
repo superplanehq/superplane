@@ -361,6 +361,15 @@ func (s *CanvasService) ListCanvasEvents(ctx context.Context, req *pb.ListCanvas
 	return canvases.ListCanvasEvents(ctx, s.registry, canvasID, req.Limit, req.Before)
 }
 
+func (s *CanvasService) ListRuns(ctx context.Context, req *pb.ListRunsRequest) (*pb.ListRunsResponse, error) {
+	canvasID, err := uuid.Parse(req.CanvasId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid workflow_id")
+	}
+
+	return canvases.ListRuns(ctx, s.registry, canvasID, req.Limit, req.Before, req.States, req.Results)
+}
+
 func (s *CanvasService) ListCanvasMemories(ctx context.Context, req *pb.ListCanvasMemoriesRequest) (*pb.ListCanvasMemoriesResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.ListCanvasMemories(ctx, s.registry, organizationID, req.CanvasId)
@@ -369,6 +378,16 @@ func (s *CanvasService) ListCanvasMemories(ctx context.Context, req *pb.ListCanv
 func (s *CanvasService) DeleteCanvasMemory(ctx context.Context, req *pb.DeleteCanvasMemoryRequest) (*pb.DeleteCanvasMemoryResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.DeleteCanvasMemory(ctx, s.registry, organizationID, req.CanvasId, req.MemoryId)
+}
+
+func (s *CanvasService) GetCanvasDashboard(ctx context.Context, req *pb.GetCanvasDashboardRequest) (*pb.GetCanvasDashboardResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetCanvasDashboard(ctx, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) UpdateCanvasDashboard(ctx context.Context, req *pb.UpdateCanvasDashboardRequest) (*pb.UpdateCanvasDashboardResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvasDashboard(ctx, organizationID, req.CanvasId, req.Panels, req.Layout)
 }
 
 func (s *CanvasService) ListEventExecutions(ctx context.Context, req *pb.ListEventExecutionsRequest) (*pb.ListEventExecutionsResponse, error) {

@@ -1,0 +1,203 @@
+import { renderTimeAgo } from "@/components/TimeAgo";
+import { getColorClass } from "@/lib/colors";
+import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
+import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
+import React from "react";
+import { getTriggerRenderer } from ".";
+
+import type {
+  ComponentBaseContext,
+  ComponentBaseMapper,
+  EventStateRegistry,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "./types";
+
+import { stringOrDash } from "./utils";
+
+const EXECUTION_MODE_DOCKER = "docker";
+const DOCKER_IMAGE_PRESET_CUSTOM = "custom";
+
+/** Mirrors `resolvedDockerImageRef` in pkg/components/runner/spec.go for execution summaries. */
+function resolvedContainerImageRef(c: Record<string, unknown>): string {
+  const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
+  if (rawMode !== EXECUTION_MODE_DOCKER) {
+    return "";
+  }
+  const preset = typeof c.docker_image_preset === "string" ? c.docker_image_preset.trim() : "";
+  const custom = typeof c.docker_image === "string" ? c.docker_image.trim() : "";
+  if (!preset) {
+    return custom;
+  }
+  if (preset === DOCKER_IMAGE_PRESET_CUSTOM) {
+    return custom;
+  }
+  return preset;
+}
+
+/** Exported for tests; mirrors runner node configuration shown in execution details. */
+export function runnerConfigurationDetails(configuration: unknown): Record<string, string> {
+  const details: Record<string, string> = {};
+  if (!configuration || typeof configuration !== "object") {
+    return details;
+  }
+  const c = configuration as Record<string, unknown>;
+  const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
+  if (rawMode === EXECUTION_MODE_DOCKER) {
+    details["Execution mode"] = "Docker";
+  } else {
+    details["Execution mode"] = "Host";
+  }
+  const image = resolvedContainerImageRef(c);
+  if (image) {
+    details["Container image"] = image;
+  }
+  const timeoutRaw = c.execution_timeout_seconds;
+  if (typeof timeoutRaw === "number" && Number.isFinite(timeoutRaw)) {
+    if (timeoutRaw > 0) {
+      details["Timeout (seconds)"] = String(Math.trunc(timeoutRaw));
+    } else if (timeoutRaw === 0) {
+      details["Timeout (seconds)"] = "Broker default (0)";
+    }
+  } else if (typeof timeoutRaw === "string") {
+    const t = timeoutRaw.trim();
+    if (t === "0") {
+      details["Timeout (seconds)"] = "Broker default (0)";
+    } else if (t !== "") {
+      details["Timeout (seconds)"] = t;
+    }
+  }
+  return details;
+}
+
+const RUNNER_STATE_MAP: EventStateMap = {
+  ...DEFAULT_EVENT_STATE_MAP,
+  passed: DEFAULT_EVENT_STATE_MAP.success,
+};
+
+type RunnerOutputs = { passed?: OutputPayload[]; failed?: OutputPayload[]; default?: OutputPayload[] } | undefined;
+
+function firstRunnerPayload(execution: ExecutionInfo): Record<string, unknown> | undefined {
+  const outputs = execution.outputs as RunnerOutputs;
+  const payload = outputs?.failed?.[0]?.data ?? outputs?.passed?.[0]?.data ?? outputs?.default?.[0]?.data;
+  if (!payload || typeof payload !== "object") return undefined;
+  return payload as Record<string, unknown>;
+}
+
+function runnerFinishedPassedState(execution: ExecutionInfo): EventState {
+  const outputs = execution.outputs as RunnerOutputs;
+  if (outputs?.failed?.length) {
+    return "failed";
+  }
+  if (outputs?.passed?.length) {
+    return "passed";
+  }
+
+  const payload = firstRunnerPayload(execution);
+  const exitCode = payload?.exit_code;
+  if (typeof exitCode === "number") {
+    return exitCode === 0 ? "passed" : "failed";
+  }
+  return "passed";
+}
+
+const runnerStateFunction = (execution: ExecutionInfo): EventState => {
+  if (!execution) return "neutral";
+
+  if (
+    execution.resultMessage &&
+    (execution.resultReason === "RESULT_REASON_ERROR" ||
+      (execution.result === "RESULT_FAILED" && execution.resultReason !== "RESULT_REASON_ERROR_RESOLVED"))
+  ) {
+    return "error";
+  }
+
+  if (execution.result === "RESULT_CANCELLED") {
+    return "cancelled";
+  }
+
+  if (execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED") {
+    return "running";
+  }
+
+  if (execution.state === "STATE_FINISHED" && execution.result === "RESULT_PASSED") {
+    return runnerFinishedPassedState(execution);
+  }
+
+  return "failed";
+};
+
+export const RUNNER_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: RUNNER_STATE_MAP,
+  getState: runnerStateFunction,
+};
+
+export const runnerMapper: ComponentBaseMapper = {
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
+    const title =
+      context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component";
+    const iconSlug = context.componentDefinition.icon || "terminal";
+    const iconColor = getColorClass(context.componentDefinition?.color || "blue");
+
+    const customField =
+      lastExecution && context.canvasMode === "live"
+        ? () => <RunnerLiveLogDialog canvasMode={context.canvasMode ?? "live"} executionId={lastExecution.id} />
+        : undefined;
+
+    return {
+      title,
+      iconSlug,
+      iconColor,
+      collapsed: context.node.isCollapsed,
+      collapsedBackground: "bg-white",
+      eventSections: lastExecution ? runnerEventSections(context.nodes, lastExecution) : undefined,
+      includeEmptyState: !lastExecution,
+      metadata: [],
+      specs: [],
+      eventStateMap: RUNNER_STATE_MAP,
+      customField,
+      customFieldPosition: "before",
+    };
+  },
+  subtitle(context: SubtitleContext): string | React.ReactNode {
+    const timestamp = context.execution.updatedAt || context.execution.createdAt;
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
+  },
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
+    const details: Record<string, string> = {
+      ...runnerConfigurationDetails(context.node.configuration),
+    };
+    const payload = firstRunnerPayload(context.execution);
+    if (!payload) {
+      return details;
+    }
+
+    details["Status"] = stringOrDash(payload.status);
+    details["Exit code"] = stringOrDash(payload.exit_code);
+    return details;
+  },
+};
+
+function runnerEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] | undefined {
+  if (!execution) return undefined;
+  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName ?? "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  const state = runnerStateFunction(execution);
+  const subtitleTimestamp = state === "running" ? execution.createdAt : execution.updatedAt || execution.createdAt;
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : undefined;
+  return [
+    {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventSubtitle,
+      eventState: state,
+      eventId: execution.rootEvent!.id!,
+    },
+  ];
+}

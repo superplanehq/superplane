@@ -12,17 +12,21 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useOrganizationId } from "@/hooks/useOrganizationId";
 import { meKeys, useMe } from "@/hooks/useMe";
+import { useAccount } from "@/contexts/useAccount";
 import { showErrorToast, showSuccessToast } from "@/lib/toast.ts";
+import { ChangePasswordDialog } from "./components/ChangePasswordDialog";
 
 export function Profile() {
   usePageTitle(["Profile"]);
   const queryClient = useQueryClient();
   const organizationId = useOrganizationId();
   const { data: user, isLoading: loading, error: meError } = useMe();
+  const { account } = useAccount();
   const [actionError, setActionError] = useState<string | null>(null);
   const [token, setToken] = useState<string>("");
   const [tokenVisible, setTokenVisible] = useState(false);
   const [regeneratingToken, setRegeneratingToken] = useState(false);
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
 
   const errorMessage =
     actionError || (meError instanceof Error ? meError.message : meError ? "Failed to load profile" : null);
@@ -83,6 +87,8 @@ export function Profile() {
     );
   }
 
+  const canChangePassword = account?.has_password === true;
+
   return (
     <div className="pt-6 max-w-none">
       <Heading level={2} className="text-lg font-medium text-left text-gray-800 dark:text-white mb-4">
@@ -124,6 +130,20 @@ export function Profile() {
                 </Text>
               </div>
             </div>
+
+            {canChangePassword && (
+              <div className="flex items-center gap-4">
+                <Button
+                  type="button"
+                  onClick={() => setPasswordModalOpen(true)}
+                  className="flex items-center gap-2"
+                  data-testid="change-password-button"
+                >
+                  <Icon name="lock" />
+                  Change password
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -199,6 +219,8 @@ export function Profile() {
           </div>
         </div>
       </div>
+
+      {canChangePassword && <ChangePasswordDialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen} />}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React from "react";
 import Editor from "@monaco-editor/react";
 import type { FieldRendererProps } from "./types";
 import { resolveIcon } from "@/lib/utils";
+import { coerceMonacoValue } from "@/lib/monaco";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { SimpleTooltip } from "../componentSidebar/SimpleTooltip";
 import { useMonacoExpressionAutocomplete } from "./useMonacoExpressionAutocomplete";
@@ -15,9 +16,10 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
     languageId: "xml",
   });
 
+  const editorValue = coerceMonacoValue(value);
+
   const copyToClipboard = () => {
-    const textToCopy = (value as string) || "";
-    navigator.clipboard.writeText(textToCopy);
+    navigator.clipboard.writeText(editorValue);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -45,8 +47,6 @@ export const XMLFieldRenderer: React.FC<FieldRendererProps> = ({ field, value, o
       return false;
     }
   };
-
-  const editorValue = (value as string) || "";
 
   const handleEditorChange = (newValue: string | undefined) => {
     const valueToUse = newValue || "";

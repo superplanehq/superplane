@@ -24,12 +24,15 @@ import {
   canvasesPublishCanvasVersion,
   canvasesListNodeExecutions,
   canvasesListCanvasEvents,
+  canvasesListRuns,
   canvasesListCanvasMemories,
   canvasesDeleteCanvasMemory,
   canvasesListEventExecutions,
   canvasesListChildExecutions,
   canvasesListNodeQueueItems,
   canvasesListNodeEvents,
+  canvasesGetCanvasDashboard,
+  canvasesUpdateCanvasDashboard,
   triggersListTriggers,
   triggersDescribeTrigger,
   widgetsListWidgets,
@@ -38,6 +41,8 @@ import {
 import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
+  CanvasesCanvasRunResult,
+  CanvasesCanvasRunState,
   CanvasesCanvasVersion,
   CanvasChangeManagement,
   SuperplaneComponentsNode,
@@ -96,6 +101,15 @@ export const canvasKeys = {
   events: () => [...canvasKeys.all, "events"] as const,
   eventList: (canvasId: string, limit?: number) => [...canvasKeys.events(), canvasId, limit] as const,
   infiniteEvents: (canvasId: string) => [...canvasKeys.events(), canvasId, "infinite"] as const,
+  runs: () => [...canvasKeys.all, "runs"] as const,
+  infiniteRuns: (canvasId: string, filters?: CanvasRunsFilters) =>
+    [
+      ...canvasKeys.runs(),
+      canvasId,
+      "infinite",
+      ...(filters?.states?.length ? ["states", ...filters.states] : []),
+      ...(filters?.results?.length ? ["results", ...filters.results] : []),
+    ] as const,
   eventExecutions: () => [...canvasKeys.all, "eventExecutions"] as const,
   eventExecution: (canvasId: string, eventId: string) => [...canvasKeys.eventExecutions(), canvasId, eventId] as const,
   childExecutions: () => [...canvasKeys.all, "childExecutions"] as const,
@@ -113,7 +127,24 @@ export const canvasKeys = {
   nodeQueueItemHistory: (canvasId: string, nodeId: string) =>
     [...canvasKeys.nodeQueueItems(), "infinite", canvasId, nodeId] as const,
   canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
+  dashboard: (canvasId: string) => [...canvasKeys.all, "dashboard", canvasId] as const,
 };
+
+export interface DashboardPanel {
+  id: string;
+  type: string;
+  content: Record<string, unknown>;
+}
+
+export interface DashboardLayoutItem {
+  i: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  minW?: number;
+  minH?: number;
+}
 
 export const CANVAS_FOLDER_COLORS = ["blue", "green", "purple", "yellow", "slate", "orange"] as const;
 export type CanvasFolderColor = (typeof CANVAS_FOLDER_COLORS)[number];
@@ -1153,6 +1184,44 @@ export const useInfiniteCanvasEvents = (canvasId: string, enabled = true) => {
   });
 };
 
+export type CanvasRunsFilters = {
+  states?: CanvasesCanvasRunState[];
+  results?: CanvasesCanvasRunResult[];
+};
+
+export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilters = {}, enabled = true) => {
+  const limit = 25;
+
+  return useInfiniteQuery({
+    queryKey: canvasKeys.infiniteRuns(canvasId, filters),
+    queryFn: async ({ pageParam }: { pageParam?: string }) => {
+      const response = await canvasesListRuns(
+        withOrganizationHeader({
+          path: { canvasId },
+          query: {
+            limit,
+            ...(filters.states?.length ? { states: filters.states } : {}),
+            ...(filters.results?.length ? { results: filters.results } : {}),
+            ...(pageParam ? { before: pageParam } : {}),
+          },
+        }),
+      );
+      return response.data;
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const currentLoadedCount = allPages.reduce((acc, page) => acc + (page?.runs?.length || 0), 0);
+      const totalCount = lastPage?.totalCount || 0;
+
+      if (currentLoadedCount >= totalCount) return undefined;
+      return lastPage?.lastTimestamp;
+    },
+    initialPageParam: undefined as string | undefined,
+    staleTime: 0,
+    refetchOnWindowFocus: false,
+    enabled: !!canvasId && enabled,
+  });
+};
+
 export interface CanvasMemoryEntry {
   id: string;
   namespace: string;
@@ -1510,3 +1579,55 @@ export const useInfiniteNodeQueueItems = (canvasId: string, nodeId: string, enab
     refetchOnWindowFocus: false,
   });
 };
+
+export const useCanvasDashboard = (canvasId: string, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: canvasKeys.dashboard(canvasId),
+    queryFn: async () => {
+      const response = await canvasesGetCanvasDashboard(
+        withOrganizationHeader({
+          path: { canvasId },
+        }),
+      );
+      return response.data?.dashboard;
+    },
+    enabled: enabled && !!canvasId,
+    staleTime: 30_000,
+  });
+};
+
+export const useUpdateCanvasDashboard = (canvasId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
+      const response = await canvasesUpdateCanvasDashboard(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: {
+            panels: input.panels.map((p) => ({
+              id: p.id,
+              type: p.type,
+              content: p.content,
+            })),
+            layout: input.layout.map((l) => ({
+              i: l.i,
+              x: l.x,
+              y: l.y,
+              w: l.w,
+              h: l.h,
+              ...(l.minW !== undefined ? { minW: l.minW } : {}),
+              ...(l.minH !== undefined ? { minH: l.minH } : {}),
+            })),
+          },
+        }),
+      );
+      return response.data?.dashboard;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(canvasKeys.dashboard(canvasId), data);
+    },
+  });
+};
+
+export type CanvasDashboardQueryResult = ReturnType<typeof useCanvasDashboard>;
+export type UpdateCanvasDashboardMutationResult = ReturnType<typeof useUpdateCanvasDashboard>;

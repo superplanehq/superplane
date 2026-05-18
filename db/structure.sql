@@ -96,7 +96,43 @@ CREATE TABLE public.accounts (
     name character varying(255) NOT NULL,
     created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    installation_admin boolean DEFAULT false NOT NULL
+    installation_admin boolean DEFAULT false NOT NULL,
+    password_changed_at timestamp with time zone
+);
+
+
+--
+-- Name: agent_session_messages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_session_messages (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    session_id uuid NOT NULL,
+    provider_event_id text DEFAULT ''::text NOT NULL,
+    role character varying(20) NOT NULL,
+    content text DEFAULT ''::text NOT NULL,
+    tool_call_id text DEFAULT ''::text NOT NULL,
+    tool_name text DEFAULT ''::text NOT NULL,
+    tool_status character varying(20) DEFAULT ''::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: agent_sessions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.agent_sessions (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    organization_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    canvas_id uuid NOT NULL,
+    provider character varying(40) NOT NULL,
+    provider_session_id text NOT NULL,
+    status character varying(40) DEFAULT 'idle'::character varying NOT NULL,
+    last_active_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -190,6 +226,18 @@ CREATE TABLE public.blueprints (
     icon character varying(32),
     color character varying(32),
     created_by uuid
+);
+
+
+--
+-- Name: canvas_dashboards; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.canvas_dashboards (
+    canvas_id uuid NOT NULL,
+    panels jsonb DEFAULT '[]'::jsonb NOT NULL,
+    layout jsonb DEFAULT '[]'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -319,27 +367,6 @@ CREATE TABLE public.installation_metadata (
 
 
 --
--- Name: organization_agent_settings; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.organization_agent_settings (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    organization_id uuid NOT NULL,
-    agent_mode_enabled boolean DEFAULT false NOT NULL,
-    openai_api_key_ciphertext bytea,
-    openai_key_encryption_key_id character varying(255),
-    openai_key_last4 character varying(8),
-    openai_key_status character varying(32) DEFAULT 'not_configured'::character varying NOT NULL,
-    openai_key_validated_at timestamp without time zone,
-    openai_key_validation_error text,
-    updated_by uuid,
-    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT organization_agent_settings_openai_key_status_check CHECK (((openai_key_status)::text = ANY ((ARRAY['not_configured'::character varying, 'valid'::character varying, 'invalid'::character varying, 'unchecked'::character varying])::text[])))
-);
-
-
---
 -- Name: organization_invitations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -384,7 +411,8 @@ CREATE TABLE public.organizations (
     usage_synced_at timestamp with time zone,
     usage_retention_window_days integer,
     usage_limits_synced_at timestamp with time zone,
-    change_management_enabled boolean DEFAULT false NOT NULL
+    change_management_enabled boolean DEFAULT false NOT NULL,
+    enabled_experimental_features jsonb DEFAULT '[]'::jsonb NOT NULL
 );
 
 
@@ -524,7 +552,8 @@ CREATE TABLE public.workflow_events (
     state character varying(32) NOT NULL,
     execution_id uuid,
     created_at timestamp without time zone NOT NULL,
-    custom_name text
+    custom_name text,
+    run_id uuid NOT NULL
 );
 
 
@@ -563,7 +592,8 @@ CREATE TABLE public.workflow_node_executions (
     configuration jsonb DEFAULT '{}'::jsonb NOT NULL,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    cancelled_by uuid
+    cancelled_by uuid,
+    run_id uuid NOT NULL
 );
 
 
@@ -577,7 +607,8 @@ CREATE TABLE public.workflow_node_queue_items (
     node_id character varying(128) NOT NULL,
     root_event_id uuid,
     event_id uuid,
-    created_at timestamp without time zone NOT NULL
+    created_at timestamp without time zone NOT NULL,
+    run_id uuid NOT NULL
 );
 
 
@@ -621,6 +652,21 @@ CREATE TABLE public.workflow_nodes (
     deleted_at timestamp with time zone,
     app_installation_id uuid,
     state_reason text
+);
+
+
+--
+-- Name: workflow_runs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.workflow_runs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    workflow_id uuid NOT NULL,
+    state character varying(32) NOT NULL,
+    result character varying(32),
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    finished_at timestamp without time zone
 );
 
 
@@ -735,6 +781,22 @@ ALTER TABLE ONLY public.accounts
 
 
 --
+-- Name: agent_session_messages agent_session_messages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_session_messages
+    ADD CONSTRAINT agent_session_messages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_sessions agent_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_sessions
+    ADD CONSTRAINT agent_sessions_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: app_installation_requests app_installation_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -788,6 +850,14 @@ ALTER TABLE ONLY public.blueprints
 
 ALTER TABLE ONLY public.blueprints
     ADD CONSTRAINT blueprints_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: canvas_dashboards canvas_dashboards_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_dashboards
+    ADD CONSTRAINT canvas_dashboards_pkey PRIMARY KEY (canvas_id);
 
 
 --
@@ -860,22 +930,6 @@ ALTER TABLE ONLY public.group_metadata
 
 ALTER TABLE ONLY public.installation_metadata
     ADD CONSTRAINT installation_metadata_pkey PRIMARY KEY (id);
-
-
---
--- Name: organization_agent_settings organization_agent_settings_organization_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_settings
-    ADD CONSTRAINT organization_agent_settings_organization_id_key UNIQUE (organization_id);
-
-
---
--- Name: organization_agent_settings organization_agent_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_settings
-    ADD CONSTRAINT organization_agent_settings_pkey PRIMARY KEY (id);
 
 
 --
@@ -1063,6 +1117,14 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: workflow_runs workflow_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: workflow_versions workflow_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1084,6 +1146,34 @@ ALTER TABLE ONLY public.workflows
 
 ALTER TABLE ONLY public.workflows
     ADD CONSTRAINT workflows_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: agent_session_messages_provider_event_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX agent_session_messages_provider_event_idx ON public.agent_session_messages USING btree (session_id, provider_event_id) WHERE (provider_event_id <> ''::text);
+
+
+--
+-- Name: agent_session_messages_session_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX agent_session_messages_session_idx ON public.agent_session_messages USING btree (session_id, created_at DESC, id DESC);
+
+
+--
+-- Name: agent_sessions_provider_session_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX agent_sessions_provider_session_id_idx ON public.agent_sessions USING btree (provider, provider_session_id);
+
+
+--
+-- Name: agent_sessions_user_canvas_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX agent_sessions_user_canvas_idx ON public.agent_sessions USING btree (organization_id, user_id, canvas_id);
 
 
 --
@@ -1262,13 +1352,6 @@ CREATE INDEX idx_node_requests_state_run_at ON public.workflow_node_requests USI
 
 
 --
--- Name: idx_organization_agent_settings_organization_id; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE INDEX idx_organization_agent_settings_organization_id ON public.organization_agent_settings USING btree (organization_id);
-
-
---
 -- Name: idx_organizations_deleted_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1346,6 +1429,13 @@ CREATE INDEX idx_workflow_events_execution_id ON public.workflow_events USING bt
 
 
 --
+-- Name: idx_workflow_events_run_id_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_events_run_id_state ON public.workflow_events USING btree (run_id, state);
+
+
+--
 -- Name: idx_workflow_events_state; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1409,6 +1499,13 @@ CREATE INDEX idx_workflow_node_executions_root_event_id ON public.workflow_node_
 
 
 --
+-- Name: idx_workflow_node_executions_run_id_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_executions_run_id_state ON public.workflow_node_executions USING btree (run_id, state);
+
+
+--
 -- Name: idx_workflow_node_executions_state_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1437,6 +1534,13 @@ CREATE INDEX idx_workflow_node_queue_items_root_event_id ON public.workflow_node
 
 
 --
+-- Name: idx_workflow_node_queue_items_run_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_node_queue_items_run_id ON public.workflow_node_queue_items USING btree (run_id);
+
+
+--
 -- Name: idx_workflow_node_requests_execution_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1462,6 +1566,20 @@ CREATE INDEX idx_workflow_nodes_parent ON public.workflow_nodes USING btree (wor
 --
 
 CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (state);
+
+
+--
+-- Name: idx_workflow_runs_workflow_created_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_workflow_created_at ON public.workflow_runs USING btree (workflow_id, created_at DESC);
+
+
+--
+-- Name: idx_workflow_runs_workflow_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_workflow_state ON public.workflow_runs USING btree (workflow_id, state);
 
 
 --
@@ -1551,6 +1669,14 @@ ALTER TABLE ONLY public.account_providers
 
 
 --
+-- Name: agent_session_messages agent_session_messages_session_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.agent_session_messages
+    ADD CONSTRAINT agent_session_messages_session_id_fkey FOREIGN KEY (session_id) REFERENCES public.agent_sessions(id) ON DELETE CASCADE;
+
+
+--
 -- Name: app_installation_requests app_installation_requests_app_installation_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1604,6 +1730,14 @@ ALTER TABLE ONLY public.app_installation_subscriptions
 
 ALTER TABLE ONLY public.app_installations
     ADD CONSTRAINT app_installations_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: canvas_dashboards canvas_dashboards_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_dashboards
+    ADD CONSTRAINT canvas_dashboards_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
 
 
 --
@@ -1676,22 +1810,6 @@ ALTER TABLE ONLY public.workflow_node_requests
 
 ALTER TABLE ONLY public.workflow_nodes
     ADD CONSTRAINT fk_workflow_nodes_parent FOREIGN KEY (workflow_id, parent_node_id) REFERENCES public.workflow_nodes(workflow_id, node_id) ON DELETE CASCADE;
-
-
---
--- Name: organization_agent_settings organization_agent_settings_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_settings
-    ADD CONSTRAINT organization_agent_settings_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
-
-
---
--- Name: organization_agent_settings organization_agent_settings_updated_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.organization_agent_settings
-    ADD CONSTRAINT organization_agent_settings_updated_by_fkey FOREIGN KEY (updated_by) REFERENCES public.users(id) ON DELETE SET NULL;
 
 
 --
@@ -1815,6 +1933,14 @@ ALTER TABLE ONLY public.workflow_events
 
 
 --
+-- Name: workflow_events workflow_events_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_events
+    ADD CONSTRAINT workflow_events_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id);
+
+
+--
 -- Name: workflow_events workflow_events_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1863,6 +1989,14 @@ ALTER TABLE ONLY public.workflow_node_executions
 
 
 --
+-- Name: workflow_node_executions workflow_node_executions_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_executions
+    ADD CONSTRAINT workflow_node_executions_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id);
+
+
+--
 -- Name: workflow_node_executions workflow_node_executions_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1884,6 +2018,14 @@ ALTER TABLE ONLY public.workflow_node_queue_items
 
 ALTER TABLE ONLY public.workflow_node_queue_items
     ADD CONSTRAINT workflow_node_queue_items_root_event_id_fkey FOREIGN KEY (root_event_id) REFERENCES public.workflow_events(id) ON DELETE SET NULL;
+
+
+--
+-- Name: workflow_node_queue_items workflow_node_queue_items_run_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_node_queue_items
+    ADD CONSTRAINT workflow_node_queue_items_run_id_fkey FOREIGN KEY (run_id) REFERENCES public.workflow_runs(id);
 
 
 --
@@ -1932,6 +2074,14 @@ ALTER TABLE ONLY public.workflow_nodes
 
 ALTER TABLE ONLY public.workflow_nodes
     ADD CONSTRAINT workflow_nodes_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id);
+
+
+--
+-- Name: workflow_runs workflow_runs_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_workflow_id_fkey FOREIGN KEY (workflow_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
 
 
 --
@@ -1998,7 +2148,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260506152447	f
+20260515120000	f
 \.
 
 

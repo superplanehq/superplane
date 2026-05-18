@@ -434,53 +434,59 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       };
     };
 
-    const isAllowedToSuggest = (text: string, position: number) => {
-      if (isRawExpression || !props.startWord || !props.suffix) {
+    const isAllowedToSuggest = useCallback(
+      (text: string, position: number) => {
+        if (isRawExpression || !props.startWord || !props.suffix) {
+          return true;
+        }
+
+        const openIndex = text.lastIndexOf(props.startWord, position);
+        if (openIndex === -1) {
+          return false;
+        }
+
+        const closeIndex = text.indexOf(props.suffix, openIndex + 2);
+        if (closeIndex !== -1 && position - 1 > closeIndex) {
+          return false;
+        }
+
         return true;
-      }
+      },
+      [isRawExpression, props.startWord, props.suffix],
+    );
 
-      const openIndex = text.lastIndexOf(props.startWord, position);
-      if (openIndex === -1) {
-        return false;
-      }
+    const getExpressionContext = useCallback(
+      (text: string, cursor: number) => {
+        if (isRawExpression || !startWord || !suffix) {
+          return {
+            expressionText: text,
+            expressionCursor: cursor,
+            startOffset: 0,
+            endOffset: text.length,
+          };
+        }
 
-      const closeIndex = text.indexOf(props.suffix, openIndex + 2);
-      if (closeIndex !== -1 && position - 1 > closeIndex) {
-        return false;
-      }
+        const openIndex = text.lastIndexOf(startWord, cursor);
+        if (openIndex === -1) {
+          return null;
+        }
 
-      return true;
-    };
+        const closeIndex = text.indexOf(suffix, openIndex + startWord.length);
+        if (closeIndex !== -1 && cursor - 1 > closeIndex) {
+          return null;
+        }
 
-    const getExpressionContext = (text: string, cursor: number) => {
-      if (isRawExpression || !startWord || !suffix) {
+        const startOffset = openIndex + startWord.length;
+        const endOffset = closeIndex === -1 ? text.length : closeIndex;
         return {
-          expressionText: text,
-          expressionCursor: cursor,
-          startOffset: 0,
-          endOffset: text.length,
+          expressionText: text.slice(startOffset, endOffset),
+          expressionCursor: Math.max(0, cursor - startOffset),
+          startOffset,
+          endOffset,
         };
-      }
-
-      const openIndex = text.lastIndexOf(startWord, cursor);
-      if (openIndex === -1) {
-        return null;
-      }
-
-      const closeIndex = text.indexOf(suffix, openIndex + startWord.length);
-      if (closeIndex !== -1 && cursor - 1 > closeIndex) {
-        return null;
-      }
-
-      const startOffset = openIndex + startWord.length;
-      const endOffset = closeIndex === -1 ? text.length : closeIndex;
-      return {
-        expressionText: text.slice(startOffset, endOffset),
-        expressionCursor: Math.max(0, cursor - startOffset),
-        startOffset,
-        endOffset,
-      };
-    };
+      },
+      [isRawExpression, startWord, suffix],
+    );
 
     const getSuggestionInsertText = (suggestion: ReturnType<typeof getSuggestions>[number]) => {
       if (suggestion.kind === "function") {
@@ -555,7 +561,102 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       return { start: left.length, end: left.length };
     };
 
-    const resolveExpressionValue = (expression: string, globals: Record<string, unknown>) => {
+    const extractTailExpressionWithParens = (expr: string) => {
+      const s = expr.trim();
+      let i = s.length - 1;
+      let bracketDepth = 0;
+      let parenDepth = 0;
+      let inSingle = false;
+      let inDouble = false;
+
+      const isEscaped = (idx: number): boolean => {
+        let bs = 0;
+        for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
+        return bs % 2 === 1;
+      };
+
+      const isStopChar = (ch: string): boolean =>
+        ch === "(" ||
+        ch === ")" ||
+        ch === "," ||
+        ch === ";" ||
+        ch === ":" ||
+        ch === "?" ||
+        ch === "+" ||
+        ch === "-" ||
+        ch === "*" ||
+        ch === "/" ||
+        ch === "%" ||
+        ch === "|" ||
+        ch === "&" ||
+        ch === "!" ||
+        ch === "=" ||
+        ch === "<" ||
+        ch === ">" ||
+        ch === "\n" ||
+        ch === "\r" ||
+        ch === "\t" ||
+        ch === " ";
+
+      for (; i >= 0; i--) {
+        const ch = s[i];
+
+        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
+        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
+
+        if (inSingle || inDouble) continue;
+
+        if (ch === "]") {
+          bracketDepth++;
+          continue;
+        }
+        if (ch === "[") {
+          bracketDepth = Math.max(0, bracketDepth - 1);
+          continue;
+        }
+        if (ch === ")") {
+          parenDepth++;
+          continue;
+        }
+        if (ch === "(") {
+          if (parenDepth === 0) {
+            return s.slice(i + 1).trim();
+          }
+          parenDepth = Math.max(0, parenDepth - 1);
+          continue;
+        }
+
+        if (bracketDepth > 0 || parenDepth > 0) continue;
+
+        if (isStopChar(ch)) {
+          return s.slice(i + 1).trim();
+        }
+      }
+
+      return s;
+    };
+
+    const normalizeSpecialFunctionExpr = (expr: string): string | null => {
+      const rootMatch = expr.match(/^root\(\)/);
+      if (rootMatch) {
+        return `__root${expr.slice(rootMatch[0].length)}`;
+      }
+
+      const previousMatch = expr.match(/^previous\(([^)]*)\)/);
+      if (previousMatch) {
+        const raw = (previousMatch[1] ?? "").trim();
+        const depth = raw === "" ? 1 : Number(raw);
+        if (!Number.isInteger(depth) || depth < 1) {
+          return null;
+        }
+
+        return `__previousByDepth["${depth}"]${expr.slice(previousMatch[0].length)}`;
+      }
+
+      return expr;
+    };
+
+    const resolveExpressionValue = useCallback((expression: string, globals: Record<string, unknown>) => {
       const tailExpr = extractTailExpressionWithParens(expression);
       if (!tailExpr) return undefined;
 
@@ -680,102 +781,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       }
 
       return cur;
-    };
-
-    const extractTailExpressionWithParens = (expr: string) => {
-      const s = expr.trim();
-      let i = s.length - 1;
-      let bracketDepth = 0;
-      let parenDepth = 0;
-      let inSingle = false;
-      let inDouble = false;
-
-      const isEscaped = (idx: number): boolean => {
-        let bs = 0;
-        for (let j = idx - 1; j >= 0 && s[j] === "\\"; j--) bs++;
-        return bs % 2 === 1;
-      };
-
-      const isStopChar = (ch: string): boolean =>
-        ch === "(" ||
-        ch === ")" ||
-        ch === "," ||
-        ch === ";" ||
-        ch === ":" ||
-        ch === "?" ||
-        ch === "+" ||
-        ch === "-" ||
-        ch === "*" ||
-        ch === "/" ||
-        ch === "%" ||
-        ch === "|" ||
-        ch === "&" ||
-        ch === "!" ||
-        ch === "=" ||
-        ch === "<" ||
-        ch === ">" ||
-        ch === "\n" ||
-        ch === "\r" ||
-        ch === "\t" ||
-        ch === " ";
-
-      for (; i >= 0; i--) {
-        const ch = s[i];
-
-        if (!inDouble && ch === "'" && !isEscaped(i)) inSingle = !inSingle;
-        else if (!inSingle && ch === '"' && !isEscaped(i)) inDouble = !inDouble;
-
-        if (inSingle || inDouble) continue;
-
-        if (ch === "]") {
-          bracketDepth++;
-          continue;
-        }
-        if (ch === "[") {
-          bracketDepth = Math.max(0, bracketDepth - 1);
-          continue;
-        }
-        if (ch === ")") {
-          parenDepth++;
-          continue;
-        }
-        if (ch === "(") {
-          if (parenDepth === 0) {
-            return s.slice(i + 1).trim();
-          }
-          parenDepth = Math.max(0, parenDepth - 1);
-          continue;
-        }
-
-        if (bracketDepth > 0 || parenDepth > 0) continue;
-
-        if (isStopChar(ch)) {
-          return s.slice(i + 1).trim();
-        }
-      }
-
-      return s;
-    };
-
-    const normalizeSpecialFunctionExpr = (expr: string): string | null => {
-      const rootMatch = expr.match(/^root\(\)/);
-      if (rootMatch) {
-        return `__root${expr.slice(rootMatch[0].length)}`;
-      }
-
-      const previousMatch = expr.match(/^previous\(([^)]*)\)/);
-      if (previousMatch) {
-        const raw = (previousMatch[1] ?? "").trim();
-        const depth = raw === "" ? 1 : Number(raw);
-        if (!Number.isInteger(depth) || depth < 1) {
-          return null;
-        }
-
-        return `__previousByDepth["${depth}"]${expr.slice(previousMatch[0].length)}`;
-      }
-
-      return expr;
-    };
+    }, []);
 
     const computeHighlightedValue = React.useCallback(
       (suggestion: ReturnType<typeof getSuggestions>[number], context: ReturnType<typeof getExpressionContext>) => {
@@ -790,7 +796,7 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
         if (typeof value === "function") return undefined;
         return value;
       },
-      [exampleObj],
+      [exampleObj, resolveExpressionValue],
     );
 
     const valuePreviewWidth = 200;
@@ -955,6 +961,8 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
       exampleObj,
       excludedSuggestions,
       computeHighlightedValue,
+      getExpressionContext,
+      isAllowedToSuggest,
     ]);
 
     // Handle clicking outside to close suggestions
@@ -1126,8 +1134,10 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
     // to prevent position jumping when switching between suggestion types
     const shouldShowValuePreview = showValuePreview && highlightedIndex >= 0;
 
+    const showBottomBar = hasExpressions || (isFocused && !!quickTip);
+
     return (
-      <div ref={containerRef} className={"relative w-full" + (quickTip || hasExpressions ? " mb-6" : "")}>
+      <div ref={containerRef} className="relative w-full">
         {/* Hidden mirror element for measuring cursor position */}
         <span
           ref={mirrorRef}
@@ -1219,61 +1229,60 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             ])}
             {...rest}
           />
-          {/* Bottom bar with preview toggle and quickTip */}
-          {(hasExpressions || quickTip) && (
-            <div className="absolute -bottom-6 left-0 right-0 flex items-center justify-between">
-              {/* Preview toggle - left side */}
-              {hasExpressions ? (
-                <button
-                  type="button"
-                  onClick={() => setPreviewMode(!previewMode)}
-                  className={twMerge([
-                    "flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors",
-                    previewMode
-                      ? allExpressionsValid
-                        ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
-                        : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
-                      : allExpressionsValid
-                        ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
-                        : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30",
-                  ])}
-                >
-                  {previewMode ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  <span>Preview</span>
-                </button>
-              ) : (
-                <span />
-              )}
-              {/* QuickTip - right side */}
-              {(quickTip || hasExpressions) && (
-                <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
-                  {quickTip
-                    ? renderQuickTip(quickTip)
-                    : [
-                        "Use ",
-                        <code
-                          key="default-tip"
-                          className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
-                        >
-                          {"{{"}
-                        </code>,
-                        " to write ",
-                        <a
-                          key="expr-link"
-                          href="https://expr-lang.org/docs/language-definition"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 dark:text-blue-400 hover:underline"
-                        >
-                          expr
-                        </a>,
-                        " expressions",
-                      ]}
-                </span>
-              )}
-            </div>
-          )}
         </span>
+        {/* Bottom bar with preview toggle and quickTip — rendered in normal flow so it
+            never overlaps the input regardless of the parent layout (grid, flex, etc.) */}
+        {showBottomBar && (
+          <div className="flex items-center justify-between mt-1 px-0.5">
+            {/* Preview toggle - left side */}
+            {hasExpressions ? (
+              <button
+                type="button"
+                onClick={() => setPreviewMode(!previewMode)}
+                className={twMerge([
+                  "flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium transition-colors",
+                  previewMode
+                    ? allExpressionsValid
+                      ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                      : "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                    : allExpressionsValid
+                      ? "text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                      : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30",
+                ])}
+              >
+                {previewMode ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                <span>Preview</span>
+              </button>
+            ) : (
+              <span />
+            )}
+            {/* QuickTip - right side */}
+            <span className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
+              {quickTip
+                ? renderQuickTip(quickTip)
+                : [
+                    "Use ",
+                    <code
+                      key="default-tip"
+                      className="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-gray-700 dark:text-gray-300"
+                    >
+                      {"{{"}
+                    </code>,
+                    " to write ",
+                    <a
+                      key="expr-link"
+                      href="https://expr-lang.org/docs/language-definition"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      expr
+                    </a>,
+                    " expressions",
+                  ]}
+            </span>
+          </div>
+        )}
 
         {/* Suggestions Dropdown - rendered in portal to escape overflow:hidden */}
         {isOpen &&

@@ -19,7 +19,6 @@ global_job_config:
   prologue:
     commands:
       - checkout
-      - touch agent/.env
       - echo "$GHCR_PUSH_TOKEN" | docker login ghcr.io -u superplanehq --password-stdin
 
 blocks:
@@ -57,8 +56,6 @@ blocks:
           commands:
             - docker manifest create "$DEV_BASE_IMAGE_REPO:app-latest" "$DEV_BASE_IMAGE_REPO:app-latest-amd64" "$DEV_BASE_IMAGE_REPO:app-latest-arm64"
             - docker manifest push "$DEV_BASE_IMAGE_REPO:app-latest"
-            - docker manifest create "$DEV_BASE_IMAGE_REPO:agent-latest" "$DEV_BASE_IMAGE_REPO:agent-latest-amd64" "$DEV_BASE_IMAGE_REPO:agent-latest-arm64"
-            - docker manifest push "$DEV_BASE_IMAGE_REPO:agent-latest"
 
   - name: "Verify Images"
     dependencies: ["Build Multi-Platform Manifests"]
@@ -67,4 +64,3 @@ blocks:
         - name: "Verify GHCR Images"
           commands:
             - docker manifest inspect "$DEV_BASE_IMAGE_REPO:app-latest"
-            - docker manifest inspect "$DEV_BASE_IMAGE_REPO:agent-latest"

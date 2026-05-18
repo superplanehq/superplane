@@ -28,3 +28,24 @@ export function getCloudflareMonitorDescription(metadata: unknown): string | und
   const raw = m.monitorDescription ?? m.monitor_description;
   return typeof raw === "string" && raw.trim() ? raw.trim() : undefined;
 }
+
+/** Prefer Cloudflare monitor description when node metadata matches the monitor id (see Setup resolver). */
+export function getCloudflareMonitorDisplayLabel(metadata: unknown, monitorId: string): string {
+  const id = monitorId.trim();
+  if (!id) return "-";
+
+  const resolvedId = getCloudflareMonitorId(metadata);
+  const resolvedDesc = getCloudflareMonitorDescription(metadata);
+  if (resolvedId === id && resolvedDesc) {
+    return resolvedDesc;
+  }
+
+  return id;
+}
+
+export function getCloudflareTunnelName(metadata: unknown): string | undefined {
+  const m = metadataRecord(metadata);
+  if (!m) return undefined;
+  const raw = m.tunnelName ?? m.tunnel_name;
+  return typeof raw === "string" && raw.trim() ? raw.trim() : undefined;
+}

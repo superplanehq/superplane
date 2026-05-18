@@ -23,6 +23,7 @@ import (
 	// Import components, triggers, and integrations to register them via init()
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/deletememory"
+	_ "github.com/superplanehq/superplane/pkg/components/display"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
 	_ "github.com/superplanehq/superplane/pkg/components/graphql"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
@@ -30,6 +31,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
+	_ "github.com/superplanehq/superplane/pkg/components/runner"
 	_ "github.com/superplanehq/superplane/pkg/components/send_email"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
