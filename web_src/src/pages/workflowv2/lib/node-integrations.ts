@@ -46,6 +46,48 @@ function buildNonReadyIntegrationMap(integrations: OrganizationsIntegration[]) {
   return map;
 }
 
+export function stripCanvasNodeSetupWarningsForRunsView(nodes: CanvasNode[]): CanvasNode[] {
+  return nodes.map((node) => {
+    const data = node.data as Record<string, unknown> | undefined;
+    if (!data || typeof data !== "object") {
+      return node;
+    }
+
+    const type = data.type;
+    if (type === "component") {
+      const component = data.component;
+      if (!component || typeof component !== "object") {
+        return node;
+      }
+      const c = component as Record<string, unknown>;
+      const { error: _err, warning: _warn, ...rest } = c;
+      return { ...node, data: { ...data, component: rest } };
+    }
+
+    if (type === "trigger") {
+      const trigger = data.trigger;
+      if (!trigger || typeof trigger !== "object") {
+        return node;
+      }
+      const t = trigger as Record<string, unknown>;
+      const { error: _err, warning: _warn, ...rest } = t;
+      return { ...node, data: { ...data, trigger: rest } };
+    }
+
+    if (type === "composite") {
+      const composite = data.composite;
+      if (!composite || typeof composite !== "object") {
+        return node;
+      }
+      const c = composite as Record<string, unknown>;
+      const { error: _err, warning: _warn, ...rest } = c;
+      return { ...node, data: { ...data, composite: rest } };
+    }
+
+    return node;
+  });
+}
+
 export function overlayIntegrationWarnings(
   nodes: CanvasNode[],
   integrations: OrganizationsIntegration[],

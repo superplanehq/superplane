@@ -107,7 +107,11 @@ import {
   versionSortValue,
 } from "./lib/canvas-versions";
 import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
-import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
+import {
+  getNodeIntegrationName,
+  overlayIntegrationWarnings,
+  stripCanvasNodeSetupWarningsForRunsView,
+} from "./lib/node-integrations";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { getVersionActionAvailability } from "./lib/version-action-state";
 import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
@@ -1941,13 +1945,14 @@ export function WorkflowPageV2() {
   const runCanvasData = useMemo<{
     nodes: CanvasNode[];
     edges: CanvasEdge[];
+    participantNodeIds: string[];
   } | null>(() => {
     if (!isRunsMode || !canvas || canvasLoading || triggersLoading || componentsLoading) {
       return null;
     }
 
     if (!selectedRun) {
-      return { nodes: [], edges: [] };
+      return { nodes: [], edges: [], participantNodeIds: [] };
     }
 
     const runNodeIds = new Set<string>();
@@ -1976,10 +1981,6 @@ export function WorkflowPageV2() {
       );
     }
 
-    if (runNodeIds.size === 0) {
-      return { nodes: [], edges: [] };
-    }
-
     const prepared = prepareData(
       canvas,
       allTriggers,
@@ -1993,13 +1994,10 @@ export function WorkflowPageV2() {
       "live",
     );
 
-    const filteredNodes = prepared.nodes.filter((node) => runNodeIds.has(node.id));
-    const filteredNodeIds = new Set(filteredNodes.map((node) => node.id));
-    const filteredEdges = prepared.edges.filter(
-      (edge) => filteredNodeIds.has(edge.source) && filteredNodeIds.has(edge.target),
-    );
+    const nodes = stripCanvasNodeSetupWarningsForRunsView(prepared.nodes);
+    const participantNodeIds = Array.from(runNodeIds);
 
-    return { nodes: filteredNodes, edges: filteredEdges };
+    return { nodes, edges: prepared.edges, participantNodeIds };
   }, [
     isRunsMode,
     selectedRun,
@@ -2026,19 +2024,16 @@ export function WorkflowPageV2() {
     lastRunsViewportKeyRef.current = runsViewportKey;
   }
 
-  const runCanvasNodeIdsKey = useMemo(() => {
-    if (!isRunsMode || !runCanvasData) return null;
-    return runCanvasData.nodes
-      .map((n) => n.id)
-      .sort()
-      .join("|");
-  }, [isRunsMode, runCanvasData]);
+  const runCanvasFitKey = useMemo(() => {
+    if (!isRunsMode || !selectedRunId || !runCanvasData) return null;
+    return `${selectedRunId}|${runCanvasData.participantNodeIds.slice().sort().join("|")}`;
+  }, [isRunsMode, selectedRunId, runCanvasData]);
 
   useEffect(() => {
     if (!isRunsMode) return;
-    if (!runCanvasNodeIdsKey) return;
+    if (!runCanvasFitKey) return;
     setRunsFitAllNonce((n) => n + 1);
-  }, [isRunsMode, runCanvasNodeIdsKey]);
+  }, [isRunsMode, runCanvasFitKey]);
 
   const getSidebarData = useCallback(
     (nodeId: string): SidebarData | null => {
@@ -5095,9 +5090,13 @@ export function WorkflowPageV2() {
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
       if (!isRunsMode || !selectedRun) return;
+      const participants = runCanvasData?.participantNodeIds;
+      if (participants && participants.length > 0 && !participants.includes(nodeId)) {
+        return;
+      }
       setRunDetailNodeId(nodeId);
     },
-    [isRunsMode, selectedRun],
+    [isRunsMode, selectedRun, runCanvasData],
   );
 
   useEffect(() => {
@@ -5819,6 +5818,16 @@ export function WorkflowPageV2() {
           viewportRef={isRunsMode ? runsViewportRef : viewportRef}
           initialFocusNodeId={initialFocusNodeIdRef.current}
           fitAllRequest={isRunsMode ? runsFitAllNonce : null}
+          fitAllFocusNodeIds={
+            isRunsMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
+              ? runCanvasData.participantNodeIds
+              : undefined
+          }
+          runParticipantNodeIds={
+            isRunsMode && selectedRun && runCanvasData && runCanvasData.participantNodeIds.length > 0
+              ? runCanvasData.participantNodeIds
+              : undefined
+          }
           runCanvasLoading={isRunsMode && !!selectedRunRootEventId && selectedRunExecutionsQuery.isLoading}
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}

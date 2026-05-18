@@ -11,8 +11,9 @@ import { TimeAgo } from "@/components/TimeAgo";
 import { Button } from "@/components/ui/button";
 import { useEventExecutions } from "@/hooks/useCanvasData";
 import { cn, flattenObject, resolveIcon } from "@/lib/utils";
-import { getExecutionDetails } from "@/pages/workflowv2/mappers";
-import { getExecutionStatus } from "@/ui/Runs/runPresentation";
+import { getExecutionDetails, getState, getStateMap } from "@/pages/workflowv2/mappers";
+import { buildExecutionInfo } from "@/pages/workflowv2/utils";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 
 interface RunNodeDetailModalProps {
   canvasId: string;
@@ -31,17 +32,42 @@ type TabData = {
   configuration?: unknown;
 };
 
-function StatusPill({ className, label }: { className: string; label: string }) {
+/** Matches {@link EventSectionDisplay} status chip on canvas nodes (style + casing). */
+function EventSectionStatusBadge({ badgeColor, label }: { badgeColor: string; label: string }) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded px-1.5 py-[1px] text-[10px] font-semibold uppercase tracking-wide ring-0",
-        className,
+        "inline-flex shrink-0 items-center justify-center rounded px-[5px] py-[1.5px] text-[11px] font-semibold uppercase tracking-wide text-white",
+        badgeColor,
       )}
     >
       {label}
     </span>
   );
+}
+
+function workflowComponentName(node: ComponentsNode | undefined): string {
+  if (node?.type === "TYPE_ACTION" && node.component) return node.component;
+  if (node?.type === "TYPE_TRIGGER" && node.component) return node.component;
+  return "default";
+}
+
+function eventBadgeForTriggeredTrigger(node: ComponentsNode | undefined): { badgeColor: string; label: string } {
+  const name = workflowComponentName(node);
+  const stateMap = getStateMap(name);
+  const style = stateMap.triggered ?? DEFAULT_EVENT_STATE_MAP.triggered;
+  return { badgeColor: style.badgeColor, label: style.label ?? "triggered" };
+}
+
+function eventBadgeForExecution(
+  node: ComponentsNode | undefined,
+  execution: CanvasesCanvasNodeExecution,
+): { badgeColor: string; label: string } {
+  const name = workflowComponentName(node);
+  const eventState = getState(name)(buildExecutionInfo(execution));
+  const stateMap = getStateMap(name);
+  const style = stateMap[eventState] ?? DEFAULT_EVENT_STATE_MAP.neutral;
+  return { badgeColor: style.badgeColor, label: style.label ?? String(eventState) };
 }
 
 function buildExecutionTabData(
@@ -216,7 +242,11 @@ export function RunNodeDetailModal({
   const hasConfig = hasObjectValue(tabData?.configuration);
   const hasAnyTab = hasDetails || hasPayload || hasConfig;
 
-  const status = nodeExecution ? getExecutionStatus(nodeExecution) : null;
+  const headerEventBadge = useMemo(() => {
+    if (isTriggerNode) return eventBadgeForTriggeredTrigger(workflowNode);
+    if (nodeExecution) return eventBadgeForExecution(workflowNode, nodeExecution);
+    return null;
+  }, [isTriggerNode, nodeExecution, workflowNode]);
 
   useEffect(() => {
     if (activeTab === "details" && hasDetails) return;
@@ -282,10 +312,8 @@ export function RunNodeDetailModal({
               </div>
             ) : null}
             <h3 className="truncate text-sm font-medium text-gray-900">{nodeName}</h3>
-            {isTriggerNode ? (
-              <StatusPill className="bg-purple-500 text-white" label="Triggered" />
-            ) : status ? (
-              <StatusPill className={status.className} label={status.label} />
+            {headerEventBadge ? (
+              <EventSectionStatusBadge badgeColor={headerEventBadge.badgeColor} label={headerEventBadge.label} />
             ) : null}
             {createdAt ? (
               <span className="text-xs text-gray-400">
