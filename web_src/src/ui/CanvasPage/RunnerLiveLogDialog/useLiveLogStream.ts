@@ -88,7 +88,7 @@ export function useLiveLogStream(executionId: string) {
     setState((prev) => ({
       ...prev,
       sections: prev.sections.map((section) => {
-        if (section.index !== index || section.status !== "passed") {
+        if (section.index !== index) {
           return section;
         }
         return {
