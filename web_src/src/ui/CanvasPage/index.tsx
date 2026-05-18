@@ -295,6 +295,10 @@ export interface CanvasPageProps {
   initialFocusNodeId?: string | null;
   /** Bump this counter to fit all currently-rendered nodes into view (e.g., when run selection changes). */
   fitAllRequest?: number | null;
+  /** When set with a bumped `fitAllRequest`, fit the viewport to this subset of nodes (e.g. run participants). */
+  fitAllFocusNodeIds?: string[];
+  /** In runs view, nodes not in this list are dimmed unless edge-hover highlighting is active. */
+  runParticipantNodeIds?: string[];
   /** Shows a loading indicator over the canvas (not the sidebar) while run executions are being fetched. */
   runCanvasLoading?: boolean;
 
@@ -422,7 +426,59 @@ type EnrichedCanvasNodeCacheEntry = {
   edges: CanvasEdge[];
   isHighlighted: boolean;
   hasHighlightedNodes: boolean;
+  runParticipantKey: string;
 };
+
+function isCanvasNodeHighlighted({
+  nodeId,
+  edgeHoverActive,
+  highlightedNodeIds,
+  runDimActive,
+  runParticipantSet,
+}: {
+  nodeId: string;
+  edgeHoverActive: boolean;
+  highlightedNodeIds: Set<string>;
+  runDimActive: boolean;
+  runParticipantSet: Set<string> | null;
+}) {
+  if (edgeHoverActive) {
+    return highlightedNodeIds.has(nodeId);
+  }
+
+  return runDimActive && (runParticipantSet?.has(nodeId) ?? false);
+}
+
+function canReuseEnrichedNodeData({
+  cachedNode,
+  node,
+  hoveredEdge,
+  connectingFrom,
+  edges,
+  isHighlighted,
+  hasHighlightedNodes,
+  runParticipantKey,
+}: {
+  cachedNode: EnrichedCanvasNodeCacheEntry | undefined;
+  node: ReactFlowNode;
+  hoveredEdge: CanvasEdge | null;
+  connectingFrom: CanvasConnectionState | null;
+  edges: CanvasEdge[];
+  isHighlighted: boolean;
+  hasHighlightedNodes: boolean;
+  runParticipantKey: string;
+}) {
+  return (
+    cachedNode &&
+    cachedNode.sourceData === node.data &&
+    cachedNode.hoveredEdge === hoveredEdge &&
+    cachedNode.connectingFrom === connectingFrom &&
+    cachedNode.edges === edges &&
+    cachedNode.isHighlighted === isHighlighted &&
+    cachedNode.hasHighlightedNodes === hasHighlightedNodes &&
+    cachedNode.runParticipantKey === runParticipantKey
+  );
+}
 
 type CollapsibleNodeData = {
   type?: unknown;
@@ -1280,6 +1336,8 @@ function CanvasPage(props: CanvasPageProps) {
               focusRequest={props.focusRequest}
               initialFocusNodeId={props.initialFocusNodeId}
               fitAllRequest={props.fitAllRequest}
+              fitAllFocusNodeIds={props.fitAllFocusNodeIds}
+              runParticipantNodeIds={props.runParticipantNodeIds}
               runsEvents={props.runsEvents}
               runsTotalCount={props.runsTotalCount}
               runsHasNextPage={props.runsHasNextPage}
@@ -1804,6 +1862,8 @@ function CanvasContent({
   focusRequest,
   initialFocusNodeId,
   fitAllRequest,
+  fitAllFocusNodeIds,
+  runParticipantNodeIds,
   runsEvents,
   runsTotalCount,
   runsHasNextPage,
@@ -1863,6 +1923,8 @@ function CanvasContent({
   focusRequest?: FocusRequest | null;
   initialFocusNodeId?: string | null;
   fitAllRequest?: number | null;
+  fitAllFocusNodeIds?: string[];
+  runParticipantNodeIds?: string[];
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsTotalCount?: number;
   runsHasNextPage?: boolean;
@@ -1884,7 +1946,7 @@ function CanvasContent({
   canCreateIntegrations?: boolean;
   onLogView?: () => void;
 }) {
-  const { fitView, screenToFlowPosition, getViewport, getInternalNode, setViewport } = useReactFlow();
+  const { fitView, screenToFlowPosition, getViewport, getInternalNode, getNodes, setViewport } = useReactFlow();
   const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
 
@@ -1941,6 +2003,12 @@ function CanvasContent({
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
   const isLiveMode = headerMode === "version-live" || headerMode === "dashboard";
   const isEditMode = headerMode === "version-edit";
+  const runSelectableSet = useMemo(() => {
+    if (headerMode !== "runs" || !runParticipantNodeIds || runParticipantNodeIds.length === 0) {
+      return null;
+    }
+    return new Set(runParticipantNodeIds);
+  }, [headerMode, runParticipantNodeIds]);
 
   useEffect(() => {
     if (isEditMode) {
@@ -2045,6 +2113,10 @@ function CanvasContent({
         return;
       }
 
+      if (runSelectableSet && onNodeClick && !runSelectableSet.has(nodeId)) {
+        return;
+      }
+
       if (isPendingConnection && onPendingConnectionNodeClick) {
         onPendingConnectionNodeClick(nodeId);
       } else if (isPlaceholder && onPendingConnectionNodeClick) {
@@ -2086,6 +2158,7 @@ function CanvasContent({
       onNodeClick,
       setCurrentTab,
       isEditMode,
+      runSelectableSet,
     ],
   );
 
@@ -2323,10 +2396,19 @@ function CanvasContent({
     if (fitAllRequest == null) return;
     if (!hasFitToViewRef.current) return;
     const id = window.setTimeout(() => {
-      fitView({ duration: 500, maxZoom: 1.0, padding: 0.2 });
+      const focusIds = fitAllFocusNodeIds?.length ? new Set(fitAllFocusNodeIds) : null;
+      const renderedNodes = getNodes();
+      const nodeSubset =
+        focusIds && focusIds.size > 0 ? renderedNodes.filter((n) => n.id && focusIds.has(n.id)) : undefined;
+      fitView({
+        ...(nodeSubset && nodeSubset.length > 0 ? { nodes: nodeSubset } : {}),
+        duration: 500,
+        maxZoom: 1.0,
+        padding: 0.2,
+      });
     }, 0);
     return () => window.clearTimeout(id);
-  }, [fitAllRequest, fitView, hasFitToViewRef]);
+  }, [fitAllRequest, fitAllFocusNodeIds, fitView, getNodes, hasFitToViewRef]);
 
   const showHeader = !isReadOnly;
 
@@ -2491,21 +2573,37 @@ function CanvasContent({
 
   const enrichedNodeCacheRef = useRef<Map<string, EnrichedCanvasNodeCacheEntry>>(new Map());
   const nodesWithCallbacks = useMemo(() => {
-    const hasHighlightedNodes = highlightedNodeIds.size > 0;
+    const runParticipantKey =
+      runParticipantNodeIds !== undefined && runParticipantNodeIds.length > 0
+        ? [...runParticipantNodeIds].sort().join("|")
+        : "";
+    const runParticipantSet =
+      runParticipantNodeIds !== undefined && runParticipantNodeIds.length > 0 ? new Set(runParticipantNodeIds) : null;
+    const edgeHoverActive = highlightedNodeIds.size > 0;
+    const runDimActive = runParticipantSet !== null;
+    const hasHighlightedNodes = edgeHoverActive || runDimActive;
     const visibleNodeIds = new Set<string>();
     const enrichedNodes = state.nodes.map((node) => {
       visibleNodeIds.add(node.id);
 
-      const isHighlighted = highlightedNodeIds.has(node.id);
+      const isHighlighted = isCanvasNodeHighlighted({
+        nodeId: node.id,
+        edgeHoverActive,
+        highlightedNodeIds,
+        runDimActive,
+        runParticipantSet,
+      });
       const cachedNode = enrichedNodeCacheRef.current.get(node.id);
-      const canReuseData =
-        cachedNode &&
-        cachedNode.sourceData === node.data &&
-        cachedNode.hoveredEdge === hoveredEdge &&
-        cachedNode.connectingFrom === connectingFrom &&
-        cachedNode.edges === state.edges &&
-        cachedNode.isHighlighted === isHighlighted &&
-        cachedNode.hasHighlightedNodes === hasHighlightedNodes;
+      const canReuseData = canReuseEnrichedNodeData({
+        cachedNode,
+        node,
+        hoveredEdge,
+        connectingFrom,
+        edges: state.edges,
+        isHighlighted,
+        hasHighlightedNodes,
+        runParticipantKey,
+      });
 
       if (canReuseData && cachedNode.sourceNode === node) {
         return cachedNode.node;
@@ -2525,6 +2623,7 @@ function CanvasContent({
           };
       const enrichedNode: ReactFlowNode = {
         ...node,
+        selectable: runSelectableSet ? runSelectableSet.has(node.id) : (node.selectable ?? true),
         data: data as ReactFlowNode["data"],
       };
 
@@ -2538,6 +2637,7 @@ function CanvasContent({
         edges: state.edges,
         isHighlighted,
         hasHighlightedNodes,
+        runParticipantKey,
       });
 
       return enrichedNode;
@@ -2550,7 +2650,16 @@ function CanvasContent({
     }
 
     return enrichedNodes;
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, blockConnectingFrom]);
+  }, [
+    state.nodes,
+    hoveredEdge,
+    connectingFrom,
+    state.edges,
+    highlightedNodeIds,
+    blockConnectingFrom,
+    runParticipantNodeIds,
+    runSelectableSet,
+  ]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -2564,27 +2673,31 @@ function CanvasContent({
     (edgeId: string) => onEdgesChangeRef.current([{ id: edgeId, type: "remove" }]),
     [],
   );
-  const styledEdges = useMemo(
-    () =>
-      state.edges?.map((e) => ({
-        ...e,
-        ...EDGE_STYLE,
-        data: {
-          ...e.data,
-          isHovered: e.id === hoveredEdgeId,
-          canDelete: isEditMode && !isReadOnly,
-          onDelete: isEditMode && !isReadOnly ? stableEdgeDelete : undefined,
-        },
-        zIndex: e.id === hoveredEdgeId ? 1000 : 0,
-      })),
-    [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly],
-  );
+  const styledEdges = useMemo(() => {
+    return state.edges?.map((e) => ({
+      ...e,
+      ...EDGE_STYLE,
+      style: { ...EDGE_STYLE.style },
+      data: {
+        ...e.data,
+        isHovered: e.id === hoveredEdgeId,
+        canDelete: isEditMode && !isReadOnly,
+        onDelete: isEditMode && !isReadOnly ? stableEdgeDelete : undefined,
+      },
+      zIndex: e.id === hoveredEdgeId ? 1000 : 0,
+    }));
+  }, [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly]);
 
   const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;
   const { onNodesChange, onEdgesChange } = state;
 
   const handleNodesChange = useCallback(
-    (changes: NodeChange[]) => {
+    (incomingChanges: NodeChange[]) => {
+      let changes = incomingChanges;
+      if (runSelectableSet) {
+        changes = changes.filter((c) => !(c.type === "select" && c.selected === true && !runSelectableSet.has(c.id)));
+      }
+
       const prev = previouslySelectedRef.current;
 
       if (prev.size > 0) {
@@ -2606,7 +2719,7 @@ function CanvasContent({
         onNodesChange(filteredChanges);
       }
     },
-    [isReadOnly, onNodesChange],
+    [isReadOnly, onNodesChange, runSelectableSet],
   );
 
   const handleEdgesChange = useCallback(
