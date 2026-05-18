@@ -65,6 +65,7 @@ export interface CompositeProps extends ComponentActionsProps {
   paused?: boolean;
 
   onViewMoreEvents?: () => void;
+  dimBodyBelowHeader?: boolean;
 }
 
 export const Composite: React.FC<CompositeProps> = ({
@@ -88,6 +89,7 @@ export const Composite: React.FC<CompositeProps> = ({
   error,
   warning,
   paused,
+  dimBodyBelowHeader,
   runDisabled,
   runDisabledTooltip,
   onEdit,
@@ -219,6 +221,7 @@ export const Composite: React.FC<CompositeProps> = ({
       error={error}
       warning={warning}
       paused={paused}
+      dimBodyBelowHeader={dimBodyBelowHeader}
     />
   );
 };
