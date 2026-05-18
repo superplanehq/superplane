@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
+	pbApps "github.com/superplanehq/superplane/pkg/protos/apps"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
 	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -74,6 +75,20 @@ func defaultResourceResolver(req any) []string {
 func canvasResourceResolver(req any) []string {
 	if request, ok := req.(interface{ GetCanvasId() string }); ok {
 		resourceID := strings.TrimSpace(request.GetCanvasId())
+		if resourceID != "" {
+			return []string{resourceID}
+		}
+	}
+
+	return nil
+}
+
+/*
+ * Resource resolver for requests that have a `GetAppId()` method.
+ */
+func appResourceResolver(req any) []string {
+	if request, ok := req.(interface{ GetAppId() string }); ok {
+		resourceID := strings.TrimSpace(request.GetAppId())
 		if resourceID != "" {
 			return []string{resourceID}
 		}
@@ -404,6 +419,64 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			Action:           "update",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
+		},
+
+		// Apps rules
+		pbApps.Apps_ListApps_FullMethodName: {Resource: "apps", Action: "read", DomainType: models.DomainTypeOrganization},
+		pbApps.Apps_CreateApp_FullMethodName: {Resource: "apps", Action: "create", DomainType: models.DomainTypeOrganization},
+		pbApps.Apps_DescribeApp_FullMethodName: {
+			Resource:         "apps",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: defaultResourceResolver,
+		},
+		pbApps.Apps_DeleteApp_FullMethodName: {
+			Resource:         "apps",
+			Action:           "delete",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: defaultResourceResolver,
+		},
+		pbApps.Apps_SyncApp_FullMethodName: {
+			Resource:         "apps",
+			Action:           "sync",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: defaultResourceResolver,
+		},
+		pbApps.Apps_GetAppDashboard_FullMethodName: {
+			Resource:         "apps",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: appResourceResolver,
+		},
+		pbApps.Apps_UpdateAppDashboard_FullMethodName: {
+			Resource:         "apps",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: appResourceResolver,
+		},
+		pbApps.Apps_GetAppCanvas_FullMethodName: {
+			Resource:         "apps",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: appResourceResolver,
+		},
+		pbApps.Apps_ListAppDocs_FullMethodName: {
+			Resource:         "apps",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: appResourceResolver,
+		},
+		pbApps.Apps_GetAppDoc_FullMethodName: {
+			Resource:         "apps",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: appResourceResolver,
+		},
+		pbApps.Apps_UpdateAppDoc_FullMethodName: {
+			Resource:         "apps",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: appResourceResolver,
 		},
 
 		// Service Accounts rules
