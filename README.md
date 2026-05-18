@@ -3,6 +3,7 @@
 SuperPlane is an **open source control plane for platform engineering**.
 It lets you define and run event-based workflows across the tools you already
 use such as Git, CI/CD, observability, incident response, infra, and notifications.
+It Fully integrates with LLM models, such like GPT, CLAUDE, Gemini, etc...
 
 ![SuperPlane screenshot](./screenshot.png)
 
