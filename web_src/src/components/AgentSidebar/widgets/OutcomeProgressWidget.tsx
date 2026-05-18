@@ -93,7 +93,7 @@ export function OutcomeProgressWidget({ state }: { state: OutcomeState }) {
 
         {/* Iteration log */}
         <div className="px-3 py-2 space-y-1">
-          {state.log.map((entry, i) => {
+          {(state.log ?? []).map((entry, i) => {
             if ("phase" in entry && (entry.phase === "building" || entry.phase === "finished")) {
               const iterEntry = entry as IterationEntry;
               const iterNum = Math.floor(i / 2) + 1;
@@ -146,7 +146,7 @@ export function OutcomeProgressWidget({ state }: { state: OutcomeState }) {
             );
           })}
 
-          {state.log.length === 0 && (
+          {(!state.log || state.log.length === 0) && (
             <div className="flex items-center gap-2 py-0.5">
               <Loader2 size={12} className="text-blue-500 animate-spin shrink-0" />
               <span className="text-xs text-slate-500">Starting…</span>
@@ -209,7 +209,7 @@ export function OutcomeProgressWidget({ state }: { state: OutcomeState }) {
 
       {/* Explanation modal */}
       {explanationOpen !== null && (() => {
-        const entry = state.log[explanationOpen] as GradingEntry;
+        const entry = state.log?.[explanationOpen] as GradingEntry;
         if (!entry?.explanation) return null;
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
