@@ -18,13 +18,30 @@ function dispatchAgentEvent(
   callbacks: AgentStreamCallbacks,
   queryClient: QueryClient,
 ): void {
-  if (data.event === "assistant_message" || data.event === "tool_started" || data.event === "tool_finished") {
-    handlePersistedMessage(data, callbacks, queryClient);
-    return;
+  switch (data.event) {
+    case "assistant_message":
+    case "tool_started":
+    case "tool_finished":
+      handlePersistedMessage(data, callbacks, queryClient);
+      return;
+    case "stream_started":
+    case "turn_completed":
+    case "session_failed":
+      callbacks.onStatusChange?.(data.status ?? "", data.error);
+      return;
+    case "outcome_evaluation_start":
+    case "outcome_evaluation_end":
+      callbacks.onOutcomeEvent?.(outcomePhase(data.event), {
+        iteration: data.extra?.iteration ?? 0,
+        result: data.extra?.result,
+        explanation: data.extra?.explanation,
+      });
+      return;
   }
-  if (data.event === "stream_started" || data.event === "turn_completed" || data.event === "session_failed") {
-    callbacks.onStatusChange?.(data.status ?? "", data.error);
-  }
+}
+
+function outcomePhase(event: "outcome_evaluation_start" | "outcome_evaluation_end"): "start" | "end" {
+  return event === "outcome_evaluation_start" ? "start" : "end";
 }
 
 function handlePersistedMessage(
@@ -40,9 +57,16 @@ function handlePersistedMessage(
 
 const SOCKET_SERVER_URL = `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/ws/agents/sessions/`;
 
+export type OutcomeEvaluation = {
+  iteration: number;
+  result?: string;
+  explanation?: string;
+};
+
 export type AgentStreamCallbacks = {
   onPersistedMessage?: (message: AgentMessage) => void;
   onStatusChange?: (status: string, error?: string) => void;
+  onOutcomeEvent?: (event: "start" | "end", evaluation: OutcomeEvaluation) => void;
 };
 
 export function useAgentSessionWebsocket(

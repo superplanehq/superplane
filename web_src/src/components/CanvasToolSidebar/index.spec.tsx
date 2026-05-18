@@ -38,6 +38,8 @@ vi.mock("@/hooks/useAgentChats", () => ({
     fetchNextPage: vi.fn(async () => undefined),
   }),
   useSendAgentChatMessage: () => sendMutation,
+  useInterruptAgentChat: () => ({ isPending: false, mutate: vi.fn() }),
+  useDefineAgentOutcome: () => ({ mutateAsync: vi.fn() }),
 }));
 
 vi.mock("@/hooks/useAgentSessionWebsocket", () => ({
@@ -62,6 +64,8 @@ function makeToolSidebarState() {
     handleToolSidebarToggle: vi.fn(),
     openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),
+    agentMode: "operator" as const,
+    switchAgentMode: vi.fn(),
   };
 }
 
@@ -215,7 +219,7 @@ describe("CanvasToolSidebar", () => {
 
     const input = await screen.findByTestId("agent-input");
     await user.type(input, "first");
-    await user.click(screen.getByRole("button", { name: "Send message" }));
+    await user.click(screen.getByRole("button", { name: "Send" }));
 
     // While the first send is still pending, user can type a new message.
     await user.type(input, "second");
