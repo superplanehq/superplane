@@ -37,7 +37,8 @@ func (n *ndjsonWriter) writeRecord(rec map[string]any) error {
 }
 
 // StreamCloudWatchLogToNDJSON tails a CloudWatch Logs stream and writes newline-delimited JSON records:
-// {"type":"line","text":"..."} for log lines, {"type":"error","message":"..."} on fatal errors.
+// {"type":"line","text":"..."} for regular lines, {"type":"cmd_start"...}/{"type":"cmd_end"...}
+// for runner command boundaries, and {"type":"error","message":"..."} on fatal errors.
 func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.Flusher, group, stream, region string) error {
 	group = strings.TrimSpace(group)
 	stream = strings.TrimSpace(stream)
@@ -105,6 +106,12 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 
 		for _, ev := range out.Events {
 			msg := awsToString(ev.Message)
+			if rec, ok := parseRunnerControlRecord(msg); ok {
+				if err := nw.writeRecord(rec); err != nil {
+					return err
+				}
+				continue
+			}
 			if err := nw.writeRecord(map[string]any{"type": "line", "text": msg}); err != nil {
 				return err
 			}
@@ -115,6 +122,61 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 			return ctx.Err()
 		case <-time.After(400 * time.Millisecond):
 		}
+	}
+}
+
+func parseRunnerControlRecord(message string) (map[string]any, bool) {
+	var envelope struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal([]byte(message), &envelope); err != nil {
+		return nil, false
+	}
+	switch envelope.Type {
+	case "cmd_start":
+		var rec struct {
+			Type  string `json:"type"`
+			Index int    `json:"index"`
+			Text  string `json:"text"`
+		}
+		if err := json.Unmarshal([]byte(message), &rec); err != nil {
+			return nil, false
+		}
+		if rec.Index < 0 {
+			return nil, false
+		}
+		return map[string]any{
+			"type":  "cmd_start",
+			"index": rec.Index,
+			"text":  rec.Text,
+		}, true
+	case "cmd_end":
+		var rec struct {
+			Type       string `json:"type"`
+			Index      int    `json:"index"`
+			Status     string `json:"status"`
+			DurationMS int64  `json:"duration_ms"`
+		}
+		if err := json.Unmarshal([]byte(message), &rec); err != nil {
+			return nil, false
+		}
+		if rec.Index < 0 {
+			return nil, false
+		}
+		if rec.DurationMS < 0 {
+			return nil, false
+		}
+		if rec.Status != "passed" && rec.Status != "failed" {
+			return nil, false
+		}
+		return map[string]any{
+			"type":        "cmd_end",
+			"index":       rec.Index,
+			"status":      rec.Status,
+			"duration_ms": rec.DurationMS,
+		}, true
+	default:
+		return nil, false
 	}
 }
 
