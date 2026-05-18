@@ -48,7 +48,7 @@ type rpcError struct {
 type Handler struct {
 	jwt         *jwt.Signer
 	registry    *registry.Registry
-	staticToken string // Static bearer token for vault-based MCP auth
+	staticToken string
 }
 
 func NewHandler(jwtSigner *jwt.Signer, reg *registry.Registry, staticToken string) *Handler {
@@ -95,12 +95,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	var claims map[string]interface{}
 
-	// Try static token first (vault-based MCP auth)
+	// Try static token first (backward compat), then JWT
 	if h.staticToken != "" && token == h.staticToken {
-		// Static token valid — claims come from tool params instead
 		claims = map[string]interface{}{}
 	} else {
-		// Fall back to JWT validation
 		claims, err = h.jwt.ValidateAndGetClaims(token)
 		if err != nil {
 			h.writeError(w, req.ID, InvalidRequest, "Unauthorized: invalid token", nil)
@@ -108,7 +106,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Extract org_id and user_id from claims (may be empty for static token)
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, "claims", claims)
 

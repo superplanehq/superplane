@@ -91,7 +91,7 @@ func (f *fakeProvider) StreamEvents(_ context.Context, _ string, _ func(agents.P
 func newService(t *testing.T, r *support.ResourceRegistry, provider agents.Provider) *agents.Service {
 	t.Helper()
 	signer := jwt.NewSigner("test-secret")
-	return agents.NewService(provider, r.AuthService, signer, "https://api.test.local")
+	return agents.NewService(provider, r.AuthService, signer, "https://api.test.local", nil)
 }
 
 func setupCanvasForUser(t *testing.T, r *support.ResourceRegistry) *models.Canvas {
