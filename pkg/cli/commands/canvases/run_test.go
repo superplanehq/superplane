@@ -12,38 +12,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRunCommandRequiresCanvasArg(t *testing.T) {
+func TestRunCommandRequiresCanvasAndNodeArgs(t *testing.T) {
 	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
 	ctx.Args = []string{}
 
-	trigger := "n1"
 	template := "T1"
-	cmd := &runCommand{trigger: &trigger, template: &template}
+	cmd := &runCommand{template: &template}
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "required")
+	require.Contains(t, err.Error(), "usage:")
 }
 
-func TestRunCommandRequiresTrigger(t *testing.T) {
+func TestRunCommandRequiresNodeID(t *testing.T) {
 	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
-	ctx.Args = []string{"some-canvas"}
+	ctx.Args = []string{"some-canvas", "  "}
 	template := "T1"
-	empty := ""
-	cmd := &runCommand{trigger: &empty, template: &template}
+	cmd := &runCommand{template: &template}
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "--trigger")
+	require.Contains(t, err.Error(), "node id")
 }
 
 func TestRunCommandRejectsTemplateWithReplay(t *testing.T) {
 	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
-	ctx.Args = []string{"4e9ae08d-0363-40d2-ba2c-5f6389a418d8"}
-	trigger := "n1"
+	ctx.Args = []string{"4e9ae08d-0363-40d2-ba2c-5f6389a418d8", "n1"}
 	template := "T1"
 	replay := "evt-1"
-	cmd := &runCommand{trigger: &trigger, template: &template, replay: &replay}
+	cmd := &runCommand{template: &template, replay: &replay}
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
@@ -52,10 +49,9 @@ func TestRunCommandRejectsTemplateWithReplay(t *testing.T) {
 
 func TestRunCommandRequiresTemplateOrReplay(t *testing.T) {
 	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
-	ctx.Args = []string{"4e9ae08d-0363-40d2-ba2c-5f6389a418d8"}
-	trigger := "n1"
+	ctx.Args = []string{"4e9ae08d-0363-40d2-ba2c-5f6389a418d8", "n1"}
 	empty := ""
-	cmd := &runCommand{trigger: &trigger, template: &empty, replay: &empty}
+	cmd := &runCommand{template: &empty, replay: &empty}
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
@@ -64,12 +60,11 @@ func TestRunCommandRequiresTemplateOrReplay(t *testing.T) {
 
 func TestRunCommandRejectsPayloadWithReplay(t *testing.T) {
 	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
-	ctx.Args = []string{"4e9ae08d-0363-40d2-ba2c-5f6389a418d8"}
-	trigger := "n1"
+	ctx.Args = []string{"4e9ae08d-0363-40d2-ba2c-5f6389a418d8", "n1"}
 	replay := "evt-1"
 	payload := `{"x":1}`
 	empty := ""
-	cmd := &runCommand{trigger: &trigger, template: &empty, replay: &replay, payload: &payload}
+	cmd := &runCommand{template: &empty, replay: &replay, payload: &payload}
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
@@ -102,11 +97,10 @@ func TestRunCommandInvokeManualHook(t *testing.T) {
 	)
 
 	ctx, stdout := newCreateCommandContextForTest(t, server.server, "text")
-	ctx.Args = []string{canvasID}
-	trigger := nodeID
+	ctx.Args = []string{canvasID, nodeID}
 	template := "Hello World"
 	empty := ""
-	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payload: &empty}
+	cmd := &runCommand{template: &template, replay: &empty, payload: &empty}
 
 	require.NoError(t, cmd.Execute(ctx))
 	require.Contains(t, stdout.String(), "Hello World")
@@ -146,11 +140,10 @@ func TestRunCommandInvokeManualHookWithPayloadFromFile(t *testing.T) {
 	)
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
-	ctx.Args = []string{canvasID}
-	trigger := nodeID
+	ctx.Args = []string{canvasID, nodeID}
 	template := "Hello World"
 	empty := ""
-	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payload: &payloadPath}
+	cmd := &runCommand{template: &template, replay: &empty, payload: &payloadPath}
 
 	require.NoError(t, cmd.Execute(ctx))
 	server.AssertCalls(t, []string{
@@ -190,11 +183,10 @@ func TestRunCommandInvokeManualHookWithPayloadAtFile(t *testing.T) {
 	)
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
-	ctx.Args = []string{canvasID}
-	trigger := nodeID
+	ctx.Args = []string{canvasID, nodeID}
 	template := "Hello World"
 	empty := ""
-	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payload: &atPath}
+	cmd := &runCommand{template: &template, replay: &empty, payload: &atPath}
 
 	require.NoError(t, cmd.Execute(ctx))
 }
@@ -226,11 +218,10 @@ func TestRunCommandInvokeManualHookWithInlinePayloadJSON(t *testing.T) {
 	)
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
-	ctx.Args = []string{canvasID}
-	trigger := nodeID
+	ctx.Args = []string{canvasID, nodeID}
 	template := "Hello World"
 	empty := ""
-	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payload: &inline}
+	cmd := &runCommand{template: &template, replay: &empty, payload: &inline}
 
 	require.NoError(t, cmd.Execute(ctx))
 }
@@ -255,11 +246,10 @@ func TestRunCommandReemitTriggerEvent(t *testing.T) {
 	)
 
 	ctx, stdout := newCreateCommandContextForTest(t, server.server, "text")
-	ctx.Args = []string{canvasID}
-	trigger := nodeID
+	ctx.Args = []string{canvasID, nodeID}
 	empty := ""
 	replay := eventID
-	cmd := &runCommand{trigger: &trigger, template: &empty, replay: &replay}
+	cmd := &runCommand{template: &empty, replay: &replay}
 
 	require.NoError(t, cmd.Execute(ctx))
 	require.Contains(t, stdout.String(), "new-event-id")
@@ -293,11 +283,10 @@ func TestRunCommandResolveCanvasNameThenInvoke(t *testing.T) {
 	)
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
-	ctx.Args = []string{"my-canvas"}
-	trigger := nodeID
+	ctx.Args = []string{"my-canvas", nodeID}
 	template := "Hello World"
 	empty := ""
-	cmd := &runCommand{trigger: &trigger, template: &template, replay: &empty, payload: &empty}
+	cmd := &runCommand{template: &template, replay: &empty, payload: &empty}
 
 	require.NoError(t, cmd.Execute(ctx))
 	server.AssertCalls(t, []string{
@@ -313,11 +302,10 @@ func TestRunCommandPayloadFromFileMustBeObject(t *testing.T) {
 	require.NoError(t, os.WriteFile(payloadPath, []byte(`["not","object"]`), 0o644))
 
 	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
-	ctx.Args = []string{canvasID}
-	trigger := "n1"
+	ctx.Args = []string{canvasID, "n1"}
 	template := "T"
 	emptyReplay := ""
-	cmd := &runCommand{trigger: &trigger, template: &template, payload: &payloadPath, replay: &emptyReplay}
+	cmd := &runCommand{template: &template, payload: &payloadPath, replay: &emptyReplay}
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)

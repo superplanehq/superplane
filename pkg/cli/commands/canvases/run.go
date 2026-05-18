@@ -13,20 +13,19 @@ import (
 )
 
 type runCommand struct {
-	trigger  *string
 	template *string
 	payload  *string
 	replay   *string
 }
 
 func (c *runCommand) Execute(ctx core.CommandContext) error {
-	if len(ctx.Args) != 1 {
-		return fmt.Errorf("canvas name or id is required as the first argument")
+	if len(ctx.Args) != 2 {
+		return fmt.Errorf("usage: superplane canvases run <canvas> <node-id> [flags]")
 	}
 
-	trigger := strings.TrimSpace(ptrVal(c.trigger))
-	if trigger == "" {
-		return fmt.Errorf("--trigger is required")
+	nodeID := strings.TrimSpace(ctx.Args[1])
+	if nodeID == "" {
+		return fmt.Errorf("manual run node id is required as the second argument")
 	}
 
 	replay := strings.TrimSpace(ptrVal(c.replay))
@@ -49,10 +48,10 @@ func (c *runCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if replay != "" {
-		return c.executeReplay(ctx, canvasID, trigger, replay)
+		return c.executeReplay(ctx, canvasID, nodeID, replay)
 	}
 
-	return c.executeManualHook(ctx, canvasID, trigger, templateName, payloadArg)
+	return c.executeManualHook(ctx, canvasID, nodeID, templateName, payloadArg)
 }
 
 func (c *runCommand) executeReplay(ctx core.CommandContext, canvasID, triggerNodeID, eventID string) error {
