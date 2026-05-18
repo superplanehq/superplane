@@ -60,20 +60,21 @@ vi.mock("../BuildingBlocksSidebar", () => ({
     isOpen ? <aside data-testid="building-blocks-sidebar" /> : null,
 }));
 
-vi.mock("@/components/AgentSidebar", () => ({
-  AgentSidebar: () => null,
+vi.mock("@/components/CanvasToolSidebar", () => ({
+  CanvasToolSidebar: () => null,
 }));
 
-vi.mock("@/components/AgentSidebar/useAgentState", () => ({
-  useAgentState: () => ({
+vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
+  useCanvasToolSidebarState: () => ({
     canvasId: undefined,
     organizationId: undefined,
     isEditing: false,
     readOnly: false,
-    isAgentSidebarOpen: false,
-    showAgentSidebarToggle: false,
-    handleAgentSidebarToggle: vi.fn(),
-    closeSidebar: vi.fn(),
+    isToolSidebarOpen: false,
+    showToolSidebarToggle: false,
+    handleToolSidebarToggle: vi.fn(),
+    openToolSidebar: vi.fn(),
+    closeToolSidebar: vi.fn(),
   }),
 }));
 
