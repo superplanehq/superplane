@@ -23,6 +23,7 @@ type Configuration struct {
 
 type Metadata struct {
 	Projects []Project `json:"projects"`
+	CloudID  string    `json:"cloudId,omitempty"`
 }
 
 func (j *Jira) Name() string {
@@ -75,6 +76,13 @@ func (j *Jira) Configuration() []configuration.Field {
 func (j *Jira) Actions() []core.Action {
 	return []core.Action{
 		&CreateIssue{},
+		&CreateIncident{},
+		&GetIncident{},
+		&DeleteIncident{},
+		&CreateAlert{},
+		&GetAlert{},
+		&DeleteAlert{},
+		&UpdateAlert{},
 	}
 }
 
@@ -115,12 +123,17 @@ func (j *Jira) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("error verifying credentials: %v", err)
 	}
 
+	cloudID, err := client.FetchCloudID()
+	if err != nil {
+		return fmt.Errorf("error resolving cloud id: %v", err)
+	}
+
 	projects, err := client.ListProjects()
 	if err != nil {
 		return fmt.Errorf("error listing projects: %v", err)
 	}
 
-	ctx.Integration.SetMetadata(Metadata{Projects: projects})
+	ctx.Integration.SetMetadata(Metadata{Projects: projects, CloudID: cloudID})
 	ctx.Integration.Ready()
 	return nil
 }
