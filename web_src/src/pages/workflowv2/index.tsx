@@ -5545,6 +5545,19 @@ export function WorkflowPageV2() {
   };
 
   const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
+  const appId = searchParams.get("appId") ?? undefined;
+  const appBanner = appId ? (
+    <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center gap-2">
+      <Link
+        to={`/${organizationId}/apps/${appId}`}
+        className="flex items-center gap-1 text-sm text-blue-700 hover:text-blue-900 transition-colors"
+      >
+        <ArrowLeft size={14} />
+        <span>Back to App</span>
+      </Link>
+    </div>
+  ) : null;
+
   const remoteUpdateBanner =
     remoteCanvasUpdatePending && !hasLocalSaveActivity ? (
       <div className="bg-amber-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -5639,7 +5652,7 @@ export function WorkflowPageV2() {
     isDraftCanvasLoading ? "draft-loading" : "draft-ready",
     isRunsMode ? "runs" : "canvas",
   ].join(":");
-  const headerBanners = [remoteUpdateBanner, templateBanner].filter(Boolean);
+  const headerBanners = [appBanner, remoteUpdateBanner, templateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
   const saveDisabled = !canUpdateCanvas || !hasEditableVersion;
   const saveDisabledTooltip = !canUpdateCanvas
