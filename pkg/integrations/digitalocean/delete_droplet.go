@@ -26,7 +26,7 @@ func (d *DeleteDroplet) Label() string {
 }
 
 func (d *DeleteDroplet) Description() string {
-	return "Delete a DigitalOcean Droplet by ID"
+	return "Delete a DigitalOcean Droplet by ID or name"
 }
 
 func (d *DeleteDroplet) Documentation() string {
@@ -41,16 +41,18 @@ func (d *DeleteDroplet) Documentation() string {
 
 ## Configuration
 
-- **Droplet**: The droplet to delete (required, supports expressions)
+- **Droplet**: The droplet ID or exact name to delete (required, supports expressions)
 
 ## Output
 
 Returns information about the deleted droplet:
 - **dropletId**: The ID of the droplet that was deleted
+- **dropletName**: The name of the droplet that was deleted, when resolved by name
 
 ## Important Notes
 
 - This operation is **permanent** and cannot be undone
+- Names must match exactly; if multiple droplets have the same name, use the droplet ID
 - All data on the droplet will be lost
 - The droplet will be shut down if it's running before deletion
 - Any snapshots of the droplet will remain in your account`
@@ -75,7 +77,7 @@ func (d *DeleteDroplet) Configuration() []configuration.Field {
 			Label:       "Droplet",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The droplet ID to delete",
+			Description: "The droplet ID or exact name to delete",
 			Placeholder: "Select droplet",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
@@ -98,7 +100,7 @@ func (d *DeleteDroplet) Setup(ctx core.SetupContext) error {
 		return errors.New("droplet is required")
 	}
 
-	err = resolveDropletMetadata(ctx, spec.Droplet)
+	err = resolveDropletDeleteMetadata(ctx, spec.Droplet)
 	if err != nil {
 		return fmt.Errorf("error resolving droplet metadata: %v", err)
 	}
@@ -113,24 +115,24 @@ func (d *DeleteDroplet) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	dropletID, err := parseDropletID(spec.Droplet)
-	if err != nil {
-		return fmt.Errorf("invalid droplet ID %q: %w", spec.Droplet, err)
-	}
-
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	err = client.DeleteDroplet(dropletID)
+	target, err := resolveDropletDeleteExecutionTarget(client, spec.Droplet, ctx.NodeMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to resolve droplet: %w", err)
+	}
+
+	err = client.DeleteDroplet(target.ID)
 	if err != nil {
 		if doErr, ok := err.(*DOAPIError); ok && doErr.StatusCode == http.StatusNotFound {
 			// Droplet already deleted, emit success
 			return ctx.ExecutionState.Emit(
 				core.DefaultOutputChannel.Name,
 				"digitalocean.droplet.deleted",
-				[]any{map[string]any{"dropletId": dropletID}},
+				[]any{dropletDeletedPayload(target)},
 			)
 		}
 		return fmt.Errorf("failed to delete droplet: %v", err)
@@ -139,7 +141,7 @@ func (d *DeleteDroplet) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"digitalocean.droplet.deleted",
-		[]any{map[string]any{"dropletId": dropletID}},
+		[]any{dropletDeletedPayload(target)},
 	)
 }
 
