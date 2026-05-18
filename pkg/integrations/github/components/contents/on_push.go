@@ -45,7 +45,7 @@ func (p *OnPush) Documentation() string {
 
 - **Repository**: Select the GitHub repository to monitor
 - **Refs**: Configure which branches/tags to monitor (e.g., ` + "`refs/heads/main`" + `, ` + "`refs/tags/*`" + `)
-- **Paths** *(optional)*: Glob patterns (GitHub Actions–style) for added, modified, and removed files. Use ` + "`!`" + ` prefix to exclude (for example ` + "`billing/**`" + ` with ` + "`!billing/**/*.md`" + `). Patterns starting only with ` + "`!`" + ` assume an include of ` + "`**`" + `. Lists stored as legacy ref-style predicates still honor ` + "`equals`" + ` values as globs; ` + "`matches`" + ` must be replaced with glob patterns. If the webhook has no per-commit file lists (empty ` + "`commits`" + ` or missing ` + "`added`" + `/` + "`modified`" + `/` + "`removed`" + ` arrays), a configured path filter cannot match and the trigger will not fire. Leave empty to fire on all pushes.
+- **Changed path filter** *(optional)*: Glob patterns matched against added, modified, and removed file paths in each push. Use ` + "`!`" + ` prefix to exclude (for example ` + "`billing/**`" + ` with ` + "`!billing/**/*.md`" + `). Patterns starting only with ` + "`!`" + ` assume an include of ` + "`**`" + `. Lists stored as legacy ref-style predicates still honor ` + "`equals`" + ` values as globs; ` + "`matches`" + ` must be replaced with glob patterns. If the webhook has no per-commit file lists (empty ` + "`commits`" + ` or missing ` + "`added`" + `/` + "`modified`" + `/` + "`removed`" + ` arrays), a configured path filter cannot match and the trigger will not fire. Leave empty to run on every push.
 
 ## Event Data
 
@@ -102,14 +102,15 @@ func (p *OnPush) Configuration() []configuration.Field {
 		},
 		{
 			Name:        "paths",
-			Label:       "Paths",
-			Description: "Optional. GitHub Actions–style globs for changed files. Prefix with ! to exclude. Exclude-only lists assume ** (all paths). Leave empty to fire on all pushes.",
+			Label:       "Changed path filter",
+			Placeholder: "e.g. pkg/** or web_src/**/*.tsx",
+			Description: "Optional. Only run when added, modified, or removed paths in the push match these glob patterns. Prefix with ! to exclude. Exclude-only lists assume ** (all paths). Leave empty to run on every push.",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
 			Togglable:   true,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
-					ItemLabel: "Pattern",
+					ItemLabel: "Path pattern",
 					ItemDefinition: &configuration.ListItemDefinition{
 						Type: configuration.FieldTypeString,
 					},

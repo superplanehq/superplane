@@ -163,6 +163,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
             ) : (
               <Input
                 type={itemDefinition?.type === "number" ? "number" : "text"}
+                placeholder={field.placeholder ?? ""}
                 value={item ?? ""}
                 onChange={(e) => {
                   const val =
