@@ -1,11 +1,17 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScrollText } from "lucide-react";
 import { useCallback, useState } from "react";
+import { Icon } from "../../../components/Icon";
 import { LiveLogStreamView } from "./LiveLogStreamView";
 import type { RunnerLiveLogDialogProps } from "./types";
 
 export function RunnerLiveLogDialog({ title, canvasMode, execution }: RunnerLiveLogDialogProps) {
   const [open, setOpen] = useState(false);
+
+  const handleOpen = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setOpen(true);
+  }, []);
 
   if (!execution) {
     return null;
@@ -15,16 +21,10 @@ export function RunnerLiveLogDialog({ title, canvasMode, execution }: RunnerLive
     return null;
   }
 
-  const handleOpen = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setOpen(true);
-  }, []);
-
   return (
     <>
       <div className="flex items-center justify-center gap-1 cursor-pointer py-1.5" onClick={handleOpen}>
-        <ScrollText className="h-4 w-4" /> View logs
+        <Icon name="scroll-text" className="h-4 w-4" /> View logs
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>

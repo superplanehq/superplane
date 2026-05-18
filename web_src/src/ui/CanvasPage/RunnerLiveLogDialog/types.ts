@@ -1,4 +1,4 @@
-import { ExecutionInfo } from "../../../pages/workflowv2/mappers/types";
+import type { ExecutionInfo } from "../../../pages/workflowv2/mappers/types";
 
 export type RunnerLiveLogDialogProps = {
   title: string;
