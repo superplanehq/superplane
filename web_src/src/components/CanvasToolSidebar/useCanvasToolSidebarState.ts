@@ -46,6 +46,11 @@ export function useCanvasToolSidebarState({
     persistOpen(false);
   }, [persistOpen]);
 
+  const openToolSidebar = useCallback(() => {
+    setIsToolSidebarOpen(true);
+    persistOpen(true);
+  }, [persistOpen]);
+
   const handleToolSidebarToggle = useCallback(() => {
     setIsToolSidebarOpen((prev) => {
       const next = !prev;
@@ -68,6 +73,7 @@ export function useCanvasToolSidebarState({
     isToolSidebarOpen,
     showToolSidebarToggle,
     handleToolSidebarToggle,
+    openToolSidebar,
     closeToolSidebar,
   };
 }

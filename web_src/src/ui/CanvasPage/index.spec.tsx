@@ -73,6 +73,7 @@ vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
     isToolSidebarOpen: false,
     showToolSidebarToggle: false,
     handleToolSidebarToggle: vi.fn(),
+    openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),
   }),
 }));

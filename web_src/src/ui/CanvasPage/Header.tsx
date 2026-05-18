@@ -32,9 +32,7 @@ export interface HeaderProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  onSelectRuns?: () => void;
   onSelectDashboard?: () => void;
-  runsNotificationCount?: number;
   /** When set with `mode === "dashboard"`, shows Add panel in the secondary header. */
   onDashboardAddPanel?: () => void;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
@@ -120,10 +118,11 @@ function PageHeader({
 
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle =
-    props.mode === "version-live" ||
-    props.mode === "version-edit" ||
-    props.mode === "runs" ||
-    props.mode === "dashboard";
+    !!props.onSelectDashboard &&
+    (props.mode === "version-live" ||
+      props.mode === "version-edit" ||
+      props.mode === "runs" ||
+      props.mode === "dashboard");
   const canvasViewMode = props.mode === "runs" ? "runs" : props.mode === "dashboard" ? "dashboard" : "version-live";
   const editing = props.mode === "version-edit";
 
@@ -137,9 +136,7 @@ function SecondaryHeader(props: HeaderProps) {
             <CanvasModeToggle
               mode={canvasViewMode}
               onSelectLive={props.onExitEditMode}
-              onSelectRuns={props.onSelectRuns}
               onSelectDashboard={props.onSelectDashboard}
-              runsNotificationCount={props.runsNotificationCount}
               editing={editing}
               hasDraft={!!props.hasUnpublishedDraftChanges}
             />

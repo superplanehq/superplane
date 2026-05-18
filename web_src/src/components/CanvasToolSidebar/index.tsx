@@ -13,29 +13,76 @@ import { useSidebarWidth } from "./useSidebarWidth";
 const TAB_AGENT = "agent";
 const TAB_RUNS = "runs";
 const TAB_VERSIONS = "versions";
+type CanvasToolSidebarMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard";
 
 export interface CanvasToolSidebarProps {
   toolSidebarState: CanvasToolSidebarState;
+  mode?: CanvasToolSidebarMode;
+  onSelectRuns?: () => void;
+  onExitRunsMode?: () => void;
+  runsContent?: ReactNode;
 }
 
-export function CanvasToolSidebar({ toolSidebarState }: CanvasToolSidebarProps) {
-  if (!toolSidebarState.showToolSidebarToggle || !toolSidebarState.isToolSidebarOpen) {
+export function CanvasToolSidebar({
+  toolSidebarState,
+  mode = "default",
+  onSelectRuns,
+  onExitRunsMode,
+  runsContent,
+}: CanvasToolSidebarProps) {
+  if (!toolSidebarState.showToolSidebarToggle || !toolSidebarState.isToolSidebarOpen || !toolSidebarState.canvasId)
     return null;
-  }
-  if (!toolSidebarState.canvasId) {
-    return null;
-  }
-  return <OpenCanvasToolSidebar toolSidebarState={toolSidebarState} />;
+
+  return (
+    <OpenCanvasToolSidebar
+      toolSidebarState={toolSidebarState}
+      mode={mode}
+      onSelectRuns={onSelectRuns}
+      onExitRunsMode={onExitRunsMode}
+      runsContent={runsContent}
+    />
+  );
 }
 
-function OpenCanvasToolSidebar({ toolSidebarState }: CanvasToolSidebarProps) {
-  const [activeTab, setActiveTab] = useState(TAB_AGENT);
+function OpenCanvasToolSidebar({
+  toolSidebarState,
+  mode = "default",
+  onSelectRuns,
+  onExitRunsMode,
+  runsContent,
+}: CanvasToolSidebarProps) {
+  const showRunsTab = Boolean(onSelectRuns || mode === "runs" || runsContent);
+  const [activeTab, setActiveTab] = useState(() => (mode === "runs" && showRunsTab ? TAB_RUNS : TAB_AGENT));
+
+  useEffect(() => {
+    if (mode === "runs" && showRunsTab) {
+      setActiveTab(TAB_RUNS);
+      return;
+    }
+    setActiveTab((currentTab) => (currentTab === TAB_RUNS ? TAB_AGENT : currentTab));
+  }, [mode, showRunsTab]);
 
   const tabs = [
     { value: TAB_AGENT, label: "Agent" },
-    { value: TAB_RUNS, label: "Runs" },
+    ...(showRunsTab ? ([{ value: TAB_RUNS, label: "Runs" }] as const) : []),
     { value: TAB_VERSIONS, label: "Versions" },
   ] as const;
+
+  const handleTabSelect = useCallback(
+    (nextTab: typeof TAB_AGENT | typeof TAB_RUNS | typeof TAB_VERSIONS) => {
+      setActiveTab(nextTab);
+
+      if (nextTab === TAB_RUNS) {
+        if (mode !== "runs") {
+          toolSidebarState.openToolSidebar();
+          onSelectRuns?.();
+        }
+        return;
+      }
+      if (mode === "runs") onExitRunsMode?.();
+    },
+    [mode, onExitRunsMode, onSelectRuns, toolSidebarState],
+  );
 
   return (
     <SidebarShell>
@@ -48,7 +95,7 @@ function OpenCanvasToolSidebar({ toolSidebarState }: CanvasToolSidebarProps) {
                 type="button"
                 role="tab"
                 aria-selected={activeTab === value}
-                onClick={() => setActiveTab(value)}
+                onClick={() => handleTabSelect(value)}
                 className={cn(
                   "mr-4 mb-[-1px] flex items-center border-b text-[13px] font-medium transition-colors",
                   activeTab === value
@@ -77,7 +124,7 @@ function OpenCanvasToolSidebar({ toolSidebarState }: CanvasToolSidebarProps) {
         ) : null}
         {activeTab === TAB_RUNS ? (
           <div className="m-0 flex min-h-0 flex-1 flex-col" role="tabpanel">
-            <EmptyToolTab />
+            {runsContent ?? <EmptyToolTab />}
           </div>
         ) : null}
         {activeTab === TAB_VERSIONS ? (

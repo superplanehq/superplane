@@ -4,8 +4,7 @@ import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { countNodesByType, extractIntegrations, getTemplateTags } from "@/pages/canvas/templateMetadata";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
-import type { QueryClient } from "@tanstack/react-query";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type QueryClient } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -31,8 +30,8 @@ import type {
 } from "@/api-client";
 import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
-
 import { Button } from "@/components/ui/button";
+import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useComponents } from "@/hooks/useComponentData";
 import {
@@ -85,7 +84,6 @@ import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
-import { RunsSidebar } from "@/ui/RunsSidebar";
 import { DashboardOverlay } from "./dashboard/DashboardOverlay";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
@@ -5686,7 +5684,6 @@ export function WorkflowPageV2() {
     isPreparingVersionAction,
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftGraphDiffVersusLive,
   });
-  const activeRunsCount = runsData.runs.filter((run) => run.state === "STATE_STARTED").length;
   const headerMode = isDashboardMode
     ? dashboardsFeatureEnabled
       ? "dashboard"
@@ -5846,9 +5843,9 @@ export function WorkflowPageV2() {
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
           onExitEditMode={handleExitEditModeFromHeader}
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
+          onExitRunsMode={handleExitRunsMode}
           onSelectDashboard={isTemplate || !dashboardsFeatureEnabled ? undefined : handleSelectDashboardMode}
           onDashboardAddPanel={onDashboardAddPanel}
-          runsNotificationCount={activeRunsCount}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
@@ -5887,9 +5884,9 @@ export function WorkflowPageV2() {
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
           onNodeClick={isRunsMode ? handleRunCanvasNodeClick : undefined}
-          runsSidebar={
+          toolSidebarRunsContent={
             isRunsMode ? (
-              <RunsSidebar
+              <RunsTabPanel
                 runs={runsData.runs}
                 selectedRunId={selectedRunId}
                 onSelectRun={handleSelectRun}

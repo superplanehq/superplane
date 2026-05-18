@@ -170,10 +170,10 @@ export interface CanvasPageProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectRuns?: () => void;
+  onExitRunsMode?: () => void;
   onSelectDashboard?: () => void;
   /** Opens the canvas dashboard add-panel dialog when `headerMode` is `dashboard`. */
   onDashboardAddPanel?: () => void;
-  runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
@@ -240,7 +240,7 @@ export interface CanvasPageProps {
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
   runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
-  runsSidebar?: React.ReactNode;
+  toolSidebarRunsContent?: React.ReactNode;
   onRunNodeSelect?: (nodeId: string) => void;
   onRunExecutionSelect?: (options: {
     nodeId: string;
@@ -707,6 +707,20 @@ function CanvasPage(props: CanvasPageProps) {
     canvasId: props.canvasId,
     organizationId: props.organizationId,
   });
+  const { isToolSidebarOpen, openToolSidebar } = toolSidebarState;
+  const previousHeaderModeRef = useRef<CanvasPageProps["headerMode"] | undefined>(undefined);
+
+  useEffect(() => {
+    if (props.headerMode === "runs" && previousHeaderModeRef.current !== "runs" && !isToolSidebarOpen)
+      openToolSidebar();
+
+    previousHeaderModeRef.current = props.headerMode;
+  }, [isToolSidebarOpen, openToolSidebar, props.headerMode]);
+
+  const handleSelectRuns = () => {
+    openToolSidebar();
+    props.onSelectRuns?.();
+  };
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
@@ -1113,10 +1127,8 @@ function CanvasPage(props: CanvasPageProps) {
           onExitEditMode={props.onExitEditMode}
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-          onSelectRuns={props.onSelectRuns}
           onSelectDashboard={props.onSelectDashboard}
           onDashboardAddPanel={props.onDashboardAddPanel}
-          runsNotificationCount={props.runsNotificationCount}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
@@ -1135,7 +1147,13 @@ function CanvasPage(props: CanvasPageProps) {
       <div className="flex-1 flex relative overflow-hidden">
         {props.headerMode === "runs" ? null : props.versionControlSidebar}
 
-        <CanvasToolSidebar toolSidebarState={toolSidebarState} />
+        <CanvasToolSidebar
+          toolSidebarState={toolSidebarState}
+          mode={props.headerMode}
+          onSelectRuns={handleSelectRuns}
+          onExitRunsMode={props.onExitRunsMode}
+          runsContent={props.toolSidebarRunsContent}
+        />
 
         {props.headerMode === "runs" ? null : (
           <RightSideControls
@@ -1147,9 +1165,6 @@ function CanvasPage(props: CanvasPageProps) {
             showMemoryButton={props.headerMode !== "dashboard"}
           />
         )}
-
-        {props.headerMode === "runs" ? props.runsSidebar : null}
-
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
             isOpen={
@@ -1627,10 +1642,8 @@ function CanvasContentHeader({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  onSelectRuns,
   onSelectDashboard,
   onDashboardAddPanel,
-  runsNotificationCount,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
   unpublishedDraftUpdatedAt,
@@ -1663,10 +1676,8 @@ function CanvasContentHeader({
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  onSelectRuns?: () => void;
   onSelectDashboard?: () => void;
   onDashboardAddPanel?: () => void;
-  runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
@@ -1709,10 +1720,8 @@ function CanvasContentHeader({
       onExitEditMode={onExitEditMode}
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-      onSelectRuns={onSelectRuns}
       onSelectDashboard={onSelectDashboard}
       onDashboardAddPanel={onDashboardAddPanel}
-      runsNotificationCount={runsNotificationCount}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
