@@ -769,15 +769,16 @@ func IsIncidentManagementRequestPractice(practice string) bool {
 		return false
 	}
 
-	low := strings.ToLower(p)
-	if strings.Contains(low, "post-incident") || strings.Contains(low, "post incident") {
+	u := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(p, "-", "_"), " ", "_"), ".", "_"))
+	if strings.Contains(u, "POST_INCIDENT") {
 		return false
 	}
+
+	low := strings.ToLower(p)
 	if strings.Contains(low, "incident management") {
 		return true
 	}
 
-	u := strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(p, "-", "_"), " ", "_"), ".", "_"))
 	switch u {
 	case "ITSM_INCIDENT", "INCIDENT_MANAGEMENT", "INCIDENT", "MANAGE_INCIDENTS", "IM":
 		return true

@@ -33,7 +33,7 @@ func (c *GetIncident) Description() string {
 }
 
 func (c *GetIncident) Documentation() string {
-	return `The Get Incident component returns incident details from the [JSM Incidents REST API](https://developer.atlassian.com/cloud/incidents/rest/api-group-incident/).
+	return `The Get Incident component returns incident details from Jira Service Management.
 
 ## Use Cases
 
