@@ -26,21 +26,25 @@ export function SurveyWidget({ questions, onAction }: SurveyWidgetProps) {
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === questions.length - 1;
 
+  function updateAnswer(value: string | null) {
+    setAnswers((current) => replaceAtIndex(current, currentIndex, value));
+  }
+
+  function updateCustomInput(value: string) {
+    setCustomInputs((current) => replaceAtIndex(current, currentIndex, value));
+    if (value.trim()) {
+      updateAnswer(value.trim());
+    }
+  }
+
   function selectOption(option: string) {
-    setAnswers((prev) => {
-      const next = [...prev];
-      next[currentIndex] = option;
-      return next;
-    });
+    updateAnswer(option);
   }
 
   function handleSubmit() {
     if (submitted) return;
     setSubmitted(true);
-    const parts = questions.map((q, i) => {
-      const answer = answers[i] || "skipped";
-      return `${q.prompt} → ${answer}`;
-    });
+    const parts = questions.map((question, index) => `${question.prompt} → ${answers[index] || "skipped"}`);
     onAction?.(parts.join("\n"));
   }
 
@@ -99,21 +103,7 @@ export function SurveyWidget({ questions, onAction }: SurveyWidgetProps) {
               type="text"
               placeholder="Type your own answer..."
               value={customInputs[currentIndex]}
-              onChange={(e) => {
-                const val = e.target.value;
-                setCustomInputs((prev) => {
-                  const next = [...prev];
-                  next[currentIndex] = val;
-                  return next;
-                });
-                if (val.trim()) {
-                  setAnswers((prev) => {
-                    const next = [...prev];
-                    next[currentIndex] = val.trim();
-                    return next;
-                  });
-                }
-              }}
+              onChange={(e) => updateCustomInput(e.target.value)}
               className={cn(
                 "flex-1 text-xs px-3 py-2 rounded border transition-colors outline-none",
                 customInputs[currentIndex] && answers[currentIndex] === customInputs[currentIndex].trim()
@@ -156,4 +146,10 @@ export function SurveyWidget({ questions, onAction }: SurveyWidgetProps) {
       </div>
     </div>
   );
+}
+
+function replaceAtIndex<T>(items: T[], index: number, value: T): T[] {
+  const next = [...items];
+  next[index] = value;
+  return next;
 }

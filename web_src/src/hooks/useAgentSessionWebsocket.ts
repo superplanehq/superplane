@@ -18,21 +18,30 @@ function dispatchAgentEvent(
   callbacks: AgentStreamCallbacks,
   queryClient: QueryClient,
 ): void {
-  if (data.event === "assistant_message" || data.event === "tool_started" || data.event === "tool_finished") {
-    handlePersistedMessage(data, callbacks, queryClient);
-    return;
+  switch (data.event) {
+    case "assistant_message":
+    case "tool_started":
+    case "tool_finished":
+      handlePersistedMessage(data, callbacks, queryClient);
+      return;
+    case "stream_started":
+    case "turn_completed":
+    case "session_failed":
+      callbacks.onStatusChange?.(data.status ?? "", data.error);
+      return;
+    case "outcome_evaluation_start":
+    case "outcome_evaluation_end":
+      callbacks.onOutcomeEvent?.(outcomePhase(data.event), {
+        iteration: data.extra?.iteration ?? 0,
+        result: data.extra?.result,
+        explanation: data.extra?.explanation,
+      });
+      return;
   }
-  if (data.event === "stream_started" || data.event === "turn_completed" || data.event === "session_failed") {
-    callbacks.onStatusChange?.(data.status ?? "", data.error);
-  }
-  if (data.event === "outcome_evaluation_start" || data.event === "outcome_evaluation_end") {
-    const phase = data.event === "outcome_evaluation_start" ? "start" : "end";
-    callbacks.onOutcomeEvent?.(phase, {
-      iteration: data.extra?.iteration ?? 0,
-      result: data.extra?.result,
-      explanation: data.extra?.explanation,
-    });
-  }
+}
+
+function outcomePhase(event: "outcome_evaluation_start" | "outcome_evaluation_end"): "start" | "end" {
+  return event === "outcome_evaluation_start" ? "start" : "end";
 }
 
 function handlePersistedMessage(

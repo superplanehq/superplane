@@ -1,6 +1,6 @@
-import { Loader2, ClipboardList, X } from "lucide-react";
+import { ClipboardList, Loader2, X } from "lucide-react";
+import { useMemo, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
 import type { RubricCategory } from "./parser";
 
 export type OutcomePhase = "building" | "grading" | "passed" | "failed" | "exhausted";
@@ -51,214 +51,342 @@ export function OutcomeProgressWidget({ state, onDismiss }: { state: OutcomeStat
   const [rubricOpen, setRubricOpen] = useState(false);
   const [explanationOpen, setExplanationOpen] = useState<number | null>(null);
 
-  const hasCategories = state.categories && state.categories.length > 0;
-  const sectionCount = hasCategories ? state.categories!.length : 0;
-  const criteriaCount = state.criteria.length;
+  const explanationEntry = useMemo(() => {
+    if (explanationOpen === null) return null;
+
+    const entry = state.log?.[explanationOpen];
+    if (!entry || !("explanation" in entry) || !entry.explanation) {
+      return null;
+    }
+
+    return entry;
+  }, [explanationOpen, state.log]);
+
+  const dismissible = onDismiss && (state.phase === "passed" || state.phase === "exhausted");
+  const sectionCount = state.categories?.length ?? 0;
 
   return (
     <>
       <div
-        className="border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden"
+        className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
         data-testid="outcome-progress"
       >
-        {/* Header */}
-        <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-sm font-medium truncate">🎯 {state.title}</span>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {onDismiss && (state.phase === "passed" || state.phase === "exhausted") && (
-              <button
-                type="button"
-                onClick={onDismiss}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
-                title="Dismiss"
-              >
-                <X size={14} />
-              </button>
-            )}
-            <span className={cn("text-xs font-medium", phaseColor[state.phase])}>
-              {(state.phase === "building" || state.phase === "grading") && (
-                <Loader2 size={10} className="inline animate-spin mr-1" />
-              )}
-              {phaseLabel[state.phase]}
-            </span>
-          </div>
-        </div>
+        <OutcomeHeader
+          title={state.title}
+          phase={state.phase}
+          dismissible={Boolean(dismissible)}
+          onDismiss={onDismiss}
+        />
 
-        {/* Sub-header: rubric meta */}
-        <div className="px-3 py-1.5 border-b border-slate-100 flex items-center justify-between">
-          <span className="text-[10px] text-slate-500">
-            {sectionCount > 0 ? `${sectionCount} sections · ` : ""}
-            {criteriaCount} criteria
-          </span>
-          <button
-            type="button"
-            onClick={() => setRubricOpen(true)}
-            className="text-[10px] text-violet-600 hover:text-violet-800 font-medium"
-          >
-            View rubric
-          </button>
-        </div>
+        <RubricSummary
+          sectionCount={sectionCount}
+          criteriaCount={state.criteria.length}
+          onOpenRubric={() => setRubricOpen(true)}
+        />
 
-        {/* Iteration log */}
-        <div className="px-3 py-2 space-y-1">
-          {(state.log ?? []).map((entry, i) => {
-            if ("phase" in entry && (entry.phase === "building" || entry.phase === "finished")) {
-              const iterEntry = entry as IterationEntry;
-              const iterNum = Math.floor(i / 2) + 1;
-              return (
-                <div key={i} className="flex items-center gap-2 py-0.5">
-                  {iterEntry.phase === "building" ? (
-                    <Loader2 size={12} className="text-blue-500 animate-spin shrink-0" />
-                  ) : (
-                    <span className="text-xs shrink-0">✓</span>
-                  )}
-                  <span className="text-xs text-slate-700">
-                    Iteration {iterNum} — {iterEntry.phase === "building" ? "building…" : "finished"}
-                  </span>
-                </div>
-              );
-            }
-
-            const gradEntry = entry as GradingEntry;
-            return (
-              <div key={i} className="flex items-center gap-2 py-0.5">
-                {gradEntry.phase === "grading" ? (
-                  <Loader2 size={12} className="text-amber-500 animate-spin shrink-0" />
-                ) : gradEntry.phase === "satisfied" ? (
-                  <span className="text-xs shrink-0">✅</span>
-                ) : (
-                  <span className="text-xs shrink-0">❌</span>
-                )}
-                <span
-                  className={cn(
-                    "text-xs",
-                    gradEntry.phase === "satisfied"
-                      ? "text-emerald-700"
-                      : gradEntry.phase === "needs_revision"
-                        ? "text-red-700"
-                        : "text-amber-700",
-                  )}
-                >
-                  {gradEntry.phase === "grading"
-                    ? "Grading…"
-                    : gradEntry.phase === "satisfied"
-                      ? "Satisfied"
-                      : "Needs revision"}
-                </span>
-                {gradEntry.explanation && (
-                  <button
-                    type="button"
-                    onClick={() => setExplanationOpen(i)}
-                    className="text-[10px] text-slate-500 hover:text-slate-700 underline ml-auto shrink-0"
-                  >
-                    see result
-                  </button>
-                )}
-              </div>
-            );
-          })}
-
-          {(!state.log || state.log.length === 0) && (
-            <div className="flex items-center gap-2 py-0.5">
-              <Loader2 size={12} className="text-blue-500 animate-spin shrink-0" />
-              <span className="text-xs text-slate-500">Starting…</span>
-            </div>
-          )}
-        </div>
+        <OutcomeLog entries={state.log} onOpenExplanation={setExplanationOpen} />
       </div>
 
-      {/* Rubric modal */}
-      {rubricOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col mx-4">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <ClipboardList size={16} className="text-violet-600" />
-                <h2 className="text-sm font-semibold text-slate-900">{state.title}</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setRubricOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
-              >
-                <X size={16} />
-              </button>
-            </div>
-            <div className="overflow-y-auto p-4 flex-1">
-              {hasCategories ? (
-                <div className="space-y-3">
-                  {state.categories!.map((cat, ci) => (
-                    <div key={ci}>
-                      <p className="text-[10px] font-semibold text-violet-600 uppercase tracking-wide mb-1">
-                        {cat.heading}
-                      </p>
-                      {cat.criteria.map((c, j) => (
-                        <div key={j} className="flex items-start gap-2 py-1 border-b border-slate-50 last:border-0">
-                          <span className="text-violet-400 text-xs mt-0.5 shrink-0">✦</span>
-                          <span className="text-sm text-slate-700">{c.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                state.criteria.map((c, i) => (
-                  <div key={i} className="flex items-start gap-2 py-1.5 border-b border-slate-50 last:border-0">
-                    <span className="text-violet-500 text-sm mt-0.5 shrink-0 font-medium">{i + 1}.</span>
-                    <span className="text-sm text-slate-700">{c.text}</span>
-                  </div>
-                ))
-              )}
-            </div>
-            <div className="px-4 py-3 border-t border-slate-200 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setRubricOpen(false)}
-                className="text-xs text-slate-500 hover:text-slate-700"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <RubricModal open={rubricOpen} state={state} onClose={() => setRubricOpen(false)} />
 
-      {/* Explanation modal */}
-      {explanationOpen !== null &&
-        (() => {
-          const entry = state.log?.[explanationOpen] as GradingEntry;
-          if (!entry?.explanation) return null;
-          return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-              <div className="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col mx-4">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                  <h2 className="text-sm font-semibold text-slate-900">Grading Result</h2>
-                  <button
-                    type="button"
-                    onClick={() => setExplanationOpen(null)}
-                    className="text-slate-400 hover:text-slate-600"
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                <div className="overflow-y-auto p-4 flex-1">
-                  <p className="text-sm text-slate-700 whitespace-pre-wrap">{entry.explanation}</p>
-                </div>
-                <div className="px-4 py-3 border-t border-slate-200 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setExplanationOpen(null)}
-                    className="text-xs text-slate-500 hover:text-slate-700"
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+      <ExplanationModal
+        explanation={explanationEntry?.explanation}
+        open={explanationEntry != null}
+        onClose={() => setExplanationOpen(null)}
+      />
     </>
   );
+}
+
+function OutcomeHeader({
+  title,
+  phase,
+  dismissible,
+  onDismiss,
+}: {
+  title: string;
+  phase: OutcomePhase;
+  dismissible: boolean;
+  onDismiss?: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="truncate text-sm font-medium">🎯 {title}</span>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        {dismissible ? (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="text-slate-400 transition-colors hover:text-slate-600"
+            title="Dismiss"
+          >
+            <X size={14} />
+          </button>
+        ) : null}
+        <span className={cn("text-xs font-medium", phaseColor[phase])}>
+          {showPhaseSpinner(phase) ? <Loader2 size={10} className="mr-1 inline animate-spin" /> : null}
+          {phaseLabel[phase]}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function RubricSummary({
+  sectionCount,
+  criteriaCount,
+  onOpenRubric,
+}: {
+  sectionCount: number;
+  criteriaCount: number;
+  onOpenRubric: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between border-b border-slate-100 px-3 py-1.5">
+      <span className="text-[10px] text-slate-500">
+        {sectionCount > 0 ? `${sectionCount} sections · ` : ""}
+        {criteriaCount} criteria
+      </span>
+      <button
+        type="button"
+        onClick={onOpenRubric}
+        className="text-[10px] font-medium text-violet-600 hover:text-violet-800"
+      >
+        View rubric
+      </button>
+    </div>
+  );
+}
+
+function OutcomeLog({
+  entries,
+  onOpenExplanation,
+}: {
+  entries: OutcomeState["log"];
+  onOpenExplanation: (index: number) => void;
+}) {
+  if (!entries.length) {
+    return (
+      <div className="px-3 py-2">
+        <div className="flex items-center gap-2 py-0.5">
+          <Loader2 size={12} className="shrink-0 animate-spin text-blue-500" />
+          <span className="text-xs text-slate-500">Starting…</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1 px-3 py-2">
+      {entries.map((entry, index) =>
+        isIterationEntry(entry) ? (
+          <IterationLogRow key={index} entry={entry} iteration={Math.floor(index / 2) + 1} />
+        ) : (
+          <GradingLogRow key={index} entry={entry} onOpenExplanation={() => onOpenExplanation(index)} />
+        ),
+      )}
+    </div>
+  );
+}
+
+function IterationLogRow({ entry, iteration }: { entry: IterationEntry; iteration: number }) {
+  return (
+    <div className="flex items-center gap-2 py-0.5">
+      {entry.phase === "building" ? (
+        <Loader2 size={12} className="shrink-0 animate-spin text-blue-500" />
+      ) : (
+        <span className="shrink-0 text-xs">✓</span>
+      )}
+      <span className="text-xs text-slate-700">
+        Iteration {iteration} — {entry.phase === "building" ? "building…" : "finished"}
+      </span>
+    </div>
+  );
+}
+
+function GradingLogRow({ entry, onOpenExplanation }: { entry: GradingEntry; onOpenExplanation: () => void }) {
+  return (
+    <div className="flex items-center gap-2 py-0.5">
+      {gradingIcon(entry.phase)}
+      <span className={cn("text-xs", gradingTextColor(entry.phase))}>{gradingLabel(entry.phase)}</span>
+      {entry.explanation ? (
+        <button
+          type="button"
+          onClick={onOpenExplanation}
+          className="ml-auto shrink-0 text-[10px] text-slate-500 underline hover:text-slate-700"
+        >
+          see result
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function RubricModal({ open, state, onClose }: { open: boolean; state: OutcomeState; onClose: () => void }) {
+  if (!open) {
+    return null;
+  }
+
+  return (
+    <CenteredModal
+      title={state.title}
+      onClose={onClose}
+      titleIcon={<ClipboardList size={16} className="text-violet-600" />}
+    >
+      {state.categories && state.categories.length > 0 ? (
+        <CategorizedCriteriaList categories={state.categories} />
+      ) : (
+        <FlatCriteriaList criteria={state.criteria} />
+      )}
+    </CenteredModal>
+  );
+}
+
+function ExplanationModal({
+  explanation,
+  open,
+  onClose,
+}: {
+  explanation?: string;
+  open: boolean;
+  onClose: () => void;
+}) {
+  if (!open || !explanation) {
+    return null;
+  }
+
+  return (
+    <CenteredModal title="Grading Result" onClose={onClose}>
+      <p className="whitespace-pre-wrap text-sm text-slate-700">{explanation}</p>
+    </CenteredModal>
+  );
+}
+
+function CenteredModal({
+  title,
+  titleIcon,
+  children,
+  onClose,
+}: {
+  title: string;
+  titleIcon?: ReactNode;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="mx-4 flex max-h-[80vh] w-full max-w-lg flex-col rounded-lg bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <div className="flex items-center gap-2">
+            {titleIcon}
+            <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+          </div>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4">{children}</div>
+        <div className="flex justify-end border-t border-slate-200 px-4 py-3">
+          <button type="button" onClick={onClose} className="text-xs text-slate-500 hover:text-slate-700">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CategorizedCriteriaList({ categories }: { categories: RubricCategory[] }) {
+  return (
+    <div className="space-y-3">
+      {categories.map((category, categoryIndex) => (
+        <div key={categoryIndex}>
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-violet-600">{category.heading}</p>
+          {category.criteria.map((criterion, criterionIndex) => (
+            <CriteriaRow
+              key={criterionIndex}
+              prefix={<span className="mt-0.5 shrink-0 text-xs text-violet-400">✦</span>}
+            >
+              <span className="text-sm text-slate-700">{criterion.text}</span>
+            </CriteriaRow>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FlatCriteriaList({ criteria }: { criteria: OutcomeState["criteria"] }) {
+  return (
+    <>
+      {criteria.map((criterion, index) => (
+        <CriteriaRow
+          key={index}
+          bordered
+          prefix={<span className="mt-0.5 shrink-0 text-sm font-medium text-violet-500">{index + 1}.</span>}
+        >
+          <span className="text-sm text-slate-700">{criterion.text}</span>
+        </CriteriaRow>
+      ))}
+    </>
+  );
+}
+
+function CriteriaRow({
+  children,
+  prefix,
+  bordered = false,
+}: {
+  children: ReactNode;
+  prefix: ReactNode;
+  bordered?: boolean;
+}) {
+  return (
+    <div className={cn("flex items-start gap-2", bordered ? "border-b border-slate-50 py-1.5 last:border-0" : "py-1")}>
+      {prefix}
+      {children}
+    </div>
+  );
+}
+
+function isIterationEntry(entry: IterationEntry | GradingEntry): entry is IterationEntry {
+  return entry.phase === "building" || entry.phase === "finished";
+}
+
+function showPhaseSpinner(phase: OutcomePhase): boolean {
+  return phase === "building" || phase === "grading";
+}
+
+function gradingIcon(phase: GradingEntry["phase"]) {
+  if (phase === "grading") {
+    return <Loader2 size={12} className="shrink-0 animate-spin text-amber-500" />;
+  }
+  if (phase === "satisfied") {
+    return <span className="shrink-0 text-xs">✅</span>;
+  }
+  return <span className="shrink-0 text-xs">❌</span>;
+}
+
+function gradingLabel(phase: GradingEntry["phase"]): string {
+  switch (phase) {
+    case "grading":
+      return "Grading…";
+    case "satisfied":
+      return "Satisfied";
+    default:
+      return "Needs revision";
+  }
+}
+
+function gradingTextColor(phase: GradingEntry["phase"]): string {
+  switch (phase) {
+    case "grading":
+      return "text-amber-700";
+    case "satisfied":
+      return "text-emerald-700";
+    default:
+      return "text-red-700";
+  }
 }

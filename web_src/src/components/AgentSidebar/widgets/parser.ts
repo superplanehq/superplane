@@ -297,54 +297,93 @@ function parseSurvey(raw: string): SurveySegment {
 function parseRubric(meta: string, raw: string): RubricSegment {
   const lines = raw.split("\n").filter((l) => l.trim());
   let title = meta.trim();
-
-  // Check if the rubric has category headings (## Heading)
-  const hasCategories = lines.some((l) => /^#{2,3}\s/.test(l.trim()));
-
-  if (hasCategories) {
-    const categories: RubricCategory[] = [];
-    const uncategorized: { text: string }[] = [];
-    let currentCategory: RubricCategory | null = null;
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (/^#{2,3}\s/.test(trimmed)) {
-        // New category heading
-        if (currentCategory) categories.push(currentCategory);
-        currentCategory = { heading: trimmed.replace(/^#{2,3}\s*/, "").trim(), criteria: [] };
-      } else if (/^[-*✦•]\s/.test(trimmed)) {
-        const criterion = { text: trimmed.replace(/^[-*✦•]\s*/, "").trim() };
-        if (currentCategory) currentCategory.criteria.push(criterion);
-        else uncategorized.push(criterion);
-      } else if (/^\d+[.)]\s/.test(trimmed)) {
-        const criterion = { text: trimmed.replace(/^\d+[.)]\s*/, "").trim() };
-        if (currentCategory) currentCategory.criteria.push(criterion);
-        else uncategorized.push(criterion);
-      } else if (!title) {
-        title = trimmed;
-      }
-    }
-    if (currentCategory) categories.push(currentCategory);
-
-    // Flatten all criteria for backward compat (used by outcome grading)
-    const allCriteria = [...uncategorized, ...categories.flatMap((c) => c.criteria)];
-    return { type: "rubric", title: title || "Build Plan", criteria: allCriteria, categories };
+  if (lines.some((line) => isRubricHeading(line.trim()))) {
+    return parseCategorizedRubric(lines, title);
   }
 
-  // Flat rubric (no categories)
   const criteria: { text: string }[] = [];
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (/^[-*✦•]\s/.test(trimmed)) {
-      criteria.push({ text: trimmed.replace(/^[-*✦•]\s*/, "").trim() });
-    } else if (/^\d+[.)]\s/.test(trimmed)) {
-      criteria.push({ text: trimmed.replace(/^\d+[.)]\s*/, "").trim() });
-    } else if (!title) {
-      title = trimmed;
-    } else {
-      criteria.push({ text: trimmed });
+    const parsedLine = parseRubricLine(line.trim());
+    if (parsedLine.type === "criterion") {
+      criteria.push(parsedLine.criterion);
+      continue;
+    }
+    if (parsedLine.type === "text" && !title) {
+      title = parsedLine.text;
+      continue;
+    }
+    if (parsedLine.type === "text") {
+      criteria.push({ text: parsedLine.text });
     }
   }
 
   return { type: "rubric", title: title || "Build Plan", criteria };
+}
+
+function parseCategorizedRubric(lines: string[], initialTitle: string): RubricSegment {
+  let title = initialTitle;
+  const categories: RubricCategory[] = [];
+  const uncategorized: { text: string }[] = [];
+  let currentCategory: RubricCategory | null = null;
+
+  for (const line of lines) {
+    const parsedLine = parseRubricLine(line.trim());
+
+    if (parsedLine.type === "heading") {
+      if (currentCategory) {
+        categories.push(currentCategory);
+      }
+      currentCategory = { heading: parsedLine.heading, criteria: [] };
+      continue;
+    }
+
+    if (parsedLine.type === "criterion") {
+      if (currentCategory) {
+        currentCategory.criteria.push(parsedLine.criterion);
+      } else {
+        uncategorized.push(parsedLine.criterion);
+      }
+      continue;
+    }
+
+    if (!title) {
+      title = parsedLine.text;
+    }
+  }
+
+  if (currentCategory) {
+    categories.push(currentCategory);
+  }
+
+  return {
+    type: "rubric",
+    title: title || "Build Plan",
+    criteria: [...uncategorized, ...categories.flatMap((category) => category.criteria)],
+    categories,
+  };
+}
+
+function isRubricHeading(line: string): boolean {
+  return /^#{2,3}\s/.test(line);
+}
+
+function parseRubricLine(
+  line: string,
+):
+  | { type: "heading"; heading: string }
+  | { type: "criterion"; criterion: { text: string } }
+  | { type: "text"; text: string } {
+  if (isRubricHeading(line)) {
+    return { type: "heading", heading: line.replace(/^#{2,3}\s*/, "").trim() };
+  }
+
+  if (/^[-*✦•]\s/.test(line)) {
+    return { type: "criterion", criterion: { text: line.replace(/^[-*✦•]\s*/, "").trim() } };
+  }
+
+  if (/^\d+[.)]\s/.test(line)) {
+    return { type: "criterion", criterion: { text: line.replace(/^\d+[.)]\s*/, "").trim() } };
+  }
+
+  return { type: "text", text: line };
 }
