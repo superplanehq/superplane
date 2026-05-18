@@ -1,5 +1,5 @@
 import { Bot, ChevronRight, Loader2, SquareTerminal } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import { ChatComposer } from "@/components/AgentSidebar/ChatComposer";
 import { isSystemNotification, formatSystemNotification } from "@/components/AgentSidebar/systemMessages";
@@ -299,7 +299,6 @@ function ChatConversation({
   const interruptMutation = useInterruptAgentChat(organizationId);
   const outcomeMutation = useDefineAgentOutcome(organizationId);
 
-  const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<string>("idle");
   const [error, setError] = useState<string | null>(null);
   const [outcomeState, setOutcomeStateRaw] = useState<OutcomeState | null>(() => {
@@ -361,21 +360,33 @@ function ChatConversation({
   );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
-  const handleSend = useCallback(async () => {
-    const value = draft.trim();
-    if (!value || sendMutation.isPending) return;
-    setDraft("");
-    setError(null);
-    try {
-      await sendMutation.mutateAsync({ chatId, content: value, mode: agentMode });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "failed to send message");
-    }
-  }, [agentMode, chatId, draft, sendMutation]);
+  const handleSend = useCallback(
+    async (content: string) => {
+      if (!content.trim() || sendMutation.isPending) return;
+      setError(null);
+      await sendMutation.mutateAsync({ chatId, content, mode: agentMode }).catch((err) => {
+        setError(err instanceof Error ? err.message : "failed to send message");
+        throw err;
+      });
+    },
+    [agentMode, chatId, sendMutation],
+  );
 
   const handleStop = useCallback(() => {
     interruptMutation.mutate({ chatId });
   }, [chatId, interruptMutation]);
+
+  const handleQuickAction = useCallback(
+    async (action: string) => {
+      if (sendMutation.isPending) return;
+      try {
+        await sendMutation.mutateAsync({ chatId, content: action, mode: agentMode });
+      } catch {
+        // Keep the current transcript unchanged when quick actions fail.
+      }
+    },
+    [agentMode, chatId, sendMutation],
+  );
 
   const handleStartBuilding = useCallback(
     async (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
@@ -439,11 +450,9 @@ function ChatConversation({
                 <MessageRow
                   key={group.message.id}
                   message={group.message}
-                  sendMutation={sendMutation}
-                  chatId={chatId}
                   canvasId={canvasId}
                   organizationId={organizationId}
-                  agentMode={agentMode}
+                  onAction={handleQuickAction}
                   onStartBuilding={handleStartBuilding}
                 />
               ),
@@ -473,8 +482,6 @@ function ChatConversation({
       />
 
       <ChatComposer
-        draft={draft}
-        onDraftChange={setDraft}
         onSend={handleSend}
         onStop={handleStop}
         sending={status === "streaming"}
@@ -539,35 +546,19 @@ function DraftActionsBar({
   );
 }
 
-function MessageRow({
+const MessageRow = memo(function MessageRow({
   message,
-  sendMutation,
-  chatId,
   canvasId,
   organizationId,
-  agentMode,
+  onAction,
   onStartBuilding,
 }: {
   message: AgentMessage;
-  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
-  chatId: string;
   canvasId: string;
   organizationId: string;
-  agentMode: AgentMode;
+  onAction: (action: string) => Promise<void>;
   onStartBuilding: (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => void;
 }) {
-  const handleAction = useCallback(
-    async (action: string) => {
-      if (sendMutation.isPending) return;
-      try {
-        await sendMutation.mutateAsync({ chatId, content: action, mode: agentMode });
-      } catch {
-        // Keep the current transcript unchanged when quick actions fail.
-      }
-    },
-    [agentMode, chatId, sendMutation],
-  );
-
   if (message.role === "tool") {
     return <ToolMessageRow message={message} />;
   }
@@ -597,7 +588,7 @@ function MessageRow({
         ) : (
           <RichMessage
             content={message.content}
-            onAction={handleAction}
+            onAction={onAction}
             onStartBuilding={onStartBuilding}
             canvasId={canvasId}
             organizationId={organizationId}
@@ -609,7 +600,7 @@ function MessageRow({
       ) : null}
     </div>
   );
-}
+});
 
 type MessageGroup =
   | { type: "message"; message: AgentMessage }
