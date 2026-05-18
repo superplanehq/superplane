@@ -74,4 +74,6 @@ export interface BlockProps extends ComponentActionsProps {
   onAnnotationBlur?: () => void;
   onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
   onClick?: (e: MouseEvent) => void;
+  /** When true, non-highlighted contextual nodes show only header + slate body (runs / edge-hover dimming). */
+  dimBodyBelowHeader?: boolean;
 }
