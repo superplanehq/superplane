@@ -6,13 +6,50 @@ Manage Cloudflare zones, rules, and DNS
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
+## Triggers
+
+<CardGrid>
+  <LinkCard title="On Load Balancing Health Alert" href="#on-load-balancing-health-alert" description="Trigger when a Cloudflare load balancing pool or origin health state changes" />
+  <LinkCard title="On Tunnel Health" href="#on-tunnel-health" description="Trigger when a Cloudflare Tunnel health notification fires for degradation or recovery" />
+</CardGrid>
+
 ## Actions
 
 <CardGrid>
   <LinkCard title="Create DNS Record" href="#create-dns-record" description="Create a DNS record in a Cloudflare zone" />
+  <LinkCard title="Create KV Namespace" href="#create-kv-namespace" description="Create a Cloudflare Workers KV namespace" />
+  <LinkCard title="Create Load Balancer" href="#create-load-balancer" description="Create a Cloudflare Load Balancer on a zone, with support for private/public visibility, monitor attachment, and custom rules" />
+  <LinkCard title="Create Monitor" href="#create-monitor" description="Create a Cloudflare load balancing health monitor" />
+  <LinkCard title="Create Origin Rule" href="#create-origin-rule" description="Create a rule to override the origin server for matching requests" />
+  <LinkCard title="Create Pool" href="#create-pool" description="Create a Cloudflare Load Balancer origin pool" />
+  <LinkCard title="Create Tunnel" href="#create-tunnel" description="Create a new Cloudflare Tunnel (cloudflared) for secure outbound-only connectivity to Cloudflare" />
+  <LinkCard title="Delete Certificate Pack" href="#delete-certificate-pack" description="Delete a custom SSL/TLS certificate pack from a Cloudflare zone" />
   <LinkCard title="Delete DNS Record" href="#delete-dns-record" description="Delete a DNS record from a Cloudflare zone" />
+  <LinkCard title="Delete KV Namespace" href="#delete-kv-namespace" description="Delete a Cloudflare Workers KV namespace" />
+  <LinkCard title="Delete KV Value" href="#delete-kv-value" description="Delete a key from a Cloudflare Workers KV namespace" />
+  <LinkCard title="Delete Load Balancer" href="#delete-load-balancer" description="Delete a Cloudflare Load Balancer" />
+  <LinkCard title="Delete Monitor" href="#delete-monitor" description="Delete a Cloudflare load balancing health monitor" />
+  <LinkCard title="Delete Origin Rule" href="#delete-origin-rule" description="Remove an origin rule" />
+  <LinkCard title="Delete Pool" href="#delete-pool" description="Delete a Cloudflare Load Balancer origin pool" />
+  <LinkCard title="Delete Tunnel" href="#delete-tunnel" description="Delete a Cloudflare Tunnel and clean up its connector credentials" />
+  <LinkCard title="Delete Worker" href="#delete-worker" description="Delete a Worker script from your Cloudflare account" />
+  <LinkCard title="Deploy Worker" href="#deploy-worker" description="Provision a Worker if needed, upload a script version, and deploy it to traffic" />
+  <LinkCard title="Get KV Value" href="#get-kv-value" description="Read a value by key from a Cloudflare Workers KV namespace" />
+  <LinkCard title="Get Load Balancer" href="#get-load-balancer" description="Retrieve a Cloudflare Load Balancer by ID" />
+  <LinkCard title="Get Monitor" href="#get-monitor" description="Retrieve a Cloudflare load balancing health monitor's configuration" />
+  <LinkCard title="Get Pool" href="#get-pool" description="Retrieve a Cloudflare Load Balancer origin pool by ID" />
+  <LinkCard title="Get Tunnel" href="#get-tunnel" description="Retrieve configuration and status for a Cloudflare Tunnel by ID" />
+  <LinkCard title="Get Worker" href="#get-worker" description="Retrieve metadata and settings for a deployed Worker script" />
+  <LinkCard title="Order Certificate Pack" href="#order-certificate-pack" description="Order a custom SSL/TLS certificate pack for a Cloudflare zone" />
+  <LinkCard title="Purge Cache" href="#purge-cache" description="Purge cached content from the Cloudflare CDN for a zone" />
+  <LinkCard title="Put KV Value" href="#put-kv-value" description="Write a key-value pair to a Cloudflare Workers KV namespace" />
   <LinkCard title="Update DNS Record" href="#update-dns-record" description="Update an existing DNS record in a Cloudflare zone" />
+  <LinkCard title="Update Load Balancer" href="#update-load-balancer" description="Update a Cloudflare Load Balancer's steering policy, pool weights, or session affinity" />
+  <LinkCard title="Update Monitor" href="#update-monitor" description="Update a Cloudflare load balancing health monitor's configuration" />
+  <LinkCard title="Update Origin Rule" href="#update-origin-rule" description="Update an existing origin rule" />
+  <LinkCard title="Update Pool" href="#update-pool" description="Update a Cloudflare Load Balancer origin pool's configuration or origin weights" />
   <LinkCard title="Update Redirect Rule" href="#update-redirect-rule" description="Update a redirect rule in a Cloudflare zone" />
+  <LinkCard title="Update Worker Route" href="#update-worker-route" description="Create or update a zone route that maps a URL pattern to a Worker script" />
 </CardGrid>
 
 ## Instructions
@@ -27,13 +64,141 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
    - **Permissions** (click "+ Add more" to add each):
      - Zone / Zone / Read
      - Zone / DNS / Edit
-     - Zone / Dynamic Redirect / Edit
-     - Zone / DNS / Edit
+     - Zone / Cache Purge / Purge
+     - Zone / SSL and Certificates / Edit
+     - Zone / Single Redirect / Edit
+     - Zone / Origin Rules / Edit
+     - Zone / Workers Routes / Edit
+	 - Zone / Load Balancers / Edit
+     - Account / Workers KV Storage / Edit
+     - Account / Workers Scripts / Edit
+     - Account / Workers / Edit
+     - Account / Load Balancing: Monitors and Pools / Edit
+     - Account / Notifications / Edit
+     - Account / Account Settings / Edit
+     - Account / Cloudflare Tunnel / Edit
    - **Zone Resources**: Include / All zones _(or select specific zones)_
+   - **Account Resources**: Include the account containing your load balancers
 5. Click **Continue to summary**, then **Create Token**
 6. Copy the token and paste it below
 
+## Find your Cloudflare Account ID
+
+The **Account ID** is required for KV storage, load balancing monitors/pools, Cloudflare Tunnels, and health alert webhooks.
+
+1. Open the [Cloudflare dashboard](https://dash.cloudflare.com/)
+2. Select the account that contains your load balancers
+3. In the account home page, copy the **Account ID** from the right sidebar
+4. Paste it into the **Account ID** field below
+
+Make sure this is the same account selected in **Account Resources** when creating the API token.
+
 > **Note**: The token is only shown once. Store it securely if needed elsewhere.
+
+<a id="on-load-balancing-health-alert"></a>
+
+## On Load Balancing Health Alert
+
+The On Load Balancing Health Alert trigger starts a workflow from Cloudflare Load Balancing health notifications.
+
+### Use Cases
+
+- **Pool unhealthy**: React when a load balancer pool becomes unhealthy
+- **Origin unhealthy**: Notify or remediate when an endpoint/origin fails health checks
+- **Failover awareness**: Detect health changes that cause Cloudflare to route traffic away from unhealthy pools
+
+### Configuration
+
+- **Pool**: Optional pool filter. Leave empty to listen across pools available to the account.
+- **New Health**: Health states to listen for. Defaults to `Unhealthy`.
+- **Event Source**: Listen for pool events, origin events, or both.
+
+### Webhook Setup
+
+SuperPlane automatically creates a Cloudflare Alerting webhook destination and notification policy for `load_balancing_health_alert`. Cloudflare signs requests with the generated webhook secret and SuperPlane verifies the `cf-webhook-auth` header before emitting an event.
+
+### Workflow execution details
+
+In the workflow execution chain, the trigger's **Details** tab lists:
+
+- **Triggered At**: When SuperPlane recorded the webhook event.
+- **Alert Type**: For example `load_balancing_health_alert`.
+- **Event Source**: `pool` or `origin`.
+- **New Health**: The health state in the notification (for example `Unhealthy`).
+- **Pool**: Pool name when Cloudflare sends it; otherwise the pool ID.
+
+The trigger **title** still prefers an origin name, then pool name, then load balancer name when those fields are present in the payload. Use the **Payload** tab (or expressions such as `$.trigger.data`) for every field Cloudflare sends, including **origin name**, **load balancer id/name**, and **account id**.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account_id": "account_abc123",
+    "alert_type": "load_balancing_health_alert",
+    "event_source": "origin",
+    "load_balancer_id": "lb_123",
+    "load_balancer_name": "api.example.com",
+    "new_health": "Unhealthy",
+    "origin_name": "api-primary",
+    "pool_id": "pool_xyz789",
+    "pool_name": "Production pool"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.loadBalancing.healthAlert"
+}
+```
+
+<a id="on-tunnel-health"></a>
+
+## On Tunnel Health
+
+The On Tunnel Health trigger starts a workflow from Cloudflare `tunnel_health_event` notifications (Cloudflare Tunnel / cloudflared).
+
+### Use Cases
+
+- **Degraded or down**: React when tunnel connectivity drops below healthy thresholds
+- **Recovery**: Resume normal processing when the tunnel returns to a healthy state
+
+### Configuration
+
+- **Tunnel**: Optional. SuperPlane adds this tunnel to the Cloudflare notification policy **and** requires the webhook payload's `tunnel_id` to match (case-insensitive), so a mis-scoped or forged request is less likely to start your workflow. Leave **Tunnel** empty to accept any tunnel on the account (policy and webhook checks both allow any tunnel id present in the payload).
+
+> **Note**: Cloudflare's **Send test** notification may include a sample `tunnel_id` that does not match your real tunnel. With a tunnel selected, that test delivery will not emit until you clear the tunnel filter or use a payload that matches your tunnel id.
+
+### Webhook Setup
+
+SuperPlane provisions a Cloudflare Alerting webhook destination and a notification policy for `tunnel_health_event`. Cloudflare signs requests with the generated webhook secret and SuperPlane verifies the `cf-webhook-auth` header before emitting an event.
+
+### Workflow execution details
+
+The trigger **Payload** tab (and expressions such as `$.trigger.data`) use a merged view of the webhook JSON: fields inside `data` are combined with top-level fields (for example `alert_type`, `account_id`) so everything is available in one object.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "account_id": "90ddd046-218b-d375-f20e-9f9082cc0c6d",
+    "alert_name": "tunnel_health_event",
+    "alert_type": "tunnel_health_event",
+    "dashboard_link": "dash.cloudflare.com/aBcD1234efgh567i890j1kl234567m89",
+    "name": "SuperPlane Tunnel Health Alert",
+    "new_status": "TUNNEL_STATUS_TYPE_DEGRADED",
+    "policy_id": "fe9eda012119414084b1c9ffc9a1e2c9",
+    "policy_name": "SuperPlane Tunnel Health Alert",
+    "severity": "INFO",
+    "status_reason": "status change",
+    "text": "A Cloudflare Tunnel in your account has changed its connection status.\nTunnel: tunnel-name (aBcD1234efgh567i890j1kl234567m80) \nNew status: TUNNEL_STATUS_TYPE_DEGRADED (status change)",
+    "timestamp": "2022-10-27T06:00:22Z",
+    "ts": 1778597408,
+    "tunnel_id": "aBcD1234efgh567i890j1kl234567m80",
+    "tunnel_name": "tunnel-name"
+  },
+  "timestamp": "2026-05-12T14:50:14.036687251Z",
+  "type": "cloudflare.tunnel.healthEvent"
+}
+```
 
 <a id="create-dns-record"></a>
 
@@ -78,6 +243,348 @@ Emits the created DNS record on the default channel. If the zone is not found, t
 }
 ```
 
+<a id="create-kv-namespace"></a>
+
+## Create KV Namespace
+
+The Create KV Namespace component creates a new Cloudflare Workers KV namespace.
+
+### Use Cases
+
+- **Feature flags**: Provision a dedicated namespace to store feature flag state
+- **Session storage**: Create a namespace for application session data
+- **Configuration store**: Set up a namespace for dynamic configuration values
+
+### Configuration
+
+- **Title**: A human-readable name for the namespace (must be unique per account)
+
+### Output
+
+Returns the created namespace with its assigned ID and title.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "namespace": {
+      "id": "0f2ac74b498b48028cb68387c421e279",
+      "supports_url_encoding": true,
+      "title": "my-kv-namespace"
+    }
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.kv.namespace.created"
+}
+```
+
+<a id="create-load-balancer"></a>
+
+## Create Load Balancer
+
+The Create Load Balancer component creates a new Cloudflare Load Balancer attached to a zone.
+
+### Use Cases
+
+- **Traffic distribution**: Route traffic across multiple origin pools
+- **Blue/green deployments**: Create a load balancer backed by your new (green) pool
+- **Multi-region failover**: Define ordered pools with a fallback for automatic failover
+
+### Configuration
+
+- **Zone**: The zone to attach the load balancer to
+- **Name**: The hostname of the load balancer (e.g. `lb.example.com`)
+- **Fallback Pool**: Pool to use when all default pools are unhealthy
+- **Default Pools**: Ordered list of pools to route traffic to
+- **Steering Policy**: How traffic is distributed across pools
+- **Session Affinity**: How client sessions are pinned to a pool
+- **Pool Weights**: Per-pool weights used when steering policy is set to Random
+
+### Output
+
+Returns the created load balancer with its assigned ID and full configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "loadBalancer": {
+      "default_pools": [
+        "64d858d71f1e9839fdfb0d2ca78951f5"
+      ],
+      "description": "description",
+      "enabled": true,
+      "fallback_pool": "64d858d71f1e9839fdfb0d2ca78951f5",
+      "id": "f7adb491a20dcab2e29a3141f2f197f7",
+      "name": "example.org",
+      "networks": [
+        "cloudflare"
+      ],
+      "proxied": true,
+      "random_steering": {
+        "default_weight": 1
+      },
+      "session_affinity": "none",
+      "session_affinity_attributes": {
+        "samesite": "Auto",
+        "secure": "Auto",
+        "zero_downtime_failover": "none"
+      },
+      "steering_policy": "random",
+      "ttl": 30
+    },
+    "zoneId": "8132be7b33d9dc874ee6da0fa112945b"
+  },
+  "timestamp": "2026-05-05T13:00:33.465739808Z",
+  "type": "cloudflare.loadBalancer.created"
+}
+```
+
+<a id="create-monitor"></a>
+
+## Create Monitor
+
+The Create Monitor component creates a Cloudflare Load Balancing health monitor.
+
+### Use Cases
+
+- **Health checks**: Monitor HTTP, HTTPS, TCP, ICMP, UDP, or SMTP endpoints
+- **Failover**: Attach the new monitor to a pool so unhealthy origins are removed from load balancer rotation
+- **Release safety**: Create monitor definitions as part of load balancing setup automation
+
+### Configuration
+
+- **Name / Type / Path / Port**: Basic monitor settings. Path is required for HTTP and HTTPS monitors. Port is required for HTTP, HTTPS, TCP, UDP ICMP, and SMTP monitors.
+- **Advanced Health Check Settings**: Optional method, expected response, headers, redirects, TLS, probe zone, **interval** and **timeout** (seconds; omit both to let Cloudflare pick plan defaults), **retries**, and consecutive thresholds. Plan minimum interval: Pro 60s, Business 15s, Enterprise 10s.
+- **Pool**: Optional pool to attach the created monitor to immediately.
+
+### Output
+
+Emits the created monitor and, when configured, the attached pool.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "account_abc123",
+    "monitor": {
+      "consecutive_down": 3,
+      "consecutive_up": 2,
+      "description": "Login page monitor",
+      "expected_codes": "2xx",
+      "id": "monitor_abc123",
+      "interval": 60,
+      "method": "GET",
+      "path": "/health",
+      "retries": 0,
+      "timeout": 5,
+      "type": "https"
+    },
+    "monitorId": "monitor_abc123",
+    "pool": {
+      "id": "pool_xyz789",
+      "monitor": "monitor_abc123",
+      "name": "Production pool"
+    },
+    "poolId": "pool_xyz789"
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.monitor.created"
+}
+```
+
+<a id="create-origin-rule"></a>
+
+## Create Origin Rule
+
+The Create Origin Rule component creates a Cloudflare origin rule that routes matching requests to a different origin server.
+
+### Configuration
+
+- **Zone**: Select the Cloudflare zone where the rule should run
+- **Apply To**: Apply to all incoming requests or build a custom filter
+- **Match Rules**: Field/operator/value predicates used to build the Cloudflare expression
+- **DNS Record**: Optional hostname Cloudflare should resolve and route to
+- **Destination Port**: Optional destination port override
+- **Host Header**: Optional HTTP Host header override
+- **SNI**: Optional SNI override
+- **Enabled**: Whether the rule is active
+
+### Output
+
+Emits the created origin rule on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "rule": {
+      "action": "route",
+      "action_parameters": {
+        "host_header": "api.example.com",
+        "origin": {
+          "host": "api-origin.example.com",
+          "port": 8443
+        }
+      },
+      "description": "Route API requests",
+      "enabled": true,
+      "expression": "starts_with(http.request.uri.path, \"/api/\")",
+      "id": "rule123"
+    },
+    "zoneId": "zone123"
+  },
+  "timestamp": "2026-05-06T12:00:00Z",
+  "type": "cloudflare.createOriginRule"
+}
+```
+
+<a id="create-pool"></a>
+
+## Create Pool
+
+The Create Pool component creates a new Cloudflare Load Balancer origin pool.
+
+### Use Cases
+
+- **Canary deployments**: Provision a new origin pool for a canary release
+- **Blue/green deployments**: Create the green pool before switching traffic
+- **Multi-region**: Add origin servers in new regions
+
+### Configuration
+
+- **Name**: A unique, human-readable name for the pool
+- **Description**: Optional description
+- **Origins**: List of origin servers with name, address, enabled flag, weight, optional port, and optional coordinates
+- **Enabled**: Whether the pool is active
+- **Minimum Origins**: Minimum number of healthy origins before marking pool unhealthy
+- **Origin Steering Policy**: How requests are distributed across origins
+- **Monitor**: (Optional) Health monitor to use for origin health checks
+- **Load Shedding**: (Optional) Configure load shedding for the pool
+
+### Output
+
+Returns the created origin pool with its assigned ID and full configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my pool",
+      "enabled": true,
+      "id": "483e85c07a861ae7a8813ef010be7036",
+      "minimum_origins": 1,
+      "name": "my-pool",
+      "origin_steering": {
+        "policy": "random"
+      },
+      "origins": [
+        {
+          "address": "192.0.2.1",
+          "enabled": true,
+          "name": "server-1",
+          "port": 2013,
+          "weight": 1
+        }
+      ]
+    }
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.pool.created"
+}
+```
+
+<a id="create-tunnel"></a>
+
+## Create Tunnel
+
+The Create Tunnel component provisions a Cloudflare Tunnel under your account.
+
+### Use Cases
+
+- **Expose internal services**: Pair with ingress rules so private origins are reachable through Cloudflare without opening inbound firewall ports
+- **Automation**: Create tunnels as part of environment provisioning
+
+### Configuration
+
+- **Name**: A unique name for the tunnel
+- **Config source**: `cloudflare` (managed in Zero Trust) or `local` (managed via local cloudflared configuration)
+
+### Output
+
+Returns the tunnel resource from the Cloudflare API, including its ID. When Cloudflare returns a connector token, it is included in the output (treat it as a secret).
+
+> **Note**: Deleting a tunnel does not automatically remove all public hostname routes; use Cloudflare Zero Trust or DNS workflows as needed.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "tunnel": {
+      "account_tag": "90ddd046218bd375f20e9f9082cc0c6d",
+      "config_src": "cloudflare",
+      "created_at": "2026-05-12T14:40:05.379813Z",
+      "id": "432c983d-7934-47a8-923f-bfa017eef9c4",
+      "metadata": {},
+      "name": "my-test-tunnel",
+      "status": "inactive",
+      "token": "eyJhIjoiOTBkZGQwNDYyMThiZDM3NWYy...rTE0rM1hHaHhNMEVpa0QvK2RacE0xQUM1N1dHZEVHMHZxS1h4SHV1UER3PT0ifQ=="
+    },
+    "tunnelId": "432c983d-7934-47a8-923f-bfa017eef9c4"
+  },
+  "timestamp": "2026-05-12T14:40:06.391597638Z",
+  "type": "cloudflare.tunnel.created"
+}
+```
+
+<a id="delete-certificate-pack"></a>
+
+## Delete Certificate Pack
+
+The Delete Certificate Pack component removes a custom SSL/TLS certificate pack from a Cloudflare zone.
+
+### Use Cases
+
+- **Environment teardown**: Remove certificates issued for preview environments when they are decommissioned
+- **Certificate rotation**: Delete old certificate packs as part of a renewal workflow
+- **Cleanup**: Remove certificates that failed validation or are no longer needed
+
+### Configuration
+
+- **Certificate Pack**: The certificate pack to delete (shown as `zone/pack-id`). Can be set from a prior Order Certificate Pack component via an expression.
+
+### Output
+
+Emits the deleted pack ID, resolved zone ID, zone name when known from integration metadata, certificate hostnames when returned by the Cloudflare API (before deletion), and `deleted: true`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "hosts": [
+      "preview-123.example.com"
+    ],
+    "packId": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
+    "zoneId": "abc123def456abc123def456abc12345",
+    "zoneName": "example.com"
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.certificate_pack.deleted"
+}
+```
+
 <a id="delete-dns-record"></a>
 
 ## Delete DNS Record
@@ -116,6 +623,739 @@ Emits the deleted DNS record (zoneId, recordId, record) on the default channel. 
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "cloudflare.dnsRecord"
+}
+```
+
+<a id="delete-kv-namespace"></a>
+
+## Delete KV Namespace
+
+The Delete KV Namespace component permanently removes a Cloudflare Workers KV namespace and all of its key-value pairs.
+
+### Use Cases
+
+- **Environment teardown**: Remove namespaces as part of infrastructure cleanup
+- **Pipeline cleanup**: Delete temporary namespaces created during a workflow
+
+### Configuration
+
+- **Namespace**: The KV namespace to delete
+
+### Output
+
+Emits a confirmation with the account ID, namespace ID, and a deleted flag.
+
+> **Warning**: This operation is irreversible. All keys stored in the namespace will be permanently deleted.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "namespace": {
+      "id": "8cc7c421092f456389b23bac8c6b609c"
+    }
+  },
+  "timestamp": "2026-05-07T05:56:34.511115884Z",
+  "type": "cloudflare.kv.namespace.deleted"
+}
+```
+
+<a id="delete-kv-value"></a>
+
+## Delete KV Value
+
+The Delete KV Value component removes a key-value pair from a Cloudflare Workers KV namespace.
+
+### Use Cases
+
+- **Cleanup**: Remove stale keys as part of a teardown workflow
+- **Feature flag rollback**: Delete a flag to revert to default behaviour
+- **Session invalidation**: Remove session keys to force re-authentication
+
+### Configuration
+
+- **Namespace**: The ID of the KV namespace to delete from
+- **Key**: The key to delete
+
+### Output
+
+Emits a confirmation with the account ID, namespace ID, and key that was deleted.
+
+> **Warning**: This operation is irreversible. The key and its value will be permanently removed.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "key": "my-key",
+    "namespaceId": "0f2ac74b498b48028cb68387c421e279"
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.kv.value.deleted"
+}
+```
+
+<a id="delete-load-balancer"></a>
+
+## Delete Load Balancer
+
+The Delete Load Balancer component permanently removes a Cloudflare Load Balancer from a zone.
+
+### Use Cases
+
+- **Teardown**: Remove a load balancer as part of environment cleanup
+- **Blue/green decommission**: Delete the old load balancer after traffic has been fully migrated
+
+### Configuration
+
+- **Load Balancer**: The load balancer to delete
+
+### Output
+
+Emits a confirmation with the zone ID and load balancer ID of the deleted load balancer.
+
+> **Warning**: This operation is irreversible. Deleting the load balancer will immediately stop routing traffic through it.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "loadBalancerId": "699d98642c564d2e855e9661899b7252",
+    "zoneId": "023e105f4ecef8ad9ca31a8372d0c353"
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.loadBalancer.deleted"
+}
+```
+
+<a id="delete-monitor"></a>
+
+## Delete Monitor
+
+The Delete Monitor component removes a Cloudflare Load Balancing health monitor.
+
+### Use Cases
+
+- **Cleanup**: Delete monitor definitions when load balancing resources are decommissioned
+- **Rollback**: Remove monitors created during test or migration workflows
+
+### Configuration
+
+- **Monitor**: The monitor to delete.
+- **Force**: Delete even when Cloudflare reports that pools or other resources reference the monitor.
+
+### Output
+
+Emits the deleted monitor ID and any references Cloudflare reported before deletion.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "account_abc123",
+    "deleted": true,
+    "monitorId": "monitor_abc123",
+    "references": []
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.monitor.deleted"
+}
+```
+
+<a id="delete-origin-rule"></a>
+
+## Delete Origin Rule
+
+The Delete Origin Rule component removes a Cloudflare origin rule from a zone.
+
+### Configuration
+
+- **Rule**: Select the origin rule to delete
+
+### Output
+
+Emits the deleted origin rule on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "rule": {
+      "action": "route",
+      "action_parameters": {
+        "origin": {
+          "host": "api-origin.example.com"
+        }
+      },
+      "description": "Route API requests",
+      "enabled": true,
+      "expression": "starts_with(http.request.uri.path, \"/api/\")",
+      "id": "rule123"
+    },
+    "zoneId": "zone123"
+  },
+  "timestamp": "2026-05-06T12:00:00Z",
+  "type": "cloudflare.deleteOriginRule"
+}
+```
+
+<a id="delete-pool"></a>
+
+## Delete Pool
+
+The Delete Pool component permanently removes a Cloudflare Load Balancer origin pool.
+
+### Use Cases
+
+- **Blue/green deployments**: Clean up the old (blue) pool after traffic has shifted
+- **Environment teardown**: Remove pools as part of infrastructure cleanup
+
+### Configuration
+
+- **Pool ID**: The origin pool to delete
+
+### Output
+
+Emits a confirmation with the account ID and pool ID of the deleted pool.
+
+> **Warning**: This operation is irreversible. Ensure the pool is not attached to any load balancer before deleting.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
+  },
+  "timestamp": "2026-05-05T05:59:02.93536262Z",
+  "type": "cloudflare.pool.deleted"
+}
+```
+
+<a id="delete-tunnel"></a>
+
+## Delete Tunnel
+
+The Delete Tunnel component permanently removes a Cloudflare Tunnel.
+
+### Use Cases
+
+- **Teardown**: Remove tunnels when an environment is decommissioned
+- **Rotation**: Delete an old tunnel after migrating to a new one
+
+### Configuration
+
+- **Tunnel**: The tunnel ID to delete
+
+### Output
+
+Emits confirmation with the account ID and tunnel ID.
+
+> **Warning**: This operation is irreversible. Active traffic using the tunnel will fail until reconfigured.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "tunnelId": "3c683924-6802-47c9-860a-f27a66e684a2"
+  },
+  "timestamp": "2026-05-12T14:02:15.319225119Z",
+  "type": "cloudflare.tunnel.deleted"
+}
+```
+
+<a id="delete-worker"></a>
+
+## Delete Worker
+
+The Delete Worker component removes a Worker script.
+
+### Configuration
+
+- **Worker Script**: Worker to delete (picker lists scripts for the account).
+- **Force**: When enabled, Cloudflare deletes the script even when blocked by bindings (see Cloudflare API `force` query parameter).
+
+### Output
+
+Emits the account ID and Worker Script that were deleted.
+
+> **Warning**: This operation is irreversible for the Worker script.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "workerScript": "my-worker"
+  },
+  "timestamp": "2026-05-05T12:00:00.000000000Z",
+  "type": "cloudflare.worker.deleted"
+}
+```
+
+<a id="deploy-worker"></a>
+
+## Deploy Worker
+
+The Deploy Worker component uploads a single-module Worker (`worker.js`) to a **Worker script name** in your account. When **Provision Worker if missing** is enabled (default), it first calls Cloudflare's Create Worker API so a **new** name works without a separate step. After upload, SuperPlane always creates a **deployment** so the new version serves 100% of traffic (`cloudflare.worker.deployed`).
+
+### Script source
+
+- **Inline**: paste the full contents of `worker.js` (ES module exporting `fetch`).
+- **URL**: provide an **https** URL that returns the script body (max 2 MiB).
+
+### Configuration
+
+- **Worker script name**: Name of the Worker in your account (same name used in routes and the dashboard). Used for both provisioning and upload.
+- **Provision Worker if missing** (default on): Calls `POST .../workers/workers` with the optional metadata fields in **Provision settings** when that section is visible. If the Worker already exists, the error is ignored and upload continues.
+- **Provision settings** (optional): Tags, Logpush, Observability, Subdomain, Tail consumers — sent only on the provision step when it runs; omit toggles to leave those keys out of the API request.
+- **Compatibility date** (optional): Passed to the **script upload** metadata. If omitted, SuperPlane sends a recent default so Cloudflare treats the upload as a modern module Worker.
+- **Compatibility flags** (optional): comma- or newline-separated flags for the upload metadata.
+- **Deployment message** (optional): annotation stored on the deployment.
+
+### Output
+
+Emits the account ID, script name, new version ID, and deployment object.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deployment": {
+      "created_on": "2026-05-05T12:00:00Z",
+      "id": "182bd5e5-6e1a-4fe4-a799-aa6d9a6ab26e",
+      "source": "api",
+      "strategy": "percentage",
+      "versions": [
+        {
+          "percentage": 100,
+          "version_id": "18f97339-c287-4872-9bdd-e2135c07ec12"
+        }
+      ]
+    },
+    "scriptName": "my-worker",
+    "versionId": "18f97339-c287-4872-9bdd-e2135c07ec12"
+  },
+  "timestamp": "2026-05-05T12:00:00.000000000Z",
+  "type": "cloudflare.worker.deployed"
+}
+```
+
+<a id="get-kv-value"></a>
+
+## Get KV Value
+
+The Get KV Value component reads a value by key from a Cloudflare Workers KV namespace.
+
+### Use Cases
+
+- **Feature flag checks**: Read a feature flag value before proceeding
+- **Configuration lookup**: Retrieve dynamic configuration at workflow runtime
+- **Audit**: Capture the current value of a key as part of a pipeline snapshot
+
+### Configuration
+
+- **Namespace**: The ID of the KV namespace to read from
+- **Key**: The key to retrieve
+
+### Output
+
+Returns the account ID, namespace ID, key, and the retrieved value string.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "key": "my-key",
+    "namespaceId": "0f2ac74b498b48028cb68387c421e279",
+    "value": "my-value"
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.kv.value.fetched"
+}
+```
+
+<a id="get-load-balancer"></a>
+
+## Get Load Balancer
+
+The Get Load Balancer component fetches the current state of a Cloudflare Load Balancer.
+
+### Use Cases
+
+- **Pre-flight validation**: Confirm a load balancer exists before updating it
+- **Audit**: Capture a snapshot of the load balancer configuration at a point in time
+- **Conditional logic**: Branch a workflow based on the current steering policy or pool set
+
+### Configuration
+
+- **Load Balancer**: The load balancer to retrieve
+
+### Output
+
+Returns the full load balancer configuration including pools, steering policy, and session affinity settings.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "loadBalancer": {
+      "default_pools": [
+        "17b5962d775c646f3f9725cbc7a53df4"
+      ],
+      "description": "Example load balancer",
+      "enabled": true,
+      "fallback_pool": "17b5962d775c646f3f9725cbc7a53df4",
+      "id": "699d98642c564d2e855e9661899b7252",
+      "name": "lb.example.com",
+      "proxied": true,
+      "session_affinity": "none",
+      "steering_policy": "random"
+    },
+    "loadBalancerId": "699d98642c564d2e855e9661899b7252",
+    "zoneId": "023e105f4ecef8ad9ca31a8372d0c353"
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.loadBalancer.fetched"
+}
+```
+
+<a id="get-monitor"></a>
+
+## Get Monitor
+
+The Get Monitor component fetches the current configuration of a Cloudflare Load Balancing health monitor.
+
+### Use Cases
+
+- **Pre-flight validation**: Confirm a monitor exists and inspect its configuration before modifying it
+- **Audit**: Capture a snapshot of monitor settings at a point in time
+- **Workflow data**: Expose monitor configuration as payload data for downstream nodes
+
+### Configuration
+
+- **Monitor**: The health monitor to retrieve
+
+### Output
+
+Returns the full monitor configuration including type, path, port, intervals, and health thresholds.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "account_abc123",
+    "monitor": {
+      "consecutive_down": 3,
+      "consecutive_up": 2,
+      "description": "Login page monitor",
+      "expected_codes": "2xx",
+      "id": "monitor_abc123",
+      "interval": 60,
+      "method": "GET",
+      "path": "/health",
+      "port": 443,
+      "retries": 0,
+      "timeout": 5,
+      "type": "https"
+    },
+    "monitorId": "monitor_abc123"
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.monitor.fetched"
+}
+```
+
+<a id="get-pool"></a>
+
+## Get Pool
+
+The Get Pool component fetches the current state of a Cloudflare Load Balancer origin pool.
+
+### Use Cases
+
+- **Health checks**: Inspect origin health and pool status in a workflow
+- **Pre-flight validation**: Confirm a pool exists before updating it
+- **Audit**: Capture a snapshot of pool configuration at a point in time
+
+### Configuration
+
+- **Pool ID**: The origin pool to retrieve
+
+### Output
+
+Returns the full pool configuration including its origins, enabled state, and health monitor.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my updated pool",
+      "enabled": true,
+      "id": "f7be7edc94014415ba06bca7b13c5c5a",
+      "minimum_origins": 1,
+      "name": "my-updated-pool",
+      "origin_steering": {
+        "policy": "random"
+      },
+      "origins": [
+        {
+          "address": "192.0.2.1:2015",
+          "enabled": false,
+          "name": "server-1",
+          "weight": 1
+        }
+      ]
+    },
+    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
+  },
+  "timestamp": "2026-05-05T05:58:40.060373991Z",
+  "type": "cloudflare.pool.fetched"
+}
+```
+
+<a id="get-tunnel"></a>
+
+## Get Tunnel
+
+The Get Tunnel component fetches the current state of a Cloudflare Tunnel (cloudflared).
+
+### Use Cases
+
+- **Health and status checks**: Inspect tunnel status in a workflow
+- **Validation**: Confirm a tunnel exists before updating routes or DNS
+
+### Configuration
+
+- **Tunnel**: The tunnel ID to retrieve
+
+### Output
+
+Returns the tunnel object from the Cloudflare API (ID, name, status, config source, timestamps, and related fields).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "tunnel": {
+      "account_tag": "90ddd046218bd375f20e9f9082cc0c6d",
+      "config_src": "local",
+      "created_at": "2026-05-12T13:59:00.953876Z",
+      "id": "3c683924-6802-47c9-860a-f27a66e684a2",
+      "metadata": {},
+      "name": "my-test-tunnel",
+      "status": "active"
+    },
+    "tunnelId": "3c683924-6802-47c9-860a-f27a66e684a2"
+  },
+  "timestamp": "2026-05-12T14:01:27.023693818Z",
+  "type": "cloudflare.tunnel.fetched"
+}
+```
+
+<a id="get-worker"></a>
+
+## Get Worker
+
+The Get Worker component loads Workers script **settings** (bindings, compatibility, usage model, etc.) and the list of **deployments** (newest first per Cloudflare).
+
+### Configuration
+
+- **Worker Script**: The Worker script in your Cloudflare account (picker lists scripts for the account).
+
+### Output
+
+Emits `settings` and `deployments` for use in later workflow steps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deployments": [
+      {
+        "created_on": "2026-05-05T12:00:00Z",
+        "id": "182bd5e5-6e1a-4fe4-a799-aa6d9a6ab26e",
+        "source": "api",
+        "strategy": "percentage",
+        "versions": [
+          {
+            "percentage": 100,
+            "version_id": "18f97339-c287-4872-9bdd-e2135c07ec12"
+          }
+        ]
+      }
+    ],
+    "settings": {
+      "bindings": [],
+      "compatibility_date": "2024-01-01",
+      "usage_model": "standard"
+    },
+    "workerScript": "my-worker"
+  },
+  "timestamp": "2026-05-05T12:00:00.000000000Z",
+  "type": "cloudflare.worker.fetched"
+}
+```
+
+<a id="order-certificate-pack"></a>
+
+## Order Certificate Pack
+
+The Order Certificate Pack component orders an advanced SSL/TLS certificate pack for custom hostnames in a Cloudflare zone.
+
+### Use Cases
+
+- **Preview environments**: Automatically provision SSL certificates for dynamically created preview subdomains
+- **Custom domains**: Issue certificates for customer-owned domains behind Cloudflare
+- **Wildcard coverage**: Order a certificate that covers both the apex and wildcard subdomains
+
+### Configuration
+
+- **Zone**: The Cloudflare zone to issue the certificate in
+- **Hosts**: One or more hostnames the certificate should cover. Include both apex and wildcard variants (e.g., `example.com` and `*.example.com`) if needed.
+- **Certificate Authority**: The CA to use — Let's Encrypt (free, automated), Google, or SSL.com.
+- **Validation Method**: How domain ownership is verified — TXT record, HTTP file, or email.
+- **Certificate Validity Period**: How long the certificate should be valid. Available for Google and SSL.com certificates.
+- **Cloudflare Branding**: Whether to include Cloudflare branding on the certificate (optional).
+
+### Output
+
+Emits the resolved zone ID, zone name when known from integration metadata, pack ID, and the ordered certificate pack object (including covered hostnames). Status will typically be `initializing` or `pending_validation` immediately after ordering.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "pack": {
+      "certificate_authority": "lets_encrypt",
+      "hosts": [
+        "preview-123.example.com"
+      ],
+      "id": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
+      "status": "initializing",
+      "type": "advanced",
+      "validation_method": "txt"
+    },
+    "packId": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
+    "zoneId": "abc123def456abc123def456abc12345",
+    "zoneName": "example.com"
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.certificate_pack.ordered"
+}
+```
+
+<a id="purge-cache"></a>
+
+## Purge Cache
+
+The Purge Cache component clears cached content from the Cloudflare CDN.
+
+### Use Cases
+
+- **Deployments**: Immediately serve fresh content after a release without waiting for TTL expiry
+- **Hotfixes**: Force CDN edge nodes to re-fetch updated assets after a critical fix
+- **Preview environments**: Clear cache for specific preview subdomain URLs
+
+### Configuration
+
+- **Zone**: The Cloudflare zone whose cache to purge
+- **Mode**:
+  - *Everything*: Purge all cached content in the zone (equivalent to "Purge Everything" in the dashboard). Use with care — this can spike origin traffic.
+  - *Files*: Purge one or more specific URLs. Supports both plain URLs and URLs with custom cache headers.
+  - *Tags*: Purge by Cache-Tag header values (Enterprise plan only).
+  - *Hosts*: Purge all files cached under one or more hostnames (Enterprise plan only).
+  - *Prefixes*: Purge all cached assets whose URL starts with one of the provided prefixes.
+
+### Output
+
+Emits the Cloudflare purge result ID, zone ID, zone name (when known from integration metadata), and the purge scope (mode + items).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "files": [
+      "https://example.com/assets/main.css",
+      "https://example.com/assets/app.js"
+    ],
+    "id": "9a7806061c88ada191ed06f989cc3dac",
+    "mode": "files",
+    "zoneId": "abc123def456abc123def456abc12345",
+    "zoneName": "example.com"
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.cache.purged"
+}
+```
+
+<a id="put-kv-value"></a>
+
+## Put KV Value
+
+The Put KV Value component writes a key-value pair to a Cloudflare Workers KV namespace.
+
+### Use Cases
+
+- **Feature flags**: Toggle features by writing flag values into KV storage
+- **Cache invalidation**: Store cache keys or version stamps
+- **Dynamic configuration**: Update runtime configuration values from a workflow
+
+### Configuration
+
+- **Namespace**: The ID of the KV namespace to write to
+- **Key**: The key name (up to 512 bytes, printable non-whitespace characters)
+- **Value**: The value to store (up to 25 MiB)
+- **Expiration TTL**: (Optional) Number of seconds until the key expires (minimum 60)
+
+### Output
+
+Emits a confirmation with the account ID, namespace ID, and key that was written.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "key": "my-key",
+    "namespaceId": "0f2ac74b498b48028cb68387c421e279",
+    "written": true
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.kv.value.put"
 }
 ```
 
@@ -160,6 +1400,222 @@ Emits the updated DNS record (id, type, name, content, proxied, ttl) on the defa
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "cloudflare.dnsRecord"
+}
+```
+
+<a id="update-load-balancer"></a>
+
+## Update Load Balancer
+
+The Update Load Balancer component modifies an existing Cloudflare Load Balancer.
+
+### Use Cases
+
+- **Traffic shifting**: Change pool weights to shift traffic between canary and stable pools
+- **Blue/green cutover**: Switch default pools to point at the green pool
+- **Session affinity changes**: Enable or disable sticky sessions for a release
+- **Steering policy update**: Switch from random to geo or latency-based steering
+
+### Configuration
+
+- **Load Balancer**: The load balancer to update
+- **Steering Policy**: (Optional) New distribution policy across pools
+- **Pool Weights**: (Optional) Per-pool weights for random steering
+- **Session Affinity**: (Optional) How client sessions are pinned to a specific pool
+- **Session Affinity TTL**: (Optional) Duration of session affinity in seconds
+- **Fallback Pool**: (Optional) New fallback pool
+- **Default Pools**: (Optional) New ordered list of active pools
+
+### Output
+
+Returns the updated load balancer configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "loadBalancer": {
+      "default_pools": [
+        "9290f38c5d07c2e2f4df57b1f61d4196",
+        "17b5962d775c646f3f9725cbc7a53df4"
+      ],
+      "description": "Example load balancer",
+      "enabled": true,
+      "fallback_pool": "17b5962d775c646f3f9725cbc7a53df4",
+      "id": "699d98642c564d2e855e9661899b7252",
+      "name": "lb.example.com",
+      "proxied": true,
+      "random_steering": {
+        "pool_weights": {
+          "17b5962d775c646f3f9725cbc7a53df4": 0.1,
+          "9290f38c5d07c2e2f4df57b1f61d4196": 0.9
+        }
+      },
+      "session_affinity": "cookie",
+      "session_affinity_ttl": 1800,
+      "steering_policy": "random"
+    },
+    "loadBalancerId": "699d98642c564d2e855e9661899b7252",
+    "zoneId": "023e105f4ecef8ad9ca31a8372d0c353"
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.loadBalancer.updated"
+}
+```
+
+<a id="update-monitor"></a>
+
+## Update Monitor
+
+The Update Monitor component modifies an existing Cloudflare Load Balancing health monitor.
+
+### Use Cases
+
+- **Adjust thresholds**: Change health check intervals, timeouts, or consecutive up/down counts
+- **Change protocol**: Switch a monitor from HTTP to HTTPS or TCP
+- **Update endpoint**: Modify the path or port being checked
+- **Tune headers**: Add or remove request headers sent during health checks
+
+### Configuration
+
+- **Monitor**: The health monitor to update (required)
+- **Type / Description / Path / Port**: Override basic monitor settings. Only toggled fields are applied.
+- **Advanced Health Check Settings**: Override method, expected response, headers, redirect, TLS, and timing thresholds.
+
+### Output
+
+Returns the updated monitor configuration after the change is applied.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "account_abc123",
+    "monitor": {
+      "consecutive_down": 3,
+      "consecutive_up": 2,
+      "description": "Updated login page monitor",
+      "expected_codes": "2xx",
+      "id": "monitor_abc123",
+      "interval": 30,
+      "method": "GET",
+      "path": "/healthz",
+      "port": 443,
+      "retries": 2,
+      "timeout": 5,
+      "type": "https"
+    },
+    "monitorId": "monitor_abc123"
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.monitor.updated"
+}
+```
+
+<a id="update-origin-rule"></a>
+
+## Update Origin Rule
+
+The Update Origin Rule component updates a Cloudflare origin rule, such as changing the origin host for matching requests.
+
+### Configuration
+
+- **Rule**: Select the origin rule to update
+- **Apply To**: Apply to all incoming requests or build a custom filter
+- **Match Rules**: Field/operator/value predicates used to build the Cloudflare expression
+- **DNS Record**: Optional hostname Cloudflare should resolve and route to
+- **Destination Port**: Optional destination port override
+- **Host Header**: Optional HTTP Host header override
+- **SNI**: Optional SNI override
+- **Enabled**: Whether the rule is active
+
+### Output
+
+Emits the updated origin rule on the default channel.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "rule": {
+      "action": "route",
+      "action_parameters": {
+        "origin": {
+          "host": "new-api-origin.example.com"
+        }
+      },
+      "description": "Route API requests",
+      "enabled": true,
+      "expression": "starts_with(http.request.uri.path, \"/api/\")",
+      "id": "rule123"
+    },
+    "zoneId": "zone123"
+  },
+  "timestamp": "2026-05-06T12:00:00Z",
+  "type": "cloudflare.updateOriginRule"
+}
+```
+
+<a id="update-pool"></a>
+
+## Update Pool
+
+The Update Pool component modifies an existing Cloudflare Load Balancer origin pool.
+
+### Use Cases
+
+- **Canary deployments**: Shift traffic weight from stable to canary origin
+- **Blue/green deployments**: Disable blue origins and enable green origins
+- **Scaling**: Add or remove origin servers dynamically
+- **Health management**: Enable or disable individual origins without removing them
+
+### Configuration
+
+- **Pool ID**: The ID of the pool to update
+- **Origins**: Full list of origin servers with updated weights or enabled status
+- **Name**: Optional new name for the pool
+- **Description**: Optional new description
+- **Enabled**: Enable or disable the entire pool
+- **Minimum Origins**: Minimum number of healthy origins before pool is marked unhealthy
+- **Origin Steering Policy**: How requests are distributed across origins
+- **Monitor**: Health monitor ID for origin health checks
+- **Load Shedding**: Configure load shedding for the pool
+
+### Output
+
+Returns the updated origin pool configuration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my updated pool",
+      "enabled": true,
+      "id": "f7be7edc94014415ba06bca7b13c5c5a",
+      "minimum_origins": 1,
+      "name": "my-updated-pool",
+      "origin_steering": {
+        "policy": "random"
+      },
+      "origins": [
+        {
+          "address": "192.0.2.1:2015",
+          "enabled": false,
+          "name": "server-1",
+          "weight": 1
+        }
+      ]
+    },
+    "poolId": "f7be7edc94014415ba06bca7b13c5c5a"
+  },
+  "timestamp": "2026-05-05T05:57:59.044021383Z",
+  "type": "cloudflare.pool.updated"
 }
 ```
 
@@ -220,6 +1676,45 @@ Returns the updated redirect rule with all current configuration.
   },
   "timestamp": "2026-03-26T19:29:35.841265352Z",
   "type": "cloudflare.redirectRule"
+}
+```
+
+<a id="update-worker-route"></a>
+
+## Update Worker Route
+
+The Update Worker Route component manages **zone routes** for Workers.
+
+### Create vs update
+
+- Leave **Route ID** empty to **create** a new route (`POST /zones/{zone}/workers/routes`).
+- Set **Route ID** to **update** an existing route (`PUT /zones/{zone}/workers/routes/{id}`).
+
+### Configuration
+
+- **Zone**: Cloudflare zone for the route.
+- **Pattern**: URL pattern (for example `example.com/*`).
+- **Worker Script**: Worker script invoked for matching traffic (picker lists scripts for the account).
+
+### Output
+
+Emits the route id, pattern, and script returned by the Cloudflare API.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "route": {
+      "id": "023e105f4ecef8ad9ca31a8372d0c353",
+      "pattern": "example.com/*",
+      "script": "my-worker"
+    },
+    "zoneId": "023e105f4ecef8ad9ca31a8372d0c353"
+  },
+  "timestamp": "2026-05-05T12:00:00.000000000Z",
+  "type": "cloudflare.workerRoute.created"
 }
 ```
 

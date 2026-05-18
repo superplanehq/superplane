@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -28,10 +29,10 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 	return &CanvasSteps{t: t, session: session, CanvasName: name}
 }
 
-// EnterEditMode clicks the Editor segment in the header to create a draft version.
+// EnterEditMode clicks the Edit button in the header to create a draft version.
 // This must be called before making any canvas changes.
 func (s *CanvasSteps) EnterEditMode() {
-	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
+	editButton := q.TestID("canvas-edit-button").Run(s.session)
 
 	deadline := time.Now().Add(15 * time.Second)
 	for {
@@ -41,7 +42,7 @@ func (s *CanvasSteps) EnterEditMode() {
 			break
 		}
 		if time.Now().After(deadline) {
-			s.t.Fatalf("editor control did not become enabled")
+			s.t.Fatalf("edit button did not become enabled")
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
@@ -108,7 +109,7 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 	}
 
 	openButton := q.TestID("open-sidebar-button").Run(s.session)
-	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
+	editButton := q.TestID("canvas-edit-button").Run(s.session)
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -143,6 +144,27 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 	s.session.AssertVisible(q.TestID("building-blocks-sidebar"))
 }
 
+func (s *CanvasSteps) OpenBuildingBlockCategory(categoryName string) {
+	s.OpenBuildingBlocksSidebar()
+
+	details := q.Locator(fmt.Sprintf(
+		`[data-testid="building-blocks-sidebar"] details:has(summary :text-is("%s"))`,
+		categoryName,
+	)).Run(s.session)
+
+	open, err := details.GetAttribute("open")
+	require.NoError(s.t, err)
+	if open != "" {
+		return
+	}
+
+	s.session.Click(q.Locator(fmt.Sprintf(
+		`[data-testid="building-blocks-sidebar"] details:has(summary :text-is("%s")) summary`,
+		categoryName,
+	)))
+	s.session.Sleep(200)
+}
+
 // ClickOnEmptyCanvasArea clicks on an empty area of the canvas to dismiss
 // any open sidebars and deselect all nodes.
 func (s *CanvasSteps) ClickOnEmptyCanvasArea() {
@@ -162,7 +184,7 @@ func (s *CanvasSteps) SelectAllNodes() {
 }
 
 func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
-	s.OpenBuildingBlocksSidebar()
+	s.OpenBuildingBlockCategory("Debugging")
 
 	source := q.TestID("building-block-noop")
 	target := q.TestID("rf__wrapper")
@@ -190,7 +212,7 @@ func (s *CanvasSteps) AddNote() {
 
 // AddNoopWithDefaultName adds a noop node using the auto-generated name and returns that name.
 func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
-	s.OpenBuildingBlocksSidebar()
+	s.OpenBuildingBlockCategory("Debugging")
 
 	source := q.TestID("building-block-noop")
 	target := q.TestID("rf__wrapper")

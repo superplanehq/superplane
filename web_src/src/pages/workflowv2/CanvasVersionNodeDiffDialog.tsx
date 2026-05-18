@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
-import { formatTimestamp, summarizeNodeDiff, VersionNodeDiffAccordion } from "./VersionNodeDiff";
+import { summarizeNodeDiff } from "./summarizeNodeDiff";
+import { formatTimestamp } from "./versionNodeDiffUtils";
+import { VersionNodeDiffAccordion } from "./VersionNodeDiff";
 import { WorkflowMarkdownPreview } from "./WorkflowMarkdownPreview";
 import { getChangeRequestReviewActionFlags, getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 

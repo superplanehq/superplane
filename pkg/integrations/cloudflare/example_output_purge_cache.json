@@ -1,0 +1,14 @@
+{
+  "data": {
+    "zoneId": "abc123def456abc123def456abc12345",
+    "zoneName": "example.com",
+    "id": "9a7806061c88ada191ed06f989cc3dac",
+    "mode": "files",
+    "files": [
+      "https://example.com/assets/main.css",
+      "https://example.com/assets/app.js"
+    ]
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.cache.purged"
+}

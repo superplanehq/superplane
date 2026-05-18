@@ -41,10 +41,10 @@ import {
   CircleSlash2,
   CircleStop,
   CircleX,
-  Cloud,
   ClipboardClock,
   Clock,
   ClockArrowDown,
+  Cloud,
   Code,
   Cog,
   Component,
@@ -99,6 +99,7 @@ import {
   MessageCircle,
   MessageCircleOff,
   MessageSquare,
+  Monitor,
   Network,
   Package,
   Pause,
@@ -151,6 +152,7 @@ import {
 } from "lucide-react";
 
 const ICONS = {
+  monitor: Monitor,
   activity: Activity,
   "alert-circle": AlertCircle,
   "alert-triangle": AlertTriangle,

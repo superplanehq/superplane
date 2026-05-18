@@ -143,6 +143,25 @@ describe("canvas node preparation resilience", () => {
     expect(triggerData.trigger.error).toBeUndefined();
     expect(triggerData.trigger.warning).toBeUndefined();
   });
+
+  it("does not prepare trigger actions when no modal opener is available", () => {
+    const getTriggerProps = vi.fn(() => ({
+      title: "Webhook",
+      iconSlug: "bolt",
+      metadata: [],
+    }));
+    vi.spyOn(mappers, "getTriggerRenderer").mockReturnValue({
+      getTriggerProps,
+      getRootEventValues: () => ({}),
+      getTitleAndSubtitle: () => ({ title: "Event", subtitle: "" }),
+    });
+
+    prepareTriggerNode(makeTriggerNode(), [{ name: "webhook", label: "Webhook", icon: "bolt" }] as never, {}, "live", {
+      canvasId: "canvas-1",
+    });
+
+    expect(getTriggerProps).toHaveBeenCalledWith(expect.objectContaining({ actions: undefined }));
+  });
 });
 
 describe("getWorkflowSaveSignature", () => {

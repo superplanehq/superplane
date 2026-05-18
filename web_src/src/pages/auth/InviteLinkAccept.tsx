@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
-import { useAccount } from "@/contexts/AccountContext";
+import { useAccount } from "@/contexts/useAccount";
 import { showErrorToast } from "@/lib/toast";
 import { analytics } from "@/lib/analytics";
 import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";

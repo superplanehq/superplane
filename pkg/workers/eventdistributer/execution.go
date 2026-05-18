@@ -96,5 +96,18 @@ func handleExecutionState(workflowID string, executionID string, wsHub *ws.Hub) 
 	wsHub.BroadcastToWorkflow(workflowID, event)
 	log.Debugf("Broadcasted %s event to workflow %s", eventName, workflowID)
 
+	// run_started is already broadcast via the dedicated CanvasRunMessage path
+	// when the root event is processed. Runs only transition to finished after
+	// an execution finishes, so only check for that here.
+	if execution.RunID != uuid.Nil && execution.State == models.CanvasNodeExecutionStateFinished {
+		if err := handleRunState(workflowID, execution.RunID.String(), wsHub); err != nil {
+			log.WithError(err).Warnf(
+				"Failed to broadcast run state for execution %s in workflow %s",
+				execution.ID,
+				workflowID,
+			)
+		}
+	}
+
 	return nil
 }

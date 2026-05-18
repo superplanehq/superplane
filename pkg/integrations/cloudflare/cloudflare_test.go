@@ -1,11 +1,13 @@
 package cloudflare
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -49,7 +51,8 @@ func Test__Cloudflare__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiToken": "token123",
+				"apiToken":  "token123",
+				"accountId": "acc123",
 			},
 		}
 
@@ -68,6 +71,7 @@ func Test__Cloudflare__Sync(t *testing.T) {
 		assert.Len(t, metadata.Zones, 1)
 		assert.Equal(t, "zone123", metadata.Zones[0].ID)
 		assert.Equal(t, "example.com", metadata.Zones[0].Name)
+		assert.Equal(t, "acc123", metadata.AccountID)
 	})
 
 	t.Run("api token -> failed zone list returns error", func(t *testing.T) {
@@ -82,7 +86,8 @@ func Test__Cloudflare__Sync(t *testing.T) {
 
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
-				"apiToken": "invalid-token",
+				"apiToken":  "invalid-token",
+				"accountId": "account123",
 			},
 		}
 
@@ -100,20 +105,38 @@ func Test__Cloudflare__Sync(t *testing.T) {
 	})
 }
 
+func Test__Cloudflare__Configuration(t *testing.T) {
+	c := &Cloudflare{}
+	fields := c.Configuration()
+
+	require.Len(t, fields, 2)
+	assert.Equal(t, "apiToken", fields[0].Name)
+	assert.True(t, fields[0].Required)
+	assert.Equal(t, "accountId", fields[1].Name)
+	assert.False(t, fields[1].Required)
+}
+
 func Test__Cloudflare__ListResources(t *testing.T) {
 	c := &Cloudflare{}
 
 	t.Run("list zones from metadata", func(t *testing.T) {
-		httpContext := &contexts.HTTPContext{}
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"success": true,
+						"result": [
+							{"id": "zone1", "name": "example.com", "status": "active"},
+							{"id": "zone2", "name": "test.com", "status": "active"}
+						]
+					}`)),
+				},
+			},
+		}
 		integrationCtx := &contexts.IntegrationContext{
 			Configuration: map[string]any{
 				"apiToken": "token123",
-			},
-			Metadata: Metadata{
-				Zones: []Zone{
-					{ID: "zone1", Name: "example.com", Status: "active"},
-					{ID: "zone2", Name: "test.com", Status: "active"},
-				},
 			},
 		}
 
@@ -141,5 +164,51 @@ func Test__Cloudflare__ListResources(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Empty(t, resources)
+	})
+
+	t.Run("certificate pack list logs zone errors and continues", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader(`{"success":false,"errors":[{"message":"temporary failure"}]}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"success": true,
+						"result": [{"id": "pack-123", "hosts": ["app.example.com"]}]
+					}`)),
+				},
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "token123"},
+			Metadata: Metadata{
+				Zones: []Zone{
+					{ID: "zone-failing", Name: "failing.example.com"},
+					{ID: "zone-working", Name: "working.example.com"},
+				},
+			},
+		}
+		var logs bytes.Buffer
+		logger := logrus.New()
+		logger.SetOutput(&logs)
+		logger.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true})
+
+		resources, err := c.ListResources("certificate_pack", core.ListResourcesContext{
+			Logger:      logrus.NewEntry(logger),
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "certificate_pack", resources[0].Type)
+		assert.Equal(t, "working.example.com - app.example.com", resources[0].Name)
+		assert.Equal(t, "zone-working/pack-123", resources[0].ID)
+		assert.Contains(t, logs.String(), "failed to list certificate packs for zone, skipping")
+		assert.Contains(t, logs.String(), "zone-failing")
+		assert.Contains(t, logs.String(), "failing.example.com")
 	})
 }
