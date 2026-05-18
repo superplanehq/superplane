@@ -98,6 +98,7 @@ import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
+import { syncViewportOnModeSwitch } from "./lib/runs-viewport";
 import { prepareComponentNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
 import {
   isDraftVersion,
@@ -728,7 +729,8 @@ export function WorkflowPageV2() {
    */
   const viewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
   const runsViewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
-  const lastRunsViewportKeyRef = useRef<string | null>(null);
+  const lastRunsViewportKeyRef = useRef<"runs" | null>(null);
+  const skipNextRunsFitAllRef = useRef(false);
 
   // Track unsaved changes on the canvas
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -2021,8 +2023,29 @@ export function WorkflowPageV2() {
   const runsViewportKey = isRunsMode ? "runs" : null;
 
   if (lastRunsViewportKeyRef.current !== runsViewportKey) {
-    runsHasFitToViewRef.current = false;
-    runsViewportRef.current = undefined;
+    const viewportSync = syncViewportOnModeSwitch({
+      previousMode: lastRunsViewportKeyRef.current,
+      nextMode: runsViewportKey,
+      canvasViewport: viewportRef.current,
+      runsViewport: runsViewportRef.current,
+    });
+
+    if (viewportSync) {
+      if (viewportSync.canvasViewport) {
+        viewportRef.current = viewportSync.canvasViewport;
+      }
+      if (viewportSync.canvasHasFitToView !== undefined) {
+        hasFitToViewRef.current = viewportSync.canvasHasFitToView;
+      }
+      if (viewportSync.runsViewport !== undefined || runsViewportKey === "runs") {
+        runsViewportRef.current = viewportSync.runsViewport;
+      }
+      if (viewportSync.runsHasFitToView !== undefined) {
+        runsHasFitToViewRef.current = viewportSync.runsHasFitToView;
+      }
+      skipNextRunsFitAllRef.current = viewportSync.skipNextRunsFitAll;
+    }
+
     lastRunsViewportKeyRef.current = runsViewportKey;
   }
 
@@ -2037,6 +2060,12 @@ export function WorkflowPageV2() {
   useEffect(() => {
     if (!isRunsMode) return;
     if (!runCanvasNodeIdsKey) return;
+
+    if (skipNextRunsFitAllRef.current) {
+      skipNextRunsFitAllRef.current = false;
+      return;
+    }
+
     setRunsFitAllNonce((n) => n + 1);
   }, [isRunsMode, runCanvasNodeIdsKey]);
 
