@@ -2,18 +2,20 @@ package mcp
 
 import (
 	"context"
-	"bytes"
 	"encoding/json"
-	"net/http"
-	"io"
+	"os"
+	"os/exec"
+	"strings"
 	"fmt"
+
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gopkg.in/yaml.v3"
-	"time"
 )
 
 // safeTime returns a formatted time string or empty string for nil pointers
@@ -235,7 +237,8 @@ func handleIntegrationsList(ctx context.Context, args map[string]interface{}) (i
 	}, nil
 }
 
-// handleCanvasUpdate updates a canvas draft version with new YAML content
+// handleCanvasUpdate updates a canvas draft version by calling the internal API.
+// It uses the openapi_client to properly serialize the canvas YAML to protobuf format.
 func handleCanvasUpdate(ctx context.Context, args map[string]interface{}) (interface{}, error) {
 	canvasID, ok := args["canvas_id"].(string)
 	if !ok || canvasID == "" {
@@ -252,7 +255,7 @@ func handleCanvasUpdate(ctx context.Context, args map[string]interface{}) (inter
 		return nil, fmt.Errorf("yaml_content is required")
 	}
 
-	// Parse UUIDs
+	// Parse UUIDs to validate
 	canvasUUID, err := uuid.Parse(canvasID)
 	if err != nil {
 		return nil, fmt.Errorf("invalid canvas_id: %w", err)
@@ -263,105 +266,92 @@ func handleCanvasUpdate(ctx context.Context, args map[string]interface{}) (inter
 		return nil, fmt.Errorf("invalid org_id: %w", err)
 	}
 
-	// Verify canvas exists
+	// Verify canvas exists and get creator for JWT
 	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
 	if err != nil {
 		return nil, fmt.Errorf("canvas not found: %w", err)
 	}
 
-	// Parse YAML content
-	var canvasData map[string]interface{}
-	if err := yaml.Unmarshal([]byte(yamlContent), &canvasData); err != nil {
-		return nil, fmt.Errorf("invalid YAML content: %w", err)
+	// Write YAML to temp file (the CLI parser expects a file)
+	tmpFile, err := os.CreateTemp("", "mcp-canvas-*.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// Ensure YAML has proper apiVersion/kind/metadata structure
+	if !strings.Contains(yamlContent, "apiVersion:") {
+		// Wrap raw content
+		yamlContent = fmt.Sprintf("apiVersion: v1\nkind: Canvas\nmetadata:\n  id: %s\n  name: %s\nspec:\n%s",
+			canvasID, canvas.Name, yamlContent)
 	}
 
-	// Call our own API to create/update the draft version.
-	// The API expects the YAML to have apiVersion/kind/metadata/spec structure.
-	// If the agent sends raw nodes/edges, wrap them.
-	apiURL := fmt.Sprintf("http://localhost:8000/api/v1/canvases/%s/versions", canvasID)
+	if _, err := tmpFile.WriteString(yamlContent); err != nil {
+		return nil, fmt.Errorf("write temp file: %w", err)
+	}
+	tmpFile.Close()
 
-	// Ensure YAML has proper structure
-	if _, hasApiVersion := canvasData["apiVersion"]; !hasApiVersion {
-		// Wrap raw canvas data in proper structure
-		wrapped := map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Canvas",
-			"metadata": map[string]interface{}{
-				"id":   canvasID,
-				"name": canvasData["name"],
-			},
-			"spec": map[string]interface{}{
-				"nodes": canvasData["nodes"],
-				"edges": canvasData["edges"],
-			},
+	// Mint a JWT for the API call
+	authToken := ""
+	if bt, ok := ctx.Value("bearer_token").(string); ok {
+		authToken = bt
+	}
+	if signer, ok := ctx.Value("jwt_signer").(*jwt.Signer); ok && signer != nil {
+		if _, verr := signer.ValidateAndGetClaims(authToken); verr != nil {
+			userID := ""
+			if canvas.CreatedBy != nil {
+				userID = canvas.CreatedBy.String()
+			}
+			claims := jwt.ScopedTokenClaims{
+				Subject: userID,
+				OrgID:   orgID,
+				Purpose: "mcp-canvas-update",
+				Scopes: jwt.ScopesFromPermissions([]jwt.Permission{
+					{ResourceType: "org", Action: "read"},
+					{ResourceType: "canvases", Action: "read", Resources: []string{canvasID}},
+					{ResourceType: "canvases", Action: "update_version", Resources: []string{canvasID}},
+				}),
+			}
+			if minted, merr := signer.GenerateScopedToken(claims, 5*time.Minute); merr == nil {
+				authToken = minted
+			}
 		}
-		yamlBytes, err := yaml.Marshal(wrapped)
-		if err != nil {
-			return nil, fmt.Errorf("failed to re-serialize YAML: %w", err)
-		}
-		yamlContent = string(yamlBytes)
 	}
 
-	// Build the update request
-	updateBody := map[string]interface{}{
-		"yaml":  yamlContent,
-		"draft": true,
+	// Call superplane CLI to do the update (it handles all the YAML→protobuf conversion)
+	// Use the CLI binary (not the server binary)
+	cliBin := "/tmp/sp-cli"
+	if _, err := os.Stat(cliBin); os.IsNotExist(err) {
+		cliBin = "superplane" // fallback to PATH
 	}
-	bodyBytes, err := json.Marshal(updateBody)
+	cmd := exec.CommandContext(ctx, cliBin, "canvases", "update", "-f", tmpFile.Name(), "--draft")
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("SUPERPLANE_URL=http://localhost:8000"),
+		fmt.Sprintf("SUPERPLANE_TOKEN=%s", authToken),
+	)
+
+	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return nil, fmt.Errorf("marshal update body: %w", err)
+		return nil, fmt.Errorf("canvas update failed: %s", string(output))
 	}
-
-	req, err := http.NewRequestWithContext(ctx, "PUT", apiURL, bytes.NewReader(bodyBytes))
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-organization-id", orgID)
-	if bearerToken, ok := ctx.Value("bearer_token").(string); ok && bearerToken != "" {
-		req.Header.Set("Authorization", "Bearer "+bearerToken)
-	}
-
-	httpClient := &http.Client{Timeout: 30 * time.Second}
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("update API call failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("canvas update failed (HTTP %d): %s", resp.StatusCode, string(respBody))
-	}
-
-	var updateResp map[string]interface{}
-	json.Unmarshal(respBody, &updateResp)
 
 	result := map[string]interface{}{
-		"success":   true,
-		"canvas_id": canvas.ID.String(),
-		"message":   "Draft version created/updated",
-		"response":  updateResp,
+		"success": true,
+		"canvas_id": canvasID,
+		"output": string(output),
 	}
 
-	output, err := json.MarshalIndent(result, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize result: %w", err)
-	}
-
+	resultJSON, _ := json.MarshalIndent(result, "", "  ")
 	return map[string]interface{}{
 		"content": []map[string]interface{}{
 			{
 				"type": "text",
-				"text": string(output),
+				"text": string(resultJSON),
 			},
 		},
 	}, nil
 }
+
 
 // handleIndexSearch searches the component registry
 func handleIndexSearch(ctx context.Context, reg *registry.Registry, args map[string]interface{}) (interface{}, error) {

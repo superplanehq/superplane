@@ -109,6 +109,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, "claims", claims)
 	ctx = context.WithValue(ctx, "bearer_token", token)
+	ctx = context.WithValue(ctx, "jwt_signer", h.jwt)
 
 	// Route to appropriate handler
 	var result interface{}
