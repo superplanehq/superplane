@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
-import { RunsSidebar } from ".";
+import { RunsTabPanel } from "./RunsTabPanel";
 
 function makeRun(overrides: Partial<CanvasesCanvasRun> = {}): CanvasesCanvasRun {
   return {
@@ -36,16 +36,16 @@ const nodes: SuperplaneComponentsNode[] = [
   },
 ];
 
-describe("RunsSidebar", () => {
+describe("RunsTabPanel", () => {
   it("shows an empty state when there are no runs", () => {
-    render(<RunsSidebar runs={[]} selectedRunId={null} onSelectRun={() => {}} workflowNodes={nodes} />);
+    render(<RunsTabPanel runs={[]} selectedRunId={null} onSelectRun={() => {}} workflowNodes={nodes} />);
 
     expect(screen.getByText("No runs yet")).toBeInTheDocument();
   });
 
   it("pins running runs above completed runs", () => {
     render(
-      <RunsSidebar
+      <RunsTabPanel
         runs={[
           makeRun({ id: "run-completed", rootEvent: { ...makeRun().rootEvent, customName: "Completed run" } }),
           makeRun({
@@ -68,7 +68,7 @@ describe("RunsSidebar", () => {
 
   it("filters runs by search text and status", () => {
     render(
-      <RunsSidebar
+      <RunsTabPanel
         runs={[
           makeRun({
             id: "run-failed",
