@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -123,7 +124,10 @@ func FindFirstCanvasMemoryByNamespaceAndMatchesInTransaction(tx *gorm.DB, canvas
 		Error
 
 	if err != nil {
-		return nil, nil
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
 	}
 
 	return &record, nil
@@ -131,6 +135,30 @@ func FindFirstCanvasMemoryByNamespaceAndMatchesInTransaction(tx *gorm.DB, canvas
 
 func FindFirstCanvasMemoryByNamespaceAndMatches(canvasID uuid.UUID, namespace string, matches map[string]any) (*CanvasMemory, error) {
 	return FindFirstCanvasMemoryByNamespaceAndMatchesInTransaction(database.Conn(), canvasID, namespace, matches)
+}
+
+func FindFirstCanvasMemoryByNamespaceInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string) (*CanvasMemory, error) {
+	var record CanvasMemory
+
+	err := tx.
+		Where("canvas_id = ? AND namespace = ?", canvasID, namespace).
+		Order("created_at DESC").
+		Limit(1).
+		First(&record).
+		Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &record, nil
+}
+
+func FindFirstCanvasMemoryByNamespace(canvasID uuid.UUID, namespace string) (*CanvasMemory, error) {
+	return FindFirstCanvasMemoryByNamespaceInTransaction(database.Conn(), canvasID, namespace)
 }
 
 func DeleteCanvasMemory(canvasID, memoryID uuid.UUID) error {
