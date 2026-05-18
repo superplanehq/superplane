@@ -2983,6 +2983,16 @@ export function WorkflowPageV2() {
     setIntegrationDialogName(integrationName);
   }, []);
 
+  // Listen for agent sidebar integration button clicks
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { integrationName } = (e as CustomEvent).detail;
+      if (integrationName) setIntegrationDialogName(integrationName);
+    };
+    window.addEventListener("agent:open-integration", handler);
+    return () => window.removeEventListener("agent:open-integration", handler);
+  }, []);
+
   const handleIntegrationCreated = useCallback(
     async (integrationId: string, instanceName: string) => {
       if (!canvas || !organizationId || !canvasId || !integrationDialogName) return;

@@ -14,6 +14,7 @@ import { SurveyWidget } from "./SurveyWidget";
 import { RubricWidget } from "./RubricWidget";
 import { RunChipFromLink } from "./RunChip";
 import { NodeChipFromLink } from "./NodeChip";
+import { IntegrationButton } from "./IntegrationButton";
 
 const MARKDOWN_CLASSES =
   "max-w-none [&_h1]:mb-1.5 [&_h1]:mt-1 [&_h1]:text-base [&_h1]:font-semibold [&_h1:first-child]:mt-0 " +
@@ -79,7 +80,7 @@ function SegmentRenderer({
         <div className={MARKDOWN_CLASSES}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm, remarkBreaks]}
-            urlTransform={(url) => (url.startsWith("run:") || url.startsWith("node:") ? url : defaultUrlTransform(url))}
+            urlTransform={(url) => (url.startsWith("run:") || url.startsWith("node:") || url.startsWith("integration:") ? url : defaultUrlTransform(url))}
             components={{
               a: ({ children, href }) => {
                 const runMatch = href?.match(/^run:([0-9a-f-]{36})(?:~(.+))?/);
@@ -92,6 +93,17 @@ function SegmentRenderer({
                       rawStatus={runMatch[2]}
                       canvasId={canvasId}
                       organizationId={organizationId}
+                    />
+                  );
+                }
+
+                const integrationMatch = href?.match(/^integration:(.+)$/);
+                if (integrationMatch) {
+                  const label = typeof children === "string" ? children : undefined;
+                  return (
+                    <IntegrationButton
+                      integrationName={integrationMatch[1]}
+                      label={label}
                     />
                   );
                 }
