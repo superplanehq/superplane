@@ -1,6 +1,6 @@
 import React from "react";
 import { resolveIcon } from "@/lib/utils";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 
 export function RunNodeIcon({
   componentName,

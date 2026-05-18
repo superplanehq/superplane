@@ -1,6 +1,7 @@
 package shared
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -143,6 +144,27 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 	s.session.AssertVisible(q.TestID("building-blocks-sidebar"))
 }
 
+func (s *CanvasSteps) OpenBuildingBlockCategory(categoryName string) {
+	s.OpenBuildingBlocksSidebar()
+
+	details := q.Locator(fmt.Sprintf(
+		`[data-testid="building-blocks-sidebar"] details:has(summary :text-is("%s"))`,
+		categoryName,
+	)).Run(s.session)
+
+	open, err := details.GetAttribute("open")
+	require.NoError(s.t, err)
+	if open != "" {
+		return
+	}
+
+	s.session.Click(q.Locator(fmt.Sprintf(
+		`[data-testid="building-blocks-sidebar"] details:has(summary :text-is("%s")) summary`,
+		categoryName,
+	)))
+	s.session.Sleep(200)
+}
+
 // ClickOnEmptyCanvasArea clicks on an empty area of the canvas to dismiss
 // any open sidebars and deselect all nodes.
 func (s *CanvasSteps) ClickOnEmptyCanvasArea() {
@@ -162,7 +184,7 @@ func (s *CanvasSteps) SelectAllNodes() {
 }
 
 func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
-	s.OpenBuildingBlocksSidebar()
+	s.OpenBuildingBlockCategory("Debugging")
 
 	source := q.TestID("building-block-noop")
 	target := q.TestID("rf__wrapper")
@@ -190,7 +212,7 @@ func (s *CanvasSteps) AddNote() {
 
 // AddNoopWithDefaultName adds a noop node using the auto-generated name and returns that name.
 func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
-	s.OpenBuildingBlocksSidebar()
+	s.OpenBuildingBlockCategory("Debugging")
 
 	source := q.TestID("building-block-noop")
 	target := q.TestID("rf__wrapper")
