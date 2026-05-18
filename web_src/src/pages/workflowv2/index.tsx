@@ -97,6 +97,7 @@ import { CanvasYamlModal } from "./CanvasYamlModal";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
 import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
+import { shouldRefitRunsViewport } from "./lib/canvas-runs";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import { prepareComponentNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
 import {
@@ -728,7 +729,8 @@ export function WorkflowPageV2() {
    */
   const viewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
   const runsViewportRef = useRef<{ x: number; y: number; zoom: number } | undefined>(undefined);
-  const lastRunsViewportKeyRef = useRef<string | null>(null);
+  const lastRunCanvasNodeIdsKeyRef = useRef<string | null>(null);
+  const skipNextRunsViewportRefitRef = useRef(false);
 
   // Track unsaved changes on the canvas
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -2018,13 +2020,6 @@ export function WorkflowPageV2() {
 
   const nodes = runCanvasData ? runCanvasData.nodes : nodesWithIntegrationStatus;
   const renderedEdges = runCanvasData ? runCanvasData.edges : preparedEdges;
-  const runsViewportKey = isRunsMode ? "runs" : null;
-
-  if (lastRunsViewportKeyRef.current !== runsViewportKey) {
-    runsHasFitToViewRef.current = false;
-    runsViewportRef.current = undefined;
-    lastRunsViewportKeyRef.current = runsViewportKey;
-  }
 
   const runCanvasNodeIdsKey = useMemo(() => {
     if (!isRunsMode || !runCanvasData) return null;
@@ -2035,8 +2030,22 @@ export function WorkflowPageV2() {
   }, [isRunsMode, runCanvasData]);
 
   useEffect(() => {
-    if (!isRunsMode) return;
-    if (!runCanvasNodeIdsKey) return;
+    if (
+      !shouldRefitRunsViewport({
+        isRunsMode,
+        runCanvasNodeIdsKey,
+        previousRunCanvasNodeIdsKey: lastRunCanvasNodeIdsKeyRef.current,
+      })
+    ) {
+      return;
+    }
+
+    lastRunCanvasNodeIdsKeyRef.current = runCanvasNodeIdsKey;
+    if (skipNextRunsViewportRefitRef.current) {
+      skipNextRunsViewportRefitRef.current = false;
+      return;
+    }
+
     setRunsFitAllNonce((n) => n + 1);
   }, [isRunsMode, runCanvasNodeIdsKey]);
 
@@ -4972,6 +4981,12 @@ export function WorkflowPageV2() {
   const handleSelectRunsMode = useCallback(() => {
     if (hasEditableVersion && liveCanvasVersionId) {
       handleUseVersion(liveCanvasVersionId);
+    }
+
+    if (!runsViewportRef.current && viewportRef.current) {
+      runsViewportRef.current = { ...viewportRef.current };
+      runsHasFitToViewRef.current = true;
+      skipNextRunsViewportRefitRef.current = true;
     }
 
     setIsRunsMode(true);
