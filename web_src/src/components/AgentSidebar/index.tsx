@@ -123,19 +123,24 @@ function ChatConversation({
     try {
       const stored = sessionStorage.getItem(`outcome-${chatId}`);
       return stored ? JSON.parse(stored) : null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   });
-  const setOutcomeState = useCallback((update: OutcomeState | null | ((prev: OutcomeState | null) => OutcomeState | null)) => {
-    setOutcomeStateRaw((prev) => {
-      const next = typeof update === "function" ? update(prev) : update;
-      if (next) {
-        sessionStorage.setItem(`outcome-${chatId}`, JSON.stringify(next));
-      } else {
-        sessionStorage.removeItem(`outcome-${chatId}`);
-      }
-      return next;
-    });
-  }, [chatId]);
+  const setOutcomeState = useCallback(
+    (update: OutcomeState | null | ((prev: OutcomeState | null) => OutcomeState | null)) => {
+      setOutcomeStateRaw((prev) => {
+        const next = typeof update === "function" ? update(prev) : update;
+        if (next) {
+          sessionStorage.setItem(`outcome-${chatId}`, JSON.stringify(next));
+        } else {
+          sessionStorage.removeItem(`outcome-${chatId}`);
+        }
+        return next;
+      });
+    },
+    [chatId],
+  );
 
   // pages[0] is the latest fetch; later entries are older batches loaded
   // via scroll-up. Reverse so chronological order falls out of flatMap.
@@ -173,7 +178,11 @@ function ChatConversation({
             if (!prev) return prev;
             if (prev.phase === "grading") {
               // Grading just finished and session went idle = passed
-              return { ...prev, phase: "passed" as OutcomePhase, criteria: prev.criteria.map(c => ({ ...c, status: "passed" as const })) };
+              return {
+                ...prev,
+                phase: "passed" as OutcomePhase,
+                criteria: prev.criteria.map((c) => ({ ...c, status: "passed" as const })),
+              };
             }
             return prev;
           });
@@ -189,15 +198,18 @@ function ChatConversation({
               return {
                 ...prev,
                 iteration: nextIteration,
-                phase: isExhausted ? "exhausted" as OutcomePhase : "building" as OutcomePhase,
-                criteria: prev.criteria.map(c => ({ ...c, status: "pending" as const, feedback: undefined })),
+                phase: isExhausted ? ("exhausted" as OutcomePhase) : ("building" as OutcomePhase),
+                criteria: prev.criteria.map((c) => ({ ...c, status: "pending" as const, feedback: undefined })),
               };
             }
             return prev;
           });
         }
       },
-      onOutcomeEvent: (phase: "start" | "end", evaluation: { iteration: number; passed?: boolean; feedback?: string }) => {
+      onOutcomeEvent: (
+        phase: "start" | "end",
+        evaluation: { iteration: number; passed?: boolean; feedback?: string },
+      ) => {
         setOutcomeState((prev) => {
           if (!prev) return prev;
           if (phase === "start") {
@@ -260,7 +272,11 @@ function ChatConversation({
         console.error("Failed to define outcome:", err);
         setOutcomeState(null);
         // Fallback: send as regular message in builder mode
-        await sendMutation.mutateAsync({ chatId, content: `Start building based on this plan:\n\n${rubricText}`, mode: "builder" });
+        await sendMutation.mutateAsync({
+          chatId,
+          content: `Start building based on this plan:\n\n${rubricText}`,
+          mode: "builder",
+        });
       }
     },
     [chatId, onModeSwitch, outcomeMutation, sendMutation],
@@ -389,7 +405,7 @@ function MessageRow({
   canvasId,
   organizationId,
   agentMode,
-  onModeSwitch,
+  onModeSwitch: _onModeSwitch,
   onStartBuilding,
 }: {
   message: AgentMessage;

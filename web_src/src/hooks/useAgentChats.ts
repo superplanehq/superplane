@@ -117,7 +117,17 @@ export function upsertAgentMessageInCache(queryClient: QueryClient, chatId: stri
 
 export function useDefineAgentOutcome(organizationId: string | undefined) {
   return useMutation({
-    mutationFn: async ({ chatId, description, rubric, maxIterations }: { chatId: string; description: string; rubric: string; maxIterations?: number }) => {
+    mutationFn: async ({
+      chatId,
+      description,
+      rubric,
+      maxIterations,
+    }: {
+      chatId: string;
+      description: string;
+      rubric: string;
+      maxIterations?: number;
+    }) => {
       const res = await fetch(`/api/v1/agents/chats/${chatId}/outcome`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-organization-id": organizationId ?? "" },
