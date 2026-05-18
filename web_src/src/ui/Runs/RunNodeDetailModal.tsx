@@ -10,7 +10,7 @@ import type {
 import { TimeAgo } from "@/components/TimeAgo";
 import { Button } from "@/components/ui/button";
 import { useEventExecutions } from "@/hooks/useCanvasData";
-import { cn, flattenObject, resolveIcon } from "@/lib/utils";
+import { cn, flattenObject, isUrl, resolveIcon } from "@/lib/utils";
 import { getExecutionDetails, getState, getStateMap } from "@/pages/workflowv2/mappers";
 import { buildExecutionInfo } from "@/pages/workflowv2/utils";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
@@ -426,12 +426,29 @@ function DetailsView({ details }: { details: Record<string, unknown> }) {
             <span className="w-[120px] shrink-0 truncate text-right text-xs text-gray-500" title={key}>
               {key}:
             </span>
-            <span className="min-w-0 break-all text-xs text-gray-800">
-              {typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? "")}
-            </span>
+            <DetailValue value={value} />
           </div>
         );
       })}
     </div>
   );
+}
+
+function DetailValue({ value }: { value: unknown }) {
+  const stringValue = typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? "");
+
+  if (isUrl(stringValue)) {
+    return (
+      <a
+        href={stringValue}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="min-w-0 break-all text-xs text-blue-600 underline underline-offset-2 hover:text-blue-700"
+      >
+        {stringValue}
+      </a>
+    );
+  }
+
+  return <span className="min-w-0 break-all text-xs text-gray-800">{stringValue}</span>;
 }
