@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useApp } from "@/hooks/useAppData";
 import { usePageTitle } from "@/hooks/usePageTitle";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";

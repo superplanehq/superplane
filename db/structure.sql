@@ -877,11 +877,11 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
--- Name: blueprints blueprints_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: app_docs app_docs_app_id_path_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.blueprints
-    ADD CONSTRAINT blueprints_organization_id_name_key UNIQUE (organization_id, name);
+ALTER TABLE ONLY public.app_docs
+    ADD CONSTRAINT app_docs_app_id_path_key UNIQUE (app_id, path);
 
 
 --
@@ -893,11 +893,11 @@ ALTER TABLE ONLY public.app_docs
 
 
 --
--- Name: app_docs app_docs_app_id_path_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: blueprints blueprints_organization_id_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.app_docs
-    ADD CONSTRAINT app_docs_app_id_path_key UNIQUE (app_id, path);
+ALTER TABLE ONLY public.blueprints
+    ADD CONSTRAINT blueprints_organization_id_name_key UNIQUE (organization_id, name);
 
 
 --
@@ -2280,7 +2280,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260515120000	f
+20260518000000	f
 \.
 
 

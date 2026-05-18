@@ -5,7 +5,7 @@ import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Input } from "@/components/Input/input";
 import { Button } from "@/components/ui/button";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useApps } from "@/hooks/useAppData";
