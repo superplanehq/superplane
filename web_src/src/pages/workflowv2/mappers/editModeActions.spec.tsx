@@ -100,7 +100,7 @@ function makeTriggerContext(overrides?: Partial<TriggerRendererContext>): Trigge
 }
 
 describe("workflow v2 edit-mode action affordances", () => {
-  it("hides start trigger run buttons in edit mode", () => {
+  it("hides start trigger run and edit buttons in edit mode", () => {
     const props = startTriggerRenderer.getTriggerProps({
       ...makeTriggerContext(),
       canvasMode: "edit",
@@ -109,10 +109,11 @@ describe("workflow v2 edit-mode action affordances", () => {
     render(<Trigger {...props} canvasMode="edit" />);
 
     expect(screen.queryByTestId("start-template-run")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-template-edit")).not.toBeInTheDocument();
     expect(screen.getByText("Example")).toBeInTheDocument();
   });
 
-  it("keeps start trigger run buttons in live mode", () => {
+  it("keeps start trigger run and edit buttons in live mode", () => {
     const props = startTriggerRenderer.getTriggerProps({
       ...makeTriggerContext(),
       canvasMode: "live",
@@ -122,9 +123,10 @@ describe("workflow v2 edit-mode action affordances", () => {
     render(<Trigger {...props} canvasMode="live" />);
 
     expect(screen.getByTestId("start-template-run")).toBeInTheDocument();
+    expect(screen.getByTestId("start-template-edit")).toBeInTheDocument();
   });
 
-  it("hides start trigger run buttons in live mode when actions are unavailable", () => {
+  it("hides start trigger run and edit buttons in live mode when actions are unavailable", () => {
     const props = startTriggerRenderer.getTriggerProps({
       ...makeTriggerContext(),
       canvasMode: "live",
@@ -134,6 +136,7 @@ describe("workflow v2 edit-mode action affordances", () => {
     render(<Trigger {...props} canvasMode="live" />);
 
     expect(screen.queryByTestId("start-template-run")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("start-template-edit")).not.toBeInTheDocument();
     expect(screen.getByText("Example")).toBeInTheDocument();
   });
 
