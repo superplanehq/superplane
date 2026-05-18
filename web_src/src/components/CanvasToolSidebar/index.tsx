@@ -1,5 +1,5 @@
 import { ArrowUp, ChevronRight, Loader2, SquareTerminal } from "lucide-react";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { RichMessage } from "@/components/AgentSidebar/widgets/RichMessage";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -186,7 +186,6 @@ function ChatConversation({
   const messagesQuery = useAgentChatMessages(chatId, organizationId, true);
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
 
-  const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<string>("idle");
   const [error, setError] = useState<string | null>(null);
 
@@ -215,17 +214,21 @@ function ChatConversation({
   );
   useAgentSessionWebsocket(chatId, organizationId, wsCallbacks);
 
-  const handleSend = useCallback(async () => {
-    const value = draft.trim();
-    if (!value || sendMutation.isPending) return;
-    setDraft("");
-    setError(null);
-    try {
-      await sendMutation.mutateAsync({ chatId, content: value });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "failed to send message");
-    }
-  }, [chatId, draft, sendMutation]);
+  const sendContent = useCallback(
+    async (content: string) => {
+      const value = content.trim();
+      if (!value || sendMutation.isPending) return false;
+      setError(null);
+      try {
+        await sendMutation.mutateAsync({ chatId, content: value });
+        return true;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "failed to send message");
+        return false;
+      }
+    },
+    [chatId, sendMutation],
+  );
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const previousScrollHeight = useRef<number | null>(null);
@@ -256,6 +259,8 @@ function ChatConversation({
     element.scrollTop = element.scrollHeight;
   }, [chatId, messages.length, showThinking]);
 
+  const messageGroups = useMemo(() => groupMessages(messages), [messages]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div ref={scrollRef} className="min-h-0 flex-1 space-y-2.5 overflow-y-auto p-3" data-testid="agent-chat-messages">
@@ -270,17 +275,16 @@ function ChatConversation({
                 <Loader2 className="mr-2 size-3 animate-spin" /> Loading older messages…
               </div>
             ) : null}
-            {groupMessages(messages).map((group) =>
+            {messageGroups.map((group) =>
               group.type === "tool-group" ? (
                 <ToolGroupRow key={group.messages[0].id} messages={group.messages} />
               ) : (
                 <MessageRow
                   key={group.message.id}
                   message={group.message}
-                  sendMutation={sendMutation}
-                  chatId={chatId}
                   canvasId={canvasId}
                   organizationId={organizationId}
+                  onAction={sendContent}
                 />
               ),
             )}
@@ -290,9 +294,8 @@ function ChatConversation({
         {error ? <p className="px-3 py-2 text-sm text-red-600">{error}</p> : null}
       </div>
       <ChatComposer
-        draft={draft}
-        onDraftChange={setDraft}
-        onSend={handleSend}
+        key={chatId}
+        onSend={sendContent}
         sending={sendMutation.isPending}
         statusLabel={statusLabel(status)}
       />
@@ -301,25 +304,37 @@ function ChatConversation({
 }
 
 function ChatComposer({
-  draft,
-  onDraftChange,
   onSend,
   sending,
   statusLabel,
 }: {
-  draft: string;
-  onDraftChange: (value: string) => void;
-  onSend: () => void;
+  onSend: (content: string) => Promise<boolean>;
   sending: boolean;
   statusLabel: string;
 }) {
-  const canSend = Boolean(draft.trim()) && !sending;
+  const [draft, setDraft] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const canSend = Boolean(draft.trim()) && !sending && !isSending;
+  const handleSend = useCallback(async () => {
+    if (!canSend) return;
+    const valueToSend = draft;
+    setDraft("");
+    setIsSending(true);
+    try {
+      const ok = await onSend(valueToSend);
+      if (!ok) {
+        setDraft((nextDraft) => (nextDraft.trim() ? nextDraft : valueToSend));
+      }
+    } finally {
+      setIsSending(false);
+    }
+  }, [canSend, draft, onSend]);
 
   return (
     <footer className="border-t border-slate-950/15 px-3 pb-3">
       <Textarea
         value={draft}
-        onChange={(e) => onDraftChange(e.target.value)}
+        onChange={(e) => setDraft(e.target.value)}
         rows={1}
         placeholder="Ask the agent…"
         data-testid="agent-input"
@@ -335,8 +350,7 @@ function ChatComposer({
           if ("isComposing" in nativeEvent && nativeEvent.isComposing) return;
           if (e.shiftKey) return;
           e.preventDefault();
-          if (!canSend) return;
-          onSend();
+          void handleSend();
         }}
       />
       <div className="flex items-center justify-between gap-2 pt-1">
@@ -346,7 +360,7 @@ function ChatComposer({
           variant="default"
           size="icon"
           className="size-7 shrink-0 rounded-full"
-          onClick={onSend}
+          onClick={() => void handleSend()}
           disabled={!canSend}
           aria-label="Send message"
           data-testid="agent-send-message-button"
@@ -362,30 +376,18 @@ function ChatComposer({
   );
 }
 
-function MessageRow({
+const MessageRow = memo(function MessageRow({
   message,
-  sendMutation,
-  chatId,
   canvasId,
   organizationId,
+  onAction,
 }: {
   message: AgentMessage;
-  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
-  chatId: string;
   canvasId: string;
   organizationId: string;
+  onAction: (content: string) => Promise<boolean>;
 }) {
-  const handleAction = useCallback(
-    async (action: string) => {
-      if (sendMutation.isPending) return;
-      try {
-        await sendMutation.mutateAsync({ chatId, content: action });
-      } catch (err) {
-        console.error("Failed to send action:", err);
-      }
-    },
-    [chatId, sendMutation],
-  );
+  const handleAction = useCallback((action: string) => onAction(action), [onAction]);
 
   if (message.role === "tool") {
     return <ToolMessageRow message={message} />;
@@ -417,7 +419,7 @@ function MessageRow({
       </div>
     </div>
   );
-}
+});
 
 type MessageGroup = { type: "message"; message: AgentMessage } | { type: "tool-group"; messages: AgentMessage[] };
 
