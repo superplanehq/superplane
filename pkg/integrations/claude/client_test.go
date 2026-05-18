@@ -18,13 +18,15 @@ func TestNewClient(t *testing.T) {
 		name           string
 		integrationCtx *contexts.IntegrationContext
 		expectError    bool
+		wantAPIKey     string
 	}{
 		{
 			name: "Success",
 			integrationCtx: &contexts.IntegrationContext{
-				Configuration: map[string]any{"apiKey": "sk-123"},
+				Configuration: map[string]any{SecretAPIKey: "sk-123"},
 			},
 			expectError: false,
+			wantAPIKey:  "sk-123",
 		},
 		{
 			name:           "Nil Context",
@@ -37,6 +39,17 @@ func TestNewClient(t *testing.T) {
 				Configuration: map[string]any{},
 			},
 			expectError: true,
+		},
+		{
+			name: "New setup flow reads secret",
+			integrationCtx: &contexts.IntegrationContext{
+				NewSetupFlow: true,
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					SecretAPIKey: {Name: SecretAPIKey, Value: []byte("sk-from-secret")},
+				},
+			},
+			expectError: false,
+			wantAPIKey:  "sk-from-secret",
 		},
 	}
 
@@ -60,8 +73,11 @@ func TestNewClient(t *testing.T) {
 				if client == nil {
 					t.Error("expected client, got nil")
 				}
-				if client.APIKey != "sk-123" {
-					t.Errorf("expected API Key 'sk-123', got %s", client.APIKey)
+				if tt.wantAPIKey == "" {
+					t.Fatal("wantAPIKey must be set for success cases")
+				}
+				if client.APIKey != tt.wantAPIKey {
+					t.Errorf("expected API Key %q, got %s", tt.wantAPIKey, client.APIKey)
 				}
 			}
 		})

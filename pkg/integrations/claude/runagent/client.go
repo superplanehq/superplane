@@ -18,6 +18,8 @@ const (
 	anthropicVersionValue      = "2023-06-01"
 	anthropicBetaManagedAgents = "managed-agents-2026-04-01"
 	sessionEventsPageLimit     = "20"
+	// apiKeySecretName matches claude.SecretAPIKey; runagent cannot import claude (import cycle).
+	apiKeySecretName = "apiKey"
 )
 
 type Client struct {
@@ -90,13 +92,24 @@ func NewClient(httpClient core.HTTPContext, ctx core.IntegrationContext) (*Clien
 		return nil, fmt.Errorf("no integration context")
 	}
 
-	apiKey, err := ctx.GetConfig("apiKey")
-	if err != nil {
-		return nil, err
+	var apiKey string
+	var err error
+	if !ctx.LegacySetup() {
+		apiKey, err = ctx.Secrets().Get(apiKeySecretName)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		var raw []byte
+		raw, err = ctx.GetConfig(apiKeySecretName)
+		if err != nil {
+			return nil, err
+		}
+		apiKey = string(raw)
 	}
 
 	return &Client{
-		APIKey:  string(apiKey),
+		APIKey:  apiKey,
 		BaseURL: defaultBaseURL,
 		http:    httpClient,
 	}, nil
