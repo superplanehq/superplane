@@ -27,12 +27,20 @@ fi
 
 echo "Building SuperPlane image (${IMAGE_REPO})"
 
+push_flag=(--push)
+output_ref="${IMAGE_REPO}:${VERSION}-${ARCH}"
+if [[ "${PUSH:-1}" == "0" ]]; then
+  push_flag=(--load)
+  output_ref="${LOCAL_TAG:-superplane:runner-verify}"
+  echo "PUSH=0: build only, loading locally as ${output_ref}"
+fi
+
 docker buildx build \
   --platform "linux/${ARCH}" \
   --progress=plain \
   --provenance=false \
-  --push \
+  "${push_flag[@]}" \
   --cache-from ghcr.io/superplanehq/superplane-dev-base:app-latest \
-  -t "${IMAGE_REPO}:${VERSION}-${ARCH}" \
+  -t "${output_ref}" \
   -f Dockerfile \
   .
