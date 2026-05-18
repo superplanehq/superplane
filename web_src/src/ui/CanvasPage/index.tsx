@@ -2605,22 +2605,24 @@ function CanvasContent({
         runParticipantKey,
       });
 
-      if (canReuseData && cachedNode.sourceNode === node) {
+      if (canReuseData && cachedNode && cachedNode.sourceNode === node) {
         return cachedNode.node;
       }
 
       const sourceData = node.data as CanvasBlockNodeData;
-      const data = canReuseData
-        ? cachedNode.data
-        : {
-            ...sourceData,
-            _callbacksRef: callbacksRef,
-            _hoveredEdge: hoveredEdge ?? undefined,
-            _connectingFrom: blockConnectingFrom,
-            _allEdges: state.edges,
-            _isHighlighted: isHighlighted,
-            _hasHighlightedNodes: hasHighlightedNodes,
-          };
+      const data =
+        canReuseData && cachedNode
+          ? cachedNode.data
+          : {
+              ...sourceData,
+              _callbacksRef: callbacksRef,
+              _hoveredEdge: hoveredEdge ?? undefined,
+              _connectingFrom: blockConnectingFrom,
+              _allEdges: state.edges,
+              _isHighlighted: isHighlighted,
+              _hasHighlightedNodes: hasHighlightedNodes,
+              _dimBodyBelowHeader: runDimActive && !isHighlighted,
+            };
       const enrichedNode: ReactFlowNode = {
         ...node,
         selectable: runSelectableSet ? runSelectableSet.has(node.id) : (node.selectable ?? true),

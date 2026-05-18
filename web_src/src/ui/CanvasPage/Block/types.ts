@@ -45,6 +45,7 @@ export interface BlockInternalData {
   _allEdges?: BlockEdgeState[];
   _isHighlighted?: boolean;
   _hasHighlightedNodes?: boolean;
+  _dimBodyBelowHeader?: boolean;
   isTemplate?: boolean;
   isPendingConnection?: boolean;
 }
@@ -74,6 +75,6 @@ export interface BlockProps extends ComponentActionsProps {
   onAnnotationBlur?: () => void;
   onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
   onClick?: (e: MouseEvent) => void;
-  /** When true, non-highlighted contextual nodes show only header + slate body (runs / edge-hover dimming). */
+  /** When true, non-highlighted run-context nodes show only header + slate body. */
   dimBodyBelowHeader?: boolean;
 }
