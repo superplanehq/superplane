@@ -62,6 +62,8 @@ export interface AnnotationComponentProps extends ComponentActionsProps {
     y?: number;
   }) => void;
   onAnnotationBlur?: () => void;
+  /** When true, keep the note header strip and replace body with a neutral block (runs contextual dimming). */
+  dimBodyBelowHeader?: boolean;
 }
 
 const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
@@ -76,6 +78,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   height: propHeight = DEFAULT_HEIGHT,
   onAnnotationUpdate,
   onAnnotationBlur,
+  dimBodyBelowHeader = false,
 }) => {
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -225,200 +228,219 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
         <div
           ref={containerRef}
           style={{ width: dimensions.width, height: dimensions.height }}
-          className={cn("group relative flex flex-col rounded-md outline outline-slate-950/20", colorStyles.container)}
+          className={cn(
+            "group relative flex flex-col rounded-md outline outline-slate-950/20",
+            dimBodyBelowHeader ? "bg-slate-200" : colorStyles.container,
+          )}
         >
-          <div className={cn("canvas-node-drag-handle h-5 w-full rounded-t-md cursor-grab", colorStyles.background)}>
+          <div
+            className={cn(
+              "canvas-node-drag-handle h-5 w-full rounded-t-md cursor-grab",
+              dimBodyBelowHeader ? "bg-slate-200" : colorStyles.background,
+            )}
+          >
             <div className="flex h-full w-full flex-col items-stretch justify-center gap-0.5 px-2">
-              <span className="h-px w-full bg-black/15" />
-              <span className="h-px w-full bg-black/15" />
-              <span className="h-px w-full bg-black/15" />
+              <span className={cn("h-px w-full", dimBodyBelowHeader ? "bg-slate-400/30" : "bg-black/15")} />
+              <span className={cn("h-px w-full", dimBodyBelowHeader ? "bg-slate-400/30" : "bg-black/15")} />
+              <span className={cn("h-px w-full", dimBodyBelowHeader ? "bg-slate-400/30" : "bg-black/15")} />
             </div>
           </div>
 
-          {!hideActionsButton && (
+          {dimBodyBelowHeader ? (
+            <div className="flex-1 min-h-24 shrink-0 bg-slate-200 rounded-b-md" aria-hidden />
+          ) : (
             <>
-              <div className="absolute -top-12 right-0 z-10 h-12 w-44 opacity-0" />
-              <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
-                <div className="group/swatch relative flex items-center px-0.5 py-0.5">
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                    }}
-                    className={cn("h-4 w-4 rounded-full border transition", NOTE_COLORS[activeColor].dot)}
-                    aria-label={`Current note color: ${NOTE_COLORS[activeColor].label}`}
-                  />
-                  <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 items-center gap-2 pr-0.5 group-hover/swatch:flex">
-                    {colorOptions.map((option) => (
+              {!hideActionsButton && (
+                <>
+                  <div className="absolute -top-12 right-0 z-10 h-12 w-44 opacity-0" />
+                  <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
+                    <div className="group/swatch relative flex items-center px-0.5 py-0.5">
                       <button
-                        key={option.value}
                         type="button"
                         onClick={(event) => {
                           event.preventDefault();
                           event.stopPropagation();
-                          onAnnotationUpdate?.({ color: option.value });
                         }}
-                        className={cn("h-4 w-4 rounded-full border transition", option.dot)}
-                        aria-label={`Set note color to ${NOTE_COLORS[option.value].label}`}
+                        className={cn("h-4 w-4 rounded-full border transition", NOTE_COLORS[activeColor].dot)}
+                        aria-label={`Current note color: ${NOTE_COLORS[activeColor].label}`}
                       />
-                    ))}
+                      <div className="absolute right-0 top-1/2 hidden -translate-y-1/2 items-center gap-2 pr-0.5 group-hover/swatch:flex">
+                        {colorOptions.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              onAnnotationUpdate?.({ color: option.value });
+                            }}
+                            className={cn("h-4 w-4 rounded-full border transition", option.dot)}
+                            aria-label={`Set note color to ${NOTE_COLORS[option.value].label}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    {onDelete && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          onDelete();
+                        }}
+                        className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
+                        aria-label="Delete note"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
                   </div>
-                </div>
-                {onDelete && (
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      onDelete();
-                    }}
-                    className="flex items-center justify-center p-1 text-gray-500 transition hover:text-gray-800"
-                    aria-label="Delete note"
+                </>
+              )}
+
+              <div className="flex-1 overflow-hidden px-3 pb-3 relative">
+                {isEditing ? (
+                  <>
+                    <textarea
+                      ref={textareaRef}
+                      data-note-id={noteId || undefined}
+                      defaultValue={noteId ? (noteDrafts.get(noteId) ?? annotationText) : annotationText}
+                      onInput={(event) => {
+                        const value = (event.target as HTMLTextAreaElement).value;
+                        if (noteId) {
+                          noteDrafts.set(noteId, value);
+                          setActiveNoteId(noteId);
+                        }
+                        debouncedTextUpdate(value);
+                      }}
+                      onBlur={() => {
+                        handleTextCommit();
+                        onAnnotationBlur?.();
+                        // Only exit edit mode if the blur was caused by clicking outside the container
+                        // This prevents exiting edit mode when component re-renders during auto-save
+                        if (lastPointerDownOutsideRef.current) {
+                          exitEditMode();
+                        } else {
+                          // Restore focus if blur wasn't from clicking outside
+                          requestAnimationFrame(() => textareaRef.current?.focus());
+                        }
+                      }}
+                      onFocus={() => {
+                        if (noteId) {
+                          setActiveNoteId(noteId);
+                        }
+                        lastPointerDownOutsideRef.current = false;
+                      }}
+                      onKeyDown={handleKeyDown}
+                      className={cn(
+                        "nodrag h-full w-full resize-none bg-transparent outline-none",
+                        textStyles,
+                        "placeholder:text-black/50",
+                      )}
+                      placeholder="Start typing..."
+                      aria-label={`${title} note`}
+                    />
+                    <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/5 text-[10px] text-black/40 pointer-events-none select-none">
+                      Markdown supported
+                    </span>
+                  </>
+                ) : (
+                  <div
+                    className={cn("nodrag h-full w-full overflow-auto cursor-text text-left", textStyles)}
+                    onDoubleClick={handleDoubleClick}
                   >
-                    <Trash2 size={16} />
-                  </button>
+                    {annotationText ? (
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                          ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
+                          li: ({ children }) => <li className="mb-1">{children}</li>,
+                          h1: ({ children }) => (
+                            <h1
+                              style={{ fontSize: "2rem" }}
+                              className="mt-2 first:mt-0 mb-2 text-lg font-semibold leading-tight"
+                            >
+                              {children}
+                            </h1>
+                          ),
+                          h2: ({ children }) => (
+                            <h2
+                              style={{ fontSize: "1.6rem" }}
+                              className="mt-2 first:mt-0 mb-2 text-base font-semibold leading-tight"
+                            >
+                              {children}
+                            </h2>
+                          ),
+                          h3: ({ children }) => (
+                            <h3
+                              style={{ fontSize: "1.3rem" }}
+                              className="mt-2 first:mt-0 mb-1 text-sm font-semibold leading-tight"
+                            >
+                              {children}
+                            </h3>
+                          ),
+                          h4: ({ children }) => (
+                            <h4
+                              style={{ fontSize: "1.1rem" }}
+                              className="mt-2 first:mt-0 mb-1 text-sm font-medium leading-tight"
+                            >
+                              {children}
+                            </h4>
+                          ),
+                          code: ({ children }) => <code className="bg-black/10 px-1 rounded text-xs">{children}</code>,
+                          pre: ({ children }) => (
+                            <pre className="bg-black/10 p-2 rounded text-xs overflow-auto mb-2">{children}</pre>
+                          ),
+                          a: ({ children, href }) => (
+                            <a
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              href={href}
+                              className="underline text-blue-600"
+                            >
+                              {children}
+                            </a>
+                          ),
+                          strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                          em: ({ children }) => <em className="italic">{children}</em>,
+                        }}
+                      >
+                        {annotationText}
+                      </ReactMarkdown>
+                    ) : (
+                      <span className="text-black/50">Double click to add and edit notes...</span>
+                    )}
+                  </div>
                 )}
               </div>
+
+              <NodeResizeControl
+                minWidth={MIN_WIDTH}
+                minHeight={MIN_HEIGHT}
+                onResize={handleResize}
+                onResizeEnd={handleResizeEnd}
+                autoScale={false}
+                position="bottom-right"
+                className="z-10 flex !h-9 !w-9 !min-h-9 !min-w-9 !translate-x-0 !translate-y-0 !items-end !justify-end !border-0 !bg-transparent !p-1.5 !shadow-none !left-auto !top-auto !right-0.5 !bottom-0.5 cursor-nwse-resize"
+              >
+                <span className="sr-only">Resize note</span>
+                <span className="pointer-events-none flex h-full w-full items-end justify-end" aria-hidden>
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="opacity-30"
+                  >
+                    <path d="M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z" fill="black" />
+                    <path d="M11.707 5.70703L5.70703 11.707L5 11L11 5L11.707 5.70703Z" fill="black" />
+                  </svg>
+                </span>
+              </NodeResizeControl>
             </>
           )}
-
-          <div className="flex-1 overflow-hidden px-3 pb-3 relative">
-            {isEditing ? (
-              <>
-                <textarea
-                  ref={textareaRef}
-                  data-note-id={noteId || undefined}
-                  defaultValue={noteId ? (noteDrafts.get(noteId) ?? annotationText) : annotationText}
-                  onInput={(event) => {
-                    const value = (event.target as HTMLTextAreaElement).value;
-                    if (noteId) {
-                      noteDrafts.set(noteId, value);
-                      setActiveNoteId(noteId);
-                    }
-                    debouncedTextUpdate(value);
-                  }}
-                  onBlur={() => {
-                    handleTextCommit();
-                    onAnnotationBlur?.();
-                    // Only exit edit mode if the blur was caused by clicking outside the container
-                    // This prevents exiting edit mode when component re-renders during auto-save
-                    if (lastPointerDownOutsideRef.current) {
-                      exitEditMode();
-                    } else {
-                      // Restore focus if blur wasn't from clicking outside
-                      requestAnimationFrame(() => textareaRef.current?.focus());
-                    }
-                  }}
-                  onFocus={() => {
-                    if (noteId) {
-                      setActiveNoteId(noteId);
-                    }
-                    lastPointerDownOutsideRef.current = false;
-                  }}
-                  onKeyDown={handleKeyDown}
-                  className={cn(
-                    "nodrag h-full w-full resize-none bg-transparent outline-none",
-                    textStyles,
-                    "placeholder:text-black/50",
-                  )}
-                  placeholder="Start typing..."
-                  aria-label={`${title} note`}
-                />
-                <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/5 text-[10px] text-black/40 pointer-events-none select-none">
-                  Markdown supported
-                </span>
-              </>
-            ) : (
-              <div
-                className={cn("nodrag h-full w-full overflow-auto cursor-text text-left", textStyles)}
-                onDoubleClick={handleDoubleClick}
-              >
-                {annotationText ? (
-                  <ReactMarkdown
-                    components={{
-                      p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc pl-4 mb-2">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
-                      li: ({ children }) => <li className="mb-1">{children}</li>,
-                      h1: ({ children }) => (
-                        <h1
-                          style={{ fontSize: "2rem" }}
-                          className="mt-2 first:mt-0 mb-2 text-lg font-semibold leading-tight"
-                        >
-                          {children}
-                        </h1>
-                      ),
-                      h2: ({ children }) => (
-                        <h2
-                          style={{ fontSize: "1.6rem" }}
-                          className="mt-2 first:mt-0 mb-2 text-base font-semibold leading-tight"
-                        >
-                          {children}
-                        </h2>
-                      ),
-                      h3: ({ children }) => (
-                        <h3
-                          style={{ fontSize: "1.3rem" }}
-                          className="mt-2 first:mt-0 mb-1 text-sm font-semibold leading-tight"
-                        >
-                          {children}
-                        </h3>
-                      ),
-                      h4: ({ children }) => (
-                        <h4
-                          style={{ fontSize: "1.1rem" }}
-                          className="mt-2 first:mt-0 mb-1 text-sm font-medium leading-tight"
-                        >
-                          {children}
-                        </h4>
-                      ),
-                      code: ({ children }) => <code className="bg-black/10 px-1 rounded text-xs">{children}</code>,
-                      pre: ({ children }) => (
-                        <pre className="bg-black/10 p-2 rounded text-xs overflow-auto mb-2">{children}</pre>
-                      ),
-                      a: ({ children, href }) => (
-                        <a target="_blank" rel="noopener noreferrer" href={href} className="underline text-blue-600">
-                          {children}
-                        </a>
-                      ),
-                      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
-                      em: ({ children }) => <em className="italic">{children}</em>,
-                    }}
-                  >
-                    {annotationText}
-                  </ReactMarkdown>
-                ) : (
-                  <span className="text-black/50">Double click to add and edit notes...</span>
-                )}
-              </div>
-            )}
-          </div>
-
-          <NodeResizeControl
-            minWidth={MIN_WIDTH}
-            minHeight={MIN_HEIGHT}
-            onResize={handleResize}
-            onResizeEnd={handleResizeEnd}
-            autoScale={false}
-            position="bottom-right"
-            className="z-10 flex !h-9 !w-9 !min-h-9 !min-w-9 !translate-x-0 !translate-y-0 !items-end !justify-end !border-0 !bg-transparent !p-1.5 !shadow-none !left-auto !top-auto !right-0.5 !bottom-0.5 cursor-nwse-resize"
-          >
-            <span className="sr-only">Resize note</span>
-            <span className="pointer-events-none flex h-full w-full items-end justify-end" aria-hidden>
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 12 12"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-                className="opacity-30"
-              >
-                <path d="M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z" fill="black" />
-                <path d="M11.707 5.70703L5.70703 11.707L5 11L11 5L11.707 5.70703Z" fill="black" />
-              </svg>
-            </span>
-          </NodeResizeControl>
         </div>
       </div>
     </SelectionWrapper>
@@ -434,5 +456,6 @@ export const AnnotationComponent = React.memo(
     prev.selected === next.selected &&
     prev.hideActionsButton === next.hideActionsButton &&
     prev.width === next.width &&
-    prev.height === next.height,
+    prev.height === next.height &&
+    prev.dimBodyBelowHeader === next.dimBodyBelowHeader,
 );

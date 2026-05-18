@@ -46,6 +46,45 @@ function buildNonReadyIntegrationMap(integrations: OrganizationsIntegration[]) {
   return map;
 }
 
+function stripNodeWarnings(
+  node: CanvasNode,
+  data: Record<string, unknown>,
+  field: "component" | "trigger" | "composite",
+): CanvasNode {
+  const value = data[field];
+  if (!value || typeof value !== "object") {
+    return node;
+  }
+
+  const record = value as Record<string, unknown>;
+  const { error: _err, warning: _warn, ...rest } = record;
+  return { ...node, data: { ...data, [field]: rest } };
+}
+
+export function stripCanvasNodeSetupWarningsForRunsView(nodes: CanvasNode[]): CanvasNode[] {
+  return nodes.map((node) => {
+    const data = node.data as Record<string, unknown> | undefined;
+    if (!data || typeof data !== "object") {
+      return node;
+    }
+
+    const type = data.type;
+    if (type === "component") {
+      return stripNodeWarnings(node, data, "component");
+    }
+
+    if (type === "trigger") {
+      return stripNodeWarnings(node, data, "trigger");
+    }
+
+    if (type === "composite") {
+      return stripNodeWarnings(node, data, "composite");
+    }
+
+    return node;
+  });
+}
+
 export function overlayIntegrationWarnings(
   nodes: CanvasNode[],
   integrations: OrganizationsIntegration[],
