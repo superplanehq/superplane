@@ -12,7 +12,7 @@ export function PermissionsProvider({ children }: PermissionsProviderProps) {
   const organizationId = useOrganizationId();
   const { data: me, isLoading: meLoading } = useMe();
 
-  const permissions = me?.permissions ?? [];
+  const permissions = useMemo(() => me?.permissions ?? [], [me?.permissions]);
 
   const permissionSet = useMemo(() => {
     return new Set(
