@@ -48,7 +48,7 @@ export function RunsToolbar({
           placeholder="Search runs..."
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          className="h-6 !text-[12px] border-0 shadow-none focus:ring-0 focus-visible:ring-0 focus-visible:border-0"
+          className="h-6 !border-0 !text-[12px] shadow-none focus:ring-0 focus-visible:ring-0"
         />
         {hasSearch ? (
           <InputGroupAddon>

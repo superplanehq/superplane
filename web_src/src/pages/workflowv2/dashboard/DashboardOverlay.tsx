@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef } from "react";
+import type { CanvasesDashboardLayoutItem, CanvasesDashboardPanel } from "@/api-client";
 
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type {
@@ -76,23 +77,24 @@ export function DashboardOverlay({
 
   const panels: DashboardPanel[] = useMemo(
     () =>
-      (dashboardQuery.data?.panels || []).map((p) => ({
-        id: p.id || "",
-        type: p.type || "markdown",
-        content: (p.content as Record<string, unknown>) || {},
+      (dashboardQuery.data?.panels || []).map((panel: CanvasesDashboardPanel) => ({
+        id: panel.id || "",
+        type: panel.type || "markdown",
+        content: (panel.content as Record<string, unknown>) || {},
       })),
     [dashboardQuery.data?.panels],
   );
+
   const layout: DashboardLayoutItem[] = useMemo(
     () =>
-      (dashboardQuery.data?.layout || []).map((l) => ({
-        i: l.i || "",
-        x: l.x || 0,
-        y: l.y || 0,
-        w: l.w || 12,
-        h: l.h || 6,
-        ...(l.minW !== undefined ? { minW: l.minW } : {}),
-        ...(l.minH !== undefined ? { minH: l.minH } : {}),
+      (dashboardQuery.data?.layout || []).map((item: CanvasesDashboardLayoutItem) => ({
+        i: item.i || "",
+        x: item.x || 0,
+        y: item.y || 0,
+        w: item.w || 12,
+        h: item.h || 6,
+        ...(item.minW !== undefined ? { minW: item.minW } : {}),
+        ...(item.minH !== undefined ? { minH: item.minH } : {}),
       })),
     [dashboardQuery.data?.layout],
   );

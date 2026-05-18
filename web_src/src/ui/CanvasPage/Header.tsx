@@ -1,11 +1,11 @@
-import type { AgentState } from "@/components/AgentSidebar/useAgentState";
+import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { MoreVertical, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
+import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions } from "./HeaderSecondaryActions";
 
 export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard";
@@ -32,9 +32,7 @@ export interface HeaderProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  onSelectRuns?: () => void;
   onSelectDashboard?: () => void;
-  runsNotificationCount?: number;
   /** When set with `mode === "dashboard"`, shows Add panel in the secondary header. */
   onDashboardAddPanel?: () => void;
   /** When set with `mode === "dashboard"`, shows the YAML button in the secondary header. */
@@ -51,11 +49,7 @@ export interface HeaderProps {
   onDiscardDraftAndStartEdit?: () => void;
   /** Canvas settings route requires `canvases:update`; hide the menu when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
-  isVersionControlOpen?: boolean;
-  onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
-  agentState: AgentState;
+  toolSidebarState: CanvasToolSidebarState;
 }
 
 export function Header(props: HeaderProps) {
@@ -124,16 +118,17 @@ function PageHeader({
 
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle =
-    props.mode === "version-live" ||
-    props.mode === "version-edit" ||
-    props.mode === "runs" ||
-    props.mode === "dashboard";
+    !!props.onSelectDashboard &&
+    (props.mode === "version-live" ||
+      props.mode === "version-edit" ||
+      props.mode === "runs" ||
+      props.mode === "dashboard");
   const canvasViewMode = props.mode === "runs" ? "runs" : props.mode === "dashboard" ? "dashboard" : "version-live";
   const editing = props.mode === "version-edit";
 
   return (
-    <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
-      <AgentSidebarTrigger agentState={props.agentState} />
+    <div className="relative flex h-12 items-center gap-3 border-b border-slate-950/15 bg-slate-100 px-4">
+      <CanvasToolSidebarTrigger toolSidebarState={props.toolSidebarState} />
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
         <div className="pointer-events-auto">
@@ -141,9 +136,7 @@ function SecondaryHeader(props: HeaderProps) {
             <CanvasModeToggle
               mode={canvasViewMode}
               onSelectLive={props.onExitEditMode}
-              onSelectRuns={props.onSelectRuns}
               onSelectDashboard={props.onSelectDashboard}
-              runsNotificationCount={props.runsNotificationCount}
               editing={editing}
               hasDraft={!!props.hasUnpublishedDraftChanges}
             />

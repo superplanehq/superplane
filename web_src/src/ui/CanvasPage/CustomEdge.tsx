@@ -105,6 +105,7 @@ export const CustomEdge = React.memo(function CustomEdge({
     stroke: selected || isHovered ? "#A1AEC0" : style.stroke || "#DEF3FE",
     strokeWidth: selected ? 3 : style.strokeWidth || 3,
     pointerEvents: "visibleStroke",
+    ...(selected || isHovered ? { strokeOpacity: 1 } : {}),
   };
   const shouldShowIcon = canDelete && (isHovered || selected === true);
   const handleDeletePointerDown = useCallback(

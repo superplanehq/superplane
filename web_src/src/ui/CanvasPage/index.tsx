@@ -47,8 +47,11 @@ import type {
   OrganizationsIntegration,
   TriggersTrigger,
 } from "@/api-client";
-import { AgentSidebar } from "@/components/AgentSidebar";
-import { useAgentState, type AgentState } from "@/components/AgentSidebar/useAgentState";
+import { CanvasToolSidebar } from "@/components/CanvasToolSidebar";
+import {
+  useCanvasToolSidebarState,
+  type CanvasToolSidebarState,
+} from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { buildSidebarComponentDocsPayload } from "@/lib/componentDocsUrl";
 import { parseDefaultValues } from "@/lib/components";
 import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
@@ -68,6 +71,7 @@ import { Block, type BlockData, type BlockProps, type CanvasBlockData } from "./
 import "./canvas-reset.css";
 import { CustomEdge } from "./CustomEdge";
 import { Header } from "./Header";
+import { isCanvasNodeHighlighted, shouldBlankCanvasNodeBody } from "./nodeDimming";
 import { RightSideControls } from "./RightSideControls";
 import { useBuildingBlocksShortcut } from "./useBuildingBlocksShortcut";
 import type { CanvasPageState } from "./useCanvasState";
@@ -167,6 +171,7 @@ export interface CanvasPageProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectRuns?: () => void;
+  onExitRunsMode?: () => void;
   onSelectDashboard?: () => void;
   /** Opens the canvas dashboard add-panel dialog when `headerMode` is `dashboard`. */
   onDashboardAddPanel?: () => void;
@@ -188,14 +193,13 @@ export interface CanvasPageProps {
   showCanvasSettingsMenu?: boolean;
   onYamlOpen: () => void;
   onMemoryOpen: () => void;
-  versionControlSidebar?: React.ReactNode;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
   hideAddControls?: boolean;
+  /** Hide the Agent / Runs / Versions left panel toggle (templates only); runs view keeps the tool sidebar visible. */
+  hideCanvasToolSidebar?: boolean;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -239,7 +243,8 @@ export interface CanvasPageProps {
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
   runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
-  runsSidebar?: React.ReactNode;
+  toolSidebarRunsContent?: React.ReactNode;
+  toolSidebarVersionsContent?: React.ReactNode;
   onRunNodeSelect?: (nodeId: string) => void;
   onRunExecutionSelect?: (options: {
     nodeId: string;
@@ -296,6 +301,10 @@ export interface CanvasPageProps {
   initialFocusNodeId?: string | null;
   /** Bump this counter to fit all currently-rendered nodes into view (e.g., when run selection changes). */
   fitAllRequest?: number | null;
+  /** When set with a bumped `fitAllRequest`, fit the viewport to this subset of nodes (e.g. run participants). */
+  fitAllFocusNodeIds?: string[];
+  /** In runs view, nodes not in this list are dimmed unless edge-hover highlighting is active. */
+  runParticipantNodeIds?: string[];
   /** Shows a loading indicator over the canvas (not the sidebar) while run executions are being fetched. */
   runCanvasLoading?: boolean;
 
@@ -423,7 +432,39 @@ type EnrichedCanvasNodeCacheEntry = {
   edges: CanvasEdge[];
   isHighlighted: boolean;
   hasHighlightedNodes: boolean;
+  runParticipantKey: string;
 };
+
+function canReuseEnrichedNodeData({
+  cachedNode,
+  node,
+  hoveredEdge,
+  connectingFrom,
+  edges,
+  isHighlighted,
+  hasHighlightedNodes,
+  runParticipantKey,
+}: {
+  cachedNode: EnrichedCanvasNodeCacheEntry | undefined;
+  node: ReactFlowNode;
+  hoveredEdge: CanvasEdge | null;
+  connectingFrom: CanvasConnectionState | null;
+  edges: CanvasEdge[];
+  isHighlighted: boolean;
+  hasHighlightedNodes: boolean;
+  runParticipantKey: string;
+}) {
+  return (
+    cachedNode &&
+    cachedNode.sourceData === node.data &&
+    cachedNode.hoveredEdge === hoveredEdge &&
+    cachedNode.connectingFrom === connectingFrom &&
+    cachedNode.edges === edges &&
+    cachedNode.isHighlighted === isHighlighted &&
+    cachedNode.hasHighlightedNodes === hasHighlightedNodes &&
+    cachedNode.runParticipantKey === runParticipantKey
+  );
+}
 
 type CollapsibleNodeData = {
   type?: unknown;
@@ -699,13 +740,40 @@ function CanvasPage(props: CanvasPageProps) {
     return props.nodes.length === 0;
   });
 
-  const agentState = useAgentState({
+  const forceEnableToolSidebar = Boolean(
+    props.onSelectRuns ||
+      props.onOpenVersionControl ||
+      props.toolSidebarRunsContent ||
+      props.toolSidebarVersionsContent ||
+      props.headerMode === "runs" ||
+      props.isVersionControlOpen,
+  );
+  const toolSidebarState = useCanvasToolSidebarState({
     isEditing: props.isEditing,
-    hideAddControls: props.hideAddControls,
+    forceEnable: forceEnableToolSidebar,
+    hideCanvasToolSidebar: props.hideCanvasToolSidebar ?? false,
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
   });
+  const { isToolSidebarOpen, openToolSidebar } = toolSidebarState;
+  const previousHeaderModeRef = useRef<CanvasPageProps["headerMode"] | undefined>(undefined);
+
+  useEffect(() => {
+    if (props.headerMode === "runs" && previousHeaderModeRef.current !== "runs" && !isToolSidebarOpen)
+      openToolSidebar();
+
+    previousHeaderModeRef.current = props.headerMode;
+  }, [isToolSidebarOpen, openToolSidebar, props.headerMode]);
+
+  useEffect(() => {
+    if (props.isVersionControlOpen && !isToolSidebarOpen) openToolSidebar();
+  }, [isToolSidebarOpen, openToolSidebar, props.isVersionControlOpen]);
+
+  const handleSelectRuns = () => {
+    openToolSidebar();
+    props.onSelectRuns?.();
+  };
 
   const initialCanvasZoom = props.nodes.length === 0 ? DEFAULT_CANVAS_ZOOM : 1;
   const [canvasZoom, setCanvasZoom] = useState(initialCanvasZoom);
@@ -1112,7 +1180,6 @@ function CanvasPage(props: CanvasPageProps) {
           onExitEditMode={props.onExitEditMode}
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-          onSelectRuns={props.onSelectRuns}
           onSelectDashboard={props.onSelectDashboard}
           onDashboardAddPanel={props.onDashboardAddPanel}
           onDashboardOpenYaml={props.onDashboardOpenYaml}
@@ -1123,20 +1190,23 @@ function CanvasPage(props: CanvasPageProps) {
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
           onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
-          isVersionControlOpen={props.isVersionControlOpen}
-          onOpenVersionControl={props.onOpenVersionControl}
-          versionControlButtonTooltip={props.versionControlButtonTooltip}
-          versionControlNotificationCount={props.versionControlNotificationCount}
-          agentState={agentState}
+          toolSidebarState={toolSidebarState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
       </div>
 
       {/* Main content area with sidebar and canvas */}
       <div className="flex-1 flex relative overflow-hidden">
-        {props.headerMode === "runs" ? null : props.versionControlSidebar}
-
-        <AgentSidebar agentState={agentState} />
+        <CanvasToolSidebar
+          toolSidebarState={toolSidebarState}
+          mode={props.headerMode}
+          onSelectRuns={handleSelectRuns}
+          onExitRunsMode={props.onExitRunsMode}
+          runsContent={props.toolSidebarRunsContent}
+          isVersionControlOpen={props.isVersionControlOpen}
+          onToggleVersionControl={props.onOpenVersionControl}
+          versionsContent={props.toolSidebarVersionsContent}
+        />
 
         {props.headerMode === "runs" ? null : (
           <RightSideControls
@@ -1148,9 +1218,6 @@ function CanvasPage(props: CanvasPageProps) {
             showMemoryButton={props.headerMode !== "dashboard"}
           />
         )}
-
-        {props.headerMode === "runs" ? props.runsSidebar : null}
-
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
           <BuildingBlocksSidebar
             isOpen={
@@ -1258,6 +1325,8 @@ function CanvasPage(props: CanvasPageProps) {
               focusRequest={props.focusRequest}
               initialFocusNodeId={props.initialFocusNodeId}
               fitAllRequest={props.fitAllRequest}
+              fitAllFocusNodeIds={props.fitAllFocusNodeIds}
+              runParticipantNodeIds={props.runParticipantNodeIds}
               runsEvents={props.runsEvents}
               runsTotalCount={props.runsTotalCount}
               runsHasNextPage={props.runsHasNextPage}
@@ -1628,7 +1697,6 @@ function CanvasContentHeader({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  onSelectRuns,
   onSelectDashboard,
   onDashboardAddPanel,
   onDashboardOpenYaml,
@@ -1639,11 +1707,7 @@ function CanvasContentHeader({
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
   showCanvasSettingsMenu,
-  isVersionControlOpen,
-  onOpenVersionControl,
-  versionControlButtonTooltip,
-  versionControlNotificationCount,
-  agentState,
+  toolSidebarState,
 }: {
   state: CanvasPageState;
   canvasName: string;
@@ -1666,7 +1730,6 @@ function CanvasContentHeader({
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  onSelectRuns?: () => void;
   onSelectDashboard?: () => void;
   onDashboardAddPanel?: () => void;
   onDashboardOpenYaml?: () => void;
@@ -1677,11 +1740,7 @@ function CanvasContentHeader({
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   showCanvasSettingsMenu?: boolean;
-  isVersionControlOpen?: boolean;
-  onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
-  agentState: AgentState;
+  toolSidebarState: CanvasToolSidebarState;
 }) {
   const stateRef = useRef(state);
   stateRef.current = state;
@@ -1714,7 +1773,6 @@ function CanvasContentHeader({
       onExitEditMode={onExitEditMode}
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-      onSelectRuns={onSelectRuns}
       onSelectDashboard={onSelectDashboard}
       onDashboardAddPanel={onDashboardAddPanel}
       onDashboardOpenYaml={onDashboardOpenYaml}
@@ -1725,11 +1783,7 @@ function CanvasContentHeader({
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
-      isVersionControlOpen={isVersionControlOpen}
-      onOpenVersionControl={onOpenVersionControl}
-      versionControlButtonTooltip={versionControlButtonTooltip}
-      versionControlNotificationCount={versionControlNotificationCount}
-      agentState={agentState}
+      toolSidebarState={toolSidebarState}
     />
   );
 }
@@ -1806,6 +1860,8 @@ function CanvasContent({
   focusRequest,
   initialFocusNodeId,
   fitAllRequest,
+  fitAllFocusNodeIds,
+  runParticipantNodeIds,
   runsEvents,
   runsTotalCount,
   runsHasNextPage,
@@ -1865,6 +1921,8 @@ function CanvasContent({
   focusRequest?: FocusRequest | null;
   initialFocusNodeId?: string | null;
   fitAllRequest?: number | null;
+  fitAllFocusNodeIds?: string[];
+  runParticipantNodeIds?: string[];
   runsEvents?: CanvasesCanvasEventWithExecutions[];
   runsTotalCount?: number;
   runsHasNextPage?: boolean;
@@ -1886,7 +1944,7 @@ function CanvasContent({
   canCreateIntegrations?: boolean;
   onLogView?: () => void;
 }) {
-  const { fitView, screenToFlowPosition, getViewport, getInternalNode, setViewport } = useReactFlow();
+  const { fitView, screenToFlowPosition, getViewport, getInternalNode, getNodes, setViewport } = useReactFlow();
   const { zoom } = useViewport();
   const isReadOnly = readOnly ?? false;
 
@@ -1943,6 +2001,12 @@ function CanvasContent({
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
   const isLiveMode = headerMode === "version-live" || headerMode === "dashboard";
   const isEditMode = headerMode === "version-edit";
+  const runSelectableSet = useMemo(() => {
+    if (headerMode !== "runs" || !runParticipantNodeIds || runParticipantNodeIds.length === 0) {
+      return null;
+    }
+    return new Set(runParticipantNodeIds);
+  }, [headerMode, runParticipantNodeIds]);
 
   useEffect(() => {
     if (isEditMode) {
@@ -2047,6 +2111,10 @@ function CanvasContent({
         return;
       }
 
+      if (runSelectableSet && onNodeClick && !runSelectableSet.has(nodeId)) {
+        return;
+      }
+
       if (isPendingConnection && onPendingConnectionNodeClick) {
         onPendingConnectionNodeClick(nodeId);
       } else if (isPlaceholder && onPendingConnectionNodeClick) {
@@ -2088,6 +2156,7 @@ function CanvasContent({
       onNodeClick,
       setCurrentTab,
       isEditMode,
+      runSelectableSet,
     ],
   );
 
@@ -2325,10 +2394,19 @@ function CanvasContent({
     if (fitAllRequest == null) return;
     if (!hasFitToViewRef.current) return;
     const id = window.setTimeout(() => {
-      fitView({ duration: 500, maxZoom: 1.0, padding: 0.2 });
+      const focusIds = fitAllFocusNodeIds?.length ? new Set(fitAllFocusNodeIds) : null;
+      const renderedNodes = getNodes();
+      const nodeSubset =
+        focusIds && focusIds.size > 0 ? renderedNodes.filter((n) => n.id && focusIds.has(n.id)) : undefined;
+      fitView({
+        ...(nodeSubset && nodeSubset.length > 0 ? { nodes: nodeSubset } : {}),
+        duration: 500,
+        maxZoom: 1.0,
+        padding: 0.2,
+      });
     }, 0);
     return () => window.clearTimeout(id);
-  }, [fitAllRequest, fitView, hasFitToViewRef]);
+  }, [fitAllRequest, fitAllFocusNodeIds, fitView, getNodes, hasFitToViewRef]);
 
   const showHeader = !isReadOnly;
 
@@ -2493,40 +2571,65 @@ function CanvasContent({
 
   const enrichedNodeCacheRef = useRef<Map<string, EnrichedCanvasNodeCacheEntry>>(new Map());
   const nodesWithCallbacks = useMemo(() => {
-    const hasHighlightedNodes = highlightedNodeIds.size > 0;
+    const runParticipantKey =
+      runParticipantNodeIds !== undefined && runParticipantNodeIds.length > 0
+        ? [...runParticipantNodeIds].sort().join("|")
+        : "";
+    const runParticipantSet =
+      runParticipantNodeIds !== undefined && runParticipantNodeIds.length > 0 ? new Set(runParticipantNodeIds) : null;
+    const edgeHoverActive = highlightedNodeIds.size > 0;
+    const runDimActive = runParticipantSet !== null;
+    const hasHighlightedNodes = edgeHoverActive || runDimActive;
     const visibleNodeIds = new Set<string>();
     const enrichedNodes = state.nodes.map((node) => {
       visibleNodeIds.add(node.id);
 
-      const isHighlighted = highlightedNodeIds.has(node.id);
+      const isHighlighted = isCanvasNodeHighlighted({
+        nodeId: node.id,
+        edgeHoverActive,
+        highlightedNodeIds,
+        runDimActive,
+        runParticipantSet,
+      });
+      const shouldBlankBody = shouldBlankCanvasNodeBody({
+        nodeId: node.id,
+        edgeHoverActive,
+        runDimActive,
+        runParticipantSet,
+      });
       const cachedNode = enrichedNodeCacheRef.current.get(node.id);
-      const canReuseData =
-        cachedNode &&
-        cachedNode.sourceData === node.data &&
-        cachedNode.hoveredEdge === hoveredEdge &&
-        cachedNode.connectingFrom === connectingFrom &&
-        cachedNode.edges === state.edges &&
-        cachedNode.isHighlighted === isHighlighted &&
-        cachedNode.hasHighlightedNodes === hasHighlightedNodes;
+      const canReuseData = canReuseEnrichedNodeData({
+        cachedNode,
+        node,
+        hoveredEdge,
+        connectingFrom,
+        edges: state.edges,
+        isHighlighted,
+        hasHighlightedNodes,
+        runParticipantKey,
+      });
 
-      if (canReuseData && cachedNode.sourceNode === node) {
+      if (canReuseData && cachedNode && cachedNode.sourceNode === node) {
         return cachedNode.node;
       }
 
       const sourceData = node.data as CanvasBlockNodeData;
-      const data = canReuseData
-        ? cachedNode.data
-        : {
-            ...sourceData,
-            _callbacksRef: callbacksRef,
-            _hoveredEdge: hoveredEdge ?? undefined,
-            _connectingFrom: blockConnectingFrom,
-            _allEdges: state.edges,
-            _isHighlighted: isHighlighted,
-            _hasHighlightedNodes: hasHighlightedNodes,
-          };
+      const data =
+        canReuseData && cachedNode
+          ? cachedNode.data
+          : {
+              ...sourceData,
+              _callbacksRef: callbacksRef,
+              _hoveredEdge: hoveredEdge ?? undefined,
+              _connectingFrom: blockConnectingFrom,
+              _allEdges: state.edges,
+              _isHighlighted: isHighlighted,
+              _hasHighlightedNodes: hasHighlightedNodes,
+              _dimBodyBelowHeader: shouldBlankBody,
+            };
       const enrichedNode: ReactFlowNode = {
         ...node,
+        selectable: runSelectableSet ? runSelectableSet.has(node.id) : (node.selectable ?? true),
         data: data as ReactFlowNode["data"],
       };
 
@@ -2540,6 +2643,7 @@ function CanvasContent({
         edges: state.edges,
         isHighlighted,
         hasHighlightedNodes,
+        runParticipantKey,
       });
 
       return enrichedNode;
@@ -2552,7 +2656,16 @@ function CanvasContent({
     }
 
     return enrichedNodes;
-  }, [state.nodes, hoveredEdge, connectingFrom, state.edges, highlightedNodeIds, blockConnectingFrom]);
+  }, [
+    state.nodes,
+    hoveredEdge,
+    connectingFrom,
+    state.edges,
+    highlightedNodeIds,
+    blockConnectingFrom,
+    runParticipantNodeIds,
+    runSelectableSet,
+  ]);
 
   const edgeTypes = useMemo(
     () => ({
@@ -2566,27 +2679,31 @@ function CanvasContent({
     (edgeId: string) => onEdgesChangeRef.current([{ id: edgeId, type: "remove" }]),
     [],
   );
-  const styledEdges = useMemo(
-    () =>
-      state.edges?.map((e) => ({
-        ...e,
-        ...EDGE_STYLE,
-        data: {
-          ...e.data,
-          isHovered: e.id === hoveredEdgeId,
-          canDelete: isEditMode && !isReadOnly,
-          onDelete: isEditMode && !isReadOnly ? stableEdgeDelete : undefined,
-        },
-        zIndex: e.id === hoveredEdgeId ? 1000 : 0,
-      })),
-    [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly],
-  );
+  const styledEdges = useMemo(() => {
+    return state.edges?.map((e) => ({
+      ...e,
+      ...EDGE_STYLE,
+      style: { ...EDGE_STYLE.style },
+      data: {
+        ...e.data,
+        isHovered: e.id === hoveredEdgeId,
+        canDelete: isEditMode && !isReadOnly,
+        onDelete: isEditMode && !isReadOnly ? stableEdgeDelete : undefined,
+      },
+      zIndex: e.id === hoveredEdgeId ? 1000 : 0,
+    }));
+  }, [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly]);
 
   const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;
   const { onNodesChange, onEdgesChange } = state;
 
   const handleNodesChange = useCallback(
-    (changes: NodeChange[]) => {
+    (incomingChanges: NodeChange[]) => {
+      let changes = incomingChanges;
+      if (runSelectableSet) {
+        changes = changes.filter((c) => !(c.type === "select" && c.selected === true && !runSelectableSet.has(c.id)));
+      }
+
       const prev = previouslySelectedRef.current;
 
       if (prev.size > 0) {
@@ -2608,7 +2725,7 @@ function CanvasContent({
         onNodesChange(filteredChanges);
       }
     },
-    [isReadOnly, onNodesChange],
+    [isReadOnly, onNodesChange, runSelectableSet],
   );
 
   const handleEdgesChange = useCallback(
