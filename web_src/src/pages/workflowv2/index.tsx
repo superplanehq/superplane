@@ -2889,14 +2889,14 @@ export function WorkflowPageV2() {
     const handler = (e: Event) => {
       const { versionId } = (e as CustomEvent).detail;
       if (!versionId) return;
-      const version = allCanvasVersions.get(versionId);
+      const version = selectableVersionsById.get(versionId);
       if (version) {
         setActiveCanvasVersion(version);
       }
     };
     window.addEventListener("agent:view-version", handler);
     return () => window.removeEventListener("agent:view-version", handler);
-  }, [allCanvasVersions]);
+  }, [selectableVersionsById]);
 
   const handleIntegrationCreated = useCallback(
     async (integrationId: string, instanceName: string) => {
