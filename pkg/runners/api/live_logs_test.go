@@ -10,8 +10,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	runneraction "github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/runners"
+	runnermodels "github.com/superplanehq/superplane/pkg/runners/models"
 	"github.com/superplanehq/superplane/test/support"
 )
 
@@ -97,6 +100,27 @@ func TestHandleRunnerLiveLogStream(t *testing.T) {
 		rec := liveLogGET(t, h, r, canvasID.String(), execID.String())
 		assert.Equal(t, http.StatusNotFound, rec.Code)
 		assert.Contains(t, rec.Body.String(), "not available for this execution")
+	})
+
+	t.Run("stored task output without cloudwatch", func(t *testing.T) {
+		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", map[string]any{
+			runneraction.ExecutionMetadataBrokerTaskID: uuid.New().String(),
+		})
+		store := runners.NewPostgresStore()
+		fleet, err := store.CreateFleet("live-log-fleet-"+uuid.New().String(), uuid.New().String())
+		require.NoError(t, err)
+		task, err := store.EnqueueJob(fleet.ID, execID, runnermodels.JobSpec{Commands: []string{"echo hi"}})
+		require.NoError(t, err)
+		_, err = store.CompleteJob(task.ID, runnermodels.FleetCompleteRequest{
+			ExitCode: 0,
+			Output:   "hello from runner\nsecond line",
+		})
+		require.NoError(t, err)
+
+		rec := liveLogGET(t, h, r, canvasID.String(), execID.String())
+		require.Equal(t, http.StatusOK, rec.Code)
+		assert.Contains(t, rec.Body.String(), `"type":"line"`)
+		assert.Contains(t, rec.Body.String(), "hello from runner")
 	})
 
 	t.Run("cloudwatch task log starts ndjson stream", func(t *testing.T) {

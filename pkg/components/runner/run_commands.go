@@ -102,6 +102,12 @@ If the completed fleet task includes valid JSON in **result**, SuperPlane includ
 func (c *Runner) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:     "fleet_id",
+			Label:    "Machine type",
+			Type:     configuration.FieldTypeRunnerFleet,
+			Required: true,
+		},
+		{
 			Name:        "execution_mode",
 			Label:       "Execution mode",
 			Type:        configuration.FieldTypeSelect,

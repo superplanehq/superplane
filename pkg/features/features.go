@@ -19,8 +19,11 @@ const FeatureClaudeManagedAgents = "claude_managed_agents"
 // is released or enabled for the organization.
 const FeatureDashboards = "dashboards"
 
+// FeatureRunner gates the Runner component and runner fleet APIs until generally available.
+const FeatureRunner = "runner"
+
 var registry = []Feature{
-	{ID: "runner", Label: "Runners", Description: "Sandboxed Runners"},
+	{ID: FeatureRunner, Label: "Runners", Description: "Sandboxed Runners"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas"},
 	{ID: FeatureDashboards, Label: "Dashboards", Description: "Markdown dashboard panels on canvases"},
 }

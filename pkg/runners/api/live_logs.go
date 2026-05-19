@@ -73,11 +73,20 @@ func (h *Handler) LiveLogStream(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	group, stream, region, ok := resolveCloudWatchLogSink(h.store(), execution.Metadata.Data())
-	if !ok {
+	group, stream, region, hasCloudWatch := resolveCloudWatchLogSink(h.store(), execution.Metadata.Data())
+	var storedOutput string
+	if !hasCloudWatch {
+		if task, err := h.store().FindTaskByExecutionID(executionID); err == nil {
+			storedOutput = strings.TrimSpace(task.Output)
+			if storedOutput == "" {
+				storedOutput = strings.TrimSpace(task.Error)
+			}
+		}
+	}
+	if !hasCloudWatch && storedOutput == "" {
 		http.Error(
 			w,
-			"Logs are not available for this execution yet. Check again shortly.",
+			"Logs are not available for this execution yet. For live streaming, configure CloudWatch on fleet-manager and AWS credentials on SuperPlane.",
 			http.StatusNotFound,
 		)
 		return
@@ -91,7 +100,11 @@ func (h *Handler) LiveLogStream(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
-	_ = livelogs.StreamCloudWatchLogToNDJSON(r.Context(), w, flusher, group, stream, region)
+	if hasCloudWatch {
+		_ = livelogs.StreamCloudWatchLogToNDJSON(r.Context(), w, flusher, group, stream, region)
+		return
+	}
+	_ = livelogs.StreamTextOutputToNDJSON(w, flusher, storedOutput)
 }
 
 func resolveCloudWatchLogSink(store runners.Store, meta any) (group, stream, region string, ok bool) {

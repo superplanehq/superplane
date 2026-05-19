@@ -22,6 +22,7 @@ import { CronFieldRenderer } from "./CronFieldRenderer";
 import { UserFieldRenderer } from "./UserFieldRenderer";
 import { RoleFieldRenderer } from "./RoleFieldRenderer";
 import { GroupFieldRenderer } from "./GroupFieldRenderer";
+import { RunnerFleetFieldRenderer } from "./RunnerFleetFieldRenderer";
 import { GitRefFieldRenderer } from "./GitRefFieldRenderer";
 import { TimezoneFieldRenderer } from "./TimezoneFieldRenderer";
 import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyFieldRenderer";
@@ -345,6 +346,16 @@ export const ConfigurationFieldRenderer = ({
 
       case "git-ref":
         return <GitRefFieldRenderer {...commonProps} />;
+
+      case "runner-fleet":
+        return (
+          <RunnerFleetFieldRenderer
+            field={field}
+            value={value as string}
+            onChange={onChange}
+            organizationId={organizationId}
+          />
+        );
 
       case "user":
         if (!domainId) {
