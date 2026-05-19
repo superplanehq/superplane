@@ -643,6 +643,162 @@ func Test__Client__IncidentsAPI(t *testing.T) {
 	})
 }
 
+func Test__Client__HeartbeatsAPI(t *testing.T) {
+	cloudID := "35273b54-3f06-40d2-880f-dd28cf6daafa"
+	teamID := "4b26961a-a837-49d2-a1fe-0973013e3c3b"
+
+	appCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"siteUrl":  "https://test.atlassian.net",
+			"email":    "test@example.com",
+			"apiToken": "test-token",
+		},
+	}
+
+	t.Run("list ops teams array response", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`[{"teamId":"` + teamID + `","teamName":"On-call"}]`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		teams, err := client.ListOpsTeams(cloudID)
+		require.NoError(t, err)
+		require.Len(t, teams, 1)
+		assert.Equal(t, "On-call", teams[0].TeamName)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/jsm/ops/api/"+cloudID+"/v1/teams")
+	})
+
+	t.Run("list ops teams wrapped response", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"platformTeams":[{"teamId":"` + teamID + `","teamName":"On-call"}]}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		teams, err := client.ListOpsTeams(cloudID)
+		require.NoError(t, err)
+		require.Len(t, teams, 1)
+		assert.Equal(t, teamID, teams[0].TeamID)
+	})
+
+	t.Run("create heartbeat", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusCreated,
+					Body:       io.NopCloser(strings.NewReader(`{"name":"DNS Checker","interval":5,"intervalUnit":"minutes","enabled":true}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		enabled := true
+		resp, err := client.CreateHeartbeat(cloudID, teamID, &CreateHeartbeatRequest{
+			Name:         "DNS Checker",
+			Interval:     5,
+			IntervalUnit: "minutes",
+			Enabled:      &enabled,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "DNS Checker", resp.Name)
+		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/teams/"+teamID+"/heartbeats")
+	})
+
+	t.Run("ping heartbeat", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusAccepted,
+					Body:       io.NopCloser(strings.NewReader(`{"message":"PONG - Heartbeat received"}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		resp, err := client.PingHeartbeat(cloudID, teamID, "DNS Checker")
+		require.NoError(t, err)
+		assert.Equal(t, "PONG - Heartbeat received", resp.Message)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/heartbeats/ping")
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "name=DNS+Checker")
+	})
+
+	t.Run("update heartbeat", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusCreated,
+					Body:       io.NopCloser(strings.NewReader(`{"name":"DNS Checker","interval":10,"intervalUnit":"minutes","enabled":false}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		interval := 10
+		enabled := false
+		resp, err := client.UpdateHeartbeat(cloudID, teamID, "DNS Checker", &UpdateHeartbeatRequest{
+			Interval: &interval,
+			Enabled:  &enabled,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 10, resp.Interval)
+		assert.Equal(t, http.MethodPatch, httpContext.Requests[0].Method)
+	})
+
+	t.Run("delete heartbeat", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusNoContent,
+					Body:       io.NopCloser(strings.NewReader("")),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		err = client.DeleteHeartbeat(cloudID, teamID, "DNS Checker")
+		require.NoError(t, err)
+		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+	})
+}
+
+func Test__parseOpsTeamsResponse(t *testing.T) {
+	t.Run("array", func(t *testing.T) {
+		teams, err := parseOpsTeamsResponse([]byte(`[{"teamId":"abc","teamName":"Ops"}]`))
+		require.NoError(t, err)
+		require.Len(t, teams, 1)
+		assert.Equal(t, "abc", teams[0].TeamID)
+		assert.Equal(t, "Ops", teams[0].TeamName)
+	})
+
+	t.Run("wrapped platformTeams", func(t *testing.T) {
+		teams, err := parseOpsTeamsResponse([]byte(`{"platformTeams":[{"teamId":"abc","teamName":"Ops"}]}`))
+		require.NoError(t, err)
+		require.Len(t, teams, 1)
+	})
+
+	t.Run("empty", func(t *testing.T) {
+		teams, err := parseOpsTeamsResponse([]byte(`[]`))
+		require.NoError(t, err)
+		assert.Empty(t, teams)
+	})
+}
+
 func Test__Client__ResolveNumericIssueID(t *testing.T) {
 	t.Run("numeric passthrough", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{Responses: []*http.Response{}}

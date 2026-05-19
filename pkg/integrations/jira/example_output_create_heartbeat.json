@@ -1,0 +1,12 @@
+{
+  "name": "DNS Server Checker",
+  "description": "Checks whether the DNS server responds",
+  "interval": 5,
+  "intervalUnit": "minutes",
+  "enabled": true,
+  "status": "Pending",
+  "ownerTeamId": "4b26961a-a837-49d2-a1fe-0973013e3c3b",
+  "alertMessage": "DNS Server Checker is expired",
+  "alertTags": ["critical", "dns"],
+  "alertPriority": "P3"
+}
