@@ -144,12 +144,21 @@ func Test__UpdateAlert__Execute__combined(t *testing.T) {
 }
 
 func Test__validateUpdateAlertConfigurable__priorityWhenEnabled(t *testing.T) {
-	cfg := map[string]any{
-		"setPriority": true,
-		"setMessage":  true,
-	}
-	err := validateUpdateAlertConfigurable(cfg, UpdateAlertSpec{Alert: "x", Message: "m", Priority: "__none__"})
-	require.ErrorContains(t, err, `choose a concrete priority`)
+	t.Run("with other operations", func(t *testing.T) {
+		cfg := map[string]any{
+			"setPriority": true,
+			"setMessage":  true,
+		}
+		err := validateUpdateAlertConfigurable(cfg, UpdateAlertSpec{Alert: "x", Message: "m", Priority: "__none__"})
+		require.ErrorContains(t, err, `choose a concrete priority`)
 
-	require.NoError(t, validateUpdateAlertConfigurable(cfg, UpdateAlertSpec{Alert: "x", Message: "m", Priority: "P3"}))
+		require.NoError(t, validateUpdateAlertConfigurable(cfg, UpdateAlertSpec{Alert: "x", Message: "m", Priority: "P3"}))
+	})
+
+	t.Run("priority only with default __none__", func(t *testing.T) {
+		cfg := map[string]any{"setPriority": true}
+		err := validateUpdateAlertConfigurable(cfg, UpdateAlertSpec{Alert: "x", Priority: "__none__"})
+		require.ErrorContains(t, err, `choose a concrete priority`)
+		require.NotContains(t, err.Error(), "enable at least one update")
+	})
 }
