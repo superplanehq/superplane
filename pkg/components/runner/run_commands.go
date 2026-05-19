@@ -3,7 +3,6 @@ package runner
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/runners"
 )
 
 const (
@@ -28,7 +28,19 @@ func init() {
 	registry.RegisterAction("runner", &Runner{})
 }
 
-type Runner struct{}
+// fleetStore is the subset of runners.Store used by the runner component.
+// Defined here so tests can provide a lightweight mock without importing pkg/runners.
+type fleetStore interface {
+	FindFleet(id uuid.UUID) (*runners.RunnerFleet, error)
+	CreateTask(id uuid.UUID, fleetID uuid.UUID, fleetTaskID string, executionID uuid.UUID) (*runners.RunnerTask, error)
+}
+
+// Runner implements the runner component.
+type Runner struct {
+	// store is used to look up fleets and persist runner tasks.
+	// If nil the runner falls back to the legacy TASK_BROKER_* env-var configuration.
+	store fleetStore
+}
 
 var dockerExecutionOnly = []configuration.VisibilityCondition{
 	{Field: "execution_mode", Values: []string{ExecutionModeDocker}},
@@ -78,7 +90,7 @@ func (c *Runner) Documentation() string {
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
 - **Custom container image**: Shown only for **Other**; use a normal reference (` + "`my.registry.example.com/org/repo:1.2.3`" + ` or ` + "`debian:bookworm-slim@sha256:…`" + `). Private registries require the runner to be configured with registry credentials.
-- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Leave at **0** to use the broker default.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Leave at **0** to use the fleet default.
 - **Commands**: One or more shell commands, one per line.
 - **Environment variables**: Optional key/value pairs available during command execution. Values can be literal strings (with expression support) or organization secret keys.
 
@@ -87,7 +99,7 @@ func (c *Runner) Documentation() string {
 - **Failed**: The commands finished with non-zero exit code.
 
 ## Structured result
-If the completed broker task includes valid JSON in **result**, SuperPlane includes it on the ` + "`runner.finished`" + ` event payload next to **status** and **exit_code** (the exact shape depends on your runner / task implementation).
+If the completed fleet task includes valid JSON in **result**, SuperPlane includes it on the ` + "`runner.finished`" + ` event payload next to **status** and **exit_code** (the exact shape depends on your runner / task implementation).
 `
 }
 
@@ -227,9 +239,9 @@ func (c *Runner) Configuration() []configuration.Field {
 			Name:        "execution_timeout_seconds",
 			Label:       "Execution timeout (seconds)",
 			Type:        configuration.FieldTypeNumber,
-			Required:    false, // legacy nodes omit this; 0 means broker default
+			Required:    false, // legacy nodes omit this; 0 means fleet default
 			Default:     0,
-			Description: "Hard time limit for the whole task, including image pull and command run. Use 0 for the broker default.",
+			Description: "Hard time limit for the whole task, including image pull and command run. Use 0 for the fleet default.",
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
 					Min: intPtr(0),
@@ -277,44 +289,71 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	webhookURL, err := ctx.Webhook.Setup()
-	if err != nil {
-		return fmt.Errorf("webhook setup: %w", err)
-	}
-
 	cmds := normalizeCommands(spec.Commands)
-	broker, err := NewBrokerClient(ctx.HTTP)
+	mode := normalizeExecutionMode(spec.ExecutionMode)
+
+	fleet, err := c.resolveFleet(spec)
 	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
+		return fmt.Errorf("resolve fleet: %w", err)
 	}
 
-	mode := normalizeExecutionMode(spec.ExecutionMode)
-	params := CreateTaskParams{
+	webhookURL, runnerTaskID, err := c.buildTaskWebhookURL(ctx, fleet)
+	if err != nil {
+		return err
+	}
+
+	fleetClient := runners.NewFleetClient(ctx.HTTP, fleet)
+	fleetTaskID, err := fleetClient.CreateTask(runners.FleetCreateTaskParams{
 		Commands:       cmds,
 		WebhookURL:     webhookURL,
-		Environment:    environment,
+		Environment:    toFleetEnv(environment),
 		ExecutionMode:  mode,
 		DockerImage:    resolvedDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
-	}
-
-	taskID, err := broker.CreateTask(params)
+	})
 	if err != nil {
-		return fmt.Errorf("create task: %w", err)
+		return fmt.Errorf("create fleet task: %w", err)
 	}
 
-	hookParams := map[string]any{"task_id": taskID}
+	hookParams := map[string]any{"task_id": fleetTaskID}
 
-	err = ctx.ExecutionState.SetKV("task_id", taskID)
-	if err != nil {
-		return fmt.Errorf("set task id in kv: %w", err)
+	// Persist runner task record when using a DB-registered fleet.
+	if fleet.ID != (uuid.UUID{}) {
+		store := c.effectiveStore()
+		if _, err := store.CreateTask(runnerTaskID, fleet.ID, fleetTaskID, ctx.ID); err != nil {
+			return fmt.Errorf("persist runner task: %w", err)
+		}
+		hookParams["fleet_id"] = fleet.ID.String()
 	}
 
-	if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
+	if err := ctx.ExecutionState.SetKV("task_id", fleetTaskID); err != nil {
+		return fmt.Errorf("set task_id in kv: %w", err)
+	}
+
+	if err := mergeRunnerBrokerTaskID(ctx.Metadata, fleetTaskID); err != nil {
 		return fmt.Errorf("runner execution metadata: %w", err)
 	}
 
 	return ctx.Requests.ScheduleActionCall(hookActionPoll, hookParams, pollInterval)
+}
+
+// buildTaskWebhookURL returns the webhook URL to pass to fleet-manager and the runner task ID.
+// For DB-registered fleets it uses the runner-task completion endpoint.
+// For legacy env-var fleets it falls back to the node webhook mechanism (runner task ID is zero).
+func (c *Runner) buildTaskWebhookURL(ctx core.ExecutionContext, fleet *runners.RunnerFleet) (string, uuid.UUID, error) {
+	if fleet.ID == (uuid.UUID{}) {
+		// Legacy mode: use the existing per-node webhook.
+		webhookURL, err := ctx.Webhook.Setup()
+		if err != nil {
+			return "", uuid.UUID{}, fmt.Errorf("webhook setup: %w", err)
+		}
+		return webhookURL, uuid.UUID{}, nil
+	}
+
+	// New mode: runner task completion endpoint.
+	runnerTaskID := uuid.New()
+	webhookURL := fmt.Sprintf("%s/api/v1/webhooks/runner/complete/%s", ctx.Webhook.GetBaseURL(), runnerTaskID)
+	return webhookURL, runnerTaskID, nil
 }
 
 func (c *Runner) Hooks() []core.Hook {
@@ -340,18 +379,20 @@ func (c *Runner) handlePoll(ctx core.ActionHookContext) error {
 		return fmt.Errorf("task_id is missing from parameters")
 	}
 
-	broker, err := NewBrokerClient(ctx.HTTP)
+	fleetIDStr, _ := ctx.Parameters["fleet_id"].(string)
+	fleet, err := c.resolveFleetByID(fleetIDStr)
 	if err != nil {
-		return fmt.Errorf("new broker client: %w", err)
+		return fmt.Errorf("resolve fleet: %w", err)
 	}
 
-	task, err := broker.FetchTaskStatus(taskID)
+	fleetClient := runners.NewFleetClient(ctx.HTTP, fleet)
+	task, err := fleetClient.FetchTaskStatus(taskID)
 	if err != nil {
-		ctx.Logger.WithError(err).Warn("runner: broker poll failed, will retry")
-		return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
+		ctx.Logger.WithError(err).Warn("runner: fleet poll failed, will retry")
+		return ctx.Requests.ScheduleActionCall(hookActionPoll, ctx.Parameters, pollInterval)
 	}
 
-	sink := taskLogFromBrokerTask(task)
+	sink := taskLogFromFleetTask(task)
 	if err := mergeRunnerTaskLog(ctx.Metadata, taskID, sink); err != nil {
 		ctx.Logger.WithError(err).Warn("runner: execution metadata update failed")
 	}
@@ -360,27 +401,22 @@ func (c *Runner) handlePoll(ctx core.ActionHookContext) error {
 		return c.processTaskStatus(ctx.ExecutionState, task)
 	}
 
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, map[string]any{"task_id": taskID}, pollInterval)
+	return ctx.Requests.ScheduleActionCall(hookActionPoll, ctx.Parameters, pollInterval)
 }
 
 func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	broker, err := NewBrokerClient(ctx.HTTP)
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("new broker client: %w", err)
-	}
-
 	var raw map[string]any
 	if err := json.Unmarshal(ctx.Body, &raw); err != nil {
 		raw = nil
 	}
 
-	task, err := broker.ProcessWebhook(ctx.Body)
+	task, err := runners.ParseWebhookTask(ctx.Body)
 	if err != nil {
 		return http.StatusInternalServerError, nil, fmt.Errorf("process webhook: %w", err)
 	}
 
 	if !task.IsInTerminalState() {
-		ctx.Logger.Warn("runner: broker webhook received non-terminal state")
+		ctx.Logger.Warn("runner: fleet webhook received non-terminal state")
 	}
 
 	executionCtx, err := ctx.FindExecutionByKV("task_id", task.TaskID)
@@ -388,7 +424,7 @@ func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 		return http.StatusNotFound, nil, nil
 	}
 
-	sink := taskLogFromBrokerTask(task)
+	sink := taskLogFromFleetTask(task)
 	if sink == nil {
 		sink = taskLogFromRawWebhook(raw)
 	}
@@ -406,7 +442,7 @@ func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 	return http.StatusOK, nil, nil
 }
 
-func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task) error {
+func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *runners.FleetTask) error {
 	if state.IsFinished() {
 		return nil
 	}
@@ -416,18 +452,18 @@ func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task)
 	}
 
 	channel := FailedOutputChannel
-	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.effectiveExitCode() == 0 {
+	if strings.ToLower(strings.TrimSpace(task.Status)) == "succeeded" && task.EffectiveExitCode() == 0 {
 		channel = PassedOutputChannel
 	}
 
-	out := map[string]any{"status": task.Status, "exit_code": task.effectiveExitCode()}
-	if v := brokerResultAsAny(task.Result); v != nil {
+	out := map[string]any{"status": task.Status, "exit_code": task.EffectiveExitCode()}
+	if v := fleetResultAsAny(task.Result); v != nil {
 		out["result"] = v
 	}
 	return state.Emit(channel, RunnerFinishedEventType, []any{out})
 }
 
-func brokerResultAsAny(raw json.RawMessage) any {
+func fleetResultAsAny(raw json.RawMessage) any {
 	b := bytes.TrimSpace(raw)
 	if len(b) == 0 || !json.Valid(b) {
 		return nil
@@ -439,28 +475,47 @@ func brokerResultAsAny(raw json.RawMessage) any {
 	return v
 }
 
-func (c *Runner) Cancel(ctx core.ExecutionContext) error {
-	if ctx.ExecutionState.IsFinished() {
-		return nil
-	}
+func (c *Runner) Cancel(ctx core.ExecutionContext) error { return nil }
+func (c *Runner) Cleanup(ctx core.SetupContext) error    { return nil }
 
-	taskID, err := ctx.ExecutionState.GetKV("task_id")
-	if err != nil {
-		if errors.Is(err, core.ErrExecutionKVNotFound) {
-			return nil
-		}
-		return fmt.Errorf("get task_id kv: %w", err)
+// resolveFleet returns the RunnerFleet to use for the given spec.
+// When spec.FleetID is set it looks up the fleet in the store.
+// Otherwise it synthesises an ephemeral fleet from the legacy TASK_BROKER_* env vars.
+func (c *Runner) resolveFleet(spec Spec) (*runners.RunnerFleet, error) {
+	if spec.FleetID != "" {
+		return c.resolveFleetByID(spec.FleetID)
 	}
-
-	broker, err := NewBrokerClient(ctx.HTTP)
-	if err != nil {
-		return err
-	}
-
-	if err := broker.CancelTask(taskID); err != nil {
-		return fmt.Errorf("cancel task: %w", err)
-	}
-	return nil
+	return legacyFleetFromEnv()
 }
 
-func (c *Runner) Cleanup(ctx core.SetupContext) error { return nil }
+func (c *Runner) resolveFleetByID(fleetIDStr string) (*runners.RunnerFleet, error) {
+	if fleetIDStr == "" {
+		return legacyFleetFromEnv()
+	}
+
+	fleetID, err := uuid.Parse(fleetIDStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid fleet_id %q: %w", fleetIDStr, err)
+	}
+
+	store := c.effectiveStore()
+	return store.FindFleet(fleetID)
+}
+
+func (c *Runner) effectiveStore() fleetStore {
+	if c.store != nil {
+		return c.store
+	}
+	return runners.NewPostgresStore()
+}
+
+func toFleetEnv(env []BrokerEnvironmentVariable) []runners.FleetEnvironmentVariable {
+	if len(env) == 0 {
+		return nil
+	}
+	out := make([]runners.FleetEnvironmentVariable, len(env))
+	for i, v := range env {
+		out[i] = runners.FleetEnvironmentVariable{Name: v.Name, Value: v.Value}
+	}
+	return out
+}
