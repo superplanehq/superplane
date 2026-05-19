@@ -489,7 +489,11 @@ The HTTP component allows you to make HTTP requests to external APIs and service
 
 ### Supported Methods
 
-- GET, POST, PUT, DELETE, PATCH
+- GET, POST, PUT, DELETE, PATCH, HEAD
+
+HEAD requests do not send a body and the response body is empty by design.
+Use HEAD for health checks, URL validation, or to inspect response headers
+and status without downloading the full response payload.
 
 ### Request Configuration
 
