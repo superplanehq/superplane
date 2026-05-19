@@ -2,14 +2,20 @@ export type AgentMode = "builder" | "operator" | "architect";
 
 const CANVAS_AGENT_MODE_STORAGE_KEY = "canvasAgentMode";
 
+export const VISIBLE_AGENT_MODES: AgentMode[] = ["builder", "operator"];
+const DEFAULT_AGENT_MODE: AgentMode = "operator";
+
+function isVisibleMode(value: unknown): value is AgentMode {
+  return typeof value === "string" && (VISIBLE_AGENT_MODES as string[]).includes(value);
+}
+
 export function readInitialAgentMode(): AgentMode {
-  if (typeof window === "undefined") return "operator";
+  if (typeof window === "undefined") return DEFAULT_AGENT_MODE;
   try {
     const stored = window.localStorage.getItem(CANVAS_AGENT_MODE_STORAGE_KEY);
-    if (stored === "builder" || stored === "architect") return stored;
-    return "operator";
+    return isVisibleMode(stored) ? stored : DEFAULT_AGENT_MODE;
   } catch {
-    return "operator";
+    return DEFAULT_AGENT_MODE;
   }
 }
 

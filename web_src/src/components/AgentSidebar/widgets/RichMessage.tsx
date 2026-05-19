@@ -33,7 +33,7 @@ const MARKDOWN_CLASSES =
   "[&_th]:border-b [&_th]:border-slate-200 " +
   "[&_td]:px-3 [&_td]:py-1.5 [&_td]:text-slate-600 [&_td]:border-b [&_td]:border-slate-100 " +
   "[&_tbody_tr:nth-child(even)]:bg-slate-50/60 " +
-  "[&_tr:last-child_td]:border-b-0 [&_tr:hover]:bg-violet-50/50";
+  "[&_tr:last-child_td]:border-b-0 [&_tr:hover]:bg-slate-50/50";
 
 type StartBuildingRubric = {
   title: string;
@@ -141,7 +141,7 @@ function MarkdownSegment({
           code: MarkdownCode,
           pre: ({ children }) => <>{children}</>,
           table: ({ children, ...props }) => (
-            <div className="my-4 overflow-x-auto rounded-lg border border-violet-200 bg-white shadow-sm">
+            <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
               <table {...props}>{children}</table>
             </div>
           ),
