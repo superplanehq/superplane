@@ -9,12 +9,16 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Approve Workflow" href="#approve-workflow" description="Approve or decline a Jira Service Management request approval" />
+  <LinkCard title="Assign Workflow To Project" href="#assign-workflow-to-project" description="Assign a Jira workflow scheme to a company-managed project" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a Jira Service Management incident via the Incidents API" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Jira" />
+  <LinkCard title="Create Workflow" href="#create-workflow" description="Create a Jira workflow" />
   <LinkCard title="Delete Incident" href="#delete-incident" description="Delete a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Delete Issue" href="#delete-issue" description="Delete a Jira issue" />
   <LinkCard title="Get Incident" href="#get-incident" description="Fetch a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Jira issue by its key" />
+  <LinkCard title="Transition Issue" href="#transition-issue" description="Move a Jira issue to a reachable workflow status" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update fields on a Jira issue" />
 </CardGrid>
 
@@ -27,6 +31,108 @@ To connect Jira to SuperPlane:
 3. Paste your **Jira Site URL** into SuperPlane. For Jira Cloud, this usually looks like `https://your-domain.atlassian.net`.
 4. Paste the Atlassian account **Email** that owns the API token.
 5. Paste the generated **API Token**.
+
+<a id="approve-workflow"></a>
+
+## Approve Workflow
+
+The Approve Workflow component approves or declines a Jira Service Management request approval.
+
+### Use Cases
+
+- **Automated approval routing**: submit a JSM approval decision after external checks pass
+- **Escalation handling**: decline requests when a SuperPlane workflow detects a failed precondition
+- **Audit context**: add a customer request comment before submitting the approval decision
+
+### Configuration
+
+- **Issue Key**: JSM request issue key, for example `ITSM-123`.
+- **Decision**: Approve or decline.
+- **Approval Selector**: Choose the latest pending approval or provide an approval id directly.
+- **Approval ID**: Required when selecting by id.
+- **Comment**: Optional public customer request comment posted before the approval decision.
+
+### Output
+
+Returns the updated approval payload from Jira Service Management.
+
+### Notes
+
+- Requires the API token's user to be in the approver list.
+- This component only works on Jira Service Management customer requests, not standard Jira issues.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "approvers": [
+      {
+        "approver": {
+          "accountId": "5b10a2844c20165700ede21g",
+          "displayName": "Alice Example",
+          "emailAddress": "alice@example.com"
+        },
+        "approverDecision": "approved"
+      }
+    ],
+    "completedDate": {
+      "iso8601": "2026-01-19T13:15:00+0000",
+      "jira": "2026-01-19T13:15:00.000+0000"
+    },
+    "finalDecision": "approved",
+    "id": "1",
+    "name": "Manager approval"
+  },
+  "timestamp": "2026-01-19T13:15:00Z",
+  "type": "jira.approval"
+}
+```
+
+<a id="assign-workflow-to-project"></a>
+
+## Assign Workflow To Project
+
+The Assign Workflow To Project component switches a Jira project to an existing workflow scheme.
+
+### Use Cases
+
+- **Project provisioning**: apply a known workflow scheme after creating or preparing a Jira project
+- **Workflow rollout**: move company-managed projects to an updated workflow scheme
+- **Canvas validation**: run in dry-run mode to validate the selected project and scheme without changing Jira
+
+### Configuration
+
+- **Project**: Company-managed Jira project to update.
+- **Workflow Scheme**: Existing Jira workflow scheme to assign.
+- **Dry Run**: Validate inputs and emit the planned assignment without changing Jira.
+
+### Output
+
+Returns `projectId`, `workflowSchemeId`, `draftCreated`, and any Jira task metadata returned by the workflow scheme switch.
+
+### Notes
+
+- Requires Jira admin permissions (`manage:jira-configuration`).
+- Workflow schemes can only be assigned to company-managed projects. Team-managed projects reject workflow scheme changes.
+- Jira may start a background task when switching schemes, especially when existing issues need migration.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "draftCreated": false,
+    "projectId": "10000",
+    "taskId": "3f83dg2a-ns2n-56ab-9812-42h5j1461629",
+    "taskSelf": "https://your-domain.atlassian.net/rest/api/3/task/3f83dg2a-ns2n-56ab-9812-42h5j1461629",
+    "taskStatus": "ENQUEUED",
+    "workflowSchemeId": "101010"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.workflowScheme.assigned"
+}
+```
 
 <a id="create-incident"></a>
 
@@ -156,6 +262,54 @@ Returns the created issue including:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "jira.issue"
+}
+```
+
+<a id="create-workflow"></a>
+
+## Create Workflow
+
+The Create Workflow component creates a Jira workflow with statuses and transitions.
+
+### Use Cases
+
+- **Service request lifecycle**: define a standard request workflow before assigning it through a workflow scheme
+- **JSM rollout automation**: create a workflow from a SuperPlane canvas as part of project provisioning
+- **Environment parity**: recreate workflow structure across Jira sites
+
+### Configuration
+
+- **Name**: Workflow name.
+- **Description**: Optional workflow description.
+- **Scope**: Global or project-scoped. Project-scoped workflows require a Jira project.
+- **Project**: Required when scope is Project.
+- **Statuses**: List of statuses with a category: TODO, IN_PROGRESS, or DONE.
+- **Transitions**: List of transitions with a target status. Directed transitions use the From status list; Global transitions are available from any status.
+
+### Output
+
+Returns the created workflow's `id`, `name`, and `version`.
+
+### Notes
+
+- Requires Jira admin permissions (`manage:jira-configuration`).
+- Jira creates workflows independently from projects. Use Assign Workflow To Project to apply a workflow scheme to a company-managed project.
+- New issues enter the **first listed status**. SuperPlane injects the Jira-required initial transition pointing at that status; the order of the Statuses list determines the starting state.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "id": "b9ff2384-d3b6-4d4e-9509-3ee19f607168",
+    "name": "Service request workflow",
+    "version": {
+      "id": "f010ac1b-3dd3-43a3-aa66-0ee8a447f76e",
+      "versionNumber": 1
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.workflow.created"
 }
 ```
 
@@ -330,6 +484,68 @@ Returns the Jira issue object including `id`, `key`, `self` and the full `fields
     "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
   },
   "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.issue"
+}
+```
+
+<a id="transition-issue"></a>
+
+## Transition Issue
+
+The Transition Issue component moves a Jira issue through its workflow.
+
+### Use Cases
+
+- **Automated triage**: move issues into the next workflow status after a SuperPlane event
+- **Cross-tool state sync**: mirror status changes from incident or deployment systems
+- **Resolution automation**: close issues with a transition-scoped resolution and comment
+
+### Configuration
+
+- **Project**: Optional Jira project used to narrow the status picker.
+- **Issue Key**: Jira issue key, for example `PROJ-123`.
+- **Target Status**: Status to move the issue to. It must be reachable from the issue's current status.
+- **Comment**: Optional transition comment.
+- **Resolution**: Optional Jira resolution name to set during the transition.
+
+### Output
+
+Returns the refreshed Jira issue after the transition.
+
+### Notes
+
+- Jira does not allow direct status writes. This component finds an available transition whose target status matches the requested status.
+- Workflow conditions and validators still apply.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "fields": {
+      "project": {
+        "id": "10000",
+        "key": "PROJ",
+        "name": "Proj"
+      },
+      "resolution": {
+        "name": "Done"
+      },
+      "status": {
+        "name": "Done",
+        "statusCategory": {
+          "key": "done",
+          "name": "Done"
+        }
+      },
+      "summary": "Investigate timeout on checkout flow",
+      "updated": "2026-01-19T13:00:00.000+0000"
+    },
+    "id": "10001",
+    "key": "PROJ-123",
+    "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+  },
+  "timestamp": "2026-01-19T13:00:00Z",
   "type": "jira.issue"
 }
 ```

@@ -1,0 +1,12 @@
+{
+    "type": "jira.workflowScheme.assigned",
+    "data": {
+        "projectId": "10000",
+        "workflowSchemeId": "101010",
+        "draftCreated": false,
+        "taskId": "3f83dg2a-ns2n-56ab-9812-42h5j1461629",
+        "taskStatus": "ENQUEUED",
+        "taskSelf": "https://your-domain.atlassian.net/rest/api/3/task/3f83dg2a-ns2n-56ab-9812-42h5j1461629"
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}

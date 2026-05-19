@@ -20,6 +20,10 @@ func (j *Jira) ListResources(resourceType string, ctx core.ListResourcesContext)
 		return listAssignees(ctx)
 	case "priority":
 		return listPriorities(ctx)
+	case "resolution":
+		return listResolutions(ctx)
+	case "workflowScheme":
+		return listWorkflowSchemes(ctx)
 	case "serviceDesk":
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
@@ -303,6 +307,63 @@ func listPriorities(ctx core.ListResourcesContext) ([]core.IntegrationResource, 
 			Type: "priority",
 			Name: p.Name,
 			ID:   p.Name,
+		})
+	}
+	return resources, nil
+}
+
+func listResolutions(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	if ctx.HTTP == nil {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	resolutions, err := client.ListResolutions()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list resolutions: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(resolutions))
+	for _, r := range resolutions {
+		resources = append(resources, core.IntegrationResource{
+			Type: "resolution",
+			Name: r.Name,
+			ID:   r.Name,
+		})
+	}
+	return resources, nil
+}
+
+func listWorkflowSchemes(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	if ctx.HTTP == nil {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	schemes, err := client.ListWorkflowSchemes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list workflow schemes: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(schemes))
+	for _, scheme := range schemes {
+		id := scheme.ID.String()
+		name := strings.TrimSpace(scheme.Name)
+		if id != "" {
+			name = fmt.Sprintf("%s (%s)", name, id)
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "workflowScheme",
+			Name: name,
+			ID:   id,
 		})
 	}
 	return resources, nil

@@ -114,9 +114,11 @@ func (c *Client) GetCurrentUser() (*User, error) {
 }
 
 type Project struct {
-	ID   string `json:"id"`
-	Key  string `json:"key"`
-	Name string `json:"name"`
+	ID         string `json:"id"`
+	Key        string `json:"key"`
+	Name       string `json:"name"`
+	Style      string `json:"style,omitempty"`
+	Simplified bool   `json:"simplified,omitempty"`
 }
 
 func (c *Client) ListProjects() ([]Project, error) {
@@ -130,6 +132,21 @@ func (c *Client) ListProjects() ([]Project, error) {
 		return nil, fmt.Errorf("error parsing projects response: %v", err)
 	}
 	return projects, nil
+}
+
+func (c *Client) GetProject(projectKey string) (*Project, error) {
+	endpoint := c.apiURL("/rest/api/3/project/" + url.PathEscape(projectKey))
+
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var project Project
+	if err := json.Unmarshal(body, &project); err != nil {
+		return nil, fmt.Errorf("error parsing project response: %v", err)
+	}
+	return &project, nil
 }
 
 type IssueTypeMeta struct {
@@ -227,12 +244,19 @@ func (c *Client) GetIssueTransitions(issueKey string) ([]Transition, error) {
 	return resp.Transitions, nil
 }
 
-type doTransitionRequest struct {
-	Transition transitionID `json:"transition"`
-}
-
 type transitionID struct {
 	ID string `json:"id"`
+}
+
+type DoTransitionOptions struct {
+	Comment    string
+	Resolution string
+}
+
+type doTransitionRequest struct {
+	Transition transitionID   `json:"transition"`
+	Fields     map[string]any `json:"fields,omitempty"`
+	Update     map[string]any `json:"update,omitempty"`
 }
 
 // ListAssignableUsers returns the users assignable to issues in a given
@@ -276,11 +300,54 @@ func (c *Client) ListPriorities() ([]Priority, error) {
 	return priorities, nil
 }
 
+type Resolution struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// ListResolutions returns all resolutions configured on the Jira site.
+// Resolutions are instance-level, not project-scoped.
+func (c *Client) ListResolutions() ([]Resolution, error) {
+	body, err := c.execRequest(http.MethodGet, c.apiURL("/rest/api/3/resolution"), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resolutions []Resolution
+	if err := json.Unmarshal(body, &resolutions); err != nil {
+		return nil, fmt.Errorf("error parsing resolutions response: %v", err)
+	}
+	return resolutions, nil
+}
+
 // DoTransition advances an issue along the given workflow transition.
 func (c *Client) DoTransition(issueKey, id string) error {
+	return c.DoTransitionWithOptions(issueKey, id, DoTransitionOptions{})
+}
+
+// DoTransitionWithOptions advances an issue and optionally applies transition-scoped fields.
+func (c *Client) DoTransitionWithOptions(issueKey, id string, opts DoTransitionOptions) error {
 	endpoint := c.apiURL("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/transitions")
 
-	body, err := json.Marshal(doTransitionRequest{Transition: transitionID{ID: id}})
+	req := doTransitionRequest{Transition: transitionID{ID: id}}
+	if resolution := strings.TrimSpace(opts.Resolution); resolution != "" {
+		req.Fields = map[string]any{
+			"resolution": map[string]any{"name": resolution},
+		}
+	}
+	if comment := strings.TrimSpace(opts.Comment); comment != "" {
+		req.Update = map[string]any{
+			"comment": []map[string]any{
+				{
+					"add": map[string]any{
+						"body": WrapInADF(comment),
+					},
+				},
+			},
+		}
+	}
+
+	body, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("error marshaling transition request: %v", err)
 	}
@@ -289,6 +356,234 @@ func (c *Client) DoTransition(issueKey, id string) error {
 		return err
 	}
 	return nil
+}
+
+type FlexibleString string
+
+func (s *FlexibleString) UnmarshalJSON(b []byte) error {
+	raw := strings.TrimSpace(string(b))
+	if raw == "" || raw == "null" {
+		*s = ""
+		return nil
+	}
+
+	var str string
+	if err := json.Unmarshal(b, &str); err == nil {
+		*s = FlexibleString(str)
+		return nil
+	}
+
+	*s = FlexibleString(raw)
+	return nil
+}
+
+func (s FlexibleString) String() string {
+	return string(s)
+}
+
+type WorkflowScope struct {
+	Type    string                   `json:"type"`
+	Project *WorkflowScopeProjectRef `json:"project,omitempty"`
+}
+
+type WorkflowScopeProjectRef struct {
+	ID string `json:"id"`
+}
+
+type WorkflowLayout struct {
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+}
+
+type WorkflowStatusUpdate struct {
+	Description     string `json:"description"`
+	Name            string `json:"name"`
+	StatusCategory  string `json:"statusCategory"`
+	StatusReference string `json:"statusReference"`
+}
+
+type WorkflowCreateStatus struct {
+	Layout          WorkflowLayout `json:"layout"`
+	Properties      map[string]any `json:"properties"`
+	StatusReference string         `json:"statusReference"`
+}
+
+type WorkflowTransitionLink struct {
+	FromPort            int    `json:"fromPort"`
+	FromStatusReference string `json:"fromStatusReference"`
+	ToPort              int    `json:"toPort"`
+}
+
+type WorkflowCreateTransition struct {
+	Actions           []any                    `json:"actions"`
+	Description       string                   `json:"description"`
+	ID                string                   `json:"id"`
+	Links             []WorkflowTransitionLink `json:"links"`
+	Name              string                   `json:"name"`
+	Properties        map[string]any           `json:"properties"`
+	ToStatusReference string                   `json:"toStatusReference"`
+	Triggers          []any                    `json:"triggers"`
+	Type              string                   `json:"type"`
+	Validators        []any                    `json:"validators"`
+}
+
+type WorkflowCreate struct {
+	Description      string                     `json:"description"`
+	Name             string                     `json:"name"`
+	StartPointLayout WorkflowLayout             `json:"startPointLayout"`
+	Statuses         []WorkflowCreateStatus     `json:"statuses"`
+	Transitions      []WorkflowCreateTransition `json:"transitions"`
+}
+
+type CreateWorkflowRequest struct {
+	Scope     WorkflowScope          `json:"scope"`
+	Statuses  []WorkflowStatusUpdate `json:"statuses"`
+	Workflows []WorkflowCreate       `json:"workflows"`
+}
+
+type WorkflowVersion struct {
+	ID            string `json:"id"`
+	VersionNumber int    `json:"versionNumber"`
+}
+
+type CreatedWorkflow struct {
+	Description string          `json:"description,omitempty"`
+	ID          string          `json:"id"`
+	IsEditable  bool            `json:"isEditable,omitempty"`
+	Name        string          `json:"name"`
+	Scope       WorkflowScope   `json:"scope"`
+	Version     WorkflowVersion `json:"version"`
+}
+
+type CreateWorkflowResponse struct {
+	Statuses  []WorkflowStatusUpdate `json:"statuses"`
+	Workflows []CreatedWorkflow      `json:"workflows"`
+}
+
+func (c *Client) CreateWorkflow(req *CreateWorkflowRequest) (*CreateWorkflowResponse, error) {
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling workflow create request: %v", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, c.apiURL("/rest/api/3/workflows/create"), bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var response CreateWorkflowResponse
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing workflow create response: %v", err)
+	}
+	return &response, nil
+}
+
+type WorkflowScheme struct {
+	ID              FlexibleString `json:"id"`
+	Name            string         `json:"name"`
+	Description     string         `json:"description,omitempty"`
+	DefaultWorkflow string         `json:"defaultWorkflow,omitempty"`
+	Draft           bool           `json:"draft,omitempty"`
+	Self            string         `json:"self,omitempty"`
+}
+
+type workflowSchemesPage struct {
+	StartAt    int              `json:"startAt"`
+	MaxResults int              `json:"maxResults"`
+	Total      int              `json:"total"`
+	IsLast     bool             `json:"isLast"`
+	Values     []WorkflowScheme `json:"values"`
+}
+
+func (c *Client) ListWorkflowSchemes() ([]WorkflowScheme, error) {
+	var out []WorkflowScheme
+	startAt := 0
+	const pageSize = 50
+
+	for range 20 {
+		query := url.Values{}
+		query.Set("startAt", strconv.Itoa(startAt))
+		query.Set("maxResults", strconv.Itoa(pageSize))
+		endpoint := c.apiURL("/rest/api/3/workflowscheme?" + query.Encode())
+
+		body, err := c.execRequest(http.MethodGet, endpoint, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page workflowSchemesPage
+		if err := json.Unmarshal(body, &page); err != nil {
+			return nil, fmt.Errorf("error parsing workflow schemes response: %v", err)
+		}
+
+		out = append(out, page.Values...)
+		if page.IsLast || len(page.Values) == 0 {
+			break
+		}
+		startAt += len(page.Values)
+		if page.Total > 0 && startAt >= page.Total {
+			break
+		}
+	}
+
+	return out, nil
+}
+
+type WorkflowSchemeAssignmentResponse struct {
+	ProjectID        string
+	WorkflowSchemeID string
+	Task             *TaskProgress
+}
+
+type TaskProgress struct {
+	ID       FlexibleString `json:"id"`
+	Self     string         `json:"self,omitempty"`
+	Status   string         `json:"status,omitempty"`
+	Message  string         `json:"message,omitempty"`
+	Progress int            `json:"progress,omitempty"`
+}
+
+type assignWorkflowSchemeRequest struct {
+	ProjectID                    string `json:"projectId"`
+	TargetSchemeID               string `json:"targetSchemeId"`
+	MappingsByIssueTypeOverrides []any  `json:"mappingsByIssueTypeOverride,omitempty"`
+}
+
+// AssignWorkflowSchemeToProject switches the workflow scheme for a classic Jira project.
+func (c *Client) AssignWorkflowSchemeToProject(projectID, schemeID string) (*WorkflowSchemeAssignmentResponse, error) {
+	req := assignWorkflowSchemeRequest{
+		ProjectID:                    projectID,
+		TargetSchemeID:               schemeID,
+		MappingsByIssueTypeOverrides: []any{},
+	}
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling workflow scheme assignment request: %v", err)
+	}
+
+	endpoint := c.apiURL("/rest/api/3/workflowscheme/project/switch")
+	responseBody, status, err := c.execRequestWithStatus(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	if status < 200 || (status >= 300 && status != http.StatusSeeOther) {
+		return nil, fmt.Errorf("request got %d code: %s", status, string(responseBody))
+	}
+
+	out := &WorkflowSchemeAssignmentResponse{
+		ProjectID:        projectID,
+		WorkflowSchemeID: schemeID,
+	}
+	if len(strings.TrimSpace(string(responseBody))) == 0 {
+		return out, nil
+	}
+
+	var task TaskProgress
+	if err := json.Unmarshal(responseBody, &task); err != nil {
+		return nil, fmt.Errorf("error parsing workflow scheme assignment response: %v", err)
+	}
+	out.Task = &task
+	return out, nil
 }
 
 type Issue struct {
@@ -640,6 +935,123 @@ func (c *Client) ListCustomerRequestsByServiceDesk(serviceDeskID string, maxTota
 	}
 
 	return out, nil
+}
+
+// CustomerRequest is returned by GET /rest/servicedeskapi/request/{issueIdOrKey}.
+type CustomerRequest struct {
+	IssueID       string `json:"issueId,omitempty"`
+	IssueKey      string `json:"issueKey,omitempty"`
+	ServiceDeskID string `json:"serviceDeskId,omitempty"`
+	RequestTypeID string `json:"requestTypeId,omitempty"`
+}
+
+func (c *Client) GetCustomerRequest(issueKey string) (*CustomerRequest, error) {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	u := fmt.Sprintf("%s/rest/servicedeskapi/request/%s", base, url.PathEscape(issueKey))
+	responseBody, err := c.execRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var out CustomerRequest
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("parse customer request: %w", err)
+	}
+	return &out, nil
+}
+
+type Approval struct {
+	ID            FlexibleString `json:"id"`
+	Name          string         `json:"name,omitempty"`
+	FinalDecision string         `json:"finalDecision,omitempty"`
+	Approvers     []Approver     `json:"approvers,omitempty"`
+	CreatedDate   map[string]any `json:"createdDate,omitempty"`
+	CompletedDate map[string]any `json:"completedDate,omitempty"`
+	Links         map[string]any `json:"_links,omitempty"`
+}
+
+type Approver struct {
+	Approver         User   `json:"approver,omitempty"`
+	ApproverDecision string `json:"approverDecision,omitempty"`
+}
+
+type approvalsPage struct {
+	Values     []Approval `json:"values"`
+	IsLastPage bool       `json:"isLastPage"`
+}
+
+func (c *Client) ListApprovals(issueKey string) ([]Approval, error) {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	var out []Approval
+	start := 0
+	const pageSize = 50
+
+	for range 20 {
+		query := url.Values{}
+		query.Set("start", strconv.Itoa(start))
+		query.Set("limit", strconv.Itoa(pageSize))
+		u := fmt.Sprintf("%s/rest/servicedeskapi/request/%s/approval?%s", base, url.PathEscape(issueKey), query.Encode())
+
+		responseBody, err := c.execRequest(http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page approvalsPage
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, fmt.Errorf("parse approvals: %w", err)
+		}
+
+		out = append(out, page.Values...)
+		if page.IsLastPage || len(page.Values) == 0 {
+			break
+		}
+		start += len(page.Values)
+	}
+
+	return out, nil
+}
+
+func (c *Client) SubmitApprovalDecision(issueKey, approvalID, decision string) (*Approval, error) {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	u := fmt.Sprintf(
+		"%s/rest/servicedeskapi/request/%s/approval/%s",
+		base,
+		url.PathEscape(issueKey),
+		url.PathEscape(approvalID),
+	)
+
+	body, err := json.Marshal(map[string]string{"decision": strings.ToLower(strings.TrimSpace(decision))})
+	if err != nil {
+		return nil, fmt.Errorf("marshal approval decision: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, u, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var out Approval
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("parse approval decision response: %w", err)
+	}
+	return &out, nil
+}
+
+func (c *Client) AddCustomerRequestComment(issueKey, body string, public bool) error {
+	base := strings.TrimSuffix(c.SiteURL, "/")
+	u := fmt.Sprintf("%s/rest/servicedeskapi/request/%s/comment", base, url.PathEscape(issueKey))
+
+	requestBody, err := json.Marshal(map[string]any{
+		"body":   body,
+		"public": public,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal customer request comment: %w", err)
+	}
+
+	_, err = c.execRequest(http.MethodPost, u, bytes.NewReader(requestBody))
+	return err
 }
 
 func jqlQuotedProjectKey(projectKey string) string {

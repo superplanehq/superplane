@@ -88,6 +88,10 @@ func (j *Jira) Actions() []core.Action {
 		&CreateIncident{},
 		&GetIncident{},
 		&DeleteIncident{},
+		&CreateWorkflow{},
+		&AssignWorkflowToProject{},
+		&TransitionIssue{},
+		&ApproveWorkflow{},
 	}
 }
 

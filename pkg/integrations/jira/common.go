@@ -2,6 +2,7 @@ package jira
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -9,9 +10,11 @@ import (
 
 // NodeMetadata stores metadata on action component nodes.
 type NodeMetadata struct {
-	Project   *Project `json:"project,omitempty"`
-	IssueType string   `json:"issueType,omitempty"`
-	Status    string   `json:"status,omitempty"`
+	Project        *Project        `json:"project,omitempty"`
+	IssueType      string          `json:"issueType,omitempty"`
+	Status         string          `json:"status,omitempty"`
+	WorkflowName   string          `json:"workflowName,omitempty"`
+	WorkflowScheme *WorkflowScheme `json:"workflowScheme,omitempty"`
 }
 
 func requireProject(httpCtx core.HTTPContext, integration core.IntegrationContext, projectKey string) (*Project, error) {
@@ -65,4 +68,30 @@ func cloudIDFromIntegration(integration core.IntegrationContext) (string, error)
 		return "", fmt.Errorf("integration is missing cloud id; re-sync the Jira integration after upgrading SuperPlane")
 	}
 	return meta.CloudID, nil
+}
+
+// applyStatus moves an issue to the requested status. It looks up available
+// transitions from the issue's current state and executes the one whose target
+// status name matches. Returns an error if no such transition exists.
+func applyStatus(client *Client, issueKey, status string) error {
+	return applyStatusWithOptions(client, issueKey, status, DoTransitionOptions{})
+}
+
+func applyStatusWithOptions(client *Client, issueKey, status string, opts DoTransitionOptions) error {
+	transitions, err := client.GetIssueTransitions(issueKey)
+	if err != nil {
+		return fmt.Errorf("failed to fetch transitions: %v", err)
+	}
+
+	for _, t := range transitions {
+		if strings.EqualFold(t.To.Name, status) {
+			return client.DoTransitionWithOptions(issueKey, t.ID, opts)
+		}
+	}
+
+	available := make([]string, 0, len(transitions))
+	for _, t := range transitions {
+		available = append(available, t.To.Name)
+	}
+	return fmt.Errorf("no transition available to status %q (available: %v)", status, available)
 }

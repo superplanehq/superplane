@@ -201,6 +201,36 @@ func Test__ListResources__Priority__MissingHTTPContext(t *testing.T) {
 	assert.Empty(t, resources)
 }
 
+func Test__ListResources__WorkflowScheme(t *testing.T) {
+	j := &Jira{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"isLast": true,
+					"values": [
+						{"id":101010,"name":"Support workflow scheme"},
+						{"id":"scheme-2","name":"Escalation workflow scheme"}
+					]
+				}`)),
+			},
+		},
+	}
+
+	resources, err := j.ListResources("workflowScheme", core.ListResourcesContext{
+		HTTP:        httpContext,
+		Integration: newAuthorizedIntegration(),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, resources, 2)
+	assert.Equal(t, "workflowScheme", resources[0].Type)
+	assert.Equal(t, "101010", resources[0].ID)
+	assert.Equal(t, "Support workflow scheme (101010)", resources[0].Name)
+	assert.Equal(t, "scheme-2", resources[1].ID)
+}
+
 func Test__ListResources__Unknown(t *testing.T) {
 	j := &Jira{}
 	appCtx := newAuthorizedIntegration()

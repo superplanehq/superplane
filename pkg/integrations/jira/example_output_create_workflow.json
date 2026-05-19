@@ -1,0 +1,12 @@
+{
+    "type": "jira.workflow.created",
+    "data": {
+        "id": "b9ff2384-d3b6-4d4e-9509-3ee19f607168",
+        "name": "Service request workflow",
+        "version": {
+            "id": "f010ac1b-3dd3-43a3-aa66-0ee8a447f76e",
+            "versionNumber": 1
+        }
+    },
+    "timestamp": "2026-01-19T12:00:00Z"
+}
