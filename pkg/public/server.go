@@ -28,6 +28,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/registry"
+	runnerapi "github.com/superplanehq/superplane/pkg/runners/api"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
 	"go.opentelemetry.io/otel/attribute"
@@ -90,6 +91,7 @@ type Server struct {
 	authHandler           *authentication.Handler
 	isDev                 bool
 	usageService          usage.Service
+	runnerAPI             *runnerapi.Handler
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -176,6 +178,11 @@ func NewServer(
 		oidcProvider:          oidcProvider,
 		registry:              registry,
 		authService:           authorizationService,
+		runnerAPI: runnerapi.New(runnerapi.Config{
+			BaseURL:     baseURL,
+			Registry:    registry,
+			AuthService: authorizationService,
+		}),
 		upgrader: &websocket.Upgrader{
 			CheckOrigin:     makeOriginChecker(getAllowedOrigins()),
 			ReadBufferSize:  1024,
@@ -341,7 +348,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	s.Router.Handle(
 		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs",
-		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogStream)),
+		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.runnerAPI.LiveLogStream)),
 	).Methods("GET")
 
 	// Protect the gRPC gateway routes with organization authentication
@@ -566,6 +573,13 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	publicRoute.HandleFunc("/.well-known/openid-configuration", s.handleOIDCConfiguration).Methods("GET")
 	publicRoute.HandleFunc("/.well-known/jwks.json", s.handleOIDCJWKS).Methods("GET")
 
+	publicRoute.
+		HandleFunc(s.BasePath+"/runner-fleets/sync", s.runnerAPI.FleetSync).
+		Methods("POST")
+	publicRoute.
+		HandleFunc(s.BasePath+"/runner-fleets/tasks/{taskId}/complete", s.runnerAPI.FleetTaskComplete).
+		Methods("POST")
+
 	//
 	// Webhook endpoints for triggers
 	//
@@ -607,6 +621,9 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/impersonate/status", s.impersonationStatus).Methods("GET")
 	adminRoute.HandleFunc("/accounts/{accountId}/promote", s.promoteAdmin).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/demote", s.demoteAdmin).Methods("POST")
+	adminRoute.HandleFunc("/runner/fleets", s.runnerAPI.AdminRegisterFleet).Methods("POST")
+	adminRoute.HandleFunc("/runner/fleets", s.runnerAPI.AdminListFleets).Methods("GET")
+	adminRoute.HandleFunc("/runner/fleets/{fleetId}", s.runnerAPI.AdminDeleteFleet).Methods("DELETE")
 
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {

@@ -30,19 +30,22 @@ func TestNormalizeExecutionMode(t *testing.T) {
 	}
 }
 
+const testFleetID = "550e8400-e29b-41d4-a716-446655440000"
+
 func TestValidateRunnerSpec(t *testing.T) {
 	t.Parallel()
-	if err := validateRunnerSpec(Spec{Commands: "echo hi", ExecutionMode: ExecutionModeHost}); err != nil {
+	if err := validateRunnerSpec(Spec{Commands: "echo hi", ExecutionMode: ExecutionModeHost, FleetID: testFleetID}); err != nil {
 		t.Fatalf("valid host spec: %v", err)
 	}
-	// Legacy persisted config: commands only (no execution_mode / execution_timeout_seconds keys).
-	if err := validateRunnerSpec(Spec{Commands: "echo hi"}); err != nil {
-		t.Fatalf("valid legacy host spec (empty execution_mode): %v", err)
+	// Persisted config: commands only (no execution_mode / execution_timeout_seconds keys).
+	if err := validateRunnerSpec(Spec{Commands: "echo hi", FleetID: testFleetID}); err != nil {
+		t.Fatalf("valid host spec (empty execution_mode): %v", err)
 	}
 	if err := validateRunnerSpec(Spec{
 		Commands:          "echo hi",
 		ExecutionMode:     ExecutionModeDocker,
 		DockerImagePreset: "debian:bookworm-slim",
+		FleetID:           testFleetID,
 	}); err != nil {
 		t.Fatalf("valid docker quick pick: %v", err)
 	}
@@ -51,6 +54,7 @@ func TestValidateRunnerSpec(t *testing.T) {
 		ExecutionMode:     ExecutionModeDocker,
 		DockerImagePreset: DockerImagePresetCustom,
 		DockerImage:       "my.registry.example.com/app:1.0.0",
+		FleetID:           testFleetID,
 	}); err != nil {
 		t.Fatalf("valid docker custom: %v", err)
 	}
@@ -59,21 +63,26 @@ func TestValidateRunnerSpec(t *testing.T) {
 		Commands:      "echo hi",
 		ExecutionMode: ExecutionModeDocker,
 		DockerImage:   "debian:bookworm-slim",
+		FleetID:       testFleetID,
 	}); err != nil {
-		t.Fatalf("valid docker legacy: %v", err)
+		t.Fatalf("valid docker without preset: %v", err)
 	}
 	if err := validateRunnerSpec(Spec{
 		Commands:                "echo hi",
 		ExecutionMode:           ExecutionModeHost,
 		ExecutionTimeoutSeconds: 120,
+		FleetID:                 testFleetID,
 	}); err != nil {
 		t.Fatalf("valid timeout: %v", err)
 	}
 
-	if err := validateRunnerSpec(Spec{Commands: "", ExecutionMode: ExecutionModeHost}); err == nil {
+	if err := validateRunnerSpec(Spec{Commands: "", ExecutionMode: ExecutionModeHost, FleetID: testFleetID}); err == nil {
 		t.Fatal("expected error for empty commands")
 	}
-	if err := validateRunnerSpec(Spec{Commands: "echo hi", ExecutionMode: ExecutionModeDocker}); err == nil {
+	if err := validateRunnerSpec(Spec{Commands: "echo hi", ExecutionMode: ExecutionModeHost}); err == nil {
+		t.Fatal("expected error for missing fleet_id")
+	}
+	if err := validateRunnerSpec(Spec{Commands: "echo hi", ExecutionMode: ExecutionModeDocker, FleetID: testFleetID}); err == nil {
 		t.Fatal("expected error for docker without image")
 	}
 	if err := validateRunnerSpec(Spec{
@@ -81,6 +90,7 @@ func TestValidateRunnerSpec(t *testing.T) {
 		ExecutionMode:     ExecutionModeDocker,
 		DockerImagePreset: DockerImagePresetCustom,
 		DockerImage:       "",
+		FleetID:           testFleetID,
 	}); err == nil {
 		t.Fatal("expected error for docker custom without image")
 	}
@@ -90,6 +100,7 @@ func TestValidateRunnerSpec(t *testing.T) {
 		ExecutionMode:     ExecutionModeDocker,
 		DockerImagePreset: DockerImagePresetCustom,
 		DockerImage:       longImage,
+		FleetID:           testFleetID,
 	}); err == nil {
 		t.Fatal("expected error for docker image reference that is too long")
 	}
@@ -97,6 +108,7 @@ func TestValidateRunnerSpec(t *testing.T) {
 		Commands:                "echo hi",
 		ExecutionMode:           ExecutionModeHost,
 		ExecutionTimeoutSeconds: -1,
+		FleetID:                 testFleetID,
 	}); err == nil {
 		t.Fatal("expected error for negative timeout")
 	}
@@ -104,6 +116,7 @@ func TestValidateRunnerSpec(t *testing.T) {
 		Commands:                "echo hi",
 		ExecutionMode:           ExecutionModeHost,
 		ExecutionTimeoutSeconds: maxExecutionTimeoutSecondsRequest + 1,
+		FleetID:                 testFleetID,
 	}); err == nil {
 		t.Fatal("expected error for timeout above max")
 	}
@@ -113,6 +126,7 @@ func TestDecodeRunnerSpec_WeakTypes(t *testing.T) {
 	t.Parallel()
 	raw := map[string]any{
 		"commands":                  "echo x",
+		"fleet_id":                  testFleetID,
 		"execution_mode":            "docker",
 		"docker_image_preset":       "debian:bookworm-slim",
 		"docker_image":              " alpine:latest ",
@@ -138,6 +152,7 @@ func TestValidateConfigurationRunnerLegacyPreExecutionFields(t *testing.T) {
 	r := &Runner{}
 	legacy := map[string]any{
 		"commands": "echo hi",
+		"fleet_id": testFleetID,
 	}
 	if err := configuration.ValidateConfiguration(r.Configuration(), legacy); err != nil {
 		t.Fatalf("ValidateConfiguration legacy runner: %v", err)
@@ -163,6 +178,7 @@ func TestValidateConfigurationRunnerLegacyDockerImageOnly(t *testing.T) {
 	err := configuration.ValidateConfiguration(r.Configuration(), map[string]any{
 		"execution_mode":            ExecutionModeDocker,
 		"commands":                  "echo hi",
+		"fleet_id":                  testFleetID,
 		"execution_timeout_seconds": 0,
 		"docker_image":              "debian:bookworm-slim",
 	})
