@@ -220,11 +220,11 @@ func (c *UpdateHeartbeat) Setup(ctx core.SetupContext) error {
 	if strings.TrimSpace(spec.Heartbeat) == "" {
 		return fmt.Errorf("heartbeat is required")
 	}
-	if !hasAnyHeartbeatUpdate(spec) {
-		return fmt.Errorf("at least one update field must be enabled")
-	}
 	if spec.Interval != nil && *spec.Interval < 1 {
 		return fmt.Errorf("interval must be at least 1")
+	}
+	if !hasEffectiveHeartbeatUpdate(spec) {
+		return fmt.Errorf("at least one update field must be enabled")
 	}
 
 	return ctx.Metadata.Set(UpdateHeartbeatNodeMetadata{TeamName: resolveOpsTeamName(ctx, spec.Team)})
@@ -251,7 +251,7 @@ func (c *UpdateHeartbeat) Execute(ctx core.ExecutionContext) error {
 	}
 
 	req := updateHeartbeatRequestFromSpec(spec)
-	if updateHeartbeatRequestEmpty(req) {
+	if !hasEffectiveHeartbeatUpdate(spec) {
 		return fmt.Errorf("at least one update field must be enabled")
 	}
 
@@ -272,14 +272,8 @@ func (c *UpdateHeartbeat) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func hasAnyHeartbeatUpdate(spec UpdateHeartbeatSpec) bool {
-	return spec.Description != nil ||
-		spec.Interval != nil ||
-		spec.IntervalUnit != nil ||
-		spec.Enabled != nil ||
-		spec.AlertMessage != nil ||
-		spec.AlertTags != nil ||
-		spec.AlertPriority != nil
+func hasEffectiveHeartbeatUpdate(spec UpdateHeartbeatSpec) bool {
+	return !updateHeartbeatRequestEmpty(updateHeartbeatRequestFromSpec(spec))
 }
 
 func updateHeartbeatRequestFromSpec(spec UpdateHeartbeatSpec) *UpdateHeartbeatRequest {

@@ -84,3 +84,39 @@ func Test__CreateHeartbeat__Execute(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, CreateJiraHeartbeatPayloadType, execCtx.Type)
 }
+
+func Test__CreateHeartbeat__Execute_defaults_enabled_true(t *testing.T) {
+	component := CreateHeartbeat{}
+	teamID := "4b26961a-a837-49d2-a1fe-0973013e3c3b"
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusCreated,
+				Body:       io.NopCloser(strings.NewReader(`{"name":"Checker","interval":5,"intervalUnit":"minutes","enabled":true}`)),
+			},
+		},
+	}
+	execCtx := &contexts.ExecutionStateContext{}
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"team":         teamID,
+			"name":         "Checker",
+			"interval":     5,
+			"intervalUnit": "minutes",
+		},
+		HTTP:           httpContext,
+		Integration:    jiraTestIntegration(),
+		ExecutionState: execCtx,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, CreateJiraHeartbeatPayloadType, execCtx.Type)
+}
+
+func Test__createHeartbeatEnabledFromSpec(t *testing.T) {
+	assert.True(t, createHeartbeatEnabledFromSpec(CreateHeartbeatSpec{}))
+	disabled := false
+	assert.False(t, createHeartbeatEnabledFromSpec(CreateHeartbeatSpec{Enabled: &disabled}))
+	enabled := true
+	assert.True(t, createHeartbeatEnabledFromSpec(CreateHeartbeatSpec{Enabled: &enabled}))
+}
