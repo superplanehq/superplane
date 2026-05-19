@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -866,4 +867,23 @@ func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
 		})
 		assert.Equal(t, http.StatusNotFound, response.Code)
 	})
+}
+
+func TestAdminRegisterRunnerFleetRequiresAdmin(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	server, _, token := setupTestServer(r, t)
+
+	body, err := json.Marshal(map[string]any{
+		"name": "x-" + uuid.New().String(),
+	})
+	require.NoError(t, err)
+	response := execRequest(server, requestParams{
+		method:      http.MethodPost,
+		path:        "/admin/api/runner/fleets",
+		authCookie:  token,
+		body:        body,
+		contentType: "application/json",
+	})
+	assert.Equal(t, http.StatusNotFound, response.Code)
 }

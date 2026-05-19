@@ -37,7 +37,10 @@ type Spec struct {
 	ExecutionMode           string                `mapstructure:"execution_mode"`
 	DockerImagePreset       string                `mapstructure:"docker_image_preset"`
 	DockerImage             string                `mapstructure:"docker_image"`
-	ExecutionTimeoutSeconds int                   `mapstructure:"execution_timeout_seconds"` // 0 = omit (broker default)
+	ExecutionTimeoutSeconds int                   `mapstructure:"execution_timeout_seconds"` // 0 = omit (fleet default)
+
+	// FleetID selects a registered runner fleet by UUID.
+	FleetID string `mapstructure:"fleet_id"`
 }
 
 func decodeRunnerSpec(raw any) (Spec, error) {
@@ -114,6 +117,10 @@ func validateRunnerSpec(spec Spec) error {
 		if spec.ExecutionTimeoutSeconds < 1 || spec.ExecutionTimeoutSeconds > maxExecutionTimeoutSecondsRequest {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the broker default", maxExecutionTimeoutSecondsRequest)
 		}
+	}
+
+	if strings.TrimSpace(spec.FleetID) == "" {
+		return fmt.Errorf("fleet_id is required")
 	}
 
 	return nil
