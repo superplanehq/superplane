@@ -1,6 +1,8 @@
 import { Loader2 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentMode } from "@/components/AgentSidebar/agentMode";
+import { AccountContext } from "@/contexts/accountContextState";
+import { createSystemMessage } from "@/components/AgentSidebar/systemMessages";
 import { ChatComposer } from "@/components/AgentSidebar/ChatComposer";
 import { useChatScroll } from "@/components/AgentSidebar/useChatScroll";
 import { useDraftActions } from "@/components/AgentSidebar/useDraftActions";
@@ -63,11 +65,24 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
   const organizationId = toolSidebarState.organizationId ?? "";
   const chatQuery = useCanvasAgentChat(canvasId, organizationId, toolSidebarState.isToolSidebarOpen);
   const chatId = chatQuery.data?.id ?? null;
+  const { account } = useContext(AccountContext);
+  const firstName = account?.name?.split(" ")[0] ?? "there";
 
   if (chatQuery.isLoading || !chatId) {
     return (
-      <div className="flex flex-1 items-center justify-center py-8 text-sm text-muted-foreground">
-        <Loader2 className="mr-2 size-4 animate-spin" /> Loading…
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex-1 overflow-y-auto p-3">
+          <div className="flex flex-col items-start">
+            <div
+              className="max-w-[85%] break-words rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-900"
+            >
+              Hi {firstName}! I'm your SuperPlane agent. Give me a moment to set up and I'll help you build.
+              <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
+                <Loader2 className="size-3 animate-spin" /> Setting up...
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -99,8 +114,37 @@ function ChatConversation({
   const [status, setStatus] = useState<string>("idle");
   const [error, setError] = useState<string | null>(null);
   const [outcomeState, setOutcomeState] = useStoredOutcomeState(chatId);
-  const messages = useConversationMessages(messagesQuery.data);
-  const showThinking = useThinkingIndicator(messages, status);
+  const rawMessages = useConversationMessages(messagesQuery.data);
+  const { account } = useContext(AccountContext);
+  const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
+
+  // Prepend a synthetic greeting as the first message so it never disappears
+  const messages = useMemo(() => {
+    const greeting: AgentMessage = {
+      id: "__greeting__",
+      role: "assistant",
+      content: `Hi ${greetingFirstName}! I'm your SuperPlane agent. I'll help you build and modify this canvas.`,
+      createdAt: rawMessages[0]?.createdAt ?? null,
+      toolCallId: "",
+      toolName: "",
+      toolStatus: "",
+    };
+    return [greeting, ...rawMessages];
+  }, [rawMessages, greetingFirstName]);
+
+  const showThinking = useThinkingIndicator(rawMessages, status);
+
+  // Auto-kickoff: send a boot message when session is new (no messages yet)
+  const bootSent = useRef(false);
+  useEffect(() => {
+    if (bootSent.current) return;
+    if (!messagesQuery.data || messagesQuery.isLoading) return;
+    const allMessages = messagesQuery.data.pages?.flatMap((p) => p.messages) ?? [];
+    if (allMessages.length === 0) {
+      bootSent.current = true;
+      sendMutation.mutate({ chatId, content: createSystemMessage("Session ready. Read the current canvas state, check connected integrations, and greet the user."), mode: agentMode });
+    }
+  }, [messagesQuery.data, messagesQuery.isLoading, chatId, agentMode, sendMutation]);
   const handlers = useConversationHandlers({
     agentMode,
     chatId,
@@ -215,6 +259,19 @@ function useConversationHandlers({
   const handleStartBuilding = useCallback(
     async (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
       const rubricText = buildRubricText(rubric);
+
+      // In Build mode: rubric is a spec confirmation, not an outcome.
+      // Agent already has full context — just confirm.
+      if (agentMode === "builder") {
+        await sendMutation.mutateAsync({
+          chatId,
+          content: "Specs approved. Start building.",
+          mode: "builder",
+        });
+        return;
+      }
+
+      // In Plan mode: kick off outcome with grading loop
       setOutcomeState(createInitialOutcomeState(rubric));
 
       try {
@@ -233,7 +290,7 @@ function useConversationHandlers({
         });
       }
     },
-    [chatId, outcomeMutation, sendMutation, setOutcomeState],
+    [chatId, agentMode, outcomeMutation, sendMutation, setOutcomeState],
   );
 
   return { handleSend, handleStop, handleQuickAction, handleStartBuilding };

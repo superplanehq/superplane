@@ -2884,6 +2884,20 @@ export function WorkflowPageV2() {
     return () => window.removeEventListener("agent:open-integration", handler);
   }, []);
 
+  // Listen for "See in Editor" from draft-actions widget
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { versionId } = (e as CustomEvent).detail;
+      if (!versionId) return;
+      const version = selectableVersionsById.get(versionId);
+      if (version) {
+        setActiveCanvasVersion(version);
+      }
+    };
+    window.addEventListener("agent:view-version", handler);
+    return () => window.removeEventListener("agent:view-version", handler);
+  }, [selectableVersionsById]);
+
   const handleIntegrationCreated = useCallback(
     async (integrationId: string, instanceName: string) => {
       if (!canvas || !organizationId || !canvasId || !integrationDialogName) return;

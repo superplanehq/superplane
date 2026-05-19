@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 )
@@ -41,4 +42,27 @@ func LoadAnthropicAgentConfig() AnthropicAgentConfig {
 // needs to run.
 func (c AnthropicAgentConfig) Enabled() bool {
 	return c.APIKey != "" && c.AgentID != "" && c.EnvironmentID != ""
+}
+
+// SessionResource defines a file to mount in agent sessions.
+type SessionResource struct {
+	FileID    string `json:"file_id"`
+	MountPath string `json:"mount_path"`
+}
+
+// LoadSessionResources reads the session resources config from ANTHROPIC_SESSION_RESOURCES_FILE env var.
+func LoadSessionResources() []SessionResource {
+	path := os.Getenv("ANTHROPIC_SESSION_RESOURCES_FILE")
+	if path == "" {
+		return nil
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var resources []SessionResource
+	if err := json.Unmarshal(data, &resources); err != nil {
+		return nil
+	}
+	return resources
 }
