@@ -258,11 +258,11 @@ function ChatConversation({
         : `# ${rubric.title}\n\n${rubric.criteria.map((c) => `- ${c}`).join("\n")}`;
 
       // In Build mode: rubric is a spec confirmation, not an outcome.
-      // Send as a regular message so the agent starts building directly.
+      // Agent already has full context — just confirm.
       if (agentMode === "builder") {
         await sendMutation.mutateAsync({
           chatId,
-          content: `Specs approved. Start building:\n\n${rubricText}`,
+          content: "Specs approved. Start building.",
           mode: "builder",
         });
         return;
