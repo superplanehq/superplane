@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -237,12 +238,84 @@ func (c *ApproveWorkflow) resolveApprovalID(client *Client, issueKey string, spe
 	if err != nil {
 		return "", fmt.Errorf("failed to list approvals: %v", err)
 	}
-	for _, approval := range approvals {
-		if strings.EqualFold(strings.TrimSpace(approval.FinalDecision), "PENDING") {
-			return approval.ID.String(), nil
+	approvalID, ok := latestPendingApprovalID(approvals)
+	if !ok {
+		return "", fmt.Errorf("no pending approval found for %s", issueKey)
+	}
+	return approvalID, nil
+}
+
+func isPendingApproval(approval Approval) bool {
+	return strings.EqualFold(strings.TrimSpace(approval.FinalDecision), "PENDING")
+}
+
+// latestPendingApprovalID returns the most recently created pending approval.
+// Jira lists approvals oldest-first; when createdDate is missing we use list
+// position (last pending wins) as a fallback.
+func latestPendingApprovalID(approvals []Approval) (string, bool) {
+	var (
+		bestID    string
+		bestTime  time.Time
+		bestIndex = -1
+		hasTime   bool
+	)
+
+	for i, approval := range approvals {
+		if !isPendingApproval(approval) {
+			continue
+		}
+		id := approval.ID.String()
+		if t, ok := approvalCreatedTime(approval); ok {
+			if !hasTime || t.After(bestTime) || (t.Equal(bestTime) && i > bestIndex) {
+				bestTime = t
+				bestID = id
+				bestIndex = i
+				hasTime = true
+			}
+			continue
+		}
+		if !hasTime && i > bestIndex {
+			bestID = id
+			bestIndex = i
 		}
 	}
-	return "", fmt.Errorf("no pending approval found for %s", issueKey)
+
+	if bestIndex < 0 {
+		return "", false
+	}
+	return bestID, true
+}
+
+func approvalCreatedTime(approval Approval) (time.Time, bool) {
+	if approval.CreatedDate == nil {
+		return time.Time{}, false
+	}
+	for _, key := range []string{"iso8601", "jira"} {
+		raw, ok := approval.CreatedDate[key].(string)
+		if !ok {
+			continue
+		}
+		if t, ok := parseJiraDateTime(raw); ok {
+			return t, true
+		}
+	}
+	return time.Time{}, false
+}
+
+func parseJiraDateTime(raw string) (time.Time, bool) {
+	raw = strings.TrimSpace(raw)
+	layouts := []string{
+		time.RFC3339Nano,
+		time.RFC3339,
+		"2006-01-02T15:04:05.000-0700",
+		"2006-01-02T15:04:05-0700",
+	}
+	for _, layout := range layouts {
+		if t, err := time.Parse(layout, raw); err == nil {
+			return t, true
+		}
+	}
+	return time.Time{}, false
 }
 
 func (c *ApproveWorkflow) Cancel(ctx core.ExecutionContext) error {
