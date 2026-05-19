@@ -149,6 +149,35 @@ func (j *Jira) ListResources(resourceType string, ctx core.ListResourcesContext)
 			})
 		}
 		return resources, nil
+
+	case "alert":
+		cloudID, err := cloudIDFromIntegration(ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("cloud id required for Ops alerts: %w", err)
+		}
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+		rows, err := client.ListOpsAlerts(cloudID, 100)
+		if err != nil {
+			return nil, fmt.Errorf("list Ops alerts: %w", err)
+		}
+		out := make([]core.IntegrationResource, 0, len(rows))
+		for _, row := range rows {
+			rawID := strings.TrimSpace(opsAlertStringField(row, "id"))
+			if rawID == "" {
+				continue
+			}
+			name := opsAlertIntegrationResourceLabel(row, rawID)
+			out = append(out, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   rawID,
+			})
+		}
+		return out, nil
+
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -247,9 +276,27 @@ func listIssueStatuses(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 	return resources, nil
 }
 
+func assigneeProjectKey(ctx core.ListResourcesContext) string {
+	projectKey := strings.TrimSpace(ctx.Parameters["project"])
+	if projectKey != "" && !strings.Contains(projectKey, "{{") {
+		return projectKey
+	}
+
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return ""
+	}
+	for _, p := range metadata.Projects {
+		if k := strings.TrimSpace(p.Key); k != "" {
+			return k
+		}
+	}
+	return ""
+}
+
 func listAssignees(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	projectKey := ctx.Parameters["project"]
-	if projectKey == "" || strings.Contains(projectKey, "{{") {
+	projectKey := assigneeProjectKey(ctx)
+	if projectKey == "" {
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -500,4 +547,23 @@ func resolveServiceDeskProjectKey(client *Client, serviceDeskID string) string {
 		}
 	}
 	return ""
+}
+
+func opsAlertIntegrationResourceLabel(row map[string]any, alertID string) string {
+	msg := strings.TrimSpace(opsAlertStringField(row, "message"))
+	if msg != "" && len(msg) > 80 {
+		msg = msg[:77] + "..."
+	}
+	tiny := strings.TrimSpace(opsAlertStringField(row, "tinyId"))
+
+	switch {
+	case msg != "" && tiny != "":
+		return fmt.Sprintf("%s #%s", msg, tiny)
+	case msg != "":
+		return msg
+	case tiny != "":
+		return fmt.Sprintf("#%s", tiny)
+	default:
+		return alertID
+	}
 }
