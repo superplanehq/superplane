@@ -1,4 +1,4 @@
-package public
+package api
 
 import (
 	"net/http"
@@ -12,16 +12,18 @@ import (
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/runners"
 	"github.com/superplanehq/superplane/pkg/runners/livelogs"
+	runnermodels "github.com/superplanehq/superplane/pkg/runners/models"
 )
 
-func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Request) {
+// LiveLogStream tails CloudWatch logs for a runner node execution.
+func (h *Handler) LiveLogStream(w http.ResponseWriter, r *http.Request) {
 	user, ok := middleware.GetUserFromContext(r.Context())
 	if !ok {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	allowed, err := s.authService.CheckOrganizationPermission(
+	allowed, err := h.AuthService.CheckOrganizationPermission(
 		user.ID.String(),
 		user.OrganizationID.String(),
 		"canvases",
@@ -71,7 +73,7 @@ func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	group, stream, region, ok := resolveCloudWatchLogSink(execution.Metadata.Data())
+	group, stream, region, ok := resolveCloudWatchLogSink(h.store(), execution.Metadata.Data())
 	if !ok {
 		http.Error(
 			w,
@@ -92,7 +94,7 @@ func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Reques
 	_ = livelogs.StreamCloudWatchLogToNDJSON(r.Context(), w, flusher, group, stream, region)
 }
 
-func resolveCloudWatchLogSink(meta any) (group, stream, region string, ok bool) {
+func resolveCloudWatchLogSink(store runners.Store, meta any) (group, stream, region string, ok bool) {
 	m, _ := meta.(map[string]any)
 	if m == nil {
 		return "", "", "", false
@@ -108,7 +110,6 @@ func resolveCloudWatchLogSink(meta any) (group, stream, region string, ok bool) 
 		}
 	}
 
-	store := runners.NewPostgresStore()
 	if brokerID, ok2 := m[runneraction.ExecutionMetadataBrokerTaskID].(string); ok2 && strings.TrimSpace(brokerID) != "" {
 		if taskID, err := uuid.Parse(strings.TrimSpace(brokerID)); err == nil {
 			if task, err := store.FindTask(taskID); err == nil {
@@ -126,14 +127,14 @@ func resolveCloudWatchLogSink(meta any) (group, stream, region string, ok bool) 
 	return "", "", "", false
 }
 
-func taskLogMapToSink(v any) *runners.FleetTaskLog {
+func taskLogMapToSink(v any) *runnermodels.FleetTaskLog {
 	switch t := v.(type) {
-	case runners.FleetTaskLog:
+	case runnermodels.FleetTaskLog:
 		return &t
-	case *runners.FleetTaskLog:
+	case *runnermodels.FleetTaskLog:
 		return t
 	case map[string]any:
-		ft := &runners.FleetTaskLog{}
+		ft := &runnermodels.FleetTaskLog{}
 		if typ, ok := t["type"].(string); ok {
 			ft.Type = typ
 		}

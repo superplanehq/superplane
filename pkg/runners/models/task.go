@@ -1,4 +1,4 @@
-package runners
+package models
 
 import (
 	"time"
@@ -7,21 +7,14 @@ import (
 	"gorm.io/datatypes"
 )
 
-type RunnerFleet struct {
-	ID        uuid.UUID                    `gorm:"primaryKey;default:uuid_generate_v4()" json:"id"`
-	Name      string                       `json:"name"`
-	Mode      string                       `gorm:"not null;default:bridge" json:"mode"`
-	FleetURL  string                       `json:"fleet_url,omitempty"`
-	AuthToken string                       `json:"-"`
-	Labels    datatypes.JSONType[[]string] `json:"labels"`
-	CreatedAt *time.Time                   `json:"created_at"`
-}
-
-func (RunnerFleet) TableName() string { return "runner_fleets" }
-
-func (f *RunnerFleet) UsesBridge() bool {
-	return f.Mode == "" || f.Mode == FleetModeBridge
-}
+const (
+	TaskStatusQueued     = "queued"
+	TaskStatusDispatched = "dispatched"
+	TaskStatusRunning    = "running"
+	TaskStatusSucceeded  = "succeeded"
+	TaskStatusFailed     = "failed"
+	TaskStatusCanceled   = "canceled"
+)
 
 type RunnerTask struct {
 	ID           uuid.UUID                   `gorm:"primaryKey;default:uuid_generate_v4()"`

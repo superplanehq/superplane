@@ -1,4 +1,4 @@
-package runners
+package models
 
 import "encoding/json"
 

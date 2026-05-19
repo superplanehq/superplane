@@ -439,11 +439,9 @@ CREATE TABLE public.role_metadata (
 CREATE TABLE public.runner_fleets (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     name character varying(255) NOT NULL,
-    fleet_url text,
     auth_token text DEFAULT ''::text NOT NULL,
     labels jsonb DEFAULT '[]'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    mode character varying(32) DEFAULT 'bridge'::character varying NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -2245,7 +2243,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260519120000	f
+20260518120000	f
 \.
 
 

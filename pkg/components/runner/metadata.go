@@ -1,11 +1,10 @@
 package runner
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/runners"
+	runnermodels "github.com/superplanehq/superplane/pkg/runners/models"
 )
 
 const (
@@ -14,8 +13,7 @@ const (
 )
 
 // TaskLogSink matches the fleet-manager JSON shape for CloudWatch-backed live logs.
-// Kept as an alias to runners.FleetTaskLog for public API compatibility.
-type TaskLogSink = runners.FleetTaskLog
+type TaskLogSink = runnermodels.FleetTaskLog
 
 func mergeExecutionMetadata(meta core.MetadataWriter, patch map[string]any) error {
 	if meta == nil {
@@ -62,7 +60,7 @@ func mergeRunnerTaskLog(meta core.MetadataWriter, brokerTaskID string, sink *Tas
 }
 
 // FinishFleetTask merges task log metadata and emits the terminal runner event.
-func FinishFleetTask(meta core.MetadataWriter, state core.ExecutionStateContext, fleetTask *runners.FleetTask, brokerTaskID string) error {
+func FinishFleetTask(meta core.MetadataWriter, state core.ExecutionStateContext, fleetTask *runnermodels.FleetTask, brokerTaskID string) error {
 	sink := taskLogFromFleetTask(fleetTask)
 	if err := mergeRunnerTaskLog(meta, brokerTaskID, sink); err != nil {
 		return err
@@ -70,7 +68,7 @@ func FinishFleetTask(meta core.MetadataWriter, state core.ExecutionStateContext,
 	return (&Runner{}).processTaskStatus(state, fleetTask)
 }
 
-func taskLogFromFleetTask(t *runners.FleetTask) *TaskLogSink {
+func taskLogFromFleetTask(t *runnermodels.FleetTask) *TaskLogSink {
 	if t == nil {
 		return nil
 	}
@@ -93,30 +91,4 @@ func taskLogFromFleetTask(t *runners.FleetTask) *TaskLogSink {
 			LogStreamName: s,
 		},
 	}
-}
-
-func taskLogFromRawWebhook(raw map[string]any) *TaskLogSink {
-	if raw == nil {
-		return nil
-	}
-	if v, ok := raw["task_log"]; ok && v != nil {
-		b, err := json.Marshal(v)
-		if err != nil {
-			return nil
-		}
-		var sink TaskLogSink
-		if err := json.Unmarshal(b, &sink); err != nil {
-			return nil
-		}
-		if strings.TrimSpace(sink.Type) != "" {
-			return &sink
-		}
-	}
-	g, _ := raw["cloudwatch_log_group"].(string)
-	s, _ := raw["cloudwatch_log_stream"].(string)
-	t := &runners.FleetTask{
-		CloudWatchLogGroup:  g,
-		CloudWatchLogStream: s,
-	}
-	return taskLogFromFleetTask(t)
 }

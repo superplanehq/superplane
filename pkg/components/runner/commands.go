@@ -14,6 +14,12 @@ const (
 	EnvironmentValueSourceSecret  = "secret"
 )
 
+// BrokerEnvironmentVariable is forwarded to fleet-manager as JSON.
+type BrokerEnvironmentVariable struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 var environmentVariableNameRegex = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 func normalizeCommands(commands string) []string {

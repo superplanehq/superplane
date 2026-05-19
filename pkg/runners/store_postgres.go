@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/runners/models"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -22,17 +23,12 @@ func (s *postgresStore) db() *gorm.DB {
 	return database.Conn()
 }
 
-func (s *postgresStore) CreateFleet(name, mode, fleetURL, authToken string, labels []string) (*RunnerFleet, error) {
+func (s *postgresStore) CreateFleet(name, authToken string, labels []string) (*models.RunnerFleet, error) {
 	if labels == nil {
 		labels = []string{}
 	}
-	if mode == "" {
-		mode = FleetModeBridge
-	}
-	fleet := &RunnerFleet{
+	fleet := &models.RunnerFleet{
 		Name:      name,
-		Mode:      mode,
-		FleetURL:  strings.TrimSpace(fleetURL),
 		AuthToken: authToken,
 		Labels:    datatypes.NewJSONType(labels),
 	}
@@ -42,28 +38,28 @@ func (s *postgresStore) CreateFleet(name, mode, fleetURL, authToken string, labe
 	return fleet, nil
 }
 
-func (s *postgresStore) ListFleets() ([]RunnerFleet, error) {
-	var fleets []RunnerFleet
+func (s *postgresStore) ListFleets() ([]models.RunnerFleet, error) {
+	var fleets []models.RunnerFleet
 	if err := s.db().Order("created_at ASC").Find(&fleets).Error; err != nil {
 		return nil, err
 	}
 	return fleets, nil
 }
 
-func (s *postgresStore) FindFleet(id uuid.UUID) (*RunnerFleet, error) {
-	var fleet RunnerFleet
+func (s *postgresStore) FindFleet(id uuid.UUID) (*models.RunnerFleet, error) {
+	var fleet models.RunnerFleet
 	if err := s.db().First(&fleet, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &fleet, nil
 }
 
-func (s *postgresStore) FindFleetByAuthToken(token string) (*RunnerFleet, error) {
+func (s *postgresStore) FindFleetByAuthToken(token string) (*models.RunnerFleet, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return nil, gorm.ErrRecordNotFound
 	}
-	var fleet RunnerFleet
+	var fleet models.RunnerFleet
 	if err := s.db().First(&fleet, "auth_token = ?", token).Error; err != nil {
 		return nil, err
 	}
@@ -71,48 +67,33 @@ func (s *postgresStore) FindFleetByAuthToken(token string) (*RunnerFleet, error)
 }
 
 func (s *postgresStore) DeleteFleet(id uuid.UUID) error {
-	return s.db().Delete(&RunnerFleet{}, "id = ?", id).Error
+	return s.db().Delete(&models.RunnerFleet{}, "id = ?", id).Error
 }
 
-func (s *postgresStore) CreateTask(id uuid.UUID, fleetID uuid.UUID, fleetTaskID string, executionID uuid.UUID) (*RunnerTask, error) {
-	task := &RunnerTask{
-		ID:          id,
-		FleetID:     fleetID,
-		FleetTaskID: fleetTaskID,
-		ExecutionID: executionID,
-		Status:      TaskStatusQueued,
-		Spec:        datatypes.NewJSONType(JobSpec{}),
-	}
-	if err := s.db().Create(task).Error; err != nil {
-		return nil, err
-	}
-	return task, nil
-}
-
-func (s *postgresStore) FindTask(id uuid.UUID) (*RunnerTask, error) {
-	var task RunnerTask
+func (s *postgresStore) FindTask(id uuid.UUID) (*models.RunnerTask, error) {
+	var task models.RunnerTask
 	if err := s.db().First(&task, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &task, nil
 }
 
-func (s *postgresStore) FindTaskByExecutionID(executionID uuid.UUID) (*RunnerTask, error) {
-	var task RunnerTask
+func (s *postgresStore) FindTaskByExecutionID(executionID uuid.UUID) (*models.RunnerTask, error) {
+	var task models.RunnerTask
 	if err := s.db().Where("execution_id = ?", executionID).First(&task).Error; err != nil {
 		return nil, err
 	}
 	return &task, nil
 }
 
-func (s *postgresStore) EnqueueJob(fleetID, executionID uuid.UUID, spec JobSpec) (*RunnerTask, error) {
+func (s *postgresStore) EnqueueJob(fleetID, executionID uuid.UUID, spec models.JobSpec) (*models.RunnerTask, error) {
 	id := uuid.New()
-	task := &RunnerTask{
+	task := &models.RunnerTask{
 		ID:          id,
 		FleetID:     fleetID,
 		FleetTaskID: id.String(),
 		ExecutionID: executionID,
-		Status:      TaskStatusQueued,
+		Status:      models.TaskStatusQueued,
 		Spec:        datatypes.NewJSONType(spec),
 	}
 	if err := s.db().Create(task).Error; err != nil {
@@ -121,8 +102,8 @@ func (s *postgresStore) EnqueueJob(fleetID, executionID uuid.UUID, spec JobSpec)
 	return task, nil
 }
 
-func (s *postgresStore) ClaimNextQueuedJob(fleetID uuid.UUID) (*RunnerTask, error) {
-	var task RunnerTask
+func (s *postgresStore) ClaimNextQueuedJob(fleetID uuid.UUID) (*models.RunnerTask, error) {
+	var task models.RunnerTask
 	err := s.db().Transaction(func(tx *gorm.DB) error {
 		var taskIDStr string
 		if err := tx.Raw(`
@@ -131,7 +112,7 @@ func (s *postgresStore) ClaimNextQueuedJob(fleetID uuid.UUID) (*RunnerTask, erro
 			ORDER BY created_at ASC
 			LIMIT 1
 			FOR UPDATE SKIP LOCKED
-		`, fleetID, TaskStatusQueued).Scan(&taskIDStr).Error; err != nil {
+		`, fleetID, models.TaskStatusQueued).Scan(&taskIDStr).Error; err != nil {
 			return err
 		}
 		if strings.TrimSpace(taskIDStr) == "" {
@@ -143,10 +124,10 @@ func (s *postgresStore) ClaimNextQueuedJob(fleetID uuid.UUID) (*RunnerTask, erro
 		}
 		task.ID = taskID
 		now := time.Now().UTC()
-		res := tx.Model(&RunnerTask{}).
-			Where("id = ? AND status = ?", taskID, TaskStatusQueued).
+		res := tx.Model(&models.RunnerTask{}).
+			Where("id = ? AND status = ?", taskID, models.TaskStatusQueued).
 			Updates(map[string]any{
-				"status":        TaskStatusDispatched,
+				"status":        models.TaskStatusDispatched,
 				"dispatched_at": now,
 			})
 		if res.Error != nil {
@@ -167,8 +148,8 @@ func (s *postgresStore) ClaimNextQueuedJob(fleetID uuid.UUID) (*RunnerTask, erro
 	return &task, nil
 }
 
-func (s *postgresStore) CompleteJob(taskID uuid.UUID, req FleetCompleteRequest) (*RunnerTask, error) {
-	var task RunnerTask
+func (s *postgresStore) CompleteJob(taskID uuid.UUID, req models.FleetCompleteRequest) (*models.RunnerTask, error) {
+	var task models.RunnerTask
 	err := s.db().Transaction(func(tx *gorm.DB) error {
 		if err := tx.First(&task, "id = ?", taskID).Error; err != nil {
 			return err
@@ -177,11 +158,11 @@ func (s *postgresStore) CompleteJob(taskID uuid.UUID, req FleetCompleteRequest) 
 			return nil
 		}
 
-		status := TaskStatusFailed
+		status := models.TaskStatusFailed
 		if req.Canceled {
-			status = TaskStatusCanceled
+			status = models.TaskStatusCanceled
 		} else if req.ExitCode == 0 && strings.TrimSpace(req.Error) == "" {
-			status = TaskStatusSucceeded
+			status = models.TaskStatusSucceeded
 		}
 
 		now := time.Now().UTC()
@@ -198,7 +179,7 @@ func (s *postgresStore) CompleteJob(taskID uuid.UUID, req FleetCompleteRequest) 
 		if req.TaskLog != nil {
 			updates["task_log"] = datatypes.NewJSONType(req.TaskLog)
 		}
-		if err := tx.Model(&RunnerTask{}).Where("id = ?", taskID).Updates(updates).Error; err != nil {
+		if err := tx.Model(&models.RunnerTask{}).Where("id = ?", taskID).Updates(updates).Error; err != nil {
 			return err
 		}
 		return tx.First(&task, "id = ?", taskID).Error
@@ -210,11 +191,11 @@ func (s *postgresStore) CompleteJob(taskID uuid.UUID, req FleetCompleteRequest) 
 }
 
 // FleetTaskFromRunnerTask builds a FleetTask for the runner component finish path.
-func FleetTaskFromRunnerTask(t *RunnerTask) *FleetTask {
+func FleetTaskFromRunnerTask(t *models.RunnerTask) *models.FleetTask {
 	if t == nil {
 		return nil
 	}
-	ft := &FleetTask{
+	ft := &models.FleetTask{
 		TaskID: t.ID.String(),
 		Status: t.Status,
 		Output: t.Output,

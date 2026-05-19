@@ -1,4 +1,4 @@
-package runners
+package models
 
 // JobSpec is the work payload SuperPlane queues for fleet-manager to pull.
 type JobSpec struct {
@@ -23,14 +23,8 @@ type TaskLogSinkCloudWatch struct {
 	Region        string `json:"region,omitempty"`
 }
 
-const (
-	TaskStatusQueued     = "queued"
-	TaskStatusDispatched = "dispatched"
-	TaskStatusRunning    = "running"
-	TaskStatusSucceeded  = "succeeded"
-	TaskStatusFailed     = "failed"
-	TaskStatusCanceled   = "canceled"
-
-	FleetModeBridge = "bridge"
-	FleetModePush   = "push"
-)
+// FleetEnvironmentVariable is a name/value pair passed to fleet-manager.
+type FleetEnvironmentVariable struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}

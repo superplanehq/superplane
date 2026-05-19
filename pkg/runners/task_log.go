@@ -1,11 +1,13 @@
 package runners
 
+import "github.com/superplanehq/superplane/pkg/runners/models"
+
 // TaskLogToFleetLog converts a stored task log sink to the fleet API shape.
-func TaskLogToFleetLog(s *TaskLogSink) *FleetTaskLog {
+func TaskLogToFleetLog(s *models.TaskLogSink) *models.FleetTaskLog {
 	if s == nil || s.Type == "" {
 		return nil
 	}
-	ft := &FleetTaskLog{Type: s.Type}
+	ft := &models.FleetTaskLog{Type: s.Type}
 	if s.CloudWatch != nil {
 		ft.CloudWatch = &struct {
 			LogGroupName  string `json:"log_group_name"`

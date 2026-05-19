@@ -39,8 +39,7 @@ type Spec struct {
 	DockerImage             string                `mapstructure:"docker_image"`
 	ExecutionTimeoutSeconds int                   `mapstructure:"execution_timeout_seconds"` // 0 = omit (fleet default)
 
-	// FleetID selects a specific registered runner fleet by UUID.
-	// When empty the runner falls back to the legacy TASK_BROKER_* env vars.
+	// FleetID selects a registered runner fleet by UUID.
 	FleetID string `mapstructure:"fleet_id"`
 }
 
@@ -118,6 +117,10 @@ func validateRunnerSpec(spec Spec) error {
 		if spec.ExecutionTimeoutSeconds < 1 || spec.ExecutionTimeoutSeconds > maxExecutionTimeoutSecondsRequest {
 			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the broker default", maxExecutionTimeoutSecondsRequest)
 		}
+	}
+
+	if strings.TrimSpace(spec.FleetID) == "" {
+		return fmt.Errorf("fleet_id is required")
 	}
 
 	return nil

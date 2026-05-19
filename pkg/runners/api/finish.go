@@ -1,4 +1,4 @@
-package public
+package api
 
 import (
 	"fmt"
@@ -11,10 +11,11 @@ import (
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/runners"
+	runnermodels "github.com/superplanehq/superplane/pkg/runners/models"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 )
 
-func (s *Server) finishRunnerTask(runnerTask *runners.RunnerTask) error {
+func (h *Handler) finishRunnerTask(runnerTask *runnermodels.RunnerTask) error {
 	if runnerTask == nil {
 		return fmt.Errorf("runner task is nil")
 	}
@@ -39,9 +40,9 @@ func (s *Server) finishRunnerTask(runnerTask *runners.RunnerTask) error {
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
 		NodeID:         execution.NodeID,
-		BaseURL:        s.BaseURL,
+		BaseURL:        h.BaseURL,
 		Configuration:  execution.Configuration.Data(),
-		HTTP:           s.registry.HTTPContext(),
+		HTTP:           h.Registry.HTTPContext(),
 		Metadata:       contexts.NewExecutionMetadataContext(tx, execution),
 		NodeMetadata:   contexts.NewNodeMetadataContext(tx, node),
 		ExecutionState: contexts.NewExecutionStateContext(tx, execution, onNewEvents),

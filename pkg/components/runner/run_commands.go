@@ -6,22 +6,19 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/runners"
+	runnermodels "github.com/superplanehq/superplane/pkg/runners/models"
 )
 
 const (
 	PassedOutputChannel     = "passed"
 	FailedOutputChannel     = "failed"
 	RunnerFinishedEventType = "runner.finished"
-
-	pollInterval   = 2 * time.Minute
-	hookActionPoll = "poll"
 )
 
 func init() {
@@ -31,15 +28,13 @@ func init() {
 // fleetStore is the subset of runners.Store used by the runner component.
 // Defined here so tests can provide a lightweight mock without importing pkg/runners.
 type fleetStore interface {
-	FindFleet(id uuid.UUID) (*runners.RunnerFleet, error)
-	CreateTask(id uuid.UUID, fleetID uuid.UUID, fleetTaskID string, executionID uuid.UUID) (*runners.RunnerTask, error)
-	EnqueueJob(fleetID, executionID uuid.UUID, spec runners.JobSpec) (*runners.RunnerTask, error)
+	FindFleet(id uuid.UUID) (*runnermodels.RunnerFleet, error)
+	EnqueueJob(fleetID, executionID uuid.UUID, spec runnermodels.JobSpec) (*runnermodels.RunnerTask, error)
 }
 
 // Runner implements the runner component.
 type Runner struct {
-	// store is used to look up fleets and persist runner tasks.
-	// If nil the runner falls back to the legacy TASK_BROKER_* env-var configuration.
+	// store looks up fleets and persists runner tasks; nil uses the Postgres store.
 	store fleetStore
 }
 
@@ -263,12 +258,7 @@ func (c *Runner) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
-	if err := validateRunnerSpec(spec); err != nil {
-		return err
-	}
-
-	_, err = ctx.Webhook.Setup()
-	return err
+	return validateRunnerSpec(spec)
 }
 
 func (c *Runner) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
@@ -300,181 +290,49 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 
 	store := c.effectiveStore()
 
-	if fleet.ID != (uuid.UUID{}) && fleet.UsesBridge() {
-		var timeoutPtr *int
-		if spec.ExecutionTimeoutSeconds > 0 {
-			t := spec.ExecutionTimeoutSeconds
-			timeoutPtr = &t
-		}
-		task, err := store.EnqueueJob(fleet.ID, ctx.ID, runners.JobSpec{
-			Commands:                cmds,
-			Environment:             toFleetEnv(environment),
-			ExecutionMode:           mode,
-			DockerImage:             resolvedDockerImageRef(spec),
-			ExecutionTimeoutSeconds: timeoutPtr,
-		})
-		if err != nil {
-			return fmt.Errorf("enqueue runner job: %w", err)
-		}
-		taskID := task.ID.String()
-		if err := ctx.ExecutionState.SetKV("task_id", taskID); err != nil {
-			return fmt.Errorf("set task_id in kv: %w", err)
-		}
-		if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
-			return fmt.Errorf("runner execution metadata: %w", err)
-		}
-		return nil
+	var timeoutPtr *int
+	if spec.ExecutionTimeoutSeconds > 0 {
+		t := spec.ExecutionTimeoutSeconds
+		timeoutPtr = &t
 	}
-
-	webhookURL, runnerTaskID, err := c.buildTaskWebhookURL(ctx, fleet)
-	if err != nil {
-		return err
-	}
-
-	fleetClient := runners.NewFleetClient(ctx.HTTP, fleet)
-	fleetTaskID, err := fleetClient.CreateTask(runners.FleetCreateTaskParams{
-		Commands:       cmds,
-		WebhookURL:     webhookURL,
-		Environment:    toFleetEnv(environment),
-		ExecutionMode:  mode,
-		DockerImage:    resolvedDockerImageRef(spec),
-		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
+	task, err := store.EnqueueJob(fleet.ID, ctx.ID, runnermodels.JobSpec{
+		Commands:                cmds,
+		Environment:             toFleetEnv(environment),
+		ExecutionMode:           mode,
+		DockerImage:             resolvedDockerImageRef(spec),
+		ExecutionTimeoutSeconds: timeoutPtr,
 	})
 	if err != nil {
-		return fmt.Errorf("create fleet task: %w", err)
+		return fmt.Errorf("enqueue runner job: %w", err)
 	}
-
-	hookParams := map[string]any{"task_id": fleetTaskID}
-
-	if fleet.ID != (uuid.UUID{}) {
-		if _, err := store.CreateTask(runnerTaskID, fleet.ID, fleetTaskID, ctx.ID); err != nil {
-			return fmt.Errorf("persist runner task: %w", err)
-		}
-		hookParams["fleet_id"] = fleet.ID.String()
-	}
-
-	if err := ctx.ExecutionState.SetKV("task_id", fleetTaskID); err != nil {
+	taskID := task.ID.String()
+	if err := ctx.ExecutionState.SetKV("task_id", taskID); err != nil {
 		return fmt.Errorf("set task_id in kv: %w", err)
 	}
-
-	if err := mergeRunnerBrokerTaskID(ctx.Metadata, fleetTaskID); err != nil {
+	if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
 		return fmt.Errorf("runner execution metadata: %w", err)
 	}
-
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, hookParams, pollInterval)
-}
-
-// buildTaskWebhookURL returns the webhook URL to pass to fleet-manager and the runner task ID.
-// For DB-registered fleets it uses the runner-task completion endpoint.
-// For legacy env-var fleets it falls back to the node webhook mechanism (runner task ID is zero).
-func (c *Runner) buildTaskWebhookURL(ctx core.ExecutionContext, fleet *runners.RunnerFleet) (string, uuid.UUID, error) {
-	if fleet.ID == (uuid.UUID{}) {
-		// Legacy mode: use the existing per-node webhook.
-		webhookURL, err := ctx.Webhook.Setup()
-		if err != nil {
-			return "", uuid.UUID{}, fmt.Errorf("webhook setup: %w", err)
-		}
-		return webhookURL, uuid.UUID{}, nil
-	}
-
-	// New mode: runner task completion endpoint.
-	runnerTaskID := uuid.New()
-	webhookURL := fmt.Sprintf("%s/api/v1/webhooks/runner/complete/%s", ctx.Webhook.GetBaseURL(), runnerTaskID)
-	return webhookURL, runnerTaskID, nil
+	return nil
 }
 
 func (c *Runner) Hooks() []core.Hook {
-	return []core.Hook{{Name: hookActionPoll, Type: core.HookTypeInternal}}
+	return nil
 }
 
 func (c *Runner) HandleHook(ctx core.ActionHookContext) error {
-	switch ctx.Name {
-	case hookActionPoll:
-		return c.handlePoll(ctx)
-	default:
-		return fmt.Errorf("unknown hook: %s", ctx.Name)
-	}
-}
-
-func (c *Runner) handlePoll(ctx core.ActionHookContext) error {
-	if ctx.ExecutionState.IsFinished() {
-		return nil
-	}
-
-	taskID, ok := ctx.Parameters["task_id"].(string)
-	if !ok {
-		return fmt.Errorf("task_id is missing from parameters")
-	}
-
-	fleetIDStr, _ := ctx.Parameters["fleet_id"].(string)
-	fleet, err := c.resolveFleetByID(fleetIDStr)
-	if err != nil {
-		return fmt.Errorf("resolve fleet: %w", err)
-	}
-
-	fleetClient := runners.NewFleetClient(ctx.HTTP, fleet)
-	task, err := fleetClient.FetchTaskStatus(taskID)
-	if err != nil {
-		ctx.Logger.WithError(err).Warn("runner: fleet poll failed, will retry")
-		return ctx.Requests.ScheduleActionCall(hookActionPoll, ctx.Parameters, pollInterval)
-	}
-
-	sink := taskLogFromFleetTask(task)
-	if err := mergeRunnerTaskLog(ctx.Metadata, taskID, sink); err != nil {
-		ctx.Logger.WithError(err).Warn("runner: execution metadata update failed")
-	}
-
-	if task.IsInTerminalState() {
-		return c.processTaskStatus(ctx.ExecutionState, task)
-	}
-
-	return ctx.Requests.ScheduleActionCall(hookActionPoll, ctx.Parameters, pollInterval)
+	return fmt.Errorf("unknown hook: %s", ctx.Name)
 }
 
 func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	var raw map[string]any
-	if err := json.Unmarshal(ctx.Body, &raw); err != nil {
-		raw = nil
-	}
-
-	task, err := runners.ParseWebhookTask(ctx.Body)
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("process webhook: %w", err)
-	}
-
-	if !task.IsInTerminalState() {
-		ctx.Logger.Warn("runner: fleet webhook received non-terminal state")
-	}
-
-	executionCtx, err := ctx.FindExecutionByKV("task_id", task.TaskID)
-	if err != nil {
-		return http.StatusNotFound, nil, nil
-	}
-
-	sink := taskLogFromFleetTask(task)
-	if sink == nil {
-		sink = taskLogFromRawWebhook(raw)
-	}
-	if executionCtx.Metadata != nil {
-		if err := mergeRunnerTaskLog(executionCtx.Metadata, task.TaskID, sink); err != nil {
-			ctx.Logger.WithError(err).Warn("runner: execution metadata update failed")
-		}
-	}
-
-	err = c.processTaskStatus(executionCtx.ExecutionState, task)
-	if err != nil {
-		return http.StatusInternalServerError, nil, fmt.Errorf("process task status: %w", err)
-	}
-
-	return http.StatusOK, nil, nil
+	return http.StatusNotFound, nil, nil
 }
 
-// ProcessFleetTask applies a terminal fleet task outcome to the execution (bridge complete or webhook).
-func (c *Runner) ProcessFleetTask(state core.ExecutionStateContext, task *runners.FleetTask) error {
+// ProcessFleetTask applies a terminal fleet task outcome from fleet-manager bridge complete.
+func (c *Runner) ProcessFleetTask(state core.ExecutionStateContext, task *runnermodels.FleetTask) error {
 	return c.processTaskStatus(state, task)
 }
 
-func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *runners.FleetTask) error {
+func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *runnermodels.FleetTask) error {
 	if state.IsFinished() {
 		return nil
 	}
@@ -510,19 +368,14 @@ func fleetResultAsAny(raw json.RawMessage) any {
 func (c *Runner) Cancel(ctx core.ExecutionContext) error { return nil }
 func (c *Runner) Cleanup(ctx core.SetupContext) error    { return nil }
 
-// resolveFleet returns the RunnerFleet to use for the given spec.
-// When spec.FleetID is set it looks up the fleet in the store.
-// Otherwise it synthesises an ephemeral fleet from the legacy TASK_BROKER_* env vars.
-func (c *Runner) resolveFleet(spec Spec) (*runners.RunnerFleet, error) {
-	if spec.FleetID != "" {
-		return c.resolveFleetByID(spec.FleetID)
-	}
-	return legacyFleetFromEnv()
+func (c *Runner) resolveFleet(spec Spec) (*runnermodels.RunnerFleet, error) {
+	return c.resolveFleetByID(spec.FleetID)
 }
 
-func (c *Runner) resolveFleetByID(fleetIDStr string) (*runners.RunnerFleet, error) {
+func (c *Runner) resolveFleetByID(fleetIDStr string) (*runnermodels.RunnerFleet, error) {
+	fleetIDStr = strings.TrimSpace(fleetIDStr)
 	if fleetIDStr == "" {
-		return legacyFleetFromEnv()
+		return nil, fmt.Errorf("fleet_id is required")
 	}
 
 	fleetID, err := uuid.Parse(fleetIDStr)
@@ -541,13 +394,13 @@ func (c *Runner) effectiveStore() fleetStore {
 	return runners.NewPostgresStore()
 }
 
-func toFleetEnv(env []BrokerEnvironmentVariable) []runners.FleetEnvironmentVariable {
+func toFleetEnv(env []BrokerEnvironmentVariable) []runnermodels.FleetEnvironmentVariable {
 	if len(env) == 0 {
 		return nil
 	}
-	out := make([]runners.FleetEnvironmentVariable, len(env))
+	out := make([]runnermodels.FleetEnvironmentVariable, len(env))
 	for i, v := range env {
-		out[i] = runners.FleetEnvironmentVariable{Name: v.Name, Value: v.Value}
+		out[i] = runnermodels.FleetEnvironmentVariable{Name: v.Name, Value: v.Value}
 	}
 	return out
 }

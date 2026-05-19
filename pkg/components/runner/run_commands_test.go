@@ -2,10 +2,7 @@ package runner
 
 import (
 	"encoding/json"
-	"io"
-	"net/http"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -14,53 +11,44 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	"github.com/superplanehq/superplane/pkg/runners"
+	runnermodels "github.com/superplanehq/superplane/pkg/runners/models"
 	"github.com/superplanehq/superplane/test/support/contexts"
+	"gorm.io/datatypes"
 )
 
 // mockStore is a test-only in-memory implementation of fleetStore.
 type mockStore struct {
-	fleet *runners.RunnerFleet
-	tasks []*runners.RunnerTask
+	fleet *runnermodels.RunnerFleet
+	tasks []*runnermodels.RunnerTask
 }
 
-func (m *mockStore) FindFleet(id uuid.UUID) (*runners.RunnerFleet, error) {
+func (m *mockStore) FindFleet(id uuid.UUID) (*runnermodels.RunnerFleet, error) {
 	return m.fleet, nil
 }
 
-func (m *mockStore) CreateTask(id uuid.UUID, fleetID uuid.UUID, fleetTaskID string, executionID uuid.UUID) (*runners.RunnerTask, error) {
-	t := &runners.RunnerTask{ID: id, FleetID: fleetID, FleetTaskID: fleetTaskID, ExecutionID: executionID}
-	m.tasks = append(m.tasks, t)
-	return t, nil
-}
-
-func (m *mockStore) EnqueueJob(fleetID, executionID uuid.UUID, spec runners.JobSpec) (*runners.RunnerTask, error) {
+func (m *mockStore) EnqueueJob(fleetID, executionID uuid.UUID, spec runnermodels.JobSpec) (*runnermodels.RunnerTask, error) {
 	id := uuid.New()
-	t := &runners.RunnerTask{ID: id, FleetID: fleetID, FleetTaskID: id.String(), ExecutionID: executionID, Status: runners.TaskStatusQueued}
+	t := &runnermodels.RunnerTask{
+		ID:          id,
+		FleetID:     fleetID,
+		FleetTaskID: id.String(),
+		ExecutionID: executionID,
+		Status:      runnermodels.TaskStatusQueued,
+		Spec:        datatypes.NewJSONType(spec),
+	}
 	m.tasks = append(m.tasks, t)
 	return t, nil
 }
 
-func testFleet() *runners.RunnerFleet {
-	return &runners.RunnerFleet{
+func testFleet() *runnermodels.RunnerFleet {
+	return &runnermodels.RunnerFleet{
 		ID:        uuid.New(),
 		Name:      "fleet-1",
-		Mode:      runners.FleetModePush,
-		FleetURL:  "https://broker.example",
 		AuthToken: "token-1",
 	}
 }
 
-func testBridgeFleet() *runners.RunnerFleet {
-	return &runners.RunnerFleet{
-		ID:        uuid.New(),
-		Name:      "fleet-bridge",
-		Mode:      runners.FleetModeBridge,
-		AuthToken: "token-bridge",
-	}
-}
-
-func testRunner(fleet *runners.RunnerFleet) *Runner {
+func testRunner(fleet *runnermodels.RunnerFleet) *Runner {
 	return &Runner{store: &mockStore{fleet: fleet}}
 }
 
@@ -160,19 +148,32 @@ func TestValidateEnvironment(t *testing.T) {
 	}
 }
 
-func TestRunnerExecuteSendsEnvironmentToFleet(t *testing.T) {
+func TestRunnerExecuteEnqueuesJob(t *testing.T) {
 	fleet := testFleet()
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-123"}`))},
-		},
-	}
-
+	store := &mockStore{fleet: fleet}
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-	requests := &contexts.RequestContext{}
-	component := testRunner(fleet)
 
-	err := component.Execute(core.ExecutionContext{
+	err := (&Runner{store: store}).Execute(core.ExecutionContext{
+		ID:             uuid.New(),
+		Configuration:  map[string]any{"fleet_id": fleet.ID.String(), "commands": "echo hello"},
+		HTTP:           &contexts.HTTPContext{},
+		ExecutionState: state,
+		Requests:       &contexts.RequestContext{},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, store.tasks, 1)
+	assert.Equal(t, []string{"echo hello"}, store.tasks[0].Spec.Data().Commands)
+	assert.Equal(t, runnermodels.TaskStatusQueued, store.tasks[0].Status)
+	assert.NotEmpty(t, state.KVs["task_id"])
+}
+
+func TestRunnerExecuteSendsEnvironmentInJobSpec(t *testing.T) {
+	fleet := testFleet()
+	store := &mockStore{fleet: fleet}
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+	err := (&Runner{store: store}).Execute(core.ExecutionContext{
 		ID: uuid.New(),
 		Configuration: map[string]any{
 			"fleet_id": fleet.ID.String(),
@@ -193,82 +194,22 @@ func TestRunnerExecuteSendsEnvironmentToFleet(t *testing.T) {
 				},
 			},
 		},
-		HTTP:           httpContext,
+		HTTP:           &contexts.HTTPContext{},
 		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{"api/token": []byte("secret'value;$PATH")}},
-		Webhook:        &contexts.NodeWebhookContext{},
 		ExecutionState: state,
-		Requests:       requests,
-	})
-
-	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
-
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
-
-	var req runners.FleetCreateTaskRequest
-	require.NoError(t, json.Unmarshal(body, &req))
-
-	assert.Equal(t, "fleet-1", req.FleetID)
-	assert.Equal(t, []string{"echo hello"}, req.Commands)
-	assert.Equal(t, "host", req.ExecutionMode)
-	assert.Equal(t, []runners.FleetEnvironmentVariable{
-		{Name: "COMMIT_AUTHOR", Value: "alice@example.com"},
-		{Name: "API_TOKEN", Value: "secret'value;$PATH"},
-	}, req.Environment)
-	assert.Equal(t, "task-123", state.KVs["task_id"])
-	assert.Equal(t, hookActionPoll, requests.Action)
-}
-
-func TestRunnerExecuteBridgeEnqueuesWithoutHTTP(t *testing.T) {
-	fleet := testBridgeFleet()
-	httpContext := &contexts.HTTPContext{}
-	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
-	requests := &contexts.RequestContext{}
-
-	err := testRunner(fleet).Execute(core.ExecutionContext{
-		ID:             uuid.New(),
-		Configuration:  map[string]any{"fleet_id": fleet.ID.String(), "commands": "echo hello"},
-		HTTP:           httpContext,
-		Webhook:        &contexts.NodeWebhookContext{},
-		ExecutionState: state,
-		Requests:       requests,
-	})
-
-	require.NoError(t, err)
-	assert.Empty(t, httpContext.Requests)
-	assert.Empty(t, requests.Action)
-	assert.NotEmpty(t, state.KVs["task_id"])
-}
-
-func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
-	fleet := testFleet()
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-123"}`))},
-		},
-	}
-
-	err := testRunner(fleet).Execute(core.ExecutionContext{
-		ID:             uuid.New(),
-		Configuration:  map[string]any{"fleet_id": fleet.ID.String(), "commands": "echo hello"},
-		HTTP:           httpContext,
-		Webhook:        &contexts.NodeWebhookContext{},
-		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		Requests:       &contexts.RequestContext{},
 	})
 
 	require.NoError(t, err)
-	require.Len(t, httpContext.Requests, 1)
-
-	body, err := io.ReadAll(httpContext.Requests[0].Body)
-	require.NoError(t, err)
-	assert.NotContains(t, string(body), "environment")
+	require.Len(t, store.tasks, 1)
+	assert.Equal(t, []runnermodels.FleetEnvironmentVariable{
+		{Name: "COMMIT_AUTHOR", Value: "alice@example.com"},
+		{Name: "API_TOKEN", Value: "secret'value;$PATH"},
+	}, store.tasks[0].Spec.Data().Environment)
 }
 
 func TestRunnerExecuteFailsWhenSecretCannotBeResolved(t *testing.T) {
 	fleet := testFleet()
-	httpContext := &contexts.HTTPContext{}
 
 	err := testRunner(fleet).Execute(core.ExecutionContext{
 		ID: uuid.New(),
@@ -286,15 +227,13 @@ func TestRunnerExecuteFailsWhenSecretCannotBeResolved(t *testing.T) {
 				},
 			},
 		},
-		HTTP:           httpContext,
+		HTTP:           &contexts.HTTPContext{},
 		Secrets:        &contexts.SecretsContext{Values: map[string][]byte{}},
-		Webhook:        &contexts.NodeWebhookContext{},
 		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
 		Requests:       &contexts.RequestContext{},
 	})
 
 	require.ErrorContains(t, err, "failed to resolve environment variable API_TOKEN")
-	assert.Empty(t, httpContext.Requests)
 }
 
 func secretRef(secret, key string) configuration.SecretKeyRef {
@@ -306,7 +245,7 @@ func TestRunnerProcessTaskStatusIncludesResult(t *testing.T) {
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	exit := 0
-	task := &runners.FleetTask{
+	task := &runnermodels.FleetTask{
 		Status:   "succeeded",
 		ExitCode: &exit,
 		Result:   json.RawMessage(`{"items":[1,2],"ok":true}`),
@@ -328,7 +267,7 @@ func TestRunnerProcessTaskStatusOmitsInvalidResult(t *testing.T) {
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	exit := 0
-	task := &runners.FleetTask{
+	task := &runnermodels.FleetTask{
 		Status:   "succeeded",
 		ExitCode: &exit,
 		Result:   json.RawMessage(`not-json`),
@@ -345,7 +284,7 @@ func TestRunnerProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
 
 	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
 	exit := 130
-	task := &runners.FleetTask{
+	task := &runnermodels.FleetTask{
 		Status:   "canceled",
 		ExitCode: &exit,
 	}
