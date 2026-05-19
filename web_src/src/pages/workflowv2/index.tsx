@@ -73,7 +73,7 @@ import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
+import type { LogEntry } from "@/ui/CanvasLogSidebar";
 import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
@@ -125,14 +125,10 @@ import {
 import {
   buildCanvasStatusLogEntry,
   buildExecutionInfo,
-  buildRunEntryFromEvent,
-  buildRunItemFromExecution,
   buildTabData,
   generateNodeId,
   generateUniqueNodeName,
   mapCanvasNodesToLogEntries,
-  mergeWorkflowLogEntries,
-  mapWorkflowEventsToRunLogEntries,
   getWorkflowSaveSignature,
   summarizeWorkflowChanges,
 } from "./utils";
@@ -591,7 +587,6 @@ export function WorkflowPageV2() {
   // payload tab also opens without a follow-up fetch.
   const selectedRunExecutionsQuery = useEventExecutions(canvasId!, selectedRun?.rootEvent?.id ?? null);
   const selectedRunFullExecutions = selectedRunExecutionsQuery.data?.executions;
-  const canvasEventsResponse = infiniteEventsQuery.data?.pages?.[0];
   const componentIconMap = useMemo(() => {
     const map: Record<string, string> = {};
     for (const c of components) {
@@ -2076,9 +2071,7 @@ export function WorkflowPageV2() {
       triggerEvent?: SidebarEvent | null;
     };
   } | null>(null);
-  const [liveRunEntries, setLiveRunEntries] = useState<LogEntry[]>([]);
   const [liveCanvasEntries, setLiveCanvasEntries] = useState<LogEntry[]>([]);
-  const [resolvedExecutionIds, setResolvedExecutionIds] = useState<Set<string>>(new Set());
   const handleExecutionChainHandled = useCallback(() => setFocusRequest(null), []);
 
   const handleSidebarChange = useCallback(
@@ -2147,83 +2140,6 @@ export function WorkflowPageV2() {
       }
     },
     [canvas, availableIntegrations, organizationId],
-  );
-
-  const handleLogView = useCallback(() => {
-    analytics.canvasLogView(organizationId ?? "");
-  }, [organizationId]);
-
-  const buildLiveRunItemFromExecution = useCallback(
-    (execution: CanvasesCanvasNodeExecution): LogRunItem => {
-      return buildRunItemFromExecution({
-        execution,
-        nodes: canvasNodes,
-        onNodeSelect: handleLogRunNodeSelect,
-        onExecutionSelect: handleLogRunExecutionSelect,
-        event: execution.rootEvent || undefined,
-      });
-    },
-    [handleLogRunExecutionSelect, handleLogRunNodeSelect, canvasNodes],
-  );
-
-  const buildLiveRunEntryFromEvent = useCallback(
-    (event: CanvasesCanvasEvent, runItems: LogRunItem[] = []): LogEntry => {
-      return buildRunEntryFromEvent({
-        event,
-        nodes: canvasNodes,
-        runItems,
-      });
-    },
-    [canvasNodes],
-  );
-
-  const handleWorkflowEventCreated = useCallback(
-    (event: CanvasesCanvasEvent) => {
-      if (!event.id) {
-        return;
-      }
-
-      const node = event.nodeId ? canvasNodesById.get(event.nodeId) : undefined;
-      if (!node || node.type !== "TYPE_TRIGGER") {
-        return;
-      }
-
-      setLiveRunEntries((prev) => {
-        const entry = buildLiveRunEntryFromEvent(event, []);
-        const next = [entry, ...prev.filter((item) => item.id !== entry.id)];
-        return next.sort((a, b) => {
-          const aTime = Date.parse(a.timestamp || "") || 0;
-          const bTime = Date.parse(b.timestamp || "") || 0;
-          return bTime - aTime;
-        });
-      });
-    },
-    [buildLiveRunEntryFromEvent, canvasNodesById],
-  );
-
-  const handleExecutionEvent = useCallback(
-    (execution: CanvasesCanvasNodeExecution) => {
-      if (!execution.rootEvent?.id) {
-        return;
-      }
-
-      setLiveRunEntries((prev) => {
-        const runItem = buildLiveRunItemFromExecution(execution);
-        const existing = prev.find((item) => item.id === execution.rootEvent?.id);
-        const existingRunItems = existing?.runItems || [];
-        const runItemsMap = new Map(existingRunItems.map((item) => [item.id, item]));
-        runItemsMap.set(runItem.id, runItem);
-        const runItems = Array.from(runItemsMap.values());
-        const entry = buildLiveRunEntryFromEvent(execution.rootEvent as CanvasesCanvasEvent, runItems);
-        const next = [entry, ...prev.filter((item) => item.id !== entry.id)];
-        return next.sort((a, b) => {
-          const aTime = Date.parse(a.timestamp || "") || 0;
-          const bTime = Date.parse(b.timestamp || "") || 0;
-          return bTime - aTime;
-        });
-      });
-    },
-    [buildLiveRunEntryFromEvent, buildLiveRunItemFromExecution],
   );
 
   const invalidateCanvasVersionData = useCallback(
@@ -2301,8 +2217,8 @@ export function WorkflowPageV2() {
     canvasId!,
     organizationId!,
     handleNodeWebsocketEvent,
-    handleWorkflowEventCreated,
-    handleExecutionEvent,
+    undefined,
+    undefined,
     handleCanvasLifecycleEvent,
     shouldApplyCanvasUpdate,
     isViewingLiveVersion,
@@ -2329,33 +2245,14 @@ export function WorkflowPageV2() {
       onNodeSelect: handleLogNodeSelect,
     });
 
-    const rootEvents = canvasEventsResponse?.events || [];
-    const runEntries = mapWorkflowEventsToRunLogEntries({
-      events: rootEvents,
-      nodes,
-      onNodeSelect: handleLogRunNodeSelect,
-      onExecutionSelect: handleLogRunExecutionSelect,
+    const allCanvasEntries = isViewingLiveVersion ? [...liveCanvasEntries, ...canvasEntries] : canvasEntries;
+
+    return allCanvasEntries.sort((a, b) => {
+      const aTime = Date.parse(a.timestamp || "") || 0;
+      const bTime = Date.parse(b.timestamp || "") || 0;
+      return aTime - bTime;
     });
-    return mergeWorkflowLogEntries({
-      isViewingLiveVersion,
-      runEntries,
-      liveRunEntries,
-      canvasEntries,
-      liveCanvasEntries,
-      resolvedExecutionIds,
-    });
-  }, [
-    isViewingLiveVersion,
-    handleLogNodeSelect,
-    handleLogRunNodeSelect,
-    handleLogRunExecutionSelect,
-    liveCanvasEntries,
-    liveRunEntries,
-    resolvedExecutionIds,
-    canvas?.metadata?.updatedAt,
-    logNodes,
-    canvasEventsResponse?.events,
-  ]);
+  }, [isViewingLiveVersion, handleLogNodeSelect, liveCanvasEntries, canvas?.metadata?.updatedAt, logNodes]);
 
   const nodeHistoryQuery = useNodeHistory({
     canvasId: canvasId || "",
@@ -5328,11 +5225,6 @@ export function WorkflowPageV2() {
       setIsResolvingErrors(true);
       try {
         await resolveExecutionErrors(canvasId, executionIds);
-        setResolvedExecutionIds((prev) => {
-          const next = new Set(prev);
-          executionIds.forEach((id) => next.add(id));
-          return next;
-        });
         await queryClient.invalidateQueries({ queryKey: [...canvasKeys.events(), canvasId] });
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecutions() });
         showSuccessToast("Errors acknowledged");
@@ -5855,7 +5747,6 @@ export function WorkflowPageV2() {
           getLoadingMoreQueue={getLoadingMoreQueue}
           onReEmit={canUpdateCanvas && isViewingLiveVersion ? handleReEmit : undefined}
           onRunItemOpen={isViewingLiveVersion ? handleRunItemOpen : undefined}
-          onLogView={handleLogView}
           loadExecutionChain={loadExecutionChain}
           getExecutionState={getExecutionState}
           workflowNodes={canvasNodes}
@@ -5863,13 +5754,8 @@ export function WorkflowPageV2() {
           triggers={allTriggers}
           logEntries={logEntries}
           runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
-          runsTotalCount={isViewingLiveVersion ? runsEventsData.totalCount : 0}
-          runsHasNextPage={!!infiniteEventsQuery.hasNextPage}
-          runsIsFetchingNextPage={infiniteEventsQuery.isFetchingNextPage}
-          onRunsLoadMore={() => infiniteEventsQuery.fetchNextPage()}
           runsNodes={canvasNodes}
           runsComponentIconMap={componentIconMap}
-          runsNodeQueueItemsMap={visibleNodeQueueItemsMap}
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
