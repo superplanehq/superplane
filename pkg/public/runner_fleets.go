@@ -15,6 +15,7 @@ import (
 
 type registerFleetRequest struct {
 	Name      string   `json:"name"`
+	Mode      string   `json:"mode"`
 	FleetURL  string   `json:"fleet_url"`
 	AuthToken string   `json:"auth_token"`
 	Labels    []string `json:"labels"`
@@ -23,7 +24,8 @@ type registerFleetRequest struct {
 type fleetResponse struct {
 	ID        string   `json:"id"`
 	Name      string   `json:"name"`
-	FleetURL  string   `json:"fleet_url"`
+	Mode      string   `json:"mode"`
+	FleetURL  string   `json:"fleet_url,omitempty"`
 	Labels    []string `json:"labels"`
 	CreatedAt string   `json:"created_at,omitempty"`
 }
@@ -33,9 +35,14 @@ func fleetToResponse(f runners.RunnerFleet) fleetResponse {
 	if labels == nil {
 		labels = []string{}
 	}
+	mode := f.Mode
+	if mode == "" {
+		mode = runners.FleetModeBridge
+	}
 	r := fleetResponse{
 		ID:       f.ID.String(),
 		Name:     f.Name,
+		Mode:     mode,
 		FleetURL: f.FleetURL,
 		Labels:   labels,
 	}
@@ -57,22 +64,48 @@ func (s *Server) adminRegisterFleet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "name is required", http.StatusBadRequest)
 		return
 	}
-	if strings.TrimSpace(req.FleetURL) == "" {
-		http.Error(w, "fleet_url is required", http.StatusBadRequest)
+	mode := strings.TrimSpace(req.Mode)
+	if mode == "" {
+		mode = runners.FleetModeBridge
+	}
+	if mode != runners.FleetModeBridge && mode != runners.FleetModePush {
+		http.Error(w, "mode must be bridge or push", http.StatusBadRequest)
+		return
+	}
+	if mode == runners.FleetModePush && strings.TrimSpace(req.FleetURL) == "" {
+		http.Error(w, "fleet_url is required for push fleets", http.StatusBadRequest)
 		return
 	}
 
+	authToken := strings.TrimSpace(req.AuthToken)
+	if authToken == "" {
+		authToken = uuid.New().String()
+	}
+
 	store := runners.NewPostgresStore()
-	fleet, err := store.CreateFleet(req.Name, req.FleetURL, req.AuthToken, req.Labels)
+	fleet, err := store.CreateFleet(req.Name, mode, req.FleetURL, authToken, req.Labels)
 	if err != nil {
 		log.Errorf("admin: failed to register runner fleet: %v", err)
 		http.Error(w, "Failed to register fleet", http.StatusInternalServerError)
 		return
 	}
 
+	resp := fleetToResponse(*fleet)
+	if strings.TrimSpace(req.AuthToken) == "" {
+		// Return generated token once at registration time.
+		type fleetCreatedResponse struct {
+			fleetResponse
+			AuthToken string `json:"auth_token"`
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(fleetCreatedResponse{resp, fleet.AuthToken})
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(fleetToResponse(*fleet))
+	json.NewEncoder(w).Encode(resp)
 }
 
 // adminListFleets lists all registered runner fleets.

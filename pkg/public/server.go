@@ -574,6 +574,13 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 		HandleFunc(s.BasePath+"/webhooks/runner/complete/{runnerTaskID}", s.HandleRunnerTaskComplete).
 		Methods("POST")
 
+	publicRoute.
+		HandleFunc(s.BasePath+"/runner-fleets/sync", s.handleRunnerFleetSync).
+		Methods("POST")
+	publicRoute.
+		HandleFunc(s.BasePath+"/runner-fleets/tasks/{taskId}/complete", s.handleRunnerFleetTaskComplete).
+		Methods("POST")
+
 	//
 	// Webhook endpoints for triggers
 	//

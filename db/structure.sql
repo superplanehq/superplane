@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -439,10 +439,11 @@ CREATE TABLE public.role_metadata (
 CREATE TABLE public.runner_fleets (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     name character varying(255) NOT NULL,
-    fleet_url text NOT NULL,
+    fleet_url text,
     auth_token text DEFAULT ''::text NOT NULL,
     labels jsonb DEFAULT '[]'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    mode character varying(32) DEFAULT 'bridge'::character varying NOT NULL
 );
 
 
@@ -455,7 +456,16 @@ CREATE TABLE public.runner_tasks (
     fleet_id uuid NOT NULL,
     fleet_task_id text NOT NULL,
     execution_id uuid NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    status character varying(32) DEFAULT 'queued'::character varying NOT NULL,
+    spec jsonb DEFAULT '{}'::jsonb NOT NULL,
+    exit_code integer,
+    output text DEFAULT ''::text NOT NULL,
+    error text DEFAULT ''::text NOT NULL,
+    result jsonb,
+    task_log jsonb,
+    dispatched_at timestamp with time zone,
+    completed_at timestamp with time zone
 );
 
 
@@ -1696,6 +1706,13 @@ CREATE INDEX runner_tasks_execution_id_idx ON public.runner_tasks USING btree (e
 
 
 --
+-- Name: runner_tasks_fleet_status_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_tasks_fleet_status_created_idx ON public.runner_tasks USING btree (fleet_id, status, created_at);
+
+
+--
 -- Name: runner_tasks_fleet_task_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2209,7 +2226,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2228,7 +2245,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260518120000	f
+20260519120000	f
 \.
 
 
@@ -2245,7 +2262,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;

@@ -61,6 +61,15 @@ func mergeRunnerTaskLog(meta core.MetadataWriter, brokerTaskID string, sink *Tas
 	return mergeExecutionMetadata(meta, patch)
 }
 
+// FinishFleetTask merges task log metadata and emits the terminal runner event.
+func FinishFleetTask(meta core.MetadataWriter, state core.ExecutionStateContext, fleetTask *runners.FleetTask, brokerTaskID string) error {
+	sink := taskLogFromFleetTask(fleetTask)
+	if err := mergeRunnerTaskLog(meta, brokerTaskID, sink); err != nil {
+		return err
+	}
+	return (&Runner{}).processTaskStatus(state, fleetTask)
+}
+
 func taskLogFromFleetTask(t *runners.FleetTask) *TaskLogSink {
 	if t == nil {
 		return nil

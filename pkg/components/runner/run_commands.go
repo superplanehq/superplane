@@ -33,6 +33,7 @@ func init() {
 type fleetStore interface {
 	FindFleet(id uuid.UUID) (*runners.RunnerFleet, error)
 	CreateTask(id uuid.UUID, fleetID uuid.UUID, fleetTaskID string, executionID uuid.UUID) (*runners.RunnerTask, error)
+	EnqueueJob(fleetID, executionID uuid.UUID, spec runners.JobSpec) (*runners.RunnerTask, error)
 }
 
 // Runner implements the runner component.
@@ -297,6 +298,34 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("resolve fleet: %w", err)
 	}
 
+	store := c.effectiveStore()
+
+	if fleet.ID != (uuid.UUID{}) && fleet.UsesBridge() {
+		var timeoutPtr *int
+		if spec.ExecutionTimeoutSeconds > 0 {
+			t := spec.ExecutionTimeoutSeconds
+			timeoutPtr = &t
+		}
+		task, err := store.EnqueueJob(fleet.ID, ctx.ID, runners.JobSpec{
+			Commands:                cmds,
+			Environment:             toFleetEnv(environment),
+			ExecutionMode:           mode,
+			DockerImage:             resolvedDockerImageRef(spec),
+			ExecutionTimeoutSeconds: timeoutPtr,
+		})
+		if err != nil {
+			return fmt.Errorf("enqueue runner job: %w", err)
+		}
+		taskID := task.ID.String()
+		if err := ctx.ExecutionState.SetKV("task_id", taskID); err != nil {
+			return fmt.Errorf("set task_id in kv: %w", err)
+		}
+		if err := mergeRunnerBrokerTaskID(ctx.Metadata, taskID); err != nil {
+			return fmt.Errorf("runner execution metadata: %w", err)
+		}
+		return nil
+	}
+
 	webhookURL, runnerTaskID, err := c.buildTaskWebhookURL(ctx, fleet)
 	if err != nil {
 		return err
@@ -317,9 +346,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 
 	hookParams := map[string]any{"task_id": fleetTaskID}
 
-	// Persist runner task record when using a DB-registered fleet.
 	if fleet.ID != (uuid.UUID{}) {
-		store := c.effectiveStore()
 		if _, err := store.CreateTask(runnerTaskID, fleet.ID, fleetTaskID, ctx.ID); err != nil {
 			return fmt.Errorf("persist runner task: %w", err)
 		}
@@ -440,6 +467,11 @@ func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webho
 	}
 
 	return http.StatusOK, nil, nil
+}
+
+// ProcessFleetTask applies a terminal fleet task outcome to the execution (bridge complete or webhook).
+func (c *Runner) ProcessFleetTask(state core.ExecutionStateContext, task *runners.FleetTask) error {
+	return c.processTaskStatus(state, task)
 }
 
 func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *runners.FleetTask) error {
