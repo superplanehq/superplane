@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import { memo, useMemo, type ComponentProps, type ReactNode } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -49,8 +49,17 @@ interface RichMessageProps {
   organizationId?: string;
 }
 
-export function RichMessage({ content, onAction, onStartBuilding, canvasId, organizationId }: RichMessageProps) {
-  const segments = parseAgentContent(content);
+export const RichMessage = memo(function RichMessage({
+  content,
+  onAction,
+  onStartBuilding,
+  canvasId,
+  organizationId,
+}: RichMessageProps) {
+  // `parseAgentContent` + the downstream ReactMarkdown render are the most
+  // expensive work in the sidebar. Memoize by content so parent re-renders
+  // (canvas pan/zoom, WebSocket status ticks, etc.) don't redo it.
+  const segments = useMemo(() => parseAgentContent(content), [content]);
 
   return (
     <div>
@@ -66,7 +75,7 @@ export function RichMessage({ content, onAction, onStartBuilding, canvasId, orga
       ))}
     </div>
   );
-}
+});
 
 function SegmentRenderer({
   segment,

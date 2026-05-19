@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import type { AgentMessage } from "./types";
 import type { MessageGroup } from "./agentMessageGroups";
 
-export function ConversationTranscript({
+export const ConversationTranscript = memo(function ConversationTranscript({
   error,
   canvasId,
   organizationId,
@@ -53,7 +53,7 @@ export function ConversationTranscript({
       {error ? <p className="px-3 py-2 text-sm text-red-600">{error}</p> : null}
     </div>
   );
-}
+});
 
 function ConversationGroup({
   group,
