@@ -1,10 +1,18 @@
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+type LiveLogRecordEnvelope = {
+  type?: string;
+  text?: string;
+  message?: string;
+  index?: number;
+  status?: "passed" | "failed";
+  duration_ms?: number;
+};
 
-type LiveLogRecord = { type?: string; text?: string; message?: string };
-
-type LiveLogStreamHandlers = {
+export type LiveLogStreamHandlers = {
   onLogLine: (text: string) => void;
   onStreamError: (message: string) => void;
+  onCmdStart?: (index: number, text: string) => void;
+  onCmdEnd?: (index: number, status: "passed" | "failed", durationMs: number) => void;
 };
 
 async function fetchRunnerLiveLogResponse(url: string, organizationId: string, signal: AbortSignal): Promise<Response> {
@@ -34,21 +42,34 @@ function requireBodyReader(res: Response): ReadableStreamDefaultReader<Uint8Arra
   return reader;
 }
 
-function tryParseLiveLogRecord(line: string): LiveLogRecord | null {
+function tryParseLiveLogRecord(line: string): LiveLogRecordEnvelope | null {
   try {
-    return JSON.parse(line) as LiveLogRecord;
+    return JSON.parse(line) as LiveLogRecordEnvelope;
   } catch {
     return null;
   }
 }
 
-function dispatchLiveLogRecord(rec: LiveLogRecord, handlers: LiveLogStreamHandlers): void {
+function dispatchLiveLogRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): void {
   if (rec.type === "line" && typeof rec.text === "string") {
     handlers.onLogLine(rec.text);
     return;
   }
   if (rec.type === "error" && typeof rec.message === "string") {
     handlers.onStreamError(rec.message);
+    return;
+  }
+  if (rec.type === "cmd_start" && typeof rec.index === "number" && typeof rec.text === "string") {
+    handlers.onCmdStart?.(rec.index, rec.text);
+    return;
+  }
+  if (
+    rec.type === "cmd_end" &&
+    typeof rec.index === "number" &&
+    (rec.status === "passed" || rec.status === "failed") &&
+    typeof rec.duration_ms === "number"
+  ) {
+    handlers.onCmdEnd?.(rec.index, rec.status, rec.duration_ms);
   }
 }
 

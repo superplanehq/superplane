@@ -1,6 +1,6 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { GitBranch, Pencil, Plus } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 
 import { Button } from "../button";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
@@ -8,10 +8,6 @@ import type { HeaderProps } from "./Header";
 
 export function SecondaryHeaderActions({
   mode,
-  isVersionControlOpen,
-  onOpenVersionControl,
-  versionControlButtonTooltip,
-  versionControlNotificationCount = 0,
   onSave,
   saveButtonHidden,
   saveDisabled,
@@ -35,7 +31,6 @@ export function SecondaryHeaderActions({
   onDiscardDraftAndStartEdit,
   onDashboardAddPanel,
 }: HeaderProps) {
-  const showVersionControlTrigger = mode === "version-live" && !!onOpenVersionControl;
   const showEditButton = mode === "version-live" && !!onEnterEditMode;
   const showDraftDropdown =
     showEditButton && !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
@@ -43,15 +38,6 @@ export function SecondaryHeaderActions({
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-      {showVersionControlTrigger ? (
-        <VersionControlButton
-          onToggle={onOpenVersionControl}
-          isOpen={!!isVersionControlOpen}
-          tooltip={versionControlButtonTooltip}
-          notificationCount={versionControlNotificationCount}
-        />
-      ) : null}
-
       <LiveModeEditControls
         showEditButton={showEditButton}
         showDraftDropdown={showDraftDropdown}
@@ -269,44 +255,6 @@ function ExitEditButton({
   }
 
   return button;
-}
-
-function VersionControlButton({
-  onToggle,
-  isOpen,
-  tooltip,
-  notificationCount,
-}: {
-  onToggle: () => void;
-  isOpen: boolean;
-  tooltip?: string;
-  notificationCount: number;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="relative inline-flex">
-          <UIButton
-            type="button"
-            variant="outline"
-            size="icon"
-            className={isOpen ? "h-8 w-8 bg-slate-200 border-slate-300" : "h-8 w-8"}
-            onClick={onToggle}
-            aria-label={isOpen ? "Close version control" : "Open version control"}
-            aria-pressed={isOpen}
-          >
-            <GitBranch className="h-4 w-4" />
-          </UIButton>
-          {notificationCount > 0 ? (
-            <span className="absolute left-5 -top-1.5 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
-              {notificationCount > 99 ? "99+" : notificationCount}
-            </span>
-          ) : null}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="top">{tooltip || "Open version control"}</TooltipContent>
-    </Tooltip>
-  );
 }
 
 function SaveButton({

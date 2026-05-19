@@ -4,14 +4,18 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BlockData } from "./Block";
 
-const { captureException, reactFlowPropsRef } = vi.hoisted(() => ({
+const { captureException, fitViewMock, getNodesMock, reactFlowPropsRef } = vi.hoisted(() => ({
   captureException: vi.fn(),
+  fitViewMock: vi.fn(),
+  getNodesMock: vi.fn<() => Array<{ id: string; position: { x: number; y: number } }>>(() => []),
   reactFlowPropsRef: {
     current: null as null | {
       nodes?: unknown;
       onConnectStart?: (...args: unknown[]) => unknown;
       onConnectEnd?: (...args: unknown[]) => unknown;
       onPaneClick?: (...args: unknown[]) => unknown;
+      onEdgeMouseEnter?: (...args: unknown[]) => unknown;
+      onEdgeMouseLeave?: (...args: unknown[]) => unknown;
     },
   },
 }));
@@ -38,7 +42,7 @@ vi.mock("@xyflow/react", () => ({
   ViewportPortal: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   useOnSelectionChange: vi.fn(),
   useReactFlow: vi.fn(() => ({
-    fitView: vi.fn(),
+    fitView: fitViewMock,
     screenToFlowPosition: vi.fn((position) => position),
     getViewport: vi.fn(() => ({ x: 0, y: 0, zoom: 1 })),
     setViewport: vi.fn(),
@@ -46,7 +50,7 @@ vi.mock("@xyflow/react", () => ({
     zoomTo: vi.fn(),
     zoomIn: vi.fn(),
     zoomOut: vi.fn(),
-    getNodes: vi.fn(() => []),
+    getNodes: getNodesMock,
     getZoom: vi.fn(() => 1),
   })),
   useStore: vi.fn((selector: (state: { minZoom: number; maxZoom: number }) => unknown) =>
@@ -60,20 +64,21 @@ vi.mock("../BuildingBlocksSidebar", () => ({
     isOpen ? <aside data-testid="building-blocks-sidebar" /> : null,
 }));
 
-vi.mock("@/components/AgentSidebar", () => ({
-  AgentSidebar: () => null,
+vi.mock("@/components/CanvasToolSidebar", () => ({
+  CanvasToolSidebar: () => null,
 }));
 
-vi.mock("@/components/AgentSidebar/useAgentState", () => ({
-  useAgentState: () => ({
+vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
+  useCanvasToolSidebarState: () => ({
     canvasId: undefined,
     organizationId: undefined,
     isEditing: false,
     readOnly: false,
-    isAgentSidebarOpen: false,
-    showAgentSidebarToggle: false,
-    handleAgentSidebarToggle: vi.fn(),
-    closeSidebar: vi.fn(),
+    isToolSidebarOpen: false,
+    showToolSidebarToggle: false,
+    handleToolSidebarToggle: vi.fn(),
+    openToolSidebar: vi.fn(),
+    closeToolSidebar: vi.fn(),
   }),
 }));
 
@@ -170,6 +175,9 @@ describe("CanvasNodeErrorBoundary", () => {
 describe("CanvasPage connection drop", () => {
   beforeEach(() => {
     reactFlowPropsRef.current = null;
+    fitViewMock.mockClear();
+    getNodesMock.mockReset();
+    getNodesMock.mockReturnValue([]);
     globalThis.ResizeObserver = class {
       observe() {}
       unobserve() {}
@@ -275,5 +283,92 @@ describe("CanvasPage connection drop", () => {
       sourceNodeId: "source-node",
       sourceHandleId: "default",
     });
+  });
+
+  it("does not re-run fit all when only run canvas nodes change", () => {
+    vi.useFakeTimers();
+    const hasFitToViewRef = { current: true };
+    getNodesMock.mockReturnValue([
+      {
+        id: "run-node-1",
+        position: { x: 0, y: 0 },
+      },
+    ]);
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="runs"
+          nodes={[
+            {
+              id: "run-node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Run 1",
+                state: "pending",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          hasFitToViewRef={hasFitToViewRef}
+          fitAllRequest={0}
+          onMemoryOpen={vi.fn()}
+          onYamlOpen={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+
+    getNodesMock.mockReturnValue([
+      {
+        id: "run-node-1",
+        position: { x: 10, y: 20 },
+      },
+    ]);
+
+    rerender(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="runs"
+          nodes={[
+            {
+              id: "run-node-1",
+              position: { x: 10, y: 20 },
+              data: {
+                label: "Run 1",
+                state: "success",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          hasFitToViewRef={hasFitToViewRef}
+          fitAllRequest={0}
+          onMemoryOpen={vi.fn()}
+          onYamlOpen={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      vi.runAllTimers();
+    });
+
+    expect(fitViewMock).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 });

@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -438,5 +439,28 @@ func brokerResultAsAny(raw json.RawMessage) any {
 	return v
 }
 
-func (c *Runner) Cancel(ctx core.ExecutionContext) error { return nil }
-func (c *Runner) Cleanup(ctx core.SetupContext) error    { return nil }
+func (c *Runner) Cancel(ctx core.ExecutionContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	taskID, err := ctx.ExecutionState.GetKV("task_id")
+	if err != nil {
+		if errors.Is(err, core.ErrExecutionKVNotFound) {
+			return nil
+		}
+		return fmt.Errorf("get task_id kv: %w", err)
+	}
+
+	broker, err := NewBrokerClient(ctx.HTTP)
+	if err != nil {
+		return err
+	}
+
+	if err := broker.CancelTask(taskID); err != nil {
+		return fmt.Errorf("cancel task: %w", err)
+	}
+	return nil
+}
+
+func (c *Runner) Cleanup(ctx core.SetupContext) error { return nil }

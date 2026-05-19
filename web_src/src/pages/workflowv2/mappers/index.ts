@@ -35,7 +35,11 @@ import {
   triggerRenderers as gitlabTriggerRenderers,
   eventStateRegistry as gitlabEventStateRegistry,
 } from "./gitlab/index";
-import { triggerRenderers as jiraTriggerRenderers } from "./jira/index";
+import {
+  componentMappers as jiraComponentMappers,
+  triggerRenderers as jiraTriggerRenderers,
+  eventStateRegistry as jiraEventStateRegistry,
+} from "./jira/index";
 import {
   componentMappers as pagerdutyComponentMappers,
   triggerRenderers as pagerdutyTriggerRenderers,
@@ -292,6 +296,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
   gitlab: gitlabComponentMappers,
+  jira: jiraComponentMappers,
   grafana: grafanaComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
@@ -415,6 +420,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cursor: cursorEventStateRegistry,
   azure: azureEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
+  jira: jiraEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
   honeycomb: honeycombEventStateRegistry,

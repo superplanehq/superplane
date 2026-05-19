@@ -36,6 +36,11 @@ func (b *blockingProvider) SendMessage(context.Context, string, string, agents.S
 	return nil
 }
 
+func (b *blockingProvider) InterruptSession(context.Context, string) error { return nil }
+func (b *blockingProvider) DefineOutcome(_ context.Context, _ string, _ agents.DefineOutcomeOptions) error {
+	return nil
+}
+
 func (b *blockingProvider) StreamEvents(context.Context, string, func(agents.ProviderEvent) error) error {
 	return nil
 }
@@ -47,8 +52,10 @@ type fakeProvider struct {
 	createCalled     int
 	sendCalled       int
 	lastPreamble     string
+	lastOutcomeOpts  agents.DefineOutcomeOptions
 	createSessionErr error
 	sendErr          error
+	defineOutcomeErr error
 }
 
 func (f *fakeProvider) Name() string { return testProviderName }
@@ -69,6 +76,20 @@ func (f *fakeProvider) SendMessage(_ context.Context, _ string, _ string, opts a
 	f.sendCalled++
 	f.lastPreamble = opts.ContextPreamble
 	return f.sendErr
+}
+
+func (f *fakeProvider) InterruptSession(_ context.Context, _ string) error {
+	return nil
+}
+
+func (f *fakeProvider) DefineOutcome(_ context.Context, _ string, opts agents.DefineOutcomeOptions) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.defineOutcomeErr != nil {
+		return f.defineOutcomeErr
+	}
+	f.lastOutcomeOpts = opts
+	return nil
 }
 
 func (f *fakeProvider) StreamEvents(_ context.Context, _ string, _ func(agents.ProviderEvent) error) error {
@@ -278,6 +299,33 @@ func TestService_SendMessage_FirstTurnPreambleSurvivesProviderFailure(t *testing
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastPreamble, "api_token:",
 		"preamble must still be injected after the previous attempt failed at the provider")
+}
+
+func TestService_DefineOutcome_RefreshesPreambleForBuildLoop(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	err = svc.DefineOutcome(
+		context.Background(),
+		r.Organization.ID,
+		r.User,
+		session.ID,
+		"Build the requested workflow",
+		"- Draft version created",
+		3,
+	)
+	require.NoError(t, err)
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "[Agent Mode: BUILD]")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "ALWAYS use \"superplane canvases update --draft\"")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "api_token:")
 }
 
 func TestService_SendMessage_PrivateToUser(t *testing.T) {

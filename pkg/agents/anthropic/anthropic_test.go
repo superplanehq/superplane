@@ -134,6 +134,32 @@ func TestSendMessage_RequiresSessionID(t *testing.T) {
 	require.Error(t, p.SendMessage(context.Background(), "", "hi", agents.SendMessageOptions{}))
 }
 
+func TestDefineOutcome_PrependsPreambleToDescription(t *testing.T) {
+	var capturedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/sessions/sesn_abc/events", r.URL.Path)
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &capturedBody)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.DefineOutcome(context.Background(), "sesn_abc", agents.DefineOutcomeOptions{
+		Description:     "Build the workflow",
+		Rubric:          "- Done",
+		MaxIterations:   3,
+		ContextPreamble: "[ctx]",
+	})
+	require.NoError(t, err)
+
+	events := capturedBody["events"].([]any)
+	require.Len(t, events, 1)
+	event := events[0].(map[string]any)
+	assert.Equal(t, "[ctx]\n\nBuild the workflow", event["description"])
+}
+
 func TestDeleteSession_SendsCorrectRequest(t *testing.T) {
 	var capturedHeaders http.Header
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

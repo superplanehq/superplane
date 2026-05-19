@@ -112,7 +112,15 @@ func (j *Jira) Configuration() []configuration.Field {
 }
 
 func (j *Jira) Actions() []core.Action {
-	return []core.Action{}
+	return []core.Action{
+		&CreateIssue{},
+		&GetIssue{},
+		&UpdateIssue{},
+		&DeleteIssue{},
+		&CreateIncident{},
+		&GetIncident{},
+		&DeleteIncident{},
+	}
 }
 
 func (j *Jira) Triggers() []core.Trigger {
