@@ -27,7 +27,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
-	"github.com/superplanehq/superplane/pkg/mcp"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gorilla/mux/otelmux"
@@ -370,10 +369,6 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/agents").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/workflows").Handler(protectedGRPCHandler)
 
-	// MCP endpoint - no middleware, auth is handled inside the handler via JWT
-	mcpStaticToken := os.Getenv("MCP_STATIC_TOKEN")
-	mcpHandler := mcp.NewHandler(s.jwt, s.registry, mcpStaticToken)
-	s.Router.Handle("/mcp", mcpHandler).Methods("POST")
 
 	return nil
 }

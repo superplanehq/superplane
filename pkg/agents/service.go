@@ -57,20 +57,18 @@ var ErrSessionForbidden = errors.New("agent session is owned by another user")
 type Service struct {
 	provider     Provider
 	auth         authorization.Authorization
-	jwtSigner    *jwt.Signer
-	baseURL      string
-	vaultManager *VaultManager
-	clock        func() time.Time
+	jwtSigner *jwt.Signer
+	baseURL   string
+	clock     func() time.Time
 }
 
-func NewService(provider Provider, auth authorization.Authorization, jwtSigner *jwt.Signer, baseURL string, vaultManager *VaultManager) *Service {
+func NewService(provider Provider, auth authorization.Authorization, jwtSigner *jwt.Signer, baseURL string) *Service {
 	return &Service{
-		provider:     provider,
-		auth:         auth,
-		jwtSigner:    jwtSigner,
-		baseURL:      baseURL,
-		vaultManager: vaultManager,
-		clock:        time.Now,
+		provider:  provider,
+		auth:      auth,
+		jwtSigner: jwtSigner,
+		baseURL:   baseURL,
+		clock:     time.Now,
 	}
 }
 
@@ -96,23 +94,7 @@ func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, can
 func (s *Service) provisionSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
 	var session *models.AgentSession
 
-	// Prepare vault and JWT before transaction
-	var vaultID string
 	var err error
-	if s.vaultManager != nil {
-		// Mint a JWT scoped to this user for MCP authentication
-		token, _, err := s.mintAgentToken(organizationID.String(), userID.String(), canvasID.String())
-		if err != nil {
-			log.WithError(err).Warn("failed to mint agent token for vault, proceeding without vault")
-		} else {
-			// Ensure user has a vault with the JWT credential
-			vaultID, err = s.vaultManager.EnsureVaultForUser(ctx, organizationID, userID, token)
-			if err != nil {
-				log.WithError(err).Warn("failed to provision vault for user, proceeding without vault")
-			}
-		}
-	}
-
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
 		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", ensureSessionLockKey(organizationID, userID, canvasID)).Error; err != nil {
 			return err
@@ -129,9 +111,6 @@ func (s *Service) provisionSession(ctx context.Context, organizationID, userID, 
 
 		title := sessionTitle(organizationID, canvasID)
 		opts := CreateSessionOptions{Title: title}
-		if vaultID != "" {
-			opts.VaultIDs = []string{vaultID}
-		}
 
 		upstream, err := s.provider.CreateSession(ctx, opts)
 		if err != nil {

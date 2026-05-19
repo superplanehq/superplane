@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
 )
 
 func RabbitMQURL() (string, error) {
@@ -27,25 +26,15 @@ type AnthropicAgentConfig struct {
 	APIKey        string
 	AgentID       string
 	EnvironmentID string
-	VaultIDs      []string
 }
 
 // LoadAnthropicAgentConfig reads the env vars for the Anthropic managed-agents
 // integration. If any required value is missing, Enabled() returns false.
 func LoadAnthropicAgentConfig() AnthropicAgentConfig {
-	vaultIDs := []string{}
-	if v := os.Getenv("ANTHROPIC_VAULT_IDS"); v != "" {
-		for _, id := range strings.Split(v, ",") {
-			if trimmed := strings.TrimSpace(id); trimmed != "" {
-				vaultIDs = append(vaultIDs, trimmed)
-			}
-		}
-	}
 	return AnthropicAgentConfig{
 		APIKey:        os.Getenv("ANTHROPIC_API_KEY"),
 		AgentID:       os.Getenv("ANTHROPIC_AGENT_ID"),
 		EnvironmentID: os.Getenv("ANTHROPIC_ENVIRONMENT_ID"),
-		VaultIDs:      vaultIDs,
 	}
 }
 

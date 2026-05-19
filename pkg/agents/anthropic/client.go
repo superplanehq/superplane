@@ -23,7 +23,6 @@ type Config struct {
 	APIKey        string
 	AgentID       string
 	EnvironmentID string
-	VaultIDs      []string
 	Resources     []agents.FileResource
 	BaseURL       string // overridable for tests
 	HTTPClient    *http.Client

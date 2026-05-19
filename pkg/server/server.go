@@ -117,7 +117,6 @@ func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.S
 		APIKey:        cfg.APIKey,
 		AgentID:       cfg.AgentID,
 		EnvironmentID: cfg.EnvironmentID,
-		VaultIDs:      cfg.VaultIDs,
 		Resources:     fileResources,
 	})
 	if err != nil {
@@ -126,13 +125,7 @@ func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.S
 	}
 
 	// Create vault manager for per-user MCP authentication
-	mcpServerURL := os.Getenv("MCP_SERVER_URL")
-	if mcpServerURL == "" {
-		mcpServerURL = baseURL + "/mcp"
-	}
-	vaultManager := agents.NewVaultManager(cfg.APIKey, "", mcpServerURL)
-
-	service := agents.NewService(provider, authService, jwtSigner, baseURL, vaultManager)
+	service := agents.NewService(provider, authService, jwtSigner, baseURL)
 	log.Info("Anthropic managed agents enabled")
 	return provider, service
 }

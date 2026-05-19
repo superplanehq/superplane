@@ -21,7 +21,6 @@ const ProviderName = "anthropic"
 type Provider struct {
 	agentID       string
 	environmentID string
-	vaultIDs      []string
 	resources     []agents.FileResource
 	client        *Client
 }
@@ -40,7 +39,6 @@ func New(cfg Config) (*Provider, error) {
 	return &Provider{
 		agentID:       cfg.AgentID,
 		environmentID: cfg.EnvironmentID,
-		vaultIDs:      cfg.VaultIDs,
 		resources:     cfg.Resources,
 		client:        client,
 	}, nil
@@ -56,13 +54,8 @@ func (p *Provider) CreateSession(ctx context.Context, opts agents.CreateSessionO
 	if opts.Title != "" {
 		body["title"] = opts.Title
 	}
-	// Merge vault IDs from provider config and per-session options
-	vaultIDs := p.vaultIDs
 	if len(opts.VaultIDs) > 0 {
-		vaultIDs = append(vaultIDs, opts.VaultIDs...)
-	}
-	if len(vaultIDs) > 0 {
-		body["vault_ids"] = vaultIDs
+		body["vault_ids"] = opts.VaultIDs
 	}
 	// Mount reference files
 	resources := opts.Resources
