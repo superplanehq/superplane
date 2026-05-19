@@ -35,8 +35,9 @@ func TestSendAgentChatMessage_ProjectsSuccess(t *testing.T) {
 	persistedID := uuid.New()
 
 	svc := &stubService{
-		sendMessage: func(_ context.Context, _, _, sid uuid.UUID, content string) (*models.AgentSessionMessage, error) {
+		sendMessage: func(_ context.Context, _, _, sid uuid.UUID, content string, mode string) (*models.AgentSessionMessage, error) {
 			assert.Equal(t, chatID, sid)
+			assert.Equal(t, "operator", mode)
 			return &models.AgentSessionMessage{
 				ID:        persistedID,
 				Role:      models.AgentMessageRoleUser,
@@ -58,7 +59,7 @@ func TestSendAgentChatMessage_TranslatesNotFound(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	svc := &stubService{
-		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string) (*models.AgentSessionMessage, error) {
+		sendMessage: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID, string, string) (*models.AgentSessionMessage, error) {
 			return nil, gorm.ErrRecordNotFound
 		},
 	}
@@ -68,4 +69,28 @@ func TestSendAgentChatMessage_TranslatesNotFound(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Equal(t, codes.NotFound, status.Code(err))
+}
+
+func TestSendAgentChatMessage_MapsBuilderMode(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	svc := &stubService{
+		sendMessage: func(_ context.Context, _, _, _ uuid.UUID, _ string, mode string) (*models.AgentSessionMessage, error) {
+			assert.Equal(t, "builder", mode)
+			return &models.AgentSessionMessage{
+				ID:        uuid.New(),
+				Role:      models.AgentMessageRoleUser,
+				Content:   "build it",
+				CreatedAt: now(),
+			}, nil
+		},
+	}
+
+	_, err := actionsagents.SendAgentChatMessage(context.Background(), svc, r.Organization.ID.String(), r.User.String(), &pb.SendAgentChatMessageRequest{
+		ChatId:  uuid.NewString(),
+		Content: "build it",
+		Mode:    pb.AgentMode_MODE_BUILDER,
+	})
+	require.NoError(t, err)
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	agentservice "github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
@@ -18,7 +19,20 @@ type AgentsService interface {
 	EnsureSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error)
 	GetSession(organizationID, userID, sessionID uuid.UUID) (*models.AgentSession, error)
 	ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]models.AgentSessionMessage, error)
-	SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string) (*models.AgentSessionMessage, error)
+	SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error)
+	InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error
+	DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error
+}
+
+func agentModeFromProto(mode pb.AgentMode) string {
+	switch mode {
+	case pb.AgentMode_MODE_BUILDER:
+		return string(agentservice.ModeBuilder)
+	case pb.AgentMode_MODE_ARCHITECT:
+		return string(agentservice.ModeArchitect)
+	default:
+		return string(agentservice.ModeOperator)
+	}
 }
 
 func parseOrgUser(orgID, userID string) (org, user uuid.UUID, err error) {

@@ -31,6 +31,15 @@ export type AgentSessionWebsocketEvent =
       event: "stream_started" | "turn_completed" | "session_failed";
       status?: string;
       error?: string;
+    }
+  | {
+      sessionId: string;
+      event: "outcome_evaluation_start" | "outcome_evaluation_end";
+      extra?: {
+        iteration?: number;
+        result?: string;
+        explanation?: string;
+      };
     };
 
 export function fromApiChat(input: AgentsAgentChatInfo | undefined): AgentChat | null {

@@ -4,7 +4,7 @@ import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { countNodesByType, extractIntegrations, getTemplateTags } from "@/pages/canvas/templateMetadata";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
-import { useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
 import debounce from "lodash.debounce";
 import { ArrowLeft, Loader2 } from "lucide-react";
@@ -23,10 +23,7 @@ import type {
   SuperplaneComponentsEdge as ComponentsEdge,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
-  IntegrationsIntegrationDefinition,
   OrganizationsIntegration,
-  SuperplaneMeUser,
-  TriggersTrigger,
 } from "@/api-client";
 import { canvasesApplyCanvasVersionChangeset, canvasesReemitTriggerEvent, canvasesUpdateNodePause } from "@/api-client";
 import { useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
@@ -68,7 +65,7 @@ import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { analytics } from "@/lib/analytics";
-import { getColorClass } from "@/lib/colors";
+// getColorClass moved to workflowPageHelpers
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
@@ -76,13 +73,14 @@ import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
-import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
+import type { LogEntry } from "@/ui/CanvasLogSidebar";
 import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
+import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import { DashboardOverlay } from "./dashboard/DashboardOverlay";
@@ -94,9 +92,7 @@ import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "
 import { CanvasYamlModal } from "./CanvasYamlModal";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
-import { prepareAnnotationNode } from "./lib/canvas-annotation-node";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
-import { prepareComponentNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
 import {
   isDraftVersion,
   isPublishedVersion,
@@ -114,7 +110,7 @@ import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-fie
 import { getVersionActionAvailability } from "./lib/version-action-state";
 import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
-import type { TriggerActionModal, User } from "./mappers/types";
+import type { TriggerActionModal } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasYaml } from "./useCanvasYaml";
 import { useExecutionChainData } from "./useExecutionChainData";
@@ -129,46 +125,30 @@ import {
 import {
   buildCanvasStatusLogEntry,
   buildExecutionInfo,
-  buildRunEntryFromEvent,
-  buildRunItemFromExecution,
   buildTabData,
-  buildUserInfo,
   generateNodeId,
   generateUniqueNodeName,
   mapCanvasNodesToLogEntries,
-  mapExecutionsToSidebarEvents,
-  mergeWorkflowLogEntries,
-  mapQueueItemsToSidebarEvents,
-  mapTriggerEventsToSidebarEvents,
-  mapWorkflowEventsToRunLogEntries,
   getWorkflowSaveSignature,
   summarizeWorkflowChanges,
 } from "./utils";
 import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabilities";
-
+import {
+  getCanvasLogNodesSignature,
+  getNodeAnalyticsProps,
+  hydrateRunExecution,
+  prepareData,
+  prepareSidebarData,
+} from "./workflowPageHelpers";
 /** Experimental feature id; must match `FeatureDashboards` in pkg/features/features.go. */
 const EXPERIMENTAL_FEATURE_DASHBOARDS = "dashboards";
-
-function getNodeAnalyticsProps(
-  node: ComponentsNode,
-  availableIntegrations: IntegrationsIntegrationDefinition[],
-): { nodeType: string; integration: string | undefined; nodeRef: string | undefined } {
-  return {
-    nodeType: node.type === "TYPE_TRIGGER" ? "trigger" : node.type === "TYPE_WIDGET" ? "annotation" : "action",
-    integration: getNodeIntegrationName(node, availableIntegrations),
-    nodeRef: node.component,
-  };
-}
-
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
 const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
-
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
-
 type CanvasSaveResult = {
   status: "saved" | "replaced" | "stale";
   workflow: CanvasesCanvas;
@@ -181,35 +161,18 @@ type CanvasSaveResult = {
     };
   };
 };
-
 type QueuedCanvasSaveRequest = {
   workflow: CanvasesCanvas;
   savingVersionId?: string;
   resolve: (result: CanvasSaveResult) => void;
   reject: (error: unknown) => void;
 };
-
 type CanvasEchoRelease = () => void;
-
-function getCanvasLogNodesSignature(nodes: ComponentsNode[]): string {
-  return JSON.stringify(
-    nodes.map((node) => ({
-      id: node.id,
-      name: node.name,
-      type: node.type,
-      component: node.component,
-      errorMessage: node.errorMessage,
-      warningMessage: node.warningMessage,
-    })),
-  );
-}
-
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
     organizationId: string;
     canvasId: string;
   }>();
-
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -276,30 +239,20 @@ export function WorkflowPageV2() {
   );
   const liveCanvasVersion = useMemo(() => {
     const publishedVersions = paginatedVersions.filter(isPublishedVersion);
-    if (publishedVersions.length > 0) {
-      return publishedVersions[0];
-    }
-
+    if (publishedVersions.length > 0) return publishedVersions[0];
     return canvasVersions.filter(isPublishedVersion)[0];
   }, [paginatedVersions, canvasVersions]);
   const visibleCanvasVersions = useMemo(() => {
     const versionMap = new Map<string, CanvasesCanvasVersion>();
     const addVersion = (version: CanvasesCanvasVersion) => {
       const versionID = version.metadata?.id;
-      if (!versionID || versionMap.has(versionID)) {
-        return;
-      }
+      if (!versionID || versionMap.has(versionID)) return;
       versionMap.set(versionID, version);
     };
-
     canvasVersions.forEach(addVersion);
     paginatedVersions.forEach(addVersion);
-
     return Array.from(versionMap.values()).filter((version) => {
-      if (isPublishedVersion(version)) {
-        return true;
-      }
-
+      if (isPublishedVersion(version)) return true;
       return version.metadata?.owner?.id === currentUserId;
     });
   }, [canvasVersions, paginatedVersions, currentUserId]);
@@ -308,7 +261,6 @@ export function WorkflowPageV2() {
     const publishedChangeRequests = canvasChangeRequests.filter(
       (changeRequest) => changeRequest.metadata?.status === "STATUS_PUBLISHED",
     );
-
     const pickNewestChangeRequest = (items: CanvasesCanvasChangeRequest[]): CanvasesCanvasChangeRequest | undefined => {
       return items
         .slice()
@@ -318,41 +270,28 @@ export function WorkflowPageV2() {
             versionSortValue(left.metadata?.publishedAt || left.metadata?.updatedAt || left.metadata?.createdAt),
         )[0];
     };
-
     const indexedByVersionID = new Map<string, CanvasesCanvasChangeRequest[]>();
     const pushIndexed = (versionID: string | undefined, changeRequest: CanvasesCanvasChangeRequest) => {
-      if (!versionID) {
-        return;
-      }
-
+      if (!versionID) return;
       const current = indexedByVersionID.get(versionID) || [];
       current.push(changeRequest);
       indexedByVersionID.set(versionID, current);
     };
-
     publishedChangeRequests.forEach((changeRequest) => {
       pushIndexed(changeRequest.metadata?.versionId, changeRequest);
       pushIndexed(changeRequest.version?.metadata?.id, changeRequest);
     });
-
     const result = new Map<string, CanvasesCanvasChangeRequest>();
     liveVersions.forEach((version) => {
       const versionID = version.metadata?.id;
-      if (!versionID) {
-        return;
-      }
-
+      if (!versionID) return;
       const directMatch = pickNewestChangeRequest(indexedByVersionID.get(versionID) || []);
       if (directMatch) {
         result.set(versionID, directMatch);
         return;
       }
-
       const versionPublishedAt = versionSortValue(version.metadata?.publishedAt);
-      if (!versionPublishedAt) {
-        return;
-      }
-
+      if (!versionPublishedAt) return;
       const timestampFallback = publishedChangeRequests
         .map((changeRequest) => {
           const requestPublishedAt = versionSortValue(changeRequest.metadata?.publishedAt);
@@ -375,17 +314,13 @@ export function WorkflowPageV2() {
         result.set(versionID, timestampFallback.changeRequest);
       }
     });
-
     return result;
   }, [canvasChangeRequests, liveVersions]);
   const liveVersionOwnerProfilesById = useMemo(() => {
     const profilesByID = new Map<string, { name: string; avatarUrl?: string }>();
     organizationUsers.forEach((user) => {
       const userID = user.metadata?.id;
-      if (!userID) {
-        return;
-      }
-
+      if (!userID) return;
       profilesByID.set(userID, {
         name: user.spec?.displayName || user.metadata?.email || userID,
         avatarUrl: user.status?.accountProviders?.[0]?.avatarUrl || undefined,
@@ -405,9 +340,7 @@ export function WorkflowPageV2() {
     const ids = new Set<string>();
     pendingApprovalVersions.forEach((item) => {
       const id = item.version.metadata?.id;
-      if (!id) {
-        return;
-      }
+      if (!id) return;
       ids.add(id);
     });
     return ids;
@@ -416,16 +349,12 @@ export function WorkflowPageV2() {
     const indexedVersions = new Map<string, CanvasesCanvasVersion>();
     visibleCanvasVersions.forEach((version) => {
       const id = version.metadata?.id;
-      if (!id) {
-        return;
-      }
+      if (!id) return;
       indexedVersions.set(id, version);
     });
     pendingApprovalVersions.forEach((item) => {
       const id = item.version.metadata?.id;
-      if (!id || indexedVersions.has(id)) {
-        return;
-      }
+      if (!id || indexedVersions.has(id)) return;
       indexedVersions.set(id, item.version);
     });
     return indexedVersions;
@@ -452,7 +381,6 @@ export function WorkflowPageV2() {
     ) {
       return selectedCanvasVersion;
     }
-
     return draftVersions[0];
   }, [activeCanvasVersionId, selectedCanvasVersion, draftVersions, pendingApprovalVersionIds]);
   const latestDraftVersion = draftVersions[0];
@@ -482,30 +410,25 @@ export function WorkflowPageV2() {
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
   const [draftCanvasSpec, setDraftCanvasSpec] = useState<CanvasesCanvas["spec"] | null>(null);
   const draftSpecToRender = draftCanvasSpec ?? selectedCanvasVersion?.spec ?? null;
-
   useEffect(() => {
     if (!isViewingDraftVersion || !activeCanvasVersionId) {
       return;
     }
-
     const preservedDraftSpec = draftCanvasSpecsRef.current.get(activeCanvasVersionId);
     if (preservedDraftSpec) {
       setDraftCanvasSpec(preservedDraftSpec);
       return;
     }
-
     const nextDraftSpec = selectedCanvasVersion?.spec ?? null;
     if (nextDraftSpec) {
       draftCanvasSpecsRef.current.set(activeCanvasVersionId, nextDraftSpec);
     }
     setDraftCanvasSpec(nextDraftSpec);
   }, [isViewingDraftVersion, activeCanvasVersionId, selectedCanvasVersion?.metadata?.id, selectedCanvasVersion?.spec]);
-
   useEffect(() => {
     if (!isViewingDraftVersion || !activeCanvasVersionId || !liveCanvas?.spec) {
       return;
     }
-
     if (!draftCanvasSpec && !selectedCanvasVersion?.spec) {
       return;
     }
@@ -616,7 +539,6 @@ export function WorkflowPageV2() {
   // payload tab also opens without a follow-up fetch.
   const selectedRunExecutionsQuery = useEventExecutions(canvasId!, selectedRun?.rootEvent?.id ?? null);
   const selectedRunFullExecutions = selectedRunExecutionsQuery.data?.executions;
-  const canvasEventsResponse = infiniteEventsQuery.data?.pages?.[0];
   const componentIconMap = useMemo(() => {
     const map: Record<string, string> = {};
     for (const c of components) {
@@ -2101,9 +2023,7 @@ export function WorkflowPageV2() {
       triggerEvent?: SidebarEvent | null;
     };
   } | null>(null);
-  const [liveRunEntries, setLiveRunEntries] = useState<LogEntry[]>([]);
   const [liveCanvasEntries, setLiveCanvasEntries] = useState<LogEntry[]>([]);
-  const [resolvedExecutionIds, setResolvedExecutionIds] = useState<Set<string>>(new Set());
   const handleExecutionChainHandled = useCallback(() => setFocusRequest(null), []);
 
   const handleSidebarChange = useCallback(
@@ -2174,83 +2094,6 @@ export function WorkflowPageV2() {
     [canvas, availableIntegrations, organizationId],
   );
 
-  const handleLogView = useCallback(() => {
-    analytics.canvasLogView(organizationId ?? "");
-  }, [organizationId]);
-
-  const buildLiveRunItemFromExecution = useCallback(
-    (execution: CanvasesCanvasNodeExecution): LogRunItem => {
-      return buildRunItemFromExecution({
-        execution,
-        nodes: canvasNodes,
-        onNodeSelect: handleLogRunNodeSelect,
-        onExecutionSelect: handleLogRunExecutionSelect,
-        event: execution.rootEvent || undefined,
-      });
-    },
-    [handleLogRunExecutionSelect, handleLogRunNodeSelect, canvasNodes],
-  );
-
-  const buildLiveRunEntryFromEvent = useCallback(
-    (event: CanvasesCanvasEvent, runItems: LogRunItem[] = []): LogEntry => {
-      return buildRunEntryFromEvent({
-        event,
-        nodes: canvasNodes,
-        runItems,
-      });
-    },
-    [canvasNodes],
-  );
-
-  const handleWorkflowEventCreated = useCallback(
-    (event: CanvasesCanvasEvent) => {
-      if (!event.id) {
-        return;
-      }
-
-      const node = event.nodeId ? canvasNodesById.get(event.nodeId) : undefined;
-      if (!node || node.type !== "TYPE_TRIGGER") {
-        return;
-      }
-
-      setLiveRunEntries((prev) => {
-        const entry = buildLiveRunEntryFromEvent(event, []);
-        const next = [entry, ...prev.filter((item) => item.id !== entry.id)];
-        return next.sort((a, b) => {
-          const aTime = Date.parse(a.timestamp || "") || 0;
-          const bTime = Date.parse(b.timestamp || "") || 0;
-          return bTime - aTime;
-        });
-      });
-    },
-    [buildLiveRunEntryFromEvent, canvasNodesById],
-  );
-
-  const handleExecutionEvent = useCallback(
-    (execution: CanvasesCanvasNodeExecution) => {
-      if (!execution.rootEvent?.id) {
-        return;
-      }
-
-      setLiveRunEntries((prev) => {
-        const runItem = buildLiveRunItemFromExecution(execution);
-        const existing = prev.find((item) => item.id === execution.rootEvent?.id);
-        const existingRunItems = existing?.runItems || [];
-        const runItemsMap = new Map(existingRunItems.map((item) => [item.id, item]));
-        runItemsMap.set(runItem.id, runItem);
-        const runItems = Array.from(runItemsMap.values());
-        const entry = buildLiveRunEntryFromEvent(execution.rootEvent as CanvasesCanvasEvent, runItems);
-        const next = [entry, ...prev.filter((item) => item.id !== entry.id)];
-        return next.sort((a, b) => {
-          const aTime = Date.parse(a.timestamp || "") || 0;
-          const bTime = Date.parse(b.timestamp || "") || 0;
-          return bTime - aTime;
-        });
-      });
-    },
-    [buildLiveRunEntryFromEvent, buildLiveRunItemFromExecution],
-  );
-
   const invalidateCanvasVersionData = useCallback(
     (targetCanvasId: string, targetVersionId?: string) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(targetCanvasId) });
@@ -2282,6 +2125,8 @@ export function WorkflowPageV2() {
       }
 
       if (eventName === "canvas_version_updated") {
+        // Notify agent sidebar draft-actions hook
+        window.dispatchEvent(new CustomEvent("canvas:version-updated", { detail: { versionId: payload.versionId } }));
         invalidateCanvasVersionData(canvasId);
         if (activeCanvasVersionId && payload.versionId === activeCanvasVersionId) {
           if (hasPendingLocalCanvasState) {
@@ -2324,8 +2169,8 @@ export function WorkflowPageV2() {
     canvasId!,
     organizationId!,
     handleNodeWebsocketEvent,
-    handleWorkflowEventCreated,
-    handleExecutionEvent,
+    undefined,
+    undefined,
     handleCanvasLifecycleEvent,
     shouldApplyCanvasUpdate,
     isViewingLiveVersion,
@@ -2352,33 +2197,14 @@ export function WorkflowPageV2() {
       onNodeSelect: handleLogNodeSelect,
     });
 
-    const rootEvents = canvasEventsResponse?.events || [];
-    const runEntries = mapWorkflowEventsToRunLogEntries({
-      events: rootEvents,
-      nodes,
-      onNodeSelect: handleLogRunNodeSelect,
-      onExecutionSelect: handleLogRunExecutionSelect,
+    const allCanvasEntries = isViewingLiveVersion ? [...liveCanvasEntries, ...canvasEntries] : canvasEntries;
+
+    return allCanvasEntries.sort((a, b) => {
+      const aTime = Date.parse(a.timestamp || "") || 0;
+      const bTime = Date.parse(b.timestamp || "") || 0;
+      return aTime - bTime;
     });
-    return mergeWorkflowLogEntries({
-      isViewingLiveVersion,
-      runEntries,
-      liveRunEntries,
-      canvasEntries,
-      liveCanvasEntries,
-      resolvedExecutionIds,
-    });
-  }, [
-    isViewingLiveVersion,
-    handleLogNodeSelect,
-    handleLogRunNodeSelect,
-    handleLogRunExecutionSelect,
-    liveCanvasEntries,
-    liveRunEntries,
-    resolvedExecutionIds,
-    canvas?.metadata?.updatedAt,
-    logNodes,
-    canvasEventsResponse?.events,
-  ]);
+  }, [isViewingLiveVersion, handleLogNodeSelect, liveCanvasEntries, canvas?.metadata?.updatedAt, logNodes]);
 
   const nodeHistoryQuery = useNodeHistory({
     canvasId: canvasId || "",
@@ -2991,6 +2817,38 @@ export function WorkflowPageV2() {
   const handleConnectIntegration = useCallback((integrationName: string) => {
     setIntegrationDialogName(integrationName);
   }, []);
+
+  // Listen for agent sidebar integration button clicks
+  const [agentConfigureIntegrationId, setAgentConfigureIntegrationId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { integrationName, instanceId } = (e as CustomEvent).detail;
+      if (instanceId) {
+        // Existing instance — open configure modal
+        setAgentConfigureIntegrationId(instanceId);
+      } else if (integrationName) {
+        // No instance — open create dialog
+        setIntegrationDialogName(integrationName);
+      }
+    };
+    window.addEventListener("agent:open-integration", handler);
+    return () => window.removeEventListener("agent:open-integration", handler);
+  }, []);
+
+  // Listen for "See in Editor" from draft-actions widget
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { versionId } = (e as CustomEvent).detail;
+      if (!versionId) return;
+      const version = selectableVersionsById.get(versionId);
+      if (version) {
+        setActiveCanvasVersion(version);
+      }
+    };
+    window.addEventListener("agent:view-version", handler);
+    return () => window.removeEventListener("agent:view-version", handler);
+  }, [selectableVersionsById]);
 
   const handleIntegrationCreated = useCallback(
     async (integrationId: string, instanceName: string) => {
@@ -5333,11 +5191,6 @@ export function WorkflowPageV2() {
       setIsResolvingErrors(true);
       try {
         await resolveExecutionErrors(canvasId, executionIds);
-        setResolvedExecutionIds((prev) => {
-          const next = new Set(prev);
-          executionIds.forEach((id) => next.add(id));
-          return next;
-        });
         await queryClient.invalidateQueries({ queryKey: [...canvasKeys.events(), canvasId] });
         await queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecutions() });
         showSuccessToast("Errors acknowledged");
@@ -5535,6 +5388,19 @@ export function WorkflowPageV2() {
   };
 
   const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
+  const appId = searchParams.get("appId") ?? undefined;
+  const appBanner = appId ? (
+    <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center gap-2">
+      <Link
+        to={`/${organizationId}/apps/${appId}`}
+        className="flex items-center gap-1 text-sm text-blue-700 hover:text-blue-900 transition-colors"
+      >
+        <ArrowLeft size={14} />
+        <span>Back to App</span>
+      </Link>
+    </div>
+  ) : null;
+
   const remoteUpdateBanner =
     remoteCanvasUpdatePending && !hasLocalSaveActivity ? (
       <div className="bg-amber-100 px-4 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -5629,7 +5495,7 @@ export function WorkflowPageV2() {
     isDraftCanvasLoading ? "draft-loading" : "draft-ready",
     isRunsMode ? "runs" : "canvas",
   ].join(":");
-  const headerBanners = [remoteUpdateBanner, templateBanner].filter(Boolean);
+  const headerBanners = [appBanner, remoteUpdateBanner, templateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
   const saveDisabled = !canUpdateCanvas || !hasEditableVersion;
   const saveDisabledTooltip = !canUpdateCanvas
@@ -5847,7 +5713,6 @@ export function WorkflowPageV2() {
           getLoadingMoreQueue={getLoadingMoreQueue}
           onReEmit={canUpdateCanvas && isViewingLiveVersion ? handleReEmit : undefined}
           onRunItemOpen={isViewingLiveVersion ? handleRunItemOpen : undefined}
-          onLogView={handleLogView}
           loadExecutionChain={loadExecutionChain}
           getExecutionState={getExecutionState}
           workflowNodes={canvasNodes}
@@ -5855,13 +5720,8 @@ export function WorkflowPageV2() {
           triggers={allTriggers}
           logEntries={logEntries}
           runsEvents={isViewingLiveVersion ? runsEventsData.events : []}
-          runsTotalCount={isViewingLiveVersion ? runsEventsData.totalCount : 0}
-          runsHasNextPage={!!infiniteEventsQuery.hasNextPage}
-          runsIsFetchingNextPage={infiniteEventsQuery.isFetchingNextPage}
-          onRunsLoadMore={() => infiniteEventsQuery.fetchNextPage()}
           runsNodes={canvasNodes}
           runsComponentIconMap={componentIconMap}
-          runsNodeQueueItemsMap={visibleNodeQueueItemsMap}
           onRunNodeSelect={handleLogRunNodeSelect}
           onRunExecutionSelect={handleLogRunExecutionSelect}
           onAcknowledgeErrors={canUpdateCanvas && isViewingLiveVersion ? handleAcknowledgeErrors : undefined}
@@ -6040,176 +5900,11 @@ export function WorkflowPageV2() {
           integrationDialogPendingInstance?.spec?.configuration as Record<string, unknown> | undefined
         }
       />
+      <ConfigureIntegrationDialog
+        integrationId={agentConfigureIntegrationId}
+        organizationId={organizationId ?? ""}
+        onClose={() => setAgentConfigureIntegrationId(null)}
+      />
     </>
   );
-}
-
-// Merge a run's lightweight execution ref with the matching full execution (preferred from the
-// prefetched event-executions query, falling back to the live store), so mappers receive metadata
-// (approval records) and outputs (wait/timegate "pushed through" detection).
-function hydrateRunExecution(
-  ref: CanvasesCanvasNodeExecution,
-  prefetched: CanvasesCanvasNodeExecution[] | undefined,
-  storeExecutions: CanvasesCanvasNodeExecution[] | undefined,
-  rootEvent: CanvasesCanvasEvent | undefined,
-): CanvasesCanvasNodeExecution {
-  const full = prefetched?.find((e) => e.id === ref.id) ?? storeExecutions?.find((e) => e.id === ref.id);
-  return {
-    ...(full ?? {}),
-    ...ref,
-    ...(full?.metadata && { metadata: full.metadata }),
-    ...(full?.outputs && { outputs: full.outputs }),
-    rootEvent,
-  } as CanvasesCanvasNodeExecution;
-}
-
-function prepareData(
-  workflow: CanvasesCanvas,
-  triggers: TriggersTrigger[],
-  components: SuperplaneActionsAction[],
-  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
-  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
-  workflowId: string,
-  queryClient: QueryClient,
-  user?: SuperplaneMeUser | null,
-  canvasMode: "live" | "edit" = "live",
-  openModal?: (modal: TriggerActionModal) => void,
-): {
-  nodes: CanvasNode[];
-  edges: CanvasEdge[];
-} {
-  const currentUser = buildUserInfo(user);
-  const edges = workflow?.spec?.edges?.map(prepareEdge) || [];
-  const workflowEdges = workflow?.spec?.edges || [];
-  const workflowNodes = workflow?.spec?.nodes || [];
-  const nodes =
-    workflowNodes
-      ?.map((node) => {
-        return prepareNode(
-          workflowNodes,
-          node,
-          triggers,
-          components,
-          nodeEventsMap,
-          nodeExecutionsMap,
-          nodeQueueItemsMap,
-          workflowId,
-          queryClient,
-          currentUser,
-          workflowEdges,
-          canvasMode,
-          openModal,
-        );
-      })
-      .map((node) => ({
-        ...node,
-        dragHandle: ".canvas-node-drag-handle",
-      })) || [];
-
-  return { nodes, edges };
-}
-
-function prepareNode(
-  nodes: ComponentsNode[],
-  node: ComponentsNode,
-  triggers: TriggersTrigger[],
-  components: SuperplaneActionsAction[],
-  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
-  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
-  workflowId: string,
-  queryClient: QueryClient,
-  currentUser?: User,
-  edges?: ComponentsEdge[],
-  canvasMode: "live" | "edit" = "live",
-  openModal?: (modal: TriggerActionModal) => void,
-): CanvasNode {
-  switch (node.type) {
-    case "TYPE_TRIGGER":
-      return prepareTriggerNode(node, triggers, nodeEventsMap, canvasMode, {
-        canvasId: workflowId,
-        openModal,
-      });
-    case "TYPE_WIDGET":
-      return prepareAnnotationNode(node);
-
-    default:
-      return prepareComponentNode({
-        nodes,
-        node,
-        components,
-        nodeExecutionsMap,
-        nodeQueueItemsMap,
-        canvasId: workflowId,
-        queryClient,
-        currentUser,
-        edges,
-        canvasMode,
-      });
-  }
-}
-
-function prepareEdge(edge: ComponentsEdge): CanvasEdge {
-  const id = `${edge.sourceId!}-targets->${edge.targetId!}-using->${edge.channel!}`;
-
-  return {
-    id: id,
-    source: edge.sourceId!,
-    target: edge.targetId!,
-    sourceHandle: edge.channel!,
-  };
-}
-
-function prepareSidebarData(
-  node: ComponentsNode,
-  nodes: ComponentsNode[],
-  components: SuperplaneActionsAction[],
-  triggers: TriggersTrigger[],
-  nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]>,
-  nodeQueueItemsMap: Record<string, CanvasesCanvasNodeQueueItem[]>,
-  nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
-  totalHistoryCount?: number,
-  totalQueueCount?: number,
-): SidebarData {
-  const executions = nodeExecutionsMap[node.id!] || [];
-  const queueItems = nodeQueueItemsMap[node.id!] || [];
-  const events = nodeEventsMap[node.id!] || [];
-
-  // Get metadata based on node type
-  const componentMetadata = node.type === "TYPE_ACTION" ? components.find((c) => c.name === node.component) : undefined;
-  const triggerMetadata = node.type === "TYPE_TRIGGER" ? triggers.find((t) => t.name === node.component) : undefined;
-
-  const nodeTitle = componentMetadata?.label || triggerMetadata?.label || node.name || "Unknown";
-  let iconSlug = "boxes";
-  let color = "indigo";
-
-  if (componentMetadata) {
-    iconSlug = componentMetadata.icon || iconSlug;
-    color = componentMetadata.color || color;
-  } else if (triggerMetadata) {
-    iconSlug = triggerMetadata.icon || iconSlug;
-    color = triggerMetadata.color || color;
-  }
-
-  const latestEvents =
-    node.type === "TYPE_TRIGGER"
-      ? mapTriggerEventsToSidebarEvents(events, node, 5)
-      : mapExecutionsToSidebarEvents(executions, nodes, 5);
-
-  // Convert queue items to sidebar events (next in queue)
-  const nextInQueueEvents = mapQueueItemsToSidebarEvents(queueItems, nodes, 5);
-  const hideQueueEvents = node.type === "TYPE_TRIGGER";
-
-  return {
-    latestEvents,
-    nextInQueueEvents,
-    title: nodeTitle,
-    iconSlug,
-    iconColor: getColorClass(color),
-    totalInHistoryCount: totalHistoryCount ? totalHistoryCount : 0,
-    totalInQueueCount: totalQueueCount ? totalQueueCount : 0,
-    hideQueueEvents,
-    isComposite: false,
-  };
 }

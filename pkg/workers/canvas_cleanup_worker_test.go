@@ -32,6 +32,14 @@ func (p *cleanupProvider) SendMessage(context.Context, string, string, agents.Se
 	return errors.New("not used")
 }
 
+func (p *cleanupProvider) InterruptSession(context.Context, string) error {
+	return errors.New("not used")
+}
+
+func (p *cleanupProvider) DefineOutcome(context.Context, string, agents.DefineOutcomeOptions) error {
+	return errors.New("not used")
+}
+
 func (p *cleanupProvider) StreamEvents(context.Context, string, func(agents.ProviderEvent) error) error {
 	return errors.New("not used")
 }

@@ -38,6 +38,8 @@ vi.mock("@/hooks/useAgentChats", () => ({
     fetchNextPage: vi.fn(async () => undefined),
   }),
   useSendAgentChatMessage: () => sendMutation,
+  useInterruptAgentChat: () => ({ isPending: false, mutate: vi.fn() }),
+  useDefineAgentOutcome: () => ({ mutateAsync: vi.fn() }),
 }));
 
 vi.mock("@/hooks/useAgentSessionWebsocket", () => ({
@@ -62,12 +64,15 @@ function makeToolSidebarState() {
     handleToolSidebarToggle: vi.fn(),
     openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),
+    agentMode: "operator" as const,
+    switchAgentMode: vi.fn(),
   };
 }
 
 describe("CanvasToolSidebar", () => {
   beforeEach(() => {
     richMessageRenderSpy.mockClear();
+    sessionStorage.clear();
   });
 
   it("enters runs mode from the runs tab", () => {
@@ -193,12 +198,14 @@ describe("CanvasToolSidebar", () => {
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
     // Initial message render.
-    expect(await screen.findByTestId("rich-message")).toHaveTextContent("Hello from the agent");
-    expect(richMessageRenderSpy).toHaveBeenCalledTimes(1);
+    const messages = await screen.findAllByTestId("rich-message");
+    expect(messages).toHaveLength(2);
+    expect(messages[1]).toHaveTextContent("Hello from the agent");
+    expect(richMessageRenderSpy).toHaveBeenCalledTimes(2);
 
     // Typing only updates local composer state, so the message list should not re-render.
     await user.type(screen.getByTestId("agent-input"), "typing...");
-    expect(richMessageRenderSpy).toHaveBeenCalledTimes(1);
+    expect(richMessageRenderSpy).toHaveBeenCalledTimes(2);
   });
 
   it("does not wipe newly typed draft while a send is in flight", async () => {
@@ -215,7 +222,7 @@ describe("CanvasToolSidebar", () => {
 
     const input = await screen.findByTestId("agent-input");
     await user.type(input, "first");
-    await user.click(screen.getByRole("button", { name: "Send message" }));
+    await user.click(screen.getByTestId("agent-send-message-button"));
 
     // While the first send is still pending, user can type a new message.
     await user.type(input, "second");
@@ -226,5 +233,24 @@ describe("CanvasToolSidebar", () => {
       resolveSend?.();
     });
     expect(input).toHaveValue("second");
+  });
+
+  it("shows Send and Stop while an outcome is still active after the chat turn ends", () => {
+    sessionStorage.setItem(
+      "outcome-chat-1",
+      JSON.stringify({
+        title: "Build plan",
+        criteria: [],
+        iteration: 1,
+        maxIterations: 3,
+        phase: "building",
+        log: [{ phase: "building" }],
+      }),
+    );
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+
+    expect(screen.getByTestId("agent-stop-button")).toBeInTheDocument();
+    expect(screen.getByTestId("agent-send-message-button")).toBeInTheDocument();
   });
 });

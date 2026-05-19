@@ -64,3 +64,19 @@ func (s *AgentsService) SendAgentChatMessage(ctx context.Context, req *pb.SendAg
 	}
 	return agentsActions.SendAgentChatMessage(ctx, s.service, orgID, userID, req)
 }
+
+func (s *AgentsService) InterruptAgentChat(ctx context.Context, req *pb.InterruptAgentChatRequest) (*pb.InterruptAgentChatResponse, error) {
+	orgID, userID, err := s.requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return agentsActions.InterruptAgentChat(ctx, s.service, orgID, userID, req)
+}
+
+func (s *AgentsService) DefineAgentOutcome(ctx context.Context, req *pb.DefineAgentOutcomeRequest) (*pb.DefineAgentOutcomeResponse, error) {
+	orgID, userID, err := s.requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return agentsActions.DefineAgentOutcome(ctx, s.service, orgID, userID, req)
+}
