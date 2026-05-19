@@ -1,5 +1,4 @@
-import { Loader2, Send } from "lucide-react";
-// import { cn } from "@/lib/utils";
+import { Loader2, Send, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { AgentMode } from "./useAgentState";
@@ -40,34 +39,35 @@ export function ChatComposer({
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
-            if (!sending) onSend();
+            if (draft.trim()) onSend();
           }
         }}
       />
       <div className="flex items-center justify-between">
         <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} streaming={sending} />
-        {sending ? (
-          <Button
-            type="button"
-            variant="destructive"
-            onClick={onStop}
-            disabled={stopping}
-            data-testid="agent-stop-button"
-            className="gap-1"
-          >
-            {stopping ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <div className="size-3 rounded-sm bg-white animate-pulse" />
-            )}
-            {stopping ? "Stopping..." : "Stop"}
-          </Button>
-        ) : (
+        <div className="flex items-center gap-2">
+          {sending && (
+            <Button
+              type="button"
+              variant="destructive"
+              size="icon"
+              onClick={onStop}
+              disabled={stopping}
+              data-testid="agent-stop-button"
+              title={stopping ? "Stopping..." : "Stop"}
+            >
+              {stopping ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Square className="size-3" />
+              )}
+            </Button>
+          )}
           <Button type="button" onClick={onSend} disabled={!draft.trim()} data-testid="agent-send-message-button">
             <Send className="size-4" />
             Send
           </Button>
-        )}
+        </div>
       </div>
     </footer>
   );
