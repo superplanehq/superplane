@@ -124,7 +124,7 @@ const DEFAULT_CHART_RENDER: WidgetChartRender = {
   kind: "chart",
   type: "bar",
   xField: "status",
-  series: [{ field: "count", label: "Count" }],
+  series: [{ label: "Count" }],
 };
 
 const DEFAULT_NUMBER_RENDER: WidgetNumberRender = {

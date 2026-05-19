@@ -186,7 +186,7 @@ function normalizeContent(raw: Record<string, unknown> | undefined): ChartPanelC
       kind: "chart",
       type: "bar",
       xField: "status",
-      series: [{ field: "count", label: "Count" }],
+      series: [{ label: "Count" }],
     },
   };
 }

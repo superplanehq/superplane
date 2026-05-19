@@ -86,7 +86,6 @@
     "react-use-websocket": "^4.0.0",
     "recharts": "^3.8.1",
     "remark-breaks": "^4.0.0",
-    "remark-directive": "^4.0.0",
     "remark-gfm": "^4.0.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",

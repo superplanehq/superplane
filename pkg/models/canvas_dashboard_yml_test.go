@@ -268,3 +268,129 @@ func TestValidateDashboardContent_RejectsInvalidLayout(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "positive")
 }
+
+func TestValidateDashboardContent_AcceptsDraftTablePanel(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "table",
+			Type: DashboardPanelTypeTable,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": ""},
+				"render":     map[string]any{"kind": "table", "columns": []any{}},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		panel    DashboardPanel
+		contains string
+	}{
+		{
+			name: "memory source without namespace",
+			panel: DashboardPanel{
+				ID:   "table",
+				Type: DashboardPanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory"},
+					"render":     map[string]any{"kind": "table", "columns": []any{}},
+				},
+			},
+			contains: "dataSource.namespace must be a string",
+		},
+		{
+			name: "table column without field",
+			panel: DashboardPanel{
+				ID:   "table",
+				Type: DashboardPanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind":    "table",
+						"columns": []any{map[string]any{"label": "Missing field"}},
+					},
+				},
+			},
+			contains: "render.columns[0].field",
+		},
+		{
+			name: "table filter with unsupported op",
+			panel: DashboardPanel{
+				ID:   "table",
+				Type: DashboardPanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind":    "table",
+						"columns": []any{},
+						"where":   []any{map[string]any{"field": "status", "op": "regex"}},
+					},
+				},
+			},
+			contains: "render.where[0].op",
+		},
+		{
+			name: "trigger row action without node",
+			panel: DashboardPanel{
+				ID:   "table",
+				Type: DashboardPanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind":       "table",
+						"columns":    []any{},
+						"rowActions": []any{map[string]any{"kind": "trigger", "label": "Run"}},
+					},
+				},
+			},
+			contains: "render.rowActions[0].node",
+		},
+		{
+			name: "chart with unsupported type",
+			panel: DashboardPanel{
+				ID:   "chart",
+				Type: DashboardPanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "executions"},
+					"render": map[string]any{
+						"kind":   "chart",
+						"type":   "pie",
+						"xField": "status",
+						"series": []any{map[string]any{"label": "Count"}},
+					},
+				},
+			},
+			contains: "render.type",
+		},
+		{
+			name: "data source limit with wrong type",
+			panel: DashboardPanel{
+				ID:   "chart",
+				Type: DashboardPanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "executions", "limit": "many"},
+					"render": map[string]any{
+						"kind":   "chart",
+						"type":   "bar",
+						"xField": "status",
+						"series": []any{map[string]any{"label": "Count"}},
+					},
+				},
+			},
+			contains: "dataSource.limit must be a number",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateDashboardContent([]DashboardPanel{tt.panel}, nil)
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.contains)
+		})
+	}
+}

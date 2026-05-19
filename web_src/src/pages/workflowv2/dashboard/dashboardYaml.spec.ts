@@ -54,7 +54,7 @@ describe("dashboardToYaml / parseDashboardYaml", () => {
         type: "chart",
         content: {
           dataSource: { kind: "executions", limit: 100 },
-          render: { kind: "chart", type: "bar", xField: "status", series: [{ field: "count", label: "Count" }] },
+          render: { kind: "chart", type: "bar", xField: "status", series: [{ label: "Count" }] },
         },
       },
       {

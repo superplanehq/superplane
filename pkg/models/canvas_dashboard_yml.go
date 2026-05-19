@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"slices"
 
 	"gopkg.in/yaml.v3"
 )
@@ -290,12 +292,23 @@ func validateDataSource(panelID string, raw any) error {
 	kind, _ := ds["kind"].(string)
 	switch kind {
 	case "memory":
-		ns, ok := ds["namespace"].(string)
-		if !ok || ns == "" {
-			return fmt.Errorf("panel %q dataSource.namespace must be a non-empty string for memory sources", panelID)
+		if _, ok := ds["namespace"].(string); !ok {
+			return fmt.Errorf("panel %q dataSource.namespace must be a string for memory sources", panelID)
 		}
-	case "executions", "runs":
-		// node (executions only) and limit are optional
+		if err := validateOptionalString(panelID, "dataSource.fieldPath", ds["fieldPath"]); err != nil {
+			return err
+		}
+	case "executions":
+		if err := validateOptionalString(panelID, "dataSource.node", ds["node"]); err != nil {
+			return err
+		}
+		if err := validateOptionalNumber(panelID, "dataSource.limit", ds["limit"]); err != nil {
+			return err
+		}
+	case "runs":
+		if err := validateOptionalNumber(panelID, "dataSource.limit", ds["limit"]); err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("panel %q dataSource.kind must be \"memory\", \"executions\", or \"runs\"", panelID)
 	}
@@ -326,10 +339,23 @@ func validateTablePanelContent(panel DashboardPanel) error {
 		return err
 	}
 	cols, ok := render["columns"].([]any)
-	if !ok || len(cols) == 0 {
-		return fmt.Errorf("panel %q render.columns must be a non-empty array", panel.ID)
+	if !ok {
+		return fmt.Errorf("panel %q render.columns must be an array", panel.ID)
 	}
-	return nil
+	for i, rawColumn := range cols {
+		column, ok := rawColumn.(map[string]any)
+		if !ok || column == nil {
+			return fmt.Errorf("panel %q render.columns[%d] must be an object", panel.ID, i)
+		}
+		field, ok := column["field"].(string)
+		if !ok || field == "" {
+			return fmt.Errorf("panel %q render.columns[%d].field must be a non-empty string", panel.ID, i)
+		}
+	}
+	if err := validateTableWhere(panel.ID, render["where"]); err != nil {
+		return err
+	}
+	return validateTableRowActions(panel.ID, render["rowActions"])
 }
 
 func validateChartPanelContent(panel DashboardPanel) error {
@@ -343,12 +369,108 @@ func validateChartPanelContent(panel DashboardPanel) error {
 	if err != nil {
 		return err
 	}
+	chartType, _ := render["type"].(string)
+	if !slices.Contains([]string{"bar", "stacked-bar", "line", "area", "donut"}, chartType) {
+		return fmt.Errorf("panel %q render.type must be one of bar/stacked-bar/line/area/donut", panel.ID)
+	}
 	if xField, ok := render["xField"].(string); !ok || xField == "" {
 		return fmt.Errorf("panel %q render.xField must be a non-empty string", panel.ID)
 	}
 	if series, ok := render["series"].([]any); !ok || len(series) == 0 {
 		return fmt.Errorf("panel %q render.series must be a non-empty array", panel.ID)
 	}
+	return nil
+}
+
+func validateOptionalString(panelID, field string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+	if _, ok := raw.(string); !ok {
+		return fmt.Errorf("panel %q %s must be a string", panelID, field)
+	}
+	return nil
+}
+
+func validateOptionalNumber(panelID, field string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+
+	var value float64
+	switch v := raw.(type) {
+	case float64:
+		value = v
+	case float32:
+		value = float64(v)
+	case int:
+		value = float64(v)
+	case int32:
+		value = float64(v)
+	case int64:
+		value = float64(v)
+	default:
+		return fmt.Errorf("panel %q %s must be a number", panelID, field)
+	}
+
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return fmt.Errorf("panel %q %s must be a number", panelID, field)
+	}
+
+	return nil
+}
+
+func validateTableWhere(panelID string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+
+	where, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q render.where must be an array", panelID)
+	}
+
+	allowedOps := []string{"eq", "neq", "contains", "not_contains", "gt", "lt", "exists", "not_exists"}
+	for i, rawFilter := range where {
+		filter, ok := rawFilter.(map[string]any)
+		if !ok || filter == nil {
+			return fmt.Errorf("panel %q render.where[%d] must be an object", panelID, i)
+		}
+		field, ok := filter["field"].(string)
+		if !ok || field == "" {
+			return fmt.Errorf("panel %q render.where[%d].field must be a non-empty string", panelID, i)
+		}
+		op, ok := filter["op"].(string)
+		if !ok || !slices.Contains(allowedOps, op) {
+			return fmt.Errorf("panel %q render.where[%d].op is not supported", panelID, i)
+		}
+	}
+
+	return nil
+}
+
+func validateTableRowActions(panelID string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+
+	actions, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q render.rowActions must be an array", panelID)
+	}
+
+	for i, rawAction := range actions {
+		action, ok := rawAction.(map[string]any)
+		if !ok || action == nil || action["kind"] != "trigger" {
+			return fmt.Errorf("panel %q render.rowActions[%d] must be a trigger action", panelID, i)
+		}
+		node, _ := action["node"].(string)
+		target, _ := action["target"].(string)
+		if node == "" && target == "" {
+			return fmt.Errorf("panel %q render.rowActions[%d].node must be set to a trigger node", panelID, i)
+		}
+	}
+
 	return nil
 }
 

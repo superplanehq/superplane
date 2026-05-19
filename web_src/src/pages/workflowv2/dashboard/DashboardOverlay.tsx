@@ -11,7 +11,7 @@ import type {
 
 import { DashboardView } from "./DashboardView";
 import { DashboardYamlModal } from "./DashboardYamlModal";
-import { DashboardContextProvider, type DashboardNodeStatus } from "./DashboardContext";
+import { DashboardContextProvider, type DashboardContextValue, type DashboardNodeStatus } from "./DashboardContext";
 
 export type DashboardOverlayProps = {
   /**
@@ -52,7 +52,7 @@ export type DashboardOverlayProps = {
   /** Latest known node status per node id; powers the status chip. */
   nodeStatuses?: Record<string, DashboardNodeStatus | undefined>;
   /** Callback invoked when a manual-run chip is clicked. */
-  onTriggerNode?: import("./DashboardContext").DashboardContextValue["onTriggerNode"];
+  onTriggerNode?: DashboardContextValue["onTriggerNode"];
 };
 
 export function DashboardOverlay({

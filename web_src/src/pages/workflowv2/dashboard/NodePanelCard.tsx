@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { CircleDot, Play } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/ui/checkbox";
 import type { DashboardPanel } from "@/hooks/useCanvasData";
 
 import { PanelEditorDialog } from "./PanelEditorDialog";
@@ -150,6 +151,7 @@ function triggerNode(
 function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange: (next: NodePanelContent) => void }) {
   const ctx = useDashboardContext();
   const nodes = ctx?.nodes ?? [];
+  const showRunId = useId();
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
@@ -181,15 +183,17 @@ function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange:
           </SelectContent>
         </Select>
       </div>
-      <label className="flex items-center gap-2 text-xs text-slate-700">
-        <input
-          type="checkbox"
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id={showRunId}
           checked={Boolean(value.showRun)}
-          onChange={(e) => onChange({ ...value, showRun: e.target.checked })}
-          className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+          onCheckedChange={(checked) => onChange({ ...value, showRun: checked === true })}
+          className="border-slate-300 data-[state=checked]:border-sky-600 data-[state=checked]:bg-sky-600"
         />
-        Show a manual "Run" button (requires run permission).
-      </label>
+        <Label htmlFor={showRunId} className="text-xs text-slate-700">
+          Show a manual "Run" button (requires run permission).
+        </Label>
+      </div>
       {value.showRun ? (
         <div className="space-y-1.5">
           <Label className="text-xs font-medium text-slate-600">Trigger template (optional)</Label>

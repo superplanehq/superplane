@@ -41,6 +41,11 @@ describe("templateForPanelType", () => {
     expect(tpl.dataSource.kind).toBe("runs");
     expect(tpl.render.aggregation).toBe("count");
   });
+
+  it("defaults chart panels to count rows when no series field is set", () => {
+    const tpl = templateForPanelType("chart") as { render: { series: Array<{ field?: string; label?: string }> } };
+    expect(tpl.render.series).toEqual([{ label: "Count" }]);
+  });
 });
 
 describe("validatePanelContent", () => {
@@ -71,12 +76,53 @@ describe("validatePanelContent", () => {
     ).toBeNull();
   });
 
+  it("allows draft table panels with an empty memory namespace", () => {
+    expect(
+      validatePanelContent("table", {
+        dataSource: { kind: "memory", namespace: "" },
+        render: { kind: "table", columns: [] },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects table columns without a field", () => {
+    const error = validatePanelContent("table", {
+      dataSource: { kind: "memory", namespace: "env" },
+      render: { kind: "table", columns: [{ label: "Missing field" }] },
+    });
+    expect(error).toMatch(/render\.columns\[0\]\.field/);
+  });
+
+  it("rejects unsupported table filter operators", () => {
+    const error = validatePanelContent("table", {
+      dataSource: { kind: "memory", namespace: "env" },
+      render: { kind: "table", columns: [], where: [{ field: "status", op: "regex" }] },
+    });
+    expect(error).toMatch(/render\.where\[0\]\.op is not supported/);
+  });
+
+  it("rejects trigger row actions without a node", () => {
+    const error = validatePanelContent("table", {
+      dataSource: { kind: "memory", namespace: "env" },
+      render: { kind: "table", columns: [], rowActions: [{ kind: "trigger", label: "Run" }] },
+    });
+    expect(error).toMatch(/render\.rowActions\[0\]\.node/);
+  });
+
   it("requires a known chart type", () => {
     const error = validatePanelContent("chart", {
       dataSource: { kind: "executions" },
       render: { kind: "chart", type: "bogus", xField: "x", series: [{}] },
     });
     expect(error).toMatch(/render\.type must be one of/);
+  });
+
+  it("rejects non-numeric data source limits", () => {
+    const error = validatePanelContent("chart", {
+      dataSource: { kind: "executions", limit: "many" },
+      render: { kind: "chart", type: "bar", xField: "x", series: [{}] },
+    });
+    expect(error).toMatch(/dataSource\.limit must be a number/);
   });
 
   it("requires a known aggregation on number panels", () => {
