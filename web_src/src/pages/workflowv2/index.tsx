@@ -140,19 +140,15 @@ import {
   prepareData,
   prepareSidebarData,
 } from "./workflowPageHelpers";
-
 /** Experimental feature id; must match `FeatureDashboards` in pkg/features/features.go. */
 const EXPERIMENTAL_FEATURE_DASHBOARDS = "dashboards";
-
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
 const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
-
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
-
 type CanvasSaveResult = {
   status: "saved" | "replaced" | "stale";
   workflow: CanvasesCanvas;
@@ -165,22 +161,18 @@ type CanvasSaveResult = {
     };
   };
 };
-
 type QueuedCanvasSaveRequest = {
   workflow: CanvasesCanvas;
   savingVersionId?: string;
   resolve: (result: CanvasSaveResult) => void;
   reject: (error: unknown) => void;
 };
-
 type CanvasEchoRelease = () => void;
-
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
     organizationId: string;
     canvasId: string;
   }>();
-
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -247,30 +239,20 @@ export function WorkflowPageV2() {
   );
   const liveCanvasVersion = useMemo(() => {
     const publishedVersions = paginatedVersions.filter(isPublishedVersion);
-    if (publishedVersions.length > 0) {
-      return publishedVersions[0];
-    }
-
+    if (publishedVersions.length > 0) return publishedVersions[0];
     return canvasVersions.filter(isPublishedVersion)[0];
   }, [paginatedVersions, canvasVersions]);
   const visibleCanvasVersions = useMemo(() => {
     const versionMap = new Map<string, CanvasesCanvasVersion>();
     const addVersion = (version: CanvasesCanvasVersion) => {
       const versionID = version.metadata?.id;
-      if (!versionID || versionMap.has(versionID)) {
-        return;
-      }
+      if (!versionID || versionMap.has(versionID)) return;
       versionMap.set(versionID, version);
     };
-
     canvasVersions.forEach(addVersion);
     paginatedVersions.forEach(addVersion);
-
     return Array.from(versionMap.values()).filter((version) => {
-      if (isPublishedVersion(version)) {
-        return true;
-      }
-
+      if (isPublishedVersion(version)) return true;
       return version.metadata?.owner?.id === currentUserId;
     });
   }, [canvasVersions, paginatedVersions, currentUserId]);
@@ -279,7 +261,6 @@ export function WorkflowPageV2() {
     const publishedChangeRequests = canvasChangeRequests.filter(
       (changeRequest) => changeRequest.metadata?.status === "STATUS_PUBLISHED",
     );
-
     const pickNewestChangeRequest = (items: CanvasesCanvasChangeRequest[]): CanvasesCanvasChangeRequest | undefined => {
       return items
         .slice()
@@ -289,41 +270,28 @@ export function WorkflowPageV2() {
             versionSortValue(left.metadata?.publishedAt || left.metadata?.updatedAt || left.metadata?.createdAt),
         )[0];
     };
-
     const indexedByVersionID = new Map<string, CanvasesCanvasChangeRequest[]>();
     const pushIndexed = (versionID: string | undefined, changeRequest: CanvasesCanvasChangeRequest) => {
-      if (!versionID) {
-        return;
-      }
-
+      if (!versionID) return;
       const current = indexedByVersionID.get(versionID) || [];
       current.push(changeRequest);
       indexedByVersionID.set(versionID, current);
     };
-
     publishedChangeRequests.forEach((changeRequest) => {
       pushIndexed(changeRequest.metadata?.versionId, changeRequest);
       pushIndexed(changeRequest.version?.metadata?.id, changeRequest);
     });
-
     const result = new Map<string, CanvasesCanvasChangeRequest>();
     liveVersions.forEach((version) => {
       const versionID = version.metadata?.id;
-      if (!versionID) {
-        return;
-      }
-
+      if (!versionID) return;
       const directMatch = pickNewestChangeRequest(indexedByVersionID.get(versionID) || []);
       if (directMatch) {
         result.set(versionID, directMatch);
         return;
       }
-
       const versionPublishedAt = versionSortValue(version.metadata?.publishedAt);
-      if (!versionPublishedAt) {
-        return;
-      }
-
+      if (!versionPublishedAt) return;
       const timestampFallback = publishedChangeRequests
         .map((changeRequest) => {
           const requestPublishedAt = versionSortValue(changeRequest.metadata?.publishedAt);
@@ -346,17 +314,13 @@ export function WorkflowPageV2() {
         result.set(versionID, timestampFallback.changeRequest);
       }
     });
-
     return result;
   }, [canvasChangeRequests, liveVersions]);
   const liveVersionOwnerProfilesById = useMemo(() => {
     const profilesByID = new Map<string, { name: string; avatarUrl?: string }>();
     organizationUsers.forEach((user) => {
       const userID = user.metadata?.id;
-      if (!userID) {
-        return;
-      }
-
+      if (!userID) return;
       profilesByID.set(userID, {
         name: user.spec?.displayName || user.metadata?.email || userID,
         avatarUrl: user.status?.accountProviders?.[0]?.avatarUrl || undefined,
@@ -376,9 +340,7 @@ export function WorkflowPageV2() {
     const ids = new Set<string>();
     pendingApprovalVersions.forEach((item) => {
       const id = item.version.metadata?.id;
-      if (!id) {
-        return;
-      }
+      if (!id) return;
       ids.add(id);
     });
     return ids;
@@ -387,16 +349,12 @@ export function WorkflowPageV2() {
     const indexedVersions = new Map<string, CanvasesCanvasVersion>();
     visibleCanvasVersions.forEach((version) => {
       const id = version.metadata?.id;
-      if (!id) {
-        return;
-      }
+      if (!id) return;
       indexedVersions.set(id, version);
     });
     pendingApprovalVersions.forEach((item) => {
       const id = item.version.metadata?.id;
-      if (!id || indexedVersions.has(id)) {
-        return;
-      }
+      if (!id || indexedVersions.has(id)) return;
       indexedVersions.set(id, item.version);
     });
     return indexedVersions;
@@ -423,7 +381,6 @@ export function WorkflowPageV2() {
     ) {
       return selectedCanvasVersion;
     }
-
     return draftVersions[0];
   }, [activeCanvasVersionId, selectedCanvasVersion, draftVersions, pendingApprovalVersionIds]);
   const latestDraftVersion = draftVersions[0];
@@ -453,30 +410,25 @@ export function WorkflowPageV2() {
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
   const [draftCanvasSpec, setDraftCanvasSpec] = useState<CanvasesCanvas["spec"] | null>(null);
   const draftSpecToRender = draftCanvasSpec ?? selectedCanvasVersion?.spec ?? null;
-
   useEffect(() => {
     if (!isViewingDraftVersion || !activeCanvasVersionId) {
       return;
     }
-
     const preservedDraftSpec = draftCanvasSpecsRef.current.get(activeCanvasVersionId);
     if (preservedDraftSpec) {
       setDraftCanvasSpec(preservedDraftSpec);
       return;
     }
-
     const nextDraftSpec = selectedCanvasVersion?.spec ?? null;
     if (nextDraftSpec) {
       draftCanvasSpecsRef.current.set(activeCanvasVersionId, nextDraftSpec);
     }
     setDraftCanvasSpec(nextDraftSpec);
   }, [isViewingDraftVersion, activeCanvasVersionId, selectedCanvasVersion?.metadata?.id, selectedCanvasVersion?.spec]);
-
   useEffect(() => {
     if (!isViewingDraftVersion || !activeCanvasVersionId || !liveCanvas?.spec) {
       return;
     }
-
     if (!draftCanvasSpec && !selectedCanvasVersion?.spec) {
       return;
     }

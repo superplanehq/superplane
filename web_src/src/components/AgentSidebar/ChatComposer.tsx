@@ -29,7 +29,7 @@ export function ChatComposer({
 
   const handleSend = useCallback(async () => {
     const content = draft.trim();
-    if (!content || sending) return;
+    if (!content) return;
 
     setDraft("");
 
@@ -38,7 +38,7 @@ export function ChatComposer({
     } catch {
       setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : content));
     }
-  }, [draft, onSend, sending]);
+  }, [draft, onSend]);
 
   return (
     <footer className="border-t border-border p-3 flex flex-col gap-2">
@@ -71,11 +71,7 @@ export function ChatComposer({
               data-testid="agent-stop-button"
               title={stopping ? "Stopping..." : "Stop"}
             >
-              {stopping ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <div className="size-3 rounded-sm bg-white" />
-              )}
+              {stopping ? <Loader2 className="size-3 animate-spin" /> : <div className="size-3 rounded-sm bg-white" />}
             </Button>
           )}
           <Button
