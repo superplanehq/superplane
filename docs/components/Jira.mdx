@@ -6,49 +6,72 @@ Manage and react to issues in Jira
 
 import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-## Actions
+## Triggers
 
 <CardGrid>
-  <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Jira" />
+  <LinkCard title="On Issue" href="#on-issue" description="Start a workflow when Jira creates, updates, or deletes an issue" />
 </CardGrid>
 
-<a id="create-issue"></a>
+## Instructions
 
-## Create Issue
+**Setup steps:**
+1. Click **Connect** once with **Client ID** and **Client Secret** empty. The same setup box at the top of this modal will change to show a **Callback URL**. If you close the modal, you can also see it on the Jira integration details page in the yellow setup box.
 
-The Create Issue component creates a new issue in Jira.
+2. Open the [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/), then select **Create app → OAuth 2.0 integration**.
+
+   > **Required scopes:**  
+   > `read:jira-work` · `write:jira-work` · `manage:jira-webhook` · `offline_access`
+
+3. In the Atlassian app, go to **Authorization → OAuth 2.0 (3LO)** and add the callback URL shown by SuperPlane.
+4. Copy the Atlassian app **Client ID** and **Client Secret** into the fields below, then save.
+5. Click **Continue** to authorize Jira. SuperPlane creates and manages the Jira issue webhook automatically.
+
+<a id="on-issue"></a>
+
+## On Issue
+
+The On Issue trigger starts a workflow execution when Jira sends an issue webhook.
 
 ### Use Cases
 
-- **Task creation**: Automatically create tasks from workflow events
-- **Bug tracking**: Create bugs from error detection systems
-- **Feature requests**: Generate feature request issues from external inputs
+- **Issue automation**: Run workflows when a Jira issue is created, updated, or deleted
+- **Project routing**: Filter issue events to a specific Jira project
+- **Notification workflows**: Send updates to other systems when issue activity happens
 
 ### Configuration
 
-- **Project**: The Jira project to create the issue in
-- **Issue Type**: The type of issue (e.g. Task, Bug, Story)
-- **Summary**: The issue summary/title
-- **Description**: Optional description text
+- **Project**: Optionally filter events to one Jira project. Leave empty to receive issues from all projects.
+- **Actions**: Optionally filter to created, updated, or deleted issue events. Leave empty to receive all issue events.
 
-### Output
+### Webhook Setup
 
-Returns the created issue including:
-- **id**: The issue ID
-- **key**: The issue key (e.g. PROJ-123)
-- **self**: API URL for the issue
+The webhook is created automatically in Jira through the REST API when you save the canvas. SuperPlane keeps one Jira webhook per connected Jira site and routes matching issue events to the configured triggers.
 
-### Example Output
+### Example Data
 
 ```json
 {
-  "data": {
+  "action": "created",
+  "issue": {
+    "fields": {
+      "issuetype": {
+        "name": "Task"
+      },
+      "project": {
+        "id": "10000",
+        "key": "SP",
+        "name": "SuperPlane"
+      },
+      "status": {
+        "name": "To Do"
+      },
+      "summary": "Example issue"
+    },
     "id": "10001",
-    "key": "PROJ-123",
-    "self": "https://your-domain.atlassian.net/rest/api/3/issue/10001"
+    "key": "SP-123",
+    "self": "https://example.atlassian.net/rest/api/3/issue/10001"
   },
-  "timestamp": "2026-01-19T12:00:00Z",
-  "type": "jira.issue"
+  "webhookEvent": "jira:issue_created"
 }
 ```
 

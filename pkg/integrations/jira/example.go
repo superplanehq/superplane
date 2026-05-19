@@ -7,12 +7,12 @@ import (
 	"github.com/superplanehq/superplane/pkg/utils"
 )
 
-//go:embed example_output_create_issue.json
-var exampleOutputCreateIssueBytes []byte
+//go:embed example_data_on_issue.json
+var exampleDataOnIssueBytes []byte
 
-var exampleOutputCreateIssueOnce sync.Once
-var exampleOutputCreateIssue map[string]any
+var exampleDataOnIssueOnce sync.Once
+var exampleDataOnIssue map[string]any
 
-func (c *CreateIssue) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueOnce, exampleOutputCreateIssueBytes, &exampleOutputCreateIssue)
+func (t *OnIssue) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnIssueOnce, exampleDataOnIssueBytes, &exampleDataOnIssue)
 }

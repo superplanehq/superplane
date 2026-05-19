@@ -35,6 +35,7 @@ import {
   triggerRenderers as gitlabTriggerRenderers,
   eventStateRegistry as gitlabEventStateRegistry,
 } from "./gitlab/index";
+import { triggerRenderers as jiraTriggerRenderers } from "./jira/index";
 import {
   componentMappers as pagerdutyComponentMappers,
   triggerRenderers as pagerdutyTriggerRenderers,
@@ -337,6 +338,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
   gitlab: gitlabTriggerRenderers,
+  jira: jiraTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
   dash0: dash0TriggerRenderers,
   daytona: daytonaTriggerRenderers,

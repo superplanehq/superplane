@@ -1,0 +1,23 @@
+{
+  "webhookEvent": "jira:issue_created",
+  "action": "created",
+  "issue": {
+    "id": "10001",
+    "key": "SP-123",
+    "self": "https://example.atlassian.net/rest/api/3/issue/10001",
+    "fields": {
+      "summary": "Example issue",
+      "project": {
+        "id": "10000",
+        "key": "SP",
+        "name": "SuperPlane"
+      },
+      "issuetype": {
+        "name": "Task"
+      },
+      "status": {
+        "name": "To Do"
+      }
+    }
+  }
+}
