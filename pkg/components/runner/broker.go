@@ -37,6 +37,7 @@ func legacyFleetFromEnv() (*runners.RunnerFleet, error) {
 	// placed in the Name for reference. The actual UUID is generated on the fly
 	// but never saved (the legacy broker does not need a runner_tasks record).
 	return &runners.RunnerFleet{
+		Mode:      runners.FleetModePush,
 		FleetURL:  baseURL,
 		AuthToken: authToken,
 		// Name carries the broker fleet_id used in API requests.

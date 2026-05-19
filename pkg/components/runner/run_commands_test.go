@@ -34,12 +34,29 @@ func (m *mockStore) CreateTask(id uuid.UUID, fleetID uuid.UUID, fleetTaskID stri
 	return t, nil
 }
 
+func (m *mockStore) EnqueueJob(fleetID, executionID uuid.UUID, spec runners.JobSpec) (*runners.RunnerTask, error) {
+	id := uuid.New()
+	t := &runners.RunnerTask{ID: id, FleetID: fleetID, FleetTaskID: id.String(), ExecutionID: executionID, Status: runners.TaskStatusQueued}
+	m.tasks = append(m.tasks, t)
+	return t, nil
+}
+
 func testFleet() *runners.RunnerFleet {
 	return &runners.RunnerFleet{
 		ID:        uuid.New(),
 		Name:      "fleet-1",
+		Mode:      runners.FleetModePush,
 		FleetURL:  "https://broker.example",
 		AuthToken: "token-1",
+	}
+}
+
+func testBridgeFleet() *runners.RunnerFleet {
+	return &runners.RunnerFleet{
+		ID:        uuid.New(),
+		Name:      "fleet-bridge",
+		Mode:      runners.FleetModeBridge,
+		AuthToken: "token-bridge",
 	}
 }
 
@@ -201,6 +218,27 @@ func TestRunnerExecuteSendsEnvironmentToFleet(t *testing.T) {
 	}, req.Environment)
 	assert.Equal(t, "task-123", state.KVs["task_id"])
 	assert.Equal(t, hookActionPoll, requests.Action)
+}
+
+func TestRunnerExecuteBridgeEnqueuesWithoutHTTP(t *testing.T) {
+	fleet := testBridgeFleet()
+	httpContext := &contexts.HTTPContext{}
+	state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+	requests := &contexts.RequestContext{}
+
+	err := testRunner(fleet).Execute(core.ExecutionContext{
+		ID:             uuid.New(),
+		Configuration:  map[string]any{"fleet_id": fleet.ID.String(), "commands": "echo hello"},
+		HTTP:           httpContext,
+		Webhook:        &contexts.NodeWebhookContext{},
+		ExecutionState: state,
+		Requests:       requests,
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, httpContext.Requests)
+	assert.Empty(t, requests.Action)
+	assert.NotEmpty(t, state.KVs["task_id"])
 }
 
 func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {

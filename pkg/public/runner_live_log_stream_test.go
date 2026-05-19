@@ -192,84 +192,20 @@ func TestHandleRunnerLiveLogStream(t *testing.T) {
 		assert.Contains(t, rec.Body.String(), "not available for this execution")
 	})
 
-	t.Run("broker task id from non-string metadata", func(t *testing.T) {
+	t.Run("cloudwatch task log starts ndjson stream", func(t *testing.T) {
 		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: 99,
-		})
-		t.Setenv("TASK_BROKER_BASE_URL", "http://127.0.0.1:1")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "token")
-		rec := runnerLiveLogGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusBadGateway, rec.Code)
-	})
-
-	t.Run("task broker not configured", func(t *testing.T) {
-		t.Setenv("TASK_BROKER_BASE_URL", "")
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "")
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "tb-x",
-		})
-		rec := runnerLiveLogGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
-		assert.Contains(t, rec.Body.String(), "not configured")
-	})
-
-	t.Run("upstream error response is proxied", func(t *testing.T) {
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "text/plain")
-			w.WriteHeader(http.StatusTeapot)
-			_, _ = w.Write([]byte("upstream"))
-		}))
-		t.Cleanup(upstream.Close)
-		t.Setenv("TASK_BROKER_BASE_URL", upstream.URL)
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "secret")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-418",
-		})
-		rec := runnerLiveLogGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusTeapot, rec.Code)
-		assert.Contains(t, rec.Body.String(), "upstream")
-	})
-
-	t.Run("upstream success streams body", func(t *testing.T) {
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Equal(t, "/v1/tasks/task-ok/live-logs", r.URL.Path)
-			assert.Equal(t, "Bearer broker-token", r.Header.Get("Authorization"))
-			assert.Equal(t, "application/x-ndjson", r.Header.Get("Accept"))
-			assert.Equal(t, "identity", r.Header.Get("Accept-Encoding"))
-			w.Header().Set("Content-Type", "application/x-ndjson")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"type":"line","text":"log"}` + "\n"))
-		}))
-		t.Cleanup(upstream.Close)
-		t.Setenv("TASK_BROKER_BASE_URL", upstream.URL)
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "broker-token")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-ok",
+			runneraction.ExecutionMetadataTaskLog: map[string]any{
+				"type": "cloudwatch",
+				"cloudwatch": map[string]any{
+					"log_group_name":  "/test/group",
+					"log_stream_name": "task-1",
+					"region":          "us-east-1",
+				},
+			},
 		})
 		rec := runnerLiveLogGET(t, server, signer, r, canvasID.String(), execID.String())
 		assert.Equal(t, http.StatusOK, rec.Code)
+		assert.Equal(t, "application/x-ndjson; charset=utf-8", rec.Header().Get("Content-Type"))
 		assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
-		assert.Contains(t, rec.Body.String(), "log")
-	})
-
-	t.Run("upstream success forwards upstream content-type", func(t *testing.T) {
-		// httptest.Server sets Content-Type to text/plain when the handler does not set one.
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("x"))
-		}))
-		t.Cleanup(upstream.Close)
-		t.Setenv("TASK_BROKER_BASE_URL", upstream.URL)
-		t.Setenv("TASK_BROKER_AUTH_TOKEN", "t")
-
-		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", map[string]any{
-			runneraction.ExecutionMetadataBrokerTaskID: "task-ct",
-		})
-		rec := runnerLiveLogGET(t, server, signer, r, canvasID.String(), execID.String())
-		assert.Equal(t, http.StatusOK, rec.Code)
-		assert.Equal(t, "x", rec.Body.String())
-		assert.NotEmpty(t, rec.Header().Get("Content-Type"))
 	})
 }
