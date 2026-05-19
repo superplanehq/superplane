@@ -17,9 +17,6 @@ REPO_URL="${REPO_URL:-https://github.com/superplanehq/superplane.git}"
 DEV_BASE_IMAGE="${DEV_BASE_IMAGE:-ghcr.io/superplanehq/superplane-dev-base:app-latest}"
 LOCAL_TAG="${LOCAL_TAG:-superplane:runner-verify}"
 
-MODULES="authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,components,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents,usage"
-REST_API_MODULES="authorization,organizations,integrations,secrets,users,groups,roles,me,configuration,actions,triggers,widgets,blueprints,canvases,canvas_folders,service_accounts,agents"
-
 cleanup() {
   if [[ -n "${TMP_WORK:-}" && -d "$TMP_WORK" ]]; then
     rm -rf "$TMP_WORK"
@@ -30,6 +27,26 @@ trap cleanup EXIT
 need_codegen() {
   [[ "${SKIP_PROTO_GEN:-0}" == "1" ]] && return 1
   return 0
+}
+
+make_var() {
+  local name="$1"
+  awk -v name="$name" '
+    $1 == name && $2 == ":=" {
+      sub("^[^:]+:= ?", "")
+      print
+      exit
+    }
+  ' Makefile
+}
+
+load_codegen_modules() {
+  MODULES="$(make_var MODULES)"
+  REST_API_MODULES="$(make_var REST_API_MODULES)"
+  if [[ -z "$MODULES" || -z "$REST_API_MODULES" ]]; then
+    echo "Could not read MODULES and REST_API_MODULES from Makefile" >&2
+    exit 1
+  fi
 }
 
 run_proto_gen() {
@@ -103,6 +120,14 @@ run_image_build() {
   echo "==> OK: image loaded locally as ${LOCAL_TAG} (not pushed)"
 }
 
+checkout_ref() {
+  if [[ -z "${GIT_REF:-}" ]]; then
+    return
+  fi
+  git fetch origin --depth 1 "${GIT_REF}" 2>/dev/null || git fetch origin "${GIT_REF}"
+  git checkout "${GIT_REF}"
+}
+
 prepare_workdir() {
   if [[ -n "${VERIFY_WORK_DIR:-}" ]]; then
     cd "$VERIFY_WORK_DIR"
@@ -110,24 +135,19 @@ prepare_workdir() {
   fi
   if [[ -f Dockerfile && -f go.mod ]]; then
     echo "==> Using current directory as repo root"
-    if [[ -n "${GIT_REF:-}" ]]; then
-      git fetch origin --depth 1 "${GIT_REF}" 2>/dev/null || git fetch origin "${GIT_REF}"
-      git checkout "${GIT_REF}"
-    fi
+    checkout_ref
     return
   fi
   TMP_WORK="$(mktemp -d)"
-  local clone_args=(--depth 1)
-  if [[ -n "${GIT_REF:-}" ]]; then
-    clone_args+=(-b "${GIT_REF}")
-  fi
   echo "==> Cloning ${REPO_URL} (ref: ${GIT_REF:-default}) into ${TMP_WORK}"
-  git clone "${clone_args[@]}" "$REPO_URL" "$TMP_WORK/repo"
+  git clone --depth 1 "$REPO_URL" "$TMP_WORK/repo"
   cd "$TMP_WORK/repo"
+  checkout_ref
 }
 
 main() {
   prepare_workdir
+  load_codegen_modules
   if need_codegen; then
     run_proto_gen
     run_openapi_spec_gen
