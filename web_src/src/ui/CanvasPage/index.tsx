@@ -1224,8 +1224,10 @@ function CanvasPage(props: CanvasPageProps) {
 
         <div className="flex-1 relative">
           {props.runCanvasLoading && props.headerMode === "runs" ? (
-            <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-50">
-              <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+            <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
+              <div className="rounded-lg bg-white/80 p-3 shadow-sm backdrop-blur-sm">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+              </div>
             </div>
           ) : null}
           {showPreviewFloatingBar || showAwaitingFloatingBar ? (
