@@ -21,7 +21,7 @@ type CreateHeartbeatSpec struct {
 	Description   string `json:"description,omitempty" mapstructure:"description"`
 	Interval      int    `json:"interval" mapstructure:"interval"`
 	IntervalUnit  string `json:"intervalUnit" mapstructure:"intervalUnit"`
-	Enabled       bool   `json:"enabled" mapstructure:"enabled"`
+	Enabled       *bool  `json:"enabled,omitempty" mapstructure:"enabled"`
 	AlertMessage  string `json:"alertMessage,omitempty" mapstructure:"alertMessage"`
 	AlertTags     []any  `json:"alertTags,omitempty" mapstructure:"alertTags"`
 	AlertPriority string `json:"alertPriority,omitempty" mapstructure:"alertPriority"`
@@ -258,7 +258,7 @@ func (c *CreateHeartbeat) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("interval must be at least 1")
 	}
 
-	enabled := spec.Enabled
+	enabled := createHeartbeatEnabledFromSpec(spec)
 	req := &CreateHeartbeatRequest{
 		Name:         name,
 		Description:  strings.TrimSpace(spec.Description),
@@ -311,6 +311,13 @@ func (c *CreateHeartbeat) Hooks() []core.Hook {
 
 func (c *CreateHeartbeat) HandleHook(ctx core.ActionHookContext) error {
 	return nil
+}
+
+func createHeartbeatEnabledFromSpec(spec CreateHeartbeatSpec) bool {
+	if spec.Enabled == nil {
+		return true
+	}
+	return *spec.Enabled
 }
 
 func createHeartbeatAlertTagsFromList(raw []any) []string {

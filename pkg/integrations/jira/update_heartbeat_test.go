@@ -65,8 +65,26 @@ func Test__UpdateHeartbeat__Setup_requires_toggled_field(t *testing.T) {
 	require.ErrorContains(t, err, "at least one update field must be enabled")
 }
 
-func Test__hasAnyHeartbeatUpdate(t *testing.T) {
-	assert.False(t, hasAnyHeartbeatUpdate(UpdateHeartbeatSpec{}))
+func Test__UpdateHeartbeat__Setup_rejects_empty_toggled_field(t *testing.T) {
+	component := UpdateHeartbeat{}
+	empty := ""
+	err := component.Setup(core.SetupContext{
+		Integration: jiraTestIntegration(),
+		Configuration: map[string]any{
+			"team":        "team-1",
+			"heartbeat":   "DNS Checker",
+			"description": empty,
+		},
+	})
+	require.ErrorContains(t, err, "at least one update field must be enabled")
+}
+
+func Test__hasEffectiveHeartbeatUpdate(t *testing.T) {
+	assert.False(t, hasEffectiveHeartbeatUpdate(UpdateHeartbeatSpec{}))
+	empty := ""
+	assert.False(t, hasEffectiveHeartbeatUpdate(UpdateHeartbeatSpec{Description: &empty}))
 	desc := "x"
-	assert.True(t, hasAnyHeartbeatUpdate(UpdateHeartbeatSpec{Description: &desc}))
+	assert.True(t, hasEffectiveHeartbeatUpdate(UpdateHeartbeatSpec{Description: &desc}))
+	interval := 5
+	assert.True(t, hasEffectiveHeartbeatUpdate(UpdateHeartbeatSpec{Interval: &interval}))
 }
