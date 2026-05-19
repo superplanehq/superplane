@@ -143,7 +143,11 @@ func (e *HTTP) Documentation() string {
 
 ## Supported Methods
 
-- GET, POST, PUT, DELETE, PATCH
+- GET, POST, PUT, DELETE, PATCH, HEAD
+
+HEAD requests do not send a body and the response body is empty by design.
+Use HEAD for health checks, URL validation, or to inspect response headers
+and status without downloading the full response payload.
 
 ## Request Configuration
 
@@ -345,6 +349,7 @@ func (e *HTTP) Configuration() []configuration.Field {
 						{Label: "PUT", Value: "PUT"},
 						{Label: "DELETE", Value: "DELETE"},
 						{Label: "PATCH", Value: "PATCH"},
+						{Label: "HEAD", Value: "HEAD"},
 					},
 				},
 			},
