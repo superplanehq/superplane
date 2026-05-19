@@ -73,9 +73,7 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex-1 overflow-y-auto p-3">
           <div className="flex flex-col items-start">
-            <div
-              className="max-w-[85%] break-words rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-900"
-            >
+            <div className="max-w-[85%] break-words rounded-lg px-3 py-2 text-sm bg-slate-100 text-slate-900">
               Hi {firstName}! I'm your SuperPlane agent. Give me a moment to set up and I'll help you build.
               <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
                 <Loader2 className="size-3 animate-spin" /> Setting up...
@@ -134,16 +132,31 @@ function ChatConversation({
 
   const showThinking = useThinkingIndicator(rawMessages, status);
 
-  // Auto-kickoff: send a boot message when session is new (no messages yet)
-  const bootSent = useRef(false);
+  // Auto-kickoff: send a boot message when session is new (no messages yet).
+  // Uses chatId in the ref key so we only send once per session, even across remounts.
+  const bootedSessions = useRef(new Set<string>());
   useEffect(() => {
-    if (bootSent.current) return;
+    if (bootedSessions.current.has(chatId)) return;
     if (!messagesQuery.data || messagesQuery.isLoading) return;
+
     const allMessages = messagesQuery.data.pages?.flatMap((p) => p.messages) ?? [];
-    if (allMessages.length === 0) {
-      bootSent.current = true;
-      sendMutation.mutate({ chatId, content: createSystemMessage("Session ready. Read the current canvas state, check connected integrations, and greet the user."), mode: agentMode });
+    if (allMessages.length > 0) {
+      // Session already has messages — mark as booted, don't send again
+      bootedSessions.current.add(chatId);
+      return;
     }
+
+    bootedSessions.current.add(chatId);
+    void sendMutation.mutateAsync({
+      chatId,
+      content: createSystemMessage(
+        "Session ready. Read the current canvas state, check connected integrations, and greet the user.",
+      ),
+      mode: agentMode,
+    }).catch(() => {
+      // Allow retry on failure
+      bootedSessions.current.delete(chatId);
+    });
   }, [messagesQuery.data, messagesQuery.isLoading, chatId, agentMode, sendMutation]);
   const handlers = useConversationHandlers({
     agentMode,
