@@ -92,24 +92,23 @@ spec:
     if (!result.ok) expect(result.error).toMatch(/content\.node must be a string/);
   });
 
-  it("rejects a table panel without columns", () => {
+  it("accepts a table panel without columns (configured via the form)", () => {
     const text = `apiVersion: v1
 kind: Dashboard
 metadata: {}
 spec:
   panels:
-    - id: bad-table
+    - id: table-1
       type: table
       content:
-        dataSource: { kind: executions }
+        dataSource: { kind: memory, namespace: environments }
         render:
           kind: table
           columns: []
   layout: []
 `;
     const result = parseDashboardYaml(text);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/render\.columns must be a non-empty array/);
+    expect(result.ok).toBe(true);
   });
 
   it("rejects empty input", () => {

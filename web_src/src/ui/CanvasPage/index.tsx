@@ -179,7 +179,6 @@ export interface CanvasPageProps {
   onDashboardOpenYaml?: () => void;
   /** Whether the dashboard YAML modal will open in read-only mode (no apply). */
   dashboardYamlReadOnly?: boolean;
-  runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
@@ -1184,7 +1183,6 @@ function CanvasPage(props: CanvasPageProps) {
           onDashboardAddPanel={props.onDashboardAddPanel}
           onDashboardOpenYaml={props.onDashboardOpenYaml}
           dashboardYamlReadOnly={props.dashboardYamlReadOnly}
-          runsNotificationCount={props.runsNotificationCount}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
@@ -1701,7 +1699,6 @@ function CanvasContentHeader({
   onDashboardAddPanel,
   onDashboardOpenYaml,
   dashboardYamlReadOnly,
-  runsNotificationCount,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
   unpublishedDraftUpdatedAt,
@@ -1734,7 +1731,6 @@ function CanvasContentHeader({
   onDashboardAddPanel?: () => void;
   onDashboardOpenYaml?: () => void;
   dashboardYamlReadOnly?: boolean;
-  runsNotificationCount?: number;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
@@ -1777,7 +1773,6 @@ function CanvasContentHeader({
       onDashboardAddPanel={onDashboardAddPanel}
       onDashboardOpenYaml={onDashboardOpenYaml}
       dashboardYamlReadOnly={dashboardYamlReadOnly}
-      runsNotificationCount={runsNotificationCount}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}

@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react";
 import { useCanvasMemoryEntries, useInfiniteCanvasEvents, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 
 import { resolveDashboardNode, useDashboardContext } from "../DashboardContext";
-import { getValueAtPath } from "./fieldPath";
+import { flattenMemoryEntries } from "./memoryRow";
 import type { WidgetDataSource } from "./types";
 
 export interface WidgetDataResult {
@@ -107,16 +107,7 @@ export function useWidgetData(canvasId: string, dataSource: WidgetDataSource): W
 
   const memoryRows = useMemo(() => {
     if (dataSource.kind !== "memory") return [];
-    const entries = memoryQuery.data ?? [];
-    const filtered = entries.filter((entry) => entry.namespace === dataSource.namespace);
-    if (!dataSource.fieldPath) return filtered.map((entry) => entry.values ?? entry);
-    const out: unknown[] = [];
-    for (const entry of filtered) {
-      const value = getValueAtPath(entry.values, dataSource.fieldPath);
-      if (Array.isArray(value)) out.push(...value);
-      else if (value !== undefined) out.push(value);
-    }
-    return out;
+    return flattenMemoryEntries(memoryQuery.data ?? [], dataSource.namespace, dataSource.fieldPath);
   }, [dataSource, memoryQuery.data]);
 
   const executionRows = useMemo(() => {

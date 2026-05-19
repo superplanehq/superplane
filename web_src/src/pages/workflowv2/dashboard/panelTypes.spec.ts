@@ -27,9 +27,13 @@ describe("templateForPanelType", () => {
     expect(templateForPanelType("markdown", "Hello").title).toBe("Hello");
   });
 
-  it("creates a non-empty default columns list for table", () => {
-    const tpl = templateForPanelType("table") as { render: { columns: unknown[] } };
-    expect(tpl.render.columns.length).toBeGreaterThan(0);
+  it("defaults table panels to memory with empty columns for discovery", () => {
+    const tpl = templateForPanelType("table") as {
+      dataSource: { kind: string };
+      render: { columns: unknown[] };
+    };
+    expect(tpl.dataSource.kind).toBe("memory");
+    expect(tpl.render.columns).toEqual([]);
   });
 
   it("uses runs as the default data source for number panels", () => {
@@ -58,12 +62,13 @@ describe("validatePanelContent", () => {
     expect(validatePanelContent("table", {})).toMatch(/dataSource must be an object/);
   });
 
-  it("requires a non-empty columns array on table panels", () => {
-    const error = validatePanelContent("table", {
-      dataSource: { kind: "executions" },
-      render: { kind: "table", columns: [] },
-    });
-    expect(error).toMatch(/render\.columns must be a non-empty array/);
+  it("allows an empty columns array on table panels", () => {
+    expect(
+      validatePanelContent("table", {
+        dataSource: { kind: "memory", namespace: "env" },
+        render: { kind: "table", columns: [] },
+      }),
+    ).toBeNull();
   });
 
   it("requires a known chart type", () => {
@@ -90,12 +95,12 @@ describe("validatePanelContent", () => {
     expect(error).toMatch(/render\.field is required/);
   });
 
-  it("memory data sources require namespace", () => {
+  it("memory data sources require namespace to be a string", () => {
     const error = validatePanelContent("table", {
       dataSource: { kind: "memory" },
       render: { kind: "table", columns: [{ field: "x" }] },
     });
-    expect(error).toMatch(/dataSource\.namespace must be a non-empty string/);
+    expect(error).toMatch(/dataSource\.namespace must be a string/);
   });
 
   it("accepts runs data sources", () => {

@@ -10,6 +10,19 @@ import type { SuperplaneComponentsNode } from "@/api-client";
  */
 export type DashboardNodeStatus = "passed" | "failed" | "running" | "pending" | "cancelled" | "skipped" | "unknown";
 
+export interface DashboardTriggerOptions {
+  /** Trigger hook name (default `run`). */
+  hookName?: string;
+  /** Start template name when applicable. */
+  templateName?: string;
+  /** @deprecated Alias for `templateName`. */
+  triggerName?: string;
+  /** Pre-built hook parameters (merged by the caller). */
+  parameters?: Record<string, unknown>;
+  /** Toast label after success (defaults to "Triggered node"). */
+  successLabel?: string;
+}
+
 export interface DashboardContextValue {
   canvasId: string;
   organizationId: string;
@@ -31,7 +44,7 @@ export interface DashboardContextValue {
    * if undefined the chip falls back to dispatching the
    * `dashboard:trigger-node` window event so a host can react when wired.
    */
-  onTriggerNode?: (nodeId: string, options?: { templateName?: string; triggerName?: string }) => void;
+  onTriggerNode?: (nodeId: string, options?: DashboardTriggerOptions) => void;
   /**
    * Optional callback when the user opens a node chip (e.g. to focus / scroll
    * the corresponding canvas node into view). Falls back to navigation.

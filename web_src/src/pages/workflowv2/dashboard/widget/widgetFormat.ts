@@ -1,3 +1,5 @@
+import { formatRelativeTime } from "@/lib/timezone";
+
 import type { WidgetColumnFormat } from "./types";
 
 /**
@@ -16,6 +18,8 @@ export function formatValue(value: unknown, format: WidgetColumnFormat | undefin
       return formatDate(value, false);
     case "datetime":
       return formatDate(value, true);
+    case "relative":
+      return formatRelative(value);
     case "duration":
       return formatDuration(value);
     case "status":
@@ -42,6 +46,19 @@ function formatPercent(value: unknown): string {
   // Values between 0 and 1 are treated as fractions; otherwise displayed as-is.
   const scaled = n > 0 && n <= 1 ? n * 100 : n;
   return `${scaled.toFixed(scaled % 1 === 0 ? 0 : 1)}%`;
+}
+
+function formatRelative(value: unknown): string {
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) {
+      return formatRelativeTime(new Date(parsed).toISOString(), true);
+    }
+  }
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return String(value ?? "");
+  const ms = n > 1e12 ? n : n * 1000;
+  return formatRelativeTime(new Date(ms).toISOString(), true);
 }
 
 function formatDate(value: unknown, includeTime: boolean): string {

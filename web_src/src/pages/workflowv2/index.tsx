@@ -1137,16 +1137,21 @@ export function WorkflowPageV2() {
    * the buttons when `canRunNodes` is false.
    */
   const handleDashboardTriggerNode = useCallback(
-    async (nodeId: string, options?: { templateName?: string; triggerName?: string }) => {
+    async (
+      nodeId: string,
+      options?: {
+        templateName?: string;
+        triggerName?: string;
+        hookName?: string;
+        parameters?: Record<string, unknown>;
+        successLabel?: string;
+      },
+    ) => {
       if (!canvasId) return;
-      const hookName = "run";
-      // `triggerName` is kept as a backwards-compatible alias for dashboard
-      // row-action YAML created before this handler grew the clearer
-      // `templateName` option. For the Start trigger, the hook is always
-      // `run`; the template is passed inside `parameters`.
+      const hookName = options?.hookName ?? "run";
       const templateName = options?.templateName ?? options?.triggerName;
       const node = canvas?.spec?.nodes?.find((n) => n.id === nodeId);
-      const parameters = buildDashboardTriggerParameters(node, hookName, templateName);
+      const parameters = options?.parameters ?? buildDashboardTriggerParameters(node, hookName, templateName);
       try {
         await canvasesInvokeNodeTriggerHook(
           withOrganizationHeader({
@@ -1154,15 +1159,14 @@ export function WorkflowPageV2() {
             body: { parameters },
           }),
         );
-        showSuccessToast("Triggered node");
-        // Refresh both the per-node execution feed (used by the Runs sidebar
-        // and node-status derivation) and the canvas-wide infinite events
-        // query that powers Dashboard table / chart / number panels.
+        showSuccessToast(options?.successLabel ? `Triggered: ${options.successLabel}` : "Triggered node");
         queryClient.invalidateQueries({ queryKey: canvasKeys.nodeExecution(canvasId, nodeId) });
         queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteEvents(canvasId) });
         queryClient.invalidateQueries({ queryKey: canvasKeys.infiniteRuns(canvasId) });
+        queryClient.invalidateQueries({ queryKey: canvasKeys.canvasMemoryEntries(canvasId) });
       } catch (error) {
         showErrorToast(getApiErrorMessage(error, "Failed to trigger node"));
+        throw error;
       }
     },
     [canvasId, canvas, queryClient],
@@ -5917,7 +5921,6 @@ export function WorkflowPageV2() {
           onDashboardAddPanel={onDashboardAddPanel}
           onDashboardOpenYaml={onDashboardOpenYaml}
           dashboardYamlReadOnly={dashboardYamlReadOnly}
-          runsNotificationCount={activeRunsCount}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}

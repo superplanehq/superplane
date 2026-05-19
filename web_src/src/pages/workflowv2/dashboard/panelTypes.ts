@@ -16,8 +16,10 @@ import type {
   WidgetNumberRender,
   WidgetRowAction,
   WidgetTableColumn,
+  WidgetTableFilter,
   WidgetTableRender,
 } from "./widget/types";
+import { normalizeRowAction, WIDGET_FILTER_OPS } from "./widget/types";
 
 /** All panel kinds the dashboard currently understands. */
 export const PANEL_TYPES = ["markdown", "node", "table", "chart", "number"] as const;
@@ -113,14 +115,9 @@ export type NumberPanelDataSource = TablePanelDataSource;
 // Templates — used to seed new panels
 // ────────────────────────────────────────────────────────────────────────────
 
-const DEFAULT_TABLE_COLUMNS: WidgetTableColumn[] = [
-  { field: "status", label: "Status", format: "status" },
-  { field: "createdAt", label: "Started", format: "datetime" },
-];
-
 const DEFAULT_TABLE_RENDER: WidgetTableRender = {
   kind: "table",
-  columns: DEFAULT_TABLE_COLUMNS,
+  columns: [],
 };
 
 const DEFAULT_CHART_RENDER: WidgetChartRender = {
@@ -150,7 +147,7 @@ export function templateForPanelType(type: PanelType, defaultTitle?: string): Re
     case "table":
       return {
         title: defaultTitle ?? "",
-        dataSource: { kind: "executions", limit: 20 },
+        dataSource: { kind: "memory", namespace: "" },
         render: DEFAULT_TABLE_RENDER,
       } satisfies TablePanelContent;
     case "chart":
@@ -241,8 +238,8 @@ function validateDataSource(value: unknown): string | null {
 }
 
 function validateMemoryDataSource(obj: Record<string, unknown>): string | null {
-  if (typeof obj.namespace !== "string" || obj.namespace.trim() === "") {
-    return "dataSource.namespace must be a non-empty string for memory sources.";
+  if (typeof obj.namespace !== "string") {
+    return "dataSource.namespace must be a string for memory sources.";
   }
   if (obj.fieldPath != null && typeof obj.fieldPath !== "string") {
     return "dataSource.fieldPath must be a string.";
@@ -274,12 +271,98 @@ function validateTableContent(content: unknown): string | null {
   if (render.kind !== "table") return 'render.kind must be "table".';
   const columnsError = validateTableColumns(render.columns);
   if (columnsError) return columnsError;
+  const whereError = validateTableWhere(render.where);
+  if (whereError) return whereError;
   return validateTableRowActions(render.rowActions);
 }
 
+function validateTableWhere(where: unknown): string | null {
+  if (where == null) return null;
+  if (!Array.isArray(where)) return "render.where must be an array.";
+  for (let i = 0; i < where.length; i += 1) {
+    const item = asObject(where[i]);
+    if (!item) return `render.where[${i}] must be an object.`;
+    if (typeof item.field !== "string" || item.field.trim() === "") {
+      return `render.where[${i}].field must be a non-empty string.`;
+    }
+    const op = item.op;
+    if (typeof op !== "string" || !WIDGET_FILTER_OPS.includes(op as WidgetTableFilter["op"])) {
+      return `render.where[${i}].op is not supported.`;
+    }
+  }
+  return null;
+}
+
+export function normalizeTablePanelContent(raw: Record<string, unknown> | undefined): TablePanelContent {
+  const r = raw ?? {};
+  const renderRaw = (r.render as Record<string, unknown>) ?? {};
+  const columns = Array.isArray(renderRaw.columns)
+    ? (renderRaw.columns as unknown[]).map((col) => {
+        const c = col as Record<string, unknown>;
+        return {
+          field: typeof c.field === "string" ? c.field : "",
+          label: typeof c.label === "string" ? c.label : undefined,
+          format: typeof c.format === "string" ? (c.format as WidgetTableColumn["format"]) : undefined,
+          show: typeof c.show === "string" ? c.show : undefined,
+          href: typeof c.href === "string" ? c.href : undefined,
+        } satisfies WidgetTableColumn;
+      })
+    : [];
+  const rowActions = Array.isArray(renderRaw.rowActions)
+    ? (renderRaw.rowActions as unknown[]).map(normalizeRowAction).filter((a): a is WidgetRowAction => a != null)
+    : undefined;
+  const where: WidgetTableFilter[] | undefined = Array.isArray(renderRaw.where)
+    ? (renderRaw.where as unknown[]).flatMap((f) => {
+        const item = f as Record<string, unknown>;
+        const op = typeof item.op === "string" ? item.op : "eq";
+        if (!WIDGET_FILTER_OPS.includes(op as WidgetTableFilter["op"])) return [];
+        const field = typeof item.field === "string" ? item.field : "";
+        if (!field.trim()) return [];
+        return [
+          {
+            field,
+            op: op as WidgetTableFilter["op"],
+            value: typeof item.value === "string" ? item.value : undefined,
+          },
+        ];
+      })
+    : undefined;
+
+  let dataSource: TablePanelDataSource = { kind: "memory", namespace: "" };
+  const ds = r.dataSource as Record<string, unknown> | undefined;
+  if (ds?.kind === "executions") {
+    dataSource = {
+      kind: "executions",
+      node: typeof ds.node === "string" ? ds.node : undefined,
+      limit: typeof ds.limit === "number" ? ds.limit : 50,
+    };
+  } else if (ds?.kind === "runs") {
+    dataSource = { kind: "runs", limit: typeof ds.limit === "number" ? ds.limit : 100 };
+  } else if (ds?.kind === "memory") {
+    dataSource = {
+      kind: "memory",
+      namespace: typeof ds.namespace === "string" ? ds.namespace : "",
+      fieldPath: typeof ds.fieldPath === "string" ? ds.fieldPath : undefined,
+    };
+  }
+
+  return {
+    title: typeof r.title === "string" ? r.title : "",
+    dataSource,
+    render: {
+      kind: "table",
+      columns,
+      rowActions,
+      where,
+      filters: Array.isArray(renderRaw.filters) ? (renderRaw.filters as string[]) : undefined,
+      emptyMessage: typeof renderRaw.emptyMessage === "string" ? renderRaw.emptyMessage : undefined,
+    },
+  };
+}
+
 function validateTableColumns(columns: unknown): string | null {
-  if (!Array.isArray(columns) || columns.length === 0) {
-    return "render.columns must be a non-empty array.";
+  if (!Array.isArray(columns)) {
+    return "render.columns must be an array.";
   }
   for (let i = 0; i < columns.length; i += 1) {
     const col = asObject(columns[i]);
@@ -291,17 +374,13 @@ function validateTableColumns(columns: unknown): string | null {
   return null;
 }
 
-const ROW_ACTION_KINDS: WidgetRowAction["kind"][] = ["trigger", "approve", "cancel", "push-through"];
-
 function validateTableRowActions(rowActions: unknown): string | null {
   if (rowActions == null) return null;
   if (!Array.isArray(rowActions)) return "render.rowActions must be an array.";
   for (let i = 0; i < rowActions.length; i += 1) {
-    const action = rowActions[i] as Partial<WidgetRowAction>;
-    if (!action || typeof action !== "object") return `render.rowActions[${i}] must be an object.`;
-    if (!action.kind || !ROW_ACTION_KINDS.includes(action.kind)) {
-      return `render.rowActions[${i}].kind must be one of ${ROW_ACTION_KINDS.join("/")}.`;
-    }
+    const action = normalizeRowAction(rowActions[i]);
+    if (!action) return `render.rowActions[${i}] must be a trigger action.`;
+    if (!action.node.trim()) return `render.rowActions[${i}].node must be set to a trigger node.`;
   }
   return null;
 }

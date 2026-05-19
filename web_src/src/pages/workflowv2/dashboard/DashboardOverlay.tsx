@@ -52,7 +52,7 @@ export type DashboardOverlayProps = {
   /** Latest known node status per node id; powers the status chip. */
   nodeStatuses?: Record<string, DashboardNodeStatus | undefined>;
   /** Callback invoked when a manual-run chip is clicked. */
-  onTriggerNode?: (nodeId: string, options?: { templateName?: string; triggerName?: string }) => void;
+  onTriggerNode?: import("./DashboardContext").DashboardContextValue["onTriggerNode"];
 };
 
 export function DashboardOverlay({

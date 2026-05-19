@@ -1,13 +1,25 @@
-import { useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ExternalLink, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-react";
 
+import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 import { useDashboardContext, resolveDashboardNode } from "../DashboardContext";
-import { DASHBOARD_EXECUTION_ACTION_EVENT, DASHBOARD_TRIGGER_NODE_EVENT } from "../dashboardEvents";
-import { getValueAtPath, interpolate } from "./fieldPath";
-import { evaluateShow } from "./showExpression";
+import { buildEnv, compileTemplate, evalTemplate } from "./celExpr";
+import { applyTableWhere } from "./evalTableWhere";
+import { interpolate } from "./fieldPath";
+import { mergeTriggerParameters } from "./mergeTriggerPayload";
+import { evaluateRowShow } from "./rowVisibility";
+import { resolveCellValue } from "./resolveCellValue";
 import { applyFilters } from "./widgetData";
 import { formatValue } from "./widgetFormat";
 import type { WidgetRowAction, WidgetTableRender } from "./types";
@@ -24,12 +36,38 @@ const STATUS_PILL_CLASS: Record<string, string> = {
   cancelled: "bg-slate-200 text-slate-600 ring-slate-300",
   running: "bg-sky-100 text-sky-700 ring-sky-300",
   pending: "bg-amber-100 text-amber-700 ring-amber-300",
+  ready: "bg-emerald-100 text-emerald-700 ring-emerald-300",
+  active: "bg-emerald-100 text-emerald-700 ring-emerald-300",
+  idle: "bg-slate-100 text-slate-600 ring-slate-300",
 };
 
+const ACTION_ICONS = {
+  play: Play,
+  stop: Square,
+  trash: Trash2,
+  refresh: RefreshCw,
+  "external-link": ExternalLink,
+} as const;
+
 export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
-  const filtered = useMemo(() => applyFilters(rows, render.filters), [rows, render.filters]);
+  const recordRows = useMemo(
+    () => rows.filter((r): r is Record<string, unknown> => Boolean(r) && typeof r === "object" && !Array.isArray(r)),
+    [rows],
+  );
+
+  const filtered = useMemo(() => {
+    const afterWhere = applyTableWhere(recordRows, render.where);
+    return applyFilters(afterWhere, render.filters);
+  }, [recordRows, render.where, render.filters]);
 
   if (isLoading) return <WidgetSpinner />;
+  if (render.columns.length === 0) {
+    return (
+      <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-table-no-columns">
+        Configure columns in the panel editor. Pick a memory namespace to see available fields.
+      </div>
+    );
+  }
   if (filtered.length === 0) {
     return (
       <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-table-empty">
@@ -43,9 +81,9 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
       <table className="w-full border-collapse text-xs">
         <thead className="bg-slate-50">
           <tr>
-            {render.columns.map((col) => (
+            {render.columns.map((col, i) => (
               <th
-                key={col.field}
+                key={`${col.field}-${i}`}
                 className="border-b border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-700"
               >
                 {col.label ?? col.field}
@@ -58,69 +96,18 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
         </thead>
         <tbody>
           {filtered.map((row, idx) => (
-            <tr key={idx} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
-              {render.columns.map((col) => {
-                const value = getValueAtPath(row, col.field);
-                const visible = evaluateShow(col.show, row);
-                if (!visible) {
-                  return (
-                    <td key={col.field} className="px-3 py-1.5 text-slate-300">
-                      —
-                    </td>
-                  );
-                }
-                const formatted = formatValue(value, col.format);
-                if (col.format === "status") {
-                  const classes =
-                    STATUS_PILL_CLASS[formatted.toLowerCase()] ?? "bg-slate-100 text-slate-600 ring-slate-300";
-                  return (
-                    <td key={col.field} className="px-3 py-1.5">
-                      <span
-                        className={cn(
-                          "inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset",
-                          classes,
-                        )}
-                      >
-                        {formatted}
-                      </span>
-                    </td>
-                  );
-                }
-                if (col.format === "link" || col.href) {
-                  const href = col.href ? interpolate(col.href, row) : String(value ?? "");
-                  return (
-                    <td key={col.field} className="px-3 py-1.5">
-                      <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sky-600 underline underline-offset-2"
-                      >
-                        {formatted || href}
-                      </a>
-                    </td>
-                  );
-                }
-                if (col.format === "code") {
-                  return (
-                    <td key={col.field} className="px-3 py-1.5">
-                      <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-800">
-                        {formatted}
-                      </code>
-                    </td>
-                  );
-                }
-                return (
-                  <td key={col.field} className="px-3 py-1.5 text-slate-700">
-                    {formatted}
-                  </td>
-                );
-              })}
+            <tr
+              key={(row.id as string | undefined) ?? idx}
+              className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
+            >
+              {render.columns.map((col, ci) => (
+                <Cell key={`${col.field}-${ci}`} col={col} row={row} />
+              ))}
               {render.rowActions && render.rowActions.length > 0 ? (
                 <td className="px-3 py-1.5 text-right">
                   <div className="inline-flex items-center gap-1">
                     {render.rowActions
-                      .filter((action) => evaluateShow(action.show, row))
+                      .filter((action) => evaluateRowShow(action.show, row))
                       .map((action, ai) => (
                         <RowActionButton key={ai} action={action} row={row} />
                       ))}
@@ -135,76 +122,175 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
   );
 }
 
-function RowActionButton({ action, row }: { action: WidgetRowAction; row: unknown }) {
-  const ctx = useDashboardContext();
-  const targetField = action.target ?? defaultTargetField(action);
-  const targetValue = targetField ? String(getValueAtPath(row, targetField) ?? "") : undefined;
-  // All four row action kinds map to `canvases:update` on the backend
-  // (InvokeNodeTriggerHook / InvokeNodeExecutionHook). Mirror that here so
-  // viewers without the permission see disabled buttons instead of clicks
-  // that fail with PermissionDenied.
-  const canRun = ctx?.canRunNodes ?? false;
-
-  const handleClick = () => {
-    if (!targetValue || !canRun) return;
-    if (action.kind === "trigger") {
-      const resolved = resolveDashboardNode(ctx, targetValue);
-      if (!resolved) return;
-      if (ctx?.onTriggerNode) {
-        ctx.onTriggerNode(resolved.node.id!, { templateName: action.triggerName });
-        return;
-      }
-      window.dispatchEvent(
-        new CustomEvent(DASHBOARD_TRIGGER_NODE_EVENT, {
-          detail: { nodeId: resolved.node.id, triggerName: action.triggerName },
-        }),
-      );
-      return;
-    }
-    // approve / cancel / push-through go through an execution-hook event for now.
-    window.dispatchEvent(
-      new CustomEvent(DASHBOARD_EXECUTION_ACTION_EVENT, {
-        detail: { executionId: targetValue, kind: action.kind },
-      }),
+function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Record<string, unknown> }) {
+  const visible = evaluateRowShow(col.show, row);
+  if (!visible) {
+    return <td className="px-3 py-1.5 text-slate-300">—</td>;
+  }
+  const value = resolveCellValue(col.field, row);
+  const formatted = formatValue(value, col.format);
+  if (col.format === "status") {
+    const classes = STATUS_PILL_CLASS[formatted.toLowerCase()] ?? "bg-slate-100 text-slate-600 ring-slate-300";
+    return (
+      <td className="px-3 py-1.5">
+        <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset", classes)}>
+          {formatted}
+        </span>
+      </td>
     );
+  }
+  if (col.format === "relative") {
+    const title = formatAbsoluteTitle(value);
+    return (
+      <td className="px-3 py-1.5 text-slate-700" title={title}>
+        {formatted}
+      </td>
+    );
+  }
+  if (col.format === "link" || col.href) {
+    const href = col.href ? interpolate(col.href, row) : String(value ?? "");
+    return (
+      <td className="px-3 py-1.5">
+        <a href={href} target="_blank" rel="noopener noreferrer" className="text-sky-600 underline underline-offset-2">
+          {formatted || href}
+        </a>
+      </td>
+    );
+  }
+  if (col.format === "code") {
+    return (
+      <td className="px-3 py-1.5">
+        <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-[11px] text-slate-800">{formatted}</code>
+      </td>
+    );
+  }
+  return <td className="px-3 py-1.5 text-slate-700">{formatted}</td>;
+}
+
+function formatAbsoluteTitle(value: unknown): string | undefined {
+  if (value == null) return undefined;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Date.parse(value);
+    if (Number.isFinite(parsed)) return formatTimestampInUserTimezone(new Date(parsed).toISOString());
+  }
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  const ms = n > 1e12 ? n : n * 1000;
+  return formatTimestampInUserTimezone(new Date(ms).toISOString());
+}
+
+function RowActionButton({ action, row }: { action: WidgetRowAction; row: Record<string, unknown> }) {
+  const ctx = useDashboardContext();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [error, setError] = useState<string | undefined>();
+  const [pending, setPending] = useState(false);
+
+  const canRun = ctx?.canRunNodes ?? false;
+  const resolved = resolveDashboardNode(ctx, action.node);
+  const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
+  const label = action.label ?? "Run";
+  const hookName = action.hook ?? "run";
+  const Icon = action.icon ? ACTION_ICONS[action.icon] : undefined;
+
+  const disabled = !canRun || !resolved || !isTrigger;
+  let tooltip: string | undefined;
+  if (!canRun) tooltip = "You do not have permission to run actions in this canvas";
+  else if (!resolved) tooltip = `Node "${action.node}" not found on this canvas`;
+  else if (!isTrigger)
+    tooltip = "Only trigger nodes can be run from the dashboard. Pick the trigger that starts your flow.";
+
+  const variantClass =
+    action.variant === "danger"
+      ? "border-red-200 text-red-700 hover:bg-red-50"
+      : action.variant === "primary"
+        ? "border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100"
+        : undefined;
+
+  const fire = async () => {
+    if (!ctx?.onTriggerNode || !resolved?.node.id) return;
+    setError(undefined);
+    setPending(true);
+    try {
+      const parameters = mergeTriggerParameters(resolved.node, hookName, action.template, row, action.payload);
+      await ctx.onTriggerNode(resolved.node.id, {
+        hookName,
+        templateName: action.template,
+        parameters,
+        successLabel: label,
+      });
+      setConfirmOpen(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to trigger");
+    } finally {
+      setPending(false);
+    }
   };
 
-  const label = action.label ?? defaultActionLabel(action.kind);
-  const disabled = !targetValue || !canRun;
+  const handleClick = () => {
+    if (disabled) return;
+    if (action.confirm?.trim()) {
+      setConfirmOpen(true);
+      return;
+    }
+    void fire();
+  };
+
+  const confirmBody = useMemo(() => {
+    if (!action.confirm) return "";
+    const env = buildEnv();
+    return evalTemplate(compileTemplate(action.confirm), row, env, (v) => String(v ?? ""));
+  }, [action.confirm, row]);
+
+  const testId = `widget-row-action-${action.node || "trigger"}`;
+
   return (
-    <Button
-      type="button"
-      size="sm"
-      variant="outline"
-      onClick={handleClick}
-      disabled={disabled}
-      aria-disabled={disabled}
-      title={canRun ? undefined : "You do not have permission to run actions in this canvas"}
-      data-testid={`widget-row-action-${action.kind}`}
-    >
-      {label}
-    </Button>
+    <div className="inline-flex flex-col items-end gap-0.5">
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={handleClick}
+        disabled={disabled || pending}
+        aria-disabled={disabled}
+        title={tooltip}
+        className={variantClass}
+        data-testid={testId}
+        data-variant={action.variant ?? "default"}
+      >
+        {Icon ? <Icon className="mr-1 h-3 w-3" /> : null}
+        {label}
+      </Button>
+      {error ? (
+        <span className="max-w-48 text-right text-[10px] text-red-600" data-testid={`${testId}-error`}>
+          {error}
+        </span>
+      ) : null}
+      {action.confirm ? (
+        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{label}</DialogTitle>
+              <DialogDescription>{confirmBody}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setConfirmOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant={action.variant === "danger" ? "destructive" : "default"}
+                onClick={() => void fire()}
+                disabled={pending}
+                data-testid={`${testId}-confirm`}
+              >
+                {label}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </div>
   );
-}
-
-function defaultTargetField(action: WidgetRowAction): string {
-  if (action.kind === "trigger") return "nodeId";
-  return "id";
-}
-
-function defaultActionLabel(kind: WidgetRowAction["kind"]): string {
-  switch (kind) {
-    case "trigger":
-      return "Trigger";
-    case "approve":
-      return "Approve";
-    case "cancel":
-      return "Cancel";
-    case "push-through":
-      return "Push through";
-    default:
-      return "Run";
-  }
 }
 
 function WidgetSpinner() {

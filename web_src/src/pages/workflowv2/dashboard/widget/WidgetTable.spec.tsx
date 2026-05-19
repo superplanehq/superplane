@@ -8,15 +8,18 @@ import { DashboardContextProvider } from "../DashboardContext";
 import { WidgetTable } from "./WidgetTable";
 import type { WidgetTableRender } from "./types";
 
-const DEPLOY_NODE: SuperplaneComponentsNode = {
-  id: "deploy-id",
-  name: "deploy",
+const START_NODE: SuperplaneComponentsNode = {
+  id: "start-id",
+  name: "start",
   type: "TYPE_TRIGGER",
+  configuration: {
+    templates: [{ name: "default", payload: { issue: { number: 0 } } }],
+  },
 };
 
 const ROWS = [
-  { id: "exec-1", service: "api", status: "failed", nodeId: "deploy-id" },
-  { id: "exec-2", service: "web", status: "passed", nodeId: "deploy-id" },
+  { id: "mem-1", namespace: "environments", service: "api", status: "failed", pr_number: "42" },
+  { id: "mem-2", namespace: "environments", service: "web", status: "passed", pr_number: "7" },
 ];
 
 const RENDER: WidgetTableRender = {
@@ -29,13 +32,8 @@ const RENDER: WidgetTableRender = {
     {
       kind: "trigger",
       label: "Redeploy",
-      target: "nodeId",
-      show: 'row.status == "failed"',
-    },
-    {
-      kind: "cancel",
-      label: "Cancel",
-      target: "id",
+      node: "start",
+      show: 'status == "failed"',
     },
   ],
 };
@@ -45,7 +43,7 @@ function renderTable({
   onTriggerNode,
 }: {
   canRunNodes: boolean;
-  onTriggerNode?: (nodeId: string, options?: { templateName?: string; triggerName?: string }) => void;
+  onTriggerNode?: (nodeId: string, options?: { hookName?: string; successLabel?: string }) => Promise<void>;
 }) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -54,9 +52,9 @@ function renderTable({
         <DashboardContextProvider
           canvasId="canvas-1"
           organizationId="org-1"
-          nodes={[DEPLOY_NODE]}
+          nodes={[START_NODE]}
           canRunNodes={canRunNodes}
-          onTriggerNode={onTriggerNode}
+          onTriggerNode={onTriggerNode ? (id, opts) => void onTriggerNode(id, opts) : undefined}
         >
           <WidgetTable render={RENDER} rows={ROWS} isLoading={false} />
         </DashboardContextProvider>
@@ -66,33 +64,33 @@ function renderTable({
 }
 
 describe("WidgetTable row actions — permission gating", () => {
-  it("invokes the trigger callback when canRunNodes is true", () => {
-    const onTrigger = vi.fn();
+  it("invokes the trigger callback when canRunNodes is true", async () => {
+    const onTrigger = vi.fn().mockResolvedValue(undefined);
     renderTable({ canRunNodes: true, onTriggerNode: onTrigger });
-    const triggers = screen.getAllByTestId("widget-row-action-trigger");
-    // Only the failed row matches the `show` expression.
+    const triggers = screen.getAllByTestId("widget-row-action-start");
     expect(triggers).toHaveLength(1);
     expect(triggers[0]).not.toBeDisabled();
     fireEvent.click(triggers[0]);
-    expect(onTrigger).toHaveBeenCalledWith("deploy-id", { templateName: undefined });
+    expect(onTrigger).toHaveBeenCalledWith(
+      "start-id",
+      expect.objectContaining({
+        hookName: "run",
+        successLabel: "Redeploy",
+      }),
+    );
   });
 
-  it("renders trigger and cancel actions disabled when canRunNodes is false", () => {
+  it("renders trigger disabled when canRunNodes is false", () => {
     const onTrigger = vi.fn();
     renderTable({ canRunNodes: false, onTriggerNode: onTrigger });
-    const trigger = screen.getByTestId("widget-row-action-trigger");
-    const cancels = screen.getAllByTestId("widget-row-action-cancel");
+    const trigger = screen.getByTestId("widget-row-action-start");
     expect(trigger).toBeDisabled();
-    cancels.forEach((c) => expect(c).toBeDisabled());
-    expect(trigger).toHaveAttribute("title", expect.stringMatching(/do not have permission/i));
     fireEvent.click(trigger);
     expect(onTrigger).not.toHaveBeenCalled();
   });
 
-  it("evaluates per-row `show` expressions even when canRunNodes is true", () => {
+  it("evaluates per-row show expressions", () => {
     renderTable({ canRunNodes: true });
-    // The non-failed row should not show the trigger button.
-    const triggers = screen.queryAllByTestId("widget-row-action-trigger");
-    expect(triggers).toHaveLength(1);
+    expect(screen.queryAllByTestId("widget-row-action-start")).toHaveLength(1);
   });
 });
