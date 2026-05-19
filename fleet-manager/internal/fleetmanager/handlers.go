@@ -13,6 +13,7 @@ import (
 
 	"github.com/superplane/runner/fleet-manager/internal/ec2provision"
 	"github.com/superplane/runner/fleet-manager/internal/store"
+	"github.com/superplane/runner/fleet-manager/internal/superplane"
 	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/cwstream"
 	"github.com/superplane/runner/shared/models"
@@ -45,6 +46,9 @@ type Server struct {
 	// successful complete (runner_id must be the EC2 instance id from IMDS in user-data).
 	TerminateRunnerAfterTaskEnabled bool
 	TerminateRunnerInstance         func(ctx context.Context, instanceID string) error
+
+	// SuperPlane reports bridge task completion upstream instead of caller webhooks.
+	SuperPlane *superplane.Client
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
@@ -301,7 +305,24 @@ func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, 
 		return nil, err
 	}
 
-	go s.DeliverWebhook(task)
+	if superplane.IsBridgeWebhook(task.WebhookURL) {
+		taskLog := s.taskLogForTask(task.ID)
+		go func(t *models.Task, tl *api.TaskLogSink) {
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			if s.SuperPlane == nil {
+				if s.Log != nil {
+					s.Log.Warn("superplane client not configured for bridge task", slog.String("task_id", t.ID))
+				}
+				return
+			}
+			if err := s.SuperPlane.CompleteTask(ctx, t, tl); err != nil && s.Log != nil {
+				s.Log.Warn("superplane complete failed", slog.String("task_id", t.ID), slog.Any("err", err))
+			}
+		}(task, taskLog)
+	} else {
+		go s.DeliverWebhook(task)
+	}
 
 	if !req.Canceled && s.TerminateRunnerAfterTaskEnabled && s.TerminateRunnerInstance != nil && isEC2InstanceID(runnerID) {
 		go func(instanceID string) {
@@ -310,8 +331,17 @@ func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, 
 			if err := s.TerminateRunnerInstance(tctx, instanceID); err != nil && s.Log != nil {
 				s.Log.Warn("terminate runner instance after task failed",
 					slog.String("instance_id", instanceID), slog.Any("err", err))
-			} else if s.Log != nil {
-				s.Log.Info("terminate runner instance after task (ec2 shutdown)", slog.String("instance_id", instanceID))
+			} else {
+				if s.Log != nil {
+					s.Log.Info("terminate runner instance after task (ec2 shutdown)", slog.String("instance_id", instanceID))
+				}
+				if s.EC2Launcher != nil {
+					repCtx, repCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+					defer repCancel()
+					if _, err := s.EC2Launcher.Launch(repCtx, 1); err != nil && s.Log != nil {
+						s.Log.Warn("replace runner instance after terminate failed", slog.Any("err", err))
+					}
+				}
 			}
 		}(runnerID)
 	}
@@ -321,7 +351,7 @@ func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, 
 
 // DeliverWebhook POSTs terminal task state to the task webhook URL.
 func (s *Server) DeliverWebhook(task *models.Task) {
-	if s.Webhook == nil {
+	if s.Webhook == nil || superplane.IsBridgeWebhook(task.WebhookURL) {
 		return
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
