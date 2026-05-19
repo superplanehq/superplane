@@ -75,9 +75,9 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 	const schemeDetailResponse = `{"id":101010,"name":"Default scheme","defaultWorkflow":"wf","issueTypeMappings":{"10100":"task-workflow"}}`
 	const issueTypesResponse = `{"issueTypes":[{"id":"10100","name":"Task"}]}`
 	const workflowStatusesResponse = `{"values":[{"id":{"name":"task-workflow"},"statuses":[
-		{"id":"10001","name":"To Do"},
-		{"id":"10002","name":"In Progress"},
-		{"id":"10003","name":"Done"}
+		{"id":"10001","name":"To Do","statusCategory":"TODO"},
+		{"id":"10002","name":"In Progress","statusCategory":"IN_PROGRESS"},
+		{"id":"10003","name":"Done","statusCategory":"DONE"}
 	]}]}`
 
 	t.Run("returns workflow + current status + transitions for a company-managed project", func(t *testing.T) {
@@ -121,8 +121,10 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 		assert.Equal(t, "task-workflow", output.WorkflowName)
 
 		require.Len(t, output.Statuses, 3)
+		statusCategories := map[string]string{}
 		var foundCurrent bool
 		for _, s := range output.Statuses {
+			statusCategories[s.Name] = s.Category
 			if s.Name == "In Progress" {
 				assert.True(t, s.IsCurrent, "current status should be flagged")
 				foundCurrent = true
@@ -130,6 +132,9 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 				assert.False(t, s.IsCurrent)
 			}
 		}
+		assert.Equal(t, "TODO", statusCategories["To Do"])
+		assert.Equal(t, "IN_PROGRESS", statusCategories["In Progress"])
+		assert.Equal(t, "DONE", statusCategories["Done"])
 		assert.True(t, foundCurrent)
 
 		require.Len(t, output.AvailableTransitions, 2)
@@ -173,9 +178,9 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 	t.Run("falls back to default workflow when issue type is not in the scheme mappings", func(t *testing.T) {
 		schemeWithoutMapping := `{"id":101010,"name":"Default scheme","defaultWorkflow":"jira-default","issueTypeMappings":{}}`
 		defaultWorkflowStatuses := `{"values":[{"id":{"name":"jira-default"},"statuses":[
-			{"id":"10001","name":"To Do"},
-			{"id":"10002","name":"In Progress"},
-			{"id":"10003","name":"Done"}
+			{"id":"10001","name":"To Do","statusCategory":"TODO"},
+			{"id":"10002","name":"In Progress","statusCategory":"IN_PROGRESS"},
+			{"id":"10003","name":"Done","statusCategory":"DONE"}
 		]}]}`
 
 		httpContext := &contexts.HTTPContext{

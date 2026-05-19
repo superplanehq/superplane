@@ -590,7 +590,7 @@ type workflowSearchEntry struct {
 	ID struct {
 		Name string `json:"name"`
 	} `json:"id"`
-	Statuses []Status `json:"statuses"`
+	Statuses []globalStatus `json:"statuses"`
 }
 
 type workflowSearchResponse struct {
@@ -616,13 +616,25 @@ func (c *Client) GetWorkflowStatusesByName(workflowName string) ([]Status, error
 	}
 	for _, entry := range out.Values {
 		if entry.ID.Name == workflowName {
-			return entry.Statuses, nil
+			return statusesFromGlobal(entry.Statuses), nil
 		}
 	}
 	if len(out.Values) > 0 {
-		return out.Values[0].Statuses, nil
+		return statusesFromGlobal(out.Values[0].Statuses), nil
 	}
 	return nil, fmt.Errorf("workflow %q not found", workflowName)
+}
+
+func statusesFromGlobal(raw []globalStatus) []Status {
+	statuses := make([]Status, 0, len(raw))
+	for _, s := range raw {
+		statuses = append(statuses, Status{
+			ID:       s.ID,
+			Name:     s.Name,
+			Category: normalizeStatusCategoryName(s.StatusCategory),
+		})
+	}
+	return statuses
 }
 
 // GetProjectIssueTypeStatuses returns each issue type's current status list

@@ -680,3 +680,28 @@ func Test__Client__ResolveNumericIssueID(t *testing.T) {
 		assert.Equal(t, "999", id)
 	})
 }
+
+func Test__GetWorkflowStatusesByName(t *testing.T) {
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{"values":[{"id":{"name":"task-workflow"},"statuses":[
+					{"id":"10001","name":"To Do","statusCategory":"TODO"},
+					{"id":"10002","name":"In Progress","statusCategory":"IN_PROGRESS"},
+					{"id":"10003","name":"Done","statusCategory":"DONE"}
+				]}]}`)),
+			},
+		},
+	}
+
+	client, err := NewClient(httpContext, newAuthorizedIntegration())
+	require.NoError(t, err)
+
+	statuses, err := client.GetWorkflowStatusesByName("task-workflow")
+	require.NoError(t, err)
+	require.Len(t, statuses, 3)
+	assert.Equal(t, Status{ID: "10001", Name: "To Do", Category: "TODO"}, statuses[0])
+	assert.Equal(t, Status{ID: "10002", Name: "In Progress", Category: "IN_PROGRESS"}, statuses[1])
+	assert.Equal(t, Status{ID: "10003", Name: "Done", Category: "DONE"}, statuses[2])
+}
