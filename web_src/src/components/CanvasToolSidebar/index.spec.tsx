@@ -222,7 +222,7 @@ describe("CanvasToolSidebar", () => {
 
     const input = await screen.findByTestId("agent-input");
     await user.type(input, "first");
-    await user.click(screen.getByRole("button", { name: "Send" }));
+    await user.click(screen.getByTestId("agent-send-message-button"));
 
     // While the first send is still pending, user can type a new message.
     await user.type(input, "second");

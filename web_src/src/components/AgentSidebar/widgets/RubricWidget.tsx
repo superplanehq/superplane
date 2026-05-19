@@ -85,11 +85,7 @@ export function RubricWidget({ title, criteria, categories, onAction, onStartBui
           <Button variant="ghost" size="sm" className="text-xs text-slate-500 h-7" onClick={openModal}>
             View Full Plan
           </Button>
-          <Button
-            size="sm"
-            className="text-xs h-7 ml-auto"
-            onClick={handleStartBuilding}
-          >
+          <Button size="sm" className="text-xs h-7 ml-auto" onClick={handleStartBuilding}>
             Start Building →
           </Button>
         </div>

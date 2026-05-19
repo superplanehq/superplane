@@ -1,7 +1,7 @@
 import { Compass, Hammer, Monitor } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import type { AgentMode } from "./agentMode";
+import { VISIBLE_AGENT_MODES, type AgentMode } from "./agentMode";
 
 const modeConfig = {
   builder: {
@@ -21,8 +21,6 @@ const modeConfig = {
   },
 } as const;
 
-const VISIBLE_MODES: AgentMode[] = ["builder", "operator"];
-
 export function ModeToggle({
   mode,
   onSwitch,
@@ -39,7 +37,7 @@ export function ModeToggle({
   return (
     <div className="flex items-center gap-1.5" data-testid="agent-mode-toggle">
       <div className="flex items-center gap-0.5 rounded-md bg-slate-100 p-0.5">
-        {VISIBLE_MODES.map((key) => {
+        {VISIBLE_AGENT_MODES.map((key) => {
           const config = modeConfig[key];
           const Icon = config.icon;
           const isActive = mode === key;
@@ -52,9 +50,7 @@ export function ModeToggle({
                   disabled={disabled || streaming}
                   className={cn(
                     "flex h-6 w-6 items-center justify-center rounded transition-colors",
-                    isActive
-                      ? "bg-white text-slate-900 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700",
+                    isActive ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700",
                     (disabled || streaming) && !isActive && "cursor-not-allowed opacity-40",
                     isActive && streaming && "animate-pulse-border",
                   )}
