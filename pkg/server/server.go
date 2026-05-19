@@ -104,11 +104,21 @@ func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.S
 		return nil, nil
 	}
 
+	// Load session resources (mounted reference files)
+	var fileResources []agents.FileResource
+	for _, r := range config.LoadSessionResources() {
+		fileResources = append(fileResources, agents.FileResource{
+			FileID:    r.FileID,
+			MountPath: r.MountPath,
+		})
+	}
+
 	provider, err := anthropic.New(anthropic.Config{
 		APIKey:        cfg.APIKey,
 		AgentID:       cfg.AgentID,
 		EnvironmentID: cfg.EnvironmentID,
 		VaultIDs:      cfg.VaultIDs,
+		Resources:     fileResources,
 	})
 	if err != nil {
 		log.WithError(err).Warn("failed to initialise Anthropic managed agents provider")

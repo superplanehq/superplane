@@ -22,6 +22,7 @@ type Provider struct {
 	agentID       string
 	environmentID string
 	vaultIDs      []string
+	resources     []agents.FileResource
 	client        *Client
 }
 
@@ -40,6 +41,7 @@ func New(cfg Config) (*Provider, error) {
 		agentID:       cfg.AgentID,
 		environmentID: cfg.EnvironmentID,
 		vaultIDs:      cfg.VaultIDs,
+		resources:     cfg.Resources,
 		client:        client,
 	}, nil
 }
@@ -61,6 +63,22 @@ func (p *Provider) CreateSession(ctx context.Context, opts agents.CreateSessionO
 	}
 	if len(vaultIDs) > 0 {
 		body["vault_ids"] = vaultIDs
+	}
+	// Mount reference files
+	resources := opts.Resources
+	if len(p.resources) > 0 && len(resources) == 0 {
+		resources = p.resources
+	}
+	if len(resources) > 0 {
+		fileResources := make([]map[string]string, len(resources))
+		for i, r := range resources {
+			fileResources[i] = map[string]string{
+				"type":       "file",
+				"file_id":    r.FileID,
+				"mount_path": r.MountPath,
+			}
+		}
+		body["resources"] = fileResources
 	}
 	data, err := p.client.executeHTTP(ctx, http.MethodPost, "/sessions", body)
 	if err != nil {

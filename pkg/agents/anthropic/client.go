@@ -8,6 +8,8 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/superplanehq/superplane/pkg/agents"
 	"time"
 )
 
@@ -22,6 +24,7 @@ type Config struct {
 	AgentID       string
 	EnvironmentID string
 	VaultIDs      []string
+	Resources     []agents.FileResource
 	BaseURL       string // overridable for tests
 	HTTPClient    *http.Client
 }

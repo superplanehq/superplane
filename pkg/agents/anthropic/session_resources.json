@@ -1,0 +1,262 @@
+[
+  {
+    "file_id": "file_011CbBVKuEZNqrTstvuLuEAm",
+    "mount_path": "/mnt/ref/canvas-builder.md",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVKwUz7GrahtqfUH1BQ",
+    "mount_path": "/mnt/ref/cli-reference.md",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVKyQq5qSM39AMnrMj5",
+    "mount_path": "/mnt/ref/monitor.md",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVL1GhCrkv2Wt42NXLb",
+    "mount_path": "/mnt/ref/canvas-yaml-spec.md",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVL3AHtjp14Hxj8hRSD",
+    "mount_path": "/mnt/ref/components-and-triggers.md",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVshj9HtKLcMF5UbVJV",
+    "mount_path": "/mnt/ref/rich-ui-widgets.md",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVsnvBzD1yAfQ8Xq69U",
+    "mount_path": "/mnt/ref/components/AWS.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVspCmJVDNyBNxRYwYr",
+    "mount_path": "/mnt/ref/components/Bitbucket.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVsqvxvYZxT4DFw3nHe",
+    "mount_path": "/mnt/ref/components/CircleCI.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVspdcxofreXTmzgpmk",
+    "mount_path": "/mnt/ref/components/Claude.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVsrdBfRtiAHAj41fjG",
+    "mount_path": "/mnt/ref/components/Cloudflare.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVstjwANhYf9YTiYt7F",
+    "mount_path": "/mnt/ref/components/Core.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVsvGCoHiLepMJisSFg",
+    "mount_path": "/mnt/ref/components/Cursor.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVswqDkKxn15jUV97Ra",
+    "mount_path": "/mnt/ref/components/Dash0.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVsyat7C6Rn94gKwJqK",
+    "mount_path": "/mnt/ref/components/Datadog.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVt1SWa1v5kPrLTwcUm",
+    "mount_path": "/mnt/ref/components/Daytona.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVt3azK8ky7hTcbyjhp",
+    "mount_path": "/mnt/ref/components/DigitalOcean.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVt5DUMrsUmNLJYvQ6E",
+    "mount_path": "/mnt/ref/components/Discord.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVt6tvdMpLjHDjYtD43",
+    "mount_path": "/mnt/ref/components/DockerHub.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVt8e6YRCd7jgrG4guk",
+    "mount_path": "/mnt/ref/components/Elastic.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtARziCgvYqhSa3iKn",
+    "mount_path": "/mnt/ref/components/FireHydrant.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtCEdzn3uQiqKoF13p",
+    "mount_path": "/mnt/ref/components/GitHub.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtDs7j9Jm4LbscEEm7",
+    "mount_path": "/mnt/ref/components/GitLab.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtFXLmVwfidiRDMBDu",
+    "mount_path": "/mnt/ref/components/GoogleCloud.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtHJyyMxYAaQErrRDi",
+    "mount_path": "/mnt/ref/components/Grafana.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtJp2RNwkUCER3GwBX",
+    "mount_path": "/mnt/ref/components/Harness.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtLbvWu7juShmCoAKb",
+    "mount_path": "/mnt/ref/components/HetznerCloud.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtNRZzdMyWt3Zmw6DL",
+    "mount_path": "/mnt/ref/components/Honeycomb.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtPusHhbHMP8nWTU1T",
+    "mount_path": "/mnt/ref/components/Incident.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtRNAx3qq6cX9wfMeS",
+    "mount_path": "/mnt/ref/components/JFrogArtifactory.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtT2PERitGkGGLLryz",
+    "mount_path": "/mnt/ref/components/Jira.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtUcdWv8GjqNVZmfoc",
+    "mount_path": "/mnt/ref/components/LaunchDarkly.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVthSZDNYifonfTJwLs",
+    "mount_path": "/mnt/ref/components/Logfire.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtjHBfwUxWfvvXne5H",
+    "mount_path": "/mnt/ref/components/MicrosoftAzure.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtkjFfd7v6rocnH3ai",
+    "mount_path": "/mnt/ref/components/MicrosoftTeams.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtnKk1jG1z8c6sNSyg",
+    "mount_path": "/mnt/ref/components/NewRelic.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtp1Spvh8XGsXrYsaY",
+    "mount_path": "/mnt/ref/components/OctopusDeploy.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtqYUgbWAQQxp6SWRL",
+    "mount_path": "/mnt/ref/components/OpenAI.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtsNriAR4o2ptLxZ7H",
+    "mount_path": "/mnt/ref/components/OracleCloudInfrastructure.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVttyqTEcrkKgtTYDMX",
+    "mount_path": "/mnt/ref/components/PagerDuty.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtvaqBmtdZ7aomfA11",
+    "mount_path": "/mnt/ref/components/Perplexity.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtx49CqWewuob7sHsX",
+    "mount_path": "/mnt/ref/components/Prometheus.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVtywVxuQizPh4YyG4k",
+    "mount_path": "/mnt/ref/components/Render.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVu1YEVDinv8HLZwgcJ",
+    "mount_path": "/mnt/ref/components/Rootly.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVu3CCe8nie9Bk5Yy6d",
+    "mount_path": "/mnt/ref/components/SMTP.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVu4rfNeQoQsKrK4kNF",
+    "mount_path": "/mnt/ref/components/Semaphore.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVu6fK2YzNC6zoMoChv",
+    "mount_path": "/mnt/ref/components/SendGrid.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVu8CaXjExGhfGEtXya",
+    "mount_path": "/mnt/ref/components/Sentry.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVuASmPH7mqVVGqboRd",
+    "mount_path": "/mnt/ref/components/ServiceNow.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVuC8iZ27eEUJE9XstK",
+    "mount_path": "/mnt/ref/components/Slack.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVuDqQc3ssBsUcpJXd4",
+    "mount_path": "/mnt/ref/components/Statuspage.mdx",
+    "type": "file"
+  },
+  {
+    "file_id": "file_011CbBVuFaqYKrn5qJrjWnAS",
+    "mount_path": "/mnt/ref/components/Telegram.mdx",
+    "type": "file"
+  }
+]
