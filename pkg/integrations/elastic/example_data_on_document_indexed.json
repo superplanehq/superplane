@@ -4,8 +4,7 @@
     "index": "workflow-audit",
     "source": {
       "@timestamp": "2026-03-12T09:00:00Z",
-      "message": "deployment started",
-      "service": "api"
+      "message": "deployment started"
     }
   },
   "timestamp": "2026-03-12T09:00:00Z",

@@ -5,14 +5,13 @@
     "ruleId": "abc-123",
     "ruleName": "High error rate detected",
     "spaceId": "default",
-    "tags": ["infrastructure", "prod"],
+    "tags": [
+      "env:prod",
+      "service:web",
+      "severity:high"
+    ],
     "status": "active",
-    "severity": "critical",
-    "context": {
-      "message": "Error rate exceeded threshold: 15%",
-      "threshold": 10,
-      "value": 15
-    }
+    "severity": "critical"
   },
   "timestamp": "2026-03-12T09:00:00Z"
 }
