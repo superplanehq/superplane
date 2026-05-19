@@ -130,7 +130,7 @@ func (t *FleetTask) EffectiveExitCode() int {
 }
 
 func (t *FleetTask) IsInTerminalState() bool {
-	return t.Status == "succeeded" || t.Status == "failed"
+	return t.Status == "succeeded" || t.Status == "failed" || t.Status == "canceled"
 }
 
 // FleetTaskLog matches the fleet-manager JSON shape for CloudWatch-backed live logs.
