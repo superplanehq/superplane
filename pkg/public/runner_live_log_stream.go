@@ -1,11 +1,7 @@
 package public
 
 import (
-	"fmt"
-	"io"
 	"net/http"
-	"net/url"
-	"os"
 	"strings"
 
 	"github.com/google/uuid"
@@ -14,6 +10,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"github.com/superplanehq/superplane/pkg/runners"
+	"github.com/superplanehq/superplane/pkg/runners/livelogs"
 )
 
 func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Request) {
@@ -73,16 +71,8 @@ func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	meta := execution.Metadata.Data()
-	var brokerTaskID string
-	if v, ok := meta[runneraction.ExecutionMetadataBrokerTaskID]; ok && v != nil {
-		if s, ok2 := v.(string); ok2 {
-			brokerTaskID = strings.TrimSpace(s)
-		} else {
-			brokerTaskID = strings.TrimSpace(fmt.Sprint(v))
-		}
-	}
-	if brokerTaskID == "" {
+	group, stream, region, ok := resolveCloudWatchLogSink(execution.Metadata.Data())
+	if !ok {
 		http.Error(
 			w,
 			"Logs are not available for this execution yet. Check again shortly.",
@@ -91,70 +81,81 @@ func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	base := strings.TrimRight(strings.TrimSpace(os.Getenv("TASK_BROKER_BASE_URL")), "/")
-	token := strings.TrimSpace(os.Getenv("TASK_BROKER_AUTH_TOKEN"))
-	if base == "" || token == "" {
-		http.Error(w, "Live logs are not configured on this installation", http.StatusServiceUnavailable)
-		return
-	}
-	upstream := base + "/v1/tasks/" + url.PathEscape(brokerTaskID) + "/live-logs"
-
-	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstream, nil)
-	if err != nil {
-		http.Error(w, "Bad gateway", http.StatusBadGateway)
-		return
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	req.Header.Set("Accept", "application/x-ndjson")
-	// Avoid upstream gzip; it adds latency and can buffer small NDJSON chunks.
-	req.Header.Set("Accept-Encoding", "identity")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadGateway)
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		if ct := resp.Header.Get("Content-Type"); ct != "" {
-			w.Header().Set("Content-Type", ct)
-		} else {
-			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		}
-		w.WriteHeader(resp.StatusCode)
-		_, _ = io.Copy(w, resp.Body)
-		return
-	}
-
-	if ct := resp.Header.Get("Content-Type"); ct != "" {
-		w.Header().Set("Content-Type", ct)
-	} else {
-		w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
-	}
+	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusOK)
-	flusher, flusherOK := w.(http.Flusher)
-	if flusherOK {
+	flusher, _ := w.(http.Flusher)
+	if flusher != nil {
 		flusher.Flush()
 	}
 
-	buf := make([]byte, 16*1024)
-	for {
-		n, readErr := resp.Body.Read(buf)
-		if n > 0 {
-			if _, writeErr := w.Write(buf[:n]); writeErr != nil {
-				return
+	_ = livelogs.StreamCloudWatchLogToNDJSON(r.Context(), w, flusher, group, stream, region)
+}
+
+func resolveCloudWatchLogSink(meta any) (group, stream, region string, ok bool) {
+	m, _ := meta.(map[string]any)
+	if m == nil {
+		return "", "", "", false
+	}
+
+	if v, exists := m[runneraction.ExecutionMetadataTaskLog]; exists && v != nil {
+		if sink := taskLogMapToSink(v); sink != nil && sink.CloudWatch != nil {
+			g := strings.TrimSpace(sink.CloudWatch.LogGroupName)
+			s := strings.TrimSpace(sink.CloudWatch.LogStreamName)
+			if g != "" && s != "" {
+				return g, s, strings.TrimSpace(sink.CloudWatch.Region), true
 			}
-			if flusherOK {
-				flusher.Flush()
-			}
-		}
-		if readErr != nil {
-			if readErr == io.EOF {
-				break
-			}
-			return
 		}
 	}
+
+	store := runners.NewPostgresStore()
+	if brokerID, ok2 := m[runneraction.ExecutionMetadataBrokerTaskID].(string); ok2 && strings.TrimSpace(brokerID) != "" {
+		if taskID, err := uuid.Parse(strings.TrimSpace(brokerID)); err == nil {
+			if task, err := store.FindTask(taskID); err == nil {
+				if sink := task.TaskLog.Data(); sink != nil && sink.CloudWatch != nil {
+					g := strings.TrimSpace(sink.CloudWatch.LogGroupName)
+					s := strings.TrimSpace(sink.CloudWatch.LogStreamName)
+					if g != "" && s != "" {
+						return g, s, strings.TrimSpace(sink.CloudWatch.Region), true
+					}
+				}
+			}
+		}
+	}
+
+	return "", "", "", false
+}
+
+func taskLogMapToSink(v any) *runners.FleetTaskLog {
+	switch t := v.(type) {
+	case runners.FleetTaskLog:
+		return &t
+	case *runners.FleetTaskLog:
+		return t
+	case map[string]any:
+		ft := &runners.FleetTaskLog{}
+		if typ, ok := t["type"].(string); ok {
+			ft.Type = typ
+		}
+		if cw, ok := t["cloudwatch"].(map[string]any); ok {
+			ft.CloudWatch = &struct {
+				LogGroupName  string `json:"log_group_name"`
+				LogStreamName string `json:"log_stream_name"`
+				Region        string `json:"region,omitempty"`
+			}{}
+			if g, ok := cw["log_group_name"].(string); ok {
+				ft.CloudWatch.LogGroupName = g
+			}
+			if s, ok := cw["log_stream_name"].(string); ok {
+				ft.CloudWatch.LogStreamName = s
+			}
+			if r, ok := cw["region"].(string); ok {
+				ft.CloudWatch.Region = r
+			}
+		}
+		if ft.Type != "" {
+			return ft
+		}
+	}
+	return nil
 }

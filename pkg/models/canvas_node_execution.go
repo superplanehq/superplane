@@ -319,6 +319,14 @@ func FindNodeExecution(workflowID, id uuid.UUID) (*CanvasNodeExecution, error) {
 	return FindNodeExecutionInTransaction(database.Conn(), workflowID, id)
 }
 
+func FindNodeExecutionByID(tx *gorm.DB, id uuid.UUID) (*CanvasNodeExecution, error) {
+	var execution CanvasNodeExecution
+	if err := tx.Where("id = ?", id).First(&execution).Error; err != nil {
+		return nil, err
+	}
+	return &execution, nil
+}
+
 func FindNodeExecutionInTransaction(tx *gorm.DB, workflowID, id uuid.UUID) (*CanvasNodeExecution, error) {
 	var execution CanvasNodeExecution
 	err := tx.
