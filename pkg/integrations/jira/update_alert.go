@@ -355,6 +355,8 @@ func buildUpdateAlertConfiguredSummaries(cfg map[string]any, spec UpdateAlertSpe
 		p := strings.TrimSpace(spec.Priority)
 		if p != "" && p != "__none__" {
 			summaries = append(summaries, fmt.Sprintf("Priority → %s", p))
+		} else {
+			summaries = append(summaries, "Priority update")
 		}
 	}
 	if isTruthy(cfg, "setAssignment") {
