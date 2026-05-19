@@ -168,38 +168,14 @@ export function useDraftActions({
     };
   }, [canvasId, dismissVersion, effectiveDraft, organizationId]);
 
-  useEffect(() => {
-    async function handleVersionUpdated(event: Event) {
-      const versionId = getUpdatedVersionId(event);
-      if (!versionId || dismissedVersionIds.has(versionId)) return;
-
-      try {
-        const data = await fetchCanvasVersion(canvasId, versionId, organizationId);
-        if (!data) {
-          await handleVersionDiscarded(versionId);
-          return;
-        }
-
-        const state = data.version?.metadata?.state;
-        if (state === PUBLISHED_STATE) {
-          await handleVersionPublished(versionId);
-          return;
-        }
-        if (state && state !== DRAFT_STATE) {
-          dismissVersion(versionId);
-        }
-      } catch {
-        // Ignore transient websocket follow-up failures.
-      }
-    }
-
-    const listener = (event: Event) => {
-      void handleVersionUpdated(event);
-    };
-
-    window.addEventListener("canvas:version-updated", listener);
-    return () => window.removeEventListener("canvas:version-updated", listener);
-  }, [canvasId, dismissVersion, dismissedVersionIds, handleVersionDiscarded, handleVersionPublished, organizationId]);
+  useCanvasVersionUpdates({
+    canvasId,
+    dismissedVersionIds,
+    dismissVersion,
+    handleVersionDiscarded,
+    handleVersionPublished,
+    organizationId,
+  });
 
   const dismiss = useCallback(() => {
     if (!effectiveDraft) return;
@@ -213,6 +189,77 @@ export function useDraftActions({
   }
 
   return { latestDraft: effectiveDraft, dismiss };
+}
+
+type UseCanvasVersionUpdatesArgs = {
+  canvasId: string;
+  organizationId: string;
+  dismissedVersionIds: Set<string>;
+  dismissVersion: (versionId: string) => void;
+  handleVersionPublished: (versionId: string) => Promise<void>;
+  handleVersionDiscarded: (versionId: string) => Promise<void>;
+};
+
+function useCanvasVersionUpdates({
+  canvasId,
+  organizationId,
+  dismissedVersionIds,
+  dismissVersion,
+  handleVersionPublished,
+  handleVersionDiscarded,
+}: UseCanvasVersionUpdatesArgs): void {
+  useEffect(() => {
+    const listener = (event: Event) => {
+      void processVersionUpdate({
+        event,
+        canvasId,
+        organizationId,
+        dismissedVersionIds,
+        dismissVersion,
+        handleVersionPublished,
+        handleVersionDiscarded,
+      });
+    };
+
+    window.addEventListener("canvas:version-updated", listener);
+    return () => window.removeEventListener("canvas:version-updated", listener);
+  }, [canvasId, dismissVersion, dismissedVersionIds, handleVersionDiscarded, handleVersionPublished, organizationId]);
+}
+
+type ProcessVersionUpdateArgs = UseCanvasVersionUpdatesArgs & {
+  event: Event;
+};
+
+async function processVersionUpdate({
+  event,
+  canvasId,
+  organizationId,
+  dismissedVersionIds,
+  dismissVersion,
+  handleVersionPublished,
+  handleVersionDiscarded,
+}: ProcessVersionUpdateArgs): Promise<void> {
+  const versionId = getUpdatedVersionId(event);
+  if (!versionId || dismissedVersionIds.has(versionId)) return;
+
+  try {
+    const data = await fetchCanvasVersion(canvasId, versionId, organizationId);
+    if (!data) {
+      await handleVersionDiscarded(versionId);
+      return;
+    }
+
+    const state = data.version?.metadata?.state;
+    if (state === PUBLISHED_STATE) {
+      await handleVersionPublished(versionId);
+      return;
+    }
+    if (state && state !== DRAFT_STATE) {
+      dismissVersion(versionId);
+    }
+  } catch {
+    // Ignore transient websocket follow-up failures.
+  }
 }
 
 function findLatestDraftAction(messages: AgentMessage[], dismissedVersionIds: Set<string>): DraftActionsSegment | null {

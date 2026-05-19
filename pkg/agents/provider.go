@@ -45,9 +45,16 @@ type OutcomeEvaluation struct {
 	Explanation string // grader's prose verdict
 }
 
+type FileResource struct {
+	FileID    string
+	MountPath string
+}
+
 type CreateSessionOptions struct {
 	InitialContext string
 	Title          string
+	VaultIDs       []string
+	Resources      []FileResource
 }
 
 type DefineOutcomeOptions struct {
@@ -57,6 +64,9 @@ type DefineOutcomeOptions struct {
 	Rubric string
 	// MaxIterations caps the provider's autonomous build/evaluate loop.
 	MaxIterations int
+	// ContextPreamble is prepended to the description so provider-managed
+	// autonomous loops get the same refreshed session context as normal turns.
+	ContextPreamble string
 }
 
 type CreateSessionResult struct {

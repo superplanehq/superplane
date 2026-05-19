@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { cn } from "@/lib/utils";
-import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Play, Trash2, TriangleAlert } from "lucide-react";
+import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Trash2, TriangleAlert } from "lucide-react";
 import {
   Component,
   memo,
@@ -39,7 +39,6 @@ import type {
   CanvasChangesetChange,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeQueueItem,
   SuperplaneActionsAction,
   ComponentsIntegrationRef,
   SuperplaneComponentsNode as ComponentsNode,
@@ -235,13 +234,8 @@ export interface CanvasPageProps {
   onAutoLayoutNodes?: (nodeIds: string[]) => void;
   onEdgeDelete?: (edgeIds: string[]) => void;
   runsEvents?: CanvasesCanvasEventWithExecutions[];
-  runsTotalCount?: number;
-  runsHasNextPage?: boolean;
-  runsIsFetchingNextPage?: boolean;
-  onRunsLoadMore?: () => void;
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
-  runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   toolSidebarRunsContent?: React.ReactNode;
   toolSidebarVersionsContent?: React.ReactNode;
   onRunNodeSelect?: (nodeId: string) => void;
@@ -264,7 +258,6 @@ export interface CanvasPageProps {
   onToggleView?: (nodeId: string, collapsed: boolean) => void;
   onReEmit?: (nodeId: string, eventOrExecutionId: string) => void;
   onRunItemOpen?: (nodeId: string | undefined, executionStatus: string, errorMessage?: string) => void;
-  onLogView?: () => void;
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
@@ -1237,8 +1230,10 @@ function CanvasPage(props: CanvasPageProps) {
 
         <div className="flex-1 relative">
           {props.runCanvasLoading && props.headerMode === "runs" ? (
-            <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-50">
-              <Loader2 className="h-6 w-6 animate-spin text-slate-500" />
+            <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
+              <div className="rounded-lg bg-white/80 p-3 shadow-sm backdrop-blur-sm">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-500" />
+              </div>
             </div>
           ) : null}
           {showPreviewFloatingBar || showAwaitingFloatingBar ? (
@@ -1326,20 +1321,14 @@ function CanvasPage(props: CanvasPageProps) {
               fitAllFocusNodeIds={props.fitAllFocusNodeIds}
               runParticipantNodeIds={props.runParticipantNodeIds}
               runsEvents={props.runsEvents}
-              runsTotalCount={props.runsTotalCount}
-              runsHasNextPage={props.runsHasNextPage}
-              runsIsFetchingNextPage={props.runsIsFetchingNextPage}
-              onRunsLoadMore={props.onRunsLoadMore}
               runsNodes={props.runsNodes}
               runsComponentIconMap={props.runsComponentIconMap}
-              runsNodeQueueItemsMap={props.runsNodeQueueItemsMap}
               onRunNodeSelect={props.onRunNodeSelect}
               onRunExecutionSelect={props.onRunExecutionSelect}
               onAcknowledgeErrors={props.onAcknowledgeErrors}
               missingIntegrations={props.missingIntegrations}
               onConnectIntegration={props.onConnectIntegration}
               canCreateIntegrations={props.canCreateIntegrations}
-              onLogView={props.onLogView}
             />
           </ReactFlowProvider>
           {props.headerMode === "runs" ? null : (
@@ -1858,20 +1847,14 @@ function CanvasContent({
   fitAllFocusNodeIds,
   runParticipantNodeIds,
   runsEvents,
-  runsTotalCount,
-  runsHasNextPage,
-  runsIsFetchingNextPage,
-  onRunsLoadMore,
   runsNodes,
   runsComponentIconMap,
-  runsNodeQueueItemsMap,
   onRunNodeSelect,
   onRunExecutionSelect,
   onAcknowledgeErrors,
   missingIntegrations,
   onConnectIntegration,
   canCreateIntegrations,
-  onLogView,
 }: {
   state: CanvasPageState;
   onNodeEdit: (nodeId: string) => void;
@@ -1919,13 +1902,8 @@ function CanvasContent({
   fitAllFocusNodeIds?: string[];
   runParticipantNodeIds?: string[];
   runsEvents?: CanvasesCanvasEventWithExecutions[];
-  runsTotalCount?: number;
-  runsHasNextPage?: boolean;
-  runsIsFetchingNextPage?: boolean;
-  onRunsLoadMore?: () => void;
   runsNodes?: ComponentsNode[];
   runsComponentIconMap?: Record<string, string>;
-  runsNodeQueueItemsMap?: Record<string, CanvasesCanvasNodeQueueItem[]>;
   onRunNodeSelect?: (nodeId: string) => void;
   onRunExecutionSelect?: (options: {
     nodeId: string;
@@ -1937,7 +1915,6 @@ function CanvasContent({
   missingIntegrations?: MissingIntegration[];
   onConnectIntegration?: (integrationName: string) => void;
   canCreateIntegrations?: boolean;
-  onLogView?: () => void;
 }) {
   const { fitView, screenToFlowPosition, getViewport, getInternalNode, getNodes, setViewport } = useReactFlow();
   const { zoom } = useViewport();
@@ -1987,14 +1964,13 @@ function CanvasContent({
     const saved = localStorage.getItem(CONSOLE_OPEN_STORAGE_KEY);
     return saved !== null ? saved === "true" : false;
   });
-  const [consoleTab, setConsoleTab] = useState<ConsoleTab>("runs");
+  const [consoleTab, setConsoleTab] = useState<ConsoleTab>("errors");
   const [logSearch, setLogSearch] = useState("");
   const [logSidebarHeight, setLogSidebarHeight] = useState(() => {
     const saved = localStorage.getItem(CONSOLE_HEIGHT_STORAGE_KEY);
     return saved ? parseInt(saved, 10) : 320;
   });
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
-  const isLiveMode = headerMode === "version-live" || headerMode === "dashboard";
   const isEditMode = headerMode === "version-edit";
   const runSelectableSet = useMemo(() => {
     if (headerMode !== "runs" || !runParticipantNodeIds || runParticipantNodeIds.length === 0) {
@@ -2021,18 +1997,6 @@ function CanvasContent({
     localStorage.setItem(CONSOLE_HEIGHT_STORAGE_KEY, String(logSidebarHeight));
   }, [logSidebarHeight]);
 
-  const runsCountInfo = useMemo(() => {
-    const events = runsEvents || [];
-    let running = 0;
-    for (const event of events) {
-      const execs = event.executions || [];
-      if (execs.some((e) => e.state === "STATE_STARTED" || e.state === "STATE_PENDING")) {
-        running++;
-      }
-    }
-    return { total: runsTotalCount || events.length, running };
-  }, [runsEvents, runsTotalCount]);
-
   const unacknowledgedErrorCount = useMemo(() => countUnacknowledgedErrors(runsEvents || []), [runsEvents]);
 
   useEffect(() => {
@@ -2040,14 +2004,6 @@ function CanvasContent({
       setIsLogSidebarOpen(false);
     }
   }, [showBottomStatusControls]);
-
-  useEffect(() => {
-    if (isLiveMode || consoleTab !== "runs") {
-      return;
-    }
-
-    setConsoleTab("errors");
-  }, [consoleTab, isLiveMode]);
 
   const [multiSelectedNodes, setMultiSelectedNodes] = useState<ReactFlowNode[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
@@ -2745,14 +2701,6 @@ function CanvasContent({
         if (entry.type === "error") acc.error += 1;
         if (entry.type === "warning") acc.warning += 1;
         if (entry.type === "success") acc.success += 1;
-        if (entry.runItems?.length) {
-          acc.total += entry.runItems.length;
-          entry.runItems.forEach((item) => {
-            if (item.type === "error") acc.error += 1;
-            if (item.type === "warning") acc.warning += 1;
-            if (item.type === "success") acc.success += 1;
-          });
-        }
         return acc;
       },
       { total: 0, error: 0, warning: 0, success: 0 },
@@ -2769,16 +2717,10 @@ function CanvasContent({
     );
   }, [logEntries, logSearch]);
 
-  const handleLogButtonClick = useCallback(
-    (tab: ConsoleTab) => {
-      setConsoleTab(tab);
-      setIsLogSidebarOpen(true);
-      if (tab === "runs") {
-        onLogView?.();
-      }
-    },
-    [onLogView],
-  );
+  const handleLogButtonClick = useCallback((tab: ConsoleTab) => {
+    setConsoleTab(tab);
+    setIsLogSidebarOpen(true);
+  }, []);
   const handleSnapToGridToggle = useCallback(() => setIsSnapToGridEnabled((prev) => !prev), []);
   const handleNodeSearch = useCallback((searchString: string) => {
     const query = searchString.toLowerCase();
@@ -2925,41 +2867,6 @@ function CanvasContent({
                 </ZoomSlider>
                 {showBottomStatusControls && !isLogSidebarOpen ? (
                   <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-1 rounded-md p-0.5 h-8">
-                    {isLiveMode ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={cn(
-                              "h-8 items-center text-xs font-medium",
-                              runsCountInfo.running > 0 && "text-blue-600",
-                            )}
-                            onClick={() => handleLogButtonClick("runs")}
-                          >
-                            {runsCountInfo.running > 0 ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : (
-                              <Play className="h-3 w-3" />
-                            )}
-                            <span className={cn(runsCountInfo.running > 0 ? "text-blue-600" : "text-gray-800")}>
-                              Runs ·{" "}
-                              <span className="tabular-nums">
-                                {(runsCountInfo.running > 0
-                                  ? runsCountInfo.running
-                                  : runsCountInfo.total
-                                ).toLocaleString("en-US")}
-                              </span>
-                            </span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {runsCountInfo.running > 0
-                            ? `${runsCountInfo.running} running`
-                            : `${runsCountInfo.total} runs`}
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : null}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -3129,7 +3036,6 @@ function CanvasContent({
         <CanvasLogSidebar
           isOpen={isLogSidebarOpen}
           onClose={() => setIsLogSidebarOpen(false)}
-          showRunsTab={isLiveMode}
           height={logSidebarHeight}
           onHeightChange={setLogSidebarHeight}
           searchValue={logSearch}
@@ -3139,13 +3045,8 @@ function CanvasContent({
           activeTab={consoleTab}
           onTabChange={setConsoleTab}
           runsEvents={runsEvents}
-          runsTotalCount={runsTotalCount}
-          runsHasNextPage={runsHasNextPage}
-          runsIsFetchingNextPage={runsIsFetchingNextPage}
-          onRunsLoadMore={onRunsLoadMore}
           runsNodes={runsNodes}
           runsComponentIconMap={runsComponentIconMap}
-          runsNodeQueueItemsMap={runsNodeQueueItemsMap}
           onRunNodeSelect={onRunNodeSelect}
           onRunExecutionSelect={onRunExecutionSelect}
           onAcknowledgeErrors={onAcknowledgeErrors}
