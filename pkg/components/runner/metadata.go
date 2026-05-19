@@ -1,10 +1,10 @@
 package runner
 
 import (
-	"encoding/json"
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/core"
+	runnermodels "github.com/superplanehq/superplane/pkg/runners/models"
 )
 
 const (
@@ -12,15 +12,8 @@ const (
 	ExecutionMetadataTaskLog      = "runner_task_log"
 )
 
-// TaskLogSink matches the task-broker / fleet-manager JSON shape for CloudWatch-backed live logs.
-type TaskLogSink struct {
-	Type       string `json:"type"`
-	CloudWatch *struct {
-		LogGroupName  string `json:"log_group_name"`
-		LogStreamName string `json:"log_stream_name"`
-		Region        string `json:"region,omitempty"`
-	} `json:"cloudwatch,omitempty"`
-}
+// TaskLogSink matches the fleet-manager JSON shape for CloudWatch-backed live logs.
+type TaskLogSink = runnermodels.FleetTaskLog
 
 func mergeExecutionMetadata(meta core.MetadataWriter, patch map[string]any) error {
 	if meta == nil {
@@ -66,7 +59,16 @@ func mergeRunnerTaskLog(meta core.MetadataWriter, brokerTaskID string, sink *Tas
 	return mergeExecutionMetadata(meta, patch)
 }
 
-func taskLogFromBrokerTask(t *Task) *TaskLogSink {
+// FinishFleetTask merges task log metadata and emits the terminal runner event.
+func FinishFleetTask(meta core.MetadataWriter, state core.ExecutionStateContext, fleetTask *runnermodels.FleetTask, brokerTaskID string) error {
+	sink := taskLogFromFleetTask(fleetTask)
+	if err := mergeRunnerTaskLog(meta, brokerTaskID, sink); err != nil {
+		return err
+	}
+	return (&Runner{}).processTaskStatus(state, fleetTask)
+}
+
+func taskLogFromFleetTask(t *runnermodels.FleetTask) *TaskLogSink {
 	if t == nil {
 		return nil
 	}
@@ -89,30 +91,4 @@ func taskLogFromBrokerTask(t *Task) *TaskLogSink {
 			LogStreamName: s,
 		},
 	}
-}
-
-func taskLogFromRawWebhook(raw map[string]any) *TaskLogSink {
-	if raw == nil {
-		return nil
-	}
-	if v, ok := raw["task_log"]; ok && v != nil {
-		b, err := json.Marshal(v)
-		if err != nil {
-			return nil
-		}
-		var sink TaskLogSink
-		if err := json.Unmarshal(b, &sink); err != nil {
-			return nil
-		}
-		if strings.TrimSpace(sink.Type) != "" {
-			return &sink
-		}
-	}
-	g, _ := raw["cloudwatch_log_group"].(string)
-	s, _ := raw["cloudwatch_log_stream"].(string)
-	t := &Task{
-		CloudWatchLogGroup:  g,
-		CloudWatchLogStream: s,
-	}
-	return taskLogFromBrokerTask(t)
 }
