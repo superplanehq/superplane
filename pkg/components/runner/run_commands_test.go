@@ -314,4 +314,3 @@ func TestRunnerProcessTaskStatusCanceledUsesFailedChannel(t *testing.T) {
 	require.NoError(t, (&Runner{}).processTaskStatus(state, task))
 	require.Equal(t, FailedOutputChannel, state.Channel)
 }
-
