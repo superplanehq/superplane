@@ -66,3 +66,24 @@ func cloudIDFromIntegration(integration core.IntegrationContext) (string, error)
 	}
 	return meta.CloudID, nil
 }
+
+// resolveCloudID returns the Atlassian cloud id from integration metadata, or fetches it from
+// the site tenant_info endpoint when metadata was not populated (e.g. integrations connected
+// before cloud id was stored during sync).
+func resolveCloudID(httpCtx core.HTTPContext, integration core.IntegrationContext) (string, error) {
+	if cloudID, err := cloudIDFromIntegration(integration); err == nil {
+		return cloudID, nil
+	}
+	if httpCtx == nil {
+		return "", fmt.Errorf("integration is missing cloud id; re-sync the Jira integration")
+	}
+	client, err := NewClient(httpCtx, integration)
+	if err != nil {
+		return "", err
+	}
+	cloudID, err := client.FetchCloudID()
+	if err != nil {
+		return "", fmt.Errorf("resolve cloud id: %w", err)
+	}
+	return cloudID, nil
+}
