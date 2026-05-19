@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -589,4 +590,19 @@ func Test__requestTypeFieldResources__createmetaFallback(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resources, 1)
 	assert.Equal(t, "5", resources[0].ID)
+}
+
+func Test__opsAlertIntegrationResourceLabel__truncatesByRune(t *testing.T) {
+	longCJK := strings.Repeat("あ", 100)
+	label := opsAlertIntegrationResourceLabel(map[string]any{
+		"message": longCJK,
+		"tinyId":  "42",
+	}, "alert-uuid")
+	assert.True(t, utf8.ValidString(label))
+	assert.LessOrEqual(t, utf8.RuneCountInString(label), opsAlertLabelMaxRunes+len(" #42"))
+	assert.Contains(t, label, "#42")
+	assert.True(t, strings.HasSuffix(label, "... #42"))
+
+	short := opsAlertIntegrationResourceLabel(map[string]any{"message": "ok", "tinyId": "1"}, "id")
+	assert.Equal(t, "ok #1", short)
 }

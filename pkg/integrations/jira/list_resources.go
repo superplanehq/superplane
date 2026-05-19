@@ -3,6 +3,7 @@ package jira
 import (
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -549,10 +550,24 @@ func resolveServiceDeskProjectKey(client *Client, serviceDeskID string) string {
 	return ""
 }
 
+const opsAlertLabelMaxRunes = 80
+
+func truncateOpsAlertLabelMessage(msg string) string {
+	if utf8.RuneCountInString(msg) <= opsAlertLabelMaxRunes {
+		return msg
+	}
+	runes := []rune(msg)
+	keep := opsAlertLabelMaxRunes - utf8.RuneCountInString("...")
+	if keep < 0 {
+		keep = 0
+	}
+	return string(runes[:keep]) + "..."
+}
+
 func opsAlertIntegrationResourceLabel(row map[string]any, alertID string) string {
 	msg := strings.TrimSpace(opsAlertStringField(row, "message"))
-	if msg != "" && len(msg) > 80 {
-		msg = msg[:77] + "..."
+	if msg != "" {
+		msg = truncateOpsAlertLabelMessage(msg)
 	}
 	tiny := strings.TrimSpace(opsAlertStringField(row, "tinyId"))
 

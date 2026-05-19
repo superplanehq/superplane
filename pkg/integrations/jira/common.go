@@ -3,7 +3,6 @@ package jira
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -100,11 +99,4 @@ func ConfigurationAsSliceMap(cfg any) map[string]any {
 		return map[string]any{}
 	}
 	return out
-}
-
-// ConfigContainsKey reports whether cfg is a serialized object that includes fieldName (typically from a toggled field).
-func ConfigContainsKey(cfg any, fieldName string) bool {
-	m := ConfigurationAsSliceMap(cfg)
-	_, ok := m[strings.TrimSpace(fieldName)]
-	return ok
 }
