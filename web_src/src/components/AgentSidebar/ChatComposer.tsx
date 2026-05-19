@@ -1,4 +1,4 @@
-import { Loader2, Send, Square } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { AgentMode } from "./useAgentState";
@@ -59,7 +59,7 @@ export function ChatComposer({
               {stopping ? (
                 <Loader2 className="size-3 animate-spin" />
               ) : (
-                <Square className="size-3" />
+                <div className="size-3 rounded-sm bg-white" />
               )}
             </Button>
           )}
