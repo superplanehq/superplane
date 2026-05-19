@@ -119,6 +119,14 @@ export function createInitialOutcomeState(rubric: {
   };
 }
 
+export function isOutcomeActive(outcomeState: OutcomeState | null): boolean {
+  if (!outcomeState) {
+    return false;
+  }
+
+  return outcomeState.phase !== "passed" && outcomeState.phase !== "exhausted" && outcomeState.phase !== "failed";
+}
+
 export function statusLabel(status: string): string {
   switch (status) {
     case "streaming":
