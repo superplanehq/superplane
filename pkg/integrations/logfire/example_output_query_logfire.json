@@ -2,15 +2,18 @@
   "data": {
     "columns": [
       {
-        "name": "start_timestamp",
-        "type": "timestamp"
+        "name": "start_timestamp"
       },
       {
-        "name": "message",
-        "type": "text"
+        "name": "message"
       }
     ],
-    "rows": [["2026-01-01T00:00:00Z", "Example Logfire record"]]
+    "rows": [
+      [
+        "2026-01-01T00:00:00Z",
+        "Example Logfire record"
+      ]
+    ]
   },
   "timestamp": "2026-03-23T12:00:00.000000000Z",
   "type": "logfire.query"
