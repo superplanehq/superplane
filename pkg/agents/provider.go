@@ -45,9 +45,16 @@ type OutcomeEvaluation struct {
 	Explanation string // grader's prose verdict
 }
 
+type FileResource struct {
+	FileID    string
+	MountPath string
+}
+
 type CreateSessionOptions struct {
 	InitialContext string
 	Title          string
+	VaultIDs       []string
+	Resources      []FileResource
 }
 
 type DefineOutcomeOptions struct {

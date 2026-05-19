@@ -215,6 +215,19 @@ function useConversationHandlers({
   const handleStartBuilding = useCallback(
     async (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
       const rubricText = buildRubricText(rubric);
+
+      // In Build mode: rubric is a spec confirmation, not an outcome.
+      // Agent already has full context — just confirm.
+      if (agentMode === "builder") {
+        await sendMutation.mutateAsync({
+          chatId,
+          content: "Specs approved. Start building.",
+          mode: "builder",
+        });
+        return;
+      }
+
+      // In Plan mode: kick off outcome with grading loop
       setOutcomeState(createInitialOutcomeState(rubric));
 
       try {
@@ -233,7 +246,7 @@ function useConversationHandlers({
         });
       }
     },
-    [chatId, outcomeMutation, sendMutation, setOutcomeState],
+    [chatId, agentMode, outcomeMutation, sendMutation, setOutcomeState],
   );
 
   return { handleSend, handleStop, handleQuickAction, handleStartBuilding };
