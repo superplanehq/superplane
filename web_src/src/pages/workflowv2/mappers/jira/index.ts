@@ -7,6 +7,10 @@ import { updateIssueMapper } from "./update_issue";
 import { createIncidentMapper } from "./create_incident";
 import { getIncidentMapper } from "./get_incident";
 import { deleteIncidentMapper } from "./delete_incident";
+import { createHeartbeatMapper } from "./create_heartbeat";
+import { pingHeartbeatMapper } from "./ping_heartbeat";
+import { updateHeartbeatMapper } from "./update_heartbeat";
+import { deleteHeartbeatMapper } from "./delete_heartbeat";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIssue: createIssueMapper,
@@ -16,6 +20,10 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIncident: createIncidentMapper,
   getIncident: getIncidentMapper,
   deleteIncident: deleteIncidentMapper,
+  createHeartbeat: createHeartbeatMapper,
+  pingHeartbeat: pingHeartbeatMapper,
+  updateHeartbeat: updateHeartbeatMapper,
+  deleteHeartbeat: deleteHeartbeatMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
@@ -28,4 +36,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createIncident: buildActionStateRegistry("created"),
   getIncident: buildActionStateRegistry("fetched"),
   deleteIncident: buildActionStateRegistry("deleted"),
+  createHeartbeat: buildActionStateRegistry("created"),
+  pingHeartbeat: buildActionStateRegistry("pinged"),
+  updateHeartbeat: buildActionStateRegistry("updated"),
+  deleteHeartbeat: buildActionStateRegistry("deleted"),
 };

@@ -81,6 +81,70 @@ func (j *Jira) ListResources(resourceType string, ctx core.ListResourcesContext)
 	case "urgency":
 		return j.listRequestTypeFieldResources(resourceType, "urgency", ctx)
 
+	case "team":
+		cloudID, err := resolveCloudID(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, err
+		}
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+		teams, err := client.ListOpsTeams(cloudID)
+		if err != nil {
+			return nil, fmt.Errorf("list operations teams: %w", err)
+		}
+		resources := make([]core.IntegrationResource, 0, len(teams))
+		for _, team := range teams {
+			if strings.TrimSpace(team.TeamID) == "" {
+				continue
+			}
+			name := strings.TrimSpace(team.TeamName)
+			if name == "" {
+				name = team.TeamID
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   team.TeamID,
+			})
+		}
+		return resources, nil
+
+	case "heartbeat":
+		teamID := strings.TrimSpace(ctx.Parameters["team"])
+		if teamID == "" {
+			return []core.IntegrationResource{}, nil
+		}
+		cloudID, err := resolveCloudID(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, err
+		}
+		client, err := NewClient(ctx.HTTP, ctx.Integration)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create client: %w", err)
+		}
+		heartbeats, err := client.ListHeartbeats(cloudID, teamID)
+		if err != nil {
+			return nil, fmt.Errorf("list heartbeats: %w", err)
+		}
+		resources := make([]core.IntegrationResource, 0, len(heartbeats))
+		for _, hb := range heartbeats {
+			if strings.TrimSpace(hb.Name) == "" {
+				continue
+			}
+			name := hb.Name
+			if hb.Status != "" {
+				name = fmt.Sprintf("%s (%s)", hb.Name, hb.Status)
+			}
+			resources = append(resources, core.IntegrationResource{
+				Type: resourceType,
+				Name: name,
+				ID:   hb.Name,
+			})
+		}
+		return resources, nil
+
 	case "issue":
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err != nil {

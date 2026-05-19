@@ -1,0 +1,9 @@
+{
+  "name": "DNS Server Checker",
+  "description": "Checks whether the DNS server responds",
+  "interval": 10,
+  "intervalUnit": "minutes",
+  "enabled": true,
+  "status": "Responsive",
+  "alertPriority": "P2"
+}
