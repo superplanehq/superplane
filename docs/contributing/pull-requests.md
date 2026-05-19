@@ -136,9 +136,10 @@ A good PR description helps reviewers understand your changes quickly. Include:
 - **What changed**: A clear summary of what the PR does
 - **Why**: The motivation or problem being solved
 - **How**: Brief explanation of the approach taken (if not obvious from the code)
+- **Scope**: What is intentionally not included in this PR
+- **Impact**: Any potential side effects or areas affected
 - **Related issues**: Link to any related GitHub issues using `Closes #123` or `Fixes #456`
 - **Breaking changes**: If applicable, clearly document any breaking changes
-
 ## Review Process
 
 Once you submit a pull request:
