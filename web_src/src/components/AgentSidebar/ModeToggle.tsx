@@ -1,4 +1,5 @@
 import { Compass, Hammer, Monitor } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { AgentMode } from "./agentMode";
 
@@ -6,25 +7,21 @@ const modeConfig = {
   builder: {
     icon: Hammer,
     label: "Build",
-    activeText: "text-orange-700",
-    activeBg: "bg-orange-50 border-orange-300",
-    activeShadow: "shadow-sm shadow-orange-100",
+    description: "Build mode — make changes to the canvas",
   },
   architect: {
     icon: Compass,
     label: "Plan",
-    activeText: "text-blue-700",
-    activeBg: "bg-blue-50 border-blue-300",
-    activeShadow: "shadow-sm shadow-blue-100",
+    description: "Plan mode — design before building",
   },
   operator: {
     icon: Monitor,
     label: "Ask",
-    activeText: "text-emerald-700",
-    activeBg: "bg-emerald-50 border-emerald-300",
-    activeShadow: "shadow-sm shadow-emerald-100",
+    description: "Ask mode — read-only questions and diagnostics",
   },
 } as const;
+
+const VISIBLE_MODES: AgentMode[] = ["builder", "operator"];
 
 export function ModeToggle({
   mode,
@@ -37,34 +34,43 @@ export function ModeToggle({
   disabled?: boolean;
   streaming?: boolean;
 }) {
+  const activeLabel = modeConfig[mode].label;
+
   return (
-    <div className="flex items-center bg-slate-100 rounded-md p-0.5 gap-0.5" data-testid="agent-mode-toggle">
-      {(Object.keys(modeConfig) as AgentMode[]).map((key) => {
-        const config = modeConfig[key];
-        const Icon = config.icon;
-        const isActive = mode === key;
-        return (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onSwitch(key)}
-            disabled={disabled || streaming}
-            className={cn(
-              "flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all border border-transparent",
-              isActive
-                ? cn(config.activeText, config.activeBg, config.activeShadow)
-                : "text-slate-500 hover:text-slate-700",
-              (disabled || streaming) && !isActive && "opacity-40 cursor-not-allowed",
-              isActive && streaming && "animate-pulse-border",
-            )}
-            aria-label={`${config.label} mode`}
-            data-testid={`agent-mode-${key}`}
-          >
-            <Icon size={12} />
-            {config.label}
-          </button>
-        );
-      })}
+    <div className="flex items-center gap-1.5" data-testid="agent-mode-toggle">
+      <div className="flex items-center gap-0.5 rounded-md bg-slate-100 p-0.5">
+        {VISIBLE_MODES.map((key) => {
+          const config = modeConfig[key];
+          const Icon = config.icon;
+          const isActive = mode === key;
+          return (
+            <Tooltip key={key}>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => onSwitch(key)}
+                  disabled={disabled || streaming}
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded transition-colors",
+                    isActive
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-700",
+                    (disabled || streaming) && !isActive && "cursor-not-allowed opacity-40",
+                    isActive && streaming && "animate-pulse-border",
+                  )}
+                  aria-label={`${config.label} mode`}
+                  aria-pressed={isActive}
+                  data-testid={`agent-mode-${key}`}
+                >
+                  <Icon size={12} />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top">{config.description}</TooltipContent>
+            </Tooltip>
+          );
+        })}
+      </div>
+      <span className="text-xs font-medium text-slate-600">{activeLabel}</span>
     </div>
   );
 }

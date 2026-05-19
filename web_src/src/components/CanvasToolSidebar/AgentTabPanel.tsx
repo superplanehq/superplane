@@ -333,7 +333,7 @@ function DraftActionsBar({
   if (!latestDraft) return null;
 
   return (
-    <div className="border-t border-violet-200 bg-violet-50/80 px-3 py-2">
+    <div className="border-t border-slate-200 bg-slate-50/80 px-3 py-2">
       <DraftActionsWidget
         versionId={latestDraft.versionId}
         message={latestDraft.message}
