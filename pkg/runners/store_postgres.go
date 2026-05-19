@@ -23,14 +23,10 @@ func (s *postgresStore) db() *gorm.DB {
 	return database.Conn()
 }
 
-func (s *postgresStore) CreateFleet(name, authToken string, labels []string) (*models.RunnerFleet, error) {
-	if labels == nil {
-		labels = []string{}
-	}
+func (s *postgresStore) CreateFleet(name, authToken string) (*models.RunnerFleet, error) {
 	fleet := &models.RunnerFleet{
 		Name:      name,
 		AuthToken: authToken,
-		Labels:    datatypes.NewJSONType(labels),
 	}
 	if err := s.db().Create(fleet).Error; err != nil {
 		return nil, err

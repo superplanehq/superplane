@@ -14,27 +14,19 @@ import (
 )
 
 type registerFleetRequest struct {
-	Name      string   `json:"name"`
-	AuthToken string   `json:"auth_token"`
-	Labels    []string `json:"labels"`
+	Name string `json:"name"`
 }
 
 type fleetResponse struct {
-	ID        string   `json:"id"`
-	Name      string   `json:"name"`
-	Labels    []string `json:"labels"`
-	CreatedAt string   `json:"created_at,omitempty"`
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt string `json:"created_at,omitempty"`
 }
 
 func fleetToResponse(f runnermodels.RunnerFleet) fleetResponse {
-	labels := f.Labels.Data()
-	if labels == nil {
-		labels = []string{}
-	}
 	r := fleetResponse{
-		ID:     f.ID.String(),
-		Name:   f.Name,
-		Labels: labels,
+		ID:   f.ID.String(),
+		Name: f.Name,
 	}
 	if f.CreatedAt != nil {
 		r.CreatedAt = f.CreatedAt.Format("2006-01-02T15:04:05Z07:00")
@@ -55,33 +47,22 @@ func (h *Handler) AdminRegisterFleet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	authToken := strings.TrimSpace(req.AuthToken)
-	if authToken == "" {
-		authToken = uuid.New().String()
-	}
+	authToken := uuid.New().String()
 
-	fleet, err := h.store().CreateFleet(req.Name, authToken, req.Labels)
+	fleet, err := h.store().CreateFleet(req.Name, authToken)
 	if err != nil {
 		log.Errorf("admin: failed to register runner fleet: %v", err)
 		http.Error(w, "Failed to register fleet", http.StatusInternalServerError)
 		return
 	}
 
-	resp := fleetToResponse(*fleet)
-	if strings.TrimSpace(req.AuthToken) == "" {
-		type fleetCreatedResponse struct {
-			fleetResponse
-			AuthToken string `json:"auth_token"`
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(fleetCreatedResponse{resp, fleet.AuthToken})
-		return
+	type fleetCreatedResponse struct {
+		fleetResponse
+		AuthToken string `json:"auth_token"`
 	}
-
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(resp)
+	json.NewEncoder(w).Encode(fleetCreatedResponse{fleetToResponse(*fleet), fleet.AuthToken})
 }
 
 // AdminListFleets lists all registered runner fleets.

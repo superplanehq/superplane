@@ -6,7 +6,7 @@ import (
 )
 
 type Store interface {
-	CreateFleet(name, authToken string, labels []string) (*models.RunnerFleet, error)
+	CreateFleet(name, authToken string) (*models.RunnerFleet, error)
 	ListFleets() ([]models.RunnerFleet, error)
 	FindFleet(id uuid.UUID) (*models.RunnerFleet, error)
 	FindFleetByAuthToken(token string) (*models.RunnerFleet, error)

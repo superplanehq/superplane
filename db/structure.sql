@@ -441,7 +441,6 @@ CREATE TABLE public.runner_fleets (
     name character varying(255) NOT NULL,
     fleet_url text,
     auth_token text DEFAULT ''::text NOT NULL,
-    labels jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     mode character varying(32) DEFAULT 'bridge'::character varying NOT NULL
 );

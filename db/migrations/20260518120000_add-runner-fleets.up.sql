@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS runner_fleets (
     id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name       VARCHAR(255) NOT NULL,
     auth_token TEXT NOT NULL DEFAULT '',
-    labels     JSONB NOT NULL DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 

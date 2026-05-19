@@ -139,7 +139,7 @@ func TestRunnerFleetBridgeSync(t *testing.T) {
 	})
 
 	t.Run("empty queue", func(t *testing.T) {
-		fleet, err := store.CreateFleet("bridge-empty-"+uuid.New().String(), uuid.New().String(), nil)
+		fleet, err := store.CreateFleet("bridge-empty-"+uuid.New().String(), uuid.New().String())
 		require.NoError(t, err)
 
 		rec := fleetSyncPOST(t, h, fleet.AuthToken, map[string]any{})
@@ -152,7 +152,7 @@ func TestRunnerFleetBridgeSync(t *testing.T) {
 	})
 
 	t.Run("returns queued job", func(t *testing.T) {
-		fleet, err := store.CreateFleet("bridge-jobs-"+uuid.New().String(), uuid.New().String(), nil)
+		fleet, err := store.CreateFleet("bridge-jobs-"+uuid.New().String(), uuid.New().String())
 		require.NoError(t, err)
 
 		_, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", nil)
@@ -184,7 +184,7 @@ func TestRunnerFleetBridgeComplete(t *testing.T) {
 	})
 
 	t.Run("task not found", func(t *testing.T) {
-		fleet, err := store.CreateFleet("bridge-complete-missing-"+uuid.New().String(), uuid.New().String(), nil)
+		fleet, err := store.CreateFleet("bridge-complete-missing-"+uuid.New().String(), uuid.New().String())
 		require.NoError(t, err)
 
 		rec := fleetCompletePOST(t, h, uuid.New().String(), fleet.AuthToken, runnermodels.FleetCompleteRequest{ExitCode: 0})
@@ -192,9 +192,9 @@ func TestRunnerFleetBridgeComplete(t *testing.T) {
 	})
 
 	t.Run("wrong fleet", func(t *testing.T) {
-		fleetA, err := store.CreateFleet("bridge-a-"+uuid.New().String(), uuid.New().String(), nil)
+		fleetA, err := store.CreateFleet("bridge-a-"+uuid.New().String(), uuid.New().String())
 		require.NoError(t, err)
-		fleetB, err := store.CreateFleet("bridge-b-"+uuid.New().String(), uuid.New().String(), nil)
+		fleetB, err := store.CreateFleet("bridge-b-"+uuid.New().String(), uuid.New().String())
 		require.NoError(t, err)
 
 		_, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-wf", nil)
@@ -206,7 +206,7 @@ func TestRunnerFleetBridgeComplete(t *testing.T) {
 	})
 
 	t.Run("invalid json body", func(t *testing.T) {
-		fleet, err := store.CreateFleet("bridge-bad-json-"+uuid.New().String(), uuid.New().String(), nil)
+		fleet, err := store.CreateFleet("bridge-bad-json-"+uuid.New().String(), uuid.New().String())
 		require.NoError(t, err)
 		_, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-json", nil)
 		task, err := store.EnqueueJob(fleet.ID, execID, runnermodels.JobSpec{Commands: []string{"echo"}})
@@ -222,7 +222,7 @@ func TestRunnerFleetBridgeComplete(t *testing.T) {
 	})
 
 	t.Run("idempotent when already terminal", func(t *testing.T) {
-		fleet, err := store.CreateFleet("bridge-idempotent-"+uuid.New().String(), uuid.New().String(), nil)
+		fleet, err := store.CreateFleet("bridge-idempotent-"+uuid.New().String(), uuid.New().String())
 		require.NoError(t, err)
 		_, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-idem", nil)
 		task, err := store.EnqueueJob(fleet.ID, execID, runnermodels.JobSpec{Commands: []string{"echo"}})
