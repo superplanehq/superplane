@@ -47,36 +47,33 @@ export interface JiraNodeMetadata {
   project?: JiraProject;
   issueType?: string;
   status?: string;
-  workflowName?: string;
-  workflowScheme?: JiraWorkflowScheme;
 }
 
-export interface JiraWorkflowVersion {
+export interface JiraWorkflowStatus {
   id?: string;
-  versionNumber?: number;
+  name?: string;
+  category?: string;
+  isCurrent?: boolean;
+}
+
+export interface JiraWorkflowAvailableTransition {
+  id?: string;
+  name?: string;
+  toStatusId?: string;
+  toStatus?: string;
 }
 
 export interface JiraWorkflow {
-  id?: string;
-  name?: string;
-  version?: JiraWorkflowVersion;
-}
-
-export interface JiraWorkflowScheme {
-  id?: string;
-  name?: string;
-  description?: string;
-  self?: string;
-}
-
-export interface JiraWorkflowSchemeAssignment {
-  projectId?: string;
+  issueKey?: string;
+  issueType?: string;
+  projectKey?: string;
+  workflowName?: string;
   workflowSchemeId?: string;
-  draftCreated?: boolean;
-  dryRun?: boolean;
-  taskId?: string;
-  taskStatus?: string;
-  taskSelf?: string;
+  workflowSchemeName?: string;
+  currentStatus?: string;
+  currentStatusId?: string;
+  statuses?: JiraWorkflowStatus[];
+  availableTransitions?: JiraWorkflowAvailableTransition[];
 }
 
 export interface JiraApproval {
@@ -122,19 +119,9 @@ export interface DeleteIssueConfiguration {
   deleteSubtasks?: boolean;
 }
 
-export interface CreateWorkflowConfiguration {
-  name?: string;
-  description?: string;
-  scope?: string;
+export interface GetWorkflowConfiguration {
   project?: string;
-  statuses?: Array<{ name?: string; category?: string }>;
-  transitions?: Array<{ name?: string; from?: string[]; to?: string; type?: string }>;
-}
-
-export interface AssignWorkflowToProjectConfiguration {
-  project?: string;
-  workflowScheme?: string;
-  dryRun?: boolean;
+  issueKey?: string;
 }
 
 export interface TransitionIssueConfiguration {

@@ -12,6 +12,15 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
+const globalStatusesResponse = `{
+	"isLast": true,
+	"values": [
+		{"id":"1","name":"To Do","statusCategory":"TODO"},
+		{"id":"2","name":"In Progress","statusCategory":"IN_PROGRESS"},
+		{"id":"3","name":"Done","statusCategory":"DONE"}
+	]
+}`
+
 func Test__ListResources__Project(t *testing.T) {
 	j := &Jira{}
 	appCtx := newAuthorizedIntegrationWithMetadata(Metadata{
@@ -201,34 +210,80 @@ func Test__ListResources__Priority__MissingHTTPContext(t *testing.T) {
 	assert.Empty(t, resources)
 }
 
-func Test__ListResources__WorkflowScheme(t *testing.T) {
+func Test__ListResources__IssueStatus(t *testing.T) {
 	j := &Jira{}
-	httpContext := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			{
-				StatusCode: http.StatusOK,
-				Body: io.NopCloser(strings.NewReader(`{
-					"isLast": true,
-					"values": [
-						{"id":101010,"name":"Support workflow scheme"},
-						{"id":"scheme-2","name":"Escalation workflow scheme"}
-					]
-				}`)),
-			},
-		},
-	}
 
-	resources, err := j.ListResources("workflowScheme", core.ListResourcesContext{
-		HTTP:        httpContext,
-		Integration: newAuthorizedIntegration(),
+	t.Run("with project parameter -> uses project statuses endpoint", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`[
+						{"name":"Task","statuses":[
+							{"id":"1","name":"To Do","statusCategory":{"key":"new"}},
+							{"id":"2","name":"Done","statusCategory":{"key":"done"}}
+						]}
+					]`)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("issueStatus", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+			Parameters:  map[string]string{"project": "TEST"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "issueStatus", resources[0].Type)
+		assert.Equal(t, "To Do", resources[0].Name)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/project/TEST/statuses")
 	})
 
-	require.NoError(t, err)
-	require.Len(t, resources, 2)
-	assert.Equal(t, "workflowScheme", resources[0].Type)
-	assert.Equal(t, "101010", resources[0].ID)
-	assert.Equal(t, "Support workflow scheme (101010)", resources[0].Name)
-	assert.Equal(t, "scheme-2", resources[1].ID)
+	t.Run("without project parameter -> falls back to global statuses", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(globalStatusesResponse)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("issueStatus", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 3)
+		assert.Equal(t, "To Do", resources[0].Name)
+		assert.Equal(t, "In Progress", resources[1].Name)
+		assert.Equal(t, "Done", resources[2].Name)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/statuses/search")
+	})
+
+	t.Run("unresolved expression project parameter -> falls back to global statuses", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(globalStatusesResponse)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("issueStatus", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+			Parameters:  map[string]string{"project": "{{ trigger.project }}"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 3)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/api/3/statuses/search")
+	})
 }
 
 func Test__ListResources__Unknown(t *testing.T) {

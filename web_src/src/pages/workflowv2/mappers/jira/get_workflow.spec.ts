@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { assignWorkflowToProjectMapper } from "./assign_workflow_to_project";
+import { getWorkflowMapper } from "./get_workflow";
 import { eventStateRegistry } from "./index";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../types";
 
 function node(overrides?: Partial<NodeInfo>): NodeInfo {
   return {
     id: "node-1",
-    name: "Assign scheme",
-    componentName: "jira.assignWorkflowToProject",
+    name: "Get workflow",
+    componentName: "jira.getWorkflow",
     isCollapsed: false,
     configuration: {},
     metadata: {},
@@ -46,8 +46,8 @@ function componentCtx(overrides?: { node?: Partial<NodeInfo> }): ComponentBaseCo
     nodes: [n],
     node: n,
     componentDefinition: {
-      name: "jira.assignWorkflowToProject",
-      label: "Assign Workflow To Project",
+      name: "jira.getWorkflow",
+      label: "Get Workflow",
       description: "",
       icon: "jira",
       color: "blue",
@@ -58,22 +58,26 @@ function componentCtx(overrides?: { node?: Partial<NodeInfo> }): ComponentBaseCo
   };
 }
 
-describe("assignWorkflowToProjectMapper", () => {
-  it("extracts assignment details", () => {
-    const details = assignWorkflowToProjectMapper.getExecutionDetails(
+describe("getWorkflowMapper", () => {
+  it("extracts workflow + current status + transitions from the payload", () => {
+    const details = getWorkflowMapper.getExecutionDetails(
       detailsCtx({
         execution: {
           outputs: {
             default: [
               {
-                type: "jira.workflowScheme.assigned",
+                type: "jira.workflow",
                 timestamp: "2026-01-19T12:00:00Z",
                 data: {
-                  projectId: "10000",
-                  workflowSchemeId: "101010",
-                  draftCreated: false,
-                  taskId: "task-1",
-                  taskStatus: "ENQUEUED",
+                  issueKey: "TEST-1",
+                  issueType: "Task",
+                  workflowName: "Software Simplified",
+                  workflowSchemeName: "Default scheme",
+                  currentStatus: "In Progress",
+                  availableTransitions: [
+                    { id: "21", name: "Stop progress", toStatus: "To Do" },
+                    { id: "31", name: "Resolve", toStatus: "Done" },
+                  ],
                 },
               },
             ],
@@ -82,33 +86,36 @@ describe("assignWorkflowToProjectMapper", () => {
       }),
     );
 
-    expect(details["Project ID"]).toBe("10000");
-    expect(details["Workflow Scheme ID"]).toBe("101010");
-    expect(details["Task ID"]).toBe("task-1");
-    expect(details["Task Status"]).toBe("ENQUEUED");
+    expect(details.Issue).toBe("TEST-1");
+    expect(details["Issue Type"]).toBe("Task");
+    expect(details.Workflow).toBe("Software Simplified");
+    expect(details["Current Status"]).toBe("In Progress");
+    expect(details["Available Transitions"]).toBe("To Do, Done");
   });
 
-  it("renders project and scheme metadata", () => {
-    const props = assignWorkflowToProjectMapper.props(
+  it("falls back gracefully when no execution data is present", () => {
+    const details = getWorkflowMapper.getExecutionDetails(detailsCtx());
+    expect(details["Executed At"]).toBeDefined();
+    expect(details.Issue).toBeUndefined();
+  });
+
+  it("renders project + issue key in metadata", () => {
+    const props = getWorkflowMapper.props(
       componentCtx({
         node: {
-          configuration: { project: "TEST", workflowScheme: "101010", dryRun: true },
-          metadata: {
-            project: { key: "TEST", name: "Test Project" },
-            workflowScheme: { id: "101010", name: "Support scheme" },
-          },
+          configuration: { project: "TEST", issueKey: "TEST-1" },
+          metadata: { project: { key: "TEST", name: "Test Project" } },
         },
       }),
     );
 
     expect(props.metadata).toEqual([
       { icon: "folder", label: "Test Project" },
-      { icon: "workflow", label: "Support scheme" },
-      { icon: "search-check", label: "Dry run" },
+      { icon: "hash", label: "TEST-1" },
     ]);
   });
 
-  it("maps finished success to assigned", () => {
-    expect(eventStateRegistry.assignWorkflowToProject.getState(execution())).toBe("assigned");
+  it("maps finished success to retrieved", () => {
+    expect(eventStateRegistry.getWorkflow.getState(execution())).toBe("retrieved");
   });
 });

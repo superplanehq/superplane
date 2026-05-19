@@ -11,10 +11,10 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { jiraComponentBaseProps } from "./base";
-import { addDetail, addProjectMetadata } from "./utils";
-import type { CreateWorkflowConfiguration, JiraNodeMetadata, JiraWorkflow } from "./types";
+import { addDetail, addIssueKeyMetadata, addProjectMetadata } from "./utils";
+import type { GetWorkflowConfiguration, JiraNodeMetadata, JiraWorkflow } from "./types";
 
-export const createWorkflowMapper: ComponentBaseMapper = {
+export const getWorkflowMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     return jiraComponentBaseProps(context, metadataList(context.node));
   },
@@ -27,22 +27,17 @@ export const createWorkflowMapper: ComponentBaseMapper = {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const workflow = outputs?.default?.[0]?.data as JiraWorkflow | undefined;
     if (workflow) {
-      addDetail(details, "Workflow ID", workflow.id);
-      addDetail(details, "Name", workflow.name);
-      if (workflow.version?.versionNumber !== undefined) {
-        details["Version"] = String(workflow.version.versionNumber);
+      addDetail(details, "Issue", workflow.issueKey);
+      addDetail(details, "Issue Type", workflow.issueType);
+      addDetail(details, "Current Status", workflow.currentStatus);
+      addDetail(details, "Workflow", workflow.workflowName);
+      addDetail(details, "Workflow Scheme", workflow.workflowSchemeName);
+      if (workflow.availableTransitions?.length) {
+        details["Available Transitions"] = workflow.availableTransitions
+          .map((t) => t.toStatus || t.name)
+          .filter(Boolean)
+          .join(", ");
       }
-    }
-
-    const configuration = context.node.configuration as CreateWorkflowConfiguration | undefined;
-    if (configuration?.scope) {
-      details["Scope"] = configuration.scope;
-    }
-    if (configuration?.statuses?.length) {
-      details["Statuses"] = String(configuration.statuses.length);
-    }
-    if (configuration?.transitions?.length) {
-      details["Transitions"] = String(configuration.transitions.length);
     }
 
     return details;
@@ -51,7 +46,8 @@ export const createWorkflowMapper: ComponentBaseMapper = {
   subtitle(context: SubtitleContext): string | React.ReactNode {
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
     const workflow = outputs?.default?.[0]?.data as JiraWorkflow | undefined;
-    if (workflow?.name) return workflow.name;
+    if (workflow?.workflowName) return workflow.workflowName;
+    if (workflow?.currentStatus) return workflow.currentStatus;
     if (context.execution.createdAt) {
       return renderTimeAgo(new Date(context.execution.createdAt));
     }
@@ -62,21 +58,10 @@ export const createWorkflowMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as JiraNodeMetadata | undefined;
-  const configuration = node.configuration as CreateWorkflowConfiguration | undefined;
-
-  const name = nodeMetadata?.workflowName || configuration?.name;
-  if (name) {
-    metadata.push({ icon: "workflow", label: name });
-  }
-
-  const scope = configuration?.scope || "GLOBAL";
-  metadata.push({ icon: "globe", label: scope === "PROJECT" ? "Project scoped" : "Global" });
+  const configuration = node.configuration as GetWorkflowConfiguration | undefined;
 
   addProjectMetadata(metadata, nodeMetadata?.project, configuration?.project);
+  addIssueKeyMetadata(metadata, "hash", configuration?.issueKey);
 
-  if (configuration?.statuses?.length) {
-    metadata.push({ icon: "list", label: `${configuration.statuses.length} statuses` });
-  }
-
-  return metadata.slice(0, 4);
+  return metadata;
 }

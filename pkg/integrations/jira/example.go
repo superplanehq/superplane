@@ -31,18 +31,6 @@ var exampleOutputDeleteIncidentBytes []byte
 var exampleOutputDeleteIncidentOnce sync.Once
 var exampleOutputDeleteIncident map[string]any
 
-//go:embed example_output_create_workflow.json
-var exampleOutputCreateWorkflowBytes []byte
-
-var exampleOutputCreateWorkflowOnce sync.Once
-var exampleOutputCreateWorkflow map[string]any
-
-//go:embed example_output_assign_workflow_to_project.json
-var exampleOutputAssignWorkflowToProjectBytes []byte
-
-var exampleOutputAssignWorkflowToProjectOnce sync.Once
-var exampleOutputAssignWorkflowToProject map[string]any
-
 //go:embed example_output_transition_issue.json
 var exampleOutputTransitionIssueBytes []byte
 
@@ -54,6 +42,12 @@ var exampleOutputApproveWorkflowBytes []byte
 
 var exampleOutputApproveWorkflowOnce sync.Once
 var exampleOutputApproveWorkflow map[string]any
+
+//go:embed example_output_get_workflow.json
+var exampleOutputGetWorkflowBytes []byte
+
+var exampleOutputGetWorkflowOnce sync.Once
+var exampleOutputGetWorkflow map[string]any
 
 func (c *CreateIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateIssueOnce, exampleOutputCreateIssueBytes, &exampleOutputCreateIssue)
@@ -101,18 +95,14 @@ func (c *DeleteIncident) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteIncidentOnce, exampleOutputDeleteIncidentBytes, &exampleOutputDeleteIncident)
 }
 
-func (c *CreateWorkflow) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateWorkflowOnce, exampleOutputCreateWorkflowBytes, &exampleOutputCreateWorkflow)
-}
-
-func (c *AssignWorkflowToProject) ExampleOutput() map[string]any {
-	return utils.UnmarshalEmbeddedJSON(&exampleOutputAssignWorkflowToProjectOnce, exampleOutputAssignWorkflowToProjectBytes, &exampleOutputAssignWorkflowToProject)
-}
-
 func (c *TransitionIssue) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputTransitionIssueOnce, exampleOutputTransitionIssueBytes, &exampleOutputTransitionIssue)
 }
 
 func (c *ApproveWorkflow) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputApproveWorkflowOnce, exampleOutputApproveWorkflowBytes, &exampleOutputApproveWorkflow)
+}
+
+func (c *GetWorkflow) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetWorkflowOnce, exampleOutputGetWorkflowBytes, &exampleOutputGetWorkflow)
 }

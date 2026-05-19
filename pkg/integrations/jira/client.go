@@ -177,13 +177,29 @@ func (c *Client) GetProjectIssueTypes(projectKey string) ([]IssueTypeMeta, error
 	return resp.IssueTypes, nil
 }
 
+// Status represents a Jira workflow status. Category is the normalized
+// statusCategory value used by Jira's workflow APIs: "TODO",
+// "IN_PROGRESS", "DONE", or "UNDEFINED". It is populated from either the
+// flat string returned by /rest/api/3/statuses/search or the nested
+// statusCategory.key returned by /rest/api/3/project/{key}/statuses.
 type Status struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Category string `json:"-"`
+}
+
+type projectStatusCategory struct {
+	Key string `json:"key"`
+}
+
+type projectStatus struct {
+	ID             string                `json:"id"`
+	Name           string                `json:"name"`
+	StatusCategory projectStatusCategory `json:"statusCategory"`
 }
 
 type projectStatusesIssueType struct {
-	Statuses []Status `json:"statuses"`
+	Statuses []projectStatus `json:"statuses"`
 }
 
 // GetProjectStatuses returns the unique set of statuses across all issue
@@ -211,16 +227,123 @@ func (c *Client) GetProjectStatuses(projectKey string) ([]Status, error) {
 				continue
 			}
 			seen[s.Name] = true
-			statuses = append(statuses, s)
+			statuses = append(statuses, Status{
+				ID:       s.ID,
+				Name:     s.Name,
+				Category: normalizeStatusCategoryKey(s.StatusCategory.Key),
+			})
 		}
 	}
 	return statuses, nil
+}
+
+type globalStatusesPage struct {
+	IsLast   bool           `json:"isLast"`
+	NextPage string         `json:"nextPage"`
+	Values   []globalStatus `json:"values"`
+}
+
+type globalStatus struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	StatusCategory string `json:"statusCategory"`
+}
+
+// ListGlobalStatuses returns every workflow status visible to the caller via
+// /rest/api/3/statuses/search. Used by the issueStatus resource picker when
+// no project context is available (e.g. when defining a global workflow) and
+// to look up status categories at workflow-create time.
+func (c *Client) ListGlobalStatuses() ([]Status, error) {
+	endpoint := c.apiURL("/rest/api/3/statuses/search?maxResults=200")
+	seen := map[string]bool{}
+	statuses := []Status{}
+
+	for endpoint != "" {
+		body, err := c.execRequest(http.MethodGet, endpoint, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page globalStatusesPage
+		if err := json.Unmarshal(body, &page); err != nil {
+			return nil, fmt.Errorf("error parsing statuses search response: %v", err)
+		}
+
+		for _, s := range page.Values {
+			if seen[s.Name] {
+				continue
+			}
+			seen[s.Name] = true
+			statuses = append(statuses, Status{
+				ID:       s.ID,
+				Name:     s.Name,
+				Category: normalizeStatusCategoryName(s.StatusCategory),
+			})
+		}
+
+		if page.IsLast || page.NextPage == "" {
+			break
+		}
+		endpoint = page.NextPage
+	}
+
+	return statuses, nil
+}
+
+// normalizeStatusCategoryKey converts the lowercase "key" values returned by
+// /rest/api/3/project/{key}/statuses (new/indeterminate/done/undefined) into
+// the upper-case category names accepted by /rest/api/3/workflows/create.
+func normalizeStatusCategoryKey(key string) string {
+	switch strings.ToLower(strings.TrimSpace(key)) {
+	case "new":
+		return "TODO"
+	case "indeterminate":
+		return "IN_PROGRESS"
+	case "done":
+		return "DONE"
+	default:
+		return "UNDEFINED"
+	}
+}
+
+// normalizeStatusCategoryName accepts the category names returned by
+// /rest/api/3/statuses/search (already TODO/IN_PROGRESS/DONE/UNDEFINED) and
+// returns the canonical value used by workflow create requests.
+func normalizeStatusCategoryName(name string) string {
+	switch strings.ToUpper(strings.TrimSpace(name)) {
+	case "TODO":
+		return "TODO"
+	case "IN_PROGRESS":
+		return "IN_PROGRESS"
+	case "DONE":
+		return "DONE"
+	default:
+		return "UNDEFINED"
+	}
 }
 
 type Transition struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
 	To   Status `json:"to"`
+	// Fields lists the fields that are present on this transition's screen,
+	// keyed by Jira field id (for example "resolution", "customfield_10010").
+	// Populated by GetIssueTransitions because we always pass
+	// expand=transitions.fields — needed to know whether a transition supports
+	// setting fields like resolution. Empty when no screen is configured.
+	Fields map[string]any `json:"fields,omitempty"`
+}
+
+// HasField reports whether this transition's screen includes the named Jira
+// field id. Used to avoid the "Field 'X' cannot be set. It is not on the
+// appropriate screen" error from Jira when the user supplies a field that
+// the chosen transition doesn't actually accept.
+func (t Transition) HasField(fieldID string) bool {
+	if t.Fields == nil {
+		return false
+	}
+	_, ok := t.Fields[strings.TrimSpace(fieldID)]
+	return ok
 }
 
 type transitionsResponse struct {
@@ -228,9 +351,13 @@ type transitionsResponse struct {
 }
 
 // GetIssueTransitions returns the transitions available from an issue's
-// current workflow state.
+// current workflow state, expanded with each transition's per-screen fields
+// so callers can decide whether a given field (for example resolution) can
+// be set during the transition.
 func (c *Client) GetIssueTransitions(issueKey string) ([]Transition, error) {
-	endpoint := c.apiURL("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/transitions")
+	query := url.Values{}
+	query.Set("expand", "transitions.fields")
+	endpoint := c.apiURL("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/transitions?" + query.Encode())
 
 	body, err := c.execRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
@@ -325,7 +452,12 @@ func (c *Client) DoTransition(issueKey, id string) error {
 	return c.DoTransitionWithOptions(issueKey, id, DoTransitionOptions{})
 }
 
-// DoTransitionWithOptions advances an issue and optionally applies transition-scoped fields.
+// DoTransitionWithOptions advances an issue and optionally applies
+// transition-scoped fields. The caller is responsible for ensuring that any
+// fields it sets are actually on the chosen transition's screen — Jira
+// returns a 400 with "Field 'X' cannot be set. It is not on the appropriate
+// screen, or unknown." otherwise. applyStatusWithOptions handles that
+// pre-check.
 func (c *Client) DoTransitionWithOptions(issueKey, id string, opts DoTransitionOptions) error {
 	endpoint := c.apiURL("/rest/api/3/issue/" + url.PathEscape(issueKey) + "/transitions")
 
@@ -381,208 +513,148 @@ func (s FlexibleString) String() string {
 	return string(s)
 }
 
-type WorkflowScope struct {
-	Type    string                   `json:"type"`
-	Project *WorkflowScopeProjectRef `json:"project,omitempty"`
+// WorkflowSchemeDetail is returned by GET /rest/api/3/workflowscheme/{id}. It
+// describes which workflow is used per issue type. Used to resolve the
+// workflow bound to an issue (issue type ID -> workflow name).
+type WorkflowSchemeDetail struct {
+	ID                FlexibleString    `json:"id"`
+	Name              string            `json:"name"`
+	DefaultWorkflow   string            `json:"defaultWorkflow"`
+	IssueTypeMappings map[string]string `json:"issueTypeMappings"`
 }
 
-type WorkflowScopeProjectRef struct {
-	ID string `json:"id"`
-}
-
-type WorkflowLayout struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
-}
-
-type WorkflowStatusUpdate struct {
-	Description     string `json:"description"`
-	Name            string `json:"name"`
-	StatusCategory  string `json:"statusCategory"`
-	StatusReference string `json:"statusReference"`
-}
-
-type WorkflowCreateStatus struct {
-	Layout          WorkflowLayout `json:"layout"`
-	Properties      map[string]any `json:"properties"`
-	StatusReference string         `json:"statusReference"`
-}
-
-type WorkflowTransitionLink struct {
-	FromPort            int    `json:"fromPort"`
-	FromStatusReference string `json:"fromStatusReference"`
-	ToPort              int    `json:"toPort"`
-}
-
-type WorkflowCreateTransition struct {
-	Actions           []any                    `json:"actions"`
-	Description       string                   `json:"description"`
-	ID                string                   `json:"id"`
-	Links             []WorkflowTransitionLink `json:"links"`
-	Name              string                   `json:"name"`
-	Properties        map[string]any           `json:"properties"`
-	ToStatusReference string                   `json:"toStatusReference"`
-	Triggers          []any                    `json:"triggers"`
-	Type              string                   `json:"type"`
-	Validators        []any                    `json:"validators"`
-}
-
-type WorkflowCreate struct {
-	Description      string                     `json:"description"`
-	Name             string                     `json:"name"`
-	StartPointLayout WorkflowLayout             `json:"startPointLayout"`
-	Statuses         []WorkflowCreateStatus     `json:"statuses"`
-	Transitions      []WorkflowCreateTransition `json:"transitions"`
-}
-
-type CreateWorkflowRequest struct {
-	Scope     WorkflowScope          `json:"scope"`
-	Statuses  []WorkflowStatusUpdate `json:"statuses"`
-	Workflows []WorkflowCreate       `json:"workflows"`
-}
-
-type WorkflowVersion struct {
-	ID            string `json:"id"`
-	VersionNumber int    `json:"versionNumber"`
-}
-
-type CreatedWorkflow struct {
-	Description string          `json:"description,omitempty"`
-	ID          string          `json:"id"`
-	IsEditable  bool            `json:"isEditable,omitempty"`
-	Name        string          `json:"name"`
-	Scope       WorkflowScope   `json:"scope"`
-	Version     WorkflowVersion `json:"version"`
-}
-
-type CreateWorkflowResponse struct {
-	Statuses  []WorkflowStatusUpdate `json:"statuses"`
-	Workflows []CreatedWorkflow      `json:"workflows"`
-}
-
-func (c *Client) CreateWorkflow(req *CreateWorkflowRequest) (*CreateWorkflowResponse, error) {
-	body, err := json.Marshal(req)
+// GetWorkflowScheme returns details for one workflow scheme.
+func (c *Client) GetWorkflowScheme(schemeID string) (*WorkflowSchemeDetail, error) {
+	endpoint := c.apiURL("/rest/api/3/workflowscheme/" + url.PathEscape(schemeID))
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error marshaling workflow create request: %v", err)
+		return nil, err
+	}
+	var out WorkflowSchemeDetail
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("error parsing workflow scheme response: %v", err)
+	}
+	if out.IssueTypeMappings == nil {
+		out.IssueTypeMappings = map[string]string{}
+	}
+	return &out, nil
+}
+
+// projectWorkflowSchemeAssignment captures one entry in the response of
+// /rest/api/3/workflowscheme/project — the assignment of a workflow scheme
+// (which can be inlined as workflowScheme) to a project.
+type projectWorkflowSchemeAssignment struct {
+	ProjectIDs     []string `json:"projectIds"`
+	WorkflowScheme struct {
+		ID              FlexibleString `json:"id"`
+		Name            string         `json:"name"`
+		DefaultWorkflow string         `json:"defaultWorkflow,omitempty"`
+	} `json:"workflowScheme"`
+}
+
+type projectWorkflowSchemesResponse struct {
+	Values []projectWorkflowSchemeAssignment `json:"values"`
+}
+
+// GetWorkflowSchemeForProject returns the workflow scheme assigned to a
+// company-managed project. For team-managed projects Jira may return an empty
+// list (their workflow lives directly on the project), so callers should
+// handle a nil result.
+func (c *Client) GetWorkflowSchemeForProject(projectID string) (*WorkflowSchemeDetail, error) {
+	query := url.Values{}
+	query.Set("projectId", projectID)
+	endpoint := c.apiURL("/rest/api/3/workflowscheme/project?" + query.Encode())
+
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp projectWorkflowSchemesResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("error parsing project workflow scheme response: %v", err)
 	}
 
-	responseBody, err := c.execRequest(http.MethodPost, c.apiURL("/rest/api/3/workflows/create"), bytes.NewReader(body))
+	for _, assignment := range resp.Values {
+		schemeID := strings.TrimSpace(assignment.WorkflowScheme.ID.String())
+		if schemeID == "" {
+			continue
+		}
+		// Resolve the full scheme details (the inlined version omits issueTypeMappings).
+		return c.GetWorkflowScheme(schemeID)
+	}
+
+	return nil, nil
+}
+
+type workflowSearchEntry struct {
+	ID struct {
+		Name string `json:"name"`
+	} `json:"id"`
+	Statuses []Status `json:"statuses"`
+}
+
+type workflowSearchResponse struct {
+	Values []workflowSearchEntry `json:"values"`
+}
+
+// GetWorkflowStatusesByName returns the statuses of a workflow looked up by
+// name. Used at scheme-switch time to compute which existing issue statuses
+// don't exist in the target workflow.
+func (c *Client) GetWorkflowStatusesByName(workflowName string) ([]Status, error) {
+	query := url.Values{}
+	query.Set("workflowName", workflowName)
+	query.Set("expand", "statuses")
+	endpoint := c.apiURL("/rest/api/3/workflow/search?" + query.Encode())
+
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+	var out workflowSearchResponse
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("error parsing workflow search response: %v", err)
+	}
+	for _, entry := range out.Values {
+		if entry.ID.Name == workflowName {
+			return entry.Statuses, nil
+		}
+	}
+	if len(out.Values) > 0 {
+		return out.Values[0].Statuses, nil
+	}
+	return nil, fmt.Errorf("workflow %q not found", workflowName)
+}
+
+// GetProjectIssueTypeStatuses returns each issue type's current status list
+// for a project. Unlike GetProjectStatuses (which dedupes across issue types),
+// this preserves the per-issue-type grouping needed to plan a scheme switch.
+func (c *Client) GetProjectIssueTypeStatuses(projectKey string) (map[string][]Status, error) {
+	endpoint := c.apiURL("/rest/api/3/project/" + url.PathEscape(projectKey) + "/statuses")
+	body, err := c.execRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	var response CreateWorkflowResponse
-	if err := json.Unmarshal(responseBody, &response); err != nil {
-		return nil, fmt.Errorf("error parsing workflow create response: %v", err)
+	var raw []struct {
+		ID       string          `json:"id"`
+		Statuses []projectStatus `json:"statuses"`
 	}
-	return &response, nil
-}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil, fmt.Errorf("error parsing project issue type statuses: %v", err)
+	}
 
-type WorkflowScheme struct {
-	ID              FlexibleString `json:"id"`
-	Name            string         `json:"name"`
-	Description     string         `json:"description,omitempty"`
-	DefaultWorkflow string         `json:"defaultWorkflow,omitempty"`
-	Draft           bool           `json:"draft,omitempty"`
-	Self            string         `json:"self,omitempty"`
-}
-
-type workflowSchemesPage struct {
-	StartAt    int              `json:"startAt"`
-	MaxResults int              `json:"maxResults"`
-	Total      int              `json:"total"`
-	IsLast     bool             `json:"isLast"`
-	Values     []WorkflowScheme `json:"values"`
-}
-
-func (c *Client) ListWorkflowSchemes() ([]WorkflowScheme, error) {
-	var out []WorkflowScheme
-	startAt := 0
-	const pageSize = 50
-
-	for range 20 {
-		query := url.Values{}
-		query.Set("startAt", strconv.Itoa(startAt))
-		query.Set("maxResults", strconv.Itoa(pageSize))
-		endpoint := c.apiURL("/rest/api/3/workflowscheme?" + query.Encode())
-
-		body, err := c.execRequest(http.MethodGet, endpoint, nil)
-		if err != nil {
-			return nil, err
+	out := map[string][]Status{}
+	for _, it := range raw {
+		converted := make([]Status, 0, len(it.Statuses))
+		for _, s := range it.Statuses {
+			converted = append(converted, Status{
+				ID:       s.ID,
+				Name:     s.Name,
+				Category: normalizeStatusCategoryKey(s.StatusCategory.Key),
+			})
 		}
-
-		var page workflowSchemesPage
-		if err := json.Unmarshal(body, &page); err != nil {
-			return nil, fmt.Errorf("error parsing workflow schemes response: %v", err)
-		}
-
-		out = append(out, page.Values...)
-		if page.IsLast || len(page.Values) == 0 {
-			break
-		}
-		startAt += len(page.Values)
-		if page.Total > 0 && startAt >= page.Total {
-			break
-		}
+		out[it.ID] = converted
 	}
-
-	return out, nil
-}
-
-type WorkflowSchemeAssignmentResponse struct {
-	ProjectID        string
-	WorkflowSchemeID string
-	Task             *TaskProgress
-}
-
-type TaskProgress struct {
-	ID       FlexibleString `json:"id"`
-	Self     string         `json:"self,omitempty"`
-	Status   string         `json:"status,omitempty"`
-	Message  string         `json:"message,omitempty"`
-	Progress int            `json:"progress,omitempty"`
-}
-
-type assignWorkflowSchemeRequest struct {
-	ProjectID                    string `json:"projectId"`
-	TargetSchemeID               string `json:"targetSchemeId"`
-	MappingsByIssueTypeOverrides []any  `json:"mappingsByIssueTypeOverride,omitempty"`
-}
-
-// AssignWorkflowSchemeToProject switches the workflow scheme for a classic Jira project.
-func (c *Client) AssignWorkflowSchemeToProject(projectID, schemeID string) (*WorkflowSchemeAssignmentResponse, error) {
-	req := assignWorkflowSchemeRequest{
-		ProjectID:                    projectID,
-		TargetSchemeID:               schemeID,
-		MappingsByIssueTypeOverrides: []any{},
-	}
-	body, err := json.Marshal(req)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling workflow scheme assignment request: %v", err)
-	}
-
-	endpoint := c.apiURL("/rest/api/3/workflowscheme/project/switch")
-	responseBody, status, err := c.execRequestWithStatus(http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	if status < 200 || (status >= 300 && status != http.StatusSeeOther) {
-		return nil, fmt.Errorf("request got %d code: %s", status, string(responseBody))
-	}
-
-	out := &WorkflowSchemeAssignmentResponse{
-		ProjectID:        projectID,
-		WorkflowSchemeID: schemeID,
-	}
-	if len(strings.TrimSpace(string(responseBody))) == 0 {
-		return out, nil
-	}
-
-	var task TaskProgress
-	if err := json.Unmarshal(responseBody, &task); err != nil {
-		return nil, fmt.Errorf("error parsing workflow scheme assignment response: %v", err)
-	}
-	out.Task = &task
 	return out, nil
 }
 
