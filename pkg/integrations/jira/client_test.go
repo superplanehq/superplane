@@ -680,3 +680,139 @@ func Test__Client__ResolveNumericIssueID(t *testing.T) {
 		assert.Equal(t, "999", id)
 	})
 }
+
+func Test__Client__OpsAlertsAPI(t *testing.T) {
+	cloudID := "35273b54-3f06-40d2-880f-dd28cf6daafa"
+	appCtx := &contexts.IntegrationContext{
+		Configuration: map[string]any{
+			"siteUrl":  "https://test.atlassian.net",
+			"email":    "test@example.com",
+			"apiToken": "test-token",
+		},
+	}
+
+	t.Run("create alert", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"result":"Request will be processed","requestId":"r1","took":0.1}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		out, err := client.CreateOpsAlert(cloudID, &OpsCreateAlertRequest{Message: "Hi"})
+		require.NoError(t, err)
+		assert.Equal(t, "r1", out.RequestID)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "api.atlassian.com/jsm/ops/api/"+cloudID+"/v1/alerts")
+	})
+
+	t.Run("get alert", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"a1","message":"m"}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		m, err := client.GetOpsAlert(cloudID, "a1")
+		require.NoError(t, err)
+		assert.Equal(t, "m", m["message"])
+	})
+
+	t.Run("assign alert", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusAccepted,
+					Body:       io.NopCloser(strings.NewReader(`{"requestId":"as1"}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		out, err := client.AssignOpsAlert(cloudID, "a1", "bb4d9938-c3c2-455d-aaab-727aa701c0d8")
+		require.NoError(t, err)
+		assert.Equal(t, "as1", out.RequestID)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/assign")
+		assert.Equal(t, http.MethodPost, httpContext.Requests[0].Method)
+	})
+
+	t.Run("resolve request ignores premature alertId until processed", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"alertId":"stale-id","isSuccess":true}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"processedAt":"2026-05-01T00:00:00Z","alertId":"new-id","isSuccess":true,"status":"Created"}`,
+					)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		id, err := client.ResolveAlertIDAfterOpsRequest(cloudID, "req-1", "")
+		require.NoError(t, err)
+		assert.Equal(t, "new-id", id)
+		require.Len(t, httpContext.Requests, 2)
+	})
+
+	t.Run("resolve request fails when processed but not successful", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"processedAt":"2026-05-01T00:00:00Z","isSuccess":false,"status":"Invalid priority"}`,
+					)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		_, err = client.ResolveAlertIDAfterOpsRequest(cloudID, "req-2", "")
+		require.ErrorContains(t, err, "failed")
+		require.ErrorContains(t, err, "Invalid priority")
+	})
+
+	t.Run("resolve request fails on success flag with error status text", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"processedAt":"2026-05-01T00:00:00Z","isSuccess":true,"status":"Alert does not exist","alertId":"old-1"}`,
+					)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		_, err = client.ResolveAlertIDAfterOpsRequest(cloudID, "req-3", "")
+		require.ErrorContains(t, err, "Alert does not exist")
+	})
+
+	t.Run("delete alert", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusAccepted,
+					Body:       io.NopCloser(strings.NewReader(`{"requestId":"d1"}`)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+		out, err := client.DeleteOpsAlert(cloudID, "a1")
+		require.NoError(t, err)
+		assert.Equal(t, "d1", out.RequestID)
+	})
+}
