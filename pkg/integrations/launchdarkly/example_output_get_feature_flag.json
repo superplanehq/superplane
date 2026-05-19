@@ -1,5 +1,6 @@
 {
   "data": {
+    "projectKey": "default",
     "key": "toggle-feature",
     "name": "Toggle Feature",
     "description": "Controls access to the new feature",
