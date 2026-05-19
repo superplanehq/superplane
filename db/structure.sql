@@ -433,6 +433,33 @@ CREATE TABLE public.role_metadata (
 
 
 --
+-- Name: runner_fleets; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_fleets (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    name character varying(255) NOT NULL,
+    fleet_url text NOT NULL,
+    auth_token text DEFAULT ''::text NOT NULL,
+    labels jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: runner_tasks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.runner_tasks (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    fleet_id uuid NOT NULL,
+    fleet_task_id text NOT NULL,
+    execution_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -986,6 +1013,22 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.role_metadata
     ADD CONSTRAINT role_metadata_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: runner_fleets runner_fleets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_fleets
+    ADD CONSTRAINT runner_fleets_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: runner_tasks runner_tasks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_tasks
+    ADD CONSTRAINT runner_tasks_pkey PRIMARY KEY (id);
 
 
 --
@@ -1639,6 +1682,27 @@ CREATE INDEX idx_workflows_organization_id ON public.workflows USING btree (orga
 
 
 --
+-- Name: runner_fleets_name_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX runner_fleets_name_idx ON public.runner_fleets USING btree (name);
+
+
+--
+-- Name: runner_tasks_execution_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX runner_tasks_execution_id_idx ON public.runner_tasks USING btree (execution_id);
+
+
+--
+-- Name: runner_tasks_fleet_task_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX runner_tasks_fleet_task_idx ON public.runner_tasks USING btree (fleet_id, fleet_task_id);
+
+
+--
 -- Name: unique_human_user_in_organization; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1826,6 +1890,22 @@ ALTER TABLE ONLY public.organization_invitations
 
 ALTER TABLE ONLY public.organization_invite_links
     ADD CONSTRAINT organization_invite_links_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: runner_tasks runner_tasks_execution_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_tasks
+    ADD CONSTRAINT runner_tasks_execution_id_fkey FOREIGN KEY (execution_id) REFERENCES public.workflow_node_executions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: runner_tasks runner_tasks_fleet_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.runner_tasks
+    ADD CONSTRAINT runner_tasks_fleet_id_fkey FOREIGN KEY (fleet_id) REFERENCES public.runner_fleets(id) ON DELETE CASCADE;
 
 
 --
@@ -2148,7 +2228,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260515120000	f
+20260518120000	f
 \.
 
 
