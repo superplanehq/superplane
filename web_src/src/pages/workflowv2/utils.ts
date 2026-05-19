@@ -3,7 +3,6 @@ import type {
   CanvasesCanvasEvent,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
-  CanvasesCanvasNodeExecutionRef,
   CanvasesCanvasNodeQueueItem,
   SuperplaneActionsAction,
   SuperplaneComponentsEdge as ComponentsEdge,
@@ -13,7 +12,7 @@ import type {
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { formatTimeAgo } from "@/lib/date";
 import { flattenObject } from "@/lib/utils";
-import type { LogEntry, LogRunItem } from "@/ui/CanvasLogSidebar";
+import type { LogEntry } from "@/ui/CanvasLogSidebar";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { createElement, Fragment, type ReactNode } from "react";
@@ -271,206 +270,6 @@ export function mapQueueItemsToSidebarEvents(
   });
 }
 
-export function mapExecutionStateToLogType(
-  execution: CanvasesCanvasNodeExecutionRef,
-  state?: string,
-): "success" | "error" | "resolved-error" {
-  if (execution.resultReason === "RESULT_REASON_ERROR_RESOLVED") {
-    return "resolved-error";
-  }
-  return state === "error" ? "error" : "success";
-}
-
-function getRunItemStateFromRef(executionRef: CanvasesCanvasNodeExecutionRef): string {
-  if (executionRef.state === "STATE_PENDING" || executionRef.state === "STATE_STARTED") return "running";
-  if (executionRef.result === "RESULT_FAILED") return "error";
-  if (executionRef.result === "RESULT_CANCELLED") return "cancelled";
-  if (executionRef.result === "RESULT_PASSED") return "success";
-  return "unknown";
-}
-
-function buildRunItemFromExecutionBase(options: {
-  execution: CanvasesCanvasNodeExecutionRef;
-  nodes: ComponentsNode[];
-  onNodeSelect: (nodeId: string) => void;
-  onExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
-  event?: CanvasesCanvasEvent;
-  timestampOverride?: string;
-  resolvedState?: string;
-  timestampFallback?: string;
-}): LogRunItem {
-  const { execution, nodes, onNodeSelect, timestampOverride, resolvedState, timestampFallback } = options;
-  const { onExecutionSelect, event } = options;
-  const componentNode = nodes.find((node) => node.id === execution.nodeId);
-  const executionState = execution.resultReason === "RESULT_REASON_ERROR_RESOLVED" ? "error" : resolvedState;
-  const nodeId = componentNode?.id || execution.nodeId || "";
-  const detail = execution.resultMessage;
-  const triggerNode = event ? nodes.find((node) => node.id === event.nodeId) : undefined;
-  const triggerEvent = event && triggerNode ? mapTriggerEventToSidebarEvent(event, triggerNode) : undefined;
-  const executionId = execution.id;
-  const title = createElement(
-    Fragment,
-    null,
-    componentNode?.name || componentNode?.id || execution.nodeId || "Execution",
-    nodeId
-      ? createElement(
-          Fragment,
-          null,
-          " · ",
-          createElement(
-            "button",
-            {
-              type: "button",
-              className: "text-blue-600 underline hover:text-blue-700",
-              onClick: () => {
-                if (onExecutionSelect && event?.id && executionId) {
-                  onExecutionSelect({
-                    nodeId,
-                    eventId: event.id,
-                    executionId,
-                    triggerEvent,
-                  });
-                  return;
-                }
-
-                onNodeSelect(nodeId);
-              },
-            },
-            nodeId,
-          ),
-        )
-      : null,
-    " · ",
-    executionState,
-  );
-
-  return {
-    id: execution.id || `${execution.nodeId}-execution`,
-    type: mapExecutionStateToLogType(execution, executionState),
-    title,
-    timestamp: timestampOverride || execution.updatedAt || execution.createdAt || timestampFallback || "",
-    isRunning: execution.state === "STATE_STARTED" || execution.state === "STATE_PENDING",
-    detail,
-    searchText: [
-      componentNode?.name,
-      componentNode?.id,
-      execution.nodeId,
-      executionState,
-      execution.resultMessage,
-      execution.resultReason,
-      execution.result,
-    ]
-      .filter(Boolean)
-      .join(" "),
-  };
-}
-
-export function buildRunItemFromExecution(options: {
-  execution: CanvasesCanvasNodeExecution;
-  nodes: ComponentsNode[];
-  onNodeSelect: (nodeId: string) => void;
-  onExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
-  event?: CanvasesCanvasEvent;
-  timestampOverride?: string;
-}): LogRunItem {
-  const { execution, nodes } = options;
-  const componentNode = nodes.find((node) => node.id === execution.nodeId);
-  const componentName = componentNode?.component || "";
-  const stateResolver = getState(componentName);
-  const resolvedState = stateResolver(buildExecutionInfo(execution));
-
-  return buildRunItemFromExecutionBase({
-    ...options,
-    execution,
-    resolvedState,
-    timestampFallback: execution.rootEvent?.createdAt || "",
-  });
-}
-
-export function buildRunItemFromExecutionRef(options: {
-  execution: CanvasesCanvasNodeExecutionRef;
-  nodes: ComponentsNode[];
-  onNodeSelect: (nodeId: string) => void;
-  onExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
-  event?: CanvasesCanvasEvent;
-  timestampOverride?: string;
-}): LogRunItem {
-  const state = getRunItemStateFromRef(options.execution);
-  return buildRunItemFromExecutionBase({ ...options, resolvedState: state });
-}
-
-export function buildRunEntryFromEvent(options: {
-  event: CanvasesCanvasEvent;
-  nodes: ComponentsNode[];
-  runItems?: LogRunItem[];
-}): LogEntry {
-  const { event, nodes, runItems = [] } = options;
-  const triggerNode = nodes.find((node) => node.id === event.nodeId);
-  const triggerRenderer = getTriggerRenderer(triggerNode?.component || "");
-  const { title, subtitle } = triggerRenderer.getTitleAndSubtitle({ event: buildEventInfo(event) });
-  const rootValues = triggerRenderer.getRootEventValues({ event: buildEventInfo(event) });
-
-  return {
-    id: event.id || `run-${Date.now()}`,
-    source: "runs",
-    timestamp: event.createdAt || "",
-    title: formatRunTitle(event.id, title),
-    type: "run",
-    runItems,
-    searchText: [title, subtitle, event.id, event.nodeId, Object.values(rootValues).join(" ")]
-      .filter(Boolean)
-      .join(" "),
-  };
-}
-
-export function mapWorkflowEventsToRunLogEntries(options: {
-  events: CanvasesCanvasEventWithExecutions[];
-  nodes: ComponentsNode[];
-  onNodeSelect: (nodeId: string) => void;
-  onExecutionSelect?: (options: {
-    nodeId: string;
-    eventId: string;
-    executionId: string;
-    triggerEvent?: SidebarEvent;
-  }) => void;
-}): LogEntry[] {
-  const { events, nodes, onNodeSelect, onExecutionSelect } = options;
-
-  return events.map((event) => {
-    const runItems = (event.executions || []).map((execution) =>
-      buildRunItemFromExecutionRef({
-        execution,
-        nodes,
-        onNodeSelect,
-        onExecutionSelect,
-        event: event as CanvasesCanvasEvent,
-        timestampOverride: event.createdAt || "",
-      }),
-    );
-
-    return buildRunEntryFromEvent({
-      event: event as CanvasesCanvasEvent,
-      nodes,
-      runItems,
-    });
-  });
-}
-
 export function mapCanvasNodesToLogEntries(options: {
   nodes: ComponentsNode[];
   workflowUpdatedAt: string;
@@ -542,60 +341,6 @@ export function mapCanvasNodesToLogEntries(options: {
     });
 
   return entries;
-}
-
-export function mergeWorkflowLogEntries(options: {
-  isViewingLiveVersion: boolean;
-  runEntries: LogEntry[];
-  liveRunEntries: LogEntry[];
-  canvasEntries: LogEntry[];
-  liveCanvasEntries: LogEntry[];
-  resolvedExecutionIds: Set<string>;
-}): LogEntry[] {
-  const { isViewingLiveVersion, runEntries, liveRunEntries, canvasEntries, liveCanvasEntries, resolvedExecutionIds } =
-    options;
-  const allCanvasEntries = [...liveCanvasEntries, ...canvasEntries];
-
-  if (!isViewingLiveVersion) {
-    return allCanvasEntries.sort((a, b) => {
-      const aTime = Date.parse(a.timestamp || "") || 0;
-      const bTime = Date.parse(b.timestamp || "") || 0;
-      return aTime - bTime;
-    });
-  }
-
-  const mergedRunEntries = new Map<string, LogEntry>();
-  runEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
-  liveRunEntries.forEach((entry) => mergedRunEntries.set(entry.id, entry));
-  const allRunEntries = Array.from(mergedRunEntries.values());
-
-  return [...allRunEntries, ...allCanvasEntries]
-    .map((entry) => {
-      if (!entry.runItems?.length || resolvedExecutionIds.size === 0) {
-        return entry;
-      }
-
-      const runItems = entry.runItems.map((item) => {
-        if (!resolvedExecutionIds.has(item.id)) {
-          return item;
-        }
-
-        return {
-          ...item,
-          type: "resolved-error" as const,
-        };
-      });
-
-      return {
-        ...entry,
-        runItems,
-      };
-    })
-    .sort((a, b) => {
-      const aTime = Date.parse(a.timestamp || "") || 0;
-      const bTime = Date.parse(b.timestamp || "") || 0;
-      return aTime - bTime;
-    });
 }
 
 export function buildCanvasStatusLogEntry(options: {
@@ -936,16 +681,6 @@ function renderNodeSublist(
     content: createElement("ul", { className: "mt-1 list-disc pl-5 space-y-1" }, ...items),
     text,
   };
-}
-
-function formatRunTitle(eventId: string | undefined, title: string): string {
-  const runIdPrefix = eventId?.slice(0, 4);
-
-  if (runIdPrefix) {
-    return `#${runIdPrefix} ·  ${title}`;
-  } else {
-    return title;
-  }
 }
 
 function formatSummaryEntry(
