@@ -9,18 +9,21 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/superplanehq/superplane/pkg/agents"
 )
 
 const (
 	defaultBaseURL    = "https://api.anthropic.com/v1"
 	apiVersion        = "2023-06-01"
-	managedAgentsBeta = "managed-agents-2026-04-01"
+	managedAgentsBeta = "managed-agents-2026-04-01,files-api-2025-04-14"
 )
 
 type Config struct {
 	APIKey        string
 	AgentID       string
 	EnvironmentID string
+	Resources     []agents.FileResource
 	BaseURL       string // overridable for tests
 	HTTPClient    *http.Client
 }
