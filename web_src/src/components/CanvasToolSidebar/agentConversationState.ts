@@ -130,7 +130,7 @@ export function isOutcomeActive(outcomeState: OutcomeState | null): boolean {
 export function statusLabel(status: string): string {
   switch (status) {
     case "streaming":
-      return "Agent is working...";
+      return "Agent is running...";
     case "failed":
       return "Last turn failed";
     case "terminated":
