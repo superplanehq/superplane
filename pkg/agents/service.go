@@ -130,10 +130,17 @@ func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, ses
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
 	}
+
+	preamble, err := s.buildPreamble(session, organizationID, userID, ModeBuilder)
+	if err != nil {
+		return fmt.Errorf("build preamble: %w", err)
+	}
+
 	if err := s.provider.DefineOutcome(ctx, session.ProviderSessionID, DefineOutcomeOptions{
-		Description:   description,
-		Rubric:        rubric,
-		MaxIterations: maxIterations,
+		Description:     description,
+		Rubric:          rubric,
+		MaxIterations:   maxIterations,
+		ContextPreamble: preamble,
 	}); err != nil {
 		return fmt.Errorf("define outcome: %w", err)
 	}

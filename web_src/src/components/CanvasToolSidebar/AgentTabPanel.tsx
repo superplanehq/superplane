@@ -20,6 +20,7 @@ import {
   buildRubricText,
   createInitialOutcomeState,
   createWebsocketCallbacks,
+  isOutcomeActive,
   statusLabel,
   useConversationMessages,
   useStoredOutcomeState,
@@ -115,9 +116,9 @@ function ChatConversation({
 
   const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
   const messageGroups = useMemo(() => groupMessages(messages), [messages]);
-  const modeDisabled =
-    status === "streaming" ||
-    (outcomeState != null && outcomeState.phase !== "passed" && outcomeState.phase !== "exhausted");
+  const outcomeActive = isOutcomeActive(outcomeState);
+  const agentBusy = status === "streaming" || outcomeMutation.isPending || outcomeActive;
+  const modeDisabled = agentBusy;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -155,7 +156,7 @@ function ChatConversation({
       <ChatComposer
         onSend={handlers.handleSend}
         onStop={handlers.handleStop}
-        sending={status === "streaming"}
+        sending={agentBusy}
         stopping={interruptMutation.isPending}
         statusLabel={statusLabel(status)}
         agentMode={agentMode}

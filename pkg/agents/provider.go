@@ -57,6 +57,9 @@ type DefineOutcomeOptions struct {
 	Rubric string
 	// MaxIterations caps the provider's autonomous build/evaluate loop.
 	MaxIterations int
+	// ContextPreamble is prepended to the description so provider-managed
+	// autonomous loops get the same refreshed session context as normal turns.
+	ContextPreamble string
 }
 
 type CreateSessionResult struct {
