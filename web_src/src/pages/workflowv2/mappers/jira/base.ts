@@ -73,3 +73,28 @@ export function jiraBaseEventSections(
 ): EventSection[] {
   return buildJiraEventSections(nodes, execution, componentName, true);
 }
+
+export function opsAlertCoreExecutionPayloadDetails(data: Record<string, unknown> | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!data) {
+    return out;
+  }
+  if (data.message != null) out.Message = String(data.message);
+  if (data.description != null) out.Description = String(data.description);
+  if (data.status != null) out.Status = String(data.status);
+  if (data.priority != null) out.Priority = String(data.priority);
+  return out;
+}
+
+function trim(s: unknown): string {
+  return typeof s === "string" ? s.trim() : "";
+}
+
+/** Card lines for Ops alert pickers — prefer enriched label from Setup when API fetch succeeded during save. */
+export function buildOpsAlertReferenceMetadata(node: NodeInfo, alertRaw?: string): MetadataItem[] {
+  const label = trim((node.metadata as { alertLabel?: string } | undefined)?.alertLabel);
+  const id = trim(alertRaw ?? "");
+  if (label !== "") return [{ icon: "hash", label }];
+  if (id !== "") return [{ icon: "hash", label: id }];
+  return [];
+}

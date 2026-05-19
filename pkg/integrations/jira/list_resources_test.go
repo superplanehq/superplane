@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -150,7 +151,7 @@ func Test__ListResources__Assignee(t *testing.T) {
 		assert.Contains(t, httpContext.Requests[0].URL.String(), "project=TEST")
 	})
 
-	t.Run("missing project -> empty list, no API call", func(t *testing.T) {
+	t.Run("missing project and metadata -> empty list, no API call", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{}
 		resources, err := j.ListResources("assignee", core.ListResourcesContext{
 			HTTP:        httpContext,
@@ -159,6 +160,30 @@ func Test__ListResources__Assignee(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, resources)
 		assert.Empty(t, httpContext.Requests)
+	})
+
+	t.Run("missing project uses first synced project from metadata", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`[
+						{"accountId":"acct-1","displayName":"Alice"}
+					]`)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("assignee", core.ListResourcesContext{
+			HTTP: httpContext,
+			Integration: newAuthorizedIntegrationWithMetadata(Metadata{
+				Projects: []Project{{Key: "SYNC", Name: "Synced"}},
+			}),
+		})
+		require.NoError(t, err)
+		require.Len(t, resources, 1)
+		assert.Equal(t, "acct-1", resources[0].ID)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "project=SYNC")
 	})
 }
 
@@ -565,4 +590,19 @@ func Test__requestTypeFieldResources__createmetaFallback(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, resources, 1)
 	assert.Equal(t, "5", resources[0].ID)
+}
+
+func Test__opsAlertIntegrationResourceLabel__truncatesByRune(t *testing.T) {
+	longCJK := strings.Repeat("あ", 100)
+	label := opsAlertIntegrationResourceLabel(map[string]any{
+		"message": longCJK,
+		"tinyId":  "42",
+	}, "alert-uuid")
+	assert.True(t, utf8.ValidString(label))
+	assert.LessOrEqual(t, utf8.RuneCountInString(label), opsAlertLabelMaxRunes+len(" #42"))
+	assert.Contains(t, label, "#42")
+	assert.True(t, strings.HasSuffix(label, "... #42"))
+
+	short := opsAlertIntegrationResourceLabel(map[string]any{"message": "ok", "tinyId": "1"}, "id")
+	assert.Equal(t, "ok #1", short)
 }

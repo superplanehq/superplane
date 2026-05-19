@@ -1,0 +1,10 @@
+{
+  "data": {
+    "alertId": "439aa701-7cd6-4549-8992-d06650561222-1779166598474",
+    "deleted": true,
+    "requestId": "82e59857-e111-44a3-9f72-013783b94f52",
+    "result": "Request will be processed"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.deleted"
+}
