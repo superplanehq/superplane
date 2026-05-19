@@ -198,24 +198,29 @@ func (c *GetWorkflow) Execute(ctx core.ExecutionContext) error {
 	}
 
 	// Resolving the workflow itself (statuses + scheme) requires a company-managed
-	// project. Team-managed projects bind workflows differently and Jira's public
-	// scheme APIs return nothing for them — we degrade gracefully and still emit
-	// the current status + available transitions, which is the most useful part.
+	// project. Team-managed projects bind workflows differently and Jira's scheme
+	// APIs return an empty list (not an error) for them — we degrade gracefully
+	// in that case and still emit current status + available transitions. Any
+	// other failure is surfaced so callers don't get partial output that looks
+	// successful.
 	if projectID != "" {
 		scheme, err := client.GetWorkflowSchemeForProject(projectID)
-		if err != nil && ctx.Logger != nil {
-			ctx.Logger.Warnf("jira.getWorkflow: failed to fetch workflow scheme for project %s: %v", projectID, err)
+		if err != nil {
+			return fmt.Errorf("failed to fetch workflow scheme for project %s: %v", projectID, err)
 		}
 		if scheme != nil {
 			output.WorkflowSchemeID = scheme.ID.String()
 			output.WorkflowSchemeName = scheme.Name
 
-			workflowName := resolveWorkflowForIssueType(client, scheme, projectKey, issueTypeName)
+			workflowName, err := resolveWorkflowForIssueType(client, scheme, projectKey, issueTypeName)
+			if err != nil {
+				return fmt.Errorf("failed to resolve workflow for issue type %q: %v", issueTypeName, err)
+			}
 			output.WorkflowName = workflowName
 			if workflowName != "" {
 				statuses, err := client.GetWorkflowStatusesByName(workflowName)
-				if err != nil && ctx.Logger != nil {
-					ctx.Logger.Warnf("jira.getWorkflow: failed to load statuses for workflow %q: %v", workflowName, err)
+				if err != nil {
+					return fmt.Errorf("failed to load statuses for workflow %q: %v", workflowName, err)
 				}
 				output.Statuses = make([]WorkflowStatus, 0, len(statuses))
 				for _, s := range statuses {
@@ -281,25 +286,29 @@ func extractIssueTypeAndProject(issue *Issue) (issueType, projectID, projectKey 
 // resolveWorkflowForIssueType maps an issue type name to the workflow that
 // the scheme routes it through. Jira keys the scheme's issueTypeMappings by
 // issue type id, so we look up the id via the project's issue types and fall
-// back to the default workflow if there's no specific mapping.
-func resolveWorkflowForIssueType(client *Client, scheme *WorkflowSchemeDetail, projectKey, issueTypeName string) string {
+// back to the scheme's default workflow when there is no specific mapping.
+// If the project's issue type list can't be fetched we return the error
+// instead of silently falling back to the default workflow — that
+// fallback could otherwise hide the issue type's real workflow.
+func resolveWorkflowForIssueType(client *Client, scheme *WorkflowSchemeDetail, projectKey, issueTypeName string) (string, error) {
 	if scheme == nil {
-		return ""
+		return "", nil
 	}
 	if strings.TrimSpace(projectKey) != "" && strings.TrimSpace(issueTypeName) != "" {
 		issueTypes, err := client.GetProjectIssueTypes(projectKey)
-		if err == nil {
-			for _, it := range issueTypes {
-				if strings.EqualFold(it.Name, issueTypeName) {
-					if wf := strings.TrimSpace(scheme.IssueTypeMappings[it.ID]); wf != "" {
-						return wf
-					}
-					break
+		if err != nil {
+			return "", err
+		}
+		for _, it := range issueTypes {
+			if strings.EqualFold(it.Name, issueTypeName) {
+				if wf := strings.TrimSpace(scheme.IssueTypeMappings[it.ID]); wf != "" {
+					return wf, nil
 				}
+				break
 			}
 		}
 	}
-	return strings.TrimSpace(scheme.DefaultWorkflow)
+	return strings.TrimSpace(scheme.DefaultWorkflow), nil
 }
 
 func statusMatches(s Status, currentID, currentName string) bool {

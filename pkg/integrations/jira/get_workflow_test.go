@@ -175,6 +175,116 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 		require.Len(t, output.AvailableTransitions, 2)
 	})
 
+	t.Run("workflow scheme fetch failure is surfaced as a hard error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(issueResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(transitionsResponse))},
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"errorMessage":"boom"}`))},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":  "TEST",
+				"issueKey": "TEST-1",
+			},
+			HTTP:           httpContext,
+			Integration:    newAuthorizedIntegration(),
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Logger:         newLogger(),
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to fetch workflow scheme")
+	})
+
+	t.Run("workflow status fetch failure is surfaced as a hard error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(issueResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(transitionsResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(projectSchemeResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(schemeDetailResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(issueTypesResponse))},
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"errorMessage":"boom"}`))},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":  "TEST",
+				"issueKey": "TEST-1",
+			},
+			HTTP:           httpContext,
+			Integration:    newAuthorizedIntegration(),
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Logger:         newLogger(),
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to load statuses")
+	})
+
+	t.Run("project issue type fetch failure does not silently fall back to default workflow", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(issueResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(transitionsResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(projectSchemeResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(schemeDetailResponse))},
+				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"errorMessage":"boom"}`))},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":  "TEST",
+				"issueKey": "TEST-1",
+			},
+			HTTP:           httpContext,
+			Integration:    newAuthorizedIntegration(),
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Logger:         newLogger(),
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to resolve workflow")
+	})
+
+	t.Run("workflow/search prefix match for a different workflow returns an error", func(t *testing.T) {
+		// scheme routes Task to "task-workflow", but workflow/search returns
+		// the older "task-workflow-old" only. We must not pretend its
+		// statuses belong to "task-workflow".
+		prefixMatchOnly := `{"values":[{"id":{"name":"task-workflow-old"},"statuses":[
+			{"id":"99","name":"Stale","statusCategory":"TODO"}
+		]}]}`
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(issueResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(transitionsResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(projectSchemeResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(schemeDetailResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(issueTypesResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(prefixMatchOnly))},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"project":  "TEST",
+				"issueKey": "TEST-1",
+			},
+			HTTP:           httpContext,
+			Integration:    newAuthorizedIntegration(),
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Logger:         newLogger(),
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `workflow "task-workflow" not found`)
+	})
+
 	t.Run("falls back to default workflow when issue type is not in the scheme mappings", func(t *testing.T) {
 		schemeWithoutMapping := `{"id":101010,"name":"Default scheme","defaultWorkflow":"jira-default","issueTypeMappings":{}}`
 		defaultWorkflowStatuses := `{"values":[{"id":{"name":"jira-default"},"statuses":[

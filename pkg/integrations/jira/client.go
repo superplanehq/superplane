@@ -597,9 +597,12 @@ type workflowSearchResponse struct {
 	Values []workflowSearchEntry `json:"values"`
 }
 
-// GetWorkflowStatusesByName returns the statuses of a workflow looked up by
-// name. Used at scheme-switch time to compute which existing issue statuses
-// don't exist in the target workflow.
+// GetWorkflowStatusesByName returns the statuses of the workflow with the
+// given exact name. Jira's /rest/api/3/workflow/search?workflowName=... does
+// a prefix-style match server-side and can return multiple workflows, so we
+// filter for an exact name match here and refuse to guess if none of the
+// returned workflows match — returning a different workflow's statuses
+// would silently mis-describe the issue's state machine.
 func (c *Client) GetWorkflowStatusesByName(workflowName string) ([]Status, error) {
 	query := url.Values{}
 	query.Set("workflowName", workflowName)
@@ -618,9 +621,6 @@ func (c *Client) GetWorkflowStatusesByName(workflowName string) ([]Status, error
 		if entry.ID.Name == workflowName {
 			return statusesFromGlobal(entry.Statuses), nil
 		}
-	}
-	if len(out.Values) > 0 {
-		return statusesFromGlobal(out.Values[0].Statuses), nil
 	}
 	return nil, fmt.Errorf("workflow %q not found", workflowName)
 }
