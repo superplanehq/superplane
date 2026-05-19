@@ -110,7 +110,7 @@ func (p *Provider) DefineOutcome(ctx context.Context, providerSessionID string, 
 
 	event := map[string]any{
 		"type":        "user.define_outcome",
-		"description": opts.Description,
+		"description": withPreamble(opts.Description, opts.ContextPreamble),
 		"rubric":      map[string]string{"type": "text", "content": opts.Rubric},
 	}
 	if opts.MaxIterations > 0 {

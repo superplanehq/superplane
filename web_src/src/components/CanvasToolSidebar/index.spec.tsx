@@ -72,6 +72,7 @@ function makeToolSidebarState() {
 describe("CanvasToolSidebar", () => {
   beforeEach(() => {
     richMessageRenderSpy.mockClear();
+    sessionStorage.clear();
   });
 
   it("enters runs mode from the runs tab", () => {
@@ -230,5 +231,24 @@ describe("CanvasToolSidebar", () => {
       resolveSend?.();
     });
     expect(input).toHaveValue("second");
+  });
+
+  it("shows Stop while an outcome is still active after the chat turn ends", () => {
+    sessionStorage.setItem(
+      "outcome-chat-1",
+      JSON.stringify({
+        title: "Build plan",
+        criteria: [],
+        iteration: 1,
+        maxIterations: 3,
+        phase: "building",
+        log: [{ phase: "building" }],
+      }),
+    );
+
+    render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
+
+    expect(screen.getByTestId("agent-stop-button")).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-send-message-button")).not.toBeInTheDocument();
   });
 });
