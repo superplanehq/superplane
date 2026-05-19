@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
@@ -116,9 +117,8 @@ func Test__OnTopicMessage__Setup(t *testing.T) {
 }
 
 func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
-	trigger := &OnTopicMessage{}
-
 	t.Run("notification for configured topic -> emits event", func(t *testing.T) {
+		trigger := &OnTopicMessage{}
 		privateKey, certPEM := createTestSigningCert(t)
 		message := signTestMessage(t, trigger, SubscriptionMessage{
 			Type:             "Notification",
@@ -167,6 +167,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("subscription confirmation for different topic -> ignored", func(t *testing.T) {
+		trigger := &OnTopicMessage{}
 		privateKey, certPEM := createTestSigningCert(t)
 		message := signTestMessage(t, trigger, SubscriptionMessage{
 			Type:             "SubscriptionConfirmation",
@@ -206,6 +207,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("confirmation for configured topic -> confirms subscription", func(t *testing.T) {
+		trigger := &OnTopicMessage{}
 		privateKey, certPEM := createTestSigningCert(t)
 		message := signTestMessage(t, trigger, SubscriptionMessage{
 			Type:             "SubscriptionConfirmation",
@@ -251,6 +253,7 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 	})
 
 	t.Run("unsupported message type -> bad request", func(t *testing.T) {
+		trigger := &OnTopicMessage{}
 		status, _, err := trigger.HandleWebhook(core.WebhookRequestContext{
 			Body: []byte(`{
 				"Type": "UnknownType",
@@ -266,6 +269,76 @@ func Test__OnTopicMessage__HandleWebhook(t *testing.T) {
 
 		require.Error(t, err)
 		assert.Equal(t, http.StatusBadRequest, status)
+	})
+
+	t.Run("multiple notifications for same cert URL -> fetches cert only once (caching)", func(t *testing.T) {
+		// New trigger instance to ensure fresh cache
+		triggerCache := &OnTopicMessage{}
+		privateKey, certPEM := createTestSigningCert(t)
+
+		message := signTestMessage(t, triggerCache, SubscriptionMessage{
+			Type:             "Notification",
+			MessageID:        "msg-123",
+			TopicArn:         "arn:aws:sns:us-east-1:123456789012:orders-events",
+			Subject:          "order.created",
+			Message:          "{\"orderId\":\"ord_123\"}",
+			Timestamp:        "2026-01-10T10:00:00Z",
+			SigningCertURL:   testSigningCertURL,
+			SignatureVersion: "2",
+		}, privateKey)
+
+		body, err := json.Marshal(message)
+		require.NoError(t, err)
+
+		eventContext := &contexts.EventContext{}
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(bytes.NewReader(certPEM)),
+				},
+				// Note: second response should NOT be needed if caching works
+			},
+		}
+
+		// First call
+		status1, _, err1 := triggerCache.HandleWebhook(core.WebhookRequestContext{
+			Body: body,
+			Configuration: map[string]any{
+				"region":   "us-east-1",
+				"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+			},
+			Events: eventContext,
+			HTTP:   httpContext,
+			Logger: log.NewEntry(log.New()),
+		})
+
+		require.NoError(t, err1)
+		assert.Equal(t, http.StatusOK, status1)
+
+		// Second call (same body, same cert URL)
+		status2, _, err2 := triggerCache.HandleWebhook(core.WebhookRequestContext{
+			Body: body,
+			Configuration: map[string]any{
+				"region":   "us-east-1",
+				"topicArn": "arn:aws:sns:us-east-1:123456789012:orders-events",
+			},
+			Events: eventContext,
+			HTTP:   httpContext,
+			Logger: log.NewEntry(log.New()),
+		})
+
+		require.NoError(t, err2)
+		assert.Equal(t, http.StatusOK, status2)
+
+		// VERIFICATION: Only 1 HTTP request should have been made to fetch the certificate
+		certRequests := 0
+		for _, req := range httpContext.Requests {
+			if req.URL.String() == testSigningCertURL {
+				certRequests++
+			}
+		}
+		assert.Equal(t, 1, certRequests, "Certificate should be fetched exactly once")
 	})
 }
 
@@ -311,8 +384,22 @@ func signTestMessage(t *testing.T, trigger *OnTopicMessage, message Subscription
 	stringToSign, err := trigger.buildStringToSign(message)
 	require.NoError(t, err)
 
-	sum := sha256.Sum256([]byte(stringToSign))
-	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, crypto.SHA256, sum[:])
+	var hash crypto.Hash
+	var digest []byte
+
+	if message.SignatureVersion == "1" {
+		hash = crypto.SHA1
+		h := sha1.New()
+		h.Write([]byte(stringToSign))
+		digest = h.Sum(nil)
+	} else {
+		hash = crypto.SHA256
+		h := sha256.New()
+		h.Write([]byte(stringToSign))
+		digest = h.Sum(nil)
+	}
+
+	signature, err := rsa.SignPKCS1v15(rand.Reader, privateKey, hash, digest)
 	require.NoError(t, err)
 
 	message.Signature = base64.StdEncoding.EncodeToString(signature)
