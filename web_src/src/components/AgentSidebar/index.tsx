@@ -256,7 +256,19 @@ function ChatConversation({
       const rubricText = rubric.categories && rubric.categories.length > 0
         ? `# ${rubric.title}\n\n${rubric.categories.map((cat) => `## ${cat.heading}\n${cat.criteria.map((c) => `- ${c.text}`).join("\n")}`).join("\n\n")}`
         : `# ${rubric.title}\n\n${rubric.criteria.map((c) => `- ${c}`).join("\n")}`;
-      // Initialize outcome progress widget
+
+      // In Build mode: rubric is a spec confirmation, not an outcome.
+      // Send as a regular message so the agent starts building directly.
+      if (agentMode === "builder") {
+        await sendMutation.mutateAsync({
+          chatId,
+          content: `Specs approved. Start building:\n\n${rubricText}`,
+          mode: "builder",
+        });
+        return;
+      }
+
+      // In Plan mode: kick off outcome with grading loop
       setOutcomeState({
         title: rubric.title,
         criteria: rubric.criteria.map((c) => ({ text: c })),
@@ -276,7 +288,6 @@ function ChatConversation({
       } catch (err) {
         console.error("Failed to define outcome:", err);
         setOutcomeState(null);
-        // Fallback: send as regular message in builder mode
         await sendMutation.mutateAsync({
           chatId,
           content: `Start building based on this plan:\n\n${rubricText}`,
@@ -284,7 +295,7 @@ function ChatConversation({
         });
       }
     },
-    [chatId, onModeSwitch, outcomeMutation, sendMutation],
+    [chatId, agentMode, outcomeMutation, sendMutation],
   );
 
   const scrollRef = useChatScroll(messagesQuery, chatId, messages.length, showThinking);
