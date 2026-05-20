@@ -35,6 +35,10 @@ export interface HeaderProps {
   onSelectDashboard?: () => void;
   /** When set with `mode === "dashboard"`, shows Add panel in the secondary header. */
   onDashboardAddPanel?: () => void;
+  /** When set with `mode === "dashboard"`, shows the YAML button in the secondary header. */
+  onDashboardOpenYaml?: () => void;
+  /** When true, the YAML button advertises read-only YAML view. Defaults to editable copy. */
+  dashboardYamlReadOnly?: boolean;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
   publishVersionLabel?: string;
   /** When true, shows the Discard control next to Publish in version edit mode (draft differs from live). */
