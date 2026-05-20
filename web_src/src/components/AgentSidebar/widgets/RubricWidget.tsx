@@ -5,8 +5,8 @@ import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { ClipboardList, ChevronDown, ChevronUp, X } from "lucide-react";
 import type { RubricCategory } from "./parser";
-import { CodeBlockWidget } from "./CodeBlockWidget";
 import { IntegrationButton } from "./IntegrationButton";
+import { MarkdownCode } from "./MarkdownCode";
 import { NodeChipFromLink } from "./NodeChip";
 import { RunChipFromLink } from "./RunChip";
 
@@ -65,7 +65,7 @@ function RubricMarkdown({
               {linkChildren}
             </AgentLink>
           ),
-          code: RubricMarkdownCode,
+          code: MarkdownCode,
           pre: ({ children: preChildren }) => <>{preChildren}</>,
           table: ({ children: tableChildren, ...props }) => (
             <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -77,21 +77,6 @@ function RubricMarkdown({
         {children}
       </ReactMarkdown>
     </div>
-  );
-}
-
-function RubricMarkdownCode({ className, children, ...props }: ComponentProps<"code"> & { children?: ReactNode }) {
-  const match = /language-(\w+)/.exec(className || "");
-  const code = String(children).replace(/\n$/, "");
-
-  if (match) {
-    return <CodeBlockWidget code={code} language={match[1]} />;
-  }
-
-  return (
-    <code className={className} {...props}>
-      {children}
-    </code>
   );
 }
 
