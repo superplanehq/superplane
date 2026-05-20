@@ -1,6 +1,6 @@
----
-title: "Dashboard and widgets"
----
+# Dashboard and Widgets
+
+## Overview
 
 Canvas dashboards are per-canvas views for turning workflow state into an operational surface: notes, pinned nodes, tables, charts, and numbers. They are useful for release dashboards, preview environments, incident views, and any workflow where the canvas itself is not the best day-to-day status display.
 
