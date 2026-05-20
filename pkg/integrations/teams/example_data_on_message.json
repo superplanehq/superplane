@@ -23,7 +23,15 @@
       "name": "SuperPlane Bot"
     },
     "text": "The deployment to staging is complete. All tests passed.",
-    "entities": []
+    "entities": [
+      {
+        "type": "clientInfo",
+        "locale": "en-US",
+        "country": "ES",
+        "platform": "Web",
+        "timezone": "Europe/Madrid"
+      }
+    ]
   },
   "timestamp": "2026-01-16T12:05:00Z"
 }
