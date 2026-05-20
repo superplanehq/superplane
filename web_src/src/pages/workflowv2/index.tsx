@@ -3461,8 +3461,8 @@ export function WorkflowPageV2() {
   const handlePlaceholderAdd = useCallback(
     async (data: {
       position: { x: number; y: number };
-      sourceNodeId: string;
-      sourceHandleId: string | null;
+      sourceNodeId?: string;
+      sourceHandleId?: string | null;
     }): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
 
@@ -3487,18 +3487,21 @@ export function WorkflowPageV2() {
         },
       };
 
-      const newEdge: ComponentsEdge = {
-        sourceId: data.sourceNodeId,
-        targetId: newNodeId,
-        channel: data.sourceHandleId || "default",
-      };
+      const newEdge =
+        data.sourceNodeId && data.sourceHandleId !== undefined
+          ? ({
+              sourceId: data.sourceNodeId,
+              targetId: newNodeId,
+              channel: data.sourceHandleId || "default",
+            } as ComponentsEdge)
+          : null;
 
       const updatedWorkflow = {
         ...latestWorkflow,
         spec: {
           ...latestWorkflow.spec,
           nodes: [...(latestWorkflow.spec?.nodes || []), newNode],
-          edges: [...(latestWorkflow.spec?.edges || []), newEdge],
+          edges: newEdge ? [...(latestWorkflow.spec?.edges || []), newEdge] : [...(latestWorkflow.spec?.edges || [])],
         },
       };
 
