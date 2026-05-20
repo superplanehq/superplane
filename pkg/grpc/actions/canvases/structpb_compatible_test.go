@@ -1,0 +1,41 @@
+package canvases
+
+import (
+	"encoding/json"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func Test__toStructpbCompatible__ConvertsJSONNumbersOnly(t *testing.T) {
+	converted, ok := toStructpbCompatible(map[string]any{
+		"number":  json.Number("42"),
+		"invalid": json.Number("not-a-number"),
+		"string":  "deploy",
+		"active":  true,
+		"missing": nil,
+		"list": []any{
+			json.Number("3"),
+			"prod",
+		},
+		"nested": map[string]any{
+			"small": json.Number("0.0000001"),
+		},
+	}).(map[string]any)
+
+	require.True(t, ok)
+	assert.Equal(t, float64(42), converted["number"])
+	assert.Equal(t, "not-a-number", converted["invalid"])
+	assert.Equal(t, "deploy", converted["string"])
+	assert.Equal(t, true, converted["active"])
+	assert.Nil(t, converted["missing"])
+
+	list, ok := converted["list"].([]any)
+	require.True(t, ok)
+	assert.Equal(t, []any{float64(3), "prod"}, list)
+
+	nested, ok := converted["nested"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(0.0000001), nested["small"])
+}
