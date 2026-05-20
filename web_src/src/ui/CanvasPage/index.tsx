@@ -748,6 +748,10 @@ function CanvasPage(props: CanvasPageProps) {
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
+    onBeforeClose: () => {
+      if (props.headerMode === "runs") props.onExitRunsMode?.();
+      if (props.isVersionControlOpen) props.onOpenVersionControl?.();
+    },
   });
   const { isToolSidebarOpen, openToolSidebar } = toolSidebarState;
   const previousHeaderModeRef = useRef<CanvasPageProps["headerMode"] | undefined>(undefined);
