@@ -77,11 +77,11 @@ export function SurveyWidget({ questions, onAction }: SurveyWidgetProps) {
   const isLast = currentIndex === questions.length - 1;
 
   return (
-    <div className="my-4 rounded-lg border border-violet-200 bg-white shadow-sm overflow-hidden">
+    <div className="my-4 rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
       {/* Header */}
-      <div className="px-3 py-2 bg-violet-50 border-b border-violet-200 flex items-center justify-between">
-        <p className="text-xs font-medium text-violet-900">{current.prompt}</p>
-        <span className="text-[10px] text-violet-500 font-medium">
+      <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <p className="text-xs font-medium text-slate-900">{current.prompt}</p>
+        <span className="text-[10px] text-slate-500 font-medium">
           {currentIndex + 1}/{questions.length}
         </span>
       </div>
@@ -117,8 +117,8 @@ export function SurveyWidget({ questions, onAction }: SurveyWidgetProps) {
               className={cn(
                 "flex-1 text-xs px-3 py-2 rounded border transition-colors outline-none",
                 customInputs[currentIndex] && answers[currentIndex] === customInputs[currentIndex].trim()
-                  ? "border-violet-300 bg-violet-50 ring-1 ring-violet-300"
-                  : "border-slate-200 bg-white focus:border-violet-300",
+                  ? "border-slate-400 bg-slate-50 ring-1 ring-slate-300"
+                  : "border-slate-200 bg-white focus:border-slate-400",
               )}
             />
           </div>
@@ -184,7 +184,7 @@ function SurveyStepDot({
       onClick={handleClick}
       className={cn(
         "size-2 rounded-full transition-colors",
-        isActive ? "bg-violet-600" : isAnswered ? "bg-violet-300" : "bg-slate-200",
+        isActive ? "bg-slate-700" : isAnswered ? "bg-slate-400" : "bg-slate-200",
       )}
       aria-label={`Question ${index + 1}`}
     />
@@ -213,12 +213,12 @@ function SurveyOptionButton({
       className={cn(
         "justify-start text-xs h-auto py-2 px-3 text-left whitespace-normal",
         selected
-          ? "bg-violet-100 text-violet-900 ring-1 ring-violet-300"
-          : "text-slate-700 hover:bg-violet-50 hover:text-violet-900",
+          ? "bg-slate-100 text-slate-900 ring-1 ring-slate-300"
+          : "text-slate-700 hover:bg-slate-50 hover:text-slate-900",
       )}
       onClick={handleClick}
     >
-      <span className="inline-flex items-center justify-center size-5 rounded bg-violet-100 text-violet-700 text-[10px] font-semibold mr-2 shrink-0">
+      <span className="inline-flex items-center justify-center size-5 rounded bg-slate-100 text-slate-700 text-[10px] font-semibold mr-2 shrink-0">
         {String.fromCharCode(65 + index)}
       </span>
       {option}
@@ -247,7 +247,7 @@ function SurveyNavigation({
       </Button>
 
       {isLast ? (
-        <Button size="sm" className="text-xs h-7 bg-violet-600 hover:bg-violet-700 text-white" onClick={onSubmit}>
+        <Button size="sm" className="text-xs h-7" onClick={onSubmit}>
           Continue →
         </Button>
       ) : (

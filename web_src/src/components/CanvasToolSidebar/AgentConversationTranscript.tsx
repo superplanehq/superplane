@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import type { AgentMessage } from "./types";
 import type { MessageGroup } from "./agentMessageGroups";
 
-export function ConversationTranscript({
+export const ConversationTranscript = memo(function ConversationTranscript({
   error,
   canvasId,
   organizationId,
@@ -53,7 +53,7 @@ export function ConversationTranscript({
       {error ? <p className="px-3 py-2 text-sm text-red-600">{error}</p> : null}
     </div>
   );
-}
+});
 
 function ConversationGroup({
   group,
@@ -135,8 +135,10 @@ const MessageRow = memo(function MessageRow({
     <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
       <div
         className={cn(
-          "max-w-[85%] break-words rounded-lg px-3 py-2 text-sm",
-          isUser ? "bg-violet-600 text-white whitespace-pre-wrap" : "bg-slate-100 text-slate-900",
+          "break-words text-sm",
+          isUser
+            ? "max-w-[85%] rounded-lg bg-slate-100 px-3 py-2 whitespace-pre-wrap text-slate-900"
+            : "max-w-[720px] text-slate-900",
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
