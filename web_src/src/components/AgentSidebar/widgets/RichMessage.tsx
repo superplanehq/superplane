@@ -5,9 +5,9 @@ import remarkGfm from "remark-gfm";
 import { BannerWidget } from "./BannerWidget";
 import { ButtonsWidget } from "./ButtonsWidget";
 import { ChartWidget } from "./ChartWidget";
-import { CodeBlockWidget } from "./CodeBlockWidget";
 import { CollapseWidget } from "./CollapseWidget";
 import { ConfirmWidget } from "./ConfirmWidget";
+import { MarkdownCode } from "./MarkdownCode";
 import { RubricWidget } from "./RubricWidget";
 import { MermaidWidget } from "./MermaidWidget";
 import { NodeChipFromLink } from "./NodeChip";
@@ -211,21 +211,6 @@ function renderSpecialLink(href: string | undefined, children: ReactNode, canvas
   }
 
   return null;
-}
-
-function MarkdownCode({ className, children, ...props }: ComponentProps<"code"> & { children?: ReactNode }) {
-  const match = /language-(\w+)/.exec(className || "");
-  const code = String(children).replace(/\n$/, "");
-
-  if (match) {
-    return <CodeBlockWidget code={code} language={match[1]} />;
-  }
-
-  return (
-    <code className={className} {...props}>
-      {children}
-    </code>
-  );
 }
 
 function isAgentLink(url: string): boolean {
