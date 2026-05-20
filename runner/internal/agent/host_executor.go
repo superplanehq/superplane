@@ -35,10 +35,7 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 		return 1, "", errors.New("empty command")
 	}
 	cmd := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
-	setResultEnv(cmd, resultHostPath)
-	if env != nil {
-		cmd.Env = env
-	}
+	applyCmdEnv(cmd, env, resultHostPath)
 	var buf bytes.Buffer
 	if live != nil {
 		mw := io.MultiWriter(&buf, live)

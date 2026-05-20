@@ -106,6 +106,26 @@ func TestCommandsShareShellEnv(t *testing.T) {
 	})
 }
 
+func TestTaskEnvironmentVariablesCommands(t *testing.T) {
+	skipIfPTYUnavailable(t)
+	t.Parallel()
+	const value = "commands-env-ok"
+	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
+		return api.CreateTaskRequest{
+			Commands: []string{`printf "%s" "$COMMIT_AUTHOR"`},
+			WebhookURL: wh,
+			Environment: []api.EnvironmentVariable{{Name: "COMMIT_AUTHOR", Value: value}},
+		}
+	}, func(t *testing.T, created api.CreateTaskResponse, payload api.WebhookPayload) {
+		if payload.Status != string(models.StatusSucceeded) || payload.ExitCode != 0 {
+			t.Fatalf("task failed: status=%s exit=%d output=%q", payload.Status, payload.ExitCode, payload.Output)
+		}
+		if !strings.Contains(payload.Output, value) {
+			t.Errorf("commands environment output got %q want substring %q", payload.Output, value)
+		}
+	})
+}
+
 func TestTaskEnvironmentVariables(t *testing.T) {
 	t.Parallel()
 	const value = "alice@example.com line=ok"

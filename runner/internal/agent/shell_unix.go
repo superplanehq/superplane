@@ -113,10 +113,7 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, sc
 	}
 
 	cmd := exec.CommandContext(ctx, bash, "--norc", "--noprofile", metaPath)
-	setResultEnv(cmd, resultHostPath)
-	if env != nil {
-		cmd.Env = env
-	}
+	applyCmdEnv(cmd, env, resultHostPath)
 	max := maxOut
 	if max <= 0 {
 		max = 512 * 1024

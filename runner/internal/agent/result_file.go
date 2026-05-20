@@ -11,6 +11,17 @@ import (
 
 const envSuperplaneResultFile = "SUPERPLANE_RESULT_FILE"
 
+// applyCmdEnv sets task environment first, then SUPERPLANE_RESULT_FILE when hostPath is set.
+func applyCmdEnv(cmd *exec.Cmd, env []string, hostPath string) {
+	if cmd == nil {
+		return
+	}
+	if env != nil {
+		cmd.Env = env
+	}
+	setResultEnv(cmd, hostPath)
+}
+
 func setResultEnv(cmd *exec.Cmd, hostPath string) {
 	if cmd == nil || strings.TrimSpace(hostPath) == "" {
 		return

@@ -11,6 +11,32 @@ import (
 	"github.com/superplane/runner/shared/api"
 )
 
+func TestHostExecutorArgvUsesTaskEnvironmentWithResultFile(t *testing.T) {
+	sh, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skipf("sh not on PATH: %v", err)
+	}
+	task := &api.TaskPayload{
+		ID:          "task-env-argv-result",
+		Command:     []string{sh, "-c", `printf "%s|%s" "$RUNNER_TEST_ENV" "$SUPERPLANE_RESULT_FILE"`},
+		Environment: []api.EnvironmentVariable{{Name: "RUNNER_TEST_ENV", Value: "argv-result-value"}},
+	}
+	resultPath := filepath.Join(t.TempDir(), "result.json")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	exit, output, err := (&HostExecutor{}).Execute(ctx, task, nil, resultPath)
+	if err != nil || exit != 0 {
+		t.Fatalf("host argv+result: exit=%d err=%v output=%q", exit, err, output)
+	}
+	if !strings.Contains(output, "argv-result-value") {
+		t.Fatalf("output = %q, want argv-result-value", output)
+	}
+	if !strings.Contains(output, resultPath) {
+		t.Fatalf("output = %q, want SUPERPLANE_RESULT_FILE=%q", output, resultPath)
+	}
+}
+
 func TestHostExecutorArgvUsesTaskEnvironment(t *testing.T) {
 	sh, err := exec.LookPath("sh")
 	if err != nil {
@@ -59,8 +85,7 @@ func TestHostExecutorCommandsUseTaskEnvironment(t *testing.T) {
 	}
 }
 
-// TestHostExecutorCommandsUseTaskEnvironmentWithResultFile runs on CI (pipe shell).
-// Task env is applied after setResultEnv on that path; this guards result-file wiring end-to-end.
+// TestHostExecutorCommandsUseTaskEnvironmentWithResultFile uses the pipe shell path (CI-safe).
 func TestHostExecutorCommandsUseTaskEnvironmentWithResultFile(t *testing.T) {
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skipf("bash not on PATH: %v", err)
@@ -113,28 +138,6 @@ func TestHostExecutorPTYCommandsUseTaskEnvironmentWithResultFile(t *testing.T) {
 	}
 	if !strings.Contains(output, "pty-task-value") {
 		t.Fatalf("output = %q, want pty-task-value", output)
-	}
-}
-
-func TestSetResultEnvPreservesExistingCmdEnv(t *testing.T) {
-	t.Setenv("RUNNER_SETRESULTENV_PROBE", "from-os")
-	cmd := exec.Command("true")
-	cmd.Env = []string{"TASK_ONLY=1", "RUNNER_SETRESULTENV_PROBE=from-task"}
-	setResultEnv(cmd, "/tmp/result.json")
-	if len(cmd.Env) != 3 {
-		t.Fatalf("cmd.Env len = %d, want 3: %#v", len(cmd.Env), cmd.Env)
-	}
-	if cmd.Env[0] != "TASK_ONLY=1" || cmd.Env[1] != "RUNNER_SETRESULTENV_PROBE=from-task" {
-		t.Fatalf("task env overwritten: %#v", cmd.Env)
-	}
-	if !strings.HasPrefix(cmd.Env[2], envSuperplaneResultFile+"=") {
-		t.Fatalf("missing result env: %#v", cmd.Env)
-	}
-
-	empty := exec.Command("true")
-	setResultEnv(empty, "/tmp/result.json")
-	if !strings.Contains(strings.Join(empty.Env, "\n"), "RUNNER_SETRESULTENV_PROBE=from-os") {
-		t.Fatalf("expected os.Environ baseline when cmd.Env unset: %#v", empty.Env)
 	}
 }
 
