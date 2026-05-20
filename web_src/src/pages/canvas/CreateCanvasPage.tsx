@@ -22,7 +22,7 @@ import { ImportYamlDialog } from "./ImportYamlDialog";
 import type { CanvasesCanvas, SuperplaneComponentsEdge, SuperplaneComponentsNode } from "@/api-client";
 import { LayoutTemplate, Monitor, Rainbow, Sparkles, Terminal, Upload } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { extractIntegrations, getTemplateTags, countNodesByType } from "./templateMetadata";
 import { NodeCountLabel, TagBadges } from "./components/TemplateCardMeta";
 

@@ -149,7 +149,12 @@ export function CanvasChangeRequestConflictResolver({
     setSelectedNodeID(nextSelected);
     setFinalDraftYAML("");
     setFinalDraftError("");
-  }, [changeRequest.metadata?.id, changeRequest.version?.spec?.nodes, changeRequest.version?.spec?.edges]);
+  }, [
+    changeRequest.metadata?.id,
+    changeRequest.version?.spec?.nodes,
+    changeRequest.version?.spec?.edges,
+    changeRequest.diff?.conflictingNodeIds,
+  ]);
 
   const currentNode = selectedNodeID ? liveNodeByID.get(selectedNodeID) : undefined;
   const incomingNode = selectedNodeID ? incomingNodeByID.get(selectedNodeID) : undefined;

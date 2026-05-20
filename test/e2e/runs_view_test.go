@@ -67,7 +67,8 @@ func (s *runsViewSteps) whenIVisitRunsView() {
 
 func (s *runsViewSteps) thenTheFinishedRunIsVisible() {
 	require.NotNil(s.t, s.run, "expected run to be created")
-	s.session.AssertVisible(q.TestID("runs-sidebar"))
+	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
+	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Runs")`))
 	s.session.AssertVisible(q.TestID("node-start-header"))
 	s.session.AssertVisible(q.TestID("node-output-header"))
 	s.session.AssertURLContains("view=runs")
@@ -93,8 +94,9 @@ func (s *runsViewSteps) whenICloseRunNodeDetails() {
 }
 
 func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
-	// The Edit button is hidden in runs view; switch back to the canvas tab first.
-	s.session.Click(q.TestID("canvas-view-mode-live"))
+	// The Canvas-only top toggle is hidden in runs view; switch back via the tool sidebar.
+	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
+	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Agent")`))
 	s.session.Click(q.TestID("canvas-edit-button"))
 }
 
@@ -104,7 +106,6 @@ func (s *runsViewSteps) thenEditModeIsVisible() {
 	for time.Now().Before(deadline) {
 		url := s.session.Page().URL()
 		if !strings.Contains(url, "view=runs") && !strings.Contains(url, "run="+s.run.ID.String()) {
-			s.session.AssertHidden(q.TestID("runs-sidebar"))
 			return
 		}
 

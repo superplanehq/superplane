@@ -54,46 +54,29 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-## Create a Cloudflare API Token
+To connect Cloudflare to SuperPlane:
 
-1. Open the [Cloudflare API Tokens page](https://dash.cloudflare.com/profile/api-tokens)
-2. Click **Create Token**
-3. Click **Get started** next to "Create Custom Token"
-4. Configure the token:
-   - **Token name**: SuperPlane Integration
-   - **Permissions** (click "+ Add more" to add each):
-     - Zone / Zone / Read
-     - Zone / DNS / Edit
-     - Zone / Cache Purge / Purge
-     - Zone / SSL and Certificates / Edit
-     - Zone / Single Redirect / Edit
-     - Zone / Origin Rules / Edit
-     - Zone / Workers Routes / Edit
-	 - Zone / Load Balancers / Edit
-     - Account / Workers KV Storage / Edit
-     - Account / Workers Scripts / Edit
-     - Account / Workers / Edit
-     - Account / Load Balancing: Monitors and Pools / Edit
-     - Account / Notifications / Edit
-     - Account / Account Settings / Edit
-     - Account / Cloudflare Tunnel / Edit
-   - **Zone Resources**: Include / All zones _(or select specific zones)_
-   - **Account Resources**: Include the account containing your load balancers
-5. Click **Continue to summary**, then **Create Token**
-6. Copy the token and paste it below
-
-## Find your Cloudflare Account ID
-
-The **Account ID** is required for KV storage, load balancing monitors/pools, Cloudflare Tunnels, and health alert webhooks.
-
-1. Open the [Cloudflare dashboard](https://dash.cloudflare.com/)
-2. Select the account that contains your load balancers
-3. In the account home page, copy the **Account ID** from the right sidebar
-4. Paste it into the **Account ID** field below
-
-Make sure this is the same account selected in **Account Resources** when creating the API token.
-
-> **Note**: The token is only shown once. Store it securely if needed elsewhere.
+1. In the [Cloudflare dashboard](https://dash.cloudflare.com/), open the account you want to connect, then go to **Manage Account → Account API Tokens** and click **Create Token → Create Custom Token**. Creating an account-owned token requires **Super Administrator** access on the Cloudflare account.
+2. Name the token and keep the first policy scoped to **Entire Account**. Select these permissions:
+   - **Developer Platform** → **Workers KV Storage** → **Edit**
+   - **Developer Platform** → **Workers Scripts** → **Edit**
+   - **Developer Platform** → **Workers** → **Edit**
+   - **Network Services** → **Account Load Balancers** → **Edit**
+   - **Network Services** → **Load Balancing: Monitors and Pools** → **Edit**
+   - **Account & Billing** → **Notifications** → **Edit**
+   - **Account & Billing** → **Account Settings** → **Edit**
+   - **Cloudflare One** → **Cloudflare Tunnel** → **Edit**
+3. Click **Add policy**. In the new policy, change the scope dropdown from **Entire Account** to **All Domains** or **Specified Domains** for only the domains SuperPlane should manage. The DNS and zone rows below are only available after switching this policy to a domain scope:
+   - **DNS & Zones** → **Zone** → **Read**
+   - **DNS & Zones** → **DNS** → **Edit**
+   - **Caching** → **Cache Purge** → **Purge**
+   - **SSL and Certificates** → **SSL and Certificates** → **Edit**
+   - **Rules & Configuration** → **Dynamic URL Redirects** → **Edit**
+   - **Rules & Configuration** → **Origin** → **Edit**
+   - **Developer Platform** → **Workers Routes** → **Edit**
+   - **Network Services** → **Zone Load Balancers** → **Edit**
+4. Optionally set an expiration date, review, create the token, and paste the generated token below. Cloudflare only shows the token once.
+5. Copy the **Account ID** from the same account's home page right sidebar and paste it into **Account ID** below.
 
 <a id="on-load-balancing-health-alert"></a>
 

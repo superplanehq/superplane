@@ -9,7 +9,8 @@ import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { resolveIcon } from "@/lib/utils";
 import { Check, Copy, Loader2, Settings, TriangleAlert, X } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getHeaderIconSrc, IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
+import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import {
   useAvailableIntegrations,
   useCreateIntegration,

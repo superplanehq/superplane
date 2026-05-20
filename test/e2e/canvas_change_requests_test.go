@@ -177,14 +177,8 @@ func (s *canvasChangeRequestSteps) createChangeRequest() {
 }
 
 func (s *canvasChangeRequestSteps) openCreatedChangeRequestFromList() {
-	// After create, the version sidebar may already be open; otherwise use the canvas control.
-	openVersionControl := q.Locator(`button[aria-label="Open version control"]`).Run(s.session)
-	openVisible, err := openVersionControl.IsVisible()
-	require.NoError(s.t, err)
-	if openVisible {
-		s.session.Click(q.Locator(`button[aria-label="Open version control"]`))
-	}
-
+	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
+	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Versions")`))
 	s.session.AssertText("Versions")
 
 	// Pending rows are tagged in CanvasVersionControlSidebar (data-testid) so we do not rely on

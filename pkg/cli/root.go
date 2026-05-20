@@ -40,10 +40,11 @@ var RootCmd = &cobra.Command{
 	Use:   "superplane",
 	Short: "SuperPlane command line interface",
 	Long:  "SuperPlane CLI - Command line interface for the SuperPlane API\n\n" + core.AgentSkillsHelp(),
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if !Verbose {
 			log.SetOutput(io.Discard)
 		}
+		return ValidateEnvironmentContext()
 	},
 }
 
@@ -104,6 +105,10 @@ func defaultBindOptions() core.BindOptions {
 		NewAPIClient:        DefaultClient,
 		DefaultOutputFormat: GetOutputFormat,
 		NewConfigContext: func() core.ConfigContext {
+			if context, ok := GetEnvironmentContext(); ok {
+				return NewEnvironmentContext(context)
+			}
+
 			context, ok := GetCurrentContext()
 			if !ok {
 				return nil
@@ -115,6 +120,10 @@ func defaultBindOptions() core.BindOptions {
 }
 
 func GetAPIURL() string {
+	if context, ok := GetEnvironmentContext(); ok {
+		return context.URL
+	}
+
 	if currentContext, ok := GetCurrentContext(); ok {
 		return currentContext.URL
 	}
@@ -123,6 +132,10 @@ func GetAPIURL() string {
 }
 
 func GetAPIToken() string {
+	if context, ok := GetEnvironmentContext(); ok {
+		return context.APIToken
+	}
+
 	if currentContext, ok := GetCurrentContext(); ok {
 		return currentContext.APIToken
 	}

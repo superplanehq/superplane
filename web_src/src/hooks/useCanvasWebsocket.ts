@@ -197,6 +197,7 @@ export function useCanvasWebsocket(
       onCanvasLifecycleEvent,
       shouldApplyCanvasUpdate,
       processRuntimeEvents,
+      organizationId,
     ],
   );
 
@@ -285,9 +286,11 @@ export function useCanvasWebsocket(
 
   // Cleanup on unmount
   useEffect(() => {
+    const queues = messageQueues.current;
+    const processing = processingNodes.current;
     return () => {
-      messageQueues.current.clear();
-      processingNodes.current.clear();
+      queues.clear();
+      processing.clear();
     };
   }, []);
 

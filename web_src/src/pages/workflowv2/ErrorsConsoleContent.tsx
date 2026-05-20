@@ -7,7 +7,7 @@ import type {
 } from "@/api-client";
 import { TimeAgo } from "@/components/TimeAgo";
 import { cn, resolveIcon } from "@/lib/utils";
-import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIcons";
+import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { findNode, getStatusBadgeProps, resolveNodeIconSlug } from "@/pages/workflowv2/lib/canvas-runs";
 import { buildTriggerSidebarEvent } from "./utils";

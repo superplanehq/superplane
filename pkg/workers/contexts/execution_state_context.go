@@ -2,9 +2,11 @@ package contexts
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -89,4 +91,15 @@ func (s *ExecutionStateContext) Fail(reason, message string) error {
 
 func (s *ExecutionStateContext) SetKV(key, value string) error {
 	return models.CreateNodeExecutionKVInTransaction(s.tx, s.execution.WorkflowID, s.execution.NodeID, s.execution.ID, key, value)
+}
+
+func (s *ExecutionStateContext) GetKV(key string) (string, error) {
+	value, err := models.FindLatestNodeExecutionKVValueInTransaction(s.tx, s.execution.ID, key)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", core.ErrExecutionKVNotFound
+		}
+		return "", err
+	}
+	return value, nil
 }
