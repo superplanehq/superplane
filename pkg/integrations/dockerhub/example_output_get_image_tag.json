@@ -12,6 +12,7 @@
     "tag_last_pulled": "2025-01-06T11:02:10.123456Z",
     "tag_last_pushed": "2025-01-05T21:06:53.506400Z",
     "repository": 98765,
+    "v2": "true",
     "images": [
       {
         "architecture": "amd64",

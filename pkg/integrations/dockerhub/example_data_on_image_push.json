@@ -16,7 +16,8 @@
       "is_private": false,
       "status": "Active",
       "star_count": 12,
-      "pull_count": 3456
+      "pull_count": 3456,
+      "description": "Demo image for SuperPlane workflows"
     }
   }
 }
