@@ -1,23 +1,11 @@
-
 # Rich UI Widgets
 
-Output these blocks in your chat messages. The frontend renders them as interactive widgets.
-
-## When to use
-
-- **Asking the user a question** — use :::buttons (3 or fewer options) or :::survey (multiple questions, free-text)
-- **Presenting a build plan** — use :::rubric with mermaid diagrams
-- **Showing operation results** — use :::success or :::error
-- **Long output** (YAML, logs, CLI output) — wrap in :::collapse
-- **Visualizing flows** — use mermaid diagrams
-- **Referencing canvas nodes** — use node chips `[Name](node:id)`
-- **Referencing integrations** — use integration buttons `[Name](integration:uuid)`
-- **After building a draft** — use :::draft-actions with the version ID
-- **Before destructive operations** — use :::confirm
-
-Always prefer widgets over plain text when presenting choices, structured data, or interactive content.
+Output these blocks in your chat messages. The frontend renders them as interactive widgets. Always prefer widgets over plain text when presenting choices, structured data, or interactive content.
 
 ## Buttons (single-choice)
+
+**When to use:** Asking the user to pick between 3 or fewer options. No free-text input needed.
+
 ```
 :::buttons
 Which option?
@@ -29,6 +17,9 @@ Which option?
 No `[input]` fields. Clickable only.
 
 ## Survey (multi-question form)
+
+**When to use:** Gathering answers to multiple questions at once, or when one option should be free-text input. Use instead of buttons when there are more than 3 options.
+
 ```
 :::survey
 First question?
@@ -43,7 +34,10 @@ Second question?
 ```
 `[input]` adds a free-text field.
 
-## Rubric (build plan with categories)
+## Rubric (build plan / spec)
+
+**When to use:** Presenting a build plan or implementation spec before building. The widget has a "Start Building" button the user clicks to approve.
+
 ```
 :::rubric Plan Title
 ## Category Name
@@ -54,18 +48,23 @@ Second question?
 - Criterion 3
 :::
 ```
-Shows "Start Building →" button. Categories with `##` headings.
+Categories with `##` headings. Criteria should be functional requirements, not implementation details.
 
 ## Draft Actions
+
+**When to use:** After successfully creating a canvas draft. Renders Publish/Discard/See in Editor buttons. Print in the chat response, not as a file.
+
 ```
 :::draft-actions
 versionId: <uuid>
 message: Draft ready — added health check nodes
 :::
 ```
-Renders Publish/Discard/See in Editor bar. Print in chat response, not as a file.
 
 ## Chart
+
+**When to use:** Showing run history, metrics, analytics, or any numerical data the user asks about.
+
 ```
 :::chart
 type: bar
@@ -79,18 +78,73 @@ series:
 ```
 Types: `bar`, `line`, `area`, `pie`.
 
-## Other Blocks
+## Collapse
 
-| Widget | Syntax | Purpose |
-|--------|--------|---------|
-| `:::steps` | `- [x] Done\n- [ ] Pending` | Progress indicator |
-| `:::collapse` | `:::collapse title="Details"\n...\n:::` | Expandable content |
-| `:::success` | `:::success\n...\n:::` | Green banner |
-| `:::error` | `:::error\n...\n:::` | Red banner |
-| `:::confirm` | YAML with message/yes/no | Destructive action confirm |
-| `` ```mermaid `` | Mermaid syntax | Flow diagrams |
+**When to use:** Any output longer than 20 lines — YAML, logs, CLI output, large JSON.
+
+```
+:::collapse title="Canvas YAML"
+(long content here)
+:::
+```
+
+## Success / Error Banners
+
+**When to use:** Showing final operation outcomes — build succeeded, deploy failed, etc.
+
+```
+:::success
+Canvas published successfully. 10 nodes, 9 edges, zero errors.
+:::
+```
+
+```
+:::error
+Build failed: missing required field `url` on http node.
+:::
+```
+
+## Confirm
+
+**When to use:** Before destructive operations — deleting nodes, discarding drafts, resetting canvas.
+
+```
+:::confirm
+message: This will delete all nodes. Are you sure?
+yes: Delete everything
+no: Cancel
+:::
+```
+
+## Steps
+
+**When to use:** Showing progress through a multi-step operation.
+
+```
+:::steps
+- [x] Read canvas state
+- [x] Check integrations
+- [ ] Write YAML
+- [ ] Deploy draft
+:::
+```
+
+## Mermaid Diagrams
+
+**When to use:** Visualizing canvas topology, workflow flows, or any process the user needs to understand before approving.
+
+````
+```mermaid
+graph TD
+    A[Schedule] --> B[HTTP Check]
+    B -->|success| C[Noop]
+    B -->|failure| D[Alert]
+```
+````
 
 ## Inline Chips
+
+**When to use:** Referencing specific canvas nodes, runs, or integrations in your messages. Chips are clickable — nodes zoom the canvas, integrations open the config dialog.
 
 | Type | Syntax | Example |
 |------|--------|---------|
