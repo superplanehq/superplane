@@ -1,7 +1,7 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
 import { Text } from "@/components/Text/text";
 import { useAccount } from "@/contexts/useAccount";
-import { ArrowLeft, Building, Network, Shield, Users } from "lucide-react";
+import { ArrowLeft, Building, Network, Shield, Terminal, Users } from "lucide-react";
 import React from "react";
 import { Link, Navigate, NavLink, Outlet } from "react-router-dom";
 
@@ -58,6 +58,10 @@ const AdminLayout: React.FC = () => {
               <NavLink to="/admin/settings" className={navLinkClass}>
                 <Network size={14} />
                 Settings
+              </NavLink>
+              <NavLink to="/admin/runner-fleets" className={navLinkClass}>
+                <Terminal size={14} />
+                Runner fleets
               </NavLink>
             </nav>
           </div>

@@ -9,7 +9,7 @@ export function LiveLogStreamView({ executionId }: { executionId: string }) {
 
   return (
     <div ref={scrollRef} className="h-full min-h-0 overflow-y-auto bg-slate-50">
-      {error ? <ErrorMessage /> : null}
+      {error ? <ErrorMessage message={error} /> : null}
       {!error && !hasAnyLogs ? <NoLogsMessage /> : null}
 
       {sections.map((section) => (
@@ -23,10 +23,11 @@ function NoLogsMessage() {
   return <div className="px-4 py-3 text-left text-muted-foreground">No log lines yet.</div>;
 }
 
-function ErrorMessage() {
+function ErrorMessage({ message }: { message: string }) {
+  const fallback = "Something went wrong while fetching logs. Please try again later.";
   return (
-    <div className="px-4 py-3 text-left text-destructive">
-      Something went wrong while fetching logs. Please try again later.
+    <div className="px-4 py-3 text-left text-destructive text-sm whitespace-pre-wrap">
+      {message.trim() || fallback}
     </div>
   );
 }
