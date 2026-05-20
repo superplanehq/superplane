@@ -269,8 +269,8 @@ export interface CanvasPageProps {
   onApplyAiOperations?: (changes: CanvasChangesetChange[]) => Promise<void>;
   onPlaceholderAdd?: (data: {
     position: { x: number; y: number };
-    sourceNodeId: string;
-    sourceHandleId: string | null;
+    sourceNodeId?: string;
+    sourceHandleId?: string | null;
   }) => Promise<string>;
   onPlaceholderConfigure?: (data: {
     placeholderId: string;
@@ -701,6 +701,7 @@ function CanvasPage(props: CanvasPageProps) {
   const [templateNodeId, setTemplateNodeId] = useState<string | null>(null);
   const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const canvasWrapperRef = useRef<HTMLDivElement | null>(null);
+  const isCreatingStarterPlaceholderRef = useRef(false);
   const localHasFitToViewRef = useRef(false);
   const localHasUserToggledSidebarRef = useRef(false);
   const localIsSidebarOpenRef = useRef<boolean | null>(null);
@@ -747,6 +748,10 @@ function CanvasPage(props: CanvasPageProps) {
     readOnly,
     canvasId: props.canvasId,
     organizationId: props.organizationId,
+    onBeforeClose: () => {
+      if (props.headerMode === "runs") props.onExitRunsMode?.();
+      if (props.isVersionControlOpen) props.onOpenVersionControl?.();
+    },
   });
   const { isToolSidebarOpen, openToolSidebar } = toolSidebarState;
   const previousHeaderModeRef = useRef<CanvasPageProps["headerMode"] | undefined>(undefined);
@@ -1049,9 +1054,59 @@ function CanvasPage(props: CanvasPageProps) {
     [readOnly, templateNodeId, handleBuildingBlockClick, handleBuildingBlockDrop, props.viewportRef, state.nodes],
   );
 
-  const handleBuildingBlocksShortcutOpen = useCallback(() => {
-    handleSidebarToggle(true);
-  }, [handleSidebarToggle]);
+  const onPlaceholderAdd = props.onPlaceholderAdd;
+  const viewportRefProp = props.viewportRef;
+
+  const handleBuildingBlocksShortcutOpen = useCallback(async () => {
+    if (readOnly) {
+      return;
+    }
+
+    if (templateNodeId) {
+      handleSidebarToggle(true);
+      state.componentSidebar.close();
+      return;
+    }
+
+    if (!onPlaceholderAdd) {
+      handleSidebarToggle(true);
+      return;
+    }
+
+    if (isCreatingStarterPlaceholderRef.current) {
+      return;
+    }
+
+    isCreatingStarterPlaceholderRef.current = true;
+    try {
+      const position = findFreePositionInViewport({
+        viewport: viewportRefProp?.current ?? { x: 0, y: 0, zoom: DEFAULT_CANVAS_ZOOM },
+        canvasRect: canvasWrapperRef.current?.getBoundingClientRect() ?? null,
+        nodes: state.nodes || [],
+        nodeSize: { width: 420, height: 200 },
+        fallbackCanvasSize: { width: window.innerWidth, height: window.innerHeight },
+      });
+      const placeholderId = await onPlaceholderAdd({ position });
+      if (!placeholderId) {
+        handleSidebarToggle(true);
+        return;
+      }
+
+      setTemplateNodeId(placeholderId);
+      setIsBuildingBlocksSidebarOpen(true);
+      state.componentSidebar.close();
+    } finally {
+      isCreatingStarterPlaceholderRef.current = false;
+    }
+  }, [
+    readOnly,
+    templateNodeId,
+    onPlaceholderAdd,
+    viewportRefProp,
+    state.nodes,
+    state.componentSidebar,
+    handleSidebarToggle,
+  ]);
 
   useBuildingBlocksShortcut({
     disabled:
