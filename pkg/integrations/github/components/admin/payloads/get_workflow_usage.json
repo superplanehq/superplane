@@ -8,7 +8,10 @@
     },
     "included_minutes": 0,
     "total_paid_minutes_used": 150.0,
-    "repositories": ["repo1", "repo2", "repo3"]
+    "repositories": [
+      "example-org/app",
+      "example-org/app-docs"
+    ]
   },
   "timestamp": "2026-02-17T20:00:00Z",
   "type": "github.workflowUsage"
