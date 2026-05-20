@@ -7,9 +7,7 @@
     "account": "123456789012",
     "time": "2024-01-01T12:00:00Z",
     "region": "us-east-1",
-    "resources": [
-      "arn:aws:ecr:us-east-1:123456789012:repository/my-repo"
-    ],
+    "resources": [],
     "detail": {
       "repository-name": "my-repo",
       "image-tag": "latest",
