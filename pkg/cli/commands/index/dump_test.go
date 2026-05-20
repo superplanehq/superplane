@@ -95,6 +95,8 @@ func TestDumpIntegrationContainsNestedFields(t *testing.T) {
 	}
 	require.Contains(t, capNames, "slack.post-message")
 	require.Contains(t, capNames, "slack.message-received")
+	require.NotEmpty(t, integration.GetCapabilities()[0].GetExampleOutput())
+	require.NotEmpty(t, integration.GetCapabilities()[1].GetExampleData())
 
 	rawStr := string(raw)
 	require.Contains(t, rawStr, "post-message")
