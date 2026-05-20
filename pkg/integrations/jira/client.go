@@ -637,39 +637,6 @@ func statusesFromGlobal(raw []globalStatus) []Status {
 	return statuses
 }
 
-// GetProjectIssueTypeStatuses returns each issue type's current status list
-// for a project. Unlike GetProjectStatuses (which dedupes across issue types),
-// this preserves the per-issue-type grouping needed to plan a scheme switch.
-func (c *Client) GetProjectIssueTypeStatuses(projectKey string) (map[string][]Status, error) {
-	endpoint := c.apiURL("/rest/api/3/project/" + url.PathEscape(projectKey) + "/statuses")
-	body, err := c.execRequest(http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var raw []struct {
-		ID       string          `json:"id"`
-		Statuses []projectStatus `json:"statuses"`
-	}
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("error parsing project issue type statuses: %v", err)
-	}
-
-	out := map[string][]Status{}
-	for _, it := range raw {
-		converted := make([]Status, 0, len(it.Statuses))
-		for _, s := range it.Statuses {
-			converted = append(converted, Status{
-				ID:       s.ID,
-				Name:     s.Name,
-				Category: normalizeStatusCategoryKey(s.StatusCategory.Key),
-			})
-		}
-		out[it.ID] = converted
-	}
-	return out, nil
-}
-
 type Issue struct {
 	ID     string         `json:"id"`
 	Key    string         `json:"key"`
