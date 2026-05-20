@@ -25,6 +25,8 @@ export type UseCanvasToolSidebarStateOptions = {
   hideCanvasToolSidebar?: boolean;
   /** Keeps the tool sidebar available even when managed agents are disabled (runs/versions flows). */
   forceEnable?: boolean;
+  /** Called before the user closes the tool sidebar via the header toggle. */
+  onBeforeClose?: () => void;
 };
 
 export function useCanvasToolSidebarState({
@@ -34,6 +36,7 @@ export function useCanvasToolSidebarState({
   organizationId,
   hideCanvasToolSidebar,
   forceEnable = false,
+  onBeforeClose,
 }: UseCanvasToolSidebarStateOptions) {
   const { has: hasFeature } = useExperimentalFeature(organizationId);
   const featureEnabled = hasFeature(FEATURE_CLAUDE_MANAGED_AGENTS);
@@ -57,12 +60,12 @@ export function useCanvasToolSidebarState({
   }, [persistOpen]);
 
   const handleToolSidebarToggle = useCallback(() => {
-    setIsToolSidebarOpen((prev) => {
-      const next = !prev;
-      persistOpen(next);
-      return next;
-    });
-  }, [persistOpen]);
+    if (isToolSidebarOpen) onBeforeClose?.();
+
+    const next = !isToolSidebarOpen;
+    setIsToolSidebarOpen(next);
+    persistOpen(next);
+  }, [isToolSidebarOpen, onBeforeClose, persistOpen]);
 
   const switchAgentMode = useCallback((mode: AgentMode) => {
     setAgentMode(mode);
