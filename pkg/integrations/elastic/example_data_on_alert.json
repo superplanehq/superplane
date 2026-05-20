@@ -11,7 +11,12 @@
       "severity:high"
     ],
     "status": "active",
-    "severity": "critical"
+    "severity": "critical",
+    "context": {
+      "message": "Error rate exceeded threshold: 15%",
+      "threshold": 10,
+      "value": 15
+    }
   },
   "timestamp": "2026-03-12T09:00:00Z"
 }
