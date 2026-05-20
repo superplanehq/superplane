@@ -1,7 +1,6 @@
 package canvases
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/models"
@@ -10,8 +9,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const MaxDashboardPanels = 50
-const MaxDashboardPayloadBytes = 1024 * 1024
+// MaxDashboardPanels and MaxDashboardPayloadBytes are re-exported from the
+// models package so existing gRPC tests/callers keep working unchanged.
+const (
+	MaxDashboardPanels       = models.MaxDashboardPanels
+	MaxDashboardPayloadBytes = models.MaxDashboardPayloadBytes
+)
 
 func serializeCanvasDashboard(dashboard *models.CanvasDashboard) (*pb.CanvasDashboard, error) {
 	panels := dashboard.Panels.Data()
@@ -131,12 +134,4 @@ func toStructpbCompatible(v any) any {
 	default:
 		return v
 	}
-}
-
-func encodedDashboardPanelsSize(panels []models.DashboardPanel) (int, error) {
-	encoded, err := json.Marshal(panels)
-	if err != nil {
-		return 0, err
-	}
-	return len(encoded), nil
 }

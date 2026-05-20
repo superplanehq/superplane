@@ -70,52 +70,8 @@ func UpdateCanvasDashboard(ctx context.Context, organizationID, canvasID string,
 }
 
 func validateDashboardInput(panels []models.DashboardPanel, layout []models.DashboardLayoutItem) error {
-	if len(panels) > MaxDashboardPanels {
-		return status.Errorf(codes.InvalidArgument, "too many panels (max %d)", MaxDashboardPanels)
+	if err := models.ValidateDashboardContent(panels, layout); err != nil {
+		return status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
-	panelIDs := make(map[string]struct{}, len(panels))
-	for _, panel := range panels {
-		if panel.ID == "" {
-			return status.Error(codes.InvalidArgument, "panel id is required")
-		}
-		if panel.Type == "" {
-			return status.Errorf(codes.InvalidArgument, "panel %q type is required", panel.ID)
-		}
-		if _, exists := panelIDs[panel.ID]; exists {
-			return status.Errorf(codes.InvalidArgument, "duplicate panel id %q", panel.ID)
-		}
-		panelIDs[panel.ID] = struct{}{}
-	}
-
-	size, err := encodedDashboardPanelsSize(panels)
-	if err != nil {
-		return status.Error(codes.Internal, "failed to validate panel size")
-	}
-	if size > MaxDashboardPayloadBytes {
-		return status.Errorf(codes.InvalidArgument, "panels payload exceeds %d bytes", MaxDashboardPayloadBytes)
-	}
-
-	layoutIDs := make(map[string]struct{}, len(layout))
-	for _, item := range layout {
-		if item.I == "" {
-			return status.Error(codes.InvalidArgument, "layout item i is required")
-		}
-		if _, exists := layoutIDs[item.I]; exists {
-			return status.Errorf(codes.InvalidArgument, "duplicate layout id %q", item.I)
-		}
-		layoutIDs[item.I] = struct{}{}
-
-		if _, ok := panelIDs[item.I]; !ok {
-			return status.Errorf(codes.InvalidArgument, "layout item %q does not reference any panel", item.I)
-		}
-		if item.W <= 0 || item.H <= 0 {
-			return status.Errorf(codes.InvalidArgument, "layout item %q must have positive width and height", item.I)
-		}
-		if item.X < 0 || item.Y < 0 {
-			return status.Errorf(codes.InvalidArgument, "layout item %q must have non-negative x and y", item.I)
-		}
-	}
-
 	return nil
 }
