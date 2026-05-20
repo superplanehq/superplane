@@ -17,7 +17,7 @@ import (
 )
 
 // JSONValue stores arbitrary JSON while preserving JSON numbers as json.Number
-// when values are scanned back from the database.
+// at JSON decode boundaries, including when values are scanned from the DB.
 type JSONValue struct {
 	data any
 }
