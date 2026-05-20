@@ -54,8 +54,8 @@ func (c *ApproveWorkflow) Documentation() string {
 
 - **Issue Key**: JSM request issue key, for example ` + "`ITSM-123`" + `.
 - **Decision**: Approve or decline.
-- **Approval Selector**: Choose the latest pending approval or provide an approval id directly.
-- **Approval ID**: Required when selecting by id.
+- **Approval Selector**: Choose the latest pending approval or pick a specific one from the list.
+- **Approval**: The pending approval to decide. Required when picking a specific approval.
 - **Comment**: Optional public customer request comment posted before the approval decision.
 
 ## Output
@@ -117,17 +117,29 @@ func (c *ApproveWorkflow) Configuration() []configuration.Field {
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{Label: "Latest pending", Value: approvalSelectorLatestPending},
-						{Label: "By ID", Value: approvalSelectorByID},
+						{Label: "Pick approval", Value: approvalSelectorByID},
 					},
 				},
 			},
 		},
 		{
 			Name:        "approvalId",
-			Label:       "Approval ID",
-			Type:        configuration.FieldTypeString,
+			Label:       "Approval",
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
-			Description: "Approval id to decide",
+			Description: "Pending approval to decide",
+			Placeholder: "Select an approval",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: "jsmApproval",
+					Parameters: []configuration.ParameterRef{
+						{
+							Name:      "issueKey",
+							ValueFrom: &configuration.ParameterValueFrom{Field: "issueKey"},
+						},
+					},
+				},
+			},
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "approvalSelector", Values: []string{approvalSelectorByID}},
 			},

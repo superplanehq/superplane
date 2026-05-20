@@ -22,6 +22,8 @@ func (j *Jira) ListResources(resourceType string, ctx core.ListResourcesContext)
 		return listPriorities(ctx)
 	case "resolution":
 		return listResolutions(ctx)
+	case "jsmApproval":
+		return listJSMApprovals(ctx)
 	case "serviceDesk":
 		client, err := NewClient(ctx.HTTP, ctx.Integration)
 		if err != nil {
@@ -312,6 +314,52 @@ func listPriorities(ctx core.ListResourcesContext) ([]core.IntegrationResource, 
 			Type: "priority",
 			Name: p.Name,
 			ID:   p.Name,
+		})
+	}
+	return resources, nil
+}
+
+// listJSMApprovals returns the pending approvals for a JSM customer request,
+// so the Approve Workflow component can offer a picker instead of asking the
+// user to copy an approval id by hand. Non-pending approvals are filtered out
+// because they are not actionable.
+func listJSMApprovals(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	issueKey := strings.TrimSpace(ctx.Parameters["issueKey"])
+	if issueKey == "" || strings.Contains(issueKey, "{{") {
+		return []core.IntegrationResource{}, nil
+	}
+
+	if ctx.HTTP == nil {
+		return []core.IntegrationResource{}, nil
+	}
+
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	approvals, err := client.ListApprovals(issueKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list approvals: %w", err)
+	}
+
+	resources := make([]core.IntegrationResource, 0, len(approvals))
+	for _, approval := range approvals {
+		if !isPendingApproval(approval) {
+			continue
+		}
+		id := approval.ID.String()
+		if id == "" {
+			continue
+		}
+		name := strings.TrimSpace(approval.Name)
+		if name == "" {
+			name = fmt.Sprintf("Approval %s", id)
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "jsmApproval",
+			Name: name,
+			ID:   id,
 		})
 	}
 	return resources, nil

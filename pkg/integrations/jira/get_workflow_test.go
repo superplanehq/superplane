@@ -63,7 +63,7 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 		"id":"10001","key":"TEST-1","self":"https://test.atlassian.net/rest/api/3/issue/10001",
 		"fields":{
 			"status":{"id":"10002","name":"In Progress"},
-			"issuetype":{"name":"Task"},
+			"issuetype":{"id":"10100","name":"Task"},
 			"project":{"id":"10000","key":"TEST"}
 		}
 	}`
@@ -73,7 +73,6 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 	]}`
 	const projectSchemeResponse = `{"values":[{"projectIds":["10000"],"workflowScheme":{"id":"101010","name":"Default scheme"}}]}`
 	const schemeDetailResponse = `{"id":101010,"name":"Default scheme","defaultWorkflow":"wf","issueTypeMappings":{"10100":"task-workflow"}}`
-	const issueTypesResponse = `{"issueTypes":[{"id":"10100","name":"Task"}]}`
 	const workflowStatusesResponse = `{"values":[{"id":{"name":"task-workflow"},"statuses":[
 		{"id":"10001","name":"To Do","statusCategory":"TODO"},
 		{"id":"10002","name":"In Progress","statusCategory":"IN_PROGRESS"},
@@ -87,7 +86,6 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(transitionsResponse))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(projectSchemeResponse))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(schemeDetailResponse))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(issueTypesResponse))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(workflowStatusesResponse))},
 			},
 		}
@@ -206,7 +204,6 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(transitionsResponse))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(projectSchemeResponse))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(schemeDetailResponse))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(issueTypesResponse))},
 				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"errorMessage":"boom"}`))},
 			},
 		}
@@ -226,30 +223,51 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 		assert.Contains(t, err.Error(), "failed to load statuses")
 	})
 
-	t.Run("project issue type fetch failure does not silently fall back to default workflow", func(t *testing.T) {
+	t.Run("sub-task resolves workflow via issue type id without create-metadata lookup", func(t *testing.T) {
+		subtaskIssue := `{
+			"id":"10002","key":"TEST-2","self":"https://test.atlassian.net/rest/api/3/issue/10002",
+			"fields":{
+				"status":{"id":"10002","name":"In Progress"},
+				"issuetype":{"id":"10200","name":"Sub-task"},
+				"project":{"id":"10000","key":"TEST"}
+			}
+		}`
+		subtaskScheme := `{"id":101010,"name":"Default scheme","defaultWorkflow":"jira-default","issueTypeMappings":{"10200":"subtask-workflow"}}`
+		subtaskWorkflowStatuses := `{"values":[{"id":{"name":"subtask-workflow"},"statuses":[
+			{"id":"10001","name":"To Do","statusCategory":"TODO"},
+			{"id":"10002","name":"In Progress","statusCategory":"IN_PROGRESS"}
+		]}]}`
+
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(issueResponse))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(subtaskIssue))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(transitionsResponse))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(projectSchemeResponse))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(schemeDetailResponse))},
-				{StatusCode: http.StatusInternalServerError, Body: io.NopCloser(strings.NewReader(`{"errorMessage":"boom"}`))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(subtaskScheme))},
+				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(subtaskWorkflowStatuses))},
 			},
 		}
 
+		execCtx := &contexts.ExecutionStateContext{}
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
 				"project":  "TEST",
-				"issueKey": "TEST-1",
+				"issueKey": "TEST-2",
 			},
 			HTTP:           httpContext,
 			Integration:    newAuthorizedIntegration(),
-			ExecutionState: &contexts.ExecutionStateContext{},
+			ExecutionState: execCtx,
 			Logger:         newLogger(),
 		})
 
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to resolve workflow")
+		require.NoError(t, err)
+		output := unwrapGetWorkflowPayload(t, execCtx.Payloads[0])
+		assert.Equal(t, "Sub-task", output.IssueType)
+		assert.Equal(t, "subtask-workflow", output.WorkflowName)
+		require.Len(t, httpContext.Requests, 5)
+		for _, req := range httpContext.Requests {
+			assert.NotContains(t, req.URL.String(), "/issue/createmeta/")
+		}
 	})
 
 	t.Run("workflow/search prefix match for a different workflow returns an error", func(t *testing.T) {
@@ -265,7 +283,6 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(transitionsResponse))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(projectSchemeResponse))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(schemeDetailResponse))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(issueTypesResponse))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(prefixMatchOnly))},
 			},
 		}
@@ -299,7 +316,6 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(transitionsResponse))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(projectSchemeResponse))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(schemeWithoutMapping))},
-				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(issueTypesResponse))},
 				{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(defaultWorkflowStatuses))},
 			},
 		}
@@ -319,6 +335,31 @@ func Test__GetWorkflow__Execute(t *testing.T) {
 		require.NoError(t, err)
 		output := unwrapGetWorkflowPayload(t, execCtx.Payloads[0])
 		assert.Equal(t, "jira-default", output.WorkflowName)
+	})
+}
+
+func TestResolveWorkflowForIssueType(t *testing.T) {
+	scheme := &WorkflowSchemeDetail{
+		DefaultWorkflow: "default-wf",
+		IssueTypeMappings: map[string]string{
+			"10200": "subtask-workflow",
+		},
+	}
+
+	t.Run("maps by issue type id from the issue", func(t *testing.T) {
+		assert.Equal(t, "subtask-workflow", resolveWorkflowForIssueType(scheme, "10200"))
+	})
+
+	t.Run("falls back to default when id has no mapping", func(t *testing.T) {
+		assert.Equal(t, "default-wf", resolveWorkflowForIssueType(scheme, "10100"))
+	})
+
+	t.Run("falls back to default when id is empty", func(t *testing.T) {
+		assert.Equal(t, "default-wf", resolveWorkflowForIssueType(scheme, ""))
+	})
+
+	t.Run("nil scheme returns empty", func(t *testing.T) {
+		assert.Equal(t, "", resolveWorkflowForIssueType(nil, "10200"))
 	})
 }
 

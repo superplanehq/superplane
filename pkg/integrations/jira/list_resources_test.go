@@ -171,6 +171,70 @@ func Test__ListResources__Assignee(t *testing.T) {
 	})
 }
 
+func Test__ListResources__JSMApproval(t *testing.T) {
+	j := &Jira{}
+
+	t.Run("returns only pending approvals for the issueKey parameter", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"values": [
+							{"id":"1","name":"Manager","finalDecision":"approved"},
+							{"id":"2","name":"Director","finalDecision":"PENDING"},
+							{"id":"3","finalDecision":"PENDING"}
+						],
+						"isLastPage": true
+					}`)),
+				},
+			},
+		}
+
+		resources, err := j.ListResources("jsmApproval", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+			Parameters:  map[string]string{"issueKey": "ITSM-1"},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, resources, 2)
+		assert.Equal(t, "jsmApproval", resources[0].Type)
+		assert.Equal(t, "2", resources[0].ID)
+		assert.Equal(t, "Director", resources[0].Name)
+		assert.Equal(t, "3", resources[1].ID)
+		assert.Equal(t, "Approval 3", resources[1].Name)
+		assert.Contains(t, httpContext.Requests[0].URL.String(), "/rest/servicedeskapi/request/ITSM-1/approval")
+	})
+
+	t.Run("missing issueKey -> empty list, no API call", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+
+		resources, err := j.ListResources("jsmApproval", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+		assert.Empty(t, httpContext.Requests)
+	})
+
+	t.Run("unresolved expression issueKey -> empty list, no API call", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+
+		resources, err := j.ListResources("jsmApproval", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: newAuthorizedIntegration(),
+			Parameters:  map[string]string{"issueKey": "{{ trigger.issueKey }}"},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, resources)
+		assert.Empty(t, httpContext.Requests)
+	})
+}
+
 func Test__ListResources__Priority(t *testing.T) {
 	j := &Jira{}
 

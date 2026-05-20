@@ -179,7 +179,7 @@ func (c *GetWorkflow) Execute(ctx core.ExecutionContext) error {
 	output.CurrentStatus = currentStatusName
 	output.CurrentStatusID = currentStatusID
 
-	issueTypeName, projectID, projectKey := extractIssueTypeAndProject(issue)
+	issueTypeName, issueTypeID, projectID, projectKey := extractIssueTypeAndProject(issue)
 	output.IssueType = issueTypeName
 	output.ProjectKey = projectKey
 
@@ -212,10 +212,7 @@ func (c *GetWorkflow) Execute(ctx core.ExecutionContext) error {
 			output.WorkflowSchemeID = scheme.ID.String()
 			output.WorkflowSchemeName = scheme.Name
 
-			workflowName, err := resolveWorkflowForIssueType(client, scheme, projectKey, issueTypeName)
-			if err != nil {
-				return fmt.Errorf("failed to resolve workflow for issue type %q: %v", issueTypeName, err)
-			}
+			workflowName := resolveWorkflowForIssueType(scheme, issueTypeID)
 			output.WorkflowName = workflowName
 			if workflowName != "" {
 				statuses, err := client.GetWorkflowStatusesByName(workflowName)
@@ -261,13 +258,16 @@ func extractIssueStatus(issue *Issue) (id, name string) {
 	return id, name
 }
 
-// extractIssueTypeAndProject pulls the issue's issue type name and the
-// project's id + key from the loosely-typed fields map.
-func extractIssueTypeAndProject(issue *Issue) (issueType, projectID, projectKey string) {
+// extractIssueTypeAndProject pulls the issue's issue type id + name and the
+// project's id + key from the loosely-typed fields map returned by GetIssue.
+func extractIssueTypeAndProject(issue *Issue) (issueType, issueTypeID, projectID, projectKey string) {
 	if issue == nil {
-		return "", "", ""
+		return "", "", "", ""
 	}
 	if it, ok := issue.Fields["issuetype"].(map[string]any); ok {
+		if v, ok := it["id"].(string); ok {
+			issueTypeID = v
+		}
 		if v, ok := it["name"].(string); ok {
 			issueType = v
 		}
@@ -280,35 +280,23 @@ func extractIssueTypeAndProject(issue *Issue) (issueType, projectID, projectKey 
 			projectKey = v
 		}
 	}
-	return issueType, projectID, projectKey
+	return issueType, issueTypeID, projectID, projectKey
 }
 
-// resolveWorkflowForIssueType maps an issue type name to the workflow that
-// the scheme routes it through. Jira keys the scheme's issueTypeMappings by
-// issue type id, so we look up the id via the project's issue types and fall
-// back to the scheme's default workflow when there is no specific mapping.
-// If the project's issue type list can't be fetched we return the error
-// instead of silently falling back to the default workflow — that
-// fallback could otherwise hide the issue type's real workflow.
-func resolveWorkflowForIssueType(client *Client, scheme *WorkflowSchemeDetail, projectKey, issueTypeName string) (string, error) {
+// resolveWorkflowForIssueType maps an issue type id to the workflow that the
+// scheme routes it through. Jira keys issueTypeMappings by issue type id; we
+// read the id from the issue itself rather than create-metadata, which only
+// lists types the caller can create (sub-tasks, epics, etc. are often omitted).
+func resolveWorkflowForIssueType(scheme *WorkflowSchemeDetail, issueTypeID string) string {
 	if scheme == nil {
-		return "", nil
+		return ""
 	}
-	if strings.TrimSpace(projectKey) != "" && strings.TrimSpace(issueTypeName) != "" {
-		issueTypes, err := client.GetProjectIssueTypes(projectKey)
-		if err != nil {
-			return "", err
-		}
-		for _, it := range issueTypes {
-			if strings.EqualFold(it.Name, issueTypeName) {
-				if wf := strings.TrimSpace(scheme.IssueTypeMappings[it.ID]); wf != "" {
-					return wf, nil
-				}
-				break
-			}
+	if id := strings.TrimSpace(issueTypeID); id != "" {
+		if wf := strings.TrimSpace(scheme.IssueTypeMappings[id]); wf != "" {
+			return wf
 		}
 	}
-	return strings.TrimSpace(scheme.DefaultWorkflow), nil
+	return strings.TrimSpace(scheme.DefaultWorkflow)
 }
 
 func statusMatches(s Status, currentID, currentName string) bool {
