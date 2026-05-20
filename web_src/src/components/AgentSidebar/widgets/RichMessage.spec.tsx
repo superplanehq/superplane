@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { RichMessage } from "./RichMessage";
@@ -43,5 +43,36 @@ describe("RichMessage", () => {
 
     // When ids are available, `run:` links should render as RunChip buttons (not external anchors).
     expect(screen.getByRole("button", { name: "run link" })).toBeInTheDocument();
+  });
+
+  it("renders full markdown sections inside rubric modals", () => {
+    render(
+      <MemoryRouter>
+        <RichMessage
+          content={[
+            ":::rubric HTTP Monitor with Retry + GitHub Notify Spec",
+            "## Flow",
+            "1. **Schedule** fires every 15 minutes",
+            "2. **HTTP GET** `https://httpbin.org/get`",
+            "",
+            "## Components",
+            "| Node | Component | Notes |",
+            "|------|-----------|-------|",
+            "| Schedule | `schedule` | minutesInterval: 15 |",
+            "",
+            "```yaml",
+            'successCodes: "200"',
+            "```",
+            ":::",
+          ].join("\n")}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /view full plan/i }));
+
+    expect(screen.getAllByText("Schedule").some((element) => element.tagName === "STRONG")).toBe(true);
+    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(screen.getByTestId("monaco-stub")).toHaveTextContent('successCodes: "200"');
   });
 });

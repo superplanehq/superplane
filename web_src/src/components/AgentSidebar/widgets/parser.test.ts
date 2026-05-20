@@ -138,4 +138,40 @@ Oops!
     expect(segments[0].type).toBe("markdown");
     expect(segments[1].type).toBe("error");
   });
+
+  it("preserves full markdown bodies inside categorized rubric sections", () => {
+    const content = `:::rubric HTTP Monitor Spec
+## Flow
+1. **Schedule** fires every 15 minutes
+2. **HTTP GET** \`https://httpbin.org/get\`
+
+## Components
+| Node | Component |
+|------|-----------|
+| Schedule | \`schedule\` |
+
+\`\`\`yaml
+minutesInterval: 15
+\`\`\`
+:::`;
+
+    const segments = parseAgentContent(content);
+
+    expect(segments).toHaveLength(1);
+    expect(segments[0]).toMatchObject({
+      type: "rubric",
+      title: "HTTP Monitor Spec",
+      body: expect.stringContaining("```yaml"),
+      categories: [
+        {
+          heading: "Flow",
+          body: expect.stringContaining("**Schedule**"),
+        },
+        {
+          heading: "Components",
+          body: expect.stringContaining("| Node | Component |"),
+        },
+      ],
+    });
+  });
 });
