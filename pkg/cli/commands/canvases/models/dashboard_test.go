@@ -54,6 +54,70 @@ unexpected: true
 	require.Contains(t, err.Error(), `unknown field "unexpected"`)
 }
 
+func TestParseDashboardValidatesResourceIdentity(t *testing.T) {
+	testCases := []struct {
+		name          string
+		raw           string
+		errorContains string
+	}{
+		{
+			name: "missing apiVersion",
+			raw: `
+kind: Dashboard
+spec:
+  panels: []
+  layout: []
+`,
+			errorContains: "dashboard apiVersion is required",
+		},
+		{
+			name: "unsupported apiVersion",
+			raw: `
+apiVersion: v2
+kind: Dashboard
+spec:
+  panels: []
+  layout: []
+`,
+			errorContains: `unsupported dashboard apiVersion "v2"`,
+		},
+		{
+			name: "unsupported kind",
+			raw: `
+apiVersion: v1
+kind: Canvas
+spec:
+  panels: []
+  layout: []
+`,
+			errorContains: `unsupported resource kind "Canvas"`,
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, err := ParseDashboard([]byte(testCase.raw))
+			require.Error(t, err)
+			require.Contains(t, err.Error(), testCase.errorContains)
+		})
+	}
+}
+
+func TestParseDashboardDefaultsEmptyCollections(t *testing.T) {
+	raw := []byte(`
+apiVersion: v1
+kind: Dashboard
+spec: {}
+`)
+
+	resource, err := ParseDashboard(raw)
+	require.NoError(t, err)
+	require.NotNil(t, resource.Spec.Panels)
+	require.Empty(t, resource.Spec.Panels)
+	require.NotNil(t, resource.Spec.Layout)
+	require.Empty(t, resource.Spec.Layout)
+}
+
 func TestDashboardConversions(t *testing.T) {
 	dashboard := openapi_client.CanvasesCanvasDashboard{}
 	dashboard.SetCanvasId("canvas-123")
