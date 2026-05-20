@@ -14,4 +14,16 @@ describe("CanvasModeToggle", () => {
 
     expect(onSelectLive).toHaveBeenCalledTimes(1);
   });
+
+  it("does not drop subsequent Canvas clicks when mode does not update immediately", async () => {
+    const user = userEvent.setup();
+    const onSelectLive = vi.fn();
+
+    render(<CanvasModeToggle mode="runs" onSelectLive={onSelectLive} onSelectDashboard={vi.fn()} />);
+
+    await user.click(screen.getByRole("tab", { name: "Canvas" }));
+    await user.click(screen.getByRole("tab", { name: "Canvas" }));
+
+    expect(onSelectLive).toHaveBeenCalledTimes(2);
+  });
 });

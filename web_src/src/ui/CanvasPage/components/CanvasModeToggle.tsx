@@ -34,14 +34,27 @@ export function CanvasModeToggle({
     <Tabs
       value={selected}
       onValueChange={(next) => {
-        // When the active `value` doesn't change immediately, Radix may emit more than one value change event.
-        // We only want to act once per mode transition.
+        // Radix Tabs may emit more than one `onValueChange` per click when `value` is controlled and the parent
+        // doesn't update it synchronously. We only want to suppress duplicates from the same user interaction,
+        // not block subsequent clicks.
         if (valueChangeHandledRef.current) return;
 
-        if (next === CANVAS_TAB && selected !== CANVAS_TAB) void onSelectLive();
-        if (next === DASHBOARD_TAB && selected !== DASHBOARD_TAB && onSelectDashboard) void onSelectDashboard();
+        if (next === CANVAS_TAB && selected !== CANVAS_TAB) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectLive();
+          return;
+        }
 
-        valueChangeHandledRef.current = true;
+        if (next === DASHBOARD_TAB && selected !== DASHBOARD_TAB && onSelectDashboard) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectDashboard();
+        }
       }}
     >
       <TabsList aria-label="Canvas view" className="h-8 min-h-8 bg-slate-100 [&_[data-slot=tabs-trigger]]:text-[13px]">
