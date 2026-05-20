@@ -4,12 +4,7 @@ import { RubricWidget } from "./RubricWidget";
 
 describe("RubricWidget", () => {
   it("renders markdown for criteria in the inline preview", () => {
-    render(
-      <RubricWidget
-        title="Test Plan"
-        criteria={[{ text: "Use **bold** and `code` correctly" }]}
-      />,
-    );
+    render(<RubricWidget title="Test Plan" criteria={[{ text: "Use **bold** and `code` correctly" }]} />);
 
     expect(screen.getByText("bold").tagName).toBe("STRONG");
     expect(screen.getByText("code").tagName).toBe("CODE");
@@ -53,12 +48,7 @@ describe("RubricWidget", () => {
   });
 
   it("renders fenced code blocks inside the rubric widget (inline preview)", () => {
-    render(
-      <RubricWidget
-        title="Test Plan"
-        criteria={[{ text: "Run this:\n\n```bash\nnpm test\n```" }]}
-      />,
-    );
+    render(<RubricWidget title="Test Plan" criteria={[{ text: "Run this:\n\n```bash\nnpm test\n```" }]} />);
 
     // No modal opened — this exercises the inline preview only.
     const codeElement = screen.getByText("npm test", { selector: "code" });
@@ -83,12 +73,7 @@ describe("RubricWidget", () => {
   });
 
   it("renders markdown (including code blocks) inside the Full Plan modal", () => {
-    render(
-      <RubricWidget
-        title="Test Plan"
-        criteria={[{ text: "Run this:\n\n```bash\nnpm test\n```" }]}
-      />,
-    );
+    render(<RubricWidget title="Test Plan" criteria={[{ text: "Run this:\n\n```bash\nnpm test\n```" }]} />);
 
     fireEvent.click(screen.getByRole("button", { name: /view full plan/i }));
 
