@@ -85,12 +85,8 @@ func serializeCapabilities(registry *registry.Registry, integration core.Integra
 				OutputChannels: []*actionpb.OutputChannel{},
 			}
 
-			if output := capability.ExampleOutput; output != nil {
-				capabilityDef.ExampleOutput, _ = structpb.NewStruct(output)
-			}
-			if data := capability.ExampleData; data != nil {
-				capabilityDef.ExampleData, _ = structpb.NewStruct(data)
-			}
+			capabilityDef.ExampleOutput = toStruct(capability.ExampleOutput)
+			capabilityDef.ExampleData = toStruct(capability.ExampleData)
 
 			for _, field := range capability.Configuration {
 				capabilityDef.Configuration = append(capabilityDef.Configuration, actions.ConfigurationFieldToProto(field))
