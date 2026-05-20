@@ -40,7 +40,7 @@ export function useSelectedRunCanvas({
     }
 
     if (!liveCanvas || !selectedRunVersion?.spec) {
-      return canvas;
+      return null;
     }
 
     return {

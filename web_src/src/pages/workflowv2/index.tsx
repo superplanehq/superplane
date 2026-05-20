@@ -115,7 +115,7 @@ import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasYaml } from "./useCanvasYaml";
 import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
-import { useRunCanvasData } from "./useRunCanvasData";
+import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
   getExitEditModeDisabledTooltip,
@@ -1879,8 +1879,19 @@ export function WorkflowPageV2() {
     selectedRunFullExecutions,
   });
 
-  const nodes = runCanvasData ? runCanvasData.nodes : nodesWithIntegrationStatus;
-  const renderedEdges = runCanvasData ? runCanvasData.edges : preparedEdges;
+  const {
+    nodes,
+    edges: renderedEdges,
+    runCanvasLoading,
+  } = useRunCanvasPresentation({
+    isRunsMode,
+    selectedRun,
+    runCanvasData,
+    liveNodes: nodesWithIntegrationStatus,
+    liveEdges: preparedEdges,
+    isSelectedRunVersionLoading,
+    isSelectedRunExecutionsLoading: selectedRunExecutionsQuery.isLoading,
+  });
   const runsViewportKey = isRunsMode ? "runs" : null;
   if (lastRunsViewportKeyRef.current !== runsViewportKey) {
     runsHasFitToViewRef.current = false;
@@ -5612,7 +5623,7 @@ export function WorkflowPageV2() {
               ? runCanvasData.participantNodeIds
               : undefined
           }
-          runCanvasLoading={isRunsMode && !!selectedRun?.rootEvent?.id && selectedRunExecutionsQuery.isLoading}
+          runCanvasLoading={runCanvasLoading}
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}

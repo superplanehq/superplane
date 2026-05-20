@@ -30,6 +30,22 @@ type UseRunCanvasDataParams = {
   selectedRunFullExecutions: CanvasesCanvasNodeExecution[] | undefined;
 };
 
+type UseRunCanvasPresentationParams = {
+  isRunsMode: boolean;
+  selectedRun: CanvasesCanvasRun | null;
+  runCanvasData: RunCanvasData | null;
+  liveNodes: CanvasNode[];
+  liveEdges: CanvasEdge[];
+  isSelectedRunVersionLoading: boolean;
+  isSelectedRunExecutionsLoading: boolean;
+};
+
+type RunCanvasData = {
+  nodes: CanvasNode[];
+  edges: CanvasEdge[];
+  participantNodeIds: string[];
+};
+
 export function useRunCanvasData({
   isRunsMode,
   selectedRun,
@@ -45,11 +61,7 @@ export function useRunCanvasData({
   me,
   visibleNodeExecutionsMap,
   selectedRunFullExecutions,
-}: UseRunCanvasDataParams): {
-  nodes: CanvasNode[];
-  edges: CanvasEdge[];
-  participantNodeIds: string[];
-} | null {
+}: UseRunCanvasDataParams): RunCanvasData | null {
   return useMemo(() => {
     if (
       !isRunsMode ||
@@ -120,4 +132,28 @@ export function useRunCanvasData({
     visibleNodeExecutionsMap,
     selectedRunFullExecutions,
   ]);
+}
+
+export function useRunCanvasPresentation({
+  isRunsMode,
+  selectedRun,
+  runCanvasData,
+  liveNodes,
+  liveEdges,
+  isSelectedRunVersionLoading,
+  isSelectedRunExecutionsLoading,
+}: UseRunCanvasPresentationParams) {
+  if (!isRunsMode) {
+    return {
+      nodes: liveNodes,
+      edges: liveEdges,
+      runCanvasLoading: false,
+    };
+  }
+
+  return {
+    nodes: runCanvasData?.nodes ?? [],
+    edges: runCanvasData?.edges ?? [],
+    runCanvasLoading: !!selectedRun && (isSelectedRunVersionLoading || isSelectedRunExecutionsLoading),
+  };
 }
