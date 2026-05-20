@@ -8,10 +8,10 @@
         "trigger-type": "StartPipelineExecution"
       },
       "pipeline": "demo-pipeline",
-      "pipeline-execution-attempt": 1.0,
+      "pipeline-execution-attempt": 1,
       "start-time": "2026-02-24T15:21:42.016Z",
       "state": "STARTED",
-      "version": 1.0
+      "version": 1
     },
     "detail-type": "CodePipeline Pipeline Execution State Change",
     "id": "00000000-0000-0000-0000-000000000002",

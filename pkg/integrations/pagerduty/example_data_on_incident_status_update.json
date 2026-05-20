@@ -23,8 +23,8 @@
         "id": "PGR0VU2",
         "type": "incident_reference",
         "self": "https://api.pagerduty.com/incidents/PGR0VU2",
-        "html_url": "https://subdomain.pagerduty.com/incidents/PGR0VU2",
-        "summary": "Database connection pool exhausted"
+        "html_url": "https://acme.pagerduty.com/incidents/PGR0VU2",
+        "summary": "A little bump in the road"
       }
     },
     "incident": {
