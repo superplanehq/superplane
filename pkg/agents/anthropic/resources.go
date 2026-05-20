@@ -3,6 +3,7 @@ package anthropic
 import (
 	"context"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -16,6 +17,9 @@ import (
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/docs"
 )
+
+//go:embed static/rich-ui-widgets.md
+var richUIWidgetsContent []byte
 
 const skillsRepoRawBaseURL = "https://raw.githubusercontent.com/superplanehq/skills/main"
 
@@ -122,6 +126,16 @@ func defaultResourceSourcesForSkillsBaseURL(skillsBaseURL string) ([]resourceSou
 			),
 		},
 	}
+
+	// Static files bundled in the binary
+	staticSources := []resourceSource{
+		{
+			MountPath:  "ref/rich-ui-widgets.md",
+			SourceKey:  "static/rich-ui-widgets.md",
+			SourceData: richUIWidgetsContent,
+		},
+	}
+	sources = append(sources, staticSources...)
 
 	componentSources, err := componentResourceSources()
 	if err != nil {
