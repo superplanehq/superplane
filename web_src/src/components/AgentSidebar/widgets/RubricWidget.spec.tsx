@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RubricWidget } from "./RubricWidget";
+
+vi.mock("@monaco-editor/react", () => ({
+  default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
+}));
 
 describe("RubricWidget", () => {
   it("renders markdown for criteria in the inline preview", () => {
@@ -51,8 +55,7 @@ describe("RubricWidget", () => {
     render(<RubricWidget title="Test Plan" criteria={[{ text: "Run this:\n\n```bash\nnpm test\n```" }]} />);
 
     // No modal opened — this exercises the inline preview only.
-    const codeElement = screen.getByText("npm test", { selector: "code" });
-    expect(codeElement.closest("pre")).not.toBeNull();
+    expect(screen.getByTestId("monaco-stub")).toHaveTextContent("npm test");
   });
 
   it("renders markdown for criteria inside a categorized inline preview", () => {
@@ -82,9 +85,7 @@ describe("RubricWidget", () => {
     const modal = heading.closest("div.fixed") as HTMLElement;
     expect(modal).not.toBeNull();
 
-    // The fenced code block must render as <pre><code>, not as raw backticks.
-    const codeElement = within(modal).getByText("npm test", { selector: "code" });
-    expect(codeElement.closest("pre")).not.toBeNull();
+    expect(within(modal).getByTestId("monaco-stub")).toHaveTextContent("npm test");
   });
 
   it("wraps GFM tables in a horizontal overflow container (Full Plan modal)", () => {
