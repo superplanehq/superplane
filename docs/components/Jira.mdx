@@ -66,19 +66,22 @@ Returns the created heartbeat object from the JSM Operations API, including **na
 
 ```json
 {
-  "alertMessage": "DNS Server Checker is expired",
-  "alertPriority": "P3",
-  "alertTags": [
-    "critical",
-    "dns"
-  ],
-  "description": "Checks whether the DNS server responds",
-  "enabled": true,
-  "interval": 5,
-  "intervalUnit": "minutes",
-  "name": "DNS Server Checker",
-  "ownerTeamId": "4b26961a-a837-49d2-a1fe-0973013e3c3b",
-  "status": "Pending"
+  "data": {
+    "alertMessage": "The alert has been raised",
+    "alertPriority": "P3",
+    "alertTags": [
+      "tag1"
+    ],
+    "description": "my new heartbeat",
+    "enabled": true,
+    "interval": 1,
+    "intervalUnit": "minutes",
+    "name": "DNS checker",
+    "ownerTeamId": "b071f2e7-2159-4110-aa25-7718b2713ed5",
+    "status": "Pending"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.created"
 }
 ```
 
@@ -247,8 +250,12 @@ Confirms deletion with **deleted** set to true and the **name** of the removed h
 
 ```json
 {
-  "deleted": true,
-  "name": "DNS Server Checker"
+  "data": {
+    "deleted": true,
+    "name": "DNS checker"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.deleted"
 }
 ```
 
@@ -465,7 +472,11 @@ Returns the API **message** (for example "PONG - Heartbeat received").
 
 ```json
 {
-  "message": "PONG - Heartbeat received"
+  "data": {
+    "message": "PONG - Heartbeat received"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.pinged"
 }
 ```
 
@@ -500,13 +511,22 @@ Returns the updated heartbeat object from the JSM Operations API.
 
 ```json
 {
-  "alertPriority": "P2",
-  "description": "Checks whether the DNS server responds",
-  "enabled": true,
-  "interval": 10,
-  "intervalUnit": "minutes",
-  "name": "DNS Server Checker",
-  "status": "Responsive"
+  "data": {
+    "alertMessage": "The alert has been raised",
+    "alertPriority": "P3",
+    "alertTags": [
+      "tag1"
+    ],
+    "description": "my new heartbeat",
+    "enabled": true,
+    "interval": 5,
+    "intervalUnit": "minutes",
+    "name": "DNS checker",
+    "ownerTeamId": "b071f2e7-2159-4110-aa25-7718b2713ed5",
+    "status": "Responsive"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.updated"
 }
 ```
 
