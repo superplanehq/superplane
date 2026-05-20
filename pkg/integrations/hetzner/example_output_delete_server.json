@@ -1,8 +1,8 @@
 {
   "type": "hetzner.server.deleted",
   "data": {
-    "actionId": 123,
-    "serverId": 42
+    "actionId": "75445789",
+    "serverId": "12345678"
   },
   "timestamp": "2024-01-15T10:30:00Z"
 }
