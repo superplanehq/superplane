@@ -1673,8 +1673,24 @@ Returns the updated issue object with all current information.
   "data": {
     "assignees": [
       {
+        "avatar_url": "https://avatars1.githubusercontent.com/u/21031067?v=4",
+        "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+        "followers_url": "https://api.github.com/users/octocat/followers",
+        "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+        "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+        "gravatar_id": "",
+        "html_url": "https://github.com/octocat",
         "id": 1,
-        "login": "octocat"
+        "login": "octocat",
+        "node_id": "MDQ6VXNlcjIxMDMxMDY3",
+        "organizations_url": "https://api.github.com/users/octocat/orgs",
+        "received_events_url": "https://api.github.com/users/octocat/received_events",
+        "repos_url": "https://api.github.com/users/octocat/repos",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+        "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+        "type": "User",
+        "url": "https://api.github.com/users/octocat"
       }
     ],
     "html_url": "https://github.com/acme/widgets/issues/42",
@@ -1720,14 +1736,18 @@ Returns the full list of labels currently on the issue after the addition.
       "default": true,
       "description": "Something isn't working",
       "id": 208045946,
-      "name": "bug"
+      "name": "bug",
+      "node_id": "MDU6TGFiZWwyMDgwNDU5NDY=",
+      "url": "https://api.github.com/repos/example-org/app/labels/bug"
     },
     {
       "color": "a2eeef",
       "default": true,
       "description": "New feature or request",
       "id": 208045947,
-      "name": "enhancement"
+      "name": "enhancement",
+      "node_id": "MDU6TGFiZWwyMDgwNDU5NDc=",
+      "url": "https://api.github.com/repos/example-org/app/labels/enhancement"
     }
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
@@ -2432,9 +2452,8 @@ The component stores repository information in node metadata:
       "Actions macOS": 240
     },
     "repositories": [
-      "repo1",
-      "repo2",
-      "repo3"
+      "example-org/app",
+      "example-org/app-docs"
     ],
     "total_paid_minutes_used": 150
   },
@@ -2557,7 +2576,9 @@ Returns the remaining list of labels on the issue after the removal.
       "default": true,
       "description": "New feature or request",
       "id": 208045947,
-      "name": "enhancement"
+      "name": "enhancement",
+      "node_id": "MDU6TGFiZWwyMDgwNDU5NDc=",
+      "url": "https://api.github.com/repos/example-org/app/labels/enhancement"
     }
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",
