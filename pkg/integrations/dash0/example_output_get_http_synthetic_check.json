@@ -36,16 +36,7 @@
                   }
                 }
               ],
-              "degradedAssertions": [
-                {
-                  "kind": "timing",
-                  "spec": {
-                    "operator": "lte",
-                    "type": "total",
-                    "value": "2000ms"
-                  }
-                }
-              ]
+              "degradedAssertions": []
             },
             "request": {
               "headers": [],
@@ -68,7 +59,9 @@
         },
         "schedule": {
           "interval": "1m",
-          "locations": ["be-brussels"],
+          "locations": [
+            "be-brussels"
+          ],
           "strategy": "all_locations"
         }
       }
