@@ -77,7 +77,7 @@ export const startTriggerRenderer: TriggerRenderer = {
 };
 
 /**
- * Custom field renderer for the start trigger that displays templates with Run buttons
+ * Custom field renderer for the start trigger that displays templates with Run and Edit buttons
  * This is only used internally by startTriggerRenderer, not registered in the global registry
  */
 const startCustomFieldRenderer: CustomFieldRenderer = {
@@ -93,6 +93,46 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
     const actions = context?.actions;
     const showTemplateRun = mode === "live" && !!actions;
 
+    const onRunTemplateClick = async (e: React.MouseEvent<HTMLButtonElement>, template: StartTemplate) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if(!actions) return;
+      await actions.invokeNodeTriggerHook("run", {
+        template: template.name,
+        payload: payloadForTemplateRun(template),
+      });
+    }
+
+    const onEditTemplateClick = (e: React.MouseEvent<HTMLButtonElement>, template: StartTemplate) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if(!actions) return;
+      actions.openModal({
+        title: "Run trigger",
+        description: (
+          <>
+            Run template <strong>{template.name}</strong> on node{" "}
+            <strong>{node.name || "Unnamed trigger"}</strong>. Edit the payload below to override the
+            template default.
+          </>
+        ),
+        content: ({ close }) => (
+          <StartRunModal
+            initialPayload={payloadForTemplateRun(template)}
+            onClose={close}
+            onRun={async (payload) => {
+              await actions.invokeNodeTriggerHook("run", {
+                template: template.name,
+                payload,
+              });
+            }}
+          />
+        ),
+      });
+      }
+
+
+
     return (
       <div className="px-2 py-1.5 flex flex-col gap-1.5">
         {templates.map((template, index) => (
@@ -104,39 +144,25 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
               <span className="text-[13px] font-medium font-inter text-gray-500 truncate">{template.name}</span>
             </div>
             {showTemplateRun && actions && (
-              <Button
-                size="sm"
-                data-testid="start-template-run"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  actions.openModal({
-                    title: "Run trigger",
-                    description: (
-                      <>
-                        Run template <strong>{template.name}</strong> on node{" "}
-                        <strong>{node.name || "Unnamed trigger"}</strong>. Edit the payload below to override the
-                        template default.
-                      </>
-                    ),
-                    content: ({ close }) => (
-                      <StartRunModal
-                        initialPayload={payloadForTemplateRun(template)}
-                        onClose={close}
-                        onRun={async (payload) => {
-                          await actions.invokeNodeTriggerHook("run", {
-                            template: template.name,
-                            payload,
-                          });
-                        }}
-                      />
-                    ),
-                  });
-                }}
-                className="flex-shrink-0 h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
-              >
-                Run
-              </Button>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  data-testid="start-template-edit"
+                  onClick={(e) => onEditTemplateClick(e, template)}
+                  className="h-7 py-1 px-2"
+                >
+                  Edit
+                </Button>
+                <Button
+                  size="sm"
+                  data-testid="start-template-run"
+                  onClick={(e) => onRunTemplateClick(e, template)}
+                  className="h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
+                >
+                  Run
+                </Button>
+              </div>
             )}
           </div>
         ))}
