@@ -82,7 +82,7 @@ function PageHeader({
   const activeCanvasId = canvasIdParam || workflowId;
 
   return (
-    <div className="relative flex h-11 items-center border-b border-slate-950/15 px-3 sm:px-4">
+    <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 px-3 sm:px-4">
       <div className="relative z-10 flex min-w-0 shrink-0 items-center">
         <OrganizationMenuButton organizationId={organizationId} />
       </div>
@@ -127,7 +127,7 @@ function SecondaryHeader(props: HeaderProps) {
   const editing = props.mode === "version-edit";
 
   return (
-    <div className="relative flex h-12 items-center gap-3 border-b border-slate-950/15 bg-slate-100 px-4">
+    <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-4">
       <CanvasToolSidebarTrigger toolSidebarState={props.toolSidebarState} />
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
