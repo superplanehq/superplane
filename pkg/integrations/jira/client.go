@@ -1448,8 +1448,13 @@ type Heartbeat struct {
 	AlertPriority string   `json:"alertPriority,omitempty"`
 }
 
+type heartbeatLinks struct {
+	Next string `json:"next,omitempty"`
+}
+
 type heartbeatPaginatedResponse struct {
-	Values []Heartbeat `json:"values"`
+	Values []Heartbeat     `json:"values"`
+	Links  *heartbeatLinks `json:"links,omitempty"`
 }
 
 // CreateHeartbeatRequest is the JSON body for POST .../heartbeats.
@@ -1536,22 +1541,35 @@ func normalizeOpsTeams(teams []OpsTeam) []OpsTeam {
 	return out
 }
 
-// ListHeartbeats returns heartbeats for an operations team.
+// ListHeartbeats returns all heartbeats for an operations team, following links.next pagination.
 func (c *Client) ListHeartbeats(cloudID, teamID string) ([]Heartbeat, error) {
-	u := c.opsAPIURL(cloudID, fmt.Sprintf("/teams/%s/heartbeats", url.PathEscape(teamID)))
-	responseBody, err := c.execRequest(http.MethodGet, u, nil)
-	if err != nil {
-		return nil, err
-	}
+	nextURL := c.opsAPIURL(cloudID, fmt.Sprintf("/teams/%s/heartbeats", url.PathEscape(teamID)))
+	var all []Heartbeat
+	const maxPages = 100
+	for range maxPages {
+		responseBody, err := c.execRequest(http.MethodGet, nextURL, nil)
+		if err != nil {
+			return nil, err
+		}
 
-	var page heartbeatPaginatedResponse
-	if err := json.Unmarshal(responseBody, &page); err != nil {
-		return nil, fmt.Errorf("parse heartbeats response: %w", err)
+		var page heartbeatPaginatedResponse
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, fmt.Errorf("parse heartbeats response: %w", err)
+		}
+
+		all = append(all, page.Values...)
+
+		if page.Links == nil || page.Links.Next == "" || len(page.Values) == 0 {
+			break
+		}
+
+		if strings.HasPrefix(page.Links.Next, "http") {
+			nextURL = page.Links.Next
+		} else {
+			nextURL = atlassianIncidentAPIHost + page.Links.Next
+		}
 	}
-	if page.Values == nil {
-		return []Heartbeat{}, nil
-	}
-	return page.Values, nil
+	return all, nil
 }
 
 // CreateHeartbeat creates a heartbeat in JSM Operations.
