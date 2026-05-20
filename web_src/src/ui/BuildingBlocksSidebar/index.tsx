@@ -8,7 +8,6 @@ import { CategorySection } from "./CategorySection";
 import { findFirstVisibleBlock } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
 
-export type { AgentContext, AgentMode } from "@/components/AgentSidebar/agentChat";
 export type { BuildingBlock, BuildingBlockCategory } from "./types";
 
 export interface BuildingBlocksSidebarProps {
