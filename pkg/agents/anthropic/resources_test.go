@@ -43,6 +43,11 @@ func TestDefaultResourceSourcesForSkillsBaseURL(t *testing.T) {
 	)
 	assert.Equal(
 		t,
+		"https://example.test/root/skills/superplane-dashboard-and-widgets/SKILL.md",
+		byMountPath["ref/skills/superplane-dashboard-and-widgets/SKILL.md"].SourceURL,
+	)
+	assert.Equal(
+		t,
 		"https://example.test/root/skills/superplane-monitor/SKILL.md",
 		byMountPath["ref/skills/superplane-monitor/SKILL.md"].SourceURL,
 	)
