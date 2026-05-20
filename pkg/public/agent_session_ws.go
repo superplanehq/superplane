@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 	"github.com/superplanehq/superplane/pkg/workers/eventdistributer"
@@ -24,6 +25,16 @@ func (s *Server) handleAgentSessionWebSocket(w http.ResponseWriter, r *http.Requ
 	sessionID, err := uuid.Parse(mux.Vars(r)["sessionId"])
 	if err != nil {
 		http.Error(w, "invalid session id", http.StatusBadRequest)
+		return
+	}
+
+	enabled, err := models.HasExperimentalFeature(user.OrganizationID, features.FeatureClaudeManagedAgents)
+	if err != nil {
+		http.Error(w, "failed to load organization", http.StatusInternalServerError)
+		return
+	}
+	if !enabled {
+		http.Error(w, "agent chat is not enabled", http.StatusForbidden)
 		return
 	}
 

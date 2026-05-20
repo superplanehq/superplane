@@ -11,6 +11,7 @@ import { defaultTriggerRenderer } from "./default";
 import { scheduleTriggerRenderer, scheduleCustomFieldRenderer } from "./schedule";
 import { webhookTriggerRenderer, webhookCustomFieldRenderer } from "./webhook";
 import { noopMapper } from "./noop";
+import { displayMapper } from "./display";
 import { addMemoryMapper } from "./addMemory";
 import { deleteMemoryMapper } from "./deleteMemory";
 import { readMemoryMapper } from "./readMemory";
@@ -34,6 +35,11 @@ import {
   triggerRenderers as gitlabTriggerRenderers,
   eventStateRegistry as gitlabEventStateRegistry,
 } from "./gitlab/index";
+import {
+  componentMappers as jiraComponentMappers,
+  triggerRenderers as jiraTriggerRenderers,
+  eventStateRegistry as jiraEventStateRegistry,
+} from "./jira/index";
 import {
   componentMappers as pagerdutyComponentMappers,
   triggerRenderers as pagerdutyTriggerRenderers,
@@ -265,6 +271,7 @@ const triggerRenderers: Record<string, TriggerRenderer> = {
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   noop: noopMapper,
+  display: displayMapper,
   addMemory: addMemoryMapper,
   deleteMemory: deleteMemoryMapper,
   readMemory: readMemoryMapper,
@@ -289,6 +296,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   semaphore: semaphoreComponentMappers,
   github: githubComponentMappers,
   gitlab: gitlabComponentMappers,
+  jira: jiraComponentMappers,
   grafana: grafanaComponentMappers,
   pagerduty: pagerdutyComponentMappers,
   dash0: dash0ComponentMappers,
@@ -335,6 +343,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   semaphore: semaphoreTriggerRenderers,
   github: githubTriggerRenderers,
   gitlab: gitlabTriggerRenderers,
+  jira: jiraTriggerRenderers,
   pagerduty: pagerdutyTriggerRenderers,
   dash0: dash0TriggerRenderers,
   daytona: daytonaTriggerRenderers,
@@ -411,6 +420,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   cursor: cursorEventStateRegistry,
   azure: azureEventStateRegistry,
   gitlab: gitlabEventStateRegistry,
+  jira: jiraEventStateRegistry,
   jfrogArtifactory: jfrogArtifactoryEventStateRegistry,
   dockerhub: dockerhubEventStateRegistry,
   honeycomb: honeycombEventStateRegistry,

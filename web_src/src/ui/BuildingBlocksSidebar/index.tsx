@@ -161,20 +161,26 @@ function OpenBuildingBlocksSidebar({
   const normalizeIntegrationName = (value?: string) => (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
   const sortedCategories = useMemo(() => {
-    const categoryOrder: Record<string, number> = {
+    const pinnedCategoryOrder: Record<string, number> = {
       Core: 0,
-      Memory: 1,
+      Debugging: 1,
+      Memory: 2,
     };
+    const integrationCategoryOrder = 3;
 
     return [...blocks].sort((a, b) => {
-      const aOrder = categoryOrder[a.name] ?? Infinity;
-      const bOrder = categoryOrder[b.name] ?? Infinity;
+      const aOrder = pinnedCategoryOrder[a.name] ?? integrationCategoryOrder;
+      const bOrder = pinnedCategoryOrder[b.name] ?? integrationCategoryOrder;
 
       if (aOrder !== bOrder) {
         return aOrder - bOrder;
       }
 
-      if (showConnectedIntegrationsOnTop && aOrder === Infinity && bOrder === Infinity) {
+      if (
+        showConnectedIntegrationsOnTop &&
+        aOrder === integrationCategoryOrder &&
+        bOrder === integrationCategoryOrder
+      ) {
         const aIntegrationName = a.blocks.find((block) => block.integrationName)?.integrationName;
         const bIntegrationName = b.blocks.find((block) => block.integrationName)?.integrationName;
 

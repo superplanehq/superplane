@@ -1,5 +1,5 @@
 import type { IntegrationCapabilityState, OrganizationsIntegration } from "@/api-client";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useAvailableIntegrations, useIntegrationMutations } from "@/hooks/useIntegrations";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";

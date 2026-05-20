@@ -8,7 +8,7 @@ import { CreateGroupPage } from "./CreateGroupPage";
 import { CreateRolePage } from "./CreateRolePage";
 import { Profile } from "./Profile";
 import { useOrganization } from "../../../hooks/useOrganizationData";
-import { useAccount } from "../../../contexts/AccountContext";
+import { useAccount } from "../../../contexts/useAccount";
 import { useParams } from "react-router-dom";
 import { Members } from "./Members";
 import { Integrations } from "./Integrations";
@@ -36,7 +36,7 @@ import {
   Users,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { PermissionTooltip, RequireAnyPermission, RequirePermission } from "@/components/PermissionGate";
 import { useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { IntegrationDetailsRoute } from "./components/IntegrationDetailsRoute";
@@ -435,7 +435,7 @@ export function OrganizationSettings() {
         </SidebarBody>
       </Sidebar>
 
-      <div className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-900">
+      <div className="flex-1 overflow-auto bg-slate-100 dark:bg-slate-900 [scrollbar-gutter:stable]">
         <div className={cn("mx-auto w-full px-8 pb-8", isIntegrationSetupRoute ? "max-w-6xl" : "max-w-3xl")}>
           <div className="pt-10 pb-8">
             <h1 className="!text-2xl font-medium text-gray-900 dark:text-white">{activeMeta.title}</h1>

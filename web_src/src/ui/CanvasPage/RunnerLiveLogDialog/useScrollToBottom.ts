@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 
-export function useScrollToBottom(text: string) {
-  const scrollRef = useRef<HTMLPreElement>(null);
+export function useScrollToBottom(trigger: unknown) {
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
     const el = scrollRef.current;
@@ -12,7 +12,7 @@ export function useScrollToBottom(text: string) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [text, scrollToBottom]);
+  }, [trigger, scrollToBottom]);
 
   return { scrollRef, scrollToBottom };
 }

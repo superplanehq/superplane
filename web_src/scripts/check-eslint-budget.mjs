@@ -106,11 +106,51 @@ function summarizeByRule(issues) {
   return Object.fromEntries(Object.entries(counts).sort((a, b) => b[1] - a[1]));
 }
 
+function extractRuleMetricValue(issue) {
+  if (issue.ruleId === "max-lines") {
+    const match = issue.message.match(/too many lines \((\d+)\)/iu);
+    return match ? Number(match[1]) : null;
+  }
+
+  if (issue.ruleId === "complexity") {
+    const match = issue.message.match(/complexity of (\d+)/iu);
+    return match ? Number(match[1]) : null;
+  }
+
+  return null;
+}
+
+function metricMaximumsWithSourceFiles(issues) {
+  const maximums = {};
+  const fileForMax = {};
+
+  for (const issue of issues) {
+    const metricValue = extractRuleMetricValue(issue);
+    if (metricValue === null) {
+      continue;
+    }
+
+    const prevMax = maximums[issue.ruleId] ?? 0;
+    if (metricValue > prevMax) {
+      maximums[issue.ruleId] = metricValue;
+      fileForMax[issue.ruleId] = issue.filePath;
+    } else if (metricValue === prevMax) {
+      const prevFile = fileForMax[issue.ruleId];
+      if (prevFile === undefined || issue.filePath.localeCompare(prevFile) < 0) {
+        fileForMax[issue.ruleId] = issue.filePath;
+      }
+    }
+  }
+
+  const sortedEntries = Object.entries(maximums).sort((a, b) => b[1] - a[1]);
+  const sortedMaximums = Object.fromEntries(sortedEntries);
+  const sortedFiles = Object.fromEntries(sortedEntries.map(([ruleId]) => [ruleId, fileForMax[ruleId]]));
+
+  return { metricMaximumByRule: sortedMaximums, fileForMetricMaximumByRule: sortedFiles };
+}
+
 function printRuleCountsVsBudget(currentByRule, maxAllowedByRule) {
-  const allRuleIds = new Set([
-    ...Object.keys(currentByRule),
-    ...Object.keys(maxAllowedByRule),
-  ]);
+  const allRuleIds = new Set([...Object.keys(currentByRule), ...Object.keys(maxAllowedByRule)]);
 
   const sortedRuleIds = [...allRuleIds].sort((a, b) => {
     const currentA = currentByRule[a] ?? 0;
@@ -137,6 +177,36 @@ function printRuleCountsVsBudget(currentByRule, maxAllowedByRule) {
   }
 }
 
+function printMetricMaximumsVsBudget(currentByRule, maxAllowedByRule, fileForCurrentMaxByRule = {}) {
+  const allRuleIds = new Set([...Object.keys(currentByRule), ...Object.keys(maxAllowedByRule)]);
+
+  const sortedRuleIds = [...allRuleIds].sort((a, b) => {
+    const currentA = currentByRule[a] ?? 0;
+    const currentB = currentByRule[b] ?? 0;
+    if (currentA !== currentB) {
+      return currentB - currentA;
+    }
+
+    return a.localeCompare(b);
+  });
+
+  if (sortedRuleIds.length === 0) {
+    console.log("- No metric maximums found.");
+    return;
+  }
+
+  for (const ruleId of sortedRuleIds) {
+    const current = currentByRule[ruleId] ?? 0;
+    const allowed = maxAllowedByRule[ruleId] ?? 0;
+    const overBudget = current > allowed;
+    const status = overBudget ? " !!! OVER BUDGET" : "";
+    const sourceFile = fileForCurrentMaxByRule[ruleId];
+    const sourceHint = sourceFile ? ` — ${sourceFile}` : "";
+    const line = `- ${ruleId}: ${current}/${allowed}${sourceHint}${status}`;
+    console.log(overBudget ? `${redStart}${line}${colorEnd}` : line);
+  }
+}
+
 function printIssues(issues) {
   if (issues.length === 0) {
     console.log("- No ESLint issues found.");
@@ -144,7 +214,9 @@ function printIssues(issues) {
   }
 
   for (const issue of issues) {
-    console.log(`- ${issue.filePath}:${issue.line}:${issue.column} [${issue.severity}] (${issue.ruleId}) ${issue.message}`);
+    console.log(
+      `- ${issue.filePath}:${issue.line}:${issue.column} [${issue.severity}] (${issue.ruleId}) ${issue.message}`,
+    );
   }
 }
 
@@ -154,9 +226,12 @@ function readBaseline() {
 }
 
 function writeBaseline(issues, countsByRule) {
+  const { metricMaximumByRule } = metricMaximumsWithSourceFiles(issues);
+
   const baseline = {
     maxAllowedTotalIssues: issues.length,
     maxAllowedByRule: countsByRule,
+    maxAllowedMetricMaximumByRule: metricMaximumByRule,
     updatedAt: new Date().toISOString(),
   };
 
@@ -170,11 +245,11 @@ function findRegressions(currentByRule, baselineByRule) {
   for (const [ruleId, currentCount] of currentEntries) {
     const allowedCount = baselineByRule[ruleId] ?? 0;
     if (currentCount > allowedCount) {
-      regressions.push({ ruleId, currentCount, allowedCount });
+      regressions.push({ ruleId, currentValue: currentCount, allowedValue: allowedCount });
     }
   }
 
-  return regressions.sort((a, b) => b.currentCount - a.currentCount);
+  return regressions.sort((a, b) => b.currentValue - a.currentValue);
 }
 
 async function main() {
@@ -182,6 +257,7 @@ async function main() {
   const results = await eslint.lintFiles(["."]);
   const issues = [...extractIssues(results), ...extractDisallowedDirectiveIssues(results)];
   const countsByRule = summarizeByRule(issues);
+  const { metricMaximumByRule, fileForMetricMaximumByRule } = metricMaximumsWithSourceFiles(issues);
 
   if (isUpdateBaseline) {
     writeBaseline(issues, countsByRule);
@@ -196,6 +272,11 @@ async function main() {
     console.log("");
     console.log("");
     console.log("");
+    console.log("Rule metric maximums vs budget:");
+    printMetricMaximumsVsBudget(metricMaximumByRule, metricMaximumByRule, fileForMetricMaximumByRule);
+    console.log("");
+    console.log("");
+    console.log("");
     console.log(`WITHIN BUDGET ${issues.length}/${issues.length}`);
     return;
   }
@@ -203,22 +284,40 @@ async function main() {
   const baseline = readBaseline();
   const maxAllowedTotal = baseline.maxAllowedTotalIssues;
   const maxAllowedByRule = baseline.maxAllowedByRule ?? {};
+  const maxAllowedMetricMaximumByRule =
+    baseline.maxAllowedMetricMaximumByRule ?? baseline.maxAllowedMetricTotalByRule ?? {};
 
   const totalRegression = issues.length - maxAllowedTotal;
   const byRuleRegressions = findRegressions(countsByRule, maxAllowedByRule);
+  const metricRegressions = findRegressions(metricMaximumByRule, maxAllowedMetricMaximumByRule);
 
-  if (totalRegression > 0 || byRuleRegressions.length > 0) {
+  if (totalRegression > 0 || byRuleRegressions.length > 0 || metricRegressions.length > 0) {
     console.error("ESLint budget exceeded.");
     console.error(`- Total issues: ${issues.length} (allowed ${maxAllowedTotal})`);
 
     if (byRuleRegressions.length > 0) {
       console.error("- Rule regressions:");
       for (const regression of byRuleRegressions.slice(0, 20)) {
-        console.error(`  - ${regression.ruleId}: ${regression.currentCount} (allowed ${regression.allowedCount})`);
+        console.error(`  - ${regression.ruleId}: ${regression.currentValue} (allowed ${regression.allowedValue})`);
       }
 
       if (byRuleRegressions.length > 20) {
         console.error(`  ... and ${byRuleRegressions.length - 20} more`);
+      }
+    }
+
+    if (metricRegressions.length > 0) {
+      console.error("- Rule metric maximum regressions:");
+      for (const regression of metricRegressions.slice(0, 20)) {
+        const sourceFile = fileForMetricMaximumByRule[regression.ruleId];
+        const sourceHint = sourceFile ? ` — ${sourceFile}` : "";
+        console.error(
+          `  - ${regression.ruleId}: ${regression.currentValue} (allowed ${regression.allowedValue})${sourceHint}`,
+        );
+      }
+
+      if (metricRegressions.length > 20) {
+        console.error(`  ... and ${metricRegressions.length - 20} more`);
       }
     }
 
@@ -229,6 +328,11 @@ async function main() {
     console.error("");
     console.error("Rule counts vs budget:");
     printRuleCountsVsBudget(countsByRule, maxAllowedByRule);
+    console.error("");
+    console.error("");
+    console.error("");
+    console.error("Rule metric maximums vs budget:");
+    printMetricMaximumsVsBudget(metricMaximumByRule, maxAllowedMetricMaximumByRule, fileForMetricMaximumByRule);
     console.error("");
     console.error("");
     console.error("");
@@ -243,6 +347,11 @@ async function main() {
   console.log("");
   console.log("Rule counts vs budget:");
   printRuleCountsVsBudget(countsByRule, maxAllowedByRule);
+  console.log("");
+  console.log("");
+  console.log("");
+  console.log("Rule metric maximums vs budget:");
+  printMetricMaximumsVsBudget(metricMaximumByRule, maxAllowedMetricMaximumByRule, fileForMetricMaximumByRule);
   console.log("");
   console.log("");
   console.log("");

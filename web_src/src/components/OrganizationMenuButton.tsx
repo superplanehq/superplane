@@ -1,5 +1,5 @@
 import SuperplaneLogo from "@/assets/superplane.svg";
-import { useAccount } from "@/contexts/AccountContext";
+import { useAccount } from "@/contexts/useAccount";
 import { useOrganization, useOrganizationUsage } from "@/hooks/useOrganizationData";
 import { isUsagePageForced } from "@/lib/env";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { PermissionTooltip } from "@/components/PermissionGate";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { posthog } from "@/posthog";
 
 interface OrganizationMenuButtonProps {
@@ -282,7 +282,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
         aria-label="Go to canvases"
         className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
       >
-        <img src={SuperplaneLogo} alt="SuperPlane" className="h-7 w-7" />
+        <img src={SuperplaneLogo} alt="SuperPlane" className="h-6 w-6" />
       </Link>
     </div>
   );

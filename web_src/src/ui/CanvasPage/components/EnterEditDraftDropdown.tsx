@@ -22,7 +22,6 @@ export function EnterEditDraftDropdown({
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <UIButton type="button" variant="default" size="sm" data-testid="canvas-edit-button">
-          <Pencil className="h-3.5 w-3.5" />
           Edit
         </UIButton>
       </DropdownMenuTrigger>
