@@ -15,7 +15,12 @@ func setResultEnv(cmd *exec.Cmd, hostPath string) {
 	if cmd == nil || strings.TrimSpace(hostPath) == "" {
 		return
 	}
-	cmd.Env = append(os.Environ(), envSuperplaneResultFile+"="+strings.TrimSpace(hostPath))
+	pair := envSuperplaneResultFile + "=" + strings.TrimSpace(hostPath)
+	if len(cmd.Env) > 0 {
+		cmd.Env = append(cmd.Env, pair)
+		return
+	}
+	cmd.Env = append(os.Environ(), pair)
 }
 
 func readTaskResultFile(path string, maxBytes int, log *slog.Logger) json.RawMessage {
