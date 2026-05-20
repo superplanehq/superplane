@@ -115,6 +115,8 @@ function SegmentRenderer({
           categories={segment.categories}
           onAction={onAction}
           onStartBuilding={onStartBuilding}
+          canvasId={canvasId}
+          organizationId={organizationId}
         />
       );
     case "success":

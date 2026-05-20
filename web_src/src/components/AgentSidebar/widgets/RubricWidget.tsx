@@ -1,10 +1,13 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, useState, type ComponentProps, type ReactNode } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { ClipboardList, ChevronDown, ChevronUp, X } from "lucide-react";
 import type { RubricCategory } from "./parser";
+import { IntegrationButton } from "./IntegrationButton";
+import { NodeChipFromLink } from "./NodeChip";
+import { RunChipFromLink } from "./RunChip";
 
 const CRITERION_MARKDOWN_CLASSES =
   "[&_p]:m-0 [&_p]:inline " +
@@ -21,7 +24,15 @@ const CRITERION_MARKDOWN_CLASSES =
   "[&_tbody_tr:nth-child(even)]:bg-slate-50/60 " +
   "[&_tr:last-child_td]:border-b-0";
 
-function CriterionMarkdown({ children }: { children: string }) {
+function CriterionMarkdown({
+  children,
+  canvasId,
+  organizationId,
+}: {
+  children: string;
+  canvasId?: string;
+  organizationId?: string;
+}) {
   return (
     <div className={`min-w-0 ${CRITERION_MARKDOWN_CLASSES}`}>
       <ReactMarkdown
@@ -29,9 +40,9 @@ function CriterionMarkdown({ children }: { children: string }) {
         urlTransform={(url) => (isAgentLink(url) ? url : defaultUrlTransform(url))}
         components={{
           a: ({ children: linkChildren, href }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer">
+            <AgentLink href={href} canvasId={canvasId} organizationId={organizationId}>
               {linkChildren}
-            </a>
+            </AgentLink>
           ),
           table: ({ children: tableChildren, ...props }) => (
             <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -56,9 +67,19 @@ interface RubricWidgetProps {
   categories?: RubricCategory[];
   onAction?: (text: string) => void;
   onStartBuilding?: (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => void;
+  canvasId?: string;
+  organizationId?: string;
 }
 
-export function RubricWidget({ title, criteria, categories, onAction, onStartBuilding }: RubricWidgetProps) {
+export function RubricWidget({
+  title,
+  criteria,
+  categories,
+  onAction,
+  onStartBuilding,
+  canvasId,
+  organizationId,
+}: RubricWidgetProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
@@ -121,6 +142,8 @@ export function RubricWidget({ title, criteria, categories, onAction, onStartBui
           previewCriteria={previewCriteria}
           onExpand={expandPreview}
           onCollapse={collapsePreview}
+          canvasId={canvasId}
+          organizationId={organizationId}
         />
 
         {/* Actions */}
@@ -142,6 +165,8 @@ export function RubricWidget({ title, criteria, categories, onAction, onStartBui
           categories={categories}
           hasCategories={hasCategories}
           onClose={closeModal}
+          canvasId={canvasId}
+          organizationId={organizationId}
         />
       )}
     </>
@@ -157,6 +182,8 @@ function RubricPreview({
   previewCriteria,
   onExpand,
   onCollapse,
+  canvasId,
+  organizationId,
 }: {
   categories?: RubricCategory[];
   criteria: RubricCriterion[];
@@ -166,6 +193,8 @@ function RubricPreview({
   previewCriteria: RubricCriterion[];
   onExpand: () => void;
   onCollapse: () => void;
+  canvasId?: string;
+  organizationId?: string;
 }) {
   return (
     <div className="px-3 py-2">
@@ -175,9 +204,20 @@ function RubricPreview({
         </p>
       ) : null}
 
-      {!expanded ? <FlatCriteriaList criteria={previewCriteria} /> : null}
-      {expanded && hasCategories ? <CategorizedList categories={categories ?? []} /> : null}
-      {expanded && !hasCategories ? <FlatCriteriaList criteria={criteria} /> : null}
+      {!expanded ? (
+        <FlatCriteriaList criteria={previewCriteria} canvasId={canvasId} organizationId={organizationId} />
+      ) : null}
+      {expanded && hasCategories ? (
+        <CategorizedList
+          categories={categories ?? []}
+          showNumbers
+          canvasId={canvasId}
+          organizationId={organizationId}
+        />
+      ) : null}
+      {expanded && !hasCategories ? (
+        <FlatCriteriaList criteria={criteria} canvasId={canvasId} organizationId={organizationId} />
+      ) : null}
 
       {hiddenCount > 0 && !expanded ? (
         <PreviewToggleButton direction="down" onClick={onExpand}>
@@ -199,12 +239,16 @@ function RubricModal({
   categories,
   hasCategories,
   onClose,
+  canvasId,
+  organizationId,
 }: {
   title: string;
   criteria: RubricCriterion[];
   categories?: RubricCategory[];
   hasCategories: boolean | undefined;
   onClose: () => void;
+  canvasId?: string;
+  organizationId?: string;
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -220,9 +264,14 @@ function RubricModal({
         </div>
         <div className="overflow-y-auto p-4 flex-1">
           {hasCategories ? (
-            <CategorizedList categories={categories ?? []} showNumbers />
+            <CategorizedList
+              categories={categories ?? []}
+              showNumbers
+              canvasId={canvasId}
+              organizationId={organizationId}
+            />
           ) : (
-            <NumberedCriteriaList criteria={criteria} />
+            <NumberedCriteriaList criteria={criteria} canvasId={canvasId} organizationId={organizationId} />
           )}
         </div>
         <div className="px-4 py-3 border-t border-slate-200 flex justify-end">
@@ -256,29 +305,59 @@ function PreviewToggleButton({
   );
 }
 
-function FlatCriteriaList({ criteria }: { criteria: RubricCriterion[] }) {
+function FlatCriteriaList({
+  criteria,
+  canvasId,
+  organizationId,
+}: {
+  criteria: RubricCriterion[];
+  canvasId?: string;
+  organizationId?: string;
+}) {
   return criteria.map((criterion, index) => (
     <div key={index} className="flex items-start gap-2 py-0.5">
       <span className="text-slate-400 text-xs mt-0.5 shrink-0">✦</span>
       <div className="min-w-0 flex-1 text-xs text-slate-700">
-        <CriterionMarkdown>{criterion.text}</CriterionMarkdown>
+        <CriterionMarkdown canvasId={canvasId} organizationId={organizationId}>
+          {criterion.text}
+        </CriterionMarkdown>
       </div>
     </div>
   ));
 }
 
-function NumberedCriteriaList({ criteria }: { criteria: RubricCriterion[] }) {
+function NumberedCriteriaList({
+  criteria,
+  canvasId,
+  organizationId,
+}: {
+  criteria: RubricCriterion[];
+  canvasId?: string;
+  organizationId?: string;
+}) {
   return criteria.map((criterion, index) => (
     <div key={index} className="flex items-start gap-2 py-1.5 border-b border-slate-50 last:border-0">
       <span className="text-slate-500 text-sm mt-0.5 shrink-0 font-medium">{index + 1}.</span>
       <div className="min-w-0 flex-1 text-sm text-slate-700">
-        <CriterionMarkdown>{criterion.text}</CriterionMarkdown>
+        <CriterionMarkdown canvasId={canvasId} organizationId={organizationId}>
+          {criterion.text}
+        </CriterionMarkdown>
       </div>
     </div>
   ));
 }
 
-function CategorizedList({ categories, showNumbers }: { categories: RubricCategory[]; showNumbers?: boolean }) {
+function CategorizedList({
+  categories,
+  showNumbers,
+  canvasId,
+  organizationId,
+}: {
+  categories: RubricCategory[];
+  showNumbers?: boolean;
+  canvasId?: string;
+  organizationId?: string;
+}) {
   let globalIndex = 0;
   return (
     <div className="space-y-3">
@@ -298,7 +377,9 @@ function CategorizedList({ categories, showNumbers }: { categories: RubricCatego
                   <span className="text-slate-400 text-xs mt-0.5 shrink-0">✦</span>
                 )}
                 <div className={`min-w-0 flex-1 ${showNumbers ? "text-sm" : "text-xs"} text-slate-700`}>
-                  <CriterionMarkdown>{c.text}</CriterionMarkdown>
+                  <CriterionMarkdown canvasId={canvasId} organizationId={organizationId}>
+                    {c.text}
+                  </CriterionMarkdown>
                 </div>
               </div>
             );
@@ -311,4 +392,53 @@ function CategorizedList({ categories, showNumbers }: { categories: RubricCatego
 
 function isAgentLink(url: string): boolean {
   return url.startsWith("run:") || url.startsWith("node:") || url.startsWith("integration:");
+}
+
+function AgentLink({
+  href,
+  children,
+  canvasId,
+  organizationId,
+}: ComponentProps<"a"> & { canvasId?: string; organizationId?: string }) {
+  const specialLink = renderSpecialLink(href, children, canvasId, organizationId);
+  if (specialLink) {
+    return specialLink;
+  }
+
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  );
+}
+
+function renderSpecialLink(href: string | undefined, children: ReactNode, canvasId?: string, organizationId?: string) {
+  const label = typeof children === "string" ? children : undefined;
+
+  const runMatch = href?.match(/^run:([0-9a-f-]{36})(?:~(.+))?/);
+  if (runMatch && canvasId && organizationId) {
+    return (
+      <RunChipFromLink
+        runId={runMatch[1]}
+        rawLabel={label}
+        rawStatus={runMatch[2]}
+        canvasId={canvasId}
+        organizationId={organizationId}
+      />
+    );
+  }
+
+  const integrationMatch = href?.match(/^integration:(.+)$/);
+  if (integrationMatch) {
+    return <IntegrationButton integrationRef={integrationMatch[1]} label={label} />;
+  }
+
+  const nodeMatch = href?.match(/^node:(.+)$/);
+  if (nodeMatch && canvasId && organizationId) {
+    return (
+      <NodeChipFromLink nodeId={nodeMatch[1]} rawLabel={label} canvasId={canvasId} organizationId={organizationId} />
+    );
+  }
+
+  return null;
 }

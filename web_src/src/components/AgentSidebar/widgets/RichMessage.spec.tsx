@@ -1,4 +1,5 @@
-import { render } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { RichMessage } from "./RichMessage";
 
@@ -23,5 +24,24 @@ describe("RichMessage", () => {
     const { container } = render(<RichMessage content="some **markdown** here" />);
     const markdownContainer = container.querySelector("[class*='min-w-0']");
     expect(markdownContainer).not.toBeNull();
+  });
+
+  it("renders rubric agent links as in-app chips when ids are available", () => {
+    render(
+      <MemoryRouter>
+        <RichMessage
+          canvasId="canvas_123"
+          organizationId="org_123"
+          content={[
+            ":::rubric Test Plan",
+            "- Open the [run link](run:123e4567-e89b-12d3-a456-426614174000)",
+            ":::",
+          ].join("\n")}
+        />
+      </MemoryRouter>,
+    );
+
+    // When ids are available, `run:` links should render as RunChip buttons (not external anchors).
+    expect(screen.getByRole("button", { name: "run link" })).toBeInTheDocument();
   });
 });
