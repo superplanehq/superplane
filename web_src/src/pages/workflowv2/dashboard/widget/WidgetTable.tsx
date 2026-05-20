@@ -179,6 +179,33 @@ function formatAbsoluteTitle(value: unknown): string | undefined {
   return formatTimestampInUserTimezone(new Date(ms).toISOString());
 }
 
+function actionDisabledTooltip({
+  canRun,
+  hasResolvedNode,
+  isTrigger,
+  node,
+}: {
+  canRun: boolean;
+  hasResolvedNode: boolean;
+  isTrigger: boolean;
+  node: string;
+}): string | undefined {
+  if (!canRun) return "You do not have permission to run actions in this canvas";
+  if (!hasResolvedNode) return `Node "${node}" not found on this canvas`;
+  if (!isTrigger) return "Only trigger nodes can be run from the dashboard. Pick the trigger that starts your flow.";
+  return undefined;
+}
+
+function isActionDisabled(canRun: boolean, hasResolvedNode: boolean, isTrigger: boolean): boolean {
+  return !canRun || !hasResolvedNode || !isTrigger;
+}
+
+function actionVariantClass(variant: WidgetRowAction["variant"]): string | undefined {
+  if (variant === "danger") return "border-red-200 text-red-700 hover:bg-red-50";
+  if (variant === "primary") return "border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100";
+  return undefined;
+}
+
 function RowActionButton({ action, row }: { action: WidgetRowAction; row: Record<string, unknown> }) {
   const ctx = useDashboardContext();
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -192,19 +219,9 @@ function RowActionButton({ action, row }: { action: WidgetRowAction; row: Record
   const hookName = action.hook ?? "run";
   const Icon = action.icon ? ACTION_ICONS[action.icon] : undefined;
 
-  const disabled = !canRun || !resolved || !isTrigger;
-  let tooltip: string | undefined;
-  if (!canRun) tooltip = "You do not have permission to run actions in this canvas";
-  else if (!resolved) tooltip = `Node "${action.node}" not found on this canvas`;
-  else if (!isTrigger)
-    tooltip = "Only trigger nodes can be run from the dashboard. Pick the trigger that starts your flow.";
-
-  const variantClass =
-    action.variant === "danger"
-      ? "border-red-200 text-red-700 hover:bg-red-50"
-      : action.variant === "primary"
-        ? "border-sky-200 bg-sky-50 text-sky-800 hover:bg-sky-100"
-        : undefined;
+  const disabled = isActionDisabled(canRun, Boolean(resolved), isTrigger);
+  const tooltip = actionDisabledTooltip({ canRun, hasResolvedNode: Boolean(resolved), isTrigger, node: action.node });
+  const variantClass = actionVariantClass(action.variant);
 
   const fire = async () => {
     if (!ctx?.onTriggerNode || !resolved?.node.id) return;

@@ -160,32 +160,38 @@ export function normalizeRowAction(raw: unknown): WidgetRowAction | null {
   if (!raw || typeof raw !== "object") return null;
   const action = raw as Record<string, unknown>;
   if (action.kind !== "trigger") return null;
-  const node = typeof action.node === "string" ? action.node : typeof action.target === "string" ? action.target : "";
+
   return {
     kind: "trigger",
-    label: typeof action.label === "string" ? action.label : undefined,
-    node,
-    hook: typeof action.hook === "string" ? action.hook : undefined,
-    template:
-      typeof action.template === "string"
-        ? action.template
-        : typeof action.triggerName === "string"
-          ? action.triggerName
-          : undefined,
-    payload:
-      action.payload && typeof action.payload === "object" && !Array.isArray(action.payload)
-        ? (action.payload as Record<string, string>)
-        : undefined,
-    confirm: typeof action.confirm === "string" ? action.confirm : undefined,
-    show: typeof action.show === "string" ? action.show : undefined,
-    variant:
-      typeof action.variant === "string" &&
-      WIDGET_ROW_ACTION_VARIANTS.includes(action.variant as WidgetRowActionVariant)
-        ? (action.variant as WidgetRowActionVariant)
-        : undefined,
-    icon:
-      typeof action.icon === "string" && WIDGET_ROW_ACTION_ICONS.includes(action.icon as WidgetRowActionIcon)
-        ? (action.icon as WidgetRowActionIcon)
-        : undefined,
+    label: stringOrUndefined(action.label),
+    node: readRowActionNode(action),
+    hook: stringOrUndefined(action.hook),
+    template: readRowActionTemplate(action),
+    payload: readRowActionPayload(action.payload),
+    confirm: stringOrUndefined(action.confirm),
+    show: stringOrUndefined(action.show),
+    variant: knownValue(action.variant, WIDGET_ROW_ACTION_VARIANTS),
+    icon: knownValue(action.icon, WIDGET_ROW_ACTION_ICONS),
   };
+}
+
+function readRowActionNode(action: Record<string, unknown>): string {
+  return stringOrUndefined(action.node) ?? stringOrUndefined(action.target) ?? "";
+}
+
+function readRowActionTemplate(action: Record<string, unknown>): string | undefined {
+  return stringOrUndefined(action.template) ?? stringOrUndefined(action.triggerName);
+}
+
+function readRowActionPayload(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  return raw as Record<string, string>;
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function knownValue<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
+  return typeof value === "string" && allowed.includes(value as T) ? (value as T) : undefined;
 }

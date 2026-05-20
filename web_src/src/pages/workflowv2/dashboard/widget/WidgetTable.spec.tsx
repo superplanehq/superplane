@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, vi } from "vitest";
 
 import type { SuperplaneComponentsNode } from "@/api-client";
-import { DashboardContextProvider } from "../DashboardContext";
+import { DashboardContextProvider } from "../DashboardContextProvider";
 import { WidgetTable } from "./WidgetTable";
 import type { WidgetTableRender } from "./types";
 

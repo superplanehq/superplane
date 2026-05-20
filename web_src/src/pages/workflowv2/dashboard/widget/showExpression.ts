@@ -24,78 +24,88 @@ type Token =
 
 const OPERATORS = ["==", "!=", ">=", "<=", "&&", "||", "!", ">", "<"];
 
+interface TokenRead {
+  token?: Token;
+  nextIndex: number;
+}
+
 function tokenize(input: string): Token[] {
   const tokens: Token[] = [];
   let i = 0;
   while (i < input.length) {
-    const ch = input[i];
-    if (ch === " " || ch === "\t" || ch === "\n") {
-      i++;
-      continue;
-    }
-    if (ch === "(") {
-      tokens.push({ kind: "lparen" });
-      i++;
-      continue;
-    }
-    if (ch === ")") {
-      tokens.push({ kind: "rparen" });
-      i++;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      const quote = ch;
-      let j = i + 1;
-      let buffer = "";
-      while (j < input.length && input[j] !== quote) {
-        if (input[j] === "\\" && j + 1 < input.length) {
-          buffer += input[j + 1];
-          j += 2;
-          continue;
-        }
-        buffer += input[j];
-        j++;
-      }
-      if (j >= input.length) throw new Error(`Unterminated string in expression: ${input}`);
-      tokens.push({ kind: "string", value: buffer });
-      i = j + 1;
-      continue;
-    }
-    if (/[0-9]/.test(ch) || (ch === "-" && /[0-9]/.test(input[i + 1] ?? ""))) {
-      let j = i + 1;
-      while (j < input.length && /[0-9.]/.test(input[j])) j++;
-      const value = Number(input.slice(i, j));
-      tokens.push({ kind: "number", value });
-      i = j;
-      continue;
-    }
-    // Operators
-    let matchedOp: string | undefined;
-    for (const op of OPERATORS) {
-      if (input.slice(i, i + op.length) === op) {
-        matchedOp = op;
-        break;
-      }
-    }
-    if (matchedOp) {
-      tokens.push({ kind: "op", value: matchedOp });
-      i += matchedOp.length;
-      continue;
-    }
-    if (/[A-Za-z_$]/.test(ch)) {
-      let j = i + 1;
-      while (j < input.length && /[A-Za-z0-9_.$[\]]/.test(input[j])) j++;
-      const raw = input.slice(i, j);
-      if (raw === "true") tokens.push({ kind: "bool", value: true });
-      else if (raw === "false") tokens.push({ kind: "bool", value: false });
-      else if (raw === "null") tokens.push({ kind: "null" });
-      else tokens.push({ kind: "ident", value: raw });
-      i = j;
-      continue;
-    }
-    throw new Error(`Unexpected character '${ch}' in expression: ${input}`);
+    const read = readToken(input, i);
+    if (read.token) tokens.push(read.token);
+    i = read.nextIndex;
   }
   return tokens;
+}
+
+function readToken(input: string, index: number): TokenRead {
+  const ch = input[index];
+  if (isWhitespace(ch)) return { nextIndex: index + 1 };
+  if (ch === "(") return { token: { kind: "lparen" }, nextIndex: index + 1 };
+  if (ch === ")") return { token: { kind: "rparen" }, nextIndex: index + 1 };
+  if (ch === '"' || ch === "'") return readStringToken(input, index, ch);
+  if (isNumberStart(input, index)) return readNumberToken(input, index);
+
+  const operator = readOperator(input, index);
+  if (operator) return { token: { kind: "op", value: operator }, nextIndex: index + operator.length };
+  if (isIdentifierStart(ch)) return readIdentifierToken(input, index);
+
+  throw new Error(`Unexpected character '${ch}' in expression: ${input}`);
+}
+
+function readStringToken(input: string, index: number, quote: string): TokenRead {
+  let j = index + 1;
+  let buffer = "";
+  while (j < input.length && input[j] !== quote) {
+    if (input[j] === "\\" && j + 1 < input.length) {
+      buffer += input[j + 1];
+      j += 2;
+      continue;
+    }
+    buffer += input[j];
+    j++;
+  }
+  if (j >= input.length) throw new Error(`Unterminated string in expression: ${input}`);
+  return { token: { kind: "string", value: buffer }, nextIndex: j + 1 };
+}
+
+function readNumberToken(input: string, index: number): TokenRead {
+  let j = index + 1;
+  while (j < input.length && /[0-9.]/.test(input[j])) j++;
+  return { token: { kind: "number", value: Number(input.slice(index, j)) }, nextIndex: j };
+}
+
+function readOperator(input: string, index: number): string | undefined {
+  return OPERATORS.find((op) => input.slice(index, index + op.length) === op);
+}
+
+function readIdentifierToken(input: string, index: number): TokenRead {
+  let j = index + 1;
+  while (j < input.length && /[A-Za-z0-9_.$[\]]/.test(input[j])) j++;
+  const raw = input.slice(index, j);
+  return { token: tokenForIdentifier(raw), nextIndex: j };
+}
+
+function tokenForIdentifier(raw: string): Token {
+  if (raw === "true") return { kind: "bool", value: true };
+  if (raw === "false") return { kind: "bool", value: false };
+  if (raw === "null") return { kind: "null" };
+  return { kind: "ident", value: raw };
+}
+
+function isWhitespace(ch: string | undefined): boolean {
+  return ch === " " || ch === "\t" || ch === "\n";
+}
+
+function isNumberStart(input: string, index: number): boolean {
+  const ch = input[index];
+  return /[0-9]/.test(ch) || (ch === "-" && /[0-9]/.test(input[index + 1] ?? ""));
+}
+
+function isIdentifierStart(ch: string | undefined): boolean {
+  return Boolean(ch && /[A-Za-z_$]/.test(ch));
 }
 
 interface ParserState {
@@ -173,11 +183,9 @@ function parsePrimary(state: ParserState, row: unknown): unknown {
 function compare(op: string, left: unknown, right: unknown): boolean {
   switch (op) {
     case "==":
-      // eslint-disable-next-line eqeqeq -- intentional loose equality so YAML strings/numbers compare naturally
-      return left == right;
+      return valuesEqual(left, right);
     case "!=":
-      // eslint-disable-next-line eqeqeq
-      return left != right;
+      return !valuesEqual(left, right);
     case ">":
       return (left as number) > (right as number);
     case "<":
@@ -189,6 +197,23 @@ function compare(op: string, left: unknown, right: unknown): boolean {
     default:
       throw new Error(`Unknown comparison: ${op}`);
   }
+}
+
+function valuesEqual(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  return normalizeComparableScalar(left) === normalizeComparableScalar(right);
+}
+
+function normalizeComparableScalar(value: unknown): unknown {
+  if (typeof value !== "string") return value;
+  const trimmed = value.trim();
+  if (trimmed === "") return value;
+  if (trimmed === "true") return true;
+  if (trimmed === "false") return false;
+  if (trimmed === "null") return null;
+
+  const numberValue = Number(trimmed);
+  return Number.isFinite(numberValue) ? numberValue : value;
 }
 
 /**

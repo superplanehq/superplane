@@ -21,23 +21,24 @@ function evalCondition(row: Record<string, unknown>, filter: WidgetTableFilter, 
 
   if (filter.op === "exists") return val !== "";
   if (filter.op === "not_exists") return val === "";
-
   if (!has) return false;
 
-  let expected: string;
-  if (filter.value == null || filter.value === "") {
-    expected = "";
-  } else {
-    const valueMaybe = compileMaybeExpr(filter.value);
-    if (valueMaybe.kind === "literal") {
-      expected = valueMaybe.value;
-    } else {
-      const expectedRaw = evalRowField(valueMaybe, row, env, getValueAtPath);
-      expected = expectedRaw == null ? "" : typeof expectedRaw === "string" ? expectedRaw : stringifyCell(expectedRaw);
-    }
-  }
+  const expected = resolveExpectedValue(row, filter.value, env);
+  return compareFilterValue(filter.op, val, expected);
+}
 
-  switch (filter.op) {
+function resolveExpectedValue(row: Record<string, unknown>, rawValue: string | undefined, env: ExprEnv): string {
+  if (rawValue == null || rawValue === "") return "";
+
+  const valueMaybe = compileMaybeExpr(rawValue);
+  if (valueMaybe.kind === "literal") return valueMaybe.value;
+
+  const expectedRaw = evalRowField(valueMaybe, row, env, getValueAtPath);
+  return expectedRaw == null ? "" : typeof expectedRaw === "string" ? expectedRaw : stringifyCell(expectedRaw);
+}
+
+function compareFilterValue(op: WidgetTableFilter["op"], val: string, expected: string): boolean {
+  switch (op) {
     case "eq":
       return val === expected;
     case "neq":
@@ -51,7 +52,7 @@ function evalCondition(row: Record<string, unknown>, filter: WidgetTableFilter, 
       const a = parseFloat(val);
       const b = parseFloat(expected);
       if (Number.isNaN(a) || Number.isNaN(b)) return false;
-      return filter.op === "gt" ? a > b : a < b;
+      return op === "gt" ? a > b : a < b;
     }
     default:
       return true;

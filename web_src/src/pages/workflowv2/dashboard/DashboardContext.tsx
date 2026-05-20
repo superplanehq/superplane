@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, type ReactNode } from "react";
+import { createContext, useContext } from "react";
 
 import type { SuperplaneComponentsNode } from "@/api-client";
 
@@ -52,28 +52,7 @@ export interface DashboardContextValue {
   onOpenNode?: (nodeId: string) => void;
 }
 
-const DashboardContext = createContext<DashboardContextValue | undefined>(undefined);
-
-export interface DashboardContextProviderProps extends DashboardContextValue {
-  children: ReactNode;
-}
-
-export function DashboardContextProvider({
-  children,
-  canvasId,
-  organizationId,
-  nodes,
-  nodeStatuses,
-  canRunNodes,
-  onTriggerNode,
-  onOpenNode,
-}: DashboardContextProviderProps) {
-  const value = useMemo<DashboardContextValue>(
-    () => ({ canvasId, organizationId, nodes, nodeStatuses, canRunNodes, onTriggerNode, onOpenNode }),
-    [canvasId, organizationId, nodes, nodeStatuses, canRunNodes, onTriggerNode, onOpenNode],
-  );
-  return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
-}
+export const DashboardContext = createContext<DashboardContextValue | undefined>(undefined);
 
 export function useDashboardContext(): DashboardContextValue | undefined {
   return useContext(DashboardContext);

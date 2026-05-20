@@ -53,6 +53,7 @@ export type DashboardYaml = {
 };
 
 export type DashboardYamlParseResult = { ok: true; data: DashboardYaml } | { ok: false; error: string };
+type ParseResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
 /**
  * Build canonical YAML text for a dashboard. The result matches the layout
@@ -91,77 +92,19 @@ export function dashboardToYaml(input: {
  * try/catch noise.
  */
 export function parseDashboardYaml(text: string): DashboardYamlParseResult {
-  const trimmed = text.trim();
-  if (!trimmed) {
-    return { ok: false, error: "Please provide a Dashboard YAML definition." };
-  }
+  const rootResult = parseDashboardRoot(text);
+  if (!rootResult.ok) return rootResult;
 
-  let parsed: unknown;
-  try {
-    parsed = yaml.load(trimmed);
-  } catch (e) {
-    return {
-      ok: false,
-      error: `Invalid YAML syntax: ${e instanceof Error ? e.message : "Unknown error"}`,
-    };
-  }
-
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { ok: false, error: "Dashboard YAML must be an object at the root." };
-  }
-
-  const root = parsed as Record<string, unknown>;
-  const unknownKeys = Object.keys(root).filter((key) => !["apiVersion", "kind", "metadata", "spec"].includes(key));
-  if (unknownKeys.length > 0) {
-    return { ok: false, error: `Unknown top-level field(s): ${unknownKeys.join(", ")}` };
-  }
-
-  if (root.apiVersion !== DASHBOARD_API_VERSION) {
-    return {
-      ok: false,
-      error: `Unsupported apiVersion ${JSON.stringify(root.apiVersion)} (expected ${JSON.stringify(DASHBOARD_API_VERSION)})`,
-    };
-  }
-  if (root.kind !== DASHBOARD_KIND) {
-    return {
-      ok: false,
-      error: `Unsupported kind ${JSON.stringify(root.kind)} (expected ${JSON.stringify(DASHBOARD_KIND)})`,
-    };
-  }
-
-  const metadata = root.metadata ?? {};
-  if (typeof metadata !== "object" || metadata === null || Array.isArray(metadata)) {
-    return { ok: false, error: "metadata must be an object." };
-  }
-  const metadataObj = metadata as Record<string, unknown>;
-  const metadataUnknown = Object.keys(metadataObj).filter((key) => !["canvasId", "name"].includes(key));
-  if (metadataUnknown.length > 0) {
-    return { ok: false, error: `Unknown metadata field(s): ${metadataUnknown.join(", ")}` };
-  }
-
-  const spec = root.spec;
-  if (!spec || typeof spec !== "object" || Array.isArray(spec)) {
-    return { ok: false, error: "spec must be an object." };
-  }
-  const specObj = spec as Record<string, unknown>;
-  const specUnknown = Object.keys(specObj).filter((key) => !["panels", "layout"].includes(key));
-  if (specUnknown.length > 0) {
-    return { ok: false, error: `Unknown spec field(s): ${specUnknown.join(", ")}` };
-  }
-
-  const panelsResult = parsePanels(specObj.panels);
+  const panelsResult = parsePanels(rootResult.data.spec.panels);
   if (!panelsResult.ok) return panelsResult;
 
-  const layoutResult = parseLayout(specObj.layout);
+  const layoutResult = parseLayout(rootResult.data.spec.layout);
   if (!layoutResult.ok) return layoutResult;
 
   const document: DashboardYaml = {
     apiVersion: DASHBOARD_API_VERSION,
     kind: DASHBOARD_KIND,
-    metadata: {
-      ...(typeof metadataObj.canvasId === "string" ? { canvasId: metadataObj.canvasId } : {}),
-      ...(typeof metadataObj.name === "string" ? { name: metadataObj.name } : {}),
-    },
+    metadata: rootResult.data.metadata,
     spec: { panels: panelsResult.data, layout: layoutResult.data },
   };
 
@@ -173,6 +116,85 @@ export function parseDashboardYaml(text: string): DashboardYamlParseResult {
   return { ok: true, data: document };
 }
 
+function parseDashboardRoot(text: string): ParseResult<{
+  metadata: DashboardYamlMetadata;
+  spec: Record<string, unknown>;
+}> {
+  const loaded = loadYamlRoot(text);
+  if (!loaded.ok) return loaded;
+
+  const rootError = validateRootHeader(loaded.data);
+  if (rootError) return { ok: false, error: rootError };
+
+  const metadata = parseMetadata(loaded.data.metadata);
+  if (!metadata.ok) return metadata;
+
+  const spec = parseSpec(loaded.data.spec);
+  if (!spec.ok) return spec;
+
+  return { ok: true, data: { metadata: metadata.data, spec: spec.data } };
+}
+
+function loadYamlRoot(text: string): ParseResult<Record<string, unknown>> {
+  const trimmed = text.trim();
+  if (!trimmed) return { ok: false, error: "Please provide a Dashboard YAML definition." };
+
+  let parsed: unknown;
+  try {
+    parsed = yaml.load(trimmed);
+  } catch (e) {
+    return { ok: false, error: `Invalid YAML syntax: ${e instanceof Error ? e.message : "Unknown error"}` };
+  }
+
+  if (!isPlainObject(parsed)) return { ok: false, error: "Dashboard YAML must be an object at the root." };
+  return { ok: true, data: parsed };
+}
+
+function validateRootHeader(root: Record<string, unknown>): string | null {
+  const unknownKeys = unknownObjectKeys(root, ["apiVersion", "kind", "metadata", "spec"]);
+  if (unknownKeys.length > 0) return `Unknown top-level field(s): ${unknownKeys.join(", ")}`;
+  if (root.apiVersion !== DASHBOARD_API_VERSION) {
+    return `Unsupported apiVersion ${JSON.stringify(root.apiVersion)} (expected ${JSON.stringify(DASHBOARD_API_VERSION)})`;
+  }
+  if (root.kind !== DASHBOARD_KIND) {
+    return `Unsupported kind ${JSON.stringify(root.kind)} (expected ${JSON.stringify(DASHBOARD_KIND)})`;
+  }
+  return null;
+}
+
+function parseMetadata(raw: unknown): ParseResult<DashboardYamlMetadata> {
+  const metadata = raw ?? {};
+  if (!isPlainObject(metadata)) return { ok: false, error: "metadata must be an object." };
+
+  const unknownKeys = unknownObjectKeys(metadata, ["canvasId", "name"]);
+  if (unknownKeys.length > 0) return { ok: false, error: `Unknown metadata field(s): ${unknownKeys.join(", ")}` };
+
+  return {
+    ok: true,
+    data: {
+      ...(typeof metadata.canvasId === "string" ? { canvasId: metadata.canvasId } : {}),
+      ...(typeof metadata.name === "string" ? { name: metadata.name } : {}),
+    },
+  };
+}
+
+function parseSpec(raw: unknown): ParseResult<Record<string, unknown>> {
+  if (!isPlainObject(raw)) return { ok: false, error: "spec must be an object." };
+
+  const unknownKeys = unknownObjectKeys(raw, ["panels", "layout"]);
+  if (unknownKeys.length > 0) return { ok: false, error: `Unknown spec field(s): ${unknownKeys.join(", ")}` };
+
+  return { ok: true, data: raw };
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function unknownObjectKeys(obj: Record<string, unknown>, allowed: string[]): string[] {
+  return Object.keys(obj).filter((key) => !allowed.includes(key));
+}
+
 /**
  * Run the shared structural validation matching the backend's
  * `ValidateDashboardContent`. Returns `null` when the input is valid.
@@ -182,29 +204,49 @@ export function validateDashboardContent(panels: DashboardPanel[], layout: Dashb
     return `Too many panels (max ${MAX_DASHBOARD_PANELS}).`;
   }
 
+  const panelIdsResult = validatePanels(panels);
+  if (!panelIdsResult.ok) return panelIdsResult.error;
+
+  const payloadError = validatePanelsPayloadSize(panels);
+  if (payloadError) return payloadError;
+
+  return validateLayoutReferences(layout, panelIdsResult.data);
+}
+
+function validatePanels(panels: DashboardPanel[]): ParseResult<Set<string>> {
   const panelIds = new Set<string>();
   for (const panel of panels) {
-    if (!panel.id) return "Panel id is required.";
-    if (!panel.type) return `Panel ${JSON.stringify(panel.id)} type is required.`;
+    if (!panel.id) return { ok: false, error: "Panel id is required." };
+    if (!panel.type) return { ok: false, error: `Panel ${JSON.stringify(panel.id)} type is required.` };
     if (!isPanelType(panel.type)) {
-      return `Panel ${JSON.stringify(panel.id)} has unsupported type ${JSON.stringify(panel.type)}.`;
+      return {
+        ok: false,
+        error: `Panel ${JSON.stringify(panel.id)} has unsupported type ${JSON.stringify(panel.type)}.`,
+      };
     }
     if (panelIds.has(panel.id)) {
-      return `Duplicate panel id ${JSON.stringify(panel.id)}.`;
+      return { ok: false, error: `Duplicate panel id ${JSON.stringify(panel.id)}.` };
     }
     panelIds.add(panel.id);
 
     const contentError = validatePanelContent(panel.type, panel.content);
     if (contentError) {
-      return `Panel ${JSON.stringify(panel.id)} ${contentError}`;
+      return { ok: false, error: `Panel ${JSON.stringify(panel.id)} ${contentError}` };
     }
   }
 
+  return { ok: true, data: panelIds };
+}
+
+function validatePanelsPayloadSize(panels: DashboardPanel[]): string | null {
   const encodedSize = byteLengthUtf8(JSON.stringify(panels));
   if (encodedSize > MAX_DASHBOARD_PAYLOAD_BYTES) {
     return `Panels payload exceeds ${MAX_DASHBOARD_PAYLOAD_BYTES} bytes.`;
   }
+  return null;
+}
 
+function validateLayoutReferences(layout: DashboardLayoutItem[], panelIds: Set<string>): string | null {
   const layoutIds = new Set<string>();
   for (const item of layout) {
     if (!item.i) return "Layout item i is required.";
@@ -261,47 +303,56 @@ function parseLayout(raw: unknown): { ok: true; data: DashboardLayoutItem[] } | 
 
   const layout: DashboardLayoutItem[] = [];
   for (let i = 0; i < raw.length; i += 1) {
-    const value = raw[i];
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-      return { ok: false, error: `spec.layout[${i}] must be an object.` };
-    }
-    const entry = value as Record<string, unknown>;
-    const allowed = ["i", "x", "y", "w", "h", "minW", "minH"];
-    const unknownKeys = Object.keys(entry).filter((key) => !allowed.includes(key));
-    if (unknownKeys.length > 0) {
-      return { ok: false, error: `Unknown field(s) on layout ${i}: ${unknownKeys.join(", ")}` };
-    }
-    if (typeof entry.i !== "string") return { ok: false, error: `spec.layout[${i}].i must be a string.` };
-    const numericFields: Array<["x" | "y" | "w" | "h" | "minW" | "minH", boolean]> = [
-      ["x", true],
-      ["y", true],
-      ["w", true],
-      ["h", true],
-      ["minW", false],
-      ["minH", false],
-    ];
-    for (const [field, required] of numericFields) {
-      const value = entry[field];
-      if (value === undefined) {
-        if (required) return { ok: false, error: `spec.layout[${i}].${field} is required.` };
-        continue;
-      }
-      if (typeof value !== "number" || !Number.isFinite(value)) {
-        return { ok: false, error: `spec.layout[${i}].${field} must be a number.` };
-      }
-    }
-    const item: DashboardLayoutItem = {
-      i: entry.i,
-      x: entry.x as number,
-      y: entry.y as number,
-      w: entry.w as number,
-      h: entry.h as number,
-    };
-    if (typeof entry.minW === "number") item.minW = entry.minW;
-    if (typeof entry.minH === "number") item.minH = entry.minH;
-    layout.push(item);
+    const item = parseLayoutItem(raw[i], i);
+    if (!item.ok) return item;
+    layout.push(item.data);
   }
   return { ok: true, data: layout };
+}
+
+function parseLayoutItem(raw: unknown, index: number): ParseResult<DashboardLayoutItem> {
+  if (!isPlainObject(raw)) return { ok: false, error: `spec.layout[${index}] must be an object.` };
+
+  const unknownKeys = unknownObjectKeys(raw, ["i", "x", "y", "w", "h", "minW", "minH"]);
+  if (unknownKeys.length > 0) {
+    return { ok: false, error: `Unknown field(s) on layout ${index}: ${unknownKeys.join(", ")}` };
+  }
+  if (typeof raw.i !== "string") return { ok: false, error: `spec.layout[${index}].i must be a string.` };
+
+  const numericError = validateLayoutItemNumbers(raw, index);
+  if (numericError) return { ok: false, error: numericError };
+
+  const item: DashboardLayoutItem = {
+    i: raw.i,
+    x: raw.x as number,
+    y: raw.y as number,
+    w: raw.w as number,
+    h: raw.h as number,
+  };
+  if (typeof raw.minW === "number") item.minW = raw.minW;
+  if (typeof raw.minH === "number") item.minH = raw.minH;
+  return { ok: true, data: item };
+}
+
+function validateLayoutItemNumbers(entry: Record<string, unknown>, index: number): string | null {
+  const numericFields: Array<["x" | "y" | "w" | "h" | "minW" | "minH", boolean]> = [
+    ["x", true],
+    ["y", true],
+    ["w", true],
+    ["h", true],
+    ["minW", false],
+    ["minH", false],
+  ];
+
+  for (const [field, required] of numericFields) {
+    const value = entry[field];
+    if (value === undefined) {
+      if (required) return `spec.layout[${index}].${field} is required.`;
+      continue;
+    }
+    if (typeof value !== "number" || !Number.isFinite(value)) return `spec.layout[${index}].${field} must be a number.`;
+  }
+  return null;
 }
 
 function normalizePanelForExport(panel: DashboardPanel): DashboardPanel {

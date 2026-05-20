@@ -87,14 +87,7 @@ export function useWidgetData(canvasId: string, dataSource: WidgetDataSource): W
     return count;
   }, [executionsEnabled, eventsData]);
 
-  useEffect(() => {
-    if (!executionsEnabled) return;
-    if (!eventsHasNextPage) return;
-    if (eventsIsFetchingNextPage || eventsIsFetching) return;
-    if (eagerExecutionCount >= executionLimit) return;
-    if (eagerPageCount >= EXECUTIONS_MAX_EAGER_PAGES) return;
-    void eventsFetchNextPage();
-  }, [
+  useEagerExecutionPagination({
     executionsEnabled,
     executionLimit,
     eagerExecutionCount,
@@ -103,7 +96,7 @@ export function useWidgetData(canvasId: string, dataSource: WidgetDataSource): W
     eventsIsFetchingNextPage,
     eventsIsFetching,
     eventsFetchNextPage,
-  ]);
+  });
 
   const memoryRows = useMemo(() => {
     if (dataSource.kind !== "memory") return [];
@@ -131,36 +124,165 @@ export function useWidgetData(canvasId: string, dataSource: WidgetDataSource): W
     return rows;
   }, [dataSource, runsQuery.data, runsLimit]);
 
+  // Treat ongoing eager pagination as part of the initial load so panels
+  // (especially `count` aggregations) don't flash an intermediate value
+  // before the rest of the pages settle.
+  const executionsLoading = isExecutionQueryLoading({
+    eventsIsLoading,
+    executionsEnabled,
+    eventsHasNextPage,
+    eagerExecutionCount,
+    executionLimit,
+    eagerPageCount,
+    eventsIsFetchingNextPage,
+    eventsIsFetching,
+  });
+
+  return resultForDataSource({
+    dataSource,
+    memoryRows,
+    memoryQuery,
+    runRows,
+    runsQuery,
+    executionRows,
+    executionsLoading,
+    eventsError,
+  });
+}
+
+function useEagerExecutionPagination({
+  executionsEnabled,
+  executionLimit,
+  eagerExecutionCount,
+  eagerPageCount,
+  eventsHasNextPage,
+  eventsIsFetchingNextPage,
+  eventsIsFetching,
+  eventsFetchNextPage,
+}: {
+  executionsEnabled: boolean;
+  executionLimit: number;
+  eagerExecutionCount: number;
+  eagerPageCount: number;
+  eventsHasNextPage: boolean | undefined;
+  eventsIsFetchingNextPage: boolean;
+  eventsIsFetching: boolean;
+  eventsFetchNextPage: () => unknown;
+}) {
+  useEffect(() => {
+    if (
+      !shouldFetchNextExecutionPage({
+        executionsEnabled,
+        executionLimit,
+        eagerExecutionCount,
+        eagerPageCount,
+        eventsHasNextPage,
+        eventsIsFetchingNextPage,
+        eventsIsFetching,
+      })
+    ) {
+      return;
+    }
+    void eventsFetchNextPage();
+  }, [
+    executionsEnabled,
+    executionLimit,
+    eagerExecutionCount,
+    eagerPageCount,
+    eventsHasNextPage,
+    eventsIsFetchingNextPage,
+    eventsIsFetching,
+    eventsFetchNextPage,
+  ]);
+}
+
+function shouldFetchNextExecutionPage({
+  executionsEnabled,
+  executionLimit,
+  eagerExecutionCount,
+  eagerPageCount,
+  eventsHasNextPage,
+  eventsIsFetchingNextPage,
+  eventsIsFetching,
+}: {
+  executionsEnabled: boolean;
+  executionLimit: number;
+  eagerExecutionCount: number;
+  eagerPageCount: number;
+  eventsHasNextPage: boolean | undefined;
+  eventsIsFetchingNextPage: boolean;
+  eventsIsFetching: boolean;
+}): boolean {
+  if (!executionsEnabled || !eventsHasNextPage) return false;
+  if (eventsIsFetchingNextPage || eventsIsFetching) return false;
+  if (eagerExecutionCount >= executionLimit) return false;
+  return eagerPageCount < EXECUTIONS_MAX_EAGER_PAGES;
+}
+
+function isExecutionQueryLoading({
+  eventsIsLoading,
+  executionsEnabled,
+  eventsHasNextPage,
+  eagerExecutionCount,
+  executionLimit,
+  eagerPageCount,
+  eventsIsFetchingNextPage,
+  eventsIsFetching,
+}: {
+  eventsIsLoading: boolean;
+  executionsEnabled: boolean;
+  eventsHasNextPage: boolean | undefined;
+  eagerExecutionCount: number;
+  executionLimit: number;
+  eagerPageCount: number;
+  eventsIsFetchingNextPage: boolean;
+  eventsIsFetching: boolean;
+}): boolean {
+  if (eventsIsLoading) return true;
+  return (
+    executionsEnabled &&
+    eventsHasNextPage === true &&
+    eagerExecutionCount < executionLimit &&
+    eagerPageCount < EXECUTIONS_MAX_EAGER_PAGES &&
+    (eventsIsFetchingNextPage || eventsIsFetching)
+  );
+}
+
+function resultForDataSource({
+  dataSource,
+  memoryRows,
+  memoryQuery,
+  runRows,
+  runsQuery,
+  executionRows,
+  executionsLoading,
+  eventsError,
+}: {
+  dataSource: WidgetDataSource;
+  memoryRows: unknown[];
+  memoryQuery: { isLoading: boolean; error: unknown };
+  runRows: unknown[];
+  runsQuery: { isLoading: boolean; error: unknown; data?: { pages?: Array<{ totalCount?: number }> } };
+  executionRows: unknown[];
+  executionsLoading: boolean;
+  eventsError: unknown;
+}): WidgetDataResult {
   if (dataSource.kind === "memory") {
-    return {
-      rows: memoryRows,
-      isLoading: memoryQuery.isLoading,
-      error: memoryQuery.error ? String(memoryQuery.error) : undefined,
-    };
+    return { rows: memoryRows, isLoading: memoryQuery.isLoading, error: errorMessage(memoryQuery.error) };
   }
   if (dataSource.kind === "runs") {
     return {
       rows: runRows,
       isLoading: runsQuery.isLoading,
-      error: runsQuery.error ? String(runsQuery.error) : undefined,
+      error: errorMessage(runsQuery.error),
       totalCount: runsQuery.data?.pages?.[0]?.totalCount,
     };
   }
-  // Treat ongoing eager pagination as part of the initial load so panels
-  // (especially `count` aggregations) don't flash an intermediate value
-  // before the rest of the pages settle.
-  const executionsLoading =
-    eventsIsLoading ||
-    (executionsEnabled &&
-      eventsHasNextPage === true &&
-      eagerExecutionCount < executionLimit &&
-      eagerPageCount < EXECUTIONS_MAX_EAGER_PAGES &&
-      (eventsIsFetchingNextPage || eventsIsFetching));
-  return {
-    rows: executionRows,
-    isLoading: executionsLoading,
-    error: eventsError ? String(eventsError) : undefined,
-  };
+  return { rows: executionRows, isLoading: executionsLoading, error: errorMessage(eventsError) };
+}
+
+function errorMessage(error: unknown): string | undefined {
+  return error ? String(error) : undefined;
 }
 
 /**

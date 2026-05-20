@@ -104,23 +104,7 @@ function CartesianChart({
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" role="img" aria-label="chart">
-      {/* axes */}
-      <line
-        x1={padding.left}
-        x2={padding.left}
-        y1={padding.top}
-        y2={padding.top + innerH}
-        stroke="#cbd5e1"
-        strokeWidth={1}
-      />
-      <line
-        x1={padding.left}
-        x2={padding.left + innerW}
-        y1={padding.top + innerH}
-        y2={padding.top + innerH}
-        stroke="#cbd5e1"
-        strokeWidth={1}
-      />
+      <ChartAxes padding={padding} innerW={innerW} innerH={innerH} />
       {data.map((row, i) => {
         const x = padding.left + slotW * i + groupGap / 2;
         const xLabel = padding.left + slotW * (i + 0.5);
@@ -198,6 +182,37 @@ function CartesianChart({
           return <polyline key={s.key} points={linePath} fill="none" stroke={s.color} strokeWidth={1.5} />;
         })}
     </svg>
+  );
+}
+
+function ChartAxes({
+  padding,
+  innerW,
+  innerH,
+}: {
+  padding: { top: number; right: number; bottom: number; left: number };
+  innerW: number;
+  innerH: number;
+}) {
+  return (
+    <>
+      <line
+        x1={padding.left}
+        x2={padding.left}
+        y1={padding.top}
+        y2={padding.top + innerH}
+        stroke="#cbd5e1"
+        strokeWidth={1}
+      />
+      <line
+        x1={padding.left}
+        x2={padding.left + innerW}
+        y1={padding.top + innerH}
+        y2={padding.top + innerH}
+        stroke="#cbd5e1"
+        strokeWidth={1}
+      />
+    </>
   );
 }
 

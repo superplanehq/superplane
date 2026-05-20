@@ -11,7 +11,8 @@ import type {
 
 import { DashboardView } from "./DashboardView";
 import { DashboardYamlModal } from "./DashboardYamlModal";
-import { DashboardContextProvider, type DashboardContextValue, type DashboardNodeStatus } from "./DashboardContext";
+import type { DashboardContextValue, DashboardNodeStatus } from "./DashboardContext";
+import { DashboardContextProvider } from "./DashboardContextProvider";
 
 export type DashboardOverlayProps = {
   /**

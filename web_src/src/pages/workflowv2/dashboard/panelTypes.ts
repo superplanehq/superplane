@@ -296,68 +296,78 @@ function validateTableWhere(where: unknown): string | null {
 export function normalizeTablePanelContent(raw: Record<string, unknown> | undefined): TablePanelContent {
   const r = raw ?? {};
   const renderRaw = (r.render as Record<string, unknown>) ?? {};
-  const columns = Array.isArray(renderRaw.columns)
-    ? (renderRaw.columns as unknown[]).map((col) => {
-        const c = col as Record<string, unknown>;
-        return {
-          field: typeof c.field === "string" ? c.field : "",
-          label: typeof c.label === "string" ? c.label : undefined,
-          format: typeof c.format === "string" ? (c.format as WidgetTableColumn["format"]) : undefined,
-          show: typeof c.show === "string" ? c.show : undefined,
-          href: typeof c.href === "string" ? c.href : undefined,
-        } satisfies WidgetTableColumn;
-      })
-    : [];
-  const rowActions = Array.isArray(renderRaw.rowActions)
-    ? (renderRaw.rowActions as unknown[]).map(normalizeRowAction).filter((a): a is WidgetRowAction => a != null)
-    : undefined;
-  const where: WidgetTableFilter[] | undefined = Array.isArray(renderRaw.where)
-    ? (renderRaw.where as unknown[]).flatMap((f) => {
-        const item = f as Record<string, unknown>;
-        const op = typeof item.op === "string" ? item.op : "eq";
-        if (!WIDGET_FILTER_OPS.includes(op as WidgetTableFilter["op"])) return [];
-        const field = typeof item.field === "string" ? item.field : "";
-        if (!field.trim()) return [];
-        return [
-          {
-            field,
-            op: op as WidgetTableFilter["op"],
-            value: typeof item.value === "string" ? item.value : undefined,
-          },
-        ];
-      })
-    : undefined;
-
-  let dataSource: TablePanelDataSource = { kind: "memory", namespace: "" };
-  const ds = r.dataSource as Record<string, unknown> | undefined;
-  if (ds?.kind === "executions") {
-    dataSource = {
-      kind: "executions",
-      node: typeof ds.node === "string" ? ds.node : undefined,
-      limit: typeof ds.limit === "number" ? ds.limit : 50,
-    };
-  } else if (ds?.kind === "runs") {
-    dataSource = { kind: "runs", limit: typeof ds.limit === "number" ? ds.limit : 100 };
-  } else if (ds?.kind === "memory") {
-    dataSource = {
-      kind: "memory",
-      namespace: typeof ds.namespace === "string" ? ds.namespace : "",
-      fieldPath: typeof ds.fieldPath === "string" ? ds.fieldPath : undefined,
-    };
-  }
 
   return {
     title: typeof r.title === "string" ? r.title : "",
-    dataSource,
+    dataSource: normalizeTableDataSource(r.dataSource),
     render: {
       kind: "table",
-      columns,
-      rowActions,
-      where,
+      columns: normalizeTableColumns(renderRaw.columns),
+      rowActions: normalizeTableRowActions(renderRaw.rowActions),
+      where: normalizeTableWhere(renderRaw.where),
       filters: Array.isArray(renderRaw.filters) ? (renderRaw.filters as string[]) : undefined,
       emptyMessage: typeof renderRaw.emptyMessage === "string" ? renderRaw.emptyMessage : undefined,
     },
   };
+}
+
+function normalizeTableColumns(raw: unknown): WidgetTableColumn[] {
+  if (!Array.isArray(raw)) return [];
+
+  return raw.map((col) => {
+    const c = asObject(col) ?? {};
+    return {
+      field: typeof c.field === "string" ? c.field : "",
+      label: typeof c.label === "string" ? c.label : undefined,
+      format: typeof c.format === "string" ? (c.format as WidgetTableColumn["format"]) : undefined,
+      show: typeof c.show === "string" ? c.show : undefined,
+      href: typeof c.href === "string" ? c.href : undefined,
+    };
+  });
+}
+
+function normalizeTableRowActions(raw: unknown): WidgetRowAction[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw.map(normalizeRowAction).filter((action): action is WidgetRowAction => action != null);
+}
+
+function normalizeTableWhere(raw: unknown): WidgetTableFilter[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw.flatMap((filter) => {
+    const item = asObject(filter) ?? {};
+    const op = typeof item.op === "string" ? item.op : "eq";
+    const field = typeof item.field === "string" ? item.field : "";
+    if (!field.trim() || !WIDGET_FILTER_OPS.includes(op as WidgetTableFilter["op"])) return [];
+    return [{ field, op: op as WidgetTableFilter["op"], value: stringOrUndefined(item.value) }];
+  });
+}
+
+function normalizeTableDataSource(raw: unknown): TablePanelDataSource {
+  const ds = asObject(raw);
+  if (ds?.kind === "executions") return normalizeExecutionsDataSource(ds);
+  if (ds?.kind === "runs") return { kind: "runs", limit: typeof ds.limit === "number" ? ds.limit : 100 };
+  if (ds?.kind === "memory") return normalizeMemoryDataSource(ds);
+  return { kind: "memory", namespace: "" };
+}
+
+function normalizeExecutionsDataSource(ds: Record<string, unknown>): TablePanelDataSource {
+  return {
+    kind: "executions",
+    node: stringOrUndefined(ds.node),
+    limit: typeof ds.limit === "number" ? ds.limit : 50,
+  };
+}
+
+function normalizeMemoryDataSource(ds: Record<string, unknown>): TablePanelDataSource {
+  return {
+    kind: "memory",
+    namespace: typeof ds.namespace === "string" ? ds.namespace : "",
+    fieldPath: stringOrUndefined(ds.fieldPath),
+  };
+}
+
+function stringOrUndefined(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 function validateTableColumns(columns: unknown): string | null {
