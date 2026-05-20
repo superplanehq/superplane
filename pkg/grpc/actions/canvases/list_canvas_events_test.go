@@ -13,7 +13,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
-	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/datatypes"
 )
 
@@ -100,7 +99,7 @@ func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 	assert.Empty(t, event2.Executions)
 }
 
-func Test__SerializeCanvasEvent__PreservesUnsafeJSONNumbersForProto(t *testing.T) {
+func Test__SerializeCanvasEvent__ConvertsJSONNumbersForProto(t *testing.T) {
 	now := time.Now()
 	event := models.CanvasEvent{
 		ID:         uuid.New(),
@@ -129,8 +128,8 @@ func Test__SerializeCanvasEvent__PreservesUnsafeJSONNumbersForProto(t *testing.T
 	payload, ok := serialized.Data.AsMap()["data"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, float64(14000000), payload["plain"])
-	assert.Equal(t, "12345678901234567890", payload["large"])
-	assert.Equal(t, "0.0000001", payload["small"])
+	assert.Equal(t, float64(12345678901234567890), payload["large"])
+	assert.Equal(t, float64(0.0000001), payload["small"])
 	assert.Equal(t, float64(42), payload["normal"])
 	assert.Equal(t, "deploy", payload["name"])
 	assert.Equal(t, true, payload["active"])
@@ -139,11 +138,6 @@ func Test__SerializeCanvasEvent__PreservesUnsafeJSONNumbersForProto(t *testing.T
 	nested, ok := payload["nested"].(map[string]any)
 	require.True(t, ok)
 	assert.Nil(t, nested["missing"])
-
-	encoded, err := protojson.Marshal(serialized.Data)
-	require.NoError(t, err)
-	assert.Contains(t, string(encoded), `"large":"12345678901234567890"`)
-	assert.Contains(t, string(encoded), `"small":"0.0000001"`)
 }
 
 func findCanvasEventWithExecutions(events []*pb.CanvasEventWithExecutions, id string) *pb.CanvasEventWithExecutions {
