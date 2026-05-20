@@ -174,6 +174,10 @@ export interface CanvasPageProps {
   onSelectDashboard?: () => void;
   /** Opens the canvas dashboard add-panel dialog when `headerMode` is `dashboard`. */
   onDashboardAddPanel?: () => void;
+  /** Opens the dashboard YAML modal when `headerMode` is `dashboard`. */
+  onDashboardOpenYaml?: () => void;
+  /** Whether the dashboard YAML modal will open in read-only mode (no apply). */
+  dashboardYamlReadOnly?: boolean;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
@@ -1170,6 +1174,8 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           onSelectDashboard={props.onSelectDashboard}
           onDashboardAddPanel={props.onDashboardAddPanel}
+          onDashboardOpenYaml={props.onDashboardOpenYaml}
+          dashboardYamlReadOnly={props.dashboardYamlReadOnly}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
@@ -1680,6 +1686,8 @@ function CanvasContentHeader({
   exitEditModeDisabledTooltip,
   onSelectDashboard,
   onDashboardAddPanel,
+  onDashboardOpenYaml,
+  dashboardYamlReadOnly,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
   unpublishedDraftUpdatedAt,
@@ -1710,6 +1718,8 @@ function CanvasContentHeader({
   exitEditModeDisabledTooltip?: string;
   onSelectDashboard?: () => void;
   onDashboardAddPanel?: () => void;
+  onDashboardOpenYaml?: () => void;
+  dashboardYamlReadOnly?: boolean;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
@@ -1750,6 +1760,8 @@ function CanvasContentHeader({
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       onSelectDashboard={onSelectDashboard}
       onDashboardAddPanel={onDashboardAddPanel}
+      onDashboardOpenYaml={onDashboardOpenYaml}
+      dashboardYamlReadOnly={dashboardYamlReadOnly}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
