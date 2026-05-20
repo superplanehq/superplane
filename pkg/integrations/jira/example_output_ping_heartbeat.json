@@ -1,3 +1,7 @@
 {
-  "message": "PONG - Heartbeat received"
+  "data": {
+    "message": "PONG - Heartbeat received"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.pinged"
 }

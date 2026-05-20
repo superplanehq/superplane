@@ -17,7 +17,23 @@ import { jiraBaseEventSections } from "./base";
 interface UpdateHeartbeatConfiguration {
   team?: string;
   heartbeat?: string;
+  description?: string | null;
+  interval?: number | null;
+  intervalUnit?: string | null;
+  enabled?: boolean | null;
+  alertMessage?: string | null;
+  alertTags?: unknown[] | null;
+  alertPriority?: string | null;
 }
+
+const FIELD_LABELS: Record<string, string> = {
+  description: "Description",
+  interval: "Interval",
+  enabled: "Enabled",
+  alertMessage: "Alert Message",
+  alertTags: "Alert Tags",
+  alertPriority: "Alert Priority",
+};
 
 interface UpdateHeartbeatNodeMetadata {
   teamName?: string;
@@ -53,6 +69,13 @@ export const updateHeartbeatMapper: ComponentBaseMapper = {
     if (data.name != null) {
       details["Name"] = String(data.name);
     }
+    if (data.description != null) {
+      details["Description"] = String(data.description);
+    }
+    if (data.interval != null) {
+      const unit = data.intervalUnit != null ? ` ${data.intervalUnit}` : "";
+      details["Interval"] = `${data.interval}${unit}`;
+    }
     if (data.status != null) {
       details["Status"] = String(data.status);
     }
@@ -78,5 +101,25 @@ function metadataList(node: NodeInfo): MetadataItem[] {
     items.push({ icon: "activity", label: configuration.heartbeat });
   }
 
+  const updated = listUpdatedFields(configuration);
+  if (updated.length > 0) {
+    items.push({ icon: "edit", label: `Updates: ${updated.join(", ")}` });
+  }
+
   return items;
+}
+
+function listUpdatedFields(configuration: UpdateHeartbeatConfiguration | undefined): string[] {
+  if (!configuration) return [];
+  const skip = new Set(["team", "heartbeat", "intervalUnit"]);
+  const updated: string[] = [];
+  (Object.keys(configuration) as (keyof UpdateHeartbeatConfiguration)[]).forEach((key) => {
+    if (skip.has(key)) return;
+    const value = configuration[key];
+    if (value === undefined || value === null) return;
+    if (typeof value === "string" && value.trim() === "") return;
+    if (Array.isArray(value) && value.length === 0) return;
+    updated.push(FIELD_LABELS[key] ?? key);
+  });
+  return updated;
 }

@@ -1,6 +1,7 @@
 package jira
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -774,6 +775,56 @@ func Test__Client__HeartbeatsAPI(t *testing.T) {
 		err = client.DeleteHeartbeat(cloudID, teamID, "DNS Checker")
 		require.NoError(t, err)
 		assert.Equal(t, http.MethodDelete, httpContext.Requests[0].Method)
+	})
+
+	t.Run("list heartbeats follows links.next pagination", func(t *testing.T) {
+		page2URL := fmt.Sprintf("/jsm/ops/api/%s/v1/teams/%s/heartbeats?offset=1&size=1", cloudID, teamID)
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"values":[{"name":"HB-1"}],"links":{"next":"` + page2URL + `"}}`,
+					)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"values":[{"name":"HB-2"}]}`,
+					)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		heartbeats, err := client.ListHeartbeats(cloudID, teamID)
+		require.NoError(t, err)
+		require.Len(t, heartbeats, 2)
+		assert.Equal(t, "HB-1", heartbeats[0].Name)
+		assert.Equal(t, "HB-2", heartbeats[1].Name)
+		require.Len(t, httpContext.Requests, 2)
+		assert.Contains(t, httpContext.Requests[1].URL.String(), "offset=1")
+	})
+
+	t.Run("list heartbeats single page", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(
+						`{"values":[{"name":"HB-1"},{"name":"HB-2"}]}`,
+					)),
+				},
+			},
+		}
+		client, err := NewClient(httpContext, appCtx)
+		require.NoError(t, err)
+
+		heartbeats, err := client.ListHeartbeats(cloudID, teamID)
+		require.NoError(t, err)
+		require.Len(t, heartbeats, 2)
+		require.Len(t, httpContext.Requests, 1)
 	})
 }
 
