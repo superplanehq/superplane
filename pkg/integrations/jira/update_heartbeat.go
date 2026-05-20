@@ -136,9 +136,11 @@ func (c *UpdateHeartbeat) Configuration() []configuration.Field {
 			Label:       "Interval unit",
 			Type:        configuration.FieldTypeSelect,
 			Required:    false,
-			Togglable:   true,
 			Default:     "minutes",
 			Description: "Unit for the expected ping interval",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "interval", Values: []string{"*"}},
+			},
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{

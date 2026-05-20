@@ -55,6 +55,13 @@ export const createHeartbeatMapper: ComponentBaseMapper = {
     if (data.name != null) {
       details["Name"] = String(data.name);
     }
+    if (data.description != null) {
+      details["Description"] = String(data.description);
+    }
+    if (data.interval != null) {
+      const unit = data.intervalUnit != null ? ` ${data.intervalUnit}` : "";
+      details["Interval"] = `${data.interval}${unit}`;
+    }
     if (data.status != null) {
       details["Status"] = String(data.status);
     }
