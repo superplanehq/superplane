@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { ClipboardList, ChevronDown, ChevronUp, X } from "lucide-react";
 import type { RubricCategory } from "./parser";
+import { CodeBlockWidget } from "./CodeBlockWidget";
 import { IntegrationButton } from "./IntegrationButton";
 import { NodeChipFromLink } from "./NodeChip";
 import { RunChipFromLink } from "./RunChip";
@@ -24,17 +25,37 @@ const CRITERION_MARKDOWN_CLASSES =
   "[&_tbody_tr:nth-child(even)]:bg-slate-50/60 " +
   "[&_tr:last-child_td]:border-b-0";
 
-function CriterionMarkdown({
+const RUBRIC_BODY_MARKDOWN_CLASSES =
+  "max-w-none " +
+  "[&_h2]:mb-2 [&_h2]:mt-3 [&_h2]:text-sm [&_h2]:font-semibold [&_h2:first-child]:mt-0 " +
+  "[&_h3]:mb-1.5 [&_h3]:mt-2 [&_h3]:text-sm [&_h3]:font-semibold [&_h3:first-child]:mt-0 " +
+  "[&_p]:mb-2 [&_p]:leading-relaxed [&_p:last-child]:mb-0 " +
+  "[&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_li]:mb-1 " +
+  "[&_strong]:font-semibold [&_em]:italic " +
+  "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 " +
+  "[&_a]:underline [&_a]:underline-offset-2 [&_a]:text-slate-700 " +
+  "[&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.85em] [&_code]:font-mono " +
+  "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
+  "[&_table]:w-full [&_table]:text-[11px] [&_table]:border-collapse " +
+  "[&_thead]:bg-slate-50 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-700 " +
+  "[&_th]:border-b [&_th]:border-slate-200 " +
+  "[&_td]:px-2 [&_td]:py-1 [&_td]:text-slate-600 [&_td]:border-b [&_td]:border-slate-100 " +
+  "[&_tbody_tr:nth-child(even)]:bg-slate-50/60 " +
+  "[&_tr:last-child_td]:border-b-0";
+
+function RubricMarkdown({
   children,
   canvasId,
   organizationId,
+  compact = false,
 }: {
   children: string;
   canvasId?: string;
   organizationId?: string;
+  compact?: boolean;
 }) {
   return (
-    <div className={`min-w-0 ${CRITERION_MARKDOWN_CLASSES}`}>
+    <div className={`min-w-0 ${compact ? CRITERION_MARKDOWN_CLASSES : RUBRIC_BODY_MARKDOWN_CLASSES}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         urlTransform={(url) => (isAgentLink(url) ? url : defaultUrlTransform(url))}
@@ -44,6 +65,8 @@ function CriterionMarkdown({
               {linkChildren}
             </AgentLink>
           ),
+          code: RubricMarkdownCode,
+          pre: ({ children: preChildren }) => <>{preChildren}</>,
           table: ({ children: tableChildren, ...props }) => (
             <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
               <table {...props}>{tableChildren}</table>
@@ -54,6 +77,21 @@ function CriterionMarkdown({
         {children}
       </ReactMarkdown>
     </div>
+  );
+}
+
+function RubricMarkdownCode({ className, children, ...props }: ComponentProps<"code"> & { children?: ReactNode }) {
+  const match = /language-(\w+)/.exec(className || "");
+  const code = String(children).replace(/\n$/, "");
+
+  if (match) {
+    return <CodeBlockWidget code={code} language={match[1]} />;
+  }
+
+  return (
+    <code className={className} {...props}>
+      {children}
+    </code>
   );
 }
 
@@ -318,9 +356,9 @@ function FlatCriteriaList({
     <div key={index} className="flex items-start gap-2 py-0.5">
       <span className="text-slate-400 text-xs mt-0.5 shrink-0">✦</span>
       <div className="min-w-0 flex-1 text-xs text-slate-700">
-        <CriterionMarkdown canvasId={canvasId} organizationId={organizationId}>
+        <RubricMarkdown compact canvasId={canvasId} organizationId={organizationId}>
           {criterion.text}
-        </CriterionMarkdown>
+        </RubricMarkdown>
       </div>
     </div>
   ));
@@ -339,9 +377,9 @@ function NumberedCriteriaList({
     <div key={index} className="flex items-start gap-2 py-1.5 border-b border-slate-50 last:border-0">
       <span className="text-slate-500 text-sm mt-0.5 shrink-0 font-medium">{index + 1}.</span>
       <div className="min-w-0 flex-1 text-sm text-slate-700">
-        <CriterionMarkdown canvasId={canvasId} organizationId={organizationId}>
+        <RubricMarkdown compact canvasId={canvasId} organizationId={organizationId}>
           {criterion.text}
-        </CriterionMarkdown>
+        </RubricMarkdown>
       </div>
     </div>
   ));
@@ -364,26 +402,34 @@ function CategorizedList({
       {categories.map((cat, ci) => (
         <div key={ci}>
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{cat.heading}</p>
-          {cat.criteria.map((c, i) => {
-            globalIndex++;
-            return (
-              <div
-                key={i}
-                className={`flex items-start gap-2 ${showNumbers ? "py-1.5 border-b border-slate-50 last:border-0" : "py-0.5"}`}
-              >
-                {showNumbers ? (
-                  <span className="text-slate-500 text-sm mt-0.5 shrink-0 font-medium">{globalIndex}.</span>
-                ) : (
-                  <span className="text-slate-400 text-xs mt-0.5 shrink-0">✦</span>
-                )}
-                <div className={`min-w-0 flex-1 ${showNumbers ? "text-sm" : "text-xs"} text-slate-700`}>
-                  <CriterionMarkdown canvasId={canvasId} organizationId={organizationId}>
-                    {c.text}
-                  </CriterionMarkdown>
+          {cat.body ? (
+            <div className={`${showNumbers ? "text-sm" : "text-xs"} text-slate-700`}>
+              <RubricMarkdown canvasId={canvasId} organizationId={organizationId}>
+                {cat.body}
+              </RubricMarkdown>
+            </div>
+          ) : (
+            cat.criteria.map((c, i) => {
+              globalIndex++;
+              return (
+                <div
+                  key={i}
+                  className={`flex items-start gap-2 ${showNumbers ? "py-1.5 border-b border-slate-50 last:border-0" : "py-0.5"}`}
+                >
+                  {showNumbers ? (
+                    <span className="text-slate-500 text-sm mt-0.5 shrink-0 font-medium">{globalIndex}.</span>
+                  ) : (
+                    <span className="text-slate-400 text-xs mt-0.5 shrink-0">✦</span>
+                  )}
+                  <div className={`min-w-0 flex-1 ${showNumbers ? "text-sm" : "text-xs"} text-slate-700`}>
+                    <RubricMarkdown compact canvasId={canvasId} organizationId={organizationId}>
+                      {c.text}
+                    </RubricMarkdown>
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       ))}
     </div>
