@@ -1,6 +1,7 @@
 package public
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -252,6 +253,47 @@ func TestHandleRunnerLiveLogStream(t *testing.T) {
 		assert.Equal(t, http.StatusOK, rec.Code)
 		assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 		assert.Contains(t, rec.Body.String(), "log")
+	})
+
+	t.Run("client disconnect does not return 5xx", func(t *testing.T) {
+		// Upstream that blocks long enough for us to cancel the request
+		// context, simulating a client that closes the live-log dialog
+		// before the broker responds. We must return a non-5xx status so
+		// the LoggingMiddleware does not capture this as a Sentry event.
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			<-r.Context().Done()
+		}))
+		t.Cleanup(upstream.Close)
+		t.Setenv("TASK_BROKER_BASE_URL", upstream.URL)
+		t.Setenv("TASK_BROKER_AUTH_TOKEN", "token")
+
+		canvasID, execID := createCanvasWithComponentExecution(t, r, "runner", "runner-1", map[string]any{
+			runneraction.ExecutionMetadataBrokerTaskID: "task-cancelled",
+		})
+
+		req := httptest.NewRequest(
+			http.MethodGet,
+			fmt.Sprintf("/api/v1/canvases/%s/node-executions/%s/runner-live-logs", canvasID, execID),
+			nil,
+		)
+		req.Header.Set("x-organization-id", r.Organization.ID.String())
+		token, err := signer.Generate(r.Account.ID.String(), time.Hour)
+		require.NoError(t, err)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
+
+		ctx, cancel := context.WithCancel(req.Context())
+		req = req.WithContext(ctx)
+		// Cancel shortly after the handler dispatches the upstream request
+		// so http.Client.Do returns a context error.
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			cancel()
+		}()
+		rec := httptest.NewRecorder()
+		server.Router.ServeHTTP(rec, req)
+		// 499 (Client Closed Request) is not captured by the Sentry
+		// middleware (it only captures 5xx).
+		assert.Equal(t, 499, rec.Code)
 	})
 
 	t.Run("upstream success forwards upstream content-type", func(t *testing.T) {

@@ -1,6 +1,8 @@
 package public
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +17,14 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
+
+// statusClientClosedRequest is the non-standard 499 status code (popularized by
+// nginx) used to indicate that the client closed the connection before the
+// server finished responding. We use it on this streaming endpoint to avoid
+// emitting a 5xx (and a corresponding Sentry event) for the very common case
+// of users navigating away from the live-log dialog, which aborts the in-flight
+// fetch request.
+const statusClientClosedRequest = 499
 
 func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Request) {
 	user, ok := middleware.GetUserFromContext(r.Context())
@@ -101,6 +111,10 @@ func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Reques
 
 	req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, upstream, nil)
 	if err != nil {
+		if isClientDisconnect(r.Context(), err) {
+			w.WriteHeader(statusClientClosedRequest)
+			return
+		}
 		http.Error(w, "Bad gateway", http.StatusBadGateway)
 		return
 	}
@@ -111,6 +125,14 @@ func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Reques
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		// When the client cancels the request (e.g. by closing the live-log
+		// dialog), the request context is cancelled and the in-flight HTTP
+		// call to the broker fails. That is not a server-side problem, so
+		// respond with 499 to avoid generating Sentry noise.
+		if isClientDisconnect(r.Context(), err) {
+			w.WriteHeader(statusClientClosedRequest)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusBadGateway)
 		return
 	}
@@ -157,4 +179,15 @@ func (s *Server) handleRunnerLiveLogStream(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	}
+}
+
+// isClientDisconnect reports whether the given error is the result of the
+// client (i.e. the HTTP request initiator) cancelling its context, rather than
+// an actual upstream/server failure. It checks both the request context state
+// and the error chain to cover the common scenarios surfaced by net/http.
+func isClientDisconnect(ctx context.Context, err error) bool {
+	if ctx != nil && ctx.Err() != nil {
+		return true
+	}
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
