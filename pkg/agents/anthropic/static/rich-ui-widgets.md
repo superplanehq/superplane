@@ -3,6 +3,20 @@
 
 Output these blocks in your chat messages. The frontend renders them as interactive widgets.
 
+## When to use
+
+- **Asking the user a question** — use :::buttons (3 or fewer options) or :::survey (multiple questions, free-text)
+- **Presenting a build plan** — use :::rubric with mermaid diagrams
+- **Showing operation results** — use :::success or :::error
+- **Long output** (YAML, logs, CLI output) — wrap in :::collapse
+- **Visualizing flows** — use mermaid diagrams
+- **Referencing canvas nodes** — use node chips `[Name](node:id)`
+- **Referencing integrations** — use integration buttons `[Name](integration:uuid)`
+- **After building a draft** — use :::draft-actions with the version ID
+- **Before destructive operations** — use :::confirm
+
+Always prefer widgets over plain text when presenting choices, structured data, or interactive content.
+
 ## Buttons (single-choice)
 ```
 :::buttons
