@@ -16,7 +16,6 @@ import (
 	"github.com/superplane/runner/fleet-manager/internal/ec2provision"
 	"github.com/superplane/runner/fleet-manager/internal/fleetmanager"
 	"github.com/superplane/runner/fleet-manager/internal/store"
-	"github.com/superplane/runner/fleet-manager/internal/superplane"
 	"github.com/superplane/runner/shared/webhook"
 )
 
@@ -54,12 +53,6 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-
-	if spClient, ok := superplane.NewClientFromEnv(); ok {
-		srv.SuperPlane = spClient
-		log.Info("superplane fleet bridge enabled", slog.String("url", spClient.BaseURL))
-		go superplane.RunSyncLoop(ctx, log, spClient, st, hub.Notify)
-	}
 
 	var launcher *ec2provision.Launcher
 	ecCfg, ecErr := ec2provision.ConfigFromEnv()
