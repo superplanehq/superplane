@@ -33,51 +33,36 @@
         }
       ],
       "labels": [
-        [
-          "0",
-          {
-            "key": "dash0.resource.type",
-            "value": {
-              "stringValue": "synthetic"
-            }
+        {
+          "key": "dash0.resource.type",
+          "value": {
+            "stringValue": "synthetic"
           }
-        ],
-        [
-          "1",
-          {
-            "key": "dash0.synthetic_check.attempt_id",
-            "value": {
-              "stringValue": "73768e2c"
-            }
+        },
+        {
+          "key": "dash0.synthetic_check.attempt_id",
+          "value": {
+            "stringValue": "73768e2c"
           }
-        ],
-        [
-          "2",
-          {
-            "key": "dash0.synthetic_check.failed_critical_assertions",
-            "value": {
-              "stringValue": "{\"be-brussels\":[{\"actualValue\":\"503\",\"assertion\":{\"kind\":\"status_code\",\"spec\":{\"operator\":\"is\",\"value\":\"200\"}},\"explanation\":\"Expected value to be 200, but got 503\"}]}"
-            }
+        },
+        {
+          "key": "dash0.synthetic_check.failed_critical_assertions",
+          "value": {
+            "stringValue": "{\"be-brussels\":[{\"actualValue\":\"503\",\"assertion\":{\"kind\":\"status_code\",\"spec\":{\"operator\":\"is\",\"value\":\"200\"}},\"explanation\":\"Expected value to be 200, but got 503\"}]}"
           }
-        ],
-        [
-          "3",
-          {
-            "key": "dash0.synthetic_check.id",
-            "value": {
-              "stringValue": "api-health-check"
-            }
+        },
+        {
+          "key": "dash0.synthetic_check.id",
+          "value": {
+            "stringValue": "64617368-3073-796e-7468-73599f287bf4"
           }
-        ],
-        [
-          "4",
-          {
-            "key": "dash0.synthetic_check.name",
-            "value": {
-              "stringValue": "API Health Check"
-            }
+        },
+        {
+          "key": "dash0.synthetic_check.name",
+          "value": {
+            "stringValue": "API Health Check"
           }
-        ]
+        }
       ]
     }
   }

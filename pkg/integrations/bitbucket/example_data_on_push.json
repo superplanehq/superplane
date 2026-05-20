@@ -12,7 +12,8 @@
         "avatar": {
           "href": "https://bitbucket.org/account/johndoe/avatar/"
         }
-      }
+      },
+      "account_id": "712020:8b94c681-feaa-4ee0-a3f1-d301aafa"
     },
     "repository": {
       "type": "repository",
@@ -23,6 +24,13 @@
         "html": {
           "href": "https://bitbucket.org/my-workspace/my-repo"
         }
+      },
+      "scm": "git",
+      "workspace": {
+        "type": "workspace",
+        "slug": "my-workspace",
+        "name": "my-workspace",
+        "uuid": "{a1b2c3d4-e5f6-7890-abcd-ef1234567890}"
       }
     },
     "push": {
@@ -40,7 +48,8 @@
                 "user": {
                   "display_name": "John Doe",
                   "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}",
-                  "type": "user"
+                  "type": "user",
+                  "nickname": "johndoe"
                 }
               },
               "message": "Add new feature\n",
@@ -48,7 +57,32 @@
               "links": {
                 "html": {
                   "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+                },
+                "self": {
+                  "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/commit/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
                 }
+              },
+              "parents": [
+                {
+                  "type": "commit",
+                  "hash": "1e65c05c1d5171631d92438a13901ca7dae9618c",
+                  "links": {
+                    "self": {
+                      "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/commit/1e65c05c1d5171631d92438a13901ca7dae9618c"
+                    },
+                    "html": {
+                      "href": "https://bitbucket.org/my-workspace/my-repo/commits/1e65c05c1d5171631d92438a13901ca7dae9618c"
+                    }
+                  }
+                }
+              ]
+            },
+            "links": {
+              "self": {
+                "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/refs/branches/main"
+              },
+              "html": {
+                "href": "https://bitbucket.org/my-workspace/my-repo/branch/main"
               }
             }
           },

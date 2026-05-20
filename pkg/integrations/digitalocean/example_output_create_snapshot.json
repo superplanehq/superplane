@@ -4,7 +4,9 @@
     "id": 220464921,
     "min_disk_size": 10,
     "name": "superplane-1773328904",
-    "regions": ["blr1"],
+    "regions": [
+      "blr1"
+    ],
     "resource_id": "98145763",
     "resource_type": "droplet",
     "size_gigabytes": 2.04
