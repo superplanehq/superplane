@@ -40,6 +40,7 @@ func Test__ListRuns__ReturnsRunsWithRootEventsAndExecutionRefs(t *testing.T) {
 
 	serializedRun := response.Runs[0]
 	assert.Equal(t, run.ID.String(), serializedRun.Id)
+	assert.Equal(t, run.VersionID.String(), serializedRun.VersionId)
 	assert.Equal(t, pb.CanvasRun_STATE_FINISHED, serializedRun.State)
 	assert.Equal(t, pb.CanvasRun_RESULT_PASSED, serializedRun.Result)
 	require.NotNil(t, serializedRun.RootEvent)

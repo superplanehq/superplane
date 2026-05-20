@@ -149,6 +149,7 @@ func SerializeCanvasRun(run models.CanvasRun, rootEvent models.CanvasEvent, exec
 	serialized := &pb.CanvasRun{
 		Id:         run.ID.String(),
 		CanvasId:   run.WorkflowID.String(),
+		VersionId:  run.VersionID.String(),
 		RootEvent:  serializedRootEvent,
 		State:      RunStateToProto(run.State),
 		Result:     RunResultToProto(run.Result),
