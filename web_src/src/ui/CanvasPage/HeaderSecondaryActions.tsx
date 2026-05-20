@@ -1,6 +1,6 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileCode, Pencil, Plus } from "lucide-react";
+import { FileCode, Plus } from "lucide-react";
 
 import { Button } from "../button";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
@@ -228,7 +228,6 @@ function EnterEditButton({
       disabled={disabled}
       data-testid="canvas-edit-button"
     >
-      <Pencil className="h-3.5 w-3.5" />
       Edit
     </UIButton>
   );
