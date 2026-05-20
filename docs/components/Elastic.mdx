@@ -98,8 +98,9 @@ Each received alert emits the parsed JSON body sent by Kibana directly as the ev
     "spaceId": "default",
     "status": "active",
     "tags": [
-      "infrastructure",
-      "prod"
+      "env:prod",
+      "service:web",
+      "severity:high"
     ]
   },
   "timestamp": "2026-03-12T09:00:00Z",
@@ -153,7 +154,8 @@ The trigger emits the full case details including id, title, status, severity, v
     "severity": "high",
     "status": "in-progress",
     "tags": [
-      "production",
+      "env:prod",
+      "service:web",
       "incident"
     ],
     "title": "Production incident",

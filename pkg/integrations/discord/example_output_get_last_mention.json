@@ -17,7 +17,8 @@
         {
           "id": "1372980427293554709",
           "username": "superplane-bot",
-          "bot": true
+          "bot": true,
+          "discriminator": "0000"
         }
       ]
     }

@@ -27,7 +27,8 @@
     "parent": {
       "name": "Test",
       "resource": "proj/default:env/test"
-    }
+    },
+    "projectKey": "app"
   },
   "timestamp": "2026-02-24T12:00:00Z"
 }

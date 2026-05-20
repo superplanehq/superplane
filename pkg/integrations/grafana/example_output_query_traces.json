@@ -8,20 +8,45 @@
           {
             "schema": {
               "fields": [
-                { "name": "traceID", "type": "string" },
-                { "name": "spanID", "type": "string" },
-                { "name": "operationName", "type": "string" },
-                { "name": "duration", "type": "number" },
-                { "name": "serviceName", "type": "string" }
+                {
+                  "name": "traceID",
+                  "type": "string"
+                },
+                {
+                  "name": "spanID",
+                  "type": "string"
+                },
+                {
+                  "name": "operationName",
+                  "type": "string"
+                },
+                {
+                  "name": "duration",
+                  "type": "number"
+                },
+                {
+                  "name": "serviceName",
+                  "type": "string"
+                }
               ]
             },
             "data": {
               "values": [
-                ["abc123def456"],
-                ["0000000000000001"],
-                ["HTTP GET /api/orders"],
-                [1523000],
-                ["order-service"]
+                [
+                  "abc123def456"
+                ],
+                [
+                  "0000000000000001"
+                ],
+                [
+                  "HTTP GET /api/orders"
+                ],
+                [
+                  1523000
+                ],
+                [
+                  "order-service"
+                ]
               ]
             }
           }

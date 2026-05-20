@@ -4,7 +4,10 @@
     "imageId": "ami-07f0e4f3e9c123abc",
     "region": "us-east-1",
     "deprecateAt": "2026-04-01T00:00:00Z",
-    "deprecationEnabled": true
+    "deprecationEnabled": true,
+    "image": {
+      "imageId": "ami-07f0e4f3e9c123abc"
+    }
   },
   "timestamp": "2026-02-19T09:40:00Z",
   "type": "aws.ec2.image.deprecationEnabled"

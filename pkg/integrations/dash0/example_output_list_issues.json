@@ -1,17 +1,33 @@
 {
-    "type": "dash0.issues.list",
+  "type": "dash0.issues.list",
+  "data": {
+    "status": "success",
     "data": {
-        "status": "success",
-        "data": {
-            "resultType": "vector",
-            "result": [
-                {
-                    "metric": {"service_name": "test"},
-                    "value": [1234567890, "1"],
-                    "values": [[1234567890, "1"], [1234567900, "2"]]
-                }
+      "resultType": "vector",
+      "result": [
+        {
+          "metric": {
+            "service_name": "test",
+            "otel_metric_name": "dash0.issue.status",
+            "issue_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+          },
+          "value": [
+            1234567890,
+            "1"
+          ],
+          "values": [
+            [
+              1234567890,
+              "1"
+            ],
+            [
+              1234567900,
+              "2"
             ]
+          ]
         }
-    },
-    "timestamp": "2026-01-19T12:00:00Z"
+      ]
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z"
 }

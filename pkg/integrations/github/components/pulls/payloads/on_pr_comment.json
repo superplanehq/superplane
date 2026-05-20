@@ -226,7 +226,11 @@
       "svn_url": "https://github.com/acme-labs/snaketoy",
       "tags_url": "https://api.github.com/repos/acme-labs/snaketoy/tags",
       "teams_url": "https://api.github.com/repos/acme-labs/snaketoy/teams",
-      "topics": ["game", "canvas", "javascript"],
+      "topics": [
+        "game",
+        "canvas",
+        "javascript"
+      ],
       "trees_url": "https://api.github.com/repos/acme-labs/snaketoy/git/trees{/sha}",
       "updated_at": "2026-02-12T09:41:27Z",
       "url": "https://api.github.com/repos/acme-labs/snaketoy",

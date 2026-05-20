@@ -89,13 +89,29 @@ The trigger emits the full Grafana webhook payload, including:
     "alerts": [
       {
         "annotations": {
+          "description": "Current 5xx rate is 8.4% (threshold: 5%). Top status: 504 (62% of failures).",
+          "runbook_url": "https://runbooks.acme.example/app/5xx-spike",
           "summary": "Error rate above threshold"
         },
+        "dashboardURL": "https://grafana.acme.example/d/overview",
+        "endsAt": "0001-01-01T00:00:00Z",
+        "fingerprint": "9c2f1b03a8e1d647",
+        "generatorURL": "https://grafana.acme.example/alerting/grafana/dec3lc8jq2lcgx/view",
         "labels": {
           "alertname": "HighErrorRate",
-          "service": "api"
+          "grafana_folder": "Production",
+          "service": "api",
+          "severity": "critical",
+          "team": "platform"
         },
-        "status": "firing"
+        "panelURL": "https://grafana.acme.example/d/overview?viewPanel=12",
+        "silenceURL": "https://grafana.acme.example/alerting/silence/new?alertmanager=grafana\u0026matcher=alertname%3Dapi+5xx+error+rate",
+        "startsAt": "2026-03-04T09:18:42.184Z",
+        "status": "firing",
+        "values": {
+          "B": 0.084,
+          "C": 1
+        }
       }
     ],
     "commonLabels": {
