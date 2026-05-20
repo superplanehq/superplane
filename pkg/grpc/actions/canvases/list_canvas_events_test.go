@@ -2,14 +2,18 @@ package canvases
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/protobuf/encoding/protojson"
 	"gorm.io/datatypes"
 )
 
@@ -94,6 +98,52 @@ func Test__ListCanvasEvents__ReturnsEventsWithExecutions(t *testing.T) {
 	event2 := findCanvasEventWithExecutions(response.Events, rootEvent2.ID.String())
 	require.NotNil(t, event2)
 	assert.Empty(t, event2.Executions)
+}
+
+func Test__SerializeCanvasEvent__PreservesUnsafeJSONNumbersForProto(t *testing.T) {
+	now := time.Now()
+	event := models.CanvasEvent{
+		ID:         uuid.New(),
+		WorkflowID: uuid.New(),
+		NodeID:     "trigger",
+		Channel:    "default",
+		Data: models.NewJSONValue(map[string]any{
+			"type": "webhook",
+			"data": map[string]any{
+				"plain":  json.Number("14000000"),
+				"large":  json.Number("12345678901234567890"),
+				"small":  json.Number("0.0000001"),
+				"normal": json.Number("42"),
+				"name":   "deploy",
+				"active": true,
+				"labels": []any{"prod"},
+				"nested": map[string]any{"missing": nil},
+			},
+		}),
+		CreatedAt: &now,
+	}
+
+	serialized, err := SerializeCanvasEvent(event)
+	require.NoError(t, err)
+
+	payload, ok := serialized.Data.AsMap()["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(14000000), payload["plain"])
+	assert.Equal(t, "12345678901234567890", payload["large"])
+	assert.Equal(t, "0.0000001", payload["small"])
+	assert.Equal(t, float64(42), payload["normal"])
+	assert.Equal(t, "deploy", payload["name"])
+	assert.Equal(t, true, payload["active"])
+	assert.Equal(t, []any{"prod"}, payload["labels"])
+
+	nested, ok := payload["nested"].(map[string]any)
+	require.True(t, ok)
+	assert.Nil(t, nested["missing"])
+
+	encoded, err := protojson.Marshal(serialized.Data)
+	require.NoError(t, err)
+	assert.Contains(t, string(encoded), `"large":"12345678901234567890"`)
+	assert.Contains(t, string(encoded), `"small":"0.0000001"`)
 }
 
 func findCanvasEventWithExecutions(events []*pb.CanvasEventWithExecutions, id string) *pb.CanvasEventWithExecutions {

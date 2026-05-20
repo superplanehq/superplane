@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/structpb"
 	"gorm.io/gorm"
 )
 
@@ -40,7 +39,7 @@ func ListCanvasMemories(ctx context.Context, registry *registry.Registry, organi
 
 	items := make([]*pb.CanvasMemory, 0, len(records))
 	for _, record := range records {
-		values, err := structpb.NewValue(record.Values.Data())
+		values, err := newStructpbValue(record.Values.Data())
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to serialize canvas memory")
 		}
