@@ -62,7 +62,7 @@ export const RichMessage = memo(function RichMessage({
   const segments = useMemo(() => parseAgentContent(content), [content]);
 
   return (
-    <div>
+    <div className="w-full min-w-0">
       {segments.map((segment, i) => (
         <SegmentRenderer
           key={i}
@@ -137,7 +137,7 @@ function MarkdownSegment({
   organizationId?: string;
 }) {
   return (
-    <div className={MARKDOWN_CLASSES}>
+    <div className={`min-w-0 ${MARKDOWN_CLASSES}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         urlTransform={(url) => (isAgentLink(url) ? url : defaultUrlTransform(url))}
