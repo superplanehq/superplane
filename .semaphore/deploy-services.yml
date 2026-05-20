@@ -1,9 +1,9 @@
 # Auto-promoted from main after docker-publish passes.
 # Requires Semaphore secret "deploy-ssh" with:
-#   SSH_PRIVATE_KEY      — contents of leo-devbox private key (PEM or OpenSSH)
+#   SSH_PRIVATE_KEY      — contents of igor-runners.pem
 #   FLEET_AUTH_TOKEN     — AUTH_TOKEN for fleet-manager container
 #   TASK_BROKER_AUTH_TOKEN — AUTH_TOKEN for task-broker container
-#   BROKER_PUBLIC_URL    — e.g. http://100.53.60.193:8081
+#   BROKER_PUBLIC_URL    — e.g. http://100.24.107.156:8081
 version: v1.0
 name: Deploy services
 
@@ -22,9 +22,8 @@ blocks:
           commands:
             - checkout
             - echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy.pem && chmod 600 ~/.ssh/deploy.pem
-            - export SSH_KEY=~/.ssh/deploy.pem
             - export FLEET_MANAGER_IMAGE="ghcr.io/superplanehq/runner/fleet-manager:latest"
-            - ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/deploy.pem ubuntu@98.84.121.90 "sudo docker pull $FLEET_MANAGER_IMAGE && sudo docker stop fleet-manager && sudo docker rm fleet-manager && sudo docker run -d --name fleet-manager --restart unless-stopped -p 8080:8080 -v fleet-manager-data:/home/nonroot --env-file /home/ubuntu/fleet-manager.env -e AWS_DEFAULT_REGION=us-east-1 $FLEET_MANAGER_IMAGE && sudo docker ps --filter name=fleet-manager"
+            - ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/deploy.pem ubuntu@44.220.93.243 "sudo docker pull $FLEET_MANAGER_IMAGE && sudo docker stop fleet-manager && sudo docker rm fleet-manager && sudo docker run -d --name fleet-manager --restart unless-stopped -p 8080:8080 -v fleet-manager-data:/home/nonroot --env-file /home/ubuntu/fleet-manager.env -e AWS_DEFAULT_REGION=us-east-1 $FLEET_MANAGER_IMAGE && sudo docker ps --filter name=fleet-manager"
 
   - name: Deploy task-broker
     task:
@@ -36,7 +35,7 @@ blocks:
             - checkout
             - echo "$SSH_PRIVATE_KEY" > ~/.ssh/deploy.pem && chmod 600 ~/.ssh/deploy.pem
             - export SSH_KEY=~/.ssh/deploy.pem
-            - export SSH_HOST=100.53.60.193
+            - export SSH_HOST=100.24.107.156
             - export AUTH_TOKEN="$TASK_BROKER_AUTH_TOKEN"
             - export BROKER_PUBLIC_URL="$BROKER_PUBLIC_URL"
             - bash scripts/start-task-broker-remote.sh
