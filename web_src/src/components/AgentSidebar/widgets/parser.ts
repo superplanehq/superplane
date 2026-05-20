@@ -13,12 +13,13 @@ export type SuccessSegment = { type: "success"; content: string };
 export type ErrorSegment = { type: "error"; content: string };
 export type DraftActionsSegment = { type: "draft-actions"; versionId: string; message?: string };
 export type SurveySegment = { type: "survey"; questions: { prompt: string; options: string[]; hasInput?: boolean }[] };
-export type RubricCategory = { heading: string; criteria: { text: string }[] };
+export type RubricCategory = { heading: string; criteria: { text: string }[]; body?: string };
 export type RubricSegment = {
   type: "rubric";
   title: string;
   criteria: { text: string }[];
   categories?: RubricCategory[];
+  body?: string;
 };
 
 export type Segment =
@@ -295,10 +296,11 @@ function parseSurvey(raw: string): SurveySegment {
 }
 
 function parseRubric(meta: string, raw: string): RubricSegment {
-  const lines = raw.split("\n").filter((l) => l.trim());
+  const rawLines = raw.split("\n");
+  const lines = rawLines.filter((l) => l.trim());
   let title = meta.trim();
   if (lines.some((line) => isRubricHeading(line.trim()))) {
-    return parseCategorizedRubric(lines, title);
+    return parseCategorizedRubric(rawLines, title, raw.trim());
   }
 
   const criteria: { text: string }[] = [];
@@ -317,25 +319,45 @@ function parseRubric(meta: string, raw: string): RubricSegment {
     }
   }
 
-  return { type: "rubric", title: title || "Build Plan", criteria };
+  return { type: "rubric", title: title || "Build Plan", criteria, body: raw.trim() };
 }
 
-function parseCategorizedRubric(lines: string[], initialTitle: string): RubricSegment {
+function parseCategorizedRubric(lines: string[], initialTitle: string, body: string): RubricSegment {
   let title = initialTitle;
   const categories: RubricCategory[] = [];
   const uncategorized: { text: string }[] = [];
-  let currentCategory: RubricCategory | null = null;
+  let currentCategory: (RubricCategory & { bodyLines: string[] }) | null = null;
+
+  const flushCategory = () => {
+    if (!currentCategory) {
+      return;
+    }
+
+    const categoryBody = currentCategory.bodyLines.join("\n").trim();
+    categories.push({
+      heading: currentCategory.heading,
+      criteria: currentCategory.criteria,
+      body: categoryBody || undefined,
+    });
+    currentCategory = null;
+  };
 
   for (const line of lines) {
-    const parsedLine = parseRubricLine(line.trim());
-
-    if (parsedLine.type === "heading") {
-      if (currentCategory) {
-        categories.push(currentCategory);
-      }
-      currentCategory = { heading: parsedLine.heading, criteria: [] };
+    const trimmed = line.trim();
+    if (!trimmed) {
+      currentCategory?.bodyLines.push(line);
       continue;
     }
+
+    const parsedLine = parseRubricLine(trimmed);
+
+    if (parsedLine.type === "heading") {
+      flushCategory();
+      currentCategory = { heading: parsedLine.heading, criteria: [], bodyLines: [] };
+      continue;
+    }
+
+    currentCategory?.bodyLines.push(line);
 
     if (parsedLine.type === "criterion") {
       if (currentCategory) {
@@ -351,15 +373,14 @@ function parseCategorizedRubric(lines: string[], initialTitle: string): RubricSe
     }
   }
 
-  if (currentCategory) {
-    categories.push(currentCategory);
-  }
+  flushCategory();
 
   return {
     type: "rubric",
     title: title || "Build Plan",
     criteria: [...uncategorized, ...categories.flatMap((category) => category.criteria)],
     categories,
+    body,
   };
 }
 
