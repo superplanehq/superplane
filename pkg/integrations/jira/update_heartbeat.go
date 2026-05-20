@@ -287,10 +287,10 @@ func updateHeartbeatRequestFromSpec(spec UpdateHeartbeatSpec) *UpdateHeartbeatRe
 	if spec.Interval != nil && *spec.Interval >= 1 {
 		interval := *spec.Interval
 		req.Interval = &interval
-	}
-	if spec.IntervalUnit != nil {
-		if unit := strings.TrimSpace(*spec.IntervalUnit); unit != "" {
-			req.IntervalUnit = unit
+		if spec.IntervalUnit != nil {
+			if unit := strings.TrimSpace(*spec.IntervalUnit); unit != "" {
+				req.IntervalUnit = unit
+			}
 		}
 	}
 	if spec.Enabled != nil {
@@ -319,9 +319,6 @@ func updateHeartbeatRequestEmpty(req *UpdateHeartbeatRequest) bool {
 		return false
 	}
 	if req.Interval != nil {
-		return false
-	}
-	if strings.TrimSpace(req.IntervalUnit) != "" {
 		return false
 	}
 	if req.Enabled != nil {
