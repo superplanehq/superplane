@@ -1,6 +1,5 @@
 {
   "data": {
-    "projectKey": "default",
     "key": "toggle-feature",
     "name": "Toggle Feature",
     "description": "Controls access to the new feature",
@@ -17,7 +16,8 @@
         "value": false,
         "name": "Disabled"
       }
-    ]
+    ],
+    "projectKey": "default"
   },
   "type": "launchdarkly.flag",
   "timestamp": "2026-01-19T12:00:00Z"
