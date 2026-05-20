@@ -116,6 +116,16 @@ func defaultResourceSourcesForSkillsBaseURL(skillsBaseURL string) ([]resourceSou
 			),
 		},
 		{
+			MountPath: "ref/skills/superplane-dashboard-and-widgets/SKILL.md",
+			SourceKey: filepath.ToSlash(filepath.Join("skills", "superplane-dashboard-and-widgets", "SKILL.md")),
+			SourceURL: skillsRawURL(
+				skillsBaseURL,
+				"skills",
+				"superplane-dashboard-and-widgets",
+				"SKILL.md",
+			),
+		},
+		{
 			MountPath: "ref/skills/superplane-monitor/SKILL.md",
 			SourceKey: filepath.ToSlash(filepath.Join("skills", "superplane-monitor", "SKILL.md")),
 			SourceURL: skillsRawURL(
