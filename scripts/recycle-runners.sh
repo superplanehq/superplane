@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/deploy.pem}"
-FLEET_HOST="13.220.51.216"
+FLEET_HOST="44.220.93.243"
 
 echo "Fetching active managed runner instances from fleet-manager host..."
 

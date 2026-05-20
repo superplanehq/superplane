@@ -22,7 +22,7 @@
 
 set -euo pipefail
 
-SSH_HOST="${SSH_HOST:-98.91.210.215}"
+SSH_HOST="${SSH_HOST:-100.24.107.156}"
 SSH_USER="${SSH_USER:-ubuntu}"
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/igor-runners.pem}"
 SSH_KEY="${SSH_KEY/#\~/$HOME}"
