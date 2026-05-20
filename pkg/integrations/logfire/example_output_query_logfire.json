@@ -2,10 +2,12 @@
   "data": {
     "columns": [
       {
-        "name": "start_timestamp"
+        "name": "start_timestamp",
+        "type": "timestamp"
       },
       {
-        "name": "message"
+        "name": "message",
+        "type": "text"
       }
     ],
     "rows": [
