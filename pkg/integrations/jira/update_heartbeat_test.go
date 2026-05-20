@@ -87,4 +87,31 @@ func Test__hasEffectiveHeartbeatUpdate(t *testing.T) {
 	assert.True(t, hasEffectiveHeartbeatUpdate(UpdateHeartbeatSpec{Description: &desc}))
 	interval := 5
 	assert.True(t, hasEffectiveHeartbeatUpdate(UpdateHeartbeatSpec{Interval: &interval}))
+
+	// intervalUnit alone (interval toggle off) must not be treated as a valid update.
+	unit := "minutes"
+	assert.False(t, hasEffectiveHeartbeatUpdate(UpdateHeartbeatSpec{IntervalUnit: &unit}))
+}
+
+func Test__updateHeartbeatRequestFromSpec_intervalUnit(t *testing.T) {
+	unit := "hours"
+	interval := 2
+
+	t.Run("intervalUnit is omitted when interval is absent", func(t *testing.T) {
+		req := updateHeartbeatRequestFromSpec(UpdateHeartbeatSpec{IntervalUnit: &unit})
+		assert.Nil(t, req.Interval)
+		assert.Empty(t, req.IntervalUnit)
+	})
+
+	t.Run("intervalUnit is included when interval is present", func(t *testing.T) {
+		req := updateHeartbeatRequestFromSpec(UpdateHeartbeatSpec{Interval: &interval, IntervalUnit: &unit})
+		assert.Equal(t, &interval, req.Interval)
+		assert.Equal(t, "hours", req.IntervalUnit)
+	})
+
+	t.Run("interval without intervalUnit is still valid", func(t *testing.T) {
+		req := updateHeartbeatRequestFromSpec(UpdateHeartbeatSpec{Interval: &interval})
+		assert.Equal(t, &interval, req.Interval)
+		assert.Empty(t, req.IntervalUnit)
+	})
 }
