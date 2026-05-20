@@ -8,7 +8,10 @@
     "embeddingModelName": "GTE Large EN v1.5",
     "projectId": "37455431-84bd-4fa2-94cf-e8486f8f8c5e",
     "projectName": "AI Agents",
-    "tags": ["production", "docs"],
+    "tags": [
+      "production",
+      "docs"
+    ],
     "database": {
       "id": "abf1055a-745d-4c24-a1db-1959ea819264",
       "name": "product-catalog-os",

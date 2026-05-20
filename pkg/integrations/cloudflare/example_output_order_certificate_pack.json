@@ -6,7 +6,9 @@
     "pack": {
       "id": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
       "certificate_authority": "lets_encrypt",
-      "hosts": ["preview-123.example.com"],
+      "hosts": [
+        "preview-123.example.com"
+      ],
       "status": "initializing",
       "type": "advanced",
       "validation_method": "txt"

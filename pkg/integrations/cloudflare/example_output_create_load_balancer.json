@@ -1,13 +1,17 @@
 {
   "data": {
     "loadBalancer": {
-      "default_pools": ["64d858d71f1e9839fdfb0d2ca78951f5"],
+      "default_pools": [
+        "64d858d71f1e9839fdfb0d2ca78951f5"
+      ],
       "description": "description",
       "enabled": true,
       "fallback_pool": "64d858d71f1e9839fdfb0d2ca78951f5",
       "id": "f7adb491a20dcab2e29a3141f2f197f7",
       "name": "example.org",
-      "networks": ["cloudflare"],
+      "networks": [
+        "cloudflare"
+      ],
       "proxied": true,
       "random_steering": {
         "default_weight": 1

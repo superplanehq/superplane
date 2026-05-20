@@ -11,8 +11,10 @@
         "methodName": "v1.compute.instances.insert",
         "resourceName": "projects/my-project/zones/us-central1-a/instances/my-vm",
         "serviceName": "compute.googleapis.com"
-      }
-    }
+      },
+      "insertId": "1k1z9d4d3vkc"
+    },
+    "insertId": "1k1z9d4d3vkc"
   },
   "timestamp": "2025-02-14T12:00:00Z"
 }

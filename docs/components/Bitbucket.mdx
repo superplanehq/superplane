@@ -61,6 +61,7 @@ This trigger automatically sets up a Bitbucket webhook when configured. The webh
 {
   "data": {
     "actor": {
+      "account_id": "712020:8b94c681-feaa-4ee0-a3f1-d301aafa",
       "display_name": "John Doe",
       "links": {
         "avatar": {
@@ -97,6 +98,14 @@ This trigger automatically sets up a Bitbucket webhook when configured. The webh
           "created": false,
           "forced": false,
           "new": {
+            "links": {
+              "html": {
+                "href": "https://bitbucket.org/my-workspace/my-repo/branch/main"
+              },
+              "self": {
+                "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/refs/branches/main"
+              }
+            },
             "name": "main",
             "target": {
               "author": {
@@ -104,6 +113,7 @@ This trigger automatically sets up a Bitbucket webhook when configured. The webh
                 "type": "author",
                 "user": {
                   "display_name": "John Doe",
+                  "nickname": "johndoe",
                   "type": "user",
                   "uuid": "{d301aafa-d676-4ee0-a3f1-8b94c681feaa}"
                 }
@@ -113,9 +123,26 @@ This trigger automatically sets up a Bitbucket webhook when configured. The webh
               "links": {
                 "html": {
                   "href": "https://bitbucket.org/my-workspace/my-repo/commits/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
+                },
+                "self": {
+                  "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/commit/709d658dc5b6d6afcd46049c2f332ee3f515a67d"
                 }
               },
               "message": "Add new feature\n",
+              "parents": [
+                {
+                  "hash": "1e65c05c1d5171631d92438a13901ca7dae9618c",
+                  "links": {
+                    "html": {
+                      "href": "https://bitbucket.org/my-workspace/my-repo/commits/1e65c05c1d5171631d92438a13901ca7dae9618c"
+                    },
+                    "self": {
+                      "href": "https://api.bitbucket.org/2.0/repositories/my-workspace/my-repo/commit/1e65c05c1d5171631d92438a13901ca7dae9618c"
+                    }
+                  },
+                  "type": "commit"
+                }
+              ],
               "type": "commit"
             },
             "type": "branch"
@@ -146,8 +173,15 @@ This trigger automatically sets up a Bitbucket webhook when configured. The webh
         }
       },
       "name": "my-repo",
+      "scm": "git",
       "type": "repository",
-      "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}"
+      "uuid": "{b7f10c3a-2a1e-4c36-af54-7e818f3b6e1d}",
+      "workspace": {
+        "name": "my-workspace",
+        "slug": "my-workspace",
+        "type": "workspace",
+        "uuid": "{a1b2c3d4-e5f6-7890-abcd-ef1234567890}"
+      }
     }
   },
   "timestamp": "2024-01-15T10:30:00Z",

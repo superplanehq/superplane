@@ -27,7 +27,10 @@
     },
     "size_slug": "s-1vcpu-1gb",
     "status": "active",
-    "tags": [],
+    "tags": [
+      "web",
+      "production"
+    ],
     "vcpus": 1
   },
   "timestamp": "2026-03-12T21:13:32.946693411Z",

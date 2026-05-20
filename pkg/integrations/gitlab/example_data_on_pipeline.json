@@ -12,7 +12,13 @@
       "updated_at": "2026-02-10 12:03:10 UTC",
       "finished_at": "2026-02-10 12:03:10 UTC",
       "duration": 190,
-      "url": "https://gitlab.com/group/example-project/-/pipelines/12345"
+      "url": "https://gitlab.com/group/example-project/-/pipelines/12345",
+      "detailed_status": "passed",
+      "stages": [
+        "build",
+        "test",
+        "deploy"
+      ]
     },
     "project": {
       "id": 987,

@@ -16,7 +16,7 @@
     "started_at": "2026-02-13T19:21:15.000Z",
     "finished_at": "2026-02-13T19:25:43.000Z",
     "committed_at": "2026-02-13T19:20:45.000Z",
-    "duration": 268.0,
+    "duration": 268,
     "queued_duration": 12.6,
     "coverage": "87.1",
     "user": {

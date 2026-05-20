@@ -12,7 +12,10 @@
         "time": 1739376000000,
         "timeEnd": 1739376000000,
         "text": "Deploy v1.2.3 to production",
-        "tags": ["deploy", "production"],
+        "tags": [
+          "deploy",
+          "production"
+        ],
         "type": "annotation"
       },
       {
@@ -22,7 +25,10 @@
         "time": 1739289600000,
         "timeEnd": 1739289600000,
         "text": "Rollback to v1.2.2",
-        "tags": ["rollback", "production"],
+        "tags": [
+          "rollback",
+          "production"
+        ],
         "type": "annotation"
       }
     ]
