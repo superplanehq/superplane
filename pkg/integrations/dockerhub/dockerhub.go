@@ -74,6 +74,7 @@ func (d *DockerHub) Actions() []core.Action {
 func (d *DockerHub) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnImagePush{},
+		&OnVulnerabilityScan{},
 	}
 }
 
