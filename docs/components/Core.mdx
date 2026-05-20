@@ -494,7 +494,6 @@ The component emits the response with:
     "body": {
       "message": "ok"
     },
-    "error": "Error to read request body: EOF",
     "headers": {
       "Content-Type": [
         "application/json"
@@ -601,9 +600,15 @@ The Merge component waits for events from all upstream nodes before forwarding a
       "event_2"
     ],
     "groupKey": "merge-group-123",
-    "sources": [
-      "node_a",
-      "node_b"
+    "sourceNodes": [
+      {
+        "nodeId": "node_a",
+        "receivedAt": "2026-01-16T17:56:10.000000000Z"
+      },
+      {
+        "nodeId": "node_b",
+        "receivedAt": "2026-01-16T17:56:15.000000000Z"
+      }
     ],
     "stopEarly": false
   },
