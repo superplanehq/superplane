@@ -83,7 +83,11 @@ import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
-import { DashboardOverlay } from "./dashboard/DashboardOverlay";
+import { getDashboardHeaderActions } from "./dashboard/dashboardHeaderActions";
+import { deriveDashboardNodeStatuses } from "./dashboard/deriveNodeStatuses";
+import { useDashboardModeActions } from "./dashboard/useDashboardModeActions";
+import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
+import { WorkflowDashboardOverlay } from "./dashboard/WorkflowDashboardOverlay";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { CanvasMemoryModal } from "./CanvasMemoryModal";
@@ -186,6 +190,8 @@ export function WorkflowPageV2() {
     setIsDashboardMode,
     isDashboardAddPanelOpen,
     setIsDashboardAddPanelOpen,
+    isDashboardYamlOpen,
+    setIsDashboardYamlOpen,
     selectedRunId,
     setSelectedRunId,
   } = useWorkflowViewSearchParams(searchParams, setSearchParams, dashboardsFeatureEnabled);
@@ -1051,6 +1057,11 @@ export function WorkflowPageV2() {
     () => (isViewingLiveVersion ? nodeExecutionsMap : {}),
     [isViewingLiveVersion, nodeExecutionsMap],
   );
+  const dashboardNodeStatuses = useMemo(
+    () => deriveDashboardNodeStatuses(visibleNodeExecutionsMap),
+    [visibleNodeExecutionsMap],
+  );
+  const handleDashboardTriggerNode = useDashboardTriggerNode({ canvasId, canvas: canvas ?? undefined, queryClient });
   const visibleNodeQueueItemsMap = useMemo(
     () => (isViewingLiveVersion ? nodeQueueItemsMap : {}),
     [isViewingLiveVersion, nodeQueueItemsMap],
@@ -4846,50 +4857,18 @@ export function WorkflowPageV2() {
     setIsVersionControlOpen((prev) => !prev);
   }, []);
 
-  const handleSelectDashboardMode = useCallback(() => {
-    if (!dashboardsFeatureEnabled) {
-      return;
-    }
-    if (hasEditableVersion && liveCanvasVersionId) {
-      handleUseVersion(liveCanvasVersionId);
-    }
-    setIsDashboardMode(true);
-    setIsRunsMode(false);
-    setSelectedRunId(null);
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        next.set("view", "dashboard");
-        next.delete("run");
-        next.delete("sidebar");
-        next.delete("node");
-        return next;
-      },
-      { replace: true },
-    );
-  }, [
+  const { handleSelectDashboardMode, handleExitDashboardMode } = useDashboardModeActions({
     dashboardsFeatureEnabled,
     handleUseVersion,
     hasEditableVersion,
     liveCanvasVersionId,
     setIsDashboardMode,
+    setIsDashboardAddPanelOpen,
+    setIsDashboardYamlOpen,
     setIsRunsMode,
     setSearchParams,
     setSelectedRunId,
-  ]);
-
-  const handleExitDashboardMode = useCallback(() => {
-    setIsDashboardMode(false);
-    setIsDashboardAddPanelOpen(false);
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        next.delete("view");
-        return next;
-      },
-      { replace: true },
-    );
-  }, [setIsDashboardAddPanelOpen, setIsDashboardMode, setSearchParams]);
+  });
 
   const handleEnterEditModeFromHeader = useCallback(async () => {
     if (isDashboardMode) {
@@ -5549,10 +5528,15 @@ export function WorkflowPageV2() {
     isRunsMode,
     canvasMode,
   });
-  const onDashboardAddPanel =
-    isDashboardMode && dashboardsFeatureEnabled && !isTemplate && canUpdateCanvas
-      ? () => setIsDashboardAddPanelOpen(true)
-      : undefined;
+  const { onDashboardAddPanel, onDashboardOpenYaml, dashboardYamlReadOnly } = getDashboardHeaderActions({
+    isDashboardMode,
+    dashboardsFeatureEnabled,
+    isTemplate,
+    canUpdateCanvas,
+    canvasDeletedRemotely,
+    openAddPanel: () => setIsDashboardAddPanelOpen(true),
+    openYaml: () => setIsDashboardYamlOpen(true),
+  });
   const hasUnpublishedDraftChanges =
     !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftGraphDiffVersusLive;
   const canvasStateMode = getWorkflowCanvasStateMode({
@@ -5581,15 +5565,25 @@ export function WorkflowPageV2() {
   return (
     <>
       <div className="relative h-full w-full">
-        {isDashboardMode && dashboardsFeatureEnabled ? (
-          <DashboardOverlay
-            readOnly={!canUpdateCanvas}
-            dashboardQuery={dashboardQuery}
-            updateDashboardMutation={updateDashboardMutation}
-            addPanelDialogOpen={isDashboardAddPanelOpen}
-            onAddPanelDialogOpenChange={setIsDashboardAddPanelOpen}
-          />
-        ) : null}
+        <WorkflowDashboardOverlay
+          isDashboardMode={isDashboardMode}
+          dashboardsFeatureEnabled={dashboardsFeatureEnabled}
+          canUpdateCanvas={canUpdateCanvas}
+          isTemplate={isTemplate}
+          canvasDeletedRemotely={canvasDeletedRemotely}
+          dashboardQuery={dashboardQuery}
+          updateDashboardMutation={updateDashboardMutation}
+          addPanelDialogOpen={isDashboardAddPanelOpen}
+          onAddPanelDialogOpenChange={setIsDashboardAddPanelOpen}
+          yamlModalOpen={isDashboardYamlOpen}
+          onYamlModalOpenChange={setIsDashboardYamlOpen}
+          canvasId={canvasId || undefined}
+          canvasName={canvas?.metadata?.name || undefined}
+          organizationId={organizationId || undefined}
+          canvasNodes={canvasNodes}
+          nodeStatuses={dashboardNodeStatuses}
+          onTriggerNode={handleDashboardTriggerNode}
+        />
         <CanvasPage
           key={canvasRenderKey}
           // Persist right sidebar in query params
@@ -5694,6 +5688,8 @@ export function WorkflowPageV2() {
           onExitRunsMode={handleExitRunsMode}
           onSelectDashboard={isTemplate || !dashboardsFeatureEnabled ? undefined : handleSelectDashboardMode}
           onDashboardAddPanel={onDashboardAddPanel}
+          onDashboardOpenYaml={onDashboardOpenYaml}
+          dashboardYamlReadOnly={dashboardYamlReadOnly}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
