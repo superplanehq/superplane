@@ -12,18 +12,22 @@ export function useChatScroll(
   const scrollRef = useRef<HTMLDivElement>(null);
   const previousScrollHeight = useRef<number | null>(null);
 
+  const queryRef = useRef(messagesQuery);
+  queryRef.current = messagesQuery;
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
     const onScroll = () => {
       if (el.scrollTop > 24) return;
-      if (!messagesQuery.hasNextPage || messagesQuery.isFetchingNextPage) return;
+      const q = queryRef.current;
+      if (!q.hasNextPage || q.isFetchingNextPage) return;
       previousScrollHeight.current = el.scrollHeight;
-      void messagesQuery.fetchNextPage();
+      void q.fetchNextPage();
     };
     el.addEventListener("scroll", onScroll);
     return () => el.removeEventListener("scroll", onScroll);
-  }, [messagesQuery]);
+  }, []);
 
   useLayoutEffect(() => {
     const el = scrollRef.current;

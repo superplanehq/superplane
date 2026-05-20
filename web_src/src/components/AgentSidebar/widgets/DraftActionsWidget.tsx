@@ -1,7 +1,6 @@
 import { Eye, Rocket, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 export interface DraftActionsWidgetProps {
   versionId: string;
@@ -85,7 +84,7 @@ export function DraftActionsWidget({
         size="sm"
         onClick={handlePublish}
         disabled={busy !== null}
-        className={cn("text-xs h-7 gap-1 bg-violet-600 hover:bg-violet-700")}
+        className="text-xs h-7 gap-1"
       >
         <Rocket size={12} />
         {busy === "publish" ? "Publishing..." : "Publish"}

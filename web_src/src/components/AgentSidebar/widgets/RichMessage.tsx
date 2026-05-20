@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from "react";
+import { memo, useMemo, type ComponentProps, type ReactNode } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -33,7 +33,7 @@ const MARKDOWN_CLASSES =
   "[&_th]:border-b [&_th]:border-slate-200 " +
   "[&_td]:px-3 [&_td]:py-1.5 [&_td]:text-slate-600 [&_td]:border-b [&_td]:border-slate-100 " +
   "[&_tbody_tr:nth-child(even)]:bg-slate-50/60 " +
-  "[&_tr:last-child_td]:border-b-0 [&_tr:hover]:bg-violet-50/50";
+  "[&_tr:last-child_td]:border-b-0 [&_tr:hover]:bg-slate-50/50";
 
 type StartBuildingRubric = {
   title: string;
@@ -49,8 +49,17 @@ interface RichMessageProps {
   organizationId?: string;
 }
 
-export function RichMessage({ content, onAction, onStartBuilding, canvasId, organizationId }: RichMessageProps) {
-  const segments = parseAgentContent(content);
+export const RichMessage = memo(function RichMessage({
+  content,
+  onAction,
+  onStartBuilding,
+  canvasId,
+  organizationId,
+}: RichMessageProps) {
+  // `parseAgentContent` + the downstream ReactMarkdown render are the most
+  // expensive work in the sidebar. Memoize by content so parent re-renders
+  // (canvas pan/zoom, WebSocket status ticks, etc.) don't redo it.
+  const segments = useMemo(() => parseAgentContent(content), [content]);
 
   return (
     <div>
@@ -66,7 +75,7 @@ export function RichMessage({ content, onAction, onStartBuilding, canvasId, orga
       ))}
     </div>
   );
-}
+});
 
 function SegmentRenderer({
   segment,
@@ -141,7 +150,7 @@ function MarkdownSegment({
           code: MarkdownCode,
           pre: ({ children }) => <>{children}</>,
           table: ({ children, ...props }) => (
-            <div className="my-4 overflow-x-auto rounded-lg border border-violet-200 bg-white shadow-sm">
+            <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
               <table {...props}>{children}</table>
             </div>
           ),

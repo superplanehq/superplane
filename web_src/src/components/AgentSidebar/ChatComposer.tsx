@@ -1,8 +1,8 @@
-import { Loader2, Send } from "lucide-react";
+import { ArrowUp, Loader2, Square } from "lucide-react";
 import { useCallback, useState } from "react";
-// import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import type { AgentMode } from "./agentMode";
 import { ModeToggle } from "./ModeToggle";
 
@@ -11,7 +11,7 @@ export function ChatComposer({
   onStop,
   sending,
   stopping,
-  statusLabel: _statusLabel,
+  statusLabel,
   agentMode,
   onModeSwitch,
   modeDisabled,
@@ -26,10 +26,11 @@ export function ChatComposer({
   modeDisabled?: boolean;
 }) {
   const [draft, setDraft] = useState("");
+  const canSend = Boolean(draft.trim()) && !sending;
 
   const handleSend = useCallback(async () => {
     const content = draft.trim();
-    if (!content || sending) return;
+    if (!content) return;
 
     setDraft("");
 
@@ -38,55 +39,70 @@ export function ChatComposer({
     } catch {
       setDraft((currentDraft) => (currentDraft.trim() ? currentDraft : content));
     }
-  }, [draft, onSend, sending]);
+  }, [draft, onSend]);
 
   return (
-    <footer className="border-t border-border p-3 flex flex-col gap-2">
+    <footer className="border-t border-slate-950/15 px-3 pb-3">
       <Textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
-        rows={3}
+        rows={1}
         placeholder="Ask the agent…"
         data-testid="agent-input"
-        className="resize-none"
+        className={cn(
+          "min-h-9 w-full resize-none border-0 bg-transparent px-0 py-2 text-sm shadow-none",
+          "outline-none ring-0 focus-visible:border-0 focus-visible:ring-0 focus-visible:outline-none",
+          "placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+          "text-[rgba(10,10,10,1)] dark:bg-transparent",
+        )}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            if (!sending) {
-              void handleSend();
-            }
-          }
+          if (e.key !== "Enter") return;
+          const nativeEvent = e.nativeEvent;
+          if ("isComposing" in nativeEvent && nativeEvent.isComposing) return;
+          if (e.shiftKey) return;
+          e.preventDefault();
+          if (!canSend) return;
+          void handleSend();
         }}
       />
-      <div className="flex items-center justify-between">
-        <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} streaming={sending} />
-        {sending ? (
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{statusLabel}</span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {sending && (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="size-7 shrink-0 rounded-full border-slate-300 bg-white text-slate-700 hover:bg-slate-100"
+              onClick={onStop}
+              disabled={stopping}
+              aria-label={stopping ? "Stopping" : "Stop"}
+              title={stopping ? "Stopping..." : "Stop"}
+              data-testid="agent-stop-button"
+            >
+              {stopping ? (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              ) : (
+                <Square className="size-3 fill-current" aria-hidden />
+              )}
+            </Button>
+          )}
           <Button
             type="button"
-            variant="destructive"
-            onClick={onStop}
-            disabled={stopping}
-            data-testid="agent-stop-button"
-            className="gap-1"
-          >
-            {stopping ? (
-              <Loader2 className="size-3 animate-spin" />
-            ) : (
-              <div className="size-3 rounded-sm bg-white animate-pulse" />
-            )}
-            {stopping ? "Stopping..." : "Stop"}
-          </Button>
-        ) : (
-          <Button
-            type="button"
+            variant="default"
+            size="icon"
+            className="size-7 shrink-0 rounded-full"
             onClick={() => void handleSend()}
-            disabled={!draft.trim()}
+            disabled={!canSend}
+            aria-label="Send message"
             data-testid="agent-send-message-button"
           >
-            <Send className="size-4" />
-            Send
+            <ArrowUp className="size-3.5" aria-hidden />
           </Button>
-        )}
+        </div>
+      </div>
+      <div className="flex items-center pt-1.5">
+        <ModeToggle mode={agentMode} onSwitch={onModeSwitch} disabled={modeDisabled} streaming={sending} />
       </div>
     </footer>
   );
