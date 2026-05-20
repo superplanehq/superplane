@@ -60,43 +60,29 @@ function OpenCanvasToolSidebar({
   onToggleVersionControl,
   versionsContent,
 }: CanvasToolSidebarProps) {
-  const showRunsTab = Boolean(onSelectRuns || mode === "runs" || runsContent);
-  const showVersionsTab = Boolean(onToggleVersionControl || isVersionControlOpen || versionsContent);
   const [activeTab, setActiveTab] = useState(() => {
-    if (mode === "runs" && showRunsTab) return TAB_RUNS;
-    if (isVersionControlOpen && showVersionsTab) return TAB_VERSIONS;
+    if (mode === "runs") return TAB_RUNS;
+    if (isVersionControlOpen) return TAB_VERSIONS;
     return TAB_AGENT;
   });
 
   useEffect(() => {
-    if (mode === "runs" && showRunsTab) {
+    if (mode === "runs") {
       setActiveTab(TAB_RUNS);
       return;
     }
-    if (isVersionControlOpen && showVersionsTab) {
+    if (isVersionControlOpen) {
       setActiveTab(TAB_VERSIONS);
       return;
     }
     setActiveTab((currentTab) => (currentTab === TAB_RUNS || currentTab === TAB_VERSIONS ? TAB_AGENT : currentTab));
-  }, [isVersionControlOpen, mode, showRunsTab, showVersionsTab]);
+  }, [isVersionControlOpen, mode]);
 
   const tabs = [
     { value: TAB_AGENT, label: "Agent" },
-    ...(showRunsTab ? ([{ value: TAB_RUNS, label: "Runs" }] as const) : []),
-    ...(showVersionsTab ? ([{ value: TAB_VERSIONS, label: "Versions" }] as const) : []),
+    { value: TAB_RUNS, label: "Runs" },
+    { value: TAB_VERSIONS, label: "Versions" },
   ] as const;
-
-  const handleClose = useCallback(() => {
-    if (activeTab === TAB_RUNS) {
-      onExitRunsMode?.();
-    }
-
-    if (activeTab === TAB_VERSIONS && isVersionControlOpen) {
-      onToggleVersionControl?.();
-    }
-
-    toolSidebarState.closeToolSidebar();
-  }, [activeTab, isVersionControlOpen, onExitRunsMode, onToggleVersionControl, toolSidebarState]);
 
   const handleTabSelect = useCallback(
     (nextTab: typeof TAB_AGENT | typeof TAB_RUNS | typeof TAB_VERSIONS) => {
@@ -133,7 +119,6 @@ function OpenCanvasToolSidebar({
           tabs={tabs}
           activeTab={activeTab}
           onSelectTab={(value) => handleTabSelect(value as typeof TAB_AGENT | typeof TAB_RUNS | typeof TAB_VERSIONS)}
-          onClose={handleClose}
         />
 
         {activeTab === TAB_AGENT ? (
