@@ -42,6 +42,7 @@ import type { EventState, EventStateMap } from "../componentBase";
 import type { ReactNode } from "react";
 import { ExecutionChainPage, HistoryQueuePage, PageHeader } from "./pages";
 import { mapTriggerEventToSidebarEvent } from "@/pages/workflowv2/utils";
+import type { SettingsCustomField } from "@/pages/workflowv2/mappers/types";
 import { analytics, useIntegrationConfigureOpen } from "@/lib/analytics";
 
 /** Optional create-dialog overrides per integration (two-step API + webhook flow). Key = integration name. */
@@ -135,7 +136,7 @@ interface ComponentSidebarProps {
   onNodeConfigCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
-  customField?: (configuration: Record<string, unknown>) => ReactNode;
+  customField?: SettingsCustomField;
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];

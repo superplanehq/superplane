@@ -4,7 +4,6 @@ import type {
   ConfigurationField,
   OrganizationsIntegration,
 } from "@/api-client";
-import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
@@ -22,6 +21,7 @@ import {
 } from "@/lib/components";
 import { useRealtimeValidation } from "@/hooks/useRealtimeValidation";
 import { SimpleTooltip } from "./SimpleTooltip";
+import type { SettingsCustomField } from "@/pages/workflowv2/mappers/types";
 
 interface SettingsTabProps {
   mode: "create" | "edit";
@@ -38,7 +38,7 @@ interface SettingsTabProps {
   onCancel?: () => void;
   domainId?: string;
   domainType?: AuthorizationDomainType;
-  customField?: (configuration: Record<string, unknown>) => ReactNode;
+  customField?: SettingsCustomField;
   integrationName?: string;
   integrationRef?: ComponentsIntegrationRef;
   integrations?: OrganizationsIntegration[];
@@ -404,6 +404,16 @@ export function SettingsTab({
     }, 300);
   }, [configurationSaveMode, isReadOnly]);
 
+  // Lets a customField (e.g. the HTTP curl-import) push a partial configuration
+  // patch back into the form. Mirrors the per-field onChange path below.
+  const applyConfigurationPatch = useCallback(
+    (patch: Record<string, unknown>) => {
+      setNodeConfiguration((previousConfiguration) => filterVisibleFields({ ...previousConfiguration, ...patch }));
+      requestAutosave();
+    },
+    [filterVisibleFields, requestAutosave],
+  );
+
   // Flush unsaved changes on unmount (e.g. when user switches away from the Settings tab)
   useEffect(() => {
     if (configurationSaveMode !== "auto") {
@@ -694,6 +704,9 @@ export function SettingsTab({
           <div
             className={`border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4 ${isReadOnly ? "pointer-events-none opacity-60" : ""}`}
           >
+            {customField?.position === "before" && !isReadOnly && (
+              <div>{customField.render(nodeConfiguration, applyConfigurationPatch)}</div>
+            )}
             {configurationFields.map((field) => {
               if (!field.name || field.name === "customName") return null;
               const fieldName = field.name;
@@ -740,8 +753,8 @@ export function SettingsTab({
           </div>
         )}
 
-        {/* Custom field section */}
-        {customField && shouldShowConfiguration && (
+        {/* Custom field section (default position: after the configuration fields) */}
+        {customField && customField.position !== "before" && shouldShowConfiguration && (
           <div
             className={
               configurationFields && configurationFields.length > 0
@@ -749,7 +762,7 @@ export function SettingsTab({
                 : "border-t border-gray-200 dark:border-gray-700 pt-6"
             }
           >
-            {customField(nodeConfiguration)}
+            {customField.render(nodeConfiguration, applyConfigurationPatch)}
           </div>
         )}
       </div>
