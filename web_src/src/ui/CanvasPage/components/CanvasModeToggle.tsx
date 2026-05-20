@@ -1,4 +1,5 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useRef } from "react";
 
 type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard";
 
@@ -12,6 +13,7 @@ interface CanvasModeToggleProps {
 
 const CANVAS_TAB = "canvas";
 const DASHBOARD_TAB = "dashboard";
+const RUNS_MODE = "runs";
 
 export function CanvasModeToggle({
   mode,
@@ -21,14 +23,25 @@ export function CanvasModeToggle({
   hasDraft = false,
 }: CanvasModeToggleProps) {
   const showDashboard = Boolean(onSelectDashboard);
-  const selected = mode === DASHBOARD_TAB ? DASHBOARD_TAB : CANVAS_TAB;
+  const selected = mode === DASHBOARD_TAB ? DASHBOARD_TAB : mode === RUNS_MODE ? RUNS_MODE : CANVAS_TAB;
+  const valueChangeHandledRef = useRef(false);
+
+  useEffect(() => {
+    valueChangeHandledRef.current = false;
+  }, [mode]);
 
   return (
     <Tabs
       value={selected}
       onValueChange={(next) => {
+        // When the active `value` doesn't change immediately, Radix may emit more than one value change event.
+        // We only want to act once per mode transition.
+        if (valueChangeHandledRef.current) return;
+
         if (next === CANVAS_TAB && selected !== CANVAS_TAB) void onSelectLive();
         if (next === DASHBOARD_TAB && selected !== DASHBOARD_TAB && onSelectDashboard) void onSelectDashboard();
+
+        valueChangeHandledRef.current = true;
       }}
     >
       <TabsList aria-label="Canvas view" className="h-8 min-h-8 bg-slate-100 [&_[data-slot=tabs-trigger]]:text-[13px]">

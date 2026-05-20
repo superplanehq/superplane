@@ -15,4 +15,3 @@ describe("CanvasModeToggle", () => {
     expect(onSelectLive).toHaveBeenCalledTimes(1);
   });
 });
-
