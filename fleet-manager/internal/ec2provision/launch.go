@@ -47,6 +47,9 @@ type Config struct {
 	HotInstanceCount       int    // target pending+running managed instances (from EC2_PROVISION_HOT_INSTANCE_COUNT)
 	// RunnerTerminateAfterEachTask sets RUNNER_TERMINATE_AFTER_EACH_TASK; fleet-manager terminates the EC2 instance after one task.
 	RunnerTerminateAfterEachTask bool
+	// VolumeSizeGB is the root EBS volume size in GiB for launched runner instances.
+	// Defaults to 30 GiB when not set. Set via EC2_PROVISION_VOLUME_SIZE_GB.
+	VolumeSizeGB int32
 	// RunnerCloudWatchLogGroup sets RUNNER_CLOUDWATCH_LOG_GROUP in EC2 user-data (optional).
 	RunnerCloudWatchLogGroup string
 	// RunnerCloudWatchLogStreamPrefix sets RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX (optional; must match TASK_CLOUDWATCH_LOG_STREAM_PREFIX on fleet-manager).
@@ -71,8 +74,10 @@ const (
 	envHotCount            = "EC2_PROVISION_HOT_INSTANCE_COUNT"
 	envRunnerCWGroup       = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_GROUP"
 	envRunnerCWPrefix      = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX"
+	envVolumeSizeGB        = "EC2_PROVISION_VOLUME_SIZE_GB"
 
 	defaultInstanceType = "t3.micro"
+	defaultVolumeSizeGB = 30
 
 	// TagKeyManaged is applied to fleet-manager-managed runner instances for Describe/Reconcile filtering.
 	TagKeyManaged = "superplane_managed_runner"
@@ -144,6 +149,14 @@ func ConfigFromEnv() (Config, error) {
 	case "0", "false", "no", "off":
 		terminateAfterTask = false
 	}
+	volumeSizeGB := int32(defaultVolumeSizeGB)
+	if v := strings.TrimSpace(os.Getenv(envVolumeSizeGB)); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 {
+			return Config{}, fmt.Errorf("%s must be a positive integer (GiB)", envVolumeSizeGB)
+		}
+		volumeSizeGB = int32(n)
+	}
 	return Config{
 		AMI:                             ami,
 		InstanceType:                    itype,
@@ -160,6 +173,7 @@ func ConfigFromEnv() (Config, error) {
 		RunnerTerminateAfterEachTask:    terminateAfterTask,
 		RunnerCloudWatchLogGroup:        strings.TrimSpace(os.Getenv(envRunnerCWGroup)),
 		RunnerCloudWatchLogStreamPrefix: strings.TrimSpace(os.Getenv(envRunnerCWPrefix)),
+		VolumeSizeGB:                    volumeSizeGB,
 	}, nil
 }
 
@@ -210,6 +224,16 @@ func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 		UserData:         aws.String(base64.StdEncoding.EncodeToString([]byte(userdata))),
 		SubnetId:         aws.String(l.Config.SubnetID),
 		SecurityGroupIds: l.Config.SecurityGroupIDs,
+		BlockDeviceMappings: []types.BlockDeviceMapping{
+			{
+				DeviceName: aws.String("/dev/sda1"),
+				Ebs: &types.EbsBlockDevice{
+					VolumeSize:          aws.Int32(l.Config.VolumeSizeGB),
+					VolumeType:          types.VolumeTypeGp3,
+					DeleteOnTermination: aws.Bool(true),
+				},
+			},
+		},
 		TagSpecifications: []types.TagSpecification{
 			{
 				ResourceType: types.ResourceTypeInstance,
