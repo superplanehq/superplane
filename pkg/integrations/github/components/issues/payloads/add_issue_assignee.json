@@ -7,7 +7,23 @@
     "assignees": [
       {
         "login": "octocat",
-        "id": 1
+        "id": 1,
+        "gists_url": "https://api.github.com/users/octocat/gists{/gist_id}",
+        "received_events_url": "https://api.github.com/users/octocat/received_events",
+        "type": "User",
+        "subscriptions_url": "https://api.github.com/users/octocat/subscriptions",
+        "html_url": "https://github.com/octocat",
+        "avatar_url": "https://avatars1.githubusercontent.com/u/21031067?v=4",
+        "url": "https://api.github.com/users/octocat",
+        "followers_url": "https://api.github.com/users/octocat/followers",
+        "events_url": "https://api.github.com/users/octocat/events{/privacy}",
+        "node_id": "MDQ6VXNlcjIxMDMxMDY3",
+        "organizations_url": "https://api.github.com/users/octocat/orgs",
+        "site_admin": false,
+        "starred_url": "https://api.github.com/users/octocat/starred{/owner}{/repo}",
+        "following_url": "https://api.github.com/users/octocat/following{/other_user}",
+        "repos_url": "https://api.github.com/users/octocat/repos",
+        "gravatar_id": ""
       }
     ],
     "html_url": "https://github.com/acme/widgets/issues/42"

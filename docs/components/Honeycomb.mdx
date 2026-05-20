@@ -58,11 +58,20 @@ When the trigger fires, SuperPlane receives the webhook and starts a workflow ex
     "operator": "greater than",
     "result_groups": [
       {
-        "Group": {},
+        "Group": {
+          "service.name": "web"
+        },
         "Result": 8.5
       }
     ],
-    "result_groups_triggered": [],
+    "result_groups_triggered": [
+      {
+        "Group": {
+          "service.name": "web"
+        },
+        "Result": 8.4
+      }
+    ],
     "result_url": "https://ui.honeycomb.io/myteam/environments/production/datasets/api-production/result/p3o2dvAhYxx/a/z5rYVCoNUZz?utm_content=view_graph\u0026utm_medium=Trigger\u0026utm_source=webhook",
     "status": "TRIGGERED",
     "summary": "Triggered: High Error Rate",

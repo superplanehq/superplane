@@ -6,7 +6,10 @@
     "vcpus": 1,
     "disk": 25,
     "status": "new",
-    "region": { "name": "New York 3", "slug": "nyc3" },
+    "region": {
+      "name": "New York 3",
+      "slug": "nyc3"
+    },
     "image": {
       "id": 12345,
       "name": "Ubuntu 24.04 (LTS) x64",
@@ -14,9 +17,21 @@
     },
     "size_slug": "s-1vcpu-1gb",
     "networks": {
-      "v4": [{ "ip_address": "104.131.186.241", "type": "public" }]
+      "v4": [
+        {
+          "ip_address": "167.99.0.10",
+          "type": "public"
+        },
+        {
+          "ip_address": "10.108.0.5",
+          "type": "private"
+        }
+      ]
     },
-    "tags": ["web"]
+    "tags": [
+      "web",
+      "production"
+    ]
   },
   "timestamp": "2026-03-12T21:10:00.000000000Z",
   "type": "digitalocean.droplet.created"

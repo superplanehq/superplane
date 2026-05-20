@@ -21,7 +21,11 @@
           "value": "prod"
         }
       ],
-      "probes": [1, 2, 3],
+      "probes": [
+        1,
+        2,
+        3
+      ],
       "created": 1776248430,
       "modified": 1776249030,
       "settings": {
@@ -34,7 +38,9 @@
           "noFollowRedirects": false,
           "failIfSSL": false,
           "failIfNotSSL": true,
-          "validStatusCodes": [200]
+          "validStatusCodes": [
+            200
+          ]
         }
       },
       "alerts": [

@@ -2,7 +2,9 @@
   "data": {
     "algorithm": "round_robin",
     "created_at": "2026-03-13T10:00:00Z",
-    "droplet_ids": [98765432, 98765433],
+    "droplet_ids": [
+      31638492
+    ],
     "forwarding_rules": [
       {
         "entry_port": 80,

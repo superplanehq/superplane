@@ -27,10 +27,17 @@
       {
         "type": "mention",
         "mentioned": {
-          "id": "28:bot-id-here",
+          "id": "28:b5e7c1f4-8a92-4c0e-bd44-1c1f8c0a3d2e",
           "name": "SuperPlane Bot"
         },
         "text": "<at>SuperPlane Bot</at>"
+      },
+      {
+        "type": "clientInfo",
+        "locale": "en-US",
+        "country": "ES",
+        "platform": "Web",
+        "timezone": "Europe/Madrid"
       }
     ]
   },

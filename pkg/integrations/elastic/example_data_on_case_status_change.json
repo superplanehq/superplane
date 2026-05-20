@@ -5,7 +5,11 @@
     "id": "3c0a2b10-4e5f-11ee-be56-0242ac120002",
     "severity": "high",
     "status": "in-progress",
-    "tags": ["production", "incident"],
+    "tags": [
+      "env:prod",
+      "service:web",
+      "incident"
+    ],
     "title": "Production incident",
     "updatedAt": "2026-03-12T10:00:00.000Z",
     "version": "WzE3LDFd"
