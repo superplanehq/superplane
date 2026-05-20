@@ -88,6 +88,33 @@ describe("RubricWidget", () => {
     expect(within(modal).getByTestId("monaco-stub")).toHaveTextContent("npm test");
   });
 
+  it("keeps numbering aligned after body-rendered categories", () => {
+    render(
+      <RubricWidget
+        title="Test Plan"
+        criteria={[{ text: "First" }, { text: "Second" }, { text: "Fallback item" }]}
+        categories={[
+          {
+            heading: "Body",
+            criteria: [{ text: "First" }, { text: "Second" }],
+            body: "1. First\n2. Second",
+          },
+          {
+            heading: "Fallback",
+            criteria: [{ text: "Fallback item" }],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /view full plan/i }));
+
+    const fallbackItem = screen.getByText("Fallback item");
+    const fallbackRow = fallbackItem.closest("div.flex") as HTMLElement;
+    expect(fallbackRow).not.toBeNull();
+    expect(within(fallbackRow).getByText("3.")).toBeInTheDocument();
+  });
+
   it("wraps GFM tables in a horizontal overflow container (Full Plan modal)", () => {
     render(
       <RubricWidget

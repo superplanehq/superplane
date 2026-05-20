@@ -384,39 +384,44 @@ function CategorizedList({
   let globalIndex = 0;
   return (
     <div className="space-y-3">
-      {categories.map((cat, ci) => (
-        <div key={ci}>
-          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{cat.heading}</p>
-          {cat.body ? (
-            <div className={`${showNumbers ? "text-sm" : "text-xs"} text-slate-700`}>
-              <RubricMarkdown canvasId={canvasId} organizationId={organizationId}>
-                {cat.body}
-              </RubricMarkdown>
-            </div>
-          ) : (
-            cat.criteria.map((c, i) => {
-              globalIndex++;
-              return (
-                <div
-                  key={i}
-                  className={`flex items-start gap-2 ${showNumbers ? "py-1.5 border-b border-slate-50 last:border-0" : "py-0.5"}`}
-                >
-                  {showNumbers ? (
-                    <span className="text-slate-500 text-sm mt-0.5 shrink-0 font-medium">{globalIndex}.</span>
-                  ) : (
-                    <span className="text-slate-400 text-xs mt-0.5 shrink-0">✦</span>
-                  )}
-                  <div className={`min-w-0 flex-1 ${showNumbers ? "text-sm" : "text-xs"} text-slate-700`}>
-                    <RubricMarkdown compact canvasId={canvasId} organizationId={organizationId}>
-                      {c.text}
-                    </RubricMarkdown>
+      {categories.map((cat, ci) => {
+        const categoryStartIndex = globalIndex;
+        globalIndex += cat.criteria.length;
+
+        return (
+          <div key={ci}>
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide mb-1">{cat.heading}</p>
+            {cat.body ? (
+              <div className={`${showNumbers ? "text-sm" : "text-xs"} text-slate-700`}>
+                <RubricMarkdown canvasId={canvasId} organizationId={organizationId}>
+                  {cat.body}
+                </RubricMarkdown>
+              </div>
+            ) : (
+              cat.criteria.map((c, i) => {
+                const criterionIndex = categoryStartIndex + i + 1;
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-2 ${showNumbers ? "py-1.5 border-b border-slate-50 last:border-0" : "py-0.5"}`}
+                  >
+                    {showNumbers ? (
+                      <span className="text-slate-500 text-sm mt-0.5 shrink-0 font-medium">{criterionIndex}.</span>
+                    ) : (
+                      <span className="text-slate-400 text-xs mt-0.5 shrink-0">✦</span>
+                    )}
+                    <div className={`min-w-0 flex-1 ${showNumbers ? "text-sm" : "text-xs"} text-slate-700`}>
+                      <RubricMarkdown compact canvasId={canvasId} organizationId={organizationId}>
+                        {c.text}
+                      </RubricMarkdown>
+                    </div>
                   </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      ))}
+                );
+              })
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
