@@ -30,7 +30,11 @@ func GetCanvasAgentChat(ctx context.Context, svc AgentsService, orgID, userID st
 		if errors.Is(err, agents.ErrSessionForbidden) {
 			return nil, status.Error(codes.PermissionDenied, "agent chat is not allowed")
 		}
-		log.WithError(err).WithField("canvas_id", canvas).Error("failed to ensure agent chat")
+		log.WithError(err).
+			WithField("canvas_id", canvas.String()).
+			WithField("organization_id", org.String()).
+			WithField("user_id", user.String()).
+			Error("failed to ensure agent chat")
 		return nil, status.Error(codes.Internal, "failed to load agent chat")
 	}
 	return &pb.GetCanvasAgentChatResponse{Chat: serializeChat(session)}, nil
