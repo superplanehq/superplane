@@ -1,0 +1,16 @@
+{
+  "data": {
+    "alertMessage": "The alert has been raised",
+    "alertPriority": "P3",
+    "alertTags": ["tag1"],
+    "description": "my new heartbeat",
+    "enabled": true,
+    "interval": 1,
+    "intervalUnit": "minutes",
+    "name": "DNS checker",
+    "ownerTeamId": "b071f2e7-2159-4110-aa25-7718b2713ed5",
+    "status": "Pending"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.created"
+}
