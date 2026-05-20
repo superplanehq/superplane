@@ -1,8 +1,7 @@
-import type { OrganizationsIntegration } from "@/api-client";
 import { Item, ItemContent, ItemGroup, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { resolveIcon } from "@/lib/utils";
-import { ChevronRight, GripVerticalIcon, Plug } from "lucide-react";
-import { useState } from "react";
+import { ChevronRight } from "lucide-react";
+import { memo, useState, type DragEvent } from "react";
 import { toTestId } from "../../lib/testID";
 import { getHeaderIconSrc, getIntegrationIconSrc } from "../componentSidebar/integrationIconMaps";
 import { filterBlocksInCategory, type TypeFilter } from "./filter";
@@ -29,47 +28,42 @@ function resolveIconSlug(block: BuildingBlock): string {
   return block.icon || "zap";
 }
 
-function setupDragPreview(
-  e: React.DragEvent,
-  dragPreviewRef: React.RefObject<HTMLDivElement | null>,
-  canvasZoom: number,
+function resolveCategoryIcon(categoryName: string, integrationName: string) {
+  if (categoryName === "Core") {
+    return resolveIcon("zap");
+  }
+  if (categoryName === "Debugging") {
+    return resolveIcon("bug");
+  }
+  if (categoryName === "Memory") {
+    return resolveIcon("database");
+  }
+  if (integrationName === "smtp") {
+    return resolveIcon("mail");
+  }
+  return resolveIcon("puzzle");
+}
+
+function renderCategoryIcon(
+  categoryIconSrc: string | undefined,
+  categoryName: string,
+  CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null,
 ) {
-  const previewElement = dragPreviewRef.current?.firstChild as HTMLElement;
-  if (!previewElement) return;
-
-  const clone = previewElement.cloneNode(true) as HTMLElement;
-  const container = document.createElement("div");
-  container.style.cssText = `position: absolute; top: -10000px; left: -10000px; pointer-events: none;`;
-  clone.style.transform = `scale(${canvasZoom})`;
-  clone.style.transformOrigin = "top left";
-  clone.style.opacity = "0.85";
-  container.appendChild(clone);
-  document.body.appendChild(container);
-
-  const rect = previewElement.getBoundingClientRect();
-  e.dataTransfer.setDragImage(container, (rect.width / 2) * canvasZoom, 30 * canvasZoom);
-  setTimeout(() => {
-    if (document.body.contains(container)) document.body.removeChild(container);
-  }, 0);
+  if (categoryIconSrc) {
+    return <img src={categoryIconSrc} alt={categoryName} className="size-4" />;
+  }
+  if (CategoryIcon) {
+    return <CategoryIcon size={14} className="text-gray-500" />;
+  }
+  return null;
 }
 
 interface BlockItemProps {
   block: BuildingBlock;
-  canvasZoom: number;
-  isDraggingRef: React.RefObject<boolean>;
-  setHoveredBlock: (block: BuildingBlock | null) => void;
-  dragPreviewRef: React.RefObject<HTMLDivElement | null>;
   onBlockClick?: (block: BuildingBlock) => void;
 }
 
-function BlockItem({
-  block,
-  canvasZoom,
-  isDraggingRef,
-  setHoveredBlock,
-  dragPreviewRef,
-  onBlockClick,
-}: BlockItemProps) {
+const BlockItem = memo(function BlockItem({ block, onBlockClick }: BlockItemProps) {
   const appIconSrc = getHeaderIconSrc(block.name);
   const IconComponent = resolveIcon(resolveIconSlug(block));
   const hoverBg = TYPE_HOVER_BG[block.type] || TYPE_HOVER_BG.component;
@@ -82,23 +76,11 @@ function BlockItem({
       onClick={() => {
         if (onBlockClick) onBlockClick(block);
       }}
-      onMouseEnter={() => {
-        setHoveredBlock(block);
+      onDragStart={(event: DragEvent<HTMLElement>) => {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("application/reactflow", JSON.stringify(block));
       }}
-      onMouseLeave={() => {
-        setHoveredBlock(null);
-      }}
-      onDragStart={(e) => {
-        isDraggingRef.current = true;
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("application/reactflow", JSON.stringify(block));
-        setupDragPreview(e, dragPreviewRef, canvasZoom);
-      }}
-      onDragEnd={() => {
-        isDraggingRef.current = false;
-        setHoveredBlock(null);
-      }}
-      className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-grab active:cursor-grabbing ${hoverBg}`}
+      className={`ml-3 px-2 py-1 flex items-center gap-2 cursor-pointer ${hoverBg}`}
       size="sm"
     >
       <ItemMedia>
@@ -121,46 +103,18 @@ function BlockItem({
           </span>
         </div>
       </ItemContent>
-
-      <GripVerticalIcon className="text-gray-500 hover:text-gray-800" size={14} />
     </Item>
   );
-}
+});
 
 export interface CategorySectionProps {
   category: BuildingBlockCategory;
-  integrations: OrganizationsIntegration[];
-  showIntegrationSetupStatus: boolean;
-  canvasZoom: number;
   searchTerm?: string;
   typeFilter?: TypeFilter;
-  isDraggingRef: React.RefObject<boolean>;
-  setHoveredBlock: (block: BuildingBlock | null) => void;
-  dragPreviewRef: React.RefObject<HTMLDivElement | null>;
   onBlockClick?: (block: BuildingBlock) => void;
 }
 
-type IntegrationState = "ready" | "error" | "pending" | "notConfigured";
-
-const INTEGRATION_STATE_COLOR: Record<IntegrationState, string> = {
-  ready: "text-green-500",
-  error: "text-red-500",
-  pending: "text-amber-600",
-  notConfigured: "text-gray-500",
-};
-
-export function CategorySection({
-  category,
-  integrations,
-  showIntegrationSetupStatus,
-  canvasZoom,
-  searchTerm = "",
-  typeFilter = "all",
-  isDraggingRef,
-  setHoveredBlock,
-  dragPreviewRef,
-  onBlockClick,
-}: CategorySectionProps) {
+export function CategorySection({ category, searchTerm = "", typeFilter = "all", onBlockClick }: CategorySectionProps) {
   const sortedBlocks = filterBlocksInCategory(category, searchTerm, typeFilter);
 
   const isCoreCategory = category.name === "Core";
@@ -175,103 +129,32 @@ export function CategorySection({
   const firstBlock = sortedBlocks[0];
   const integrationName = firstBlock?.integrationName || category.name.toLowerCase();
   const categoryIconSrc = integrationName === "smtp" ? undefined : getIntegrationIconSrc(integrationName);
-
-  const integrationState = resolveIntegrationState(category, integrations, firstBlock);
-  const integrationStatusColorClass = INTEGRATION_STATE_COLOR[integrationState];
-
-  let CategoryIcon: React.ComponentType<{ size?: number; className?: string }> | null = null;
-  if (category.name === "Core") {
-    CategoryIcon = resolveIcon("zap");
-  } else if (category.name === "Debugging") {
-    CategoryIcon = resolveIcon("bug");
-  } else if (category.name === "Memory") {
-    CategoryIcon = resolveIcon("database");
-  } else if (integrationName === "smtp") {
-    CategoryIcon = resolveIcon("mail");
-  } else if (categoryIconSrc) {
-    // Integration category - will use img tag
-  } else {
-    CategoryIcon = resolveIcon("puzzle");
-  }
+  const CategoryIcon = categoryIconSrc ? null : resolveCategoryIcon(category.name, integrationName);
 
   return (
     <details
       className="flex-1 px-5 mb-5 group"
       open={isOpen}
       onToggle={(event) => {
-        if (hasSearchTerm) {
-          return;
+        if (!hasSearchTerm) {
+          setIsManuallyOpen(event.currentTarget.open);
         }
-        setIsManuallyOpen(event.currentTarget.open);
       }}
     >
       <summary className="relative cursor-pointer hover:text-gray-500 dark:hover:text-gray-300 mb-3 flex w-full items-center justify-between gap-2 [&::-webkit-details-marker]:hidden [&::marker]:hidden">
         <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-border/60" />
         <span className="relative z-10 flex items-center gap-1 bg-white dark:bg-gray-900 pr-3">
           <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
-          {categoryIconSrc ? (
-            <img src={categoryIconSrc} alt={category.name} className="size-4" />
-          ) : CategoryIcon ? (
-            <CategoryIcon size={14} className="text-gray-500" />
-          ) : null}
+          {renderCategoryIcon(categoryIconSrc, category.name, CategoryIcon)}
           <span className="text-[13px] text-gray-800 font-medium pl-1">{category.name}</span>
         </span>
-        {showIntegrationSetupStatus && (
-          <span className="relative z-10 shrink-0 bg-white dark:bg-gray-900 pl-3">
-            <Plug size={14} className={integrationStatusColorClass} />
-          </span>
-        )}
       </summary>
 
-      {isOpen && (
-        <ItemGroup>
-          {sortedBlocks.map((block) => (
-            <BlockItem
-              key={`${block.type}-${block.name}`}
-              block={block}
-              canvasZoom={canvasZoom}
-              isDraggingRef={isDraggingRef}
-              setHoveredBlock={setHoveredBlock}
-              dragPreviewRef={dragPreviewRef}
-              onBlockClick={onBlockClick}
-            />
-          ))}
-        </ItemGroup>
-      )}
+      <ItemGroup>
+        {sortedBlocks.map((block) => (
+          <BlockItem key={`${block.type}-${block.name}`} block={block} onBlockClick={onBlockClick} />
+        ))}
+      </ItemGroup>
     </details>
   );
-}
-
-function resolveIntegrationState(
-  category: BuildingBlockCategory,
-  integrations: OrganizationsIntegration[],
-  firstBlock: BuildingBlock,
-): IntegrationState {
-  if (category.name === "Core" || category.name === "Memory" || category.name === "Debugging") {
-    return "ready";
-  }
-
-  const name = normalizeIntegrationName(firstBlock?.integrationName);
-
-  const matchingIntegrationStates = integrations
-    .filter((integration) => normalizeIntegrationName(integration.metadata?.integrationName) === name)
-    .map((integration) => integration.status?.state);
-
-  if (matchingIntegrationStates.includes("ready")) {
-    return "ready";
-  }
-
-  if (matchingIntegrationStates.includes("error")) {
-    return "error";
-  }
-
-  if (matchingIntegrationStates.includes("pending")) {
-    return "pending";
-  }
-
-  return "notConfigured";
-}
-
-function normalizeIntegrationName(value?: string) {
-  return (value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }

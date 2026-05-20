@@ -31,7 +31,11 @@ export const ConversationTranscript = memo(function ConversationTranscript({
   showThinking: boolean;
 }) {
   return (
-    <div ref={scrollRef} className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3" data-testid="agent-chat-messages">
+    <div
+      ref={scrollRef}
+      className="min-h-0 min-w-0 flex-1 space-y-2 overflow-y-auto p-3"
+      data-testid="agent-chat-messages"
+    >
       {isLoading ? (
         <LoadingState label="Loading…" />
       ) : (
@@ -132,13 +136,13 @@ const MessageRow = memo(function MessageRow({
   const isUser = message.role === "user";
 
   return (
-    <div className={cn("flex flex-col", isUser ? "items-end" : "items-start")}>
+    <div className={cn("flex w-full min-w-0 flex-col", isUser ? "items-end" : "items-start")}>
       <div
         className={cn(
-          "break-words text-sm",
+          "min-w-0 break-words text-sm",
           isUser
             ? "max-w-[85%] rounded-lg bg-slate-100 px-3 py-2 whitespace-pre-wrap text-slate-900"
-            : "max-w-[720px] text-slate-900",
+            : "w-full max-w-[720px] text-slate-900",
         )}
         data-testid={isUser ? "agent-user-message" : "agent-assistant-message"}
       >
