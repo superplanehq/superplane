@@ -10,9 +10,8 @@ import (
 )
 
 func TestMembersInvitations(t *testing.T) {
-	steps := &membersSteps{t: t}
-
 	t.Run("viewing the invite link", func(t *testing.T) {
+		steps := &membersSteps{t: t}
 		steps.start()
 		steps.visitMembersPage()
 		steps.assertInviteLinkVisible()
@@ -20,6 +19,7 @@ func TestMembersInvitations(t *testing.T) {
 	})
 
 	t.Run("viewing existing organization members", func(t *testing.T) {
+		steps := &membersSteps{t: t}
 		steps.start()
 		steps.visitMembersPage()
 		steps.assertMembersHeaderVisible()
