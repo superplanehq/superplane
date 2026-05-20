@@ -1,8 +1,9 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import type { CanvasesCanvasVersion } from "@/api-client";
 import { describe, expect, it, vi } from "vitest";
 import { VersionsTabPanel } from "./VersionsTabPanel";
 
-function makePublishedVersion(id: string, number: number) {
+function makePublishedVersion(id: string): CanvasesCanvasVersion {
   return {
     metadata: {
       id,
@@ -11,7 +12,6 @@ function makePublishedVersion(id: string, number: number) {
       state: "STATE_PUBLISHED",
       publishedAt: "2026-05-18T12:00:00Z",
     },
-    version: number,
   };
 }
 
@@ -37,7 +37,7 @@ describe("VersionsTabPanel", () => {
     render(
       <VersionsTabPanel
         liveCanvasVersionId="version-2"
-        liveVersions={[makePublishedVersion("version-2", 2), makePublishedVersion("version-1", 1)]}
+        liveVersions={[makePublishedVersion("version-2"), makePublishedVersion("version-1")]}
         canUpdateCanvas={true}
         isTemplate={false}
         canvasDeletedRemotely={false}
@@ -54,7 +54,7 @@ describe("VersionsTabPanel", () => {
   it("keeps expanded versions visible when selecting a different version", () => {
     const liveVersions = Array.from({ length: 12 }, (_, index) => {
       const number = 12 - index;
-      return makePublishedVersion(`version-${number}`, number);
+      return makePublishedVersion(`version-${number}`);
     });
 
     const { rerender } = render(
@@ -82,7 +82,7 @@ describe("VersionsTabPanel", () => {
     rerender(
       <VersionsTabPanel
         liveCanvasVersionId="version-12"
-        selectedCanvasVersion={makePublishedVersion("version-9", 9)}
+        selectedCanvasVersion={makePublishedVersion("version-9")}
         liveVersions={liveVersions}
         canUpdateCanvas={true}
         isTemplate={false}
