@@ -1,5 +1,5 @@
 import { useCallback, useState, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
@@ -13,18 +13,30 @@ const CRITERION_MARKDOWN_CLASSES =
   "[&_a]:underline [&_a]:underline-offset-2 [&_a]:text-slate-700 " +
   "[&_code]:rounded [&_code]:bg-slate-100 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[0.85em] [&_code]:font-mono " +
   "[&_pre]:my-1 [&_pre]:overflow-x-auto [&_pre]:rounded [&_pre]:bg-slate-100 [&_pre]:p-2 [&_pre]:text-[11px] " +
-  "[&_pre_code]:bg-transparent [&_pre_code]:p-0";
+  "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
+  "[&_table]:w-full [&_table]:text-[11px] [&_table]:border-collapse " +
+  "[&_thead]:bg-slate-50 [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold [&_th]:text-slate-700 " +
+  "[&_th]:border-b [&_th]:border-slate-200 " +
+  "[&_td]:px-2 [&_td]:py-1 [&_td]:text-slate-600 [&_td]:border-b [&_td]:border-slate-100 " +
+  "[&_tbody_tr:nth-child(even)]:bg-slate-50/60 " +
+  "[&_tr:last-child_td]:border-b-0";
 
 function CriterionMarkdown({ children }: { children: string }) {
   return (
     <div className={`min-w-0 ${CRITERION_MARKDOWN_CLASSES}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
+        urlTransform={(url) => (isAgentLink(url) ? url : defaultUrlTransform(url))}
         components={{
           a: ({ children: linkChildren, href }) => (
             <a href={href} target="_blank" rel="noopener noreferrer">
               {linkChildren}
             </a>
+          ),
+          table: ({ children: tableChildren, ...props }) => (
+            <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+              <table {...props}>{tableChildren}</table>
+            </div>
           ),
         }}
       >
@@ -295,4 +307,8 @@ function CategorizedList({ categories, showNumbers }: { categories: RubricCatego
       ))}
     </div>
   );
+}
+
+function isAgentLink(url: string): boolean {
+  return url.startsWith("run:") || url.startsWith("node:") || url.startsWith("integration:");
 }
