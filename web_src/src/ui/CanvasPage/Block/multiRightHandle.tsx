@@ -166,14 +166,7 @@ function MultiRightHandleLines({ layout, channels }: { layout: MultiRightHandleL
               stroke={APPEND_CONNECTOR_COLOR}
               strokeWidth={3}
             />
-            <line
-              x1={layout.branchEndX}
-              y1={y}
-              x2={lineEndX}
-              y2={y}
-              stroke={APPEND_CONNECTOR_COLOR}
-              strokeWidth={3}
-            />
+            <line x1={layout.branchEndX} y1={y} x2={lineEndX} y2={y} stroke={APPEND_CONNECTOR_COLOR} strokeWidth={3} />
           </g>
         );
       })}
