@@ -9,6 +9,8 @@
       "status": "started",
       "severity": "sev2",
       "started_at": "2026-01-19T12:00:00Z",
+      "mitigated_at": null,
+      "resolved_at": null,
       "url": "https://app.rootly.com/incidents/abc123-def456"
     }
   },
