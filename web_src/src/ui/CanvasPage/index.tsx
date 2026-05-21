@@ -1556,10 +1556,10 @@ function Sidebar({
 
   // Trigger data loading when sidebar opens for a node
   useEffect(() => {
-    if (state.componentSidebar.selectedNodeId && loadSidebarData) {
+    if (shouldShowRunsSidebar && state.componentSidebar.selectedNodeId && loadSidebarData) {
       loadSidebarData(state.componentSidebar.selectedNodeId);
     }
-  }, [state.componentSidebar.selectedNodeId, loadSidebarData]);
+  }, [state.componentSidebar.selectedNodeId, loadSidebarData, shouldShowRunsSidebar]);
 
   useEffect(() => {
     if (sidebarData?.latestEvents) {
