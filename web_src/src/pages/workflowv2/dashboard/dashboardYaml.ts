@@ -1,12 +1,12 @@
 /**
- * Dashboard YAML serialization helpers.
+ * Console YAML serialization helpers.
  *
- * Mirrors the canonical schema produced/consumed by `pkg/models/canvas_dashboard_yml.go`
- * so that a YAML file round-trips faithfully through both surfaces.
+ * The product surfaces this as "Console"; backend models and Go validators
+ * still use the legacy "Dashboard" naming (see `pkg/models/canvas_dashboard_yml.go`).
  *
  * The canonical schema is:
  *   apiVersion: v1
- *   kind: Dashboard
+ *   kind: Console        # legacy "Dashboard" is still accepted on import
  *   metadata:
  *     canvasId?: <uuid>
  *     name?: <display-only>
@@ -22,10 +22,13 @@ import type { DashboardLayoutItem, DashboardPanel } from "@/hooks/useCanvasData"
 import { PANEL_TYPES, isPanelType, validatePanelContent, type PanelType } from "./panelTypes";
 
 export const DASHBOARD_API_VERSION = "v1";
-export const DASHBOARD_KIND = "Dashboard";
+export const DASHBOARD_KIND = "Console";
+// Legacy kind value accepted on import for back-compat with files exported
+// before the Console rename.
+const LEGACY_DASHBOARD_KIND = "Dashboard";
 
 /**
- * Top-level panel types supported by the current Dashboard YAML schema.
+ * Top-level panel types supported by the current Console YAML schema.
  * The validation source-of-truth lives in {@link PANEL_TYPES}; re-exported
  * here for ergonomics so YAML callers don't need a second import.
  */
@@ -56,9 +59,9 @@ export type DashboardYamlParseResult = { ok: true; data: DashboardYaml } | { ok:
 type ParseResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
 /**
- * Build canonical YAML text for a dashboard. The result matches the layout
+ * Build canonical YAML text for a console. The result matches the layout
  * produced by `DashboardToYML` on the backend: stable key order, no nullish
- * `minW`/`minH` keys, empty dashboards still produce a valid empty `spec`.
+ * `minW`/`minH` keys, empty consoles still produce a valid empty `spec`.
  */
 export function dashboardToYaml(input: {
   panels: DashboardPanel[];
@@ -87,7 +90,7 @@ export function dashboardToYaml(input: {
 }
 
 /**
- * Parse a YAML string into a validated dashboard import payload. Returns a
+ * Parse a YAML string into a validated console import payload. Returns a
  * tagged union so callers can render the error message inline without
  * try/catch noise.
  */
@@ -137,7 +140,7 @@ function parseDashboardRoot(text: string): ParseResult<{
 
 function loadYamlRoot(text: string): ParseResult<Record<string, unknown>> {
   const trimmed = text.trim();
-  if (!trimmed) return { ok: false, error: "Please provide a Dashboard YAML definition." };
+  if (!trimmed) return { ok: false, error: "Please provide a Console YAML definition." };
 
   let parsed: unknown;
   try {
@@ -146,7 +149,7 @@ function loadYamlRoot(text: string): ParseResult<Record<string, unknown>> {
     return { ok: false, error: `Invalid YAML syntax: ${e instanceof Error ? e.message : "Unknown error"}` };
   }
 
-  if (!isPlainObject(parsed)) return { ok: false, error: "Dashboard YAML must be an object at the root." };
+  if (!isPlainObject(parsed)) return { ok: false, error: "Console YAML must be an object at the root." };
   return { ok: true, data: parsed };
 }
 
@@ -156,7 +159,7 @@ function validateRootHeader(root: Record<string, unknown>): string | null {
   if (root.apiVersion !== DASHBOARD_API_VERSION) {
     return `Unsupported apiVersion ${JSON.stringify(root.apiVersion)} (expected ${JSON.stringify(DASHBOARD_API_VERSION)})`;
   }
-  if (root.kind !== DASHBOARD_KIND) {
+  if (root.kind !== DASHBOARD_KIND && root.kind !== LEGACY_DASHBOARD_KIND) {
     return `Unsupported kind ${JSON.stringify(root.kind)} (expected ${JSON.stringify(DASHBOARD_KIND)})`;
   }
   return null;
@@ -392,9 +395,9 @@ function byteLengthUtf8(s: string): number {
 }
 
 export function dashboardYamlFilename(canvasName?: string): string {
-  const safe = (canvasName || "dashboard")
+  const safe = (canvasName || "console")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
-  return `${safe || "dashboard"}-dashboard.yaml`;
+  return `${safe || "console"}-console.yaml`;
 }
