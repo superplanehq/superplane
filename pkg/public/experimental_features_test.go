@@ -35,7 +35,6 @@ func TestListExperimentalFeatures(t *testing.T) {
 			ids = append(ids, id)
 		}
 		assert.Contains(t, ids, "runner")
-		assert.Contains(t, ids, features.FeatureFanOut)
 		assert.Contains(t, ids, features.FeatureDashboards)
 	})
 

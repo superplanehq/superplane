@@ -19,12 +19,8 @@ const FeatureClaudeManagedAgents = "claude_managed_agents"
 // is released or enabled for the organization.
 const FeatureDashboards = "dashboards"
 
-// FeatureFanOut gates the Fan Out core component until it is generally available.
-const FeatureFanOut = "fanOut"
-
 var registry = []Feature{
 	{ID: "runner", Label: "Runners", Description: "Sandboxed Runners"},
-	{ID: FeatureFanOut, Label: "Fan Out", Description: "Emit one downstream event per item in an array"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas"},
 	{ID: FeatureDashboards, Label: "Dashboards", Description: "Markdown dashboard panels on canvases"},
 }
