@@ -117,12 +117,7 @@ func parseCanvasYAML(data []byte) (*pb.Canvas, error) {
 		return nil, fmt.Errorf("canvas metadata is required")
 	}
 
-	if canvas.Metadata.GetIsTemplate() {
-		return nil, fmt.Errorf("repository canvas is marked as a template")
-	}
-
 	canvas.Metadata.Id = ""
-	canvas.Metadata.IsTemplate = false
 
 	return &canvas, nil
 }

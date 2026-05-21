@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
+import { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { MAX_APP_NAME_LENGTH } from "./constants";
 import type { InstallResult, OrganizationOption } from "./types";
 
@@ -40,14 +40,10 @@ export function useInstallApp({
   const handleInstall = useCallback(
     async (installName = name, installOrganizationId = organizationId) => {
       const trimmedName = installName.trim();
+      const nameError = validateName(trimmedName);
 
-      if (!trimmedName) {
-        setNameError("Name is required");
-        return;
-      }
-
-      if (trimmedName.length > MAX_APP_NAME_LENGTH) {
-        setNameError(`Name must be ${MAX_APP_NAME_LENGTH} characters or less`);
+      if (nameError) {
+        setNameError(nameError);
         return;
       }
 
@@ -113,4 +109,16 @@ export function useInstallApp({
     clearNameError,
     showOrganizationPicker: organizations.length > 1,
   };
+}
+
+function validateName(name: string) {
+  if (!name) {
+    return "Name is required";
+  }
+
+  if (name.length > MAX_APP_NAME_LENGTH) {
+    return `Name must be ${MAX_APP_NAME_LENGTH} characters or less`;
+  }
+
+  return null;
 }
