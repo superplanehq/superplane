@@ -43,11 +43,12 @@ func BuildProcessQueueContext(
 		return nil, err
 	}
 
+	input := normalizeExpressionValue(event.Data.Data())
 	configBuilder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
 		WithPreviousExecution(event.ExecutionID).
-		WithInput(map[string]any{event.NodeID: event.Data.Data()})
+		WithInput(map[string]any{event.NodeID: input})
 	if len(configFields) > 0 {
 		configBuilder = configBuilder.WithConfigurationFields(configFields)
 	}
@@ -75,7 +76,7 @@ func BuildProcessQueueContext(
 	builder := NewNodeConfigurationBuilder(tx, queueItem.WorkflowID).
 		WithNodeID(node.NodeID).
 		WithRootEvent(&queueItem.RootEventID).
-		WithInput(map[string]any{event.NodeID: event.Data.Data()})
+		WithInput(map[string]any{event.NodeID: input})
 	if event.ExecutionID != nil {
 		builder = builder.WithPreviousExecution(event.ExecutionID)
 	}
@@ -87,7 +88,7 @@ func BuildProcessQueueContext(
 		RootEventID:   queueItem.RootEventID.String(),
 		EventID:       event.ID.String(),
 		SourceNodeID:  event.NodeID,
-		Input:         event.Data.Data(),
+		Input:         input,
 		Expressions:   NewExpressionContext(builder),
 	}
 
