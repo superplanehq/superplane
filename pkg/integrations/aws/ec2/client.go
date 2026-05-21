@@ -399,12 +399,14 @@ func (c *Client) RunInstances(input RunInstancesInput) (*RunInstancesOutput, err
 		params.Set("NetworkInterface.1.AssociatePublicIpAddress", "true")
 	}
 
-	for index, securityGroupID := range input.SecurityGroupIDs {
+	securityGroupIndex := 1
+	for _, securityGroupID := range input.SecurityGroupIDs {
 		trimmed := strings.TrimSpace(securityGroupID)
 		if trimmed == "" {
 			continue
 		}
-		params.Set(fmt.Sprintf("NetworkInterface.1.SecurityGroupId.%d", index+1), trimmed)
+		params.Set(fmt.Sprintf("NetworkInterface.1.SecurityGroupId.%d", securityGroupIndex), trimmed)
+		securityGroupIndex++
 	}
 
 	keyName := strings.TrimSpace(input.KeyName)
