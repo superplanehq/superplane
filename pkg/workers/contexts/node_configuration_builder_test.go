@@ -82,16 +82,50 @@ func Test_NodeConfigurationBuilder_JSONNumberTemplateUsesOriginalToken(t *testin
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithInput(map[string]any{
 			"trigger": map[string]any{
-				"id": json.Number("14000000"),
+				"id":    json.Number("14000000"),
+				"small": json.Number("0.0000001"),
 			},
 		})
 
 	result, err := builder.Build(map[string]any{
-		"id": "{{ previous().id }}",
+		"id":    "{{ previous().id }}",
+		"small": "{{ previous().small }}",
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "14000000", result["id"])
+	assert.Equal(t, "0.0000001", result["small"])
+}
+
+func Test_NodeConfigurationBuilder_JSONNumberExpressionsUseNumericTypes(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"count": json.Number("42"),
+				"price": json.Number("10.5"),
+				"items": []any{json.Number("2")},
+			},
+		})
+
+	result, err := builder.ResolveExpression(`previous().count > 10 && previous().price + previous().items[0] == 12.5`)
+
+	require.NoError(t, err)
+	assert.Equal(t, true, result)
+}
+
+func Test_NodeConfigurationBuilder_JSONNumberRootPayloadExpressionsUseNumericTypes(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithRootPayload(map[string]any{
+			"count": json.Number("42"),
+			"nested": map[string]any{
+				"price": json.Number("10.5"),
+			},
+		})
+
+	result, err := builder.ResolveExpression(`root().count >= 42 && root().nested.price * 2 == 21`)
+
+	require.NoError(t, err)
+	assert.Equal(t, true, result)
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_RootFunction(t *testing.T) {
