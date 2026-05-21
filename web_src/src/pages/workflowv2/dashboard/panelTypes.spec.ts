@@ -235,3 +235,51 @@ describe("validatePanelContent", () => {
     expect(error).toMatch(/dataSource\.sources must be a non-empty array/);
   });
 });
+
+describe("validatePanelContent — chart series and legend", () => {
+  it("accepts chart series with format, prefix, and suffix", () => {
+    expect(
+      validatePanelContent("chart", {
+        dataSource: { kind: "executions" },
+        render: {
+          kind: "chart",
+          type: "bar",
+          xField: "service",
+          series: [{ field: "cost", label: "Cost", format: "number", prefix: "$", suffix: " /mo" }],
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects chart series with a non-string prefix", () => {
+    const error = validatePanelContent("chart", {
+      dataSource: { kind: "executions" },
+      render: {
+        kind: "chart",
+        type: "bar",
+        xField: "service",
+        series: [{ field: "cost", prefix: 42 }],
+      },
+    });
+    expect(error).toMatch(/render\.series\[0\]\.prefix must be a string/);
+  });
+
+  it("accepts chart legend modes", () => {
+    for (const legend of ["auto", "show", "hide"] as const) {
+      expect(
+        validatePanelContent("chart", {
+          dataSource: { kind: "executions" },
+          render: { kind: "chart", type: "bar", xField: "x", series: [{}], legend },
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it("rejects unknown legend modes", () => {
+    const error = validatePanelContent("chart", {
+      dataSource: { kind: "executions" },
+      render: { kind: "chart", type: "bar", xField: "x", series: [{}], legend: "bogus" },
+    });
+    expect(error).toMatch(/render\.legend must be one of/);
+  });
+});

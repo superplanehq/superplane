@@ -377,8 +377,33 @@ func validateChartPanelContent(panel DashboardPanel) error {
 	if xField, ok := render["xField"].(string); !ok || xField == "" {
 		return fmt.Errorf("panel %q render.xField must be a non-empty string", panel.ID)
 	}
-	if series, ok := render["series"].([]any); !ok || len(series) == 0 {
+	series, ok := render["series"].([]any)
+	if !ok || len(series) == 0 {
 		return fmt.Errorf("panel %q render.series must be a non-empty array", panel.ID)
+	}
+	for i, rawSeries := range series {
+		if err := validateChartSeries(panel.ID, i, rawSeries); err != nil {
+			return err
+		}
+	}
+	if legend, ok := render["legend"]; ok && legend != nil {
+		legendStr, isString := legend.(string)
+		if !isString || !slices.Contains([]string{"auto", "show", "hide"}, legendStr) {
+			return fmt.Errorf("panel %q render.legend must be one of auto/show/hide", panel.ID)
+		}
+	}
+	return nil
+}
+
+func validateChartSeries(panelID string, index int, raw any) error {
+	series, ok := raw.(map[string]any)
+	if !ok || series == nil {
+		return fmt.Errorf("panel %q render.series[%d] must be an object", panelID, index)
+	}
+	for _, key := range []string{"field", "label", "color", "format", "prefix", "suffix"} {
+		if err := validateOptionalString(panelID, fmt.Sprintf("render.series[%d].%s", index, key), series[key]); err != nil {
+			return err
+		}
 	}
 	return nil
 }

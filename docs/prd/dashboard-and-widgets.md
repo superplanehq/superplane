@@ -248,22 +248,44 @@ Chart render shape:
 render:
   kind: chart
   type: bar
-  xField: status
+  xField: service
   series:
-    - label: Count
+    - field: cost
+      label: Cost
+      format: number
+      prefix: "$"
+  legend: auto
 ```
 
 Supported `type` values:
 
-- `bar`
-- `stacked-bar`
+- `bar` — one bar per category, grouped side-by-side when multiple series are configured.
+- `stacked-bar` — multiple series stacked on top of each other per category. Visually identical to `bar` with a single series; the editor surfaces a hint until you add a second series.
 - `line`
 - `area`
-- `donut`
+- `donut` — one slice per row, keyed by `xField`, valued by the first series.
 
 If a series omits `field`, the chart counts rows per `xField` bucket. If `field` is present, the chart reads numeric values from that field.
 
-`WidgetChart` uses a small SVG renderer rather than a heavy chart container. Keep chart changes deterministic and responsive inside a dashboard grid cell.
+### Series formatting
+
+Each series supports optional display fields used by the hover tooltip (and the donut value rows):
+
+- `format` — one of `text`, `number`, `percent`, `duration`. Defaults to `number` when omitted.
+- `prefix` — literal string rendered before the formatted value (for example `"$"`).
+- `suffix` — literal string rendered after the formatted value (for example `" MWh"`).
+
+Tooltips show the category in the header and one row per series with `label — prefix{value}suffix`. Donut tooltips append the slice's share of the total (for example `ec2 — $1,200 (52%)`).
+
+### Legend
+
+`render.legend` controls legend visibility:
+
+- `auto` (default) — visible for donut charts or when 2+ series are configured; hidden otherwise.
+- `show` — always visible (useful when you want consistent labels even for a single-series chart).
+- `hide` — never rendered.
+
+`WidgetChart` is implemented with Recharts via the shared shadcn `ChartContainer`. Category labels live in the tooltip rather than on the chart surface so densely-packed x-axes don't overlap.
 
 ## Number Panels
 

@@ -20,7 +20,8 @@ import type {
   WidgetTableFilter,
   WidgetTableRender,
 } from "./widget/types";
-import { normalizeRowAction, WIDGET_FILTER_OPS } from "./widget/types";
+import { normalizeRowAction, WIDGET_CHART_LEGEND_MODES, WIDGET_FILTER_OPS } from "./widget/types";
+import type { WidgetChartLegendMode } from "./widget/types";
 
 /** All panel kinds the dashboard currently understands. */
 export const PANEL_TYPES = ["markdown", "node", "table", "chart", "number"] as const;
@@ -484,6 +485,10 @@ function validateChartContent(content: unknown): string | null {
   if (dsError) return dsError;
   const render = asObject(obj.render);
   if (!render) return "render must be an object.";
+  return validateChartRender(render);
+}
+
+function validateChartRender(render: Record<string, unknown>): string | null {
   if (render.kind !== "chart") return 'render.kind must be "chart".';
   const allowedTypes = ["bar", "stacked-bar", "line", "area", "donut"];
   if (typeof render.type !== "string" || !allowedTypes.includes(render.type)) {
@@ -494,6 +499,29 @@ function validateChartContent(content: unknown): string | null {
   }
   if (!Array.isArray(render.series) || render.series.length === 0) {
     return "render.series must be a non-empty array.";
+  }
+  for (let i = 0; i < render.series.length; i += 1) {
+    const seriesError = validateChartSeries(render.series[i], i);
+    if (seriesError) return seriesError;
+  }
+  return validateChartLegend(render.legend);
+}
+
+function validateChartLegend(legend: unknown): string | null {
+  if (legend === undefined) return null;
+  if (typeof legend !== "string" || !WIDGET_CHART_LEGEND_MODES.includes(legend as WidgetChartLegendMode)) {
+    return `render.legend must be one of ${WIDGET_CHART_LEGEND_MODES.join(", ")}.`;
+  }
+  return null;
+}
+
+function validateChartSeries(raw: unknown, index: number): string | null {
+  const series = asObject(raw);
+  if (!series) return `render.series[${index}] must be an object.`;
+  for (const key of ["field", "label", "color", "format", "prefix", "suffix"] as const) {
+    if (series[key] !== undefined && series[key] !== null && typeof series[key] !== "string") {
+      return `render.series[${index}].${key} must be a string.`;
+    }
   }
   return null;
 }

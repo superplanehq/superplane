@@ -466,6 +466,41 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			},
 			contains: "dataSource.sources must be a non-empty array",
 		},
+		{
+			name: "chart series prefix must be a string",
+			panel: DashboardPanel{
+				ID:   "chart",
+				Type: DashboardPanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "executions"},
+					"render": map[string]any{
+						"kind":   "chart",
+						"type":   "bar",
+						"xField": "service",
+						"series": []any{map[string]any{"field": "cost", "prefix": 42}},
+					},
+				},
+			},
+			contains: "render.series[0].prefix must be a string",
+		},
+		{
+			name: "chart legend mode must be auto/show/hide",
+			panel: DashboardPanel{
+				ID:   "chart",
+				Type: DashboardPanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "executions"},
+					"render": map[string]any{
+						"kind":   "chart",
+						"type":   "bar",
+						"xField": "service",
+						"series": []any{map[string]any{"field": "cost"}},
+						"legend": "bogus",
+					},
+				},
+			},
+			contains: "render.legend must be one of auto/show/hide",
+		},
 	}
 
 	for _, tt := range tests {
@@ -475,6 +510,30 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			assert.Contains(t, err.Error(), tt.contains)
 		})
 	}
+}
+
+func TestValidateDashboardContent_AcceptsChartSeriesFormatAndLegend(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "chart",
+			Type: DashboardPanelTypeChart,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "executions"},
+				"render": map[string]any{
+					"kind":   "chart",
+					"type":   "bar",
+					"xField": "service",
+					"series": []any{
+						map[string]any{"field": "cost", "label": "Cost", "format": "number", "prefix": "$", "suffix": " /mo"},
+					},
+					"legend": "show",
+				},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
 }
 
 func TestValidateDashboardContent_AcceptsCompositeNumberPanel(t *testing.T) {
