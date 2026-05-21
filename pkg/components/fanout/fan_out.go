@@ -74,14 +74,6 @@ func (f *FanOut) Color() string {
 	return "blue"
 }
 
-func (f *FanOut) ExampleOutput() map[string]any {
-	return map[string]any{
-		"item":       map[string]any{"service": "EC2", "cost_usd": 42.5},
-		"index":      0,
-		"totalCount": 3,
-	}
-}
-
 func (f *FanOut) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
 		{Name: ChannelNameItem, Label: "Item"},
