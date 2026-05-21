@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 import type { DashboardPanel } from "@/hooks/useCanvasData";
@@ -87,19 +87,16 @@ function CompositeNumberPanelDataBound({
   canvasId: string;
 }) {
   const memoryQuery = useCanvasMemoryEntries(canvasId, true);
-  if (memoryQuery.error) return <PanelError message={String(memoryQuery.error)} />;
-  return (
-    <WidgetNumber
-      render={content.render}
-      rows={[]}
-      isLoading={memoryQuery.isLoading}
-      composite={{
-        entries: memoryQuery.data ?? [],
-        sources: dataSource.sources,
-        combine: dataSource.combine,
-      }}
-    />
+  const composite = useMemo(
+    () => ({
+      entries: memoryQuery.data ?? [],
+      sources: dataSource.sources,
+      combine: dataSource.combine,
+    }),
+    [memoryQuery.data, dataSource.sources, dataSource.combine],
   );
+  if (memoryQuery.error) return <PanelError message={String(memoryQuery.error)} />;
+  return <WidgetNumber render={content.render} rows={[]} isLoading={memoryQuery.isLoading} composite={composite} />;
 }
 
 function PanelError({ message }: { message: string }) {
