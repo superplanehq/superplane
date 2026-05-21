@@ -44,14 +44,8 @@ export const getWorkflowMapper: ComponentBaseMapper = {
   },
 
   subtitle(context: SubtitleContext): string | React.ReactNode {
-    const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const workflow = outputs?.default?.[0]?.data as JiraWorkflow | undefined;
-    if (workflow?.workflowName) return workflow.workflowName;
-    if (workflow?.currentStatus) return workflow.currentStatus;
-    if (context.execution.createdAt) {
-      return renderTimeAgo(new Date(context.execution.createdAt));
-    }
-    return "";
+    const timestamp = context.execution.updatedAt || context.execution.createdAt;
+    return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
   },
 };
 
