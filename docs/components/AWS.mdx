@@ -34,6 +34,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="CodePipeline • Run Pipeline" href="#code-pipeline-•-run-pipeline" description="Start an AWS CodePipeline execution and wait for it to complete" />
   <LinkCard title="EC2 • Copy Image" href="#ec2-•-copy-image" description="Copy an EC2 AMI image to another region" />
   <LinkCard title="EC2 • Create Image" href="#ec2-•-create-image" description="Create a new AMI image from an EC2 instance" />
+  <LinkCard title="EC2 • Create Instance" href="#ec2-•-create-instance" description="Launch a new EC2 instance and wait for it to reach running state" />
+  <LinkCard title="EC2 • Delete Instance" href="#ec2-•-delete-instance" description="Terminate an EC2 instance and wait for termination" />
   <LinkCard title="EC2 • Deregister Image" href="#ec2-•-deregister-image" description="Deregister an EC2 AMI image" />
   <LinkCard title="EC2 • Disable Image" href="#ec2-•-disable-image" description="Disable an EC2 AMI image" />
   <LinkCard title="EC2 • Disable Image Deprecation" href="#ec2-•-disable-image-deprecation" description="Disable deprecation for an EC2 AMI image" />
@@ -1041,6 +1043,100 @@ The Create Image component creates a new Amazon Machine Image (AMI) from an EC2 
   },
   "timestamp": "2026-02-18T12:00:00Z",
   "type": "aws.ec2.image"
+}
+```
+
+<a id="ec2-•-create-instance"></a>
+
+## EC2 • Create Instance
+
+The Create Instance component launches a new Amazon EC2 instance and waits until it reaches **running** state before emitting.
+
+### Use Cases
+
+- **Ephemeral compute**: Provision temporary VMs for tests, builds, or automation
+- **Environment provisioning**: Launch instances as part of deployment workflows
+- **On-demand capacity**: Create additional compute when triggered by events
+
+### Configuration
+
+- **Name**: Required value for the `Name` tag
+- **Region**: AWS region where the instance will be launched
+- **Operating System**: Quick Start OS family, similar to the AWS launch wizard
+- **Image**: Public AMI for the selected operating system
+- **Instance Type**: EC2 instance type from the current generation catalog
+- **Subnet**: VPC subnet for the primary network interface
+- **Security Group**: Security group attached to the instance
+- **Configure Root Volume** (optional): Override the AMI root volume size and type
+- **Key Pair** (optional): EC2 key pair for SSH access
+- **User Data** (optional): Shell script or cloud-init payload executed at launch
+- **Associate Public IP Address**: Assign a public IPv4 address when the subnet supports it
+
+### Output
+
+Emits instance details on the default output channel, including:
+- `instanceId` — EC2 instance ID
+- `state` — should be `running`
+- `publicIpAddress` / `privateIpAddress` — network addresses when available
+- `publicDnsName` / `privateDnsName` — DNS names when available
+
+### Example Output
+
+```json
+{
+  "data": {
+    "imageId": "ami-07f0e4f3e9c123abc",
+    "instanceId": "i-0abc1234567890def",
+    "instanceType": "t3.micro",
+    "keyName": "my-key",
+    "launchTime": "2026-05-21T12:00:00.000Z",
+    "name": "ephemeral-builder",
+    "privateDnsName": "ip-10-0-1-25.ec2.internal",
+    "privateIpAddress": "10.0.1.25",
+    "publicDnsName": "ec2-54-198-10-42.compute-1.amazonaws.com",
+    "publicIpAddress": "54.198.10.42",
+    "region": "us-east-1",
+    "state": "running",
+    "subnetId": "subnet-0abc1234567890def",
+    "vpcId": "vpc-0abc1234567890def"
+  },
+  "timestamp": "2026-05-21T12:01:00Z",
+  "type": "aws.ec2.instance"
+}
+```
+
+<a id="ec2-•-delete-instance"></a>
+
+## EC2 • Delete Instance
+
+The Delete Instance component terminates an Amazon EC2 instance and waits until AWS reports it as **terminated**.
+
+### Use Cases
+
+- **Ephemeral cleanup**: Tear down temporary instances after a workflow finishes
+- **Cost controls**: Delete unused instances from automation
+- **Incident remediation**: Terminate unhealthy instances after replacement capacity exists
+
+### Configuration
+
+- **Region**: AWS region where the instance runs
+- **Instance**: EC2 instance ID to terminate
+
+### Output
+
+Emits a deletion payload on the default output channel:
+- `state` — `terminated`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "instanceId": "i-0abc1234567890def",
+    "state": "terminated"
+  },
+  "timestamp": "2026-05-21T12:05:00Z",
+  "type": "aws.ec2.instance.deleted"
 }
 ```
 
