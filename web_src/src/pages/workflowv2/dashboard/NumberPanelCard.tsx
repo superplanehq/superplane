@@ -1,22 +1,21 @@
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { DashboardPanel } from "@/hooks/useCanvasData";
 
-import { DataSourceForm } from "./DataSourceForm";
+import { useCanvasMemoryEntries } from "@/hooks/useCanvasData";
+
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { useDashboardContext } from "./DashboardContext";
-import type { NumberPanelContent } from "./panelTypes";
+import { NumberPanelForm } from "./NumberPanelForm";
+import {
+  isCompositeMemoryDataSource,
+  type CompositeMemoryNumberDataSource,
+  type NumberPanelContent,
+} from "./panelTypes";
 import { useWidgetData } from "./widget/useWidgetData";
 import { WidgetNumber } from "./widget/WidgetNumber";
-import type { WidgetColumnFormat, WidgetNumberAggregation } from "./widget/types";
-
-const AGGREGATIONS: WidgetNumberAggregation[] = ["count", "sum", "avg", "min", "max", "first", "last"];
-const NUMBER_FORMATS: WidgetColumnFormat[] = ["text", "number", "percent", "duration"];
 
 interface NumberPanelCardProps {
   panel: DashboardPanel;
@@ -57,115 +56,49 @@ export function NumberPanelCard({ panel, readOnly, onDelete, onChange }: NumberP
 function NumberPanelBody({ content }: { content: NumberPanelContent }) {
   const ctx = useDashboardContext();
   if (!ctx?.canvasId) return <PanelError message="Loading canvas…" />;
-  return <NumberPanelDataBound content={content} canvasId={ctx.canvasId} />;
+  const dataSource = content.dataSource;
+  if (isCompositeMemoryDataSource(dataSource)) {
+    return <CompositeNumberPanelDataBound content={content} dataSource={dataSource} canvasId={ctx.canvasId} />;
+  }
+  return <NumberPanelDataBound content={content} dataSource={dataSource} canvasId={ctx.canvasId} />;
 }
 
-function NumberPanelDataBound({ content, canvasId }: { content: NumberPanelContent; canvasId: string }) {
-  const { rows, isLoading, error, totalCount } = useWidgetData(canvasId, content.dataSource);
+function NumberPanelDataBound({
+  content,
+  dataSource,
+  canvasId,
+}: {
+  content: NumberPanelContent;
+  dataSource: Exclude<NumberPanelContent["dataSource"], CompositeMemoryNumberDataSource>;
+  canvasId: string;
+}) {
+  const { rows, isLoading, error, totalCount } = useWidgetData(canvasId, dataSource);
   if (error) return <PanelError message={error} />;
   return <WidgetNumber render={content.render} rows={rows} isLoading={isLoading} totalCount={totalCount} />;
 }
 
-function NumberPanelForm({
-  value,
-  onChange,
+function CompositeNumberPanelDataBound({
+  content,
+  dataSource,
+  canvasId,
 }: {
-  value: NumberPanelContent;
-  onChange: (next: NumberPanelContent) => void;
+  content: NumberPanelContent;
+  dataSource: CompositeMemoryNumberDataSource;
+  canvasId: string;
 }) {
-  const aggregationNeedsField = value.render.aggregation !== "count";
-
+  const memoryQuery = useCanvasMemoryEntries(canvasId, true);
+  if (memoryQuery.error) return <PanelError message={String(memoryQuery.error)} />;
   return (
-    <div className="space-y-3">
-      <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Title (optional)</Label>
-        <Input
-          value={value.title ?? ""}
-          onChange={(e) => onChange({ ...value, title: e.target.value })}
-          placeholder="Defaults to panel id"
-        />
-      </div>
-      <DataSourceForm value={value.dataSource} onChange={(ds) => onChange({ ...value, dataSource: ds })} />
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Aggregation</Label>
-          <Select
-            value={value.render.aggregation}
-            onValueChange={(v) =>
-              onChange({ ...value, render: { ...value.render, aggregation: v as WidgetNumberAggregation } })
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {AGGREGATIONS.map((a) => (
-                <SelectItem key={a} value={a}>
-                  {a}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        {aggregationNeedsField ? (
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-slate-600">Field</Label>
-            <Input
-              value={value.render.field ?? ""}
-              onChange={(e) => onChange({ ...value, render: { ...value.render, field: e.target.value } })}
-              placeholder="e.g. durationMs"
-            />
-          </div>
-        ) : null}
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Format</Label>
-          <Select
-            value={value.render.format ?? "__none__"}
-            onValueChange={(v) =>
-              onChange({
-                ...value,
-                render: { ...value.render, format: v === "__none__" ? undefined : (v as WidgetColumnFormat) },
-              })
-            }
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Default" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Default</SelectItem>
-              {NUMBER_FORMATS.map((f) => (
-                <SelectItem key={f} value={f}>
-                  {f}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs font-medium text-slate-600">Label (optional)</Label>
-          <Input
-            value={value.render.label ?? ""}
-            onChange={(e) => onChange({ ...value, render: { ...value.render, label: e.target.value || undefined } })}
-            placeholder="e.g. Total duration"
-          />
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Sparkline field (optional)</Label>
-        <Input
-          value={value.render.sparklineField ?? ""}
-          onChange={(e) =>
-            onChange({
-              ...value,
-              render: { ...value.render, sparklineField: e.target.value || undefined },
-            })
-          }
-          placeholder="e.g. createdAt"
-        />
-      </div>
-    </div>
+    <WidgetNumber
+      render={content.render}
+      rows={[]}
+      isLoading={memoryQuery.isLoading}
+      composite={{
+        entries: memoryQuery.data ?? [],
+        sources: dataSource.sources,
+        combine: dataSource.combine,
+      }}
+    />
   );
 }
 
