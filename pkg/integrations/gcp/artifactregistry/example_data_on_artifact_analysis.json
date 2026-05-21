@@ -10,8 +10,20 @@
       "packageIssue": [
         {
           "affectedPackage": "libssl1.1",
-          "affectedVersion": {"name": "1.1.1n-0+deb11u3", "kind": "NORMAL"},
-          "fixedVersion": {"name": "1.1.1n-0+deb11u5", "kind": "NORMAL"}
+          "affectedVersion": {
+            "name": "1.1.1n-0+deb11u3",
+            "kind": "NORMAL"
+          },
+          "fixedVersion": {
+            "name": "1.1.1n-0+deb11u5",
+            "kind": "NORMAL"
+          },
+          "affectedCpeUri": "cpe:/o:debian:debian_linux:12",
+          "fixedCpeUri": "cpe:/o:debian:debian_linux:12",
+          "fixedPackage": "libssl3",
+          "fixAvailable": true,
+          "packageType": "OS",
+          "effectiveSeverity": "HIGH"
         }
       ]
     }

@@ -5,7 +5,11 @@
     "ruleId": "abc-123",
     "ruleName": "High error rate detected",
     "spaceId": "default",
-    "tags": ["infrastructure", "prod"],
+    "tags": [
+      "env:prod",
+      "service:web",
+      "severity:high"
+    ],
     "status": "active",
     "severity": "critical",
     "context": {

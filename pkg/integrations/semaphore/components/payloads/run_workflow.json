@@ -44,7 +44,7 @@
     "repository": {
       "slug": "test/test",
       "url": "https://github.com/test/test"
-    },  
+    },
     "revision": {
       "branch": {
         "commit_range": "0000000000000000000000000000000000000000^...0000000000000000000000000000000000000000",

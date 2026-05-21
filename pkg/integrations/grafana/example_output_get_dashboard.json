@@ -6,11 +6,26 @@
     "url": "https://grafana.example.com/d/cIBgcSjkk/production-overview",
     "folderTitle": "Platform",
     "folder": "fdg4m1rt63hj8q",
-    "tags": ["production", "platform"],
+    "tags": [
+      "production",
+      "platform"
+    ],
     "panels": [
-      {"id": 1, "title": "Request Rate", "type": "timeseries"},
-      {"id": 2, "title": "Error Rate", "type": "timeseries"},
-      {"id": 3, "title": "P99 Latency", "type": "gauge"}
+      {
+        "id": 1,
+        "title": "Request Rate",
+        "type": "timeseries"
+      },
+      {
+        "id": 2,
+        "title": "Error Rate",
+        "type": "timeseries"
+      },
+      {
+        "id": 3,
+        "title": "P99 Latency",
+        "type": "gauge"
+      }
     ]
   },
   "timestamp": "2026-03-31T10:24:30Z",

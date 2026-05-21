@@ -5,14 +5,18 @@
       "name": "bug",
       "color": "d73a4a",
       "description": "Something isn't working",
-      "default": true
+      "default": true,
+      "node_id": "MDU6TGFiZWwyMDgwNDU5NDY=",
+      "url": "https://api.github.com/repos/example-org/app/labels/bug"
     },
     {
       "id": 208045947,
       "name": "enhancement",
       "color": "a2eeef",
       "description": "New feature or request",
-      "default": true
+      "default": true,
+      "node_id": "MDU6TGFiZWwyMDgwNDU5NDc=",
+      "url": "https://api.github.com/repos/example-org/app/labels/enhancement"
     }
   ],
   "timestamp": "2026-01-16T17:56:16.680755501Z",

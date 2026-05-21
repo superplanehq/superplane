@@ -15,12 +15,12 @@
     "runLevelMetrics": [
       {
         "metricName": "Retrieved context relevance",
-        "numberValue": 0,
+        "numberValue": 85.0,
         "stringValue": ""
       },
       {
         "metricName": "Response-context completeness",
-        "numberValue": 0,
+        "numberValue": 90.0,
         "stringValue": ""
       },
       {
@@ -39,11 +39,6 @@
             "metricName": "Correctness (general hallucinations)",
             "numberValue": 100,
             "stringValue": ""
-          },
-          {
-            "metricName": "Retrieved context relevance",
-            "numberValue": 0,
-            "stringValue": ""
           }
         ]
       },
@@ -56,11 +51,6 @@
             "metricName": "Correctness (general hallucinations)",
             "numberValue": 66.67,
             "stringValue": ""
-          },
-          {
-            "metricName": "Retrieved context relevance",
-            "numberValue": 0,
-            "stringValue": ""
           }
         ]
       }
@@ -71,5 +61,3 @@
   "timestamp": "2025-01-01T00:03:44Z",
   "type": "digitalocean.evaluation.passed"
 }
-
-
