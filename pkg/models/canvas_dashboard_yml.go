@@ -13,6 +13,9 @@ import (
 )
 
 const (
+	// ConsoleKind is the canonical YAML kind for canvas consoles (product name).
+	ConsoleKind = "Console"
+	// DashboardKind is the legacy YAML kind accepted on import for back-compat.
 	DashboardKind       = "Dashboard"
 	DashboardAPIVersion = "v1"
 
@@ -109,7 +112,7 @@ func DashboardToYML(dashboard *CanvasDashboard, canvasName string) ([]byte, erro
 
 	resource := DashboardYAML{
 		APIVersion: DashboardAPIVersion,
-		Kind:       DashboardKind,
+		Kind:       ConsoleKind,
 		Metadata: DashboardYAMLMetadata{
 			CanvasID: dashboard.CanvasID.String(),
 			Name:     canvasName,
@@ -153,11 +156,15 @@ func (d *DashboardYAML) Validate() error {
 	if d.Kind == "" {
 		return errors.New("kind is required")
 	}
-	if d.Kind != DashboardKind {
-		return fmt.Errorf("unsupported kind %q (expected %q)", d.Kind, DashboardKind)
+	if !isValidDashboardYAMLKind(d.Kind) {
+		return fmt.Errorf("unsupported kind %q (expected %q)", d.Kind, ConsoleKind)
 	}
 
 	return ValidateDashboardContent(d.Spec.Panels, d.Spec.Layout)
+}
+
+func isValidDashboardYAMLKind(kind string) bool {
+	return kind == ConsoleKind || kind == DashboardKind
 }
 
 // ValidateDashboardContent enforces the shared validation rules used by both

@@ -34,7 +34,7 @@ spec:
 	resource, err := DashboardFromYML([]byte(yaml))
 	require.NoError(t, err)
 	require.Equal(t, "v1", resource.APIVersion)
-	require.Equal(t, "Dashboard", resource.Kind)
+	require.Equal(t, DashboardKind, resource.Kind)
 	require.Equal(t, "My dashboard", resource.Metadata.Name)
 	require.Len(t, resource.Spec.Panels, 1)
 	require.Equal(t, "intro", resource.Spec.Panels[0].ID)
@@ -44,6 +44,32 @@ spec:
 	require.Equal(t, 12, resource.Spec.Layout[0].W)
 	require.NotNil(t, resource.Spec.Layout[0].MinW)
 	assert.Equal(t, 2, *resource.Spec.Layout[0].MinW)
+}
+
+func TestDashboardFromYML_ParsesValidConsoleKind(t *testing.T) {
+	yaml := `apiVersion: v1
+kind: Console
+metadata:
+  name: Ops console
+spec:
+  panels:
+    - id: intro
+      type: markdown
+      content:
+        body: "# Hello"
+  layout:
+    - i: intro
+      x: 0
+      y: 0
+      w: 12
+      h: 6
+`
+
+	resource, err := DashboardFromYML([]byte(yaml))
+	require.NoError(t, err)
+	require.Equal(t, ConsoleKind, resource.Kind)
+	require.Equal(t, "Ops console", resource.Metadata.Name)
+	require.Len(t, resource.Spec.Panels, 1)
 }
 
 func TestDashboardFromYML_RejectsEmptyInput(t *testing.T) {
@@ -195,12 +221,13 @@ func TestDashboardToYML_RoundTripsEmptyDashboard(t *testing.T) {
 	out, err := DashboardToYML(dashboard, "Canvas Name")
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "apiVersion: v1")
-	assert.Contains(t, string(out), "kind: Dashboard")
+	assert.Contains(t, string(out), "kind: Console")
 	assert.Contains(t, string(out), canvasID.String())
 	assert.Contains(t, string(out), "name: Canvas Name")
 
 	parsed, err := DashboardFromYML(out)
 	require.NoError(t, err)
+	require.Equal(t, ConsoleKind, parsed.Kind)
 	assert.Empty(t, parsed.Spec.Panels)
 	assert.Empty(t, parsed.Spec.Layout)
 }

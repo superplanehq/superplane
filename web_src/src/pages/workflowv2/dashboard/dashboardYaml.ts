@@ -1,8 +1,9 @@
 /**
  * Console YAML serialization helpers.
  *
- * The product surfaces this as "Console"; backend models and Go validators
- * still use the legacy "Dashboard" naming (see `pkg/models/canvas_dashboard_yml.go`).
+ * The product surfaces this as "Console". Go validators in
+ * `pkg/models/canvas_dashboard_yml.go` accept both `kind: Console` (canonical)
+ * and legacy `kind: Dashboard` on import; export uses Console on both surfaces.
  *
  * The canonical schema is:
  *   apiVersion: v1

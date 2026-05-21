@@ -118,6 +118,13 @@ func (c *UpsertMemory) OutputChannels(configuration any) []core.OutputChannel {
 func (c *UpsertMemory) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:        "namespace",
+			Label:       "Namespace",
+			Type:        configuration.FieldTypeString,
+			Description: "Memory namespace to upsert in",
+			Required:    true,
+		},
+		{
 			Name:        "iterateList",
 			Label:       "Input is a list",
 			Type:        configuration.FieldTypeBool,
@@ -141,13 +148,6 @@ func (c *UpsertMemory) Configuration() []configuration.Field {
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "iterateList", Values: []string{"true"}},
 			},
-		},
-		{
-			Name:        "namespace",
-			Label:       "Namespace",
-			Type:        configuration.FieldTypeString,
-			Description: "Memory namespace to upsert in",
-			Required:    true,
 		},
 		{
 			Name:        "valueList",
