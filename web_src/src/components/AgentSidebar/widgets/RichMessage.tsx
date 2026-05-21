@@ -1,13 +1,13 @@
-import type { ComponentProps, ReactNode } from "react";
+import { memo, useMemo, type ComponentProps, type ReactNode } from "react";
 import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { BannerWidget } from "./BannerWidget";
 import { ButtonsWidget } from "./ButtonsWidget";
 import { ChartWidget } from "./ChartWidget";
-import { CodeBlockWidget } from "./CodeBlockWidget";
 import { CollapseWidget } from "./CollapseWidget";
 import { ConfirmWidget } from "./ConfirmWidget";
+import { MarkdownCode } from "./MarkdownCode";
 import { RubricWidget } from "./RubricWidget";
 import { MermaidWidget } from "./MermaidWidget";
 import { NodeChipFromLink } from "./NodeChip";
@@ -49,11 +49,20 @@ interface RichMessageProps {
   organizationId?: string;
 }
 
-export function RichMessage({ content, onAction, onStartBuilding, canvasId, organizationId }: RichMessageProps) {
-  const segments = parseAgentContent(content);
+export const RichMessage = memo(function RichMessage({
+  content,
+  onAction,
+  onStartBuilding,
+  canvasId,
+  organizationId,
+}: RichMessageProps) {
+  // `parseAgentContent` + the downstream ReactMarkdown render are the most
+  // expensive work in the sidebar. Memoize by content so parent re-renders
+  // (canvas pan/zoom, WebSocket status ticks, etc.) don't redo it.
+  const segments = useMemo(() => parseAgentContent(content), [content]);
 
   return (
-    <div>
+    <div className="w-full min-w-0">
       {segments.map((segment, i) => (
         <SegmentRenderer
           key={i}
@@ -66,7 +75,7 @@ export function RichMessage({ content, onAction, onStartBuilding, canvasId, orga
       ))}
     </div>
   );
-}
+});
 
 function SegmentRenderer({
   segment,
@@ -106,6 +115,8 @@ function SegmentRenderer({
           categories={segment.categories}
           onAction={onAction}
           onStartBuilding={onStartBuilding}
+          canvasId={canvasId}
+          organizationId={organizationId}
         />
       );
     case "success":
@@ -128,7 +139,7 @@ function MarkdownSegment({
   organizationId?: string;
 }) {
   return (
-    <div className={MARKDOWN_CLASSES}>
+    <div className={`min-w-0 ${MARKDOWN_CLASSES}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         urlTransform={(url) => (isAgentLink(url) ? url : defaultUrlTransform(url))}
@@ -200,21 +211,6 @@ function renderSpecialLink(href: string | undefined, children: ReactNode, canvas
   }
 
   return null;
-}
-
-function MarkdownCode({ className, children, ...props }: ComponentProps<"code"> & { children?: ReactNode }) {
-  const match = /language-(\w+)/.exec(className || "");
-  const code = String(children).replace(/\n$/, "");
-
-  if (match) {
-    return <CodeBlockWidget code={code} language={match[1]} />;
-  }
-
-  return (
-    <code className={className} {...props}>
-      {children}
-    </code>
-  );
 }
 
 function isAgentLink(url: string): boolean {

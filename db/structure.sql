@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -674,7 +674,8 @@ CREATE TABLE public.workflow_runs (
     result character varying(32),
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    finished_at timestamp without time zone
+    finished_at timestamp without time zone,
+    version_id uuid NOT NULL
 );
 
 
@@ -1577,6 +1578,13 @@ CREATE INDEX idx_workflow_nodes_state ON public.workflow_nodes USING btree (stat
 
 
 --
+-- Name: idx_workflow_runs_version_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_runs_version_id ON public.workflow_runs USING btree (version_id);
+
+
+--
 -- Name: idx_workflow_runs_workflow_created_at; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -2085,6 +2093,14 @@ ALTER TABLE ONLY public.workflow_nodes
 
 
 --
+-- Name: workflow_runs workflow_runs_version_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.workflow_runs
+    ADD CONSTRAINT workflow_runs_version_id_fkey FOREIGN KEY (version_id) REFERENCES public.workflow_versions(id) ON DELETE RESTRICT;
+
+
+--
 -- Name: workflow_runs workflow_runs_workflow_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2137,7 +2153,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2156,7 +2172,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260515120000	f
+20260520171949	f
 \.
 
 
@@ -2173,7 +2189,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;

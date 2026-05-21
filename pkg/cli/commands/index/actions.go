@@ -293,6 +293,7 @@ func actionsFromCapabilities(capabilities []openapi_client.IntegrationsCapabilit
 			Description:    capability.Description,
 			Configuration:  capability.Configuration,
 			OutputChannels: capability.OutputChannels,
+			ExampleOutput:  capability.ExampleOutput,
 		})
 	}
 	return actions
