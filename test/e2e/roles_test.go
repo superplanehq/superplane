@@ -11,9 +11,8 @@ import (
 )
 
 func TestRoles(t *testing.T) {
-	steps := &RolesSteps{t: t}
-
 	t.Run("creating a new role", func(t *testing.T) {
+		steps := &RolesSteps{t: t}
 		steps.start()
 		steps.visitCreateRolePage()
 		steps.fillInCreateRoleForm("E2E Example Role")

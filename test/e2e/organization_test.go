@@ -10,9 +10,8 @@ import (
 )
 
 func TestOrganizationCreation(t *testing.T) {
-	steps := &organizationCreationSteps{t: t}
-
 	t.Run("creating a new organization from the create page", func(t *testing.T) {
+		steps := &organizationCreationSteps{t: t}
 		orgName := "E2E Created Organization"
 		steps.start()
 		steps.visitCreateOrganizationPage()

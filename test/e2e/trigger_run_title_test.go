@@ -75,7 +75,7 @@ func (s *triggerRunTitleSteps) saveAndPublish() {
 }
 
 func (s *triggerRunTitleSteps) runManualTrigger() {
-	s.canvas.RunManualTrigger("Start")
+	s.canvas.EmitManualTrigger("Start")
 	s.session.Sleep(2000)
 }
 
