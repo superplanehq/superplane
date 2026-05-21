@@ -112,7 +112,7 @@ export function TypedPanelShell({
           <DialogHeader>
             <DialogTitle>Delete this panel?</DialogTitle>
             <DialogDescription>
-              This panel and its contents will be removed from the dashboard. The content is not recoverable.
+              This panel and its contents will be removed from the console. The content is not recoverable.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

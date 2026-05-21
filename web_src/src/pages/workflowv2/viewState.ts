@@ -1,4 +1,6 @@
-export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard";
+// The "dashboard" header mode is the internal id for the user-facing Console
+// tab. String value kept stable to avoid touching every consumer.
+export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
 
 export function readStoredBoolean(key: string): boolean {
@@ -22,15 +24,21 @@ export function getWorkflowHeaderMode({
   isDashboardMode,
   dashboardsFeatureEnabled,
   isRunsMode,
+  isMemoryMode,
   canvasMode,
 }: {
   isDashboardMode: boolean;
   dashboardsFeatureEnabled: boolean;
   isRunsMode: boolean;
+  isMemoryMode: boolean;
   canvasMode: "edit" | "live";
 }): WorkflowHeaderMode {
   if (isDashboardMode) {
     return dashboardsFeatureEnabled ? "dashboard" : "version-live";
+  }
+
+  if (isMemoryMode) {
+    return "memory";
   }
 
   if (isRunsMode) {
