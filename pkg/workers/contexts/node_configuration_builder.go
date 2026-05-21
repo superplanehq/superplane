@@ -596,6 +596,13 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 
 	latestByExecution := latestEventByExecution(events, executionIDs)
 	for nodeRef, executionID := range executionIDByRef {
+		if payload, ok, err := b.payloadFromTriggeringEvent(executionID); err != nil {
+			return err
+		} else if ok {
+			messageChain[nodeRef] = payload
+			continue
+		}
+
 		event, ok := latestByExecution[executionID]
 		if !ok {
 			return fmt.Errorf("node %s has no outputs", nodeRef)
@@ -605,6 +612,36 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 	}
 
 	return nil
+}
+
+// payloadFromTriggeringEvent returns the event payload that triggered the current
+// execution when that event belongs to the referenced node's execution. This
+// preserves per-branch data for components (e.g. For Each) that emit multiple
+// events from a single execution.
+func (b *NodeConfigurationBuilder) payloadFromTriggeringEvent(executionID uuid.UUID) (any, bool, error) {
+	if b.previousExecutionID == nil {
+		return nil, false, nil
+	}
+
+	prevExecution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *b.previousExecutionID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if prevExecution.EventID == uuid.Nil {
+		return nil, false, nil
+	}
+
+	triggerEvent, err := models.FindCanvasEventInTransaction(b.tx, prevExecution.EventID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	if triggerEvent.ExecutionID == nil || *triggerEvent.ExecutionID != executionID {
+		return nil, false, nil
+	}
+
+	return triggerEvent.Data.Data(), true, nil
 }
 
 func latestEventByExecution(events []models.CanvasEvent, executionIDs []uuid.UUID) map[uuid.UUID]models.CanvasEvent {
