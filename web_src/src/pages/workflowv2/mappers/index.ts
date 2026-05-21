@@ -248,6 +248,7 @@ import {
 } from "./oci/index";
 
 import { filterMapper, FILTER_STATE_REGISTRY } from "./filter";
+import { fanOutMapper, FAN_OUT_STATE_REGISTRY } from "./fanOut";
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
 import { runnerMapper, RUNNER_STATE_REGISTRY } from "./runner";
 import { waitCustomFieldRenderer, waitMapper, WAIT_STATE_REGISTRY } from "./wait";
@@ -284,6 +285,7 @@ const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   runner: runnerMapper,
   timeGate: timeGateMapper,
   filter: filterMapper,
+  fanOut: fanOutMapper,
   wait: waitMapper,
   approval: approvalMapper,
   merge: mergeMapper,
@@ -437,6 +439,7 @@ const eventStateRegistries: Record<string, EventStateRegistry> = {
   ssh: SSH_STATE_REGISTRY,
   runner: RUNNER_STATE_REGISTRY,
   filter: FILTER_STATE_REGISTRY,
+  fanOut: FAN_OUT_STATE_REGISTRY,
   if: IF_STATE_REGISTRY,
   timeGate: TIME_GATE_STATE_REGISTRY,
   wait: WAIT_STATE_REGISTRY,
