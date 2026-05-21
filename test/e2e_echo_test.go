@@ -106,8 +106,8 @@ func TestTaskEnvironmentVariablesCommands(t *testing.T) {
 	const value = "commands-env-ok"
 	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
 		return api.CreateTaskRequest{
-			Commands: []string{`printf '{"value":"%s"}' "$COMMIT_AUTHOR" > "$SUPERPLANE_RESULT_FILE"`},
-			WebhookURL: wh,
+			Commands:    []string{`printf '{"value":"%s"}' "$COMMIT_AUTHOR" > "$SUPERPLANE_RESULT_FILE"`},
+			WebhookURL:  wh,
 			Environment: []api.EnvironmentVariable{{Name: "COMMIT_AUTHOR", Value: value}},
 		}
 	}, func(t *testing.T, created api.CreateTaskResponse, payload api.WebhookPayload) {

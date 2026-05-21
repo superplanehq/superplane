@@ -143,9 +143,9 @@ func ValidateEnvironment(env []EnvironmentVariable) string {
 type WebhookPayload struct {
 	TaskID      string `json:"task_id"`
 	FleetTaskID string `json:"fleet_task_id,omitempty"` // when task-broker forwards, fleet-managed id
-	Status   string `json:"status"`
-	ExitCode int    `json:"exit_code"`
-	Error    string `json:"error,omitempty"`
+	Status      string `json:"status"`
+	ExitCode    int    `json:"exit_code"`
+	Error       string `json:"error,omitempty"`
 	// CloudWatch fields mirror TaskStatusResponse when fleet-manager advertises log routing.
 	CloudWatchLogGroup  string `json:"cloudwatch_log_group,omitempty"`
 	CloudWatchLogStream string `json:"cloudwatch_log_stream,omitempty"`
@@ -158,8 +158,8 @@ type WebhookPayload struct {
 type TaskStatusResponse struct {
 	ID              string `json:"id"`
 	Status          string `json:"status"`
-	ExitCode *int   `json:"exit_code,omitempty"`
-	Error    string `json:"error,omitempty"`
+	ExitCode        *int   `json:"exit_code,omitempty"`
+	Error           string `json:"error,omitempty"`
 	CancelRequested bool   `json:"cancel_requested,omitempty"`
 	// CloudWatchLogGroup and CloudWatchLogStream are set when fleet-manager is configured
 	// with TASK_CLOUDWATCH_LOG_GROUP so clients can tail logs in AWS (runner must use the same group/prefix).
