@@ -94,9 +94,9 @@ func (s *runsViewSteps) whenICloseRunNodeDetails() {
 }
 
 func (s *runsViewSteps) whenIEnterEditModeFromRuns() {
-	// The Canvas-only top toggle is hidden in runs view; switch back via the tool sidebar.
+	// The Agent tab is feature-flagged; switch back through another always-visible tool tab.
 	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
-	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Agent")`))
+	s.session.Click(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"]:has-text("Versions")`))
 	s.session.Click(q.TestID("canvas-edit-button"))
 }
 
