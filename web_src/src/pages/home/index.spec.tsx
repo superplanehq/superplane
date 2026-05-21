@@ -61,8 +61,8 @@ vi.mock("@/components/Dialog/dialog", () => ({
   DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
 }));
 
-vi.mock("@/components/CreateCanvasModal", () => ({
-  CreateCanvasModal: () => null,
+vi.mock("./EditAppModal", () => ({
+  EditAppModal: () => null,
 }));
 
 vi.mock("@/contexts/useAccount", () => ({
@@ -76,9 +76,14 @@ vi.mock("@/contexts/usePermissions", () => ({
   }),
 }));
 
-vi.mock("./useCreateCanvasModalState", () => ({
-  useCreateCanvasModalState: () => ({
-    onOpenEdit: vi.fn(),
+vi.mock("./useEditApp", () => ({
+  useEditApp: () => ({
+    editingCanvas: null,
+    openEdit: vi.fn(),
+    closeEdit: vi.fn(),
+    saveApp: vi.fn(),
+    isSaving: false,
+    isOpen: false,
   }),
 }));
 

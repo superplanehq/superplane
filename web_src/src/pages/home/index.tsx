@@ -2,8 +2,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Palette, Plus, Search } from "lucide-react";
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { CreateCanvasModal } from "../../components/CreateCanvasModal";
+import { useParams } from "react-router-dom";
 import { Heading } from "../../components/Heading/heading";
 import { Input } from "../../components/Input/input";
 import { Text } from "../../components/Text/text";
@@ -15,19 +14,18 @@ import {
   DEFAULT_CANVAS_FOLDER_COLOR,
   useCanvasFolders,
   useCanvases,
-  useCreateCanvas,
   type CanvasFolderColor,
 } from "../../hooks/useCanvasData";
 import { Button } from "@/components/ui/button";
-import { useCreateCanvasModalState } from "./useCreateCanvasModalState";
+import { useCreateApp } from "./useCreateApp";
+import { useEditApp } from "./useEditApp";
 import type { CanvasFoldersCanvasFolder, CanvasesCanvas } from "@/api-client";
 import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { CanvasFolderSection } from "./CanvasFolderSection";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 import { generateUntitledAppName } from "@/lib/untitledAppName";
-import { getUsageLimitToastMessage } from "@/lib/usageLimits";
-import { showErrorToast } from "@/lib/toast";
 import { CreateAppModal } from "./CreateAppModal";
+import { EditAppModal } from "./EditAppModal";
 
 const compareByName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
 
@@ -66,13 +64,21 @@ export function HomePage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateAppModalOpen, setIsCreateAppModalOpen] = useState(false);
-  const canvasModalState = useCreateCanvasModalState();
-  const navigate = useNavigate();
 
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const createCanvasMutation = useCreateCanvas(organizationId || "");
+  const { createApp, isSaving: isCreateAppSaving } = useCreateApp({
+    onCreated: () => setIsCreateAppModalOpen(false),
+  });
+  const {
+    editingCanvas,
+    openEdit,
+    closeEdit,
+    saveApp,
+    isSaving: isEditAppSaving,
+    isOpen: isEditAppModalOpen,
+  } = useEditApp();
 
   const {
     data: canvasesData = [],
@@ -118,28 +124,6 @@ export function HomePage() {
   });
 
   const isLoading = canvasesLoading || canvasFoldersLoading;
-
-  const handleCreateApp = async (name: string) => {
-    if (!organizationId || !canCreateCanvases || createCanvasMutation.isPending) {
-      return;
-    }
-
-    try {
-      const result = await createCanvasMutation.mutateAsync({
-        name,
-        method: "ui",
-      });
-
-      const canvasId = result?.data?.canvas?.metadata?.id;
-      if (canvasId) {
-        setIsCreateAppModalOpen(false);
-        navigate(`/${organizationId}/canvases/${canvasId}`);
-      }
-    } catch (error) {
-      showErrorToast(getUsageLimitToastMessage(error, "Failed to create app"));
-      throw error;
-    }
-  };
 
   const defaultAppName = generateUntitledAppName(canvases.map((canvas) => canvas.name));
 
@@ -199,7 +183,7 @@ export function HomePage() {
                 canvasFolders={canvasFolders}
                 organizationId={organizationId}
                 searchQuery={searchQuery}
-                onEditCanvas={canvasModalState.onOpenEdit}
+                onEditCanvas={openEdit}
                 canUpdateCanvases={canUpdateCanvases}
                 canDeleteCanvases={canDeleteCanvases}
                 permissionsLoading={permissionsLoading}
@@ -209,13 +193,20 @@ export function HomePage() {
         </div>
       </main>
 
-      <CreateCanvasModal {...canvasModalState} />
+      <EditAppModal
+        open={isEditAppModalOpen}
+        initialName={editingCanvas?.name ?? ""}
+        initialDescription={editingCanvas?.description}
+        isSaving={isEditAppSaving}
+        onClose={closeEdit}
+        onSave={saveApp}
+      />
       <CreateAppModal
         open={isCreateAppModalOpen}
         defaultName={defaultAppName}
-        isSaving={createCanvasMutation.isPending}
+        isSaving={isCreateAppSaving}
         onClose={() => setIsCreateAppModalOpen(false)}
-        onSave={handleCreateApp}
+        onSave={createApp}
       />
     </div>
   );
