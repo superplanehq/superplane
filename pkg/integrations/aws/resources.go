@@ -39,6 +39,21 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case "ec2.image":
 		return ec2.ListImages(ctx, resourceType)
 
+	case "ec2.imageOS":
+		return ec2.ListImageOperatingSystems(ctx, resourceType)
+
+	case "ec2.instanceType":
+		return ec2.ListInstanceTypes(ctx, resourceType)
+
+	case "ec2.subnet":
+		return ec2.ListSubnets(ctx, resourceType)
+
+	case "ec2.securityGroup":
+		return ec2.ListSecurityGroups(ctx, resourceType)
+
+	case "ec2.keyPair":
+		return ec2.ListKeyPairs(ctx, resourceType)
+
 	case "codeartifact.repository":
 		return codeartifact.ListRepositories(ctx, resourceType)
 
