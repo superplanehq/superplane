@@ -12,6 +12,9 @@ fi
 cat > /home/app/Caddyfile <<EOF
 ${base_url} {
   tls internal
+  request_body {
+    max_size 10MB
+  }
   reverse_proxy 127.0.0.1:8000
 }
 EOF

@@ -66,7 +66,11 @@ import (
 )
 
 const (
-	// Event payload can be up to 64k in size
+	// MaxWebhookRequestBodySize is the maximum HTTP body size for /webhooks/* requests.
+	// Runner completion webhooks may include up to ~512KB of command output from the fleet manager.
+	MaxWebhookRequestBodySize = 10 * 1024 * 1024
+
+	// MaxEventSize is the maximum payload size accepted by the webhook trigger component.
 	MaxEventSize = 64 * 1024
 
 	// The size of the stage execution outputs can be up to 4k
@@ -1067,7 +1071,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, MaxEventSize)
+	r.Body = http.MaxBytesReader(w, r.Body, MaxWebhookRequestBodySize)
 	defer r.Body.Close()
 
 	body, err := io.ReadAll(r.Body)
@@ -1075,7 +1079,7 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		if _, ok := err.(*http.MaxBytesError); ok {
 			http.Error(
 				w,
-				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxEventSize),
+				fmt.Sprintf("Request body is too large - must be up to %d bytes", MaxWebhookRequestBodySize),
 				http.StatusRequestEntityTooLarge,
 			)
 

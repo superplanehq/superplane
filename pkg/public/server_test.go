@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -749,5 +750,29 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 		assert.True(t, data.UsageEnabled)
 		assert.Equal(t, int32(1), data.MaxOrganizations)
 		assert.Equal(t, "account organization limit exceeded", data.Message)
+	})
+}
+
+func Test__HandleWebhook_requestBodyLimit(t *testing.T) {
+	t.Run("accepts runner-sized completion payloads", func(t *testing.T) {
+		body := make([]byte, MaxEventSize+1)
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/webhooks/test", bytes.NewReader(body))
+		req.Body = http.MaxBytesReader(rec, req.Body, MaxWebhookRequestBodySize)
+
+		_, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+	})
+
+	t.Run("rejects payloads above MaxWebhookRequestBodySize", func(t *testing.T) {
+		body := make([]byte, MaxWebhookRequestBodySize+1)
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/webhooks/test", bytes.NewReader(body))
+		req.Body = http.MaxBytesReader(rec, req.Body, MaxWebhookRequestBodySize)
+
+		_, err := io.ReadAll(req.Body)
+		require.Error(t, err)
+		var maxBytesErr *http.MaxBytesError
+		require.ErrorAs(t, err, &maxBytesErr)
 	})
 }
