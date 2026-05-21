@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -24,12 +25,11 @@ type StreamConfig struct {
 	Region     string // optional; default chain (e.g. AWS_REGION on EC2)
 }
 
-// StreamWriter batches bytes into CloudWatch log events.
+// StreamWriter batches task log bytes into CloudWatch log events.
 type StreamWriter struct {
 	client *cloudwatchlogs.Client
 	group  string
 	stream string
-
 	mu        sync.Mutex
 	buf       []byte
 	token     *string
@@ -187,6 +187,7 @@ func (w *StreamWriter) flush(ctx context.Context) error {
 	w.buf = w.buf[:0]
 	w.mu.Unlock()
 
+	data = normalizeTerminalOutput(data)
 	lastTS := w.takeLastTS()
 	allEvents := bytesToEvents(data, &lastTS)
 	if len(allEvents) == 0 {
@@ -276,6 +277,47 @@ func (w *StreamWriter) prependBytes(b []byte) {
 	w.mu.Lock()
 	w.buf = append(b, w.buf...)
 	w.mu.Unlock()
+}
+
+// ansiEscape matches CSI color/cursor sequences (e.g. apt progress bars use \033[33m … \033[0m).
+var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[ -/]*[@-~]`)
+
+func stripANSI(data []byte) []byte {
+	return ansiEscape.ReplaceAll(data, nil)
+}
+
+// normalizeTerminalOutput makes TTY-oriented task stdout/stderr readable in CloudWatch.
+func normalizeTerminalOutput(data []byte) []byte {
+	return collapseCarriageReturns(stripANSI(data))
+}
+
+// collapseCarriageReturns applies terminal-style \r handling: bytes before the last \r
+// on each line are dropped so progress output (e.g. git "Counting objects") becomes one
+// readable line instead of garbled columns in CloudWatch.
+func collapseCarriageReturns(data []byte) []byte {
+	if !bytes.Contains(data, []byte{'\r'}) {
+		return data
+	}
+	out := make([]byte, 0, len(data))
+	lineStart := 0
+	for i := 0; i < len(data); i++ {
+		switch data[i] {
+		case '\r':
+			if i+1 < len(data) && data[i+1] == '\n' {
+				out = append(out, data[lineStart:i]...)
+				out = append(out, '\n')
+				i++
+				lineStart = i + 1
+				continue
+			}
+			lineStart = i + 1
+		case '\n':
+			out = append(out, data[lineStart:i]...)
+			out = append(out, '\n')
+			lineStart = i + 1
+		}
+	}
+	return append(out, data[lineStart:]...)
 }
 
 func bytesToEvents(data []byte, lastTS *int64) []types.InputLogEvent {
