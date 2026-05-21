@@ -73,7 +73,7 @@ function OpenCanvasToolSidebar({
       return;
     }
     setActiveTab((currentTab) => {
-      if (currentTab === TAB_AGENT && !hasAgentTab) return TAB_RUNS;
+      if ((currentTab === TAB_AGENT || currentTab === TAB_VERSIONS) && !hasAgentTab) return TAB_RUNS;
       if ((currentTab === TAB_RUNS || currentTab === TAB_VERSIONS) && hasAgentTab) return TAB_AGENT;
       return currentTab;
     });

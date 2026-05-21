@@ -147,6 +147,34 @@ describe("CanvasToolSidebar", () => {
     expect(screen.getByText("Runs content")).toBeInTheDocument();
   });
 
+  it("falls back to runs when version control closes and managed agents are disabled", () => {
+    const toolSidebarState = makeToolSidebarState({ isAgentEnabled: false });
+    const { rerender } = render(
+      <CanvasToolSidebar
+        toolSidebarState={toolSidebarState}
+        isVersionControlOpen={true}
+        runsContent={<div>Runs content</div>}
+        versionsContent={<div>Versions content</div>}
+      />,
+    );
+
+    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Versions" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Versions content")).toBeInTheDocument();
+
+    rerender(
+      <CanvasToolSidebar
+        toolSidebarState={toolSidebarState}
+        isVersionControlOpen={false}
+        runsContent={<div>Runs content</div>}
+        versionsContent={<div>Versions content</div>}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Runs" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Runs content")).toBeInTheDocument();
+  });
+
   it("enters versions from the versions tab", () => {
     const onToggleVersionControl = vi.fn();
 
