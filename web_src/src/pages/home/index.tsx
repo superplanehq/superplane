@@ -139,7 +139,7 @@ export function HomePage() {
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <Heading level={2} className="!text-2xl mb-1">
-                  Canvases
+                  Apps
                 </Heading>
                 <Text className="text-gray-800 dark:text-gray-400">
                   Overview of all mapped automations across your organization.
@@ -206,13 +206,13 @@ function CanvasToolbar({
           <Button asChild>
             <Link to={`/${organizationId}/canvases/new`} aria-label="Create new canvas">
               <Plus className="h-4 w-4" />
-              New Canvas
+              New App
             </Link>
           </Button>
         ) : (
           <Button type="button" disabled>
             <Plus className="h-4 w-4" />
-            New Canvas
+            New App
           </Button>
         )}
       </PermissionTooltip>
@@ -221,7 +221,7 @@ function CanvasToolbar({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <Input
-            placeholder="Filter canvases..."
+            placeholder="Filter apps..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
@@ -336,7 +336,7 @@ function CanvasesSearchEmptyState() {
     <div className="text-center py-12">
       <Palette className="mx-auto text-gray-400 mb-4" size={48} aria-hidden />
       <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
-        No canvases found
+        No apps found
       </Heading>
       <Text className="text-gray-500 dark:text-gray-400 mb-6">
         Nothing matches that filter, try another word or clear it
@@ -350,7 +350,7 @@ function CanvasesEmptyState() {
     <div className="text-center py-12">
       <Palette className="mx-auto text-gray-400 mb-4" size={48} aria-hidden />
       <Heading level={3} className="text-lg text-gray-800 dark:text-white mb-2">
-        No canvases yet
+        No apps yet
       </Heading>
     </div>
   );
