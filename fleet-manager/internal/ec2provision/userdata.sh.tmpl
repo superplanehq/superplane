@@ -25,7 +25,13 @@ INSTANCE_ID=$(curl -sf --max-time 3 -H "X-aws-ec2-metadata-token: $METADATA_TOKE
 #########################################################
 
 apt-get update -qy
-apt-get install -qy bash ca-certificates curl unzip build-essential docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+apt-get install -qy bash ca-certificates curl unzip build-essential gnupg lsb-release
+
+# Add Docker's official apt repository
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
+apt-get update -qy
+apt-get install -qy docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
 unzip -q /tmp/awscliv2.zip -d /tmp
