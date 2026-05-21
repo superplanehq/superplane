@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import type { ChartPanelDataSource } from "./panelTypes";
+import { useMemoryCatalog } from "./widget/useMemoryCatalog";
 
 interface DataSourceFormProps {
   value: ChartPanelDataSource;
@@ -20,6 +21,11 @@ interface DataSourceFormProps {
 export function DataSourceForm({ value, onChange, hideLimit }: DataSourceFormProps) {
   const ctx = useDashboardContext();
   const nodes = ctx?.nodes ?? [];
+  const canvasId = ctx?.canvasId;
+  const memoryNamespace = value.kind === "memory" ? value.namespace : undefined;
+  const { namespaces, fields } = useMemoryCatalog(canvasId, memoryNamespace);
+  const namespaceListId = canvasId ? `data-source-namespaces-${canvasId}` : undefined;
+  const fieldPathListId = memoryNamespace ? `data-source-field-paths-${memoryNamespace}` : undefined;
 
   const setKind = (kind: "memory" | "executions" | "runs") => {
     if (kind === "memory") {
@@ -114,18 +120,36 @@ export function DataSourceForm({ value, onChange, hideLimit }: DataSourceFormPro
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-slate-600">Namespace</Label>
             <Input
+              list={namespaces.length > 0 && namespaceListId ? namespaceListId : undefined}
               value={value.namespace}
               onChange={(e) => onChange({ ...value, namespace: e.target.value })}
               placeholder="e.g. deployments"
+              data-testid="data-source-namespace"
             />
+            {namespaces.length > 0 && namespaceListId ? (
+              <datalist id={namespaceListId}>
+                {namespaces.map((n) => (
+                  <option key={n.namespace} value={n.namespace} />
+                ))}
+              </datalist>
+            ) : null}
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-slate-600">Field path (optional)</Label>
             <Input
+              list={fields.length > 0 && fieldPathListId ? fieldPathListId : undefined}
               value={value.fieldPath ?? ""}
               onChange={(e) => onChange({ ...value, fieldPath: e.target.value || undefined })}
               placeholder="e.g. items"
+              data-testid="data-source-field-path"
             />
+            {fields.length > 0 && fieldPathListId ? (
+              <datalist id={fieldPathListId}>
+                {fields.map((f) => (
+                  <option key={f.field} value={f.field} />
+                ))}
+              </datalist>
+            ) : null}
           </div>
         </>
       )}

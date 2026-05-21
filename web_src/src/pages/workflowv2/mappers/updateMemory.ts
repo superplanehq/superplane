@@ -20,12 +20,18 @@ type UpdateMemoryMetadata = {
   valueFields?: string[];
   matches?: Record<string, unknown>;
   updatedCount?: number;
+  iterateList?: boolean;
+  itemVariable?: string;
+  count?: number;
 };
 
 type UpdateMemoryConfiguration = {
   namespace?: string;
   matchList?: Array<{ name?: string; value?: unknown }>;
   valueList?: Array<{ name?: string; value?: unknown }>;
+  iterateList?: boolean;
+  listSource?: string;
+  itemVariable?: string;
 };
 
 type UpdateMemoryOutputs = {
@@ -106,6 +112,18 @@ export const updateMemoryMapper: ComponentBaseMapper = {
     if (valueFields.length > 0) {
       details["Updated Fields"] = valueFields.join(", ");
     }
+    if (metadata.iterateList) {
+      details["List Mode"] = "Enabled";
+      if (metadata.itemVariable) {
+        details["Item Variable"] = metadata.itemVariable;
+      }
+      if (typeof metadata.count === "number") {
+        details["Iterations"] = String(metadata.count);
+      }
+      if (typeof metadata.updatedCount === "number") {
+        details["Rows Updated"] = String(metadata.updatedCount);
+      }
+    }
 
     return details;
   },
@@ -145,6 +163,9 @@ function getUpdateMemoryMetadataList(node: NodeInfo): Array<{ icon: string; labe
   }
   if (valueFields.length > 0) {
     items.push({ icon: "list", label: `set: ${valueFields.join(", ")}` });
+  }
+  if (config.iterateList || metadata.iterateList) {
+    items.push({ icon: "repeat", label: "List mode" });
   }
 
   return items;

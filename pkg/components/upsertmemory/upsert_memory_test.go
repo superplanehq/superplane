@@ -5,19 +5,22 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
 type canvasMemoryContext struct {
-	namespace     string
-	matches       map[string]any
-	values        map[string]any
-	updatedValues []any
-	updateCalls   int
-	addCalls      int
-	err           error
-	addErr        error
+	namespace      string
+	matches        map[string]any
+	values         map[string]any
+	addedValues    []any
+	updatedValues  []any
+	updatedPerCall [][]any
+	updateCalls    int
+	addCalls       int
+	err            error
+	addErr         error
 }
 
 func (c *canvasMemoryContext) Add(namespace string, values any) error {
@@ -27,6 +30,7 @@ func (c *canvasMemoryContext) Add(namespace string, values any) error {
 	if ok {
 		c.values = valueMap
 	}
+	c.addedValues = append(c.addedValues, values)
 	return c.addErr
 }
 
@@ -45,6 +49,13 @@ func (c *canvasMemoryContext) Update(namespace string, matches map[string]any, v
 	c.values = values
 	if c.err != nil {
 		return nil, c.err
+	}
+	if len(c.updatedPerCall) > 0 {
+		idx := c.updateCalls - 1
+		if idx >= len(c.updatedPerCall) {
+			idx = len(c.updatedPerCall) - 1
+		}
+		return c.updatedPerCall[idx], nil
 	}
 	return c.updatedValues, nil
 }
@@ -222,6 +233,78 @@ func TestUpsertMemoryExecute(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to upsert canvas memory")
 	})
+
+	t.Run("list mode upserts one row per element", func(t *testing.T) {
+		component := &UpsertMemory{}
+		execState := &contexts.ExecutionStateContext{}
+		memoryCtx := &canvasMemoryContext{
+			updatedPerCall: [][]any{
+				{map[string]any{"environment": "production", "name": "api"}},
+				nil,
+			},
+		}
+		execMetadata := &contexts.MetadataContext{}
+
+		items := []any{
+			map[string]any{"name": "api"},
+			map[string]any{"name": "worker"},
+		}
+
+		expressions := &contexts.ExpressionContext{
+			Output: items,
+			ScopedOutputFn: func(expression string, scope map[string]any) (any, error) {
+				return scope["item"].(map[string]any)["name"], nil
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"namespace":    "deployments",
+				"iterateList":  true,
+				"listSource":   "list",
+				"itemVariable": "item",
+				"matchList":    []map[string]any{},
+				"valueList": []map[string]any{
+					{"name": "name", "value": "item.name"},
+				},
+			},
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
+			CanvasMemory:   memoryCtx,
+			ExecutionState: execState,
+			Expressions:    expressions,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, 2, memoryCtx.updateCalls)
+		assert.Equal(t, 1, memoryCtx.addCalls)
+
+		metadata, ok := execMetadata.Get().(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, true, metadata["iterateList"])
+		assert.Equal(t, "item", metadata["itemVariable"])
+		assert.Equal(t, 2, metadata["count"])
+		assert.Equal(t, 1, metadata["updatedCount"])
+		assert.Equal(t, 1, metadata["createdCount"])
+
+		require.Len(t, execState.Payloads, 1)
+		payload, ok := execState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		outerData, ok := payload["data"].(map[string]any)
+		require.True(t, ok)
+		innerData, ok := outerData["data"].(map[string]any)
+		require.True(t, ok)
+
+		itemsResults, ok := innerData["items"].([]any)
+		require.True(t, ok)
+		require.Len(t, itemsResults, 2)
+		first, ok := itemsResults[0].(map[string]any)
+		require.True(t, ok)
+		second, ok := itemsResults[1].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, OperationUpdated, first["operation"])
+		assert.Equal(t, OperationCreated, second["operation"])
+	})
 }
 
 func TestUpsertMemorySetup(t *testing.T) {
@@ -279,6 +362,37 @@ func TestUpsertMemorySetup(t *testing.T) {
 				"matchList": []map[string]any{},
 				"valueList": []map[string]any{
 					{"name": "value", "value": "abc123"},
+				},
+			},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("list mode requires listSource", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"namespace":   "deployments",
+				"iterateList": true,
+				"matchList":   []map[string]any{},
+				"valueList": []map[string]any{
+					{"name": "value", "value": "abc"},
+				},
+			},
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "listSource")
+	})
+
+	t.Run("list mode accepts valid configuration", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"namespace":    "deployments",
+				"iterateList":  true,
+				"listSource":   "x",
+				"itemVariable": "service",
+				"matchList":    []map[string]any{},
+				"valueList": []map[string]any{
+					{"name": "name", "value": "service.name"},
 				},
 			},
 		})
