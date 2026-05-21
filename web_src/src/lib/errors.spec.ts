@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getApiErrorMessage, getResponseErrorMessage } from "@/lib/errors";
+import { getApiErrorMessage, getResponseErrorMessage, isTransientHttpError, summarizeError } from "@/lib/errors";
 
 describe("errors", () => {
   it("extracts nested api error messages", () => {
@@ -82,5 +82,74 @@ describe("errors", () => {
     const response = new Response("", { status: 500 });
 
     await expect(getResponseErrorMessage(response, "fallback")).resolves.toBe("fallback");
+  });
+});
+
+describe("isTransientHttpError", () => {
+  it("treats HTML response bodies as transient", () => {
+    const htmlError = `<!DOCTYPE html>
+<html lang="en-US">
+  <head><title>superplane.com | 502: Bad gateway</title></head>
+  <body>Bad gateway</body>
+</html>`;
+
+    expect(isTransientHttpError(htmlError)).toBe(true);
+    expect(isTransientHttpError("<html><head></head><body>hi</body></html>")).toBe(true);
+  });
+
+  it("treats browser network failures as transient", () => {
+    expect(isTransientHttpError(new TypeError("Failed to fetch"))).toBe(true);
+    expect(isTransientHttpError(new TypeError("Load failed"))).toBe(true);
+    expect(isTransientHttpError({ name: "AbortError" })).toBe(true);
+  });
+
+  it("treats transient HTTP statuses as transient", () => {
+    for (const status of [0, 401, 403, 408, 429, 502, 503, 504]) {
+      expect(isTransientHttpError({ status })).toBe(true);
+      expect(isTransientHttpError({ response: { status } })).toBe(true);
+    }
+  });
+
+  it("does not treat real application errors as transient", () => {
+    expect(isTransientHttpError({ status: 400 })).toBe(false);
+    expect(isTransientHttpError({ response: { status: 422 } })).toBe(false);
+    expect(isTransientHttpError(new Error("validation failed"))).toBe(false);
+    expect(isTransientHttpError("conflict resolving canvas changes")).toBe(false);
+    expect(isTransientHttpError(undefined)).toBe(false);
+    expect(isTransientHttpError(null)).toBe(false);
+  });
+});
+
+describe("summarizeError", () => {
+  it("collapses HTML response bodies to a short label", () => {
+    const htmlError = `<!DOCTYPE html>
+<html lang="en-US">
+  <head><title>superplane.com | 502: Bad gateway</title></head>
+  <body>Bad gateway</body>
+</html>`;
+
+    expect(summarizeError(htmlError)).toBe("HTML response body");
+  });
+
+  it("includes the HTTP status when available", () => {
+    expect(summarizeError({ status: 503 })).toBe("HTTP 503");
+    expect(summarizeError({ response: { status: 504 } })).toBe("HTTP 504");
+  });
+
+  it("returns the error message for Error instances", () => {
+    expect(summarizeError(new Error("validation failed"))).toBe("validation failed");
+  });
+
+  it("truncates very long messages", () => {
+    const longString = "x".repeat(500);
+    const summary = summarizeError(longString, 50);
+    expect(summary.length).toBeLessThanOrEqual(50);
+    expect(summary.endsWith("…")).toBe(true);
+  });
+
+  it("handles non-string, non-error values", () => {
+    expect(summarizeError(undefined)).toBe("Unknown error");
+    expect(summarizeError(null)).toBe("Unknown error");
+    expect(summarizeError({ foo: "bar" })).toBe('{"foo":"bar"}');
   });
 });

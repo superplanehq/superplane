@@ -67,7 +67,8 @@ import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { analytics } from "@/lib/analytics";
 // getColorClass moved to workflowPageHelpers
 import { filterVisibleConfiguration } from "@/lib/components";
-import { getApiErrorMessage } from "@/lib/errors";
+import { getApiErrorMessage, isTransientHttpError, summarizeError } from "@/lib/errors";
+import { Sentry } from "@/sentry";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
 import { DefaultLayoutEngine } from "@/lib/layout";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
@@ -169,6 +170,36 @@ type QueuedCanvasSaveRequest = {
   reject: (error: unknown) => void;
 };
 type CanvasEchoRelease = () => void;
+
+/**
+ * Report a canvas auto-save failure without polluting telemetry.
+ *
+ * Auto-save runs silently in the background after position drags. Transient
+ * failures (HTML error pages from a proxy, auth redirects, offline blips,
+ * 5xx gateway errors) are expected and will be retried on the next tick, so
+ * they are dropped here. Unexpected failures are forwarded to Sentry with a
+ * stable fingerprint so they group together instead of producing one issue
+ * per unique response body.
+ */
+function reportAutoSaveFailure(error: unknown): void {
+  // Transient failures (HTML error pages from a proxy / auth redirect, offline
+  // blips, 5xx gateways) are expected for a silent background save and will
+  // retry on the next tick — drop them so they do not flood Sentry.
+  if (isTransientHttpError(error)) {
+    return;
+  }
+
+  const summary = summarizeError(error);
+
+  Sentry.withScope((scope) => {
+    scope.setTag("auto_save.scope", "canvas-auto-save");
+    scope.setExtra("errorSummary", summary);
+    scope.setFingerprint(["canvas-auto-save-failure"]);
+    const reportable = error instanceof Error ? error : new Error(`Canvas auto-save failed: ${summary}`);
+    Sentry.captureException(reportable);
+  });
+}
+
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
     organizationId: string;
@@ -1636,7 +1667,7 @@ export function WorkflowPageV2() {
 
             // Auto-save completed silently (no toast or state changes)
           } catch (error) {
-            console.error("Failed to auto-save", error);
+            reportAutoSaveFailure(error);
           } finally {
             if (focusedNoteId) {
               requestAnimationFrame(() => {
