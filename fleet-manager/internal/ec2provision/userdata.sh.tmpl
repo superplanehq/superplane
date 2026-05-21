@@ -1,0 +1,133 @@
+#!/bin/bash
+set -euxo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+#########################################################
+# 
+# Instance id
+#
+# Query EC2 instance metadata (169.254.169.254) for this host's id (e.g. i-0abc…).
+# That value becomes RUNNER_ID.
+#
+#########################################################
+
+INSTANCE_METADATA_URL=http://169.254.169.254
+
+METADATA_TOKEN=$(curl -sf --max-time 3 "$INSTANCE_METADATA_URL/latest/api/token" -X PUT -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+INSTANCE_ID=$(curl -sf --max-time 3 -H "X-aws-ec2-metadata-token: $METADATA_TOKEN" "$INSTANCE_METADATA_URL/latest/meta-data/instance-id")
+
+#########################################################
+# 
+# Packages
+#
+# Install bash, curl, docker, ca-certificates, and AWS CLI v2.
+#
+#########################################################
+
+apt-get update -qy
+apt-get install -qy bash ca-certificates curl unzip build-essential docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install --update
+
+systemctl enable --now docker
+
+#########################################################
+# 
+# Runner binary
+#
+# Install the runner binary from S3.
+#
+#########################################################
+
+export AWS_DEFAULT_REGION={{shellQuote .RunnerInstallAWSRegion}}
+RUNNER_S3_URI={{shellQuote .RunnerS3URI}}
+
+aws s3 cp "$RUNNER_S3_URI" /usr/local/bin/runner
+chmod 755 /usr/local/bin/runner
+
+#########################################################
+# 
+# /etc/default/superplane-runner
+#
+# Environment file for the runner. FLEET_MANAGER_URL and optional settings are
+# rendered at launch; RUNNER_ID is filled from ${INSTANCE_ID} when the script runs.
+#
+#########################################################
+
+umask 022
+
+cat > /etc/default/superplane-runner <<ENVEOF
+FLEET_MANAGER_URL={{shellQuote .FleetManagerURL}}
+RUNNER_ID=${INSTANCE_ID}
+RUNNER_SHELL=/bin/bash
+AUTH_TOKEN={{shellQuote .RunnersAuthToken}}
+RUNNER_TERMINATE_AFTER_EACH_TASK={{.RunnerTerminateAfterEachTask}}
+RUNNER_CLOUDWATCH_LOG_GROUP={{shellQuote .RunnerCloudWatchLogGroup}}
+RUNNER_CLOUDWATCH_REGION={{shellQuote .RunnerInstallAWSRegion}}
+RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX={{shellQuote .RunnerCloudWatchLogStreamPrefix}}
+ENVEOF
+
+chmod 644 /etc/default/superplane-runner
+
+#########################################################
+# 
+# CloudWatch agent
+#
+# Install the CloudWatch agent and ship runner process logs (systemd stdout/stderr)
+# to the configured log group under stream {instance_id}/runner-process.
+#
+#########################################################
+
+curl -fsSL https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb -o /tmp/cwa.deb
+dpkg -i /tmp/cwa.deb
+
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF'
+{{.CloudWatchAgentJSON}}
+CWEOF
+
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
+
+#########################################################
+# 
+# Systemd unit
+#
+# Run the runner as superplane-runner.service. Sandbox restrictions are relaxed so
+# host-mode tasks can use PTY + bash without fork/exec EPERM.
+#
+#########################################################
+cat > /etc/systemd/system/superplane-runner.service <<'UNITEOF'
+[Unit]
+Description=Superplane runner (host process; host-mode tasks run on Ubuntu)
+After=network-online.target docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+EnvironmentFile=/etc/default/superplane-runner
+PrivateUsers=no
+RestrictNamespaces=no
+MemoryDenyWriteExecute=no
+RestrictRealtime=no
+RestrictSUIDSGID=no
+LockPersonality=no
+Restart={{.RestartPolicy}}
+ExecStart=/usr/local/bin/runner
+StandardOutput=append:/var/log/superplane-runner.log
+StandardError=append:/var/log/superplane-runner.log
+
+[Install]
+WantedBy=multi-user.target
+UNITEOF
+
+#########################################################
+# 
+# Start
+#
+# Enable and start the runner service.
+#
+#########################################################
+systemctl daemon-reload
+systemctl enable --now superplane-runner.service
