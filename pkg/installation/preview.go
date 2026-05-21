@@ -1,4 +1,4 @@
-package githubapps
+package installation
 
 import (
 	"fmt"

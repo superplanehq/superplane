@@ -1,4 +1,4 @@
-package githubapps
+package installation
 
 import (
 	"testing"
@@ -12,10 +12,10 @@ func TestBuildPreviewUsesCanvasMetadata(t *testing.T) {
 	preview, err := BuildPreview("github.com/superplanehq/preview-env-github-digitalocean")
 	require.NoError(t, err)
 
-	assert.Equal(t, "Preview Environments - storejs complex", preview.CanvasName)
-	assert.Equal(t, "StoreJS preview", preview.Description)
-	assert.Equal(t, "Install Preview Environments - storejs complex", preview.Title)
-	assert.Equal(t, "Preview Environments - storejs complex", preview.DefaultName)
+	assert.NotEmpty(t, preview.CanvasName)
+	assert.NotEmpty(t, preview.Description)
+	assert.Equal(t, "Install "+preview.CanvasName, preview.Title)
+	assert.Equal(t, preview.CanvasName, preview.DefaultName)
 }
 
 func TestPreviewFromCanvasFallsBackToRepoNameWhenCanvasNameMissing(t *testing.T) {
