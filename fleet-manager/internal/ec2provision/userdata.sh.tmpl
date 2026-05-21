@@ -25,7 +25,7 @@ INSTANCE_ID=$(curl -sf --max-time 3 -H "X-aws-ec2-metadata-token: $METADATA_TOKE
 #########################################################
 
 apt-get update -qy
-apt-get install -qy bash ca-certificates curl unzip build-essential docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+apt-get install -qy bash ca-certificates curl unzip build-essential docker.io
 
 curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
 unzip -q /tmp/awscliv2.zip -d /tmp
