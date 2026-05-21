@@ -93,6 +93,47 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		autoLayoutNodes: &updateAutoLayoutNodes,
 	}, options)
 
+	dashboardCmd := &cobra.Command{
+		Use:   "dashboard",
+		Short: "Manage canvas dashboards",
+		Long: `Manage the per-canvas dashboard attached to a canvas.
+
+Dashboard files use this shape:
+
+apiVersion: v1
+kind: Dashboard
+metadata:
+  name: Optional display name
+spec:
+  panels: []
+  layout: []
+
+AI agents: for dashboard YAML examples and workflow, install skill:
+- ` + core.SkillsInstallCommand("superplane-dashboard-and-widgets"),
+	}
+
+	dashboardGetCmd := &cobra.Command{
+		Use:   "get <name-or-id>",
+		Short: "Get a canvas dashboard",
+		Args:  cobra.ExactArgs(1),
+	}
+	core.Bind(dashboardGetCmd, &dashboardGetCommand{}, options)
+
+	var dashboardUpdateFile string
+	dashboardUpdateCmd := &cobra.Command{
+		Use:     "update <name-or-id>",
+		Aliases: []string{"create", "apply"},
+		Short:   "Create or replace a canvas dashboard from a YAML file",
+		Long:    "Creates or replaces the dashboard attached to a canvas using --file. Dashboard import is replace-all.",
+		Args:    cobra.ExactArgs(1),
+	}
+	dashboardUpdateCmd.Flags().StringVarP(&dashboardUpdateFile, "file", "f", "", "dashboard YAML file")
+	_ = dashboardUpdateCmd.MarkFlagRequired("file")
+	core.Bind(dashboardUpdateCmd, &dashboardUpdateCommand{file: &dashboardUpdateFile}, options)
+
+	dashboardCmd.AddCommand(dashboardGetCmd)
+	dashboardCmd.AddCommand(dashboardUpdateCmd)
+
 	var changeRequestsListStatusFilter string
 	var changeRequestsListOnlyMine bool
 	var changeRequestsListQuery string
@@ -253,6 +294,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	root.AddCommand(initCmd)
 	root.AddCommand(createCmd)
 	root.AddCommand(updateCmd)
+	root.AddCommand(dashboardCmd)
 	root.AddCommand(deleteCmd)
 	root.AddCommand(changeRequestsCmd)
 
