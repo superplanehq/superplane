@@ -89,7 +89,18 @@ function StatusBadge({ status }: { status: CommandSection["status"] }) {
     "bg-blue-500": status === "running",
   });
 
-  const label = status === "passed" ? "Passed" : "Failed";
+  let label = "";
+  switch (status) {
+    case "passed":
+      label = "Passed";
+      break;
+    case "failed":
+      label = "Failed";
+      break;
+    default:
+      label = "Running";
+      break;
+  }
 
   return (
     <div className={klass}>
