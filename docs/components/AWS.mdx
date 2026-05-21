@@ -1062,11 +1062,12 @@ The Create Instance component launches a new Amazon EC2 instance and waits until
 
 - **Name**: Required value for the `Name` tag
 - **Region**: AWS region where the instance will be launched
-- **Operating System**: Quick Start OS family, similar to the AWS launch wizard
+- **Operating System**: Quick Start operating system family, similar to the AWS launch wizard
 - **Image**: Public AMI for the selected operating system
 - **Instance Type**: EC2 instance type from the current generation catalog
 - **Subnet**: VPC subnet for the primary network interface
-- **Security Group**: Security group attached to the instance
+- **Firewall**: Create a launch security group (like the AWS launch wizard) or use an existing one
+- **Allow SSH/HTTP/HTTPS from the internet**: Ingress rules when creating a new security group
 - **Configure Root Volume** (optional): Override the AMI root volume size and type
 - **Key Pair** (optional): EC2 key pair for SSH access
 - **User Data** (optional): Shell script or cloud-init payload executed at launch
