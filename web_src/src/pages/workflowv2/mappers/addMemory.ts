@@ -15,11 +15,17 @@ import { defaultStateFunction } from "./stateRegistry";
 type AddMemoryMetadata = {
   namespace?: string;
   fields?: string[];
+  iterateList?: boolean;
+  itemVariable?: string;
+  count?: number;
 };
 
 type AddMemoryConfiguration = {
   namespace?: string;
   valueList?: Array<{ name?: string; value?: unknown }>;
+  iterateList?: boolean;
+  listSource?: string;
+  itemVariable?: string;
 };
 
 export const addMemoryMapper: ComponentBaseMapper = {
@@ -58,6 +64,15 @@ export const addMemoryMapper: ComponentBaseMapper = {
     if (fields.length > 0) {
       details["Fields"] = fields.join(", ");
     }
+    if (metadata.iterateList) {
+      details["List Mode"] = "Enabled";
+      if (metadata.itemVariable) {
+        details["Item Variable"] = metadata.itemVariable;
+      }
+      if (typeof metadata.count === "number") {
+        details["Rows Added"] = String(metadata.count);
+      }
+    }
 
     return details;
   },
@@ -93,6 +108,9 @@ function getAddMemoryMetadataList(node: NodeInfo): Array<{ icon: string; label: 
   }
   if (fields.length > 0) {
     items.push({ icon: "list", label: fields.join(", ") });
+  }
+  if (config.iterateList || metadata.iterateList) {
+    items.push({ icon: "repeat", label: "List mode" });
   }
 
   return items;

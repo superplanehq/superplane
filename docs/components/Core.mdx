@@ -215,7 +215,7 @@ Send a POST request to the webhook URL with your payload. The workflow will rece
 
 ## Add Memory
 
-The Add Memory component appends a new item to canvas-level memory storage.
+The Add Memory component appends one or more items to canvas-level memory storage.
 
 ### Use Cases
 
@@ -229,6 +229,23 @@ The Add Memory component appends a new item to canvas-level memory storage.
 2. Appends a new memory row for the current canvas
 3. Emits `memory.added` with the saved payload
 
+### List Mode
+
+Enable **Input is a list** to write one memory row per element of a list expression.
+
+- **List Source**: an expression that evaluates to a list, for example `$["Runner"].data.result.services`.
+- **Item Variable**: the variable name used to reference each element in the value expressions (defaults to `item`).
+
+In list mode, each field value in the **Values** list is evaluated once per element with the iteration variable in scope. A single `memory.added` event is emitted with all written rows and a `count` field.
+
+#### Example Configuration
+
+- List Source: `$["Runner"].data.result.services`
+- Item Variable: `service`
+- Values:
+  - `name` → `service.name`
+  - `id` → `service.id`
+
 ### Example Output
 
 ```json
@@ -241,6 +258,25 @@ The Add Memory component appends a new item to canvas-level memory storage.
         "id": "1",
         "pull_request": "123"
       }
+    }
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "memory.added"
+}
+```
+
+#### Example Output (list mode)
+
+```json
+{
+  "data": {
+    "data": {
+      "namespace": "services",
+      "count": 2,
+      "values": [
+        { "name": "api", "id": "1" },
+        { "name": "worker", "id": "2" }
+      ]
     }
   },
   "timestamp": "2026-01-19T12:00:00Z",
@@ -905,6 +941,15 @@ The Update Memory component updates matching rows in canvas-level memory storage
 - **Found**: At least one matching memory row was updated
 - **Not Found**: No matching memory rows were updated
 
+### List Mode
+
+Enable **Input is a list** to iterate over a list expression and run one update per element.
+
+- **List Source**: an expression that evaluates to a list, for example `$["Runner"].data.result.services`.
+- **Item Variable**: the variable name used to reference each element in the value expressions (defaults to `item`).
+
+The `matchList` is evaluated once and applied identically to every iteration. Each `valueList` field value is evaluated per element with the iteration variable in scope. All resulting updates are reported in a single `memory.updated` event; the channel is `found` when at least one row was updated across all iterations.
+
 ### Example Output
 
 ```json
@@ -964,6 +1009,17 @@ This lets you store just one field (for example `value`) without extra marker fi
 ### Output
 
 Always emits to the default channel. Check `data.operation` to know whether the component updated existing rows or created a new row.
+
+### List Mode
+
+Enable **Input is a list** to iterate over a list expression and run one upsert per element.
+
+- **List Source**: an expression that evaluates to a list, for example `$["Runner"].data.result.services`.
+- **Item Variable**: the variable name used to reference each element in the value expressions (defaults to `item`).
+
+The `matchList` is evaluated once and applied identically to every iteration. Each `valueList` field value is evaluated per element with the iteration variable in scope. All upserts are reported in a single `memory.upserted` event with a per-item `items` array containing the operation result (`updated` or `created`) and the affected records.
+
+When a non-empty `matchList` is configured in list mode, each iteration attempts to update the same matched rows. List mode is most useful for inserting multiple rows (empty `matchList`) or when each item's values are meant to overwrite the matched rows.
 
 ### Example Output
 
