@@ -47,13 +47,18 @@ type Config struct {
 	HotInstanceCount       int    // target pending+running managed instances (from EC2_PROVISION_HOT_INSTANCE_COUNT)
 	// RunnerTerminateAfterEachTask sets RUNNER_TERMINATE_AFTER_EACH_TASK; fleet-manager terminates the EC2 instance after one task.
 	RunnerTerminateAfterEachTask bool
-	// VolumeSizeGB is the root EBS volume size in GiB for launched runner instances.
-	// Defaults to 30 GiB when not set. Set via EC2_PROVISION_VOLUME_SIZE_GB.
-	VolumeSizeGB int32
 	// RunnerCloudWatchLogGroup sets RUNNER_CLOUDWATCH_LOG_GROUP in EC2 user-data (optional).
 	RunnerCloudWatchLogGroup string
 	// RunnerCloudWatchLogStreamPrefix sets RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX (optional; must match TASK_CLOUDWATCH_LOG_STREAM_PREFIX on fleet-manager).
 	RunnerCloudWatchLogStreamPrefix string
+	// RunnerProcessLogGroup is the CloudWatch log group for runner process (systemd service) logs.
+	// When set, the CloudWatch agent is installed and configured to ship journald output for
+	// superplane-runner.service to this group under stream name <instance-id>/runner-process.
+	RunnerProcessLogGroup string
+	// RunnerProcessLogRegion is the AWS region for runner process logs (defaults to RunnerCloudWatchRegion or us-east-1).
+	// VolumeSizeGB is the root EBS volume size in GiB for launched runner instances (default 30).
+	VolumeSizeGB int32
+	RunnerProcessLogRegion string
 }
 
 // ErrDisabled means EC2 pool management is off (hot instance count env not set).
@@ -74,6 +79,8 @@ const (
 	envHotCount            = "EC2_PROVISION_HOT_INSTANCE_COUNT"
 	envRunnerCWGroup       = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_GROUP"
 	envRunnerCWPrefix      = "EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX"
+	envRunnerProcCWGroup   = "EC2_PROVISION_RUNNER_PROCESS_LOG_GROUP"
+	envRunnerProcCWRegion  = "EC2_PROVISION_RUNNER_PROCESS_LOG_REGION"
 	envVolumeSizeGB        = "EC2_PROVISION_VOLUME_SIZE_GB"
 
 	defaultInstanceType = "t3.micro"
@@ -173,6 +180,8 @@ func ConfigFromEnv() (Config, error) {
 		RunnerTerminateAfterEachTask:    terminateAfterTask,
 		RunnerCloudWatchLogGroup:        strings.TrimSpace(os.Getenv(envRunnerCWGroup)),
 		RunnerCloudWatchLogStreamPrefix: strings.TrimSpace(os.Getenv(envRunnerCWPrefix)),
+		RunnerProcessLogGroup:           strings.TrimSpace(os.Getenv(envRunnerProcCWGroup)),
+		RunnerProcessLogRegion:          strings.TrimSpace(os.Getenv(envRunnerProcCWRegion)),
 		VolumeSizeGB:                    volumeSizeGB,
 	}, nil
 }
@@ -327,6 +336,25 @@ func userDataScript(c Config) string {
 	if c.RunnerTerminateAfterEachTask {
 		restartPolicy = "no"
 	}
+	// Install CloudWatch agent for runner process logs if configured.
+	if strings.TrimSpace(c.RunnerProcessLogGroup) != "" {
+		procRegion := c.RunnerProcessLogRegion
+		if procRegion == "" {
+			procRegion = c.RunnerInstallAWSRegion
+		}
+		if procRegion == "" {
+			procRegion = "us-east-1"
+		}
+		b.WriteString("# Install CloudWatch agent for runner process logs\n")
+		b.WriteString("curl -fsSL https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb -o /tmp/cwa.deb\n")
+		b.WriteString("dpkg -i /tmp/cwa.deb\n")
+		fmt.Fprintf(&b, "cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF'\n")
+		fmt.Fprintf(&b, `{\n  \"logs\": {\n    \"logs_collected\": {\n      \"files\": {\n        \"collect_list\": [{\n          \"file_path\": \"/var/log/superplane-runner.log\",\n          \"log_group_name\": %q,\n          \"log_stream_name\": \"{instance_id}/runner-process\",\n          \"timestamp_format\": \"%%Y-%%m-%%dT%%H:%%M:%%S\"\n        }]\n      }\n    },\n    \"log_stream_name\": \"{instance_id}/runner-process\"\n  },\n  \"agent\": {\n    \"region\": %q\n  }\n}\n`, c.RunnerProcessLogGroup, procRegion)
+		b.WriteString("CWEOF\n")
+		b.WriteString("/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s\n")
+		// Redirect systemd service stdout/stderr to a log file for CWA to pick up
+		b.WriteString("# Runner logs will be written to /var/log/superplane-runner.log via StandardOutput redirect\n")
+	}
 	b.WriteString("cat > /etc/systemd/system/superplane-runner.service <<'UNITEOF'\n")
 	b.WriteString("[Unit]\n")
 	b.WriteString("Description=Superplane runner (host process; host-mode tasks run on Ubuntu)\n")
@@ -346,6 +374,10 @@ func userDataScript(c Config) string {
 	b.WriteString("LockPersonality=no\n")
 	fmt.Fprintf(&b, "Restart=%s\n", restartPolicy)
 	b.WriteString("ExecStart=/usr/local/bin/runner\n")
+	if strings.TrimSpace(c.RunnerProcessLogGroup) != "" {
+		b.WriteString("StandardOutput=append:/var/log/superplane-runner.log\n")
+		b.WriteString("StandardError=append:/var/log/superplane-runner.log\n")
+	}
 	b.WriteString("\n")
 	b.WriteString("[Install]\n")
 	b.WriteString("WantedBy=multi-user.target\n")
