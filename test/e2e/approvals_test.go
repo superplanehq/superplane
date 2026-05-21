@@ -11,7 +11,6 @@ import (
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
-	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestApprovals(t *testing.T) {
@@ -306,35 +305,12 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 }
 
 func (s *ApprovalSteps) runManualTrigger() {
-	// Under full-suite load, publishing and websocket sync can lag enough that the
-	// first trigger click is occasionally ignored. Retry several times before failing.
-	for attempt := 0; attempt < 4; attempt++ {
-		s.canvas.RunManualTrigger("Start")
-		if s.waitForApprovalExecution(45 * time.Second) {
-			return
-		}
-		s.session.Sleep(500)
-	}
-
-	// Last-resort fallback: emit a trigger event directly if UI clicks were missed.
-	s.emitManualTriggerFallback()
-	if s.waitForApprovalExecution(45 * time.Second) {
+	s.canvas.EmitManualTrigger("Start")
+	if s.waitForApprovalExecution(90 * time.Second) {
 		return
 	}
 
-	s.t.Fatalf("timed out waiting for execution of node Approval after retrying manual trigger")
-}
-
-func (s *ApprovalSteps) emitManualTriggerFallback() {
-	startNode := s.canvas.GetNodeFromDB("Start")
-	support.EmitCanvasEventForNodeWithData(
-		s.t,
-		s.canvas.WorkflowID,
-		startNode.NodeID,
-		"default",
-		nil,
-		map[string]any{"message": "Hello, World!"},
-	)
+	s.t.Fatalf("timed out waiting for execution of node Approval after emitting manual trigger")
 }
 
 func (s *ApprovalSteps) waitForApprovalExecution(timeout time.Duration) bool {

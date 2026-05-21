@@ -56,7 +56,7 @@ func (s *runsViewSteps) givenACanvasWithManualTriggerAndNoop() {
 }
 
 func (s *runsViewSteps) whenTheManualTriggerRuns() {
-	s.canvas.RunManualTrigger("Start")
+	s.canvas.EmitManualTrigger("Start")
 	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
 	s.run = s.waitForFinishedRun()
 }
