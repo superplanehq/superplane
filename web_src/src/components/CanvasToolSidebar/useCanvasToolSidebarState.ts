@@ -85,6 +85,7 @@ export function useCanvasToolSidebarState({
     readOnly,
     isToolSidebarOpen,
     showToolSidebarToggle,
+    isAgentEnabled: featureEnabled,
     handleToolSidebarToggle,
     openToolSidebar,
     closeToolSidebar,

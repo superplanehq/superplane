@@ -60,11 +60,8 @@ function OpenCanvasToolSidebar({
   onToggleVersionControl,
   versionsContent,
 }: CanvasToolSidebarProps) {
-  const [activeTab, setActiveTab] = useState(() => {
-    if (mode === "runs") return TAB_RUNS;
-    if (isVersionControlOpen) return TAB_VERSIONS;
-    return TAB_AGENT;
-  });
+  const hasAgentTab = toolSidebarState.isAgentEnabled;
+  const [activeTab, setActiveTab] = useState(() => defaultToolTab(mode, Boolean(isVersionControlOpen), hasAgentTab));
 
   useEffect(() => {
     if (mode === "runs") {
@@ -75,11 +72,15 @@ function OpenCanvasToolSidebar({
       setActiveTab(TAB_VERSIONS);
       return;
     }
-    setActiveTab((currentTab) => (currentTab === TAB_RUNS || currentTab === TAB_VERSIONS ? TAB_AGENT : currentTab));
-  }, [isVersionControlOpen, mode]);
+    setActiveTab((currentTab) => {
+      if (currentTab === TAB_AGENT && !hasAgentTab) return TAB_RUNS;
+      if ((currentTab === TAB_RUNS || currentTab === TAB_VERSIONS) && hasAgentTab) return TAB_AGENT;
+      return currentTab;
+    });
+  }, [hasAgentTab, isVersionControlOpen, mode]);
 
   const tabs = [
-    { value: TAB_AGENT, label: "Agent" },
+    ...(hasAgentTab ? [{ value: TAB_AGENT, label: "Agent" }] : []),
     { value: TAB_RUNS, label: "Runs" },
     { value: TAB_VERSIONS, label: "Versions" },
   ] as const;
@@ -121,7 +122,7 @@ function OpenCanvasToolSidebar({
           onSelectTab={(value) => handleTabSelect(value as typeof TAB_AGENT | typeof TAB_RUNS | typeof TAB_VERSIONS)}
         />
 
-        {activeTab === TAB_AGENT ? (
+        {activeTab === TAB_AGENT && hasAgentTab ? (
           <div className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden" role="tabpanel">
             <AgentTabPanel toolSidebarState={toolSidebarState} />
           </div>
@@ -139,4 +140,11 @@ function OpenCanvasToolSidebar({
       </div>
     </SidebarShell>
   );
+}
+
+function defaultToolTab(mode: CanvasToolSidebarMode, isVersionControlOpen: boolean, hasAgentTab: boolean) {
+  if (mode === "runs") return TAB_RUNS;
+  if (isVersionControlOpen) return TAB_VERSIONS;
+  if (hasAgentTab) return TAB_AGENT;
+  return TAB_RUNS;
 }
