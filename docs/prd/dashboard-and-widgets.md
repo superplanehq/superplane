@@ -279,6 +279,52 @@ Number panels aggregate rows into a single KPI. Supported aggregations are:
 
 Aggregations other than `count` require a non-empty `field`.
 
+### Display Symbols
+
+`render.prefix` and `render.suffix` wrap the formatted value with a literal string. Use them for currency or unit hints — e.g. `prefix: "R$"`, `suffix: " MWh"`. They apply after `render.format`, so locale-aware formatting (`number`, `percent`, `duration`) is preserved. When the aggregate is null/empty the widget still renders the em-dash placeholder without symbols.
+
+```yaml
+render:
+  kind: number
+  aggregation: sum
+  field: cost
+  format: number
+  prefix: "R$"
+```
+
+### Composite Memory Sources
+
+Number panels backed by memory accept a composite data source that aggregates each namespace with its own configuration and then merges the partials. This is useful when the contributing namespaces have different schemas (for example "sum of cost" in one namespace and "count of tests" in another).
+
+```yaml
+type: number
+content:
+  dataSource:
+    kind: memory
+    combine: sum
+    sources:
+      - namespace: expenses
+        aggregation: sum
+        field: cost
+      - namespace: tests
+        aggregation: count
+  render:
+    kind: number
+    format: number
+    prefix: "R$"
+```
+
+Rules:
+
+- `sources` is a non-empty array. Each entry needs a non-empty `namespace`, an `aggregation` from the standard set, and a `field` when the aggregation is anything other than `count`. An optional `fieldPath` flattens the entry the same way the single-namespace memory source does.
+- `combine` is one of `sum`, `min`, `max`, or `avg`. `sum` is the default the form seeds when switching to the composite mode.
+- When `sources` is set, `render.aggregation` and `render.field` must be absent — the per-source configuration is the source of truth.
+- Partial values that are `null` (for example a namespace with no numeric rows under `sum`) are skipped during combine; the panel only renders the em-dash placeholder when every partial is null.
+- `avg` is an unweighted mean of the available partials, not a row-weighted average across namespaces. Pick `sum` when row-level math is required.
+- Sparklines are only available for the single-source mode in this iteration.
+
+The editor exposes a Single / Multiple toggle in the Number panel form. Switching to Multiple seeds one source from the current single-source configuration so existing panels do not lose context.
+
 ## Node Panels
 
 Node panels resolve the configured `node` by id or name. They display the latest status from `deriveDashboardNodeStatuses` and can optionally show a manual Run button.

@@ -112,12 +112,17 @@ export type WidgetNumberAggregation = "count" | "sum" | "avg" | "min" | "max" | 
 
 export interface WidgetNumberRender {
   kind: "number";
-  aggregation: WidgetNumberAggregation;
+  /** Required for simple data sources. Composite memory sources carry their own per-source aggregation. */
+  aggregation?: WidgetNumberAggregation;
   field?: string;
   filters?: string[];
   format?: WidgetColumnFormat;
   label?: string;
   sparklineField?: string;
+  /** Optional display string rendered before the formatted value (e.g. "R$"). */
+  prefix?: string;
+  /** Optional display string rendered after the formatted value (e.g. " MWh"). */
+  suffix?: string;
 }
 
 export type WidgetRender = WidgetTableRender | WidgetChartRender | WidgetNumberRender;

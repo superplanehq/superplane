@@ -384,6 +384,88 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			},
 			contains: "dataSource.limit must be a number",
 		},
+		{
+			name: "number render prefix must be string",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "runs"},
+					"render":     map[string]any{"kind": "number", "aggregation": "count", "prefix": 42},
+				},
+			},
+			contains: "render.prefix must be a string",
+		},
+		{
+			name: "composite number panel rejects render.aggregation",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"dataSource": map[string]any{
+						"kind":    "memory",
+						"combine": "sum",
+						"sources": []any{
+							map[string]any{"namespace": "a", "aggregation": "sum", "field": "cost"},
+						},
+					},
+					"render": map[string]any{"kind": "number", "aggregation": "sum", "field": "cost"},
+				},
+			},
+			contains: "render.aggregation must not be set",
+		},
+		{
+			name: "composite number panel rejects unknown combine",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"dataSource": map[string]any{
+						"kind":    "memory",
+						"combine": "median",
+						"sources": []any{
+							map[string]any{"namespace": "a", "aggregation": "sum", "field": "cost"},
+						},
+					},
+					"render": map[string]any{"kind": "number"},
+				},
+			},
+			contains: "dataSource.combine must be one of",
+		},
+		{
+			name: "composite number panel requires field for non-count source",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"dataSource": map[string]any{
+						"kind":    "memory",
+						"combine": "sum",
+						"sources": []any{
+							map[string]any{"namespace": "a", "aggregation": "sum"},
+						},
+					},
+					"render": map[string]any{"kind": "number"},
+				},
+			},
+			contains: "dataSource.sources[0].field is required",
+		},
+		{
+			name: "composite number panel rejects empty sources",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"dataSource": map[string]any{
+						"kind":    "memory",
+						"combine": "sum",
+						"sources": []any{},
+					},
+					"render": map[string]any{"kind": "number"},
+				},
+			},
+			contains: "dataSource.sources must be a non-empty array",
+		},
 	}
 
 	for _, tt := range tests {
@@ -393,4 +475,27 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			assert.Contains(t, err.Error(), tt.contains)
 		})
 	}
+}
+
+func TestValidateDashboardContent_AcceptsCompositeNumberPanel(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "score",
+			Type: DashboardPanelTypeNumber,
+			Content: map[string]any{
+				"dataSource": map[string]any{
+					"kind":    "memory",
+					"combine": "sum",
+					"sources": []any{
+						map[string]any{"namespace": "a", "aggregation": "sum", "field": "cost"},
+						map[string]any{"namespace": "b", "aggregation": "count"},
+					},
+				},
+				"render": map[string]any{"kind": "number", "prefix": "R$"},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
 }

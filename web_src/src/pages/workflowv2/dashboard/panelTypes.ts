@@ -13,6 +13,7 @@
 
 import type {
   WidgetChartRender,
+  WidgetNumberAggregation,
   WidgetNumberRender,
   WidgetRowAction,
   WidgetTableColumn,
@@ -109,7 +110,36 @@ export type TablePanelDataSource =
   | { kind: "executions"; node?: string; limit?: number }
   | { kind: "runs"; limit?: number };
 export type ChartPanelDataSource = TablePanelDataSource;
-export type NumberPanelDataSource = TablePanelDataSource;
+
+/** How partial aggregates from a composite memory data source are combined into a single value. */
+export type WidgetNumberCombine = "sum" | "min" | "max" | "avg";
+export const WIDGET_NUMBER_COMBINE_OPS: WidgetNumberCombine[] = ["sum", "min", "max", "avg"];
+
+/** One namespace contribution inside a composite memory data source. */
+export interface MemoryNumberSource {
+  namespace: string;
+  aggregation: WidgetNumberAggregation;
+  field?: string;
+  fieldPath?: string;
+}
+
+export type CompositeMemoryNumberDataSource = {
+  kind: "memory";
+  sources: MemoryNumberSource[];
+  combine: WidgetNumberCombine;
+};
+
+/**
+ * Number panels accept the shared table/chart data sources plus a composite
+ * memory variant where each namespace carries its own aggregation and field.
+ */
+export type NumberPanelDataSource = TablePanelDataSource | CompositeMemoryNumberDataSource;
+
+export function isCompositeMemoryDataSource(value: unknown): value is CompositeMemoryNumberDataSource {
+  const obj = asObject(value);
+  if (!obj) return false;
+  return obj.kind === "memory" && Array.isArray(obj.sources);
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Templates — used to seed new panels
@@ -243,6 +273,58 @@ function validateMemoryDataSource(obj: Record<string, unknown>): string | null {
   }
   if (obj.fieldPath != null && typeof obj.fieldPath !== "string") {
     return "dataSource.fieldPath must be a string.";
+  }
+  return null;
+}
+
+/**
+ * Number panels accept either the shared data-source shapes (memory with a
+ * single namespace, executions, runs) or a composite memory variant where
+ * each namespace declares its own aggregation/field and the partials are
+ * merged with a configured combine operator.
+ */
+function validateNumberDataSource(value: unknown): string | null {
+  const obj = asObject(value);
+  if (!obj) return "dataSource must be an object.";
+  if (obj.kind === "memory" && Array.isArray(obj.sources)) {
+    return validateCompositeMemoryDataSource(obj);
+  }
+  return validateDataSource(value);
+}
+
+const ALLOWED_NUMBER_AGGREGATIONS = ["count", "sum", "avg", "min", "max", "first", "last"];
+
+function validateCompositeMemoryDataSource(obj: Record<string, unknown>): string | null {
+  const sources = obj.sources as unknown[];
+  if (sources.length === 0) {
+    return "dataSource.sources must be a non-empty array.";
+  }
+  for (let i = 0; i < sources.length; i += 1) {
+    const sourceError = validateMemoryNumberSource(sources[i], i);
+    if (sourceError) return sourceError;
+  }
+  if (typeof obj.combine !== "string" || !WIDGET_NUMBER_COMBINE_OPS.includes(obj.combine as WidgetNumberCombine)) {
+    return `dataSource.combine must be one of ${WIDGET_NUMBER_COMBINE_OPS.join(", ")}.`;
+  }
+  return null;
+}
+
+function validateMemoryNumberSource(raw: unknown, index: number): string | null {
+  const source = asObject(raw);
+  if (!source) return `dataSource.sources[${index}] must be an object.`;
+  if (typeof source.namespace !== "string" || source.namespace.trim() === "") {
+    return `dataSource.sources[${index}].namespace must be a non-empty string.`;
+  }
+  if (typeof source.aggregation !== "string" || !ALLOWED_NUMBER_AGGREGATIONS.includes(source.aggregation)) {
+    return `dataSource.sources[${index}].aggregation must be one of ${ALLOWED_NUMBER_AGGREGATIONS.join(", ")}.`;
+  }
+  if (source.aggregation !== "count") {
+    if (typeof source.field !== "string" || source.field.trim() === "") {
+      return `dataSource.sources[${index}].field is required when aggregation is "${source.aggregation}".`;
+    }
+  }
+  if (source.fieldPath != null && typeof source.fieldPath !== "string") {
+    return `dataSource.sources[${index}].fieldPath must be a string.`;
   }
   return null;
 }
@@ -419,11 +501,19 @@ function validateChartContent(content: unknown): string | null {
 function validateNumberContent(content: unknown): string | null {
   const obj = asObject(content);
   if (!obj) return "content must be an object.";
-  const dsError = validateDataSource(obj.dataSource);
+  const dsError = validateNumberDataSource(obj.dataSource);
   if (dsError) return dsError;
   const render = asObject(obj.render);
   if (!render) return "render must be an object.";
   if (render.kind !== "number") return 'render.kind must be "number".';
+  const symbolError = validateNumberRenderSymbols(render);
+  if (symbolError) return symbolError;
+  if (isCompositeMemoryDataSource(obj.dataSource)) {
+    if (render.aggregation !== undefined) {
+      return "render.aggregation must not be set when dataSource.sources is used (each source defines its own aggregation).";
+    }
+    return null;
+  }
   const allowedAggregations = ["count", "sum", "avg", "min", "max", "first", "last"];
   if (typeof render.aggregation !== "string" || !allowedAggregations.includes(render.aggregation)) {
     return `render.aggregation must be one of ${allowedAggregations.join(", ")}.`;
@@ -432,6 +522,16 @@ function validateNumberContent(content: unknown): string | null {
     if (typeof render.field !== "string" || render.field.trim() === "") {
       return `render.field is required when aggregation is "${render.aggregation}".`;
     }
+  }
+  return null;
+}
+
+function validateNumberRenderSymbols(render: Record<string, unknown>): string | null {
+  if (render.prefix !== undefined && render.prefix !== null && typeof render.prefix !== "string") {
+    return "render.prefix must be a string.";
+  }
+  if (render.suffix !== undefined && render.suffix !== null && typeof render.suffix !== "string") {
+    return "render.suffix must be a string.";
   }
   return null;
 }

@@ -13,6 +13,7 @@ import { TypedPanelShell } from "./TypedPanelShell";
 import { useDashboardContext } from "./DashboardContext";
 import type { ChartPanelContent } from "./panelTypes";
 import { useWidgetData } from "./widget/useWidgetData";
+import { useMemoryCatalog } from "./widget/useMemoryCatalog";
 import { WidgetChart } from "./widget/WidgetChart";
 import type { WidgetChartKind, WidgetChartSeries } from "./widget/types";
 
@@ -73,6 +74,13 @@ function ChartPanelForm({
   value: ChartPanelContent;
   onChange: (next: ChartPanelContent) => void;
 }) {
+  const ctx = useDashboardContext();
+  const canvasId = ctx?.canvasId;
+  const memoryNamespace = value.dataSource.kind === "memory" ? value.dataSource.namespace : undefined;
+  const { fields } = useMemoryCatalog(canvasId, memoryNamespace);
+  const fieldListId = memoryNamespace ? `chart-fields-${memoryNamespace}` : undefined;
+  const hasFieldSuggestions = fields.length > 0 && Boolean(fieldListId);
+
   const updateSeries = (idx: number, patch: Partial<WidgetChartSeries>) => {
     const series = value.render.series.map((s, i) => (i === idx ? { ...s, ...patch } : s));
     onChange({ ...value, render: { ...value.render, series } });
@@ -120,12 +128,21 @@ function ChartPanelForm({
         <div className="space-y-1.5">
           <Label className="text-xs font-medium text-slate-600">X-axis field</Label>
           <Input
+            list={hasFieldSuggestions ? fieldListId : undefined}
             value={value.render.xField}
             onChange={(e) => onChange({ ...value, render: { ...value.render, xField: e.target.value } })}
             placeholder="e.g. status"
+            data-testid="chart-x-field"
           />
         </div>
       </div>
+      {hasFieldSuggestions ? (
+        <datalist id={fieldListId}>
+          {fields.map((f) => (
+            <option key={f.field} value={f.field} />
+          ))}
+        </datalist>
+      ) : null}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label className="text-xs font-medium text-slate-600">Series</Label>
@@ -137,6 +154,7 @@ function ChartPanelForm({
           {value.render.series.map((s, idx) => (
             <div key={idx} className="grid grid-cols-12 items-center gap-2 rounded border border-slate-200 p-2">
               <Input
+                list={hasFieldSuggestions ? fieldListId : undefined}
                 className="col-span-5 h-8"
                 value={s.field ?? ""}
                 onChange={(e) => updateSeries(idx, { field: e.target.value || undefined })}
