@@ -1,6 +1,10 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RubricWidget } from "./RubricWidget";
+
+vi.mock("@monaco-editor/react", () => ({
+  default: ({ value }: { value?: string }) => <pre data-testid="monaco-stub">{value}</pre>,
+}));
 
 describe("RubricWidget", () => {
   it("renders markdown for criteria in the inline preview", () => {
@@ -51,8 +55,7 @@ describe("RubricWidget", () => {
     render(<RubricWidget title="Test Plan" criteria={[{ text: "Run this:\n\n```bash\nnpm test\n```" }]} />);
 
     // No modal opened — this exercises the inline preview only.
-    const codeElement = screen.getByText("npm test", { selector: "code" });
-    expect(codeElement.closest("pre")).not.toBeNull();
+    expect(screen.getByTestId("monaco-stub")).toHaveTextContent("npm test");
   });
 
   it("renders markdown for criteria inside a categorized inline preview", () => {
@@ -82,9 +85,34 @@ describe("RubricWidget", () => {
     const modal = heading.closest("div.fixed") as HTMLElement;
     expect(modal).not.toBeNull();
 
-    // The fenced code block must render as <pre><code>, not as raw backticks.
-    const codeElement = within(modal).getByText("npm test", { selector: "code" });
-    expect(codeElement.closest("pre")).not.toBeNull();
+    expect(within(modal).getByTestId("monaco-stub")).toHaveTextContent("npm test");
+  });
+
+  it("keeps numbering aligned after body-rendered categories", () => {
+    render(
+      <RubricWidget
+        title="Test Plan"
+        criteria={[{ text: "First" }, { text: "Second" }, { text: "Fallback item" }]}
+        categories={[
+          {
+            heading: "Body",
+            criteria: [{ text: "First" }, { text: "Second" }],
+            body: "1. First\n2. Second",
+          },
+          {
+            heading: "Fallback",
+            criteria: [{ text: "Fallback item" }],
+          },
+        ]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /view full plan/i }));
+
+    const fallbackItem = screen.getByText("Fallback item");
+    const fallbackRow = fallbackItem.closest("div.flex") as HTMLElement;
+    expect(fallbackRow).not.toBeNull();
+    expect(within(fallbackRow).getByText("3.")).toBeInTheDocument();
   });
 
   it("wraps GFM tables in a horizontal overflow container (Full Plan modal)", () => {

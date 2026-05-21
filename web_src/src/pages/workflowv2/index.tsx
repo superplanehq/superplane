@@ -149,6 +149,13 @@ const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
 const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
+
+function clearComponentSidebarSearchParams(params: URLSearchParams): URLSearchParams {
+  params.delete("sidebar");
+  params.delete("node");
+  return params;
+}
+
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
 type CanvasSaveResult = {
   status: "saved" | "replaced" | "stale";
@@ -894,7 +901,7 @@ export function WorkflowPageV2() {
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.delete("version");
-        return next;
+        return clearComponentSidebarSearchParams(next);
       });
       hasSyncedVersionFromURLRef.current = true;
       return;
@@ -1412,7 +1419,7 @@ export function WorkflowPageV2() {
         if (version.metadata?.id) {
           next.set("version", version.metadata.id);
         }
-        return next;
+        return clearComponentSidebarSearchParams(next);
       });
 
       queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
@@ -4183,7 +4190,7 @@ export function WorkflowPageV2() {
         setSearchParams((current) => {
           const next = new URLSearchParams(current);
           next.set("version", editVersionID);
-          return next;
+          return clearComponentSidebarSearchParams(next);
         });
       }
 
@@ -4251,7 +4258,7 @@ export function WorkflowPageV2() {
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.delete("version");
-        return next;
+        return clearComponentSidebarSearchParams(next);
       });
       await refreshLatestLiveCanvasData();
       showSuccessToast("Version published");
@@ -4342,7 +4349,7 @@ export function WorkflowPageV2() {
           setSearchParams((current) => {
             const next = new URLSearchParams(current);
             next.delete("version");
-            return next;
+            return clearComponentSidebarSearchParams(next);
           });
           await refreshLatestLiveCanvasData();
         },
@@ -4498,7 +4505,7 @@ export function WorkflowPageV2() {
           setSearchParams((current) => {
             const next = new URLSearchParams(current);
             next.set("version", resolvedVersionID);
-            return next;
+            return clearComponentSidebarSearchParams(next);
           });
         }
 
@@ -4581,7 +4588,7 @@ export function WorkflowPageV2() {
         } else {
           next.set("version", versionID);
         }
-        return next;
+        return clearComponentSidebarSearchParams(next);
       });
 
       queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
@@ -4994,7 +5001,7 @@ export function WorkflowPageV2() {
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.delete("version");
-        return next;
+        return clearComponentSidebarSearchParams(next);
       });
 
       if (liveCanvasVersion?.spec) {

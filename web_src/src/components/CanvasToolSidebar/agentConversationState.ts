@@ -92,10 +92,10 @@ export function createWebsocketCallbacks(
 export function buildRubricText(rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }): string {
   if (rubric.categories && rubric.categories.length > 0) {
     const sections = rubric.categories
-      .map(
-        (category) =>
-          `## ${category.heading}\n${category.criteria.map((criterion) => `- ${criterion.text}`).join("\n")}`,
-      )
+      .map((category) => {
+        const body = category.body || category.criteria.map((criterion) => `- ${criterion.text}`).join("\n");
+        return `## ${category.heading}\n${body}`;
+      })
       .join("\n\n");
     return `# ${rubric.title}\n\n${sections}`;
   }
