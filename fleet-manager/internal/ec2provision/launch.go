@@ -56,7 +56,8 @@ type Config struct {
 	// superplane-runner.service to this group under stream name <instance-id>/runner-process.
 	RunnerProcessLogGroup string
 	// RunnerProcessLogRegion is the AWS region for runner process logs (defaults to RunnerCloudWatchRegion or us-east-1).
-	// VolumeSizeGB is the root EBS volume size in GiB for launched runner instances (default 30).
+	// VolumeSizeGB is the root EBS volume size in GiB for launched runner instances.
+	// Defaults to 30 GiB when not set. Set via EC2_PROVISION_VOLUME_SIZE_GB.
 	VolumeSizeGB int32
 	RunnerProcessLogRegion string
 }
