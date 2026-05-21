@@ -2,6 +2,8 @@ package shared
 
 import (
 	"fmt"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -89,14 +91,29 @@ func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
 }
 
 func (s *CanvasSteps) Create() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/new")
-	s.session.FillIn(q.TestID("canvas-name-input"), s.CanvasName)
-	s.session.Click(q.TestID("create-canvas-button"))
-	s.session.Sleep(500)
+	s.session.Visit("/" + s.session.OrgID.String() + "/")
+	s.session.Click(q.Text("New App"))
+	s.session.Sleep(300)
+	s.session.FillIn(q.TestID("create-app-name-input"), s.CanvasName)
+	s.session.Click(q.TestID("create-app-save-button"))
+	s.session.Sleep(1000)
 
-	wf, err := models.FindCanvasByName(s.CanvasName, s.session.OrgID)
-	require.NoError(s.t, err)
-	s.WorkflowID = wf.ID
+	s.WorkflowID = extractCanvasIDFromURL(s.t, s.session.Page().URL())
+}
+
+func extractCanvasIDFromURL(t *testing.T, rawURL string) uuid.UUID {
+	t.Helper()
+
+	parsedURL, err := url.Parse(rawURL)
+	require.NoError(t, err)
+
+	matches := regexp.MustCompile(`/canvases/([0-9a-f-]{36})`).FindStringSubmatch(parsedURL.Path)
+	require.Len(t, matches, 2, "expected canvas ID in URL %q", rawURL)
+
+	canvasID, err := uuid.Parse(matches[1])
+	require.NoError(t, err)
+
+	return canvasID
 }
 
 func (s *CanvasSteps) Visit() {
