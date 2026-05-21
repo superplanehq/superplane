@@ -11,7 +11,6 @@ import (
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
-	"github.com/superplanehq/superplane/test/support"
 )
 
 func TestSendEmailComponent(t *testing.T) {
@@ -141,7 +140,7 @@ func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) 
 }
 
 func (s *SendEmailSteps) runManualTrigger() {
-	s.canvas.RunManualTrigger("Start")
+	s.canvas.EmitManualTrigger("Start")
 	s.canvas.WaitForExecution(
 		"Send Email",
 		models.CanvasNodeExecutionStateFinished,
@@ -161,13 +160,7 @@ func (s *SendEmailSteps) givenSMTPSettingsExist() {
 }
 
 func (s *SendEmailSteps) runManualTriggerAndWaitForFinish() {
-	s.canvas.RunManualTrigger("Start")
-	if s.waitForSendEmailFinished(90 * time.Second) {
-		return
-	}
-
-	// Fallback for missed click in overloaded suites: emit trigger directly.
-	s.emitManualTriggerFallback()
+	s.canvas.EmitManualTrigger("Start")
 	_ = s.waitForSendEmailFinished(180 * time.Second)
 }
 
@@ -181,18 +174,6 @@ func (s *SendEmailSteps) waitForSendEmailFinished(timeout time.Duration) bool {
 		s.session.Sleep(500)
 	}
 	return false
-}
-
-func (s *SendEmailSteps) emitManualTriggerFallback() {
-	startNode := s.canvas.GetNodeFromDB("Start")
-	support.EmitCanvasEventForNodeWithData(
-		s.t,
-		s.canvas.WorkflowID,
-		startNode.NodeID,
-		"default",
-		nil,
-		map[string]any{"message": "Hello, World!"},
-	)
 }
 
 func (s *SendEmailSteps) assertSendEmailExecutionFinished() {
