@@ -223,3 +223,9 @@ func (c *Client) GetRepositoryTag(namespace, repository, tag string) (*Tag, erro
 
 	return &result, nil
 }
+
+func (c *Client) DeleteRepositoryTag(namespace, repository, tag string) error {
+	path := fmt.Sprintf("/v2/namespaces/%s/repositories/%s/tags/%s", namespace, repository, tag)
+	_, _, err := c.doRequest(http.MethodDelete, path, nil)
+	return err
+}
