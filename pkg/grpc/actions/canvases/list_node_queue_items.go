@@ -115,7 +115,7 @@ func getInputForQueueItem(queueItem models.CanvasNodeQueueItem, events []models.
 				return nil, fmt.Errorf("event data cannot be turned into input for queue item %s", queueItem.ID.String())
 			}
 
-			data, err := structpb.NewStruct(eventData)
+			data, err := newStructpbStruct(eventData)
 			if err != nil {
 				return nil, err
 			}
