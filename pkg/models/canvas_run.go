@@ -22,6 +22,7 @@ const (
 type CanvasRun struct {
 	ID         uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
 	WorkflowID uuid.UUID
+	VersionID  uuid.UUID
 	State      string
 	Result     string
 	CreatedAt  *time.Time
@@ -89,9 +90,15 @@ func FindOrCreateCanvasRunForRootEventInTransaction(tx *gorm.DB, rootEvent *Canv
 }
 
 func CreateCanvasRunInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*CanvasRun, error) {
+	liveVersion, err := FindLiveCanvasVersionInTransaction(tx, workflowID)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	run := &CanvasRun{
 		WorkflowID: workflowID,
+		VersionID:  liveVersion.ID,
 		State:      CanvasRunStateStarted,
 		CreatedAt:  &now,
 		UpdatedAt:  &now,
