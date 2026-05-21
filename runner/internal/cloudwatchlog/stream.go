@@ -27,9 +27,9 @@ type StreamConfig struct {
 
 // StreamWriter batches task log bytes into CloudWatch log events.
 type StreamWriter struct {
-	client *cloudwatchlogs.Client
-	group  string
-	stream string
+	client    *cloudwatchlogs.Client
+	group     string
+	stream    string
 	mu        sync.Mutex
 	buf       []byte
 	token     *string
