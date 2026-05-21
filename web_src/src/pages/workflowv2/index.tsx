@@ -90,8 +90,9 @@ import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
 import { WorkflowDashboardOverlay } from "./dashboard/WorkflowDashboardOverlay";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useMemoryModeActions } from "./useMemoryModeActions";
+import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
-import { MemoryOverlay } from "./MemoryOverlay";
+import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
 import { countMemoryNamespaces } from "./memoryNamespaces";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
@@ -140,15 +141,11 @@ import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabil
 import {
   getCanvasLogNodesSignature,
   getNodeAnalyticsProps,
+  isCanvasLoadNotFoundError,
   prepareData,
   prepareSidebarData,
 } from "./workflowPageHelpers";
-/**
- * Experimental feature id; must match `FeatureDashboards` in pkg/features/features.go.
- *
- * The flag id stays as "dashboards" for backend compatibility; the feature is
- * surfaced to users as "Console" (see `experimentalFeatureDisplay.ts`).
- */
+/** Backend flag id (`FeatureDashboards`); UI label is "Console" via `experimentalFeatureDisplay.ts`. */
 const EXPERIMENTAL_FEATURE_DASHBOARDS = "dashboards";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
@@ -777,18 +774,11 @@ export function WorkflowPageV2() {
   // Redirect to home page if workflow is not found (404)
   // Use replace to avoid back button issues and prevent 404 flash
   useEffect(() => {
-    if (canvasError && !canvasLoading) {
-      // Check if it's a 404 error
-      const is404 =
-        (canvasError as any)?.status === 404 ||
-        (canvasError as any)?.response?.status === 404 ||
-        (canvasError as any)?.code === "NOT_FOUND" ||
-        (canvasError as any)?.message?.includes("not found") ||
-        (canvasError as any)?.message?.includes("404");
-
-      if (is404 && organizationId && !canvasDeletedRemotely) {
-        navigate(`/${organizationId}`, { replace: true });
-      }
+    if (!canvasError || canvasLoading) {
+      return;
+    }
+    if (isCanvasLoadNotFoundError(canvasError) && organizationId && !canvasDeletedRemotely) {
+      navigate(`/${organizationId}`, { replace: true });
     }
   }, [canvasError, canvasLoading, navigate, organizationId, canvasDeletedRemotely]);
   useEffect(() => {
@@ -4855,69 +4845,19 @@ export function WorkflowPageV2() {
     setSelectedRunId,
   });
 
-  const handleEnterEditModeFromHeader = useCallback(async () => {
-    if (isDashboardMode) {
-      handleExitDashboardMode();
-      await handleToggleEditMode();
-      return;
-    }
-    if (isMemoryMode) {
-      handleExitMemoryMode();
-      await handleToggleEditMode();
-      return;
-    }
-    if (isRunsMode) {
-      setIsRunsMode(false);
-      setSelectedRunId(null);
-      setRunDetailNodeId(null);
-      await handleToggleEditMode();
-      setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          next.delete("view");
-          next.delete("run");
-          return next;
-        },
-        { replace: true },
-      );
-      return;
-    }
-    await handleToggleEditMode();
-  }, [
-    handleExitDashboardMode,
-    handleExitMemoryMode,
-    handleToggleEditMode,
+  const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader } = useWorkflowHeaderEditActions({
     isDashboardMode,
     isMemoryMode,
     isRunsMode,
-    setIsRunsMode,
-    setSearchParams,
-    setSelectedRunId,
-  ]);
-
-  const handleExitEditModeFromHeader = useCallback(async () => {
-    if (isDashboardMode) {
-      handleExitDashboardMode();
-      return;
-    }
-    if (isMemoryMode) {
-      handleExitMemoryMode();
-      return;
-    }
-    if (isRunsMode) {
-      handleExitRunsMode();
-      return;
-    }
-    await handleToggleEditMode();
-  }, [
     handleExitDashboardMode,
     handleExitMemoryMode,
     handleExitRunsMode,
     handleToggleEditMode,
-    isDashboardMode,
-    isMemoryMode,
-    isRunsMode,
-  ]);
+    setIsRunsMode,
+    setSelectedRunId,
+    setRunDetailNodeId,
+    setSearchParams,
+  });
 
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
@@ -5589,25 +5529,16 @@ export function WorkflowPageV2() {
           nodeStatuses={dashboardNodeStatuses}
           onTriggerNode={handleDashboardTriggerNode}
         />
-        {isMemoryMode ? (
-          <MemoryOverlay
-            entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
-            isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}
-            errorMessage={
-              isViewingDraftVersion
-                ? undefined
-                : canvasMemoryError instanceof Error
-                  ? canvasMemoryError.message
-                  : undefined
-            }
-            onDeleteEntry={
-              canUpdateCanvas && isViewingLiveVersion
-                ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId)
-                : undefined
-            }
-            deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
-          />
-        ) : null}
+        <WorkflowMemoryOverlayLayer
+          isMemoryMode={isMemoryMode}
+          isViewingDraftVersion={isViewingDraftVersion}
+          isViewingLiveVersion={isViewingLiveVersion}
+          canUpdateCanvas={canUpdateCanvas}
+          entries={canvasMemoryEntries}
+          isLoading={canvasMemoryLoading}
+          error={canvasMemoryError}
+          deleteCanvasMemoryEntry={deleteCanvasMemoryEntry}
+        />
         <CanvasPage
           key={canvasRenderKey}
           // Persist right sidebar in query params
