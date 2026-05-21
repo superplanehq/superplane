@@ -20,6 +20,7 @@ const {
   useCanvases,
   useCanvasFolders,
   useDeleteCanvas,
+  useCreateCanvas,
   useCreateCanvasFolder,
   useUpdateCanvasFolder,
   useMoveCanvasFolder,
@@ -29,6 +30,7 @@ const {
   useCanvases: vi.fn(),
   useCanvasFolders: vi.fn(),
   useDeleteCanvas: vi.fn(),
+  useCreateCanvas: vi.fn(),
   useCreateCanvasFolder: vi.fn(),
   useUpdateCanvasFolder: vi.fn(),
   useMoveCanvasFolder: vi.fn(),
@@ -39,6 +41,8 @@ const {
 const mutationMocks = vi.hoisted(() => ({
   deleteCanvas: vi.fn(),
   deleteCanvasAsync: vi.fn(),
+  createCanvas: vi.fn(),
+  createCanvasAsync: vi.fn(),
   createCanvasFolder: vi.fn(),
   updateCanvasFolder: vi.fn(),
   moveCanvasFolder: vi.fn(),
@@ -92,6 +96,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useCanvases,
   useCanvasFolders,
   useDeleteCanvas,
+  useCreateCanvas,
   useCreateCanvasFolder,
   useUpdateCanvasFolder,
   useMoveCanvasFolder,
@@ -159,6 +164,11 @@ describe("HomePage canvas folders", () => {
       mutateAsync: mutationMocks.deleteCanvasAsync,
       isPending: false,
     });
+    useCreateCanvas.mockReturnValue({
+      mutate: mutationMocks.createCanvas,
+      mutateAsync: mutationMocks.createCanvasAsync,
+      isPending: false,
+    });
     useCreateCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.createCanvasFolder, isPending: false });
     useUpdateCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.updateCanvasFolder, isPending: false });
     useMoveCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.moveCanvasFolder, isPending: false });
@@ -169,13 +179,28 @@ describe("HomePage canvas folders", () => {
     });
   });
 
-  it("uses the toolbar as the canvas creation entrypoint", () => {
+  it("uses the toolbar as the canvas creation entrypoint", async () => {
+    const user = userEvent.setup();
+    mutationMocks.createCanvasAsync.mockResolvedValue({
+      data: { canvas: { metadata: { id: "canvas-new" } } },
+    });
     useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
     useCanvasFolders.mockReturnValue({ data: [], isLoading: false, error: null });
 
     renderHome();
 
-    expect(screen.getByRole("link", { name: /new canvas/i })).toHaveAttribute("href", "/org-123/canvases/new");
+    await user.click(screen.getByRole("button", { name: /new app/i }));
+    expect(screen.getByRole("dialog", { name: /new app/i })).toBeInTheDocument();
+    expect(screen.getByLabelText("App name")).toHaveValue("Untitled App 1");
+
+    await user.click(screen.getByTestId("create-app-save-button"));
+
+    await waitFor(() => {
+      expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith({
+        name: "Untitled App 1",
+        method: "ui",
+      });
+    });
     expect(screen.queryByText("Point & Click")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Grid view")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("List view")).not.toBeInTheDocument();

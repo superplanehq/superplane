@@ -2,7 +2,7 @@ import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Palette, Plus, Search } from "lucide-react";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { CreateCanvasModal } from "../../components/CreateCanvasModal";
 import { Heading } from "../../components/Heading/heading";
 import { Input } from "../../components/Input/input";
@@ -15,6 +15,7 @@ import {
   DEFAULT_CANVAS_FOLDER_COLOR,
   useCanvasFolders,
   useCanvases,
+  useCreateCanvas,
   type CanvasFolderColor,
 } from "../../hooks/useCanvasData";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,10 @@ import type { CanvasFoldersCanvasFolder, CanvasesCanvas } from "@/api-client";
 import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { CanvasFolderSection } from "./CanvasFolderSection";
 import type { CanvasCardData, CanvasFolderData } from "./types";
+import { generateUntitledAppName } from "@/lib/untitledAppName";
+import { getUsageLimitToastMessage } from "@/lib/usageLimits";
+import { showErrorToast } from "@/lib/toast";
+import { CreateAppModal } from "./CreateAppModal";
 
 const compareByName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
 
@@ -60,11 +65,14 @@ export function HomePage() {
   usePageTitle(["Home"]);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCreateAppModalOpen, setIsCreateAppModalOpen] = useState(false);
   const canvasModalState = useCreateCanvasModalState();
+  const navigate = useNavigate();
 
   const { organizationId } = useParams<{ organizationId: string }>();
   const { account } = useAccount();
   const { canAct, isLoading: permissionsLoading } = usePermissions();
+  const createCanvasMutation = useCreateCanvas(organizationId || "");
 
   const {
     data: canvasesData = [],
@@ -111,6 +119,30 @@ export function HomePage() {
 
   const isLoading = canvasesLoading || canvasFoldersLoading;
 
+  const handleCreateApp = async (name: string) => {
+    if (!organizationId || !canCreateCanvases || createCanvasMutation.isPending) {
+      return;
+    }
+
+    try {
+      const result = await createCanvasMutation.mutateAsync({
+        name,
+        method: "ui",
+      });
+
+      const canvasId = result?.data?.canvas?.metadata?.id;
+      if (canvasId) {
+        setIsCreateAppModalOpen(false);
+        navigate(`/${organizationId}/canvases/${canvasId}`);
+      }
+    } catch (error) {
+      showErrorToast(getUsageLimitToastMessage(error, "Failed to create app"));
+      throw error;
+    }
+  };
+
+  const defaultAppName = generateUntitledAppName(canvases.map((canvas) => canvas.name));
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -149,11 +181,11 @@ export function HomePage() {
 
             <div className="mb-6">
               <CanvasToolbar
-                organizationId={organizationId}
                 searchQuery={searchQuery}
                 setSearchQuery={setSearchQuery}
                 canCreateCanvases={canCreateCanvases}
                 permissionsLoading={permissionsLoading}
+                onOpenCreateApp={() => setIsCreateAppModalOpen(true)}
               />
             </div>
 
@@ -178,43 +210,41 @@ export function HomePage() {
       </main>
 
       <CreateCanvasModal {...canvasModalState} />
+      <CreateAppModal
+        open={isCreateAppModalOpen}
+        defaultName={defaultAppName}
+        isSaving={createCanvasMutation.isPending}
+        onClose={() => setIsCreateAppModalOpen(false)}
+        onSave={handleCreateApp}
+      />
     </div>
   );
 }
 
 interface CanvasToolbarProps {
-  organizationId: string;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   canCreateCanvases: boolean;
   permissionsLoading: boolean;
+  onOpenCreateApp: () => void;
 }
 
 function CanvasToolbar({
-  organizationId,
   searchQuery,
   setSearchQuery,
   canCreateCanvases,
   permissionsLoading,
+  onOpenCreateApp,
 }: CanvasToolbarProps) {
   const allowed = canCreateCanvases || permissionsLoading;
 
   return (
     <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
       <PermissionTooltip allowed={allowed} message="You don't have permission to create canvases.">
-        {allowed ? (
-          <Button asChild>
-            <Link to={`/${organizationId}/canvases/new`} aria-label="Create new canvas">
-              <Plus className="h-4 w-4" />
-              New App
-            </Link>
-          </Button>
-        ) : (
-          <Button type="button" disabled>
-            <Plus className="h-4 w-4" />
-            New App
-          </Button>
-        )}
+        <Button type="button" onClick={onOpenCreateApp} disabled={!canCreateCanvases} aria-label="Create new app">
+          <Plus className="h-4 w-4" />
+          New App
+        </Button>
       </PermissionTooltip>
 
       <div className="min-w-0 w-full sm:ml-auto sm:w-80">

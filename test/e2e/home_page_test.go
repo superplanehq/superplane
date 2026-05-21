@@ -16,8 +16,8 @@ func TestHomePage(t *testing.T) {
 	t.Run("creating a new canvas", func(t *testing.T) {
 		steps.Start()
 		steps.VisitHomePage()
-		steps.FillInNewCanvasForm("Example Canvas")
-		steps.AssertCanvasSavedInDB("Example Canvas")
+		steps.ClickNewApp()
+		steps.AssertCanvasSavedInDB("Untitled App 1")
 	})
 
 	t.Run("showing canvases in folders", func(t *testing.T) {
@@ -66,11 +66,12 @@ func (steps *TestHomePageSteps) AssertCanvasFolderVisible(folderTitle, canvasNam
 	steps.session.AssertText(canvasName)
 }
 
-func (steps *TestHomePageSteps) FillInNewCanvasForm(canvasName string) {
-	steps.session.Visit("/" + steps.session.OrgID.String() + "/canvases/new")
-	steps.session.FillIn(q.TestID("canvas-name-input"), canvasName)
-	steps.session.Click(q.TestID("create-canvas-button"))
-	steps.session.Sleep(500)
+func (steps *TestHomePageSteps) ClickNewApp() {
+	steps.session.Click(q.Text("New App"))
+	steps.session.Sleep(300)
+	steps.session.FillIn(q.TestID("create-app-name-input"), "Untitled App 1")
+	steps.session.Click(q.TestID("create-app-save-button"))
+	steps.session.Sleep(1000)
 }
 
 func (steps *TestHomePageSteps) AssertComponentSavedInDB(s string) {
