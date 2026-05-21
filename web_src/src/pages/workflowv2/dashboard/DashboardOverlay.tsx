@@ -115,7 +115,7 @@ export function DashboardOverlay({
   // strip is gone and the grid fills the available area.
   const overlayContent = (
     <div
-      className="absolute inset-x-0 bottom-0 z-10 flex flex-col bg-slate-100 top-[calc(2.75rem+3rem)]"
+      className="absolute inset-x-0 bottom-0 top-20 z-10 flex flex-col bg-slate-100"
       data-testid="dashboard-overlay"
     >
       <div className="min-h-0 flex-1 overflow-auto">

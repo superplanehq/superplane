@@ -11,6 +11,7 @@ export function useWorkflowViewSearchParams(
 ) {
   const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
   const [isDashboardMode, setIsDashboardMode] = useState(() => searchParams.get("view") === "dashboard");
+  const [isMemoryMode, setIsMemoryMode] = useState(() => searchParams.get("view") === "memory");
   const [isDashboardAddPanelOpen, setIsDashboardAddPanelOpen] = useState(false);
   const [isDashboardYamlOpen, setIsDashboardYamlOpen] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(() => searchParams.get("run"));
@@ -23,6 +24,11 @@ export function useWorkflowViewSearchParams(
 
   useEffect(() => {
     setIsRunsMode(viewParam === "runs");
+    if (viewParam === "memory") {
+      setIsMemoryMode(true);
+    } else {
+      setIsMemoryMode(false);
+    }
     if (viewParam === "dashboard") {
       if (dashboardsFeatureEnabled) {
         setIsDashboardMode(true);
@@ -57,6 +63,8 @@ export function useWorkflowViewSearchParams(
     setIsRunsMode,
     isDashboardMode,
     setIsDashboardMode,
+    isMemoryMode,
+    setIsMemoryMode,
     isDashboardAddPanelOpen,
     setIsDashboardAddPanelOpen,
     isDashboardYamlOpen,

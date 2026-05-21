@@ -89,8 +89,9 @@ import { useDashboardModeActions } from "./dashboard/useDashboardModeActions";
 import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
 import { WorkflowDashboardOverlay } from "./dashboard/WorkflowDashboardOverlay";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
+import { useMemoryModeActions } from "./useMemoryModeActions";
+import { WorkflowMemoryOverlay } from "./WorkflowMemoryOverlay";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
-import { CanvasMemoryModal } from "./CanvasMemoryModal";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { CanvasYamlModal } from "./CanvasYamlModal";
@@ -192,6 +193,8 @@ export function WorkflowPageV2() {
     setIsRunsMode,
     isDashboardMode,
     setIsDashboardMode,
+    isMemoryMode,
+    setIsMemoryMode,
     isDashboardAddPanelOpen,
     setIsDashboardAddPanelOpen,
     isDashboardYamlOpen,
@@ -579,7 +582,6 @@ export function WorkflowPageV2() {
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
-  const [isMemoryViewModalOpen, setIsMemoryViewModalOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() =>
     readStoredBoolean(CANVAS_VERSION_CONTROL_STORAGE_KEY),
   );
@@ -4828,6 +4830,7 @@ export function WorkflowPageV2() {
     hasEditableVersion,
     liveCanvasVersionId,
     setIsDashboardMode,
+    setIsMemoryMode,
     setIsDashboardAddPanelOpen,
     setIsDashboardYamlOpen,
     setIsRunsMode,
@@ -4835,9 +4838,27 @@ export function WorkflowPageV2() {
     setSelectedRunId,
   });
 
+  const { handleSelectMemoryMode, handleExitMemoryMode } = useMemoryModeActions({
+    hasEditableVersion,
+    liveCanvasVersionId,
+    handleUseVersion,
+    setIsMemoryMode,
+    setIsDashboardMode,
+    setIsDashboardAddPanelOpen,
+    setIsDashboardYamlOpen,
+    setIsRunsMode,
+    setSelectedRunId,
+    setSearchParams,
+  });
+
   const handleEnterEditModeFromHeader = useCallback(async () => {
     if (isDashboardMode) {
       handleExitDashboardMode();
+      await handleToggleEditMode();
+      return;
+    }
+    if (isMemoryMode) {
+      handleExitMemoryMode();
       await handleToggleEditMode();
       return;
     }
@@ -4860,8 +4881,10 @@ export function WorkflowPageV2() {
     await handleToggleEditMode();
   }, [
     handleExitDashboardMode,
+    handleExitMemoryMode,
     handleToggleEditMode,
     isDashboardMode,
+    isMemoryMode,
     isRunsMode,
     setIsRunsMode,
     setSearchParams,
@@ -4873,12 +4896,24 @@ export function WorkflowPageV2() {
       handleExitDashboardMode();
       return;
     }
+    if (isMemoryMode) {
+      handleExitMemoryMode();
+      return;
+    }
     if (isRunsMode) {
       handleExitRunsMode();
       return;
     }
     await handleToggleEditMode();
-  }, [handleExitDashboardMode, handleExitRunsMode, handleToggleEditMode, isDashboardMode, isRunsMode]);
+  }, [
+    handleExitDashboardMode,
+    handleExitMemoryMode,
+    handleExitRunsMode,
+    handleToggleEditMode,
+    isDashboardMode,
+    isMemoryMode,
+    isRunsMode,
+  ]);
 
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
@@ -5490,6 +5525,7 @@ export function WorkflowPageV2() {
   const headerMode = getWorkflowHeaderMode({
     isDashboardMode,
     dashboardsFeatureEnabled,
+    isMemoryMode,
     isRunsMode,
     canvasMode,
   });
@@ -5549,6 +5585,22 @@ export function WorkflowPageV2() {
           nodeStatuses={dashboardNodeStatuses}
           onTriggerNode={handleDashboardTriggerNode}
         />
+        <WorkflowMemoryOverlay
+          isMemoryMode={isMemoryMode}
+          entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
+          isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}
+          errorMessage={
+            isViewingDraftVersion
+              ? undefined
+              : canvasMemoryError instanceof Error
+                ? canvasMemoryError.message
+                : undefined
+          }
+          onDeleteEntry={
+            canUpdateCanvas && isViewingLiveVersion ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined
+          }
+          deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
+        />
         <CanvasPage
           key={canvasRenderKey}
           // Persist right sidebar in query params
@@ -5569,8 +5621,6 @@ export function WorkflowPageV2() {
           showBottomStatusControls={!isTemplate && !isRunsMode}
           hideAddControls={isTemplate || isRunsMode}
           hideCanvasToolSidebar={isTemplate}
-          memoryItemCount={canvasMemoryEntries.length}
-          onMemoryOpen={() => setIsMemoryViewModalOpen(true)}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           nodes={nodes}
           edges={renderedEdges}
@@ -5652,6 +5702,7 @@ export function WorkflowPageV2() {
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
           onExitRunsMode={handleExitRunsMode}
           onSelectDashboard={isTemplate || !dashboardsFeatureEnabled ? undefined : handleSelectDashboardMode}
+          onSelectMemory={isTemplate ? undefined : handleSelectMemoryMode}
           onDashboardAddPanel={onDashboardAddPanel}
           onDashboardOpenYaml={onDashboardOpenYaml}
           dashboardYamlReadOnly={dashboardYamlReadOnly}
@@ -5761,19 +5812,6 @@ export function WorkflowPageV2() {
           isImporting={hasLocalSaveActivity}
         />
       ) : null}
-      <CanvasMemoryModal
-        open={isMemoryViewModalOpen}
-        onOpenChange={setIsMemoryViewModalOpen}
-        entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
-        isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}
-        errorMessage={
-          isViewingDraftVersion ? undefined : canvasMemoryError instanceof Error ? canvasMemoryError.message : undefined
-        }
-        onDeleteEntry={
-          canUpdateCanvas && isViewingLiveVersion ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined
-        }
-        deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
-      />
       {resolvingConflictChangeRequest ? (
         <div className="fixed inset-0 z-[100] min-h-0 bg-slate-50">
           <CanvasChangeRequestConflictResolver

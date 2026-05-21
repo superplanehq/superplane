@@ -26,4 +26,15 @@ describe("CanvasModeToggle", () => {
 
     expect(onSelectLive).toHaveBeenCalledTimes(2);
   });
+
+  it("selects memory mode when clicking the Memory tab", async () => {
+    const user = userEvent.setup();
+    const onSelectMemory = vi.fn();
+
+    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectMemory={onSelectMemory} />);
+
+    await user.click(screen.getByRole("tab", { name: "Memory" }));
+
+    expect(onSelectMemory).toHaveBeenCalledTimes(1);
+  });
 });
