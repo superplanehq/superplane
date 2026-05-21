@@ -68,6 +68,7 @@ func (d *DockerHub) Configuration() []configuration.Field {
 func (d *DockerHub) Actions() []core.Action {
 	return []core.Action{
 		&GetImageTag{},
+		&DeleteTag{},
 	}
 }
 

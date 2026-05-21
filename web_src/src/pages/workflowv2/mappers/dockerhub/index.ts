@@ -1,11 +1,13 @@
 import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
 import { getImageTagMapper } from "./get_image_tag";
+import { deleteTagMapper } from "./delete_tag";
 import { onImagePushCustomFieldRenderer, onImagePushTriggerRenderer } from "./on_image_push";
 import { onVulnerabilityScanCustomFieldRenderer, onVulnerabilityScanTriggerRenderer } from "./on_vulnerability_scan";
 import { buildActionStateRegistry } from "../utils";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   getImageTag: getImageTagMapper,
+  deleteTag: deleteTagMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -20,4 +22,5 @@ export const customFieldRenderers: Record<string, CustomFieldRenderer> = {
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getImageTag: buildActionStateRegistry("retrieved"),
+  deleteTag: buildActionStateRegistry("deleted"),
 };
