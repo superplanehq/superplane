@@ -3,6 +3,8 @@ package githubapps
 import (
 	"fmt"
 	"strings"
+
+	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 )
 
 // Preview describes an installable GitHub app before the user confirms installation.
@@ -31,33 +33,31 @@ func BuildPreview(repoParam string) (*Preview, error) {
 
 	repo.Ref = ref
 
-	defaultName, err := GenerateInstallationName()
-	if err != nil {
-		return nil, err
-	}
+	return previewFromCanvas(repo, canvas, ref), nil
+}
 
+func previewFromCanvas(repo *Repository, canvas *pb.Canvas, ref string) *Preview {
 	canvasName := strings.TrimSpace(canvas.GetMetadata().GetName())
 	description := strings.TrimSpace(canvas.GetMetadata().GetDescription())
 
-	title := canvasName
-	if readmeTitle, readmeErr := FetchReadmeTitle(repo); readmeErr == nil && readmeTitle != "" {
-		title = readmeTitle
+	defaultName := truncateInstallationName(canvasName)
+	if defaultName == "" {
+		defaultName = DefaultInstallationName(repo.Name)
 	}
 
-	if title == "" {
-		title = repo.Name
+	displayName := canvasName
+	if displayName == "" {
+		displayName = DefaultInstallationName(repo.Name)
 	}
-
-	installTitle := fmt.Sprintf("Install %s", title)
 
 	return &Preview{
 		Repo:        repo.String(),
 		Owner:       repo.Owner,
 		Repository:  repo.Name,
 		Ref:         ref,
-		Title:       installTitle,
+		Title:       fmt.Sprintf("Install %s", displayName),
 		Description: description,
 		CanvasName:  canvasName,
 		DefaultName: defaultName,
-	}, nil
+	}
 }

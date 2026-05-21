@@ -1,17 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import AuthGuard from "@/components/AuthGuard";
+import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
+import { UsageLimitAlert } from "@/components/UsageLimitAlert";
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
+import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import AuthGuard from "@/components/AuthGuard";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { getApiErrorMessage } from "@/lib/errors";
 import { parseGitHubRepoParam } from "@/lib/githubRepo";
 import { showErrorToast } from "@/lib/toast";
-import { getUsageLimitToastMessage } from "@/lib/usageLimits";
+import { getUsageLimitNotice, getUsageLimitToastMessage } from "@/lib/usageLimits";
+import { ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 const MAX_APP_NAME_LENGTH = 50;
 
@@ -191,37 +195,60 @@ function InstallPageContent() {
   if (isLoading || (canAutoInstall && isInstalling)) {
     return (
       <InstallShell>
-        <div className="flex items-center justify-center py-16">
+        <div className="flex flex-col items-center justify-center gap-4 py-16">
           <div className="animate-spin rounded-full h-8 w-8 border-b border-blue-600" />
-          <p className="ml-3 text-gray-500">{canAutoInstall ? "Installing app..." : "Loading installation..."}</p>
+          <Text className="text-gray-500 dark:text-gray-400">
+            {canAutoInstall ? "Installing app..." : "Loading installation..."}
+          </Text>
         </div>
       </InstallShell>
     );
   }
 
   if (loadError || !preview) {
+    const usageLimitNotice = loadError ? getUsageLimitNotice(loadError) : null;
+
     return (
       <InstallShell>
-        <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {loadError || "Unable to load app installation details."}
+        <InstallPageHeader title="Install App" description="Add a pre-built app from GitHub to your organization." />
+        <div className="rounded-lg bg-white p-6 shadow-sm outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-800">
+          {usageLimitNotice ? (
+            <UsageLimitAlert notice={usageLimitNotice} />
+          ) : (
+            <Alert variant="destructive">
+              <AlertTitle>Unable to install app</AlertTitle>
+              <AlertDescription>{loadError || "Unable to load app installation details."}</AlertDescription>
+            </Alert>
+          )}
         </div>
       </InstallShell>
     );
   }
 
   const showOrganizationPicker = organizations.length > 1;
+  const repoHref = preview.repo ? `https://${preview.repo.replace(/^https?:\/\//, "")}` : null;
 
   return (
     <InstallShell>
-      <div className="mx-auto w-full max-w-lg">
-        <Heading level={2} className="!text-2xl mb-2">
-          {preview.title}
-        </Heading>
-        {preview.description ? (
-          <Text className="text-gray-600 dark:text-gray-400 mb-8">{preview.description}</Text>
-        ) : (
-          <div className="mb-8" />
-        )}
+      <InstallPageHeader title={preview.title} />
+
+      <div className="rounded-lg bg-white p-6 shadow-sm outline outline-slate-950/10 dark:bg-gray-900 dark:outline-gray-800">
+        {repoHref ? (
+          <div className="mb-6">
+            <Text className="text-sm text-gray-500 dark:text-gray-400">
+              Source repository{" "}
+              <a
+                href={repoHref}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 font-medium text-gray-800 hover:underline dark:text-gray-200"
+              >
+                {preview.repo}
+                <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+              </a>
+            </Text>
+          </div>
+        ) : null}
 
         <form
           className="space-y-6"
@@ -231,16 +258,26 @@ function InstallPageContent() {
           }}
         >
           <div className="space-y-2">
-            <Label htmlFor="install-app-name">Name</Label>
+            <Label htmlFor="install-app-name">App name</Label>
             <Input
               id="install-app-name"
               data-testid="install-app-name-input"
               value={name}
               maxLength={MAX_APP_NAME_LENGTH}
+              autoFocus
               onChange={(event) => {
-                setName(event.target.value);
+                if (event.target.value.length <= MAX_APP_NAME_LENGTH) {
+                  setName(event.target.value);
+                }
+
                 if (nameError) {
                   setNameError("");
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void handleInstall();
                 }
               }}
             />
@@ -249,9 +286,7 @@ function InstallPageContent() {
 
           {showOrganizationPicker ? (
             <div className="space-y-2">
-              <Label htmlFor="install-app-organization">
-                Organization to which you want to install if you have more than one
-              </Label>
+              <Label htmlFor="install-app-organization">Organization</Label>
               <Select value={organizationId} onValueChange={setOrganizationId}>
                 <SelectTrigger id="install-app-organization" data-testid="install-app-organization-select">
                   <SelectValue placeholder="Select an organization" />
@@ -267,29 +302,43 @@ function InstallPageContent() {
             </div>
           ) : null}
 
-          <LoadingButton
-            type="submit"
-            data-testid="install-app-submit"
-            loading={isInstalling}
-            loadingText="Installing..."
-            disabled={!name.trim() || !organizationId}
-            className="w-full sm:w-auto"
-          >
-            Install
-          </LoadingButton>
+          <div className="flex flex-row justify-start gap-3 pt-2">
+            <LoadingButton
+              type="submit"
+              data-testid="install-app-submit"
+              loading={isInstalling}
+              loadingText="Installing..."
+              disabled={!name.trim() || !organizationId}
+            >
+              Install
+            </LoadingButton>
+          </div>
         </form>
       </div>
     </InstallShell>
   );
 }
 
+function InstallPageHeader({ title, description }: { title: string; description?: string }) {
+  return (
+    <div className="mb-6">
+      <Heading level={2} className="!text-2xl mb-1">
+        {title}
+      </Heading>
+      {description ? <Text className="text-gray-800 dark:text-gray-400">{description}</Text> : null}
+    </div>
+  );
+}
+
 function InstallShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-900">
-      <header className="bg-white border-b border-slate-950/15 px-4 h-12 flex items-center">
-        <span className="text-sm font-medium text-slate-700">SuperPlane</span>
+    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
+      <header className="flex h-12 items-center border-b border-slate-950/15 bg-white px-4 dark:border-gray-800 dark:bg-gray-900">
+        <OrganizationMenuButton />
       </header>
-      <main className="p-8">{children}</main>
+      <main className="flex w-full flex-grow-1 flex-col">
+        <div className="mx-auto w-full max-w-[640px] flex-grow-1 p-8">{children}</div>
+      </main>
     </div>
   );
 }

@@ -1,47 +1,64 @@
 package githubapps
 
 import (
-	"crypto/rand"
-	"fmt"
-	"math/big"
+	"strings"
+	"unicode"
 )
 
-var adjectives = []string{
-	"amber", "azure", "bold", "brisk", "calm", "clever", "crisp", "daring",
-	"gentle", "golden", "green", "lucky", "mellow", "nimble", "quiet", "rapid",
-	"silver", "steady", "swift", "vivid",
+const maxInstallationNameLength = 50
+
+// DefaultInstallationName derives a human-readable app name from a GitHub repository name.
+// Example: preview-env-github-digitalocean -> Preview Env Github Digitalocean
+func DefaultInstallationName(repoName string) string {
+	name := humanizeRepoName(repoName)
+	if name == "" {
+		return "Untitled App"
+	}
+
+	return truncateInstallationName(name)
 }
 
-var nouns = []string{
-	"brook", "cloud", "coral", "ember", "falcon", "forest", "harbor", "meadow",
-	"nova", "orchid", "peak", "pine", "river", "rose", "spark", "stone", "wave",
+func truncateInstallationName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+
+	if len(name) <= maxInstallationNameLength {
+		return name
+	}
+
+	return strings.TrimSpace(name[:maxInstallationNameLength])
 }
 
-// GenerateInstallationName returns a short random name such as green-rose-57383.
-func GenerateInstallationName() (string, error) {
-	adjective, err := randomWord(adjectives)
-	if err != nil {
-		return "", err
+func humanizeRepoName(repoName string) string {
+	trimmed := strings.TrimSpace(repoName)
+	if trimmed == "" {
+		return ""
 	}
 
-	noun, err := randomWord(nouns)
-	if err != nil {
-		return "", err
+	segments := strings.FieldsFunc(trimmed, func(r rune) bool {
+		return r == '-' || r == '_' || r == '.'
+	})
+
+	words := make([]string, 0, len(segments))
+	for _, segment := range segments {
+		word := titleWord(segment)
+		if word != "" {
+			words = append(words, word)
+		}
 	}
 
-	suffix, err := rand.Int(rand.Reader, big.NewInt(90000))
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf("%s-%s-%d", adjective, noun, suffix.Int64()+10000), nil
+	return strings.Join(words, " ")
 }
 
-func randomWord(words []string) (string, error) {
-	index, err := rand.Int(rand.Reader, big.NewInt(int64(len(words))))
-	if err != nil {
-		return "", err
+func titleWord(word string) string {
+	word = strings.TrimSpace(word)
+	if word == "" {
+		return ""
 	}
 
-	return words[index.Int64()], nil
+	runes := []rune(strings.ToLower(word))
+	runes[0] = unicode.ToUpper(runes[0])
+	return string(runes)
 }

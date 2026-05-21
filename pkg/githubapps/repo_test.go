@@ -29,8 +29,10 @@ func TestParseRepository(t *testing.T) {
 	})
 }
 
-func TestGenerateInstallationName(t *testing.T) {
-	name, err := GenerateInstallationName()
-	require.NoError(t, err)
-	assert.Regexp(t, `^[a-z]+-[a-z]+-\d{5}$`, name)
+func TestDefaultInstallationName(t *testing.T) {
+	assert.Equal(t, "Preview Env Github Digitalocean", DefaultInstallationName("preview-env-github-digitalocean"))
+	assert.Equal(t, "Widgets", DefaultInstallationName("widgets"))
+	assert.Equal(t, "My App", DefaultInstallationName("my_app"))
+	assert.Equal(t, "Acme Widgets", DefaultInstallationName("acme.widgets"))
+	assert.Equal(t, "Untitled App", DefaultInstallationName(""))
 }

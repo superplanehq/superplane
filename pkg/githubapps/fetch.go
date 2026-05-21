@@ -64,35 +64,6 @@ func fetchCanvasAtRef(repo *Repository, ref string) (*pb.Canvas, error) {
 	return parseCanvasYAML(body)
 }
 
-// FetchReadmeTitle returns the first markdown H1 from README.md, if present.
-func FetchReadmeTitle(repo *Repository) (string, error) {
-	ref := repo.Ref
-	if ref == "" {
-		ref = defaultRefs[0]
-	}
-
-	rawURL := fmt.Sprintf(
-		"https://raw.githubusercontent.com/%s/%s/%s/README.md",
-		repo.Owner,
-		repo.Name,
-		ref,
-	)
-
-	body, err := fetchURL(rawURL)
-	if err != nil {
-		return "", err
-	}
-
-	for _, line := range strings.Split(string(body), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "# ") {
-			return strings.TrimSpace(strings.TrimPrefix(trimmed, "# ")), nil
-		}
-	}
-
-	return "", fmt.Errorf("readme title not found")
-}
-
 func fetchURL(rawURL string) ([]byte, error) {
 	parsed, err := url.Parse(rawURL)
 	if err != nil {
