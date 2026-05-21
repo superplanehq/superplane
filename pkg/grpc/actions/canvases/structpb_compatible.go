@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"encoding/json"
+	"strconv"
 
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -40,6 +41,11 @@ func jsonNumberForStructpb(value json.Number) any {
 	raw := value.String()
 	number, err := value.Float64()
 	if err != nil {
+		return raw
+	}
+
+	// Float64() succeeds for out-of-range integers but loses bits past 2^53.
+	if strconv.FormatFloat(number, 'f', -1, 64) != raw {
 		return raw
 	}
 

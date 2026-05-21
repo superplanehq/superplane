@@ -10,11 +10,13 @@ import (
 
 func Test__toStructpbCompatible__ConvertsJSONNumbersOnly(t *testing.T) {
 	converted, ok := toStructpbCompatible(map[string]any{
-		"number":  json.Number("42"),
-		"invalid": json.Number("not-a-number"),
-		"string":  "deploy",
-		"active":  true,
-		"missing": nil,
+		"number":    json.Number("42"),
+		"unsafeInt": json.Number("9007199254740993"),
+		"snowflake": json.Number("12345678901234567890"),
+		"invalid":   json.Number("not-a-number"),
+		"string":    "deploy",
+		"active":    true,
+		"missing":   nil,
 		"list": []any{
 			json.Number("3"),
 			"prod",
@@ -26,6 +28,8 @@ func Test__toStructpbCompatible__ConvertsJSONNumbersOnly(t *testing.T) {
 
 	require.True(t, ok)
 	assert.Equal(t, float64(42), converted["number"])
+	assert.Equal(t, "9007199254740993", converted["unsafeInt"])
+	assert.Equal(t, "12345678901234567890", converted["snowflake"])
 	assert.Equal(t, "not-a-number", converted["invalid"])
 	assert.Equal(t, "deploy", converted["string"])
 	assert.Equal(t, true, converted["active"])

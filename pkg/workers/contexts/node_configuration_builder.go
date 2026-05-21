@@ -54,6 +54,7 @@ func (b *NodeConfigurationBuilder) WithRootEvent(rootEventID *uuid.UUID) *NodeCo
 	return b
 }
 
+// WithRootPayload stores payload normalized for expression evaluation (see normalizeExpressionValue).
 func (b *NodeConfigurationBuilder) WithRootPayload(payload any) *NodeConfigurationBuilder {
 	b.rootPayload = normalizeExpressionValue(payload)
 	return b
@@ -64,6 +65,7 @@ func (b *NodeConfigurationBuilder) WithPreviousExecution(previousExecutionID *uu
 	return b
 }
 
+// WithInput stores input normalized for expression evaluation (see normalizeExpressionValue).
 func (b *NodeConfigurationBuilder) WithInput(input any) *NodeConfigurationBuilder {
 	b.input = normalizeExpressionValue(input)
 	return b
@@ -403,12 +405,11 @@ func firstChainRef(chainRefs map[string]string) string {
 }
 
 func extractInputMap(input any) map[string]any {
-	inputMap := map[string]any{}
-	if input, ok := normalizeExpressionValue(input).(map[string]any); ok {
-		return input
+	if inputMap, ok := input.(map[string]any); ok {
+		return inputMap
 	}
 
-	return inputMap
+	return map[string]any{}
 }
 
 func normalizeExpressionValue(value any) any {
@@ -551,21 +552,21 @@ func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
 
 	if rootEvent == nil {
 		if b.rootPayload != nil {
-			return normalizeExpressionValue(b.rootPayload), nil
+			return b.rootPayload, nil
 		}
 		return nil, fmt.Errorf("no root event found")
 	}
 
-	payload := rootEvent.Data.Data()
+	payload := normalizeExpressionValue(rootEvent.Data.Data())
 
 	if rootEvent.ExecutionID != nil {
 		execution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *rootEvent.ExecutionID)
 		if err == nil && execution != nil {
-			payload = injectConfig(payload, execution.Configuration.Data())
+			return injectConfig(payload, execution.Configuration.Data()), nil
 		}
 	}
 
-	return normalizeExpressionValue(payload), nil
+	return payload, nil
 }
 
 func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]any, rootEvent *models.CanvasEvent, refToNodeID map[string]string) map[string]string {
@@ -591,8 +592,8 @@ func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]an
 	return chainRefs
 }
 
+// injectConfig merges config into payload. payload must already be normalized; configData is normalized here.
 func injectConfig(payload any, configData map[string]any) any {
-	payload = normalizeExpressionValue(payload)
 	if len(configData) == 0 {
 		return payload
 	}
@@ -746,12 +747,12 @@ func (b *NodeConfigurationBuilder) resolvePreviousPayload(depth int) (any, error
 
 func (b *NodeConfigurationBuilder) injectConfigFromPreviousExecution(payload any) any {
 	if b.previousExecutionID == nil {
-		return normalizeExpressionValue(payload)
+		return payload
 	}
 
 	execution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *b.previousExecutionID)
 	if err != nil || execution == nil {
-		return normalizeExpressionValue(payload)
+		return payload
 	}
 
 	return injectConfig(payload, execution.Configuration.Data())
@@ -798,7 +799,7 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		}
 
 		if payload := event.Data.Data(); payload != nil {
-			return step, injectConfig(payload, execution.Configuration.Data()), nil
+			return step, injectConfig(normalizeExpressionValue(payload), execution.Configuration.Data()), nil
 		}
 	}
 
@@ -820,6 +821,7 @@ func (b *NodeConfigurationBuilder) resolveFromRoot(depth int, step int) (any, er
 	}
 
 	if payload := rootEvent.Data.Data(); payload != nil {
+		payload = normalizeExpressionValue(payload)
 		if rootEvent.ExecutionID != nil {
 			execution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *rootEvent.ExecutionID)
 			if err == nil && execution != nil {
@@ -827,7 +829,7 @@ func (b *NodeConfigurationBuilder) resolveFromRoot(depth int, step int) (any, er
 			}
 		}
 
-		return normalizeExpressionValue(payload), nil
+		return payload, nil
 	}
 
 	return nil, nil
@@ -909,7 +911,7 @@ func (b *NodeConfigurationBuilder) singleInputPayload() (any, bool, error) {
 	}
 
 	for _, value := range inputMap {
-		return normalizeExpressionValue(value), true, nil
+		return value, true, nil
 	}
 
 	return nil, false, nil
