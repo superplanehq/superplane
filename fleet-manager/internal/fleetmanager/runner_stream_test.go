@@ -81,7 +81,6 @@ func TestRunnerStream_HappyPath(t *testing.T) {
 		TaskID:   taskMsg.Task.ID,
 		RunnerID: "runner-ws-1",
 		ExitCode: 0,
-		Output:   "out\n",
 	}
 	if err := conn.WriteJSON(comp); err != nil {
 		t.Fatal(err)
@@ -150,7 +149,6 @@ func TestRunnerStream_WakeAfterHello(t *testing.T) {
 			TaskID:   taskMsg.Task.ID,
 			RunnerID: "r-wake",
 			ExitCode: 0,
-			Output:   "",
 		})
 		var ack wsrunner.Ack
 		_ = conn.ReadJSON(&ack)
@@ -325,7 +323,6 @@ func TestRunnerStream_CancelPushDeliversFrame(t *testing.T) {
 		TaskID:   taskID,
 		RunnerID: runnerID,
 		ExitCode: 130,
-		Output:   "",
 		Canceled: true,
 	}); err != nil {
 		t.Fatal(err)

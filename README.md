@@ -39,7 +39,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for design detail.
 
 ### Upgrade note: Docker multi-line `commands` (breaking if you relied on the old runner)
 
-Older runner builds ran multi-line **`commands`** through **`docker run` with a PTY** and **interactive bash** in the container. Current runners use **`docker pull` → `docker run -d` → `docker exec` … `sh -c '…'`** with **no PTY**. Anything that depended on a **TTY**, **bash-only** syntax (e.g. `[[ ]]`, bashisms not in POSIX `sh`), or **interactive** behavior may break or change. Prefer argv **`command`** for strict control, or adjust scripts for **`sh`**. When **CloudWatch live** logging is enabled, **`docker pull` / `docker run -d` diagnostics** are copied to the live stream on success; they are **not** included in the task **completion `output`** / webhook body (that payload remains **exec-phase** stdout/stderr only). Putting pull/run logs into the webhook would be an explicit product change.
+Older runner builds ran multi-line **`commands`** through **`docker run` with a PTY** and **interactive bash** in the container. Current runners use **`docker pull` → `docker run -d` → `docker exec` … `sh -c '…'`** with **no PTY**. Anything that depended on a **TTY**, **bash-only** syntax (e.g. `[[ ]]`, bashisms not in POSIX `sh`), or **interactive** behavior may break or change. Prefer argv **`command`** for strict control, or adjust scripts for **`sh`**. When **CloudWatch live** logging is enabled, **`docker pull` / `docker run -d` diagnostics** are copied to the live stream on success; they are **not** duplicated in completion payloads. Task stdout/stderr are streamed to CloudWatch; completion webhooks and **`GET /v1/tasks/{id}`** expose **`task_log`** (not inline **`output`**).
 
 ## Build
 
@@ -169,7 +169,7 @@ export AUTH_TOKEN= # if fleet-manager uses it
 - `POST /v1/tasks/claim` — runner pulls the next task (HTTP transport)
 - `POST /v1/tasks/{id}/complete` — runner reports result (HTTP transport); body may include optional **`result`** (JSON) from **`SUPERPLANE_RESULT_FILE**
 
-When the broker is **not** in the path, fleet-manager POSTs the completion **webhook** to `webhook_url` with `task_id`, `status`, `exit_code`, `output`, optional `error`, optional `result` (no `fleet_task_id`). Task `environment` values are execution-only and are not returned by status or webhook payloads.
+When the broker is **not** in the path, fleet-manager POSTs the completion **webhook** to `webhook_url` with `task_id`, `status`, `exit_code`, optional `error`, optional `result`, and optional **`task_log`** (when CloudWatch is configured). Task `environment` values are execution-only and are not returned by status or webhook payloads.
 
 ## End-to-end with the broker
 

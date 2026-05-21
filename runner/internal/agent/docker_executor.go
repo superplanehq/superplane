@@ -154,7 +154,7 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 // `command`, the program is invoked directly.
 //
 // When live is non-nil, stdout/stderr bytes are tee'd to it in addition to
-// being captured for the returned `output` string (CloudWatch live streaming).
+// being captured for the returned `output` string (internal only; not sent on complete).
 func dockerExecTask(ctx context.Context, name string, task *api.TaskPayload, live io.Writer) (int, string, error) {
 	args, err := dockerExecArgs(name, task)
 	if err != nil {

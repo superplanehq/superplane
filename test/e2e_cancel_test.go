@@ -278,6 +278,6 @@ func TestCancelClaimedStopsArgvSleep(t *testing.T) {
 		t.Fatal("timed out waiting for canceled webhook")
 	}
 	if payload.Status != string(models.StatusCanceled) {
-		t.Fatalf("webhook status: %q output=%q", payload.Status, payload.Output)
+		t.Fatalf("webhook status: %q", payload.Status)
 	}
 }

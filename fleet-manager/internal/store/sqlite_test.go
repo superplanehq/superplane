@@ -45,7 +45,7 @@ func TestSQLite_CreateClaimComplete(t *testing.T) {
 		t.Fatalf("claim state: %+v", got)
 	}
 
-	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 0, "hello\n", "", "", false)
+	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestSQLite_ResultJSONRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	payload := `{"answer":42}`
-	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 0, "hello\n", payload, "", false)
+	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 0, payload, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +206,7 @@ func TestSQLite_CompleteClearsEnvironment(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 0, "hello\n", "", "", false)
+	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -566,7 +566,7 @@ func TestSQLite_CancelClaimedThenCompleteCanceled(t *testing.T) {
 		t.Fatal("expected cancel_requested")
 	}
 
-	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 130, "stopped\n", "", "", true)
+	done, err := s.CompleteTask(ctx, task.ID, "runner-1", 130, "", "", true)
 	if err != nil {
 		t.Fatal(err)
 	}

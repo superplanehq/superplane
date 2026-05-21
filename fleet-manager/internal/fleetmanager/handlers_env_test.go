@@ -119,7 +119,6 @@ func TestCreateClaimTaskRoundTripsEnvironmentAndDoesNotExposeInStatusOrWebhook(t
 	completeBody, err := json.Marshal(api.CompleteTaskRequest{
 		RunnerID: "runner-1",
 		ExitCode: 0,
-		Output:   "alice@example.com",
 	})
 	if err != nil {
 		t.Fatal(err)

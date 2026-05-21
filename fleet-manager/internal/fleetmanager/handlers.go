@@ -191,7 +191,6 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 	resp := api.TaskStatusResponse{
 		ID:              task.ID,
 		Status:          string(task.Status),
-		Output:          task.Output,
 		Error:           task.ErrorMessage,
 		CancelRequested: task.CancelRequested,
 	}
@@ -296,7 +295,7 @@ func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, 
 	if len(req.Result) > 0 {
 		resultJSON = string(req.Result)
 	}
-	task, err := s.Store.CompleteTask(ctx, taskID, runnerID, req.ExitCode, req.Output, resultJSON, req.Error, req.Canceled)
+	task, err := s.Store.CompleteTask(ctx, taskID, runnerID, req.ExitCode, resultJSON, req.Error, req.Canceled)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +335,6 @@ func (s *Server) DeliverWebhook(task *models.Task) {
 		TaskID:   task.ID,
 		Status:   st,
 		ExitCode: exit,
-		Output:   task.Output,
 		Error:    task.ErrorMessage,
 	}
 	if g := strings.TrimSpace(s.TaskCloudWatchLogGroup); g != "" {

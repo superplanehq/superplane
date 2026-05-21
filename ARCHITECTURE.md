@@ -37,7 +37,7 @@ Runners should remain **stateless** with respect to queue policy: they execute a
 
 ### Executor abstraction
 
-Both modes implement a small `Executor` interface (`runner/internal/agent/executor.go`) with a single `Execute(ctx, task, live)` method. The agent loop picks `HostExecutor` or `DockerExecutor` based on `task.execution_mode` and is otherwise oblivious to how the task is run; when a CloudWatch log group is configured it passes a `live io.Writer` so each executor can tee stdout/stderr to the live log stream while still returning the buffered output used by the webhook. New backends (Kubernetes, Firecracker, …) plug in as additional implementations without touching the claim/complete code paths.
+Both modes implement a small `Executor` interface (`runner/internal/agent/executor.go`) with a single `Execute(ctx, task, live)` method. The agent loop picks `HostExecutor` or `DockerExecutor` based on `task.execution_mode` and is otherwise oblivious to how the task is run; when a CloudWatch log group is configured it passes a `live io.Writer` so each executor streams stdout/stderr to CloudWatch. Completion webhooks and status responses expose **`task_log`** pointers, not inline log text. New backends (Kubernetes, Firecracker, …) plug in as additional implementations without touching the claim/complete code paths.
 
 ### Docker execution lifecycle
 
@@ -79,7 +79,7 @@ Provisioning is **orthogonal** to task claiming:
 ## Design decisions to finalize
 
 - **Webhook contract** — JSON schema, optional HMAC signing, idempotency keys for safe retries.
-- **Log handling** — Inline in webhook payload vs URLs to large artifacts (e.g. object storage).
+- **Log handling** — CloudWatch via **`task_log`** on completion webhooks and status; optional live tail via task-broker.
 - **Security** — Authentication for callers and runners (tokens, mTLS); whether arbitrary shell is acceptable or sandboxes/allowlists are required.
 - **Fairness and isolation** — Single queue vs priorities; per-tenant quotas and rate limits.
 

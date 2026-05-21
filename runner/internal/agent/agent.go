@@ -91,12 +91,12 @@ func (a *Agent) Run(ctx context.Context) error {
 			}
 			continue
 		}
-		exit, out, runErr, userCanceled, result := a.execute(ctx, base, task, nil)
+		exit, _, runErr, userCanceled, result := a.execute(ctx, base, task, nil)
 		errMsg := ""
 		if runErr != nil {
 			errMsg = runErr.Error()
 		}
-		if err := a.complete(ctx, base, task.ID, exit, out, errMsg, userCanceled, result); err != nil {
+		if err := a.complete(ctx, base, task.ID, exit, errMsg, userCanceled, result); err != nil {
 			return err
 		}
 		if a.Config.ExitAfterEachTask {
@@ -153,11 +153,10 @@ func (a *Agent) claim(ctx context.Context, base string) (*api.TaskPayload, error
 	return out.Task, nil
 }
 
-func (a *Agent) complete(ctx context.Context, base, id string, exit int, output, errMsg string, canceled bool, result json.RawMessage) error {
+func (a *Agent) complete(ctx context.Context, base, id string, exit int, errMsg string, canceled bool, result json.RawMessage) error {
 	payload := api.CompleteTaskRequest{
 		RunnerID: a.Config.RunnerID,
 		ExitCode: exit,
-		Output:   output,
 		Error:    errMsg,
 		Canceled: canceled,
 		Result:   result,
@@ -314,9 +313,8 @@ func (a *Agent) execute(ctx context.Context, base string, task *api.TaskPayload,
 	}
 
 	// Optional live-stream of stdout/stderr to CloudWatch Logs while the
-	// task runs. The buffered output returned by ex.Execute is still the
-	// source of truth for the webhook payload; CloudWatch is just for
-	// real-time observation.
+	// task runs. Task logs are read from CloudWatch (task_log on webhooks);
+	// completion payloads do not include inline output.
 	var live io.Writer
 	var cwClose func()
 	if g := strings.TrimSpace(a.Config.CloudWatchLogGroup); g != "" {

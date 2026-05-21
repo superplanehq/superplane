@@ -42,12 +42,6 @@ func TestEchoHelloWorld(t *testing.T) {
 		if payload.ExitCode != 0 {
 			t.Errorf("exit_code: got %d want 0", payload.ExitCode)
 		}
-		if !strings.Contains(payload.Output, "hello world") {
-			t.Errorf("output should contain first line; got %q", payload.Output)
-		}
-		if !strings.Contains(payload.Output, "second") {
-			t.Errorf("output should contain second line; got %q", payload.Output)
-		}
 	})
 }
 
@@ -70,12 +64,6 @@ func TestCommandsFailOnFirstFailedLine(t *testing.T) {
 		if payload.ExitCode == 0 {
 			t.Fatalf("exit_code: want non-zero, got 0")
 		}
-		if !strings.Contains(payload.Output, "before") {
-			t.Errorf("output missing first line: %q", payload.Output)
-		}
-		if strings.Contains(payload.Output, "AFTER_SHOULD_NOT_RUN") {
-			t.Errorf("later directive should not run after failure (errexit / fail-fast): %q", payload.Output)
-		}
 	})
 }
 
@@ -86,7 +74,7 @@ func TestCommandsShareShellEnv(t *testing.T) {
 		return api.CreateTaskRequest{
 			Commands: []string{
 				"export A=123",
-				"echo $A",
+				`printf '{"a":%s}' "$A" > "$SUPERPLANE_RESULT_FILE"`,
 			},
 			WebhookURL: wh,
 		}
@@ -100,8 +88,14 @@ func TestCommandsShareShellEnv(t *testing.T) {
 		if payload.ExitCode != 0 {
 			t.Errorf("exit_code: got %d want 0", payload.ExitCode)
 		}
-		if !strings.Contains(payload.Output, "123") {
-			t.Errorf("exported variable should be visible in next command; output %q", payload.Output)
+		var result struct {
+			A int `json:"a"`
+		}
+		if err := json.Unmarshal(payload.Result, &result); err != nil {
+			t.Fatalf("result json: %v", err)
+		}
+		if result.A != 123 {
+			t.Errorf("exported variable should persist across commands; result.a=%d", result.A)
 		}
 	})
 }
@@ -112,16 +106,22 @@ func TestTaskEnvironmentVariablesCommands(t *testing.T) {
 	const value = "commands-env-ok"
 	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
 		return api.CreateTaskRequest{
-			Commands: []string{`printf "%s" "$COMMIT_AUTHOR"`},
+			Commands: []string{`printf '{"value":"%s"}' "$COMMIT_AUTHOR" > "$SUPERPLANE_RESULT_FILE"`},
 			WebhookURL: wh,
 			Environment: []api.EnvironmentVariable{{Name: "COMMIT_AUTHOR", Value: value}},
 		}
 	}, func(t *testing.T, created api.CreateTaskResponse, payload api.WebhookPayload) {
 		if payload.Status != string(models.StatusSucceeded) || payload.ExitCode != 0 {
-			t.Fatalf("task failed: status=%s exit=%d output=%q", payload.Status, payload.ExitCode, payload.Output)
+			t.Fatalf("task failed: status=%s exit=%d", payload.Status, payload.ExitCode)
 		}
-		if !strings.Contains(payload.Output, value) {
-			t.Errorf("commands environment output got %q want substring %q", payload.Output, value)
+		var result struct {
+			Value string `json:"value"`
+		}
+		if err := json.Unmarshal(payload.Result, &result); err != nil {
+			t.Fatalf("result json: %v", err)
+		}
+		if result.Value != value {
+			t.Errorf("commands environment result.value got %q want %q", result.Value, value)
 		}
 	})
 }
@@ -131,7 +131,7 @@ func TestTaskEnvironmentVariables(t *testing.T) {
 	const value = "alice@example.com line=ok"
 	runFleetWebhookE2E(t, func(wh string) api.CreateTaskRequest {
 		return api.CreateTaskRequest{
-			Command:     []string{"sh", "-c", `printf "%s" "$COMMIT_AUTHOR"`},
+			Command:     []string{"sh", "-c", `printf '{"value":"%s"}' "$COMMIT_AUTHOR" > "$SUPERPLANE_RESULT_FILE"`},
 			WebhookURL:  wh,
 			Environment: []api.EnvironmentVariable{{Name: "COMMIT_AUTHOR", Value: value}},
 		}
@@ -145,8 +145,14 @@ func TestTaskEnvironmentVariables(t *testing.T) {
 		if payload.ExitCode != 0 {
 			t.Errorf("exit_code: got %d want 0", payload.ExitCode)
 		}
-		if payload.Output != value {
-			t.Errorf("environment value output got %q want %q", payload.Output, value)
+		var result struct {
+			Value string `json:"value"`
+		}
+		if err := json.Unmarshal(payload.Result, &result); err != nil {
+			t.Fatalf("result json: %v", err)
+		}
+		if result.Value != value {
+			t.Errorf("environment result.value got %q want %q", result.Value, value)
 		}
 	})
 }
