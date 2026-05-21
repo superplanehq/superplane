@@ -18,6 +18,7 @@ import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import { TemplatesPage } from "./pages/canvas/TemplatesPage";
 import { HomePage } from "./pages/home";
+import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
@@ -92,6 +93,9 @@ function AppRouter() {
 
               {/* Invite link acceptance */}
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
+
+              {/* GitHub app installation */}
+              <Route path="install" element={withAuthOnly(InstallPage)} />
 
               {/* Organization-scoped protected routes */}
               <Route path=":organizationId" element={<OrganizationScope />}>
