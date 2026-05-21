@@ -28,7 +28,7 @@ Backend registration alone is not enough. Every user-facing **component** (and *
 Copy and complete:
 
 ```
-- [ ] Registry key matches Go `Name()` exactly (e.g. `forEach`, not `for-each`)
+- [ ] Registry key matches Go `Name()` exactly (e.g. `fanOut`, not `fan-out`)
 - [ ] `componentBaseMappers` entry in index.ts
 - [ ] `iconSlug` matches backend `Icon()` when possible
 - [ ] Configuration fields surfaced in `specs` (expressions, labels, etc.)
@@ -49,15 +49,15 @@ import type { ComponentBaseContext, ComponentBaseMapper, ExecutionDetailsContext
 import type { ComponentBaseProps } from "@/ui/componentBase";
 import { renderTimeAgo } from "@/components/TimeAgo";
 
-type ForEachConfiguration = { arrayExpression: string };
+type FanOutConfiguration = { arrayExpression: string };
 
-export const forEachMapper: ComponentBaseMapper = {
+export const fanOutMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
-    const configuration = context.node.configuration as ForEachConfiguration;
+    const configuration = context.node.configuration as FanOutConfiguration;
     return {
       iconSlug: "split", // match backend Icon()
       collapsed: context.node.isCollapsed,
-      title: context.node.name || context.componentDefinition.label || "For Each",
+      title: context.node.name || context.componentDefinition.label || "Fan Out",
       specs: configuration.arrayExpression
         ? [{ title: "Array", tooltipTitle: "Array expression", value: configuration.arrayExpression }]
         : undefined,
@@ -68,7 +68,7 @@ export const forEachMapper: ComponentBaseMapper = {
     return context.execution.createdAt ? renderTimeAgo(new Date(context.execution.createdAt)) : "";
   },
   getExecutionDetails(context: ExecutionDetailsContext) {
-    const configuration = context.execution.configuration as ForEachConfiguration;
+    const configuration = context.execution.configuration as FanOutConfiguration;
     return { "Array expression": configuration.arrayExpression ?? "-" };
   },
 };
@@ -77,21 +77,21 @@ export const forEachMapper: ComponentBaseMapper = {
 2. **Register** in `web_src/src/pages/workflowv2/mappers/index.ts`:
 
 ```typescript
-import { forEachMapper } from "./forEach";
+import { fanOutMapper } from "./fanOut";
 
 const componentBaseMappers: Record<string, ComponentBaseMapper> = {
   // ...
-  forEach: forEachMapper,
+  fanOut: fanOutMapper,
 };
 ```
 
-3. **Custom states** (if the component emits named channels): define `*_STATE_MAP`, `*StateFunction`, `*_STATE_REGISTRY`, and add to `eventStateRegistries`. Mirror channel names from Go `OutputChannels()` (e.g. For Each → `item`).
+3. **Custom states** (if the component emits named channels): define `*_STATE_MAP`, `*StateFunction`, `*_STATE_REGISTRY`, and add to `eventStateRegistries`. Mirror channel names from Go `OutputChannels()` (e.g. Fan Out → `item`).
 
 ## Verify registration
 
 ```bash
-# Registry key must exist (replace forEach with component Name())
-rg 'forEach:' web_src/src/pages/workflowv2/mappers/index.ts
+# Registry key must exist (replace fanOut with component Name())
+rg 'fanOut:' web_src/src/pages/workflowv2/mappers/index.ts
 ```
 
 Integration components: key is often `integration.component` via `appMappers`; see `docs/contributing/integrations.md` and `docs/contributing/component-customization.md`.

@@ -35,13 +35,11 @@ func TestFanOutExecute(t *testing.T) {
 		assert.Equal(t, PayloadType, execState.Type)
 		require.Len(t, execState.Payloads, 3)
 
-		// check first payload
 		first := execState.Payloads[0].(map[string]any)["data"].(map[string]any)
 		assert.Equal(t, map[string]any{"service": "EC2", "cost": 10.0}, first["item"])
 		assert.Equal(t, 0, first["index"])
 		assert.Equal(t, 3, first["totalCount"])
 
-		// check last payload
 		last := execState.Payloads[2].(map[string]any)["data"].(map[string]any)
 		assert.Equal(t, map[string]any{"service": "RDS", "cost": 20.0}, last["item"])
 		assert.Equal(t, 2, last["index"])

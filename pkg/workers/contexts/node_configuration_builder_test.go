@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1625,4 +1626,97 @@ func Test_NodeConfigurationBuilder_Config_DoesNotOverwriteExistingConfigKey(t *t
 	assert.Equal(t, "https://api.example.com", result["api_url"])
 	assert.Equal(t, "https://api.example.com", result["prev_api_url"])
 	assert.Equal(t, "ok", result["output_status"])
+}
+
+func Test_NodeConfigurationBuilder_FanOutBranchPayload(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	triggerNode := "start"
+	fanOutNode := "fanOut"
+	waitNode := "wait"
+	displayNode := "display"
+
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Name:   triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+			{
+				NodeID: fanOutNode,
+				Name:   fanOutNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "fanOut"}}),
+			},
+			{
+				NodeID: waitNode,
+				Name:   waitNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "wait"}}),
+			},
+			{
+				NodeID: displayNode,
+				Name:   displayNode,
+				Type:   models.NodeTypeComponent,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "display"}}),
+			},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: fanOutNode, Channel: "default"},
+			{SourceID: fanOutNode, TargetID: waitNode, Channel: "item"},
+			{SourceID: waitNode, TargetID: displayNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNodeWithData(
+		t,
+		canvas.ID,
+		triggerNode,
+		"default",
+		nil,
+		map[string]any{"items": []any{"a", "b", "c"}},
+	)
+
+	fanOutExecution := support.CreateCanvasNodeExecution(t, canvas.ID, fanOutNode, rootEvent.ID, rootEvent.ID, nil)
+
+	now := time.Now()
+	emitItem := func(item string, index int) *models.CanvasEvent {
+		return support.EmitCanvasEventForNodeWithData(
+			t,
+			canvas.ID,
+			fanOutNode,
+			"item",
+			&fanOutExecution.ID,
+			map[string]any{"item": item, "index": index, "totalCount": 3},
+		)
+	}
+
+	_ = emitItem("a", 0)
+	branchEvent := emitItem("b", 1)
+	_ = emitItem("c", 2)
+
+	// Align timestamps like PassInTransaction (same CreatedAt for all branch events).
+	require.NoError(t, database.Conn().Model(&models.CanvasEvent{}).
+		Where("execution_id = ?", fanOutExecution.ID).
+		Update("created_at", now).Error)
+
+	waitInput := map[string]any{"item": "b", "index": 1, "totalCount": 3}
+	waitExecution := support.CreateNextNodeExecution(t, canvas.ID, waitNode, rootEvent.ID, branchEvent.ID, &fanOutExecution.ID)
+
+	builder := NewNodeConfigurationBuilder(database.Conn(), canvas.ID).
+		WithPreviousExecution(&waitExecution.ID).
+		WithRootEvent(&rootEvent.ID).
+		WithInput(map[string]any{waitNode: waitInput})
+
+	result, err := builder.Build(map[string]any{
+		"item": "{{ $[\"" + fanOutNode + "\"].item }}",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "b", result["item"])
 }

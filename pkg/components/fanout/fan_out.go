@@ -44,7 +44,7 @@ func (f *FanOut) Documentation() string {
 ## Use Cases
 
 - Iterate over a list of results and process each one independently
-- Fan out runner output arrays into per-item workflow paths
+- Split runner output arrays into per-item workflow paths
 - Process each page, service, or record with the same downstream steps
 
 ## How It Works
@@ -86,7 +86,7 @@ func (f *FanOut) Configuration() []configuration.Field {
 			Name:        "arrayExpression",
 			Label:       "Array Expression",
 			Type:        configuration.FieldTypeExpression,
-			Description: "Expression that evaluates to the array to fan out",
+			Description: "Expression that evaluates to the array to iterate over",
 			Required:    true,
 		},
 	}
@@ -161,11 +161,9 @@ func toSlice(v any) ([]any, error) {
 	if v == nil {
 		return []any{}, nil
 	}
-	// direct []any
 	if s, ok := v.([]any); ok {
 		return s, nil
 	}
-	// reflect-based fallback for typed slices
 	rv := reflect.ValueOf(v)
 	if rv.Kind() != reflect.Slice {
 		return nil, fmt.Errorf("got %T", v)

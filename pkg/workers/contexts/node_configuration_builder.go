@@ -589,21 +589,42 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 		executionIDByRef[nodeRef] = execution.ID
 	}
 
-	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, executionIDs)
+	chainExecutions, err := b.listLinearExecutionsInChain()
 	if err != nil {
 		return err
 	}
 
-	latestByExecution := latestEventByExecution(events, executionIDs)
-	for nodeRef, executionID := range executionIDByRef {
-		if payload, ok, err := b.payloadFromTriggeringEvent(executionID); err != nil {
-			return err
-		} else if ok {
-			messageChain[nodeRef] = payload
-			continue
-		}
+	executionIDSet := make(map[uuid.UUID]struct{}, len(executionIDByRef)+len(chainExecutions))
+	for _, executionID := range executionIDByRef {
+		executionIDSet[executionID] = struct{}{}
+	}
+	for _, execution := range chainExecutions {
+		executionIDSet[execution.ID] = struct{}{}
+	}
 
-		event, ok := latestByExecution[executionID]
+	allExecutionIDs := make([]uuid.UUID, 0, len(executionIDSet))
+	for executionID := range executionIDSet {
+		allExecutionIDs = append(allExecutionIDs, executionID)
+	}
+
+	events, err := models.ListCanvasEventsForExecutionsInTransaction(b.tx, allExecutionIDs)
+	if err != nil {
+		return err
+	}
+
+	events, err = appendPreferredBranchEvents(b.tx, events, preferredEventIDByExecution(chainExecutions))
+	if err != nil {
+		return err
+	}
+
+	eventsByID := indexEventsByID(events)
+	preferredEventID := preferredEventIDByExecution(chainExecutions)
+
+	for nodeRef, executionID := range executionIDByRef {
+		event, ok, err := eventForExecution(executionID, events, eventsByID, preferredEventID)
+		if err != nil {
+			return fmt.Errorf("node %s: %w", nodeRef, err)
+		}
 		if !ok {
 			return fmt.Errorf("node %s has no outputs", nodeRef)
 		}
@@ -614,55 +635,85 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 	return nil
 }
 
-// payloadFromTriggeringEvent returns the event payload that triggered the current
-// execution when that event belongs to the referenced node's execution. This
-// preserves per-branch data for components (e.g. For Each) that emit multiple
-// events from a single execution.
-func (b *NodeConfigurationBuilder) payloadFromTriggeringEvent(executionID uuid.UUID) (any, bool, error) {
-	if b.previousExecutionID == nil {
-		return nil, false, nil
+// preferredEventIDByExecution maps a parent execution to the canvas event that routed
+// into the child on this branch (from child.EventID when child.PreviousExecutionID is set).
+func preferredEventIDByExecution(executions []models.CanvasNodeExecution) map[uuid.UUID]uuid.UUID {
+	preferred := make(map[uuid.UUID]uuid.UUID, len(executions))
+	for _, execution := range executions {
+		if execution.PreviousExecutionID == nil || execution.EventID == uuid.Nil {
+			continue
+		}
+		preferred[*execution.PreviousExecutionID] = execution.EventID
 	}
-
-	prevExecution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *b.previousExecutionID)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if prevExecution.EventID == uuid.Nil {
-		return nil, false, nil
-	}
-
-	triggerEvent, err := models.FindCanvasEventInTransaction(b.tx, prevExecution.EventID)
-	if err != nil {
-		return nil, false, err
-	}
-
-	if triggerEvent.ExecutionID == nil || *triggerEvent.ExecutionID != executionID {
-		return nil, false, nil
-	}
-
-	return triggerEvent.Data.Data(), true, nil
+	return preferred
 }
 
-func latestEventByExecution(events []models.CanvasEvent, executionIDs []uuid.UUID) map[uuid.UUID]models.CanvasEvent {
-	latestByExecution := make(map[uuid.UUID]models.CanvasEvent, len(executionIDs))
+func indexEventsByID(events []models.CanvasEvent) map[uuid.UUID]models.CanvasEvent {
+	byID := make(map[uuid.UUID]models.CanvasEvent, len(events))
 	for _, event := range events {
-		if event.ExecutionID == nil {
+		byID[event.ID] = event
+	}
+	return byID
+}
+
+func appendPreferredBranchEvents(
+	tx *gorm.DB,
+	events []models.CanvasEvent,
+	preferredEventID map[uuid.UUID]uuid.UUID,
+) ([]models.CanvasEvent, error) {
+	byID := indexEventsByID(events)
+	for _, eventID := range preferredEventID {
+		if eventID == uuid.Nil {
+			continue
+		}
+		if _, ok := byID[eventID]; ok {
 			continue
 		}
 
-		latest, ok := latestByExecution[*event.ExecutionID]
-		if !ok || event.CreatedAt == nil {
-			latestByExecution[*event.ExecutionID] = event
-			continue
+		event, err := models.FindCanvasEventInTransaction(tx, eventID)
+		if err != nil {
+			return nil, err
 		}
+		events = append(events, *event)
+		byID[eventID] = *event
+	}
+	return events, nil
+}
 
-		if latest.CreatedAt == nil || event.CreatedAt.After(*latest.CreatedAt) {
-			latestByExecution[*event.ExecutionID] = event
+// eventForExecution picks the canvas event whose payload should represent an upstream
+// execution on the current branch. It prefers the child's incoming event ID from the
+// linear execution chain; otherwise it uses the sole event on that execution.
+func eventForExecution(
+	executionID uuid.UUID,
+	events []models.CanvasEvent,
+	eventsByID map[uuid.UUID]models.CanvasEvent,
+	preferredEventID map[uuid.UUID]uuid.UUID,
+) (models.CanvasEvent, bool, error) {
+	if eventID, ok := preferredEventID[executionID]; ok && eventID != uuid.Nil {
+		if event, found := eventsByID[eventID]; found {
+			return event, true, nil
 		}
 	}
 
-	return latestByExecution
+	var matched []models.CanvasEvent
+	for _, event := range events {
+		if event.ExecutionID != nil && *event.ExecutionID == executionID {
+			matched = append(matched, event)
+		}
+	}
+
+	switch len(matched) {
+	case 0:
+		return models.CanvasEvent{}, false, nil
+	case 1:
+		return matched[0], true, nil
+	default:
+		return models.CanvasEvent{}, false, fmt.Errorf(
+			"execution %s has ambiguous outputs (%d events)",
+			executionID,
+			len(matched),
+		)
+	}
 }
 
 func parseDepth(param any) (int, error) {
@@ -760,15 +811,24 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		return step, nil, err
 	}
 
-	latestByExecution := latestEventByExecution(events, executionIDs)
+	preferredEventID := preferredEventIDByExecution(executionsInChain)
+	events, err = appendPreferredBranchEvents(b.tx, events, preferredEventID)
+	if err != nil {
+		return step, nil, err
+	}
+
+	eventsByID := indexEventsByID(events)
 	for _, execution := range executionsInChain[startIndex:] {
 		step++
 		if step < depth {
 			continue
 		}
 
-		event, exists := latestByExecution[execution.ID]
-		if !exists {
+		event, ok, err := eventForExecution(execution.ID, events, eventsByID, preferredEventID)
+		if err != nil {
+			return step, nil, err
+		}
+		if !ok {
 			continue
 		}
 
