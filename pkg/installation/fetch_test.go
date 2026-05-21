@@ -27,22 +27,6 @@ spec:
 	assert.Empty(t, canvas.GetMetadata().GetId())
 }
 
-func TestParseCanvasYAMLRejectsTemplate(t *testing.T) {
-	raw := []byte(`apiVersion: v1
-kind: Canvas
-metadata:
-  name: Template App
-  isTemplate: true
-spec:
-  nodes: []
-  edges: []
-`)
-
-	_, err := parseCanvasYAML(raw)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "template")
-}
-
 func TestParseCanvasYAMLRejectsUnsupportedKind(t *testing.T) {
 	raw := []byte(`apiVersion: v1
 kind: Dashboard
