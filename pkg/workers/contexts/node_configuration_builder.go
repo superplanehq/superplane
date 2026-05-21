@@ -1,6 +1,7 @@
 package contexts
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
@@ -649,6 +650,15 @@ func parseDepth(param any) (int, error) {
 			return 0, fmt.Errorf("depth must be >= 1")
 		}
 		return parsed, nil
+	case json.Number:
+		parsed, err := value.Int64()
+		if err != nil {
+			return 0, fmt.Errorf("depth must be an integer")
+		}
+		if parsed < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return int(parsed), nil
 	default:
 		return 0, fmt.Errorf("depth must be an integer")
 	}
