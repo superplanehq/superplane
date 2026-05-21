@@ -689,13 +689,8 @@ func resolveCreateInstanceNodeMetadata(ctx core.SetupContext, config CreateInsta
 	}
 
 	if metadata.SubnetID != "" {
-		if subnets, err := client.ListSubnets(); err == nil {
-			for _, subnet := range subnets {
-				if subnet.SubnetID == metadata.SubnetID {
-					metadata.SubnetName = subnetResourceName(subnet)
-					break
-				}
-			}
+		if subnet, err := client.DescribeSubnet(metadata.SubnetID); err == nil {
+			metadata.SubnetName = subnetResourceName(*subnet)
 		}
 	}
 
