@@ -1,10 +1,12 @@
 package ec2
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -25,8 +27,8 @@ import (
 const (
 	ec2ServiceName       = "ec2"
 	ssmServiceName       = "ssm"
+	ssmTargetPrefix      = "AmazonSSM."
 	ec2APIVersion        = "2016-11-15"
-	ssmAPIVersion        = "2014-11-06"
 	ResourceTypeImageOS  = "ec2.imageOS"
 	maxPublicImagesPerOS = 200
 	defaultUbuntuImages  = 12
@@ -738,50 +740,21 @@ func (c *Client) ListPublicImages(imageOS string) ([]Image, error) {
 	}
 
 	imagesByID := map[string]Image{}
+	c.tryLoadPublicImagesFromSSM(imageOS, definition, imagesByID)
 
-	if len(definition.SSMParameterNames) > 0 {
-		amiIDs, err := c.listPublicAMIIDsFromSSMNames(definition.SSMParameterNames)
-		if err == nil && len(amiIDs) > 0 {
-			if err := c.mergePublicImagesByIDs(imagesByID, amiIDs); err != nil {
-				return nil, err
-			}
+	relevantCount := countRelevantPublicImages(imageOS, imagesByID)
+	if !definition.skipDescribeWhenSSMResolved(relevantCount) {
+		if err := c.loadPublicImagesFromDescribe(imageOS, definition, imagesByID); err != nil {
+			return nil, err
 		}
 	}
 
-	if len(definition.SSMParameterPaths) > 0 {
-		amiIDs, err := c.listPublicAMIIDsFromSSM(definition.SSMParameterPaths)
-		if err == nil && len(amiIDs) > 0 {
-			if err := c.mergePublicImagesByIDs(imagesByID, amiIDs); err != nil {
-				return nil, err
-			}
+	images := collectRelevantPublicImages(imageOS, imagesByID)
+	if len(images) == 0 {
+		if err := c.loadPublicImagesFromDescribe(imageOS, definition, imagesByID); err != nil {
+			return nil, err
 		}
-	}
-
-	if !definition.skipDescribeWhenSSMResolved(len(imagesByID)) {
-		for _, owner := range definition.Owners {
-			for _, nameFilter := range definition.NameFilters {
-				params := publicImageDescribeParams(owner, definition, nameFilter)
-
-				matches, err := c.describeImagesPaginated(params)
-				if err != nil {
-					return nil, err
-				}
-
-				for _, image := range matches {
-					parsed := imageFromXML(image)
-					if parsed.ImageID == "" || !isRelevantPublicImage(imageOS, *parsed) {
-						continue
-					}
-					parsed.Region = c.region
-					imagesByID[parsed.ImageID] = *parsed
-				}
-			}
-		}
-	}
-
-	images := make([]Image, 0, len(imagesByID))
-	for _, image := range imagesByID {
-		images = append(images, image)
+		images = collectRelevantPublicImages(imageOS, imagesByID)
 	}
 
 	sort.Slice(images, func(i, j int) bool {
@@ -793,6 +766,81 @@ func (c *Client) ListPublicImages(imageOS string) ([]Image, error) {
 	}
 
 	return images, nil
+}
+
+func (c *Client) tryLoadPublicImagesFromSSM(imageOS string, definition imageOSDefinition, imagesByID map[string]Image) {
+	if len(definition.SSMParameterNames) > 0 {
+		amiIDs, err := c.listPublicAMIIDsFromSSMNames(definition.SSMParameterNames)
+		if err == nil && len(amiIDs) > 0 {
+			_ = c.mergePublicImagesByIDs(imageOS, imagesByID, amiIDs)
+		}
+	}
+
+	if len(definition.SSMParameterPaths) > 0 {
+		amiIDs, err := c.listPublicAMIIDsFromSSM(definition.SSMParameterPaths)
+		if err == nil && len(amiIDs) > 0 {
+			_ = c.mergePublicImagesByIDs(imageOS, imagesByID, amiIDs)
+		}
+	}
+}
+
+func (c *Client) loadPublicImagesFromDescribe(imageOS string, definition imageOSDefinition, imagesByID map[string]Image) error {
+	for _, owner := range definition.Owners {
+		for _, nameFilter := range definition.NameFilters {
+			params := publicImageDescribeParams(owner, definition, nameFilter)
+
+			matches, err := c.describeImagesPaginated(params)
+			if err != nil {
+				return err
+			}
+
+			for _, image := range matches {
+				parsed := imageFromXML(image)
+				if parsed.ImageID == "" || !isRelevantPublicImage(imageOS, *parsed) {
+					continue
+				}
+				parsed.Region = c.region
+				imagesByID[parsed.ImageID] = *parsed
+			}
+		}
+	}
+
+	return nil
+}
+
+func countRelevantPublicImages(imageOS string, imagesByID map[string]Image) int {
+	count := 0
+	for _, image := range imagesByID {
+		if isAvailablePublicImage(imageOS, image) {
+			count++
+		}
+	}
+
+	return count
+}
+
+func collectRelevantPublicImages(imageOS string, imagesByID map[string]Image) []Image {
+	images := make([]Image, 0, len(imagesByID))
+	for _, image := range imagesByID {
+		if !isAvailablePublicImage(imageOS, image) {
+			continue
+		}
+		images = append(images, image)
+	}
+
+	return images
+}
+
+func isAvailablePublicImage(imageOS string, image Image) bool {
+	if strings.TrimSpace(image.ImageID) == "" {
+		return false
+	}
+
+	if state := strings.TrimSpace(image.State); state != "" && state != ImageStateAvailable {
+		return false
+	}
+
+	return isRelevantPublicImage(imageOS, image)
 }
 
 func publicImageDescribeParams(owner string, definition imageOSDefinition, nameFilter string) url.Values {
@@ -832,7 +880,7 @@ func (c *Client) describeImagesByIDs(imageIDs []string) ([]xmlImage, error) {
 	return c.describeImagesPaginated(params)
 }
 
-func (c *Client) mergePublicImagesByIDs(imagesByID map[string]Image, amiIDs []string) error {
+func (c *Client) mergePublicImagesByIDs(imageOS string, imagesByID map[string]Image, amiIDs []string) error {
 	matches, err := c.describeImagesByIDs(amiIDs)
 	if err != nil {
 		return err
@@ -840,7 +888,7 @@ func (c *Client) mergePublicImagesByIDs(imagesByID map[string]Image, amiIDs []st
 
 	for _, image := range matches {
 		parsed := imageFromXML(image)
-		if parsed.ImageID == "" {
+		if !isAvailablePublicImage(imageOS, *parsed) {
 			continue
 		}
 		parsed.Region = c.region
@@ -861,23 +909,23 @@ func (c *Client) listPublicAMIIDsFromSSMNames(names []string) ([]string, error) 
 			end = len(names)
 		}
 
-		params := url.Values{}
-		params.Set("WithDecryption", "false")
-		index := 1
+		batchNames := make([]string, 0, end-start)
 		for _, name := range names[start:end] {
 			name = strings.TrimSpace(name)
 			if name == "" {
 				continue
 			}
-			params.Set(fmt.Sprintf("Names.%d", index), name)
-			index++
+			batchNames = append(batchNames, name)
 		}
-		if index == 1 {
+		if len(batchNames) == 0 {
 			continue
 		}
 
 		response := getParametersResponse{}
-		if err := c.postSSMForm("GetParameters", params, &response); err != nil {
+		if err := c.postSSMJSON("GetParameters", map[string]any{
+			"Names":          batchNames,
+			"WithDecryption": false,
+		}, &response); err != nil {
 			return nil, err
 		}
 
@@ -909,17 +957,18 @@ func (c *Client) listPublicAMIIDsFromSSM(paths []string) ([]string, error) {
 
 		nextToken := ""
 		for {
-			params := url.Values{}
-			params.Set("Path", path)
-			params.Set("Recursive", "true")
-			params.Set("WithDecryption", "false")
-			params.Set("MaxResults", "50")
+			payload := map[string]any{
+				"Path":           path,
+				"Recursive":      true,
+				"WithDecryption": false,
+				"MaxResults":     10,
+			}
 			if nextToken != "" {
-				params.Set("NextToken", nextToken)
+				payload["NextToken"] = nextToken
 			}
 
 			response := getParametersByPathResponse{}
-			if err := c.postSSMForm("GetParametersByPath", params, &response); err != nil {
+			if err := c.postSSMJSON("GetParametersByPath", payload, &response); err != nil {
 				return nil, err
 			}
 
@@ -1044,8 +1093,51 @@ func (c *Client) postForm(action string, params url.Values, out any) error {
 	return c.postSignedForm(ec2ServiceName, ec2APIVersion, action, params, out)
 }
 
-func (c *Client) postSSMForm(action string, params url.Values, out any) error {
-	return c.postSignedForm(ssmServiceName, ssmAPIVersion, action, params, out)
+func (c *Client) postSSMJSON(action string, payload any, out any) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal SSM request: %w", err)
+	}
+
+	endpoint := fmt.Sprintf("https://%s.%s.amazonaws.com/", ssmServiceName, c.region)
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to build SSM request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+	req.Header.Set("X-Amz-Target", ssmTargetPrefix+action)
+	if err := c.signRequest(req, body, ssmServiceName); err != nil {
+		return err
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("SSM request failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read SSM response: %w", err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		if awsErr := common.ParseError(responseBody); awsErr != nil {
+			return awsErr
+		}
+		return fmt.Errorf("SSM API request failed with %d: %s", res.StatusCode, string(responseBody))
+	}
+
+	if out == nil {
+		return nil
+	}
+
+	if err := json.Unmarshal(responseBody, out); err != nil {
+		return fmt.Errorf("failed to decode SSM response: %w", err)
+	}
+
+	return nil
 }
 
 func (c *Client) postSignedForm(service, version, action string, params url.Values, out any) error {
@@ -1360,17 +1452,17 @@ type describeInstanceTypesResponse struct {
 }
 
 type getParametersByPathResponse struct {
-	Parameters []xmlSSMParameter `xml:"Parameters>member"`
-	NextToken  string            `xml:"NextToken"`
+	Parameters []ssmParameter `json:"Parameters"`
+	NextToken  string         `json:"NextToken"`
 }
 
 type getParametersResponse struct {
-	Parameters []xmlSSMParameter `xml:"Parameters>member"`
+	Parameters []ssmParameter `json:"Parameters"`
 }
 
-type xmlSSMParameter struct {
-	Name  string `xml:"Name"`
-	Value string `xml:"Value"`
+type ssmParameter struct {
+	Name  string `json:"Name"`
+	Value string `json:"Value"`
 }
 
 type xmlInstanceType struct {
