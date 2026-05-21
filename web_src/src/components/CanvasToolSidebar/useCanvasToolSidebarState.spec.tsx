@@ -17,6 +17,7 @@ function Harness({ onBeforeClose }: { onBeforeClose: () => void }) {
   return (
     <div>
       <div data-testid="open-state">{state.isToolSidebarOpen ? "open" : "closed"}</div>
+      <div data-testid="agent-state">{state.isAgentEnabled ? "enabled" : "disabled"}</div>
       <button type="button" onClick={state.handleToolSidebarToggle}>
         toggle
       </button>
@@ -32,6 +33,7 @@ describe("useCanvasToolSidebarState", () => {
     render(<Harness onBeforeClose={onBeforeClose} />);
 
     expect(screen.getByTestId("open-state")).toHaveTextContent("open");
+    expect(screen.getByTestId("agent-state")).toHaveTextContent("disabled");
 
     fireEvent.click(screen.getByRole("button", { name: "toggle" }));
 

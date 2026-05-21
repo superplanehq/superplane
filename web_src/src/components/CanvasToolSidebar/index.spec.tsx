@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasToolSidebar } from ".";
+import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const richMessageRenderSpy = vi.fn();
 
@@ -53,7 +54,7 @@ vi.mock("@/components/AgentSidebar/widgets/RichMessage", () => ({
   },
 }));
 
-function makeToolSidebarState() {
+function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
   return {
     canvasId: "canvas-1",
     organizationId: "org-1",
@@ -61,11 +62,13 @@ function makeToolSidebarState() {
     readOnly: false,
     isToolSidebarOpen: true,
     showToolSidebarToggle: true,
+    isAgentEnabled: true,
     handleToolSidebarToggle: vi.fn(),
     openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),
     agentMode: "operator" as const,
     switchAgentMode: vi.fn(),
+    ...overrides,
   };
 }
 
@@ -111,6 +114,37 @@ describe("CanvasToolSidebar", () => {
 
     expect(onExitRunsMode).toHaveBeenCalledTimes(1);
     expect(screen.getByPlaceholderText("Ask the agent…")).toBeInTheDocument();
+  });
+
+  it("hides the agent tab when managed agents are disabled", () => {
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })}
+        runsContent={<div>Runs content</div>}
+      />,
+    );
+
+    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Runs" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Versions" })).toBeInTheDocument();
+    expect(screen.getByText("Runs content")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Ask the agent…")).not.toBeInTheDocument();
+  });
+
+  it("does not switch from runs mode to the agent tab when managed agents are disabled", () => {
+    const onExitRunsMode = vi.fn();
+
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })}
+        mode="runs"
+        onExitRunsMode={onExitRunsMode}
+        runsContent={<div>Runs content</div>}
+      />,
+    );
+
+    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
+    expect(screen.getByText("Runs content")).toBeInTheDocument();
   });
 
   it("enters versions from the versions tab", () => {
