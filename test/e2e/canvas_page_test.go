@@ -257,10 +257,16 @@ func (s *CanvasPageSteps) givenACanvasExistsWithANoopNode() {
 }
 
 func (s *CanvasPageSteps) toggleNodeViewOnCanvas(nodeName string) {
-	nodeHeader := q.TestID("node", nodeName, "header")
-	s.session.HoverOver(nodeHeader)
+	safe := strings.ToLower(nodeName)
+	safe = strings.ReplaceAll(safe, " ", "-")
+	node := q.Locator(`.react-flow__node:has([data-testid="node-` + safe + `-header"])`)
+	toggleButton := q.Locator(
+		`.react-flow__node:has([data-testid="node-` + safe + `-header"]) [data-testid="node-action-toggle-view"]`,
+	)
+
+	s.session.HoverOver(node)
 	s.session.Sleep(100)
-	s.session.Click(q.TestID("node-action-toggle-view"))
+	s.session.Click(toggleButton)
 	s.session.Sleep(300)
 }
 
@@ -318,18 +324,93 @@ func (s *CanvasPageSteps) givenACanvasWithManualTriggerAndWaitNodeAndQueuedItems
 	s.canvas.Connect("Start", "Wait")
 	s.canvas.Save()
 	s.canvas.Publish()
-
-	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-start-header"]) [data-testid="start-template-run"]`)
-	emitEvent := q.TestID("emit-event-submit-button")
+	s.t.Cleanup(func() {
+		s.cleanupQueuedWaitWork("Wait")
+	})
 
 	for i := 0; i < itemsAmount; i++ {
-		s.session.Click(startTemplateRun)
-		s.session.Click(emitEvent)
+		s.canvas.EmitManualTrigger("Start")
 		s.session.Sleep(100)
 	}
 
 	// wait for the first item to start processing
 	s.session.Sleep(500)
+}
+
+func (s *CanvasPageSteps) cleanupQueuedWaitWork(nodeName string) {
+	if s.canvas == nil {
+		return
+	}
+
+	node, err := s.findNodeByName(nodeName)
+	if err != nil {
+		s.t.Logf("cleanup queued wait work: find node %q: %v", nodeName, err)
+		return
+	}
+	if node == nil {
+		s.t.Logf("cleanup queued wait work: node %q not found", nodeName)
+		return
+	}
+
+	activeStates := []string{
+		models.CanvasNodeExecutionStatePending,
+		models.CanvasNodeExecutionStateStarted,
+	}
+
+	var executions []models.CanvasNodeExecution
+	err = database.Conn().
+		Where("workflow_id = ?", node.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		Where("state IN ?", activeStates).
+		Find(&executions).
+		Error
+	if err != nil {
+		s.t.Logf("cleanup queued wait work: find executions: %v", err)
+		return
+	}
+
+	for i := range executions {
+		if err := executions[i].Cancel(nil); err != nil {
+			s.t.Logf("cleanup queued wait work: cancel execution %s: %v", executions[i].ID, err)
+		}
+	}
+
+	if err := database.Conn().
+		Where("workflow_id = ?", node.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		Delete(&models.CanvasNodeQueueItem{}).
+		Error; err != nil {
+		s.t.Logf("cleanup queued wait work: delete queue items: %v", err)
+	}
+
+	if err := database.Conn().
+		Where("workflow_id = ?", node.WorkflowID).
+		Where("node_id = ?", node.NodeID).
+		Where("state = ?", models.NodeExecutionRequestStatePending).
+		Delete(&models.CanvasNodeRequest{}).
+		Error; err != nil {
+		s.t.Logf("cleanup queued wait work: delete node requests: %v", err)
+	}
+}
+
+func (s *CanvasPageSteps) findNodeByName(nodeName string) (*models.CanvasNode, error) {
+	canvas, err := models.FindCanvas(s.session.OrgID, s.canvas.WorkflowID)
+	if err != nil {
+		return nil, err
+	}
+
+	nodes, err := models.FindCanvasNodes(canvas.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range nodes {
+		if nodes[i].Name == nodeName {
+			return &nodes[i], nil
+		}
+	}
+
+	return nil, nil
 }
 
 func (s *CanvasPageSteps) openSidebarForNode(node string) {

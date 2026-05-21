@@ -14,9 +14,8 @@ import (
 )
 
 func TestWebhookResetSecret(t *testing.T) {
-	steps := &WebhookResetSteps{t: t}
-
 	t.Run("reset webhook secret shows new key", func(t *testing.T) {
+		steps := &WebhookResetSteps{t: t}
 		steps.start()
 		steps.givenACanvasWithWebhook("Webhook Reset Canvas", "Webhook")
 		steps.openWebhookConfiguration("Webhook")

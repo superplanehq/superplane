@@ -151,7 +151,7 @@ func (s *WaitSteps) givenACanvasWithManualTriggerWaitAndOutput() {
 }
 
 func (s *WaitSteps) runManualTrigger() {
-	s.canvas.RunManualTrigger("Start")
+	s.canvas.EmitManualTrigger("Start")
 	s.canvas.WaitForExecutionInStates(
 		"Wait",
 		[]string{
