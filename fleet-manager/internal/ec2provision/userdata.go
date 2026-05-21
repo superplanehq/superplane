@@ -21,7 +21,7 @@ type userDataVars struct {
 	RunnerInstallAWSRegion          string
 	FleetManagerURL                 string
 	RunnersAuthToken                string
-	RunnerTerminateAfterEachTask      bool
+	RunnerTerminateAfterEachTask    bool
 	RunnerCloudWatchLogGroup        string
 	RunnerCloudWatchLogStreamPrefix string
 	CloudWatchAgentJSON             string
