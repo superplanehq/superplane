@@ -1,8 +1,10 @@
 package contexts
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -74,6 +76,22 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	assert.Equal(t, "login", result["action"])
 	assert.Equal(t, "true", result["success"])
 	assert.Equal(t, "42", result["count"])
+}
+
+func Test_NodeConfigurationBuilder_JSONNumberTemplateUsesOriginalToken(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"id": json.Number("14000000"),
+			},
+		})
+
+	result, err := builder.Build(map[string]any{
+		"id": "{{ previous().id }}",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "14000000", result["id"])
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_RootFunction(t *testing.T) {
