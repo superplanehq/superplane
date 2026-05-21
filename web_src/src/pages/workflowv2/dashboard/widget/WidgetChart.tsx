@@ -1,8 +1,32 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { Loader2 } from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 
 import { applyFilters, buildChartData } from "./widgetData";
-import type { WidgetChartRender } from "./types";
+import { formatPercentOfTotal, formatSeriesValue } from "./chartFormat";
+import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries } from "./types";
 
 interface WidgetChartProps {
   render: WidgetChartRender;
@@ -11,32 +35,36 @@ interface WidgetChartProps {
 }
 
 const DEFAULT_PALETTE = ["#0284c7", "#16a34a", "#dc2626", "#a855f7", "#f59e0b", "#0ea5e9"];
+const STACK_ID = "stack";
+
+interface ChartSeries extends WidgetChartSeries {
+  key: string;
+  color: string;
+}
 
 /**
- * Compact SVG-based chart renderer used by Dashboard widget blocks.
- *
- * Kept dependency-free on purpose: the canvas already ships Recharts but that
- * library expects to live inside its own ResponsiveContainer, which makes
- * reliable embedding inside a dashboard cell tricky. The chart shapes covered
- * here (bar, stacked-bar, line, area, donut) all map cleanly onto a small set
- * of SVG primitives so the renderer stays predictable.
+ * Dashboard chart renderer powered by Recharts via the project's shadcn
+ * `ChartContainer`. Supports bar (grouped/stacked), line, area, and donut
+ * charts, with hover tooltips and a configurable legend. Each series can
+ * declare a `format` / `prefix` / `suffix` so currencies, durations, or
+ * percentages render consistently in the tooltip.
  */
 export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   const filtered = useMemo(() => applyFilters(rows, render.filters), [rows, render.filters]);
-  const seriesKeys = useMemo(
+  const series = useMemo<ChartSeries[]>(
     () =>
       render.series.map((s, idx) => ({
+        ...s,
         key: s.label ?? s.field ?? `series-${idx}`,
-        field: s.field,
         color: s.color ?? DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
       })),
     [render.series],
   );
   const data = useMemo(() => {
-    const built = buildChartData(filtered, render.xField, seriesKeys);
+    const built = buildChartData(filtered, render.xField, series);
     if (render.limit) return built.slice(0, render.limit);
     return built;
-  }, [filtered, render.xField, render.limit, seriesKeys]);
+  }, [filtered, render.xField, render.limit, series]);
 
   if (isLoading) {
     return (
@@ -54,222 +82,229 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   }
 
   return (
-    <div className="flex h-full flex-col gap-2 p-3" data-testid="widget-chart">
+    <div className="flex h-full min-h-0 flex-col gap-1 p-3" data-testid="widget-chart">
       {render.title ? <div className="text-xs font-medium text-slate-600">{render.title}</div> : null}
-      <div className="min-h-[120px] flex-1">
+      <div className="min-h-0 flex-1">
         {render.type === "donut" ? (
-          <DonutChart data={data} series={seriesKeys[0]} />
+          <DonutChartView data={data} series={series[0]} legendMode={render.legend ?? "auto"} />
         ) : (
-          <CartesianChart type={render.type} data={data} series={seriesKeys} />
+          <CartesianChartView type={render.type} data={data} series={series} legendMode={render.legend ?? "auto"} />
         )}
       </div>
-      <Legend series={seriesKeys} />
     </div>
   );
 }
 
-interface SeriesKey {
-  key: string;
-  field?: string;
-  color: string;
-}
+const CHART_MARGIN = { top: 8, right: 8, left: 0, bottom: 0 } as const;
+// Recharts wraps the tooltip in an absolutely positioned div with a default
+// `transform 400ms ease` transition. That transition makes the tooltip slide
+// in from the chart origin (top-left) the first time it appears, which feels
+// confusing. We disable the wrapper transition and add a quick fade-in on the
+// content so the tooltip appears in place.
+const TOOLTIP_WRAPPER_STYLE: CSSProperties = { transition: "none" };
+const TOOLTIP_CONTENT_CLASS = "animate-in fade-in duration-150";
 
-function CartesianChart({
+function CartesianChartView({
   type,
   data,
   series,
+  legendMode,
 }: {
-  type: WidgetChartRender["type"];
+  type: Exclude<WidgetChartRender["type"], "donut">;
   data: Array<Record<string, unknown>>;
-  series: SeriesKey[];
+  series: ChartSeries[];
+  legendMode: WidgetChartLegendMode;
 }) {
-  const width = 320;
-  const height = 160;
-  const padding = { top: 8, right: 8, bottom: 24, left: 32 };
-  const innerW = width - padding.left - padding.right;
-  const innerH = height - padding.top - padding.bottom;
-
-  const values = data.flatMap((row) => series.map((s) => toNumber(row[s.key])));
+  const chartConfig = useMemo<ChartConfig>(() => {
+    const config: ChartConfig = {};
+    for (const s of series) {
+      config[s.key] = { label: s.label ?? s.field ?? s.key, color: s.color };
+    }
+    return config;
+  }, [series]);
+  const seriesByKey = useMemo(() => new Map(series.map((s) => [s.key, s])), [series]);
+  const showLegend = legendMode === "show" || (legendMode === "auto" && series.length > 1);
   const stacked = type === "stacked-bar";
-  const stackTotals = stacked
-    ? data.map((row) => series.reduce((acc, s) => acc + Math.max(0, toNumber(row[s.key]) ?? 0), 0))
-    : null;
-  const max = stacked
-    ? Math.max(...(stackTotals ?? [0]), 0)
-    : Math.max(0, ...values.filter((v): v is number => v != null));
-  const safeMax = max === 0 ? 1 : max;
 
-  const slotW = innerW / data.length;
-  const groupGap = 0.2 * slotW;
+  const sharedAxes = <CartesianFrame stacked={stacked || type === "bar"} seriesByKey={seriesByKey} />;
+  const legend = showLegend ? <ChartLegend content={<ChartLegendContent />} verticalAlign="bottom" /> : null;
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full" role="img" aria-label="chart">
-      <ChartAxes padding={padding} innerW={innerW} innerH={innerH} />
-      {data.map((row, i) => {
-        const x = padding.left + slotW * i + groupGap / 2;
-        const xLabel = padding.left + slotW * (i + 0.5);
-        if (type === "bar" || type === "stacked-bar") {
-          const barAreaW = slotW - groupGap;
-          if (type === "stacked-bar") {
-            let cumulative = 0;
-            return (
-              <g key={i}>
-                {series.map((s) => {
-                  const v = Math.max(0, toNumber(row[s.key]) ?? 0);
-                  const h = (v / safeMax) * innerH;
-                  const y = padding.top + innerH - cumulative - h;
-                  cumulative += h;
-                  return <rect key={s.key} x={x} y={y} width={barAreaW} height={h} fill={s.color} />;
-                })}
-                <text x={xLabel} y={height - 6} textAnchor="middle" fontSize={9} fill="#64748b">
-                  {String(row.x ?? "")}
-                </text>
-              </g>
-            );
-          }
-          const perBarW = barAreaW / series.length;
-          return (
-            <g key={i}>
-              {series.map((s, si) => {
-                const v = toNumber(row[s.key]) ?? 0;
-                const h = (Math.max(0, v) / safeMax) * innerH;
-                const y = padding.top + innerH - h;
-                return (
-                  <rect
-                    key={s.key}
-                    x={x + si * perBarW}
-                    y={y}
-                    width={Math.max(0, perBarW - 1)}
-                    height={h}
-                    fill={s.color}
-                  />
-                );
-              })}
-              <text x={xLabel} y={height - 6} textAnchor="middle" fontSize={9} fill="#64748b">
-                {String(row.x ?? "")}
-              </text>
-            </g>
-          );
-        }
-        // line/area: handled below as polylines
-        return (
-          <text key={`label-${i}`} x={xLabel} y={height - 6} textAnchor="middle" fontSize={9} fill="#64748b">
-            {String(row.x ?? "")}
-          </text>
-        );
-      })}
-      {(type === "line" || type === "area") &&
-        series.map((s) => {
-          const points = data.map((row, i) => {
-            const v = toNumber(row[s.key]) ?? 0;
-            const x = padding.left + slotW * (i + 0.5);
-            const y = padding.top + innerH - (Math.max(0, v) / safeMax) * innerH;
-            return `${x.toFixed(1)},${y.toFixed(1)}`;
-          });
-          const linePath = points.join(" ");
-          if (type === "area") {
-            const baseY = padding.top + innerH;
-            const firstX = padding.left + slotW * 0.5;
-            const lastX = padding.left + slotW * (data.length - 0.5);
-            const areaPath = `${firstX},${baseY} ${linePath} ${lastX},${baseY}`;
-            return (
-              <g key={s.key}>
-                <polygon points={areaPath} fill={s.color} fillOpacity={0.18} />
-                <polyline points={linePath} fill="none" stroke={s.color} strokeWidth={1.5} />
-              </g>
-            );
-          }
-          return <polyline key={s.key} points={linePath} fill="none" stroke={s.color} strokeWidth={1.5} />;
-        })}
-    </svg>
+    <ChartContainer config={chartConfig} className="aspect-auto h-full w-full">
+      {type === "area" ? (
+        <AreaChart data={data} margin={CHART_MARGIN}>
+          {sharedAxes}
+          {legend}
+          {series.map((s) => (
+            <Area
+              key={s.key}
+              type="monotone"
+              dataKey={s.key}
+              stroke={s.color}
+              fill={s.color}
+              fillOpacity={0.2}
+              strokeWidth={2}
+            />
+          ))}
+        </AreaChart>
+      ) : type === "line" ? (
+        <LineChart data={data} margin={CHART_MARGIN}>
+          {sharedAxes}
+          {legend}
+          {series.map((s) => (
+            <Line
+              key={s.key}
+              type="monotone"
+              dataKey={s.key}
+              stroke={s.color}
+              strokeWidth={2}
+              dot={{ r: 2.5, fill: s.color }}
+              activeDot={{ r: 4 }}
+            />
+          ))}
+        </LineChart>
+      ) : (
+        <BarChart data={data} margin={CHART_MARGIN}>
+          {sharedAxes}
+          {legend}
+          {series.map((s) => (
+            <Bar
+              key={s.key}
+              dataKey={s.key}
+              fill={s.color}
+              stackId={stacked ? STACK_ID : undefined}
+              radius={stacked ? 0 : [3, 3, 0, 0]}
+            />
+          ))}
+        </BarChart>
+      )}
+    </ChartContainer>
   );
 }
 
-function ChartAxes({
-  padding,
-  innerW,
-  innerH,
-}: {
-  padding: { top: number; right: number; bottom: number; left: number };
-  innerW: number;
-  innerH: number;
-}) {
+function CartesianFrame({ stacked, seriesByKey }: { stacked: boolean; seriesByKey: Map<string, ChartSeries> }) {
+  const tooltipFormatter = (value: unknown, name: unknown) => {
+    const key = String(name ?? "");
+    const s = seriesByKey.get(key);
+    const label = s?.label ?? s?.field ?? key;
+    const formatted = formatSeriesValue(value, { format: s?.format, prefix: s?.prefix, suffix: s?.suffix });
+    return (
+      <div className="flex w-full items-center justify-between gap-3">
+        <span className="text-muted-foreground">{label}</span>
+        <span className="font-mono font-medium text-foreground tabular-nums">{formatted}</span>
+      </div>
+    );
+  };
   return (
     <>
-      <line
-        x1={padding.left}
-        x2={padding.left}
-        y1={padding.top}
-        y2={padding.top + innerH}
-        stroke="#cbd5e1"
-        strokeWidth={1}
+      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+      <XAxis
+        dataKey="x"
+        tickLine={false}
+        axisLine={false}
+        fontSize={11}
+        interval="preserveStartEnd"
+        minTickGap={16}
+        tickFormatter={(v: unknown) => String(v ?? "")}
       />
-      <line
-        x1={padding.left}
-        x2={padding.left + innerW}
-        y1={padding.top + innerH}
-        y2={padding.top + innerH}
-        stroke="#cbd5e1"
-        strokeWidth={1}
+      <YAxis tickLine={false} axisLine={false} fontSize={11} width={36} tickFormatter={yTickFormatter} />
+      <ChartTooltip
+        cursor={stacked ? { fill: "rgba(148, 163, 184, 0.12)" } : true}
+        wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+        content={<ChartTooltipContent formatter={tooltipFormatter} indicator="dot" className={TOOLTIP_CONTENT_CLASS} />}
       />
     </>
   );
 }
 
-function DonutChart({ data, series }: { data: Array<Record<string, unknown>>; series: SeriesKey | undefined }) {
+function yTickFormatter(value: number) {
+  if (!Number.isFinite(value)) return String(value);
+  if (Math.abs(value) >= 1000) return value.toLocaleString();
+  return String(value);
+}
+
+function DonutChartView({
+  data,
+  series,
+  legendMode,
+}: {
+  data: Array<Record<string, unknown>>;
+  series: ChartSeries | undefined;
+  legendMode: WidgetChartLegendMode;
+}) {
+  const seriesKey = series?.key ?? "";
+  const sliceData = useMemo(() => {
+    if (!seriesKey) return [];
+    return data.map((row, idx) => ({
+      x: String(row.x ?? ""),
+      value: Number(row[seriesKey]) || 0,
+      color: DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
+    }));
+  }, [data, seriesKey]);
+
+  const total = useMemo(() => sliceData.reduce((acc, slice) => acc + slice.value, 0), [sliceData]);
+
+  const chartConfig = useMemo<ChartConfig>(() => {
+    const config: ChartConfig = {};
+    for (const slice of sliceData) {
+      config[slice.x || "(empty)"] = { label: slice.x || "(empty)", color: slice.color };
+    }
+    return config;
+  }, [sliceData]);
+
   if (!series) return null;
-  const radius = 56;
-  const width = radius * 2 + 24;
-  const height = radius * 2 + 24;
-  const cx = width / 2;
-  const cy = height / 2;
-  const total = data.reduce((acc, row) => acc + (toNumber(row[series.key]) ?? 0), 0);
-  if (total === 0) return <div className="p-4 text-center text-xs text-slate-500">No data</div>;
-  let cumulative = 0;
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="mx-auto h-full" role="img" aria-label="donut">
-      {data.map((row, i) => {
-        const value = toNumber(row[series.key]) ?? 0;
-        if (value === 0) return null;
-        const start = (cumulative / total) * Math.PI * 2;
-        cumulative += value;
-        const end = (cumulative / total) * Math.PI * 2;
-        const largeArc = end - start > Math.PI ? 1 : 0;
-        const x1 = cx + radius * Math.sin(start);
-        const y1 = cy - radius * Math.cos(start);
-        const x2 = cx + radius * Math.sin(end);
-        const y2 = cy - radius * Math.cos(end);
-        const color = DEFAULT_PALETTE[i % DEFAULT_PALETTE.length];
-        return (
-          <path
-            key={i}
-            d={`M ${cx} ${cy} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${radius} ${radius} 0 ${largeArc} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z`}
-            fill={color}
-            stroke="#fff"
-            strokeWidth={1.5}
-          />
-        );
-      })}
-      <circle cx={cx} cy={cy} r={radius * 0.55} fill="#fff" />
-    </svg>
-  );
-}
+  if (total === 0) {
+    return <div className="p-4 text-center text-xs text-slate-500">No data</div>;
+  }
 
-function Legend({ series }: { series: SeriesKey[] }) {
-  if (series.length <= 1) return null;
-  return (
-    <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-600">
-      {series.map((s) => (
-        <div key={s.key} className="inline-flex items-center gap-1">
-          <span className="inline-block size-2 rounded-full" style={{ backgroundColor: s.color }} />
-          {s.key}
-        </div>
-      ))}
-    </div>
-  );
-}
+  const showLegend = legendMode !== "hide";
 
-function toNumber(value: unknown): number | null {
-  const n = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(n) ? n : null;
+  const tooltipFormatter = (value: unknown, _name: unknown, item: { payload?: { x?: string } }) => {
+    const sliceName = item.payload?.x ?? String(_name ?? "");
+    const formatted = formatSeriesValue(value, {
+      format: series.format,
+      prefix: series.prefix,
+      suffix: series.suffix,
+    });
+    const pct = formatPercentOfTotal(value, total);
+    return (
+      <div className="flex w-full items-center justify-between gap-3">
+        <span className="text-muted-foreground">{sliceName}</span>
+        <span className="font-mono font-medium text-foreground tabular-nums">
+          {formatted}
+          {pct}
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <ChartContainer config={chartConfig} className="aspect-auto h-full w-full">
+      <PieChart>
+        <ChartTooltip
+          wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+          content={
+            <ChartTooltipContent nameKey="x" hideLabel formatter={tooltipFormatter} className={TOOLTIP_CONTENT_CLASS} />
+          }
+        />
+        {showLegend ? <ChartLegend content={<ChartLegendContent nameKey="x" />} verticalAlign="bottom" /> : null}
+        <Pie
+          data={sliceData}
+          dataKey="value"
+          nameKey="x"
+          cx="50%"
+          cy="50%"
+          innerRadius="55%"
+          outerRadius="85%"
+          paddingAngle={1}
+          stroke="#fff"
+          strokeWidth={1.5}
+        >
+          {sliceData.map((slice) => (
+            <Cell key={slice.x} fill={slice.color} />
+          ))}
+        </Pie>
+      </PieChart>
+    </ChartContainer>
+  );
 }

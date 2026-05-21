@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import { dashboardToYaml, parseDashboardYaml, validateDashboardContent, MAX_DASHBOARD_PANELS } from "./dashboardYaml";
 
 describe("dashboardToYaml / parseDashboardYaml", () => {
-  it("round-trips an empty dashboard", () => {
+  it("round-trips an empty console", () => {
     const text = dashboardToYaml({ panels: [], layout: [], canvasId: "abc", canvasName: "My Canvas" });
     expect(text).toContain("apiVersion: v1");
-    expect(text).toContain("kind: Dashboard");
+    expect(text).toContain("kind: Console");
     expect(text).toContain("canvasId: abc");
     expect(text).toContain("name: My Canvas");
 
@@ -18,7 +18,30 @@ describe("dashboardToYaml / parseDashboardYaml", () => {
     }
   });
 
-  it("round-trips a populated dashboard", () => {
+  it("accepts legacy `kind: Dashboard` on import for back-compat", () => {
+    const text = `apiVersion: v1
+kind: Dashboard
+metadata: {}
+spec:
+  panels:
+    - id: intro
+      type: markdown
+      content:
+        body: "# Hi"
+  layout:
+    - i: intro
+      x: 0
+      y: 0
+      w: 12
+      h: 6
+`;
+    const result = parseDashboardYaml(text);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error);
+    expect(result.data.spec.panels).toEqual([{ id: "intro", type: "markdown", content: { body: "# Hi" } }]);
+  });
+
+  it("round-trips a populated console", () => {
     const text = dashboardToYaml({
       panels: [{ id: "intro", type: "markdown", content: { body: "# Hi" } }],
       layout: [{ i: "intro", x: 0, y: 0, w: 12, h: 6, minW: 2, minH: 2 }],
@@ -77,7 +100,7 @@ describe("dashboardToYaml / parseDashboardYaml", () => {
 
   it("rejects a node panel whose node field is not a string", () => {
     const text = `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -94,7 +117,7 @@ spec:
 
   it("accepts a table panel without columns (configured via the form)", () => {
     const text = `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -117,7 +140,7 @@ spec:
 
   it("rejects unknown root keys", () => {
     const text = `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels: []
@@ -131,7 +154,7 @@ extra: 1
 
   it("rejects unsupported panel types", () => {
     const text = `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -147,7 +170,7 @@ spec:
 
   it("rejects duplicate panel ids", () => {
     const text = `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -166,7 +189,7 @@ spec:
 
   it("rejects non-string body", () => {
     const text = `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -183,7 +206,7 @@ spec:
 
   it("rejects layout referring to missing panel", () => {
     const text = `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -203,7 +226,7 @@ spec:
 
   it("rejects wrong apiVersion", () => {
     const text = `apiVersion: v2
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels: []
@@ -212,6 +235,134 @@ spec:
     const result = parseDashboardYaml(text);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("Unsupported apiVersion");
+  });
+
+  it("round-trips a number panel with prefix and suffix symbols", () => {
+    const panels = [
+      {
+        id: "spend",
+        type: "number",
+        content: {
+          dataSource: { kind: "memory", namespace: "expenses" },
+          render: {
+            kind: "number",
+            aggregation: "sum",
+            field: "amount",
+            format: "number",
+            prefix: "R$",
+            suffix: " /mo",
+          },
+        },
+      },
+    ];
+    const layout = [{ i: "spend", x: 0, y: 0, w: 6, h: 3 }];
+    const text = dashboardToYaml({ panels, layout });
+    const result = parseDashboardYaml(text);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error);
+    expect(result.data.spec.panels).toEqual(panels);
+  });
+
+  it("round-trips a composite memory number panel with heterogeneous sources", () => {
+    const panels = [
+      {
+        id: "score",
+        type: "number",
+        content: {
+          dataSource: {
+            kind: "memory",
+            combine: "sum",
+            sources: [
+              { namespace: "a", aggregation: "sum", field: "cost" },
+              { namespace: "b", aggregation: "count" },
+            ],
+          },
+          render: { kind: "number", format: "number", prefix: "R$" },
+        },
+      },
+    ];
+    const layout = [{ i: "score", x: 0, y: 0, w: 4, h: 3 }];
+    const text = dashboardToYaml({ panels, layout });
+    const result = parseDashboardYaml(text);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error);
+    expect(result.data.spec.panels).toEqual(panels);
+  });
+
+  it("rejects a composite memory number panel when render.aggregation is set", () => {
+    const text = `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels:
+    - id: score
+      type: number
+      content:
+        dataSource:
+          kind: memory
+          combine: sum
+          sources:
+            - namespace: a
+              aggregation: sum
+              field: cost
+        render:
+          kind: number
+          aggregation: sum
+          field: cost
+  layout: []
+`;
+    const result = parseDashboardYaml(text);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/render\.aggregation must not be set/);
+  });
+
+  it("rejects a composite memory number panel with an unknown combine operator", () => {
+    const text = `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels:
+    - id: score
+      type: number
+      content:
+        dataSource:
+          kind: memory
+          combine: median
+          sources:
+            - namespace: a
+              aggregation: sum
+              field: cost
+        render:
+          kind: number
+  layout: []
+`;
+    const result = parseDashboardYaml(text);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/dataSource\.combine must be one of/);
+  });
+
+  it("rejects a composite memory source missing a field for non-count aggregation", () => {
+    const text = `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels:
+    - id: score
+      type: number
+      content:
+        dataSource:
+          kind: memory
+          combine: sum
+          sources:
+            - namespace: a
+              aggregation: sum
+        render:
+          kind: number
+  layout: []
+`;
+    const result = parseDashboardYaml(text);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/dataSource\.sources\[0\]\.field is required/);
   });
 });
 
@@ -237,7 +388,7 @@ describe("validateDashboardContent", () => {
     ).toContain("non-negative");
   });
 
-  it("accepts a valid dashboard", () => {
+  it("accepts a valid console", () => {
     expect(
       validateDashboardContent(
         [{ id: "p", type: "markdown", content: { body: "ok" } }],
