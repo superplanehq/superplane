@@ -744,15 +744,17 @@ func (c *Client) ListPublicImages(imageOS string) ([]Image, error) {
 	imagesByID := map[string]Image{}
 	c.tryLoadPublicImagesFromSSM(imageOS, definition, imagesByID)
 
+	describeAttempted := false
 	relevantCount := countRelevantPublicImages(imageOS, imagesByID)
 	if !definition.skipDescribeWhenSSMResolved(relevantCount) {
 		if err := c.loadPublicImagesFromDescribe(imageOS, definition, imagesByID); err != nil {
 			return nil, err
 		}
+		describeAttempted = true
 	}
 
 	images := collectRelevantPublicImages(imageOS, imagesByID)
-	if len(images) == 0 {
+	if len(images) == 0 && !describeAttempted {
 		if err := c.loadPublicImagesFromDescribe(imageOS, definition, imagesByID); err != nil {
 			return nil, err
 		}
