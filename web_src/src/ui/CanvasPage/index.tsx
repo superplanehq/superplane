@@ -160,7 +160,7 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "dashboard";
+  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
@@ -172,6 +172,8 @@ export interface CanvasPageProps {
   onSelectRuns?: () => void;
   onExitRunsMode?: () => void;
   onSelectDashboard?: () => void;
+  /** Switches the canvas surface to the Memory tab. Omitted on templates. */
+  onSelectMemory?: () => void;
   /** Opens the canvas dashboard add-panel dialog when `headerMode` is `dashboard`. */
   onDashboardAddPanel?: () => void;
   /** Opens the dashboard YAML modal when `headerMode` is `dashboard`. */
@@ -187,10 +189,10 @@ export interface CanvasPageProps {
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
-  memoryItemCount?: number;
+  /** Distinct namespace count for the Memory tab badge. No badge when 0. */
+  memoryNamespaceCount?: number;
   showCanvasSettingsMenu?: boolean;
   onYamlOpen: () => void;
-  onMemoryOpen: () => void;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
   showBottomStatusControls?: boolean;
@@ -1114,6 +1116,7 @@ function CanvasPage(props: CanvasPageProps) {
       Boolean(props.hideAddControls) ||
       props.headerMode === "version-live" ||
       props.headerMode === "dashboard" ||
+      props.headerMode === "memory" ||
       props.headerMode === "runs" ||
       state.componentSidebar.isOpen,
     isSidebarOpen: isBuildingBlocksSidebarOpen,
@@ -1199,7 +1202,8 @@ function CanvasPage(props: CanvasPageProps) {
       ref={canvasWrapperRef}
       className={cn(
         "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
-        (props.headerMode === "version-live" || props.headerMode === "dashboard") && "sp-canvas-live",
+        (props.headerMode === "version-live" || props.headerMode === "dashboard" || props.headerMode === "memory") &&
+          "sp-canvas-live",
         props.headerMode === "runs" && "sp-canvas-live",
       )}
     >
@@ -1228,6 +1232,8 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           onSelectDashboard={props.onSelectDashboard}
+          onSelectMemory={props.onSelectMemory}
+          memoryNamespaceCount={props.memoryNamespaceCount}
           onDashboardAddPanel={props.onDashboardAddPanel}
           onDashboardOpenYaml={props.onDashboardOpenYaml}
           dashboardYamlReadOnly={props.dashboardYamlReadOnly}
@@ -1254,14 +1260,12 @@ function CanvasPage(props: CanvasPageProps) {
           versionsContent={props.toolSidebarVersionsContent}
         />
 
-        {props.headerMode === "runs" ? null : (
+        {props.headerMode === "runs" || props.headerMode === "memory" ? null : (
           <RightSideControls
             mode={readOnly ? "live" : "edit"}
             onSidebarOpen={handleBuildingBlocksShortcutOpen}
             onAddNote={handleAddNote}
-            onMemoryOpen={props.onMemoryOpen}
             onYamlOpen={props.onYamlOpen}
-            showMemoryButton={props.headerMode !== "dashboard"}
           />
         )}
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
@@ -1270,6 +1274,7 @@ function CanvasPage(props: CanvasPageProps) {
               isBuildingBlocksSidebarOpen &&
               props.headerMode !== "version-live" &&
               props.headerMode !== "dashboard" &&
+              props.headerMode !== "memory" &&
               props.headerMode !== "runs"
             }
             onToggle={handleSidebarToggle}
@@ -1413,7 +1418,11 @@ function CanvasPage(props: CanvasPageProps) {
               configurationSaveMode={props.configurationSaveMode}
               currentTab={currentTab}
               onTabChange={setCurrentTab}
-              canvasMode={props.headerMode === "version-live" || props.headerMode === "dashboard" ? "live" : "edit"}
+              canvasMode={
+                props.headerMode === "version-live" || props.headerMode === "dashboard" || props.headerMode === "memory"
+                  ? "live"
+                  : "edit"
+              }
               organizationId={props.organizationId}
               getCustomField={props.getCustomField}
               integrations={props.integrations}
@@ -1740,6 +1749,8 @@ function CanvasContentHeader({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   onSelectDashboard,
+  onSelectMemory,
+  memoryNamespaceCount,
   onDashboardAddPanel,
   onDashboardOpenYaml,
   dashboardYamlReadOnly,
@@ -1772,6 +1783,8 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectDashboard?: () => void;
+  onSelectMemory?: () => void;
+  memoryNamespaceCount?: number;
   onDashboardAddPanel?: () => void;
   onDashboardOpenYaml?: () => void;
   dashboardYamlReadOnly?: boolean;
@@ -1814,6 +1827,8 @@ function CanvasContentHeader({
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       onSelectDashboard={onSelectDashboard}
+      onSelectMemory={onSelectMemory}
+      memoryNamespaceCount={memoryNamespaceCount}
       onDashboardAddPanel={onDashboardAddPanel}
       onDashboardOpenYaml={onDashboardOpenYaml}
       dashboardYamlReadOnly={dashboardYamlReadOnly}

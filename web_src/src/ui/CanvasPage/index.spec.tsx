@@ -198,7 +198,6 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={true}
           activeCanvasVersionId="draft-version"
-          onMemoryOpen={vi.fn()}
           onYamlOpen={vi.fn()}
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
@@ -256,7 +255,6 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={true}
           activeCanvasVersionId="draft-version"
-          onMemoryOpen={vi.fn()}
           onYamlOpen={vi.fn()}
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
@@ -300,7 +298,6 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={true}
           activeCanvasVersionId="draft-version"
-          onMemoryOpen={vi.fn()}
           onYamlOpen={vi.fn()}
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
@@ -354,7 +351,6 @@ describe("CanvasPage connection drop", () => {
           activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           fitAllRequest={0}
-          onMemoryOpen={vi.fn()}
           onYamlOpen={vi.fn()}
         />
       </MemoryRouter>,
@@ -395,7 +391,6 @@ describe("CanvasPage connection drop", () => {
           activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           fitAllRequest={0}
-          onMemoryOpen={vi.fn()}
           onYamlOpen={vi.fn()}
         />
       </MemoryRouter>,

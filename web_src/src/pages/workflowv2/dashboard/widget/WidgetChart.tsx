@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { Loader2 } from "lucide-react";
 import {
   Area,
@@ -96,6 +96,13 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
 }
 
 const CHART_MARGIN = { top: 8, right: 8, left: 0, bottom: 0 } as const;
+// Recharts wraps the tooltip in an absolutely positioned div with a default
+// `transform 400ms ease` transition. That transition makes the tooltip slide
+// in from the chart origin (top-left) the first time it appears, which feels
+// confusing. We disable the wrapper transition and add a quick fade-in on the
+// content so the tooltip appears in place.
+const TOOLTIP_WRAPPER_STYLE: CSSProperties = { transition: "none" };
+const TOOLTIP_CONTENT_CLASS = "animate-in fade-in duration-150";
 
 function CartesianChartView({
   type,
@@ -203,7 +210,8 @@ function CartesianFrame({ stacked, seriesByKey }: { stacked: boolean; seriesByKe
       <YAxis tickLine={false} axisLine={false} fontSize={11} width={36} tickFormatter={yTickFormatter} />
       <ChartTooltip
         cursor={stacked ? { fill: "rgba(148, 163, 184, 0.12)" } : true}
-        content={<ChartTooltipContent formatter={tooltipFormatter} indicator="dot" />}
+        wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+        content={<ChartTooltipContent formatter={tooltipFormatter} indicator="dot" className={TOOLTIP_CONTENT_CLASS} />}
       />
     </>
   );
@@ -273,7 +281,12 @@ function DonutChartView({
   return (
     <ChartContainer config={chartConfig} className="aspect-auto h-full w-full">
       <PieChart>
-        <ChartTooltip content={<ChartTooltipContent nameKey="x" hideLabel formatter={tooltipFormatter} />} />
+        <ChartTooltip
+          wrapperStyle={TOOLTIP_WRAPPER_STYLE}
+          content={
+            <ChartTooltipContent nameKey="x" hideLabel formatter={tooltipFormatter} className={TOOLTIP_CONTENT_CLASS} />
+          }
+        />
         {showLegend ? <ChartLegend content={<ChartLegendContent nameKey="x" />} verticalAlign="bottom" /> : null}
         <Pie
           data={sliceData}

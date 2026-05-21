@@ -1,29 +1,44 @@
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useRef } from "react";
 
-type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard";
+type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLive: () => void;
   onSelectDashboard?: () => void;
+  onSelectMemory?: () => void;
+  /** Distinct namespace count shown as a badge next to the Memory tab. No badge when 0. */
+  memoryNamespaceCount?: number;
   editing?: boolean;
   hasDraft?: boolean;
 }
 
 const CANVAS_TAB = "canvas";
 const DASHBOARD_TAB = "dashboard";
+const MEMORY_TAB = "memory";
 const RUNS_MODE = "runs";
 
 export function CanvasModeToggle({
   mode,
   onSelectLive,
   onSelectDashboard,
+  onSelectMemory,
+  memoryNamespaceCount = 0,
   editing = false,
   hasDraft = false,
 }: CanvasModeToggleProps) {
   const showDashboard = Boolean(onSelectDashboard);
-  const selected = mode === DASHBOARD_TAB ? DASHBOARD_TAB : mode === RUNS_MODE ? RUNS_MODE : CANVAS_TAB;
+  const showMemory = Boolean(onSelectMemory);
+  const selected =
+    mode === DASHBOARD_TAB
+      ? DASHBOARD_TAB
+      : mode === MEMORY_TAB
+        ? MEMORY_TAB
+        : mode === RUNS_MODE
+          ? RUNS_MODE
+          : CANVAS_TAB;
   const valueChangeHandledRef = useRef(false);
 
   useEffect(() => {
@@ -54,6 +69,15 @@ export function CanvasModeToggle({
             valueChangeHandledRef.current = false;
           });
           void onSelectDashboard();
+          return;
+        }
+
+        if (next === MEMORY_TAB && selected !== MEMORY_TAB && onSelectMemory) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectMemory();
         }
       }}
     >
@@ -79,6 +103,22 @@ export function CanvasModeToggle({
             ) : null}
           </span>
         </TabsTrigger>
+        {showMemory ? (
+          <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory">
+            <span className="inline-flex items-center gap-1.5">
+              Memory
+              {memoryNamespaceCount > 0 ? (
+                <Badge
+                  variant="secondary"
+                  className="h-4 px-1.5 py-0 text-[10px] leading-none"
+                  data-testid="canvas-view-mode-memory-badge"
+                >
+                  {memoryNamespaceCount}
+                </Badge>
+              ) : null}
+            </span>
+          </TabsTrigger>
+        ) : null}
       </TabsList>
     </Tabs>
   );
