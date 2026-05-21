@@ -56,6 +56,16 @@ func ParseDashboard(raw []byte) (*Dashboard, error) {
 }
 
 func DashboardResourceFromDashboard(dashboard openapi_client.CanvasesCanvasDashboard, canvasName string) Dashboard {
+	panels := dashboard.GetPanels()
+	if panels == nil {
+		panels = []openapi_client.CanvasesDashboardPanel{}
+	}
+
+	layout := dashboard.GetLayout()
+	if layout == nil {
+		layout = []openapi_client.CanvasesDashboardLayoutItem{}
+	}
+
 	return Dashboard{
 		APIVersion: DashboardAPIVersion,
 		Kind:       DashboardKind,
@@ -64,8 +74,8 @@ func DashboardResourceFromDashboard(dashboard openapi_client.CanvasesCanvasDashb
 			Name:     canvasName,
 		},
 		Spec: DashboardSpec{
-			Panels: dashboard.GetPanels(),
-			Layout: dashboard.GetLayout(),
+			Panels: panels,
+			Layout: layout,
 		},
 	}
 }

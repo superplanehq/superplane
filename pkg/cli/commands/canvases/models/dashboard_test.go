@@ -1,8 +1,10 @@
 package models
 
 import (
+	"encoding/json"
 	"testing"
 
+	"github.com/ghodss/yaml"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -138,4 +140,25 @@ func TestDashboardConversions(t *testing.T) {
 	body := UpdateDashboardRequestFromDashboard(resource)
 	require.Len(t, body.GetPanels(), 1)
 	require.Len(t, body.GetLayout(), 1)
+}
+
+func TestDashboardResourceFromDashboardDefaultsEmptyCollections(t *testing.T) {
+	dashboard := openapi_client.CanvasesCanvasDashboard{}
+	dashboard.SetCanvasId("canvas-123")
+
+	resource := DashboardResourceFromDashboard(dashboard, "My Canvas")
+
+	jsonPayload, err := json.Marshal(resource)
+	require.NoError(t, err)
+	require.Contains(t, string(jsonPayload), `"panels":[]`)
+	require.Contains(t, string(jsonPayload), `"layout":[]`)
+	require.NotContains(t, string(jsonPayload), `"panels":null`)
+	require.NotContains(t, string(jsonPayload), `"layout":null`)
+
+	yamlPayload, err := yaml.Marshal(resource)
+	require.NoError(t, err)
+	require.Contains(t, string(yamlPayload), "panels: []")
+	require.Contains(t, string(yamlPayload), "layout: []")
+	require.NotContains(t, string(yamlPayload), "panels: null")
+	require.NotContains(t, string(yamlPayload), "layout: null")
 }
