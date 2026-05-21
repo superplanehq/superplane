@@ -11,9 +11,8 @@ import (
 )
 
 func TestHomePage(t *testing.T) {
-	steps := &TestHomePageSteps{t: t}
-
 	t.Run("creating a new canvas", func(t *testing.T) {
+		steps := &TestHomePageSteps{t: t}
 		steps.Start()
 		steps.VisitHomePage()
 		steps.FillInNewCanvasForm("Example Canvas")
@@ -21,6 +20,7 @@ func TestHomePage(t *testing.T) {
 	})
 
 	t.Run("showing canvases in folders", func(t *testing.T) {
+		steps := &TestHomePageSteps{t: t}
 		steps.Start()
 		steps.GivenCanvasInFolder("Foldered Canvas", "Deployments")
 		steps.VisitHomePage()
