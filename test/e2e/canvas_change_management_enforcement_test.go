@@ -93,7 +93,7 @@ func (s *canvasChangeManagementEnforcementSteps) visitCanvasSettings() {
 	s.session.Click(q.Locator(`header button[aria-label="Canvas menu"]`))
 	s.session.AssertVisible(q.Locator(`[role="menuitem"]:has-text("Settings")`))
 	s.session.Click(q.Locator(`[role="menuitem"]:has-text("Settings")`))
-	s.session.AssertText("Canvas Name")
+	s.session.AssertText("App name")
 	s.session.AssertVisible(canvasChangeManagementSwitchQuery())
 }
 

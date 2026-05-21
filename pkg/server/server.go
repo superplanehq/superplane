@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -31,7 +32,36 @@ import (
 
 var _ = registryimports.Loaded
 
+var agentProviderOverride = struct {
+	sync.Mutex
+	provider agents.Provider
+}{}
+
+func SetAgentProviderForTests(provider agents.Provider) func() {
+	agentProviderOverride.Lock()
+	previous := agentProviderOverride.provider
+	agentProviderOverride.provider = provider
+	agentProviderOverride.Unlock()
+
+	return func() {
+		agentProviderOverride.Lock()
+		agentProviderOverride.provider = previous
+		agentProviderOverride.Unlock()
+	}
+}
+
+func getAgentProviderOverride() agents.Provider {
+	agentProviderOverride.Lock()
+	defer agentProviderOverride.Unlock()
+	return agentProviderOverride.provider
+}
+
 func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.Signer, baseURL string) (agents.Provider, agentsActions.AgentsService) {
+	if provider := getAgentProviderOverride(); provider != nil {
+		log.WithField("provider", provider.Name()).Info("Managed agents enabled with provider override")
+		return provider, agents.NewService(provider, authService, jwtSigner, baseURL)
+	}
+
 	cfg := config.LoadAnthropicAgentConfig()
 	if !cfg.Enabled() {
 		log.Info("Anthropic managed agents disabled: missing ANTHROPIC_* env vars")
