@@ -100,6 +100,28 @@ func TestAgentE2E(t *testing.T) {
 		steps.assertHidden(q.TestID("agent-stop-button"))
 	})
 
+	t.Run("sends a follow-up message while a turn is still running", func(t *testing.T) {
+		steps := newAgentSteps(t)
+		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
+			if isAgentSystemMessage(call.Message) {
+				return []agents.ProviderEvent{agentTurnCompletedEvent()}, nil
+			}
+
+			return nil, nil
+		})
+
+		steps.start()
+		steps.openAgent()
+		steps.sendMessage("Keep running while I add more context")
+		steps.assertVisible(q.TestID("agent-stop-button"))
+		steps.fillMessage("Here is more context")
+		steps.assertSendButtonEnabled()
+		steps.submitMessage()
+		steps.waitForSendCall(func(call support.AgentProviderSendMessageCall) bool {
+			return call.Message == "Here is more context"
+		})
+	})
+
 	t.Run("starts outcome-based building from a rubric response", func(t *testing.T) {
 		steps := newAgentSteps(t)
 		steps.withSendMessageHandler(func(call support.AgentProviderSendMessageCall) ([]agents.ProviderEvent, error) {
@@ -230,8 +252,25 @@ func (s *agentSteps) switchToAskMode() {
 }
 
 func (s *agentSteps) sendMessage(message string) {
+	s.fillMessage(message)
+	s.submitMessage()
+}
+
+func (s *agentSteps) fillMessage(message string) {
 	s.session.FillIn(q.TestID("agent-input"), message)
+}
+
+func (s *agentSteps) submitMessage() {
 	s.session.Click(q.TestID("agent-send-message-button"))
+}
+
+func (s *agentSteps) assertSendButtonEnabled() {
+	button := q.TestID("agent-send-message-button").Run(s.session)
+	require.Eventually(s.t, func() bool {
+		disabled, err := button.IsDisabled()
+		require.NoError(s.t, err)
+		return !disabled
+	}, 10*time.Second, 200*time.Millisecond)
 }
 
 func (s *agentSteps) stopAgent() {
