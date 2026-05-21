@@ -10,6 +10,7 @@ interface DashboardModeActionsConfig {
   setIsDashboardAddPanelOpen: (value: boolean) => void;
   setIsDashboardYamlOpen: (value: boolean) => void;
   setIsRunsMode: (value: boolean) => void;
+  setIsMemoryMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
 }
@@ -23,6 +24,7 @@ export function useDashboardModeActions({
   setIsDashboardAddPanelOpen,
   setIsDashboardYamlOpen,
   setIsRunsMode,
+  setIsMemoryMode,
   setSelectedRunId,
   setSearchParams,
 }: DashboardModeActionsConfig) {
@@ -32,6 +34,7 @@ export function useDashboardModeActions({
 
     setIsDashboardMode(true);
     setIsRunsMode(false);
+    setIsMemoryMode(false);
     setSelectedRunId(null);
     setSearchParams(toDashboardSearchParams, { replace: true });
   }, [
@@ -40,6 +43,7 @@ export function useDashboardModeActions({
     hasEditableVersion,
     liveCanvasVersionId,
     setIsDashboardMode,
+    setIsMemoryMode,
     setIsRunsMode,
     setSearchParams,
     setSelectedRunId,
@@ -57,7 +61,9 @@ export function useDashboardModeActions({
 
 function toDashboardSearchParams(current: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(current);
-  next.set("view", "dashboard");
+  // Public URL param uses the product name (Console); internal hook/state
+  // identifiers still reference "dashboard".
+  next.set("view", "console");
   next.delete("run");
   next.delete("sidebar");
   next.delete("node");

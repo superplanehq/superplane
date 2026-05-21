@@ -3,6 +3,7 @@ import { Text } from "@/components/Text/text";
 import { useToggleAdminExperimentalFeature } from "@/hooks/useAdminExperimentalFeatures";
 import { useExperimentalFeaturesRegistry } from "@/hooks/useExperimentalFeatures";
 import { useOrganization } from "@/hooks/useOrganizationData";
+import { getExperimentalFeatureDescription, getExperimentalFeatureLabel } from "@/lib/experimentalFeatureDisplay";
 import { Switch } from "@/ui/switch";
 import { FlaskConical } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -60,16 +61,18 @@ export function OrgExperimentalFeaturesTable({ orgId }: { orgId: string }) {
               {visible.map((feature) => {
                 const isOn = enabled.has(feature.id);
                 const isBusy = pendingId === feature.id;
+                const label = getExperimentalFeatureLabel(feature);
+                const description = getExperimentalFeatureDescription(feature);
                 return (
                   <tr key={feature.id} className="border-b border-slate-50 last:border-0">
-                    <td className="px-4 py-2.5 text-gray-800 font-medium">{feature.label}</td>
-                    <td className="px-4 py-2.5 text-gray-500">{feature.description || "—"}</td>
+                    <td className="px-4 py-2.5 text-gray-800 font-medium">{label}</td>
+                    <td className="px-4 py-2.5 text-gray-500">{description || "—"}</td>
                     <td className="px-4 py-2.5 text-right">
                       <Switch
                         checked={isOn}
                         onCheckedChange={(next) => handleToggle(feature.id, next)}
                         disabled={isBusy}
-                        aria-label={`Toggle ${feature.label}`}
+                        aria-label={`Toggle ${label}`}
                       />
                     </td>
                   </tr>
