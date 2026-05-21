@@ -1,14 +1,20 @@
 package ec2
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,8 +25,14 @@ import (
 )
 
 const (
-	serviceName = "ec2"
-	apiVersion  = "2016-11-15"
+	ec2ServiceName       = "ec2"
+	ssmServiceName       = "ssm"
+	ssmTargetPrefix      = "AmazonSSM."
+	ec2APIVersion        = "2016-11-15"
+	ResourceTypeImageOS  = "ec2.imageOS"
+	maxPublicImagesPerOS = 200
+	defaultUbuntuImages  = 12
+	defaultDebianImages  = 8
 )
 
 type Client struct {
@@ -35,6 +47,81 @@ type Instance struct {
 	InstanceType string `json:"instanceType" mapstructure:"instanceType"`
 	State        string `json:"state" mapstructure:"state"`
 	Name         string `json:"name" mapstructure:"name"`
+}
+
+type InstanceDetails struct {
+	RequestID        string `json:"requestId,omitempty" mapstructure:"requestId"`
+	InstanceID       string `json:"instanceId" mapstructure:"instanceId"`
+	InstanceType     string `json:"instanceType" mapstructure:"instanceType"`
+	ImageID          string `json:"imageId" mapstructure:"imageId"`
+	State            string `json:"state" mapstructure:"state"`
+	Name             string `json:"name" mapstructure:"name"`
+	KeyName          string `json:"keyName,omitempty" mapstructure:"keyName"`
+	LaunchTime       string `json:"launchTime,omitempty" mapstructure:"launchTime"`
+	PrivateIPAddress string `json:"privateIpAddress,omitempty" mapstructure:"privateIpAddress"`
+	PublicIPAddress  string `json:"publicIpAddress,omitempty" mapstructure:"publicIpAddress"`
+	PrivateDNSName   string `json:"privateDnsName,omitempty" mapstructure:"privateDnsName"`
+	PublicDNSName    string `json:"publicDnsName,omitempty" mapstructure:"publicDnsName"`
+	SubnetID         string `json:"subnetId,omitempty" mapstructure:"subnetId"`
+	VpcID            string `json:"vpcId,omitempty" mapstructure:"vpcId"`
+	Region           string `json:"region" mapstructure:"region"`
+}
+
+type Subnet struct {
+	SubnetID         string `json:"subnetId" mapstructure:"subnetId"`
+	VpcID            string `json:"vpcId" mapstructure:"vpcId"`
+	CidrBlock        string `json:"cidrBlock" mapstructure:"cidrBlock"`
+	AvailabilityZone string `json:"availabilityZone" mapstructure:"availabilityZone"`
+	Name             string `json:"name" mapstructure:"name"`
+}
+
+type SecurityGroup struct {
+	GroupID     string `json:"groupId" mapstructure:"groupId"`
+	GroupName   string `json:"groupName" mapstructure:"groupName"`
+	Description string `json:"description" mapstructure:"description"`
+	VpcID       string `json:"vpcId" mapstructure:"vpcId"`
+}
+
+type KeyPair struct {
+	KeyName   string `json:"keyName" mapstructure:"keyName"`
+	KeyPairID string `json:"keyPairId" mapstructure:"keyPairId"`
+}
+
+type RunInstancesInput struct {
+	ImageID                  string
+	InstanceType             string
+	SubnetID                 string
+	SecurityGroupIDs         []string
+	KeyName                  string
+	UserData                 string
+	Name                     string
+	AssociatePublicIPAddress bool
+	RootVolume               *RootVolumeConfig
+}
+
+type RootVolumeConfig struct {
+	DeviceName string
+	VolumeSize int
+	VolumeType string
+}
+
+type InstanceTypeInfo struct {
+	InstanceType string `json:"instanceType" mapstructure:"instanceType"`
+	VCPUs        int    `json:"vcpus" mapstructure:"vcpus"`
+	MemoryMiB    int    `json:"memoryMiB" mapstructure:"memoryMiB"`
+}
+
+type RunInstancesOutput struct {
+	RequestID  string `json:"requestId" mapstructure:"requestId"`
+	InstanceID string `json:"instanceId" mapstructure:"instanceId"`
+	Region     string `json:"region" mapstructure:"region"`
+	State      string `json:"state" mapstructure:"state"`
+}
+
+type TerminateInstancesOutput struct {
+	RequestID  string `json:"requestId" mapstructure:"requestId"`
+	InstanceID string `json:"instanceId" mapstructure:"instanceId"`
+	State      string `json:"state" mapstructure:"state"`
 }
 
 type CreateImageInput struct {
@@ -284,7 +371,7 @@ func (c *Client) ListInstances() ([]Instance, error) {
 				instances = append(instances, Instance{
 					InstanceID:   instance.InstanceID,
 					InstanceType: instance.InstanceType,
-					State:        instance.State.Name,
+					State:        instance.stateName(),
 					Name:         nameTag(instance.Tags),
 				})
 			}
@@ -297,6 +384,320 @@ func (c *Client) ListInstances() ([]Instance, error) {
 	}
 
 	return instances, nil
+}
+
+func (c *Client) RunInstances(input RunInstancesInput) (*RunInstancesOutput, error) {
+	params := url.Values{}
+	params.Set("MinCount", "1")
+	params.Set("MaxCount", "1")
+	params.Set("ImageId", strings.TrimSpace(input.ImageID))
+	params.Set("InstanceType", strings.TrimSpace(input.InstanceType))
+	params.Set("NetworkInterface.1.DeviceIndex", "0")
+	params.Set("NetworkInterface.1.SubnetId", strings.TrimSpace(input.SubnetID))
+
+	if input.AssociatePublicIPAddress {
+		params.Set("NetworkInterface.1.AssociatePublicIpAddress", "true")
+	}
+
+	securityGroupIndex := 1
+	for _, securityGroupID := range input.SecurityGroupIDs {
+		trimmed := strings.TrimSpace(securityGroupID)
+		if trimmed == "" {
+			continue
+		}
+		params.Set(fmt.Sprintf("NetworkInterface.1.SecurityGroupId.%d", securityGroupIndex), trimmed)
+		securityGroupIndex++
+	}
+
+	keyName := strings.TrimSpace(input.KeyName)
+	if keyName != "" {
+		params.Set("KeyName", keyName)
+	}
+
+	userData := strings.TrimSpace(input.UserData)
+	if userData != "" {
+		params.Set("UserData", base64.StdEncoding.EncodeToString([]byte(userData)))
+	}
+
+	name := strings.TrimSpace(input.Name)
+	if name != "" {
+		params.Set("TagSpecification.1.ResourceType", "instance")
+		params.Set("TagSpecification.1.Tag.1.Key", "Name")
+		params.Set("TagSpecification.1.Tag.1.Value", name)
+	}
+
+	if input.RootVolume != nil {
+		deviceName := strings.TrimSpace(input.RootVolume.DeviceName)
+		if deviceName == "" {
+			deviceName = "/dev/xvda"
+		}
+
+		params.Set("BlockDeviceMapping.1.DeviceName", deviceName)
+		params.Set("BlockDeviceMapping.1.Ebs.DeleteOnTermination", "true")
+		if input.RootVolume.VolumeSize > 0 {
+			params.Set("BlockDeviceMapping.1.Ebs.VolumeSize", fmt.Sprintf("%d", input.RootVolume.VolumeSize))
+		}
+		volumeType := strings.TrimSpace(input.RootVolume.VolumeType)
+		if volumeType != "" {
+			params.Set("BlockDeviceMapping.1.Ebs.VolumeType", volumeType)
+		}
+	}
+
+	response := runInstancesResponse{}
+	if err := c.postForm("RunInstances", params, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.Instances) == 0 || strings.TrimSpace(response.Instances[0].InstanceID) == "" {
+		return nil, fmt.Errorf("response did not include instance ID")
+	}
+
+	instance := response.Instances[0]
+	return &RunInstancesOutput{
+		RequestID:  response.RequestID,
+		InstanceID: instance.InstanceID,
+		Region:     c.region,
+		State:      instance.stateName(),
+	}, nil
+}
+
+func (c *Client) DescribeInstance(instanceID string) (*InstanceDetails, error) {
+	params := url.Values{}
+	params.Set("InstanceId.1", strings.TrimSpace(instanceID))
+
+	response := describeInstancesResponse{}
+	if err := c.postForm("DescribeInstances", params, &response); err != nil {
+		return nil, err
+	}
+
+	for _, reservation := range response.Reservations {
+		for _, instance := range reservation.Instances {
+			if instance.InstanceID == strings.TrimSpace(instanceID) {
+				return instanceDetailsFromXML(instance, c.region, response.RequestID), nil
+			}
+		}
+	}
+
+	return nil, &common.Error{
+		Code:    "InvalidInstanceID.NotFound",
+		Message: fmt.Sprintf("instance not found: %s", instanceID),
+	}
+}
+
+func (c *Client) TerminateInstances(instanceIDs ...string) (*TerminateInstancesOutput, error) {
+	params := url.Values{}
+	index := 1
+	for _, instanceID := range instanceIDs {
+		trimmed := strings.TrimSpace(instanceID)
+		if trimmed == "" {
+			continue
+		}
+		params.Set(fmt.Sprintf("InstanceId.%d", index), trimmed)
+		index++
+	}
+
+	if index == 1 {
+		return nil, fmt.Errorf("at least one instance ID is required")
+	}
+
+	response := terminateInstancesResponse{}
+	if err := c.postForm("TerminateInstances", params, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.Instances) == 0 || strings.TrimSpace(response.Instances[0].InstanceID) == "" {
+		return nil, fmt.Errorf("response did not include instance ID")
+	}
+
+	instance := response.Instances[0]
+	return &TerminateInstancesOutput{
+		RequestID:  response.RequestID,
+		InstanceID: instance.InstanceID,
+		State:      instance.stateName(),
+	}, nil
+}
+
+func (c *Client) ListSubnets() ([]Subnet, error) {
+	subnets := []Subnet{}
+	nextToken := ""
+
+	for {
+		params := url.Values{}
+		params.Set("MaxResults", "100")
+		if nextToken != "" {
+			params.Set("NextToken", nextToken)
+		}
+
+		response := describeSubnetsResponse{}
+		if err := c.postForm("DescribeSubnets", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, subnet := range response.Subnets {
+			subnets = append(subnets, Subnet{
+				SubnetID:         subnet.SubnetID,
+				VpcID:            subnet.VpcID,
+				CidrBlock:        subnet.CidrBlock,
+				AvailabilityZone: subnet.AvailabilityZone,
+				Name:             nameTag(subnet.Tags),
+			})
+		}
+
+		nextToken = strings.TrimSpace(response.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	return subnets, nil
+}
+
+func (c *Client) ListSecurityGroups() ([]SecurityGroup, error) {
+	securityGroups := []SecurityGroup{}
+	nextToken := ""
+
+	for {
+		params := url.Values{}
+		params.Set("MaxResults", "100")
+		if nextToken != "" {
+			params.Set("NextToken", nextToken)
+		}
+
+		response := describeSecurityGroupsResponse{}
+		if err := c.postForm("DescribeSecurityGroups", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, group := range response.SecurityGroups {
+			securityGroups = append(securityGroups, SecurityGroup{
+				GroupID:     group.GroupID,
+				GroupName:   group.GroupName,
+				Description: group.Description,
+				VpcID:       group.VpcID,
+			})
+		}
+
+		nextToken = strings.TrimSpace(response.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	return securityGroups, nil
+}
+
+func (c *Client) DescribeSubnet(subnetID string) (*Subnet, error) {
+	trimmed := strings.TrimSpace(subnetID)
+	if trimmed == "" {
+		return nil, fmt.Errorf("subnet ID is required")
+	}
+
+	params := url.Values{}
+	params.Set("Filter.1.Name", "subnet-id")
+	params.Set("Filter.1.Value.1", trimmed)
+
+	response := describeSubnetsResponse{}
+	if err := c.postForm("DescribeSubnets", params, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.Subnets) == 0 {
+		return nil, fmt.Errorf("subnet not found: %s", trimmed)
+	}
+
+	subnet := response.Subnets[0]
+	return &Subnet{
+		SubnetID:         subnet.SubnetID,
+		VpcID:            subnet.VpcID,
+		CidrBlock:        subnet.CidrBlock,
+		AvailabilityZone: subnet.AvailabilityZone,
+		Name:             nameTag(subnet.Tags),
+	}, nil
+}
+
+func (c *Client) CreateSecurityGroup(groupName, description, vpcID string) (string, error) {
+	trimmedName := strings.TrimSpace(groupName)
+	trimmedDescription := strings.TrimSpace(description)
+	trimmedVpcID := strings.TrimSpace(vpcID)
+
+	if trimmedName == "" {
+		return "", fmt.Errorf("security group name is required")
+	}
+	if trimmedDescription == "" {
+		return "", fmt.Errorf("security group description is required")
+	}
+	if trimmedVpcID == "" {
+		return "", fmt.Errorf("VPC ID is required")
+	}
+
+	params := url.Values{}
+	params.Set("GroupName", trimmedName)
+	params.Set("GroupDescription", trimmedDescription)
+	params.Set("VpcId", trimmedVpcID)
+
+	response := createSecurityGroupResponse{}
+	if err := c.postForm("CreateSecurityGroup", params, &response); err != nil {
+		return "", err
+	}
+
+	groupID := strings.TrimSpace(response.GroupID)
+	if groupID == "" {
+		return "", fmt.Errorf("response did not include security group ID")
+	}
+
+	return groupID, nil
+}
+
+func (c *Client) EnsureSecurityGroupIngressRules(groupID string, rules []SecurityGroupIngressRule) error {
+	trimmedGroupID := strings.TrimSpace(groupID)
+	if trimmedGroupID == "" {
+		return fmt.Errorf("security group ID is required")
+	}
+	if len(rules) == 0 {
+		return nil
+	}
+
+	params := url.Values{}
+	params.Set("GroupId", trimmedGroupID)
+
+	for index, rule := range rules {
+		prefix := fmt.Sprintf("IpPermissions.%d", index+1)
+		params.Set(prefix+".IpProtocol", rule.Protocol)
+		params.Set(prefix+".FromPort", strconv.Itoa(rule.FromPort))
+		params.Set(prefix+".ToPort", strconv.Itoa(rule.ToPort))
+		params.Set(prefix+".IpRanges.1.CidrIp", rule.CidrIPv4)
+	}
+
+	if err := c.postForm("AuthorizeSecurityGroupIngress", params, &authorizeSecurityGroupIngressResponse{}); err != nil {
+		if IsSecurityGroupRuleDuplicate(err) {
+			return nil
+		}
+		return err
+	}
+
+	return nil
+}
+
+func (c *Client) ListKeyPairs() ([]KeyPair, error) {
+	response := describeKeyPairsResponse{}
+	if err := c.postForm("DescribeKeyPairs", url.Values{}, &response); err != nil {
+		return nil, err
+	}
+
+	keyPairs := make([]KeyPair, 0, len(response.KeyPairs))
+	for _, keyPair := range response.KeyPairs {
+		keyPairs = append(keyPairs, KeyPair{
+			KeyName:   keyPair.KeyName,
+			KeyPairID: keyPair.KeyPairID,
+		})
+	}
+
+	return keyPairs, nil
+}
+
+func IsInstanceNotFound(err error) bool {
+	var awsErr *common.Error
+	return errors.As(err, &awsErr) && awsErr.Code == "InvalidInstanceID.NotFound"
 }
 
 func (c *Client) ListImages(ownerID string, includeDisabled bool) ([]Image, error) {
@@ -334,6 +735,343 @@ func (c *Client) ListImages(ownerID string, includeDisabled bool) ([]Image, erro
 	return images, nil
 }
 
+func (c *Client) ListPublicImages(imageOS string) ([]Image, error) {
+	definition, ok := imageOSDefinitions[strings.TrimSpace(imageOS)]
+	if !ok {
+		return nil, fmt.Errorf("unsupported image OS: %s", imageOS)
+	}
+
+	imagesByID := map[string]Image{}
+	c.tryLoadPublicImagesFromSSM(imageOS, definition, imagesByID)
+
+	relevantCount := countRelevantPublicImages(imageOS, imagesByID)
+	if !definition.skipDescribeWhenSSMResolved(relevantCount) {
+		if err := c.loadPublicImagesFromDescribe(imageOS, definition, imagesByID); err != nil {
+			return nil, err
+		}
+	}
+
+	images := collectRelevantPublicImages(imageOS, imagesByID)
+	if len(images) == 0 {
+		if err := c.loadPublicImagesFromDescribe(imageOS, definition, imagesByID); err != nil {
+			return nil, err
+		}
+		images = collectRelevantPublicImages(imageOS, imagesByID)
+	}
+
+	sort.Slice(images, func(i, j int) bool {
+		return images[i].CreationDate > images[j].CreationDate
+	})
+
+	if len(images) > definition.publicImageLimit() {
+		images = images[:definition.publicImageLimit()]
+	}
+
+	return images, nil
+}
+
+func (c *Client) tryLoadPublicImagesFromSSM(imageOS string, definition imageOSDefinition, imagesByID map[string]Image) {
+	if len(definition.SSMParameterNames) > 0 {
+		amiIDs, err := c.listPublicAMIIDsFromSSMNames(definition.SSMParameterNames)
+		if err == nil && len(amiIDs) > 0 {
+			_ = c.mergePublicImagesByIDs(imageOS, imagesByID, amiIDs)
+		}
+	}
+
+	if len(definition.SSMParameterPaths) > 0 {
+		amiIDs, err := c.listPublicAMIIDsFromSSM(definition.SSMParameterPaths)
+		if err == nil && len(amiIDs) > 0 {
+			_ = c.mergePublicImagesByIDs(imageOS, imagesByID, amiIDs)
+		}
+	}
+}
+
+func (c *Client) loadPublicImagesFromDescribe(imageOS string, definition imageOSDefinition, imagesByID map[string]Image) error {
+	for _, owner := range definition.Owners {
+		for _, nameFilter := range definition.NameFilters {
+			params := publicImageDescribeParams(owner, definition, nameFilter)
+
+			matches, err := c.describeImagesPaginated(params)
+			if err != nil {
+				return err
+			}
+
+			for _, image := range matches {
+				parsed := imageFromXML(image)
+				if parsed.ImageID == "" || !isRelevantPublicImage(imageOS, *parsed) {
+					continue
+				}
+				parsed.Region = c.region
+				imagesByID[parsed.ImageID] = *parsed
+			}
+		}
+	}
+
+	return nil
+}
+
+func countRelevantPublicImages(imageOS string, imagesByID map[string]Image) int {
+	count := 0
+	for _, image := range imagesByID {
+		if isAvailablePublicImage(imageOS, image) {
+			count++
+		}
+	}
+
+	return count
+}
+
+func collectRelevantPublicImages(imageOS string, imagesByID map[string]Image) []Image {
+	images := make([]Image, 0, len(imagesByID))
+	for _, image := range imagesByID {
+		if !isAvailablePublicImage(imageOS, image) {
+			continue
+		}
+		images = append(images, image)
+	}
+
+	return images
+}
+
+func isAvailablePublicImage(imageOS string, image Image) bool {
+	if strings.TrimSpace(image.ImageID) == "" {
+		return false
+	}
+
+	if state := strings.TrimSpace(image.State); state != "" && state != ImageStateAvailable {
+		return false
+	}
+
+	return isRelevantPublicImage(imageOS, image)
+}
+
+func publicImageDescribeParams(owner string, definition imageOSDefinition, nameFilter string) url.Values {
+	params := url.Values{}
+	params.Set("MaxResults", "100")
+	params.Set("Owner.1", owner)
+
+	filterIndex := 1
+	addFilter := func(name, value string) {
+		params.Set(fmt.Sprintf("Filter.%d.Name", filterIndex), name)
+		params.Set(fmt.Sprintf("Filter.%d.Value.1", filterIndex), value)
+		filterIndex++
+	}
+
+	addFilter("state", ImageStateAvailable)
+	addFilter("name", nameFilter)
+	addFilter("root-device-type", "ebs")
+	addFilter("virtualization-type", "hvm")
+	if strings.TrimSpace(definition.Platform) != "" {
+		addFilter("platform", definition.Platform)
+	}
+
+	return params
+}
+
+func (c *Client) describeImagesByIDs(imageIDs []string) ([]xmlImage, error) {
+	if len(imageIDs) == 0 {
+		return nil, nil
+	}
+
+	params := url.Values{}
+	params.Set("MaxResults", "100")
+	for index, imageID := range imageIDs {
+		params.Set(fmt.Sprintf("ImageId.%d", index+1), imageID)
+	}
+
+	return c.describeImagesPaginated(params)
+}
+
+func (c *Client) mergePublicImagesByIDs(imageOS string, imagesByID map[string]Image, amiIDs []string) error {
+	matches, err := c.describeImagesByIDs(amiIDs)
+	if err != nil {
+		return err
+	}
+
+	for _, image := range matches {
+		parsed := imageFromXML(image)
+		if !isAvailablePublicImage(imageOS, *parsed) {
+			continue
+		}
+		parsed.Region = c.region
+		imagesByID[parsed.ImageID] = *parsed
+	}
+
+	return nil
+}
+
+func (c *Client) listPublicAMIIDsFromSSMNames(names []string) ([]string, error) {
+	amiIDs := []string{}
+	seen := map[string]struct{}{}
+
+	const batchSize = 10
+	for start := 0; start < len(names); start += batchSize {
+		end := start + batchSize
+		if end > len(names) {
+			end = len(names)
+		}
+
+		batchNames := make([]string, 0, end-start)
+		for _, name := range names[start:end] {
+			name = strings.TrimSpace(name)
+			if name == "" {
+				continue
+			}
+			batchNames = append(batchNames, name)
+		}
+		if len(batchNames) == 0 {
+			continue
+		}
+
+		response := getParametersResponse{}
+		if err := c.postSSMJSON("GetParameters", map[string]any{
+			"Names":          batchNames,
+			"WithDecryption": false,
+		}, &response); err != nil {
+			return nil, err
+		}
+
+		for _, parameter := range response.Parameters {
+			amiID := strings.TrimSpace(parameter.Value)
+			if !strings.HasPrefix(amiID, "ami-") {
+				continue
+			}
+			if _, ok := seen[amiID]; ok {
+				continue
+			}
+			seen[amiID] = struct{}{}
+			amiIDs = append(amiIDs, amiID)
+		}
+	}
+
+	return amiIDs, nil
+}
+
+func (c *Client) listPublicAMIIDsFromSSM(paths []string) ([]string, error) {
+	amiIDs := []string{}
+	seen := map[string]struct{}{}
+
+	for _, path := range paths {
+		path = strings.TrimSpace(path)
+		if path == "" {
+			continue
+		}
+
+		nextToken := ""
+		for {
+			payload := map[string]any{
+				"Path":           path,
+				"Recursive":      true,
+				"WithDecryption": false,
+				"MaxResults":     10,
+			}
+			if nextToken != "" {
+				payload["NextToken"] = nextToken
+			}
+
+			response := getParametersByPathResponse{}
+			if err := c.postSSMJSON("GetParametersByPath", payload, &response); err != nil {
+				return nil, err
+			}
+
+			for _, parameter := range response.Parameters {
+				name := strings.TrimSpace(parameter.Name)
+				if name == "" || strings.Contains(name, "arm64") {
+					continue
+				}
+
+				amiID := strings.TrimSpace(parameter.Value)
+				if !strings.HasPrefix(amiID, "ami-") {
+					continue
+				}
+
+				if _, ok := seen[amiID]; ok {
+					continue
+				}
+
+				seen[amiID] = struct{}{}
+				amiIDs = append(amiIDs, amiID)
+			}
+
+			nextToken = strings.TrimSpace(response.NextToken)
+			if nextToken == "" {
+				break
+			}
+		}
+	}
+
+	return amiIDs, nil
+}
+
+func (c *Client) describeImagesPaginated(params url.Values) ([]xmlImage, error) {
+	images := []xmlImage{}
+	nextToken := ""
+
+	for {
+		pageParams := url.Values{}
+		for key, values := range params {
+			for _, value := range values {
+				pageParams.Add(key, value)
+			}
+		}
+		if nextToken != "" {
+			pageParams.Set("NextToken", nextToken)
+		}
+
+		response := describeImagesResponse{}
+		if err := c.postForm("DescribeImages", pageParams, &response); err != nil {
+			return nil, err
+		}
+
+		images = append(images, response.Images...)
+		nextToken = strings.TrimSpace(response.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	return images, nil
+}
+
+func (c *Client) ListInstanceTypes() ([]InstanceTypeInfo, error) {
+	instanceTypes := []InstanceTypeInfo{}
+	nextToken := ""
+
+	for {
+		params := url.Values{}
+		params.Set("MaxResults", "100")
+		params.Set("Filter.1.Name", "current-generation")
+		params.Set("Filter.1.Value.1", "true")
+		if nextToken != "" {
+			params.Set("NextToken", nextToken)
+		}
+
+		response := describeInstanceTypesResponse{}
+		if err := c.postForm("DescribeInstanceTypes", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, item := range response.InstanceTypes {
+			instanceTypes = append(instanceTypes, InstanceTypeInfo{
+				InstanceType: item.InstanceType,
+				VCPUs:        item.VCPUInfo.vcpus(),
+				MemoryMiB:    item.MemoryInfo.memoryMiB(),
+			})
+		}
+
+		nextToken = strings.TrimSpace(response.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	sort.Slice(instanceTypes, func(i, j int) bool {
+		return instanceTypes[i].InstanceType < instanceTypes[j].InstanceType
+	})
+
+	return instanceTypes, nil
+}
+
 func (c *Client) runImageBooleanAction(action, imageID string, additionalParams url.Values) (string, error) {
 	params := additionalParams
 	if params == nil {
@@ -354,22 +1092,73 @@ func (c *Client) runImageBooleanAction(action, imageID string, additionalParams 
 }
 
 func (c *Client) postForm(action string, params url.Values, out any) error {
+	return c.postSignedForm(ec2ServiceName, ec2APIVersion, action, params, out)
+}
+
+func (c *Client) postSSMJSON(action string, payload any, out any) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal SSM request: %w", err)
+	}
+
+	endpoint := fmt.Sprintf("https://%s.%s.amazonaws.com/", ssmServiceName, c.region)
+	req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to build SSM request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+	req.Header.Set("X-Amz-Target", ssmTargetPrefix+action)
+	if err := c.signRequest(req, body, ssmServiceName); err != nil {
+		return err
+	}
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("SSM request failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	responseBody, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read SSM response: %w", err)
+	}
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		if awsErr := common.ParseError(responseBody); awsErr != nil {
+			return awsErr
+		}
+		return fmt.Errorf("SSM API request failed with %d: %s", res.StatusCode, string(responseBody))
+	}
+
+	if out == nil {
+		return nil
+	}
+
+	if err := json.Unmarshal(responseBody, out); err != nil {
+		return fmt.Errorf("failed to decode SSM response: %w", err)
+	}
+
+	return nil
+}
+
+func (c *Client) postSignedForm(service, version, action string, params url.Values, out any) error {
 	if params == nil {
 		params = url.Values{}
 	}
 
 	params.Set("Action", action)
-	params.Set("Version", apiVersion)
+	params.Set("Version", version)
 
 	body := []byte(params.Encode())
-	endpoint := fmt.Sprintf("https://ec2.%s.amazonaws.com/", c.region)
+	endpoint := fmt.Sprintf("https://%s.%s.amazonaws.com/", service, c.region)
 	req, err := http.NewRequest(http.MethodPost, endpoint, strings.NewReader(string(body)))
 	if err != nil {
 		return fmt.Errorf("failed to build request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")
-	if err := c.signRequest(req, body); err != nil {
+	if err := c.signRequest(req, body, service); err != nil {
 		return err
 	}
 
@@ -388,7 +1177,7 @@ func (c *Client) postForm(action string, params url.Values, out any) error {
 		if awsErr := parseError(responseBody); awsErr != nil {
 			return awsErr
 		}
-		return fmt.Errorf("EC2 API request failed with %d: %s", res.StatusCode, string(responseBody))
+		return fmt.Errorf("%s API request failed with %d: %s", strings.ToUpper(service), res.StatusCode, string(responseBody))
 	}
 
 	if out == nil {
@@ -402,10 +1191,10 @@ func (c *Client) postForm(action string, params url.Values, out any) error {
 	return nil
 }
 
-func (c *Client) signRequest(req *http.Request, payload []byte) error {
+func (c *Client) signRequest(req *http.Request, payload []byte, service string) error {
 	hash := sha256.Sum256(payload)
 	payloadHash := hex.EncodeToString(hash[:])
-	return c.signer.SignHTTP(context.Background(), *c.credentials, req, payloadHash, serviceName, c.region, time.Now())
+	return c.signer.SignHTTP(context.Background(), *c.credentials, req, payloadHash, service, c.region, time.Now())
 }
 
 func nameTag(tags []xmlTag) string {
@@ -456,6 +1245,7 @@ type imageActionResponse struct {
 }
 
 type describeInstancesResponse struct {
+	RequestID    string           `xml:"requestId"`
 	Reservations []xmlReservation `xml:"reservationSet>item"`
 	NextToken    string           `xml:"nextToken"`
 }
@@ -571,10 +1361,28 @@ func ownerIDFromImageLocation(imageLocation string) string {
 }
 
 type xmlInstance struct {
-	InstanceID   string   `xml:"instanceId"`
-	InstanceType string   `xml:"instanceType"`
-	State        xmlState `xml:"instanceState"`
-	Tags         []xmlTag `xml:"tagSet>item"`
+	InstanceID       string   `xml:"instanceId"`
+	InstanceType     string   `xml:"instanceType"`
+	ImageID          string   `xml:"imageId"`
+	KeyName          string   `xml:"keyName"`
+	LaunchTime       string   `xml:"launchTime"`
+	PrivateDNSName   string   `xml:"privateDnsName"`
+	PrivateIPAddress string   `xml:"privateIpAddress"`
+	PublicDNSName    string   `xml:"dnsName"`
+	PublicIPAddress  string   `xml:"ipAddress"`
+	SubnetID         string   `xml:"subnetId"`
+	VpcID            string   `xml:"vpcId"`
+	State            xmlState `xml:"instanceState"`
+	CurrentState     xmlState `xml:"currentState"`
+	Tags             []xmlTag `xml:"tagSet>item"`
+}
+
+func (instance xmlInstance) stateName() string {
+	if instance.State.Name != "" {
+		return instance.State.Name
+	}
+
+	return instance.CurrentState.Name
 }
 
 type xmlState struct {
@@ -584,4 +1392,358 @@ type xmlState struct {
 type xmlTag struct {
 	Key   string `xml:"key"`
 	Value string `xml:"value"`
+}
+
+type runInstancesResponse struct {
+	RequestID string        `xml:"requestId"`
+	Instances []xmlInstance `xml:"instancesSet>item"`
+}
+
+type terminateInstancesResponse struct {
+	RequestID string        `xml:"requestId"`
+	Instances []xmlInstance `xml:"instancesSet>item"`
+}
+
+type describeSubnetsResponse struct {
+	Subnets   []xmlSubnet `xml:"subnetSet>item"`
+	NextToken string      `xml:"nextToken"`
+}
+
+type xmlSubnet struct {
+	SubnetID         string   `xml:"subnetId"`
+	VpcID            string   `xml:"vpcId"`
+	CidrBlock        string   `xml:"cidrBlock"`
+	AvailabilityZone string   `xml:"availabilityZone"`
+	Tags             []xmlTag `xml:"tagSet>item"`
+}
+
+type describeSecurityGroupsResponse struct {
+	SecurityGroups []xmlSecurityGroup `xml:"securityGroupInfo>item"`
+	NextToken      string             `xml:"nextToken"`
+}
+
+type xmlSecurityGroup struct {
+	GroupID     string `xml:"groupId"`
+	GroupName   string `xml:"groupName"`
+	Description string `xml:"groupDescription"`
+	VpcID       string `xml:"vpcId"`
+}
+
+type createSecurityGroupResponse struct {
+	RequestID string `xml:"requestId"`
+	GroupID   string `xml:"groupId"`
+}
+
+type authorizeSecurityGroupIngressResponse struct {
+	RequestID string `xml:"requestId"`
+	Return    bool   `xml:"return"`
+}
+
+type describeKeyPairsResponse struct {
+	KeyPairs []xmlKeyPair `xml:"keySet>item"`
+}
+
+type xmlKeyPair struct {
+	KeyName   string `xml:"keyName"`
+	KeyPairID string `xml:"keyPairId"`
+}
+
+type describeInstanceTypesResponse struct {
+	InstanceTypes []xmlInstanceType `xml:"instanceTypeSet>item"`
+	NextToken     string            `xml:"nextToken"`
+}
+
+type getParametersByPathResponse struct {
+	Parameters []ssmParameter `json:"Parameters"`
+	NextToken  string         `json:"NextToken"`
+}
+
+type getParametersResponse struct {
+	Parameters []ssmParameter `json:"Parameters"`
+}
+
+type ssmParameter struct {
+	Name  string `json:"Name"`
+	Value string `json:"Value"`
+}
+
+type xmlInstanceType struct {
+	InstanceType string        `xml:"instanceType"`
+	VCPUInfo     xmlVCPUInfo   `xml:"vCpuInfo"`
+	MemoryInfo   xmlMemoryInfo `xml:"memoryInfo"`
+}
+
+type xmlVCPUInfo struct {
+	DefaultVCPUs          int `xml:"defaultVCpus"`
+	DefaultVcpus          int `xml:"defaultVcpus"`
+	DefaultCores          int `xml:"defaultCores"`
+	DefaultThreadsPerCore int `xml:"defaultThreadsPerCore"`
+}
+
+func (info xmlVCPUInfo) vcpus() int {
+	if info.DefaultVCPUs > 0 {
+		return info.DefaultVCPUs
+	}
+
+	if info.DefaultVcpus > 0 {
+		return info.DefaultVcpus
+	}
+
+	if info.DefaultCores > 0 && info.DefaultThreadsPerCore > 0 {
+		return info.DefaultCores * info.DefaultThreadsPerCore
+	}
+
+	return info.DefaultCores
+}
+
+type xmlMemoryInfo struct {
+	SizeInMiB int `xml:"sizeInMiB"`
+	SizeInMib int `xml:"sizeInMib"`
+}
+
+func (info xmlMemoryInfo) memoryMiB() int {
+	if info.SizeInMiB > 0 {
+		return info.SizeInMiB
+	}
+
+	return info.SizeInMib
+}
+
+func instanceDetailsFromXML(instance xmlInstance, region, requestID string) *InstanceDetails {
+	return &InstanceDetails{
+		RequestID:        requestID,
+		InstanceID:       instance.InstanceID,
+		InstanceType:     instance.InstanceType,
+		ImageID:          instance.ImageID,
+		State:            instance.stateName(),
+		Name:             nameTag(instance.Tags),
+		KeyName:          instance.KeyName,
+		LaunchTime:       instance.LaunchTime,
+		PrivateIPAddress: instance.PrivateIPAddress,
+		PublicIPAddress:  instance.PublicIPAddress,
+		PrivateDNSName:   instance.PrivateDNSName,
+		PublicDNSName:    instance.PublicDNSName,
+		SubnetID:         instance.SubnetID,
+		VpcID:            instance.VpcID,
+		Region:           region,
+	}
+}
+
+func instanceDetailsToMap(instance *InstanceDetails) map[string]any {
+	if instance == nil {
+		return map[string]any{}
+	}
+
+	return map[string]any{
+		"instanceId":       instance.InstanceID,
+		"instanceType":     instance.InstanceType,
+		"imageId":          instance.ImageID,
+		"state":            instance.State,
+		"name":             instance.Name,
+		"keyName":          instance.KeyName,
+		"launchTime":       instance.LaunchTime,
+		"privateIpAddress": instance.PrivateIPAddress,
+		"publicIpAddress":  instance.PublicIPAddress,
+		"privateDnsName":   instance.PrivateDNSName,
+		"publicDnsName":    instance.PublicDNSName,
+		"subnetId":         instance.SubnetID,
+		"vpcId":            instance.VpcID,
+		"region":           instance.Region,
+	}
+}
+
+type imageOSDefinition struct {
+	Label                     string
+	Owners                    []string
+	NameFilters               []string
+	Platform                  string
+	SSMParameterNames         []string
+	SSMParameterPaths         []string
+	MaxPublicImages           int
+	SkipDescribeIfSSMResolved bool
+}
+
+func (definition imageOSDefinition) publicImageLimit() int {
+	if definition.MaxPublicImages > 0 {
+		return definition.MaxPublicImages
+	}
+
+	return maxPublicImagesPerOS
+}
+
+func (definition imageOSDefinition) skipDescribeWhenSSMResolved(resolvedImages int) bool {
+	if !definition.SkipDescribeIfSSMResolved {
+		return false
+	}
+
+	return resolvedImages > 0
+}
+
+func isRelevantPublicImage(imageOS string, image Image) bool {
+	name := strings.ToLower(strings.TrimSpace(image.Name))
+	architecture := strings.TrimSpace(image.Architecture)
+	if architecture != "" && architecture != "x86_64" {
+		return false
+	}
+
+	switch strings.TrimSpace(imageOS) {
+	case "ubuntu":
+		if strings.Contains(name, "minimal") || strings.Contains(name, "daily") || strings.Contains(name, "/pro-") || strings.Contains(name, "-eks-") {
+			return false
+		}
+		if !strings.Contains(name, "-server-") && !strings.Contains(name, "server") {
+			return false
+		}
+		for _, release := range []string{"resolute", "noble", "jammy", "26.04", "24.04", "22.04"} {
+			if strings.Contains(name, release) {
+				return true
+			}
+		}
+		return false
+	case "debian":
+		for _, release := range []string{"debian-12", "debian-11", "bookworm", "bullseye"} {
+			if strings.Contains(name, release) {
+				return true
+			}
+		}
+		return false
+	default:
+		return true
+	}
+}
+
+var imageOSDefinitions = map[string]imageOSDefinition{
+	"amazon_linux": {
+		Label:  "Amazon Linux",
+		Owners: []string{"amazon"},
+		NameFilters: []string{
+			"al2023-ami-*-x86_64",
+			"al2023-ami-minimal-*-x86_64",
+			"amzn2-ami-hvm-*-x86_64-gp2",
+			"amzn2-ami-hvm-*-x86_64",
+		},
+		SSMParameterPaths: []string{
+			"/aws/service/ami-amazon-linux-latest/",
+		},
+	},
+	"ubuntu": {
+		Label:  "Ubuntu",
+		Owners: []string{"099720109477"},
+		SSMParameterNames: []string{
+			"/aws/service/canonical/ubuntu/server/resolute/stable/current/amd64/hvm/ebs-gp3/ami-id",
+			"/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id",
+			"/aws/service/canonical/ubuntu/server/noble/stable/current/amd64/hvm/ebs-gp3/ami-id",
+			"/aws/service/canonical/ubuntu/server/jammy/stable/current/amd64/hvm/ebs-gp3/ami-id",
+		},
+		NameFilters: []string{
+			"ubuntu/images/*/ubuntu-resolute-*-amd64-server-*",
+			"ubuntu/images/*/ubuntu-noble-*-amd64-server-*",
+			"ubuntu/images/*/ubuntu-jammy-*-amd64-server-*",
+		},
+		MaxPublicImages:           defaultUbuntuImages,
+		SkipDescribeIfSSMResolved: true,
+	},
+	"windows": {
+		Label:  "Windows",
+		Owners: []string{"amazon"},
+		NameFilters: []string{
+			"Windows_Server-*-English-Full-Base-*",
+			"Windows_Server-*-English-Core-Base-*",
+			"Windows_Server-*-English-*-Base-*",
+		},
+		Platform: "windows",
+		SSMParameterPaths: []string{
+			"/aws/service/ami-windows-latest/",
+		},
+	},
+	"red_hat": {
+		Label:  "Red Hat",
+		Owners: []string{"309956199498"},
+		NameFilters: []string{
+			"RHEL-*-x86_64-*",
+			"RHEL-*",
+		},
+	},
+	"suse": {
+		Label:  "SUSE Linux",
+		Owners: []string{"013124491280"},
+		NameFilters: []string{
+			"suse-sles-*-x86_64*",
+			"suse-sles-*",
+			"sles-*-x86_64*",
+			"sles-*",
+		},
+	},
+	"debian": {
+		Label:  "Debian",
+		Owners: []string{"136693071363"},
+		SSMParameterNames: []string{
+			"/aws/service/debian/release/12/latest/amd64",
+			"/aws/service/debian/release/bookworm/latest/amd64",
+			"/aws/service/debian/release/11/latest/amd64",
+			"/aws/service/debian/release/bullseye/latest/amd64",
+		},
+		NameFilters: []string{
+			"debian-12-amd64-*",
+			"debian-11-amd64-*",
+		},
+		MaxPublicImages:           defaultDebianImages,
+		SkipDescribeIfSSMResolved: true,
+	},
+}
+
+func ListImageOperatingSystems(_ core.ListResourcesContext, resourceType string) ([]core.IntegrationResource, error) {
+	keys := make([]string, 0, len(imageOSDefinitions))
+	for key := range imageOSDefinitions {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	resources := make([]core.IntegrationResource, 0, len(keys))
+	for _, key := range keys {
+		definition := imageOSDefinitions[key]
+		resources = append(resources, core.IntegrationResource{
+			Type: resourceType,
+			Name: definition.Label,
+			ID:   key,
+		})
+	}
+
+	return resources, nil
+}
+
+func imageOSLabel(imageOS string) string {
+	definition, ok := imageOSDefinitions[strings.TrimSpace(imageOS)]
+	if !ok {
+		return strings.TrimSpace(imageOS)
+	}
+
+	return definition.Label
+}
+
+func requireImageOS(value string) (string, error) {
+	imageOS := strings.TrimSpace(value)
+	if imageOS == "" {
+		return "", fmt.Errorf("operating system is required")
+	}
+
+	if _, ok := imageOSDefinitions[imageOS]; !ok {
+		return "", fmt.Errorf("unsupported operating system: %s", imageOS)
+	}
+
+	return imageOS, nil
+}
+
+func publicImageResourceName(image Image) string {
+	name := strings.TrimSpace(image.Name)
+	if name == "" {
+		return image.ImageID
+	}
+
+	architecture := strings.TrimSpace(image.Architecture)
+	if architecture == "" {
+		return fmt.Sprintf("%s (%s)", name, image.ImageID)
+	}
+
+	return fmt.Sprintf("%s (%s, %s)", name, image.ImageID, architecture)
 }
