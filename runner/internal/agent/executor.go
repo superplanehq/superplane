@@ -16,9 +16,8 @@ import (
 // an error — typically by performing cleanup inside a deferred function.
 //
 // live, when non-nil, receives a copy of every stdout/stderr byte the task
-// produces as it runs, in addition to whatever the implementation accumulates
-// for the returned `output` string (used by the agent for CloudWatch live
-// log streaming).
+// produces as it runs (CloudWatch live log streaming). Executors may still
+// accumulate output internally for tests and diagnostics; it is not sent on complete.
 type Executor interface {
 	Execute(ctx context.Context, task *api.TaskPayload, live io.Writer, resultHostPath string) (exit int, output string, err error)
 }

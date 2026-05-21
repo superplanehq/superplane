@@ -17,7 +17,7 @@ type Store interface {
 	// RequestCancelTask requests stop: queued tasks become canceled immediately; claimed tasks set cancel_requested.
 	RequestCancelTask(ctx context.Context, id string) (*models.Task, CancelOutcome, error)
 	// CompleteTask records terminal state; runnerID must match the claim. When canceled is true, status is always canceled.
-	CompleteTask(ctx context.Context, id, runnerID string, exitCode int, output, resultJSON, errMsg string, canceled bool) (*models.Task, error)
+	CompleteTask(ctx context.Context, id, runnerID string, exitCode int, resultJSON, errMsg string, canceled bool) (*models.Task, error)
 	// ReapExpiredLeases returns expired claimed rows to queued, or to canceled when cancel_requested; canceled lists tasks that need webhooks.
 	ReapExpiredLeases(ctx context.Context) (requeued int64, canceled []*models.Task, err error)
 }

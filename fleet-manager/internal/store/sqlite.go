@@ -393,7 +393,7 @@ UPDATE tasks SET cancel_requested = 1 WHERE id = ? AND status = ?`,
 	return nil, CancelOutcome(""), fmt.Errorf("cancel: task %s in unexpected state %s", id, t.Status)
 }
 
-func (s *SQLiteStore) CompleteTask(ctx context.Context, id, runnerID string, exitCode int, output, resultJSON, errMsg string, canceled bool) (*models.Task, error) {
+func (s *SQLiteStore) CompleteTask(ctx context.Context, id, runnerID string, exitCode int, resultJSON, errMsg string, canceled bool) (*models.Task, error) {
 	var final models.TaskStatus
 	if canceled {
 		final = models.StatusCanceled
@@ -413,7 +413,7 @@ UPDATE tasks SET
 	cancel_requested = 0,
 	environment_json = NULL
 WHERE id = ? AND runner_id = ? AND status = ?`,
-		string(final), exitCode, output, nullStringErr(resultJSON), nullStringErr(errMsg), id, runnerID, string(models.StatusClaimed),
+		string(final), exitCode, "", nullStringErr(resultJSON), nullStringErr(errMsg), id, runnerID, string(models.StatusClaimed),
 	)
 	if err != nil {
 		return nil, err

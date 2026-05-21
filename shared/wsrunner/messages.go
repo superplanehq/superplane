@@ -46,7 +46,6 @@ type Complete struct {
 	TaskID   string          `json:"task_id"`
 	RunnerID string          `json:"runner_id"`
 	ExitCode int             `json:"exit_code"`
-	Output   string          `json:"output"`
 	Error    string          `json:"error,omitempty"`
 	Canceled bool            `json:"canceled,omitempty"`
 	Result   json.RawMessage `json:"result,omitempty"`

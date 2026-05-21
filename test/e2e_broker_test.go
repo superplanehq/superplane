@@ -209,9 +209,6 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 	if payload.ExitCode != 0 {
 		t.Errorf("exit_code: got %d", payload.ExitCode)
 	}
-	if !strings.Contains(payload.Output, "hello world") || !strings.Contains(payload.Output, "second") {
-		t.Errorf("combined output unexpected: %q", payload.Output)
-	}
 
 	pollURL := brokerPublic + "/v1/tasks/" + created.ID
 	pollReq, err := http.NewRequest(http.MethodGet, pollURL, nil)

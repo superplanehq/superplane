@@ -139,7 +139,7 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 		wg.Add(1)
 		go wsCtrlReadDuringExecute(readCtx, conn, task.ID, pushCh, &wg, &writeMu)
 
-		exit, out, runErr, userCanceled, result := a.execute(ctx, a.fleetBase(), task, pushCh)
+		exit, _, runErr, userCanceled, result := a.execute(ctx, a.fleetBase(), task, pushCh)
 
 		readStop()
 		_ = conn.SetReadDeadline(time.Now().Add(time.Millisecond))
@@ -155,7 +155,6 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 			TaskID:   task.ID,
 			RunnerID: a.Config.RunnerID,
 			ExitCode: exit,
-			Output:   truncateString(out, a.Config.MaxOutputBytes),
 			Error:    errMsg,
 			Canceled: userCanceled,
 			Result:   result,

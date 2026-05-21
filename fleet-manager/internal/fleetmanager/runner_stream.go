@@ -167,7 +167,6 @@ func (s *Server) runnerStreamOneTask(conn *websocket.Conn, ctx context.Context, 
 		req := api.CompleteTaskRequest{
 			RunnerID: compRunnerID,
 			ExitCode: comp.ExitCode,
-			Output:   comp.Output,
 			Error:    comp.Error,
 			Canceled: comp.Canceled,
 			Result:   comp.Result,
