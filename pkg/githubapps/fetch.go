@@ -1,6 +1,7 @@
 package githubapps
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,12 +21,23 @@ var defaultRefs = []string{"main", "master"}
 // FetchCanvas loads and parses canvas.yaml from a public GitHub repository.
 func FetchCanvas(repo *Repository) (*pb.Canvas, string, error) {
 	if repo.Ref == "" {
+		var lastErr error
 		for _, ref := range defaultRefs {
 			canvas, err := fetchCanvasAtRef(repo, ref)
 			if err == nil {
 				repo.Ref = ref
 				return canvas, ref, nil
 			}
+
+			lastErr = err
+		}
+
+		if lastErr != nil && strings.Contains(lastErr.Error(), "not found") {
+			return nil, "", fmt.Errorf("canvas.yaml not found on main or master branch")
+		}
+
+		if lastErr != nil {
+			return nil, "", lastErr
 		}
 
 		return nil, "", fmt.Errorf("canvas.yaml not found on main or master branch")
@@ -120,8 +132,13 @@ func parseCanvasYAML(data []byte) (*pb.Canvas, error) {
 		return nil, fmt.Errorf("parse canvas yaml: %w", err)
 	}
 
+	canvasJSON, err := canvasJSONFromResource(jsonData)
+	if err != nil {
+		return nil, err
+	}
+
 	var canvas pb.Canvas
-	if err := protojson.Unmarshal(jsonData, &canvas); err != nil {
+	if err := protojson.Unmarshal(canvasJSON, &canvas); err != nil {
 		return nil, fmt.Errorf("parse canvas definition: %w", err)
 	}
 
@@ -137,4 +154,41 @@ func parseCanvasYAML(data []byte) (*pb.Canvas, error) {
 	canvas.Metadata.IsTemplate = false
 
 	return &canvas, nil
+}
+
+func canvasJSONFromResource(jsonData []byte) ([]byte, error) {
+	var resource map[string]json.RawMessage
+	if err := json.Unmarshal(jsonData, &resource); err != nil {
+		return nil, fmt.Errorf("parse canvas yaml: %w", err)
+	}
+
+	if kindRaw, ok := resource["kind"]; ok {
+		var kind string
+		if err := json.Unmarshal(kindRaw, &kind); err != nil {
+			return nil, fmt.Errorf("parse canvas definition: %w", err)
+		}
+
+		if kind != "" && kind != "Canvas" {
+			return nil, fmt.Errorf("unsupported resource kind %q", kind)
+		}
+	}
+
+	canvasPayload := make(map[string]json.RawMessage)
+	if metadata, ok := resource["metadata"]; ok {
+		canvasPayload["metadata"] = metadata
+	}
+	if spec, ok := resource["spec"]; ok {
+		canvasPayload["spec"] = spec
+	}
+
+	if len(canvasPayload) == 0 {
+		return jsonData, nil
+	}
+
+	canvasJSON, err := json.Marshal(canvasPayload)
+	if err != nil {
+		return nil, fmt.Errorf("parse canvas definition: %w", err)
+	}
+
+	return canvasJSON, nil
 }
