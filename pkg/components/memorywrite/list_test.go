@@ -121,3 +121,35 @@ func TestResolveValue_EmptyStringIsLiteral(t *testing.T) {
 	assert.Equal(t, "   ", got)
 	assert.Empty(t, expressions.scopeCalls)
 }
+
+func TestResolvePairs_TrimsNamesAndSkipsEmpty(t *testing.T) {
+	expressions := &fakeExpressionContext{
+		scopeFunc: func(expression string, _ map[string]any) (any, error) {
+			if expression == "expr" {
+				return 42, nil
+			}
+			return nil, fmt.Errorf("unexpected %q", expression)
+		},
+	}
+
+	got, err := ResolvePairs([]NameValuePair{
+		{Name: " kept ", Value: "expr"},
+		{Name: "literal", Value: 7},
+		{Name: "  ", Value: "ignored"},
+	}, map[string]any{"item": "x"}, expressions)
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"kept": 42, "literal": 7}, got)
+}
+
+func TestResolvePairs_WrapsResolveErrors(t *testing.T) {
+	expressions := &fakeExpressionContext{
+		scopeFunc: func(string, map[string]any) (any, error) {
+			return nil, fmt.Errorf("boom")
+		},
+	}
+
+	_, err := ResolvePairs([]NameValuePair{{Name: "bad", Value: "x"}}, nil, expressions)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `field "bad"`)
+	assert.Contains(t, err.Error(), "boom")
+}

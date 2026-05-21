@@ -540,6 +540,9 @@ function validateNumberContent(content: unknown): string | null {
     if (render.aggregation !== undefined) {
       return "render.aggregation must not be set when dataSource.sources is used (each source defines its own aggregation).";
     }
+    if (render.field !== undefined) {
+      return "render.field must not be set when dataSource.sources is used (each source defines its own field).";
+    }
     return null;
   }
   const allowedAggregations = ["count", "sum", "avg", "min", "max", "first", "last"];

@@ -531,6 +531,9 @@ func validateNumberPanelContent(panel DashboardPanel) error {
 		if _, hasAgg := render["aggregation"]; hasAgg {
 			return fmt.Errorf("panel %q render.aggregation must not be set when dataSource.sources is used (each source defines its own aggregation)", panel.ID)
 		}
+		if _, hasField := render["field"]; hasField {
+			return fmt.Errorf("panel %q render.field must not be set when dataSource.sources is used (each source defines its own field)", panel.ID)
+		}
 		return nil
 	}
 

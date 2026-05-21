@@ -135,3 +135,27 @@ func ResolveValue(value any, scope map[string]any, expressions core.ExpressionCo
 	}
 	return resolved, nil
 }
+
+// NameValuePair is the common shape for configured name/value field lists.
+type NameValuePair struct {
+	Name  string `json:"name"`
+	Value any    `json:"value"`
+}
+
+// ResolvePairs evaluates each pair's value in scope and returns a map keyed by
+// trimmed name. Pairs with empty names are skipped.
+func ResolvePairs(pairs []NameValuePair, scope map[string]any, expressions core.ExpressionContext) (map[string]any, error) {
+	values := make(map[string]any, len(pairs))
+	for _, pair := range pairs {
+		name := strings.TrimSpace(pair.Name)
+		if name == "" {
+			continue
+		}
+		resolved, err := ResolveValue(pair.Value, scope, expressions)
+		if err != nil {
+			return nil, fmt.Errorf("field %q: %w", name, err)
+		}
+		values[name] = resolved
+	}
+	return values, nil
+}

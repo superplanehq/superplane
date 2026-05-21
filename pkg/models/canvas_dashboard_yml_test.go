@@ -442,6 +442,24 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			contains: "render.aggregation must not be set",
 		},
 		{
+			name: "composite number panel rejects render.field",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"dataSource": map[string]any{
+						"kind":    "memory",
+						"combine": "sum",
+						"sources": []any{
+							map[string]any{"namespace": "a", "aggregation": "sum", "field": "cost"},
+						},
+					},
+					"render": map[string]any{"kind": "number", "field": "cost"},
+				},
+			},
+			contains: "render.field must not be set",
+		},
+		{
 			name: "composite number panel rejects unknown combine",
 			panel: DashboardPanel{
 				ID:   "n",

@@ -316,6 +316,32 @@ spec:
     if (!result.ok) expect(result.error).toMatch(/render\.aggregation must not be set/);
   });
 
+  it("rejects a composite memory number panel when only render.field is set", () => {
+    const text = `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels:
+    - id: score
+      type: number
+      content:
+        dataSource:
+          kind: memory
+          combine: sum
+          sources:
+            - namespace: a
+              aggregation: sum
+              field: cost
+        render:
+          kind: number
+          field: cost
+  layout: []
+`;
+    const result = parseDashboardYaml(text);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/render\.field must not be set/);
+  });
+
   it("rejects a composite memory number panel with an unknown combine operator", () => {
     const text = `apiVersion: v1
 kind: Console

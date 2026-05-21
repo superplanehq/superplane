@@ -39,10 +39,7 @@ func (s Spec) listMode() memorywrite.ListMode {
 	}.Normalize()
 }
 
-type ValuePair struct {
-	Name  string `json:"name"`
-	Value any    `json:"value"`
-}
+type ValuePair = memorywrite.NameValuePair
 
 func (c *AddMemory) Name() string {
 	return ComponentName
@@ -217,7 +214,7 @@ func (c *AddMemory) executeListMode(ctx core.ExecutionContext, spec Spec, mode m
 	writtenValues := make([]any, 0, len(items))
 	for i, item := range items {
 		scope := mode.Scope(item)
-		values, resolveErr := resolveValueList(spec.ValueList, scope, ctx.Expressions)
+		values, resolveErr := memorywrite.ResolvePairs(spec.ValueList, scope, ctx.Expressions)
 		if resolveErr != nil {
 			return fmt.Errorf("failed to resolve values for list item %d: %w", i, resolveErr)
 		}
@@ -252,22 +249,6 @@ func (c *AddMemory) executeListMode(ctx core.ExecutionContext, spec Spec, mode m
 			},
 		},
 	)
-}
-
-func resolveValueList(pairs []ValuePair, scope map[string]any, expressions core.ExpressionContext) (map[string]any, error) {
-	values := make(map[string]any, len(pairs))
-	for _, pair := range pairs {
-		name := strings.TrimSpace(pair.Name)
-		if name == "" {
-			continue
-		}
-		resolved, err := memorywrite.ResolveValue(pair.Value, scope, expressions)
-		if err != nil {
-			return nil, fmt.Errorf("field %q: %w", name, err)
-		}
-		values[name] = resolved
-	}
-	return values, nil
 }
 
 func extractFieldNames(pairs []ValuePair) []string {

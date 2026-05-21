@@ -203,6 +203,18 @@ describe("validatePanelContent", () => {
     expect(error).toMatch(/render\.aggregation must not be set/);
   });
 
+  it("rejects composite memory panels that also set render.field", () => {
+    const error = validatePanelContent("number", {
+      dataSource: {
+        kind: "memory",
+        combine: "sum",
+        sources: [{ namespace: "a", aggregation: "sum", field: "cost" }],
+      },
+      render: { kind: "number", field: "cost" },
+    });
+    expect(error).toMatch(/render\.field must not be set/);
+  });
+
   it("rejects composite memory panels with an unknown combine operator", () => {
     const error = validatePanelContent("number", {
       dataSource: {

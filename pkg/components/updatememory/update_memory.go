@@ -33,10 +33,7 @@ type Spec struct {
 	ItemVariable string      `json:"itemVariable,omitempty"`
 }
 
-type FieldPair struct {
-	Name  string `json:"name"`
-	Value any    `json:"value"`
-}
+type FieldPair = memorywrite.NameValuePair
 
 func (s Spec) listMode() memorywrite.ListMode {
 	return memorywrite.ListMode{
@@ -296,7 +293,7 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 	perItemValues := make([]any, 0, len(items))
 	for i, item := range items {
 		scope := mode.Scope(item)
-		values, resolveErr := resolveValuePairs(spec.ValueList, scope, ctx.Expressions)
+		values, resolveErr := memorywrite.ResolvePairs(spec.ValueList, scope, ctx.Expressions)
 		if resolveErr != nil {
 			return fmt.Errorf("failed to resolve values for list item %d: %w", i, resolveErr)
 		}
@@ -343,22 +340,6 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 			},
 		},
 	)
-}
-
-func resolveValuePairs(pairs []FieldPair, scope map[string]any, expressions core.ExpressionContext) (map[string]any, error) {
-	values := make(map[string]any, len(pairs))
-	for _, pair := range pairs {
-		name := strings.TrimSpace(pair.Name)
-		if name == "" {
-			continue
-		}
-		resolved, err := memorywrite.ResolveValue(pair.Value, scope, expressions)
-		if err != nil {
-			return nil, fmt.Errorf("field %q: %w", name, err)
-		}
-		values[name] = resolved
-	}
-	return values, nil
 }
 
 func decodeSpec(raw any) (Spec, error) {
