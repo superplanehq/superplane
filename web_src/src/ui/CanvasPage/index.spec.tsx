@@ -358,7 +358,6 @@ describe("CanvasPage connection drop", () => {
           getSidebarData={getSidebarData}
           loadSidebarData={loadSidebarData}
           workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
-          onMemoryOpen={vi.fn()}
           onYamlOpen={vi.fn()}
         />
       </MemoryRouter>,
@@ -392,7 +391,6 @@ describe("CanvasPage connection drop", () => {
           getSidebarData={getSidebarData}
           loadSidebarData={loadSidebarData}
           workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
-          onMemoryOpen={vi.fn()}
           onYamlOpen={vi.fn()}
         />
       </MemoryRouter>,
