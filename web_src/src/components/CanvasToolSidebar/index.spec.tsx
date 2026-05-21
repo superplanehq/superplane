@@ -258,7 +258,8 @@ describe("CanvasToolSidebar", () => {
     expect(input).toHaveValue("second");
   });
 
-  it("shows Send and Stop while an outcome is still active after the chat turn ends", () => {
+  it("allows sending while an outcome is still active after the chat turn ends", async () => {
+    const user = userEvent.setup();
     sessionStorage.setItem(
       "outcome-chat-1",
       JSON.stringify({
@@ -274,6 +275,8 @@ describe("CanvasToolSidebar", () => {
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
     expect(screen.getByTestId("agent-stop-button")).toBeInTheDocument();
-    expect(screen.getByTestId("agent-send-message-button")).toBeInTheDocument();
+
+    await user.type(screen.getByTestId("agent-input"), "Keep going");
+    expect(screen.getByTestId("agent-send-message-button")).toBeEnabled();
   });
 });
