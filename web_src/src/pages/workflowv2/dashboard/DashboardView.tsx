@@ -76,7 +76,7 @@ export function DashboardView({
   if (errorMessage) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-sm text-red-600">
-        <p className="font-medium">Failed to load dashboard</p>
+        <p className="font-medium">Failed to load console</p>
         <p className="text-slate-500">{errorMessage}</p>
       </div>
     );
@@ -204,10 +204,10 @@ function EmptyState({ readOnly, onAdd }: { readOnly: boolean; onAdd: () => void 
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
             <LayoutGrid className="h-7 w-7 text-slate-600" />
           </div>
-          <h3 className="mt-5 text-xl font-semibold tracking-tight text-slate-900">Build your dashboard</h3>
+          <h3 className="mt-5 text-xl font-semibold tracking-tight text-slate-900">Build your console</h3>
           <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
-            Dashboard panels surface the most important docs, links, and live data for this canvas. Drag panels into
-            place and resize from the bottom-right corner to lay them out the way your team works.
+            Console panels surface the most important docs, links, and live data for this canvas. Drag panels into place
+            and resize from the bottom-right corner to lay them out the way your team works.
           </p>
         </div>
 

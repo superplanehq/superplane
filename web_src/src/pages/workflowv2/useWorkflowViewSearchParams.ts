@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 /**
- * Keeps runs/dashboard view mode and selected run in sync with `view` and `run` search params.
+ * Keeps runs/console view mode and selected run in sync with `view` and `run` search params.
+ *
+ * Public URL value is `view=console` for the Console tab. Internal state flags
+ * (`isDashboardMode`, etc.) still use the legacy "dashboard" name.
  */
 export function useWorkflowViewSearchParams(
   searchParams: URLSearchParams,
@@ -10,7 +13,7 @@ export function useWorkflowViewSearchParams(
   dashboardsFeatureEnabled: boolean,
 ) {
   const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
-  const [isDashboardMode, setIsDashboardMode] = useState(() => searchParams.get("view") === "dashboard");
+  const [isDashboardMode, setIsDashboardMode] = useState(() => searchParams.get("view") === "console");
   const [isMemoryMode, setIsMemoryMode] = useState(() => searchParams.get("view") === "memory");
   const [isDashboardAddPanelOpen, setIsDashboardAddPanelOpen] = useState(false);
   const [isDashboardYamlOpen, setIsDashboardYamlOpen] = useState(false);
@@ -25,7 +28,7 @@ export function useWorkflowViewSearchParams(
   useEffect(() => {
     setIsRunsMode(viewParam === "runs");
     setIsMemoryMode(viewParam === "memory");
-    if (viewParam === "dashboard") {
+    if (viewParam === "console") {
       if (dashboardsFeatureEnabled) {
         setIsDashboardMode(true);
       } else {
@@ -35,7 +38,7 @@ export function useWorkflowViewSearchParams(
         setSearchParamsRef.current(
           (current) => {
             const next = new URLSearchParams(current);
-            if (next.get("view") !== "dashboard") {
+            if (next.get("view") !== "console") {
               return current;
             }
             next.delete("view");
@@ -48,7 +51,7 @@ export function useWorkflowViewSearchParams(
       setIsDashboardMode(false);
     }
     setSelectedRunId(runParam || null);
-    if (viewParam !== "dashboard") {
+    if (viewParam !== "console") {
       setIsDashboardAddPanelOpen(false);
       setIsDashboardYamlOpen(false);
     }

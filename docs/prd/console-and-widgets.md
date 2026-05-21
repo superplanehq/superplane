@@ -1,22 +1,32 @@
-# Dashboard and Widgets
+# Console and Widgets
+
+> Naming note: the product surfaces this feature as **Console**. In the
+> codebase and persisted data it is still called "Dashboard" (file names,
+> Go types, DB table `canvas_dashboards`, YAML helper modules, etc.). YAML
+> import accepts both `kind: Console` (current) and `kind: Dashboard`
+> (legacy).
 
 ## Overview
 
-Canvas dashboards are per-canvas views for turning workflow state into an operational surface: notes, pinned nodes, tables, charts, and numbers. They are useful for release dashboards, preview environments, incident views, and any workflow where the canvas itself is not the best day-to-day status display.
+Canvas consoles are per-canvas views for turning workflow state into an operational surface: notes, pinned nodes, tables, charts, and numbers. They are useful for release consoles, preview environments, incident views, and any workflow where the canvas itself is not the best day-to-day status display.
 
-This guide is written for both humans configuring dashboards and agents changing the implementation. It explains what users see, how dashboard data is stored, how widgets fetch and render rows, and which files must stay in sync.
+This guide is written for both humans configuring consoles and agents changing the implementation. It explains what users see, how console data is stored, how widgets fetch and render rows, and which files must stay in sync.
 
 ## What Users See
 
-- A dashboard belongs to one canvas. Templates do not have editable dashboards.
-- Users enter dashboard mode from the workflow v2 header when the dashboards feature is enabled.
+- A console belongs to one canvas. Templates do not have editable consoles.
+- Users enter console mode from the workflow v2 header (URL `?view=console`) when the Console feature is enabled.
 - The canvas graph is hidden and replaced by a 12-column draggable grid.
 - Users with `canvases:update` can add, move, resize, edit, delete, import, and export panels.
-- Users without edit permission can still view dashboards and export YAML.
+- Users without edit permission can still view consoles and export YAML.
 - Runtime actions, such as node-panel runs and table row actions, require `canvases:update`; disabled controls explain why they cannot run.
-- Importing dashboard YAML is replace-all: all panels and layout items are replaced in one update.
+- Importing console YAML is replace-all: all panels and layout items are replaced in one update.
 
 ## Implementation Map
+
+> Internal code still uses the legacy "dashboard" naming. The folder name,
+> file names, and Go symbols below are the actual identifiers in the
+> codebase; only user-facing text was rebranded to Console.
 
 Primary frontend paths:
 
@@ -79,11 +89,15 @@ pkg/grpc/actions/canvases/
 protos/canvases.proto
 ```
 
+The Console feature flag is registered in `pkg/features/features.go` with the
+backend id `dashboards`; the frontend display label is overridden to
+**Console** in `web_src/src/lib/experimentalFeatureDisplay.ts`.
+
 ## Architecture
 
 | Layer | Responsibility |
 | --- | --- |
-| Workflow host | `index.tsx` owns workflow mode, feature flag checks, and header wiring. It delegates dashboard-specific work to small dashboard modules. |
+| Workflow host | `index.tsx` owns workflow mode, feature flag checks, and header wiring. It delegates console-specific work to small dashboard modules. |
 | Overlay | `WorkflowDashboardOverlay` decides whether to render. `DashboardOverlay` maps API data, wires query/mutation state, and provides context. |
 | Context | `DashboardContext` exposes canvas nodes, node statuses, run permission, and trigger callbacks. `resolveDashboardNode` accepts node id or node name. |
 | Grid | `DashboardView` renders the 12-column `react-grid-layout` surface and routes each panel to its card. |
@@ -97,7 +111,7 @@ When changing panel shapes, keep frontend validation, backend validation, YAML t
 
 ## Stored Data Model
 
-Dashboard data is stored as arbitrary JSON content plus a layout:
+Console data is stored as arbitrary JSON content plus a layout:
 
 - `DashboardPanel`: `id`, `type`, `content`
 - `DashboardLayoutItem`: `i`, `x`, `y`, `w`, `h`, optional `minW`, `minH`
@@ -137,7 +151,7 @@ Execution widgets eager-load more event pages until they have enough execution r
 
 ## Table Panels
 
-Table panels are the most configurable widget type. They can display canvas memory, executions, or runs. Memory-backed tables are the recommended pattern for ephemeral environment dashboards.
+Table panels are the most configurable widget type. They can display canvas memory, executions, or runs. Memory-backed tables are the recommended pattern for ephemeral environment consoles.
 
 ### Memory Table Example
 
@@ -227,14 +241,14 @@ Runtime flow:
 2. Optional `confirm` text is interpolated.
 3. `mergeTriggerParameters` builds hook parameters from the trigger template, row data, and action payload.
 4. `DashboardContext.onTriggerNode` calls `useDashboardTriggerNode`.
-5. `InvokeNodeTriggerHook` fires and dashboard-related queries are invalidated.
+5. `InvokeNodeTriggerHook` fires and console-related queries are invalidated.
 
 ## Expressions And Templates
 
-Dashboard widgets support two related expression styles:
+Console widgets support two related expression styles:
 
 - `{{ CEL }}` templates use CEL through `cel-js`. The row environment contains row fields and `now` as Unix seconds.
-- Legacy dashboard expressions such as `status == "running"` are supported in `show` and some filters.
+- Legacy expressions such as `status == "running"` are supported in `show` and some filters.
 
 Use CEL templates for new payloads, confirmation text, and rich interpolation. Use structured `where` filters when the condition is simple and should be validated.
 
@@ -355,11 +369,11 @@ Node panels resolve the configured `node` by id or name. They display the latest
 
 ## YAML Import And Export
 
-Canonical dashboard YAML:
+Canonical Console YAML:
 
 ```yaml
 apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata:
   canvasId: 00000000-0000-0000-0000-000000000000
   name: Example canvas
@@ -387,13 +401,13 @@ spec:
 Rules:
 
 - `apiVersion` must be `v1`.
-- `kind` must be `Dashboard`.
+- `kind` must be `Console`. Legacy `kind: Dashboard` is still accepted on import for back-compat with files exported before the rename.
 - Unknown top-level, metadata, panel, and layout fields are rejected.
 - `metadata.canvasId` and `metadata.name` are informational on export.
 - Missing `spec.panels` or `spec.layout` means an empty list.
 - Maximum panel count is 50.
 - Maximum panel payload size is 1 MiB.
-- Import replaces the whole dashboard.
+- Import replaces the whole console.
 
 Frontend YAML parsing lives in `dashboardYaml.ts`. Backend YAML parsing and validation lives in `canvas_dashboard_yml.go`. Keep error behavior and accepted shapes aligned.
 
@@ -401,10 +415,10 @@ Frontend YAML parsing lives in `dashboardYaml.ts`. Backend YAML parsing and vali
 
 | Operation | Expected permission / state |
 | --- | --- |
-| View dashboard | Canvas read access. |
+| View console | Canvas read access. |
 | Edit panels or layout | `canvases:update`, not a template, and canvas not deleted remotely. |
 | Import YAML | Same as edit. |
-| Export YAML | Available in dashboard mode, including read-only viewers. |
+| Export YAML | Available in console mode, including read-only viewers. |
 | Run node panel or table row action | `canvases:update`, not a template, and canvas not deleted remotely. |
 
 The UI disables unavailable controls, but server-side authorization is authoritative. Check `pkg/authorization/interceptor.go` when adding new RPCs.
@@ -437,7 +451,7 @@ When adding row action kinds:
 
 ## Testing And Verification
 
-Focused checks for dashboard work:
+Focused checks for console work:
 
 ```bash
 cd web_src
@@ -469,8 +483,8 @@ Add or update tests in these areas:
 
 ## Maintenance Notes
 
-- The dashboard code has strict lint-budget pressure. Prefer small helpers and component-only files where Fast Refresh applies.
-- Do not update the ESLint budget to hide dashboard regressions. Refactor the touched code instead.
+- The console code has strict lint-budget pressure. Prefer small helpers and component-only files where Fast Refresh applies.
+- Do not update the ESLint budget to hide console regressions. Refactor the touched code instead.
 - Keep draft panel states valid when possible so users can add a panel before fully configuring it.
 - Keep user-facing text using `SuperPlane` capitalization.
-- Do not manually create migrations. If dashboard persistence changes, use `make db.migration.create NAME=<dash-name>` and leave rollback files empty.
+- Do not manually create migrations. If console persistence changes, use `make db.migration.create NAME=<name>` and leave rollback files empty.

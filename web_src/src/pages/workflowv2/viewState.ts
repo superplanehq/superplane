@@ -1,3 +1,5 @@
+// The "dashboard" header mode is the internal id for the user-facing Console
+// tab. String value kept stable to avoid touching every consumer.
 export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
 
