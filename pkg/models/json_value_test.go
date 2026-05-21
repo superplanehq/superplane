@@ -46,3 +46,10 @@ func Test__JSONValue__ScanPreservesJSONNumbers(t *testing.T) {
 	assert.Contains(t, string(encoded), `"large":12345678901234567890`)
 	assert.Contains(t, string(encoded), `"small":0.0000001`)
 }
+
+func Test__UnmarshalJSONValue__RejectsMultipleTopLevelValues(t *testing.T) {
+	var value any
+	err := models.UnmarshalJSONValue([]byte(`{"a":1}{"b":2}`), &value)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "multiple top-level values")
+}

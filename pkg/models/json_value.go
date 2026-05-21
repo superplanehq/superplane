@@ -50,7 +50,7 @@ func (j *JSONValue) Scan(value any) error {
 		return fmt.Errorf("failed to unmarshal JSONB value: %v", value)
 	}
 
-	return unmarshalJSONValue(data, &j.data)
+	return UnmarshalJSONValue(data, &j.data)
 }
 
 func (j JSONValue) MarshalJSON() ([]byte, error) {
@@ -58,7 +58,7 @@ func (j JSONValue) MarshalJSON() ([]byte, error) {
 }
 
 func (j *JSONValue) UnmarshalJSON(data []byte) error {
-	return unmarshalJSONValue(data, &j.data)
+	return UnmarshalJSONValue(data, &j.data)
 }
 
 func (JSONValue) GormDataType() string {
@@ -91,7 +91,9 @@ func (j JSONValue) GormValue(_ context.Context, db *gorm.DB) clause.Expr {
 	return gorm.Expr("?", string(data))
 }
 
-func unmarshalJSONValue(data []byte, value any) error {
+// UnmarshalJSONValue decodes JSON into value using json.Number for numeric tokens
+// and rejects payloads with multiple top-level values.
+func UnmarshalJSONValue(data []byte, value any) error {
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.UseNumber()
 	if err := decoder.Decode(value); err != nil {
