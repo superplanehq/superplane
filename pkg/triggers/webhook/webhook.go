@@ -1,10 +1,7 @@
 package webhook
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -12,6 +9,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -301,7 +299,7 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	}
 
 	var parsedData any
-	err = unmarshalPayload(ctx.Body, &parsedData)
+	err = models.UnmarshalJSONValue(ctx.Body, &parsedData)
 	if err != nil {
 		return http.StatusBadRequest, nil, fmt.Errorf("error parsing request body: %v", err)
 	}
@@ -317,23 +315,6 @@ func (w *Webhook) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webh
 	}
 
 	return http.StatusOK, nil, nil
-}
-
-func unmarshalPayload(data []byte, value any) error {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.UseNumber()
-	if err := decoder.Decode(value); err != nil {
-		return err
-	}
-
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
-		if err == nil {
-			return fmt.Errorf("invalid JSON: multiple top-level values")
-		}
-		return err
-	}
-
-	return nil
 }
 
 func (w *Webhook) Cleanup(ctx core.TriggerContext) error {
