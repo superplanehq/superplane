@@ -1,11 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
-import { Trash2 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
+import { ChevronDown, Trash2 } from "lucide-react";
+import { useState } from "react";
 
-export type CanvasMemoryModalProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+export type CanvasMemoryViewProps = {
   entries: CanvasMemoryEntry[];
   isLoading?: boolean;
   errorMessage?: string;
@@ -13,39 +12,13 @@ export type CanvasMemoryModalProps = {
   deletingId?: string;
 };
 
-export function CanvasMemoryModal(props: CanvasMemoryModalProps) {
-  return (
-    <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent size="large" className="flex max-h-[90vh] w-[90vw] h-full flex-col gap-0 overflow-hidden p-0">
-        <div className="flex h-full min-h-0 flex-col">
-          <div className="flex shrink-0 items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
-            <span className="font-mono text-sm text-gray-600">Canvas Memory</span>
-          </div>
-
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50">
-            <CanvasMemoryModalBody
-              entries={props.entries}
-              isLoading={props.isLoading}
-              errorMessage={props.errorMessage}
-              onDeleteEntry={props.onDeleteEntry}
-              deletingId={props.deletingId}
-            />
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-type CanvasMemoryBodyProps = {
-  entries: CanvasMemoryEntry[];
-  isLoading?: boolean;
-  errorMessage?: string;
-  onDeleteEntry?: (memoryId: string) => void;
-  deletingId?: string;
-};
-
-function CanvasMemoryModalBody({ entries, isLoading, errorMessage, onDeleteEntry, deletingId }: CanvasMemoryBodyProps) {
+export function CanvasMemoryView({
+  entries,
+  isLoading,
+  errorMessage,
+  onDeleteEntry,
+  deletingId,
+}: CanvasMemoryViewProps) {
   const groupedEntries = entries.reduce<Record<string, CanvasMemoryEntry[]>>((acc, entry) => {
     const namespace = entry.namespace || "(no namespace)";
     if (!acc[namespace]) {
@@ -79,15 +52,51 @@ function CanvasMemoryModalBody({ entries, isLoading, errorMessage, onDeleteEntry
   return (
     <div className="min-h-0 w-full min-w-0 flex-1 overflow-auto">
       {Object.entries(groupedEntries).map(([namespace, values]) => (
-        <div key={namespace} className="m-4 border border-slate-300 rounded-md bg-white">
-          <div className="px-3 py-2 font-mono text-sm text-gray-600 border-b border-slate-300">
-            Namespace: {namespace}
-          </div>
-
-          {renderNamespaceTable(values, onDeleteEntry, deletingId)}
-        </div>
+        <NamespaceSection
+          key={namespace}
+          namespace={namespace}
+          values={values}
+          onDeleteEntry={onDeleteEntry}
+          deletingId={deletingId}
+        />
       ))}
     </div>
+  );
+}
+
+type NamespaceSectionProps = {
+  namespace: string;
+  values: CanvasMemoryEntry[];
+  onDeleteEntry?: (memoryId: string) => void;
+  deletingId?: string;
+};
+
+function NamespaceSection({ namespace, values, onDeleteEntry, deletingId }: NamespaceSectionProps) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  return (
+    <Collapsible
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      className="m-4 border border-slate-300 rounded-md bg-white"
+      data-testid={`memory-namespace-section-${namespace}`}
+    >
+      <CollapsibleTrigger
+        className="group flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-sm text-gray-600 border-b border-slate-300 data-[state=closed]:border-b-0 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        data-testid={`memory-namespace-toggle-${namespace}`}
+        aria-label={`Toggle ${namespace} namespace`}
+      >
+        <ChevronDown
+          aria-hidden="true"
+          className="size-4 shrink-0 text-gray-500 transition-transform duration-150 group-data-[state=closed]:-rotate-90"
+        />
+        <span className="flex-1 truncate">Namespace: {namespace}</span>
+        <span className="shrink-0 text-xs font-normal text-gray-500">
+          {values.length} {values.length === 1 ? "item" : "items"}
+        </span>
+      </CollapsibleTrigger>
+      <CollapsibleContent>{renderNamespaceTable(values, onDeleteEntry, deletingId)}</CollapsibleContent>
+    </Collapsible>
   );
 }
 

@@ -1,9 +1,10 @@
 import { useDashboardContext } from "./DashboardContext";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 import type { ChartPanelDataSource } from "./panelTypes";
+import { DataSourceExecutionsFields, DataSourceMemoryFields, DataSourceRunsFields } from "./dataSourceFormFields";
+import { useMemoryCatalog } from "./widget/useMemoryCatalog";
 
 interface DataSourceFormProps {
   value: ChartPanelDataSource;
@@ -20,6 +21,11 @@ interface DataSourceFormProps {
 export function DataSourceForm({ value, onChange, hideLimit }: DataSourceFormProps) {
   const ctx = useDashboardContext();
   const nodes = ctx?.nodes ?? [];
+  const canvasId = ctx?.canvasId;
+  const memoryNamespace = value.kind === "memory" ? value.namespace : undefined;
+  const { namespaces, fields } = useMemoryCatalog(canvasId, memoryNamespace);
+  const namespaceListId = canvasId ? `data-source-namespaces-${canvasId}` : undefined;
+  const fieldPathListId = memoryNamespace ? `data-source-field-paths-${memoryNamespace}` : undefined;
 
   const setKind = (kind: "memory" | "executions" | "runs") => {
     if (kind === "memory") {
@@ -48,86 +54,18 @@ export function DataSourceForm({ value, onChange, hideLimit }: DataSourceFormPro
       </div>
 
       {value.kind === "runs" ? (
-        hideLimit ? null : (
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-slate-600">Limit</Label>
-            <Input
-              type="number"
-              min={1}
-              value={value.limit ?? ""}
-              onChange={(e) =>
-                onChange({
-                  ...value,
-                  limit: e.target.value === "" ? undefined : Number(e.target.value),
-                })
-              }
-              placeholder="100"
-            />
-          </div>
-        )
+        <DataSourceRunsFields value={value} hideLimit={hideLimit} onChange={onChange} />
       ) : value.kind === "executions" ? (
-        <>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-slate-600">Node (optional)</Label>
-            <Select
-              value={value.node ?? "__all__"}
-              onValueChange={(v) =>
-                onChange({
-                  ...value,
-                  node: v === "__all__" ? undefined : v,
-                })
-              }
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="All nodes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">All nodes</SelectItem>
-                {nodes.map((n) => (
-                  <SelectItem key={n.id} value={n.name || n.id || ""}>
-                    {n.name || n.id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {hideLimit ? null : (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-medium text-slate-600">Limit</Label>
-              <Input
-                type="number"
-                min={1}
-                value={value.limit ?? ""}
-                onChange={(e) =>
-                  onChange({
-                    ...value,
-                    limit: e.target.value === "" ? undefined : Number(e.target.value),
-                  })
-                }
-                placeholder="50"
-              />
-            </div>
-          )}
-        </>
+        <DataSourceExecutionsFields value={value} hideLimit={hideLimit} nodes={nodes} onChange={onChange} />
       ) : (
-        <>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-slate-600">Namespace</Label>
-            <Input
-              value={value.namespace}
-              onChange={(e) => onChange({ ...value, namespace: e.target.value })}
-              placeholder="e.g. deployments"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium text-slate-600">Field path (optional)</Label>
-            <Input
-              value={value.fieldPath ?? ""}
-              onChange={(e) => onChange({ ...value, fieldPath: e.target.value || undefined })}
-              placeholder="e.g. items"
-            />
-          </div>
-        </>
+        <DataSourceMemoryFields
+          value={value}
+          namespaces={namespaces}
+          fields={fields}
+          namespaceListId={namespaceListId}
+          fieldPathListId={fieldPathListId}
+          onChange={onChange}
+        />
       )}
     </div>
   );

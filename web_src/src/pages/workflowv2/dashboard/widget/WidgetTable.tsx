@@ -192,7 +192,7 @@ function actionDisabledTooltip({
 }): string | undefined {
   if (!canRun) return "You do not have permission to run actions in this canvas";
   if (!hasResolvedNode) return `Node "${node}" not found on this canvas`;
-  if (!isTrigger) return "Only trigger nodes can be run from the dashboard. Pick the trigger that starts your flow.";
+  if (!isTrigger) return "Only trigger nodes can be run from the console. Pick the trigger that starts your flow.";
   return undefined;
 }
 

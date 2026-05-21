@@ -1,28 +1,44 @@
 import { useMemo } from "react";
 import { Loader2 } from "lucide-react";
 
-import { applyFilters, aggregateNumber } from "./widgetData";
+import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
+
+import { aggregateNumber, aggregateNumberPerSource, applyFilters, combinePartials } from "./widgetData";
 import { formatValue } from "./widgetFormat";
 import { getValueAtPath } from "./fieldPath";
 import type { WidgetNumberRender } from "./types";
+import type { MemoryNumberSource, WidgetNumberCombine } from "../panelTypes";
 
 interface WidgetNumberProps {
   render: WidgetNumberRender;
   rows: unknown[];
   isLoading: boolean;
   totalCount?: number;
+  /** Composite memory mode: aggregate each source independently and combine the partials. */
+  composite?: {
+    entries: CanvasMemoryEntry[];
+    sources: MemoryNumberSource[];
+    combine: WidgetNumberCombine;
+  };
 }
 
-export function WidgetNumber({ render, rows, isLoading, totalCount }: WidgetNumberProps) {
+export function WidgetNumber({ render, rows, isLoading, totalCount, composite }: WidgetNumberProps) {
   const filtered = useMemo(() => applyFilters(rows, render.filters), [rows, render.filters]);
   const value = useMemo(() => {
+    if (composite) {
+      const partials = composite.sources.map((source) =>
+        aggregateNumberPerSource(composite.entries, source, render.filters),
+      );
+      return combinePartials(partials, composite.combine);
+    }
     if (render.aggregation === "count" && !render.filters?.length && totalCount !== undefined) {
       return totalCount;
     }
+    if (!render.aggregation) return null;
     return aggregateNumber(filtered, render.aggregation, render.field);
-  }, [filtered, render.aggregation, render.field, render.filters, totalCount]);
+  }, [composite, filtered, render.aggregation, render.field, render.filters, totalCount]);
   const sparkline = useMemo(() => {
-    if (!render.sparklineField) return null;
+    if (!render.sparklineField || composite) return null;
     return filtered
       .map((row) => {
         const raw = getValueAtPath(row, render.sparklineField!);
@@ -30,7 +46,7 @@ export function WidgetNumber({ render, rows, isLoading, totalCount }: WidgetNumb
         return Number.isFinite(n) ? n : null;
       })
       .filter((n): n is number => n != null);
-  }, [filtered, render.sparklineField]);
+  }, [composite, filtered, render.sparklineField]);
 
   if (isLoading) {
     return (
@@ -40,7 +56,10 @@ export function WidgetNumber({ render, rows, isLoading, totalCount }: WidgetNumb
     );
   }
 
-  const display = value == null ? "—" : formatValue(value, render.format ?? "number");
+  const display =
+    value == null
+      ? "—"
+      : `${render.prefix ?? ""}${formatValue(value, render.format ?? "number")}${render.suffix ?? ""}`;
   return (
     <div className="flex h-full flex-col items-start justify-center gap-1 p-4" data-testid="widget-number">
       {render.label ? (
