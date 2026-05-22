@@ -18,10 +18,10 @@ export const Block = React.memo(function Block(props: BlockProps) {
   const isHighlighted = data._isHighlighted || false;
   const hasHighlightedNodes = data._hasHighlightedNodes || false;
   const shouldFade = hasHighlightedNodes && !isHighlighted;
-  const shouldBlankBody = data._dimBodyBelowHeader || false;
+  const isDeleted = data._draftDiffStatus === "removed";
+  const shouldBlankBody = data._dimBodyBelowHeader || isDeleted;
   const isConnectionInteractive = props.canvasMode !== "live";
   const diffRing = data._draftDiffStatus ? DRAFT_DIFF_RING[data._draftDiffStatus] || "" : "";
-  const isDeleted = data._draftDiffStatus === "removed";
 
   return (
     <div
