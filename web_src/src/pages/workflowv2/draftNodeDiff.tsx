@@ -230,5 +230,30 @@ export function buildDraftDiffMap(
   const liveNodes = (liveVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
   const removedNodes = liveNodes.filter((n) => statusMap[String(n.id)] === "removed");
 
-  return { statusMap, removedNodes };
+  // Compute per-edge diff
+  const edgeKey = (e: { sourceId: string; targetId: string; channel: string }) =>
+    `${e.sourceId}->${e.targetId}::${e.channel}`;
+
+  const liveEdgeList = (Array.isArray(liveVersion?.spec?.edges) ? liveVersion.spec.edges : []) as Array<
+    Record<string, unknown>
+  >;
+  const draftEdgeList = (Array.isArray(draftVersion?.spec?.edges) ? draftVersion.spec.edges : []) as Array<
+    Record<string, unknown>
+  >;
+
+  const normalize = (e: Record<string, unknown>) => ({
+    sourceId: String(e.sourceId ?? ""),
+    targetId: String(e.targetId ?? ""),
+    channel: String(e.channel ?? "default"),
+  });
+
+  const liveEdgeSet = new Set(liveEdgeList.map((e) => edgeKey(normalize(e))));
+  const draftEdgeSet = new Set(draftEdgeList.map((e) => edgeKey(normalize(e))));
+
+  const addedEdges = draftEdgeList.filter((e) => !liveEdgeSet.has(edgeKey(normalize(e))));
+  const removedEdgeKeys = new Set(
+    liveEdgeList.filter((e) => !draftEdgeSet.has(edgeKey(normalize(e)))).map((e) => edgeKey(normalize(e))),
+  );
+
+  return { statusMap, removedNodes, addedEdges, removedEdgeKeys };
 }

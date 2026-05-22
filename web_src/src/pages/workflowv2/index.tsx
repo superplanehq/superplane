@@ -1901,6 +1901,42 @@ export function WorkflowPageV2() {
     return [...preparedNodes, ...ghostNodes];
   }, [preparedNodes, draftDiffResult, liveCanvasVersion, allTriggers, allComponents, canvasId, queryClient]);
 
+  // Style edges based on draft vs live diff
+  const edgesWithDiff = useMemo(() => {
+    if (!draftDiffResult) return preparedEdges;
+    const { addedEdges, removedEdgeKeys } = draftDiffResult;
+    const edgeKey = (source: string, target: string, channel: string) => `${source}->${target}::${channel}`;
+    const addedSet = new Set(
+      (addedEdges || []).map((e: Record<string, unknown>) =>
+        edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default")),
+      ),
+    );
+
+    // Mark new edges
+    const styled = preparedEdges.map((edge) => {
+      const key = edgeKey(edge.source, edge.target, edge.sourceHandle || "default");
+      if (addedSet.has(key)) {
+        return { ...edge, data: { ...edge.data, _draftDiffStatus: "added" } };
+      }
+      return edge;
+    });
+
+    // Inject ghost edges for removed connections
+    const ghostEdges = [...(removedEdgeKeys || [])].map((key) => {
+      const [sourcePart, rest] = key.split("::");
+      const [source, target] = sourcePart.split("->");
+      return {
+        id: `ghost-edge-${key}`,
+        source,
+        target,
+        sourceHandle: rest || "default",
+        data: { _draftDiffStatus: "removed" },
+      };
+    });
+
+    return [...styled, ...ghostEdges];
+  }, [preparedEdges, draftDiffResult]);
+
   const nodesWithIntegrationStatus = useMemo(
     () => overlayIntegrationWarnings(nodesWithGhosts, integrations, canvasNodes),
     [nodesWithGhosts, integrations, canvasNodes],
@@ -1932,7 +1968,7 @@ export function WorkflowPageV2() {
     selectedRun,
     runCanvasData,
     liveNodes: nodesWithIntegrationStatus,
-    liveEdges: preparedEdges,
+    liveEdges: edgesWithDiff,
     isSelectedRunVersionLoading,
     isSelectedRunExecutionsLoading: selectedRunExecutionsQuery.isLoading,
   });
