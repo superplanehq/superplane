@@ -28,6 +28,9 @@ func Test__toStructpbCompatible__ConvertsJSONNumbersOnly(t *testing.T) {
 
 	require.True(t, ok)
 	assert.Equal(t, float64(42), converted["number"])
+	assert.Equal(t, float64(1), jsonNumberForStructpb(json.Number("1.0")))
+	assert.Equal(t, float64(100000), jsonNumberForStructpb(json.Number("1e5")))
+	assert.Equal(t, float64(10.5), jsonNumberForStructpb(json.Number("10.5")))
 	assert.Equal(t, "9007199254740993", converted["unsafeInt"])
 	assert.Equal(t, "12345678901234567890", converted["snowflake"])
 	assert.Equal(t, "not-a-number", converted["invalid"])

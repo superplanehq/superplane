@@ -16,8 +16,9 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-// JSONValue stores arbitrary JSON while preserving JSON numbers as json.Number
-// at JSON decode boundaries, including when values are scanned from the DB.
+// JSONValue stores arbitrary JSON while preserving JSON number tokens as json.Number
+// when decoding (DB scan, API ingress, and in-memory UnmarshalJSON). Writes marshal
+// the stored value as-is, so tokens survive round-trips once ingress avoids float64.
 type JSONValue struct {
 	data any
 }

@@ -2,7 +2,8 @@ package canvases
 
 import (
 	"encoding/json"
-	"strconv"
+	"math"
+	"math/big"
 
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -40,14 +41,50 @@ func toStructpbCompatible(value any) any {
 func jsonNumberForStructpb(value json.Number) any {
 	raw := value.String()
 	number, err := value.Float64()
-	if err != nil {
+	if err != nil || math.IsInf(number, 0) {
 		return raw
 	}
 
-	// Float64() succeeds for out-of-range integers but loses bits past 2^53.
-	if strconv.FormatFloat(number, 'f', -1, 64) != raw {
+	if jsonNumberLosesFloat64Precision(raw, number) {
 		return raw
 	}
 
 	return number
+}
+
+func jsonNumberLosesFloat64Precision(raw string, number float64) bool {
+	if !isJSONIntegerToken(raw) {
+		return false
+	}
+
+	original, ok := new(big.Int).SetString(raw, 10)
+	if !ok {
+		return true
+	}
+
+	converted := new(big.Int)
+	new(big.Float).SetFloat64(number).Int(converted)
+	return original.Cmp(converted) != 0
+}
+
+func isJSONIntegerToken(raw string) bool {
+	if raw == "" || raw == "-" {
+		return false
+	}
+
+	start := 0
+	if raw[0] == '-' {
+		if len(raw) == 1 {
+			return false
+		}
+		start = 1
+	}
+
+	for i := start; i < len(raw); i++ {
+		if raw[i] < '0' || raw[i] > '9' {
+			return false
+		}
+	}
+
+	return true
 }

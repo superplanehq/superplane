@@ -413,30 +413,71 @@ func extractInputMap(input any) map[string]any {
 }
 
 func normalizeExpressionValue(value any) any {
+	normalized, _ := normalizeExpressionValueWithChanged(value)
+	return normalized
+}
+
+func normalizeExpressionValueWithChanged(value any) (any, bool) {
 	switch v := value.(type) {
 	case json.Number:
-		return normalizeJSONNumber(v)
+		return normalizeJSONNumber(v), true
 	case map[string]any:
-		result := make(map[string]any, len(v))
-		for key, item := range v {
-			result[key] = normalizeExpressionValue(item)
-		}
-		return result
+		return normalizeExpressionMap(v)
 	case map[string]string:
 		result := make(map[string]any, len(v))
 		for key, item := range v {
 			result[key] = item
 		}
-		return result
+		return result, true
 	case []any:
-		result := make([]any, len(v))
-		for i, item := range v {
-			result[i] = normalizeExpressionValue(item)
-		}
-		return result
+		return normalizeExpressionSlice(v)
 	default:
-		return v
+		return v, false
 	}
+}
+
+func normalizeExpressionMap(value map[string]any) (any, bool) {
+	var out map[string]any
+	changed := false
+	for key, item := range value {
+		normalized, itemChanged := normalizeExpressionValueWithChanged(item)
+		if !itemChanged {
+			continue
+		}
+		changed = true
+		if out == nil {
+			out = make(map[string]any, len(value))
+			for k, v := range value {
+				out[k] = v
+			}
+		}
+		out[key] = normalized
+	}
+	if !changed {
+		return value, false
+	}
+	return out, true
+}
+
+func normalizeExpressionSlice(value []any) (any, bool) {
+	var out []any
+	changed := false
+	for i, item := range value {
+		normalized, itemChanged := normalizeExpressionValueWithChanged(item)
+		if !itemChanged {
+			continue
+		}
+		changed = true
+		if out == nil {
+			out = make([]any, len(value))
+			copy(out, value)
+		}
+		out[i] = normalized
+	}
+	if !changed {
+		return value, false
+	}
+	return out, true
 }
 
 func normalizeJSONNumber(value json.Number) any {
