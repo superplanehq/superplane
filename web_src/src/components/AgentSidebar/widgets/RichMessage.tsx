@@ -22,6 +22,8 @@ const MARKDOWN_CLASSES =
   "[&_h2]:mb-1 [&_h2]:mt-1 [&_h2]:text-sm [&_h2]:font-semibold [&_h2:first-child]:mt-0 " +
   "[&_h3]:mb-0.5 [&_h3]:mt-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3:first-child]:mt-0 " +
   "[&_p]:mb-2 [&_p]:leading-relaxed [&_p:last-child]:mb-0 " +
+  "[&_strong]:font-semibold [&_b]:font-semibold " +
+  "[&_hr]:my-5 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-slate-200 " +
   "[&_ol]:mb-2 [&_ol]:ml-5 [&_ol]:list-decimal [&_ul]:mb-2 [&_ul]:ml-5 [&_ul]:list-disc [&_li]:mb-0.5 " +
   "[&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-slate-300 [&_blockquote]:pl-3 " +
   "[&_code]:rounded [&_code]:bg-slate-200/70 [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-xs " +
@@ -152,7 +154,7 @@ function MarkdownSegment({
           code: MarkdownCode,
           pre: ({ children }) => <>{children}</>,
           table: ({ children, ...props }) => (
-            <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div className="my-4 overflow-x-auto rounded-lg border border-slate-200 bg-white">
               <table {...props}>{children}</table>
             </div>
           ),

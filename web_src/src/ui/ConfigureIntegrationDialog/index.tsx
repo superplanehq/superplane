@@ -12,6 +12,7 @@ import { getApiErrorMessage } from "@/lib/errors";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { useIntegration, useUpdateIntegration, useAvailableIntegrations } from "@/hooks/useIntegrations";
 import { showErrorToast } from "@/lib/toast";
+import { useIntegrationConfigureOpen } from "@/lib/analytics";
 import type { ConfigurationField } from "@/api-client";
 
 interface ConfigureIntegrationDialogProps {
@@ -44,6 +45,8 @@ export function ConfigureIntegrationDialog({
   const [name, setName] = useState("");
   const [config, setConfig] = useState<Record<string, unknown>>({});
 
+  useIntegrationConfigureOpen(integration ?? undefined, integrationId, "node_configuration", organizationId);
+
   useEffect(() => {
     if (integration?.spec?.configuration) {
       setConfig(integration.spec.configuration as Record<string, unknown>);
@@ -70,9 +73,31 @@ export function ConfigureIntegrationDialog({
   }, [integrationId, name, config, updateMutation, onClose]);
 
   const handleBrowserAction = useCallback(() => {
-    const url = integration?.status?.browserAction?.url;
+    const browserAction = integration?.status?.browserAction;
+    if (!browserAction) return;
+
+    const { url, method, formFields } = browserAction;
+    if (method?.toUpperCase() === "POST" && formFields) {
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = url || "";
+      form.target = "_blank";
+      form.style.display = "none";
+      Object.entries(formFields).forEach(([key, value]) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = String(value);
+        form.appendChild(input);
+      });
+      document.body.appendChild(form);
+      form.submit();
+      document.body.removeChild(form);
+      return;
+    }
+
     if (url) window.open(url, "_blank");
-  }, [integration?.status?.browserAction?.url]);
+  }, [integration?.status?.browserAction]);
 
   return (
     <Dialog open={!!integrationId} onOpenChange={(open) => !open && onClose()}>
@@ -97,9 +122,11 @@ export function ConfigureIntegrationDialog({
                       integration.metadata?.integrationName}
                   </DialogTitle>
                   <a
-                    href={`/${organizationId}/settings/integrations/${integration.metadata?.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={
+                      integration.metadata?.id
+                        ? `/${organizationId}/settings/integrations/${integration.metadata.id}`
+                        : `/${organizationId}/settings/integrations`
+                    }
                     className="inline-flex h-4 w-4 items-center justify-center text-gray-500 hover:text-gray-800 transition-colors"
                     aria-label="Open integration settings"
                   >
