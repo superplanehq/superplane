@@ -141,7 +141,7 @@ import {
   prepareData,
   prepareSidebarData,
 } from "./workflowPageHelpers";
-/** Experimental feature id; must match `FeatureDashboards` in pkg/features/features.go. */
+/** Backend flag id (`FeatureDashboards`); UI label is "Console" via `experimentalFeatureDisplay.ts`. */
 const EXPERIMENTAL_FEATURE_DASHBOARDS = "dashboards";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";

@@ -1,6 +1,9 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useRef } from "react";
 
+// The "dashboard" mode/tab value is the internal id for what the product
+// surfaces to users as "Console". The string literal is kept to avoid
+// renaming the canvas mode union and downstream call sites.
 type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard";
 
 interface CanvasModeToggleProps {
@@ -59,8 +62,8 @@ export function CanvasModeToggle({
     >
       <TabsList aria-label="Canvas view" className="h-8 min-h-8 bg-slate-100 [&_[data-slot=tabs-trigger]]:text-[13px]">
         {showDashboard ? (
-          <TabsTrigger value={DASHBOARD_TAB} data-testid="canvas-view-mode-dashboard" aria-label="Dashboard">
-            Dashboard
+          <TabsTrigger value={DASHBOARD_TAB} data-testid="canvas-view-mode-dashboard" aria-label="Console">
+            Console
           </TabsTrigger>
         ) : null}
         <TabsTrigger

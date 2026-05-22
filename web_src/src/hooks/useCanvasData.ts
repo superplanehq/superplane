@@ -1580,6 +1580,8 @@ export const useInfiniteNodeQueueItems = (canvasId: string, nodeId: string, enab
   });
 };
 
+// Surfaced to users as "Console". The hook and API still use the legacy
+// "dashboard" naming; only user-facing text reflects the new product name.
 export const useCanvasDashboard = (canvasId: string, enabled: boolean = true) => {
   return useQuery({
     queryKey: canvasKeys.dashboard(canvasId),
