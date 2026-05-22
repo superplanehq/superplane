@@ -153,6 +153,14 @@ func (c *DeleteInstance) Execute(ctx core.ExecutionContext) error {
 
 	client := NewClient(ctx.HTTP, creds, region)
 	if _, err := client.TerminateInstances(instanceID); err != nil {
+		if IsInstanceNotFound(err) {
+			return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, DeleteInstancePayloadType, []any{
+				map[string]any{
+					"instanceId": instanceID,
+					"state":      InstanceStateTerminated,
+				},
+			})
+		}
 		return fmt.Errorf("failed to terminate instance: %w", err)
 	}
 
