@@ -52,7 +52,7 @@ export const Block = React.memo(function Block(props: BlockProps) {
   const shouldFade = hasHighlightedNodes && !isHighlighted;
   const isDeleted = data._draftDiffStatus === "removed";
   const shouldBlankBody = data._dimBodyBelowHeader || isDeleted;
-  const isConnectionInteractive = props.canvasMode !== "live";
+  const isConnectionInteractive = props.canvasMode !== "live" && !isDeleted;
 
   return (
     <div
