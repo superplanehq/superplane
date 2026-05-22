@@ -375,3 +375,46 @@ func sessionTitle(organizationID, canvasID uuid.UUID) string {
 	}
 	return org.Name + " - " + canvas.Name
 }
+
+// CanvasSessionInfo holds session + user info for the session browser.
+type CanvasSessionInfo struct {
+	SessionID    string
+	UserID       string
+	UserName     string
+	Status       string
+	LastActiveAt *time.Time
+}
+
+// ListCanvasSessions returns all agent sessions for a canvas with user info.
+func (s *Service) ListCanvasSessions(organizationID, canvasID uuid.UUID) ([]CanvasSessionInfo, error) {
+	var results []struct {
+		SessionID    string
+		UserID       string
+		UserName     string
+		Status       string
+		LastActiveAt *time.Time
+	}
+
+	err := database.Conn().
+		Table("agent_sessions").
+		Select("agent_sessions.id as session_id, agent_sessions.user_id, accounts.name as user_name, agent_sessions.status, agent_sessions.last_active_at").
+		Joins("LEFT JOIN accounts ON accounts.id = agent_sessions.user_id").
+		Where("agent_sessions.organization_id = ? AND agent_sessions.canvas_id = ?", organizationID, canvasID).
+		Order("agent_sessions.updated_at DESC").
+		Scan(&results).Error
+	if err != nil {
+		return nil, fmt.Errorf("list canvas sessions: %w", err)
+	}
+
+	entries := make([]CanvasSessionInfo, len(results))
+	for i, r := range results {
+		entries[i] = CanvasSessionInfo{
+			SessionID:    r.SessionID,
+			UserID:       r.UserID,
+			UserName:     r.UserName,
+			Status:       r.Status,
+			LastActiveAt: r.LastActiveAt,
+		}
+	}
+	return entries, nil
+}
