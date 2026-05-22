@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/models"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -41,13 +40,13 @@ func (s *EventContext) Emit(payloadType string, payload any) error {
 	now := time.Now()
 
 	//
-	// We use RawMessage here to avoid a second marshal when GORM persists the JSONType.
+	// We use RawMessage here to avoid a second marshal when GORM persists the JSON value.
 	//
 	event := models.CanvasEvent{
 		WorkflowID: s.node.WorkflowID,
 		NodeID:     s.node.NodeID,
 		Channel:    "default",
-		Data:       datatypes.NewJSONType[any](json.RawMessage(data)),
+		Data:       models.NewJSONValue(json.RawMessage(data)),
 		State:      models.CanvasEventStatePending,
 		CreatedAt:  &now,
 	}
