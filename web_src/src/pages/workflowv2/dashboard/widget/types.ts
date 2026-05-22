@@ -92,10 +92,19 @@ export interface WidgetTableRender {
 
 export type WidgetChartKind = "bar" | "stacked-bar" | "line" | "area" | "donut";
 
+export type WidgetChartLegendMode = "auto" | "show" | "hide";
+export const WIDGET_CHART_LEGEND_MODES: WidgetChartLegendMode[] = ["auto", "show", "hide"];
+
 export interface WidgetChartSeries {
   field?: string;
   label?: string;
   color?: string;
+  /** Optional value format applied in tooltips (and in donut value rows). */
+  format?: WidgetColumnFormat;
+  /** Optional display string prepended to the formatted value (e.g. "$"). */
+  prefix?: string;
+  /** Optional display string appended to the formatted value (e.g. " MWh"). */
+  suffix?: string;
 }
 
 export interface WidgetChartRender {
@@ -106,18 +115,25 @@ export interface WidgetChartRender {
   title?: string;
   limit?: number;
   filters?: string[];
+  /** Legend visibility. Defaults to "auto" — visible for donut charts or when 2+ series exist. */
+  legend?: WidgetChartLegendMode;
 }
 
 export type WidgetNumberAggregation = "count" | "sum" | "avg" | "min" | "max" | "first" | "last";
 
 export interface WidgetNumberRender {
   kind: "number";
-  aggregation: WidgetNumberAggregation;
+  /** Required for simple data sources. Composite memory sources carry their own per-source aggregation. */
+  aggregation?: WidgetNumberAggregation;
   field?: string;
   filters?: string[];
   format?: WidgetColumnFormat;
   label?: string;
   sparklineField?: string;
+  /** Optional display string rendered before the formatted value (e.g. "R$"). */
+  prefix?: string;
+  /** Optional display string rendered after the formatted value (e.g. " MWh"). */
+  suffix?: string;
 }
 
 export type WidgetRender = WidgetTableRender | WidgetChartRender | WidgetNumberRender;
