@@ -10,11 +10,11 @@ import (
 	"gorm.io/datatypes"
 )
 
-func TestDashboardFromYML_ParsesValidDashboard(t *testing.T) {
+func TestDashboardFromYML_ParsesValidConsole(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata:
-  name: My dashboard
+  name: Ops console
 spec:
   panels:
     - id: intro
@@ -34,8 +34,8 @@ spec:
 	resource, err := DashboardFromYML([]byte(yaml))
 	require.NoError(t, err)
 	require.Equal(t, "v1", resource.APIVersion)
-	require.Equal(t, "Dashboard", resource.Kind)
-	require.Equal(t, "My dashboard", resource.Metadata.Name)
+	require.Equal(t, ConsoleKind, resource.Kind)
+	require.Equal(t, "Ops console", resource.Metadata.Name)
 	require.Len(t, resource.Spec.Panels, 1)
 	require.Equal(t, "intro", resource.Spec.Panels[0].ID)
 	require.Equal(t, "markdown", resource.Spec.Panels[0].Type)
@@ -44,6 +44,19 @@ spec:
 	require.Equal(t, 12, resource.Spec.Layout[0].W)
 	require.NotNil(t, resource.Spec.Layout[0].MinW)
 	assert.Equal(t, 2, *resource.Spec.Layout[0].MinW)
+}
+
+func TestDashboardFromYML_RejectsLegacyDashboardKind(t *testing.T) {
+	yaml := `apiVersion: v1
+kind: Dashboard
+metadata: {}
+spec:
+  panels: []
+  layout: []
+`
+	_, err := DashboardFromYML([]byte(yaml))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported kind")
 }
 
 func TestDashboardFromYML_RejectsEmptyInput(t *testing.T) {
@@ -55,7 +68,7 @@ func TestDashboardFromYML_RejectsEmptyInput(t *testing.T) {
 
 func TestDashboardFromYML_RejectsUnknownFields(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata:
   name: ok
 spec:
@@ -81,7 +94,7 @@ spec:
 
 func TestDashboardFromYML_RejectsWrongAPIVersion(t *testing.T) {
 	yaml := `apiVersion: v2
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels: []
@@ -98,7 +111,7 @@ func TestDashboardFromYML_RejectsNonObjectRoot(t *testing.T) {
 
 func TestDashboardFromYML_RejectsUnsupportedPanelType(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -114,7 +127,7 @@ spec:
 
 func TestDashboardFromYML_RejectsDuplicatePanelIDs(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -133,7 +146,7 @@ spec:
 
 func TestDashboardFromYML_RejectsLayoutWithUnknownPanel(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -153,7 +166,7 @@ spec:
 
 func TestDashboardFromYML_RejectsNonStringBody(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -170,7 +183,7 @@ spec:
 
 func TestDashboardFromYML_RejectsTooManyPanels(t *testing.T) {
 	var b strings.Builder
-	b.WriteString("apiVersion: v1\nkind: Dashboard\nmetadata: {}\nspec:\n  panels:\n")
+	b.WriteString("apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n  panels:\n")
 	for i := 0; i < MaxDashboardPanels+1; i++ {
 		b.WriteString("    - id: p")
 		b.WriteString(strings.Repeat("a", 1))
@@ -195,12 +208,13 @@ func TestDashboardToYML_RoundTripsEmptyDashboard(t *testing.T) {
 	out, err := DashboardToYML(dashboard, "Canvas Name")
 	require.NoError(t, err)
 	assert.Contains(t, string(out), "apiVersion: v1")
-	assert.Contains(t, string(out), "kind: Dashboard")
+	assert.Contains(t, string(out), "kind: Console")
 	assert.Contains(t, string(out), canvasID.String())
 	assert.Contains(t, string(out), "name: Canvas Name")
 
 	parsed, err := DashboardFromYML(out)
 	require.NoError(t, err)
+	require.Equal(t, ConsoleKind, parsed.Kind)
 	assert.Empty(t, parsed.Spec.Panels)
 	assert.Empty(t, parsed.Spec.Layout)
 }
@@ -384,6 +398,141 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			},
 			contains: "dataSource.limit must be a number",
 		},
+		{
+			name: "number render prefix must be string",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "runs"},
+					"render":     map[string]any{"kind": "number", "aggregation": "count", "prefix": 42},
+				},
+			},
+			contains: "render.prefix must be a string",
+		},
+		{
+			name: "composite number panel rejects render.aggregation",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"dataSource": map[string]any{
+						"kind":    "memory",
+						"combine": "sum",
+						"sources": []any{
+							map[string]any{"namespace": "a", "aggregation": "sum", "field": "cost"},
+						},
+					},
+					"render": map[string]any{"kind": "number", "aggregation": "sum", "field": "cost"},
+				},
+			},
+			contains: "render.aggregation must not be set",
+		},
+		{
+			name: "composite number panel rejects render.field",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"dataSource": map[string]any{
+						"kind":    "memory",
+						"combine": "sum",
+						"sources": []any{
+							map[string]any{"namespace": "a", "aggregation": "sum", "field": "cost"},
+						},
+					},
+					"render": map[string]any{"kind": "number", "field": "cost"},
+				},
+			},
+			contains: "render.field must not be set",
+		},
+		{
+			name: "composite number panel rejects unknown combine",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"dataSource": map[string]any{
+						"kind":    "memory",
+						"combine": "median",
+						"sources": []any{
+							map[string]any{"namespace": "a", "aggregation": "sum", "field": "cost"},
+						},
+					},
+					"render": map[string]any{"kind": "number"},
+				},
+			},
+			contains: "dataSource.combine must be one of",
+		},
+		{
+			name: "composite number panel requires field for non-count source",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"dataSource": map[string]any{
+						"kind":    "memory",
+						"combine": "sum",
+						"sources": []any{
+							map[string]any{"namespace": "a", "aggregation": "sum"},
+						},
+					},
+					"render": map[string]any{"kind": "number"},
+				},
+			},
+			contains: "dataSource.sources[0].field is required",
+		},
+		{
+			name: "composite number panel rejects empty sources",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"dataSource": map[string]any{
+						"kind":    "memory",
+						"combine": "sum",
+						"sources": []any{},
+					},
+					"render": map[string]any{"kind": "number"},
+				},
+			},
+			contains: "dataSource.sources must be a non-empty array",
+		},
+		{
+			name: "chart series prefix must be a string",
+			panel: DashboardPanel{
+				ID:   "chart",
+				Type: DashboardPanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "executions"},
+					"render": map[string]any{
+						"kind":   "chart",
+						"type":   "bar",
+						"xField": "service",
+						"series": []any{map[string]any{"field": "cost", "prefix": 42}},
+					},
+				},
+			},
+			contains: "render.series[0].prefix must be a string",
+		},
+		{
+			name: "chart legend mode must be auto/show/hide",
+			panel: DashboardPanel{
+				ID:   "chart",
+				Type: DashboardPanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "executions"},
+					"render": map[string]any{
+						"kind":   "chart",
+						"type":   "bar",
+						"xField": "service",
+						"series": []any{map[string]any{"field": "cost"}},
+						"legend": "bogus",
+					},
+				},
+			},
+			contains: "render.legend must be one of auto/show/hide",
+		},
 	}
 
 	for _, tt := range tests {
@@ -393,4 +542,51 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			assert.Contains(t, err.Error(), tt.contains)
 		})
 	}
+}
+
+func TestValidateDashboardContent_AcceptsChartSeriesFormatAndLegend(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "chart",
+			Type: DashboardPanelTypeChart,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "executions"},
+				"render": map[string]any{
+					"kind":   "chart",
+					"type":   "bar",
+					"xField": "service",
+					"series": []any{
+						map[string]any{"field": "cost", "label": "Cost", "format": "number", "prefix": "$", "suffix": " /mo"},
+					},
+					"legend": "show",
+				},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateDashboardContent_AcceptsCompositeNumberPanel(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "score",
+			Type: DashboardPanelTypeNumber,
+			Content: map[string]any{
+				"dataSource": map[string]any{
+					"kind":    "memory",
+					"combine": "sum",
+					"sources": []any{
+						map[string]any{"namespace": "a", "aggregation": "sum", "field": "cost"},
+						map[string]any{"namespace": "b", "aggregation": "count"},
+					},
+				},
+				"render": map[string]any{"kind": "number", "prefix": "R$"},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
 }

@@ -3,10 +3,10 @@ import type { CanvasesDashboardLayoutItem, CanvasesDashboardPanel } from "@/api-
 
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type {
-  CanvasDashboardQueryResult,
+  CanvasConsoleQueryResult,
   DashboardLayoutItem,
   DashboardPanel,
-  UpdateCanvasDashboardMutationResult,
+  UpdateCanvasConsoleMutationResult,
 } from "@/hooks/useCanvasData";
 
 import { DashboardView } from "./DashboardView";
@@ -37,8 +37,8 @@ export type DashboardOverlayProps = {
    * rules; the same backend rules apply even if the UI is bypassed.
    */
   canRunNodes: boolean;
-  dashboardQuery: CanvasDashboardQueryResult;
-  updateDashboardMutation: UpdateCanvasDashboardMutationResult;
+  dashboardQuery: CanvasConsoleQueryResult;
+  updateDashboardMutation: UpdateCanvasConsoleMutationResult;
   addPanelDialogOpen: boolean;
   onAddPanelDialogOpenChange: (open: boolean) => void;
   /** Controlled state for the YAML modal — owned by the canvas page header. */
