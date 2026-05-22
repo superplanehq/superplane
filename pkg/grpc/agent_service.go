@@ -80,3 +80,11 @@ func (s *AgentsService) DefineAgentOutcome(ctx context.Context, req *pb.DefineAg
 	}
 	return agentsActions.DefineAgentOutcome(ctx, s.service, orgID, userID, req)
 }
+
+func (s *AgentsService) ListCanvasSessions(ctx context.Context, req *pb.ListCanvasSessionsRequest) (*pb.ListCanvasSessionsResponse, error) {
+	orgID, userID, err := s.requestContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return agentsActions.ListCanvasSessions(ctx, s.service, orgID, userID, req)
+}
