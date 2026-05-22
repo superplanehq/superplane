@@ -1,5 +1,9 @@
+import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
+
 import { getValueAtPath } from "./fieldPath";
+import { flattenMemoryEntries } from "./memoryRow";
 import { evaluateShow } from "./showExpression";
+import type { MemoryNumberSource, WidgetNumberCombine } from "../panelTypes";
 import type { WidgetNumberAggregation } from "./types";
 
 /**
@@ -46,6 +50,51 @@ export function aggregateNumber(
       return numeric[0];
     case "last":
       return numeric[numeric.length - 1];
+    default:
+      return null;
+  }
+}
+
+/**
+ * Aggregate a single memory namespace contribution for a composite number
+ * widget. Flattens the relevant entries (optionally walking `fieldPath`),
+ * filters them with the widget's shared `render.filters`, and runs the
+ * source's own aggregation/field configuration. Returns `null` when the
+ * source has no rows or no numeric values to aggregate (except `count`,
+ * which returns `0` for an empty namespace).
+ */
+export function aggregateNumberPerSource(
+  entries: CanvasMemoryEntry[],
+  source: MemoryNumberSource,
+  filters: string[] | undefined,
+): number | null {
+  const rows = flattenMemoryEntries(entries, source.namespace, source.fieldPath);
+  const filtered = applyFilters(rows, filters);
+  return aggregateNumber(filtered, source.aggregation, source.field);
+}
+
+/**
+ * Merge per-source partial aggregates into a single value. Null partials are
+ * skipped (a namespace that produced no numeric value does not poison the
+ * combine); if every partial is `null`, the result is `null` so the widget
+ * renders its em-dash placeholder.
+ *
+ * `avg` is the unweighted mean of the available partials — not a row-weighted
+ * average across namespaces. Document this in the number panel UI so users
+ * can pick `sum` when they want row-level math.
+ */
+export function combinePartials(partials: Array<number | null>, combine: WidgetNumberCombine): number | null {
+  const present = partials.filter((value): value is number => value != null);
+  if (present.length === 0) return null;
+  switch (combine) {
+    case "sum":
+      return present.reduce((a, b) => a + b, 0);
+    case "min":
+      return Math.min(...present);
+    case "max":
+      return Math.max(...present);
+    case "avg":
+      return present.reduce((a, b) => a + b, 0) / present.length;
     default:
       return null;
   }
