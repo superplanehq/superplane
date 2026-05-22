@@ -22,6 +22,7 @@ function dispatchAgentEvent(
     case "assistant_message":
     case "tool_started":
     case "tool_finished":
+    case "user_message":
       handlePersistedMessage(data, callbacks, queryClient);
       return;
     case "stream_started":
