@@ -698,14 +698,6 @@ export function WorkflowPageV2() {
     setCreateChangeRequestDescription("");
   }, [isCreateChangeRequestMode, canvasChangeRequests.length]);
 
-  useEffect(() => {
-    if (!hasEditableVersion || !isVersionControlOpen) {
-      return;
-    }
-
-    setIsVersionControlOpen(false);
-  }, [hasEditableVersion, isVersionControlOpen]);
-
   const lastSavedWorkflowRef = useRef<CanvasesCanvas | null>(null);
   const lastSavedWorkflowSignatureRef = useRef("");
   const lastAppliedVersionSnapshotRef = useRef("");
@@ -4655,6 +4647,22 @@ export function WorkflowPageV2() {
     ],
   );
 
+  const handleUseVersionFromVersionPanel = useCallback(
+    (versionID: string) => {
+      if (hasEditableVersion && hasPendingLocalCanvasState && versionID !== activeCanvasVersionIdRef.current) {
+        const shouldSwitch = window.confirm(
+          "You have unsaved changes in the current draft. Switch versions and discard those unsaved changes?",
+        );
+        if (!shouldSwitch) {
+          return;
+        }
+      }
+
+      handleUseVersion(versionID);
+    },
+    [handleUseVersion, hasEditableVersion, hasPendingLocalCanvasState],
+  );
+
   const handleSubmitCreateChangeRequest = useCallback(
     async ({ title, description }: { title: string; description: string }) => {
       if (!organizationId || !canvasId) {
@@ -4816,17 +4824,8 @@ export function WorkflowPageV2() {
   }, [setIsRunsMode, setSearchParams, setSelectedRunId]);
 
   const handleOpenVersionControl = useCallback(() => {
-    if (hasEditableVersion) {
-      if (!liveCanvasVersionId) {
-        showErrorToast("No live version available");
-        return;
-      }
-
-      handleUseVersion(liveCanvasVersionId);
-    }
-
     setIsVersionControlOpen(true);
-  }, [handleUseVersion, hasEditableVersion, liveCanvasVersionId]);
+  }, []);
 
   const handleCloseVersionControl = useCallback(() => {
     setIsVersionControlOpen(false);
@@ -5274,9 +5273,8 @@ export function WorkflowPageV2() {
   const { onShowDiff, yamlDiffModal } = useCanvasYamlDiffModal({
     hasUnpublishedDraftChanges,
     liveCanvas,
-    liveCanvasVersionSpec: liveCanvasVersion?.spec,
-    draftCanvas: canvas,
-    nodes,
+    liveCanvasVersion,
+    draftCanvasVersion: latestDraftVersion,
     buildYamlExportPayload,
   });
 
@@ -5665,26 +5663,26 @@ export function WorkflowPageV2() {
             ) : null
           }
           toolSidebarVersionsContent={
-            !hasEditableVersion ? (
-              <VersionsTabPanel
-                scrollPersistenceKey={canvasId}
-                liveCanvasVersionId={liveCanvasVersionId}
-                selectedCanvasVersion={selectedCanvasVersion}
-                pendingApprovalVersions={pendingApprovalVersions}
-                liveVersions={liveVersions}
-                liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
-                canUpdateCanvas={canUpdateCanvas}
-                isTemplate={isTemplate}
-                canvasDeletedRemotely={canvasDeletedRemotely}
-                onUseVersion={handleUseVersion}
-                onVersionNodeDiffContextChange={setVersionNodeDiffContext}
-                onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
-                loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
-                loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
-                changeRequestApprovalConfig={liveCanvas?.spec?.changeManagement}
-                rejectedVersions={rejectedVersions}
-              />
-            ) : null
+            <VersionsTabPanel
+              scrollPersistenceKey={canvasId}
+              liveCanvasVersionId={liveCanvasVersionId}
+              selectedCanvasVersion={selectedCanvasVersion}
+              pendingApprovalVersions={pendingApprovalVersions}
+              liveVersions={liveVersions}
+              liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
+              canUpdateCanvas={canUpdateCanvas}
+              isTemplate={isTemplate}
+              canvasDeletedRemotely={canvasDeletedRemotely}
+              onUseVersion={handleUseVersionFromVersionPanel}
+              onVersionNodeDiffContextChange={setVersionNodeDiffContext}
+              onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
+              loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
+              loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
+              changeRequestApprovalConfig={
+                liveCanvasVersion?.spec?.changeManagement ?? liveCanvas?.spec?.changeManagement
+              }
+              rejectedVersions={rejectedVersions}
+            />
           }
           focusRequest={focusRequest}
           onExecutionChainHandled={handleExecutionChainHandled}

@@ -1,5 +1,5 @@
-import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from "react";
-import type { CanvasesCanvas } from "@/api-client";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
 import type { CanvasNode } from "@/ui/CanvasPage";
 
 const CanvasYamlDiffModal = lazy(() =>
@@ -14,18 +14,16 @@ type YamlExportPayload = {
 type UseCanvasYamlDiffModalParams = {
   hasUnpublishedDraftChanges: boolean;
   liveCanvas?: CanvasesCanvas;
-  liveCanvasVersionSpec?: CanvasesCanvas["spec"];
-  draftCanvas?: CanvasesCanvas | null;
-  nodes: CanvasNode[];
+  liveCanvasVersion?: CanvasesCanvasVersion;
+  draftCanvasVersion?: CanvasesCanvasVersion;
   buildYamlExportPayload: (workflow?: CanvasesCanvas | null, overrideNodes?: CanvasNode[]) => YamlExportPayload | null;
 };
 
 export function useCanvasYamlDiffModal({
   hasUnpublishedDraftChanges,
   liveCanvas,
-  liveCanvasVersionSpec,
-  draftCanvas,
-  nodes,
+  liveCanvasVersion,
+  draftCanvasVersion,
   buildYamlExportPayload,
 }: UseCanvasYamlDiffModalParams): {
   onShowDiff: (() => void) | undefined;
@@ -33,15 +31,18 @@ export function useCanvasYamlDiffModal({
 } {
   const [open, setOpen] = useState(false);
   const payload = useMemo(() => {
-    if (!hasUnpublishedDraftChanges || !liveCanvas) {
+    if (!hasUnpublishedDraftChanges || !liveCanvas || !liveCanvasVersion?.spec || !draftCanvasVersion?.spec) {
       return null;
     }
 
     const livePayload = buildYamlExportPayload({
       ...liveCanvas,
-      spec: liveCanvasVersionSpec || liveCanvas.spec,
+      spec: liveCanvasVersion.spec,
     });
-    const draftPayload = buildYamlExportPayload(draftCanvas, nodes);
+    const draftPayload = buildYamlExportPayload({
+      ...liveCanvas,
+      spec: draftCanvasVersion.spec,
+    });
 
     if (!livePayload || !draftPayload || livePayload.yamlText === draftPayload.yamlText) {
       return null;
@@ -52,9 +53,21 @@ export function useCanvasYamlDiffModal({
       draftYamlText: draftPayload.yamlText,
       filename: draftPayload.filename || livePayload.filename,
     };
-  }, [buildYamlExportPayload, draftCanvas, hasUnpublishedDraftChanges, liveCanvas, liveCanvasVersionSpec, nodes]);
+  }, [
+    buildYamlExportPayload,
+    draftCanvasVersion?.spec,
+    hasUnpublishedDraftChanges,
+    liveCanvas,
+    liveCanvasVersion?.spec,
+  ]);
 
   const onShowDiff = useCallback(() => setOpen(true), []);
+
+  useEffect(() => {
+    if (!payload && open) {
+      setOpen(false);
+    }
+  }, [open, payload]);
 
   return {
     onShowDiff: payload ? onShowDiff : undefined,
