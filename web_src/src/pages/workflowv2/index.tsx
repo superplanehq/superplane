@@ -421,12 +421,6 @@ export function WorkflowPageV2() {
     !!selectedCanvasVersionID && pendingApprovalVersionIds.has(selectedCanvasVersionID);
   const isViewingDraftVersion =
     !!selectedCanvasVersion && isDraftVersion(selectedCanvasVersion) && !isViewingPendingApprovalVersion;
-  const draftDiffResult = useMemo(() => {
-    if (!isViewingDraftVersion || !canvas) return undefined;
-    // Use the current canvas spec (includes live edits) for accurate diff
-    const currentDraft = { spec: canvas.spec } as CanvasesCanvasVersion;
-    return buildDraftDiffMap(liveCanvasVersion, currentDraft);
-  }, [isViewingDraftVersion, liveCanvasVersion, canvas]);
   const isViewingCurrentLiveVersion =
     !selectedCanvasVersion || selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
@@ -511,6 +505,11 @@ export function WorkflowPageV2() {
       spec: versionSpec,
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftSpecToRender]);
+  const draftDiffResult = useMemo(() => {
+    if (!isViewingDraftVersion || !canvas) return undefined;
+    const currentDraft = { spec: canvas.spec } as CanvasesCanvasVersion;
+    return buildDraftDiffMap(liveCanvasVersion, currentDraft);
+  }, [isViewingDraftVersion, liveCanvasVersion, canvas]);
   const isChangeManagementDisabled = !(
     liveCanvas?.spec?.changeManagement?.enabled ??
     liveCanvasVersion?.spec?.changeManagement?.enabled ??
