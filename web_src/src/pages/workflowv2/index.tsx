@@ -241,7 +241,7 @@ export function WorkflowPageV2() {
   });
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
-  const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);
+  const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true);
   const { data: canvasChangeRequests = [] } = useCanvasChangeRequests(organizationId!, canvasId!);
   const paginatedVersions = useMemo(
     () => (canvasLiveVersionsQuery.data?.pages || []).flatMap((page) => page?.versions || []),
