@@ -3,7 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY } from "../CanvasPage";
+import { useSidebarLayoutStore, useSidebarLayoutViewport, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { CategorySection } from "./CategorySection";
 import { findFirstVisibleBlock } from "./filter";
 import type { BuildingBlock, BuildingBlockCategory } from "./types";
@@ -81,23 +81,14 @@ function OpenBuildingBlocksSidebar({
   const sidebarRef = useRef<HTMLDivElement>(null);
   const activeResizePointerIdRef = useRef<number | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    if (typeof window === "undefined") {
-      return 460;
-    }
 
-    const saved = window.localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
-    const parsed = saved ? Number.parseInt(saved, 10) : NaN;
-    if (!Number.isFinite(parsed)) {
-      return 460;
-    }
-    return Math.max(280, Math.min(640, parsed));
-  });
-  const [isResizing, setIsResizing] = useState(false);
+  const sidebarWidth = useSidebarLayoutStore((state) => state.rightWidth);
+  const isResizing = useSidebarLayoutStore((state) => state.isRightResizing);
+  const setRightResizing = useSidebarLayoutStore((state) => state.setRightResizing);
+  const resizeRight = useSidebarLayoutStore((state) => state.resizeRight);
 
-  useEffect(() => {
-    localStorage.setItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY, String(sidebarWidth));
-  }, [sidebarWidth]);
+  useSidebarMount("right");
+  useSidebarLayoutViewport();
 
   useEffect(() => {
     if (!searchInputRef.current) {
@@ -113,11 +104,12 @@ function OpenBuildingBlocksSidebar({
     };
   }, []);
 
-  const updateSidebarWidthFromPointer = useCallback((clientX: number) => {
-    const newWidth = window.innerWidth - clientX;
-    const clampedWidth = Math.max(280, Math.min(640, newWidth));
-    setSidebarWidth(clampedWidth);
-  }, []);
+  const updateSidebarWidthFromPointer = useCallback(
+    (clientX: number) => {
+      resizeRight(window.innerWidth - clientX);
+    },
+    [resizeRight],
+  );
 
   useEffect(() => {
     if (!isResizing) {
@@ -136,7 +128,7 @@ function OpenBuildingBlocksSidebar({
         return;
       }
       activeResizePointerIdRef.current = null;
-      setIsResizing(false);
+      setRightResizing(false);
     };
 
     window.addEventListener("pointermove", handleWindowPointerMove);
@@ -152,16 +144,16 @@ function OpenBuildingBlocksSidebar({
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
-  }, [isResizing, updateSidebarWidthFromPointer]);
+  }, [isResizing, updateSidebarWidthFromPointer, setRightResizing]);
 
   const handlePointerDown = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       event.preventDefault();
       activeResizePointerIdRef.current = event.pointerId;
       updateSidebarWidthFromPointer(event.clientX);
-      setIsResizing(true);
+      setRightResizing(true);
     },
-    [updateSidebarWidthFromPointer],
+    [updateSidebarWidthFromPointer, setRightResizing],
   );
 
   const sortedCategories = useMemo(() => {
@@ -185,88 +177,92 @@ function OpenBuildingBlocksSidebar({
   return (
     <div
       ref={sidebarRef}
-      className="border-l-1 border-border absolute right-0 top-0 h-full z-21 flex flex-col overflow-hidden bg-white"
+      className="absolute right-0 top-0 h-full z-21"
       style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
       data-testid="building-blocks-sidebar"
     >
       <div
         onPointerDown={handlePointerDown}
-        className={`absolute left-0 top-0 bottom-0 w-5 cursor-ew-resize touch-none hover:bg-gray-100 transition-colors flex items-center justify-center group z-40 ${
-          isResizing ? "bg-blue-50" : ""
-        }`}
-        style={{ marginLeft: "-10px" }}
+        className="group absolute left-0 top-0 bottom-0 z-40 w-4 cursor-col-resize touch-none bg-transparent"
+        style={{ marginLeft: "-8px" }}
       >
         <div
-          className={`w-2 h-14 rounded-full bg-gray-300 group-hover:bg-gray-800 transition-colors ${
-            isResizing ? "bg-blue-500" : ""
+          aria-hidden
+          className={`pointer-events-none absolute top-0 bottom-0 left-1/2 w-px -translate-x-1/2 bg-transparent transition-colors group-hover:bg-slate-950/50 ${
+            isResizing ? "bg-slate-950/50" : ""
           }`}
         />
       </div>
 
-      <div className="flex items-center justify-between gap-3 px-5 py-2.5 shrink-0">
-        <div className="flex flex-col items-start gap-0.5 min-w-0">
-          <h2 className="text-sm font-medium">Select Component</h2>
-        </div>
-        <button
-          type="button"
-          onClick={() => onToggle(false)}
-          data-testid="close-sidebar-button"
-          className="shrink-0 z-40 w-8 h-8 hover:bg-slate-950/5 rounded-md flex items-center justify-center cursor-pointer leading-none border border-transparent text-muted-foreground"
-          aria-label="Close sidebar"
-        >
-          <X size={16} />
-        </button>
-      </div>
-
-      <div className="flex flex-1 flex-col min-h-0 overflow-y-auto overflow-x-hidden">
-        <div className="flex items-center gap-2 px-5 pt-3 shrink-0">
-          <div className="flex-1 relative min-w-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-            <Input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Filter components..."
-              className="pl-9"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter" || disabled || !onEnterSubmit) {
-                  return;
-                }
-                if (searchTerm.trim().length === 0) {
-                  return;
-                }
-                const firstBlock = findFirstVisibleBlock(sortedCategories, searchTerm, "all");
-                if (!firstBlock) {
-                  return;
-                }
-                e.preventDefault();
-                onEnterSubmit(firstBlock);
-              }}
-            />
+      <div className="border-l-1 border-border h-full flex flex-col overflow-hidden bg-white">
+        <div className="flex items-center justify-between gap-3 px-5 py-2.5 shrink-0">
+          <div className="flex flex-col items-start gap-0.5 min-w-0">
+            <h2 className="text-sm font-medium">Select Component</h2>
           </div>
+          <button
+            type="button"
+            onClick={() => onToggle(false)}
+            data-testid="close-sidebar-button"
+            className="shrink-0 z-40 w-8 h-8 hover:bg-slate-950/5 rounded-md flex items-center justify-center cursor-pointer leading-none border border-transparent text-muted-foreground"
+            aria-label="Close sidebar"
+          >
+            <X size={16} />
+          </button>
         </div>
 
-        <div className="relative flex-1 min-h-0 gap-2 py-6">
-          {sortedCategories.map((category) => (
-            <CategorySection
-              key={category.name}
-              category={category}
-              searchTerm={searchTerm}
-              onBlockClick={onBlockClick}
-            />
-          ))}
+        <div className="flex flex-1 flex-col min-h-0 overflow-y-auto overflow-x-hidden">
+          <div className="flex items-center gap-2 px-5 pt-3 shrink-0">
+            <div className="flex-1 relative min-w-0">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                size={16}
+              />
+              <Input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Filter components..."
+                className="pl-9"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key !== "Enter" || disabled || !onEnterSubmit) {
+                    return;
+                  }
+                  if (searchTerm.trim().length === 0) {
+                    return;
+                  }
+                  const firstBlock = findFirstVisibleBlock(sortedCategories, searchTerm, "all");
+                  if (!firstBlock) {
+                    return;
+                  }
+                  e.preventDefault();
+                  onEnterSubmit(firstBlock);
+                }}
+              />
+            </div>
+          </div>
 
-          {disabled && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
-              </TooltipTrigger>
-              <TooltipContent side="left" sideOffset={10}>
-                <p>{disabledTooltip}</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
+          <div className="relative flex-1 min-h-0 gap-2 py-6">
+            {sortedCategories.map((category) => (
+              <CategorySection
+                key={category.name}
+                category={category}
+                searchTerm={searchTerm}
+                onBlockClick={onBlockClick}
+              />
+            ))}
+
+            {disabled && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="absolute inset-0 bg-white/60 dark:bg-gray-900/60 z-30 cursor-not-allowed" />
+                </TooltipTrigger>
+                <TooltipContent side="left" sideOffset={10}>
+                  <p>{disabledTooltip}</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         </div>
       </div>
     </div>
