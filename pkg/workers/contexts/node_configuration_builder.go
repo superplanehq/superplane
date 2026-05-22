@@ -481,10 +481,9 @@ func normalizeExpressionSlice(value []any) (any, bool) {
 }
 
 func normalizeJSONNumber(value json.Number) any {
-	if integer, err := value.Int64(); err == nil {
-		return integer
-	}
-
+	// Use float64 for all parseable numeric tokens so expression envs match
+	// standard json.Unmarshal (which never produces int/int). Preferring Int64
+	// would make expr perform integer division for int / int operands.
 	if number, err := value.Float64(); err == nil {
 		return number
 	}

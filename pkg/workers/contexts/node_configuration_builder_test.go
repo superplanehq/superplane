@@ -113,6 +113,24 @@ func Test_NodeConfigurationBuilder_JSONNumberExpressionsUseNumericTypes(t *testi
 	assert.Equal(t, true, result)
 }
 
+func Test_NodeConfigurationBuilder_JSONNumberDivisionUsesFloatSemantics(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"count":   json.Number("10"),
+				"divisor": json.Number("3"),
+			},
+		})
+
+	result, err := builder.ResolveExpression(`previous().count / 3`)
+	require.NoError(t, err)
+	assert.InDelta(t, 10.0/3.0, result, 1e-9)
+
+	resultBoth, err := builder.ResolveExpression(`previous().count / previous().divisor`)
+	require.NoError(t, err)
+	assert.InDelta(t, 10.0/3.0, resultBoth, 1e-9)
+}
+
 func Test_NodeConfigurationBuilder_JSONNumberRootPayloadExpressionsUseNumericTypes(t *testing.T) {
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithRootPayload(map[string]any{
