@@ -48,6 +48,7 @@ export function SecondaryHeaderActions({
         onEnterEditMode={onEnterEditMode}
         enterEditModeDisabled={enterEditModeDisabled}
         enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+        hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
         onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
         unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       />
@@ -123,6 +124,7 @@ function LiveModeEditControls({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
+  hasUnpublishedDraftChanges,
   onDiscardDraftAndStartEdit,
   unpublishedDraftUpdatedAt,
 }: Pick<
@@ -130,6 +132,7 @@ function LiveModeEditControls({
   | "onEnterEditMode"
   | "enterEditModeDisabled"
   | "enterEditModeDisabledTooltip"
+  | "hasUnpublishedDraftChanges"
   | "onDiscardDraftAndStartEdit"
   | "unpublishedDraftUpdatedAt"
 > & {
@@ -153,6 +156,7 @@ function LiveModeEditControls({
   return (
     <EnterEditButton
       onClick={onEnterEditMode}
+      label={hasUnpublishedDraftChanges ? "Continue Editing" : "Edit"}
       disabled={!!enterEditModeDisabled}
       disabledTooltip={enterEditModeDisabledTooltip}
     />
@@ -228,10 +232,12 @@ function HeaderActionSeparator() {
 
 function EnterEditButton({
   onClick,
+  label,
   disabled,
   disabledTooltip,
 }: {
   onClick: () => void;
+  label: string;
   disabled: boolean;
   disabledTooltip?: string;
 }) {
@@ -244,7 +250,7 @@ function EnterEditButton({
       disabled={disabled}
       data-testid="canvas-edit-button"
     >
-      Edit
+      {label}
     </UIButton>
   );
 
