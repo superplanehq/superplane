@@ -246,6 +246,22 @@ describe("validatePanelContent", () => {
     });
     expect(error).toMatch(/dataSource\.sources must be a non-empty array/);
   });
+
+  it("rejects composite memory panels when sources is null", () => {
+    const error = validatePanelContent("number", {
+      dataSource: { kind: "memory", combine: "sum", sources: null },
+      render: { kind: "number" },
+    });
+    expect(error).toMatch(/dataSource\.sources must be an array/);
+  });
+
+  it("rejects composite memory panels when sources is not an array", () => {
+    const error = validatePanelContent("number", {
+      dataSource: { kind: "memory", combine: "sum", sources: "oops" },
+      render: { kind: "number", aggregation: "count" },
+    });
+    expect(error).toMatch(/dataSource\.sources must be an array/);
+  });
 });
 
 describe("validatePanelContent — chart series and legend", () => {

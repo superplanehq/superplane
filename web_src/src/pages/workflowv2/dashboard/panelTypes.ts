@@ -142,6 +142,11 @@ export function isCompositeMemoryDataSource(value: unknown): value is CompositeM
   return obj.kind === "memory" && Array.isArray(obj.sources);
 }
 
+/** True when YAML/config intends composite mode (sources key present), including invalid shapes. */
+function hasCompositeMemorySourcesKey(obj: Record<string, unknown>): boolean {
+  return obj.kind === "memory" && Object.prototype.hasOwnProperty.call(obj, "sources");
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // Templates — used to seed new panels
 // ────────────────────────────────────────────────────────────────────────────
@@ -287,7 +292,7 @@ function validateMemoryDataSource(obj: Record<string, unknown>): string | null {
 function validateNumberDataSource(value: unknown): string | null {
   const obj = asObject(value);
   if (!obj) return "dataSource must be an object.";
-  if (obj.kind === "memory" && Array.isArray(obj.sources)) {
+  if (hasCompositeMemorySourcesKey(obj)) {
     return validateCompositeMemoryDataSource(obj);
   }
   return validateDataSource(value);
@@ -296,7 +301,10 @@ function validateNumberDataSource(value: unknown): string | null {
 const ALLOWED_NUMBER_AGGREGATIONS = ["count", "sum", "avg", "min", "max", "first", "last"];
 
 function validateCompositeMemoryDataSource(obj: Record<string, unknown>): string | null {
-  const sources = obj.sources as unknown[];
+  if (!Array.isArray(obj.sources)) {
+    return "dataSource.sources must be an array.";
+  }
+  const sources = obj.sources;
   if (sources.length === 0) {
     return "dataSource.sources must be a non-empty array.";
   }
@@ -536,7 +544,8 @@ function validateNumberContent(content: unknown): string | null {
   if (render.kind !== "number") return 'render.kind must be "number".';
   const symbolError = validateNumberRenderSymbols(render);
   if (symbolError) return symbolError;
-  if (isCompositeMemoryDataSource(obj.dataSource)) {
+  const dataSource = asObject(obj.dataSource);
+  if (dataSource && hasCompositeMemorySourcesKey(dataSource)) {
     if (render.aggregation !== undefined) {
       return "render.aggregation must not be set when dataSource.sources is used (each source defines its own aggregation).";
     }
