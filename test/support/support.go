@@ -238,7 +238,7 @@ func EmitCanvasEventForNodeWithData(
 		WorkflowID:  canvasID,
 		NodeID:      nodeID,
 		Channel:     channel,
-		Data:        datatypes.NewJSONType[any](data),
+		Data:        models.NewJSONValue(data),
 		State:       models.CanvasEventStatePending,
 		ExecutionID: executionID,
 		CreatedAt:   &now,
