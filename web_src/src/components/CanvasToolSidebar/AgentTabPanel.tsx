@@ -213,6 +213,7 @@ function ChatConversation({
         onSend={handlers.handleSend}
         onStop={handlers.handleStop}
         sending={agentBusy}
+        sendPending={sendMutation.isPending}
         stopping={interruptMutation.isPending}
         statusLabel={statusLabel(status)}
         agentMode={agentMode}

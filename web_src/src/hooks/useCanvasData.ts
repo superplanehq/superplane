@@ -268,7 +268,7 @@ export const useInfiniteCanvasLiveVersions = (
   organizationId: string,
   canvasId: string,
   enabled: boolean = true,
-  limit: number = 20,
+  limit: number = 50,
 ) => {
   return useInfiniteQuery({
     queryKey: canvasKeys.versionHistory(canvasId),
@@ -1580,9 +1580,7 @@ export const useInfiniteNodeQueueItems = (canvasId: string, nodeId: string, enab
   });
 };
 
-// Surfaced to users as "Console". The hook and API still use the legacy
-// "dashboard" naming; only user-facing text reflects the new product name.
-export const useCanvasDashboard = (canvasId: string, enabled: boolean = true) => {
+export const useCanvasConsole = (canvasId: string, enabled: boolean = true) => {
   return useQuery({
     queryKey: canvasKeys.dashboard(canvasId),
     queryFn: async () => {
@@ -1598,7 +1596,7 @@ export const useCanvasDashboard = (canvasId: string, enabled: boolean = true) =>
   });
 };
 
-export const useUpdateCanvasDashboard = (canvasId: string) => {
+export const useUpdateCanvasConsole = (canvasId: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
@@ -1631,5 +1629,5 @@ export const useUpdateCanvasDashboard = (canvasId: string) => {
   });
 };
 
-export type CanvasDashboardQueryResult = ReturnType<typeof useCanvasDashboard>;
-export type UpdateCanvasDashboardMutationResult = ReturnType<typeof useUpdateCanvasDashboard>;
+export type CanvasConsoleQueryResult = ReturnType<typeof useCanvasConsole>;
+export type UpdateCanvasConsoleMutationResult = ReturnType<typeof useUpdateCanvasConsole>;

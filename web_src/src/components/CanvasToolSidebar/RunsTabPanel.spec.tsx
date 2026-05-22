@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { CanvasesCanvasRun, SuperplaneComponentsNode } from "@/api-client";
 import { RunsTabPanel } from "./RunsTabPanel";
 
@@ -101,5 +101,46 @@ describe("RunsTabPanel", () => {
 
     expect(screen.getByText("Broken deploy")).toBeInTheDocument();
     expect(screen.queryByText("Healthy deploy")).not.toBeInTheDocument();
+  });
+
+  it("loads more runs when the sidebar scroll reaches the end", () => {
+    const onLoadMore = vi.fn();
+    const runs = Array.from({ length: 25 }, (_, index) =>
+      makeRun({
+        id: `run-${index}`,
+        rootEvent: { ...makeRun().rootEvent, customName: `Deploy ${index}` },
+      }),
+    );
+
+    const { rerender } = render(
+      <RunsTabPanel runs={runs} selectedRunId={null} onSelectRun={() => {}} workflowNodes={nodes} />,
+    );
+    const scroller = screen.getByTestId("runs-sidebar-scroll");
+
+    Object.defineProperties(scroller, {
+      scrollHeight: { configurable: true, value: 1000 },
+      clientHeight: { configurable: true, value: 300 },
+      scrollTop: { configurable: true, writable: true, value: 0 },
+    });
+
+    rerender(
+      <RunsTabPanel
+        runs={runs}
+        selectedRunId={null}
+        onSelectRun={() => {}}
+        workflowNodes={nodes}
+        hasNextPage={true}
+        isFetchingNextPage={false}
+        onLoadMore={onLoadMore}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    expect(onLoadMore).not.toHaveBeenCalled();
+
+    scroller.scrollTop = 860;
+    fireEvent.scroll(scroller);
+
+    expect(onLoadMore).toHaveBeenCalledTimes(1);
   });
 });

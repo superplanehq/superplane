@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Code2, Database, Plus, StickyNote } from "lucide-react";
+import { Code2, Plus, StickyNote } from "lucide-react";
 import { memo, type ReactNode } from "react";
 
 export type RightSideControlsProps = {
@@ -9,25 +9,16 @@ export type RightSideControlsProps = {
   onSidebarOpen: () => void;
   onAddNote: () => void | Promise<void>;
   onYamlOpen: () => void;
-  onMemoryOpen: () => void;
-  memoryItemCount?: number;
-  /** When false, the canvas memory control is hidden (e.g. dashboard or runs surface). */
-  showMemoryButton?: boolean;
 };
 
 export const RightSideControls = memo(function RightSideControls(props: RightSideControlsProps) {
+  if (props.mode === "live") return null;
   return (
     <div className="absolute top-4 right-4 z-10 flex flex-col gap-2.5">
-      {props.mode === "live" ? <LiveCanvasButtons {...props} /> : <EditCanvasButtons {...props} />}
+      <EditCanvasButtons {...props} />
     </div>
   );
 });
-
-function LiveCanvasButtons({ onMemoryOpen, showMemoryButton = true }: RightSideControlsProps) {
-  return showMemoryButton ? (
-    <ControlButton tooltip="Canvas memory" onClick={onMemoryOpen} testId="open-memory-button" icon={<Database />} />
-  ) : null;
-}
 
 function EditCanvasButtons({ onSidebarOpen, onAddNote, onYamlOpen }: RightSideControlsProps) {
   return (

@@ -1,13 +1,12 @@
 /**
  * Console YAML serialization helpers.
  *
- * The product surfaces this as "Console". Go validators in
- * `pkg/models/canvas_dashboard_yml.go` accept both `kind: Console` (canonical)
- * and legacy `kind: Dashboard` on import; export uses Console on both surfaces.
+ * Mirrors the Go validators in `pkg/models/canvas_dashboard_yml.go` so a YAML
+ * file round-trips faithfully through both surfaces.
  *
  * The canonical schema is:
  *   apiVersion: v1
- *   kind: Console        # legacy "Dashboard" is still accepted on import
+ *   kind: Console
  *   metadata:
  *     canvasId?: <uuid>
  *     name?: <display-only>
@@ -24,9 +23,6 @@ import { PANEL_TYPES, isPanelType, validatePanelContent, type PanelType } from "
 
 export const DASHBOARD_API_VERSION = "v1";
 export const DASHBOARD_KIND = "Console";
-// Legacy kind value accepted on import for back-compat with files exported
-// before the Console rename.
-const LEGACY_DASHBOARD_KIND = "Dashboard";
 
 /**
  * Top-level panel types supported by the current Console YAML schema.
@@ -160,7 +156,7 @@ function validateRootHeader(root: Record<string, unknown>): string | null {
   if (root.apiVersion !== DASHBOARD_API_VERSION) {
     return `Unsupported apiVersion ${JSON.stringify(root.apiVersion)} (expected ${JSON.stringify(DASHBOARD_API_VERSION)})`;
   }
-  if (root.kind !== DASHBOARD_KIND && root.kind !== LEGACY_DASHBOARD_KIND) {
+  if (root.kind !== DASHBOARD_KIND) {
     return `Unsupported kind ${JSON.stringify(root.kind)} (expected ${JSON.stringify(DASHBOARD_KIND)})`;
   }
   return null;

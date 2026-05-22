@@ -15,6 +15,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const MaxCanvasVersionLimit = 50
+
 func ListCanvasVersions(ctx context.Context, organizationID string, canvasID string) (*pb.ListCanvasVersionsResponse, error) {
 	return ListCanvasVersionsPaginated(ctx, organizationID, canvasID, 0, nil)
 }
@@ -42,7 +44,7 @@ func ListCanvasVersionsPaginated(
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
-	limit = getLimit(limit)
+	limit = getCanvasVersionLimit(limit)
 	beforeTime := getBefore(before)
 
 	var publishedVersions []models.CanvasVersion
@@ -95,6 +97,18 @@ func ListCanvasVersionsPaginated(
 		HasNextPage:   hasNextPage(len(publishedVersions), int(limit), publishedCount),
 		LastTimestamp: getLastCanvasVersionTimestamp(publishedVersions),
 	}, nil
+}
+
+func getCanvasVersionLimit(limit uint32) uint32 {
+	if limit <= 0 {
+		return DefaultLimit
+	}
+
+	if limit > MaxCanvasVersionLimit {
+		return MaxCanvasVersionLimit
+	}
+
+	return limit
 }
 
 func getLastCanvasVersionTimestamp(versions []models.CanvasVersion) *timestamppb.Timestamp {

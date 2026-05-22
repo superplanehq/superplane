@@ -2,6 +2,7 @@ junit-report.xml
 pkg/web/assets/dist
 tmp
 build/
+node_modules/
 design/node_modules/
 # macOS Finder metadata
 .DS_Store
