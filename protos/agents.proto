@@ -81,6 +81,17 @@ service Agents {
       tags: "Agent";
     };
   }
+
+  rpc ListCanvasSessions(ListCanvasSessionsRequest) returns (ListCanvasSessionsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/agents/canvases/{canvas_id}/sessions"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List all agent sessions for a canvas";
+      description: "Returns all user sessions for the given canvas, including user info and last activity.";
+      tags: "Agent";
+    };
+  }
 }
 
 enum AgentMode {
@@ -134,6 +145,23 @@ message DefineAgentOutcomeRequest {
 }
 
 message DefineAgentOutcomeResponse {}
+
+message ListCanvasSessionsRequest {
+  string canvas_id = 1;
+}
+
+message ListCanvasSessionsResponse {
+  repeated CanvasSessionInfo sessions = 1;
+}
+
+message CanvasSessionInfo {
+  string id = 1;
+  string user_id = 2;
+  string user_name = 3;
+  string user_avatar_url = 4;
+  string status = 5;
+  google.protobuf.Timestamp last_activity_at = 6;
+}
 
 message AgentChatInfo {
   string id = 1;
