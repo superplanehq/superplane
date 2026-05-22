@@ -9,6 +9,8 @@ export function ToolTabsHeader({
   activeTab: string;
   onSelectTab: (value: string) => void;
 }) {
+  const selectedTab = tabs.some(({ value }) => value === activeTab) ? activeTab : tabs[0]?.value;
+
   return (
     <div
       className="flex h-10 min-h-10 shrink-0 flex-row items-stretch border-b border-slate-950/15 px-4"
@@ -20,11 +22,11 @@ export function ToolTabsHeader({
           key={value}
           type="button"
           role="tab"
-          aria-selected={activeTab === value}
+          aria-selected={selectedTab === value}
           onClick={() => onSelectTab(value)}
           className={cn(
             "mr-4 mb-[-1px] flex items-center border-b text-[13px] font-medium transition-colors",
-            activeTab === value
+            selectedTab === value
               ? "border-gray-700 text-gray-800 dark:border-blue-600 dark:text-blue-400"
               : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300",
           )}
