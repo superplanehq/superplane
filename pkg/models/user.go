@@ -493,3 +493,12 @@ func FindUserAccountProviders(users []User) ([]UserAccountProvider, error) {
 
 	return accountProviders, nil
 }
+
+// IsOrgMember checks if a user ID belongs to the given organization.
+func IsOrgMember(organizationID, userID uuid.UUID) bool {
+	var count int64
+	database.Conn().Model(&User{}).
+		Where("id = ? AND organization_id = ?", userID, organizationID).
+		Count(&count)
+	return count > 0
+}
