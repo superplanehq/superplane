@@ -46,6 +46,7 @@ export interface BlockInternalData {
   _isHighlighted?: boolean;
   _hasHighlightedNodes?: boolean;
   _dimBodyBelowHeader?: boolean;
+  _draftDiffStatus?: "added" | "updated" | "removed";
   isTemplate?: boolean;
   isPendingConnection?: boolean;
 }

@@ -97,7 +97,7 @@ import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { CanvasYamlModal } from "./CanvasYamlModal";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
-import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
+import { buildDraftDiffMap, buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import {
   isDraftVersion,
@@ -420,6 +420,10 @@ export function WorkflowPageV2() {
     !!selectedCanvasVersionID && pendingApprovalVersionIds.has(selectedCanvasVersionID);
   const isViewingDraftVersion =
     !!selectedCanvasVersion && isDraftVersion(selectedCanvasVersion) && !isViewingPendingApprovalVersion;
+  const draftDiffResult = useMemo(
+    () => (isViewingDraftVersion ? buildDraftDiffMap(liveCanvasVersion, latestDraftVersion) : undefined),
+    [isViewingDraftVersion, liveCanvasVersion, latestDraftVersion],
+  );
   const isViewingCurrentLiveVersion =
     !selectedCanvasVersion || selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
@@ -1842,6 +1846,7 @@ export function WorkflowPageV2() {
       me,
       canvasMode,
       openTriggerModal,
+      draftDiffResult?.statusMap,
     );
   }, [
     canvas,
@@ -1859,11 +1864,49 @@ export function WorkflowPageV2() {
     me,
     canvasMode,
     openTriggerModal,
+    draftDiffResult,
   ]);
 
+  // Inject ghost nodes for deleted nodes (exist in live but removed from draft)
+  const nodesWithGhosts = useMemo(() => {
+    if (!draftDiffResult?.removedNodes?.length) return preparedNodes;
+    const ghostNodes: typeof preparedNodes = draftDiffResult.removedNodes.map((removedNode) => {
+      const pos = (removedNode.position as { x?: number; y?: number }) || {};
+      return {
+        id: String(removedNode.id),
+        position: { x: pos.x ?? 0, y: pos.y ?? 0 },
+        draggable: false,
+        selectable: false,
+        data: {
+          type: "component" as const,
+          label: String(removedNode.name || "Deleted node"),
+          state: "pending" as const,
+          outputChannels: ["default"],
+          _draftDiffStatus: "removed" as const,
+          _dimBodyBelowHeader: true,
+          component: {
+            iconSlug: "trash-2",
+            iconColor: "text-gray-400",
+            collapsedBackground: "bg-gray-200",
+            title: String(removedNode.name || "Deleted node"),
+            collapsed: false,
+            includeEmptyState: true,
+            emptyStateProps: {
+              title: "Removed from draft",
+              purpose: "runtime" as const,
+              tone: "neutral" as const,
+            },
+            parameters: [],
+          },
+        },
+      };
+    });
+    return [...preparedNodes, ...ghostNodes];
+  }, [preparedNodes, draftDiffResult]);
+
   const nodesWithIntegrationStatus = useMemo(
-    () => overlayIntegrationWarnings(preparedNodes, integrations, canvasNodes),
-    [preparedNodes, integrations, canvasNodes],
+    () => overlayIntegrationWarnings(nodesWithGhosts, integrations, canvasNodes),
+    [nodesWithGhosts, integrations, canvasNodes],
   );
 
   const runCanvasData = useRunCanvasData({
