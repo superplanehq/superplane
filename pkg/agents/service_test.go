@@ -328,7 +328,7 @@ func TestService_DefineOutcome_RefreshesPreambleForBuildLoop(t *testing.T) {
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "api_token:")
 }
 
-func TestService_SendMessage_SharedSession(t *testing.T) {
+func TestService_SendMessage_SharedSession_OrgMember(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 
@@ -339,10 +339,28 @@ func TestService_SendMessage_SharedSession(t *testing.T) {
 	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
 	require.NoError(t, err)
 
-	// Any org member can send to a shared canvas session
-	_, err = svc.SendMessage(context.Background(), r.Organization.ID, uuid.New(), session.ID, "collaboration")
+	// A second org member can send to the shared session
+	user2 := support.CreateUser(t, r, r.Organization.ID)
+	_, err = svc.SendMessage(context.Background(), r.Organization.ID, user2.ID, session.ID, "collaboration")
 	require.NoError(t, err)
 	assert.Equal(t, 1, provider.sendCalled)
+}
+
+func TestService_SendMessage_SharedSession_RejectsNonMember(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	canvas := setupCanvasForUser(t, r)
+	provider := &fakeProvider{}
+	svc := newService(t, r, provider)
+
+	session, err := svc.EnsureSession(context.Background(), r.Organization.ID, r.User, canvas.ID)
+	require.NoError(t, err)
+
+	// A random UUID that's not an org member should be rejected
+	_, err = svc.SendMessage(context.Background(), r.Organization.ID, uuid.New(), session.ID, "intrusion")
+	require.Error(t, err)
+	assert.Equal(t, 0, provider.sendCalled)
 }
 
 func TestService_SendMessage_RejectsEmpty(t *testing.T) {

@@ -404,10 +404,14 @@ func sessionTitle(organizationID, canvasID uuid.UUID) string {
 }
 
 // getSharedSession tries user-scoped first, then falls back to org-scoped for shared sessions.
+// Verifies the user is an actual member of the organization.
 func (s *Service) getSharedSession(organizationID, userID, sessionID uuid.UUID) (*models.AgentSession, error) {
 	session, err := s.GetSession(organizationID, userID, sessionID)
 	if err == nil {
 		return session, nil
+	}
+	if !models.IsOrgMember(organizationID, userID) {
+		return nil, ErrSessionForbidden
 	}
 	return models.FindSharedCanvasSessionByID(organizationID, sessionID)
 }
