@@ -4,13 +4,11 @@ import { AlertTriangle, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+import type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
+
 import { buildEnv, compileTemplate, evalTemplateDetailed } from "./widget/celExpr";
 
-export interface PayloadDraftEntry {
-  rowId: string;
-  path: string;
-  template: string;
-}
+export type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
 
 export function PayloadEditor({
   entries,

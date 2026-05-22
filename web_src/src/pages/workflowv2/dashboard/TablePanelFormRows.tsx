@@ -8,7 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { SuperplaneComponentsNode } from "@/api-client";
 
 import { getTriggerTemplates } from "./dashboardTriggerParameters";
-import { PayloadEditor, type PayloadDraftEntry } from "./TablePanelPayloadEditor";
+import type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
+
+import { PayloadEditor } from "./TablePanelPayloadEditor";
 import {
   WIDGET_FILTER_OPS,
   WIDGET_ROW_ACTION_ICONS,
@@ -20,7 +22,7 @@ import {
 } from "./widget/types";
 import { suggestColumnFormat } from "./widget/useMemoryCatalog";
 
-export type { PayloadDraftEntry } from "./TablePanelPayloadEditor";
+export type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
 
 const COLUMN_FORMATS: WidgetColumnFormat[] = [
   "text",
@@ -219,6 +221,12 @@ export function ActionRow({
 
 const TEMPLATE_CUSTOM = "__custom__";
 
+function templateFieldSelectValue(currentValue: string, matchesKnown: boolean): string {
+  if (matchesKnown) return currentValue;
+  if (currentValue) return TEMPLATE_CUSTOM;
+  return "__default__";
+}
+
 function ActionMainFields({
   action,
   triggerNodes,
@@ -315,7 +323,7 @@ function ActionTemplateField({
     );
   }
 
-  const selectValue = matchesKnown ? currentValue : currentValue ? TEMPLATE_CUSTOM : "__default__";
+  const selectValue = templateFieldSelectValue(currentValue, matchesKnown);
 
   return (
     <div className="space-y-1">

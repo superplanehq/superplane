@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
 
 import type { SuperplaneComponentsNode } from "@/api-client";
 
@@ -29,7 +29,7 @@ const INITIAL: TablePanelContent = {
   },
 };
 
-function Harness({ initial }: { initial: TablePanelContent }) {
+function Harness({ initial, actionPayloadIndex = 0 }: { initial: TablePanelContent; actionPayloadIndex?: number }) {
   const [value, setValue] = useState<TablePanelContent>(initial);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return (
@@ -37,11 +37,25 @@ function Harness({ initial }: { initial: TablePanelContent }) {
       <QueryClientProvider client={queryClient}>
         <DashboardContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[START_NODE]} canRunNodes>
           <TablePanelForm value={value} onChange={setValue} />
-          <pre data-testid="harness-state">{JSON.stringify(value.render.rowActions?.[0]?.payload ?? null)}</pre>
+          <pre data-testid="harness-state">
+            {JSON.stringify(value.render.rowActions?.[actionPayloadIndex]?.payload ?? null)}
+          </pre>
         </DashboardContextProvider>
       </QueryClientProvider>
     </MemoryRouter>
   );
+}
+
+function getActionRemoveButtons(): HTMLButtonElement[] {
+  return screen
+    .getAllByPlaceholderText("Label")
+    .map((input) => {
+      const row = input.closest(".grid");
+      const buttons = row?.querySelectorAll("button");
+      if (!buttons || buttons.length === 0) return null;
+      return buttons[buttons.length - 1] ?? null;
+    })
+    .filter((button): button is HTMLButtonElement => button instanceof HTMLButtonElement);
 }
 
 function getPathInputs(): HTMLInputElement[] {
@@ -61,6 +75,10 @@ function getPayloadRow(index: number): HTMLElement {
 }
 
 describe("TablePanelForm payload editor", () => {
+  beforeAll(() => {
+    Element.prototype.scrollIntoView ??= () => {};
+  });
+
   it("renders a trailing blank row by default and adds rows only when typing", () => {
     render(<Harness initial={INITIAL} />);
     expect(getPathInputs()).toHaveLength(1);
@@ -176,5 +194,48 @@ describe("TablePanelForm payload editor", () => {
     expect(getPathInputs().map((i) => i.value)).toEqual(["in-progress.path", ""]);
     const state = JSON.parse(screen.getByTestId("harness-state").textContent ?? "null");
     expect(state).toEqual({ "in-progress.path": "" });
+  });
+
+  it("keeps payload drafts aligned when removing a middle row action", () => {
+    const threeActions: TablePanelContent = {
+      ...INITIAL,
+      render: {
+        ...INITIAL.render,
+        rowActions: [
+          { kind: "trigger", label: "Action A", node: "start", hook: "run" },
+          { kind: "trigger", label: "Action B", node: "start", hook: "run" },
+          { kind: "trigger", label: "Action C", node: "start", hook: "run" },
+        ],
+      },
+    };
+    render(<Harness initial={threeActions} actionPayloadIndex={1} />);
+
+    // Each action starts with one trailing blank payload row.
+    expect(getPathInputs()).toHaveLength(3);
+
+    // Edit the third action's payload (index 2).
+    const thirdActionPath = getPathInputs()[2]!;
+    fireEvent.change(thirdActionPath, { target: { value: "keep.after.remove" } });
+
+    expect(getPathInputs().map((i) => i.value)).toEqual(["", "", "keep.after.remove", ""]);
+
+    // Remove the middle action — former index 2 becomes index 1.
+    fireEvent.click(getActionRemoveButtons()[1]!);
+
+    expect(screen.getAllByPlaceholderText("Label").map((i) => (i as HTMLInputElement).value)).toEqual([
+      "Action A",
+      "Action C",
+    ]);
+    expect(getPathInputs().map((i) => i.value)).toEqual(["", "keep.after.remove", ""]);
+
+    const state = JSON.parse(screen.getByTestId("harness-state").textContent ?? "null");
+    expect(state).toEqual({ "keep.after.remove": "" });
+
+    // Adding a new action must not resurrect a stale draft from the old index 2 slot.
+    fireEvent.click(screen.getByTestId("table-add-action"));
+    expect(screen.getAllByPlaceholderText("Label")).toHaveLength(3);
+    const pathValues = getPathInputs().map((i) => i.value);
+    expect(pathValues.filter((v) => v === "keep.after.remove")).toHaveLength(1);
+    expect(pathValues[pathValues.length - 1]).toBe("");
   });
 });
