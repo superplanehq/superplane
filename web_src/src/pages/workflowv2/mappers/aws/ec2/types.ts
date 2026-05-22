@@ -26,3 +26,20 @@ export interface Ec2Image {
   virtualizationType?: string;
   hypervisor?: string;
 }
+
+export interface Ec2Instance {
+  instanceId?: string;
+  instanceType?: string;
+  imageId?: string;
+  state?: string;
+  name?: string;
+  keyName?: string;
+  launchTime?: string;
+  privateIpAddress?: string;
+  publicIpAddress?: string;
+  privateDnsName?: string;
+  publicDnsName?: string;
+  subnetId?: string;
+  vpcId?: string;
+  region?: string;
+}
