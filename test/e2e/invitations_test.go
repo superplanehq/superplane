@@ -16,9 +16,8 @@ import (
 )
 
 func TestInvitations(t *testing.T) {
-	steps := &invitationSteps{t: t}
-
 	t.Run("accepting invite link assigns viewer role", func(t *testing.T) {
+		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
 		token := steps.createInviteLink()
 		invitee := steps.createInviteeAccount()
@@ -28,6 +27,7 @@ func TestInvitations(t *testing.T) {
 	})
 
 	t.Run("following invite link and creating password account", func(t *testing.T) {
+		steps := &invitationSteps{t: t}
 		steps.startLoggedOut()
 		token := steps.createInviteLink()
 
@@ -46,6 +46,7 @@ func TestInvitations(t *testing.T) {
 	})
 
 	t.Run("disabled invite link no longer works", func(t *testing.T) {
+		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
 		token := steps.createInviteLink()
 		steps.disableInviteLink(token)
@@ -54,6 +55,7 @@ func TestInvitations(t *testing.T) {
 	})
 
 	t.Run("viewer sees invite link access message", func(t *testing.T) {
+		steps := &invitationSteps{t: t}
 		steps.startLoggedIn()
 		token := steps.createInviteLink()
 		invitee := steps.createInviteeAccount()

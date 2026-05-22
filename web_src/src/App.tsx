@@ -15,10 +15,10 @@ import { Login } from "./pages/auth/Login";
 import OrganizationCreate from "./pages/auth/OrganizationCreate";
 import OrganizationSelect from "./pages/auth/OrganizationSelect";
 import OwnerSetup from "./pages/auth/OwnerSetup";
-import { CreateCanvasPage } from "./pages/canvas/CreateCanvasPage";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import { TemplatesPage } from "./pages/canvas/TemplatesPage";
 import { HomePage } from "./pages/home";
+import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
 import InviteLinkAccept from "./pages/auth/InviteLinkAccept";
@@ -94,10 +94,12 @@ function AppRouter() {
               {/* Invite link acceptance */}
               <Route path="invite/:token" element={withAuthOnly(InviteLinkAccept)} />
 
+              {/* GitHub app installation */}
+              <Route path="install" element={withAuthOnly(InstallPage)} />
+
               {/* Organization-scoped protected routes */}
               <Route path=":organizationId" element={<OrganizationScope />}>
                 <Route index element={withAuthAndPermission(HomePage, "canvases", "read")} />
-                <Route path="canvases/new" element={withAuthAndPermission(CreateCanvasPage, "canvases", "create")} />
                 <Route
                   path="canvases/:canvasId/settings"
                   element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}

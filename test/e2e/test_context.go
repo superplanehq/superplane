@@ -9,9 +9,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	pw "github.com/playwright-community/playwright-go"
+	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/server"
 	"github.com/superplanehq/superplane/test/e2e/session"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 type TestContext struct {
@@ -22,10 +25,12 @@ type TestContext struct {
 	viteCmd   *exec.Cmd
 
 	baseURL string
+
+	AgentProvider *support.TestAgentProvider
 }
 
 func NewTestContext(t *testing.M) *TestContext {
-	return &TestContext{timeoutMs: 10000}
+	return &TestContext{timeoutMs: 15000}
 }
 
 func (s *TestContext) Start() {
@@ -54,18 +59,37 @@ func (s *TestContext) Start() {
 	os.Setenv("OIDC_KEYS_PATH", "../../test/fixtures/oidc-keys")
 	os.Setenv("PUBLIC_API_PORT", "8001")
 	os.Setenv("BASE_URL", "http://127.0.0.1:8001")
+	os.Setenv("VITE_DEV_HOST", "127.0.0.1")
 	os.Setenv("WEBHOOKS_BASE_URL", "https://superplane.sxmoon.com")
 	os.Setenv("ALLOWED_WS_ORIGINS", "http://127.0.0.1:8001")
 	os.Setenv("APP_ENV", "development")
 	os.Setenv("OWNER_SETUP_ENABLED", "yes")
 	os.Setenv("ENABLE_PASSWORD_LOGIN", "yes")
 	os.Setenv("ENABLE_MAGIC_CODE_LOGIN", "yes")
+	os.Setenv("AGENT_ENABLED", "yes")
+
+	s.AgentProvider = support.NewAgentProvider()
+	s.ResetAgentProvider()
+	server.SetAgentProviderForTests(s.AgentProvider)
 
 	s.startVite()
 	s.startAppServer()
 	s.startPlaywright()
 	s.launchBrowser()
 	s.setUpNavigationLogger()
+}
+
+func (s *TestContext) ResetAgentProvider() {
+	s.AgentProvider.Reset()
+	s.AgentProvider.SetSendMessageEvents(agentTurnCompletedEvent())
+	s.AgentProvider.SetDefineOutcomeEvents(agentTurnCompletedEvent())
+}
+
+func agentTurnCompletedEvent() agents.ProviderEvent {
+	return agents.ProviderEvent{
+		ProviderEventID: "e2e-turn-completed-" + uuid.NewString(),
+		Type:            agents.ProviderEventTurnCompleted,
+	}
 }
 
 func (s *TestContext) startPlaywright() {
@@ -87,13 +111,6 @@ func (s *TestContext) launchBrowser() {
 		Viewport: &pw.Size{
 			Width:  2560,
 			Height: 1440,
-		},
-		RecordVideo: &pw.RecordVideo{
-			Dir: "/app/tmp/videos",
-			Size: &pw.Size{
-				Width:  2560,
-				Height: 1440,
-			},
 		},
 	})
 	if err != nil {

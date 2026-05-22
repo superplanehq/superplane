@@ -1,5 +1,5 @@
 import { Check, Copy, Maximize2 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { memo, useCallback, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -54,7 +54,7 @@ function calcHeight(code: string, maxPx = 250): number {
   return Math.min(Math.max(lineCount * lineHeight + 16, 60), maxPx);
 }
 
-export function CodeBlockWidget({ code, language }: CodeBlockWidgetProps) {
+export const CodeBlockWidget = memo(function CodeBlockWidget({ code, language }: CodeBlockWidgetProps) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const monacoLang = mapLanguage(language);
@@ -69,7 +69,7 @@ export function CodeBlockWidget({ code, language }: CodeBlockWidgetProps) {
 
   return (
     <>
-      <div className="my-4 rounded-lg border border-slate-200 overflow-hidden bg-white group">
+      <div className="my-4 w-full min-w-0 rounded-lg border border-slate-200 overflow-hidden bg-white group">
         <div className="flex items-center justify-between px-3 py-1 bg-slate-50 border-b border-slate-200">
           <span className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">{language || "code"}</span>
           <div className="flex items-center gap-1">
@@ -132,4 +132,4 @@ export function CodeBlockWidget({ code, language }: CodeBlockWidgetProps) {
       </Dialog>
     </>
   );
-}
+});

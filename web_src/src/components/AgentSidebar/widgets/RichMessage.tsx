@@ -5,9 +5,9 @@ import remarkGfm from "remark-gfm";
 import { BannerWidget } from "./BannerWidget";
 import { ButtonsWidget } from "./ButtonsWidget";
 import { ChartWidget } from "./ChartWidget";
-import { CodeBlockWidget } from "./CodeBlockWidget";
 import { CollapseWidget } from "./CollapseWidget";
 import { ConfirmWidget } from "./ConfirmWidget";
+import { MarkdownCode } from "./MarkdownCode";
 import { RubricWidget } from "./RubricWidget";
 import { MermaidWidget } from "./MermaidWidget";
 import { NodeChipFromLink } from "./NodeChip";
@@ -62,7 +62,7 @@ export const RichMessage = memo(function RichMessage({
   const segments = useMemo(() => parseAgentContent(content), [content]);
 
   return (
-    <div>
+    <div className="w-full min-w-0">
       {segments.map((segment, i) => (
         <SegmentRenderer
           key={i}
@@ -115,6 +115,8 @@ function SegmentRenderer({
           categories={segment.categories}
           onAction={onAction}
           onStartBuilding={onStartBuilding}
+          canvasId={canvasId}
+          organizationId={organizationId}
         />
       );
     case "success":
@@ -137,7 +139,7 @@ function MarkdownSegment({
   organizationId?: string;
 }) {
   return (
-    <div className={MARKDOWN_CLASSES}>
+    <div className={`min-w-0 ${MARKDOWN_CLASSES}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         urlTransform={(url) => (isAgentLink(url) ? url : defaultUrlTransform(url))}
@@ -209,21 +211,6 @@ function renderSpecialLink(href: string | undefined, children: ReactNode, canvas
   }
 
   return null;
-}
-
-function MarkdownCode({ className, children, ...props }: ComponentProps<"code"> & { children?: ReactNode }) {
-  const match = /language-(\w+)/.exec(className || "");
-  const code = String(children).replace(/\n$/, "");
-
-  if (match) {
-    return <CodeBlockWidget code={code} language={match[1]} />;
-  }
-
-  return (
-    <code className={className} {...props}>
-      {children}
-    </code>
-  );
 }
 
 function isAgentLink(url: string): boolean {

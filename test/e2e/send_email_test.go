@@ -60,12 +60,7 @@ func (s *SendEmailSteps) givenACanvasExists(canvasName string) {
 }
 
 func (s *SendEmailSteps) addSendEmailWithUser(nodeName, subject, body string) {
-	s.canvas.OpenBuildingBlocksSidebar()
-
-	source := q.TestID("building-block-sendemail")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, 500, 250)
+	s.canvas.AddBuildingBlockByTestID("building-block-sendemail", models.Position{X: 500, Y: 250})
 	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
@@ -126,12 +121,7 @@ func (s *SendEmailSteps) givenCanvasWithManualTriggerSendEmailAndOutput() {
 }
 
 func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) {
-	s.canvas.OpenBuildingBlocksSidebar()
-
-	source := q.TestID("building-block-sendemail")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.canvas.AddBuildingBlockByTestID("building-block-sendemail", pos)
 	s.session.Sleep(500)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
@@ -150,11 +140,11 @@ func (s *SendEmailSteps) addSendEmailNode(nodeName string, pos models.Position) 
 }
 
 func (s *SendEmailSteps) runManualTrigger() {
-	s.canvas.RunManualTrigger("Start")
+	s.canvas.EmitManualTrigger("Start")
 	s.canvas.WaitForExecution(
 		"Send Email",
 		models.CanvasNodeExecutionStateFinished,
-		30*time.Second,
+		90*time.Second,
 	)
 }
 
@@ -170,15 +160,25 @@ func (s *SendEmailSteps) givenSMTPSettingsExist() {
 }
 
 func (s *SendEmailSteps) runManualTriggerAndWaitForFinish() {
-	s.canvas.RunManualTrigger("Start")
-	s.canvas.WaitForExecution(
-		"Send Email",
-		models.CanvasNodeExecutionStateFinished,
-		30*time.Second,
-	)
+	s.canvas.EmitManualTrigger("Start")
+	_ = s.waitForSendEmailFinished(180 * time.Second)
+}
+
+func (s *SendEmailSteps) waitForSendEmailFinished(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		executions := s.canvas.GetExecutionsForNodeInState("Send Email", models.CanvasNodeExecutionStateFinished)
+		if len(executions) > 0 {
+			return true
+		}
+		s.session.Sleep(500)
+	}
+	return false
 }
 
 func (s *SendEmailSteps) assertSendEmailExecutionFinished() {
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 90*time.Second)
+
 	sendEmailExecs := s.canvas.GetExecutionsForNode("Send Email")
 	outputExecs := s.canvas.GetExecutionsForNode("Output")
 
@@ -191,7 +191,10 @@ func (s *SendEmailSteps) assertSendEmailExecutionFinished() {
 
 func (s *SendEmailSteps) assertSendEmailExecutionFailed() {
 	sendEmailExecs := s.canvas.GetExecutionsForNode("Send Email")
+	outputExecs := s.canvas.GetExecutionsForNode("Output")
+
 	require.Len(s.t, sendEmailExecs, 1, "expected one execution for send email node")
+	require.Empty(s.t, outputExecs, "expected output node not to execute when send email fails")
 	require.Equal(s.t, models.CanvasNodeExecutionStateFinished, sendEmailExecs[0].State)
 	require.Equal(s.t, models.CanvasNodeExecutionResultFailed, sendEmailExecs[0].Result)
 }

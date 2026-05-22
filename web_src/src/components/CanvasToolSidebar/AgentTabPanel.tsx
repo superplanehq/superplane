@@ -213,6 +213,7 @@ function ChatConversation({
         onSend={handlers.handleSend}
         onStop={handlers.handleStop}
         sending={agentBusy}
+        sendPending={sendMutation.isPending}
         stopping={interruptMutation.isPending}
         statusLabel={statusLabel(status)}
         agentMode={agentMode}
@@ -240,42 +241,51 @@ function useConversationHandlers({
   setError: (value: string | null) => void;
   setOutcomeState: (update: OutcomeState | null | ((prev: OutcomeState | null) => OutcomeState | null)) => void;
 }): ConversationHandlers {
+  // React Query mutation objects are new on every render; keep latest refs in
+  // a ref so the handler callbacks stay stable across parent re-renders
+  // (canvas zoom/pan ticks the parent often).
+  const mutationsRef = useRef({ sendMutation, interruptMutation, outcomeMutation });
+  mutationsRef.current = { sendMutation, interruptMutation, outcomeMutation };
+
   const handleSend = useCallback(
     async (content: string) => {
-      if (!content.trim() || sendMutation.isPending) return;
+      const { sendMutation: send } = mutationsRef.current;
+      if (!content.trim() || send.isPending) return;
       setError(null);
-      await sendMutation.mutateAsync({ chatId, content, mode: agentMode }).catch((error) => {
+      await send.mutateAsync({ chatId, content, mode: agentMode }).catch((error) => {
         setError(error instanceof Error ? error.message : "failed to send message");
         throw error;
       });
     },
-    [agentMode, chatId, sendMutation, setError],
+    [agentMode, chatId, setError],
   );
 
   const handleStop = useCallback(() => {
-    interruptMutation.mutate({ chatId });
-  }, [chatId, interruptMutation]);
+    mutationsRef.current.interruptMutation.mutate({ chatId });
+  }, [chatId]);
 
   const handleQuickAction = useCallback(
     async (action: string) => {
-      if (sendMutation.isPending) return;
+      const { sendMutation: send } = mutationsRef.current;
+      if (send.isPending) return;
       try {
-        await sendMutation.mutateAsync({ chatId, content: action, mode: agentMode });
+        await send.mutateAsync({ chatId, content: action, mode: agentMode });
       } catch {
         // Keep the current transcript unchanged when quick actions fail.
       }
     },
-    [agentMode, chatId, sendMutation],
+    [agentMode, chatId],
   );
 
   const handleStartBuilding = useCallback(
     async (rubric: { title: string; criteria: string[]; categories?: RubricCategory[] }) => {
       const rubricText = buildRubricText(rubric);
+      const { sendMutation: send, outcomeMutation: outcome } = mutationsRef.current;
 
       // In Build mode: rubric is a spec confirmation, not an outcome.
       // Agent already has full context — just confirm.
       if (agentMode === "builder") {
-        await sendMutation.mutateAsync({
+        await send.mutateAsync({
           chatId,
           content: "Specs approved. Start building.",
           mode: "builder",
@@ -287,7 +297,7 @@ function useConversationHandlers({
       setOutcomeState(createInitialOutcomeState(rubric));
 
       try {
-        await outcomeMutation.mutateAsync({
+        await outcome.mutateAsync({
           chatId,
           description: `Build a canvas based on this plan: ${rubric.title}`,
           rubric: rubricText,
@@ -295,17 +305,20 @@ function useConversationHandlers({
         });
       } catch {
         setOutcomeState(null);
-        await sendMutation.mutateAsync({
+        await send.mutateAsync({
           chatId,
           content: `Start building based on this plan:\n\n${rubricText}`,
           mode: "builder",
         });
       }
     },
-    [chatId, agentMode, outcomeMutation, sendMutation, setOutcomeState],
+    [chatId, agentMode, setOutcomeState],
   );
 
-  return { handleSend, handleStop, handleQuickAction, handleStartBuilding };
+  return useMemo(
+    () => ({ handleSend, handleStop, handleQuickAction, handleStartBuilding }),
+    [handleSend, handleStop, handleQuickAction, handleStartBuilding],
+  );
 }
 
 function DraftActionsBar({

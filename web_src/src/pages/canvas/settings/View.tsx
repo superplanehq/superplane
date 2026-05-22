@@ -164,7 +164,7 @@ export function SettingsView({
             onClick={onBackToCanvas}
           >
             <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
-            Back to canvas
+            Back to app
           </Button>
         ) : null}
         <IdentityFields
