@@ -36,6 +36,8 @@ describe("fromApiMessage", () => {
       toolName: "search",
       toolCallId: "call-1",
       toolStatus: "started",
+      userId: "",
+      userName: "",
       createdAt: "2026-05-13T00:00:00Z",
     });
     expect(msg).toEqual({
@@ -45,6 +47,8 @@ describe("fromApiMessage", () => {
       toolName: "search",
       toolCallId: "call-1",
       toolStatus: "started",
+      userId: "",
+      userName: "",
       createdAt: "2026-05-13T00:00:00Z",
     });
   });

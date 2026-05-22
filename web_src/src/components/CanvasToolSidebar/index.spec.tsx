@@ -26,6 +26,8 @@ vi.mock("@/hooks/useAgentChats", () => ({
               toolName: "",
               toolCallId: "",
               toolStatus: "",
+              userId: "",
+              userName: "",
               createdAt: null,
             },
           ],

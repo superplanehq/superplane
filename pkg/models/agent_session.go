@@ -166,3 +166,46 @@ func FailStuckStreamingSessions(cutoff time.Time) ([]AgentSession, error) {
 	}
 	return stuck, nil
 }
+
+// FindSharedCanvasSession finds the single shared session for a canvas, regardless of which user created it.
+func FindSharedCanvasSession(tx *gorm.DB, organizationID, canvasID uuid.UUID) (*AgentSession, error) {
+	var session AgentSession
+	err := tx.
+		Where("organization_id = ? AND canvas_id = ?", organizationID, canvasID).
+		Order("created_at ASC").
+		First(&session).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+// FindSharedCanvasSessionByID finds a session by org and session ID.
+func FindSharedCanvasSessionByID(organizationID uuid.UUID, sessionID uuid.UUID) (*AgentSession, error) {
+	var session AgentSession
+	err := database.Conn().
+		Where("organization_id = ? AND id = ?", organizationID, sessionID).
+		First(&session).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+// TrySetStreaming atomically transitions a session from idle to streaming.
+// Returns true if the transition succeeded, false if the session was already streaming.
+func TrySetStreaming(sessionID uuid.UUID) (bool, error) {
+	now := time.Now()
+	result := database.Conn().Model(&AgentSession{}).
+		Where("id = ? AND status = ?", sessionID, AgentSessionStatusIdle).
+		Updates(map[string]any{
+			"status":         AgentSessionStatusStreaming,
+			"last_active_at": &now,
+			"updated_at":     &now,
+		})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
