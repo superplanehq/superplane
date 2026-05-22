@@ -57,8 +57,10 @@ func TestRunsView(t *testing.T) {
 		steps.thenVersionsSidebarRowCountIsAtLeast(50)
 		steps.whenIScrollVersionsSidebarToTheEnd()
 		steps.thenVersionsSidebarRowCountIsAtLeast(56)
+		steps.thenVersionsSidebarIsScrolledFromTop()
 		steps.whenISelectTheLastLoadedVersion()
 		steps.thenVersionsSidebarRowCountIsAtLeast(56)
+		steps.thenVersionsSidebarIsScrolledFromTop()
 	})
 }
 
@@ -215,6 +217,22 @@ func (s *runsViewSteps) thenVersionsSidebarRowCountIsAtLeast(expected int) {
 	s.waitForSidebarRowCountAtLeast(s.session.Page().GetByTestId("canvas-live-version-row"), expected)
 }
 
+func (s *runsViewSteps) thenVersionsSidebarIsScrolledFromTop() {
+	deadline := time.Now().Add(10 * time.Second)
+	scrollTop := 0.0
+
+	for time.Now().Before(deadline) {
+		scrollTop = s.sidebarScrollTop("versions-sidebar-scroll")
+		if scrollTop > 0 {
+			return
+		}
+
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	require.Greater(s.t, scrollTop, 0.0)
+}
+
 func (s *runsViewSteps) whenIScrollRunsSidebarToTheEnd() {
 	s.scrollSidebarToTheEnd("runs-sidebar-scroll")
 }
@@ -238,6 +256,21 @@ func (s *runsViewSteps) scrollSidebarToTheEnd(testID string) {
 	require.NoError(s.t, scroller.Hover(pw.LocatorHoverOptions{Timeout: pw.Float(15000)}))
 	require.NoError(s.t, s.session.Page().Mouse().Wheel(0, 5000))
 	s.session.Sleep(500)
+}
+
+func (s *runsViewSteps) sidebarScrollTop(testID string) float64 {
+	value, err := s.session.Page().GetByTestId(testID).Evaluate(`element => element.scrollTop`, nil)
+	require.NoError(s.t, err)
+
+	switch scrollTop := value.(type) {
+	case float64:
+		return scrollTop
+	case int:
+		return float64(scrollTop)
+	default:
+		s.t.Fatalf("unexpected scrollTop value %T", value)
+		return 0
+	}
 }
 
 func (s *runsViewSteps) waitForSidebarRowCountAtLeast(locator pw.Locator, expected int) int {
