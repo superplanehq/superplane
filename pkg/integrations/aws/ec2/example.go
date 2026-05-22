@@ -34,6 +34,12 @@ var exampleOutputEnableImageDeprecationBytes []byte
 //go:embed example_output_disable_image_deprecation.json
 var exampleOutputDisableImageDeprecationBytes []byte
 
+//go:embed example_output_create_instance.json
+var exampleOutputCreateInstanceBytes []byte
+
+//go:embed example_output_delete_instance.json
+var exampleOutputDeleteInstanceBytes []byte
+
 var exampleDataOnImageOnce sync.Once
 var exampleDataOnImage map[string]any
 
@@ -60,6 +66,12 @@ var exampleOutputEnableImageDeprecation map[string]any
 
 var exampleOutputDisableImageDeprecationOnce sync.Once
 var exampleOutputDisableImageDeprecation map[string]any
+
+var exampleOutputCreateInstanceOnce sync.Once
+var exampleOutputCreateInstance map[string]any
+
+var exampleOutputDeleteInstanceOnce sync.Once
+var exampleOutputDeleteInstance map[string]any
 
 func (t *OnImage) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageOnce, exampleDataOnImageBytes, &exampleDataOnImage)
@@ -106,5 +118,21 @@ func (c *DisableImageDeprecation) ExampleOutput() map[string]any {
 		&exampleOutputDisableImageDeprecationOnce,
 		exampleOutputDisableImageDeprecationBytes,
 		&exampleOutputDisableImageDeprecation,
+	)
+}
+
+func (c *CreateInstance) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCreateInstanceOnce,
+		exampleOutputCreateInstanceBytes,
+		&exampleOutputCreateInstance,
+	)
+}
+
+func (c *DeleteInstance) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputDeleteInstanceOnce,
+		exampleOutputDeleteInstanceBytes,
+		&exampleOutputDeleteInstance,
 	)
 }
