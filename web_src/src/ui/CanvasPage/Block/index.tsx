@@ -1,6 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Minus, Diff } from "lucide-react";
 import { BlockContent } from "./content";
 import { LeftHandle, RightHandle } from "./handles";
 import type { BlockProps } from "./types";
@@ -10,8 +10,8 @@ export type { CanvasBlockData } from "./types";
 
 const DIFF_BADGE: Record<string, { label: string; bg: string; Icon: React.FC<{ className?: string }> }> = {
   added: { label: "ADDED", bg: "bg-green-500", Icon: Plus },
-  updated: { label: "EDITED", bg: "bg-blue-500", Icon: Pencil },
-  removed: { label: "DELETED", bg: "bg-red-500", Icon: Trash2 },
+  updated: { label: "EDITED", bg: "bg-blue-500", Icon: Diff },
+  removed: { label: "REMOVED", bg: "bg-red-500", Icon: Minus },
 };
 
 function DraftDiffBadge({ status }: { status: string }) {
