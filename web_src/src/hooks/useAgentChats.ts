@@ -148,3 +148,35 @@ export function useDefineAgentOutcome(organizationId: string | undefined) {
     },
   });
 }
+
+export type CanvasSession = {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatarUrl: string;
+  status: string;
+  lastActivityAt: string | null;
+};
+
+export function useCanvasSessions(canvasId: string | undefined, organizationId: string | undefined, enabled: boolean) {
+  return useQuery({
+    queryKey: [...agentChatKeys.all, "sessions", canvasId],
+    enabled: enabled && Boolean(canvasId),
+    queryFn: async (): Promise<CanvasSession[]> => {
+      const res = await fetch(`/api/v1/agents/canvases/${canvasId}/sessions`, {
+        headers: { "x-organization-id": organizationId ?? "" },
+        credentials: "include",
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data.sessions ?? []).map((s: Record<string, string>) => ({
+        id: s.id ?? "",
+        userId: s.userId ?? "",
+        userName: s.userName ?? "",
+        userAvatarUrl: s.userAvatarUrl ?? "",
+        status: s.status ?? "idle",
+        lastActivityAt: s.lastActivityAt ?? null,
+      }));
+    },
+  });
+}
