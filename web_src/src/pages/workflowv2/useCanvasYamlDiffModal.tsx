@@ -16,6 +16,9 @@ type UseCanvasYamlDiffModalParams = {
   liveCanvas?: CanvasesCanvas;
   liveCanvasVersion?: CanvasesCanvasVersion;
   draftCanvasVersion?: CanvasesCanvasVersion;
+  draftCanvas?: CanvasesCanvas | null;
+  draftNodes: CanvasNode[];
+  activeCanvasVersionId: string;
   buildYamlExportPayload: (workflow?: CanvasesCanvas | null, overrideNodes?: CanvasNode[]) => YamlExportPayload | null;
 };
 
@@ -24,6 +27,9 @@ export function useCanvasYamlDiffModal({
   liveCanvas,
   liveCanvasVersion,
   draftCanvasVersion,
+  draftCanvas,
+  draftNodes,
+  activeCanvasVersionId,
   buildYamlExportPayload,
 }: UseCanvasYamlDiffModalParams): {
   onShowDiff: (() => void) | undefined;
@@ -39,10 +45,14 @@ export function useCanvasYamlDiffModal({
       ...liveCanvas,
       spec: liveCanvasVersion.spec,
     });
-    const draftPayload = buildYamlExportPayload({
-      ...liveCanvas,
-      spec: draftCanvasVersion.spec,
-    });
+    const useCurrentDraftCanvas =
+      !!draftCanvas && !!activeCanvasVersionId && draftCanvasVersion.metadata?.id === activeCanvasVersionId;
+    const draftPayload = useCurrentDraftCanvas
+      ? buildYamlExportPayload(draftCanvas, draftNodes)
+      : buildYamlExportPayload({
+          ...liveCanvas,
+          spec: draftCanvasVersion.spec,
+        });
 
     if (!livePayload || !draftPayload || livePayload.yamlText === draftPayload.yamlText) {
       return null;
@@ -54,8 +64,12 @@ export function useCanvasYamlDiffModal({
       filename: draftPayload.filename || livePayload.filename,
     };
   }, [
+    activeCanvasVersionId,
     buildYamlExportPayload,
+    draftCanvas,
+    draftCanvasVersion?.metadata?.id,
     draftCanvasVersion?.spec,
+    draftNodes,
     hasUnpublishedDraftChanges,
     liveCanvas,
     liveCanvasVersion?.spec,

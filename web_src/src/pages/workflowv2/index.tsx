@@ -5275,6 +5275,9 @@ export function WorkflowPageV2() {
     liveCanvas,
     liveCanvasVersion,
     draftCanvasVersion: latestDraftVersion,
+    draftCanvas: canvas,
+    draftNodes: nodes,
+    activeCanvasVersionId,
     buildYamlExportPayload,
   });
 
