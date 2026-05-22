@@ -114,6 +114,7 @@ import type { TriggerActionModal } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
 import { useCanvasYaml } from "./useCanvasYaml";
+import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
@@ -1861,9 +1862,23 @@ export function WorkflowPageV2() {
     openTriggerModal,
   ]);
 
+  const { nodes: nodesWithDraftVisualDiff, edges: edgesWithDraftVisualDiff } = useDraftVisualDiff({
+    isViewingDraftVersion,
+    canvas,
+    liveCanvasVersion,
+    latestDraftVersion,
+    selectedCanvasVersion,
+    preparedNodes,
+    preparedEdges,
+    allTriggers,
+    allComponents,
+    canvasId,
+    queryClient,
+  });
+
   const nodesWithIntegrationStatus = useMemo(
-    () => overlayIntegrationWarnings(preparedNodes, integrations, canvasNodes),
-    [preparedNodes, integrations, canvasNodes],
+    () => overlayIntegrationWarnings(nodesWithDraftVisualDiff, integrations, canvasNodes),
+    [nodesWithDraftVisualDiff, integrations, canvasNodes],
   );
 
   const runCanvasData = useRunCanvasData({
@@ -1892,7 +1907,7 @@ export function WorkflowPageV2() {
     selectedRun,
     runCanvasData,
     liveNodes: nodesWithIntegrationStatus,
-    liveEdges: preparedEdges,
+    liveEdges: edgesWithDraftVisualDiff,
     isSelectedRunVersionLoading,
     isSelectedRunExecutionsLoading: selectedRunExecutionsQuery.isLoading,
   });
@@ -5279,7 +5294,7 @@ export function WorkflowPageV2() {
 
   const hasUnpublishedDraftChanges =
     !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftGraphDiffVersusLive;
-  const { onShowDiff, yamlDiffModal } = useCanvasYamlDiffModal({
+  const { onShowDiff, onShowNodeDiff, yamlDiffModal } = useCanvasYamlDiffModal({
     hasUnpublishedDraftChanges,
     liveCanvas,
     liveCanvasVersion,
@@ -5609,6 +5624,7 @@ export function WorkflowPageV2() {
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           onShowDiff={onShowDiff}
+          onShowNodeDiff={onShowNodeDiff}
           onDiscardVersion={handleResetDraftChanges}
           discardVersionDisabled={resetDraftDisabled}
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
