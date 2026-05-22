@@ -1,6 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import { Plus, Minus, Diff } from "lucide-react";
+import { Plus, Minus, Diff, Eye } from "lucide-react";
 import { BlockContent } from "./content";
 import { LeftHandle, RightHandle } from "./handles";
 import type { BlockProps } from "./types";
@@ -19,14 +19,26 @@ function DraftDiffBadge({ status }: { status: string }) {
   if (!badge) return null;
   const { Icon } = badge;
   return (
-    <div
-      className={cn(
-        "absolute -bottom-3 right-2 z-10 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white shadow-sm",
-        badge.bg,
-      )}
-    >
-      <Icon className="h-3 w-3" />
-      <span>{badge.label}</span>
+    <div className="absolute -bottom-3 right-2 z-10 flex items-center gap-1 nodrag">
+      <button
+        type="button"
+        className="flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-gray-600 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:bg-gray-50 border border-gray-200"
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+      >
+        <Eye className="h-3 w-3" />
+        <span>See diff</span>
+      </button>
+      <div
+        className={cn(
+          "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white shadow-sm",
+          badge.bg,
+        )}
+      >
+        <Icon className="h-3 w-3" />
+        <span>{badge.label}</span>
+      </div>
     </div>
   );
 }
