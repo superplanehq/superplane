@@ -8,7 +8,7 @@ import { CanvasModeToggle } from "./components/CanvasModeToggle";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions } from "./HeaderSecondaryActions";
 
-export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard";
+export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
 
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). */
@@ -33,6 +33,8 @@ export interface HeaderProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectDashboard?: () => void;
+  /** Provided when Memory is available as a first-class tab; opens the Memory view. */
+  onSelectMemory?: () => void;
   /** When set with `mode === "dashboard"`, shows Add panel in the secondary header. */
   onDashboardAddPanel?: () => void;
   /** When set with `mode === "dashboard"`, shows the YAML button in the secondary header. */
@@ -118,12 +120,20 @@ function PageHeader({
 
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle =
-    !!props.onSelectDashboard &&
+    (!!props.onSelectDashboard || !!props.onSelectMemory) &&
     (props.mode === "version-live" ||
       props.mode === "version-edit" ||
       props.mode === "runs" ||
-      props.mode === "dashboard");
-  const canvasViewMode = props.mode === "runs" ? "runs" : props.mode === "dashboard" ? "dashboard" : "version-live";
+      props.mode === "dashboard" ||
+      props.mode === "memory");
+  const canvasViewMode =
+    props.mode === "runs"
+      ? "runs"
+      : props.mode === "dashboard"
+        ? "dashboard"
+        : props.mode === "memory"
+          ? "memory"
+          : "version-live";
   const editing = props.mode === "version-edit";
 
   return (
@@ -137,6 +147,7 @@ function SecondaryHeader(props: HeaderProps) {
               mode={canvasViewMode}
               onSelectLive={props.onExitEditMode}
               onSelectDashboard={props.onSelectDashboard}
+              onSelectMemory={props.onSelectMemory}
               editing={editing}
               hasDraft={!!props.hasUnpublishedDraftChanges}
             />
