@@ -229,3 +229,42 @@ func UpdateCanvasMemoriesByNamespaceAndMatchesInTransaction(
 func UpdateCanvasMemoriesByNamespaceAndMatches(canvasID uuid.UUID, namespace string, matches map[string]any, values map[string]any) ([]CanvasMemory, error) {
 	return UpdateCanvasMemoriesByNamespaceAndMatchesInTransaction(database.Conn(), canvasID, namespace, matches, values)
 }
+
+func UpdateCanvasMemoriesByNamespaceInTransaction(
+	tx *gorm.DB,
+	canvasID uuid.UUID,
+	namespace string,
+	values map[string]any,
+) ([]CanvasMemory, error) {
+	if len(values) == 0 {
+		return []CanvasMemory{}, fmt.Errorf("at least one value expression is required")
+	}
+
+	valuesJSON, err := json.Marshal(values)
+	if err != nil {
+		return nil, err
+	}
+
+	var updatedRecords []CanvasMemory
+	err = tx.Raw(
+		`WITH updated AS (
+			UPDATE canvas_memories
+			SET values = values || ?::jsonb, updated_at = NOW()
+			WHERE canvas_id = ? AND namespace = ?
+			RETURNING *
+		)
+		SELECT * FROM updated ORDER BY created_at DESC`,
+		valuesJSON,
+		canvasID,
+		namespace,
+	).Scan(&updatedRecords).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedRecords, nil
+}
+
+func UpdateCanvasMemoriesByNamespace(canvasID uuid.UUID, namespace string, values map[string]any) ([]CanvasMemory, error) {
+	return UpdateCanvasMemoriesByNamespaceInTransaction(database.Conn(), canvasID, namespace, values)
+}
