@@ -17,12 +17,14 @@ export type AgentMessage = {
   toolCallId: string;
   toolStatus: string;
   createdAt: string | null;
+  userId: string;
+  userName: string;
 };
 
 export type AgentSessionWebsocketEvent =
   | {
       sessionId: string;
-      event: "assistant_message" | "tool_started" | "tool_finished";
+      event: "assistant_message" | "tool_started" | "tool_finished" | "user_message";
       messageId: string;
       message: AgentMessage;
     }
@@ -64,5 +66,7 @@ export function fromApiMessage(input: AgentsAgentChatMessage | undefined): Agent
     toolCallId: input.toolCallId ?? "",
     toolStatus: input.toolStatus ?? "",
     createdAt: input.createdAt ?? null,
+    userId: input.userId ?? "",
+    userName: input.userName ?? "",
   };
 }

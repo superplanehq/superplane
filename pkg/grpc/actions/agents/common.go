@@ -85,5 +85,11 @@ func serializeMessage(message *models.AgentSessionMessage) *pb.AgentChatMessage 
 	if message.CreatedAt != nil {
 		out.CreatedAt = timestamppb.New(*message.CreatedAt)
 	}
+	if message.UserID != nil {
+		out.UserId = message.UserID.String()
+		if user, err := models.FindUnscopedUserByID(message.UserID.String()); err == nil {
+			out.UserName = user.Name
+		}
+	}
 	return out
 }
