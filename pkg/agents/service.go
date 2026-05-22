@@ -193,6 +193,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	}
 	persisted := &models.AgentSessionMessage{
 		SessionID: sessionID,
+		UserID:    &userID,
 		Role:      messageRole,
 		Content:   content,
 	}
