@@ -18,27 +18,18 @@ describe("dashboardToYaml / parseDashboardYaml", () => {
     }
   });
 
-  it("accepts legacy `kind: Dashboard` on import for back-compat", () => {
+  it("rejects legacy `kind: Dashboard` on import", () => {
     const text = `apiVersion: v1
 kind: Dashboard
 metadata: {}
 spec:
-  panels:
-    - id: intro
-      type: markdown
-      content:
-        body: "# Hi"
-  layout:
-    - i: intro
-      x: 0
-      y: 0
-      w: 12
-      h: 6
+  panels: []
+  layout: []
 `;
     const result = parseDashboardYaml(text);
-    expect(result.ok).toBe(true);
-    if (!result.ok) throw new Error(result.error);
-    expect(result.data.spec.panels).toEqual([{ id: "intro", type: "markdown", content: { body: "# Hi" } }]);
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("expected parseDashboardYaml to fail for kind: Dashboard");
+    expect(result.error).toMatch(/Unsupported kind/);
   });
 
   it("round-trips a populated console", () => {

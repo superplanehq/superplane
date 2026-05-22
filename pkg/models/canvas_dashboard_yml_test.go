@@ -10,11 +10,11 @@ import (
 	"gorm.io/datatypes"
 )
 
-func TestDashboardFromYML_ParsesValidDashboard(t *testing.T) {
+func TestDashboardFromYML_ParsesValidConsole(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata:
-  name: My dashboard
+  name: Ops console
 spec:
   panels:
     - id: intro
@@ -34,8 +34,8 @@ spec:
 	resource, err := DashboardFromYML([]byte(yaml))
 	require.NoError(t, err)
 	require.Equal(t, "v1", resource.APIVersion)
-	require.Equal(t, DashboardKind, resource.Kind)
-	require.Equal(t, "My dashboard", resource.Metadata.Name)
+	require.Equal(t, ConsoleKind, resource.Kind)
+	require.Equal(t, "Ops console", resource.Metadata.Name)
 	require.Len(t, resource.Spec.Panels, 1)
 	require.Equal(t, "intro", resource.Spec.Panels[0].ID)
 	require.Equal(t, "markdown", resource.Spec.Panels[0].Type)
@@ -46,30 +46,17 @@ spec:
 	assert.Equal(t, 2, *resource.Spec.Layout[0].MinW)
 }
 
-func TestDashboardFromYML_ParsesValidConsoleKind(t *testing.T) {
+func TestDashboardFromYML_RejectsLegacyDashboardKind(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Console
-metadata:
-  name: Ops console
+kind: Dashboard
+metadata: {}
 spec:
-  panels:
-    - id: intro
-      type: markdown
-      content:
-        body: "# Hello"
-  layout:
-    - i: intro
-      x: 0
-      y: 0
-      w: 12
-      h: 6
+  panels: []
+  layout: []
 `
-
-	resource, err := DashboardFromYML([]byte(yaml))
-	require.NoError(t, err)
-	require.Equal(t, ConsoleKind, resource.Kind)
-	require.Equal(t, "Ops console", resource.Metadata.Name)
-	require.Len(t, resource.Spec.Panels, 1)
+	_, err := DashboardFromYML([]byte(yaml))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unsupported kind")
 }
 
 func TestDashboardFromYML_RejectsEmptyInput(t *testing.T) {
@@ -81,7 +68,7 @@ func TestDashboardFromYML_RejectsEmptyInput(t *testing.T) {
 
 func TestDashboardFromYML_RejectsUnknownFields(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata:
   name: ok
 spec:
@@ -107,7 +94,7 @@ spec:
 
 func TestDashboardFromYML_RejectsWrongAPIVersion(t *testing.T) {
 	yaml := `apiVersion: v2
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels: []
@@ -124,7 +111,7 @@ func TestDashboardFromYML_RejectsNonObjectRoot(t *testing.T) {
 
 func TestDashboardFromYML_RejectsUnsupportedPanelType(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -140,7 +127,7 @@ spec:
 
 func TestDashboardFromYML_RejectsDuplicatePanelIDs(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -159,7 +146,7 @@ spec:
 
 func TestDashboardFromYML_RejectsLayoutWithUnknownPanel(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -179,7 +166,7 @@ spec:
 
 func TestDashboardFromYML_RejectsNonStringBody(t *testing.T) {
 	yaml := `apiVersion: v1
-kind: Dashboard
+kind: Console
 metadata: {}
 spec:
   panels:
@@ -196,7 +183,7 @@ spec:
 
 func TestDashboardFromYML_RejectsTooManyPanels(t *testing.T) {
 	var b strings.Builder
-	b.WriteString("apiVersion: v1\nkind: Dashboard\nmetadata: {}\nspec:\n  panels:\n")
+	b.WriteString("apiVersion: v1\nkind: Console\nmetadata: {}\nspec:\n  panels:\n")
 	for i := 0; i < MaxDashboardPanels+1; i++ {
 		b.WriteString("    - id: p")
 		b.WriteString(strings.Repeat("a", 1))

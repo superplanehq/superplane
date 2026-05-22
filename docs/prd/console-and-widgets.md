@@ -2,9 +2,9 @@
 
 > Naming note: the product surfaces this feature as **Console**. In the
 > codebase and persisted data it is still called "Dashboard" (file names,
-> Go types, DB table `canvas_dashboards`, YAML helper modules, etc.). YAML
-> import accepts both `kind: Console` (current) and `kind: Dashboard`
-> (legacy).
+> Go types, DB table `canvas_dashboards`, YAML helper modules, etc.). The
+> YAML `kind` is `Console`; legacy `kind: Dashboard` files exported before
+> the rename are no longer accepted on import.
 
 ## Overview
 
@@ -90,8 +90,8 @@ protos/canvases.proto
 ```
 
 The Console feature flag is registered in `pkg/features/features.go` with the
-backend id `dashboards`; the frontend display label is overridden to
-**Console** in `web_src/src/lib/experimentalFeatureDisplay.ts`.
+backend id `dashboards` and the user-facing label **Console**. The id is kept
+for back-compat with existing per-organization enablement records.
 
 ## Architecture
 
@@ -401,7 +401,7 @@ spec:
 Rules:
 
 - `apiVersion` must be `v1`.
-- `kind` must be `Console`. Legacy `kind: Dashboard` is still accepted on import for back-compat with files exported before the rename.
+- `kind` must be `Console`. Legacy `kind: Dashboard` files exported before the rename are not accepted; re-export from the current UI to upgrade them.
 - Unknown top-level, metadata, panel, and layout fields are rejected.
 - `metadata.canvasId` and `metadata.name` are informational on export.
 - Missing `spec.panels` or `spec.layout` means an empty list.
