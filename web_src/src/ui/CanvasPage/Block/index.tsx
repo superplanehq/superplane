@@ -22,7 +22,7 @@ function DraftDiffBadge({ status }: { status: string }) {
     <div className="absolute -bottom-3 right-2 z-10 flex items-center gap-1 nodrag">
       <button
         type="button"
-        className="flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-gray-600 opacity-0 shadow-sm transition-opacity group-hover:opacity-100 hover:bg-gray-50 border border-gray-200"
+        className="flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-gray-600 opacity-0 shadow-sm transition-opacity group-hover/block:opacity-100 hover:bg-gray-50 border border-gray-200"
         onClick={(e) => {
           e.stopPropagation();
         }}
@@ -54,7 +54,7 @@ export const Block = React.memo(function Block(props: BlockProps) {
 
   return (
     <div
-      className={cn("relative w-fit", shouldFade && !shouldBlankBody && "opacity-30")}
+      className={cn("group/block relative w-fit", shouldFade && !shouldBlankBody && "opacity-30")}
       onClick={(e) => props.onClick?.(e)}
     >
       <div className="relative z-[1] w-fit">
