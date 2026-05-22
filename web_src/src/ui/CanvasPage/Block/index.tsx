@@ -25,11 +25,7 @@ export const Block = React.memo(function Block(props: BlockProps) {
 
   return (
     <div
-      className={cn(
-        "relative w-fit rounded-md",
-        diffRing,
-        shouldFade && !shouldBlankBody && "opacity-30",
-      )}
+      className={cn("relative w-fit rounded-md", diffRing, shouldFade && !shouldBlankBody && "opacity-30")}
       onClick={(e) => props.onClick?.(e)}
     >
       <div className="relative z-[1] w-fit">

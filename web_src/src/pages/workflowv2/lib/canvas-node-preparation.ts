@@ -184,7 +184,11 @@ export function prepareTriggerNode(
   triggers: TriggersTrigger[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   canvasMode: "live" | "edit" = "live",
-  options: { canvasId: string; openModal?: (modal: TriggerActionModal) => void; draftDiffStatus?: "added" | "updated" | "removed" },
+  options: {
+    canvasId: string;
+    openModal?: (modal: TriggerActionModal) => void;
+    draftDiffStatus?: "added" | "updated" | "removed";
+  },
 ): CanvasNode {
   const triggerMetadata = triggers.find((t) => t.name === node.component);
   const displayLabel = getTriggerDisplayLabel(node, triggerMetadata);

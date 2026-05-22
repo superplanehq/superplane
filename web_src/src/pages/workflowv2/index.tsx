@@ -1896,11 +1896,6 @@ export function WorkflowPageV2() {
         ...prepared,
         draggable: false,
         selectable: false,
-        data: {
-          ...prepared.data,
-          _draftDiffStatus: "removed" as const,
-          _dimBodyBelowHeader: true,
-        },
       };
     });
     return [...preparedNodes, ...ghostNodes];
