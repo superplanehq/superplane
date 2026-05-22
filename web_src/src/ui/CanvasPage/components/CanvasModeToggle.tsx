@@ -1,29 +1,40 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useRef } from "react";
 
-type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard";
+type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLive: () => void;
   onSelectDashboard?: () => void;
+  onSelectMemory?: () => void;
   editing?: boolean;
   hasDraft?: boolean;
 }
 
 const CANVAS_TAB = "canvas";
 const DASHBOARD_TAB = "dashboard";
+const MEMORY_TAB = "memory";
 const RUNS_MODE = "runs";
 
 export function CanvasModeToggle({
   mode,
   onSelectLive,
   onSelectDashboard,
+  onSelectMemory,
   editing = false,
   hasDraft = false,
 }: CanvasModeToggleProps) {
   const showDashboard = Boolean(onSelectDashboard);
-  const selected = mode === DASHBOARD_TAB ? DASHBOARD_TAB : mode === RUNS_MODE ? RUNS_MODE : CANVAS_TAB;
+  const showMemory = Boolean(onSelectMemory);
+  const selected =
+    mode === DASHBOARD_TAB
+      ? DASHBOARD_TAB
+      : mode === MEMORY_TAB
+        ? MEMORY_TAB
+        : mode === RUNS_MODE
+          ? RUNS_MODE
+          : CANVAS_TAB;
   const valueChangeHandledRef = useRef(false);
 
   useEffect(() => {
@@ -54,6 +65,15 @@ export function CanvasModeToggle({
             valueChangeHandledRef.current = false;
           });
           void onSelectDashboard();
+          return;
+        }
+
+        if (next === MEMORY_TAB && selected !== MEMORY_TAB && onSelectMemory) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectMemory();
         }
       }}
     >
@@ -79,6 +99,11 @@ export function CanvasModeToggle({
             ) : null}
           </span>
         </TabsTrigger>
+        {showMemory ? (
+          <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory">
+            Memory
+          </TabsTrigger>
+        ) : null}
       </TabsList>
     </Tabs>
   );

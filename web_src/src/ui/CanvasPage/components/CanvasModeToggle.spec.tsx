@@ -26,4 +26,28 @@ describe("CanvasModeToggle", () => {
 
     expect(onSelectLive).toHaveBeenCalledTimes(2);
   });
+
+  it("invokes onSelectMemory when clicking the Memory tab", async () => {
+    const user = userEvent.setup();
+    const onSelectMemory = vi.fn();
+
+    render(
+      <CanvasModeToggle
+        mode="version-live"
+        onSelectLive={vi.fn()}
+        onSelectDashboard={vi.fn()}
+        onSelectMemory={onSelectMemory}
+      />,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Memory" }));
+
+    expect(onSelectMemory).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the Memory tab when onSelectMemory is not provided", () => {
+    render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectDashboard={vi.fn()} />);
+
+    expect(screen.queryByRole("tab", { name: "Memory" })).not.toBeInTheDocument();
+  });
 });
