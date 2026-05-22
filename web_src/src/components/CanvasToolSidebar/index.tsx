@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AgentTabPanel } from "./AgentTabPanel";
 import { EmptyToolTab } from "./EmptyToolTab";
 import { SidebarShell } from "./SidebarShell";
@@ -18,7 +18,8 @@ export interface CanvasToolSidebarProps {
   onExitRunsMode?: () => void;
   runsContent?: ReactNode;
   isVersionControlOpen?: boolean;
-  onToggleVersionControl?: () => void;
+  onOpenVersionControl?: () => void;
+  onCloseVersionControl?: () => void;
   versionsContent?: ReactNode;
 }
 
@@ -29,7 +30,8 @@ export function CanvasToolSidebar({
   onExitRunsMode,
   runsContent,
   isVersionControlOpen,
-  onToggleVersionControl,
+  onOpenVersionControl,
+  onCloseVersionControl,
   versionsContent,
 }: CanvasToolSidebarProps) {
   if (!toolSidebarState.showToolSidebarToggle || !toolSidebarState.isToolSidebarOpen || !toolSidebarState.canvasId) {
@@ -44,7 +46,8 @@ export function CanvasToolSidebar({
       onExitRunsMode={onExitRunsMode}
       runsContent={runsContent}
       isVersionControlOpen={isVersionControlOpen}
-      onToggleVersionControl={onToggleVersionControl}
+      onOpenVersionControl={onOpenVersionControl}
+      onCloseVersionControl={onCloseVersionControl}
       versionsContent={versionsContent}
     />
   );
@@ -57,10 +60,12 @@ function OpenCanvasToolSidebar({
   onExitRunsMode,
   runsContent,
   isVersionControlOpen,
-  onToggleVersionControl,
+  onOpenVersionControl,
+  onCloseVersionControl,
   versionsContent,
 }: CanvasToolSidebarProps) {
   const hasAgentTab = toolSidebarState.isAgentEnabled;
+  const hasAutoOpenedVersionControlRef = useRef(false);
   const [activeTab, setActiveTab] = useState(() => defaultToolTab(mode, Boolean(isVersionControlOpen), hasAgentTab));
 
   useEffect(() => {
@@ -73,11 +78,28 @@ function OpenCanvasToolSidebar({
       return;
     }
     setActiveTab((currentTab) => {
-      if ((currentTab === TAB_AGENT || currentTab === TAB_VERSIONS) && !hasAgentTab) return TAB_RUNS;
+      if (currentTab === TAB_AGENT && !hasAgentTab) return TAB_VERSIONS;
       if ((currentTab === TAB_RUNS || currentTab === TAB_VERSIONS) && hasAgentTab) return TAB_AGENT;
       return currentTab;
     });
   }, [hasAgentTab, isVersionControlOpen, mode]);
+
+  useEffect(() => {
+    if (
+      hasAgentTab ||
+      isVersionControlOpen ||
+      mode === "runs" ||
+      activeTab !== TAB_VERSIONS ||
+      !onOpenVersionControl ||
+      hasAutoOpenedVersionControlRef.current
+    ) {
+      return;
+    }
+
+    hasAutoOpenedVersionControlRef.current = true;
+    toolSidebarState.openToolSidebar();
+    onOpenVersionControl();
+  }, [activeTab, hasAgentTab, isVersionControlOpen, mode, onOpenVersionControl, toolSidebarState]);
 
   const tabs = [
     ...(hasAgentTab ? [{ value: TAB_AGENT, label: "Agent" }] : []),
@@ -90,7 +112,7 @@ function OpenCanvasToolSidebar({
       setActiveTab(nextTab);
 
       if (nextTab === TAB_RUNS) {
-        if (isVersionControlOpen) onToggleVersionControl?.();
+        if (isVersionControlOpen) onCloseVersionControl?.();
         if (mode !== "runs") {
           toolSidebarState.openToolSidebar();
           onSelectRuns?.();
@@ -103,14 +125,22 @@ function OpenCanvasToolSidebar({
       if (nextTab === TAB_VERSIONS) {
         if (!isVersionControlOpen) {
           toolSidebarState.openToolSidebar();
-          onToggleVersionControl?.();
+          onOpenVersionControl?.();
         }
         return;
       }
 
-      if (isVersionControlOpen) onToggleVersionControl?.();
+      if (isVersionControlOpen) onCloseVersionControl?.();
     },
-    [isVersionControlOpen, mode, onExitRunsMode, onSelectRuns, onToggleVersionControl, toolSidebarState],
+    [
+      isVersionControlOpen,
+      mode,
+      onCloseVersionControl,
+      onExitRunsMode,
+      onOpenVersionControl,
+      onSelectRuns,
+      toolSidebarState,
+    ],
   );
 
   return (
@@ -146,5 +176,5 @@ function defaultToolTab(mode: CanvasToolSidebarMode, isVersionControlOpen: boole
   if (mode === "runs") return TAB_RUNS;
   if (isVersionControlOpen) return TAB_VERSIONS;
   if (hasAgentTab) return TAB_AGENT;
-  return TAB_RUNS;
+  return TAB_VERSIONS;
 }
