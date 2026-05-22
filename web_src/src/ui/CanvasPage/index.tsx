@@ -157,6 +157,7 @@ export interface CanvasPageProps {
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
+  onShowNodeDiff?: (nodeId: string) => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
@@ -397,6 +398,7 @@ type CanvasNodeRendererCallbacks = {
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
   onToggleView: React.MutableRefObject<((nodeId: string) => void) | undefined>;
+  onShowNodeDiff: React.MutableRefObject<CanvasPageProps["onShowNodeDiff"] | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
   onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
   runDisabled?: boolean;
@@ -579,6 +581,7 @@ function buildInteractiveNodeBlockProps(
     onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
     onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
+    onShowDiff: getNodeAction(callbacks.onShowNodeDiff, nodeId),
     onAnnotationUpdate: getAnnotationUpdateAction(callbacks),
     onAnnotationBlur: getVoidAction(callbacks.onAnnotationBlur),
   };
@@ -1354,6 +1357,7 @@ function CanvasPage(props: CanvasPageProps) {
               onAutoLayoutNodes={props.onAutoLayoutNodes}
               onEdgeCreate={props.onEdgeCreate}
               onToggleView={handleToggleView}
+              onShowNodeDiff={props.onShowNodeDiff}
               onDuplicate={props.onDuplicate}
               onDeactivate={props.onDeactivate}
               onAnnotationUpdate={props.onAnnotationUpdate}
@@ -1893,6 +1897,7 @@ function CanvasContent({
   onDeactivate,
   onTogglePause,
   onToggleView,
+  onShowNodeDiff,
   onAnnotationUpdate,
   onAnnotationBlur,
   onBuildingBlockDrop,
@@ -1942,6 +1947,7 @@ function CanvasContent({
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
+  onShowNodeDiff?: (nodeId: string) => void;
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
@@ -2203,6 +2209,8 @@ function CanvasContent({
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
+  const onShowNodeDiffRef = useRef(onShowNodeDiff);
+  onShowNodeDiffRef.current = onShowNodeDiff;
 
   const onAnnotationUpdateRef = useRef(onAnnotationUpdate);
   onAnnotationUpdateRef.current = onAnnotationUpdate;
@@ -2492,6 +2500,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
+    onShowNodeDiff: onShowNodeDiffRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     runDisabled,
@@ -2509,6 +2518,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
+    onShowNodeDiff: onShowNodeDiffRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     runDisabled,
@@ -2706,18 +2716,28 @@ function CanvasContent({
     [],
   );
   const styledEdges = useMemo(() => {
-    return state.edges?.map((e) => ({
-      ...e,
-      ...EDGE_STYLE,
-      style: { ...EDGE_STYLE.style },
-      data: {
-        ...e.data,
-        isHovered: e.id === hoveredEdgeId,
-        canDelete: isEditMode && !isReadOnly,
-        onDelete: isEditMode && !isReadOnly ? stableEdgeDelete : undefined,
-      },
-      zIndex: e.id === hoveredEdgeId ? 1000 : 0,
-    }));
+    return state.edges?.map((e) => {
+      const diffStatus = (e.data as Record<string, unknown> | undefined)?._draftDiffStatus;
+      const diffStyle =
+        diffStatus === "removed"
+          ? { stroke: "#FDA4AF", strokeDasharray: "8 4" }
+          : diffStatus === "added"
+            ? { stroke: "#86EFAC" }
+            : {};
+
+      return {
+        ...e,
+        ...EDGE_STYLE,
+        style: { ...EDGE_STYLE.style, ...diffStyle },
+        data: {
+          ...e.data,
+          isHovered: e.id === hoveredEdgeId,
+          canDelete: isEditMode && !isReadOnly && diffStatus !== "removed",
+          onDelete: isEditMode && !isReadOnly && diffStatus !== "removed" ? stableEdgeDelete : undefined,
+        },
+        zIndex: e.id === hoveredEdgeId ? 1000 : 0,
+      };
+    });
   }, [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly]);
 
   const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;
