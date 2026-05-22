@@ -79,8 +79,8 @@ export function CanvasModeToggle({
     >
       <TabsList aria-label="Canvas view" className="h-8 min-h-8 bg-slate-100 [&_[data-slot=tabs-trigger]]:text-[13px]">
         {showDashboard ? (
-          <TabsTrigger value={DASHBOARD_TAB} data-testid="canvas-view-mode-dashboard" aria-label="Dashboard">
-            Dashboard
+          <TabsTrigger value={DASHBOARD_TAB} data-testid="canvas-view-mode-dashboard" aria-label="Console">
+            Console
           </TabsTrigger>
         ) : null}
         <TabsTrigger
