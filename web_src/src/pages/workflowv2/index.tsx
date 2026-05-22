@@ -618,6 +618,15 @@ export function WorkflowPageV2() {
   const hasFitToViewRef = useRef(false);
   const runsHasFitToViewRef = useRef(false);
   const hasSyncedVersionFromURLRef = useRef(false);
+  const autoOpenedVersionControlCanvasIdsRef = useRef<Set<string>>(new Set());
+  const hasAutoOpenedVersionControl = Boolean(canvasId && autoOpenedVersionControlCanvasIdsRef.current.has(canvasId));
+  const handleVersionControlAutoOpened = useCallback(() => {
+    if (!canvasId) {
+      return;
+    }
+
+    autoOpenedVersionControlCanvasIdsRef.current.add(canvasId);
+  }, [canvasId]);
 
   /**
    * Capture the initial node focus from the URL so we only zoom once.
@@ -5524,6 +5533,8 @@ export function WorkflowPageV2() {
           showCanvasSettingsMenu={canUpdateCanvas}
           isVersionControlOpen={isVersionControlOpen}
           onOpenVersionControl={handleOpenVersionControl}
+          hasAutoOpenedVersionControl={hasAutoOpenedVersionControl}
+          onVersionControlAutoOpened={handleVersionControlAutoOpened}
           onCloseVersionControl={handleCloseVersionControl}
           showBottomStatusControls={!isTemplate && !isRunsMode && !isMemoryMode}
           hideAddControls={isTemplate || isRunsMode || isMemoryMode}

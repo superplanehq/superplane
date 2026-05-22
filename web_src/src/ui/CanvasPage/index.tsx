@@ -194,6 +194,8 @@ export interface CanvasPageProps {
   onYamlOpen: () => void;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
+  hasAutoOpenedVersionControl?: boolean;
+  onVersionControlAutoOpened?: () => void;
   onCloseVersionControl?: () => void;
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
@@ -1257,6 +1259,8 @@ function CanvasPage(props: CanvasPageProps) {
           runsContent={props.toolSidebarRunsContent}
           isVersionControlOpen={props.isVersionControlOpen}
           onOpenVersionControl={props.onOpenVersionControl}
+          hasAutoOpenedVersionControl={props.hasAutoOpenedVersionControl}
+          onVersionControlAutoOpened={props.onVersionControlAutoOpened}
           onCloseVersionControl={props.onCloseVersionControl}
           versionsContent={props.toolSidebarVersionsContent}
         />

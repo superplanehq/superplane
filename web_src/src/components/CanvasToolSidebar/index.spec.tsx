@@ -134,17 +134,39 @@ describe("CanvasToolSidebar", () => {
 
   it("opens version control on first open when managed agents are disabled", async () => {
     const onOpenVersionControl = vi.fn();
+    const onVersionControlAutoOpened = vi.fn();
 
     render(
       <CanvasToolSidebar
         toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })}
         mode="version-live"
         onOpenVersionControl={onOpenVersionControl}
+        onVersionControlAutoOpened={onVersionControlAutoOpened}
       />,
     );
 
     expect(screen.getByRole("tab", { name: "Versions" })).toHaveAttribute("aria-selected", "true");
     await waitFor(() => expect(onOpenVersionControl).toHaveBeenCalledTimes(1));
+    expect(onVersionControlAutoOpened).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not auto-open version control after it already auto-opened for the canvas", () => {
+    const onOpenVersionControl = vi.fn();
+    const onVersionControlAutoOpened = vi.fn();
+
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })}
+        mode="version-live"
+        hasAutoOpenedVersionControl={true}
+        onOpenVersionControl={onOpenVersionControl}
+        onVersionControlAutoOpened={onVersionControlAutoOpened}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Versions" })).toHaveAttribute("aria-selected", "true");
+    expect(onOpenVersionControl).not.toHaveBeenCalled();
+    expect(onVersionControlAutoOpened).not.toHaveBeenCalled();
   });
 
   it("does not switch from runs mode to the agent tab when managed agents are disabled", () => {

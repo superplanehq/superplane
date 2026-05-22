@@ -19,6 +19,8 @@ export interface CanvasToolSidebarProps {
   runsContent?: ReactNode;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
+  hasAutoOpenedVersionControl?: boolean;
+  onVersionControlAutoOpened?: () => void;
   onCloseVersionControl?: () => void;
   versionsContent?: ReactNode;
 }
@@ -31,6 +33,8 @@ export function CanvasToolSidebar({
   runsContent,
   isVersionControlOpen,
   onOpenVersionControl,
+  hasAutoOpenedVersionControl,
+  onVersionControlAutoOpened,
   onCloseVersionControl,
   versionsContent,
 }: CanvasToolSidebarProps) {
@@ -47,6 +51,8 @@ export function CanvasToolSidebar({
       runsContent={runsContent}
       isVersionControlOpen={isVersionControlOpen}
       onOpenVersionControl={onOpenVersionControl}
+      hasAutoOpenedVersionControl={hasAutoOpenedVersionControl}
+      onVersionControlAutoOpened={onVersionControlAutoOpened}
       onCloseVersionControl={onCloseVersionControl}
       versionsContent={versionsContent}
     />
@@ -61,11 +67,13 @@ function OpenCanvasToolSidebar({
   runsContent,
   isVersionControlOpen,
   onOpenVersionControl,
+  hasAutoOpenedVersionControl,
+  onVersionControlAutoOpened,
   onCloseVersionControl,
   versionsContent,
 }: CanvasToolSidebarProps) {
   const hasAgentTab = toolSidebarState.isAgentEnabled;
-  const hasAutoOpenedVersionControlRef = useRef(false);
+  const hasAutoOpenedVersionControlInMountRef = useRef(false);
   const [activeTab, setActiveTab] = useState(() => defaultToolTab(mode, Boolean(isVersionControlOpen), hasAgentTab));
 
   useEffect(() => {
@@ -91,15 +99,26 @@ function OpenCanvasToolSidebar({
       mode === "runs" ||
       activeTab !== TAB_VERSIONS ||
       !onOpenVersionControl ||
-      hasAutoOpenedVersionControlRef.current
+      hasAutoOpenedVersionControl ||
+      hasAutoOpenedVersionControlInMountRef.current
     ) {
       return;
     }
 
-    hasAutoOpenedVersionControlRef.current = true;
+    hasAutoOpenedVersionControlInMountRef.current = true;
+    onVersionControlAutoOpened?.();
     toolSidebarState.openToolSidebar();
     onOpenVersionControl();
-  }, [activeTab, hasAgentTab, isVersionControlOpen, mode, onOpenVersionControl, toolSidebarState]);
+  }, [
+    activeTab,
+    hasAgentTab,
+    hasAutoOpenedVersionControl,
+    isVersionControlOpen,
+    mode,
+    onOpenVersionControl,
+    onVersionControlAutoOpened,
+    toolSidebarState,
+  ]);
 
   const tabs = [
     ...(hasAgentTab ? [{ value: TAB_AGENT, label: "Agent" }] : []),
