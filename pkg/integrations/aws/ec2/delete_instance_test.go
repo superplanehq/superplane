@@ -179,6 +179,50 @@ func Test__DeleteInstance__PollEmitsWhenTerminated(t *testing.T) {
 	assert.Equal(t, DeleteInstancePayloadType, executionState.Type)
 }
 
+func Test__DeleteInstance__Execute_InstanceAlreadyGone(t *testing.T) {
+	component := &DeleteInstance{}
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusBadRequest,
+				Body: io.NopCloser(strings.NewReader(`
+					<Response>
+						<Errors>
+							<Error>
+								<Code>InvalidInstanceID.NotFound</Code>
+								<Message>The instance ID 'i-abc123' does not exist</Message>
+							</Error>
+						</Errors>
+					</Response>
+				`)),
+			},
+		},
+	}
+	executionState := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"region":   "us-east-1",
+			"instance": "i-abc123",
+		},
+		HTTP:           httpContext,
+		Metadata:       &contexts.MetadataContext{},
+		Requests:       &contexts.RequestContext{},
+		ExecutionState: executionState,
+		Integration: &contexts.IntegrationContext{
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+				"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+				"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+			},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.True(t, executionState.Passed)
+	assert.Equal(t, DeleteInstancePayloadType, executionState.Type)
+}
+
 func Test__DeleteInstance__PollTreatsNotFoundAsTerminated(t *testing.T) {
 	component := &DeleteInstance{}
 	httpContext := &contexts.HTTPContext{
