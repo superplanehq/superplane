@@ -29,7 +29,6 @@ export const Block = React.memo(function Block(props: BlockProps) {
         "relative w-fit rounded-md",
         diffRing,
         shouldFade && !shouldBlankBody && "opacity-30",
-        isDeleted && "opacity-50",
       )}
       onClick={(e) => props.onClick?.(e)}
     >
