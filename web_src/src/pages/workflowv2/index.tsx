@@ -421,10 +421,12 @@ export function WorkflowPageV2() {
     !!selectedCanvasVersionID && pendingApprovalVersionIds.has(selectedCanvasVersionID);
   const isViewingDraftVersion =
     !!selectedCanvasVersion && isDraftVersion(selectedCanvasVersion) && !isViewingPendingApprovalVersion;
-  const draftDiffResult = useMemo(
-    () => (isViewingDraftVersion ? buildDraftDiffMap(liveCanvasVersion, latestDraftVersion) : undefined),
-    [isViewingDraftVersion, liveCanvasVersion, latestDraftVersion],
-  );
+  const draftDiffResult = useMemo(() => {
+    if (!isViewingDraftVersion || !canvas) return undefined;
+    // Use the current canvas spec (includes live edits) for accurate diff
+    const currentDraft = { spec: canvas.spec } as CanvasesCanvasVersion;
+    return buildDraftDiffMap(liveCanvasVersion, currentDraft);
+  }, [isViewingDraftVersion, liveCanvasVersion, canvas]);
   const isViewingCurrentLiveVersion =
     !selectedCanvasVersion || selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
