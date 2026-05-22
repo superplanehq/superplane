@@ -16,6 +16,7 @@ export interface HeaderProps {
   onSave?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
+  onShowDiff?: () => void;
   organizationId?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
