@@ -1888,8 +1888,8 @@ export function WorkflowPageV2() {
             iconSlug: "trash-2",
             iconColor: "text-gray-400",
             title: String(removedNode.name || "Deleted node"),
-            collapsed: !!removedNode.isCollapsed,
-            parameters: [],
+            collapsed: false,
+            parameters: [{ label: "This node was removed from the draft", value: "" }],
           },
         },
       };
