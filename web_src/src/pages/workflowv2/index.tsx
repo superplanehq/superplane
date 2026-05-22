@@ -5709,6 +5709,7 @@ export function WorkflowPageV2() {
           toolSidebarVersionsContent={
             !hasEditableVersion ? (
               <VersionsTabPanel
+                scrollPersistenceKey={canvasId}
                 liveCanvasVersionId={liveCanvasVersionId}
                 selectedCanvasVersion={selectedCanvasVersion}
                 pendingApprovalVersions={pendingApprovalVersions}

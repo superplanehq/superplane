@@ -1,11 +1,14 @@
 import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
 import { ChevronDown, ChevronRight, GitBranch } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type UIEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from "react";
 import type { CanvasVersionNodeDiffContext } from "@/pages/workflowv2/CanvasVersionNodeDiffDialog";
 import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
 import { VersionRow } from "./VersionsTabPanelRow";
 
+const persistedScrollPositions = new Map<string, number>();
+
 export interface VersionsTabPanelProps {
+  scrollPersistenceKey?: string;
   liveCanvasVersionId?: string;
   selectedCanvasVersion?: CanvasesCanvasVersion | null;
   pendingApprovalVersions?: Array<{
@@ -42,6 +45,7 @@ type VersionRowItem = {
 };
 
 export function VersionsTabPanel({
+  scrollPersistenceKey,
   liveCanvasVersionId,
   selectedCanvasVersion,
   pendingApprovalVersions,
@@ -86,10 +90,34 @@ export function VersionsTabPanel({
   });
   const handleScroll = useCallback(
     (event: UIEvent<HTMLDivElement>) => {
+      if (scrollPersistenceKey) {
+        persistedScrollPositions.set(scrollPersistenceKey, event.currentTarget.scrollTop);
+      }
+
       loadMoreIfNeeded(event.currentTarget);
     },
-    [loadMoreIfNeeded],
+    [loadMoreIfNeeded, scrollPersistenceKey],
   );
+
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    if (!element || !scrollPersistenceKey) return;
+
+    const scrollTop = persistedScrollPositions.get(scrollPersistenceKey);
+    if (scrollTop == null) return;
+
+    element.scrollTop = scrollTop;
+  }, [scrollPersistenceKey]);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+
+    return () => {
+      if (!element || !scrollPersistenceKey) return;
+
+      persistedScrollPositions.set(scrollPersistenceKey, element.scrollTop);
+    };
+  }, [scrollPersistenceKey]);
 
   useEffect(() => {
     loadMoreIfNeeded(scrollRef.current);
