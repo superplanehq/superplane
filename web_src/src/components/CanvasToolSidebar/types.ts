@@ -24,7 +24,7 @@ export type AgentMessage = {
 export type AgentSessionWebsocketEvent =
   | {
       sessionId: string;
-      event: "assistant_message" | "tool_started" | "tool_finished";
+      event: "assistant_message" | "tool_started" | "tool_finished" | "user_message";
       messageId: string;
       message: AgentMessage;
     }

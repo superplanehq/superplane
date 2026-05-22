@@ -201,6 +201,24 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, fmt.Errorf("persist user message: %w", err)
 	}
 
+	// Broadcast user message to all WS subscribers so other users see it
+	userName := ""
+	if user, lookupErr := models.FindUnscopedUserByID(userID.String()); lookupErr == nil {
+		userName = user.Name
+	}
+	_ = messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
+		SessionID: sessionID.String(),
+		Event:     "user_message",
+		MessageID: persisted.ID.String(),
+		Message: &messages.AgentMessage{
+			ID:       persisted.ID.String(),
+			Role:     persisted.Role,
+			Content:  persisted.Content,
+			UserID:   userID.String(),
+			UserName: userName,
+		},
+	})
+
 	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusStreaming); err != nil {
 		log.WithError(err).Warn("failed to mark agent session as streaming")
 	}

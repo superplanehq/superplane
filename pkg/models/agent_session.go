@@ -180,3 +180,15 @@ func FindSharedCanvasSession(tx *gorm.DB, organizationID, canvasID uuid.UUID) (*
 	}
 	return &session, nil
 }
+
+// FindSharedCanvasSessionByID finds a session by org and session ID.
+func FindSharedCanvasSessionByID(organizationID uuid.UUID, sessionID uuid.UUID) (*AgentSession, error) {
+	var session AgentSession
+	err := database.Conn().
+		Where("organization_id = ? AND id = ?", organizationID, sessionID).
+		First(&session).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
