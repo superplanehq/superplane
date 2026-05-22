@@ -79,6 +79,7 @@ export function prepareData(
   user?: SuperplaneMeUser | null,
   canvasMode: "live" | "edit" = "live",
   openModal?: (modal: TriggerActionModal) => void,
+  draftDiffStatusMap?: Record<string, "added" | "updated" | "removed">,
 ): {
   nodes: CanvasNode[];
   edges: CanvasEdge[];
@@ -104,6 +105,7 @@ export function prepareData(
           workflowEdges,
           canvasMode,
           openModal,
+          draftDiffStatusMap?.[node.id!],
         );
       })
       .map((node) => ({
@@ -128,12 +130,14 @@ export function prepareNode(
   edges?: ComponentsEdge[],
   canvasMode: "live" | "edit" = "live",
   openModal?: (modal: TriggerActionModal) => void,
+  draftDiffStatus?: "added" | "updated" | "removed",
 ): CanvasNode {
   switch (node.type) {
     case "TYPE_TRIGGER":
       return prepareTriggerNode(node, triggers, nodeEventsMap, canvasMode, {
         canvasId: workflowId,
         openModal,
+        draftDiffStatus,
       });
     case "TYPE_WIDGET":
       return prepareAnnotationNode(node);
@@ -150,6 +154,7 @@ export function prepareNode(
         currentUser,
         edges,
         canvasMode,
+        draftDiffStatus,
       });
   }
 }
