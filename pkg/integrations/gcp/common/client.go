@@ -134,3 +134,9 @@ func (c *Client) PostURL(ctx context.Context, fullURL string, body any) ([]byte,
 	}
 	return c.ExecRequest(ctx, http.MethodPost, fullURL, bodyReader)
 }
+
+func (c *Client) Delete(ctx context.Context, path string) ([]byte, error) {
+	path = strings.TrimPrefix(path, "/")
+	url := strings.TrimSuffix(c.baseURL, "/") + "/" + path
+	return c.ExecRequest(ctx, http.MethodDelete, url, nil)
+}
