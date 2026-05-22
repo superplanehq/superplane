@@ -160,7 +160,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, fmt.Errorf("message content is required")
 	}
 
-	session, err := models.FindAgentSessionForUser(organizationID, userID, sessionID)
+	session, err := models.FindAgentSessionInOrg(organizationID, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -218,8 +218,15 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
+
+	// Inject user identity so the agent knows who is talking
+	userIdentity := fmt.Sprintf("current_user_id: %s", userID.String())
+	if user, err := models.FindUnscopedUserByID(userID.String()); err == nil && user.Name != "" {
+		userIdentity = fmt.Sprintf("current_user_id: %s\ncurrent_user_name: %s", userID.String(), user.Name)
+	}
+
 	draftStatus := getDraftStatus(session.CanvasID)
-	return base + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
+	return base + "\n" + userIdentity + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -374,4 +381,53 @@ func sessionTitle(organizationID, canvasID uuid.UUID) string {
 		return org.Name
 	}
 	return org.Name + " - " + canvas.Name
+}
+
+// CanvasSessionInfo holds session + user info for the session browser.
+type CanvasSessionInfo struct {
+	SessionID    string
+	UserID       string
+	UserName     string
+	Status       string
+	LastActiveAt *time.Time
+}
+
+// ListCanvasSessions returns all agent sessions for a canvas with user info.
+func (s *Service) ListCanvasSessions(organizationID, canvasID uuid.UUID) ([]CanvasSessionInfo, error) {
+	var results []struct {
+		SessionID    string
+		UserID       string
+		UserName     string
+		Status       string
+		LastActiveAt *time.Time
+	}
+
+	err := database.Conn().
+		Table("agent_sessions").
+		Select("agent_sessions.id as session_id, agent_sessions.user_id, COALESCE(NULLIF(users.name, ''), 'Unknown') as user_name, agent_sessions.status, agent_sessions.last_active_at").
+		Joins("LEFT JOIN users ON users.id = agent_sessions.user_id").
+		Where("agent_sessions.organization_id = ? AND agent_sessions.canvas_id = ?", organizationID, canvasID).
+		Order("agent_sessions.updated_at DESC").
+		Scan(&results).Error
+	if err != nil {
+		return nil, fmt.Errorf("list canvas sessions: %w", err)
+	}
+
+	entries := make([]CanvasSessionInfo, len(results))
+	for i, r := range results {
+		entries[i] = CanvasSessionInfo{
+			SessionID:    r.SessionID,
+			UserID:       r.UserID,
+			UserName:     r.UserName,
+			Status:       r.Status,
+			LastActiveAt: r.LastActiveAt,
+		}
+	}
+	return entries, nil
+}
+
+// GetSessionInOrg finds a session by ID within an organization, regardless of owner.
+// Used for the session browser read-only view.
+func (s *Service) GetSessionInOrg(organizationID, sessionID uuid.UUID) (*models.AgentSession, error) {
+	return models.FindAgentSessionInOrg(organizationID, sessionID)
 }

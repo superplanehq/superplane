@@ -2,6 +2,8 @@ import { Loader2 } from "lucide-react";
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { AgentMode } from "@/components/AgentSidebar/agentMode";
 import { AccountContext } from "@/contexts/accountContextState";
+import { SessionListView } from "./SessionListView";
+import { Users } from "lucide-react";
 import { createSystemMessage } from "@/components/AgentSidebar/systemMessages";
 import { ChatComposer } from "@/components/AgentSidebar/ChatComposer";
 import { useChatScroll } from "@/components/AgentSidebar/useChatScroll";
@@ -12,6 +14,7 @@ import type { RubricCategory } from "@/components/AgentSidebar/widgets/parser";
 import {
   useAgentChatMessages,
   useCanvasAgentChat,
+  useCanvasSessions,
   useDefineAgentOutcome,
   useInterruptAgentChat,
   useSendAgentChatMessage,
@@ -39,6 +42,7 @@ type ChatConversationProps = {
   agentMode: AgentMode;
   onModeSwitch: (mode: AgentMode) => void;
   isEditing: boolean;
+  readOnly?: boolean;
 };
 
 type DraftActionsBarProps = {
@@ -67,6 +71,9 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
   const chatId = chatQuery.data?.id ?? null;
   const { account } = useContext(AccountContext);
   const firstName = account?.name?.split(" ")[0] ?? "there";
+  const [viewMode, setViewMode] = useState<"my-session" | "session-list" | "viewing-session">("my-session");
+  const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
+  const sessionsQuery = useCanvasSessions(canvasId, organizationId, viewMode === "session-list");
 
   if (chatQuery.isLoading || !chatId) {
     return (
@@ -85,15 +92,62 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
     );
   }
 
+  if (viewMode === "session-list") {
+    return (
+      <SessionListView
+        sessions={sessionsQuery.data ?? []}
+        currentUserId={account?.id ?? ""}
+        onSelectSession={(sessionId) => {
+          setViewingSessionId(sessionId);
+          setViewMode("viewing-session");
+        }}
+        onBack={() => setViewMode("my-session")}
+      />
+    );
+  }
+
+  if (viewMode === "viewing-session" && viewingSessionId) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+          <button type="button" onClick={() => setViewMode("session-list")} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700">
+            <Users className="size-3" />
+            All sessions
+          </button>
+        </div>
+        <ChatConversation
+          chatId={viewingSessionId}
+          canvasId={canvasId}
+          organizationId={organizationId}
+          agentMode={toolSidebarState.agentMode}
+          onModeSwitch={toolSidebarState.switchAgentMode}
+          isEditing={toolSidebarState.isEditing}
+        />
+      </div>
+    );
+  }
+
   return (
-    <ChatConversation
-      chatId={chatId}
-      canvasId={canvasId}
-      organizationId={organizationId}
-      agentMode={toolSidebarState.agentMode}
-      onModeSwitch={toolSidebarState.switchAgentMode}
-      isEditing={toolSidebarState.isEditing}
-    />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center justify-end border-b border-border px-3 py-1">
+        <button
+          type="button"
+          onClick={() => setViewMode("session-list")}
+          className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-600"
+        >
+          <Users className="size-3" />
+          All sessions
+        </button>
+      </div>
+      <ChatConversation
+        chatId={chatId}
+        canvasId={canvasId}
+        organizationId={organizationId}
+        agentMode={toolSidebarState.agentMode}
+        onModeSwitch={toolSidebarState.switchAgentMode}
+        isEditing={toolSidebarState.isEditing}
+      />
+    </div>
   );
 }
 
@@ -104,6 +158,7 @@ function ChatConversation({
   agentMode,
   onModeSwitch,
   isEditing,
+  readOnly,
 }: ChatConversationProps) {
   const messagesQuery = useAgentChatMessages(chatId, organizationId, true);
   const sendMutation = useSendAgentChatMessage(organizationId, canvasId);
@@ -116,8 +171,9 @@ function ChatConversation({
   const { account } = useContext(AccountContext);
   const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
 
-  // Prepend a synthetic greeting as the first message so it never disappears
+  // Prepend a synthetic greeting as the first message (only for own session)
   const messages = useMemo(() => {
+    if (readOnly) return rawMessages;
     const greeting: AgentMessage = {
       id: "__greeting__",
       role: "assistant",
@@ -128,13 +184,14 @@ function ChatConversation({
       toolStatus: "",
     };
     return [greeting, ...rawMessages];
-  }, [rawMessages, greetingFirstName]);
+  }, [rawMessages, greetingFirstName, readOnly]);
 
   const showThinking = useThinkingIndicator(rawMessages, status);
 
   // Auto-kickoff: send a boot message when session is new (no messages yet)
   const bootState = useRef<"idle" | "sending" | "sent">("idle");
   useEffect(() => {
+    if (readOnly) return;
     if (bootState.current !== "idle") return;
     if (!messagesQuery.data || messagesQuery.isLoading) return;
 
@@ -209,6 +266,7 @@ function ChatConversation({
         onVersionPublished={() => setOutcomeState(null)}
       />
 
+      {!readOnly && (
       <ChatComposer
         onSend={handlers.handleSend}
         onStop={handlers.handleStop}
@@ -220,6 +278,7 @@ function ChatConversation({
         onModeSwitch={onModeSwitch}
         modeDisabled={modeDisabled}
       />
+      )}
     </div>
   );
 }

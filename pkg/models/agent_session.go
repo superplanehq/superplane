@@ -166,3 +166,15 @@ func FailStuckStreamingSessions(cutoff time.Time) ([]AgentSession, error) {
 	}
 	return stuck, nil
 }
+
+// FindAgentSessionInOrg finds a session by org and session ID without filtering by user.
+func FindAgentSessionInOrg(organizationID, sessionID uuid.UUID) (*AgentSession, error) {
+	var session AgentSession
+	err := database.Conn().
+		Where("organization_id = ? AND id = ?", organizationID, sessionID).
+		First(&session).Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
