@@ -1,0 +1,8 @@
+{
+  "data": {
+    "instanceId": "i-0abc1234567890def",
+    "state": "terminated"
+  },
+  "timestamp": "2026-05-21T12:05:00Z",
+  "type": "aws.ec2.instance.deleted"
+}
