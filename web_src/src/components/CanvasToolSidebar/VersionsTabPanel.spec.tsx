@@ -89,6 +89,34 @@ describe("VersionsTabPanel", () => {
     expect(screen.getByText("v1")).toBeInTheDocument();
   });
 
+  it("restores the sidebar scroll position after remounting for the same canvas", () => {
+    const liveVersions = Array.from({ length: 12 }, (_, index) => {
+      const number = 12 - index;
+      return makePublishedVersion(`version-${number}`);
+    });
+    const props = {
+      scrollPersistenceKey: "canvas-1",
+      liveCanvasVersionId: "version-12",
+      liveVersions,
+      canUpdateCanvas: true,
+      isTemplate: false,
+      canvasDeletedRemotely: false,
+      onUseVersion: vi.fn(),
+      onVersionNodeDiffContextChange: vi.fn(),
+    };
+
+    const { unmount } = render(<VersionsTabPanel {...props} />);
+    const scroller = screen.getByTestId("versions-sidebar-scroll");
+
+    scroller.scrollTop = 420;
+    fireEvent.scroll(scroller);
+    unmount();
+
+    render(<VersionsTabPanel {...props} selectedCanvasVersion={makePublishedVersion("version-9")} />);
+
+    expect(screen.getByTestId("versions-sidebar-scroll").scrollTop).toBe(420);
+  });
+
   it("loads older versions when the sidebar scroll reaches the end", () => {
     const onLoadMoreLiveVersions = vi.fn();
     const liveVersions = [makePublishedVersion("version-3"), makePublishedVersion("version-2")];
