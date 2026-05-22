@@ -217,3 +217,33 @@ export function prepareSidebarData(
     isComposite: false,
   };
 }
+
+function readErrorField(error: unknown, key: string): unknown {
+  if (typeof error !== "object" || error === null) {
+    return undefined;
+  }
+  return (error as Record<string, unknown>)[key];
+}
+
+/** True when a canvas fetch failed because the canvas does not exist. */
+export function isCanvasLoadNotFoundError(error: unknown): boolean {
+  if (readErrorField(error, "status") === 404) {
+    return true;
+  }
+
+  const response = readErrorField(error, "response");
+  if (typeof response === "object" && response !== null && readErrorField(response, "status") === 404) {
+    return true;
+  }
+
+  if (readErrorField(error, "code") === "NOT_FOUND") {
+    return true;
+  }
+
+  const message = readErrorField(error, "message");
+  if (typeof message !== "string") {
+    return false;
+  }
+
+  return message.includes("not found") || message.includes("404");
+}

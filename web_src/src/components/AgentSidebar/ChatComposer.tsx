@@ -10,6 +10,7 @@ export function ChatComposer({
   onSend,
   onStop,
   sending,
+  sendPending,
   stopping,
   statusLabel,
   agentMode,
@@ -19,6 +20,7 @@ export function ChatComposer({
   onSend: (content: string) => Promise<void>;
   onStop: () => void;
   sending: boolean;
+  sendPending: boolean;
   stopping?: boolean;
   statusLabel: string;
   agentMode: AgentMode;
@@ -26,7 +28,7 @@ export function ChatComposer({
   modeDisabled?: boolean;
 }) {
   const [draft, setDraft] = useState("");
-  const canSend = Boolean(draft.trim()) && !sending;
+  const canSend = Boolean(draft.trim()) && !sendPending;
 
   const handleSend = useCallback(async () => {
     const content = draft.trim();
