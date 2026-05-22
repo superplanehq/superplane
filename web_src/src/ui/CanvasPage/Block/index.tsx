@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { BlockContent } from "./content";
 import { LeftHandle, RightHandle } from "./handles";
 import type { BlockProps } from "./types";
@@ -7,11 +8,28 @@ import type { BlockProps } from "./types";
 export type { BlockData, BlockProps } from "./types";
 export type { CanvasBlockData } from "./types";
 
-const DRAFT_DIFF_RING: Record<string, string> = {
-  added: "ring-2 ring-green-500",
-  updated: "ring-2 ring-orange-400",
-  removed: "ring-2 ring-red-500 pointer-events-none",
+const DIFF_BADGE: Record<string, { label: string; bg: string; Icon: React.FC<{ className?: string }> }> = {
+  added: { label: "ADDED", bg: "bg-green-500", Icon: Plus },
+  updated: { label: "EDITED", bg: "bg-blue-500", Icon: Pencil },
+  removed: { label: "DELETED", bg: "bg-red-500", Icon: Trash2 },
 };
+
+function DraftDiffBadge({ status }: { status: string }) {
+  const badge = DIFF_BADGE[status];
+  if (!badge) return null;
+  const { Icon } = badge;
+  return (
+    <div
+      className={cn(
+        "absolute -bottom-3 right-2 z-10 flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold tracking-wide text-white shadow-sm",
+        badge.bg,
+      )}
+    >
+      <Icon className="h-3 w-3" />
+      <span>{badge.label}</span>
+    </div>
+  );
+}
 
 export const Block = React.memo(function Block(props: BlockProps) {
   const data = props.data;
@@ -21,11 +39,10 @@ export const Block = React.memo(function Block(props: BlockProps) {
   const isDeleted = data._draftDiffStatus === "removed";
   const shouldBlankBody = data._dimBodyBelowHeader || isDeleted;
   const isConnectionInteractive = props.canvasMode !== "live";
-  const diffRing = data._draftDiffStatus ? DRAFT_DIFF_RING[data._draftDiffStatus] || "" : "";
 
   return (
     <div
-      className={cn("relative w-fit rounded-md", diffRing, shouldFade && !shouldBlankBody && "opacity-30")}
+      className={cn("relative w-fit", shouldFade && !shouldBlankBody && "opacity-30")}
       onClick={(e) => props.onClick?.(e)}
     >
       <div className="relative z-[1] w-fit">
@@ -38,6 +55,7 @@ export const Block = React.memo(function Block(props: BlockProps) {
           onAppendFromNode={props.onAppendFromNode}
         />
       </div>
+      {data._draftDiffStatus && <DraftDiffBadge status={data._draftDiffStatus} />}
     </div>
   );
 });
