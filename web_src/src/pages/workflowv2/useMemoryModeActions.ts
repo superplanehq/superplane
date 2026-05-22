@@ -1,74 +1,72 @@
 import { useCallback } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
-interface DashboardModeActionsConfig {
-  dashboardsFeatureEnabled: boolean;
+interface MemoryModeActionsConfig {
   hasEditableVersion: boolean;
   liveCanvasVersionId: string | undefined;
   handleUseVersion: (versionId: string) => void;
+  setIsMemoryMode: (value: boolean) => void;
   setIsDashboardMode: (value: boolean) => void;
   setIsDashboardAddPanelOpen: (value: boolean) => void;
   setIsDashboardYamlOpen: (value: boolean) => void;
   setIsRunsMode: (value: boolean) => void;
-  setIsMemoryMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
 }
 
-export function useDashboardModeActions({
-  dashboardsFeatureEnabled,
+export function useMemoryModeActions({
   hasEditableVersion,
   liveCanvasVersionId,
   handleUseVersion,
+  setIsMemoryMode,
   setIsDashboardMode,
   setIsDashboardAddPanelOpen,
   setIsDashboardYamlOpen,
   setIsRunsMode,
-  setIsMemoryMode,
   setSelectedRunId,
   setSearchParams,
-}: DashboardModeActionsConfig) {
-  const handleSelectDashboardMode = useCallback(() => {
-    if (!dashboardsFeatureEnabled) return;
+}: MemoryModeActionsConfig) {
+  const handleSelectMemoryMode = useCallback(() => {
     if (hasEditableVersion && liveCanvasVersionId) handleUseVersion(liveCanvasVersionId);
 
-    setIsDashboardMode(true);
+    setIsMemoryMode(true);
+    setIsDashboardMode(false);
+    setIsDashboardAddPanelOpen(false);
+    setIsDashboardYamlOpen(false);
     setIsRunsMode(false);
-    setIsMemoryMode(false);
     setSelectedRunId(null);
-    setSearchParams(toDashboardSearchParams, { replace: true });
+    setSearchParams(toMemorySearchParams, { replace: true });
   }, [
-    dashboardsFeatureEnabled,
     handleUseVersion,
     hasEditableVersion,
     liveCanvasVersionId,
+    setIsDashboardAddPanelOpen,
     setIsDashboardMode,
+    setIsDashboardYamlOpen,
     setIsMemoryMode,
     setIsRunsMode,
     setSearchParams,
     setSelectedRunId,
   ]);
 
-  const handleExitDashboardMode = useCallback(() => {
-    setIsDashboardMode(false);
-    setIsDashboardAddPanelOpen(false);
-    setIsDashboardYamlOpen(false);
-    setSearchParams(removeDashboardSearchParam, { replace: true });
-  }, [setIsDashboardAddPanelOpen, setIsDashboardYamlOpen, setIsDashboardMode, setSearchParams]);
+  const handleExitMemoryMode = useCallback(() => {
+    setIsMemoryMode(false);
+    setSearchParams(removeMemorySearchParam, { replace: true });
+  }, [setIsMemoryMode, setSearchParams]);
 
-  return { handleSelectDashboardMode, handleExitDashboardMode };
+  return { handleSelectMemoryMode, handleExitMemoryMode };
 }
 
-function toDashboardSearchParams(current: URLSearchParams): URLSearchParams {
+function toMemorySearchParams(current: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(current);
-  next.set("view", "dashboard");
+  next.set("view", "memory");
   next.delete("run");
   next.delete("sidebar");
   next.delete("node");
   return next;
 }
 
-function removeDashboardSearchParam(current: URLSearchParams): URLSearchParams {
+function removeMemorySearchParam(current: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(current);
   next.delete("view");
   return next;
