@@ -3,7 +3,7 @@
 // Strings wrapped in `{{ ... }}` are compiled once and evaluated per row.
 // Strings without braces use legacy dot-path semantics via callers.
 import { type CstNode } from "chevrotain";
-import { evaluate as celEvaluate, parse as celParse } from "cel-js";
+import { CelTypeError, evaluate as celEvaluate, parse as celParse } from "cel-js";
 
 export type CompiledExpr = { ok: true; raw: string; cst: CstNode } | { ok: false; raw: string; error: string };
 
@@ -150,14 +150,68 @@ function formatTimestampSeconds(value: number): string {
   return date.toISOString();
 }
 
+export type EvalResult = { ok: true; value: unknown } | { ok: false; error: string };
+
+/**
+ * Evaluate a compiled CEL expression. Returns `undefined` on any error so
+ * existing callers (column rendering, payload merging, etc.) keep failing
+ * gracefully. Numeric-looking string fields are silently retried as numbers
+ * when a `CelTypeError` is raised — memory rows commonly stringify scalars,
+ * and authors expect `{{ value / 2 }}` to "just work" on those rows.
+ */
 export function evalExpr(compiled: CompiledExpr, row: Record<string, unknown>, env: ExprEnv): unknown {
-  if (!compiled.ok) return undefined;
+  const detailed = evalExprDetailed(compiled, row, env);
+  return detailed.ok ? detailed.value : undefined;
+}
+
+/**
+ * Same as `evalExpr` but surfaces compile/eval errors so the editor can
+ * display them in inline previews. The error string is the first compile
+ * error or the message from the underlying eval error.
+ */
+export function evalExprDetailed(compiled: CompiledExpr, row: Record<string, unknown>, env: ExprEnv): EvalResult {
+  if (!compiled.ok) return { ok: false, error: compiled.error };
   const vars = { ...env.globals, ...row };
   try {
-    return celEvaluate(compiled.cst, vars, env.functions);
-  } catch {
-    return undefined;
+    return { ok: true, value: celEvaluate(compiled.cst, vars, env.functions) };
+  } catch (initial) {
+    if (!(initial instanceof CelTypeError)) {
+      return { ok: false, error: initial instanceof Error ? initial.message : String(initial) };
+    }
+    const coerced = coerceNumericStrings(vars);
+    if (coerced === vars) {
+      return { ok: false, error: initial.message };
+    }
+    try {
+      return { ok: true, value: celEvaluate(compiled.cst, coerced, env.functions) };
+    } catch (retry) {
+      const message = retry instanceof Error ? retry.message : String(retry);
+      return { ok: false, error: message };
+    }
   }
+}
+
+/**
+ * Returns a new vars object with string values that parse cleanly as finite
+ * numbers replaced with their numeric form. Non-numeric strings are left
+ * alone so equality and substring checks still work. When nothing changes
+ * the original object is returned so callers can short-circuit.
+ */
+function coerceNumericStrings(vars: Record<string, unknown>): Record<string, unknown> {
+  let changed = false;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(vars)) {
+    if (typeof value === "string" && value.trim() !== "") {
+      const n = Number(value);
+      if (Number.isFinite(n)) {
+        out[key] = n;
+        changed = true;
+        continue;
+      }
+    }
+    out[key] = value;
+  }
+  return changed ? out : vars;
 }
 
 export function evalRowField(
@@ -187,6 +241,31 @@ export function evalTemplate(
     out += stringify(value);
   }
   return out;
+}
+
+/**
+ * Render a template like `evalTemplate` but surface the first compile/eval
+ * error encountered. Useful for the payload editor preview where authors
+ * benefit from a concrete error string instead of silent emptiness.
+ */
+export function evalTemplateDetailed(
+  template: CompiledTemplate,
+  row: Record<string, unknown>,
+  env: ExprEnv,
+  stringify: (value: unknown) => string,
+): { ok: true; value: string } | { ok: false; error: string } {
+  let out = "";
+  for (const seg of template.segments) {
+    if (seg.kind === "literal") {
+      out += seg.value;
+      continue;
+    }
+    const detailed = evalExprDetailed(seg.expr, row, env);
+    if (!detailed.ok) return { ok: false, error: detailed.error };
+    if (detailed.value === undefined) continue;
+    out += stringify(detailed.value);
+  }
+  return { ok: true, value: out };
 }
 
 export function evalBoolExpr(raw: string | undefined, row: Record<string, unknown>, env: ExprEnv): boolean {
