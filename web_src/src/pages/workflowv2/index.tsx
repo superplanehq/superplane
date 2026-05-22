@@ -1872,7 +1872,8 @@ export function WorkflowPageV2() {
   // Run them through the real preparation pipeline so they render with full body,
   // then overlay dimBodyBelowHeader for the gray slate look.
   const nodesWithGhosts = useMemo(() => {
-    if (!draftDiffResult?.removedNodes?.length) return preparedNodes;
+    // Ghost nodes for deleted nodes disabled for now
+    if (true || !draftDiffResult?.removedNodes?.length) return preparedNodes;
     const liveNodes = (liveCanvasVersion?.spec?.nodes || []) as ComponentsNode[];
     const ghostNodes = draftDiffResult.removedNodes.map((removedNode) => {
       const node = removedNode as unknown as ComponentsNode;
