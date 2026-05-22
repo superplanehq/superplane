@@ -132,6 +132,30 @@ func (s *Server) runnerStreamOneTask(conn *websocket.Conn, ctx context.Context, 
 		return err
 	}
 
+	// Keep the connection alive while the runner executes a long task. Without this,
+	// fleet-manager sends no traffic during the task, the runner has nothing to pong,
+	// and the 90s read deadline below expires before Complete can arrive (issue #22).
+	pingCtx, stopPing := context.WithCancel(ctx)
+	defer stopPing()
+	go func() {
+		ticker := time.NewTicker(runnerStreamPingPeriod)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-pingCtx.Done():
+				return
+			case <-ticker.C:
+				writeMu.Lock()
+				_ = conn.SetWriteDeadline(time.Now().Add(runnerStreamWriteWait))
+				werr := conn.WriteMessage(websocket.PingMessage, nil)
+				writeMu.Unlock()
+				if werr != nil {
+					return
+				}
+			}
+		}
+	}()
+
 	for {
 		_ = conn.SetReadDeadline(time.Now().Add(runnerStreamReadIdle))
 		_, raw, err := conn.ReadMessage()
