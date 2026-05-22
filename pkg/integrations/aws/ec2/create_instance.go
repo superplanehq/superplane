@@ -588,6 +588,35 @@ func (c *CreateInstance) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.U
 }
 
 func (c *CreateInstance) Cancel(ctx core.ExecutionContext) error {
+	var metadata CreateInstanceExecutionMetadata
+	if err := mapstructure.Decode(ctx.Metadata.Get(), &metadata); err != nil {
+		return fmt.Errorf("failed to decode metadata: %w", err)
+	}
+
+	if metadata.InstanceID == "" {
+		return nil
+	}
+
+	config, err := decodeCreateInstanceConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
+	}
+
+	region, err := requireRegion(config.Region)
+	if err != nil {
+		return err
+	}
+
+	creds, err := common.CredentialsFromInstallation(ctx.Integration)
+	if err != nil {
+		return fmt.Errorf("failed to get AWS credentials: %w", err)
+	}
+
+	client := NewClient(ctx.HTTP, creds, region)
+	if _, err := client.TerminateInstances(metadata.InstanceID); err != nil && !IsInstanceNotFound(err) {
+		return fmt.Errorf("failed to terminate instance %s during cancel: %w", metadata.InstanceID, err)
+	}
+
 	return nil
 }
 

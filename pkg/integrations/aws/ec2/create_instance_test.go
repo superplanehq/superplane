@@ -356,3 +356,111 @@ func Test__CreateInstance__ExecuteCreatesSecurityGroup(t *testing.T) {
 	runBodyString := string(runBody)
 	assert.Contains(t, runBodyString, "NetworkInterface.1.SecurityGroupId.1=sg-new123")
 }
+
+func Test__CreateInstance__Cancel(t *testing.T) {
+	component := &CreateInstance{}
+	config := map[string]any{
+		"name":              "builder",
+		"region":            "us-east-1",
+		"image":             "ami-123",
+		"instanceType":      "t3.micro",
+		"subnet":            "subnet-123",
+		"securityGroupMode": "existing",
+		"securityGroup":     "sg-123",
+	}
+
+	t.Run("no instance launched -> no-op", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{}
+		err := component.Cancel(core.ExecutionContext{
+			Configuration: config,
+			HTTP:          httpContext,
+			Metadata:      &contexts.MetadataContext{},
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 0, "no API calls expected when no instance launched")
+	})
+
+	t.Run("instance launched -> terminates it", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<TerminateInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+							<requestId>req-term</requestId>
+							<instancesSet>
+								<item>
+									<instanceId>i-abc123</instanceId>
+									<previousState><name>running</name><code>16</code></previousState>
+									<currentState><name>shutting-down</name><code>32</code></currentState>
+								</item>
+							</instancesSet>
+						</TerminateInstancesResponse>
+					`)),
+				},
+			},
+		}
+		err := component.Cancel(core.ExecutionContext{
+			Configuration: config,
+			HTTP:          httpContext,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{"instanceId": "i-abc123"},
+			},
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		body, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), "Action=TerminateInstances")
+		assert.Contains(t, string(body), "InstanceId.1=i-abc123")
+	})
+
+	t.Run("instance already gone -> no error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusBadRequest,
+					Body: io.NopCloser(strings.NewReader(`
+						<ErrorResponse>
+							<Errors>
+								<Error>
+									<Code>InvalidInstanceID.NotFound</Code>
+									<Message>The instance ID 'i-abc123' does not exist</Message>
+								</Error>
+							</Errors>
+						</ErrorResponse>
+					`)),
+				},
+			},
+		}
+		err := component.Cancel(core.ExecutionContext{
+			Configuration: config,
+			HTTP:          httpContext,
+			Metadata: &contexts.MetadataContext{
+				Metadata: map[string]any{"instanceId": "i-abc123"},
+			},
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+		require.NoError(t, err)
+	})
+}
