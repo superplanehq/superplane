@@ -20,8 +20,21 @@ interface VMInstanceNodeMetadata {
 }
 
 interface DeleteVMInstanceConfiguration {
-  zone?: string;
   instance?: string;
+}
+
+interface DeleteVMInstanceOutputData {
+  instanceName?: string;
+  zone?: string;
+}
+
+function parseInstancePath(value: string | undefined): { zone: string; name: string } | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.includes("{{")) return null;
+  const match = trimmed.match(/zones\/([^/]+)\/instances\/([^/?#]+)/);
+  if (!match) return null;
+  return { zone: match[1], name: match[2] };
 }
 
 export const deleteVMInstanceMapper: ComponentBaseMapper = {
@@ -42,7 +55,7 @@ export const deleteVMInstanceMapper: ComponentBaseMapper = {
     };
   },
 
-  getExecutionDetails(context: ExecutionDetailsContext): Record<string, any> {
+  getExecutionDetails(context: ExecutionDetailsContext): Record<string, string> {
     const details: Record<string, string> = {};
 
     if (context.execution.createdAt) {
@@ -50,7 +63,7 @@ export const deleteVMInstanceMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as Record<string, any> | undefined;
+    const result = outputs?.default?.[0]?.data as DeleteVMInstanceOutputData | undefined;
     if (!result) return details;
 
     if (result.instanceName) {
@@ -75,8 +88,9 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   const nodeMetadata = node.metadata as VMInstanceNodeMetadata | undefined;
   const configuration = node.configuration as DeleteVMInstanceConfiguration | undefined;
 
-  const instanceName = nodeMetadata?.instanceName || configuration?.instance;
-  const zone = nodeMetadata?.zone || configuration?.zone;
+  const parsed = parseInstancePath(configuration?.instance);
+  const instanceName = nodeMetadata?.instanceName || parsed?.name || configuration?.instance;
+  const zone = nodeMetadata?.zone || parsed?.zone;
 
   if (instanceName) {
     metadata.push({ icon: "trash-2", label: instanceName });
@@ -89,9 +103,18 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 }
 
 function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName!);
-  const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+  const rootEvent = execution.rootEvent;
+  if (!rootEvent?.nodeId) {
+    return [];
+  }
+
+  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
+  if (!rootTriggerNode?.componentName) {
+    return [];
+  }
+
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
+  const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
   const subtitleTimestamp = execution.updatedAt || execution.createdAt;
   const fallbackSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
   const eventSubtitle = subtitle || fallbackSubtitle;
@@ -102,7 +125,7 @@ function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componen
       eventTitle: title,
       eventSubtitle,
       eventState: getState(componentName)(execution),
-      eventId: execution.rootEvent!.id!,
+      eventId: rootEvent.id!,
     },
   ];
 }

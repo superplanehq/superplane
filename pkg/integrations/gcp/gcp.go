@@ -937,7 +937,7 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case compute.ResourceTypeFirewall:
 		return compute.ListFirewallResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeInstance:
-		return compute.ListInstanceResources(reqCtx, client, p["project"], p["zone"])
+		return compute.ListInstanceResources(reqCtx, client, p["project"])
 	case clouddns.ResourceTypeManagedZone:
 		return clouddns.ListManagedZoneResources(reqCtx, client, p["projectId"])
 	case cloudbuild.ResourceTypeTrigger:

@@ -1327,32 +1327,37 @@ func ListFirewallResources(ctx context.Context, c Client, project string) ([]cor
 const ResourceTypeInstance = "instance"
 
 type Instance struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`
-	Zone   string `json:"zone"`
-}
-
-type instancesListResp struct {
-	Items         []*instanceListItem `json:"items"`
-	NextPageToken string              `json:"nextPageToken"`
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	Zone     string `json:"zone"`
+	SelfLink string `json:"selfLink"`
 }
 
 type instanceListItem struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`
-	Zone   string `json:"zone"`
+	Name     string `json:"name"`
+	Status   string `json:"status"`
+	Zone     string `json:"zone"`
+	SelfLink string `json:"selfLink"`
 }
 
-func ListInstances(ctx context.Context, c Client, project, zone string) ([]Instance, error) {
+type instancesScopedList struct {
+	Instances []*instanceListItem `json:"instances"`
+}
+
+type instancesAggregatedListResp struct {
+	Items         map[string]*instancesScopedList `json:"items"`
+	NextPageToken string                          `json:"nextPageToken"`
+}
+
+// ListInstances returns every VM instance in the project across all zones using
+// the aggregatedList endpoint, so callers don't need to know which zone the
+// instance lives in.
+func ListInstances(ctx context.Context, c Client, project string) ([]Instance, error) {
 	project = strings.TrimSpace(project)
-	zone = strings.TrimSpace(zone)
 	if project == "" {
 		project = c.ProjectID()
 	}
-	if zone == "" {
-		return nil, fmt.Errorf("zone is required")
-	}
-	path := fmt.Sprintf("projects/%s/zones/%s/instances", project, zone)
+	path := fmt.Sprintf("projects/%s/aggregated/instances", project)
 	var all []Instance
 	var pageToken string
 	for {
@@ -1360,15 +1365,25 @@ func ListInstances(ctx context.Context, c Client, project, zone string) ([]Insta
 		if err != nil {
 			return nil, err
 		}
-		var resp instancesListResp
+		var resp instancesAggregatedListResp
 		if err := json.Unmarshal(body, &resp); err != nil {
-			return nil, fmt.Errorf("parse instances response: %w", err)
+			return nil, fmt.Errorf("parse instances aggregated response: %w", err)
 		}
-		for _, it := range resp.Items {
-			if it == nil {
+		for _, scoped := range resp.Items {
+			if scoped == nil {
 				continue
 			}
-			all = append(all, Instance{Name: it.Name, Status: it.Status, Zone: lastSegment(it.Zone)})
+			for _, it := range scoped.Instances {
+				if it == nil {
+					continue
+				}
+				all = append(all, Instance{
+					Name:     it.Name,
+					Status:   it.Status,
+					Zone:     lastSegment(it.Zone),
+					SelfLink: it.SelfLink,
+				})
+			}
 		}
 		pageToken = resp.NextPageToken
 		if pageToken == "" {
@@ -1378,21 +1393,24 @@ func ListInstances(ctx context.Context, c Client, project, zone string) ([]Insta
 	return all, nil
 }
 
-func ListInstanceResources(ctx context.Context, c Client, project, zone string) ([]core.IntegrationResource, error) {
-	if strings.TrimSpace(zone) == "" {
-		return []core.IntegrationResource{}, nil
-	}
-	list, err := ListInstances(ctx, c, project, zone)
+func ListInstanceResources(ctx context.Context, c Client, project string) ([]core.IntegrationResource, error) {
+	list, err := ListInstances(ctx, c, project)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]core.IntegrationResource, 0, len(list))
 	for _, inst := range list {
 		label := inst.Name
-		if inst.Status != "" {
+		switch {
+		case inst.Zone != "" && inst.Status != "":
+			label = fmt.Sprintf("%s (%s, %s)", inst.Name, inst.Zone, inst.Status)
+		case inst.Zone != "":
+			label = fmt.Sprintf("%s (%s)", inst.Name, inst.Zone)
+		case inst.Status != "":
 			label = fmt.Sprintf("%s (%s)", inst.Name, inst.Status)
 		}
-		out = append(out, core.IntegrationResource{Type: ResourceTypeInstance, Name: label, ID: inst.Name})
+		id := fmt.Sprintf("zones/%s/instances/%s", inst.Zone, inst.Name)
+		out = append(out, core.IntegrationResource{Type: ResourceTypeInstance, Name: label, ID: id})
 	}
 	return out, nil
 }

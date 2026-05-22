@@ -18,7 +18,6 @@ import (
 type DeleteVMInstance struct{}
 
 type DeleteVMInstanceSpec struct {
-	Zone     string `mapstructure:"zone"`
 	Instance string `mapstructure:"instance"`
 }
 
@@ -36,7 +35,7 @@ func (d *DeleteVMInstance) Label() string {
 }
 
 func (d *DeleteVMInstance) Description() string {
-	return "Permanently delete a Google Compute Engine VM instance by name and zone"
+	return "Permanently delete a Google Compute Engine VM instance"
 }
 
 func (d *DeleteVMInstance) Documentation() string {
@@ -51,8 +50,7 @@ func (d *DeleteVMInstance) Documentation() string {
 
 ## Configuration
 
-- **Zone**: The GCP zone where the instance lives (required)
-- **Instance**: The VM instance name to delete (required, supports expressions)
+- **VM Instance**: Pick from the list of VMs in your project, or pass an expression chained from an upstream node (e.g. the ` + "`selfLink`" + ` emitted by ` + "`gcp.createVM`" + `). The selection encodes both the zone and the instance name.
 
 ## Output
 
@@ -65,7 +63,7 @@ Returns information about the deleted instance:
 - This operation is **permanent** and cannot be undone
 - All data on the instance will be lost unless boot/data disks have auto-delete disabled
 - The instance will be stopped if running before deletion
-- If the instance is not found in the configured zone, the action fails so that misconfigured zone/project values do not silently mask incomplete cleanup`
+- If the instance is not found at the resolved zone/name, the action fails so that misconfigured or stale expressions do not silently mask incomplete cleanup`
 }
 
 func (d *DeleteVMInstance) Icon() string {
@@ -83,34 +81,53 @@ func (d *DeleteVMInstance) OutputChannels(configuration any) []core.OutputChanne
 func (d *DeleteVMInstance) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "zone",
-			Label:       "Zone",
-			Type:        configuration.FieldTypeIntegrationResource,
-			Required:    true,
-			Description: "The GCP zone where the VM instance is located (e.g. us-central1-a).",
-			TypeOptions: &configuration.TypeOptions{
-				Resource: &configuration.ResourceTypeOptions{
-					Type: ResourceTypeZone,
-				},
-			},
-		},
-		{
 			Name:        "instance",
 			Label:       "VM Instance",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The VM instance to delete.",
+			Description: "The VM instance to delete. Lists every VM in your project across all zones.",
 			Placeholder: "Select instance",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: ResourceTypeInstance,
-					Parameters: []configuration.ParameterRef{
-						{Name: "zone", ValueFrom: &configuration.ParameterValueFrom{Field: "zone"}},
-					},
 				},
 			},
 		},
 	}
+}
+
+// parseInstancePath extracts (zone, name) from a value of the form
+// `zones/<zone>/instances/<name>` (relative path) or a full GCE selfLink URL
+// containing the same substring. This lets the same field accept both the
+// dropdown value and an expression chaining `selfLink` from an upstream node.
+func parseInstancePath(value string) (string, string, error) {
+	s := strings.TrimSpace(value)
+	if s == "" {
+		return "", "", errors.New("instance is required")
+	}
+	idx := strings.Index(s, "zones/")
+	if idx < 0 {
+		return "", "", fmt.Errorf("instance %q must be a path like zones/<zone>/instances/<name> or a GCE selfLink URL", value)
+	}
+	rest := s[idx+len("zones/"):]
+	slash := strings.Index(rest, "/")
+	if slash <= 0 {
+		return "", "", fmt.Errorf("instance %q is missing a zone segment", value)
+	}
+	zone := rest[:slash]
+	after := rest[slash+1:]
+	const prefix = "instances/"
+	if !strings.HasPrefix(after, prefix) {
+		return "", "", fmt.Errorf("instance %q is missing an instances/ segment", value)
+	}
+	name := after[len(prefix):]
+	if q := strings.IndexAny(name, "/?#"); q >= 0 {
+		name = name[:q]
+	}
+	if zone == "" || name == "" {
+		return "", "", fmt.Errorf("instance %q is missing a zone or name", value)
+	}
+	return zone, name, nil
 }
 
 func (d *DeleteVMInstance) Setup(ctx core.SetupContext) error {
@@ -119,40 +136,39 @@ func (d *DeleteVMInstance) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	if strings.TrimSpace(spec.Zone) == "" {
-		return errors.New("zone is required")
-	}
-
-	if strings.TrimSpace(spec.Instance) == "" {
+	instanceValue := strings.TrimSpace(spec.Instance)
+	if instanceValue == "" {
 		return errors.New("instance is required")
 	}
 
-	return d.resolveNodeMetadata(ctx, spec)
+	return d.resolveNodeMetadata(ctx, instanceValue)
 }
 
-func (d *DeleteVMInstance) resolveNodeMetadata(ctx core.SetupContext, spec DeleteVMInstanceSpec) error {
-	zone := lastSegment(strings.TrimSpace(spec.Zone))
-	instanceName := strings.TrimSpace(spec.Instance)
-
-	// If the instance is an expression, skip the API call and store what we have
-	if strings.Contains(instanceName, "{{") {
+func (d *DeleteVMInstance) resolveNodeMetadata(ctx core.SetupContext, instanceValue string) error {
+	// Expressions are resolved at execution time. Store the raw value so the UI
+	// can still display something meaningful in the collapsed node.
+	if strings.Contains(instanceValue, "{{") {
 		return ctx.Metadata.Set(VMInstanceNodeMetadata{
-			InstanceName: instanceName,
-			Zone:         zone,
+			InstanceName: instanceValue,
 		})
+	}
+
+	zone, name, err := parseInstancePath(instanceValue)
+	if err != nil {
+		return err
 	}
 
 	// If metadata is already set for the same instance, skip the API call
 	var existing VMInstanceNodeMetadata
-	if err := mapstructure.Decode(ctx.Metadata.Get(), &existing); err == nil &&
-		existing.InstanceName == instanceName && existing.Zone == zone {
+	if decErr := mapstructure.Decode(ctx.Metadata.Get(), &existing); decErr == nil &&
+		existing.InstanceName == name && existing.Zone == zone {
 		return nil
 	}
 
 	// No integration available (e.g. in tests without credentials) — store what we have
 	if ctx.Integration == nil {
 		return ctx.Metadata.Set(VMInstanceNodeMetadata{
-			InstanceName: instanceName,
+			InstanceName: name,
 			Zone:         zone,
 		})
 	}
@@ -160,15 +176,15 @@ func (d *DeleteVMInstance) resolveNodeMetadata(ctx core.SetupContext, spec Delet
 	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
 	if err != nil {
 		return ctx.Metadata.Set(VMInstanceNodeMetadata{
-			InstanceName: instanceName,
+			InstanceName: name,
 			Zone:         zone,
 		})
 	}
 
-	body, err := GetInstance(context.Background(), client, client.ProjectID(), zone, instanceName)
+	body, err := GetInstance(context.Background(), client, client.ProjectID(), zone, name)
 	if err != nil {
 		return ctx.Metadata.Set(VMInstanceNodeMetadata{
-			InstanceName: instanceName,
+			InstanceName: name,
 			Zone:         zone,
 		})
 	}
@@ -176,14 +192,14 @@ func (d *DeleteVMInstance) resolveNodeMetadata(ctx core.SetupContext, spec Delet
 	payload, err := InstancePayloadFromGetResponse(body, zone)
 	if err != nil {
 		return ctx.Metadata.Set(VMInstanceNodeMetadata{
-			InstanceName: instanceName,
+			InstanceName: name,
 			Zone:         zone,
 		})
 	}
 
 	resolvedName, _ := payload["name"].(string)
 	if resolvedName == "" {
-		resolvedName = instanceName
+		resolvedName = name
 	}
 
 	return ctx.Metadata.Set(VMInstanceNodeMetadata{
@@ -198,8 +214,10 @@ func (d *DeleteVMInstance) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error decoding configuration: %v", err)
 	}
 
-	zone := lastSegment(strings.TrimSpace(spec.Zone))
-	instanceName := strings.TrimSpace(spec.Instance)
+	zone, instanceName, err := parseInstancePath(spec.Instance)
+	if err != nil {
+		return err
+	}
 
 	client, err := getClient(ctx)
 	if err != nil {
@@ -214,10 +232,10 @@ func (d *DeleteVMInstance) Execute(ctx core.ExecutionContext) error {
 	if err != nil {
 		// Surface the underlying API error (including 404s). A 404 may indicate
 		// the instance is genuinely already gone, but it can also be caused by a
-		// misconfigured zone/project pointing at a non-existent resource path —
-		// in which case the VM may still exist elsewhere. Returning the error
-		// lets the workflow author decide how to handle it explicitly rather
-		// than silently claiming the cleanup succeeded.
+		// stale expression or a renamed resource — in which case the VM may
+		// still exist. Returning the error lets the workflow author decide how
+		// to handle it explicitly rather than silently claiming the cleanup
+		// succeeded.
 		return fmt.Errorf("failed to delete VM instance: %w", err)
 	}
 

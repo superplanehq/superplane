@@ -29,7 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud DNS • Update Record" href="#cloud-dns-•-update-record" description="Update an existing DNS record in a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
-  <LinkCard title="Compute • Delete VM Instance" href="#compute-•-delete-vm-instance" description="Permanently delete a Google Compute Engine VM instance by name and zone" />
+  <LinkCard title="Compute • Delete VM Instance" href="#compute-•-delete-vm-instance" description="Permanently delete a Google Compute Engine VM instance" />
   <LinkCard title="Pub/Sub • Create Subscription" href="#pub/sub-•-create-subscription" description="Create a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Create Topic" href="#pub/sub-•-create-topic" description="Create a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
@@ -770,8 +770,7 @@ The Delete VM Instance component permanently deletes a Compute Engine VM instanc
 
 ### Configuration
 
-- **Zone**: The GCP zone where the instance lives (required)
-- **Instance**: The VM instance name to delete (required, supports expressions)
+- **VM Instance**: Pick from the list of VMs in your project, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.createVM`). The selection encodes both the zone and the instance name.
 
 ### Output
 
@@ -784,7 +783,7 @@ Returns information about the deleted instance:
 - This operation is **permanent** and cannot be undone
 - All data on the instance will be lost unless boot/data disks have auto-delete disabled
 - The instance will be stopped if running before deletion
-- If the instance is not found in the configured zone, the action fails so that misconfigured zone/project values do not silently mask incomplete cleanup
+- If the instance is not found at the resolved zone/name, the action fails so that misconfigured or stale expressions do not silently mask incomplete cleanup
 
 ### Example Output
 
