@@ -96,38 +96,46 @@ func (d *DeleteVMInstance) Configuration() []configuration.Field {
 	}
 }
 
-// parseInstancePath extracts (zone, name) from a value of the form
+// parseInstancePath extracts (project, zone, name) from a value of the form
 // `zones/<zone>/instances/<name>` (relative path) or a full GCE selfLink URL
-// containing the same substring. This lets the same field accept both the
-// dropdown value and an expression chaining `selfLink` from an upstream node.
-func parseInstancePath(value string) (string, string, error) {
+// containing `projects/<project>/zones/<zone>/instances/<name>`. The project
+// segment is optional — relative paths from the dropdown have no project, but
+// chained selfLinks do, and the caller must verify it matches the integration's
+// bound project before issuing the delete.
+func parseInstancePath(value string) (project, zone, name string, err error) {
 	s := strings.TrimSpace(value)
 	if s == "" {
-		return "", "", errors.New("instance is required")
+		return "", "", "", errors.New("instance is required")
+	}
+	if idx := strings.Index(s, "projects/"); idx >= 0 {
+		rest := s[idx+len("projects/"):]
+		if slash := strings.Index(rest, "/"); slash > 0 {
+			project = rest[:slash]
+		}
 	}
 	idx := strings.Index(s, "zones/")
 	if idx < 0 {
-		return "", "", fmt.Errorf("instance %q must be a path like zones/<zone>/instances/<name> or a GCE selfLink URL", value)
+		return "", "", "", fmt.Errorf("instance %q must be a path like zones/<zone>/instances/<name> or a GCE selfLink URL", value)
 	}
 	rest := s[idx+len("zones/"):]
 	slash := strings.Index(rest, "/")
 	if slash <= 0 {
-		return "", "", fmt.Errorf("instance %q is missing a zone segment", value)
+		return "", "", "", fmt.Errorf("instance %q is missing a zone segment", value)
 	}
-	zone := rest[:slash]
+	zone = rest[:slash]
 	after := rest[slash+1:]
 	const prefix = "instances/"
 	if !strings.HasPrefix(after, prefix) {
-		return "", "", fmt.Errorf("instance %q is missing an instances/ segment", value)
+		return "", "", "", fmt.Errorf("instance %q is missing an instances/ segment", value)
 	}
-	name := after[len(prefix):]
+	name = after[len(prefix):]
 	if q := strings.IndexAny(name, "/?#"); q >= 0 {
 		name = name[:q]
 	}
 	if zone == "" || name == "" {
-		return "", "", fmt.Errorf("instance %q is missing a zone or name", value)
+		return "", "", "", fmt.Errorf("instance %q is missing a zone or name", value)
 	}
-	return zone, name, nil
+	return project, zone, name, nil
 }
 
 func (d *DeleteVMInstance) Setup(ctx core.SetupContext) error {
@@ -153,7 +161,7 @@ func (d *DeleteVMInstance) resolveNodeMetadata(ctx core.SetupContext, instanceVa
 		})
 	}
 
-	zone, name, err := parseInstancePath(instanceValue)
+	_, zone, name, err := parseInstancePath(instanceValue)
 	if err != nil {
 		return err
 	}
@@ -211,46 +219,54 @@ func (d *DeleteVMInstance) resolveNodeMetadata(ctx core.SetupContext, instanceVa
 func (d *DeleteVMInstance) Execute(ctx core.ExecutionContext) error {
 	spec := DeleteVMInstanceSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
-		return fmt.Errorf("error decoding configuration: %v", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	zone, instanceName, err := parseInstancePath(spec.Instance)
+	urlProject, zone, instanceName, err := parseInstancePath(spec.Instance)
 	if err != nil {
-		return err
+		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
 	client, err := getClient(ctx)
 	if err != nil {
-		return fmt.Errorf("error creating client: %v", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to create GCP client: %v", err))
 	}
 
 	project := client.ProjectID()
-	callCtx := context.Background()
+	// If the value carried an explicit project (selfLink form), it must match
+	// the integration's bound project. Silently rewriting to the integration
+	// project could delete a same-named VM in the wrong place.
+	if urlProject != "" && urlProject != project {
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf(
+			"instance belongs to project %q but this GCP integration is bound to project %q; cross-project deletes are not supported",
+			urlProject, project,
+		))
+	}
 
+	callCtx := context.Background()
 	path := fmt.Sprintf("projects/%s/zones/%s/instances/%s", project, zone, instanceName)
 	body, err := client.Delete(callCtx, path)
 	if err != nil {
 		// Surface the underlying API error (including 404s). A 404 may indicate
 		// the instance is genuinely already gone, but it can also be caused by a
 		// stale expression or a renamed resource — in which case the VM may
-		// still exist. Returning the error lets the workflow author decide how
-		// to handle it explicitly rather than silently claiming the cleanup
-		// succeeded.
-		return fmt.Errorf("failed to delete VM instance: %w", err)
+		// still exist. Failing loudly lets the workflow author decide how to
+		// handle it explicitly rather than silently claiming success.
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to delete VM instance: %v", err))
 	}
 
 	var opResp struct {
 		Name string `json:"name"`
 	}
 	if err := json.Unmarshal(body, &opResp); err != nil {
-		return fmt.Errorf("parse delete operation response: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("parse delete operation response: %v", err))
 	}
 	if opResp.Name == "" {
-		return errors.New("delete operation response missing operation name; cannot confirm deletion")
+		return ctx.ExecutionState.Fail("error", "delete operation response missing operation name; cannot confirm deletion")
 	}
 
 	if err := WaitForZoneOperation(callCtx, client, project, zone, lastSegment(opResp.Name)); err != nil {
-		return fmt.Errorf("error waiting for delete operation: %w", err)
+		return ctx.ExecutionState.Fail("error", fmt.Sprintf("error waiting for delete operation: %v", err))
 	}
 
 	return ctx.ExecutionState.Emit(
