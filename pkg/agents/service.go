@@ -160,7 +160,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, fmt.Errorf("message content is required")
 	}
 
-	session, err := models.FindAgentSessionForUser(organizationID, userID, sessionID)
+	session, err := models.FindAgentSessionInOrg(organizationID, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -218,8 +218,15 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
+
+	// Inject user identity so the agent knows who is talking
+	userIdentity := fmt.Sprintf("current_user_id: %s", userID.String())
+	if user, err := models.FindUnscopedUserByID(userID.String()); err == nil && user.Name != "" {
+		userIdentity = fmt.Sprintf("current_user_id: %s\ncurrent_user_name: %s", userID.String(), user.Name)
+	}
+
 	draftStatus := getDraftStatus(session.CanvasID)
-	return base + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
+	return base + "\n" + userIdentity + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {

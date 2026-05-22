@@ -122,7 +122,6 @@ export function AgentTabPanel({ toolSidebarState }: { toolSidebarState: CanvasTo
           agentMode={toolSidebarState.agentMode}
           onModeSwitch={toolSidebarState.switchAgentMode}
           isEditing={toolSidebarState.isEditing}
-          readOnly
         />
       </div>
     );
