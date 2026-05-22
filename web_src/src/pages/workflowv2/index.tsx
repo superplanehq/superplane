@@ -415,15 +415,15 @@ export function WorkflowPageV2() {
     () => hasDraftVersusLiveGraphDiff(liveCanvasVersion, latestDraftVersion),
     [liveCanvasVersion, latestDraftVersion],
   );
-  const draftDiffResult = useMemo(
-    () => (isViewingDraftVersion ? buildDraftDiffMap(liveCanvasVersion, latestDraftVersion) : undefined),
-    [isViewingDraftVersion, liveCanvasVersion, latestDraftVersion],
-  );
   const selectedCanvasVersionID = selectedCanvasVersion?.metadata?.id || "";
   const isViewingPendingApprovalVersion =
     !!selectedCanvasVersionID && pendingApprovalVersionIds.has(selectedCanvasVersionID);
   const isViewingDraftVersion =
     !!selectedCanvasVersion && isDraftVersion(selectedCanvasVersion) && !isViewingPendingApprovalVersion;
+  const draftDiffResult = useMemo(
+    () => (isViewingDraftVersion ? buildDraftDiffMap(liveCanvasVersion, latestDraftVersion) : undefined),
+    [isViewingDraftVersion, liveCanvasVersion, latestDraftVersion],
+  );
   const isViewingCurrentLiveVersion =
     !selectedCanvasVersion || selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
