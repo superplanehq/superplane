@@ -115,7 +115,7 @@ func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]mode
 }
 
 func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error {
-	session, err := s.GetSession(organizationID, userID, sessionID)
+	session, err := s.getSharedSession(organizationID, userID, sessionID)
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
 	}
@@ -126,7 +126,7 @@ func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, 
 }
 
 func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error {
-	session, err := s.GetSession(organizationID, userID, sessionID)
+	session, err := s.getSharedSession(organizationID, userID, sessionID)
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
 	}
@@ -160,16 +160,9 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, fmt.Errorf("message content is required")
 	}
 
-	// Any org member can send to the shared canvas session
-	var session *models.AgentSession
-	session, err := models.FindAgentSessionForUser(organizationID, userID, sessionID)
+	session, err := s.getSharedSession(organizationID, userID, sessionID)
 	if err != nil {
-		// Fall back to org-scoped lookup for shared sessions
-		var orgSession models.AgentSession
-		if orgErr := database.Conn().Where("organization_id = ? AND id = ?", organizationID, sessionID).First(&orgSession).Error; orgErr != nil {
-			return nil, err
-		}
-		session = &orgSession
+		return nil, err
 	}
 
 	agentMode := ModeOperator
@@ -408,4 +401,13 @@ func sessionTitle(organizationID, canvasID uuid.UUID) string {
 		return org.Name
 	}
 	return org.Name + " - " + canvas.Name
+}
+
+// getSharedSession tries user-scoped first, then falls back to org-scoped for shared sessions.
+func (s *Service) getSharedSession(organizationID, userID, sessionID uuid.UUID) (*models.AgentSession, error) {
+	session, err := s.GetSession(organizationID, userID, sessionID)
+	if err == nil {
+		return session, nil
+	}
+	return models.FindSharedCanvasSessionByID(organizationID, sessionID)
 }

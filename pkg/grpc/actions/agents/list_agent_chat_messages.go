@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
-	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/agents"
 	"google.golang.org/grpc/codes"
@@ -26,14 +25,13 @@ func ListAgentChatMessages(_ context.Context, svc AgentsService, orgID, userID s
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
 
-	// Try user-scoped first, then org-scoped (shared canvas sessions)
+	// Allow any org member to read messages from shared canvas sessions
 	if _, err := svc.GetSession(org, user, chatID); err != nil {
-		var orgSession models.AgentSession
-		if orgErr := database.Conn().Where("organization_id = ? AND id = ?", org, chatID).First(&orgSession).Error; orgErr != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
+		if _, orgErr := models.FindSharedCanvasSessionByID(org, chatID); orgErr != nil {
+			if errors.Is(orgErr, gorm.ErrRecordNotFound) {
 				return nil, status.Error(codes.NotFound, "agent chat not found")
 			}
-			log.WithError(err).WithField("chat_id", chatID).Error("failed to load agent chat")
+			log.WithError(orgErr).WithField("chat_id", chatID).Error("failed to load agent chat")
 			return nil, status.Error(codes.Internal, "failed to load agent chat")
 		}
 	}
