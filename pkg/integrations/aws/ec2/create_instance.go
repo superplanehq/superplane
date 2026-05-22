@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/google/uuid"
@@ -26,8 +27,6 @@ var rootVolumeTypeOptions = []configuration.FieldOption{
 	{Label: "General Purpose SSD (gp2)", Value: "gp2"},
 	{Label: "Provisioned IOPS SSD (io1)", Value: "io1"},
 	{Label: "Provisioned IOPS SSD (io2)", Value: "io2"},
-	{Label: "Throughput Optimized HDD (st1)", Value: "st1"},
-	{Label: "Cold HDD (sc1)", Value: "sc1"},
 	{Label: "Magnetic (standard)", Value: "standard"},
 }
 
@@ -710,8 +709,16 @@ func validateCreateInstanceConfiguration(config CreateInstanceConfiguration) err
 		if config.VolumeSizeGiB < 1 {
 			return fmt.Errorf("volume size must be at least 1 GiB")
 		}
-		if strings.TrimSpace(config.VolumeType) == "" {
+		volumeType := strings.TrimSpace(config.VolumeType)
+		if volumeType == "" {
 			return fmt.Errorf("volume type is required when configuring the root volume")
+		}
+		validBootVolumeTypes := []string{"gp3", "gp2", "io1", "io2", "standard"}
+		if !slices.Contains(validBootVolumeTypes, volumeType) {
+			return fmt.Errorf("volume type %q cannot be used as a boot volume; valid types are: gp3, gp2, io1, io2, standard", volumeType)
+		}
+		if (volumeType == "io1" || volumeType == "io2") && config.VolumeIops < 100 {
+			return fmt.Errorf("IOPS must be at least 100 for %s volume type", volumeType)
 		}
 	}
 	return nil
