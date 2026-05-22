@@ -1,5 +1,7 @@
 package ec2
 
+import "time"
+
 const (
 	Source                   = "aws.ec2"
 	DetailTypeAMIStateChange = "EC2 AMI State Change"
@@ -11,4 +13,22 @@ const (
 	ImageStateFailed       = "failed"
 	ImageStateDeregistered = "deregistered"
 	ImageStateDisabled     = "disabled"
+)
+
+const (
+	InstanceStatePending      = "pending"
+	InstanceStateRunning      = "running"
+	InstanceStateShuttingDown = "shutting-down"
+	InstanceStateTerminated   = "terminated"
+	InstanceStateStopping     = "stopping"
+	InstanceStateStopped      = "stopped"
+)
+
+const (
+	CreateInstancePayloadType = "aws.ec2.instance"
+	DeleteInstancePayloadType = "aws.ec2.instance.deleted"
+
+	instancePollInterval    = 10 * time.Second
+	maxInstancePollErrors   = 10
+	maxInstancePollAttempts = 180
 )
