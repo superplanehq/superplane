@@ -505,11 +505,10 @@ export function WorkflowPageV2() {
       spec: versionSpec,
     };
   }, [liveCanvas, selectedCanvasVersion, isViewingDraftVersion, draftSpecToRender]);
-  const draftDiffResult = useMemo(() => {
-    if (!isViewingDraftVersion || !canvas) return undefined;
-    const currentDraft = { spec: canvas.spec } as CanvasesCanvasVersion;
-    return buildDraftDiffMap(liveCanvasVersion, currentDraft);
-  }, [isViewingDraftVersion, liveCanvasVersion, canvas]);
+  const draftDiffResult = useMemo(
+    () => (isViewingDraftVersion ? buildDraftDiffMap(liveCanvasVersion, latestDraftVersion) : undefined),
+    [isViewingDraftVersion, liveCanvasVersion, latestDraftVersion],
+  );
   const isChangeManagementDisabled = !(
     liveCanvas?.spec?.changeManagement?.enabled ??
     liveCanvasVersion?.spec?.changeManagement?.enabled ??
