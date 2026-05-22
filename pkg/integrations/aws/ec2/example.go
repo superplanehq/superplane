@@ -40,6 +40,12 @@ var exampleOutputCreateInstanceBytes []byte
 //go:embed example_output_delete_instance.json
 var exampleOutputDeleteInstanceBytes []byte
 
+//go:embed example_output_get_instance.json
+var exampleOutputGetInstanceBytes []byte
+
+//go:embed example_output_manage_instance_power.json
+var exampleOutputManageInstancePowerBytes []byte
+
 var exampleDataOnImageOnce sync.Once
 var exampleDataOnImage map[string]any
 
@@ -72,6 +78,12 @@ var exampleOutputCreateInstance map[string]any
 
 var exampleOutputDeleteInstanceOnce sync.Once
 var exampleOutputDeleteInstance map[string]any
+
+var exampleOutputGetInstanceOnce sync.Once
+var exampleOutputGetInstance map[string]any
+
+var exampleOutputManageInstancePowerOnce sync.Once
+var exampleOutputManageInstancePower map[string]any
 
 func (t *OnImage) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageOnce, exampleDataOnImageBytes, &exampleDataOnImage)
@@ -134,5 +146,21 @@ func (c *DeleteInstance) ExampleOutput() map[string]any {
 		&exampleOutputDeleteInstanceOnce,
 		exampleOutputDeleteInstanceBytes,
 		&exampleOutputDeleteInstance,
+	)
+}
+
+func (c *GetInstance) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetInstanceOnce,
+		exampleOutputGetInstanceBytes,
+		&exampleOutputGetInstance,
+	)
+}
+
+func (c *ManageInstancePower) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputManageInstancePowerOnce,
+		exampleOutputManageInstancePowerBytes,
+		&exampleOutputManageInstancePower,
 	)
 }

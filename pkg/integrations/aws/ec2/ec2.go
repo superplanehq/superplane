@@ -25,8 +25,10 @@ const (
 )
 
 const (
-	CreateInstancePayloadType = "aws.ec2.instance"
-	DeleteInstancePayloadType = "aws.ec2.instance.deleted"
+	CreateInstancePayloadType      = "aws.ec2.instance"
+	DeleteInstancePayloadType      = "aws.ec2.instance.deleted"
+	GetInstancePayloadType         = "aws.ec2.instance"
+	ManageInstancePowerPayloadType = "aws.ec2.instance"
 
 	instancePollInterval    = 10 * time.Second
 	maxInstancePollErrors   = 10
