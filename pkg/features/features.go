@@ -22,7 +22,7 @@ const FeatureDashboards = "dashboards"
 var registry = []Feature{
 	{ID: "runner", Label: "Runners", Description: "Sandboxed Runners"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas"},
-	{ID: FeatureDashboards, Label: "Dashboards", Description: "Markdown dashboard panels on canvases"},
+	{ID: FeatureDashboards, Label: "Console", Description: "Console panels and widgets on canvases"},
 }
 
 func All() []Feature {

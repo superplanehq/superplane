@@ -19,7 +19,7 @@ func Test__Get(t *testing.T) {
 		f, ok := Get(FeatureDashboards)
 		assert.True(t, ok)
 		assert.Equal(t, FeatureDashboards, f.ID)
-		assert.Equal(t, "Dashboards", f.Label)
+		assert.Equal(t, "Console", f.Label)
 	})
 
 	t.Run("unknown id returns zero value and false", func(t *testing.T) {

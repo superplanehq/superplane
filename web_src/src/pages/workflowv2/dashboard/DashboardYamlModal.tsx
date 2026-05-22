@@ -52,7 +52,7 @@ export function DashboardYamlModal({
         <DialogHeader className="border-b border-slate-200 px-4 py-3">
           <DialogTitle className="flex items-center gap-2 text-sm font-mono text-slate-600">{filename}</DialogTitle>
           <DialogDescription className="sr-only">
-            View, copy, download, or import the dashboard as a YAML file. Imports replace every panel and layout entry.
+            View, copy, download, or import the console as a YAML file. Imports replace every panel and layout entry.
           </DialogDescription>
         </DialogHeader>
 
@@ -123,7 +123,7 @@ function useDashboardYamlEditor({
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(text);
-      showSuccessToast("Dashboard YAML copied to clipboard");
+      showSuccessToast("Console YAML copied to clipboard");
     } catch {
       showErrorToast("Failed to copy YAML to clipboard");
     }
@@ -131,7 +131,7 @@ function useDashboardYamlEditor({
 
   const handleDownload = useCallback(() => {
     downloadYaml(text, filename);
-    showSuccessToast("Dashboard exported as YAML");
+    showSuccessToast("Console exported as YAML");
   }, [text, filename]);
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -167,10 +167,10 @@ function useDashboardYamlEditor({
       await onImport({ panels: result.data.spec.panels, layout: result.data.spec.layout });
       setConfirmingReplace(false);
       onOpenChange(false);
-      showSuccessToast("Dashboard imported from YAML");
+      showSuccessToast("Console imported from YAML");
     } catch (e) {
       setConfirmingReplace(false);
-      setParseError(e instanceof Error ? e.message : "Failed to import dashboard.");
+      setParseError(e instanceof Error ? e.message : "Failed to import console.");
     }
   }, [text, onImport, onOpenChange]);
 
@@ -276,7 +276,7 @@ function DashboardYamlToolbar({
   return (
     <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2">
       <span className="text-xs text-slate-500">
-        {isDirty ? "Editor has unsaved YAML edits" : "Showing live dashboard YAML"}
+        {isDirty ? "Editor has unsaved YAML edits" : "Showing live console YAML"}
       </span>
       <div className="flex items-center gap-2">
         {canImport ? (
@@ -369,9 +369,9 @@ function ReplaceDashboardDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Replace dashboard?</DialogTitle>
+          <DialogTitle>Replace console?</DialogTitle>
           <DialogDescription>
-            Applying this YAML replaces every panel and layout entry for the current dashboard. This action cannot be
+            Applying this YAML replaces every panel and layout entry for the current console. This action cannot be
             undone.
           </DialogDescription>
         </DialogHeader>
@@ -385,7 +385,7 @@ function ReplaceDashboardDialog({
             disabled={isImporting}
             data-testid="dashboard-yaml-replace-confirm"
           >
-            Replace dashboard
+            Replace console
           </Button>
         </DialogFooter>
       </DialogContent>
