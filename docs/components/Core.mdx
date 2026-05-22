@@ -215,7 +215,7 @@ Send a POST request to the webhook URL with your payload. The workflow will rece
 
 ## Add Memory
 
-The Add Memory component appends a new item to canvas-level memory storage.
+The Add Memory component appends one or more items to canvas-level memory storage.
 
 ### Use Cases
 
@@ -228,6 +228,14 @@ The Add Memory component appends a new item to canvas-level memory storage.
 1. Reads `namespace` and value fields from configuration
 2. Appends a new memory row for the current canvas
 3. Emits `memory.added` with the saved payload
+
+### List Mode
+
+Enable "Input is a list" to add one memory row per element of a list expression.
+Configure `listSource` (the expression that yields the list) and `itemVariable`
+(the name to reference each element in field-value expressions, defaults to `item`).
+
+A single `memory.added` event is emitted with all written rows and the total `count`.
 
 ### Example Output
 
@@ -905,6 +913,13 @@ The Update Memory component updates matching rows in canvas-level memory storage
 - **Found**: At least one matching memory row was updated
 - **Not Found**: No matching memory rows were updated
 
+### List Mode
+
+Enable "Input is a list" to iterate over a list expression and run one update per element.
+The `matchList` is evaluated once (same matches for every iteration), while each
+`valueList` field value is evaluated per element with the iteration variable in scope
+(defaults to `item`). All resulting updates are reported in a single `memory.updated` event.
+
 ### Example Output
 
 ```json
@@ -964,6 +979,17 @@ This lets you store just one field (for example `value`) without extra marker fi
 ### Output
 
 Always emits to the default channel. Check `data.operation` to know whether the component updated existing rows or created a new row.
+
+### List Mode
+
+Enable "Input is a list" to iterate over a list expression and run one upsert per element.
+The `matchList` is evaluated once (same matches for every iteration), while each
+`valueList` field value is evaluated per element with the iteration variable in scope
+(defaults to `item`). All upserts are reported in a single `memory.upserted` event with per-item operation results.
+
+Note: when a non-empty `matchList` is configured in list mode, each iteration attempts to
+update the same matched rows. List mode is most useful for inserting multiple rows
+(empty `matchList`) or when each item's values are meant to overwrite the matched rows.
 
 ### Example Output
 
