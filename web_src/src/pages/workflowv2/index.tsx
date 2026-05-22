@@ -1901,36 +1901,6 @@ export function WorkflowPageV2() {
     return [...preparedNodes, ...ghostNodes];
   }, [preparedNodes, draftDiffResult, liveCanvasVersion, allTriggers, allComponents, canvasId, queryClient]);
 
-  // Inject ghost edges for deleted connections and style edges based on node diff
-  const edgesWithDiff = useMemo(() => {
-    if (!draftDiffResult) return preparedEdges;
-    const { statusMap, removedEdges } = draftDiffResult;
-
-    // Style existing edges based on connected node status
-    const styledExisting = preparedEdges.map((edge) => {
-      const srcStatus = statusMap[edge.source];
-      const tgtStatus = statusMap[edge.target];
-      if (srcStatus === "added" || tgtStatus === "added") {
-        return { ...edge, data: { ...edge.data, _draftDiffStatus: "added" } };
-      }
-      if (srcStatus === "updated" || tgtStatus === "updated") {
-        return { ...edge, data: { ...edge.data, _draftDiffStatus: "updated" } };
-      }
-      return edge;
-    });
-
-    // Add ghost edges for removed connections
-    const ghostEdges = removedEdges.map((e) => ({
-      id: `ghost-${String(e.sourceId)}->${String(e.targetId)}-${String(e.channel || "default")}`,
-      source: String(e.sourceId),
-      target: String(e.targetId),
-      sourceHandle: String(e.channel || "default"),
-      data: { _draftDiffStatus: "removed" },
-    }));
-
-    return [...styledExisting, ...ghostEdges];
-  }, [preparedEdges, draftDiffResult]);
-
   const nodesWithIntegrationStatus = useMemo(
     () => overlayIntegrationWarnings(nodesWithGhosts, integrations, canvasNodes),
     [nodesWithGhosts, integrations, canvasNodes],
@@ -1962,7 +1932,7 @@ export function WorkflowPageV2() {
     selectedRun,
     runCanvasData,
     liveNodes: nodesWithIntegrationStatus,
-    liveEdges: edgesWithDiff,
+    liveEdges: preparedEdges,
     isSelectedRunVersionLoading,
     isSelectedRunExecutionsLoading: selectedRunExecutionsQuery.isLoading,
   });
