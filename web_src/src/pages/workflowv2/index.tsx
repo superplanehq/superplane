@@ -97,7 +97,7 @@ import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { CanvasYamlModal } from "./CanvasYamlModal";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
-import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
+import { buildDraftDiffMap, buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import {
   isDraftVersion,
@@ -142,6 +142,7 @@ import {
   getNodeAnalyticsProps,
   isCanvasLoadNotFoundError,
   prepareData,
+  prepareNode,
   prepareSidebarData,
 } from "./workflowPageHelpers";
 /** Backend flag id (`FeatureDashboards`); the registry label is "Console". */
@@ -420,6 +421,10 @@ export function WorkflowPageV2() {
     !!selectedCanvasVersionID && pendingApprovalVersionIds.has(selectedCanvasVersionID);
   const isViewingDraftVersion =
     !!selectedCanvasVersion && isDraftVersion(selectedCanvasVersion) && !isViewingPendingApprovalVersion;
+  const draftDiffResult = useMemo(
+    () => (isViewingDraftVersion ? buildDraftDiffMap(liveCanvasVersion, latestDraftVersion) : undefined),
+    [isViewingDraftVersion, liveCanvasVersion, latestDraftVersion],
+  );
   const isViewingCurrentLiveVersion =
     !selectedCanvasVersion || selectedCanvasVersion.metadata?.id === liveCanvasVersionId;
   const isViewingLiveVersion = isViewingCurrentLiveVersion;
@@ -1842,6 +1847,7 @@ export function WorkflowPageV2() {
       me,
       canvasMode,
       openTriggerModal,
+      draftDiffResult?.statusMap,
     );
   }, [
     canvas,
@@ -1859,11 +1865,81 @@ export function WorkflowPageV2() {
     me,
     canvasMode,
     openTriggerModal,
+    draftDiffResult,
   ]);
 
+  // Inject ghost nodes for deleted nodes (exist in live but removed from draft)
+  // Run them through the real preparation pipeline so they render with full body,
+  // then overlay dimBodyBelowHeader for the gray slate look.
+  const nodesWithGhosts = useMemo(() => {
+    if (!draftDiffResult?.removedNodes?.length) return preparedNodes;
+    const liveNodes = (liveCanvasVersion?.spec?.nodes || []) as ComponentsNode[];
+    const ghostNodes = draftDiffResult.removedNodes.map((removedNode) => {
+      const node = removedNode as unknown as ComponentsNode;
+      const prepared = prepareNode(
+        liveNodes,
+        node,
+        allTriggers,
+        allComponents,
+        {},
+        {},
+        {},
+        canvasId!,
+        queryClient,
+        undefined,
+        liveCanvasVersion?.spec?.edges as ComponentsEdge[] | undefined,
+        "edit",
+        undefined,
+        "removed",
+      );
+      return {
+        ...prepared,
+        draggable: false,
+        selectable: false,
+      };
+    });
+    return [...preparedNodes, ...ghostNodes];
+  }, [preparedNodes, draftDiffResult, liveCanvasVersion, allTriggers, allComponents, canvasId, queryClient]);
+
+  // Style edges based on draft vs live diff
+  const edgesWithDiff = useMemo(() => {
+    if (!draftDiffResult) return preparedEdges;
+    const { addedEdges, removedEdgeKeys } = draftDiffResult;
+    const edgeKey = (source: string, target: string, channel: string) => `${source}->${target}::${channel}`;
+    const addedSet = new Set(
+      (addedEdges || []).map((e: Record<string, unknown>) =>
+        edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default")),
+      ),
+    );
+
+    // Mark new edges
+    const styled = preparedEdges.map((edge) => {
+      const key = edgeKey(edge.source, edge.target, edge.sourceHandle || "default");
+      if (addedSet.has(key)) {
+        return { ...edge, data: { ...edge.data, _draftDiffStatus: "added" } };
+      }
+      return edge;
+    });
+
+    // Inject ghost edges for removed connections
+    const ghostEdges = [...(removedEdgeKeys || [])].map((key) => {
+      const [sourcePart, rest] = key.split("::");
+      const [source, target] = sourcePart.split("->");
+      return {
+        id: `ghost-edge-${key}`,
+        source,
+        target,
+        sourceHandle: rest || "default",
+        data: { _draftDiffStatus: "removed" },
+      };
+    });
+
+    return [...styled, ...ghostEdges];
+  }, [preparedEdges, draftDiffResult]);
+
   const nodesWithIntegrationStatus = useMemo(
-    () => overlayIntegrationWarnings(preparedNodes, integrations, canvasNodes),
-    [preparedNodes, integrations, canvasNodes],
+    () => overlayIntegrationWarnings(nodesWithGhosts, integrations, canvasNodes),
+    [nodesWithGhosts, integrations, canvasNodes],
   );
 
   const runCanvasData = useRunCanvasData({
@@ -1892,7 +1968,7 @@ export function WorkflowPageV2() {
     selectedRun,
     runCanvasData,
     liveNodes: nodesWithIntegrationStatus,
-    liveEdges: preparedEdges,
+    liveEdges: edgesWithDiff,
     isSelectedRunVersionLoading,
     isSelectedRunExecutionsLoading: selectedRunExecutionsQuery.isLoading,
   });
