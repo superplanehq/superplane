@@ -110,3 +110,27 @@ func UnmarshalJSONValue(data []byte, value any) error {
 
 	return nil
 }
+
+// IsJSONIntegerToken reports whether raw is a JSON number token without a
+// decimal point or exponent.
+func IsJSONIntegerToken(raw string) bool {
+	if raw == "" || raw == "-" {
+		return false
+	}
+
+	start := 0
+	if raw[0] == '-' {
+		if len(raw) == 1 {
+			return false
+		}
+		start = 1
+	}
+
+	for i := start; i < len(raw); i++ {
+		if raw[i] < '0' || raw[i] > '9' {
+			return false
+		}
+	}
+
+	return true
+}

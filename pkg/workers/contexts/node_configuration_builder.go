@@ -481,15 +481,20 @@ func normalizeExpressionSlice(value []any) (any, bool) {
 }
 
 func normalizeJSONNumber(value json.Number) any {
+	raw := value.String()
 	if integer, err := value.Int64(); err == nil {
 		return integer
+	}
+
+	if models.IsJSONIntegerToken(raw) {
+		return raw
 	}
 
 	if number, err := value.Float64(); err == nil {
 		return number
 	}
 
-	return value
+	return raw
 }
 
 func formatTemplateValue(value any) string {

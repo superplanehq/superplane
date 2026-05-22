@@ -5,6 +5,7 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/superplanehq/superplane/pkg/models"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -53,7 +54,7 @@ func jsonNumberForStructpb(value json.Number) any {
 }
 
 func jsonNumberLosesFloat64Precision(raw string, number float64) bool {
-	if !isJSONIntegerToken(raw) {
+	if !models.IsJSONIntegerToken(raw) {
 		return false
 	}
 
@@ -65,26 +66,4 @@ func jsonNumberLosesFloat64Precision(raw string, number float64) bool {
 	converted := new(big.Int)
 	new(big.Float).SetFloat64(number).Int(converted)
 	return original.Cmp(converted) != 0
-}
-
-func isJSONIntegerToken(raw string) bool {
-	if raw == "" || raw == "-" {
-		return false
-	}
-
-	start := 0
-	if raw[0] == '-' {
-		if len(raw) == 1 {
-			return false
-		}
-		start = 1
-	}
-
-	for i := start; i < len(raw); i++ {
-		if raw[i] < '0' || raw[i] > '9' {
-			return false
-		}
-	}
-
-	return true
 }

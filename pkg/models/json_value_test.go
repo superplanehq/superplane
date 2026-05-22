@@ -53,3 +53,25 @@ func Test__UnmarshalJSONValue__RejectsMultipleTopLevelValues(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "multiple top-level values")
 }
+
+func Test__IsJSONIntegerToken(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want bool
+	}{
+		{name: "integer", raw: "42", want: true},
+		{name: "negative integer", raw: "-42", want: true},
+		{name: "large integer", raw: "12345678901234567890", want: true},
+		{name: "decimal", raw: "1.0", want: false},
+		{name: "exponent", raw: "1e5", want: false},
+		{name: "empty", raw: "", want: false},
+		{name: "minus only", raw: "-", want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, models.IsJSONIntegerToken(tt.raw))
+		})
+	}
+}

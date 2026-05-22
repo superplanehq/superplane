@@ -82,19 +82,22 @@ func Test_NodeConfigurationBuilder_JSONNumberTemplateUsesOriginalToken(t *testin
 	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
 		WithInput(map[string]any{
 			"trigger": map[string]any{
-				"id":    json.Number("14000000"),
-				"small": json.Number("0.0000001"),
+				"id":        json.Number("14000000"),
+				"small":     json.Number("0.0000001"),
+				"snowflake": json.Number("12345678901234567890"),
 			},
 		})
 
 	result, err := builder.Build(map[string]any{
-		"id":    "{{ previous().id }}",
-		"small": "{{ previous().small }}",
+		"id":        "{{ previous().id }}",
+		"small":     "{{ previous().small }}",
+		"snowflake": "{{ previous().snowflake }}",
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, "14000000", result["id"])
 	assert.Equal(t, "0.0000001", result["small"])
+	assert.Equal(t, "12345678901234567890", result["snowflake"])
 }
 
 func Test_NodeConfigurationBuilder_JSONNumberExpressionsUseNumericTypes(t *testing.T) {
@@ -111,6 +114,20 @@ func Test_NodeConfigurationBuilder_JSONNumberExpressionsUseNumericTypes(t *testi
 
 	require.NoError(t, err)
 	assert.Equal(t, true, result)
+}
+
+func Test_NodeConfigurationBuilder_JSONNumberLargeIntegerExpressionsUseString(t *testing.T) {
+	builder := NewNodeConfigurationBuilder(nil, uuid.New()).
+		WithInput(map[string]any{
+			"trigger": map[string]any{
+				"snowflake": json.Number("12345678901234567890"),
+			},
+		})
+
+	result, err := builder.ResolveExpression(`previous().snowflake`)
+
+	require.NoError(t, err)
+	assert.Equal(t, "12345678901234567890", result)
 }
 
 func Test_NodeConfigurationBuilder_JSONNumberRootPayloadExpressionsUseNumericTypes(t *testing.T) {
