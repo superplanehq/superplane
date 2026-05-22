@@ -1323,3 +1323,76 @@ func ListFirewallResources(ctx context.Context, c Client, project string) ([]cor
 	}
 	return out, nil
 }
+
+const ResourceTypeInstance = "instance"
+
+type Instance struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Zone   string `json:"zone"`
+}
+
+type instancesListResp struct {
+	Items         []*instanceListItem `json:"items"`
+	NextPageToken string              `json:"nextPageToken"`
+}
+
+type instanceListItem struct {
+	Name   string `json:"name"`
+	Status string `json:"status"`
+	Zone   string `json:"zone"`
+}
+
+func ListInstances(ctx context.Context, c Client, project, zone string) ([]Instance, error) {
+	project = strings.TrimSpace(project)
+	zone = strings.TrimSpace(zone)
+	if project == "" {
+		project = c.ProjectID()
+	}
+	if zone == "" {
+		return nil, fmt.Errorf("zone is required")
+	}
+	path := fmt.Sprintf("projects/%s/zones/%s/instances", project, zone)
+	var all []Instance
+	var pageToken string
+	for {
+		body, err := c.Get(ctx, withPageToken(path, pageToken))
+		if err != nil {
+			return nil, err
+		}
+		var resp instancesListResp
+		if err := json.Unmarshal(body, &resp); err != nil {
+			return nil, fmt.Errorf("parse instances response: %w", err)
+		}
+		for _, it := range resp.Items {
+			if it == nil {
+				continue
+			}
+			all = append(all, Instance{Name: it.Name, Status: it.Status, Zone: lastSegment(it.Zone)})
+		}
+		pageToken = resp.NextPageToken
+		if pageToken == "" {
+			break
+		}
+	}
+	return all, nil
+}
+
+func ListInstanceResources(ctx context.Context, c Client, project, zone string) ([]core.IntegrationResource, error) {
+	if strings.TrimSpace(zone) == "" {
+		return []core.IntegrationResource{}, nil
+	}
+	list, err := ListInstances(ctx, c, project, zone)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]core.IntegrationResource, 0, len(list))
+	for _, inst := range list {
+		label := inst.Name
+		if inst.Status != "" {
+			label = fmt.Sprintf("%s (%s)", inst.Name, inst.Status)
+		}
+		out = append(out, core.IntegrationResource{Type: ResourceTypeInstance, Name: label, ID: inst.Name})
+	}
+	return out, nil
+}
