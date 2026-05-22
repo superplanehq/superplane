@@ -18,7 +18,8 @@ export interface CanvasToolSidebarProps {
   onExitRunsMode?: () => void;
   runsContent?: ReactNode;
   isVersionControlOpen?: boolean;
-  onToggleVersionControl?: () => void;
+  onOpenVersionControl?: () => void;
+  onCloseVersionControl?: () => void;
   versionsContent?: ReactNode;
 }
 
@@ -29,7 +30,8 @@ export function CanvasToolSidebar({
   onExitRunsMode,
   runsContent,
   isVersionControlOpen,
-  onToggleVersionControl,
+  onOpenVersionControl,
+  onCloseVersionControl,
   versionsContent,
 }: CanvasToolSidebarProps) {
   if (!toolSidebarState.showToolSidebarToggle || !toolSidebarState.isToolSidebarOpen || !toolSidebarState.canvasId) {
@@ -44,7 +46,8 @@ export function CanvasToolSidebar({
       onExitRunsMode={onExitRunsMode}
       runsContent={runsContent}
       isVersionControlOpen={isVersionControlOpen}
-      onToggleVersionControl={onToggleVersionControl}
+      onOpenVersionControl={onOpenVersionControl}
+      onCloseVersionControl={onCloseVersionControl}
       versionsContent={versionsContent}
     />
   );
@@ -57,7 +60,8 @@ function OpenCanvasToolSidebar({
   onExitRunsMode,
   runsContent,
   isVersionControlOpen,
-  onToggleVersionControl,
+  onOpenVersionControl,
+  onCloseVersionControl,
   versionsContent,
 }: CanvasToolSidebarProps) {
   const hasAgentTab = toolSidebarState.isAgentEnabled;
@@ -86,7 +90,7 @@ function OpenCanvasToolSidebar({
       isVersionControlOpen ||
       mode === "runs" ||
       activeTab !== TAB_VERSIONS ||
-      !onToggleVersionControl ||
+      !onOpenVersionControl ||
       hasAutoOpenedVersionControlRef.current
     ) {
       return;
@@ -94,8 +98,8 @@ function OpenCanvasToolSidebar({
 
     hasAutoOpenedVersionControlRef.current = true;
     toolSidebarState.openToolSidebar();
-    onToggleVersionControl();
-  }, [activeTab, hasAgentTab, isVersionControlOpen, mode, onToggleVersionControl, toolSidebarState]);
+    onOpenVersionControl();
+  }, [activeTab, hasAgentTab, isVersionControlOpen, mode, onOpenVersionControl, toolSidebarState]);
 
   const tabs = [
     ...(hasAgentTab ? [{ value: TAB_AGENT, label: "Agent" }] : []),
@@ -108,7 +112,7 @@ function OpenCanvasToolSidebar({
       setActiveTab(nextTab);
 
       if (nextTab === TAB_RUNS) {
-        if (isVersionControlOpen) onToggleVersionControl?.();
+        if (isVersionControlOpen) onCloseVersionControl?.();
         if (mode !== "runs") {
           toolSidebarState.openToolSidebar();
           onSelectRuns?.();
@@ -121,14 +125,22 @@ function OpenCanvasToolSidebar({
       if (nextTab === TAB_VERSIONS) {
         if (!isVersionControlOpen) {
           toolSidebarState.openToolSidebar();
-          onToggleVersionControl?.();
+          onOpenVersionControl?.();
         }
         return;
       }
 
-      if (isVersionControlOpen) onToggleVersionControl?.();
+      if (isVersionControlOpen) onCloseVersionControl?.();
     },
-    [isVersionControlOpen, mode, onExitRunsMode, onSelectRuns, onToggleVersionControl, toolSidebarState],
+    [
+      isVersionControlOpen,
+      mode,
+      onCloseVersionControl,
+      onExitRunsMode,
+      onOpenVersionControl,
+      onSelectRuns,
+      toolSidebarState,
+    ],
   );
 
   return (

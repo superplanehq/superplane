@@ -133,18 +133,18 @@ describe("CanvasToolSidebar", () => {
   });
 
   it("opens version control on first open when managed agents are disabled", async () => {
-    const onToggleVersionControl = vi.fn();
+    const onOpenVersionControl = vi.fn();
 
     render(
       <CanvasToolSidebar
         toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })}
         mode="version-live"
-        onToggleVersionControl={onToggleVersionControl}
+        onOpenVersionControl={onOpenVersionControl}
       />,
     );
 
     expect(screen.getByRole("tab", { name: "Versions" })).toHaveAttribute("aria-selected", "true");
-    await waitFor(() => expect(onToggleVersionControl).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onOpenVersionControl).toHaveBeenCalledTimes(1));
   });
 
   it("does not switch from runs mode to the agent tab when managed agents are disabled", () => {
@@ -192,33 +192,33 @@ describe("CanvasToolSidebar", () => {
   });
 
   it("enters versions from the versions tab", () => {
-    const onToggleVersionControl = vi.fn();
+    const onOpenVersionControl = vi.fn();
 
     render(
       <CanvasToolSidebar
         toolSidebarState={makeToolSidebarState()}
         mode="version-live"
         isVersionControlOpen={false}
-        onToggleVersionControl={onToggleVersionControl}
+        onOpenVersionControl={onOpenVersionControl}
         versionsContent={<div>Versions content</div>}
       />,
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Versions" }));
 
-    expect(onToggleVersionControl).toHaveBeenCalledTimes(1);
+    expect(onOpenVersionControl).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Versions content")).toBeInTheDocument();
   });
 
   it("exits versions when switching back to the agent tab", () => {
-    const onToggleVersionControl = vi.fn();
+    const onCloseVersionControl = vi.fn();
 
     render(
       <CanvasToolSidebar
         toolSidebarState={makeToolSidebarState()}
         mode="version-live"
         isVersionControlOpen={true}
-        onToggleVersionControl={onToggleVersionControl}
+        onCloseVersionControl={onCloseVersionControl}
         versionsContent={<div>Versions content</div>}
       />,
     );
@@ -227,7 +227,7 @@ describe("CanvasToolSidebar", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Agent" }));
 
-    expect(onToggleVersionControl).toHaveBeenCalledTimes(1);
+    expect(onCloseVersionControl).toHaveBeenCalledTimes(1);
     expect(screen.getByPlaceholderText("Ask the agent…")).toBeInTheDocument();
   });
 

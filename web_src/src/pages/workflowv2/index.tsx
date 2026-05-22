@@ -4815,8 +4815,21 @@ export function WorkflowPageV2() {
     );
   }, [setIsRunsMode, setSearchParams, setSelectedRunId]);
 
-  const handleToggleVersionControl = useCallback(() => {
-    setIsVersionControlOpen((prev) => !prev);
+  const handleOpenVersionControl = useCallback(() => {
+    if (hasEditableVersion) {
+      if (!liveCanvasVersionId) {
+        showErrorToast("No live version available");
+        return;
+      }
+
+      handleUseVersion(liveCanvasVersionId);
+    }
+
+    setIsVersionControlOpen(true);
+  }, [handleUseVersion, hasEditableVersion, liveCanvasVersionId]);
+
+  const handleCloseVersionControl = useCallback(() => {
+    setIsVersionControlOpen(false);
   }, []);
 
   const { handleSelectDashboardMode, handleExitDashboardMode } = useDashboardModeActions({
@@ -5509,7 +5522,8 @@ export function WorkflowPageV2() {
           awaitingApprovalBanner={awaitingApprovalBanner}
           showCanvasSettingsMenu={canUpdateCanvas}
           isVersionControlOpen={isVersionControlOpen}
-          onOpenVersionControl={!hasEditableVersion ? handleToggleVersionControl : undefined}
+          onOpenVersionControl={handleOpenVersionControl}
+          onCloseVersionControl={handleCloseVersionControl}
           showBottomStatusControls={!isTemplate && !isRunsMode && !isMemoryMode}
           hideAddControls={isTemplate || isRunsMode || isMemoryMode}
           hideCanvasToolSidebar={isTemplate}

@@ -194,6 +194,7 @@ export interface CanvasPageProps {
   onYamlOpen: () => void;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
+  onCloseVersionControl?: () => void;
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
   hideAddControls?: boolean;
@@ -751,7 +752,7 @@ function CanvasPage(props: CanvasPageProps) {
     organizationId: props.organizationId,
     onBeforeClose: () => {
       if (props.headerMode === "runs") props.onExitRunsMode?.();
-      if (props.isVersionControlOpen) props.onOpenVersionControl?.();
+      if (props.isVersionControlOpen) props.onCloseVersionControl?.();
     },
   });
   const { isToolSidebarOpen, openToolSidebar } = toolSidebarState;
@@ -1255,7 +1256,8 @@ function CanvasPage(props: CanvasPageProps) {
           onExitRunsMode={props.onExitRunsMode}
           runsContent={props.toolSidebarRunsContent}
           isVersionControlOpen={props.isVersionControlOpen}
-          onToggleVersionControl={props.onOpenVersionControl}
+          onOpenVersionControl={props.onOpenVersionControl}
+          onCloseVersionControl={props.onCloseVersionControl}
           versionsContent={props.toolSidebarVersionsContent}
         />
 
