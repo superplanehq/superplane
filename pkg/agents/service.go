@@ -160,9 +160,16 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, fmt.Errorf("message content is required")
 	}
 
+	// Any org member can send to the shared canvas session
+	var session *models.AgentSession
 	session, err := models.FindAgentSessionForUser(organizationID, userID, sessionID)
 	if err != nil {
-		return nil, err
+		// Fall back to org-scoped lookup for shared sessions
+		var orgSession models.AgentSession
+		if orgErr := database.Conn().Where("organization_id = ? AND id = ?", organizationID, sessionID).First(&orgSession).Error; orgErr != nil {
+			return nil, err
+		}
+		session = &orgSession
 	}
 
 	agentMode := ModeOperator
@@ -186,12 +193,31 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	}
 	persisted := &models.AgentSessionMessage{
 		SessionID: sessionID,
+		UserID:    &userID,
 		Role:      messageRole,
 		Content:   content,
 	}
 	if err := models.AppendAgentSessionMessage(persisted); err != nil {
 		return nil, fmt.Errorf("persist user message: %w", err)
 	}
+
+	// Broadcast user message to all WS subscribers so other users see it
+	userName := ""
+	if user, lookupErr := models.FindUnscopedUserByID(userID.String()); lookupErr == nil {
+		userName = user.Name
+	}
+	_ = messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
+		SessionID: sessionID.String(),
+		Event:     "user_message",
+		MessageID: persisted.ID.String(),
+		Message: &messages.AgentMessage{
+			ID:       persisted.ID.String(),
+			Role:     persisted.Role,
+			Content:  persisted.Content,
+			UserID:   userID.String(),
+			UserName: userName,
+		},
+	})
 
 	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusStreaming); err != nil {
 		log.WithError(err).Warn("failed to mark agent session as streaming")
@@ -218,8 +244,14 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
+	// Inject user identity so the agent knows who is talking
+	userIdentity := fmt.Sprintf("current_user_id: %s", userID.String())
+	if user, err := models.FindUnscopedUserByID(userID.String()); err == nil && user.Name != "" {
+		userIdentity = fmt.Sprintf("current_user_id: %s\ncurrent_user_name: %s", userID.String(), user.Name)
+	}
+
 	draftStatus := getDraftStatus(session.CanvasID)
-	return base + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
+	return base + "\n" + userIdentity + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -283,7 +315,8 @@ func (s *Service) checkAgentPermission(userID, organizationID string) error {
 }
 
 func findCanvasSession(tx *gorm.DB, orgID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
-	session, err := models.FindAgentSessionByCanvasInTransaction(tx, orgID, userID, canvasID)
+	// Look for a shared session on this canvas (any user), not per-user
+	session, err := models.FindSharedCanvasSession(tx, orgID, canvasID)
 	if err == nil {
 		return session, nil
 	}
