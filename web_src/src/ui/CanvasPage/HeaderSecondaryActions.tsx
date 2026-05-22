@@ -93,8 +93,8 @@ export function SecondaryHeaderActions({
           </TooltipTrigger>
           <TooltipContent side="bottom">
             {dashboardYamlReadOnly
-              ? "View the dashboard as YAML"
-              : "View, copy, download, or import this dashboard as YAML"}
+              ? "View the console as YAML"
+              : "View, copy, download, or import this console as YAML"}
           </TooltipContent>
         </Tooltip>
       ) : null}

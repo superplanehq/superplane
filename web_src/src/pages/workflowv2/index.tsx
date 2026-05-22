@@ -36,7 +36,7 @@ import {
   canvasKeys,
   useActOnCanvasChangeRequest,
   useCanvas,
-  useCanvasDashboard,
+  useCanvasConsole,
   useCanvasChangeRequests,
   useCanvasMemoryEntries,
   useCanvasVersion,
@@ -53,7 +53,7 @@ import {
   useInfiniteCanvasLiveVersions,
   useResolveCanvasChangeRequest,
   useTriggers,
-  useUpdateCanvasDashboard,
+  useUpdateCanvasConsole,
   useUpdateCanvasVersion,
   useWidgets,
 } from "@/hooks/useCanvasData";
@@ -144,7 +144,7 @@ import {
   prepareData,
   prepareSidebarData,
 } from "./workflowPageHelpers";
-/** Experimental feature id; must match `FeatureDashboards` in pkg/features/features.go. */
+/** Backend flag id (`FeatureDashboards`); the registry label is "Console". */
 const EXPERIMENTAL_FEATURE_DASHBOARDS = "dashboards";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
@@ -577,8 +577,8 @@ export function WorkflowPageV2() {
   const canUpdateCanvas = canAct("canvases", "update");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
-  const dashboardQuery = useCanvasDashboard(canvasId!, !isTemplate && dashboardsFeatureEnabled);
-  const updateDashboardMutation = useUpdateCanvasDashboard(canvasId!);
+  const dashboardQuery = useCanvasConsole(canvasId!, !isTemplate && dashboardsFeatureEnabled);
+  const updateDashboardMutation = useUpdateCanvasConsole(canvasId!);
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
