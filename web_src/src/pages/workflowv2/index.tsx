@@ -1887,15 +1887,8 @@ export function WorkflowPageV2() {
           component: {
             iconSlug: "trash-2",
             iconColor: "text-gray-400",
-            collapsedBackground: "bg-gray-200",
             title: String(removedNode.name || "Deleted node"),
             collapsed: false,
-            includeEmptyState: true,
-            emptyStateProps: {
-              title: "Removed from draft",
-              purpose: "runtime" as const,
-              tone: "neutral" as const,
-            },
             parameters: [],
           },
         },
