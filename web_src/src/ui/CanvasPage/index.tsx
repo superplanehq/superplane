@@ -2699,9 +2699,9 @@ function CanvasContent({
       const diffStatus = (e.data as Record<string, unknown> | undefined)?._draftDiffStatus as string | undefined;
       const diffStyle =
         diffStatus === "removed"
-          ? { stroke: "#EF4444", strokeDasharray: "8 4" }
+          ? { stroke: "#F9A8A8", strokeDasharray: "8 4" }
           : diffStatus === "added"
-            ? { stroke: "#22C55E" }
+            ? { stroke: "#86EFAC" }
             : {};
       return {
         ...e,
