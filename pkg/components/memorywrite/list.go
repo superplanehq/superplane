@@ -159,3 +159,22 @@ func ResolvePairs(pairs []NameValuePair, scope map[string]any, expressions core.
 	}
 	return values, nil
 }
+
+// ResolveAllItemValues evaluates valueList for every list element before any
+// memory writes run, so expression failures do not leave partial writes.
+func ResolveAllItemValues(
+	items []any,
+	mode ListMode,
+	pairs []NameValuePair,
+	expressions core.ExpressionContext,
+) ([]map[string]any, error) {
+	resolved := make([]map[string]any, 0, len(items))
+	for i, item := range items {
+		values, err := ResolvePairs(pairs, mode.Scope(item), expressions)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve values for list item %d: %w", i, err)
+		}
+		resolved = append(resolved, values)
+	}
+	return resolved, nil
+}

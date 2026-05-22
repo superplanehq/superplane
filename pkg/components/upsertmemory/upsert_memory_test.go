@@ -11,16 +11,18 @@ import (
 )
 
 type canvasMemoryContext struct {
-	namespace      string
-	matches        map[string]any
-	values         map[string]any
-	addedValues    []any
-	updatedValues  []any
-	updatedPerCall [][]any
-	updateCalls    int
-	addCalls       int
-	err            error
-	addErr         error
+	namespace              string
+	matches                map[string]any
+	values                 map[string]any
+	addedValues            []any
+	updatedValues          []any
+	namespaceUpdatedValues []any
+	updatedPerCall         [][]any
+	updateCalls            int
+	namespaceUpdateCalls   int
+	addCalls               int
+	err                    error
+	addErr                 error
 }
 
 func (c *canvasMemoryContext) Add(namespace string, values any) error {
@@ -50,12 +52,28 @@ func (c *canvasMemoryContext) Update(namespace string, matches map[string]any, v
 	if c.err != nil {
 		return nil, c.err
 	}
+	if len(matches) == 0 {
+		return nil, errors.New("at least one match expression is required")
+	}
 	if len(c.updatedPerCall) > 0 {
 		idx := c.updateCalls - 1
 		if idx >= len(c.updatedPerCall) {
 			idx = len(c.updatedPerCall) - 1
 		}
 		return c.updatedPerCall[idx], nil
+	}
+	return c.updatedValues, nil
+}
+
+func (c *canvasMemoryContext) UpdateNamespace(namespace string, values map[string]any) ([]any, error) {
+	c.namespaceUpdateCalls++
+	c.namespace = namespace
+	c.values = values
+	if c.err != nil {
+		return nil, c.err
+	}
+	if c.namespaceUpdatedValues != nil {
+		return c.namespaceUpdatedValues, nil
 	}
 	return c.updatedValues, nil
 }
@@ -177,9 +195,10 @@ func TestUpsertMemoryExecute(t *testing.T) {
 		})
 
 		assert.NoError(t, err)
-		assert.Equal(t, 1, memoryCtx.updateCalls)
+		assert.Equal(t, 0, memoryCtx.updateCalls)
+		assert.Equal(t, 1, memoryCtx.namespaceUpdateCalls)
 		assert.Equal(t, core.DefaultOutputChannel.Name, execState.Channel)
-		assert.Equal(t, map[string]any{}, memoryCtx.matches)
+		assert.Equal(t, map[string]any{"value": "new-sha"}, memoryCtx.values)
 		assert.Equal(t, map[string]any{}, execMetadata.Get().(map[string]any)["matches"])
 	})
 
@@ -240,7 +259,6 @@ func TestUpsertMemoryExecute(t *testing.T) {
 		memoryCtx := &canvasMemoryContext{
 			updatedPerCall: [][]any{
 				{map[string]any{"environment": "production", "name": "api"}},
-				nil,
 			},
 		}
 		execMetadata := &contexts.MetadataContext{}
@@ -276,16 +294,17 @@ func TestUpsertMemoryExecute(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Equal(t, 2, memoryCtx.updateCalls)
-		assert.Equal(t, 1, memoryCtx.addCalls)
+		assert.Equal(t, 0, memoryCtx.updateCalls)
+		assert.Equal(t, 0, memoryCtx.namespaceUpdateCalls)
+		assert.Equal(t, 2, memoryCtx.addCalls)
 
 		metadata, ok := execMetadata.Get().(map[string]any)
 		require.True(t, ok)
 		assert.Equal(t, true, metadata["iterateList"])
 		assert.Equal(t, "item", metadata["itemVariable"])
 		assert.Equal(t, 2, metadata["count"])
-		assert.Equal(t, 1, metadata["updatedCount"])
-		assert.Equal(t, 1, metadata["createdCount"])
+		assert.Equal(t, 0, metadata["updatedCount"])
+		assert.Equal(t, 2, metadata["createdCount"])
 
 		require.Len(t, execState.Payloads, 1)
 		payload, ok := execState.Payloads[0].(map[string]any)
@@ -302,8 +321,61 @@ func TestUpsertMemoryExecute(t *testing.T) {
 		require.True(t, ok)
 		second, ok := itemsResults[1].(map[string]any)
 		require.True(t, ok)
-		assert.Equal(t, OperationUpdated, first["operation"])
+		assert.Equal(t, OperationCreated, first["operation"])
 		assert.Equal(t, OperationCreated, second["operation"])
+	})
+
+	t.Run("list mode with matches updates then creates per item", func(t *testing.T) {
+		component := &UpsertMemory{}
+		execState := &contexts.ExecutionStateContext{}
+		memoryCtx := &canvasMemoryContext{
+			updatedPerCall: [][]any{
+				{map[string]any{"environment": "production", "name": "api"}},
+				nil,
+			},
+		}
+		execMetadata := &contexts.MetadataContext{}
+
+		items := []any{
+			map[string]any{"name": "api"},
+			map[string]any{"name": "worker"},
+		}
+
+		expressions := &contexts.ExpressionContext{
+			Output: items,
+			ScopedOutputFn: func(expression string, scope map[string]any) (any, error) {
+				return scope["item"].(map[string]any)["name"], nil
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"namespace":    "deployments",
+				"iterateList":  true,
+				"listSource":   "list",
+				"itemVariable": "item",
+				"matchList": []map[string]any{
+					{"name": "environment", "value": "production"},
+				},
+				"valueList": []map[string]any{
+					{"name": "name", "value": "item.name"},
+				},
+			},
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
+			CanvasMemory:   memoryCtx,
+			ExecutionState: execState,
+			Expressions:    expressions,
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, 2, memoryCtx.updateCalls)
+		assert.Equal(t, 1, memoryCtx.addCalls)
+
+		metadata, ok := execMetadata.Get().(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 1, metadata["updatedCount"])
+		assert.Equal(t, 1, metadata["createdCount"])
 	})
 }
 

@@ -289,14 +289,14 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 	}
 
 	matches := buildPairs(spec.MatchList)
+	resolved, err := memorywrite.ResolveAllItemValues(items, mode, spec.ValueList, ctx.Expressions)
+	if err != nil {
+		return err
+	}
+
 	allUpdated := make([]any, 0)
-	perItemValues := make([]any, 0, len(items))
-	for i, item := range items {
-		scope := mode.Scope(item)
-		values, resolveErr := memorywrite.ResolvePairs(spec.ValueList, scope, ctx.Expressions)
-		if resolveErr != nil {
-			return fmt.Errorf("failed to resolve values for list item %d: %w", i, resolveErr)
-		}
+	perItemValues := make([]any, 0, len(resolved))
+	for i, values := range resolved {
 		perItemValues = append(perItemValues, values)
 		updated, updateErr := updateCtx.Update(spec.Namespace, matches, values)
 		if updateErr != nil {

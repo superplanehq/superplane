@@ -43,8 +43,9 @@ func (s Spec) listMode() memorywrite.ListMode {
 
 type FieldPair = memorywrite.NameValuePair
 
-type canvasMemoryUpdateContext interface {
+type canvasMemoryUpsertContext interface {
 	Update(namespace string, matches map[string]any, values map[string]any) ([]any, error)
+	UpdateNamespace(namespace string, values map[string]any) ([]any, error)
 }
 
 func (c *UpsertMemory) Name() string {
@@ -234,7 +235,7 @@ func (c *UpsertMemory) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
-	updateCtx, ok := ctx.CanvasMemory.(canvasMemoryUpdateContext)
+	upsertCtx, ok := ctx.CanvasMemory.(canvasMemoryUpsertContext)
 	if !ok {
 		return fmt.Errorf("canvas memory update operations are not supported")
 	}
@@ -245,25 +246,19 @@ func (c *UpsertMemory) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if mode.IterateList {
-		return executeListMode(ctx, spec, mode, updateCtx)
+		return executeListMode(ctx, spec, mode, upsertCtx)
 	}
 
 	matches := buildPairs(spec.MatchList)
 	values := buildPairs(spec.ValueList)
-	updatedValues, updateErr := updateCtx.Update(spec.Namespace, matches, values)
-	if updateErr != nil {
-		return fmt.Errorf("failed to upsert canvas memory: %w", updateErr)
+	operation, affectedValues, upsertErr := upsertMemoryRow(ctx, spec.Namespace, matches, values, upsertCtx, false)
+	if upsertErr != nil {
+		return fmt.Errorf("failed to upsert canvas memory: %w", upsertErr)
 	}
 
-	operation := OperationUpdated
-	affectedValues := updatedValues
-
-	if len(updatedValues) == 0 {
-		if err := ctx.CanvasMemory.Add(spec.Namespace, values); err != nil {
-			return fmt.Errorf("failed to upsert canvas memory: %w", err)
-		}
-		operation = OperationCreated
-		affectedValues = []any{values}
+	updatedCount := 0
+	if operation == OperationUpdated {
+		updatedCount = len(affectedValues)
 	}
 
 	metadata := map[string]any{
@@ -272,7 +267,7 @@ func (c *UpsertMemory) Execute(ctx core.ExecutionContext) error {
 		"valueFields":  extractFieldNames(spec.ValueList),
 		"matches":      matches,
 		"operation":    operation,
-		"updatedCount": len(updatedValues),
+		"updatedCount": updatedCount,
 	}
 
 	if err := ctx.Metadata.Set(metadata); err != nil {
@@ -297,43 +292,38 @@ func (c *UpsertMemory) Execute(ctx core.ExecutionContext) error {
 	)
 }
 
-func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.ListMode, updateCtx canvasMemoryUpdateContext) error {
+func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.ListMode, upsertCtx canvasMemoryUpsertContext) error {
 	items, err := mode.EvaluateList(ctx.Expressions)
 	if err != nil {
 		return err
 	}
 
 	matches := buildPairs(spec.MatchList)
+	insertOnly := len(matches) == 0
+
+	resolved, err := memorywrite.ResolveAllItemValues(items, mode, spec.ValueList, ctx.Expressions)
+	if err != nil {
+		return err
+	}
+
 	records := make([]any, 0)
-	perItemValues := make([]any, 0, len(items))
-	itemResults := make([]any, 0, len(items))
+	perItemValues := make([]any, 0, len(resolved))
+	itemResults := make([]any, 0, len(resolved))
 	updatedTotal := 0
 	createdTotal := 0
 
-	for i, item := range items {
-		scope := mode.Scope(item)
-		values, resolveErr := memorywrite.ResolvePairs(spec.ValueList, scope, ctx.Expressions)
-		if resolveErr != nil {
-			return fmt.Errorf("failed to resolve values for list item %d: %w", i, resolveErr)
-		}
+	for i, values := range resolved {
 		perItemValues = append(perItemValues, values)
 
-		updatedValues, updateErr := updateCtx.Update(spec.Namespace, matches, values)
-		if updateErr != nil {
-			return fmt.Errorf("failed to upsert canvas memory for list item %d: %w", i, updateErr)
+		operation, affected, upsertErr := upsertMemoryRow(ctx, spec.Namespace, matches, values, upsertCtx, insertOnly)
+		if upsertErr != nil {
+			return fmt.Errorf("failed to upsert canvas memory for list item %d: %w", i, upsertErr)
 		}
 
-		operation := OperationUpdated
-		affected := updatedValues
-		if len(updatedValues) == 0 {
-			if err := ctx.CanvasMemory.Add(spec.Namespace, values); err != nil {
-				return fmt.Errorf("failed to upsert canvas memory for list item %d: %w", i, err)
-			}
-			operation = OperationCreated
-			affected = []any{values}
+		if operation == OperationCreated {
 			createdTotal++
 		} else {
-			updatedTotal += len(updatedValues)
+			updatedTotal += len(affected)
 		}
 
 		records = append(records, affected...)
@@ -353,7 +343,7 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 		"createdCount": createdTotal,
 		"iterateList":  true,
 		"itemVariable": mode.ItemVariable,
-		"count":        len(items),
+		"count":        len(resolved),
 	}
 
 	if err := ctx.Metadata.Set(metadata); err != nil {
@@ -376,6 +366,40 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 			},
 		},
 	)
+}
+
+func upsertMemoryRow(
+	ctx core.ExecutionContext,
+	namespace string,
+	matches map[string]any,
+	values map[string]any,
+	upsertCtx canvasMemoryUpsertContext,
+	insertOnly bool,
+) (operation string, affected []any, err error) {
+	if insertOnly {
+		if err := ctx.CanvasMemory.Add(namespace, values); err != nil {
+			return "", nil, err
+		}
+		return OperationCreated, []any{values}, nil
+	}
+
+	var updated []any
+	if len(matches) == 0 {
+		updated, err = upsertCtx.UpdateNamespace(namespace, values)
+	} else {
+		updated, err = upsertCtx.Update(namespace, matches, values)
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	if len(updated) > 0 {
+		return OperationUpdated, updated, nil
+	}
+
+	if err := ctx.CanvasMemory.Add(namespace, values); err != nil {
+		return "", nil, err
+	}
+	return OperationCreated, []any{values}, nil
 }
 
 func decodeSpec(raw any) (Spec, error) {

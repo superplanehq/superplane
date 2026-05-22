@@ -141,6 +141,48 @@ func TestResolvePairs_TrimsNamesAndSkipsEmpty(t *testing.T) {
 	assert.Equal(t, map[string]any{"kept": 42, "literal": 7}, got)
 }
 
+func TestResolveAllItemValues_ResolvesBeforeWrites(t *testing.T) {
+	items := []any{
+		map[string]any{"name": "api"},
+		map[string]any{"name": "worker"},
+	}
+	expressions := &fakeExpressionContext{
+		scopeFunc: func(expression string, scope map[string]any) (any, error) {
+			return scope["item"].(map[string]any)["name"], nil
+		},
+	}
+
+	got, err := ResolveAllItemValues(
+		items,
+		ListMode{IterateList: true, ListSource: "src", ItemVariable: "item"},
+		[]NameValuePair{{Name: "name", Value: "item.name"}},
+		expressions,
+	)
+	require.NoError(t, err)
+	assert.Equal(t, []map[string]any{{"name": "api"}, {"name": "worker"}}, got)
+}
+
+func TestResolveAllItemValues_FailsOnSecondItem(t *testing.T) {
+	items := []any{map[string]any{"name": "api"}, map[string]any{"name": "worker"}}
+	expressions := &fakeExpressionContext{
+		scopeFunc: func(expression string, _ map[string]any) (any, error) {
+			if expression == "bad" {
+				return nil, fmt.Errorf("boom")
+			}
+			return "ok", nil
+		},
+	}
+
+	_, err := ResolveAllItemValues(
+		items,
+		ListMode{IterateList: true, ListSource: "src", ItemVariable: "item"},
+		[]NameValuePair{{Name: "name", Value: "bad"}},
+		expressions,
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "list item 0")
+}
+
 func TestResolvePairs_WrapsResolveErrors(t *testing.T) {
 	expressions := &fakeExpressionContext{
 		scopeFunc: func(string, map[string]any) (any, error) {

@@ -211,13 +211,13 @@ func (c *AddMemory) executeListMode(ctx core.ExecutionContext, spec Spec, mode m
 		return err
 	}
 
-	writtenValues := make([]any, 0, len(items))
-	for i, item := range items {
-		scope := mode.Scope(item)
-		values, resolveErr := memorywrite.ResolvePairs(spec.ValueList, scope, ctx.Expressions)
-		if resolveErr != nil {
-			return fmt.Errorf("failed to resolve values for list item %d: %w", i, resolveErr)
-		}
+	resolved, err := memorywrite.ResolveAllItemValues(items, mode, spec.ValueList, ctx.Expressions)
+	if err != nil {
+		return err
+	}
+
+	writtenValues := make([]any, 0, len(resolved))
+	for i, values := range resolved {
 		if err := ctx.CanvasMemory.Add(spec.Namespace, values); err != nil {
 			return fmt.Errorf("failed to add canvas memory for list item %d: %w", i, err)
 		}
