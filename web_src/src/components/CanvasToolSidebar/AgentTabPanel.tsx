@@ -172,8 +172,9 @@ function ChatConversation({
   const { account } = useContext(AccountContext);
   const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
 
-  // Prepend a synthetic greeting as the first message so it never disappears
+  // Prepend a synthetic greeting as the first message (only for own session)
   const messages = useMemo(() => {
+    if (readOnly) return rawMessages;
     const greeting: AgentMessage = {
       id: "__greeting__",
       role: "assistant",
@@ -184,13 +185,14 @@ function ChatConversation({
       toolStatus: "",
     };
     return [greeting, ...rawMessages];
-  }, [rawMessages, greetingFirstName]);
+  }, [rawMessages, greetingFirstName, readOnly]);
 
   const showThinking = useThinkingIndicator(rawMessages, status);
 
   // Auto-kickoff: send a boot message when session is new (no messages yet)
   const bootState = useRef<"idle" | "sending" | "sent">("idle");
   useEffect(() => {
+    if (readOnly) return;
     if (bootState.current !== "idle") return;
     if (!messagesQuery.data || messagesQuery.isLoading) return;
 
