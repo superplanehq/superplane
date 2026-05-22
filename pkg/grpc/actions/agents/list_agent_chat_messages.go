@@ -24,12 +24,15 @@ func ListAgentChatMessages(_ context.Context, svc AgentsService, orgID, userID s
 		return nil, status.Error(codes.InvalidArgument, "invalid chat id")
 	}
 
+	// Try user-scoped first, then fall back to org-scoped (for session browser read-only view)
 	if _, err := svc.GetSession(org, user, chatID); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "agent chat not found")
+		if _, orgErr := svc.GetSessionInOrg(org, chatID); orgErr != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, status.Error(codes.NotFound, "agent chat not found")
+			}
+			log.WithError(err).WithField("chat_id", chatID).Error("failed to load agent chat")
+			return nil, status.Error(codes.Internal, "failed to load agent chat")
 		}
-		log.WithError(err).WithField("chat_id", chatID).Error("failed to load agent chat")
-		return nil, status.Error(codes.Internal, "failed to load agent chat")
 	}
 
 	var beforeID uuid.UUID
