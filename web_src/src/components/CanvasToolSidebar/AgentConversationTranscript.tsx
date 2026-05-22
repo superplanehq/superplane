@@ -1,5 +1,5 @@
 import { Bot, ChevronRight, Loader2, SquareTerminal } from "lucide-react";
-import { memo, useCallback, useEffect, useState, type RefObject } from "react";
+import { memo, useCallback, useEffect, useRef, useState, type RefObject } from "react";
 import { formatSystemNotification, isSystemNotification } from "@/components/AgentSidebar/systemMessages";
 import type { RubricCategory } from "@/components/AgentSidebar/widgets/parser";
 import { RichMessage } from "@/components/AgentSidebar/widgets/RichMessage";
@@ -159,7 +159,19 @@ const MessageRow = memo(function MessageRow({
         )}
       </div>
       {message.createdAt ? (
-        <span className="mt-0.5 px-1 text-[10px] text-slate-400">{formatTime(message.createdAt)}</span>
+        <div className="mt-0.5 flex items-center gap-1.5 px-1">
+          {isUser && message.userName ? (
+            <>
+              <span className="text-[10px] text-slate-400">{formatTime(message.createdAt)}</span>
+              <div className="flex size-3.5 items-center justify-center rounded-full bg-slate-300 text-[8px] font-medium text-white">
+                {(message.userName[0] ?? "?").toUpperCase()}
+              </div>
+              <span className="text-[10px] text-slate-400">{message.userName.split(" ")[0]}</span>
+            </>
+          ) : (
+            <span className="text-[10px] text-slate-400">{formatTime(message.createdAt)}</span>
+          )}
+        </div>
       ) : null}
     </div>
   );
@@ -226,8 +238,17 @@ function truncateQuestion(question: string): string {
 }
 
 function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
-  const [expanded, setExpanded] = useState(true);
   const hasRunning = messages.some((message) => message.toolStatus === "started");
+  const [expanded, setExpanded] = useState(hasRunning);
+  const prevRunning = useRef(hasRunning);
+
+  useEffect(() => {
+    if (prevRunning.current && !hasRunning) {
+      setExpanded(false);
+    }
+    prevRunning.current = hasRunning;
+  }, [hasRunning]);
+
   const count = messages.length;
   const label = hasRunning
     ? `Running command${count > 1 ? ` (${count})` : ""}...`

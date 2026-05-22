@@ -38,7 +38,8 @@ func (s *Server) handleAgentSessionWebSocket(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	if _, err := models.FindAgentSessionForUser(user.OrganizationID, user.ID, sessionID); err != nil {
+	// Allow any org member to subscribe to the shared canvas session
+	if _, err := models.FindSharedCanvasSessionByID(user.OrganizationID, sessionID); err != nil {
 		http.Error(w, "agent session not found", http.StatusNotFound)
 		return
 	}

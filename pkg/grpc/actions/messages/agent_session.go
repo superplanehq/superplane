@@ -60,6 +60,8 @@ type AgentMessage struct {
 	ToolName   string     `json:"toolName,omitempty"`
 	ToolStatus string     `json:"toolStatus,omitempty"`
 	CreatedAt  *time.Time `json:"createdAt,omitempty"`
+	UserID     string     `json:"userId,omitempty"`
+	UserName   string     `json:"userName,omitempty"`
 }
 
 // AgentOutcomeEventMessage carries outcome/grader lifecycle events.
