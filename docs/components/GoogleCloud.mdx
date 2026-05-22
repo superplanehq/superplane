@@ -784,7 +784,7 @@ Returns information about the deleted instance:
 - This operation is **permanent** and cannot be undone
 - All data on the instance will be lost unless boot/data disks have auto-delete disabled
 - The instance will be stopped if running before deletion
-- Deleting an already-deleted instance is treated as success (idempotent)
+- If the instance is not found in the configured zone, the action fails so that misconfigured zone/project values do not silently mask incomplete cleanup
 
 ### Example Output
 

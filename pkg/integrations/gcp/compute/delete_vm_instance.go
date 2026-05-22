@@ -65,7 +65,7 @@ Returns information about the deleted instance:
 - This operation is **permanent** and cannot be undone
 - All data on the instance will be lost unless boot/data disks have auto-delete disabled
 - The instance will be stopped if running before deletion
-- Deleting an already-deleted instance is treated as success (idempotent)`
+- If the instance is not found in the configured zone, the action fails so that misconfigured zone/project values do not silently mask incomplete cleanup`
 }
 
 func (d *DeleteVMInstance) Icon() string {
@@ -212,32 +212,27 @@ func (d *DeleteVMInstance) Execute(ctx core.ExecutionContext) error {
 	path := fmt.Sprintf("projects/%s/zones/%s/instances/%s", project, zone, instanceName)
 	body, err := client.Delete(callCtx, path)
 	if err != nil {
-		var apiErr *gcpcommon.GCPAPIError
-		if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound {
-			// Already deleted — emit success (idempotent)
-			return ctx.ExecutionState.Emit(
-				core.DefaultOutputChannel.Name,
-				"gcp.compute.vmInstance.deleted",
-				[]any{map[string]any{"instanceName": instanceName, "zone": zone}},
-			)
-		}
-		return fmt.Errorf("failed to delete VM instance: %v", err)
+		// Surface the underlying API error (including 404s). A 404 may indicate
+		// the instance is genuinely already gone, but it can also be caused by a
+		// misconfigured zone/project pointing at a non-existent resource path —
+		// in which case the VM may still exist elsewhere. Returning the error
+		// lets the workflow author decide how to handle it explicitly rather
+		// than silently claiming the cleanup succeeded.
+		return fmt.Errorf("failed to delete VM instance: %w", err)
 	}
 
 	var opResp struct {
 		Name string `json:"name"`
 	}
-	if err := json.Unmarshal(body, &opResp); err != nil || opResp.Name == "" {
-		// If we can't parse the operation, the delete may have already completed
-		return ctx.ExecutionState.Emit(
-			core.DefaultOutputChannel.Name,
-			"gcp.compute.vmInstance.deleted",
-			[]any{map[string]any{"instanceName": instanceName, "zone": zone}},
-		)
+	if err := json.Unmarshal(body, &opResp); err != nil {
+		return fmt.Errorf("parse delete operation response: %w", err)
+	}
+	if opResp.Name == "" {
+		return errors.New("delete operation response missing operation name; cannot confirm deletion")
 	}
 
 	if err := WaitForZoneOperation(callCtx, client, project, zone, lastSegment(opResp.Name)); err != nil {
-		return fmt.Errorf("error waiting for delete operation: %v", err)
+		return fmt.Errorf("error waiting for delete operation: %w", err)
 	}
 
 	return ctx.ExecutionState.Emit(

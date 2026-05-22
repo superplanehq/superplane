@@ -172,7 +172,7 @@ func Test__DeleteVMInstance__Execute(t *testing.T) {
 		assert.Equal(t, "us-central1-a", data["zone"])
 	})
 
-	t.Run("instance not found (404) -> emits success (idempotent)", func(t *testing.T) {
+	t.Run("instance not found (404) -> returns error (no silent success)", func(t *testing.T) {
 		mc := &mockDeleteClient{
 			projectID: "my-project",
 			deleteFunc: func(ctx context.Context, path string) ([]byte, error) {
@@ -193,9 +193,62 @@ func Test__DeleteVMInstance__Execute(t *testing.T) {
 			ExecutionState: state,
 		})
 
-		require.NoError(t, err)
-		assert.True(t, state.Passed)
-		assert.Equal(t, "gcp.compute.vmInstance.deleted", state.Type)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to delete VM instance")
+		assert.False(t, state.Passed)
+	})
+
+	t.Run("unparseable delete response -> returns error", func(t *testing.T) {
+		mc := &mockDeleteClient{
+			projectID: "my-project",
+			deleteFunc: func(ctx context.Context, path string) ([]byte, error) {
+				return []byte("not-json"), nil
+			},
+		}
+
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) {
+			return mc, nil
+		})
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"zone":     "us-central1-a",
+				"instance": "my-vm",
+			},
+			ExecutionState: state,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "parse delete operation response")
+		assert.False(t, state.Passed)
+	})
+
+	t.Run("delete response missing operation name -> returns error", func(t *testing.T) {
+		mc := &mockDeleteClient{
+			projectID: "my-project",
+			deleteFunc: func(ctx context.Context, path string) ([]byte, error) {
+				body, _ := json.Marshal(map[string]any{"status": "PENDING"})
+				return body, nil
+			},
+		}
+
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) {
+			return mc, nil
+		})
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"zone":     "us-central1-a",
+				"instance": "my-vm",
+			},
+			ExecutionState: state,
+		})
+
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "missing operation name")
+		assert.False(t, state.Passed)
 	})
 
 	t.Run("API error (not 404) -> returns error", func(t *testing.T) {
