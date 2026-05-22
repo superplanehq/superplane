@@ -22,6 +22,7 @@ const (
 type AgentSessionMessage struct {
 	ID              uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
 	SessionID       uuid.UUID
+	UserID          *uuid.UUID `gorm:"column:user_id"`
 	ProviderEventID string
 	Role            string
 	Content         string

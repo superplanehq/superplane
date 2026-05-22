@@ -91,7 +91,7 @@ describe("useAgentSessionWebsocket", () => {
             toolName: "",
             toolCallId: "",
             toolStatus: "",
-            createdAt: null,
+            createdAt: null, userId: "", userName: "",
           },
         ],
         hasMore: false,
@@ -100,9 +100,9 @@ describe("useAgentSessionWebsocket", () => {
     emit("assistant_message", {
       sessionId: "session-1",
       messageId: "msg-1",
-      message: { id: "msg-1", role: "assistant", content: "done" },
+      message: { id: "msg-1", role: "assistant", content: "done", toolCallId: "", toolName: "", toolStatus: "", createdAt: null, userId: "", userName: "" },
     });
-    expect(onPersisted).toHaveBeenCalledWith(expect.objectContaining({ id: "msg-1", content: "done" }));
+    expect(onPersisted).toHaveBeenCalledWith(expect.objectContaining({ id: "msg-1", content: "done", userId: "", userName: "" }));
     expect(flatMessageIds(queryClient)).toEqual(["msg-existing", "msg-1"]);
   });
 
@@ -118,7 +118,7 @@ describe("useAgentSessionWebsocket", () => {
             toolName: "",
             toolCallId: "",
             toolStatus: "",
-            createdAt: null,
+            createdAt: null, userId: "", userName: "",
           },
         ],
         hasMore: true,
@@ -132,7 +132,7 @@ describe("useAgentSessionWebsocket", () => {
             toolName: "",
             toolCallId: "",
             toolStatus: "",
-            createdAt: null,
+            createdAt: null, userId: "", userName: "",
           },
         ],
         hasMore: false,
@@ -154,12 +154,12 @@ describe("useAgentSessionWebsocket", () => {
     emit("tool_started", {
       sessionId: "session-1",
       messageId: "tool-1",
-      message: { id: "tool-1", role: "tool", toolName: "search", toolStatus: "started" },
+      message: { id: "tool-1", role: "tool", toolName: "search", toolStatus: "started", content: "", toolCallId: "", createdAt: null, userId: "", userName: "" },
     });
     emit("tool_finished", {
       sessionId: "session-1",
       messageId: "tool-1",
-      message: { id: "tool-1", role: "tool", toolName: "search", toolStatus: "finished" },
+      message: { id: "tool-1", role: "tool", toolName: "search", toolStatus: "finished", content: "", toolCallId: "", createdAt: null, userId: "", userName: "" },
     });
     const data = queryClient.getQueryData<InfiniteData<AgentMessagesPage>>(agentChatKeys.messages("session-1"));
     expect(data?.pages[0].messages).toHaveLength(1);

@@ -61,7 +61,7 @@ func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, can
 func (s *Service) provisionSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
 	var session *models.AgentSession
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", ensureSessionLockKey(organizationID, userID, canvasID)).Error; err != nil {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", ensureSessionLockKey(organizationID, canvasID)).Error; err != nil {
 			return err
 		}
 
@@ -115,7 +115,7 @@ func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]mode
 }
 
 func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error {
-	session, err := s.GetSession(organizationID, userID, sessionID)
+	session, err := s.getSharedSession(organizationID, userID, sessionID)
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
 	}
@@ -126,7 +126,7 @@ func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, 
 }
 
 func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error {
-	session, err := s.GetSession(organizationID, userID, sessionID)
+	session, err := s.getSharedSession(organizationID, userID, sessionID)
 	if err != nil {
 		return fmt.Errorf("get session: %w", err)
 	}
@@ -160,7 +160,7 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, fmt.Errorf("message content is required")
 	}
 
-	session, err := models.FindAgentSessionForUser(organizationID, userID, sessionID)
+	session, err := s.getSharedSession(organizationID, userID, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -186,12 +186,32 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	}
 	persisted := &models.AgentSessionMessage{
 		SessionID: sessionID,
+		UserID:    &userID,
 		Role:      messageRole,
 		Content:   content,
 	}
 	if err := models.AppendAgentSessionMessage(persisted); err != nil {
 		return nil, fmt.Errorf("persist user message: %w", err)
 	}
+
+	// Broadcast user message to all WS subscribers so other users see it
+	userName := ""
+	if user, lookupErr := models.FindUnscopedUserByID(userID.String()); lookupErr == nil {
+		userName = user.Name
+	}
+	_ = messages.PublishAgentSessionEvent(messages.AgentSessionEventMessage{
+		SessionID: sessionID.String(),
+		Event:     "user_message",
+		MessageID: persisted.ID.String(),
+		Message: &messages.AgentMessage{
+			ID:        persisted.ID.String(),
+			Role:      persisted.Role,
+			Content:   persisted.Content,
+			CreatedAt: persisted.CreatedAt,
+			UserID:    userID.String(),
+			UserName:  userName,
+		},
+	})
 
 	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusStreaming); err != nil {
 		log.WithError(err).Warn("failed to mark agent session as streaming")
@@ -218,8 +238,14 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 		session.CanvasID.String(),
 		session.CanvasID.String(),
 	)
+	// Inject user identity so the agent knows who is talking
+	userIdentity := fmt.Sprintf("current_user_id: %s", userID.String())
+	if user, err := models.FindUnscopedUserByID(userID.String()); err == nil && user.Name != "" {
+		userIdentity = fmt.Sprintf("current_user_id: %s\ncurrent_user_name: %s", userID.String(), user.Name)
+	}
+
 	draftStatus := getDraftStatus(session.CanvasID)
-	return base + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
+	return base + "\n" + userIdentity + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -283,7 +309,8 @@ func (s *Service) checkAgentPermission(userID, organizationID string) error {
 }
 
 func findCanvasSession(tx *gorm.DB, orgID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
-	session, err := models.FindAgentSessionByCanvasInTransaction(tx, orgID, userID, canvasID)
+	// Look for a shared session on this canvas (any user), not per-user
+	session, err := models.FindSharedCanvasSession(tx, orgID, canvasID)
 	if err == nil {
 		return session, nil
 	}
@@ -308,10 +335,9 @@ func findCursorMessage(sessionID, beforeID uuid.UUID) (*models.AgentSessionMessa
 	return &anchor, nil
 }
 
-func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
+func ensureSessionLockKey(organizationID, canvasID uuid.UUID) int64 {
 	h := fnv.New64a()
 	h.Write(organizationID[:])
-	h.Write(userID[:])
 	h.Write(canvasID[:])
 	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
 }
@@ -374,4 +400,25 @@ func sessionTitle(organizationID, canvasID uuid.UUID) string {
 		return org.Name
 	}
 	return org.Name + " - " + canvas.Name
+}
+
+// getSharedSession tries user-scoped first, then falls back to org-scoped for shared sessions.
+// Verifies the user is an actual member of the organization.
+func (s *Service) getSharedSession(organizationID, userID, sessionID uuid.UUID) (*models.AgentSession, error) {
+	session, err := s.GetSession(organizationID, userID, sessionID)
+	if err == nil {
+		return session, nil
+	}
+	// Only fall back to shared lookup on not-found, not on DB errors
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("get session: %w", err)
+	}
+	isMember, memberErr := models.IsOrgMember(organizationID, userID)
+	if memberErr != nil {
+		return nil, fmt.Errorf("check org membership: %w", memberErr)
+	}
+	if !isMember {
+		return nil, ErrSessionForbidden
+	}
+	return models.FindSharedCanvasSessionByID(organizationID, sessionID)
 }
