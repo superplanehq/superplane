@@ -573,8 +573,6 @@ func (c *CreateInstance) poll(ctx core.ActionHookContext) error {
 	switch instance.State {
 	case InstanceStateRunning:
 		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateInstancePayloadType, []any{instanceDetailsToMap(instance)})
-	case InstanceStateTerminated, InstanceStateShuttingDown:
-		return fmt.Errorf("instance %s entered state %s unexpectedly", instance.InstanceID, instance.State)
 	default:
 		if metadata.PollAttempts >= maxInstancePollAttempts {
 			return fmt.Errorf("timed out waiting for instance %s to reach running after %d poll attempts (state: %s)", instance.InstanceID, metadata.PollAttempts, instance.State)

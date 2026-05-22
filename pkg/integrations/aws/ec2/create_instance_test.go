@@ -285,6 +285,61 @@ func Test__CreateInstance__PollEmitsWhenRunning(t *testing.T) {
 	require.Len(t, executionState.Payloads, 1)
 }
 
+func Test__CreateInstance__PollReschedulesWhenInstanceShuttingDownOrTerminated(t *testing.T) {
+	component := &CreateInstance{}
+
+	for _, state := range []string{"shutting-down", "terminated"} {
+		t.Run(state+" -> reschedules poll", func(t *testing.T) {
+			httpContext := &contexts.HTTPContext{
+				Responses: []*http.Response{
+					{
+						StatusCode: http.StatusOK,
+						Body: io.NopCloser(strings.NewReader(`
+							<DescribeInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+								<reservationSet>
+									<item>
+										<instancesSet>
+											<item>
+												<instanceId>i-abc123</instanceId>
+												<instanceState><name>` + state + `</name></instanceState>
+											</item>
+										</instancesSet>
+									</item>
+								</reservationSet>
+							</DescribeInstancesResponse>
+						`)),
+					},
+				},
+			}
+			requests := &contexts.RequestContext{}
+
+			err := component.HandleHook(core.ActionHookContext{
+				Name: "poll",
+				Configuration: map[string]any{
+					"region": "us-east-1",
+				},
+				HTTP: httpContext,
+				Integration: &contexts.IntegrationContext{
+					CurrentSecrets: map[string]core.IntegrationSecret{
+						"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+						"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+						"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+					},
+				},
+				Metadata: &contexts.MetadataContext{
+					Metadata: CreateInstanceExecutionMetadata{InstanceID: "i-abc123"},
+				},
+				Requests:       requests,
+				ExecutionState: &contexts.ExecutionStateContext{},
+				Logger:         logrus.NewEntry(logrus.New()),
+			})
+
+			require.NoError(t, err)
+			assert.Equal(t, "poll", requests.Action, "expected poll to be rescheduled")
+		})
+	}
+}
+
 func Test__CreateInstance__PollErrorsWhenMetadataMissingInstanceID(t *testing.T) {
 	component := &CreateInstance{}
 
