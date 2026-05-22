@@ -391,13 +391,14 @@ func (s *Service) ListCanvasSessions(organizationID, canvasID uuid.UUID) ([]Canv
 		SessionID    string
 		UserID       string
 		UserName     string
+		UserEmail    string
 		Status       string
 		LastActiveAt *time.Time
 	}
 
 	err := database.Conn().
 		Table("agent_sessions").
-		Select("agent_sessions.id as session_id, agent_sessions.user_id, accounts.name as user_name, agent_sessions.status, agent_sessions.last_active_at").
+		Select("agent_sessions.id as session_id, agent_sessions.user_id, COALESCE(NULLIF(accounts.name, ''), accounts.email, 'Unknown') as user_name, COALESCE(accounts.email, '') as user_email, agent_sessions.status, agent_sessions.last_active_at").
 		Joins("LEFT JOIN accounts ON accounts.id = agent_sessions.user_id").
 		Where("agent_sessions.organization_id = ? AND agent_sessions.canvas_id = ?", organizationID, canvasID).
 		Order("agent_sessions.updated_at DESC").
@@ -417,4 +418,10 @@ func (s *Service) ListCanvasSessions(organizationID, canvasID uuid.UUID) ([]Canv
 		}
 	}
 	return entries, nil
+}
+
+// GetSessionInOrg finds a session by ID within an organization, regardless of owner.
+// Used for the session browser read-only view.
+func (s *Service) GetSessionInOrg(organizationID, sessionID uuid.UUID) (*models.AgentSession, error) {
+	return models.FindAgentSessionInOrg(organizationID, sessionID)
 }

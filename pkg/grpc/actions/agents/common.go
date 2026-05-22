@@ -23,6 +23,7 @@ type AgentsService interface {
 	InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error
 	DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error
 	ListCanvasSessions(organizationID, canvasID uuid.UUID) ([]agentservice.CanvasSessionInfo, error)
+	GetSessionInOrg(organizationID, sessionID uuid.UUID) (*models.AgentSession, error)
 }
 
 func agentModeFromProto(mode pb.AgentMode) string {
