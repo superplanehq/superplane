@@ -2695,18 +2695,27 @@ function CanvasContent({
     [],
   );
   const styledEdges = useMemo(() => {
-    return state.edges?.map((e) => ({
-      ...e,
-      ...EDGE_STYLE,
-      style: { ...EDGE_STYLE.style },
-      data: {
-        ...e.data,
-        isHovered: e.id === hoveredEdgeId,
-        canDelete: isEditMode && !isReadOnly,
-        onDelete: isEditMode && !isReadOnly ? stableEdgeDelete : undefined,
-      },
-      zIndex: e.id === hoveredEdgeId ? 1000 : 0,
-    }));
+    return state.edges?.map((e) => {
+      const diffStatus = (e.data as Record<string, unknown> | undefined)?._draftDiffStatus as string | undefined;
+      const diffStyle =
+        diffStatus === "removed"
+          ? { stroke: "#EF4444", strokeDasharray: "8 4" }
+          : diffStatus === "added"
+            ? { stroke: "#22C55E" }
+            : {};
+      return {
+        ...e,
+        ...EDGE_STYLE,
+        style: { ...EDGE_STYLE.style, ...diffStyle },
+        data: {
+          ...e.data,
+          isHovered: e.id === hoveredEdgeId,
+          canDelete: isEditMode && !isReadOnly && diffStatus !== "removed",
+          onDelete: isEditMode && !isReadOnly ? stableEdgeDelete : undefined,
+        },
+        zIndex: e.id === hoveredEdgeId ? 1000 : 0,
+      };
+    });
   }, [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly]);
 
   const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;
