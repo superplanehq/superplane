@@ -219,17 +219,19 @@ export function useCanvasYamlDiffModal({
   return {
     onShowDiff: payload ? onShowDiff : undefined,
     onShowNodeDiff: hasUnpublishedDraftChanges ? onShowNodeDiff : undefined,
-    yamlDiffModal: payload ? (
+    yamlDiffModal: (
       <>
-        <Suspense fallback={null}>
-          <CanvasYamlDiffModal
-            open={open}
-            onOpenChange={setOpen}
-            liveYamlText={payload.liveYamlText}
-            draftYamlText={payload.draftYamlText}
-            filename={payload.filename}
-          />
-        </Suspense>
+        {payload ? (
+          <Suspense fallback={null}>
+            <CanvasYamlDiffModal
+              open={open}
+              onOpenChange={setOpen}
+              liveYamlText={payload.liveYamlText}
+              draftYamlText={payload.draftYamlText}
+              filename={payload.filename}
+            />
+          </Suspense>
+        ) : null}
         {nodePayload ? (
           <Suspense fallback={null}>
             <CanvasYamlDiffModal
@@ -246,6 +248,6 @@ export function useCanvasYamlDiffModal({
           </Suspense>
         ) : null}
       </>
-    ) : null,
+    ),
   };
 }
