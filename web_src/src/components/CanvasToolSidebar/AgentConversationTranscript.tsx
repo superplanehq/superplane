@@ -1,5 +1,6 @@
 import { Bot, ChevronRight, Loader2, SquareTerminal } from "lucide-react";
-import { memo, useCallback, useEffect, useState, type RefObject } from "react";
+import { memo, useCallback, useContext, useEffect, useRef, useState, type RefObject } from "react";
+import { AccountContext } from "@/contexts/accountContextState";
 import { formatSystemNotification, isSystemNotification } from "@/components/AgentSidebar/systemMessages";
 import type { RubricCategory } from "@/components/AgentSidebar/widgets/parser";
 import { RichMessage } from "@/components/AgentSidebar/widgets/RichMessage";
@@ -134,6 +135,7 @@ const MessageRow = memo(function MessageRow({
   }
 
   const isUser = message.role === "user";
+  const { account } = useContext(AccountContext);
 
   return (
     <div className={cn("flex w-full min-w-0 flex-col", isUser ? "items-end" : "items-start")}>
@@ -159,7 +161,23 @@ const MessageRow = memo(function MessageRow({
         )}
       </div>
       {message.createdAt ? (
-        <span className="mt-0.5 px-1 text-[10px] text-slate-400">{formatTime(message.createdAt)}</span>
+        <div className="mt-0.5 flex items-center gap-1.5 px-1">
+          {isUser && account ? (
+            <>
+              <span className="text-[10px] text-slate-400">{formatTime(message.createdAt)}</span>
+              {account.avatar_url ? (
+                <img src={account.avatar_url} alt="" className="size-3.5 rounded-full" />
+              ) : (
+                <div className="flex size-3.5 items-center justify-center rounded-full bg-slate-300 text-[8px] font-medium text-white">
+                  {(account.name?.[0] ?? "?").toUpperCase()}
+                </div>
+              )}
+              <span className="text-[10px] text-slate-400">{account.name?.split(" ")[0]}</span>
+            </>
+          ) : (
+            <span className="text-[10px] text-slate-400">{formatTime(message.createdAt)}</span>
+          )}
+        </div>
       ) : null}
     </div>
   );
@@ -226,8 +244,17 @@ function truncateQuestion(question: string): string {
 }
 
 function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
-  const [expanded, setExpanded] = useState(true);
   const hasRunning = messages.some((message) => message.toolStatus === "started");
+  const [expanded, setExpanded] = useState(hasRunning);
+  const prevRunning = useRef(hasRunning);
+
+  useEffect(() => {
+    if (prevRunning.current && !hasRunning) {
+      setExpanded(false);
+    }
+    prevRunning.current = hasRunning;
+  }, [hasRunning]);
+
   const count = messages.length;
   const label = hasRunning
     ? `Running command${count > 1 ? ` (${count})` : ""}...`
