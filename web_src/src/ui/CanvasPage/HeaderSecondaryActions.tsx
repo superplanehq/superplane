@@ -1,6 +1,6 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileCode, Plus } from "lucide-react";
+import { FileCode, GitCompareArrows, Plus } from "lucide-react";
 
 import { Button } from "../button";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
@@ -14,6 +14,7 @@ export function SecondaryHeaderActions({
   saveDisabledTooltip,
   saveIsPrimary,
   hasUnpublishedDraftChanges,
+  onShowDiff,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -47,6 +48,7 @@ export function SecondaryHeaderActions({
         onEnterEditMode={onEnterEditMode}
         enterEditModeDisabled={enterEditModeDisabled}
         enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+        hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
         onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
         unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       />
@@ -63,6 +65,7 @@ export function SecondaryHeaderActions({
       {mode === "version-edit" ? (
         <EditModeVersionActions
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+          onShowDiff={onShowDiff}
           onDiscardVersion={onDiscardVersion}
           discardVersionDisabled={discardVersionDisabled}
           discardVersionDisabledTooltip={discardVersionDisabledTooltip}
@@ -121,6 +124,7 @@ function LiveModeEditControls({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
+  hasUnpublishedDraftChanges,
   onDiscardDraftAndStartEdit,
   unpublishedDraftUpdatedAt,
 }: Pick<
@@ -128,6 +132,7 @@ function LiveModeEditControls({
   | "onEnterEditMode"
   | "enterEditModeDisabled"
   | "enterEditModeDisabledTooltip"
+  | "hasUnpublishedDraftChanges"
   | "onDiscardDraftAndStartEdit"
   | "unpublishedDraftUpdatedAt"
 > & {
@@ -151,6 +156,7 @@ function LiveModeEditControls({
   return (
     <EnterEditButton
       onClick={onEnterEditMode}
+      label={hasUnpublishedDraftChanges ? "Continue Editing" : "Edit"}
       disabled={!!enterEditModeDisabled}
       disabledTooltip={enterEditModeDisabledTooltip}
     />
@@ -159,6 +165,7 @@ function LiveModeEditControls({
 
 function EditModeVersionActions({
   hasUnpublishedDraftChanges,
+  onShowDiff,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -172,6 +179,7 @@ function EditModeVersionActions({
 }: Pick<
   HeaderProps,
   | "hasUnpublishedDraftChanges"
+  | "onShowDiff"
   | "onDiscardVersion"
   | "discardVersionDisabled"
   | "discardVersionDisabledTooltip"
@@ -186,11 +194,19 @@ function EditModeVersionActions({
   return (
     <div className="flex items-center gap-2">
       {hasUnpublishedDraftChanges ? (
-        <DiscardDraftButton
-          onDiscard={() => onDiscardVersion?.()}
-          disabled={discardVersionDisabled || !onDiscardVersion}
-          disabledTooltip={discardVersionDisabledTooltip}
-        />
+        <>
+          {onShowDiff ? (
+            <>
+              <ShowDiffButton onShowDiff={onShowDiff} />
+              <HeaderActionSeparator />
+            </>
+          ) : null}
+          <DiscardDraftButton
+            onDiscard={() => onDiscardVersion?.()}
+            disabled={discardVersionDisabled || !onDiscardVersion}
+            disabledTooltip={discardVersionDisabledTooltip}
+          />
+        </>
       ) : null}
       {onExitEditMode ? (
         <ExitEditButton
@@ -210,12 +226,18 @@ function EditModeVersionActions({
   );
 }
 
+function HeaderActionSeparator() {
+  return <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-slate-200" />;
+}
+
 function EnterEditButton({
   onClick,
+  label,
   disabled,
   disabledTooltip,
 }: {
   onClick: () => void;
+  label: string;
   disabled: boolean;
   disabledTooltip?: string;
 }) {
@@ -228,7 +250,7 @@ function EnterEditButton({
       disabled={disabled}
       data-testid="canvas-edit-button"
     >
-      Edit
+      {label}
     </UIButton>
   );
 
@@ -324,6 +346,15 @@ function SaveButton({
     >
       Save
     </Button>
+  );
+}
+
+function ShowDiffButton({ onShowDiff }: { onShowDiff: () => void }) {
+  return (
+    <UIButton type="button" variant="outline" size="sm" onClick={onShowDiff} data-testid="canvas-show-diff-button">
+      <GitCompareArrows className="mr-1 h-3.5 w-3.5" />
+      Show Diff
+    </UIButton>
   );
 }
 
