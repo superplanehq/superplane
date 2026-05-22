@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
+import { buildDraftDiffMap, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
 
 describe("hasDraftVersusLiveGraphDiff", () => {
   const node = (id: string, integrationId?: string | null) => ({
@@ -55,5 +55,50 @@ describe("hasDraftVersusLiveGraphDiff", () => {
     };
 
     expect(hasDraftVersusLiveGraphDiff(live as never, draft as never)).toBe(true);
+  });
+});
+
+describe("buildDraftDiffMap", () => {
+  const node = (id: string, overrides: Record<string, unknown> = {}) => ({
+    id,
+    name: `Node ${id}`,
+    type: "TYPE_ACTION",
+    ref: "r",
+    configuration: {},
+    position: { x: 0, y: 0 },
+    isCollapsed: false,
+    ...overrides,
+  });
+
+  it("marks added, updated, and removed nodes", () => {
+    const live = {
+      spec: {
+        nodes: [node("removed"), node("updated"), node("unchanged")],
+      },
+    };
+    const draft = {
+      spec: {
+        nodes: [node("added"), node("updated", { configuration: { value: "new" } }), node("unchanged")],
+      },
+    };
+
+    expect(buildDraftDiffMap(live as never, draft as never)).toEqual({
+      statusMap: {
+        added: "added",
+        removed: "removed",
+        updated: "updated",
+      },
+      removedNodes: [node("removed")],
+    });
+  });
+
+  it("does not mark position-only changes as visual edits", () => {
+    const live = { spec: { nodes: [node("a", { position: { x: 0, y: 0 } })] } };
+    const draft = { spec: { nodes: [node("a", { position: { x: 100, y: 200 } })] } };
+
+    expect(buildDraftDiffMap(live as never, draft as never)).toEqual({
+      statusMap: {},
+      removedNodes: [],
+    });
   });
 });
