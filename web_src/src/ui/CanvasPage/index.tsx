@@ -156,6 +156,7 @@ export interface CanvasPageProps {
   saveDisabledTooltip?: string;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
+  onShowDiff?: () => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
@@ -1218,6 +1219,7 @@ function CanvasPage(props: CanvasPageProps) {
           saveDisabledTooltip={props.saveDisabledTooltip}
           onPublishVersion={props.onPublishVersion}
           onDiscardVersion={props.onDiscardVersion}
+          onShowDiff={props.onShowDiff}
           publishVersionDisabled={props.publishVersionDisabled}
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
           discardVersionDisabled={props.discardVersionDisabled}
@@ -1734,6 +1736,7 @@ function CanvasContentHeader({
   saveDisabledTooltip,
   onPublishVersion,
   onDiscardVersion,
+  onShowDiff,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
   discardVersionDisabled,
@@ -1767,6 +1770,7 @@ function CanvasContentHeader({
   saveDisabledTooltip?: string;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
+  onShowDiff?: () => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
@@ -1810,6 +1814,7 @@ function CanvasContentHeader({
       saveDisabledTooltip={saveDisabledTooltip}
       onPublishVersion={onPublishVersion}
       onDiscardVersion={onDiscardVersion}
+      onShowDiff={onShowDiff}
       publishVersionDisabled={publishVersionDisabled}
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}

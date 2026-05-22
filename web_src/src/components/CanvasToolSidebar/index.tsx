@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AgentTabPanel } from "./AgentTabPanel";
 import { EmptyToolTab } from "./EmptyToolTab";
 import { SidebarShell } from "./SidebarShell";
@@ -61,6 +61,7 @@ function OpenCanvasToolSidebar({
   versionsContent,
 }: CanvasToolSidebarProps) {
   const hasAgentTab = toolSidebarState.isAgentEnabled;
+  const hasAutoOpenedVersionControlRef = useRef(false);
   const [activeTab, setActiveTab] = useState(() => defaultToolTab(mode, Boolean(isVersionControlOpen), hasAgentTab));
 
   useEffect(() => {
@@ -73,11 +74,28 @@ function OpenCanvasToolSidebar({
       return;
     }
     setActiveTab((currentTab) => {
-      if ((currentTab === TAB_AGENT || currentTab === TAB_VERSIONS) && !hasAgentTab) return TAB_RUNS;
+      if (currentTab === TAB_AGENT && !hasAgentTab) return TAB_VERSIONS;
       if ((currentTab === TAB_RUNS || currentTab === TAB_VERSIONS) && hasAgentTab) return TAB_AGENT;
       return currentTab;
     });
   }, [hasAgentTab, isVersionControlOpen, mode]);
+
+  useEffect(() => {
+    if (
+      hasAgentTab ||
+      isVersionControlOpen ||
+      mode === "runs" ||
+      activeTab !== TAB_VERSIONS ||
+      !onToggleVersionControl ||
+      hasAutoOpenedVersionControlRef.current
+    ) {
+      return;
+    }
+
+    hasAutoOpenedVersionControlRef.current = true;
+    toolSidebarState.openToolSidebar();
+    onToggleVersionControl();
+  }, [activeTab, hasAgentTab, isVersionControlOpen, mode, onToggleVersionControl, toolSidebarState]);
 
   const tabs = [
     ...(hasAgentTab ? [{ value: TAB_AGENT, label: "Agent" }] : []),
@@ -146,5 +164,5 @@ function defaultToolTab(mode: CanvasToolSidebarMode, isVersionControlOpen: boole
   if (mode === "runs") return TAB_RUNS;
   if (isVersionControlOpen) return TAB_VERSIONS;
   if (hasAgentTab) return TAB_AGENT;
-  return TAB_RUNS;
+  return TAB_VERSIONS;
 }
