@@ -1901,41 +1901,50 @@ export function WorkflowPageV2() {
     return [...preparedNodes, ...ghostNodes];
   }, [preparedNodes, draftDiffResult, liveCanvasVersion, allTriggers, allComponents, canvasId, queryClient]);
 
-  // Style edges based on draft vs live diff
+  // Style edges based on draft vs live diff (compare current edges against live version)
   const edgesWithDiff = useMemo(() => {
-    if (!draftDiffResult) return preparedEdges;
-    const { addedEdges, removedEdgeKeys } = draftDiffResult;
+    if (!isViewingDraftVersion || !liveCanvasVersion) return preparedEdges;
     const edgeKey = (source: string, target: string, channel: string) => `${source}->${target}::${channel}`;
-    const addedSet = new Set(
-      (addedEdges || []).map((e: Record<string, unknown>) =>
-        edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default")),
-      ),
+
+    // Build set of live edge keys
+    const liveEdges = (liveCanvasVersion.spec?.edges || []) as Array<Record<string, unknown>>;
+    const liveEdgeSet = new Set(
+      liveEdges.map((e) => edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"))),
     );
 
-    // Mark new edges
+    // Build set of current draft edge keys
+    const draftEdgeSet = new Set(preparedEdges.map((e) => edgeKey(e.source, e.target, e.sourceHandle || "default")));
+
+    // Mark new edges (in draft, not in live)
     const styled = preparedEdges.map((edge) => {
       const key = edgeKey(edge.source, edge.target, edge.sourceHandle || "default");
-      if (addedSet.has(key)) {
+      if (!liveEdgeSet.has(key)) {
         return { ...edge, data: { ...edge.data, _draftDiffStatus: "added" } };
       }
       return edge;
     });
 
-    // Inject ghost edges for removed connections
-    const ghostEdges = [...(removedEdgeKeys || [])].map((key) => {
-      const [sourcePart, rest] = key.split("::");
-      const [source, target] = sourcePart.split("->");
-      return {
-        id: `ghost-edge-${key}`,
-        source,
-        target,
-        sourceHandle: rest || "default",
-        data: { _draftDiffStatus: "removed" },
-      };
-    });
+    // Inject ghost edges for removed connections (in live, not in draft)
+    const ghostEdges = liveEdges
+      .filter((e) => {
+        const key = edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"));
+        return !draftEdgeSet.has(key);
+      })
+      .map((e) => {
+        const src = String(e.sourceId ?? "");
+        const tgt = String(e.targetId ?? "");
+        const ch = String(e.channel ?? "default");
+        return {
+          id: `ghost-edge-${src}->${tgt}::${ch}`,
+          source: src,
+          target: tgt,
+          sourceHandle: ch,
+          data: { _draftDiffStatus: "removed" },
+        };
+      });
 
     return [...styled, ...ghostEdges];
-  }, [preparedEdges, draftDiffResult]);
+  }, [preparedEdges, isViewingDraftVersion, liveCanvasVersion]);
 
   const nodesWithIntegrationStatus = useMemo(
     () => overlayIntegrationWarnings(nodesWithGhosts, integrations, canvasNodes),
