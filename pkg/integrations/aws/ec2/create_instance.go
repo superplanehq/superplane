@@ -599,11 +599,11 @@ func (c *CreateInstance) poll(ctx core.ActionHookContext) error {
 	switch instance.State {
 	case InstanceStateRunning:
 		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateInstancePayloadType, []any{instanceDetailsToMap(instance)})
-	case InstanceStateTerminated:
+	case InstanceStateTerminated, InstanceStateStopped, InstanceStateStopping:
 		if ctx.ExecutionState.IsFinished() {
 			return nil
 		}
-		return fmt.Errorf("instance %s was terminated before reaching running state", instance.InstanceID)
+		return fmt.Errorf("instance %s entered state %q and will not reach running without intervention", instance.InstanceID, instance.State)
 	default:
 		if metadata.PollAttempts >= maxInstancePollAttempts {
 			return fmt.Errorf("timed out waiting for instance %s to reach running after %d poll attempts (state: %s)", instance.InstanceID, metadata.PollAttempts, instance.State)

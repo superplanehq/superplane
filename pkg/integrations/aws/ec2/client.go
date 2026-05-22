@@ -1663,19 +1663,6 @@ var imageOSDefinitions = map[string]imageOSDefinition{
 		MaxPublicImages:           defaultUbuntuImages,
 		SkipDescribeIfSSMResolved: true,
 	},
-	"windows": {
-		Label:  "Windows",
-		Owners: []string{"amazon"},
-		NameFilters: []string{
-			"Windows_Server-*-English-Full-Base-*",
-			"Windows_Server-*-English-Core-Base-*",
-			"Windows_Server-*-English-*-Base-*",
-		},
-		Platform: "windows",
-		SSMParameterPaths: []string{
-			"/aws/service/ami-windows-latest/",
-		},
-	},
 	"red_hat": {
 		Label:  "Red Hat",
 		Owners: []string{"309956199498"},
