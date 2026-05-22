@@ -178,9 +178,23 @@ func ListSecurityGroups(ctx core.ListResourcesContext, resourceType string) ([]c
 	}
 
 	client := NewClient(ctx.HTTP, creds, region)
-	securityGroups, err := client.ListSecurityGroups()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list EC2 security groups: %w", err)
+
+	var securityGroups []SecurityGroup
+	subnetID := strings.TrimSpace(ctx.Parameters["subnetId"])
+	if subnetID != "" {
+		subnet, err := client.DescribeSubnet(subnetID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to describe subnet: %w", err)
+		}
+		securityGroups, err = client.ListSecurityGroupsByVPC(subnet.VpcID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to list EC2 security groups: %w", err)
+		}
+	} else {
+		securityGroups, err = client.ListSecurityGroups()
+		if err != nil {
+			return nil, fmt.Errorf("failed to list EC2 security groups: %w", err)
+		}
 	}
 
 	resources := make([]core.IntegrationResource, 0, len(securityGroups))

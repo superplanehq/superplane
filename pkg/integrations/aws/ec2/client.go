@@ -103,6 +103,7 @@ type RootVolumeConfig struct {
 	DeviceName string
 	VolumeSize int
 	VolumeType string
+	Iops       int
 }
 
 type InstanceTypeInfo struct {
@@ -439,6 +440,9 @@ func (c *Client) RunInstances(input RunInstancesInput) (*RunInstancesOutput, err
 		if volumeType != "" {
 			params.Set("BlockDeviceMapping.1.Ebs.VolumeType", volumeType)
 		}
+		if input.RootVolume.Iops > 0 {
+			params.Set("BlockDeviceMapping.1.Ebs.Iops", fmt.Sprintf("%d", input.RootVolume.Iops))
+		}
 	}
 
 	response := runInstancesResponse{}
@@ -551,11 +555,27 @@ func (c *Client) ListSubnets() ([]Subnet, error) {
 }
 
 func (c *Client) ListSecurityGroups() ([]SecurityGroup, error) {
+	return c.listSecurityGroups(url.Values{})
+}
+
+func (c *Client) ListSecurityGroupsByVPC(vpcID string) ([]SecurityGroup, error) {
+	params := url.Values{}
+	params.Set("Filter.1.Name", "vpc-id")
+	params.Set("Filter.1.Value.1", strings.TrimSpace(vpcID))
+	return c.listSecurityGroups(params)
+}
+
+func (c *Client) listSecurityGroups(baseParams url.Values) ([]SecurityGroup, error) {
 	securityGroups := []SecurityGroup{}
 	nextToken := ""
 
 	for {
 		params := url.Values{}
+		for k, vs := range baseParams {
+			for _, v := range vs {
+				params.Add(k, v)
+			}
+		}
 		params.Set("MaxResults", "100")
 		if nextToken != "" {
 			params.Set("NextToken", nextToken)

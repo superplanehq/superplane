@@ -51,6 +51,7 @@ type CreateInstanceConfiguration struct {
 	ConfigureRootVolume      bool   `json:"configureRootVolume" mapstructure:"configureRootVolume"`
 	VolumeSizeGiB            int    `json:"volumeSizeGiB" mapstructure:"volumeSizeGiB"`
 	VolumeType               string `json:"volumeType" mapstructure:"volumeType"`
+	VolumeIops               int    `json:"volumeIops" mapstructure:"volumeIops"`
 }
 
 type CreateInstanceNodeMetadata struct {
@@ -289,6 +290,12 @@ func (c *CreateInstance) Configuration() []configuration.Field {
 								Field: "region",
 							},
 						},
+						{
+							Name: "subnetId",
+							ValueFrom: &configuration.ParameterValueFrom{
+								Field: "subnet",
+							},
+						},
 					},
 				},
 			},
@@ -376,6 +383,25 @@ func (c *CreateInstance) Configuration() []configuration.Field {
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: rootVolumeTypeOptions,
+				},
+			},
+		},
+		{
+			Name:        "volumeIops",
+			Label:       "Volume IOPS",
+			Type:        configuration.FieldTypeNumber,
+			Required:    false,
+			Description: "Provisioned IOPS for io1 or io2 volume types. io1 minimum 100, maximum 64000; io2 minimum 100, maximum 256000.",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "configureRootVolume", Values: []string{"true"}},
+				{Field: "volumeType", Values: []string{"io1", "io2"}},
+			},
+			RequiredConditions: []configuration.RequiredCondition{
+				{Field: "volumeType", Values: []string{"io1", "io2"}},
+			},
+			TypeOptions: &configuration.TypeOptions{
+				Number: &configuration.NumberTypeOptions{
+					Min: func() *int { value := 100; return &value }(),
 				},
 			},
 		},
@@ -493,6 +519,7 @@ func (c *CreateInstance) Execute(ctx core.ExecutionContext) error {
 			DeviceName: image.RootDeviceName,
 			VolumeSize: volumeSize,
 			VolumeType: volumeType,
+			Iops:       config.VolumeIops,
 		}
 	}
 
@@ -574,6 +601,9 @@ func (c *CreateInstance) poll(ctx core.ActionHookContext) error {
 	case InstanceStateRunning:
 		return ctx.ExecutionState.Emit(core.DefaultOutputChannel.Name, CreateInstancePayloadType, []any{instanceDetailsToMap(instance)})
 	case InstanceStateTerminated:
+		if ctx.ExecutionState.IsFinished() {
+			return nil
+		}
 		return fmt.Errorf("instance %s was terminated before reaching running state", instance.InstanceID)
 	default:
 		if metadata.PollAttempts >= maxInstancePollAttempts {
