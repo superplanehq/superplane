@@ -49,6 +49,7 @@ type PrepareComponentNodeArgs = {
   currentUser?: User;
   edges?: ComponentsEdge[];
   canvasMode?: "live" | "edit";
+  draftDiffStatus?: "added" | "updated" | "removed";
 };
 
 type PrepareComponentBaseNodeArgs = {
@@ -62,6 +63,7 @@ type PrepareComponentBaseNodeArgs = {
   currentUser?: User;
   edges?: ComponentsEdge[];
   canvasMode?: "live" | "edit";
+  draftDiffStatus?: "added" | "updated" | "removed";
 };
 
 type NodePosition = {
@@ -89,6 +91,7 @@ function buildPreparedTriggerCanvasNode(args: {
   canvasMode?: "live" | "edit";
   canvasId: string;
   openModal?: (modal: TriggerActionModal) => void;
+  draftDiffStatus?: "added" | "updated" | "removed";
 }): CanvasNode {
   const {
     node,
@@ -118,6 +121,7 @@ function buildPreparedTriggerCanvasNode(args: {
       label: displayLabel,
       state: "pending" as const,
       outputChannels: ["default"],
+      _draftDiffStatus: args.draftDiffStatus,
       trigger: {
         ...triggerProps,
         collapsed: node.isCollapsed,
@@ -180,7 +184,7 @@ export function prepareTriggerNode(
   triggers: TriggersTrigger[],
   nodeEventsMap: Record<string, CanvasesCanvasEvent[]>,
   canvasMode: "live" | "edit" = "live",
-  options: { canvasId: string; openModal?: (modal: TriggerActionModal) => void },
+  options: { canvasId: string; openModal?: (modal: TriggerActionModal) => void; draftDiffStatus?: "added" | "updated" | "removed" },
 ): CanvasNode {
   const triggerMetadata = triggers.find((t) => t.name === node.component);
   const displayLabel = getTriggerDisplayLabel(node, triggerMetadata);
@@ -196,6 +200,7 @@ export function prepareTriggerNode(
       canvasMode,
       canvasId: options.canvasId,
       openModal: options.openModal,
+      draftDiffStatus: options.draftDiffStatus,
     });
   } catch (error) {
     console.error(`[CanvasPage] Failed to prepare trigger node "${node.id}":`, error);
@@ -223,6 +228,7 @@ export function prepareComponentNode(args: PrepareComponentNodeArgs): CanvasNode
     currentUser,
     edges,
     canvasMode: args.canvasMode,
+    draftDiffStatus: args.draftDiffStatus,
   });
 }
 
@@ -267,6 +273,7 @@ export function prepareComponentBaseNode(args: PrepareComponentBaseNodeArgs): Ca
         label: displayLabel,
         state: "pending" as const,
         outputChannels: metadata?.outputChannels?.map((channel) => channel.name) || ["default"],
+        _draftDiffStatus: args.draftDiffStatus,
         component: {
           ...componentBaseProps,
           emptyStateProps,
