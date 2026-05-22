@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+	"github.com/superplanehq/superplane/pkg/components/memorywrite"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -24,15 +25,23 @@ func init() {
 type UpsertMemory struct{}
 
 type Spec struct {
-	Namespace string      `json:"namespace"`
-	MatchList []FieldPair `json:"matchList"`
-	ValueList []FieldPair `json:"valueList"`
+	Namespace    string      `json:"namespace"`
+	MatchList    []FieldPair `json:"matchList"`
+	ValueList    []FieldPair `json:"valueList"`
+	IterateList  bool        `json:"iterateList,omitempty"`
+	ListSource   string      `json:"listSource,omitempty"`
+	ItemVariable string      `json:"itemVariable,omitempty"`
 }
 
-type FieldPair struct {
-	Name  string `json:"name"`
-	Value any    `json:"value"`
+func (s Spec) listMode() memorywrite.ListMode {
+	return memorywrite.ListMode{
+		IterateList:  s.IterateList,
+		ListSource:   s.ListSource,
+		ItemVariable: s.ItemVariable,
+	}.Normalize()
 }
+
+type FieldPair = memorywrite.NameValuePair
 
 type canvasMemoryUpdateContext interface {
 	Update(namespace string, matches map[string]any, values map[string]any) ([]any, error)
@@ -73,7 +82,18 @@ This lets you store just one field (for example ` + "`value`" + `) without extra
 
 ## Output
 
-Always emits to the default channel. Check ` + "`data.operation`" + ` to know whether the component updated existing rows or created a new row.`
+Always emits to the default channel. Check ` + "`data.operation`" + ` to know whether the component updated existing rows or created a new row.
+
+## List Mode
+
+Enable "Input is a list" to iterate over a list expression and run one upsert per element.
+The ` + "`matchList`" + ` is evaluated once (same matches for every iteration), while each
+` + "`valueList`" + ` field value is evaluated per element with the iteration variable in scope
+(defaults to ` + "`item`" + `). All upserts are reported in a single ` + "`memory.upserted`" + ` event with per-item operation results.
+
+Note: when a non-empty ` + "`matchList`" + ` is configured in list mode, each iteration attempts to
+update the same matched rows. List mode is most useful for inserting multiple rows
+(empty ` + "`matchList`" + `) or when each item's values are meant to overwrite the matched rows.`
 }
 
 func (c *UpsertMemory) Icon() string {
@@ -100,6 +120,31 @@ func (c *UpsertMemory) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Description: "Memory namespace to upsert in",
 			Required:    true,
+		},
+		{
+			Name:        "iterateList",
+			Label:       "Input is a list",
+			Type:        configuration.FieldTypeBool,
+			Description: "When enabled, iterate over a list expression and upsert once per element (matchList stays global)",
+		},
+		{
+			Name:        "listSource",
+			Label:       "List Source",
+			Type:        configuration.FieldTypeExpression,
+			Description: "Expression that evaluates to a list, e.g. $[\"Runner\"].data.result.services",
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "iterateList", Values: []string{"true"}},
+			},
+		},
+		{
+			Name:        "itemVariable",
+			Label:       "Item Variable",
+			Type:        configuration.FieldTypeString,
+			Description: "Variable name bound to each list element when evaluating field values (default: item)",
+			Default:     memorywrite.DefaultItemVariable,
+			VisibilityConditions: []configuration.VisibilityCondition{
+				{Field: "iterateList", Values: []string{"true"}},
+			},
 		},
 		{
 			Name:        "valueList",
@@ -173,7 +218,10 @@ func (c *UpsertMemory) Setup(ctx core.SetupContext) error {
 		return err
 	}
 	spec = normalizeSpec(spec)
-	return validateSpec(spec)
+	if err := validateSpec(spec); err != nil {
+		return err
+	}
+	return spec.listMode().Validate()
 }
 
 func (c *UpsertMemory) Execute(ctx core.ExecutionContext) error {
@@ -189,6 +237,15 @@ func (c *UpsertMemory) Execute(ctx core.ExecutionContext) error {
 	updateCtx, ok := ctx.CanvasMemory.(canvasMemoryUpdateContext)
 	if !ok {
 		return fmt.Errorf("canvas memory update operations are not supported")
+	}
+
+	mode := spec.listMode()
+	if err := mode.Validate(); err != nil {
+		return err
+	}
+
+	if mode.IterateList {
+		return executeListMode(ctx, spec, mode, updateCtx)
 	}
 
 	matches := buildPairs(spec.MatchList)
@@ -234,6 +291,87 @@ func (c *UpsertMemory) Execute(ctx core.ExecutionContext) error {
 					"operation": operation,
 					"records":   affectedValues,
 					"count":     len(affectedValues),
+				},
+			},
+		},
+	)
+}
+
+func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.ListMode, updateCtx canvasMemoryUpdateContext) error {
+	items, err := mode.EvaluateList(ctx.Expressions)
+	if err != nil {
+		return err
+	}
+
+	matches := buildPairs(spec.MatchList)
+	records := make([]any, 0)
+	perItemValues := make([]any, 0, len(items))
+	itemResults := make([]any, 0, len(items))
+	updatedTotal := 0
+	createdTotal := 0
+
+	for i, item := range items {
+		scope := mode.Scope(item)
+		values, resolveErr := memorywrite.ResolvePairs(spec.ValueList, scope, ctx.Expressions)
+		if resolveErr != nil {
+			return fmt.Errorf("failed to resolve values for list item %d: %w", i, resolveErr)
+		}
+		perItemValues = append(perItemValues, values)
+
+		updatedValues, updateErr := updateCtx.Update(spec.Namespace, matches, values)
+		if updateErr != nil {
+			return fmt.Errorf("failed to upsert canvas memory for list item %d: %w", i, updateErr)
+		}
+
+		operation := OperationUpdated
+		affected := updatedValues
+		if len(updatedValues) == 0 {
+			if err := ctx.CanvasMemory.Add(spec.Namespace, values); err != nil {
+				return fmt.Errorf("failed to upsert canvas memory for list item %d: %w", i, err)
+			}
+			operation = OperationCreated
+			affected = []any{values}
+			createdTotal++
+		} else {
+			updatedTotal += len(updatedValues)
+		}
+
+		records = append(records, affected...)
+		itemResults = append(itemResults, map[string]any{
+			"operation": operation,
+			"values":    values,
+			"records":   affected,
+		})
+	}
+
+	metadata := map[string]any{
+		"namespace":    spec.Namespace,
+		"matchFields":  extractFieldNames(spec.MatchList),
+		"valueFields":  extractFieldNames(spec.ValueList),
+		"matches":      matches,
+		"updatedCount": updatedTotal,
+		"createdCount": createdTotal,
+		"iterateList":  true,
+		"itemVariable": mode.ItemVariable,
+		"count":        len(items),
+	}
+
+	if err := ctx.Metadata.Set(metadata); err != nil {
+		return fmt.Errorf("failed to set execution metadata: %w", err)
+	}
+
+	return ctx.ExecutionState.Emit(
+		core.DefaultOutputChannel.Name,
+		PayloadType,
+		[]any{
+			map[string]any{
+				"data": map[string]any{
+					"namespace": spec.Namespace,
+					"matches":   matches,
+					"values":    perItemValues,
+					"items":     itemResults,
+					"records":   records,
+					"count":     len(records),
 				},
 			},
 		},
