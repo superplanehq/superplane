@@ -268,7 +268,7 @@ export const useInfiniteCanvasLiveVersions = (
   organizationId: string,
   canvasId: string,
   enabled: boolean = true,
-  limit: number = 20,
+  limit: number = 50,
 ) => {
   return useInfiniteQuery({
     queryKey: canvasKeys.versionHistory(canvasId),
