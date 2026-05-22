@@ -38,7 +38,12 @@ func (s *Server) handleAgentSessionWebSocket(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Allow any org member to subscribe to the shared canvas session
+	// Verify org membership before allowing WS subscription
+	isMember, memberErr := models.IsOrgMember(user.OrganizationID, user.ID)
+	if memberErr != nil || !isMember {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
 	if _, err := models.FindSharedCanvasSessionByID(user.OrganizationID, sessionID); err != nil {
 		http.Error(w, "agent session not found", http.StatusNotFound)
 		return

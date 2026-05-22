@@ -27,6 +27,18 @@ func ListAgentChatMessages(_ context.Context, svc AgentsService, orgID, userID s
 
 	// Allow any org member to read messages from shared canvas sessions
 	if _, err := svc.GetSession(org, user, chatID); err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			log.WithError(err).WithField("chat_id", chatID).Error("failed to load agent chat")
+			return nil, status.Error(codes.Internal, "failed to load agent chat")
+		}
+		isMember, memberErr := models.IsOrgMember(org, user)
+		if memberErr != nil {
+			log.WithError(memberErr).Error("failed to check org membership")
+			return nil, status.Error(codes.Internal, "failed to verify access")
+		}
+		if !isMember {
+			return nil, status.Error(codes.PermissionDenied, "not a member of this organization")
+		}
 		if _, orgErr := models.FindSharedCanvasSessionByID(org, chatID); orgErr != nil {
 			if errors.Is(orgErr, gorm.ErrRecordNotFound) {
 				return nil, status.Error(codes.NotFound, "agent chat not found")

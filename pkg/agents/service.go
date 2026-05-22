@@ -61,7 +61,7 @@ func (s *Service) EnsureSession(ctx context.Context, organizationID, userID, can
 func (s *Service) provisionSession(ctx context.Context, organizationID, userID, canvasID uuid.UUID) (*models.AgentSession, error) {
 	var session *models.AgentSession
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", ensureSessionLockKey(organizationID, userID, canvasID)).Error; err != nil {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(?)", ensureSessionLockKey(organizationID, canvasID)).Error; err != nil {
 			return err
 		}
 
@@ -335,10 +335,9 @@ func findCursorMessage(sessionID, beforeID uuid.UUID) (*models.AgentSessionMessa
 	return &anchor, nil
 }
 
-func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
+func ensureSessionLockKey(organizationID, canvasID uuid.UUID) int64 {
 	h := fnv.New64a()
 	h.Write(organizationID[:])
-	h.Write(userID[:])
 	h.Write(canvasID[:])
 	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
 }
@@ -410,7 +409,15 @@ func (s *Service) getSharedSession(organizationID, userID, sessionID uuid.UUID) 
 	if err == nil {
 		return session, nil
 	}
-	if !models.IsOrgMember(organizationID, userID) {
+	// Only fall back to shared lookup on not-found, not on DB errors
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("get session: %w", err)
+	}
+	isMember, memberErr := models.IsOrgMember(organizationID, userID)
+	if memberErr != nil {
+		return nil, fmt.Errorf("check org membership: %w", memberErr)
+	}
+	if !isMember {
 		return nil, ErrSessionForbidden
 	}
 	return models.FindSharedCanvasSessionByID(organizationID, sessionID)
