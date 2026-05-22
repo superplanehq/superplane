@@ -100,9 +100,10 @@ export const CustomEdge = React.memo(function CustomEdge({
   }, [id, onDeleteEdge, setEdges]);
 
   // Update style based on selection and hover state
+  const hasDiffColor = style.stroke && style.stroke !== "#C9D5E1";
   const edgeStyle: CSSProperties = {
     ...style,
-    stroke: selected || isHovered ? "#A1AEC0" : style.stroke || "#DEF3FE",
+    stroke: hasDiffColor ? style.stroke : selected || isHovered ? "#A1AEC0" : style.stroke || "#DEF3FE",
     strokeWidth: selected ? 3 : style.strokeWidth || 3,
     pointerEvents: "visibleStroke",
     ...(selected || isHovered ? { strokeOpacity: 1 } : {}),

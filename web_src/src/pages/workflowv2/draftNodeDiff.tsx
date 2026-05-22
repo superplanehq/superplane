@@ -209,3 +209,32 @@ export function buildDraftNodeDiffSummary(
 
   return { items, addedCount, updatedCount, removedCount };
 }
+
+/**
+ * Returns a map of nodeId -> diff status for canvas node rendering.
+ * Includes positions for removed nodes so they can be rendered as ghost nodes.
+ */
+export function buildDraftDiffMap(
+  liveVersion?: CanvasesCanvasVersion,
+  draftVersion?: CanvasesCanvasVersion,
+): {
+  statusMap: Record<string, "added" | "updated" | "removed">;
+  removedNodes: Array<Record<string, unknown>>;
+} {
+  const { items } = buildDraftNodeDiffSummary(liveVersion, draftVersion);
+  const statusMap: Record<string, "added" | "updated" | "removed"> = {};
+  for (const item of items) {
+    statusMap[item.id] = item.changeType;
+  }
+
+  const liveNodes = (liveVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
+  const removedNodes = liveNodes.filter((n) => statusMap[String(n.id)] === "removed");
+
+  // Compute edge diff: edges from live that connect to removed nodes
+  const liveEdges = (liveVersion?.spec?.edges || []) as Array<Record<string, unknown>>;
+  const removedEdges = liveEdges.filter(
+    (e) => statusMap[String(e.sourceId)] === "removed" || statusMap[String(e.targetId)] === "removed",
+  );
+
+  return { statusMap, removedNodes, removedEdges };
+}
