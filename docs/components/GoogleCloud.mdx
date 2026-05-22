@@ -29,6 +29,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud DNS • Update Record" href="#cloud-dns-•-update-record" description="Update an existing DNS record in a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
+  <LinkCard title="Compute • Delete VM Instance" href="#compute-•-delete-vm-instance" description="Permanently delete a Google Compute Engine VM instance" />
   <LinkCard title="Pub/Sub • Create Subscription" href="#pub/sub-•-create-subscription" description="Create a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Create Topic" href="#pub/sub-•-create-topic" description="Create a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
@@ -751,6 +752,49 @@ Emits a payload with instance details: instanceId, selfLink, internalIP, externa
   },
   "timestamp": "2025-02-14T12:00:00Z",
   "type": "gcp.createVM.completed"
+}
+```
+
+<a id="compute-•-delete-vm-instance"></a>
+
+## Compute • Delete VM Instance
+
+The Delete VM Instance component permanently deletes a Compute Engine VM instance.
+
+### Use Cases
+
+- **Cleanup**: Remove temporary or test VMs after use
+- **Cost optimization**: Automatically tear down unused infrastructure
+- **Automated workflows**: Delete VMs as part of deployment rollback or cleanup processes
+- **Environment management**: Remove ephemeral environments after testing
+
+### Configuration
+
+- **VM Instance**: Pick from the list of VMs in your project, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.createVM`). The selection encodes both the zone and the instance name.
+
+### Output
+
+Returns information about the deleted instance:
+- **instanceName**: The name of the instance that was deleted
+- **zone**: The zone the instance was in
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone
+- All data on the instance will be lost unless boot/data disks have auto-delete disabled
+- The instance will be stopped if running before deletion
+- If the instance is not found at the resolved zone/name, the action fails so that misconfigured or stale expressions do not silently mask incomplete cleanup
+
+### Example Output
+
+```json
+{
+  "data": {
+    "instanceName": "my-vm",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.vmInstance.deleted"
 }
 ```
 
