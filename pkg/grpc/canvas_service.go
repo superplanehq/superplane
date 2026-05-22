@@ -5,6 +5,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/canvasstorage"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -20,6 +22,9 @@ type CanvasService struct {
 	authService    authorization.Authorization
 	webhookBaseURL string
 	usageService   usage.Service
+
+	canvasStorage        canvasstorage.Provider
+	canvasStorageOptions canvases.CanvasRepositoryStorageOptions
 }
 
 func NewCanvasService(
@@ -28,13 +33,26 @@ func NewCanvasService(
 	encryptor crypto.Encryptor,
 	webhookBaseURL string,
 	usageService usage.Service,
+	canvasStorage canvasstorage.Provider,
+	canvasStorageConfig config.CanvasStorageConfig,
 ) *CanvasService {
+	providerName := canvasStorageConfig.Driver
+	if providerName == config.CanvasStorageDriverDisabled {
+		providerName = ""
+	}
+
 	return &CanvasService{
 		registry:       registry,
 		encryptor:      encryptor,
 		authService:    authService,
 		webhookBaseURL: webhookBaseURL,
 		usageService:   usageService,
+		canvasStorage:  canvasStorage,
+		canvasStorageOptions: canvases.CanvasRepositoryStorageOptions{
+			ProviderName:  providerName,
+			DefaultBranch: canvasStorageConfig.DefaultBranch,
+			MaxFileBytes:  canvasStorageConfig.MaxFileBytes,
+		},
 	}
 }
 
@@ -51,6 +69,31 @@ func (s *CanvasService) DescribeCanvas(ctx context.Context, req *pb.DescribeCanv
 func (s *CanvasService) UpdateCanvas(ctx context.Context, req *pb.UpdateCanvasRequest) (*pb.UpdateCanvasResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.UpdateCanvas(ctx, s.authService, organizationID, req.Id, req.Name, req.Description, req.ChangeManagement)
+}
+
+func (s *CanvasService) GetCanvasRepository(ctx context.Context, req *pb.GetCanvasRepositoryRequest) (*pb.GetCanvasRepositoryResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetCanvasRepository(ctx, organizationID, req.CanvasId, s.canvasStorage, s.canvasStorageOptions)
+}
+
+func (s *CanvasService) ListCanvasRepositoryFiles(ctx context.Context, req *pb.ListCanvasRepositoryFilesRequest) (*pb.ListCanvasRepositoryFilesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListCanvasRepositoryFiles(ctx, organizationID, req.CanvasId, req.Ref, s.canvasStorage, s.canvasStorageOptions)
+}
+
+func (s *CanvasService) GetCanvasRepositoryFile(ctx context.Context, req *pb.GetCanvasRepositoryFileRequest) (*pb.GetCanvasRepositoryFileResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetCanvasRepositoryFile(ctx, organizationID, req.CanvasId, req.Path, req.Ref, s.canvasStorage, s.canvasStorageOptions)
+}
+
+func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb.CommitCanvasRepositoryFilesRequest) (*pb.CommitCanvasRepositoryFilesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CommitCanvasRepositoryFiles(ctx, organizationID, req.CanvasId, req, s.canvasStorage, s.canvasStorageOptions)
+}
+
+func (s *CanvasService) CreateCanvasRepositoryGitURL(ctx context.Context, req *pb.CreateCanvasRepositoryGitURLRequest) (*pb.CreateCanvasRepositoryGitURLResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CreateCanvasRepositoryGitURL(ctx, organizationID, req.CanvasId, req, s.canvasStorage, s.canvasStorageOptions)
 }
 
 func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {

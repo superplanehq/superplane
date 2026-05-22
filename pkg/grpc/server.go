@@ -11,6 +11,8 @@ import (
 
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/canvasstorage"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -108,6 +110,12 @@ func RunServer(
 		log.Fatalf("failed to initialize usage service: %v", err)
 	}
 
+	canvasStorageConfig := config.LoadCanvasStorageConfig()
+	canvasStorage, err := canvasstorage.NewProvider(canvasStorageConfig)
+	if err != nil {
+		log.Fatalf("failed to initialize canvas storage: %v", err)
+	}
+
 	organizationService := NewOrganizationService(
 		authService,
 		registry,
@@ -145,7 +153,15 @@ func RunServer(
 	blueprintService := NewBlueprintService(registry)
 	pbBlueprints.RegisterBlueprintsServer(grpcServer, blueprintService)
 
-	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL, usageService)
+	canvasService := NewCanvasService(
+		authService,
+		registry,
+		encryptor,
+		webhooksBaseURL,
+		usageService,
+		canvasStorage,
+		canvasStorageConfig,
+	)
 	pbCanvases.RegisterCanvasesServer(grpcServer, canvasService)
 
 	canvasFolderService := NewCanvasFolderService()

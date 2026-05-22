@@ -1,4 +1,4 @@
-export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
+export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
 
 export function readStoredBoolean(key: string): boolean {
@@ -23,12 +23,14 @@ export function getWorkflowHeaderMode({
   dashboardsFeatureEnabled,
   isRunsMode,
   isMemoryMode,
+  isFilesMode,
   canvasMode,
 }: {
   isDashboardMode: boolean;
   dashboardsFeatureEnabled: boolean;
   isRunsMode: boolean;
   isMemoryMode: boolean;
+  isFilesMode: boolean;
   canvasMode: "edit" | "live";
 }): WorkflowHeaderMode {
   if (isDashboardMode) {
@@ -37,6 +39,10 @@ export function getWorkflowHeaderMode({
 
   if (isMemoryMode) {
     return "memory";
+  }
+
+  if (isFilesMode) {
+    return "files";
   }
 
   if (isRunsMode) {

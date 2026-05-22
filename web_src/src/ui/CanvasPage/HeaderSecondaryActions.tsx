@@ -32,6 +32,7 @@ export function SecondaryHeaderActions({
   onDashboardAddPanel,
   onDashboardOpenYaml,
   dashboardYamlReadOnly,
+  filesHeaderActionsSlotId,
 }: HeaderProps) {
   const showEditButton = mode === "version-live" && !!onEnterEditMode;
   const showDraftDropdown =
@@ -110,6 +111,10 @@ export function SecondaryHeaderActions({
           <Plus className="mr-1 h-3.5 w-3.5" />
           Add panel
         </UIButton>
+      ) : null}
+
+      {mode === "files" && filesHeaderActionsSlotId ? (
+        <div id={filesHeaderActionsSlotId} className="flex shrink-0 items-center gap-2" />
       ) : null}
     </div>
   );

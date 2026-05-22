@@ -1,51 +1,51 @@
 import { useCallback } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
-interface DashboardModeActionsConfig {
-  dashboardsFeatureEnabled: boolean;
+interface FilesModeActionsConfig {
   hasEditableVersion: boolean;
   liveCanvasVersionId: string | undefined;
   handleUseVersion: (versionId: string) => void;
+  setIsFilesMode: (value: boolean) => void;
   setIsDashboardMode: (value: boolean) => void;
   setIsDashboardAddPanelOpen: (value: boolean) => void;
   setIsDashboardYamlOpen: (value: boolean) => void;
   setIsRunsMode: (value: boolean) => void;
   setIsMemoryMode: (value: boolean) => void;
-  setIsFilesMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
 }
 
-export function useDashboardModeActions({
-  dashboardsFeatureEnabled,
+export function useFilesModeActions({
   hasEditableVersion,
   liveCanvasVersionId,
   handleUseVersion,
+  setIsFilesMode,
   setIsDashboardMode,
   setIsDashboardAddPanelOpen,
   setIsDashboardYamlOpen,
   setIsRunsMode,
   setIsMemoryMode,
-  setIsFilesMode,
   setSelectedRunId,
   setSearchParams,
-}: DashboardModeActionsConfig) {
-  const handleSelectDashboardMode = useCallback(() => {
-    if (!dashboardsFeatureEnabled) return;
+}: FilesModeActionsConfig) {
+  const handleSelectFilesMode = useCallback(() => {
     if (hasEditableVersion && liveCanvasVersionId) handleUseVersion(liveCanvasVersionId);
 
-    setIsDashboardMode(true);
+    setIsFilesMode(true);
+    setIsDashboardMode(false);
+    setIsDashboardAddPanelOpen(false);
+    setIsDashboardYamlOpen(false);
     setIsRunsMode(false);
     setIsMemoryMode(false);
-    setIsFilesMode(false);
     setSelectedRunId(null);
-    setSearchParams(toDashboardSearchParams, { replace: true });
+    setSearchParams(toFilesSearchParams, { replace: true });
   }, [
-    dashboardsFeatureEnabled,
     handleUseVersion,
     hasEditableVersion,
     liveCanvasVersionId,
+    setIsDashboardAddPanelOpen,
     setIsDashboardMode,
+    setIsDashboardYamlOpen,
     setIsFilesMode,
     setIsMemoryMode,
     setIsRunsMode,
@@ -53,26 +53,24 @@ export function useDashboardModeActions({
     setSelectedRunId,
   ]);
 
-  const handleExitDashboardMode = useCallback(() => {
-    setIsDashboardMode(false);
-    setIsDashboardAddPanelOpen(false);
-    setIsDashboardYamlOpen(false);
-    setSearchParams(removeDashboardSearchParam, { replace: true });
-  }, [setIsDashboardAddPanelOpen, setIsDashboardYamlOpen, setIsDashboardMode, setSearchParams]);
+  const handleExitFilesMode = useCallback(() => {
+    setIsFilesMode(false);
+    setSearchParams(removeFilesSearchParam, { replace: true });
+  }, [setIsFilesMode, setSearchParams]);
 
-  return { handleSelectDashboardMode, handleExitDashboardMode };
+  return { handleSelectFilesMode, handleExitFilesMode };
 }
 
-function toDashboardSearchParams(current: URLSearchParams): URLSearchParams {
+function toFilesSearchParams(current: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(current);
-  next.set("view", "dashboard");
+  next.set("view", "files");
   next.delete("run");
   next.delete("sidebar");
   next.delete("node");
   return next;
 }
 
-function removeDashboardSearchParam(current: URLSearchParams): URLSearchParams {
+function removeFilesSearchParam(current: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(current);
   next.delete("view");
   return next;

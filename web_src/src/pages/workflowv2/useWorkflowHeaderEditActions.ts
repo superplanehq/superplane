@@ -4,9 +4,11 @@ import type { SetURLSearchParams } from "react-router-dom";
 interface WorkflowHeaderEditActionsConfig {
   isDashboardMode: boolean;
   isMemoryMode: boolean;
+  isFilesMode: boolean;
   isRunsMode: boolean;
   handleExitDashboardMode: () => void;
   handleExitMemoryMode: () => void;
+  handleExitFilesMode: () => void;
   handleExitRunsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
   setIsRunsMode: (value: boolean) => void;
@@ -18,9 +20,11 @@ interface WorkflowHeaderEditActionsConfig {
 export function useWorkflowHeaderEditActions({
   isDashboardMode,
   isMemoryMode,
+  isFilesMode,
   isRunsMode,
   handleExitDashboardMode,
   handleExitMemoryMode,
+  handleExitFilesMode,
   handleExitRunsMode,
   handleToggleEditMode,
   setIsRunsMode,
@@ -39,6 +43,11 @@ export function useWorkflowHeaderEditActions({
       await handleToggleEditMode();
       return;
     }
+    if (isFilesMode) {
+      handleExitFilesMode();
+      await handleToggleEditMode();
+      return;
+    }
     if (isRunsMode) {
       setIsRunsMode(false);
       setSelectedRunId(null);
@@ -50,9 +59,11 @@ export function useWorkflowHeaderEditActions({
     await handleToggleEditMode();
   }, [
     handleExitDashboardMode,
+    handleExitFilesMode,
     handleExitMemoryMode,
     handleToggleEditMode,
     isDashboardMode,
+    isFilesMode,
     isMemoryMode,
     isRunsMode,
     setIsRunsMode,
@@ -70,6 +81,10 @@ export function useWorkflowHeaderEditActions({
       handleExitMemoryMode();
       return;
     }
+    if (isFilesMode) {
+      handleExitFilesMode();
+      return;
+    }
     if (isRunsMode) {
       handleExitRunsMode();
       return;
@@ -77,10 +92,12 @@ export function useWorkflowHeaderEditActions({
     await handleToggleEditMode();
   }, [
     handleExitDashboardMode,
+    handleExitFilesMode,
     handleExitMemoryMode,
     handleExitRunsMode,
     handleToggleEditMode,
     isDashboardMode,
+    isFilesMode,
     isMemoryMode,
     isRunsMode,
   ]);

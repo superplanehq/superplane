@@ -5,7 +5,7 @@
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -268,6 +268,25 @@ CREATE TABLE public.canvas_memories (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: canvas_repositories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.canvas_repositories (
+    canvas_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    provider text NOT NULL,
+    repo_id text NOT NULL,
+    default_branch text DEFAULT 'main'::text NOT NULL,
+    head_sha text,
+    status text DEFAULT 'ready'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT canvas_repositories_provider_check CHECK ((provider = ANY (ARRAY['code_storage'::text, 'local_git'::text]))),
+    CONSTRAINT canvas_repositories_status_check CHECK ((status = ANY (ARRAY['provisioning'::text, 'ready'::text, 'error'::text])))
 );
 
 
@@ -886,6 +905,22 @@ ALTER TABLE ONLY public.canvas_memories
 
 
 --
+-- Name: canvas_repositories canvas_repositories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_repositories
+    ADD CONSTRAINT canvas_repositories_pkey PRIMARY KEY (canvas_id);
+
+
+--
+-- Name: canvas_repositories canvas_repositories_provider_repo_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_repositories
+    ADD CONSTRAINT canvas_repositories_provider_repo_id_key UNIQUE (provider, repo_id);
+
+
+--
 -- Name: casbin_rule casbin_rule_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1301,6 +1336,13 @@ CREATE INDEX idx_canvas_folders_organization_id_title ON public.canvas_folders U
 --
 
 CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USING btree (canvas_id, namespace);
+
+
+--
+-- Name: idx_canvas_repositories_organization_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_canvas_repositories_organization_id ON public.canvas_repositories USING btree (organization_id);
 
 
 --
@@ -1765,6 +1807,22 @@ ALTER TABLE ONLY public.canvas_memories
 
 
 --
+-- Name: canvas_repositories canvas_repositories_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_repositories
+    ADD CONSTRAINT canvas_repositories_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: canvas_repositories canvas_repositories_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_repositories
+    ADD CONSTRAINT canvas_repositories_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
 -- Name: workflow_node_execution_kvs fk_wnek_workflow; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2145,7 +2203,7 @@ ALTER TABLE ONLY public.workflows
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -2164,7 +2222,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260520171949	f
+20260522144532	f
 \.
 
 
@@ -2181,7 +2239,7 @@ COPY public.schema_migrations (version, dirty) FROM stdin;
 \restrict abcdef123
 
 -- Dumped from database version 17.5 (Debian 17.5-1.pgdg130+1)
--- Dumped by pg_dump version 17.9 (Ubuntu 17.9-1.pgdg22.04+1)
+-- Dumped by pg_dump version 17.10 (Ubuntu 17.10-1.pgdg22.04+1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;

@@ -90,9 +90,11 @@ import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
 import { WorkflowDashboardOverlay } from "./dashboard/WorkflowDashboardOverlay";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useMemoryModeActions } from "./useMemoryModeActions";
+import { useFilesModeActions } from "./useFilesModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
+import { WorkflowFilesOverlayLayer } from "./WorkflowFilesOverlayLayer";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { CanvasYamlModal } from "./CanvasYamlModal";
@@ -197,6 +199,8 @@ export function WorkflowPageV2() {
     setIsDashboardMode,
     isMemoryMode,
     setIsMemoryMode,
+    isFilesMode,
+    setIsFilesMode,
     isDashboardAddPanelOpen,
     setIsDashboardAddPanelOpen,
     isDashboardYamlOpen,
@@ -4766,6 +4770,7 @@ export function WorkflowPageV2() {
     (runId: string) => {
       setSelectedRunId(runId);
       setIsRunsMode(true);
+      setIsFilesMode(false);
       setRunDetailNodeId(null);
       setSearchParams(
         (current) => {
@@ -4779,7 +4784,7 @@ export function WorkflowPageV2() {
         { replace: true },
       );
     },
-    [setIsRunsMode, setSearchParams, setSelectedRunId],
+    [setIsFilesMode, setIsRunsMode, setSearchParams, setSelectedRunId],
   );
 
   const handleSelectRunsMode = useCallback(() => {
@@ -4789,6 +4794,7 @@ export function WorkflowPageV2() {
 
     setIsRunsMode(true);
     setIsMemoryMode(false);
+    setIsFilesMode(false);
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
@@ -4799,7 +4805,15 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [handleUseVersion, hasEditableVersion, liveCanvasVersionId, setIsMemoryMode, setIsRunsMode, setSearchParams]);
+  }, [
+    handleUseVersion,
+    hasEditableVersion,
+    liveCanvasVersionId,
+    setIsFilesMode,
+    setIsMemoryMode,
+    setIsRunsMode,
+    setSearchParams,
+  ]);
 
   const handleExitRunsMode = useCallback(() => {
     setIsRunsMode(false);
@@ -4829,6 +4843,7 @@ export function WorkflowPageV2() {
     setIsDashboardAddPanelOpen,
     setIsDashboardYamlOpen,
     setIsRunsMode,
+    setIsFilesMode,
     setIsMemoryMode,
     setSearchParams,
     setSelectedRunId,
@@ -4843,6 +4858,21 @@ export function WorkflowPageV2() {
     setIsDashboardAddPanelOpen,
     setIsDashboardYamlOpen,
     setIsRunsMode,
+    setIsFilesMode,
+    setSearchParams,
+    setSelectedRunId,
+  });
+
+  const { handleSelectFilesMode, handleExitFilesMode } = useFilesModeActions({
+    handleUseVersion,
+    hasEditableVersion,
+    liveCanvasVersionId,
+    setIsFilesMode,
+    setIsDashboardMode,
+    setIsDashboardAddPanelOpen,
+    setIsDashboardYamlOpen,
+    setIsRunsMode,
+    setIsMemoryMode,
     setSearchParams,
     setSelectedRunId,
   });
@@ -4850,9 +4880,11 @@ export function WorkflowPageV2() {
   const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader } = useWorkflowHeaderEditActions({
     isDashboardMode,
     isMemoryMode,
+    isFilesMode,
     isRunsMode,
     handleExitDashboardMode,
     handleExitMemoryMode,
+    handleExitFilesMode,
     handleExitRunsMode,
     handleToggleEditMode,
     setIsRunsMode,
@@ -5473,6 +5505,7 @@ export function WorkflowPageV2() {
     dashboardsFeatureEnabled,
     isRunsMode,
     isMemoryMode,
+    isFilesMode,
     canvasMode,
   });
   const { onDashboardAddPanel, onDashboardOpenYaml, dashboardYamlReadOnly } = getDashboardHeaderActions({
@@ -5508,6 +5541,7 @@ export function WorkflowPageV2() {
   });
   runDisabledRef.current = runDisabled;
   runDisabledTooltipRef.current = runDisabledTooltip;
+  const filesHeaderActionsSlotId = canvasId ? `canvas-files-header-actions-${canvasId}` : "canvas-files-header-actions";
 
   return (
     <>
@@ -5541,6 +5575,12 @@ export function WorkflowPageV2() {
           error={canvasMemoryError}
           deleteCanvasMemoryEntry={deleteCanvasMemoryEntry}
         />
+        <WorkflowFilesOverlayLayer
+          isFilesMode={isFilesMode}
+          canvasId={canvasId || undefined}
+          canWrite={canUpdateCanvas && !isTemplate}
+          headerActionsSlotId={filesHeaderActionsSlotId}
+        />
         <CanvasPage
           key={canvasRenderKey}
           // Persist right sidebar in query params
@@ -5558,8 +5598,8 @@ export function WorkflowPageV2() {
           showCanvasSettingsMenu={canUpdateCanvas}
           isVersionControlOpen={isVersionControlOpen}
           onOpenVersionControl={!hasEditableVersion ? handleToggleVersionControl : undefined}
-          showBottomStatusControls={!isTemplate && !isRunsMode && !isMemoryMode}
-          hideAddControls={isTemplate || isRunsMode || isMemoryMode}
+          showBottomStatusControls={!isTemplate && !isRunsMode && !isMemoryMode && !isFilesMode}
+          hideAddControls={isTemplate || isRunsMode || isMemoryMode || isFilesMode}
           hideCanvasToolSidebar={isTemplate}
           onSelectMemory={isTemplate ? undefined : handleSelectMemoryMode}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
@@ -5604,7 +5644,7 @@ export function WorkflowPageV2() {
           canUpdateIntegrations={canUpdateIntegrations}
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
-          readOnly={isReadOnly || isRunsMode}
+          readOnly={isReadOnly || isRunsMode || isFilesMode}
           hasFitToViewRef={isRunsMode ? runsHasFitToViewRef : hasFitToViewRef}
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
@@ -5643,9 +5683,11 @@ export function WorkflowPageV2() {
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
           onExitRunsMode={handleExitRunsMode}
           onSelectDashboard={isTemplate || !dashboardsFeatureEnabled ? undefined : handleSelectDashboardMode}
+          onSelectFiles={isTemplate ? undefined : handleSelectFilesMode}
           onDashboardAddPanel={onDashboardAddPanel}
           onDashboardOpenYaml={onDashboardOpenYaml}
           dashboardYamlReadOnly={dashboardYamlReadOnly}
+          filesHeaderActionsSlotId={filesHeaderActionsSlotId}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}

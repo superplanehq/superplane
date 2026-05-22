@@ -73,6 +73,63 @@ service Canvases {
     };
   }
 
+  rpc GetCanvasRepository(GetCanvasRepositoryRequest) returns (GetCanvasRepositoryResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/repository"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get canvas repository";
+      description: "Returns metadata for the Git-backed file repository attached to a canvas";
+      tags: "CanvasRepository";
+    };
+  }
+
+  rpc ListCanvasRepositoryFiles(ListCanvasRepositoryFilesRequest) returns (ListCanvasRepositoryFilesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/repository/files"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas repository files";
+      description: "Lists files in the Git-backed repository attached to a canvas";
+      tags: "CanvasRepository";
+    };
+  }
+
+  rpc GetCanvasRepositoryFile(GetCanvasRepositoryFileRequest) returns (GetCanvasRepositoryFileResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/repository/file/{path=**}"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get canvas repository file";
+      description: "Returns one file from the Git-backed repository attached to a canvas";
+      tags: "CanvasRepository";
+    };
+  }
+
+  rpc CommitCanvasRepositoryFiles(CommitCanvasRepositoryFilesRequest) returns (CommitCanvasRepositoryFilesResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/repository/commits"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Commit canvas repository files";
+      description: "Commits file additions, updates, and deletions to the Git-backed repository attached to a canvas";
+      tags: "CanvasRepository";
+    };
+  }
+
+  rpc CreateCanvasRepositoryGitURL(CreateCanvasRepositoryGitURLRequest) returns (CreateCanvasRepositoryGitURLResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/repository/git-url"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create canvas repository Git URL";
+      description: "Creates a short-lived authenticated Git URL for the repository attached to a canvas";
+      tags: "CanvasRepository";
+    };
+  }
+
   rpc CreateCanvasVersion(CreateCanvasVersionRequest) returns (CreateCanvasVersionResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/versions"
@@ -471,6 +528,88 @@ message UpdateCanvasRequest {
 
 message UpdateCanvasResponse {
   Canvas canvas = 1;
+}
+
+message CanvasRepository {
+  string canvas_id = 1;
+  string provider = 2;
+  string repo_id = 3;
+  string default_branch = 4;
+  string head_sha = 5;
+  string status = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message GetCanvasRepositoryRequest {
+  string canvas_id = 1;
+}
+
+message GetCanvasRepositoryResponse {
+  CanvasRepository repository = 1;
+}
+
+message ListCanvasRepositoryFilesRequest {
+  string canvas_id = 1;
+  string ref = 2;
+}
+
+message CanvasRepositoryFile {
+  string path = 1;
+}
+
+message ListCanvasRepositoryFilesResponse {
+  CanvasRepository repository = 1;
+  repeated CanvasRepositoryFile files = 2;
+  string ref = 3;
+}
+
+message GetCanvasRepositoryFileRequest {
+  string canvas_id = 1;
+  string path = 2;
+  string ref = 3;
+}
+
+message GetCanvasRepositoryFileResponse {
+  CanvasRepository repository = 1;
+  string path = 2;
+  bytes content = 3;
+  string ref = 4;
+}
+
+message CanvasRepositoryFileOperation {
+  string path = 1;
+  bytes content = 2;
+  bool delete = 3;
+}
+
+message CommitCanvasRepositoryFilesRequest {
+  string canvas_id = 1;
+  string branch = 2;
+  string base_branch = 3;
+  string expected_head_sha = 4;
+  string message = 5;
+  repeated CanvasRepositoryFileOperation operations = 6;
+}
+
+message CommitCanvasRepositoryFilesResponse {
+  CanvasRepository repository = 1;
+  string commit_sha = 2;
+  string old_sha = 3;
+  string new_sha = 4;
+  string branch = 5;
+}
+
+message CreateCanvasRepositoryGitURLRequest {
+  string canvas_id = 1;
+  bool read_only = 2;
+  int64 ttl_seconds = 3;
+  bool allow_force_push = 4;
+}
+
+message CreateCanvasRepositoryGitURLResponse {
+  CanvasRepository repository = 1;
+  string url = 2;
+  google.protobuf.Timestamp expires_at = 3;
 }
 
 message CreateCanvasRequest {

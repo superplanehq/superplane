@@ -78,7 +78,8 @@ RUN apt-get update && \
   postgresql-contrib \
   rabbitmq-server \
   ca-certificates \
-  curl && \
+  curl \
+  git && \
   # Ensure PostgreSQL server binaries (initdb, pg_ctl, psql, etc.) are on PATH
   ln -s /usr/lib/postgresql/*/bin/* /usr/local/bin/ && \
   rm -rf /var/lib/apt/lists/*
