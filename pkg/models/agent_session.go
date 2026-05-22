@@ -166,3 +166,17 @@ func FailStuckStreamingSessions(cutoff time.Time) ([]AgentSession, error) {
 	}
 	return stuck, nil
 }
+
+// FindSharedCanvasSession finds the single shared session for a canvas, regardless of which user created it.
+func FindSharedCanvasSession(tx *gorm.DB, organizationID, canvasID uuid.UUID) (*AgentSession, error) {
+	var session AgentSession
+	err := tx.
+		Where("organization_id = ? AND canvas_id = ?", organizationID, canvasID).
+		Order("created_at ASC").
+		First(&session).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
