@@ -395,9 +395,7 @@ func (c *Client) RunInstances(input RunInstancesInput) (*RunInstancesOutput, err
 	params.Set("NetworkInterface.1.DeviceIndex", "0")
 	params.Set("NetworkInterface.1.SubnetId", strings.TrimSpace(input.SubnetID))
 
-	if input.AssociatePublicIPAddress {
-		params.Set("NetworkInterface.1.AssociatePublicIpAddress", "true")
-	}
+	params.Set("NetworkInterface.1.AssociatePublicIpAddress", fmt.Sprintf("%t", input.AssociatePublicIPAddress))
 
 	securityGroupIndex := 1
 	for _, securityGroupID := range input.SecurityGroupIDs {

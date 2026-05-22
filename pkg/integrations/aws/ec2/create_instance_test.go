@@ -169,6 +169,56 @@ func Test__CreateInstance__Execute(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, "i-abc123", stored.InstanceID)
 	})
+
+	t.Run("associate public IP disabled -> sends false explicitly", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`
+						<RunInstancesResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
+							<requestId>req-456</requestId>
+							<instancesSet>
+								<item>
+									<instanceId>i-def456</instanceId>
+									<instanceState><name>pending</name></instanceState>
+								</item>
+							</instancesSet>
+						</RunInstancesResponse>
+					`)),
+				},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":                     "builder",
+				"region":                   "us-east-1",
+				"image":                    "ami-123",
+				"instanceType":             "t3.micro",
+				"subnet":                   "subnet-123",
+				"securityGroupMode":        "existing",
+				"securityGroup":            "sg-123",
+				"associatePublicIpAddress": false,
+			},
+			HTTP:     httpContext,
+			Metadata: &contexts.MetadataContext{},
+			Requests: &contexts.RequestContext{},
+			Integration: &contexts.IntegrationContext{
+				CurrentSecrets: map[string]core.IntegrationSecret{
+					"accessKeyId":     {Name: "accessKeyId", Value: []byte("key")},
+					"secretAccessKey": {Name: "secretAccessKey", Value: []byte("secret")},
+					"sessionToken":    {Name: "sessionToken", Value: []byte("token")},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpContext.Requests, 1)
+		body, err := io.ReadAll(httpContext.Requests[0].Body)
+		require.NoError(t, err)
+		assert.Contains(t, string(body), "NetworkInterface.1.AssociatePublicIpAddress=false")
+	})
 }
 
 func Test__CreateInstance__PollEmitsWhenRunning(t *testing.T) {
