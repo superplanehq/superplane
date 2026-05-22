@@ -221,13 +221,46 @@ export function buildDraftDiffMap(
   statusMap: Record<string, "added" | "updated" | "removed">;
   removedNodes: Array<Record<string, unknown>>;
 } {
-  const { items } = buildDraftNodeDiffSummary(liveVersion, draftVersion);
+  const liveNodes = (liveVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
+  const draftNodes = (draftVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
+
+  const byID = (nodes: Array<Record<string, unknown>>) => {
+    const map = new Map<string, Record<string, unknown>>();
+    nodes.forEach((node) => {
+      const id = String(node.id || "");
+      if (id) map.set(id, node);
+    });
+    return map;
+  };
+
+  // Compare without position — layout changes are not functional edits
+  const functionalSnapshot = (node: Record<string, unknown>) =>
+    JSON.stringify({
+      name: node.name || null,
+      type: node.type || null,
+      ref: node.ref || null,
+      configuration: node.configuration || null,
+      isCollapsed: node.isCollapsed || false,
+      integrationId: getComparableIntegrationId(node),
+    });
+
+  const liveByID = byID(liveNodes);
+  const draftByID = byID(draftNodes);
+  const allIDs = new Set([...liveByID.keys(), ...draftByID.keys()]);
+
   const statusMap: Record<string, "added" | "updated" | "removed"> = {};
-  for (const item of items) {
-    statusMap[item.id] = item.changeType;
+  for (const id of allIDs) {
+    const liveNode = liveByID.get(id);
+    const draftNode = draftByID.get(id);
+    if (!liveNode && draftNode) {
+      statusMap[id] = "added";
+    } else if (liveNode && !draftNode) {
+      statusMap[id] = "removed";
+    } else if (liveNode && draftNode && functionalSnapshot(liveNode) !== functionalSnapshot(draftNode)) {
+      statusMap[id] = "updated";
+    }
   }
 
-  const liveNodes = (liveVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
   const removedNodes = liveNodes.filter((n) => statusMap[String(n.id)] === "removed");
 
   return { statusMap, removedNodes };
