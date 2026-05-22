@@ -1,6 +1,6 @@
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 
-import { MemoryOverlay } from "./MemoryOverlay";
+import { CanvasMemoryView } from "./CanvasMemoryView";
 
 interface DeleteCanvasMemoryMutation {
   mutate: (memoryId: string) => void;
@@ -32,7 +32,7 @@ export function WorkflowMemoryOverlayLayer({
   if (!isMemoryMode) return null;
 
   return (
-    <MemoryOverlay
+    <CanvasMemoryView
       entries={isViewingDraftVersion ? [] : entries}
       isLoading={isViewingDraftVersion ? false : isLoading}
       errorMessage={isViewingDraftVersion ? undefined : error instanceof Error ? error.message : undefined}

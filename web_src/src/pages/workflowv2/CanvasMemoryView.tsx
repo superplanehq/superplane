@@ -12,13 +12,18 @@ export type CanvasMemoryViewProps = {
   deletingId?: string;
 };
 
-export function CanvasMemoryView({
-  entries,
-  isLoading,
-  errorMessage,
-  onDeleteEntry,
-  deletingId,
-}: CanvasMemoryViewProps) {
+export function CanvasMemoryView(props: CanvasMemoryViewProps) {
+  return (
+    <div
+      className="absolute inset-x-0 bottom-0 top-[5rem] z-10 flex flex-col overflow-hidden bg-slate-50"
+      data-testid="memory-overlay"
+    >
+      <CanvasMemoryViewBody {...props} />
+    </div>
+  );
+}
+
+function CanvasMemoryViewBody({ entries, isLoading, errorMessage, onDeleteEntry, deletingId }: CanvasMemoryViewProps) {
   const groupedEntries = entries.reduce<Record<string, CanvasMemoryEntry[]>>((acc, entry) => {
     const namespace = entry.namespace || "(no namespace)";
     if (!acc[namespace]) {

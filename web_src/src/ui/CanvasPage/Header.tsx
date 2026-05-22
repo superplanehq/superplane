@@ -35,8 +35,6 @@ export interface HeaderProps {
   onSelectDashboard?: () => void;
   /** Provided when Memory is available as a first-class tab; opens the Memory view. */
   onSelectMemory?: () => void;
-  /** Distinct namespace count for the Memory tab badge. No badge when 0. */
-  memoryNamespaceCount?: number;
   /** When set with `mode === "dashboard"`, shows Add panel in the secondary header. */
   onDashboardAddPanel?: () => void;
   /** When set with `mode === "dashboard"`, shows the YAML button in the secondary header. */
@@ -150,7 +148,6 @@ function SecondaryHeader(props: HeaderProps) {
               onSelectLive={props.onExitEditMode}
               onSelectDashboard={props.onSelectDashboard}
               onSelectMemory={props.onSelectMemory}
-              memoryNamespaceCount={props.memoryNamespaceCount}
               editing={editing}
               hasDraft={!!props.hasUnpublishedDraftChanges}
             />

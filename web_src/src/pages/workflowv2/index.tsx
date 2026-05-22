@@ -93,7 +93,6 @@ import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
-import { countMemoryNamespaces } from "./memoryNamespaces";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { CanvasYamlModal } from "./CanvasYamlModal";
@@ -575,10 +574,6 @@ export function WorkflowPageV2() {
     error: canvasMemoryError,
   } = useCanvasMemoryEntries(canvasId!, isViewingLiveVersion);
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
-  const memoryNamespaceCount = useMemo(
-    () => (isViewingDraftVersion ? 0 : countMemoryNamespaces(canvasMemoryEntries)),
-    [canvasMemoryEntries, isViewingDraftVersion],
-  );
   const canUpdateCanvas = canAct("canvases", "update");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
@@ -5566,7 +5561,6 @@ export function WorkflowPageV2() {
           showBottomStatusControls={!isTemplate && !isRunsMode && !isMemoryMode}
           hideAddControls={isTemplate || isRunsMode || isMemoryMode}
           hideCanvasToolSidebar={isTemplate}
-          memoryNamespaceCount={memoryNamespaceCount}
           onSelectMemory={isTemplate ? undefined : handleSelectMemoryMode}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           nodes={nodes}

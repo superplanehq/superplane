@@ -45,22 +45,6 @@ describe("CanvasModeToggle", () => {
     expect(onSelectMemory).toHaveBeenCalledTimes(1);
   });
 
-  it("does not render the namespace count badge while MEMORY_TAB_NAMESPACE_BADGE_ENABLED is false", () => {
-    render(
-      <CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectMemory={vi.fn()} memoryNamespaceCount={3} />,
-    );
-
-    expect(screen.queryByTestId("canvas-view-mode-memory-badge")).not.toBeInTheDocument();
-  });
-
-  it("hides the badge when memoryNamespaceCount is 0", () => {
-    render(
-      <CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectMemory={vi.fn()} memoryNamespaceCount={0} />,
-    );
-
-    expect(screen.queryByTestId("canvas-view-mode-memory-badge")).not.toBeInTheDocument();
-  });
-
   it("hides the Memory tab when onSelectMemory is not provided", () => {
     render(<CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectDashboard={vi.fn()} />);
 

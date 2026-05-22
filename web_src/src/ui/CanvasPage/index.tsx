@@ -189,8 +189,6 @@ export interface CanvasPageProps {
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
-  /** Distinct namespace count for the Memory tab badge. No badge when 0. */
-  memoryNamespaceCount?: number;
   showCanvasSettingsMenu?: boolean;
   onYamlOpen: () => void;
   isVersionControlOpen?: boolean;
@@ -1233,7 +1231,6 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           onSelectDashboard={props.onSelectDashboard}
           onSelectMemory={props.onSelectMemory}
-          memoryNamespaceCount={props.memoryNamespaceCount}
           onDashboardAddPanel={props.onDashboardAddPanel}
           onDashboardOpenYaml={props.onDashboardOpenYaml}
           dashboardYamlReadOnly={props.dashboardYamlReadOnly}
@@ -1750,7 +1747,6 @@ function CanvasContentHeader({
   exitEditModeDisabledTooltip,
   onSelectDashboard,
   onSelectMemory,
-  memoryNamespaceCount,
   onDashboardAddPanel,
   onDashboardOpenYaml,
   dashboardYamlReadOnly,
@@ -1784,7 +1780,6 @@ function CanvasContentHeader({
   exitEditModeDisabledTooltip?: string;
   onSelectDashboard?: () => void;
   onSelectMemory?: () => void;
-  memoryNamespaceCount?: number;
   onDashboardAddPanel?: () => void;
   onDashboardOpenYaml?: () => void;
   dashboardYamlReadOnly?: boolean;
@@ -1828,7 +1823,6 @@ function CanvasContentHeader({
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       onSelectDashboard={onSelectDashboard}
       onSelectMemory={onSelectMemory}
-      memoryNamespaceCount={memoryNamespaceCount}
       onDashboardAddPanel={onDashboardAddPanel}
       onDashboardOpenYaml={onDashboardOpenYaml}
       dashboardYamlReadOnly={dashboardYamlReadOnly}

@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useRef } from "react";
 
@@ -9,8 +8,6 @@ interface CanvasModeToggleProps {
   onSelectLive: () => void;
   onSelectDashboard?: () => void;
   onSelectMemory?: () => void;
-  /** Distinct namespace count shown as a badge next to the Memory tab. No badge when 0. */
-  memoryNamespaceCount?: number;
   editing?: boolean;
   hasDraft?: boolean;
 }
@@ -20,15 +17,11 @@ const DASHBOARD_TAB = "dashboard";
 const MEMORY_TAB = "memory";
 const RUNS_MODE = "runs";
 
-/** Re-enable when the Memory tab namespace count badge should be visible again. */
-const MEMORY_TAB_NAMESPACE_BADGE_ENABLED = false;
-
 export function CanvasModeToggle({
   mode,
   onSelectLive,
   onSelectDashboard,
   onSelectMemory,
-  memoryNamespaceCount = 0,
   editing = false,
   hasDraft = false,
 }: CanvasModeToggleProps) {
@@ -108,18 +101,7 @@ export function CanvasModeToggle({
         </TabsTrigger>
         {showMemory ? (
           <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory">
-            <span className="inline-flex items-center gap-1.5">
-              Memory
-              {MEMORY_TAB_NAMESPACE_BADGE_ENABLED && memoryNamespaceCount > 0 ? (
-                <Badge
-                  variant="secondary"
-                  className="h-4 px-1.5 py-0 text-[10px] leading-none"
-                  data-testid="canvas-view-mode-memory-badge"
-                >
-                  {memoryNamespaceCount}
-                </Badge>
-              ) : null}
-            </span>
+            Memory
           </TabsTrigger>
         ) : null}
       </TabsList>
