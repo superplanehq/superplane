@@ -100,13 +100,13 @@ func (c *CreateInstance) Documentation() string {
 - **Name**: Required value for the ` + "`Name`" + ` tag
 - **Region**: AWS region where the instance will be launched
 - **Operating System**: Quick Start operating system family, similar to the AWS launch wizard
-- **Image**: Public AMI for the selected operating system
+- **Image**: Public AMI for the selected operating system. These are filtered to only show currently available images in the selected region for the chosen OS family
 - **Instance Type**: EC2 instance type from the current generation catalog
 - **Subnet**: VPC subnet for the primary network interface
 - **Firewall**: Create a launch security group (like the AWS launch wizard) or use an existing one
 - **Allow SSH/HTTP/HTTPS from the internet**: Ingress rules when creating a new security group
 - **Configure Root Volume** (optional): Override the AMI root volume size and type
-- **Key Pair** (optional): EC2 key pair for SSH access
+- **Key Pair** (optional): EC2 key pair for SSH access. These are filtered to show only key pairs available in the selected region
 - **User Data** (optional): Shell script or cloud-init payload executed at launch
 - **Associate Public IP Address**: Assign a public IPv4 address when the subnet supports it
 
@@ -174,7 +174,7 @@ func (c *CreateInstance) Configuration() []configuration.Field {
 			Label:       "Image",
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "Public AMI for the selected operating system",
+			Description: "Public AMI for the selected operating system. These only show currently available images in the selected region for the chosen OS family",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "region", Values: []string{"*"}},
 				{Field: "imageOs", Values: []string{"*"}},
@@ -385,7 +385,7 @@ func (c *CreateInstance) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    false,
 			Togglable:   true,
-			Description: "EC2 key pair for SSH access",
+			Description: "EC2 key pair for SSH access. These only show key pairs available in the selected region",
 			VisibilityConditions: []configuration.VisibilityCondition{
 				{Field: "region", Values: []string{"*"}},
 			},
