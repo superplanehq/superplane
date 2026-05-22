@@ -230,5 +230,11 @@ export function buildDraftDiffMap(
   const liveNodes = (liveVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
   const removedNodes = liveNodes.filter((n) => statusMap[String(n.id)] === "removed");
 
-  return { statusMap, removedNodes };
+  // Compute edge diff: edges from live that connect to removed nodes
+  const liveEdges = (liveVersion?.spec?.edges || []) as Array<Record<string, unknown>>;
+  const removedEdges = liveEdges.filter(
+    (e) => statusMap[String(e.sourceId)] === "removed" || statusMap[String(e.targetId)] === "removed",
+  );
+
+  return { statusMap, removedNodes, removedEdges };
 }
