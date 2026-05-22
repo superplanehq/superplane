@@ -142,6 +142,7 @@ import {
   getNodeAnalyticsProps,
   isCanvasLoadNotFoundError,
   prepareData,
+  prepareNode,
   prepareSidebarData,
 } from "./workflowPageHelpers";
 /** Backend flag id (`FeatureDashboards`); the registry label is "Console". */
@@ -1868,34 +1869,42 @@ export function WorkflowPageV2() {
   ]);
 
   // Inject ghost nodes for deleted nodes (exist in live but removed from draft)
+  // Run them through the real preparation pipeline so they render with full body,
+  // then overlay dimBodyBelowHeader for the gray slate look.
   const nodesWithGhosts = useMemo(() => {
     if (!draftDiffResult?.removedNodes?.length) return preparedNodes;
-    const ghostNodes: typeof preparedNodes = draftDiffResult.removedNodes.map((removedNode) => {
-      const pos = (removedNode.position as { x?: number; y?: number }) || {};
+    const liveNodes = (liveCanvasVersion?.spec?.nodes || []) as ComponentsNode[];
+    const ghostNodes = draftDiffResult.removedNodes.map((removedNode) => {
+      const node = removedNode as unknown as ComponentsNode;
+      const prepared = prepareNode(
+        liveNodes,
+        node,
+        allTriggers,
+        allComponents,
+        {},
+        {},
+        {},
+        canvasId!,
+        queryClient,
+        undefined,
+        liveCanvasVersion?.spec?.edges as ComponentsEdge[] | undefined,
+        "edit",
+        undefined,
+        "removed",
+      );
       return {
-        id: String(removedNode.id),
-        position: { x: pos.x ?? 0, y: pos.y ?? 0 },
+        ...prepared,
         draggable: false,
         selectable: false,
         data: {
-          type: "component" as const,
-          label: String(removedNode.name || "Deleted node"),
-          state: "pending" as const,
-          outputChannels: ["default"],
+          ...prepared.data,
           _draftDiffStatus: "removed" as const,
           _dimBodyBelowHeader: true,
-          component: {
-            iconSlug: "trash-2",
-            iconColor: "text-gray-400",
-            title: String(removedNode.name || "Deleted node"),
-            collapsed: false,
-            parameters: [],
-          },
         },
       };
     });
     return [...preparedNodes, ...ghostNodes];
-  }, [preparedNodes, draftDiffResult]);
+  }, [preparedNodes, draftDiffResult, liveCanvasVersion, allTriggers, allComponents, canvasId, queryClient]);
 
   const nodesWithIntegrationStatus = useMemo(
     () => overlayIntegrationWarnings(nodesWithGhosts, integrations, canvasNodes),
