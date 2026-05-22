@@ -211,11 +211,12 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		Event:     "user_message",
 		MessageID: persisted.ID.String(),
 		Message: &messages.AgentMessage{
-			ID:       persisted.ID.String(),
-			Role:     persisted.Role,
-			Content:  persisted.Content,
-			UserID:   userID.String(),
-			UserName: userName,
+			ID:        persisted.ID.String(),
+			Role:      persisted.Role,
+			Content:   persisted.Content,
+			CreatedAt: persisted.CreatedAt,
+			UserID:    userID.String(),
+			UserName:  userName,
 		},
 	})
 
