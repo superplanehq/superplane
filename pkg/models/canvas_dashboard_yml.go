@@ -7,11 +7,15 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 const (
+	// ConsoleKind is the canonical YAML kind for canvas consoles (product name).
+	ConsoleKind = "Console"
+	// DashboardKind is the legacy YAML kind accepted on import for back-compat.
 	DashboardKind       = "Dashboard"
 	DashboardAPIVersion = "v1"
 
@@ -108,7 +112,7 @@ func DashboardToYML(dashboard *CanvasDashboard, canvasName string) ([]byte, erro
 
 	resource := DashboardYAML{
 		APIVersion: DashboardAPIVersion,
-		Kind:       DashboardKind,
+		Kind:       ConsoleKind,
 		Metadata: DashboardYAMLMetadata{
 			CanvasID: dashboard.CanvasID.String(),
 			Name:     canvasName,
@@ -152,11 +156,15 @@ func (d *DashboardYAML) Validate() error {
 	if d.Kind == "" {
 		return errors.New("kind is required")
 	}
-	if d.Kind != DashboardKind {
-		return fmt.Errorf("unsupported kind %q (expected %q)", d.Kind, DashboardKind)
+	if !isValidDashboardYAMLKind(d.Kind) {
+		return fmt.Errorf("unsupported kind %q (expected %q)", d.Kind, ConsoleKind)
 	}
 
 	return ValidateDashboardContent(d.Spec.Panels, d.Spec.Layout)
+}
+
+func isValidDashboardYAMLKind(kind string) bool {
+	return kind == ConsoleKind || kind == DashboardKind
 }
 
 // ValidateDashboardContent enforces the shared validation rules used by both
@@ -376,8 +384,33 @@ func validateChartPanelContent(panel DashboardPanel) error {
 	if xField, ok := render["xField"].(string); !ok || xField == "" {
 		return fmt.Errorf("panel %q render.xField must be a non-empty string", panel.ID)
 	}
-	if series, ok := render["series"].([]any); !ok || len(series) == 0 {
+	series, ok := render["series"].([]any)
+	if !ok || len(series) == 0 {
 		return fmt.Errorf("panel %q render.series must be a non-empty array", panel.ID)
+	}
+	for i, rawSeries := range series {
+		if err := validateChartSeries(panel.ID, i, rawSeries); err != nil {
+			return err
+		}
+	}
+	if legend, ok := render["legend"]; ok && legend != nil {
+		legendStr, isString := legend.(string)
+		if !isString || !slices.Contains([]string{"auto", "show", "hide"}, legendStr) {
+			return fmt.Errorf("panel %q render.legend must be one of auto/show/hide", panel.ID)
+		}
+	}
+	return nil
+}
+
+func validateChartSeries(panelID string, index int, raw any) error {
+	series, ok := raw.(map[string]any)
+	if !ok || series == nil {
+		return fmt.Errorf("panel %q render.series[%d] must be an object", panelID, index)
+	}
+	for _, key := range []string{"field", "label", "color", "format", "prefix", "suffix"} {
+		if err := validateOptionalString(panelID, fmt.Sprintf("render.series[%d].%s", index, key), series[key]); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -478,13 +511,32 @@ func validateNumberPanelContent(panel DashboardPanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
-	if err := validateDataSource(panel.ID, panel.Content["dataSource"]); err != nil {
+	if err := validateNumberDataSource(panel.ID, panel.Content["dataSource"]); err != nil {
 		return err
 	}
 	render, err := validateRender(panel.ID, panel.Content["render"], "number")
 	if err != nil {
 		return err
 	}
+	if err := validateOptionalString(panel.ID, "render.prefix", render["prefix"]); err != nil {
+		return err
+	}
+	if err := validateOptionalString(panel.ID, "render.suffix", render["suffix"]); err != nil {
+		return err
+	}
+
+	// Composite memory sources carry per-source aggregation; render-level
+	// aggregation/field must be absent so configuration is unambiguous.
+	if isCompositeMemoryDataSource(panel.Content["dataSource"]) {
+		if _, hasAgg := render["aggregation"]; hasAgg {
+			return fmt.Errorf("panel %q render.aggregation must not be set when dataSource.sources is used (each source defines its own aggregation)", panel.ID)
+		}
+		if _, hasField := render["field"]; hasField {
+			return fmt.Errorf("panel %q render.field must not be set when dataSource.sources is used (each source defines its own field)", panel.ID)
+		}
+		return nil
+	}
+
 	aggregation, _ := render["aggregation"].(string)
 	switch aggregation {
 	case "count", "sum", "avg", "min", "max", "first", "last":
@@ -497,6 +549,78 @@ func validateNumberPanelContent(panel DashboardPanel) error {
 		}
 	}
 	return nil
+}
+
+func isCompositeMemoryDataSource(raw any) bool {
+	ds, ok := raw.(map[string]any)
+	if !ok || ds == nil {
+		return false
+	}
+	if ds["kind"] != "memory" {
+		return false
+	}
+	_, ok = ds["sources"].([]any)
+	return ok
+}
+
+var allowedNumberCombineOps = []string{"sum", "min", "max", "avg"}
+var allowedNumberAggregations = []string{"count", "sum", "avg", "min", "max", "first", "last"}
+
+// validateNumberDataSource accepts the shared data-source shapes plus the
+// composite memory variant where each namespace has its own aggregation and
+// the partials are merged via `combine`.
+func validateNumberDataSource(panelID string, raw any) error {
+	ds, ok := raw.(map[string]any)
+	if !ok || ds == nil {
+		return fmt.Errorf("panel %q dataSource must be an object", panelID)
+	}
+	if ds["kind"] == "memory" {
+		if _, hasSources := ds["sources"]; hasSources {
+			return validateCompositeMemoryDataSource(panelID, ds)
+		}
+	}
+	return validateDataSource(panelID, raw)
+}
+
+func validateCompositeMemoryDataSource(panelID string, ds map[string]any) error {
+	sources, ok := ds["sources"].([]any)
+	if !ok {
+		return fmt.Errorf("panel %q dataSource.sources must be an array", panelID)
+	}
+	if len(sources) == 0 {
+		return fmt.Errorf("panel %q dataSource.sources must be a non-empty array", panelID)
+	}
+	for i, raw := range sources {
+		if err := validateMemoryNumberSource(panelID, i, raw); err != nil {
+			return err
+		}
+	}
+	combine, _ := ds["combine"].(string)
+	if !slices.Contains(allowedNumberCombineOps, combine) {
+		return fmt.Errorf("panel %q dataSource.combine must be one of %s", panelID, strings.Join(allowedNumberCombineOps, "/"))
+	}
+	return nil
+}
+
+func validateMemoryNumberSource(panelID string, index int, raw any) error {
+	source, ok := raw.(map[string]any)
+	if !ok || source == nil {
+		return fmt.Errorf("panel %q dataSource.sources[%d] must be an object", panelID, index)
+	}
+	namespace, _ := source["namespace"].(string)
+	if namespace == "" {
+		return fmt.Errorf("panel %q dataSource.sources[%d].namespace must be a non-empty string", panelID, index)
+	}
+	aggregation, _ := source["aggregation"].(string)
+	if !slices.Contains(allowedNumberAggregations, aggregation) {
+		return fmt.Errorf("panel %q dataSource.sources[%d].aggregation must be one of %s", panelID, index, strings.Join(allowedNumberAggregations, "/"))
+	}
+	if aggregation != "count" {
+		if field, ok := source["field"].(string); !ok || field == "" {
+			return fmt.Errorf("panel %q dataSource.sources[%d].field is required when aggregation is %q", panelID, index, aggregation)
+		}
+	}
+	return validateOptionalString(panelID, fmt.Sprintf("dataSource.sources[%d].fieldPath", index), source["fieldPath"])
 }
 
 // normalizeDashboardPanelsForExport ensures stable field order in panel

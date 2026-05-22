@@ -157,4 +157,141 @@ describe("validatePanelContent", () => {
       }),
     ).toBeNull();
   });
+
+  it("accepts number panels with prefix and suffix symbols", () => {
+    expect(
+      validatePanelContent("number", {
+        dataSource: { kind: "runs" },
+        render: { kind: "number", aggregation: "count", prefix: "R$", suffix: " MWh" },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects non-string prefix on number panels", () => {
+    const error = validatePanelContent("number", {
+      dataSource: { kind: "runs" },
+      render: { kind: "number", aggregation: "count", prefix: 42 },
+    });
+    expect(error).toMatch(/render\.prefix must be a string/);
+  });
+
+  it("accepts composite memory number panels with heterogeneous sources", () => {
+    expect(
+      validatePanelContent("number", {
+        dataSource: {
+          kind: "memory",
+          combine: "sum",
+          sources: [
+            { namespace: "a", aggregation: "sum", field: "cost" },
+            { namespace: "b", aggregation: "count" },
+          ],
+        },
+        render: { kind: "number" },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects composite memory panels that also set render.aggregation", () => {
+    const error = validatePanelContent("number", {
+      dataSource: {
+        kind: "memory",
+        combine: "sum",
+        sources: [{ namespace: "a", aggregation: "sum", field: "cost" }],
+      },
+      render: { kind: "number", aggregation: "sum" },
+    });
+    expect(error).toMatch(/render\.aggregation must not be set/);
+  });
+
+  it("rejects composite memory panels that also set render.field", () => {
+    const error = validatePanelContent("number", {
+      dataSource: {
+        kind: "memory",
+        combine: "sum",
+        sources: [{ namespace: "a", aggregation: "sum", field: "cost" }],
+      },
+      render: { kind: "number", field: "cost" },
+    });
+    expect(error).toMatch(/render\.field must not be set/);
+  });
+
+  it("rejects composite memory panels with an unknown combine operator", () => {
+    const error = validatePanelContent("number", {
+      dataSource: {
+        kind: "memory",
+        combine: "median",
+        sources: [{ namespace: "a", aggregation: "sum", field: "cost" }],
+      },
+      render: { kind: "number" },
+    });
+    expect(error).toMatch(/dataSource\.combine must be one of/);
+  });
+
+  it("rejects composite memory sources missing a field for non-count aggregation", () => {
+    const error = validatePanelContent("number", {
+      dataSource: {
+        kind: "memory",
+        combine: "sum",
+        sources: [{ namespace: "a", aggregation: "sum" }],
+      },
+      render: { kind: "number" },
+    });
+    expect(error).toMatch(/dataSource\.sources\[0\]\.field is required/);
+  });
+
+  it("rejects composite memory panels with empty sources", () => {
+    const error = validatePanelContent("number", {
+      dataSource: { kind: "memory", combine: "sum", sources: [] },
+      render: { kind: "number" },
+    });
+    expect(error).toMatch(/dataSource\.sources must be a non-empty array/);
+  });
+});
+
+describe("validatePanelContent — chart series and legend", () => {
+  it("accepts chart series with format, prefix, and suffix", () => {
+    expect(
+      validatePanelContent("chart", {
+        dataSource: { kind: "executions" },
+        render: {
+          kind: "chart",
+          type: "bar",
+          xField: "service",
+          series: [{ field: "cost", label: "Cost", format: "number", prefix: "$", suffix: " /mo" }],
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects chart series with a non-string prefix", () => {
+    const error = validatePanelContent("chart", {
+      dataSource: { kind: "executions" },
+      render: {
+        kind: "chart",
+        type: "bar",
+        xField: "service",
+        series: [{ field: "cost", prefix: 42 }],
+      },
+    });
+    expect(error).toMatch(/render\.series\[0\]\.prefix must be a string/);
+  });
+
+  it("accepts chart legend modes", () => {
+    for (const legend of ["auto", "show", "hide"] as const) {
+      expect(
+        validatePanelContent("chart", {
+          dataSource: { kind: "executions" },
+          render: { kind: "chart", type: "bar", xField: "x", series: [{}], legend },
+        }),
+      ).toBeNull();
+    }
+  });
+
+  it("rejects unknown legend modes", () => {
+    const error = validatePanelContent("chart", {
+      dataSource: { kind: "executions" },
+      render: { kind: "chart", type: "bar", xField: "x", series: [{}], legend: "bogus" },
+    });
+    expect(error).toMatch(/render\.legend must be one of/);
+  });
 });
