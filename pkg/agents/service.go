@@ -213,12 +213,17 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		},
 	})
 
-	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusStreaming); err != nil {
-		log.WithError(err).Warn("failed to mark agent session as streaming")
+	// Only enqueue if not already streaming (prevents parallel streams)
+	started, statusErr := models.TrySetStreaming(sessionID)
+	if statusErr != nil {
+		log.WithError(statusErr).Warn("failed to check/update agent session status")
 	}
-
-	if err := s.enqueueStream(sessionID, organizationID, userID); err != nil {
-		return nil, err
+	if started {
+		if err := s.enqueueStream(sessionID, organizationID, userID); err != nil {
+			// Message is persisted and broadcast — log the enqueue failure
+			// rather than returning an error that would confuse the sender
+			log.WithError(err).WithField("session_id", sessionID).Error("failed to enqueue stream after SendMessage")
+		}
 	}
 	return persisted, nil
 }

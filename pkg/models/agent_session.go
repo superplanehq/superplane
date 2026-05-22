@@ -192,3 +192,20 @@ func FindSharedCanvasSessionByID(organizationID uuid.UUID, sessionID uuid.UUID) 
 	}
 	return &session, nil
 }
+
+// TrySetStreaming atomically transitions a session from idle to streaming.
+// Returns true if the transition succeeded, false if the session was already streaming.
+func TrySetStreaming(sessionID uuid.UUID) (bool, error) {
+	now := time.Now()
+	result := database.Conn().Model(&AgentSession{}).
+		Where("id = ? AND status = ?", sessionID, AgentSessionStatusIdle).
+		Updates(map[string]any{
+			"status":         AgentSessionStatusStreaming,
+			"last_active_at": &now,
+			"updated_at":     &now,
+		})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected > 0, nil
+}
