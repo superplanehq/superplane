@@ -1862,7 +1862,21 @@ export function WorkflowPageV2() {
     openTriggerModal,
   ]);
 
+  const [visualDiffEnabled, setVisualDiffEnabled] = useState(() => {
+    const stored = localStorage.getItem("visual-diff-enabled");
+    return stored === null ? true : stored === "true";
+  });
+
+  const toggleVisualDiff = useCallback(() => {
+    setVisualDiffEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem("visual-diff-enabled", String(next));
+      return next;
+    });
+  }, []);
+
   const { nodes: nodesWithDraftVisualDiff, edges: edgesWithDraftVisualDiff } = useDraftVisualDiff({
+    enabled: visualDiffEnabled,
     isViewingDraftVersion,
     canvas,
     liveCanvasVersion,
@@ -5624,6 +5638,8 @@ export function WorkflowPageV2() {
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           onShowDiff={onShowDiff}
+          visualDiffEnabled={visualDiffEnabled}
+          onToggleVisualDiff={toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
           onDiscardVersion={handleResetDraftChanges}
           discardVersionDisabled={resetDraftDisabled}
