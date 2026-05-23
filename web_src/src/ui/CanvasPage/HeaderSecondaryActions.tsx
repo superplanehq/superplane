@@ -205,14 +205,15 @@ function EditModeVersionActions({
       {hasUnpublishedDraftChanges ? (
         <>
           {onToggleVisualDiff && (
-            <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
               <Switch
+                id="visual-diff-toggle"
                 checked={!!visualDiffEnabled}
                 onCheckedChange={onToggleVisualDiff}
                 data-testid="canvas-toggle-visual-diff"
               />
-              Diff X-Ray
-            </label>
+              <label htmlFor="visual-diff-toggle">Diff X-Ray</label>
+            </div>
           )}
           {onShowDiff ? (
             <>
