@@ -21,6 +21,11 @@ function parseStatus(raw?: string): RunStatusKey {
   return "unknown";
 }
 
+/** Chat-local color overrides for run pills (e.g. green instead of emerald for passed). */
+const STYLE_BY_STATUS: Partial<Record<RunStatusKey, string>> = {
+  passed: "bg-green-50 text-green-700",
+};
+
 export function RunChipFromLink({
   runId,
   rawLabel,
@@ -48,8 +53,9 @@ export function RunChip({ runId, label, status, canvasId, organizationId }: RunC
       type="button"
       onClick={() => navigate(`/${organizationId}/canvases/${canvasId}?view=runs&run=${runId}`)}
       className={cn(
-        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset transition-colors cursor-pointer align-middle",
+        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full ring-0 text-xs font-medium transition-colors cursor-pointer align-middle",
         meta.badgeClassName,
+        STYLE_BY_STATUS[status],
       )}
       title={`Run ${runId}`}
     >

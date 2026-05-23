@@ -57,6 +57,7 @@ import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { findFreePositionInViewport } from "@/pages/workflowv2/lib/find-free-position-in-viewport";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
+import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
@@ -367,9 +368,32 @@ export interface CanvasPageProps {
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
+/**
+ * @deprecated Width is now coordinated by the shared sidebar layout store.
+ *  Kept exported for backward compatibility with existing test mocks.
+ */
 export const COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY = "componentSidebarWidth";
 export const CONSOLE_OPEN_STORAGE_KEY = "consoleOpen";
 export const CONSOLE_HEIGHT_STORAGE_KEY = "consoleHeight";
+
+function ComponentSidebarLoadingSkeleton() {
+  const sidebarWidth = useSidebarLayoutStore((state) => state.rightWidth);
+  useSidebarMount("right");
+
+  return (
+    <div
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white"
+      style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
+    >
+      <div className="flex items-center justify-center h-full">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          <p className="text-sm text-gray-500">Loading events...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const EDGE_STYLE = {
   type: "custom",
@@ -1632,22 +1656,7 @@ function Sidebar({
 
   // Show loading state when data is being fetched (skip for annotation nodes)
   if (sidebarData.isLoading && currentTab === "latest" && shouldShowRunsSidebar) {
-    const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
-    const sidebarWidth = saved ? parseInt(saved, 10) : 450;
-
-    return (
-      <div
-        className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white"
-        style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
-      >
-        <div className="flex items-center justify-center h-full">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-            <p className="text-sm text-gray-500">Loading events...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <ComponentSidebarLoadingSkeleton />;
   }
 
   return (

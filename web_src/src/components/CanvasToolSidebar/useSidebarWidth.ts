@@ -1,29 +1,37 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import {
+  SIDEBAR_MIN_WIDTH,
+  useSidebarLayoutStore,
+  useSidebarLayoutViewport,
+  useSidebarMount,
+} from "@/stores/sidebarLayoutStore";
 
-/** Persists user-adjusted sidebar width; value kept for backward compatibility. */
+/**
+ * Backward-compat exports. The actual width state and constraint logic now
+ * live in {@link useSidebarLayoutStore} so the left and right sidebars can
+ * coordinate.
+ */
 export const CANVAS_TOOL_SIDEBAR_WIDTH_STORAGE_KEY = "agent-sidebar-width";
-export const CANVAS_TOOL_SIDEBAR_MIN_WIDTH = 320;
-export const CANVAS_TOOL_SIDEBAR_MAX_WIDTH = 720;
+export const CANVAS_TOOL_SIDEBAR_MIN_WIDTH = SIDEBAR_MIN_WIDTH;
 export const CANVAS_TOOL_SIDEBAR_DEFAULT_WIDTH = 380;
 
 export function useSidebarWidth() {
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(() => {
-    const saved = typeof window !== "undefined" ? localStorage.getItem(CANVAS_TOOL_SIDEBAR_WIDTH_STORAGE_KEY) : null;
-    const parsed = saved ? parseInt(saved, 10) : NaN;
-    if (!Number.isFinite(parsed)) return CANVAS_TOOL_SIDEBAR_DEFAULT_WIDTH;
-    return Math.max(CANVAS_TOOL_SIDEBAR_MIN_WIDTH, Math.min(CANVAS_TOOL_SIDEBAR_MAX_WIDTH, parsed));
-  });
-  const [isResizing, setIsResizing] = useState(false);
+  const width = useSidebarLayoutStore((state) => state.leftWidth);
+  const isResizing = useSidebarLayoutStore((state) => state.isLeftResizing);
+  const setLeftResizing = useSidebarLayoutStore((state) => state.setLeftResizing);
+  const resizeLeft = useSidebarLayoutStore((state) => state.resizeLeft);
 
-  useEffect(() => {
-    localStorage.setItem(CANVAS_TOOL_SIDEBAR_WIDTH_STORAGE_KEY, String(width));
-  }, [width]);
+  useSidebarMount("left");
+  useSidebarLayoutViewport();
 
-  const handleMouseDown = useCallback((event: React.MouseEvent) => {
-    event.preventDefault();
-    setIsResizing(true);
-  }, []);
+  const handleMouseDown = useCallback(
+    (event: React.MouseEvent) => {
+      event.preventDefault();
+      setLeftResizing(true);
+    },
+    [setLeftResizing],
+  );
 
   useEffect(() => {
     if (!isResizing) return;
@@ -31,14 +39,10 @@ export function useSidebarWidth() {
     const handleMouseMove = (event: MouseEvent) => {
       const rect = sidebarRef.current?.getBoundingClientRect();
       const left = rect?.left ?? 0;
-      const nextWidth = Math.max(
-        CANVAS_TOOL_SIDEBAR_MIN_WIDTH,
-        Math.min(CANVAS_TOOL_SIDEBAR_MAX_WIDTH, event.clientX - left),
-      );
-      setWidth(nextWidth);
+      resizeLeft(event.clientX - left);
     };
 
-    const handleMouseUp = () => setIsResizing(false);
+    const handleMouseUp = () => setLeftResizing(false);
 
     document.addEventListener("mousemove", handleMouseMove);
     document.addEventListener("mouseup", handleMouseUp);
@@ -51,7 +55,7 @@ export function useSidebarWidth() {
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
     };
-  }, [isResizing]);
+  }, [isResizing, resizeLeft, setLeftResizing]);
 
   return { sidebarRef, width, isResizing, handleMouseDown };
 }

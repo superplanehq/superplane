@@ -193,7 +193,9 @@ function ChatConversation({
 
       {outcomeState ? (
         <div className="border-t border-slate-200 px-3 py-2">
-          <OutcomeProgressWidget state={outcomeState} onDismiss={() => setOutcomeState(null)} />
+          <div className="mx-auto w-full max-w-[800px]">
+            <OutcomeProgressWidget state={outcomeState} onDismiss={() => setOutcomeState(null)} />
+          </div>
         </div>
       ) : null}
 
@@ -347,14 +349,16 @@ function DraftActionsBar({
 
   return (
     <div className="border-t border-slate-200 bg-slate-50/80 px-3 py-2">
-      <DraftActionsWidget
-        versionId={latestDraft.versionId}
-        message={latestDraft.message}
-        canvasId={canvasId}
-        organizationId={organizationId}
-        isEditing={isEditing}
-        onDismiss={dismiss}
-      />
+      <div className="mx-auto w-full max-w-[800px]">
+        <DraftActionsWidget
+          versionId={latestDraft.versionId}
+          message={latestDraft.message}
+          canvasId={canvasId}
+          organizationId={organizationId}
+          isEditing={isEditing}
+          onDismiss={dismiss}
+        />
+      </div>
     </div>
   );
 }
