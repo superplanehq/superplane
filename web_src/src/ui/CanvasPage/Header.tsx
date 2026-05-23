@@ -18,6 +18,8 @@ export interface HeaderProps {
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
+  visualDiffEnabled?: boolean;
+  onToggleVisualDiff?: () => void;
   organizationId?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;

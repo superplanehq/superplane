@@ -8,11 +8,12 @@ import type {
 } from "@/api-client";
 import type { CanvasEdge, CanvasNode } from "@/ui/CanvasPage";
 import type { QueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { buildDraftDiffMap } from "./draftNodeDiff";
 import { prepareNode } from "./workflowPageHelpers";
 
 type UseDraftVisualDiffArgs = {
+  enabled: boolean;
   isViewingDraftVersion: boolean;
   canvas: CanvasesCanvas | null | undefined;
   liveCanvasVersion?: CanvasesCanvasVersion;
@@ -101,6 +102,7 @@ function buildEdgesWithDiff(preparedEdges: CanvasEdge[], liveCanvasVersion?: Can
 }
 
 export function useDraftVisualDiff({
+  enabled,
   isViewingDraftVersion,
   canvas,
   liveCanvasVersion,
@@ -114,7 +116,7 @@ export function useDraftVisualDiff({
   queryClient,
 }: UseDraftVisualDiffArgs) {
   const draftDiffResult = useMemo(() => {
-    if (!isViewingDraftVersion || !canvas?.spec) {
+    if (!enabled || !isViewingDraftVersion || !canvas?.spec) {
       return undefined;
     }
 
@@ -124,7 +126,7 @@ export function useDraftVisualDiff({
     } as CanvasesCanvasVersion;
 
     return buildDraftDiffMap(liveCanvasVersion, draftVersionForDiff);
-  }, [canvas?.spec, isViewingDraftVersion, latestDraftVersion, liveCanvasVersion, selectedCanvasVersion]);
+  }, [enabled, canvas?.spec, isViewingDraftVersion, latestDraftVersion, liveCanvasVersion, selectedCanvasVersion]);
 
   const nodes = useMemo(() => {
     const nodesWithStatuses = applyNodeStatuses(preparedNodes, draftDiffResult?.statusMap);
@@ -174,12 +176,31 @@ export function useDraftVisualDiff({
   ]);
 
   const edges = useMemo(() => {
-    if (!isViewingDraftVersion) {
+    if (!enabled || !isViewingDraftVersion) {
       return preparedEdges;
     }
 
     return buildEdgesWithDiff(preparedEdges, liveCanvasVersion);
-  }, [isViewingDraftVersion, liveCanvasVersion, preparedEdges]);
+  }, [enabled, isViewingDraftVersion, liveCanvasVersion, preparedEdges]);
 
   return { nodes, edges };
+}
+
+const STORAGE_KEY = "visual-diff-enabled";
+
+export function useVisualDiffToggle() {
+  const [enabled, setEnabled] = useState(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored === null ? true : stored === "true";
+  });
+
+  const toggle = useCallback(() => {
+    setEnabled((prev) => {
+      const next = !prev;
+      localStorage.setItem(STORAGE_KEY, String(next));
+      return next;
+    });
+  }, []);
+
+  return { visualDiffEnabled: enabled, toggleVisualDiff: toggle };
 }
