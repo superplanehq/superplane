@@ -5547,26 +5547,6 @@ export function WorkflowPageV2() {
           error={canvasMemoryError}
           deleteCanvasMemoryEntry={deleteCanvasMemoryEntry}
         />
-        {isViewingDraftVersion && (
-          <div className="pointer-events-none absolute inset-x-0 top-[theme(spacing.10)] z-30 flex justify-center">
-            <button
-              type="button"
-              onClick={toggleVisualDiff}
-              className={cn(
-                "pointer-events-auto flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium shadow-sm transition-colors",
-                visualDiffEnabled
-                  ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                  : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50",
-              )}
-            >
-              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 3v18M3 12h18" strokeLinecap="round" />
-                {visualDiffEnabled && <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />}
-              </svg>
-              Changes
-            </button>
-          </div>
-        )}
         <CanvasPage
           key={canvasRenderKey}
           // Persist right sidebar in query params
@@ -5660,6 +5640,8 @@ export function WorkflowPageV2() {
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           onShowDiff={onShowDiff}
+          visualDiffEnabled={visualDiffEnabled}
+          onToggleVisualDiff={toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
           onDiscardVersion={handleResetDraftChanges}
           discardVersionDisabled={resetDraftDisabled}

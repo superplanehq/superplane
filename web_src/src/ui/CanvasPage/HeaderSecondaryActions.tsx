@@ -1,6 +1,6 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileCode, GitCompareArrows, Plus } from "lucide-react";
+import { Eye, FileCode, GitCompareArrows, Plus } from "lucide-react";
 
 import { Button } from "../button";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
@@ -15,6 +15,8 @@ export function SecondaryHeaderActions({
   saveIsPrimary,
   hasUnpublishedDraftChanges,
   onShowDiff,
+  visualDiffEnabled,
+  onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -66,6 +68,8 @@ export function SecondaryHeaderActions({
         <EditModeVersionActions
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
           onShowDiff={onShowDiff}
+          visualDiffEnabled={visualDiffEnabled}
+          onToggleVisualDiff={onToggleVisualDiff}
           onDiscardVersion={onDiscardVersion}
           discardVersionDisabled={discardVersionDisabled}
           discardVersionDisabledTooltip={discardVersionDisabledTooltip}
@@ -166,6 +170,8 @@ function LiveModeEditControls({
 function EditModeVersionActions({
   hasUnpublishedDraftChanges,
   onShowDiff,
+  visualDiffEnabled,
+  onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -180,6 +186,8 @@ function EditModeVersionActions({
   HeaderProps,
   | "hasUnpublishedDraftChanges"
   | "onShowDiff"
+  | "visualDiffEnabled"
+  | "onToggleVisualDiff"
   | "onDiscardVersion"
   | "discardVersionDisabled"
   | "discardVersionDisabledTooltip"
@@ -195,6 +203,18 @@ function EditModeVersionActions({
     <div className="flex items-center gap-2">
       {hasUnpublishedDraftChanges ? (
         <>
+          {onToggleVisualDiff && (
+            <UIButton
+              type="button"
+              variant={visualDiffEnabled ? "default" : "outline"}
+              size="sm"
+              onClick={onToggleVisualDiff}
+              data-testid="canvas-toggle-visual-diff"
+            >
+              <Eye className="mr-1 h-3.5 w-3.5" />
+              Changes
+            </UIButton>
+          )}
           {onShowDiff ? (
             <>
               <ShowDiffButton onShowDiff={onShowDiff} />
