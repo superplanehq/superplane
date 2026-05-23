@@ -13,6 +13,7 @@ import { buildDraftDiffMap } from "./draftNodeDiff";
 import { prepareNode } from "./workflowPageHelpers";
 
 type UseDraftVisualDiffArgs = {
+  enabled: boolean;
   isViewingDraftVersion: boolean;
   canvas: CanvasesCanvas | null | undefined;
   liveCanvasVersion?: CanvasesCanvasVersion;
@@ -101,6 +102,7 @@ function buildEdgesWithDiff(preparedEdges: CanvasEdge[], liveCanvasVersion?: Can
 }
 
 export function useDraftVisualDiff({
+  enabled,
   isViewingDraftVersion,
   canvas,
   liveCanvasVersion,
@@ -114,7 +116,7 @@ export function useDraftVisualDiff({
   queryClient,
 }: UseDraftVisualDiffArgs) {
   const draftDiffResult = useMemo(() => {
-    if (!isViewingDraftVersion || !canvas?.spec) {
+    if (!enabled || !isViewingDraftVersion || !canvas?.spec) {
       return undefined;
     }
 
