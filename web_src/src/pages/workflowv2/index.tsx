@@ -1864,25 +1864,17 @@ export function WorkflowPageV2() {
   ]);
 
   const [visualDiffEnabled, setVisualDiffEnabled] = useState(() => {
-    if (!canvasId) return true;
-    const stored = localStorage.getItem(`visual-diff-${canvasId}`);
+    const stored = localStorage.getItem("visual-diff-enabled");
     return stored === null ? true : stored === "true";
   });
-
-  // Sync state when navigating between canvases
-  useEffect(() => {
-    if (!canvasId) return;
-    const stored = localStorage.getItem(`visual-diff-${canvasId}`);
-    setVisualDiffEnabled(stored === null ? true : stored === "true");
-  }, [canvasId]);
 
   const toggleVisualDiff = useCallback(() => {
     setVisualDiffEnabled((prev) => {
       const next = !prev;
-      if (canvasId) localStorage.setItem(`visual-diff-${canvasId}`, String(next));
+      localStorage.setItem("visual-diff-enabled", String(next));
       return next;
     });
-  }, [canvasId]);
+  }, []);
 
   const { nodes: nodesWithDraftVisualDiff, edges: edgesWithDraftVisualDiff } = useDraftVisualDiff({
     enabled: visualDiffEnabled,
