@@ -1864,7 +1864,6 @@ export function WorkflowPageV2() {
   ]);
 
   const { visualDiffEnabled, toggleVisualDiff } = useVisualDiffToggle();
-
   const { nodes: nodesWithDraftVisualDiff, edges: edgesWithDraftVisualDiff } = useDraftVisualDiff({
     enabled: visualDiffEnabled,
     isViewingDraftVersion,
