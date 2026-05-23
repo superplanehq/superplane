@@ -1,5 +1,6 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Switch } from "@/ui/switch";
 import { Eye, FileCode, GitCompareArrows, Plus } from "lucide-react";
 
 import { Button } from "../button";
@@ -204,16 +205,14 @@ function EditModeVersionActions({
       {hasUnpublishedDraftChanges ? (
         <>
           {onToggleVisualDiff && (
-            <UIButton
-              type="button"
-              variant={visualDiffEnabled ? "default" : "outline"}
-              size="sm"
-              onClick={onToggleVisualDiff}
-              data-testid="canvas-toggle-visual-diff"
-            >
-              <Eye className="mr-1 h-3.5 w-3.5" />
+            <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+              <Switch
+                checked={!!visualDiffEnabled}
+                onCheckedChange={onToggleVisualDiff}
+                data-testid="canvas-toggle-visual-diff"
+              />
               Changes
-            </UIButton>
+            </label>
           )}
           {onShowDiff ? (
             <>

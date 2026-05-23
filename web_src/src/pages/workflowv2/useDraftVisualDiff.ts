@@ -126,7 +126,7 @@ export function useDraftVisualDiff({
     } as CanvasesCanvasVersion;
 
     return buildDraftDiffMap(liveCanvasVersion, draftVersionForDiff);
-  }, [canvas?.spec, isViewingDraftVersion, latestDraftVersion, liveCanvasVersion, selectedCanvasVersion]);
+  }, [enabled, canvas?.spec, isViewingDraftVersion, latestDraftVersion, liveCanvasVersion, selectedCanvasVersion]);
 
   const nodes = useMemo(() => {
     const nodesWithStatuses = applyNodeStatuses(preparedNodes, draftDiffResult?.statusMap);
@@ -176,12 +176,12 @@ export function useDraftVisualDiff({
   ]);
 
   const edges = useMemo(() => {
-    if (!isViewingDraftVersion) {
+    if (!enabled || !isViewingDraftVersion) {
       return preparedEdges;
     }
 
     return buildEdgesWithDiff(preparedEdges, liveCanvasVersion);
-  }, [isViewingDraftVersion, liveCanvasVersion, preparedEdges]);
+  }, [enabled, isViewingDraftVersion, liveCanvasVersion, preparedEdges]);
 
   return { nodes, edges };
 }
