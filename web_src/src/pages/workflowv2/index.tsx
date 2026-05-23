@@ -1,4 +1,5 @@
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
+import { cn } from "@/lib/utils";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { useQueryClient } from "@tanstack/react-query";
@@ -1862,7 +1863,29 @@ export function WorkflowPageV2() {
     openTriggerModal,
   ]);
 
+  const [visualDiffEnabled, setVisualDiffEnabled] = useState(() => {
+    if (!canvasId) return true;
+    const stored = localStorage.getItem(`visual-diff-${canvasId}`);
+    return stored === null ? true : stored === "true";
+  });
+
+  // Sync state when navigating between canvases
+  useEffect(() => {
+    if (!canvasId) return;
+    const stored = localStorage.getItem(`visual-diff-${canvasId}`);
+    setVisualDiffEnabled(stored === null ? true : stored === "true");
+  }, [canvasId]);
+
+  const toggleVisualDiff = useCallback(() => {
+    setVisualDiffEnabled((prev) => {
+      const next = !prev;
+      if (canvasId) localStorage.setItem(`visual-diff-${canvasId}`, String(next));
+      return next;
+    });
+  }, [canvasId]);
+
   const { nodes: nodesWithDraftVisualDiff, edges: edgesWithDraftVisualDiff } = useDraftVisualDiff({
+    enabled: visualDiffEnabled,
     isViewingDraftVersion,
     canvas,
     liveCanvasVersion,
@@ -5624,6 +5647,8 @@ export function WorkflowPageV2() {
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           onShowDiff={onShowDiff}
+          visualDiffEnabled={visualDiffEnabled}
+          onToggleVisualDiff={toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
           onDiscardVersion={handleResetDraftChanges}
           discardVersionDisabled={resetDraftDisabled}
