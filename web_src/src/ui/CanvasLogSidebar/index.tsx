@@ -247,7 +247,7 @@ export function CanvasLogSidebar({
       >
         <div
           onMouseDown={handleResizeStart}
-          className="group absolute left-0 right-0 top-0 z-30 h-4 cursor-ns-resize bg-transparent"
+          className="group absolute left-0 right-0 top-0 z-30 h-4 cursor-row-resize bg-transparent"
           style={{ marginTop: "-8px" }}
         >
           <div

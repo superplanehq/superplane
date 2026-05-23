@@ -77,7 +77,7 @@ export function SurveyWidget({ questions, onAction }: SurveyWidgetProps) {
   const isLast = currentIndex === questions.length - 1;
 
   return (
-    <div className="my-4 rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+    <div className="my-4 rounded-lg border border-slate-200 bg-white overflow-hidden">
       {/* Header */}
       <div className="px-3 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
         <p className="text-xs font-medium text-slate-900">{current.prompt}</p>
