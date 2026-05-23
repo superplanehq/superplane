@@ -1,7 +1,7 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "@/ui/switch";
-import { Eye, FileCode, GitCompareArrows, Plus } from "lucide-react";
+import { FileCode, GitCompareArrows, Plus } from "lucide-react";
 
 import { Button } from "../button";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
