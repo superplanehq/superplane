@@ -115,6 +115,7 @@ import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
 import { useCanvasYaml } from "./useCanvasYaml";
 import { useDraftVisualDiff } from "./useDraftVisualDiff";
+import { useVisualDiffToggle } from "./useVisualDiffToggle";
 import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
@@ -1862,7 +1863,9 @@ export function WorkflowPageV2() {
     openTriggerModal,
   ]);
 
+  const { visualDiffEnabled, toggleVisualDiff } = useVisualDiffToggle();
   const { nodes: nodesWithDraftVisualDiff, edges: edgesWithDraftVisualDiff } = useDraftVisualDiff({
+    enabled: visualDiffEnabled,
     isViewingDraftVersion,
     canvas,
     liveCanvasVersion,
@@ -5624,6 +5627,8 @@ export function WorkflowPageV2() {
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           onShowDiff={onShowDiff}
+          visualDiffEnabled={visualDiffEnabled}
+          onToggleVisualDiff={toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
           onDiscardVersion={handleResetDraftChanges}
           discardVersionDisabled={resetDraftDisabled}
