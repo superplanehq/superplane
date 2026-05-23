@@ -1869,6 +1869,13 @@ export function WorkflowPageV2() {
     return stored === null ? true : stored === "true";
   });
 
+  // Sync state when navigating between canvases
+  useEffect(() => {
+    if (!canvasId) return;
+    const stored = localStorage.getItem(`visual-diff-${canvasId}`);
+    setVisualDiffEnabled(stored === null ? true : stored === "true");
+  }, [canvasId]);
+
   const toggleVisualDiff = useCallback(() => {
     setVisualDiffEnabled((prev) => {
       const next = !prev;
