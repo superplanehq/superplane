@@ -211,7 +211,7 @@ function EditModeVersionActions({
                 onCheckedChange={onToggleVisualDiff}
                 data-testid="canvas-toggle-visual-diff"
               />
-              Changes
+              Diff X-Ray
             </label>
           )}
           {onShowDiff ? (
@@ -372,7 +372,7 @@ function ShowDiffButton({ onShowDiff }: { onShowDiff: () => void }) {
   return (
     <UIButton type="button" variant="outline" size="sm" onClick={onShowDiff} data-testid="canvas-show-diff-button">
       <GitCompareArrows className="mr-1 h-3.5 w-3.5" />
-      Show Diff
+      Diff Yaml
     </UIButton>
   );
 }
