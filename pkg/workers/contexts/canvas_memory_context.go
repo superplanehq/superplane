@@ -100,3 +100,22 @@ func (c *CanvasMemoryContext) Update(namespace string, matches map[string]any, v
 
 	return updatedValues, nil
 }
+
+func (c *CanvasMemoryContext) UpdateNamespace(namespace string, values map[string]any) ([]any, error) {
+	namespace = strings.TrimSpace(namespace)
+	if namespace == "" {
+		return nil, fmt.Errorf("namespace is required")
+	}
+
+	records, err := models.UpdateCanvasMemoriesByNamespaceInTransaction(c.tx, c.canvasID, namespace, values)
+	if err != nil {
+		return nil, err
+	}
+
+	updatedValues := make([]any, 0, len(records))
+	for _, record := range records {
+		updatedValues = append(updatedValues, record.Values.Data())
+	}
+
+	return updatedValues, nil
+}
