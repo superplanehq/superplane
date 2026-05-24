@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -20,14 +19,12 @@ import (
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	dbPath := getenv("DATABASE_PATH", "./broker.db")
-	if dir := filepath.Dir(dbPath); dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			log.Error("mkdir", slog.Any("err", err))
-			os.Exit(1)
-		}
+	databaseURL := getenv("DATABASE_URL", "")
+	if databaseURL == "" {
+		log.Error("DATABASE_URL is required — postgres connection string, e.g. postgres://user:pass@host:5432/broker?sslmode=disable")
+		os.Exit(1)
 	}
-	st, err := store.OpenSQLite(dbPath)
+	st, err := store.OpenPostgres(databaseURL)
 	if err != nil {
 		log.Error("open database", slog.Any("err", err))
 		os.Exit(1)

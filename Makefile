@@ -3,7 +3,7 @@ DOCKER_SERVICES := fleet-manager task-broker runner
 # Local dev defaults (override: make runner LOCAL_FLEET_URL=http://host.docker.internal:8080)
 LOCAL_TMP ?= /tmp
 LOCAL_FLEET_DB ?= $(LOCAL_TMP)/superplane-fleet-local.db
-LOCAL_BROKER_DB ?= $(LOCAL_TMP)/superplane-broker-local.db
+LOCAL_BROKER_DATABASE_URL ?= postgres://broker:broker@127.0.0.1:5432/broker?sslmode=disable
 LOCAL_FLEET_LISTEN ?= :8080
 LOCAL_BROKER_LISTEN ?= :8081
 LOCAL_FLEET_URL ?= http://127.0.0.1:8080
@@ -42,7 +42,7 @@ fleet-manager: build
 
 # Long-running: run in its own terminal.
 task-broker: build
-	DATABASE_PATH=$(LOCAL_BROKER_DB) LISTEN_ADDR=$(LOCAL_BROKER_LISTEN) \
+	DATABASE_URL=$(LOCAL_BROKER_DATABASE_URL) LISTEN_ADDR=$(LOCAL_BROKER_LISTEN) \
 		BROKER_PUBLIC_URL=$(LOCAL_BROKER_PUBLIC_URL) AUTH_TOKEN=$(LOCAL_STACK_AUTH_TOKEN) ./bin/task-broker
 
 # After fleet-manager + task-broker are listening; registers LOCAL_FLEET_ID → LOCAL_FLEET_URL on the broker.

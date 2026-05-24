@@ -12,7 +12,7 @@
 #   AUTH_TOKEN       — bearer token for broker /v1 (required; or set in TASK_BROKER_ENV_FILE)
 #
 # Optional extra env for the container: TASK_BROKER_ENV_FILE → uploaded; docker --env-file
-# (LISTEN_ADDR, DATABASE_PATH override, etc.—usually unnecessary; image sets DATABASE_PATH).
+# (LISTEN_ADDR, DATABASE_URL, etc.—DATABASE_URL is required in the env file or image env).
 #
 # Env templates under scripts/deploy/ (task-broker.env is gitignored; copy from *.env.example).
 #
@@ -85,7 +85,6 @@ opts=(
   --restart unless-stopped
   -p "${HOST_PORT}:8081"
   -e "BROKER_PUBLIC_URL=${BROKER_PUBLIC_URL}"
-  -v task-broker-data:/home/nonroot
 )
 if [[ -n "$AUTH_TOKEN" ]]; then
   opts+=( -e "AUTH_TOKEN=${AUTH_TOKEN}" )

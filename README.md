@@ -62,7 +62,7 @@ The broker needs a URL that **downstream fleet-manager** instances can POST to w
 | Environment variable | Default       | Description                                                                                                              |
 | -------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `LISTEN_ADDR`        | `:8081`       | HTTP listen address                                                                                                      |
-| `DATABASE_PATH`      | `./broker.db` | SQLite (fleets + broker-scoped tasks)                                                                                    |
+| `DATABASE_URL`       | —             | **Required.** PostgreSQL connection string (fleets + broker-scoped tasks)                                                |
 | `BROKER_PUBLIC_URL`  | (empty)       | Base URL reachable by fleet-manager(s), used to build completion relay URLs (**set in real deployments**)                |
 | `AUTH_TOKEN`         | —             | **Required.** Clients must send `Authorization: Bearer …` for **`/v1/fleets`** and **`/v1/tasks`** (and related routes). **`/v1/webhooks/complete/*`** stays unauthenticated for fleet-manager callbacks |
 
@@ -79,16 +79,20 @@ The broker needs a URL that **downstream fleet-manager** instances can POST to w
 | `POST`   | `/webhooks/complete/{brokerTaskId}` | Called by fleet-manager; forwards JSON to the original caller                                                                                                                                                                                   |
 
 ```bash
-export DATABASE_PATH=./broker.db
+export DATABASE_URL='postgres://broker:broker@127.0.0.1:5432/broker?sslmode=disable'
 export LISTEN_ADDR=:8081
 export BROKER_PUBLIC_URL=http://127.0.0.1:8081   # fleet-manager must reach this
 export AUTH_TOKEN=your-secret                  # mandatory
 ./bin/task-broker
 ```
 
+Local dev expects Postgres on `127.0.0.1:5432` with database `broker` (see `LOCAL_BROKER_DATABASE_URL` in the `Makefile`). GORM auto-migrates schema on startup.
+
+**Tests** that touch the broker store require `TEST_DATABASE_URL` (same format as `DATABASE_URL`). CI starts Postgres via `sem-service`; locally run e.g. `docker run -d --name broker-pg -e POSTGRES_USER=broker -e POSTGRES_PASSWORD=broker -e POSTGRES_DB=broker -p 5432:5432 postgres:16-alpine` and export `TEST_DATABASE_URL=postgres://broker:broker@127.0.0.1:5432/broker?sslmode=disable`. Use `go test ./... -p 1` when sharing one test database.
+
 **Inspect upstream task status** (uses `AUTH_TOKEN` and broker base from **`scripts/deploy/task-broker.env`** unless you export overrides): `./scripts/check-broker-task.sh <broker_task_id>`
 
-**Correlate broker + fleet SQLite over SSH** (default EC2 hosts match deploy scripts): `./scripts/show-runner-queue-state.sh`
+**Correlate broker + fleet SQLite over SSH** (default EC2 hosts match deploy scripts): `./scripts/show-runner-queue-state.sh` — broker rows require `TASK_BROKER_DATABASE_URL` (Postgres); fleet-manager still uses SQLite on the remote host.
 
 ## Run fleet-manager
 

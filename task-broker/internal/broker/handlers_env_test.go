@@ -8,14 +8,13 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/superplane/runner/shared/api"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
-	"github.com/superplane/runner/task-broker/internal/store"
+	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
 
 func TestCreateBrokerTaskForwardsEnvironment(t *testing.T) {
@@ -36,11 +35,8 @@ func TestCreateBrokerTaskForwardsEnvironment(t *testing.T) {
 	}))
 	defer fleet.Close()
 
-	st, err := store.OpenSQLite(filepath.Join(t.TempDir(), "broker.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
 	if err := st.CreateFleet(context.Background(), &brokermodels.Fleet{
 		ID:        "fleet-1",
 		BaseURL:   fleet.URL,
