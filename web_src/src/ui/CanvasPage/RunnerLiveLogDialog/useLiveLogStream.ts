@@ -32,13 +32,14 @@ function appendLineToLatestSection(state: LogState, text: string): LogState {
   };
 }
 
-function pushCommandSection(state: LogState, index: number, text: string): LogState {
+function pushCommandSection(state: LogState, index: number, text: string, startedAtMs: number | null): LogState {
   const section: CommandSection = {
     index,
     text,
     lines: [],
     status: "running",
     duration_ms: null,
+    started_at: startedAtMs ?? Date.now(),
     collapsed: false,
   };
 
@@ -113,7 +114,8 @@ export function useLiveLogStream(executionId: string) {
         await stream.pump({
           onLogLine: (t) => setState((prev) => appendLineToLatestSection(prev, t)),
           onStreamError: (m) => setState((prev) => ({ ...prev, error: m })),
-          onCmdStart: (index, text) => setState((prev) => pushCommandSection(prev, index, text)),
+          onCmdStart: (index, text, startedAtMs) =>
+            setState((prev) => pushCommandSection(prev, index, text, startedAtMs)),
           onCmdEnd: (index, status, durationMs) =>
             setState((prev) => completeCommandSection(prev, index, status, durationMs)),
         });

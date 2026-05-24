@@ -6,12 +6,13 @@ type LiveLogRecordEnvelope = {
   index?: number;
   status?: "passed" | "failed";
   duration_ms?: number;
+  started_at?: number;
 };
 
 export type LiveLogStreamHandlers = {
   onLogLine: (text: string) => void;
   onStreamError: (message: string) => void;
-  onCmdStart?: (index: number, text: string) => void;
+  onCmdStart?: (index: number, text: string, startedAtMs: number | null) => void;
   onCmdEnd?: (index: number, status: "passed" | "failed", durationMs: number) => void;
 };
 
@@ -60,7 +61,8 @@ function dispatchLiveLogRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStre
     return;
   }
   if (rec.type === "cmd_start" && typeof rec.index === "number" && typeof rec.text === "string") {
-    handlers.onCmdStart?.(rec.index, rec.text);
+    const startedAtMs = typeof rec.started_at === "number" && rec.started_at >= 0 ? rec.started_at : null;
+    handlers.onCmdStart?.(rec.index, rec.text, startedAtMs);
     return;
   }
   if (

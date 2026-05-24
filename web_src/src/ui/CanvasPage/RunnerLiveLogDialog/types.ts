@@ -9,7 +9,7 @@ export type RunnerLiveLogDialogProps = {
 export type LiveLogRecord =
   | { type: "line"; text: string }
   | { type: "error"; message: string }
-  | { type: "cmd_start"; index: number; text: string }
+  | { type: "cmd_start"; index: number; text: string; started_at?: number }
   | { type: "cmd_end"; index: number; status: "passed" | "failed"; duration_ms: number };
 
 export type CommandSection = {
@@ -18,6 +18,7 @@ export type CommandSection = {
   lines: string[];
   status: "running" | "passed" | "failed";
   duration_ms: number | null;
+  started_at: number | null;
   collapsed: boolean;
 };
 
