@@ -16,34 +16,21 @@ import (
 	"github.com/superplane/runner/runner/internal/agent"
 )
 
+var log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
 func main() {
-	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-
-	base := strings.TrimSpace(os.Getenv("FLEET_MANAGER_URL"))
-	if base == "" {
-		log.Error("FLEET_MANAGER_URL is required")
-		os.Exit(1)
-	}
-
-	runnerID := strings.TrimSpace(os.Getenv("RUNNER_ID"))
-	if runnerID == "" {
-		if h, err := os.Hostname(); err == nil && h != "" {
-			runnerID = h
-		} else {
-			runnerID = "runner-" + uuid.NewString()
-		}
-	}
-
 	cfg := agent.DefaultConfig()
-	cfg.BaseURL = base
-	cfg.RunnerID = runnerID
-	cfg.Token = os.Getenv("AUTH_TOKEN")
-	cfg.Transport = strings.TrimSpace(os.Getenv("RUNNER_TRANSPORT"))
+	cfg.BaseURL = getFleetManagerURL()
+	cfg.RunnerID = getRunnerID()
+	cfg.Token = getAuthToken()
+	cfg.Transport = getTransport()
+
 	if v := os.Getenv("POLL_EMPTY_MS"); v != "" {
 		if ms, err := strconv.Atoi(v); err == nil && ms > 0 {
 			cfg.PollEmpty = time.Duration(ms) * time.Millisecond
 		}
 	}
+
 	cfg.ExitAfterEachTask = envTruthy("RUNNER_TERMINATE_AFTER_EACH_TASK")
 	if v := strings.TrimSpace(os.Getenv("RUNNER_MAX_EXECUTION_SECONDS")); v != "" {
 		// Caps local run wall clock only; fleet-manager lease still uses task execution_timeout_seconds (see README).
@@ -57,6 +44,7 @@ func main() {
 			cfg.MaxExecutionSeconds = sec
 		}
 	}
+
 	cfg.Log = log
 	cfg.CloudWatchLogGroup = strings.TrimSpace(os.Getenv("RUNNER_CLOUDWATCH_LOG_GROUP"))
 	cfg.CloudWatchRegion = strings.TrimSpace(os.Getenv("RUNNER_CLOUDWATCH_REGION"))
@@ -109,4 +97,45 @@ func transportLabel(cfg agent.Config) string {
 	default:
 		return "websocket"
 	}
+}
+
+func getRunnerID() string {
+	runnerID := strings.TrimSpace(os.Getenv("RUNNER_ID"))
+	if runnerID == "" {
+		if h, err := os.Hostname(); err == nil && h != "" {
+			runnerID = h
+		} else {
+			runnerID = "runner-" + uuid.NewString()
+		}
+	}
+	return runnerID
+}
+
+func getFleetManagerURL() string {
+	base := strings.TrimSpace(os.Getenv("FLEET_MANAGER_URL"))
+	if base == "" {
+		log.Error("FLEET_MANAGER_URL is required")
+		os.Exit(1)
+	}
+
+	return base
+}
+
+func getAuthToken() string {
+	token := strings.TrimSpace(os.Getenv("AUTH_TOKEN"))
+	if token == "" {
+		log.Error("AUTH_TOKEN is required")
+		os.Exit(1)
+	}
+
+	return token
+}
+
+func getTransport() string {
+	transport := strings.TrimSpace(os.Getenv("RUNNER_TRANSPORT"))
+	if transport == "" {
+		return "websocket"
+	}
+
+	return transport
 }
