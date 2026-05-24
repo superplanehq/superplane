@@ -160,7 +160,12 @@ export interface CanvasPageProps {
   onShowDiff?: () => void;
   onShowNodeDiff?: (nodeId: string) => void;
   visualDiffEnabled?: boolean;
+  diffCounts?: { added: number; updated: number; removed: number };
   onToggleVisualDiff?: () => void;
+  showDeletedNodes?: boolean;
+  onToggleShowDeletedNodes?: () => void;
+  showEdgeDiff?: boolean;
+  onToggleShowEdgeDiff?: () => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
@@ -1253,7 +1258,12 @@ function CanvasPage(props: CanvasPageProps) {
           onDiscardVersion={props.onDiscardVersion}
           onShowDiff={props.onShowDiff}
           visualDiffEnabled={props.visualDiffEnabled}
+          diffCounts={props.diffCounts}
           onToggleVisualDiff={props.onToggleVisualDiff}
+          showDeletedNodes={props.showDeletedNodes}
+          onToggleShowDeletedNodes={props.onToggleShowDeletedNodes}
+          showEdgeDiff={props.showEdgeDiff}
+          onToggleShowEdgeDiff={props.onToggleShowEdgeDiff}
           publishVersionDisabled={props.publishVersionDisabled}
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
           discardVersionDisabled={props.discardVersionDisabled}
@@ -1761,7 +1771,12 @@ function CanvasContentHeader({
   onDiscardVersion,
   onShowDiff,
   visualDiffEnabled,
+  diffCounts,
   onToggleVisualDiff,
+  showDeletedNodes,
+  onToggleShowDeletedNodes,
+  showEdgeDiff,
+  onToggleShowEdgeDiff,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
   discardVersionDisabled,
@@ -1797,7 +1812,12 @@ function CanvasContentHeader({
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
   visualDiffEnabled?: boolean;
+  diffCounts?: { added: number; updated: number; removed: number };
   onToggleVisualDiff?: () => void;
+  showDeletedNodes?: boolean;
+  onToggleShowDeletedNodes?: () => void;
+  showEdgeDiff?: boolean;
+  onToggleShowEdgeDiff?: () => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
@@ -1844,7 +1864,12 @@ function CanvasContentHeader({
       onShowDiff={onShowDiff}
       visualDiffEnabled={visualDiffEnabled}
       onToggleVisualDiff={onToggleVisualDiff}
+      diffCounts={diffCounts}
       publishVersionDisabled={publishVersionDisabled}
+      showDeletedNodes={showDeletedNodes}
+      onToggleShowDeletedNodes={onToggleShowDeletedNodes}
+      showEdgeDiff={showEdgeDiff}
+      onToggleShowEdgeDiff={onToggleShowEdgeDiff}
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
