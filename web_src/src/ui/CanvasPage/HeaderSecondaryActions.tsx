@@ -2,7 +2,7 @@ import { Button as UIButton } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "@/ui/switch";
-import { FileCode, GitCompareArrows, Minus, Pencil, Plus } from "lucide-react";
+import { FileCode, Minus, Pencil, Plus } from "lucide-react";
 
 import { Button } from "../button";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
@@ -287,10 +287,19 @@ function EditModeVersionActions({
                       Show edges
                     </label>
                   )}
-                  {onShowDiff && (
-                    <ShowDiffButton onShowDiff={onShowDiff} />
-                  )}
                 </div>
+                {onShowDiff && (
+                  <div className="-mx-3 -mb-3 mt-2 border-t border-slate-200 px-3 py-2">
+                    <button
+                      type="button"
+                      onClick={onShowDiff}
+                      className="text-xs font-medium text-blue-600 hover:text-blue-700 underline-offset-2 hover:underline"
+                      data-testid="canvas-show-diff-button"
+                    >
+                      View full diff
+                    </button>
+                  </div>
+                )}
               </HoverCardContent>
             </HoverCard>
           )}
@@ -442,14 +451,6 @@ function SaveButton({
   );
 }
 
-function ShowDiffButton({ onShowDiff }: { onShowDiff: () => void }) {
-  return (
-    <UIButton type="button" variant="outline" size="sm" onClick={onShowDiff} data-testid="canvas-show-diff-button">
-      <GitCompareArrows className="mr-1 h-3.5 w-3.5" />
-      Diff Yaml
-    </UIButton>
-  );
-}
 
 function DiscardDraftButton({
   onDiscard,
