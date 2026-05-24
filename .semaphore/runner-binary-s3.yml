@@ -1,36 +1,53 @@
-# Promoted when main is green — create Semaphore secret "runner-s3" with IAM user/role credentials
-# and EC2_PROVISION_RUNNER_S3_URI (same as fleet-manager: s3://bucket/key for runner-linux-amd64).
 version: v1.0
 name: Publish runner binary to S3
 
 agent:
   machine:
     type: f1-standard-2
-    os_image: ubuntu2404
+    os_image: ubuntu2204
+
+global_job_config:
+  secrets:
+    - name: runner-s3
+
+  prologue:
+    commands:
+      - checkout
+      - sem-version go 1.22
+      - cache restore
+      - go mod download
+      - cache store
+      - aws sts get-caller-identity
 
 blocks:
-  - name: Upload linux/amd64 runner
+  - name: linux/amd64 runner
     task:
-      secrets:
-        - name: runner-s3
+      agent:
+        machine:
+          type: f1-standard-2
+          os_image: ubuntu2404
+
       jobs:
-        - name: build and s3 cp
+        - name: Build amd64 runner
           commands:
-            # ubuntu2404 noble: awscli apt package missing; AWS CLI v2 official bundle
-            - sudo apt-get update -qy && sudo apt-get install -qy curl unzip
-            - curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
-            - unzip -q /tmp/awscliv2.zip -d /tmp
-            - sudo /tmp/aws/install --update
-            - checkout
-            - sem-version go 1.22
-            - cache restore
-            - go mod download
-            - cache store
-            - export RUNNER_ARTIFACT="$(pwd)/runner-linux-amd64"
-            - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o "$RUNNER_ARTIFACT" ./runner/cmd/runner
-            - chmod 755 "$RUNNER_ARTIFACT"
-            - '[ -n "${EC2_PROVISION_RUNNER_S3_URI}" ]'
-            - 'echo "${EC2_PROVISION_RUNNER_S3_URI}" | grep -q "^s3://" || (echo "EC2_PROVISION_RUNNER_S3_URI must be s3://bucket/key"; exit 1)'
-            - aws sts get-caller-identity
-            - aws s3 cp "$RUNNER_ARTIFACT" "${EC2_PROVISION_RUNNER_S3_URI}" --sse AES256
-            - 'echo "Published ${EC2_PROVISION_RUNNER_S3_URI} (SHA $(echo "${SEMAPHORE_GIT_SHA}" | cut -c1-12))"'
+            - export CGO_ENABLED=0
+            - export GOOS=linux
+            - export GOARCH=amd64
+            - go build -trimpath -ldflags="-s -w" -o runner ./runner/cmd/runner
+            - aws s3 cp runner s3://superplanehq-runner-artifacts/production/runner-linux-amd64 --sse AES256
+
+  - name: linux/arm64 runner
+    task:
+      agent:
+        machine:
+          type: r1-standard-2
+          os_image: ubuntu2404
+
+      jobs:
+        - name: Build arm64 runner
+          commands:
+            - export CGO_ENABLED=0
+            - export GOOS=linux
+            - export GOARCH=arm64
+            - go build -trimpath -ldflags="-s -w" -o runner ./runner/cmd/runner
+            - aws s3 cp runner s3://superplanehq-runner-artifacts/production/runner-linux-arm64 --sse AES256
