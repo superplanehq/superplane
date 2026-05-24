@@ -26,5 +26,6 @@ export type LogState = {
   sections: CommandSection[];
   orphanLines: string[];
   error: string | null;
+  streamWarning: string | null;
   isStreaming: boolean;
 };

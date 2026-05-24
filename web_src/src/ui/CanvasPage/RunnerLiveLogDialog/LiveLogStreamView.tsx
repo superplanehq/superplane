@@ -5,13 +5,14 @@ import type { CommandSection } from "./types";
 import { useLiveLogStream } from "./useLiveLogStream";
 
 export function LiveLogStreamView({ executionId }: { executionId: string }) {
-  const { sections, orphanLines, error, toggleSection, scrollRef } = useLiveLogStream(executionId);
+  const { sections, orphanLines, error, streamWarning, toggleSection, scrollRef } = useLiveLogStream(executionId);
   const hasAnyLogs = orphanLines.length > 0 || sections.length > 0;
   const lastSectionIndex = sections.length - 1;
 
   return (
     <div ref={scrollRef} className="h-full min-h-0 overflow-y-auto bg-slate-50">
       {error ? <ErrorMessage /> : null}
+      {!error && streamWarning ? <StreamWarningMessage message={streamWarning} /> : null}
       {!error && !hasAnyLogs ? <NoLogsMessage /> : null}
 
       {sections.map((section, index) => (
@@ -36,6 +37,10 @@ function ErrorMessage() {
       Something went wrong while fetching logs. Please try again later.
     </div>
   );
+}
+
+function StreamWarningMessage({ message }: { message: string }) {
+  return <div className="px-4 py-3 text-left text-amber-700">{message}</div>;
 }
 
 function CommandSectionView({
