@@ -4,7 +4,7 @@ name: Publish runner binary to S3
 agent:
   machine:
     type: f1-standard-2
-    os_image: ubuntu2204
+    os_image: ubuntu2404
 
 global_job_config:
   secrets:
@@ -21,6 +21,7 @@ global_job_config:
 
 blocks:
   - name: linux/amd64 runner
+    dependencies: []
     task:
       agent:
         machine:
@@ -33,10 +34,12 @@ blocks:
             - export CGO_ENABLED=0
             - export GOOS=linux
             - export GOARCH=amd64
-            - go build -trimpath -ldflags="-s -w" -o runner ./runner/cmd/runner
-            - aws s3 cp runner s3://superplanehq-runner-artifacts/production/runner-linux-amd64 --sse AES256
+            - mkdir -p bin
+            - go build -trimpath -ldflags="-s -w" -o bin/runner-linux-amd64 ./runner/cmd/runner
+            - aws s3 cp bin/runner-linux-amd64 s3://superplanehq-runner-artifacts/production/runner-linux-amd64 --sse AES256
 
   - name: linux/arm64 runner
+    dependencies: []
     task:
       agent:
         machine:
@@ -49,5 +52,6 @@ blocks:
             - export CGO_ENABLED=0
             - export GOOS=linux
             - export GOARCH=arm64
-            - go build -trimpath -ldflags="-s -w" -o runner ./runner/cmd/runner
-            - aws s3 cp runner s3://superplanehq-runner-artifacts/production/runner-linux-arm64 --sse AES256
+            - mkdir -p bin
+            - go build -trimpath -ldflags="-s -w" -o bin/runner-linux-arm64 ./runner/cmd/runner
+            - aws s3 cp bin/runner-linux-arm64 s3://superplanehq-runner-artifacts/production/runner-linux-arm64 --sse AES256
