@@ -123,7 +123,7 @@ export function PanelEditorDialog<T extends object>({
               YAML
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="form" className="mt-3 max-h-[60vh] overflow-auto">
+          <TabsContent value="form" className="mt-3 max-h-[60vh] overflow-auto px-1 pb-6">
             {renderForm({ value: formDraft, onChange: handleFormChange, error: schemaError })}
           </TabsContent>
           <TabsContent value="yaml" className="mt-3">
