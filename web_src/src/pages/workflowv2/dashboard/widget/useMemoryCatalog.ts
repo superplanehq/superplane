@@ -74,3 +74,16 @@ export function suggestColumnFormat(field: string): "status" | "relative" | "dat
   if (lower === "url" || lower === "link" || lower === "href") return "link";
   return "text";
 }
+
+/**
+ * Build a sample row by pairing each discovered field with the first observed
+ * sample value. Used by the payload editor preview to show how `{{ expr }}`
+ * resolves for a concrete row without needing live memory.
+ */
+export function sampleRowFromFields(fields: MemoryFieldSummary[]): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  for (const f of fields) {
+    row[f.field] = f.sample ?? "";
+  }
+  return row;
+}
