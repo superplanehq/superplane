@@ -1,7 +1,3 @@
-# Auto-promoted from docker-publish when main is green.
-# Requires Semaphore secret "aws-prod" with:
-#   AWS_ACCESS_KEY_ID     — prod IAM credentials (account 802589444644)
-#   AWS_SECRET_ACCESS_KEY
 version: v1.0
 name: Deploy services
 
