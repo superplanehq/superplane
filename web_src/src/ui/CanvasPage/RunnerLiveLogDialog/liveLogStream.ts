@@ -51,28 +51,58 @@ function tryParseLiveLogRecord(line: string): LiveLogRecordEnvelope | null {
   }
 }
 
-function dispatchLiveLogRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): void {
-  if (rec.type === "line" && typeof rec.text === "string") {
-    handlers.onLogLine(rec.text);
-    return;
+function parseStartedAtMs(value: number | undefined): number | null {
+  return typeof value === "number" && value >= 0 ? value : null;
+}
+
+function dispatchLineRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): boolean {
+  if (rec.type !== "line" || typeof rec.text !== "string") {
+    return false;
   }
-  if (rec.type === "error" && typeof rec.message === "string") {
-    handlers.onStreamError(rec.message);
-    return;
+  handlers.onLogLine(rec.text);
+  return true;
+}
+
+function dispatchErrorRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): boolean {
+  if (rec.type !== "error" || typeof rec.message !== "string") {
+    return false;
   }
-  if (rec.type === "cmd_start" && typeof rec.index === "number" && typeof rec.text === "string") {
-    const startedAtMs = typeof rec.started_at === "number" && rec.started_at >= 0 ? rec.started_at : null;
-    handlers.onCmdStart?.(rec.index, rec.text, startedAtMs);
-    return;
+  handlers.onStreamError(rec.message);
+  return true;
+}
+
+function dispatchCmdStartRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): boolean {
+  if (rec.type !== "cmd_start" || typeof rec.index !== "number" || typeof rec.text !== "string") {
+    return false;
   }
+  handlers.onCmdStart?.(rec.index, rec.text, parseStartedAtMs(rec.started_at));
+  return true;
+}
+
+function dispatchCmdEndRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): boolean {
   if (
-    rec.type === "cmd_end" &&
-    typeof rec.index === "number" &&
-    (rec.status === "passed" || rec.status === "failed") &&
-    typeof rec.duration_ms === "number"
+    rec.type !== "cmd_end" ||
+    typeof rec.index !== "number" ||
+    (rec.status !== "passed" && rec.status !== "failed") ||
+    typeof rec.duration_ms !== "number"
   ) {
-    handlers.onCmdEnd?.(rec.index, rec.status, rec.duration_ms);
+    return false;
   }
+  handlers.onCmdEnd?.(rec.index, rec.status, rec.duration_ms);
+  return true;
+}
+
+function dispatchLiveLogRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): void {
+  if (dispatchLineRecord(rec, handlers)) {
+    return;
+  }
+  if (dispatchErrorRecord(rec, handlers)) {
+    return;
+  }
+  if (dispatchCmdStartRecord(rec, handlers)) {
+    return;
+  }
+  dispatchCmdEndRecord(rec, handlers);
 }
 
 /** Consumes complete NDJSON lines from buffer; returns the trailing incomplete fragment. */
