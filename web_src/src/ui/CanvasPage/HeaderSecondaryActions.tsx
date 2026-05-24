@@ -1,7 +1,8 @@
 import { Button as UIButton } from "@/components/ui/button";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Switch } from "@/ui/switch";
-import { FileCode, GitCompareArrows, Plus } from "lucide-react";
+import { FileCode, GitCompareArrows, Minus, Pencil, Plus } from "lucide-react";
 
 import { Button } from "../button";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
@@ -17,6 +18,11 @@ export function SecondaryHeaderActions({
   hasUnpublishedDraftChanges,
   onShowDiff,
   visualDiffEnabled,
+  diffCounts,
+  showDeletedNodes,
+  onToggleShowDeletedNodes,
+  showEdgeDiff,
+  onToggleShowEdgeDiff,
   onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
@@ -70,7 +76,12 @@ export function SecondaryHeaderActions({
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
           onShowDiff={onShowDiff}
           visualDiffEnabled={visualDiffEnabled}
+          diffCounts={diffCounts}
           onToggleVisualDiff={onToggleVisualDiff}
+          showDeletedNodes={showDeletedNodes}
+          onToggleShowDeletedNodes={onToggleShowDeletedNodes}
+          showEdgeDiff={showEdgeDiff}
+          onToggleShowEdgeDiff={onToggleShowEdgeDiff}
           onDiscardVersion={onDiscardVersion}
           discardVersionDisabled={discardVersionDisabled}
           discardVersionDisabledTooltip={discardVersionDisabledTooltip}
@@ -172,6 +183,11 @@ function EditModeVersionActions({
   hasUnpublishedDraftChanges,
   onShowDiff,
   visualDiffEnabled,
+  diffCounts,
+  showDeletedNodes,
+  onToggleShowDeletedNodes,
+  showEdgeDiff,
+  onToggleShowEdgeDiff,
   onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
@@ -188,6 +204,11 @@ function EditModeVersionActions({
   | "hasUnpublishedDraftChanges"
   | "onShowDiff"
   | "visualDiffEnabled"
+  | "diffCounts"
+  | "showDeletedNodes"
+  | "onToggleShowDeletedNodes"
+  | "showEdgeDiff"
+  | "onToggleShowEdgeDiff"
   | "onToggleVisualDiff"
   | "onDiscardVersion"
   | "discardVersionDisabled"
@@ -204,23 +225,75 @@ function EditModeVersionActions({
     <div className="flex items-center gap-2">
       {hasUnpublishedDraftChanges ? (
         <>
-          {onToggleVisualDiff && (
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-              <Switch
-                id="visual-diff-toggle"
-                checked={!!visualDiffEnabled}
-                onCheckedChange={onToggleVisualDiff}
-                data-testid="canvas-toggle-visual-diff"
-              />
-              <label htmlFor="visual-diff-toggle">Diff X-Ray</label>
-            </div>
+          {diffCounts && (diffCounts.added > 0 || diffCounts.updated > 0 || diffCounts.removed > 0) && (
+            <HoverCard openDelay={100} closeDelay={200}>
+              <HoverCardTrigger asChild>
+                <button type="button" className="flex items-center gap-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs font-medium hover:bg-slate-100 transition-colors cursor-default">
+                  {diffCounts.added > 0 && (
+                    <span className="flex items-center gap-0.5 text-emerald-600 px-1">
+                      <Plus className="h-3 w-3" />{diffCounts.added}
+                    </span>
+                  )}
+                  {diffCounts.added > 0 && (diffCounts.updated > 0 || diffCounts.removed > 0) && (
+                    <span className="text-slate-300">|</span>
+                  )}
+                  {diffCounts.updated > 0 && (
+                    <span className="flex items-center gap-0.5 text-sky-600 px-1">
+                      <Pencil className="h-3 w-3" />{diffCounts.updated}
+                    </span>
+                  )}
+                  {diffCounts.updated > 0 && diffCounts.removed > 0 && (
+                    <span className="text-slate-300">|</span>
+                  )}
+                  {diffCounts.removed > 0 && (
+                    <span className="flex items-center gap-0.5 text-red-600 px-1">
+                      <Minus className="h-3 w-3" />{diffCounts.removed}
+                    </span>
+                  )}
+                </button>
+              </HoverCardTrigger>
+              <HoverCardContent align="start" className="w-auto p-3">
+                <div className="flex flex-col gap-2">
+                  {onToggleVisualDiff && (
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                      <Switch
+                        id="visual-diff-toggle"
+                        checked={!!visualDiffEnabled}
+                        onCheckedChange={onToggleVisualDiff}
+                        data-testid="canvas-toggle-visual-diff"
+                      />
+                      <label htmlFor="visual-diff-toggle">Diff X-Ray</label>
+                    </div>
+                  )}
+                  {onToggleShowDeletedNodes && (
+                    <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!showDeletedNodes}
+                        onChange={onToggleShowDeletedNodes}
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500"
+                      />
+                      Show deleted nodes
+                    </label>
+                  )}
+                  {onToggleShowEdgeDiff && (
+                    <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!showEdgeDiff}
+                        onChange={onToggleShowEdgeDiff}
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500"
+                      />
+                      Show edges
+                    </label>
+                  )}
+                  {onShowDiff && (
+                    <ShowDiffButton onShowDiff={onShowDiff} />
+                  )}
+                </div>
+              </HoverCardContent>
+            </HoverCard>
           )}
-          {onShowDiff ? (
-            <>
-              <ShowDiffButton onShowDiff={onShowDiff} />
-              <HeaderActionSeparator />
-            </>
-          ) : null}
           <DiscardDraftButton
             onDiscard={() => onDiscardVersion?.()}
             disabled={discardVersionDisabled || !onDiscardVersion}
