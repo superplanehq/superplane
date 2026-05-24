@@ -149,8 +149,8 @@ func TestValidateConfigurationRunnerLegacyPreExecutionFields(t *testing.T) {
 	if spec.ExecutionMode != ExecutionModeHost {
 		t.Fatalf("execution_mode default: got %q want %q", spec.ExecutionMode, ExecutionModeHost)
 	}
-	if spec.ExecutionTimeoutSeconds != 0 {
-		t.Fatalf("timeout default: got %d want 0", spec.ExecutionTimeoutSeconds)
+	if spec.ExecutionTimeoutSeconds != DefaultExecutionTimeoutSeconds {
+		t.Fatalf("timeout default: got %d want %d", spec.ExecutionTimeoutSeconds, DefaultExecutionTimeoutSeconds)
 	}
 	if err := validateRunnerSpec(spec); err != nil {
 		t.Fatalf("validateRunnerSpec legacy: %v", err)
