@@ -2,7 +2,7 @@ export type AgentMode = "builder" | "operator" | "architect";
 
 const CANVAS_AGENT_MODE_STORAGE_KEY = "canvasAgentMode";
 
-export const VISIBLE_AGENT_MODES: AgentMode[] = ["builder", "operator"];
+export const VISIBLE_AGENT_MODES: AgentMode[] = ["operator", "builder"];
 const DEFAULT_AGENT_MODE: AgentMode = "operator";
 
 function isVisibleMode(value: unknown): value is AgentMode {

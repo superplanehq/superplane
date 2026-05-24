@@ -6,7 +6,6 @@ import {
   useCanvases,
   type CanvasFolderColor,
 } from "@/hooks/useCanvasData";
-import { generateUntitledAppName } from "@/lib/untitledAppName";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 
 const compareByName = <T extends { name: string }>(left: T, right: T) => left.name.localeCompare(right.name);
@@ -97,6 +96,5 @@ export function useHomePageCanvasList(organizationId: string | undefined, search
     filteredCanvases: filterCanvasesByQuery(canvases, searchQuery),
     isLoading: canvasesLoading || canvasFoldersLoading,
     canvasError: canvasesApiError || canvasFoldersApiError ? "Failed to fetch canvases. Please try again later." : null,
-    defaultAppName: generateUntitledAppName(canvases.map((canvas) => canvas.name)),
   };
 }

@@ -67,10 +67,7 @@ export function OutcomeProgressWidget({ state, onDismiss }: { state: OutcomeStat
 
   return (
     <>
-      <div
-        className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
-        data-testid="outcome-progress"
-      >
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white" data-testid="outcome-progress">
         <OutcomeHeader
           title={state.title}
           phase={state.phase}

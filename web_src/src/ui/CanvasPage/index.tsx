@@ -57,6 +57,7 @@ import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { findFreePositionInViewport } from "@/pages/workflowv2/lib/find-free-position-in-viewport";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
+import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
@@ -157,6 +158,18 @@ export interface CanvasPageProps {
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
+  onShowNodeDiff?: (nodeId: string) => void;
+  visualDiffEnabled?: boolean;
+  draftVisualDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
+    diffToggles: {
+      showDeletedNodes: boolean;
+      toggleShowDeletedNodes: () => void;
+      showEdgeDiff: boolean;
+      toggleShowEdgeDiff: () => void;
+    };
+  };
+  onToggleVisualDiff?: () => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
@@ -364,9 +377,32 @@ export interface CanvasPageProps {
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
+/**
+ * @deprecated Width is now coordinated by the shared sidebar layout store.
+ *  Kept exported for backward compatibility with existing test mocks.
+ */
 export const COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY = "componentSidebarWidth";
 export const CONSOLE_OPEN_STORAGE_KEY = "consoleOpen";
 export const CONSOLE_HEIGHT_STORAGE_KEY = "consoleHeight";
+
+function ComponentSidebarLoadingSkeleton() {
+  const sidebarWidth = useSidebarLayoutStore((state) => state.rightWidth);
+  useSidebarMount("right");
+
+  return (
+    <div
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white"
+      style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
+    >
+      <div className="flex items-center justify-center h-full">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          <p className="text-sm text-gray-500">Loading events...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const EDGE_STYLE = {
   type: "custom",
@@ -397,6 +433,7 @@ type CanvasNodeRendererCallbacks = {
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
   onToggleView: React.MutableRefObject<((nodeId: string) => void) | undefined>;
+  onShowNodeDiff: React.MutableRefObject<CanvasPageProps["onShowNodeDiff"] | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
   onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
   runDisabled?: boolean;
@@ -579,6 +616,7 @@ function buildInteractiveNodeBlockProps(
     onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
     onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
+    onShowDiff: getNodeAction(callbacks.onShowNodeDiff, nodeId),
     onAnnotationUpdate: getAnnotationUpdateAction(callbacks),
     onAnnotationBlur: getVoidAction(callbacks.onAnnotationBlur),
   };
@@ -1223,6 +1261,9 @@ function CanvasPage(props: CanvasPageProps) {
           onPublishVersion={props.onPublishVersion}
           onDiscardVersion={props.onDiscardVersion}
           onShowDiff={props.onShowDiff}
+          visualDiffEnabled={props.visualDiffEnabled}
+          draftVisualDiff={props.draftVisualDiff}
+          onToggleVisualDiff={props.onToggleVisualDiff}
           publishVersionDisabled={props.publishVersionDisabled}
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
           discardVersionDisabled={props.discardVersionDisabled}
@@ -1354,6 +1395,7 @@ function CanvasPage(props: CanvasPageProps) {
               onAutoLayoutNodes={props.onAutoLayoutNodes}
               onEdgeCreate={props.onEdgeCreate}
               onToggleView={handleToggleView}
+              onShowNodeDiff={props.onShowNodeDiff}
               onDuplicate={props.onDuplicate}
               onDeactivate={props.onDeactivate}
               onAnnotationUpdate={props.onAnnotationUpdate}
@@ -1624,22 +1666,7 @@ function Sidebar({
 
   // Show loading state when data is being fetched (skip for annotation nodes)
   if (sidebarData.isLoading && currentTab === "latest" && shouldShowRunsSidebar) {
-    const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
-    const sidebarWidth = saved ? parseInt(saved, 10) : 450;
-
-    return (
-      <div
-        className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white"
-        style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
-      >
-        <div className="flex items-center justify-center h-full">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-            <p className="text-sm text-gray-500">Loading events...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <ComponentSidebarLoadingSkeleton />;
   }
 
   return (
@@ -1743,6 +1770,9 @@ function CanvasContentHeader({
   onPublishVersion,
   onDiscardVersion,
   onShowDiff,
+  visualDiffEnabled,
+  draftVisualDiff,
+  onToggleVisualDiff,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
   discardVersionDisabled,
@@ -1777,6 +1807,17 @@ function CanvasContentHeader({
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
+  visualDiffEnabled?: boolean;
+  draftVisualDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
+    diffToggles: {
+      showDeletedNodes: boolean;
+      toggleShowDeletedNodes: () => void;
+      showEdgeDiff: boolean;
+      toggleShowEdgeDiff: () => void;
+    };
+  };
+  onToggleVisualDiff?: () => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
@@ -1821,6 +1862,9 @@ function CanvasContentHeader({
       onPublishVersion={onPublishVersion}
       onDiscardVersion={onDiscardVersion}
       onShowDiff={onShowDiff}
+      visualDiffEnabled={visualDiffEnabled}
+      onToggleVisualDiff={onToggleVisualDiff}
+      draftVisualDiff={draftVisualDiff}
       publishVersionDisabled={publishVersionDisabled}
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}
@@ -1893,6 +1937,7 @@ function CanvasContent({
   onDeactivate,
   onTogglePause,
   onToggleView,
+  onShowNodeDiff,
   onAnnotationUpdate,
   onAnnotationBlur,
   onBuildingBlockDrop,
@@ -1942,6 +1987,7 @@ function CanvasContent({
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
+  onShowNodeDiff?: (nodeId: string) => void;
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
@@ -2203,6 +2249,8 @@ function CanvasContent({
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
+  const onShowNodeDiffRef = useRef(onShowNodeDiff);
+  onShowNodeDiffRef.current = onShowNodeDiff;
 
   const onAnnotationUpdateRef = useRef(onAnnotationUpdate);
   onAnnotationUpdateRef.current = onAnnotationUpdate;
@@ -2492,6 +2540,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
+    onShowNodeDiff: onShowNodeDiffRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     runDisabled,
@@ -2509,6 +2558,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
+    onShowNodeDiff: onShowNodeDiffRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     runDisabled,
@@ -2706,18 +2756,28 @@ function CanvasContent({
     [],
   );
   const styledEdges = useMemo(() => {
-    return state.edges?.map((e) => ({
-      ...e,
-      ...EDGE_STYLE,
-      style: { ...EDGE_STYLE.style },
-      data: {
-        ...e.data,
-        isHovered: e.id === hoveredEdgeId,
-        canDelete: isEditMode && !isReadOnly,
-        onDelete: isEditMode && !isReadOnly ? stableEdgeDelete : undefined,
-      },
-      zIndex: e.id === hoveredEdgeId ? 1000 : 0,
-    }));
+    return state.edges?.map((e) => {
+      const diffStatus = (e.data as Record<string, unknown> | undefined)?._draftDiffStatus;
+      const diffStyle =
+        diffStatus === "removed"
+          ? { stroke: "#FDA4AF", strokeDasharray: "8 4" }
+          : diffStatus === "added"
+            ? { stroke: "#86EFAC" }
+            : {};
+
+      return {
+        ...e,
+        ...EDGE_STYLE,
+        style: { ...EDGE_STYLE.style, ...diffStyle },
+        data: {
+          ...e.data,
+          isHovered: e.id === hoveredEdgeId,
+          canDelete: isEditMode && !isReadOnly && diffStatus !== "removed",
+          onDelete: isEditMode && !isReadOnly && diffStatus !== "removed" ? stableEdgeDelete : undefined,
+        },
+        zIndex: e.id === hoveredEdgeId ? 1000 : 0,
+      };
+    });
   }, [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly]);
 
   const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;
