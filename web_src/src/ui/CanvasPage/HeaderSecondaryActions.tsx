@@ -1,9 +1,9 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Switch } from "@/ui/switch";
-import { FileCode, GitCompareArrows, Plus } from "lucide-react";
+import { FileCode, Plus } from "lucide-react";
 
 import { Button } from "../button";
+import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
 import type { HeaderProps } from "./Header";
 
@@ -17,6 +17,7 @@ export function SecondaryHeaderActions({
   hasUnpublishedDraftChanges,
   onShowDiff,
   visualDiffEnabled,
+  draftVisualDiff,
   onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
@@ -70,6 +71,7 @@ export function SecondaryHeaderActions({
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
           onShowDiff={onShowDiff}
           visualDiffEnabled={visualDiffEnabled}
+          draftVisualDiff={draftVisualDiff}
           onToggleVisualDiff={onToggleVisualDiff}
           onDiscardVersion={onDiscardVersion}
           discardVersionDisabled={discardVersionDisabled}
@@ -172,6 +174,7 @@ function EditModeVersionActions({
   hasUnpublishedDraftChanges,
   onShowDiff,
   visualDiffEnabled,
+  draftVisualDiff,
   onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
@@ -188,6 +191,7 @@ function EditModeVersionActions({
   | "hasUnpublishedDraftChanges"
   | "onShowDiff"
   | "visualDiffEnabled"
+  | "draftVisualDiff"
   | "onToggleVisualDiff"
   | "onDiscardVersion"
   | "discardVersionDisabled"
@@ -204,23 +208,15 @@ function EditModeVersionActions({
     <div className="flex items-center gap-2">
       {hasUnpublishedDraftChanges ? (
         <>
-          {onToggleVisualDiff && (
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-              <Switch
-                id="visual-diff-toggle"
-                checked={!!visualDiffEnabled}
-                onCheckedChange={onToggleVisualDiff}
-                data-testid="canvas-toggle-visual-diff"
-              />
-              <label htmlFor="visual-diff-toggle">Diff X-Ray</label>
-            </div>
+          {draftVisualDiff?.diffCounts && (
+            <DiffSummaryHoverCard
+              diffCounts={draftVisualDiff.diffCounts}
+              visualDiffEnabled={visualDiffEnabled}
+              onToggleVisualDiff={onToggleVisualDiff}
+              diffToggles={draftVisualDiff.diffToggles}
+              onShowDiff={onShowDiff}
+            />
           )}
-          {onShowDiff ? (
-            <>
-              <ShowDiffButton onShowDiff={onShowDiff} />
-              <HeaderActionSeparator />
-            </>
-          ) : null}
           <DiscardDraftButton
             onDiscard={() => onDiscardVersion?.()}
             disabled={discardVersionDisabled || !onDiscardVersion}
@@ -244,10 +240,6 @@ function EditModeVersionActions({
       />
     </div>
   );
-}
-
-function HeaderActionSeparator() {
-  return <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-slate-200" />;
 }
 
 function EnterEditButton({
@@ -366,15 +358,6 @@ function SaveButton({
     >
       Save
     </Button>
-  );
-}
-
-function ShowDiffButton({ onShowDiff }: { onShowDiff: () => void }) {
-  return (
-    <UIButton type="button" variant="outline" size="sm" onClick={onShowDiff} data-testid="canvas-show-diff-button">
-      <GitCompareArrows className="mr-1 h-3.5 w-3.5" />
-      Diff Yaml
-    </UIButton>
   );
 }
 
