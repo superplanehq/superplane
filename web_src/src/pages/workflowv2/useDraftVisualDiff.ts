@@ -14,8 +14,6 @@ import { prepareNode } from "./workflowPageHelpers";
 
 type UseDraftVisualDiffArgs = {
   enabled: boolean;
-  showDeletedNodes: boolean;
-  showEdgeDiff: boolean;
   isViewingDraftVersion: boolean;
   canvas: CanvasesCanvas | null | undefined;
   liveCanvasVersion?: CanvasesCanvasVersion;
@@ -116,8 +114,6 @@ function buildEdgesWithDiff(preparedEdges: CanvasEdge[], liveCanvasVersion?: Can
 
 export function useDraftVisualDiff({
   enabled,
-  showDeletedNodes,
-  showEdgeDiff,
   isViewingDraftVersion,
   canvas,
   liveCanvasVersion,
@@ -130,6 +126,7 @@ export function useDraftVisualDiff({
   canvasId,
   queryClient,
 }: UseDraftVisualDiffArgs) {
+  const { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff } = useDiffSubToggles();
   const draftDiffResult = useMemo(() => {
     if (!enabled || !isViewingDraftVersion || !canvas?.spec) {
       return undefined;
@@ -234,7 +231,12 @@ export function useDraftVisualDiff({
     preparedEdges,
   ]);
 
-  return { nodes, edges, diffCounts };
+  return {
+    nodes,
+    edges,
+    diffCounts,
+    diffToggles: { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff },
+  };
 }
 
 const STORAGE_KEY = "visual-diff-enabled";
@@ -259,32 +261,23 @@ export function useVisualDiffToggle() {
 const SHOW_DELETED_NODES_KEY = "visual-diff-show-deleted-nodes";
 const SHOW_EDGE_DIFF_KEY = "visual-diff-show-edges";
 
-export function useDiffSubToggles() {
-  const [showDeletedNodes, setShowDeletedNodes] = useState(() => {
-    const stored = localStorage.getItem(SHOW_DELETED_NODES_KEY);
-    return stored === null ? true : stored === "true";
+function useLocalStorageToggle(key: string, defaultValue = true) {
+  const [value, setValue] = useState(() => {
+    const stored = localStorage.getItem(key);
+    return stored === null ? defaultValue : stored === "true";
   });
-
-  const [showEdgeDiff, setShowEdgeDiff] = useState(() => {
-    const stored = localStorage.getItem(SHOW_EDGE_DIFF_KEY);
-    return stored === null ? true : stored === "true";
-  });
-
-  const toggleShowDeletedNodes = useCallback(() => {
-    setShowDeletedNodes((prev) => {
+  const toggle = useCallback(() => {
+    setValue((prev) => {
       const next = !prev;
-      localStorage.setItem(SHOW_DELETED_NODES_KEY, String(next));
+      localStorage.setItem(key, String(next));
       return next;
     });
-  }, []);
+  }, [key]);
+  return [value, toggle] as const;
+}
 
-  const toggleShowEdgeDiff = useCallback(() => {
-    setShowEdgeDiff((prev) => {
-      const next = !prev;
-      localStorage.setItem(SHOW_EDGE_DIFF_KEY, String(next));
-      return next;
-    });
-  }, []);
-
+function useDiffSubToggles() {
+  const [showDeletedNodes, toggleShowDeletedNodes] = useLocalStorageToggle(SHOW_DELETED_NODES_KEY);
+  const [showEdgeDiff, toggleShowEdgeDiff] = useLocalStorageToggle(SHOW_EDGE_DIFF_KEY);
   return { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff };
 }

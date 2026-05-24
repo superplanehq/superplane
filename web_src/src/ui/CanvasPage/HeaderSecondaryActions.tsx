@@ -18,10 +18,7 @@ export function SecondaryHeaderActions({
   onShowDiff,
   visualDiffEnabled,
   diffCounts,
-  showDeletedNodes,
-  onToggleShowDeletedNodes,
-  showEdgeDiff,
-  onToggleShowEdgeDiff,
+  diffToggles,
   onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
@@ -76,11 +73,8 @@ export function SecondaryHeaderActions({
           onShowDiff={onShowDiff}
           visualDiffEnabled={visualDiffEnabled}
           diffCounts={diffCounts}
+          diffToggles={diffToggles}
           onToggleVisualDiff={onToggleVisualDiff}
-          showDeletedNodes={showDeletedNodes}
-          onToggleShowDeletedNodes={onToggleShowDeletedNodes}
-          showEdgeDiff={showEdgeDiff}
-          onToggleShowEdgeDiff={onToggleShowEdgeDiff}
           onDiscardVersion={onDiscardVersion}
           discardVersionDisabled={discardVersionDisabled}
           discardVersionDisabledTooltip={discardVersionDisabledTooltip}
@@ -183,10 +177,7 @@ function EditModeVersionActions({
   onShowDiff,
   visualDiffEnabled,
   diffCounts,
-  showDeletedNodes,
-  onToggleShowDeletedNodes,
-  showEdgeDiff,
-  onToggleShowEdgeDiff,
+  diffToggles,
   onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
@@ -204,10 +195,7 @@ function EditModeVersionActions({
   | "onShowDiff"
   | "visualDiffEnabled"
   | "diffCounts"
-  | "showDeletedNodes"
-  | "onToggleShowDeletedNodes"
-  | "showEdgeDiff"
-  | "onToggleShowEdgeDiff"
+  | "diffToggles"
   | "onToggleVisualDiff"
   | "onDiscardVersion"
   | "discardVersionDisabled"
@@ -229,10 +217,7 @@ function EditModeVersionActions({
               diffCounts={diffCounts}
               visualDiffEnabled={visualDiffEnabled}
               onToggleVisualDiff={onToggleVisualDiff}
-              showDeletedNodes={showDeletedNodes}
-              onToggleShowDeletedNodes={onToggleShowDeletedNodes}
-              showEdgeDiff={showEdgeDiff}
-              onToggleShowEdgeDiff={onToggleShowEdgeDiff}
+              diffToggles={diffToggles}
               onShowDiff={onShowDiff}
             />
           )}

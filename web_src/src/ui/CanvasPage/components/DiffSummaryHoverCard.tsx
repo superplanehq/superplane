@@ -7,10 +7,12 @@ interface DiffSummaryHoverCardProps {
   diffCounts: { added: number; updated: number; removed: number };
   visualDiffEnabled?: boolean;
   onToggleVisualDiff?: () => void;
-  showDeletedNodes?: boolean;
-  onToggleShowDeletedNodes?: () => void;
-  showEdgeDiff?: boolean;
-  onToggleShowEdgeDiff?: () => void;
+  diffToggles?: {
+    showDeletedNodes: boolean;
+    toggleShowDeletedNodes: () => void;
+    showEdgeDiff: boolean;
+    toggleShowEdgeDiff: () => void;
+  };
   onShowDiff?: () => void;
 }
 
@@ -46,10 +48,7 @@ export function DiffSummaryHoverCard({
   diffCounts,
   visualDiffEnabled,
   onToggleVisualDiff,
-  showDeletedNodes,
-  onToggleShowDeletedNodes,
-  showEdgeDiff,
-  onToggleShowEdgeDiff,
+  diffToggles,
   onShowDiff,
 }: DiffSummaryHoverCardProps) {
   const hasChanges = diffCounts.added > 0 || diffCounts.updated > 0 || diffCounts.removed > 0;
@@ -78,31 +77,31 @@ export function DiffSummaryHoverCard({
               <label htmlFor="visual-diff-toggle">Diff X-Ray</label>
             </div>
           )}
-          {onToggleShowDeletedNodes && (
-            <div
-              className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}
-            >
-              <Checkbox
-                id="show-deleted-nodes"
-                checked={!!showDeletedNodes}
-                onCheckedChange={onToggleShowDeletedNodes}
-                disabled={!visualDiffEnabled}
-              />
-              <label htmlFor="show-deleted-nodes">Show deleted nodes</label>
-            </div>
-          )}
-          {onToggleShowEdgeDiff && (
-            <div
-              className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}
-            >
-              <Checkbox
-                id="show-edge-diff"
-                checked={!!showEdgeDiff}
-                onCheckedChange={onToggleShowEdgeDiff}
-                disabled={!visualDiffEnabled}
-              />
-              <label htmlFor="show-edge-diff">Show edges</label>
-            </div>
+          {diffToggles && (
+            <>
+              <div
+                className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}
+              >
+                <Checkbox
+                  id="show-deleted-nodes"
+                  checked={diffToggles.showDeletedNodes}
+                  onCheckedChange={diffToggles.toggleShowDeletedNodes}
+                  disabled={!visualDiffEnabled}
+                />
+                <label htmlFor="show-deleted-nodes">Show deleted nodes</label>
+              </div>
+              <div
+                className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}
+              >
+                <Checkbox
+                  id="show-edge-diff"
+                  checked={diffToggles.showEdgeDiff}
+                  onCheckedChange={diffToggles.toggleShowEdgeDiff}
+                  disabled={!visualDiffEnabled}
+                />
+                <label htmlFor="show-edge-diff">Show edges</label>
+              </div>
+            </>
           )}
         </div>
         {onShowDiff && (

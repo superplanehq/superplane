@@ -114,7 +114,7 @@ import type { TriggerActionModal } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
 import { useCanvasYaml } from "./useCanvasYaml";
-import { useDiffSubToggles, useDraftVisualDiff, useVisualDiffToggle } from "./useDraftVisualDiff";
+import { useDraftVisualDiff, useVisualDiffToggle } from "./useDraftVisualDiff";
 import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
@@ -1863,15 +1863,8 @@ export function WorkflowPageV2() {
   ]);
 
   const { visualDiffEnabled, toggleVisualDiff } = useVisualDiffToggle();
-  const { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff } = useDiffSubToggles();
-  const {
-    nodes: nodesWithDraftVisualDiff,
-    edges: edgesWithDraftVisualDiff,
-    diffCounts,
-  } = useDraftVisualDiff({
+  const { nodes: nodesWithDraftVisualDiff, edges: edgesWithDraftVisualDiff } = useDraftVisualDiff({
     enabled: visualDiffEnabled,
-    showDeletedNodes,
-    showEdgeDiff,
     isViewingDraftVersion,
     canvas,
     liveCanvasVersion,
@@ -5634,11 +5627,6 @@ export function WorkflowPageV2() {
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           onShowDiff={onShowDiff}
           visualDiffEnabled={visualDiffEnabled}
-          diffCounts={diffCounts}
-          showDeletedNodes={showDeletedNodes}
-          onToggleShowDeletedNodes={toggleShowDeletedNodes}
-          showEdgeDiff={showEdgeDiff}
-          onToggleShowEdgeDiff={toggleShowEdgeDiff}
           onToggleVisualDiff={toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
           onDiscardVersion={handleResetDraftChanges}
