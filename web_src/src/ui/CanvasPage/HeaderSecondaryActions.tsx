@@ -266,23 +266,25 @@ function EditModeVersionActions({
                     </div>
                   )}
                   {onToggleShowDeletedNodes && (
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
+                    <label className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer ${visualDiffEnabled ? "text-slate-600" : "text-slate-400 cursor-not-allowed"}`}>
                       <input
                         type="checkbox"
                         checked={!!showDeletedNodes}
                         onChange={onToggleShowDeletedNodes}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500"
+                        disabled={!visualDiffEnabled}
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500 disabled:opacity-50"
                       />
                       Show deleted nodes
                     </label>
                   )}
                   {onToggleShowEdgeDiff && (
-                    <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
+                    <label className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer ${visualDiffEnabled ? "text-slate-600" : "text-slate-400 cursor-not-allowed"}`}>
                       <input
                         type="checkbox"
                         checked={!!showEdgeDiff}
                         onChange={onToggleShowEdgeDiff}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500"
+                        disabled={!visualDiffEnabled}
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500 disabled:opacity-50"
                       />
                       Show edges
                     </label>
