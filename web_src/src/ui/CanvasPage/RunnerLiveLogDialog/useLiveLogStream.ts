@@ -160,6 +160,67 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+type LiveLogSessionParams = {
+  organizationId: string;
+  canvasId: string;
+  executionId: string;
+  sessionAbort: AbortController;
+  stateRef: { current: LogState };
+  setState: Dispatch<SetStateAction<LogState>>;
+  setActiveStream: (stream: LiveLogStream | null) => void;
+};
+
+async function runLiveLogSession({
+  organizationId,
+  canvasId,
+  executionId,
+  sessionAbort,
+  stateRef,
+  setState,
+  setActiveStream,
+}: LiveLogSessionParams): Promise<void> {
+  let reconnecting = false;
+
+  while (!sessionAbort.signal.aborted) {
+    const stream = new LiveLogStream(organizationId, canvasId, executionId);
+    setActiveStream(stream);
+    const replayLineSkip = new Map<number, number>();
+
+    try {
+      await stream.pump(createStreamHandlers(reconnecting, replayLineSkip, setState));
+    } catch (error) {
+      if ((error as Error).name === "AbortError") {
+        return;
+      }
+      if (!sessionAbort.signal.aborted) {
+        setState((prev) => applyStreamFailure(prev, (error as Error).message));
+      }
+    } finally {
+      stream.stop();
+      setActiveStream(null);
+    }
+
+    if (sessionAbort.signal.aborted || !hasRunningCommand(stateRef.current)) {
+      return;
+    }
+
+    reconnecting = true;
+    setState((prev) => ({
+      ...prev,
+      isStreaming: false,
+      streamWarning: "Live log stream interrupted. Reconnecting…",
+    }));
+
+    try {
+      await sleep(RECONNECT_DELAY_MS, sessionAbort.signal);
+    } catch {
+      return;
+    }
+
+    setState((prev) => ({ ...prev, isStreaming: true }));
+  }
+}
+
 export function useLiveLogStream(executionId: string) {
   const organizationId = useOrganizationId();
   const canvasId = useCanvasId();
@@ -198,58 +259,21 @@ export function useLiveLogStream(executionId: string) {
     let activeStream: LiveLogStream | null = null;
     setState({ ...initialLogState, isStreaming: true });
 
-    (async () => {
-      let reconnecting = false;
-
-      while (!sessionAbort.signal.aborted) {
-        const stream = new LiveLogStream(organizationId, canvasId, executionId);
+    void runLiveLogSession({
+      organizationId,
+      canvasId,
+      executionId,
+      sessionAbort,
+      stateRef,
+      setState,
+      setActiveStream: (stream) => {
         activeStream = stream;
-        const replayLineSkip = new Map<number, number>();
-
-        try {
-          await stream.pump(createStreamHandlers(reconnecting, replayLineSkip, setState));
-        } catch (error) {
-          if ((error as Error).name === "AbortError") {
-            return;
-          }
-          if (!sessionAbort.signal.aborted) {
-            setState((prev) => applyStreamFailure(prev, (error as Error).message));
-          }
-        } finally {
-          stream.stop();
-          if (activeStream === stream) {
-            activeStream = null;
-          }
-        }
-
-        if (sessionAbort.signal.aborted) {
-          return;
-        }
-
-        if (!hasRunningCommand(stateRef.current)) {
-          break;
-        }
-
-        reconnecting = true;
-        setState((prev) => ({
-          ...prev,
-          isStreaming: false,
-          streamWarning: "Live log stream interrupted. Reconnecting…",
-        }));
-
-        try {
-          await sleep(RECONNECT_DELAY_MS, sessionAbort.signal);
-        } catch {
-          return;
-        }
-
-        setState((prev) => ({ ...prev, isStreaming: true }));
-      }
-
+      },
+    }).finally(() => {
       if (!sessionAbort.signal.aborted) {
         setState((prev) => ({ ...prev, isStreaming: false }));
       }
-    })();
+    });
 
     return () => {
       sessionAbort.abort();
