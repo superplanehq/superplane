@@ -5,14 +5,13 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/superplane/runner/shared/models"
 )
 
 // DefaultExecutionTimeoutSeconds is used when create omits execution_timeout_seconds
 // (runner wall-clock limit and fleet-manager lease lower bound for COALESCE).
-const DefaultExecutionTimeoutSeconds = 540 // 9 minutes
+const DefaultExecutionTimeoutSeconds = 3600 // 1 hour
 
 // MaxExecutionTimeoutSecondsRequest is the largest execution_timeout_seconds accepted on create.
 const MaxExecutionTimeoutSecondsRequest = 86400 // 24 hours
@@ -52,7 +51,6 @@ type CreateTaskResponse struct {
 // ClaimTaskRequest is POST /v1/tasks/claim.
 type ClaimTaskRequest struct {
 	RunnerID     string `json:"runner_id"`
-	FleetID      string `json:"fleet_id"`
 	LeaseSeconds int    `json:"lease_seconds"`
 }
 
@@ -77,6 +75,7 @@ type TaskPayload struct {
 type CompleteTaskRequest struct {
 	RunnerID string `json:"runner_id"`
 	ExitCode int    `json:"exit_code"`
+	Output   string `json:"output"`
 	Error    string `json:"error,omitempty"`
 	// Result is optional JSON read by the runner from SUPERPLANE_RESULT_FILE after execution.
 	Result json.RawMessage `json:"result,omitempty"`
@@ -143,10 +142,12 @@ func ValidateEnvironment(env []EnvironmentVariable) string {
 
 // WebhookPayload is POSTed to the caller webhook URL on terminal status.
 type WebhookPayload struct {
-	TaskID   string `json:"task_id"`
-	Status   string `json:"status"`
-	ExitCode int    `json:"exit_code"`
-	Error    string `json:"error,omitempty"`
+	TaskID      string `json:"task_id"`
+	FleetTaskID string `json:"fleet_task_id,omitempty"` // when task-broker forwards, fleet-managed id
+	Status      string `json:"status"`
+	ExitCode    int    `json:"exit_code"`
+	Output      string `json:"output"`
+	Error       string `json:"error,omitempty"`
 	// CloudWatch fields mirror TaskStatusResponse when fleet-manager advertises log routing.
 	CloudWatchLogGroup  string `json:"cloudwatch_log_group,omitempty"`
 	CloudWatchLogStream string `json:"cloudwatch_log_stream,omitempty"`
@@ -155,20 +156,14 @@ type WebhookPayload struct {
 	Result  json.RawMessage `json:"result,omitempty"`
 }
 
-// TaskStatusResponse is GET task-broker /v1/tasks/{id}.
+// TaskStatusResponse is GET fleet-manager /v1/tasks/{id}.
 type TaskStatusResponse struct {
-	ID              string     `json:"id"`
-	Status          string     `json:"status"`
-	FleetID         string     `json:"fleet_id"`
-	CreatedAt       time.Time  `json:"created_at"`
-	ClaimedAt       *time.Time `json:"claimed_at,omitempty"`
-	LeaseUntil      *time.Time `json:"lease_until,omitempty"`
-	RunnerID        string     `json:"runner_id,omitempty"` // set after claim (EC2: instance id from IMDS)
-	ExecutionMode   string     `json:"execution_mode,omitempty"`
-	DockerImage     string     `json:"docker_image,omitempty"`
-	ExitCode        *int       `json:"exit_code,omitempty"`
-	Error           string     `json:"error,omitempty"`
-	CancelRequested bool       `json:"cancel_requested,omitempty"`
+	ID              string `json:"id"`
+	Status          string `json:"status"`
+	ExitCode        *int   `json:"exit_code,omitempty"`
+	Output          string `json:"output,omitempty"`
+	Error           string `json:"error,omitempty"`
+	CancelRequested bool   `json:"cancel_requested,omitempty"`
 	// CloudWatchLogGroup and CloudWatchLogStream are set when fleet-manager is configured
 	// with TASK_CLOUDWATCH_LOG_GROUP so clients can tail logs in AWS (runner must use the same group/prefix).
 	CloudWatchLogGroup      string          `json:"cloudwatch_log_group,omitempty"`
@@ -185,10 +180,18 @@ type CancelTaskResponse struct {
 	Status string `json:"status"` // task status after the operation
 }
 
-// ListTasksResponse is GET task-broker /v1/tasks (non-terminal tasks only).
-type ListTasksResponse struct {
-	Tasks []TaskStatusResponse `json:"tasks"`
+// BrokerGetTaskResponse is GET task-broker /v1/tasks/{broker_task_id}.
+type BrokerGetTaskResponse struct {
+	TaskID                  string          `json:"task_id"`
+	FleetTaskID             string          `json:"fleet_task_id,omitempty"`
+	Status                  string          `json:"status"`
+	ExitCode                *int            `json:"exit_code,omitempty"`
+	Output                  string          `json:"output,omitempty"`
+	Error                   string          `json:"error,omitempty"`
+	CancelRequested         bool            `json:"cancel_requested,omitempty"`
+	CloudWatchLogGroup      string          `json:"cloudwatch_log_group,omitempty"`
+	CloudWatchLogStream     string          `json:"cloudwatch_log_stream,omitempty"`
+	TaskLog                 *TaskLogSink    `json:"task_log,omitempty"`
+	ExecutionTimeoutSeconds *int            `json:"execution_timeout_seconds,omitempty"`
+	Result                  json.RawMessage `json:"result,omitempty"`
 }
-
-// BrokerGetTaskResponse is GET task-broker /v1/tasks/{id} (same shape as TaskStatusResponse).
-type BrokerGetTaskResponse = TaskStatusResponse

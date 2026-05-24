@@ -149,7 +149,7 @@ export DATABASE_PATH=./fleet.db
 | `RUNNER_ID`          | Optional; defaults to host name or a random id                                                         |
 | `AUTH_TOKEN`         | Optional; must match fleet-manager if set                                                              |
 | `POLL_EMPTY_MS`      | Sleep when no work (default ~1000 ms)                                                                  |
-| `RUNNER_MAX_EXECUTION_SECONDS` | Optional. Hard cap on run wall clock on **this** runner. Does **not** change fleet-manager `lease_until`, which still uses `execution_timeout_seconds` from the task (or the 9m default) plus buffer — so leases can be longer than the capped run when set. |
+| `RUNNER_MAX_EXECUTION_SECONDS` | Optional. Hard cap on run wall clock on **this** runner. Does **not** change fleet-manager `lease_until`, which still uses `execution_timeout_seconds` from the task (or the 1h default) plus buffer — so leases can be longer than the capped run when set. |
 | `RUNNER_TERMINATE_AFTER_EACH_TASK` | If `true`/`1`/`yes`, exit the runner process after **one** successful task (off by default locally; **on** for fleet-manager EC2 user-data unless disabled). **`runner_id`** must be the EC2 instance id (`i-…`) for **fleet-manager** to terminate the VM; termination is done by fleet-manager, not the runner binary. |
 | `RUNNER_CLOUDWATCH_LOG_GROUP` | When set, task stdout/stderr are streamed to **Amazon CloudWatch Logs** (`PutLogEvents`) on a per-task log stream (see `shared/cwstream`). Uses the default AWS credential chain (EC2 instance profile, env keys, etc.). |
 | `RUNNER_CLOUDWATCH_REGION` | Optional AWS region for the CloudWatch Logs client (defaults to the SDK default chain). |
