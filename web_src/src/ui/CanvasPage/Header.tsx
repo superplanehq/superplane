@@ -20,6 +20,7 @@ export interface HeaderProps {
   onShowDiff?: () => void;
   visualDiffEnabled?: boolean;
   onToggleVisualDiff?: () => void;
+  diffCounts?: { added: number; updated: number; removed: number };
   organizationId?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;

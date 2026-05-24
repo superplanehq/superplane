@@ -160,6 +160,7 @@ export interface CanvasPageProps {
   onShowDiff?: () => void;
   onShowNodeDiff?: (nodeId: string) => void;
   visualDiffEnabled?: boolean;
+  diffCounts?: { added: number; updated: number; removed: number };
   onToggleVisualDiff?: () => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
@@ -1253,6 +1254,7 @@ function CanvasPage(props: CanvasPageProps) {
           onDiscardVersion={props.onDiscardVersion}
           onShowDiff={props.onShowDiff}
           visualDiffEnabled={props.visualDiffEnabled}
+          diffCounts={props.diffCounts}
           onToggleVisualDiff={props.onToggleVisualDiff}
           publishVersionDisabled={props.publishVersionDisabled}
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
@@ -1761,6 +1763,7 @@ function CanvasContentHeader({
   onDiscardVersion,
   onShowDiff,
   visualDiffEnabled,
+  diffCounts,
   onToggleVisualDiff,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
@@ -1797,6 +1800,7 @@ function CanvasContentHeader({
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
   visualDiffEnabled?: boolean;
+  diffCounts?: { added: number; updated: number; removed: number };
   onToggleVisualDiff?: () => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
@@ -1844,6 +1848,7 @@ function CanvasContentHeader({
       onShowDiff={onShowDiff}
       visualDiffEnabled={visualDiffEnabled}
       onToggleVisualDiff={onToggleVisualDiff}
+      diffCounts={diffCounts}
       publishVersionDisabled={publishVersionDisabled}
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}

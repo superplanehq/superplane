@@ -1863,7 +1863,7 @@ export function WorkflowPageV2() {
   ]);
 
   const { visualDiffEnabled, toggleVisualDiff } = useVisualDiffToggle();
-  const { nodes: nodesWithDraftVisualDiff, edges: edgesWithDraftVisualDiff } = useDraftVisualDiff({
+  const { nodes: nodesWithDraftVisualDiff, edges: edgesWithDraftVisualDiff, diffCounts } = useDraftVisualDiff({
     enabled: visualDiffEnabled,
     isViewingDraftVersion,
     canvas,
@@ -5627,6 +5627,7 @@ export function WorkflowPageV2() {
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           onShowDiff={onShowDiff}
           visualDiffEnabled={visualDiffEnabled}
+          diffCounts={diffCounts}
           onToggleVisualDiff={toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
           onDiscardVersion={handleResetDraftChanges}
