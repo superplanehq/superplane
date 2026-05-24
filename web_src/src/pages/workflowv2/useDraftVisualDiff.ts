@@ -183,7 +183,48 @@ export function useDraftVisualDiff({
     return buildEdgesWithDiff(preparedEdges, liveCanvasVersion);
   }, [enabled, isViewingDraftVersion, liveCanvasVersion, preparedEdges]);
 
-  return { nodes, edges };
+  const diffCounts = useMemo(() => {
+    if (!isViewingDraftVersion || !canvas?.spec) return { added: 0, updated: 0, removed: 0 };
+
+    let added = 0;
+    let updated = 0;
+    let removed = 0;
+
+    // Node diffs
+    const draftVersionForDiff = {
+      ...(latestDraftVersion || selectedCanvasVersion || {}),
+      spec: canvas.spec,
+    } as CanvasesCanvasVersion;
+    const diffResult = buildDraftDiffMap(liveCanvasVersion, draftVersionForDiff);
+    if (diffResult?.statusMap) {
+      const values = Object.values(diffResult.statusMap);
+      added = values.filter((s) => s === "added").length;
+      updated = values.filter((s) => s === "updated").length;
+      removed = diffResult.removedNodes?.length || 0;
+    }
+
+    // Edge diffs
+    if (liveCanvasVersion?.spec?.edges && preparedEdges.length > 0) {
+      const liveEdges = liveCanvasVersion.spec.edges as Array<Record<string, unknown>>;
+      const liveEdgeSet = new Set(
+        liveEdges.map((e) => edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"))),
+      );
+      const draftEdgeSet = new Set(
+        preparedEdges.map((e) => edgeKey(e.source, e.target, e.sourceHandle || "default")),
+      );
+      for (const e of preparedEdges) {
+        const key = edgeKey(e.source, e.target, e.sourceHandle || "default");
+        if (!liveEdgeSet.has(key)) added += 1;
+      }
+      for (const e of liveEdges) {
+        const key = edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"));
+        if (!draftEdgeSet.has(key)) removed += 1;
+      }
+    }
+    return { added, updated, removed };
+  }, [isViewingDraftVersion, canvas?.spec, liveCanvasVersion, latestDraftVersion, selectedCanvasVersion, preparedEdges]);
+
+  return { nodes, edges, diffCounts };
 }
 
 const STORAGE_KEY = "visual-diff-enabled";
