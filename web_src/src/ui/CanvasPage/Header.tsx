@@ -20,6 +20,15 @@ export interface HeaderProps {
   onShowDiff?: () => void;
   visualDiffEnabled?: boolean;
   onToggleVisualDiff?: () => void;
+  draftVisualDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
+    diffToggles: {
+      showDeletedNodes: boolean;
+      toggleShowDeletedNodes: () => void;
+      showEdgeDiff: boolean;
+      toggleShowEdgeDiff: () => void;
+    };
+  };
   organizationId?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
