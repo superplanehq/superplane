@@ -19,6 +19,10 @@ export function SecondaryHeaderActions({
   onShowDiff,
   visualDiffEnabled,
   diffCounts,
+  showDeletedNodes,
+  onToggleShowDeletedNodes,
+  showEdgeDiff,
+  onToggleShowEdgeDiff,
   onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
@@ -74,6 +78,10 @@ export function SecondaryHeaderActions({
           visualDiffEnabled={visualDiffEnabled}
           diffCounts={diffCounts}
           onToggleVisualDiff={onToggleVisualDiff}
+          showDeletedNodes={showDeletedNodes}
+          onToggleShowDeletedNodes={onToggleShowDeletedNodes}
+          showEdgeDiff={showEdgeDiff}
+          onToggleShowEdgeDiff={onToggleShowEdgeDiff}
           onDiscardVersion={onDiscardVersion}
           discardVersionDisabled={discardVersionDisabled}
           discardVersionDisabledTooltip={discardVersionDisabledTooltip}
@@ -176,6 +184,10 @@ function EditModeVersionActions({
   onShowDiff,
   visualDiffEnabled,
   diffCounts,
+  showDeletedNodes,
+  onToggleShowDeletedNodes,
+  showEdgeDiff,
+  onToggleShowEdgeDiff,
   onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
@@ -193,6 +205,10 @@ function EditModeVersionActions({
   | "onShowDiff"
   | "visualDiffEnabled"
   | "diffCounts"
+  | "showDeletedNodes"
+  | "onToggleShowDeletedNodes"
+  | "showEdgeDiff"
+  | "onToggleShowEdgeDiff"
   | "onToggleVisualDiff"
   | "onDiscardVersion"
   | "discardVersionDisabled"
@@ -248,6 +264,28 @@ function EditModeVersionActions({
                       />
                       <label htmlFor="visual-diff-toggle">Diff X-Ray</label>
                     </div>
+                  )}
+                  {onToggleShowDeletedNodes && (
+                    <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!showDeletedNodes}
+                        onChange={onToggleShowDeletedNodes}
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500"
+                      />
+                      Show deleted nodes
+                    </label>
+                  )}
+                  {onToggleShowEdgeDiff && (
+                    <label className="flex items-center gap-1.5 text-xs font-medium text-slate-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!showEdgeDiff}
+                        onChange={onToggleShowEdgeDiff}
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500"
+                      />
+                      Show edges
+                    </label>
                   )}
                   {onShowDiff && (
                     <ShowDiffButton onShowDiff={onShowDiff} />
