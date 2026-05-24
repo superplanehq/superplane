@@ -1,5 +1,35 @@
 import type { SuperplaneComponentsNode as ComponentsNode } from "@/api-client/types.gen";
 
+/** A Start trigger template as exposed by `node.configuration.templates`. */
+export interface DashboardTriggerTemplate {
+  name: string;
+  payload: Record<string, unknown>;
+}
+
+/**
+ * Read the (named) trigger templates declared on a node's configuration.
+ * Returns an empty array when the node is undefined, has no templates, or
+ * exposes templates without names. Shared by the dashboard form editor and
+ * `buildDashboardTriggerParameters` so both agree on which template is the
+ * default and what default payload it carries.
+ */
+export function getTriggerTemplates(node: ComponentsNode | undefined): DashboardTriggerTemplate[] {
+  if (!node) return [];
+  const config = node.configuration as { templates?: Array<{ name?: string; payload?: unknown }> } | undefined;
+  const templates = config?.templates;
+  if (!templates || templates.length === 0) return [];
+  const out: DashboardTriggerTemplate[] = [];
+  for (const tpl of templates) {
+    if (!tpl?.name) continue;
+    const payload =
+      tpl.payload && typeof tpl.payload === "object" && !Array.isArray(tpl.payload)
+        ? (tpl.payload as Record<string, unknown>)
+        : {};
+    out.push({ name: tpl.name, payload });
+  }
+  return out;
+}
+
 /**
  * Derive the `parameters` body the gRPC `InvokeNodeTriggerHook` endpoint
  * expects when the dashboard fires a quick Run on a referenced node.
@@ -27,14 +57,8 @@ export function buildDashboardTriggerParameters(
   templateName?: string,
 ): Record<string, unknown> {
   if (!node || hookName !== "run") return {};
-  const config = node.configuration as { templates?: Array<{ name?: string; payload?: unknown }> } | undefined;
-  const templates = config?.templates;
-  if (!templates || templates.length === 0) return {};
+  const templates = getTriggerTemplates(node);
+  if (templates.length === 0) return {};
   const template = (templateName ? templates.find((t) => t.name === templateName) : undefined) ?? templates[0];
-  if (!template?.name) return {};
-  const payload =
-    template.payload && typeof template.payload === "object" && !Array.isArray(template.payload)
-      ? (template.payload as Record<string, unknown>)
-      : {};
-  return { template: template.name, payload };
+  return { template: template.name, payload: template.payload };
 }

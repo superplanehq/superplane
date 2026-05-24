@@ -1,8 +1,9 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileCode, GitCompareArrows, Plus } from "lucide-react";
+import { FileCode, Plus } from "lucide-react";
 
 import { Button } from "../button";
+import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
 import type { HeaderProps } from "./Header";
 
@@ -15,6 +16,9 @@ export function SecondaryHeaderActions({
   saveIsPrimary,
   hasUnpublishedDraftChanges,
   onShowDiff,
+  visualDiffEnabled,
+  draftVisualDiff,
+  onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -66,6 +70,9 @@ export function SecondaryHeaderActions({
         <EditModeVersionActions
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
           onShowDiff={onShowDiff}
+          visualDiffEnabled={visualDiffEnabled}
+          draftVisualDiff={draftVisualDiff}
+          onToggleVisualDiff={onToggleVisualDiff}
           onDiscardVersion={onDiscardVersion}
           discardVersionDisabled={discardVersionDisabled}
           discardVersionDisabledTooltip={discardVersionDisabledTooltip}
@@ -166,6 +173,9 @@ function LiveModeEditControls({
 function EditModeVersionActions({
   hasUnpublishedDraftChanges,
   onShowDiff,
+  visualDiffEnabled,
+  draftVisualDiff,
+  onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -180,6 +190,9 @@ function EditModeVersionActions({
   HeaderProps,
   | "hasUnpublishedDraftChanges"
   | "onShowDiff"
+  | "visualDiffEnabled"
+  | "draftVisualDiff"
+  | "onToggleVisualDiff"
   | "onDiscardVersion"
   | "discardVersionDisabled"
   | "discardVersionDisabledTooltip"
@@ -195,12 +208,15 @@ function EditModeVersionActions({
     <div className="flex items-center gap-2">
       {hasUnpublishedDraftChanges ? (
         <>
-          {onShowDiff ? (
-            <>
-              <ShowDiffButton onShowDiff={onShowDiff} />
-              <HeaderActionSeparator />
-            </>
-          ) : null}
+          {draftVisualDiff?.diffCounts && (
+            <DiffSummaryHoverCard
+              diffCounts={draftVisualDiff.diffCounts}
+              visualDiffEnabled={visualDiffEnabled}
+              onToggleVisualDiff={onToggleVisualDiff}
+              diffToggles={draftVisualDiff.diffToggles}
+              onShowDiff={onShowDiff}
+            />
+          )}
           <DiscardDraftButton
             onDiscard={() => onDiscardVersion?.()}
             disabled={discardVersionDisabled || !onDiscardVersion}
@@ -226,10 +242,6 @@ function EditModeVersionActions({
   );
 }
 
-function HeaderActionSeparator() {
-  return <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-slate-200" />;
-}
-
 function EnterEditButton({
   onClick,
   label,
@@ -244,7 +256,7 @@ function EnterEditButton({
   const button = (
     <UIButton
       type="button"
-      variant="default"
+      variant="outline"
       size="sm"
       onClick={onClick}
       disabled={disabled}
@@ -346,15 +358,6 @@ function SaveButton({
     >
       Save
     </Button>
-  );
-}
-
-function ShowDiffButton({ onShowDiff }: { onShowDiff: () => void }) {
-  return (
-    <UIButton type="button" variant="outline" size="sm" onClick={onShowDiff} data-testid="canvas-show-diff-button">
-      <GitCompareArrows className="mr-1 h-3.5 w-3.5" />
-      Show Diff
-    </UIButton>
   );
 }
 

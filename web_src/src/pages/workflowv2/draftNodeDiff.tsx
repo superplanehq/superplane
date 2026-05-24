@@ -14,6 +14,8 @@ export type DraftNodeDiffItem = {
   lines: DraftDiffLine[];
 };
 
+export type DraftDiffStatus = DraftNodeDiffItem["changeType"];
+
 export type DraftNodeDiffSummary = {
   items: DraftNodeDiffItem[];
   addedCount: number;
@@ -208,4 +210,68 @@ export function buildDraftNodeDiffSummary(
   });
 
   return { items, addedCount, updatedCount, removedCount };
+}
+
+/**
+ * Returns node diff state for canvas rendering. Position-only changes are ignored
+ * so moving a node does not mark it visually edited.
+ */
+export function buildDraftDiffMap(
+  liveVersion?: CanvasesCanvasVersion,
+  draftVersion?: CanvasesCanvasVersion,
+): {
+  statusMap: Record<string, DraftDiffStatus>;
+  removedNodes: Array<Record<string, unknown>>;
+} {
+  const liveNodes = (liveVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
+  const draftNodes = (draftVersion?.spec?.nodes || []) as Array<Record<string, unknown>>;
+
+  const byID = (nodes: Array<Record<string, unknown>>) => {
+    const map = new Map<string, Record<string, unknown>>();
+    nodes.forEach((node) => {
+      const id = String(node.id || "");
+      if (id) {
+        map.set(id, node);
+      }
+    });
+    return map;
+  };
+
+  const functionalSnapshot = (node: Record<string, unknown>) =>
+    JSON.stringify({
+      name: node.name || null,
+      type: node.type || null,
+      ref: node.ref || null,
+      configuration: node.configuration || null,
+      isCollapsed: node.isCollapsed || false,
+      integrationId: getComparableIntegrationId(node),
+    });
+
+  const liveByID = byID(liveNodes);
+  const draftByID = byID(draftNodes);
+  const allNodeIDs = new Set([...liveByID.keys(), ...draftByID.keys()]);
+  const statusMap: Record<string, DraftDiffStatus> = {};
+
+  for (const nodeID of allNodeIDs) {
+    const liveNode = liveByID.get(nodeID);
+    const draftNode = draftByID.get(nodeID);
+
+    if (!liveNode && draftNode) {
+      statusMap[nodeID] = "added";
+      continue;
+    }
+
+    if (liveNode && !draftNode) {
+      statusMap[nodeID] = "removed";
+      continue;
+    }
+
+    if (liveNode && draftNode && functionalSnapshot(liveNode) !== functionalSnapshot(draftNode)) {
+      statusMap[nodeID] = "updated";
+    }
+  }
+
+  const removedNodes = liveNodes.filter((node) => statusMap[String(node.id)] === "removed");
+
+  return { statusMap, removedNodes };
 }

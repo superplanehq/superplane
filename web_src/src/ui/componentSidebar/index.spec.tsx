@@ -2,11 +2,9 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { createContext, useContext, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const TabsContext = createContext<{ value: string }>({ value: "latest" });
+import { useSidebarLayoutStore } from "@/stores/sidebarLayoutStore";
 
-vi.mock("../CanvasPage", () => ({
-  COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY: "component-sidebar-width",
-}));
+const TabsContext = createContext<{ value: string }>({ value: "latest" });
 
 vi.mock("@/components/ui/tabs", () => ({
   Tabs: ({ value, children }: { value: string; children?: ReactNode }) => (
@@ -149,10 +147,12 @@ function renderSidebar(props?: Partial<React.ComponentProps<typeof ComponentSide
 describe("ComponentSidebar", () => {
   beforeEach(() => {
     localStorage.clear();
+    useSidebarLayoutStore.getState().hydrateFromStorage();
   });
 
   it("uses clamped default width when local storage value is invalid", () => {
-    localStorage.setItem("component-sidebar-width", "not-a-number");
+    localStorage.setItem("componentSidebarWidth", "not-a-number");
+    useSidebarLayoutStore.getState().hydrateFromStorage();
     const { container } = renderSidebar();
 
     const sidebar = container.firstElementChild as HTMLElement | null;

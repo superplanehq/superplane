@@ -195,20 +195,15 @@ describe("HomePage canvas folders", () => {
     renderHome();
 
     await user.click(screen.getByRole("button", { name: /new app/i }));
-    expect(screen.getByRole("dialog", { name: /new app/i })).toBeInTheDocument();
-    expect(screen.getByLabelText("App name")).toHaveValue("Untitled App 1");
-
-    await user.click(screen.getByTestId("create-app-save-button"));
 
     await waitFor(() => {
-      expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith({
-        name: "Untitled App 1",
-        method: "ui",
-      });
+      expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: expect.stringMatching(/^[a-z]+-[a-z]+$/),
+          method: "ui",
+        }),
+      );
     });
-    expect(screen.queryByText("Point & Click")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Grid view")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("List view")).not.toBeInTheDocument();
   });
 
   it("renders folders before free canvases using the manual folder order", () => {

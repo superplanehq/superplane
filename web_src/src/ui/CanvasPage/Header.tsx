@@ -5,6 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreVertical, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
+import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions } from "./HeaderSecondaryActions";
 
@@ -17,6 +18,17 @@ export interface HeaderProps {
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
+  visualDiffEnabled?: boolean;
+  onToggleVisualDiff?: () => void;
+  draftVisualDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
+    diffToggles: {
+      showDeletedNodes: boolean;
+      toggleShowDeletedNodes: () => void;
+      showEdgeDiff: boolean;
+      toggleShowEdgeDiff: () => void;
+    };
+  };
   organizationId?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
@@ -89,8 +101,18 @@ function PageHeader({
       <div className="relative z-10 flex min-w-0 shrink-0 items-center">
         <OrganizationMenuButton organizationId={organizationId} />
       </div>
-      <div className="pointer-events-none absolute inset-x-0 flex justify-center px-24">
-        <span className="truncate text-center text-sm font-medium text-slate-900">{headerTitle}</span>
+      <div className="pointer-events-none absolute inset-x-0 flex items-center justify-center px-24">
+        <div className="pointer-events-auto">
+          {organizationId && activeCanvasId ? (
+            <CanvasProjectSwitcher
+              organizationId={organizationId}
+              activeCanvasId={activeCanvasId}
+              canvasName={headerTitle}
+            />
+          ) : (
+            <span className="block truncate text-center text-[13px] font-medium text-slate-900">{headerTitle}</span>
+          )}
+        </div>
       </div>
       <div className="relative z-10 ml-auto flex shrink-0 items-center">
         {showCanvasSettingsMenu && organizationId && activeCanvasId ? (
