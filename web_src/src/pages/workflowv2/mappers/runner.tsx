@@ -19,6 +19,8 @@ import type {
 
 import { stringOrDash } from "./utils";
 
+const DEFAULT_EXECUTION_TIMEOUT_SECONDS = 3600;
+
 const EXECUTION_MODE_DOCKER = "docker";
 const DOCKER_IMAGE_PRESET_CUSTOM = "custom";
 
@@ -57,19 +59,19 @@ export function runnerConfigurationDetails(configuration: unknown): Record<strin
     details["Container image"] = image;
   }
   const timeoutRaw = c.execution_timeout_seconds;
+  const timeoutLabel = (value: number | string) => {
+    const parsed = typeof value === "number" ? value : Number.parseInt(value.trim(), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return String(DEFAULT_EXECUTION_TIMEOUT_SECONDS);
+    }
+    return String(Math.trunc(parsed));
+  };
   if (typeof timeoutRaw === "number" && Number.isFinite(timeoutRaw)) {
-    if (timeoutRaw > 0) {
-      details["Timeout (seconds)"] = String(Math.trunc(timeoutRaw));
-    } else if (timeoutRaw === 0) {
-      details["Timeout (seconds)"] = "Broker default (0)";
-    }
-  } else if (typeof timeoutRaw === "string") {
-    const t = timeoutRaw.trim();
-    if (t === "0") {
-      details["Timeout (seconds)"] = "Broker default (0)";
-    } else if (t !== "") {
-      details["Timeout (seconds)"] = t;
-    }
+    details["Timeout (seconds)"] = timeoutLabel(timeoutRaw);
+  } else if (typeof timeoutRaw === "string" && timeoutRaw.trim() !== "") {
+    details["Timeout (seconds)"] = timeoutLabel(timeoutRaw);
+  } else {
+    details["Timeout (seconds)"] = String(DEFAULT_EXECUTION_TIMEOUT_SECONDS);
   }
   return details;
 }

@@ -15,6 +15,21 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+// ActiveTask is a non-terminal task from GET /v1/tasks on the task broker.
+type ActiveTask struct {
+	ID                      string     `json:"id"`
+	Status                  string     `json:"status"`
+	FleetID                 string     `json:"fleet_id"`
+	CreatedAt               time.Time  `json:"created_at"`
+	ClaimedAt               *time.Time `json:"claimed_at,omitempty"`
+	LeaseUntil              *time.Time `json:"lease_until,omitempty"`
+	RunnerID                string     `json:"runner_id,omitempty"`
+	ExecutionMode           string     `json:"execution_mode,omitempty"`
+	DockerImage             string     `json:"docker_image,omitempty"`
+	CancelRequested         bool       `json:"cancel_requested,omitempty"`
+	ExecutionTimeoutSeconds *int       `json:"execution_timeout_seconds,omitempty"`
+}
+
 const (
 	brokerHTTPTimeout = 30 * time.Second
 
@@ -98,7 +113,7 @@ type CreateTaskParams struct {
 	Environment    []BrokerEnvironmentVariable
 	ExecutionMode  string
 	DockerImage    string
-	TimeoutSeconds int // 0 = omit (broker / fleet default)
+	TimeoutSeconds int // 0 = DefaultExecutionTimeoutSeconds
 }
 
 type brokerCreateTaskResponse struct {
@@ -119,10 +134,11 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		ExecutionMode: mode,
 		DockerImage:   strings.TrimSpace(p.DockerImage),
 	}
-	if p.TimeoutSeconds > 0 {
-		t := p.TimeoutSeconds
-		req.ExecutionTimeoutSeconds = &t
+	timeout := p.TimeoutSeconds
+	if timeout <= 0 {
+		timeout = DefaultExecutionTimeoutSeconds
 	}
+	req.ExecutionTimeoutSeconds = &timeout
 
 	bodyBytes, err := json.Marshal(req)
 	if err != nil {
@@ -248,6 +264,45 @@ func (b *BrokerClient) CancelTask(brokerTaskID string) error {
 	}
 
 	return fmt.Errorf("broker cancel: exceeded retries: %w", lastErr)
+}
+
+func (b *BrokerClient) ListActiveTasks() ([]ActiveTask, error) {
+	httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodGet, b.baseURL+"/v1/tasks", nil)
+	if err != nil {
+		return nil, fmt.Errorf("new request: %w", err)
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+b.authToken)
+
+	resp, err := b.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("broker request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("broker rejected list tasks: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var out struct {
+		Tasks []ActiveTask `json:"tasks"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("unmarshal list tasks response: %w", err)
+	}
+
+	if out.Tasks == nil {
+		return []ActiveTask{}, nil
+	}
+
+	return out.Tasks, nil
 }
 
 func (b *BrokerClient) FetchTaskStatus(taskID string) (*Task, error) {
