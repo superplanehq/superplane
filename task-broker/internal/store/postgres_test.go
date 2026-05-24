@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/superplane/runner/shared/models"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	"github.com/superplane/runner/task-broker/internal/store"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
@@ -19,8 +20,6 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 
 	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
 		ID:        "fleet-a",
-		BaseURL:   "http://fleet-a.example",
-		AuthToken: "secret",
 		Labels:    []string{"prod", "tier-1"},
 		CreatedAt: now,
 	}); err != nil {
@@ -31,17 +30,15 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got == nil || got.BaseURL != "http://fleet-a.example" || got.AuthToken != "secret" {
+	if got == nil || len(got.Labels) != 2 {
 		t.Fatalf("get fleet: %#v", got)
 	}
 	if !store.LabelsSubset(got.Labels, []string{"prod"}) {
 		t.Fatalf("labels: %#v", got.Labels)
 	}
 
-	// Upsert replaces fields.
 	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
 		ID:        "fleet-a",
-		BaseURL:   "http://fleet-a-new.example",
 		Labels:    []string{"staging"},
 		CreatedAt: now.Add(time.Minute),
 	}); err != nil {
@@ -51,13 +48,12 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.BaseURL != "http://fleet-a-new.example" || got.AuthToken != "" {
+	if len(got.Labels) != 1 || got.Labels[0] != "staging" {
 		t.Fatalf("upsert fleet: %#v", got)
 	}
 
 	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
 		ID:        "fleet-b",
-		BaseURL:   "http://fleet-b.example",
 		Labels:    []string{"prod", "tier-2"},
 		CreatedAt: now,
 	}); err != nil {
@@ -80,44 +76,31 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 		t.Fatalf("list fleets: %d", len(list))
 	}
 
-	taskID := "broker-task-1"
-	if err := st.InsertBrokerTask(ctx, &brokermodels.BrokerTask{
-		ID:               taskID,
-		FleetID:          "fleet-a",
-		CallerWebhookURL: "https://caller.example/hook",
-		CreatedAt:        now,
-	}); err != nil {
+	task := &models.Task{
+		ID:         "task-1",
+		FleetID:    "fleet-a",
+		Command:    []string{"echo", "hi"},
+		WebhookURL: "https://caller.example/hook",
+		Status:     models.StatusQueued,
+		CreatedAt:  now,
+	}
+	if err := st.CreateTask(ctx, task); err != nil {
 		t.Fatal(err)
 	}
-
-	task, err := st.GetBrokerTask(ctx, taskID)
+	gotTask, err := st.GetTask(ctx, "task-1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if task == nil || task.FleetTaskID != "" {
-		t.Fatalf("get task: %#v", task)
+	if gotTask == nil || gotTask.FleetID != "fleet-a" {
+		t.Fatalf("get task: %#v", gotTask)
 	}
 
-	if err := st.UpdateBrokerTaskFleetTaskID(ctx, taskID, "fleet-task-99"); err != nil {
-		t.Fatal(err)
-	}
-	task, err = st.GetBrokerTask(ctx, taskID)
+	claimed, err := st.ClaimTask(ctx, "runner-1", "fleet-a", 60*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if task.FleetTaskID != "fleet-task-99" {
-		t.Fatalf("fleet task id: %q", task.FleetTaskID)
-	}
-
-	if err := st.DeleteBrokerTask(ctx, taskID); err != nil {
-		t.Fatal(err)
-	}
-	task, err = st.GetBrokerTask(ctx, taskID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if task != nil {
-		t.Fatalf("expected nil after delete, got %#v", task)
+	if claimed == nil || claimed.ID != "task-1" {
+		t.Fatalf("claim: %#v", claimed)
 	}
 
 	if err := st.DeleteFleet(ctx, "fleet-b"); err != nil {
@@ -142,15 +125,5 @@ func TestPostgresStoreFindFleetByLabelsEmpty(t *testing.T) {
 	}
 	if match != nil {
 		t.Fatalf("expected nil, got %#v", match)
-	}
-}
-
-func TestPostgresStoreUpdateBrokerTaskMissing(t *testing.T) {
-	st, cleanup := testdb.Open(t)
-	defer cleanup()
-
-	err := st.UpdateBrokerTaskFleetTaskID(context.Background(), "missing", "x")
-	if err == nil {
-		t.Fatal("expected error")
 	}
 }

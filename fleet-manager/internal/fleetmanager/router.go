@@ -12,9 +12,7 @@ import (
 
 // RouterOptions configures HTTP middleware.
 type RouterOptions struct {
-	// AuthToken when non-empty requires Authorization: Bearer <token> for /v1.
-	AuthToken string
-	// DiagnosticsToken when non-empty enables /v1/admin/* (Bearer auth). Requires EC2Launcher on Server.
+	AuthToken        string
 	DiagnosticsToken string
 }
 
@@ -37,18 +35,6 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 			r.Get("/ec2-console-output", s.adminEc2Console)
 		})
 	}
-
-	r.Route("/v1", func(r chi.Router) {
-		if strings.TrimSpace(opt.AuthToken) != "" {
-			r.Use(bearerAuth(opt.AuthToken))
-		}
-		r.Post("/tasks", s.createTask)
-		r.Get("/runners/stream", s.runnerStream)
-		r.Post("/tasks/claim", s.claimTask)
-		r.Get("/tasks/{id}", s.getTask)
-		r.Post("/tasks/{id}/cancel", s.cancelTask)
-		r.Post("/tasks/{id}/complete", s.completeTask)
-	})
 
 	return r
 }

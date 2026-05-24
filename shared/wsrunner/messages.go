@@ -25,6 +25,7 @@ const (
 type Hello struct {
 	Type         string `json:"type"`
 	RunnerID     string `json:"runner_id"`
+	FleetID      string `json:"fleet_id"`
 	LeaseSeconds int    `json:"lease_seconds"`
 }
 

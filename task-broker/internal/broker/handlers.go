@@ -1,13 +1,10 @@
 package broker
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
 
@@ -15,7 +12,8 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/superplane/runner/shared/api"
-	sharedmodels "github.com/superplane/runner/shared/models"
+	"github.com/superplane/runner/shared/cwstream"
+	"github.com/superplane/runner/shared/models"
 	"github.com/superplane/runner/shared/webhook"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	taskstore "github.com/superplane/runner/task-broker/internal/store"
@@ -23,11 +21,16 @@ import (
 
 // Server implements task-broker HTTP handlers.
 type Server struct {
-	Store     taskstore.Store
-	PublicURL string // reachable base URL fleet-manager uses to call webhookComplete
-	Webhook   *webhook.Sender
-	Log       *slog.Logger
-	HTTP      *http.Client
+	Store   taskstore.Store
+	Webhook *webhook.Sender
+	Log     *slog.Logger
+
+	TaskNotify   *WaitHub
+	RunnerCancel *RunnerCancelHub
+
+	TaskCloudWatchLogGroup        string
+	TaskCloudWatchLogStreamPrefix string
+	TaskCloudWatchRegion          string
 }
 
 func (s *Server) health(w http.ResponseWriter, _ *http.Request) {
@@ -42,19 +45,12 @@ func (s *Server) registerFleet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.ID = strings.TrimSpace(req.ID)
-	req.BaseURL = strings.TrimSpace(req.BaseURL)
 	if req.ID == "" {
 		writeError(w, http.StatusBadRequest, "id required")
 		return
 	}
-	if req.BaseURL == "" {
-		writeError(w, http.StatusBadRequest, "base_url required")
-		return
-	}
 	f := &brokermodels.Fleet{
 		ID:        req.ID,
-		BaseURL:   strings.TrimRight(req.BaseURL, "/"),
-		AuthToken: strings.TrimSpace(req.AuthToken),
 		Labels:    taskstore.NormalizeLabels(req.Labels),
 		CreatedAt: time.Now().UTC(),
 	}
@@ -100,19 +96,12 @@ func fleetToResponse(f *brokermodels.Fleet) *api.FleetResponse {
 	}
 	return &api.FleetResponse{
 		ID:        f.ID,
-		BaseURL:   f.BaseURL,
 		Labels:    append([]string(nil), f.Labels...),
 		CreatedAt: f.CreatedAt.Unix(),
 	}
 }
 
-func (s *Server) createBrokerTask(w http.ResponseWriter, r *http.Request) {
-	public := strings.TrimRight(strings.TrimSpace(s.PublicURL), "/")
-	if public == "" {
-		writeError(w, http.StatusInternalServerError, "broker public URL not configured")
-		return
-	}
-
+func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 	var req api.BrokerCreateTaskRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid json")
@@ -138,26 +127,17 @@ func (s *Server) createBrokerTask(w http.ResponseWriter, r *http.Request) {
 	var err error
 	if hasID {
 		fleet, err = s.Store.GetFleet(ctx, strings.TrimSpace(req.FleetID))
-		if err != nil {
-			s.logErr("get fleet", err)
-			writeError(w, http.StatusInternalServerError, "could not load fleet")
-			return
-		}
-		if fleet == nil {
-			writeError(w, http.StatusNotFound, "fleet not found")
-			return
-		}
 	} else {
 		fleet, err = s.Store.FindFleetByLabels(ctx, req.FleetLabels)
-		if err != nil {
-			s.logErr("find fleet by labels", err)
-			writeError(w, http.StatusInternalServerError, "could not route fleet")
-			return
-		}
-		if fleet == nil {
-			writeError(w, http.StatusNotFound, "no fleet matches fleet_labels")
-			return
-		}
+	}
+	if err != nil {
+		s.logErr("resolve fleet", err)
+		writeError(w, http.StatusInternalServerError, "could not route fleet")
+		return
+	}
+	if fleet == nil {
+		writeError(w, http.StatusNotFound, "fleet not found")
+		return
 	}
 
 	if msg := validateCreateTaskPayload(&req.CreateTaskRequest); msg != "" {
@@ -165,241 +145,254 @@ func (s *Server) createBrokerTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	brokerID := uuid.NewString()
-	row := &brokermodels.BrokerTask{
-		ID:               brokerID,
-		FleetID:          fleet.ID,
-		FleetTaskID:      "",
-		CallerWebhookURL: strings.TrimSpace(req.WebhookURL),
-		CreatedAt:        time.Now().UTC(),
+	hasArgv := len(req.Command) > 0
+	var normalizedCmds []string
+	for _, c := range req.Commands {
+		c = strings.TrimSpace(c)
+		if c != "" {
+			normalizedCmds = append(normalizedCmds, c)
+		}
 	}
-	if err := s.Store.InsertBrokerTask(ctx, row); err != nil {
-		s.logErr("insert broker task", err)
-		writeError(w, http.StatusInternalServerError, "could not create broker task")
+	hasShell := len(normalizedCmds) > 0
+
+	mode := models.ExecutionHost
+	switch strings.ToLower(strings.TrimSpace(req.ExecutionMode)) {
+	case "", string(models.ExecutionHost):
+		mode = models.ExecutionHost
+	case string(models.ExecutionDocker):
+		mode = models.ExecutionDocker
+	default:
+		writeError(w, http.StatusBadRequest, "invalid execution_mode")
 		return
 	}
 
-	upstreamWebhook := public + "/v1/webhooks/complete/" + brokerID
-	up := api.CreateTaskRequest{
-		Command:                 append([]string(nil), req.Command...),
-		Commands:                append([]string(nil), req.Commands...),
-		Environment:             api.CloneEnvironment(req.Environment),
-		WebhookURL:              upstreamWebhook,
-		ExecutionMode:           req.ExecutionMode,
-		DockerImage:             req.DockerImage,
-		ExecutionTimeoutSeconds: cloneIntPtr(req.ExecutionTimeoutSeconds),
+	task := &models.Task{
+		ID:            uuid.NewString(),
+		FleetID:       fleet.ID,
+		WebhookURL:    strings.TrimSpace(req.WebhookURL),
+		Status:        models.StatusQueued,
+		CreatedAt:     time.Now().UTC(),
+		ExecutionMode: mode,
+		DockerImage:   req.DockerImage,
+		Environment:   api.CloneEnvironment(req.Environment),
 	}
-
-	payload, err := json.Marshal(up)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "marshal upstream")
+	if hasShell {
+		task.Commands = normalizedCmds
+	} else if hasArgv {
+		task.Command = req.Command
+	}
+	if req.ExecutionTimeoutSeconds != nil {
+		v := *req.ExecutionTimeoutSeconds
+		task.ExecutionTimeoutSeconds = &v
+	}
+	if err := s.Store.CreateTask(ctx, task); err != nil {
+		s.logErr("create task", err)
+		writeError(w, http.StatusInternalServerError, "could not create task")
 		return
 	}
-
-	t0 := time.Now()
-	fleetTaskID, st, respBody := s.forwardCreateTask(ctx, fleet, payload)
-	upstreamDur := time.Since(t0)
-	if st != http.StatusCreated {
-		_ = s.Store.DeleteBrokerTask(ctx, brokerID)
-		s.warn("upstream create failed",
-			slog.Int("status", st),
-			slog.String("fleet", fleet.ID),
-			slog.Duration("dur", upstreamDur),
-			slog.String("upstream_host", upstreamBaseHost(fleet.BaseURL)),
-			slog.String("body", strings.TrimSpace(string(respBody))))
-		writeError(w, http.StatusBadGateway, "fleet-manager rejected task")
-		return
+	if s.TaskNotify != nil {
+		s.TaskNotify.Notify()
 	}
-	if fleetTaskID == "" {
-		_ = s.Store.DeleteBrokerTask(ctx, brokerID)
-		writeError(w, http.StatusBadGateway, "fleet-manager missing task id")
-		return
-	}
-	if err := s.Store.UpdateBrokerTaskFleetTaskID(ctx, brokerID, fleetTaskID); err != nil {
-		s.logErr("record fleet task id", err)
-		writeError(w, http.StatusInternalServerError, "could not correlate task")
-		return
-	}
-
-	if s.Log != nil {
-		s.Log.Info("fleet_upstream_http",
-			slog.String("op", "create_task"),
-			slog.Int("http_status", st),
-			slog.Duration("dur", upstreamDur),
-			slog.String("broker_task_id", brokerID),
-			slog.String("fleet_id", fleet.ID),
-			slog.String("fleet_task_id", fleetTaskID),
-			slog.String("upstream_host", upstreamBaseHost(fleet.BaseURL)),
-		)
-	}
-
-	writeJSON(w, http.StatusCreated, api.BrokerCreateTaskResponse{ID: brokerID})
+	writeJSON(w, http.StatusCreated, api.BrokerCreateTaskResponse{ID: task.ID})
 }
 
-func (s *Server) getBrokerTask(w http.ResponseWriter, r *http.Request) {
-	brokerID := strings.TrimSpace(chi.URLParam(r, "id"))
-	if brokerID == "" {
+func (s *Server) claimTask(w http.ResponseWriter, r *http.Request) {
+	var req api.ClaimTaskRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if strings.TrimSpace(req.RunnerID) == "" {
+		writeError(w, http.StatusBadRequest, "runner_id required")
+		return
+	}
+	if strings.TrimSpace(req.FleetID) == "" {
+		writeError(w, http.StatusBadRequest, "fleet_id required")
+		return
+	}
+	lease := time.Duration(req.LeaseSeconds) * time.Second
+	if lease <= 0 {
+		lease = 5 * time.Minute
+	}
+
+	task, err := s.Store.ClaimTask(r.Context(), req.RunnerID, req.FleetID, lease)
+	if err != nil {
+		s.logErr("claim task", err)
+		writeError(w, http.StatusInternalServerError, "could not claim task")
+		return
+	}
+	var payload *api.TaskPayload
+	if task != nil {
+		payload = api.TaskPayloadFrom(task)
+	}
+	writeJSON(w, http.StatusOK, api.ClaimTaskResponse{Task: payload})
+}
+
+func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	if id == "" {
 		writeError(w, http.StatusBadRequest, "id required")
 		return
 	}
-	row, err := s.Store.GetBrokerTask(r.Context(), brokerID)
+	task, err := s.Store.GetTask(r.Context(), id)
 	if err != nil {
-		s.logErr("get broker task", err)
-		writeError(w, http.StatusInternalServerError, "lookup failed")
+		s.logErr("get task", err)
+		writeError(w, http.StatusInternalServerError, "could not load task")
 		return
 	}
-	if row == nil {
+	if task == nil {
 		writeError(w, http.StatusNotFound, "task not found")
 		return
 	}
-	if row.FleetTaskID == "" {
-		writeJSON(w, http.StatusOK, api.BrokerGetTaskResponse{
-			TaskID: brokerID,
-			Status: "pending",
-		})
+	writeJSON(w, http.StatusOK, taskStatusResponse(task, s))
+}
+
+func taskStatusResponse(task *models.Task, s *Server) api.TaskStatusResponse {
+	resp := api.TaskStatusResponse{
+		ID:              task.ID,
+		Status:          string(task.Status),
+		Error:           task.ErrorMessage,
+		CancelRequested: task.CancelRequested,
+	}
+	if g := strings.TrimSpace(s.TaskCloudWatchLogGroup); g != "" {
+		resp.CloudWatchLogGroup = g
+		resp.CloudWatchLogStream = cwstream.TaskLogStream(s.TaskCloudWatchLogStreamPrefix, task.ID)
+	}
+	resp.TaskLog = s.taskLogForTask(task.ID)
+	if task.ExitCode != nil {
+		ec := *task.ExitCode
+		resp.ExitCode = &ec
+	}
+	if task.ExecutionTimeoutSeconds != nil {
+		v := *task.ExecutionTimeoutSeconds
+		resp.ExecutionTimeoutSeconds = &v
+	}
+	if strings.TrimSpace(task.ResultJSON) != "" {
+		resp.Result = json.RawMessage(task.ResultJSON)
+	}
+	return resp
+}
+
+func (s *Server) completeTask(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "id required")
 		return
 	}
-	fleet, err := s.Store.GetFleet(r.Context(), row.FleetID)
+	var req api.CompleteTaskRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	runnerID := strings.TrimSpace(req.RunnerID)
+	if runnerID == "" {
+		runnerID = strings.TrimSpace(r.Header.Get("X-Runner-Id"))
+	}
+	if runnerID == "" {
+		writeError(w, http.StatusBadRequest, "runner_id required (body or X-Runner-Id)")
+		return
+	}
+
+	_, err := s.completeTaskCore(r.Context(), id, runnerID, req)
 	if err != nil {
-		s.logErr("get fleet for task poll", err)
-		writeError(w, http.StatusInternalServerError, "could not load fleet")
+		if strings.Contains(err.Error(), "not found") || strings.Contains(err.Error(), "wrong runner") {
+			writeError(w, http.StatusConflict, "cannot complete task")
+			return
+		}
+		s.logErr("complete task", err)
+		writeError(w, http.StatusInternalServerError, "could not complete task")
 		return
 	}
-	if fleet == nil {
-		writeError(w, http.StatusInternalServerError, "fleet missing")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) cancelTask(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "id required")
 		return
 	}
-	st, upstream := s.forwardGetTask(r.Context(), fleet, row.FleetTaskID)
-	if st == http.StatusNotFound {
-		writeError(w, http.StatusBadGateway, "upstream task missing")
-		return
-	}
-	if st != http.StatusOK {
-		s.warn("upstream get task failed", slog.Int("status", st), slog.String("fleet", fleet.ID))
-		writeError(w, http.StatusBadGateway, "fleet-manager rejected status request")
-		return
-	}
-	up, taskLog, err := parseUpstreamTaskLog(upstream)
+	task, outcome, err := s.Store.RequestCancelTask(r.Context(), id)
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "invalid upstream response")
+		s.logErr("cancel task", err)
+		writeError(w, http.StatusInternalServerError, "could not cancel task")
 		return
 	}
-	writeJSON(w, http.StatusOK, api.BrokerGetTaskResponse{
-		TaskID:                  brokerID,
-		FleetTaskID:             row.FleetTaskID,
-		Status:                  strings.TrimSpace(up.Status),
-		ExitCode:                up.ExitCode,
-		Error:                   up.Error,
-		CancelRequested:         up.CancelRequested,
-		CloudWatchLogGroup:      up.CloudWatchLogGroup,
-		CloudWatchLogStream:     up.CloudWatchLogStream,
-		TaskLog:                 taskLog,
-		ExecutionTimeoutSeconds: up.ExecutionTimeoutSeconds,
-		Result:                  up.Result,
+	switch outcome {
+	case taskstore.CancelOutcomeNotFound:
+		writeError(w, http.StatusNotFound, "task not found")
+		return
+	case taskstore.CancelOutcomeCanceledQueued:
+		go s.DeliverWebhook(task)
+	case taskstore.CancelOutcomeCancelRequested:
+		rid := strings.TrimSpace(task.RunnerID)
+		if s.RunnerCancel != nil && rid != "" {
+			if !s.RunnerCancel.PushCancel(rid, task.ID) && s.Log != nil {
+				s.Log.Debug("runner cancel ws push not delivered",
+					slog.String("runner_id", rid), slog.String("task_id", task.ID))
+			}
+		}
+	}
+	if task == nil {
+		writeError(w, http.StatusInternalServerError, "cancel task missing row")
+		return
+	}
+	writeJSON(w, http.StatusOK, api.CancelTaskResponse{
+		ID:     task.ID,
+		State:  string(outcome),
+		Status: string(task.Status),
 	})
 }
 
-// parseUpstreamTaskLog unmarshals fleet-manager GET /v1/tasks/{id} JSON and derives task_log
-// (including legacy cloudwatch_log_group / cloudwatch_log_stream fields).
-func parseUpstreamTaskLog(upstream []byte) (api.TaskStatusResponse, *api.TaskLogSink, error) {
-	var up api.TaskStatusResponse
-	if err := json.Unmarshal(upstream, &up); err != nil {
-		return up, nil, err
+func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, req api.CompleteTaskRequest) (*models.Task, error) {
+	resultJSON := ""
+	if len(req.Result) > 0 {
+		resultJSON = string(req.Result)
 	}
-	taskLog := up.TaskLog
-	if taskLog == nil && strings.TrimSpace(up.CloudWatchLogGroup) != "" && strings.TrimSpace(up.CloudWatchLogStream) != "" {
-		taskLog = api.TaskLogSinkCloudWatchFromParts(up.CloudWatchLogGroup, up.CloudWatchLogStream, "")
+	task, err := s.Store.CompleteTask(ctx, taskID, runnerID, req.ExitCode, resultJSON, req.Error, req.Canceled)
+	if err != nil {
+		return nil, err
 	}
-	return up, taskLog, nil
+	go s.DeliverWebhook(task)
+	return task, nil
 }
 
-func (s *Server) cancelBrokerTask(w http.ResponseWriter, r *http.Request) {
-	brokerID := strings.TrimSpace(chi.URLParam(r, "id"))
-	if brokerID == "" {
-		writeError(w, http.StatusBadRequest, "id required")
+func (s *Server) DeliverWebhook(task *models.Task) {
+	if s.Webhook == nil || task == nil {
 		return
 	}
-	row, err := s.Store.GetBrokerTask(r.Context(), brokerID)
-	if err != nil {
-		s.logErr("get broker task", err)
-		writeError(w, http.StatusInternalServerError, "lookup failed")
-		return
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	exit := 0
+	if task.ExitCode != nil {
+		exit = *task.ExitCode
 	}
-	if row == nil {
-		writeError(w, http.StatusNotFound, "task not found")
-		return
+	payload := api.WebhookPayload{
+		TaskID:   task.ID,
+		Status:   string(task.Status),
+		ExitCode: exit,
+		Error:    task.ErrorMessage,
 	}
-	if row.FleetTaskID == "" {
-		writeError(w, http.StatusConflict, "task not yet assigned upstream")
-		return
+	if g := strings.TrimSpace(s.TaskCloudWatchLogGroup); g != "" {
+		payload.CloudWatchLogGroup = g
+		payload.CloudWatchLogStream = cwstream.TaskLogStream(s.TaskCloudWatchLogStreamPrefix, task.ID)
 	}
-	fleet, err := s.Store.GetFleet(r.Context(), row.FleetID)
-	if err != nil {
-		s.logErr("get fleet for cancel", err)
-		writeError(w, http.StatusInternalServerError, "could not load fleet")
-		return
+	payload.TaskLog = s.taskLogForTask(task.ID)
+	if strings.TrimSpace(task.ResultJSON) != "" {
+		payload.Result = json.RawMessage(task.ResultJSON)
 	}
-	if fleet == nil {
-		writeError(w, http.StatusInternalServerError, "fleet missing")
-		return
+	if err := s.Webhook.Deliver(ctx, task.WebhookURL, payload); err != nil && s.Log != nil {
+		s.Log.Warn("webhook delivery failed", slog.String("task_id", task.ID), slog.Any("err", err))
 	}
-	st, upstream := s.forwardCancelTask(r.Context(), fleet, row.FleetTaskID)
-	if st == http.StatusNotFound {
-		writeError(w, http.StatusBadGateway, "upstream task missing")
-		return
-	}
-	if st != http.StatusOK {
-		s.warn("upstream cancel failed", slog.Int("status", st), slog.String("fleet", fleet.ID))
-		writeError(w, http.StatusBadGateway, "fleet-manager rejected cancel")
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(upstream)
 }
 
-func (s *Server) forwardCancelTask(ctx context.Context, fleet *brokermodels.Fleet, fleetTaskID string) (status int, respBody []byte) {
-	c := s.HTTP
-	if c == nil {
-		c = http.DefaultClient
+func (s *Server) taskLogForTask(taskID string) *api.TaskLogSink {
+	if g := strings.TrimSpace(s.TaskCloudWatchLogGroup); g != "" {
+		stream := cwstream.TaskLogStream(s.TaskCloudWatchLogStreamPrefix, taskID)
+		return api.TaskLogSinkCloudWatchFromParts(g, stream, s.TaskCloudWatchRegion)
 	}
-	u := strings.TrimRight(fleet.BaseURL, "/") + "/v1/tasks/" + fleetTaskID + "/cancel"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, nil)
-	if err != nil {
-		return 0, nil
-	}
-	if t := fleet.AuthToken; t != "" {
-		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(t))
-	}
-	resp, err := c.Do(req)
-	if err != nil {
-		return 0, []byte(err.Error())
-	}
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(io.LimitReader(resp.Body, 65536))
-	return resp.StatusCode, b
-}
-
-func (s *Server) forwardGetTask(ctx context.Context, fleet *brokermodels.Fleet, fleetTaskID string) (status int, respBody []byte) {
-	c := s.HTTP
-	if c == nil {
-		c = http.DefaultClient
-	}
-	u := fleet.BaseURL + "/v1/tasks/" + fleetTaskID
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
-	if err != nil {
-		return 0, nil
-	}
-	if t := fleet.AuthToken; t != "" {
-		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(t))
-	}
-	resp, err := c.Do(req)
-	if err != nil {
-		return 0, []byte(err.Error())
-	}
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(io.LimitReader(resp.Body, 65536))
-	return resp.StatusCode, b
+	return nil
 }
 
 func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
@@ -417,10 +410,10 @@ func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
 	case !hasArgv && !hasCmds:
 		return "command or commands required"
 	}
-	mode := sharedmodels.ExecutionMode(strings.ToLower(strings.TrimSpace(req.ExecutionMode)))
+	mode := models.ExecutionMode(strings.ToLower(strings.TrimSpace(req.ExecutionMode)))
 	switch mode {
-	case "", sharedmodels.ExecutionHost:
-	case sharedmodels.ExecutionDocker:
+	case "", models.ExecutionHost:
+	case models.ExecutionDocker:
 		if strings.TrimSpace(req.DockerImage) == "" {
 			return "docker_image required for docker execution_mode"
 		}
@@ -436,103 +429,6 @@ func validateCreateTaskPayload(req *api.CreateTaskRequest) string {
 	return ""
 }
 
-func cloneIntPtr(p *int) *int {
-	if p == nil {
-		return nil
-	}
-	v := *p
-	return &v
-}
-
-func (s *Server) forwardCreateTask(ctx context.Context, fleet *brokermodels.Fleet, body []byte) (fleetTaskID string, status int, respBody []byte) {
-	c := s.HTTP
-	if c == nil {
-		c = http.DefaultClient
-	}
-	u := fleet.BaseURL + "/v1/tasks"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
-	if err != nil {
-		return "", 0, nil
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if t := fleet.AuthToken; t != "" {
-		req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(t))
-	}
-	resp, err := c.Do(req)
-	if err != nil {
-		return "", 0, []byte(err.Error())
-	}
-	defer resp.Body.Close()
-	b, _ := io.ReadAll(io.LimitReader(resp.Body, 65536))
-	if resp.StatusCode != http.StatusCreated {
-		return "", resp.StatusCode, b
-	}
-	var parsed api.CreateTaskResponse
-	if err := json.Unmarshal(b, &parsed); err != nil {
-		return "", resp.StatusCode, b
-	}
-	return parsed.ID, resp.StatusCode, b
-}
-
-func (s *Server) webhookComplete(w http.ResponseWriter, r *http.Request) {
-	brokerID := strings.TrimSpace(chi.URLParam(r, "brokerTaskID"))
-	if brokerID == "" {
-		writeError(w, http.StatusBadRequest, "missing broker task id")
-		return
-	}
-	var upstream api.WebhookPayload
-	if err := json.NewDecoder(r.Body).Decode(&upstream); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json")
-		return
-	}
-
-	row, err := s.Store.GetBrokerTask(r.Context(), brokerID)
-	if err != nil {
-		s.logErr("get broker task", err)
-		writeError(w, http.StatusInternalServerError, "lookup failed")
-		return
-	}
-	if row == nil {
-		writeError(w, http.StatusNotFound, "unknown broker task")
-		return
-	}
-	if row.FleetTaskID == "" || row.FleetTaskID != upstream.TaskID {
-		writeError(w, http.StatusForbidden, "task id mismatch")
-		return
-	}
-
-	out := api.WebhookPayload{
-		TaskID:              brokerID,
-		FleetTaskID:         upstream.TaskID,
-		Status:              upstream.Status,
-		ExitCode:            upstream.ExitCode,
-		Error:               upstream.Error,
-		CloudWatchLogGroup:  upstream.CloudWatchLogGroup,
-		CloudWatchLogStream: upstream.CloudWatchLogStream,
-		TaskLog:             upstream.TaskLog,
-		Result:              upstream.Result,
-	}
-	if out.TaskLog == nil && strings.TrimSpace(upstream.CloudWatchLogGroup) != "" && strings.TrimSpace(upstream.CloudWatchLogStream) != "" {
-		out.TaskLog = api.TaskLogSinkCloudWatchFromParts(upstream.CloudWatchLogGroup, upstream.CloudWatchLogStream, "")
-	}
-
-	ws := s.Webhook
-	if ws == nil {
-		ws = webhook.DefaultSender()
-	}
-	if ws.Log == nil {
-		ws.Log = s.Log
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
-	defer cancel()
-	if err := ws.Deliver(ctx, row.CallerWebhookURL, out); err != nil {
-		s.warn("caller webhook delivery failed", slog.String("broker_task_id", brokerID), slog.Any("err", err))
-		writeError(w, http.StatusBadGateway, "caller webhook delivery failed")
-		return
-	}
-	w.WriteHeader(http.StatusOK)
-}
-
 func (s *Server) logErr(msg string, err error) {
 	if s.Log != nil {
 		s.Log.Error(msg, slog.Any("err", err))
@@ -543,12 +439,4 @@ func (s *Server) warn(msg string, attrs ...any) {
 	if s.Log != nil {
 		s.Log.Warn(msg, attrs...)
 	}
-}
-
-func upstreamBaseHost(base string) string {
-	u, err := url.Parse(strings.TrimSpace(base))
-	if err != nil || u.Host == "" {
-		return ""
-	}
-	return u.Host
 }

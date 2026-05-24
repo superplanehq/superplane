@@ -17,29 +17,11 @@ import (
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
 
-func TestCreateBrokerTaskForwardsEnvironment(t *testing.T) {
-	received := make(chan api.CreateTaskRequest, 1)
-	fleet := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.URL.Path != "/v1/tasks" {
-			http.NotFound(w, r)
-			return
-		}
-		defer r.Body.Close()
-		var req api.CreateTaskRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "bad json", http.StatusBadRequest)
-			return
-		}
-		received <- req
-		writeJSON(w, http.StatusCreated, api.CreateTaskResponse{ID: "fleet-task-1"})
-	}))
-	defer fleet.Close()
-
+func TestCreateBrokerTaskPersistsEnvironment(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
 	if err := st.CreateFleet(context.Background(), &brokermodels.Fleet{
 		ID:        "fleet-1",
-		BaseURL:   fleet.URL,
 		Labels:    []string{"e2e"},
 		CreatedAt: time.Now().UTC(),
 	}); err != nil {
@@ -47,10 +29,8 @@ func TestCreateBrokerTaskForwardsEnvironment(t *testing.T) {
 	}
 
 	srv := &Server{
-		Store:     st,
-		PublicURL: "http://broker.example",
-		Log:       slog.Default(),
-		HTTP:      fleet.Client(),
+		Store: st,
+		Log:   slog.Default(),
 	}
 	ts := httptest.NewServer(NewRouter(srv, RouterOptions{AuthToken: "token"}))
 	defer ts.Close()
@@ -86,21 +66,31 @@ func TestCreateBrokerTaskForwardsEnvironment(t *testing.T) {
 		t.Fatalf("create broker task: %d %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
 	}
 
-	select {
-	case upstream := <-received:
-		if len(upstream.Environment) != 2 {
-			t.Fatalf("environment: %#v", upstream.Environment)
-		}
-		if upstream.Environment[0].Name != "COMMIT_AUTHOR" || upstream.Environment[0].Value != "alice@example.com" {
-			t.Fatalf("first env: %#v", upstream.Environment[0])
-		}
-		if upstream.Environment[1].Name != "SPECIAL" || upstream.Environment[1].Value != "line one\nline two=ok" {
-			t.Fatalf("second env: %#v", upstream.Environment[1])
-		}
-		if !strings.Contains(upstream.WebhookURL, "/v1/webhooks/complete/") {
-			t.Fatalf("upstream webhook should be broker relay, got %q", upstream.WebhookURL)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("timed out waiting for upstream create")
+	var created api.BrokerCreateTaskResponse
+	if err := json.Unmarshal(respBody, &created); err != nil {
+		t.Fatal(err)
+	}
+	if created.ID == "" {
+		t.Fatal("empty task id")
+	}
+
+	task, err := st.GetTask(context.Background(), created.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if task == nil {
+		t.Fatal("task not found")
+	}
+	if len(task.Environment) != 2 {
+		t.Fatalf("environment: %#v", task.Environment)
+	}
+	if task.Environment[0].Name != "COMMIT_AUTHOR" || task.Environment[0].Value != "alice@example.com" {
+		t.Fatalf("first env: %#v", task.Environment[0])
+	}
+	if task.Environment[1].Name != "SPECIAL" || task.Environment[1].Value != "line one\nline two=ok" {
+		t.Fatalf("second env: %#v", task.Environment[1])
+	}
+	if task.WebhookURL != "https://example.com/hook" {
+		t.Fatalf("webhook: %q", task.WebhookURL)
 	}
 }

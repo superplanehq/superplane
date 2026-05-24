@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -188,7 +187,6 @@ func runFleetWebhookE2E(t *testing.T, makeReq func(webhookURL string) api.Create
 
 	root := moduleRoot(t)
 	binDir := t.TempDir()
-	fleetPath := filepath.Join(binDir, "fleet-manager")
 	runnerPath := filepath.Join(binDir, "worker")
 
 	build := func(pkg, out string) {
@@ -199,35 +197,10 @@ func runFleetWebhookE2E(t *testing.T, makeReq func(webhookURL string) api.Create
 			t.Fatalf("go build %s: %v\n%s", pkg, err, out)
 		}
 	}
-	build("./fleet-manager/cmd/fleet-manager", fleetPath)
 	build("./runner/cmd/runner", runnerPath)
 
-	dbPath := filepath.Join(t.TempDir(), "fleet-e2e.db")
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	addr := ln.Addr().String()
-	_ = ln.Close()
-
-	fleetCmd := exec.Command(fleetPath)
-	fleetCmd.Env = subprocessEnv(
-		"DATABASE_PATH="+dbPath,
-		"LISTEN_ADDR="+addr,
-		"REAP_INTERVAL_SEC=3600",
-	)
-	fleetCmd.Stdout = io.Discard
-	fleetCmd.Stderr = newTestLogWriter(t, "fleet-manager")
-	if err := fleetCmd.Start(); err != nil {
-		t.Fatalf("start fleet-manager: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = fleetCmd.Process.Signal(syscall.SIGTERM)
-		_, _ = fleetCmd.Process.Wait()
-	})
-
-	baseURL := "http://" + addr
-	waitReady(t, baseURL+"/healthz", 5*time.Second)
+	stack := startBrokerStack(t, root, binDir)
+	baseURL := stack.BrokerURL
 
 	received := make(chan api.WebhookPayload, 1)
 	whSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -252,7 +225,8 @@ func runFleetWebhookE2E(t *testing.T, makeReq func(webhookURL string) api.Create
 
 	runnerCmd := exec.Command(runnerPath)
 	runnerCmd.Env = runnerSubprocessEnv(
-		"FLEET_MANAGER_URL="+baseURL,
+		"TASK_BROKER_URL="+baseURL,
+		"RUNNER_FLEET_ID="+stack.FleetID,
 		"RUNNER_ID=e2e-runner-1",
 		"POLL_EMPTY_MS=20",
 	)
@@ -266,7 +240,10 @@ func runFleetWebhookE2E(t *testing.T, makeReq func(webhookURL string) api.Create
 		_, _ = runnerCmd.Process.Wait()
 	})
 
-	createBody, err := json.Marshal(makeReq(whSrv.URL))
+	createBody, err := json.Marshal(api.BrokerCreateTaskRequest{
+		CreateTaskRequest: makeReq(whSrv.URL),
+		FleetID:           stack.FleetID,
+	})
 	if err != nil {
 		t.Fatalf("marshal create task: %v", err)
 	}
@@ -277,7 +254,7 @@ func runFleetWebhookE2E(t *testing.T, makeReq func(webhookURL string) api.Create
 		t.Fatalf("new request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	setE2EFleetAuth(req)
+	setE2EBrokerAuth(req, stack.AuthToken)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("create task: %v", err)

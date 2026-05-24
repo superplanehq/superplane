@@ -19,7 +19,8 @@ var userDataTemplate = template.Must(template.New("userdata").Funcs(template.Fun
 type userDataVars struct {
 	RunnerS3URI                     string
 	RunnerInstallAWSRegion          string
-	FleetManagerURL                 string
+	TaskBrokerURL                   string
+	RunnerFleetID                   string
 	RunnersAuthToken                string
 	RunnerTerminateAfterEachTask    bool
 	RunnerCloudWatchLogGroup        string
@@ -45,7 +46,8 @@ func userDataVarsFromConfig(c Config) userDataVars {
 	return userDataVars{
 		RunnerS3URI:                     strings.TrimSpace(c.RunnerS3URI),
 		RunnerInstallAWSRegion:          strings.TrimSpace(c.RunnerInstallAWSRegion),
-		FleetManagerURL:                 c.FleetManagerURL,
+		TaskBrokerURL:                   c.TaskBrokerURL,
+		RunnerFleetID:                   c.RunnerFleetID,
 		RunnersAuthToken:                strings.TrimSpace(c.RunnersAuthToken),
 		RunnerTerminateAfterEachTask:    c.RunnerTerminateAfterEachTask,
 		RunnerCloudWatchLogGroup:        strings.TrimSpace(c.RunnerCloudWatchLogGroup),

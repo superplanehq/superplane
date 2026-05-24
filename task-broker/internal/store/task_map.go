@@ -1,0 +1,107 @@
+package store
+
+import (
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"github.com/superplane/runner/shared/models"
+	brokermodels "github.com/superplane/runner/task-broker/internal/models"
+)
+
+func taskRowFromModel(t *models.Task) (*brokermodels.Task, error) {
+	cmd := t.Command
+	if cmd == nil {
+		cmd = []string{}
+	}
+	cmdJSON, err := json.Marshal(cmd)
+	if err != nil {
+		return nil, err
+	}
+	row := &brokermodels.Task{
+		ID:                      t.ID,
+		FleetID:                 t.FleetID,
+		CommandJSON:             string(cmdJSON),
+		WebhookURL:              t.WebhookURL,
+		Status:                  string(t.Status),
+		CreatedAt:               t.CreatedAt,
+		RunnerID:                t.RunnerID,
+		ExecutionMode:           string(t.ExecutionMode),
+		DockerImage:             t.DockerImage,
+		Output:                  t.Output,
+		ResultJSON:              t.ResultJSON,
+		ErrorMessage:            t.ErrorMessage,
+		CancelRequested:         t.CancelRequested,
+		ClaimedAt:               t.ClaimedAt,
+		LeaseUntil:              t.LeaseUntil,
+		ExecutionTimeoutSeconds: t.ExecutionTimeoutSeconds,
+		ExitCode:                t.ExitCode,
+	}
+	if len(t.Commands) > 0 {
+		b, err := json.Marshal(t.Commands)
+		if err != nil {
+			return nil, err
+		}
+		row.CommandsJSON = string(b)
+	}
+	if len(t.Environment) > 0 {
+		b, err := json.Marshal(t.Environment)
+		if err != nil {
+			return nil, err
+		}
+		row.EnvironmentJSON = string(b)
+	}
+	if row.ExecutionMode == "" {
+		row.ExecutionMode = string(models.ExecutionHost)
+	}
+	return row, nil
+}
+
+func taskModelFromRow(row *brokermodels.Task) (*models.Task, error) {
+	var cmd []string
+	if err := json.Unmarshal([]byte(row.CommandJSON), &cmd); err != nil {
+		return nil, fmt.Errorf("command_json: %w", err)
+	}
+	var cmds []string
+	if strings.TrimSpace(row.CommandsJSON) != "" {
+		if err := json.Unmarshal([]byte(row.CommandsJSON), &cmds); err != nil {
+			return nil, fmt.Errorf("commands_json: %w", err)
+		}
+	}
+	var env []models.EnvironmentVariable
+	if strings.TrimSpace(row.EnvironmentJSON) != "" {
+		if err := json.Unmarshal([]byte(row.EnvironmentJSON), &env); err != nil {
+			return nil, fmt.Errorf("environment_json: %w", err)
+		}
+	}
+	t := &models.Task{
+		ID:                      row.ID,
+		FleetID:                 row.FleetID,
+		Command:                 cmd,
+		Commands:                cmds,
+		Environment:             env,
+		WebhookURL:              row.WebhookURL,
+		Status:                  models.TaskStatus(row.Status),
+		CreatedAt:               row.CreatedAt.UTC(),
+		RunnerID:                row.RunnerID,
+		ExecutionMode:           models.ExecutionMode(row.ExecutionMode),
+		DockerImage:             row.DockerImage,
+		Output:                  row.Output,
+		ResultJSON:              row.ResultJSON,
+		ErrorMessage:            row.ErrorMessage,
+		CancelRequested:         row.CancelRequested,
+		ClaimedAt:               row.ClaimedAt,
+		LeaseUntil:              row.LeaseUntil,
+		ExecutionTimeoutSeconds: row.ExecutionTimeoutSeconds,
+		ExitCode:                row.ExitCode,
+	}
+	if t.ClaimedAt != nil {
+		ct := t.ClaimedAt.UTC()
+		t.ClaimedAt = &ct
+	}
+	if t.LeaseUntil != nil {
+		lt := t.LeaseUntil.UTC()
+		t.LeaseUntil = &lt
+	}
+	return t, nil
+}

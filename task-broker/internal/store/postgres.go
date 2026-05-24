@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -46,7 +45,20 @@ func OpenPostgres(dsn string) (*PostgresStore, error) {
 func (s *PostgresStore) migrate() error {
 	migrateMu.Lock()
 	defer migrateMu.Unlock()
-	return s.db.AutoMigrate(&brokermodels.Fleet{}, &brokermodels.BrokerTask{})
+	if err := s.db.AutoMigrate(&brokermodels.Fleet{}, &brokermodels.Task{}); err != nil {
+		return err
+	}
+	// Drop legacy proxy columns from earlier broker versions.
+	for _, stmt := range []string{
+		`ALTER TABLE fleets DROP COLUMN IF EXISTS base_url`,
+		`ALTER TABLE fleets DROP COLUMN IF EXISTS auth_token`,
+		`DROP TABLE IF EXISTS broker_tasks`,
+	} {
+		if err := s.db.Exec(stmt).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *PostgresStore) Close() error {
@@ -59,7 +71,7 @@ func (s *PostgresStore) Close() error {
 
 // Truncate removes all rows (for tests).
 func (s *PostgresStore) Truncate(ctx context.Context) error {
-	return s.db.WithContext(ctx).Exec("TRUNCATE TABLE fleets, broker_tasks RESTART IDENTITY CASCADE").Error
+	return s.db.WithContext(ctx).Exec("TRUNCATE TABLE fleets, tasks RESTART IDENTITY CASCADE").Error
 }
 
 func (s *PostgresStore) CreateFleet(ctx context.Context, f *brokermodels.Fleet) error {
@@ -67,7 +79,7 @@ func (s *PostgresStore) CreateFleet(ctx context.Context, f *brokermodels.Fleet) 
 	row.Labels = NormalizeLabels(f.Labels)
 	return s.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"base_url", "auth_token", "labels", "created_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"labels", "created_at"}),
 	}).Create(&row).Error
 }
 
@@ -119,37 +131,4 @@ func (s *PostgresStore) FindFleetByLabels(ctx context.Context, required []string
 	}
 	sort.Strings(candidates)
 	return s.GetFleet(ctx, candidates[0])
-}
-
-func (s *PostgresStore) InsertBrokerTask(ctx context.Context, t *brokermodels.BrokerTask) error {
-	return s.db.WithContext(ctx).Create(t).Error
-}
-
-func (s *PostgresStore) UpdateBrokerTaskFleetTaskID(ctx context.Context, brokerID, fleetTaskID string) error {
-	res := s.db.WithContext(ctx).Model(&brokermodels.BrokerTask{}).
-		Where("id = ?", brokerID).
-		Update("fleet_task_id", fleetTaskID)
-	if res.Error != nil {
-		return res.Error
-	}
-	if res.RowsAffected == 0 {
-		return fmt.Errorf("broker task not found: %s", brokerID)
-	}
-	return nil
-}
-
-func (s *PostgresStore) GetBrokerTask(ctx context.Context, brokerID string) (*brokermodels.BrokerTask, error) {
-	var t brokermodels.BrokerTask
-	err := s.db.WithContext(ctx).First(&t, "id = ?", brokerID).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	return &t, nil
-}
-
-func (s *PostgresStore) DeleteBrokerTask(ctx context.Context, brokerID string) error {
-	return s.db.WithContext(ctx).Delete(&brokermodels.BrokerTask{}, "id = ?", brokerID).Error
 }

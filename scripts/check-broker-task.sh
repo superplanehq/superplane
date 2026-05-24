@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Inspect task state via task-broker GET /v1/tasks/{id}.
 #
-# Uses AUTH_TOKEN and optional BROKER_PUBLIC_URL from scripts/deploy/task-broker.env when
+# Uses AUTH_TOKEN and optional BROKER_URL from scripts/deploy/task-broker.env when
 # TASK_BROKER_ENV_FILE points at that file (default). Override with AUTH_TOKEN / BROKER_URL.
 #
 # Usage:
@@ -28,7 +28,7 @@ load_kv() {
 if [[ -f "$ENV_FILE" ]]; then
   if [[ -z "${BROKER_URL:-}" ]]; then
     export BROKER_URL
-    BROKER_URL="$(load_kv BROKER_PUBLIC_URL "$ENV_FILE")"
+    BROKER_URL="$(load_kv BROKER_URL "$ENV_FILE")"
     if [[ "$(echo "$BROKER_URL" | tr -d '[:space:]')" == "" ]]; then
       unset BROKER_URL
     fi

@@ -57,7 +57,7 @@ chmod 755 /usr/local/bin/runner
 # 
 # /etc/default/superplane-runner
 #
-# Environment file for the runner. FLEET_MANAGER_URL and optional settings are
+# Environment file for the runner. TASK_BROKER_URL and RUNNER_FLEET_ID are
 # rendered at launch; RUNNER_ID is filled from ${INSTANCE_ID} when the script runs.
 #
 #########################################################
@@ -65,9 +65,11 @@ chmod 755 /usr/local/bin/runner
 umask 022
 
 cat > /etc/default/superplane-runner <<ENVEOF
-FLEET_MANAGER_URL={{shellQuote .FleetManagerURL}}
+TASK_BROKER_URL={{shellQuote .TaskBrokerURL}}
+RUNNER_FLEET_ID={{shellQuote .RunnerFleetID}}
 RUNNER_ID=${INSTANCE_ID}
 RUNNER_SHELL=/bin/bash
+RUNNER_HEALTH_ADDR=0.0.0.0:9090
 AUTH_TOKEN={{shellQuote .RunnersAuthToken}}
 RUNNER_TERMINATE_AFTER_EACH_TASK={{.RunnerTerminateAfterEachTask}}
 RUNNER_CLOUDWATCH_LOG_GROUP={{shellQuote .RunnerCloudWatchLogGroup}}

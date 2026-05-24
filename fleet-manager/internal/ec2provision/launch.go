@@ -2,7 +2,7 @@
 // runner binary from S3 and runs it under systemd so host-mode tasks run on Ubuntu.
 //
 // Enabled when EC2_PROVISION_HOT_INSTANCE_COUNT is set together with AMI, subnet, security groups,
-// and fleet-manager URL; see ConfigFromEnv and ErrDisabled.
+// task-broker URL, and runner fleet id; see ConfigFromEnv and ErrDisabled.
 package ec2provision
 
 import (
@@ -38,7 +38,8 @@ type Config struct {
 	RunnerS3URI string
 	// RunnerInstallAWSRegion is AWS_DEFAULT_REGION in user-data for aws s3 cp (same region as fleet-manager / bucket).
 	RunnerInstallAWSRegion string
-	FleetManagerURL        string // FLEET_MANAGER_URL for runners (reachable from VPC)
+	TaskBrokerURL          string // EC2_PROVISION_TASK_BROKER_URL for runners (reachable from VPC)
+	RunnerFleetID          string // EC2_PROVISION_RUNNER_FLEET_ID registered on task-broker
 	RunnersAuthToken       string // optional runner AUTH_TOKEN
 	KeyName                string // optional EC2 key pair name
 	RunnersIAMProfName     string // optional IAM instance profile name for runners
@@ -54,10 +55,12 @@ type Config struct {
 	// superplane-runner.service to this group under stream name <instance-id>/runner-process.
 	RunnerProcessLogGroup string
 	// RunnerProcessLogRegion is the AWS region for runner process logs (defaults to RunnerCloudWatchRegion or us-east-1).
-	// VolumeSizeGB is the root EBS volume size in GiB for launched runner instances.
-	// Defaults to 30 GiB when not set. Set via EC2_PROVISION_VOLUME_SIZE_GB.
 	VolumeSizeGB           int32
 	RunnerProcessLogRegion string
+	// BootGraceSec skips health probes for newly launched instances.
+	BootGraceSec int
+	// RunnerHealthPort is the TCP port for GET /healthz on runner private IP (default 9090).
+	RunnerHealthPort int
 }
 
 // ErrDisabled means EC2 pool management is off (hot instance count env not set).
@@ -69,7 +72,8 @@ const (
 	envSubnet              = "EC2_PROVISION_SUBNET_ID"
 	envSecurityGroups      = "EC2_PROVISION_SECURITY_GROUP_IDS"
 	envRunnerS3URI         = "EC2_PROVISION_RUNNER_S3_URI"
-	envFleetManagerURL     = "EC2_PROVISION_FLEET_MANAGER_URL"
+	envTaskBrokerURL       = "EC2_PROVISION_TASK_BROKER_URL"
+	envRunnerFleetID       = "EC2_PROVISION_RUNNER_FLEET_ID"
 	envRunnersAuth         = "EC2_PROVISION_RUNNER_AUTH_TOKEN"
 	envKeyName             = "EC2_PROVISION_KEY_NAME"
 	envRunnerIAMProf       = "EC2_PROVISION_RUNNER_INSTANCE_PROFILE"
@@ -80,9 +84,13 @@ const (
 	envRunnerProcCWGroup   = "EC2_PROVISION_RUNNER_PROCESS_LOG_GROUP"
 	envRunnerProcCWRegion  = "EC2_PROVISION_RUNNER_PROCESS_LOG_REGION"
 	envVolumeSizeGB        = "EC2_PROVISION_VOLUME_SIZE_GB"
+	envBootGraceSec        = "EC2_PROVISION_BOOT_GRACE_SEC"
+	envRunnerHealthPort    = "EC2_PROVISION_RUNNER_HEALTH_PORT"
 
-	defaultInstanceType = "t3.micro"
-	defaultVolumeSizeGB = 30
+	defaultInstanceType     = "t3.micro"
+	defaultVolumeSizeGB     = 30
+	defaultBootGraceSec     = 300
+	defaultRunnerHealthPort = 9090
 
 	// TagKeyManaged is applied to fleet-manager-managed runner instances for Describe/Reconcile filtering.
 	TagKeyManaged = "superplane_managed_runner"
@@ -104,9 +112,10 @@ func ConfigFromEnv() (Config, error) {
 	ami := strings.TrimSpace(os.Getenv(envAMI))
 	sub := strings.TrimSpace(os.Getenv(envSubnet))
 	sgs := strings.TrimSpace(os.Getenv(envSecurityGroups))
-	url := strings.TrimSpace(os.Getenv(envFleetManagerURL))
-	if ami == "" || sub == "" || sgs == "" || url == "" {
-		return Config{}, fmt.Errorf("set %s, %s, %s, and %s", envAMI, envSubnet, envSecurityGroups, envFleetManagerURL)
+	url := strings.TrimSpace(os.Getenv(envTaskBrokerURL))
+	fleetID := strings.TrimSpace(os.Getenv(envRunnerFleetID))
+	if ami == "" || sub == "" || sgs == "" || url == "" || fleetID == "" {
+		return Config{}, fmt.Errorf("set %s, %s, %s, %s, and %s", envAMI, envSubnet, envSecurityGroups, envTaskBrokerURL, envRunnerFleetID)
 	}
 	var sgIDs []string
 	for _, p := range strings.Split(sgs, ",") {
@@ -153,6 +162,22 @@ func ConfigFromEnv() (Config, error) {
 		}
 		volumeSizeGB = int32(n)
 	}
+	bootGrace := defaultBootGraceSec
+	if v := strings.TrimSpace(os.Getenv(envBootGraceSec)); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return Config{}, fmt.Errorf("%s must be a non-negative integer", envBootGraceSec)
+		}
+		bootGrace = n
+	}
+	healthPort := defaultRunnerHealthPort
+	if v := strings.TrimSpace(os.Getenv(envRunnerHealthPort)); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 1 || n > 65535 {
+			return Config{}, fmt.Errorf("%s must be a valid TCP port", envRunnerHealthPort)
+		}
+		healthPort = n
+	}
 	return Config{
 		AMI:                             ami,
 		InstanceType:                    itype,
@@ -160,7 +185,8 @@ func ConfigFromEnv() (Config, error) {
 		SecurityGroupIDs:                sgIDs,
 		RunnerS3URI:                     runnerS3,
 		RunnerInstallAWSRegion:          region,
-		FleetManagerURL:                 url,
+		TaskBrokerURL:                   url,
+		RunnerFleetID:                   fleetID,
 		RunnersAuthToken:                strings.TrimSpace(os.Getenv(envRunnersAuth)),
 		KeyName:                         strings.TrimSpace(os.Getenv(envKeyName)),
 		RunnersIAMProfName:              prof,
@@ -171,6 +197,8 @@ func ConfigFromEnv() (Config, error) {
 		RunnerProcessLogGroup:           strings.TrimSpace(os.Getenv(envRunnerProcCWGroup)),
 		RunnerProcessLogRegion:          strings.TrimSpace(os.Getenv(envRunnerProcCWRegion)),
 		VolumeSizeGB:                    volumeSizeGB,
+		BootGraceSec:                    bootGrace,
+		RunnerHealthPort:                healthPort,
 	}, nil
 }
 
@@ -203,7 +231,7 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Launcher, error) {
 	return &Launcher{Client: cli, Config: cfg, Log: log}, nil
 }
 
-// Launch creates `count` on-demand Ubuntu hosts that install the runner from S3 and connect to FleetManagerURL.
+// Launch creates `count` on-demand Ubuntu hosts that install the runner from S3 and connect to TaskBrokerURL.
 func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 	if count < 1 {
 		return nil, fmt.Errorf("count must be at least 1")
