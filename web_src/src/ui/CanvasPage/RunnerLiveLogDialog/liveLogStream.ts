@@ -6,12 +6,13 @@ type LiveLogRecordEnvelope = {
   index?: number;
   status?: "passed" | "failed";
   duration_ms?: number;
+  started_at?: number;
 };
 
 export type LiveLogStreamHandlers = {
   onLogLine: (text: string) => void;
   onStreamError: (message: string) => void;
-  onCmdStart?: (index: number, text: string) => void;
+  onCmdStart?: (index: number, text: string, startedAtMs: number | null) => void;
   onCmdEnd?: (index: number, status: "passed" | "failed", durationMs: number) => void;
 };
 
@@ -50,27 +51,58 @@ function tryParseLiveLogRecord(line: string): LiveLogRecordEnvelope | null {
   }
 }
 
-function dispatchLiveLogRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): void {
-  if (rec.type === "line" && typeof rec.text === "string") {
-    handlers.onLogLine(rec.text);
-    return;
+function parseStartedAtMs(value: number | undefined): number | null {
+  return typeof value === "number" && value >= 0 ? value : null;
+}
+
+function dispatchLineRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): boolean {
+  if (rec.type !== "line" || typeof rec.text !== "string") {
+    return false;
   }
-  if (rec.type === "error" && typeof rec.message === "string") {
-    handlers.onStreamError(rec.message);
-    return;
+  handlers.onLogLine(rec.text);
+  return true;
+}
+
+function dispatchErrorRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): boolean {
+  if (rec.type !== "error" || typeof rec.message !== "string") {
+    return false;
   }
-  if (rec.type === "cmd_start" && typeof rec.index === "number" && typeof rec.text === "string") {
-    handlers.onCmdStart?.(rec.index, rec.text);
-    return;
+  handlers.onStreamError(rec.message);
+  return true;
+}
+
+function dispatchCmdStartRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): boolean {
+  if (rec.type !== "cmd_start" || typeof rec.index !== "number" || typeof rec.text !== "string") {
+    return false;
   }
+  handlers.onCmdStart?.(rec.index, rec.text, parseStartedAtMs(rec.started_at));
+  return true;
+}
+
+function dispatchCmdEndRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): boolean {
   if (
-    rec.type === "cmd_end" &&
-    typeof rec.index === "number" &&
-    (rec.status === "passed" || rec.status === "failed") &&
-    typeof rec.duration_ms === "number"
+    rec.type !== "cmd_end" ||
+    typeof rec.index !== "number" ||
+    (rec.status !== "passed" && rec.status !== "failed") ||
+    typeof rec.duration_ms !== "number"
   ) {
-    handlers.onCmdEnd?.(rec.index, rec.status, rec.duration_ms);
+    return false;
   }
+  handlers.onCmdEnd?.(rec.index, rec.status, rec.duration_ms);
+  return true;
+}
+
+function dispatchLiveLogRecord(rec: LiveLogRecordEnvelope, handlers: LiveLogStreamHandlers): void {
+  if (dispatchLineRecord(rec, handlers)) {
+    return;
+  }
+  if (dispatchErrorRecord(rec, handlers)) {
+    return;
+  }
+  if (dispatchCmdStartRecord(rec, handlers)) {
+    return;
+  }
+  dispatchCmdEndRecord(rec, handlers);
 }
 
 /** Consumes complete NDJSON lines from buffer; returns the trailing incomplete fragment. */
