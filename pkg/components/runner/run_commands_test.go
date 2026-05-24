@@ -169,6 +169,8 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 		{Name: "COMMIT_AUTHOR", Value: "alice@example.com"},
 		{Name: "API_TOKEN", Value: "secret'value;$PATH"},
 	}, req.Environment)
+	require.NotNil(t, req.ExecutionTimeoutSeconds)
+	assert.Equal(t, DefaultExecutionTimeoutSeconds, *req.ExecutionTimeoutSeconds)
 	assert.Equal(t, "task-123", state.KVs["task_id"])
 	assert.Equal(t, hookActionPoll, requests.Action)
 }
@@ -365,4 +367,39 @@ func TestRunnerCancelCallsBroker(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, httpContext.Requests, 1)
 	assert.Equal(t, "/v1/tasks/broker-42/cancel", httpContext.Requests[0].URL.Path)
+}
+
+func TestBrokerListActiveTasks(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"tasks": [
+						{"id":"task-1","status":"queued","fleet_id":"fleet-1","created_at":"2026-05-24T12:00:00Z"},
+						{"id":"task-2","status":"claimed","fleet_id":"fleet-1","created_at":"2026-05-24T12:01:00Z","runner_id":"runner-a"}
+					]
+				}`)),
+			},
+		},
+	}
+
+	broker, err := NewBrokerClient(httpContext)
+	require.NoError(t, err)
+
+	tasks, err := broker.ListActiveTasks()
+	require.NoError(t, err)
+	require.Len(t, tasks, 2)
+	assert.Equal(t, "task-1", tasks[0].ID)
+	assert.Equal(t, "queued", tasks[0].Status)
+	assert.Equal(t, "task-2", tasks[1].ID)
+	assert.Equal(t, "runner-a", tasks[1].RunnerID)
+	require.Len(t, httpContext.Requests, 1)
+	assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+	assert.Equal(t, "/v1/tasks", httpContext.Requests[0].URL.Path)
+	assert.Equal(t, "Bearer token-1", httpContext.Requests[0].Header.Get("Authorization"))
 }

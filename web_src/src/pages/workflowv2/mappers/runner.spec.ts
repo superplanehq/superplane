@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { runnerConfigurationDetails, runnerMapper } from "./runner";
 import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload } from "./types";
 
+const DEFAULT_EXECUTION_TIMEOUT_SECONDS = 3600;
+
 function buildRunnerNode(configuration: Record<string, unknown>): NodeInfo {
   return {
     id: "node-runner-1",
@@ -19,6 +21,7 @@ function buildExecution(overrides: {
   state?: ExecutionInfo["state"];
   result?: ExecutionInfo["result"];
   createdAt?: string;
+  metadata?: Record<string, unknown>;
 }): ExecutionInfo {
   const now = overrides.createdAt ?? new Date().toISOString();
   return {
@@ -28,7 +31,7 @@ function buildExecution(overrides: {
     result: overrides.result ?? "RESULT_PASSED",
     resultReason: "RESULT_REASON_OK",
     resultMessage: "",
-    metadata: {},
+    metadata: overrides.metadata ?? {},
     configuration: {},
     rootEvent: undefined,
     outputs: overrides.outputs,
@@ -42,7 +45,7 @@ describe("runnerConfigurationDetails", () => {
       { execution_mode: "host", commands: "echo hi", execution_timeout_seconds: 0 },
       {
         "Execution mode": "Host",
-        "Timeout (seconds)": "Broker default (0)",
+        "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
       },
     ],
     [
@@ -56,7 +59,7 @@ describe("runnerConfigurationDetails", () => {
       },
       {
         "Execution mode": "Host",
-        "Timeout (seconds)": "Broker default (0)",
+        "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
       },
     ],
     [
@@ -70,7 +73,7 @@ describe("runnerConfigurationDetails", () => {
       {
         "Execution mode": "Docker",
         "Container image": "debian:bookworm-slim",
-        "Timeout (seconds)": "Broker default (0)",
+        "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
       },
     ],
     [
@@ -99,7 +102,7 @@ describe("runnerConfigurationDetails", () => {
       {
         "Execution mode": "Docker",
         "Container image": "alpine:3.20",
-        "Timeout (seconds)": "Broker default (0)",
+        "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
       },
     ],
     [
@@ -107,7 +110,7 @@ describe("runnerConfigurationDetails", () => {
       { execution_mode: "host", commands: "x", execution_timeout_seconds: "0" },
       {
         "Execution mode": "Host",
-        "Timeout (seconds)": "Broker default (0)",
+        "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
       },
     ],
     [
@@ -131,6 +134,7 @@ describe("runnerConfigurationDetails", () => {
       }),
     ).toEqual({
       "Execution mode": "Host",
+      "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
     });
   });
 });
@@ -159,7 +163,7 @@ describe("runnerMapper.getExecutionDetails", () => {
     expect(runnerMapper.getExecutionDetails(ctx)).toEqual({
       "Execution mode": "Docker",
       "Container image": "python:3.12-slim",
-      "Timeout (seconds)": "Broker default (0)",
+      "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
       Status: "succeeded",
       "Exit code": "0",
     });
@@ -172,7 +176,32 @@ describe("runnerMapper.getExecutionDetails", () => {
 
     expect(runnerMapper.getExecutionDetails(ctx)).toEqual({
       "Execution mode": "Host",
-      "Timeout (seconds)": "Broker default (0)",
+      "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
+    });
+  });
+
+  it("includes broker task id from execution metadata", () => {
+    const node = buildRunnerNode({ execution_mode: "host", commands: "id", execution_timeout_seconds: 0 });
+    const execution = buildExecution({
+      metadata: { runner_broker_task_id: "52fa5506-844c-4e46-b1c7-52162b8ac1f7" },
+      outputs: {
+        failed: [
+          {
+            type: "runner.finished",
+            timestamp: new Date().toISOString(),
+            data: { status: "failed", exit_code: 1 },
+          },
+        ],
+      },
+    });
+    const ctx: ExecutionDetailsContext = { nodes: [node], node, execution };
+
+    expect(runnerMapper.getExecutionDetails(ctx)).toEqual({
+      "Execution mode": "Host",
+      "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
+      "Task ID": "52fa5506-844c-4e46-b1c7-52162b8ac1f7",
+      Status: "failed",
+      "Exit code": "1",
     });
   });
 });
