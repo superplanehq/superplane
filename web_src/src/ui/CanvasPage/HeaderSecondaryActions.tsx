@@ -1,6 +1,7 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Checkbox } from "@/ui/checkbox";
 import { Switch } from "@/ui/switch";
 import { FileCode, Minus, Pencil, Plus } from "lucide-react";
 
@@ -267,7 +268,7 @@ function EditModeVersionActions({
                   )}
                   {onToggleShowDeletedNodes && (
                     <div className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}>
-                      <Switch
+                      <Checkbox
                         id="show-deleted-nodes"
                         checked={!!showDeletedNodes}
                         onCheckedChange={onToggleShowDeletedNodes}
@@ -278,7 +279,7 @@ function EditModeVersionActions({
                   )}
                   {onToggleShowEdgeDiff && (
                     <div className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}>
-                      <Switch
+                      <Checkbox
                         id="show-edge-diff"
                         checked={!!showEdgeDiff}
                         onCheckedChange={onToggleShowEdgeDiff}
