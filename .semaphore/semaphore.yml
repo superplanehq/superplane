@@ -15,7 +15,7 @@ promotions:
   - name: Publish runner binary to S3
     pipeline_file: runner-binary-s3.yml
     auto_promote:
-      when: "result = 'passed' and branch = 'main'"
+      when: "result = 'passed' and branch = 'main' and change_in('/runner/')"
 
 blocks:
   - name: Build and test
