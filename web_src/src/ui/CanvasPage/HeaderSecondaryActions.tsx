@@ -266,28 +266,26 @@ function EditModeVersionActions({
                     </div>
                   )}
                   {onToggleShowDeletedNodes && (
-                    <label className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer ${visualDiffEnabled ? "text-slate-600" : "text-slate-400 cursor-not-allowed"}`}>
-                      <input
-                        type="checkbox"
+                    <div className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}>
+                      <Switch
+                        id="show-deleted-nodes"
                         checked={!!showDeletedNodes}
-                        onChange={onToggleShowDeletedNodes}
+                        onCheckedChange={onToggleShowDeletedNodes}
                         disabled={!visualDiffEnabled}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500 disabled:opacity-50"
                       />
-                      Show deleted nodes
-                    </label>
+                      <label htmlFor="show-deleted-nodes">Show deleted nodes</label>
+                    </div>
                   )}
                   {onToggleShowEdgeDiff && (
-                    <label className={`flex items-center gap-1.5 text-xs font-medium cursor-pointer ${visualDiffEnabled ? "text-slate-600" : "text-slate-400 cursor-not-allowed"}`}>
-                      <input
-                        type="checkbox"
+                    <div className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}>
+                      <Switch
+                        id="show-edge-diff"
                         checked={!!showEdgeDiff}
-                        onChange={onToggleShowEdgeDiff}
+                        onCheckedChange={onToggleShowEdgeDiff}
                         disabled={!visualDiffEnabled}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-slate-600 focus:ring-slate-500 disabled:opacity-50"
                       />
-                      Show edges
-                    </label>
+                      <label htmlFor="show-edge-diff">Show edges</label>
+                    </div>
                   )}
                 </div>
                 {onShowDiff && (

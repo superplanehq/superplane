@@ -52,38 +52,53 @@ function applyNodeStatuses(nodes: CanvasNode[], statusMap: Record<string, string
   });
 }
 
-function buildEdgesWithDiff(preparedEdges: CanvasEdge[], liveCanvasVersion?: CanvasesCanvasVersion) {
-  if (!liveCanvasVersion?.spec?.edges) {
-    return preparedEdges;
-  }
-
+function buildEdgeDiffSets(
+  preparedEdges: CanvasEdge[],
+  liveCanvasVersion?: CanvasesCanvasVersion,
+): { liveEdgeSet: Set<string>; draftEdgeSet: Set<string>; liveEdges: Array<Record<string, unknown>> } | null {
+  if (!liveCanvasVersion?.spec?.edges) return null;
   const liveEdges = liveCanvasVersion.spec.edges as Array<Record<string, unknown>>;
   const liveEdgeSet = new Set(
-    liveEdges.map((edge) =>
-      edgeKey(String(edge.sourceId ?? ""), String(edge.targetId ?? ""), String(edge.channel ?? "default")),
-    ),
+    liveEdges.map((e) => edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"))),
   );
   const draftEdgeSet = new Set(
-    preparedEdges.map((edge) => edgeKey(edge.source, edge.target, edge.sourceHandle || "default")),
+    preparedEdges.map((e) => edgeKey(e.source, e.target, e.sourceHandle || "default")),
   );
+  return { liveEdgeSet, draftEdgeSet, liveEdges };
+}
+
+function countEdgeDiffs(
+  preparedEdges: CanvasEdge[],
+  liveCanvasVersion?: CanvasesCanvasVersion,
+): { addedEdges: number; removedEdges: number } {
+  const sets = buildEdgeDiffSets(preparedEdges, liveCanvasVersion);
+  if (!sets) return { addedEdges: 0, removedEdges: 0 };
+  let addedEdges = 0;
+  let removedEdges = 0;
+  for (const e of preparedEdges) {
+    const key = edgeKey(e.source, e.target, e.sourceHandle || "default");
+    if (!sets.liveEdgeSet.has(key)) addedEdges += 1;
+  }
+  for (const e of sets.liveEdges) {
+    const key = edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"));
+    if (!sets.draftEdgeSet.has(key)) removedEdges += 1;
+  }
+  return { addedEdges, removedEdges };
+}
+
+function buildEdgesWithDiff(preparedEdges: CanvasEdge[], liveCanvasVersion?: CanvasesCanvasVersion) {
+  const sets = buildEdgeDiffSets(preparedEdges, liveCanvasVersion);
+  if (!sets) return preparedEdges;
+
   const styledEdges = preparedEdges.map((edge) => {
     const key = edgeKey(edge.source, edge.target, edge.sourceHandle || "default");
-    if (liveEdgeSet.has(key)) {
-      return edge;
-    }
-
-    return {
-      ...edge,
-      data: {
-        ...edge.data,
-        _draftDiffStatus: "added",
-      },
-    };
+    if (sets.liveEdgeSet.has(key)) return edge;
+    return { ...edge, data: { ...edge.data, _draftDiffStatus: "added" } };
   });
-  const removedEdges = liveEdges
+  const removedEdges = sets.liveEdges
     .filter((edge) => {
       const key = edgeKey(String(edge.sourceId ?? ""), String(edge.targetId ?? ""), String(edge.channel ?? "default"));
-      return !draftEdgeSet.has(key);
+      return !sets.draftEdgeSet.has(key);
     })
     .map((edge) => {
       const source = String(edge.sourceId ?? "");
@@ -94,9 +109,7 @@ function buildEdgesWithDiff(preparedEdges: CanvasEdge[], liveCanvasVersion?: Can
         source,
         target,
         sourceHandle: channel,
-        data: {
-          _draftDiffStatus: "removed",
-        },
+        data: { _draftDiffStatus: "removed" },
       };
     });
 
@@ -209,23 +222,10 @@ export function useDraftVisualDiff({
     }
 
     // Edge diffs
-    if (liveCanvasVersion?.spec?.edges && preparedEdges.length > 0) {
-      const liveEdges = liveCanvasVersion.spec.edges as Array<Record<string, unknown>>;
-      const liveEdgeSet = new Set(
-        liveEdges.map((e) => edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"))),
-      );
-      const draftEdgeSet = new Set(
-        preparedEdges.map((e) => edgeKey(e.source, e.target, e.sourceHandle || "default")),
-      );
-      for (const e of preparedEdges) {
-        const key = edgeKey(e.source, e.target, e.sourceHandle || "default");
-        if (!liveEdgeSet.has(key)) added += 1;
-      }
-      for (const e of liveEdges) {
-        const key = edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"));
-        if (!draftEdgeSet.has(key)) removed += 1;
-      }
-    }
+    const { addedEdges, removedEdges } = countEdgeDiffs(preparedEdges, liveCanvasVersion);
+    added += addedEdges;
+    removed += removedEdges;
+
     return { added, updated, removed };
   }, [isViewingDraftVersion, canvas?.spec, liveCanvasVersion, latestDraftVersion, selectedCanvasVersion, preparedEdges]);
 
