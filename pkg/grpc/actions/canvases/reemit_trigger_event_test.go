@@ -73,7 +73,7 @@ func Test__ReemitTriggerEvent(t *testing.T) {
 			WorkflowID: canvas.ID,
 			NodeID:     componentNodeID,
 			Channel:    "default",
-			Data:       datatypes.NewJSONType[any](map[string]any{"data": map[string]any{"message": "Hello"}}),
+			Data:       models.NewJSONValue(map[string]any{"data": map[string]any{"message": "Hello"}}),
 			State:      models.CanvasEventStatePending,
 			CreatedAt:  &now,
 		}
@@ -89,7 +89,7 @@ func Test__ReemitTriggerEvent(t *testing.T) {
 			WorkflowID: canvas.ID,
 			NodeID:     triggerNodeID,
 			Channel:    "default",
-			Data:       datatypes.NewJSONType[any](map[string]any{"data": map[string]any{"message": "Hello"}}),
+			Data:       models.NewJSONValue(map[string]any{"data": map[string]any{"message": "Hello"}}),
 			State:      models.CanvasEventStatePending,
 			CreatedAt:  ptr(time.Now()),
 		}
@@ -124,7 +124,7 @@ func Test__ReemitTriggerEvent(t *testing.T) {
 			WorkflowID: canvas.ID,
 			NodeID:     triggerNodeID,
 			Channel:    "default",
-			Data: datatypes.NewJSONType[any](map[string]any{
+			Data: models.NewJSONValue(map[string]any{
 				"type":      "manual.run",
 				"timestamp": now.UTC().Format(time.RFC3339Nano),
 				"data":      map[string]any{"message": "Hello"},
