@@ -50,38 +50,51 @@ function applyNodeStatuses(nodes: CanvasNode[], statusMap: Record<string, string
   });
 }
 
-function buildEdgesWithDiff(preparedEdges: CanvasEdge[], liveCanvasVersion?: CanvasesCanvasVersion) {
-  if (!liveCanvasVersion?.spec?.edges) {
-    return preparedEdges;
-  }
-
-  const liveEdges = liveCanvasVersion.spec.edges as Array<Record<string, unknown>>;
+function buildEdgeDiffSets(
+  preparedEdges: CanvasEdge[],
+  liveCanvasVersion?: CanvasesCanvasVersion,
+): { liveEdgeSet: Set<string>; draftEdgeSet: Set<string>; liveEdges: Array<Record<string, unknown>> } | null {
+  const liveEdges = (liveCanvasVersion?.spec?.edges ?? []) as Array<Record<string, unknown>>;
+  if (liveEdges.length === 0 && preparedEdges.length === 0) return null;
   const liveEdgeSet = new Set(
-    liveEdges.map((edge) =>
-      edgeKey(String(edge.sourceId ?? ""), String(edge.targetId ?? ""), String(edge.channel ?? "default")),
-    ),
+    liveEdges.map((e) => edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"))),
   );
-  const draftEdgeSet = new Set(
-    preparedEdges.map((edge) => edgeKey(edge.source, edge.target, edge.sourceHandle || "default")),
-  );
+  const draftEdgeSet = new Set(preparedEdges.map((e) => edgeKey(e.source, e.target, e.sourceHandle || "default")));
+  return { liveEdgeSet, draftEdgeSet, liveEdges };
+}
+
+function countEdgeDiffs(
+  preparedEdges: CanvasEdge[],
+  liveCanvasVersion?: CanvasesCanvasVersion,
+): { addedEdges: number; removedEdges: number } {
+  const sets = buildEdgeDiffSets(preparedEdges, liveCanvasVersion);
+  if (!sets) return { addedEdges: 0, removedEdges: 0 };
+  let addedEdges = 0;
+  let removedEdges = 0;
+  for (const e of preparedEdges) {
+    const key = edgeKey(e.source, e.target, e.sourceHandle || "default");
+    if (!sets.liveEdgeSet.has(key)) addedEdges += 1;
+  }
+  for (const e of sets.liveEdges) {
+    const key = edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"));
+    if (!sets.draftEdgeSet.has(key)) removedEdges += 1;
+  }
+  return { addedEdges, removedEdges };
+}
+
+function buildEdgesWithDiff(preparedEdges: CanvasEdge[], liveCanvasVersion?: CanvasesCanvasVersion) {
+  const sets = buildEdgeDiffSets(preparedEdges, liveCanvasVersion);
+  if (!sets) return preparedEdges;
+
   const styledEdges = preparedEdges.map((edge) => {
     const key = edgeKey(edge.source, edge.target, edge.sourceHandle || "default");
-    if (liveEdgeSet.has(key)) {
-      return edge;
-    }
-
-    return {
-      ...edge,
-      data: {
-        ...edge.data,
-        _draftDiffStatus: "added",
-      },
-    };
+    if (sets.liveEdgeSet.has(key)) return edge;
+    return { ...edge, data: { ...edge.data, _draftDiffStatus: "added" } };
   });
-  const removedEdges = liveEdges
+  const removedEdges = sets.liveEdges
     .filter((edge) => {
       const key = edgeKey(String(edge.sourceId ?? ""), String(edge.targetId ?? ""), String(edge.channel ?? "default"));
-      return !draftEdgeSet.has(key);
+      return !sets.draftEdgeSet.has(key);
     })
     .map((edge) => {
       const source = String(edge.sourceId ?? "");
@@ -92,9 +105,7 @@ function buildEdgesWithDiff(preparedEdges: CanvasEdge[], liveCanvasVersion?: Can
         source,
         target,
         sourceHandle: channel,
-        data: {
-          _draftDiffStatus: "removed",
-        },
+        data: { _draftDiffStatus: "removed" },
       };
     });
 
@@ -115,6 +126,7 @@ export function useDraftVisualDiff({
   canvasId,
   queryClient,
 }: UseDraftVisualDiffArgs) {
+  const { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff } = useDiffSubToggles();
   const draftDiffResult = useMemo(() => {
     if (!enabled || !isViewingDraftVersion || !canvas?.spec) {
       return undefined;
@@ -130,7 +142,7 @@ export function useDraftVisualDiff({
 
   const nodes = useMemo(() => {
     const nodesWithStatuses = applyNodeStatuses(preparedNodes, draftDiffResult?.statusMap);
-    if (!draftDiffResult?.removedNodes.length || !liveCanvasVersion?.spec?.nodes || !canvasId) {
+    if (!showDeletedNodes || !draftDiffResult?.removedNodes.length || !liveCanvasVersion?.spec?.nodes || !canvasId) {
       return nodesWithStatuses;
     }
 
@@ -173,17 +185,58 @@ export function useDraftVisualDiff({
     liveCanvasVersion?.spec,
     preparedNodes,
     queryClient,
+    showDeletedNodes,
   ]);
 
   const edges = useMemo(() => {
-    if (!enabled || !isViewingDraftVersion) {
+    if (!enabled || !isViewingDraftVersion || !showEdgeDiff) {
       return preparedEdges;
     }
 
     return buildEdgesWithDiff(preparedEdges, liveCanvasVersion);
-  }, [enabled, isViewingDraftVersion, liveCanvasVersion, preparedEdges]);
+  }, [enabled, isViewingDraftVersion, showEdgeDiff, liveCanvasVersion, preparedEdges]);
 
-  return { nodes, edges };
+  const diffCounts = useMemo(() => {
+    if (!isViewingDraftVersion || !canvas?.spec) return { added: 0, updated: 0, removed: 0 };
+
+    let added = 0;
+    let updated = 0;
+    let removed = 0;
+
+    // Node diffs
+    const draftVersionForDiff = {
+      ...(latestDraftVersion || selectedCanvasVersion || {}),
+      spec: canvas.spec,
+    } as CanvasesCanvasVersion;
+    const diffResult = buildDraftDiffMap(liveCanvasVersion, draftVersionForDiff);
+    if (diffResult?.statusMap) {
+      const values = Object.values(diffResult.statusMap);
+      added = values.filter((s) => s === "added").length;
+      updated = values.filter((s) => s === "updated").length;
+      removed = diffResult.removedNodes?.length || 0;
+    }
+
+    // Edge diffs
+    const { addedEdges, removedEdges } = countEdgeDiffs(preparedEdges, liveCanvasVersion);
+    added += addedEdges;
+    removed += removedEdges;
+
+    return { added, updated, removed };
+  }, [
+    isViewingDraftVersion,
+    canvas?.spec,
+    liveCanvasVersion,
+    latestDraftVersion,
+    selectedCanvasVersion,
+    preparedEdges,
+  ]);
+
+  return {
+    nodes,
+    edges,
+    diffCounts,
+    diffToggles: { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff },
+  };
 }
 
 const STORAGE_KEY = "visual-diff-enabled";
@@ -203,4 +256,28 @@ export function useVisualDiffToggle() {
   }, []);
 
   return { visualDiffEnabled: enabled, toggleVisualDiff: toggle };
+}
+
+const SHOW_DELETED_NODES_KEY = "visual-diff-show-deleted-nodes";
+const SHOW_EDGE_DIFF_KEY = "visual-diff-show-edges";
+
+function useLocalStorageToggle(key: string, defaultValue = true) {
+  const [value, setValue] = useState(() => {
+    const stored = localStorage.getItem(key);
+    return stored === null ? defaultValue : stored === "true";
+  });
+  const toggle = useCallback(() => {
+    setValue((prev) => {
+      const next = !prev;
+      localStorage.setItem(key, String(next));
+      return next;
+    });
+  }, [key]);
+  return [value, toggle] as const;
+}
+
+function useDiffSubToggles() {
+  const [showDeletedNodes, toggleShowDeletedNodes] = useLocalStorageToggle(SHOW_DELETED_NODES_KEY);
+  const [showEdgeDiff, toggleShowEdgeDiff] = useLocalStorageToggle(SHOW_EDGE_DIFF_KEY);
+  return { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff };
 }
