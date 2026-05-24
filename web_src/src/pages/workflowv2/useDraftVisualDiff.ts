@@ -61,9 +61,7 @@ function buildEdgeDiffSets(
   const liveEdgeSet = new Set(
     liveEdges.map((e) => edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"))),
   );
-  const draftEdgeSet = new Set(
-    preparedEdges.map((e) => edgeKey(e.source, e.target, e.sourceHandle || "default")),
-  );
+  const draftEdgeSet = new Set(preparedEdges.map((e) => edgeKey(e.source, e.target, e.sourceHandle || "default")));
   return { liveEdgeSet, draftEdgeSet, liveEdges };
 }
 
@@ -227,7 +225,14 @@ export function useDraftVisualDiff({
     removed += removedEdges;
 
     return { added, updated, removed };
-  }, [isViewingDraftVersion, canvas?.spec, liveCanvasVersion, latestDraftVersion, selectedCanvasVersion, preparedEdges]);
+  }, [
+    isViewingDraftVersion,
+    canvas?.spec,
+    liveCanvasVersion,
+    latestDraftVersion,
+    selectedCanvasVersion,
+    preparedEdges,
+  ]);
 
   return { nodes, edges, diffCounts };
 }

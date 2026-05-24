@@ -1864,7 +1864,11 @@ export function WorkflowPageV2() {
 
   const { visualDiffEnabled, toggleVisualDiff } = useVisualDiffToggle();
   const { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff } = useDiffSubToggles();
-  const { nodes: nodesWithDraftVisualDiff, edges: edgesWithDraftVisualDiff, diffCounts } = useDraftVisualDiff({
+  const {
+    nodes: nodesWithDraftVisualDiff,
+    edges: edgesWithDraftVisualDiff,
+    diffCounts,
+  } = useDraftVisualDiff({
     enabled: visualDiffEnabled,
     showDeletedNodes,
     showEdgeDiff,

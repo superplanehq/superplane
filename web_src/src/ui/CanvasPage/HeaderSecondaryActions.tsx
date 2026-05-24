@@ -229,10 +229,14 @@ function EditModeVersionActions({
           {diffCounts && (diffCounts.added > 0 || diffCounts.updated > 0 || diffCounts.removed > 0) && (
             <HoverCard openDelay={100} closeDelay={200}>
               <HoverCardTrigger asChild>
-                <button type="button" className="flex items-center gap-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs font-medium hover:bg-slate-100 transition-colors cursor-default">
+                <button
+                  type="button"
+                  className="flex items-center gap-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs font-medium hover:bg-slate-100 transition-colors cursor-default"
+                >
                   {diffCounts.added > 0 && (
                     <span className="flex items-center gap-0.5 text-emerald-600 px-1">
-                      <Plus className="h-3 w-3" />{diffCounts.added}
+                      <Plus className="h-3 w-3" />
+                      {diffCounts.added}
                     </span>
                   )}
                   {diffCounts.added > 0 && (diffCounts.updated > 0 || diffCounts.removed > 0) && (
@@ -240,15 +244,15 @@ function EditModeVersionActions({
                   )}
                   {diffCounts.updated > 0 && (
                     <span className="flex items-center gap-0.5 text-sky-600 px-1">
-                      <Pencil className="h-3 w-3" />{diffCounts.updated}
+                      <Pencil className="h-3 w-3" />
+                      {diffCounts.updated}
                     </span>
                   )}
-                  {diffCounts.updated > 0 && diffCounts.removed > 0 && (
-                    <span className="text-slate-300">|</span>
-                  )}
+                  {diffCounts.updated > 0 && diffCounts.removed > 0 && <span className="text-slate-300">|</span>}
                   {diffCounts.removed > 0 && (
                     <span className="flex items-center gap-0.5 text-red-600 px-1">
-                      <Minus className="h-3 w-3" />{diffCounts.removed}
+                      <Minus className="h-3 w-3" />
+                      {diffCounts.removed}
                     </span>
                   )}
                 </button>
@@ -267,7 +271,9 @@ function EditModeVersionActions({
                     </div>
                   )}
                   {onToggleShowDeletedNodes && (
-                    <div className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}>
+                    <div
+                      className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}
+                    >
                       <Checkbox
                         id="show-deleted-nodes"
                         checked={!!showDeletedNodes}
@@ -278,7 +284,9 @@ function EditModeVersionActions({
                     </div>
                   )}
                   {onToggleShowEdgeDiff && (
-                    <div className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}>
+                    <div
+                      className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}
+                    >
                       <Checkbox
                         id="show-edge-diff"
                         checked={!!showEdgeDiff}
@@ -327,10 +335,6 @@ function EditModeVersionActions({
       />
     </div>
   );
-}
-
-function HeaderActionSeparator() {
-  return <span aria-hidden="true" className="mx-1 h-5 w-px shrink-0 bg-slate-200" />;
 }
 
 function EnterEditButton({
@@ -451,7 +455,6 @@ function SaveButton({
     </Button>
   );
 }
-
 
 function DiscardDraftButton({
   onDiscard,
