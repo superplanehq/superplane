@@ -1,0 +1,55 @@
+# Auto-promoted from docker-publish when main is green.
+# Requires Semaphore secret "aws-prod" with:
+#   AWS_ACCESS_KEY_ID     — prod IAM credentials (account 802589444644)
+#   AWS_SECRET_ACCESS_KEY
+version: v1.0
+name: Deploy services
+
+agent:
+  machine:
+    type: f1-standard-2
+    os_image: ubuntu2404
+
+global_job_config:
+  secrets:
+    - name: aws-prod
+  env_vars:
+    - name: AWS_DEFAULT_REGION
+      value: us-east-1
+
+blocks:
+  - name: Deploy task-broker
+    task:
+      jobs:
+        - name: ECS deploy task-broker
+          commands:
+            - aws ecs update-service --cluster default --service task-broker --force-new-deployment
+            - aws ecs wait services-stable --cluster default --services task-broker
+
+  - name: Deploy fleet-manager
+    task:
+      jobs:
+        - name: ECS deploy fleet-manager
+          commands:
+            - aws ecs update-service --cluster default --service fleet-manager --force-new-deployment
+            - aws ecs wait services-stable --cluster default --services fleet-manager
+
+  - name: Recycle runners
+    dependencies:
+      - Deploy fleet-manager
+    task:
+      jobs:
+        - name: Terminate stale EC2 runners
+          commands:
+            - |
+              RUNNER_IDS=$(aws ec2 describe-instances \
+                --filters "Name=tag:superplane_managed_runner,Values=true" \
+                          "Name=instance-state-name,Values=running,pending" \
+                --query 'Reservations[*].Instances[*].InstanceId' \
+                --output text)
+              if [ -n "$RUNNER_IDS" ]; then
+                echo "Recycling runners: $RUNNER_IDS"
+                aws ec2 terminate-instances --instance-ids $RUNNER_IDS
+              else
+                echo "No runners to recycle"
+              fi
