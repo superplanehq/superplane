@@ -56,8 +56,8 @@ function buildEdgeDiffSets(
   preparedEdges: CanvasEdge[],
   liveCanvasVersion?: CanvasesCanvasVersion,
 ): { liveEdgeSet: Set<string>; draftEdgeSet: Set<string>; liveEdges: Array<Record<string, unknown>> } | null {
-  if (!liveCanvasVersion?.spec?.edges) return null;
-  const liveEdges = liveCanvasVersion.spec.edges as Array<Record<string, unknown>>;
+  const liveEdges = (liveCanvasVersion?.spec?.edges ?? []) as Array<Record<string, unknown>>;
+  if (liveEdges.length === 0 && preparedEdges.length === 0) return null;
   const liveEdgeSet = new Set(
     liveEdges.map((e) => edgeKey(String(e.sourceId ?? ""), String(e.targetId ?? ""), String(e.channel ?? "default"))),
   );
