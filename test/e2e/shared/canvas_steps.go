@@ -102,7 +102,7 @@ func (s *CanvasSteps) Create() {
 	// Rename the canvas to the desired name (instant create uses random names)
 	err := database.Conn().
 		Model(&models.Canvas{}).
-		Where("workflow_id = ?", s.WorkflowID).
+		Where("id = ?", s.WorkflowID).
 		Update("name", s.CanvasName).Error
 	require.NoError(s.t, err)
 }
