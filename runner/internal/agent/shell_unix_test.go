@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -112,6 +113,96 @@ func TestHostShellDirectivesEcho(t *testing.T) {
 	}
 	if out == "" || !strings.Contains(out, "hello") {
 		t.Fatalf("expected hello in output: %q", out)
+	}
+}
+
+func TestEndMarkerStreamHoldback(t *testing.T) {
+	t.Parallel()
+	endMark := "e-0123456789abcdef-0123456789abcdef"
+	tmpl := "\x01 " + endMark + " 0\n"
+
+	tests := []struct {
+		name string
+		data string
+		want int
+	}{
+		{name: "empty", data: "", want: 0},
+		{name: "no marker prefix", data: "hello world\n", want: 0},
+		{name: "partial SOH", data: "out\n\x01", want: 1},
+		{name: "partial marker line", data: "out\n\x01 " + endMark[:8], want: len("\x01 " + endMark[:8])},
+		{name: "complete marker withheld", data: "out\n" + tmpl, want: len(tmpl)},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := endMarkerStreamHoldback([]byte(tc.data), endMark)
+			if got != tc.want {
+				t.Fatalf("holdback=%d want=%d data=%q", got, tc.want, tc.data)
+			}
+		})
+	}
+}
+
+type syncLiveWriter struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (w *syncLiveWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.Write(p)
+}
+
+func (w *syncLiveWriter) String() string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.buf.String()
+}
+
+func (w *syncLiveWriter) waitContains(substr string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if strings.Contains(w.String(), substr) {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return false
+}
+
+func TestRunShellPTYSessionLiveStreamsIncrementally(t *testing.T) {
+	skipPTYIntegrationOnCI(t)
+	bash, err := exec.LookPath("bash")
+	if err != nil {
+		t.Fatalf("bash required: %v", err)
+	}
+	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i")
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	live := &syncLiveWriter{}
+	done := make(chan struct{})
+	var code int
+	var runErr error
+	go func() {
+		code, _, runErr = runShellPTYSession(ctx, 128*1024, cmd, []string{
+			`for i in 1 2 3; do echo line$i; sleep 0.15; done`,
+		}, live, "")
+		close(done)
+	}()
+
+	if !live.waitContains("line1", 2*time.Second) {
+		t.Fatalf("live log did not receive line1 during command; live=%q", live.String())
+	}
+	if strings.Contains(live.String(), "line3") {
+		t.Fatalf("expected line3 only after later streaming; live=%q", live.String())
+	}
+	<-done
+	if runErr != nil || code != 0 {
+		t.Fatalf("runShellPTYSession: code=%d err=%v live=%q", code, runErr, live.String())
+	}
+	if !strings.Contains(live.String(), "line3") {
+		t.Fatalf("expected all lines in live log; live=%q", live.String())
 	}
 }
 
