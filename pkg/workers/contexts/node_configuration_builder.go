@@ -1,9 +1,11 @@
 package contexts
 
 import (
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -52,8 +54,9 @@ func (b *NodeConfigurationBuilder) WithRootEvent(rootEventID *uuid.UUID) *NodeCo
 	return b
 }
 
+// WithRootPayload stores payload normalized for expression evaluation (see normalizeExpressionValue).
 func (b *NodeConfigurationBuilder) WithRootPayload(payload any) *NodeConfigurationBuilder {
-	b.rootPayload = payload
+	b.rootPayload = normalizeExpressionValue(payload)
 	return b
 }
 
@@ -62,8 +65,9 @@ func (b *NodeConfigurationBuilder) WithPreviousExecution(previousExecutionID *uu
 	return b
 }
 
+// WithInput stores input normalized for expression evaluation (see normalizeExpressionValue).
 func (b *NodeConfigurationBuilder) WithInput(input any) *NodeConfigurationBuilder {
-	b.input = input
+	b.input = normalizeExpressionValue(input)
 	return b
 }
 
@@ -234,7 +238,7 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 			return ""
 		}
 
-		return fmt.Sprintf("%v", value)
+		return formatTemplateValue(value)
 	})
 
 	if err != nil {
@@ -261,7 +265,7 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 	}
 
 	if b.parentBlueprintNode != nil {
-		env["config"] = b.parentBlueprintNode.Configuration.Data()
+		env["config"] = normalizeExpressionValue(b.parentBlueprintNode.Configuration.Data())
 	}
 
 	exprOptions := []expr.Option{
@@ -401,12 +405,101 @@ func firstChainRef(chainRefs map[string]string) string {
 }
 
 func extractInputMap(input any) map[string]any {
-	inputMap := map[string]any{}
-	if input, ok := input.(map[string]any); ok {
-		return input
+	if inputMap, ok := input.(map[string]any); ok {
+		return inputMap
 	}
 
-	return inputMap
+	return map[string]any{}
+}
+
+func normalizeExpressionValue(value any) any {
+	normalized, _ := normalizeExpressionValueWithChanged(value)
+	return normalized
+}
+
+func normalizeExpressionValueWithChanged(value any) (any, bool) {
+	switch v := value.(type) {
+	case json.Number:
+		return normalizeJSONNumber(v), true
+	case map[string]any:
+		return normalizeExpressionMap(v)
+	case map[string]string:
+		result := make(map[string]any, len(v))
+		for key, item := range v {
+			result[key] = item
+		}
+		return result, true
+	case []any:
+		return normalizeExpressionSlice(v)
+	default:
+		return v, false
+	}
+}
+
+func normalizeExpressionMap(value map[string]any) (any, bool) {
+	var out map[string]any
+	changed := false
+	for key, item := range value {
+		normalized, itemChanged := normalizeExpressionValueWithChanged(item)
+		if !itemChanged {
+			continue
+		}
+		changed = true
+		if out == nil {
+			out = make(map[string]any, len(value))
+			for k, v := range value {
+				out[k] = v
+			}
+		}
+		out[key] = normalized
+	}
+	if !changed {
+		return value, false
+	}
+	return out, true
+}
+
+func normalizeExpressionSlice(value []any) (any, bool) {
+	var out []any
+	changed := false
+	for i, item := range value {
+		normalized, itemChanged := normalizeExpressionValueWithChanged(item)
+		if !itemChanged {
+			continue
+		}
+		changed = true
+		if out == nil {
+			out = make([]any, len(value))
+			copy(out, value)
+		}
+		out[i] = normalized
+	}
+	if !changed {
+		return value, false
+	}
+	return out, true
+}
+
+func normalizeJSONNumber(value json.Number) any {
+	// Use float64 for all parseable numeric tokens so expression envs match
+	// standard json.Unmarshal (which never produces int/int). Preferring Int64
+	// would make expr perform integer division for int / int operands.
+	if number, err := value.Float64(); err == nil {
+		return number
+	}
+
+	return value
+}
+
+func formatTemplateValue(value any) string {
+	switch v := value.(type) {
+	case float32:
+		return strconv.FormatFloat(float64(v), 'f', -1, 32)
+	case float64:
+		return strconv.FormatFloat(v, 'f', -1, 64)
+	default:
+		return fmt.Sprintf("%v", v)
+	}
 }
 
 func (b *NodeConfigurationBuilder) resolveNodeRefs(nodeRefs []string, executionChainNodeIDs []string) (map[string]string, error) {
@@ -504,12 +597,12 @@ func (b *NodeConfigurationBuilder) resolveRootPayload() (any, error) {
 		return nil, fmt.Errorf("no root event found")
 	}
 
-	payload := rootEvent.Data.Data()
+	payload := normalizeExpressionValue(rootEvent.Data.Data())
 
 	if rootEvent.ExecutionID != nil {
 		execution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *rootEvent.ExecutionID)
 		if err == nil && execution != nil {
-			payload = injectConfig(payload, execution.Configuration.Data())
+			return injectConfig(payload, execution.Configuration.Data()), nil
 		}
 	}
 
@@ -528,7 +621,7 @@ func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]an
 
 		if rootEvent != nil && rootEvent.NodeID == nodeID {
 			if _, exists := messageChain[nodeRef]; !exists {
-				messageChain[nodeRef] = rootEvent.Data.Data()
+				messageChain[nodeRef] = normalizeExpressionValue(rootEvent.Data.Data())
 			}
 			continue
 		}
@@ -539,6 +632,7 @@ func populateFromInputOrRoot(messageChain map[string]any, inputMap map[string]an
 	return chainRefs
 }
 
+// injectConfig merges config into payload. payload must already be normalized; configData is normalized here.
 func injectConfig(payload any, configData map[string]any) any {
 	if len(configData) == 0 {
 		return payload
@@ -557,7 +651,7 @@ func injectConfig(payload any, configData map[string]any) any {
 	for key, value := range payloadMap {
 		withConfig[key] = value
 	}
-	withConfig["config"] = configData
+	withConfig["config"] = normalizeExpressionValue(configData)
 	return withConfig
 }
 
@@ -601,7 +695,7 @@ func (b *NodeConfigurationBuilder) populateFromExecutions(
 			return fmt.Errorf("node %s has no outputs", nodeRef)
 		}
 
-		messageChain[nodeRef] = event.Data.Data()
+		messageChain[nodeRef] = normalizeExpressionValue(event.Data.Data())
 	}
 
 	return nil
@@ -649,6 +743,15 @@ func parseDepth(param any) (int, error) {
 			return 0, fmt.Errorf("depth must be >= 1")
 		}
 		return parsed, nil
+	case json.Number:
+		parsed, err := value.Int64()
+		if err != nil {
+			return 0, fmt.Errorf("depth must be an integer")
+		}
+		if parsed < 1 {
+			return 0, fmt.Errorf("depth must be >= 1")
+		}
+		return int(parsed), nil
 	default:
 		return 0, fmt.Errorf("depth must be an integer")
 	}
@@ -736,7 +839,7 @@ func (b *NodeConfigurationBuilder) resolveFromExecutions(depth int, step int, ha
 		}
 
 		if payload := event.Data.Data(); payload != nil {
-			return step, injectConfig(payload, execution.Configuration.Data()), nil
+			return step, injectConfig(normalizeExpressionValue(payload), execution.Configuration.Data()), nil
 		}
 	}
 
@@ -758,6 +861,7 @@ func (b *NodeConfigurationBuilder) resolveFromRoot(depth int, step int) (any, er
 	}
 
 	if payload := rootEvent.Data.Data(); payload != nil {
+		payload = normalizeExpressionValue(payload)
 		if rootEvent.ExecutionID != nil {
 			execution, err := models.FindNodeExecutionInTransaction(b.tx, b.workflowID, *rootEvent.ExecutionID)
 			if err == nil && execution != nil {
@@ -786,7 +890,7 @@ func (b *NodeConfigurationBuilder) buildMemoryExpressionNamespace() map[string]a
 
 			values := make([]any, 0, len(records))
 			for _, record := range records {
-				values = append(values, record.Values.Data())
+				values = append(values, normalizeExpressionValue(record.Values.Data()))
 			}
 
 			return values, nil
@@ -802,7 +906,7 @@ func (b *NodeConfigurationBuilder) buildMemoryExpressionNamespace() map[string]a
 				return nil, err
 			}
 			if record != nil {
-				return record.Values.Data(), nil
+				return normalizeExpressionValue(record.Values.Data()), nil
 			}
 
 			return nil, nil
