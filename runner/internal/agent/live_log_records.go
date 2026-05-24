@@ -15,9 +15,10 @@ const (
 )
 
 type liveLogCommandStartRecord struct {
-	Type  string `json:"type"`
-	Index int    `json:"index"`
-	Text  string `json:"text"`
+	Type      string `json:"type"`
+	Index     int    `json:"index"`
+	Text      string `json:"text"`
+	StartedAt int64  `json:"started_at"`
 }
 
 type liveLogCommandEndRecord struct {
@@ -27,14 +28,15 @@ type liveLogCommandEndRecord struct {
 	DurationMS int64                `json:"duration_ms"`
 }
 
-func writeLiveLogCommandStart(live io.Writer, index int, text string) {
+func writeLiveLogCommandStart(live io.Writer, index int, text string, startedAt time.Time) {
 	if live == nil || index < 0 {
 		return
 	}
 	rec := liveLogCommandStartRecord{
-		Type:  "cmd_start",
-		Index: index,
-		Text:  strings.TrimSpace(text),
+		Type:      "cmd_start",
+		Index:     index,
+		Text:      strings.TrimSpace(text),
+		StartedAt: startedAt.UnixMilli(),
 	}
 	writeLiveLogRecord(live, rec)
 }

@@ -138,6 +138,7 @@ func parseRunnerControlRecord(message string) (map[string]any, bool) {
 			Type  string `json:"type"`
 			Index int    `json:"index"`
 			Text  string `json:"text"`
+			StartedAt *int64 `json:"started_at"`
 		}
 		if err := json.Unmarshal([]byte(message), &rec); err != nil {
 			return nil, false
@@ -145,11 +146,15 @@ func parseRunnerControlRecord(message string) (map[string]any, bool) {
 		if rec.Index < 0 {
 			return nil, false
 		}
-		return map[string]any{
+		out := map[string]any{
 			"type":  "cmd_start",
 			"index": rec.Index,
 			"text":  rec.Text,
-		}, true
+		}
+		if rec.StartedAt != nil && *rec.StartedAt >= 0 {
+			out["started_at"] = *rec.StartedAt
+		}
+		return out, true
 	case "cmd_end":
 		var rec struct {
 			Type       string `json:"type"`
