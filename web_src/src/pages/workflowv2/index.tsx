@@ -114,7 +114,7 @@ import type { TriggerActionModal } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
 import { useCanvasYaml } from "./useCanvasYaml";
-import { useDraftVisualDiff, useVisualDiffToggle } from "./useDraftVisualDiff";
+import { useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
@@ -1862,9 +1862,7 @@ export function WorkflowPageV2() {
     openTriggerModal,
   ]);
 
-  const { visualDiffEnabled, toggleVisualDiff } = useVisualDiffToggle();
-  const { nodes: nodesWithDraftVisualDiff, edges: edgesWithDraftVisualDiff } = useDraftVisualDiff({
-    enabled: visualDiffEnabled,
+  const draftVisualDiff = useDraftVisualDiff({
     isViewingDraftVersion,
     canvas,
     liveCanvasVersion,
@@ -1879,8 +1877,8 @@ export function WorkflowPageV2() {
   });
 
   const nodesWithIntegrationStatus = useMemo(
-    () => overlayIntegrationWarnings(nodesWithDraftVisualDiff, integrations, canvasNodes),
-    [nodesWithDraftVisualDiff, integrations, canvasNodes],
+    () => overlayIntegrationWarnings(draftVisualDiff.nodes, integrations, canvasNodes),
+    [draftVisualDiff.nodes, integrations, canvasNodes],
   );
 
   const runCanvasData = useRunCanvasData({
@@ -1909,7 +1907,7 @@ export function WorkflowPageV2() {
     selectedRun,
     runCanvasData,
     liveNodes: nodesWithIntegrationStatus,
-    liveEdges: edgesWithDraftVisualDiff,
+    liveEdges: draftVisualDiff.edges,
     isSelectedRunVersionLoading,
     isSelectedRunExecutionsLoading: selectedRunExecutionsQuery.isLoading,
   });
@@ -5626,8 +5624,9 @@ export function WorkflowPageV2() {
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           onShowDiff={onShowDiff}
-          visualDiffEnabled={visualDiffEnabled}
-          onToggleVisualDiff={toggleVisualDiff}
+          visualDiffEnabled={draftVisualDiff.visualDiffEnabled}
+          draftVisualDiff={draftVisualDiff}
+          onToggleVisualDiff={draftVisualDiff.toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
           onDiscardVersion={handleResetDraftChanges}
           discardVersionDisabled={resetDraftDisabled}
