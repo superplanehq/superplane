@@ -15,6 +15,7 @@ global_job_config:
 
 blocks:
   - name: Deploy task-broker
+    dependencies: []
     task:
       jobs:
         - name: ECS deploy task-broker
@@ -23,6 +24,7 @@ blocks:
             - aws ecs wait services-stable --cluster default --services task-broker
 
   - name: Deploy fleet-manager
+    dependencies: []
     task:
       jobs:
         - name: ECS deploy fleet-manager
@@ -32,6 +34,7 @@ blocks:
 
   - name: Recycle runners
     dependencies:
+      - Deploy task-broker
       - Deploy fleet-manager
     task:
       jobs:
