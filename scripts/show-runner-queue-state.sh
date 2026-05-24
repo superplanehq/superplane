@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-# Show correlated task rows from remote task-broker + fleet-manager SQLite volumes.
+# Show correlated task rows from task-broker (PostgreSQL) + fleet-manager (SQLite on remote host).
 #
-# Requires SSH access to both hosts (same defaults as deploy scripts). Pulls alpine:3.20
-# on each machine once (for sqlite CLI).
+# Broker queries use TASK_BROKER_DATABASE_URL locally (psql). Fleet-manager still uses SSH +
+# alpine sqlite against the remote Docker volume.
 #
 # Env:
-#   TASK_BROKER_SSH_HOST       — default 98.91.210.215
+#   TASK_BROKER_DATABASE_URL   — required for broker rows (postgres connection string)
+#   TASK_BROKER_SSH_HOST       — default 98.91.210.215 (informational)
 #   FLEET_MANAGER_SSH_HOST     — default 13.220.51.216
 #   SSH_USER                   — default ubuntu
 #   SSH_KEY                    — default ~/.ssh/igor-runners.pem
 #   SHOW_RUNNER_TASK_LIMIT     — broker rows (default 25); digits only
 #
 # Usage:
-#   ./scripts/show-runner-queue-state.sh
+#   TASK_BROKER_DATABASE_URL='postgres://…' ./scripts/show-runner-queue-state.sh
 
 set -euo pipefail
 
@@ -33,18 +34,24 @@ if [[ ! -f "$SSH_KEY" ]]; then
   exit 1
 fi
 
-SSH_BASE=(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${TASK_BROKER_SSH_HOST}")
+if [[ -z "${TASK_BROKER_DATABASE_URL:-}" ]]; then
+  echo "TASK_BROKER_DATABASE_URL is required (task-broker uses PostgreSQL)" >&2
+  exit 1
+fi
+
+if ! command -v psql >/dev/null 2>&1; then
+  echo "psql not found on PATH (required for broker queries)" >&2
+  exit 1
+fi
+
 SSH_FLEET=(ssh -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new "${SSH_USER}@${FLEET_MANAGER_SSH_HOST}")
 
 sql_b64() {
   printf '%s' "$1" | base64 | tr -d '\n\r'
 }
 
-# NOTE: piping into ssh doesn't attach stdin to a remote sudo pipeline reliably; encode SQL instead.
-broker_sql_remote() {
-  local enc
-  enc="$(sql_b64 "$1")"
-  "${SSH_BASE[@]}" "echo '${enc}' | base64 -d | sudo docker run -i --rm -v task-broker-data:/data alpine:3.20 sh -lc 'apk add -q sqlite >/dev/null && sqlite3 -batch /data/broker.db'"
+broker_sql() {
+  psql "$TASK_BROKER_DATABASE_URL" -At -v ON_ERROR_STOP=1 -c "$1"
 }
 
 fleet_sql_remote() {
@@ -72,13 +79,13 @@ echo ""
 
 BROKER_QUERY=$(
   cat <<EOSQL
-SELECT id || '|' || fleet_id || '|' || COALESCE(fleet_task_id, '') || '|' || CAST(created_at AS TEXT)
+SELECT id || '|' || fleet_id || '|' || COALESCE(fleet_task_id, '') || '|' || FLOOR(EXTRACT(EPOCH FROM created_at))::bigint
 FROM broker_tasks ORDER BY created_at DESC LIMIT ${LIMIT};
 EOSQL
 )
 
 broker_lines=()
-while IFS= read -r _line || [[ -n "${_line}" ]]; do broker_lines+=("$_line"); done < <(broker_sql_remote "$BROKER_QUERY" | tr -d '\r')
+while IFS= read -r _line || [[ -n "${_line}" ]]; do broker_lines+=("$_line"); done < <(broker_sql "$BROKER_QUERY" | tr -d '\r')
 
 if [[ "${#broker_lines[@]}" -eq 0 ]]; then
   echo "No broker_tasks rows returned (broker DB empty or SSH/SQL failure)." >&2
@@ -166,9 +173,9 @@ fleet_sql_remote "$SUMMARY_SQL" | tr -d '\r' | while IFS= read -r line; do
 done || true
 
 echo ""
-echo "Broker rows by fleet_task linkage (${TASK_BROKER_SSH_HOST} broker.db):"
+echo "Broker rows by fleet_task linkage (PostgreSQL):"
 LINK_SQL="SELECT CASE WHEN fleet_task_id IS NULL OR fleet_task_id='' THEN 'no_fleet_task_id' ELSE 'has_fleet_task_id' END AS k, COUNT(*) FROM broker_tasks GROUP BY k;"
-broker_sql_remote "$LINK_SQL" | tr -d '\r' | while IFS= read -r line; do
+broker_sql "$LINK_SQL" | tr -d '\r' | while IFS= read -r line; do
   printf '  %s\n' "${line}"
 
 done || true

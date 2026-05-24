@@ -22,7 +22,7 @@ type SQLiteStore struct {
 
 // OpenSQLite opens or creates a SQLite database and applies schema.
 func OpenSQLite(path string) (*SQLiteStore, error) {
-	db, err := sql.Open("sqlite", path)
+	db, err := sql.Open("sqlite", sqliteDSN(path))
 	if err != nil {
 		return nil, err
 	}
@@ -139,6 +139,17 @@ func (s *SQLiteStore) ensureResultJSONColumn() error {
 
 func (s *SQLiteStore) Close() error {
 	return s.db.Close()
+}
+
+func sqliteDSN(path string) string {
+	if strings.Contains(path, "_pragma=") {
+		return path
+	}
+	p := path
+	if !strings.HasPrefix(p, "file:") {
+		p = "file:" + p
+	}
+	return p + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=synchronous(NORMAL)"
 }
 
 func (s *SQLiteStore) CreateTask(ctx context.Context, t *models.Task) error {

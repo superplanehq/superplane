@@ -55,11 +55,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	log.Info("runner starting", slog.String("runner_id", runnerID), slog.String("fleet_manager", base), slog.String("transport", transportLabel(cfg)), slog.Bool("cloudwatch_logs", strings.TrimSpace(cfg.CloudWatchLogGroup) != ""))
+	log.Info("runner starting", slog.String("runner_id", cfg.RunnerID), slog.String("fleet_manager", cfg.BaseURL), slog.String("transport", transportLabel(cfg)), slog.Bool("cloudwatch_logs", strings.TrimSpace(cfg.CloudWatchLogGroup) != ""))
 
 	// Remove containers leftover from a previous crashed run of this
 	// runner_id. Best-effort: a missing docker CLI or daemon is a no-op.
-	if removed, err := agent.SweepDockerOrphans(ctx, runnerID); err != nil {
+	if removed, err := agent.SweepDockerOrphans(ctx, cfg.RunnerID); err != nil {
 		log.Warn("docker_orphan_sweep failed", slog.Any("err", err))
 	} else if removed > 0 {
 		log.Info("docker_orphan_sweep", slog.Int("removed", removed))

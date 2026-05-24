@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -45,7 +46,10 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 
 	fleetDB := filepath.Join(t.TempDir(), "fleet.db")
 	fleetAddr := freeTCPAddr(t)
-	brokerDB := filepath.Join(t.TempDir(), "broker.db")
+	brokerDSN := os.Getenv("TEST_DATABASE_URL")
+	if brokerDSN == "" {
+		t.Skip("TEST_DATABASE_URL unset — required for task-broker e2e (see README)")
+	}
 	brokerAddr := freeTCPAddr(t)
 	brokerPublic := "http://" + brokerAddr
 	const brokerAuthToken = "e2e-broker-auth-token"
@@ -70,7 +74,7 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 
 	brokerCmd := exec.Command(brokerBin)
 	brokerCmd.Env = subprocessEnv(
-		"DATABASE_PATH="+brokerDB,
+		"DATABASE_URL="+brokerDSN,
 		"LISTEN_ADDR="+brokerAddr,
 		"BROKER_PUBLIC_URL="+brokerPublic,
 		"AUTH_TOKEN="+brokerAuthToken,
@@ -91,9 +95,10 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 	fleetBase := "http://" + fleetAddr
 
 	regBody, err := json.Marshal(api.RegisterFleetRequest{
-		ID:      "e2e-fleet",
-		BaseURL: fleetBase,
-		Labels:  []string{"e2e", "tier-test"},
+		ID:        "e2e-fleet",
+		BaseURL:   fleetBase,
+		AuthToken: E2EAuthToken,
+		Labels:    []string{"e2e", "tier-test"},
 	})
 	if err != nil {
 		t.Fatal(err)

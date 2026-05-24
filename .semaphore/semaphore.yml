@@ -35,4 +35,6 @@ blocks:
             - go vet ./...
             - mkdir -p bin
             - make build
-            - go test ./... -count=1
+            - sem-service start postgres 16
+            - export TEST_DATABASE_URL='postgresql://postgres:@0.0.0.0:5432/postgres?sslmode=disable'
+            - go test ./... -count=1 -p 1

@@ -13,7 +13,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/task-br
 FROM gcr.io/distroless/static-debian12:nonroot
 
 WORKDIR /home/nonroot
-ENV DATABASE_PATH=/home/nonroot/broker.db
 
 COPY --from=build /out/task-broker /task-broker
 
