@@ -730,7 +730,7 @@ Runs shell commands on a fleet runner.
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
 - **Custom container image**: Shown only for **Other**; use a normal reference (`my.registry.example.com/org/repo:1.2.3` or `debian:bookworm-slim@sha256:…`). Private registries require the runner to be configured with registry credentials.
-- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Leave at **0** to use the broker default.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
 - **Commands**: One or more shell commands, one per line.
 - **Environment variables**: Optional key/value pairs available during command execution. Values can be literal strings (with expression support) or organization secret keys.
 
