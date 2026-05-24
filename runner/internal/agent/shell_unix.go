@@ -434,6 +434,7 @@ func readThroughEndMarker(ctx context.Context, sess *shellSession, endMark strin
 	re := regexp.MustCompile(`\x01\s*` + regexp.QuoteMeta(endMark) + `\s+(\d+)\r?\n`)
 	timer := time.NewTimer(deadline)
 	defer timer.Stop()
+	streamed := 0
 	for {
 		select {
 		case <-ctx.Done():
@@ -450,18 +451,56 @@ func readThroughEndMarker(ctx context.Context, sess *shellSession, endMark strin
 		default:
 			data := sess.snapshot()
 			loc := re.FindSubmatchIndex(data)
-			if loc == nil {
-				time.Sleep(5 * time.Millisecond)
-				continue
+			if loc != nil {
+				if loc[0] > streamed {
+					sess.appendOut(data[streamed:loc[0]])
+				}
+				code, convErr := strconv.Atoi(string(data[loc[2]:loc[3]]))
+				if convErr != nil {
+					return 1, convErr
+				}
+				sess.consumePrefix(loc[1])
+				return code, nil
 			}
-			before := data[:loc[0]]
-			sess.appendOut(before)
-			code, convErr := strconv.Atoi(string(data[loc[2]:loc[3]]))
-			if convErr != nil {
-				return 1, convErr
+			if safe := len(data) - endMarkerStreamHoldback(data, endMark); safe > streamed {
+				sess.appendOut(data[streamed:safe])
+				streamed = safe
 			}
-			sess.consumePrefix(loc[1])
-			return code, nil
+			time.Sleep(5 * time.Millisecond)
 		}
 	}
+}
+
+// endMarkerStreamHoldback returns how many trailing bytes in data might be an incomplete
+// end-marker line and must not be streamed yet (so protocol bytes never leak to live logs).
+func endMarkerStreamHoldback(data []byte, endMark string) int {
+	if len(data) == 0 {
+		return 0
+	}
+	maxHold := 0
+	for _, tmpl := range endMarkerLineTemplates(endMark) {
+		limit := len(tmpl)
+		if limit > len(data) {
+			limit = len(data)
+		}
+		for i := 1; i <= limit; i++ {
+			if bytes.HasPrefix([]byte(tmpl), data[len(data)-i:]) {
+				if i > maxHold {
+					maxHold = i
+				}
+			}
+		}
+	}
+	return maxHold
+}
+
+func endMarkerLineTemplates(endMark string) []string {
+	// Match readThroughEndMarker: \x01\s*endMark\s+\d+\r?\n (and plain endMark fallback).
+	withSOH := "\x01 " + endMark + " 0"
+	plain := endMark + " 0"
+	out := make([]string, 0, 8)
+	for _, base := range []string{withSOH, plain} {
+		out = append(out, base, base+"\r", base+"\n", base+"\r\n")
+	}
+	return out
 }
