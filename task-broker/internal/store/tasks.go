@@ -33,6 +33,26 @@ func (s *PostgresStore) GetTask(ctx context.Context, id string) (*models.Task, e
 	return taskModelFromRow(&row)
 }
 
+func (s *PostgresStore) ListActiveTasks(ctx context.Context) ([]*models.Task, error) {
+	var rows []brokermodels.Task
+	err := s.db.WithContext(ctx).
+		Where("status IN ?", []string{string(models.StatusQueued), string(models.StatusClaimed)}).
+		Order("created_at ASC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*models.Task, 0, len(rows))
+	for i := range rows {
+		t, err := taskModelFromRow(&rows[i])
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, nil
+}
+
 func (s *PostgresStore) ClaimTask(ctx context.Context, runnerID, fleetID string, lease time.Duration) (*models.Task, error) {
 	fleetID = strings.TrimSpace(fleetID)
 	if fleetID == "" {

@@ -37,6 +37,7 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 			r.Get("/fleets", s.listFleets)
 			r.Post("/fleets", s.registerFleet)
 			r.Delete("/fleets/{id}", s.deleteFleet)
+			r.Get("/tasks", s.listTasks)
 			r.Post("/tasks", s.createTask)
 			r.Post("/tasks/claim", s.claimTask)
 			r.Get("/tasks/{id}/live-logs", s.getTaskLiveLogs)
