@@ -36,7 +36,7 @@ blocks:
             - export GOARCH=amd64
             - mkdir -p bin
             - go build -trimpath -ldflags="-s -w" -o bin/runner-linux-amd64 ./runner/cmd/runner
-            - aws s3 cp bin/runner-linux-amd64 s3://superplanehq-runner-artifacts/production/runner-linux-amd64 --sse AES256
+            - aws s3 cp bin/runner-linux-amd64 s3://superplane-runner/latest/runner-linux-amd64 --sse AES256
 
   - name: linux/arm64 runner
     dependencies: []
@@ -54,4 +54,4 @@ blocks:
             - export GOARCH=arm64
             - mkdir -p bin
             - go build -trimpath -ldflags="-s -w" -o bin/runner-linux-arm64 ./runner/cmd/runner
-            - aws s3 cp bin/runner-linux-arm64 s3://superplanehq-runner-artifacts/production/runner-linux-arm64 --sse AES256
+            - aws s3 cp bin/runner-linux-arm64 s3://superplane-runner/latest/runner-linux-arm64 --sse AES256
