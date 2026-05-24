@@ -248,9 +248,20 @@ func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func taskStatusResponse(task *models.Task, s *Server) api.TaskStatusResponse {
+	mode := string(task.ExecutionMode)
+	if mode == "" {
+		mode = string(models.ExecutionHost)
+	}
 	resp := api.TaskStatusResponse{
 		ID:              task.ID,
 		Status:          string(task.Status),
+		FleetID:         task.FleetID,
+		CreatedAt:       task.CreatedAt.UTC(),
+		ClaimedAt:       task.ClaimedAt,
+		LeaseUntil:      task.LeaseUntil,
+		RunnerID:        strings.TrimSpace(task.RunnerID),
+		ExecutionMode:   mode,
+		DockerImage:     strings.TrimSpace(task.DockerImage),
 		Error:           task.ErrorMessage,
 		CancelRequested: task.CancelRequested,
 	}

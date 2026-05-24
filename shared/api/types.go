@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/superplane/runner/shared/models"
 )
@@ -154,13 +155,20 @@ type WebhookPayload struct {
 	Result  json.RawMessage `json:"result,omitempty"`
 }
 
-// TaskStatusResponse is GET fleet-manager /v1/tasks/{id}.
+// TaskStatusResponse is GET task-broker /v1/tasks/{id}.
 type TaskStatusResponse struct {
-	ID              string `json:"id"`
-	Status          string `json:"status"`
-	ExitCode        *int   `json:"exit_code,omitempty"`
-	Error           string `json:"error,omitempty"`
-	CancelRequested bool   `json:"cancel_requested,omitempty"`
+	ID              string     `json:"id"`
+	Status          string     `json:"status"`
+	FleetID         string     `json:"fleet_id"`
+	CreatedAt       time.Time  `json:"created_at"`
+	ClaimedAt       *time.Time `json:"claimed_at,omitempty"`
+	LeaseUntil      *time.Time `json:"lease_until,omitempty"`
+	RunnerID        string     `json:"runner_id,omitempty"` // set after claim (EC2: instance id from IMDS)
+	ExecutionMode   string     `json:"execution_mode,omitempty"`
+	DockerImage     string     `json:"docker_image,omitempty"`
+	ExitCode        *int       `json:"exit_code,omitempty"`
+	Error           string     `json:"error,omitempty"`
+	CancelRequested bool       `json:"cancel_requested,omitempty"`
 	// CloudWatchLogGroup and CloudWatchLogStream are set when fleet-manager is configured
 	// with TASK_CLOUDWATCH_LOG_GROUP so clients can tail logs in AWS (runner must use the same group/prefix).
 	CloudWatchLogGroup      string          `json:"cloudwatch_log_group,omitempty"`
