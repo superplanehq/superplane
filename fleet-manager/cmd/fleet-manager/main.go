@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -15,60 +14,25 @@ import (
 
 	"github.com/superplane/runner/fleet-manager/internal/ec2provision"
 	"github.com/superplane/runner/fleet-manager/internal/fleetmanager"
-	"github.com/superplane/runner/fleet-manager/internal/store"
-	"github.com/superplane/runner/shared/webhook"
 )
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	dbPath := getenv("DATABASE_PATH", "./fleet.db")
-	if dir := filepath.Dir(dbPath); dir != "." && dir != "" {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			log.Error("mkdir", slog.Any("err", err))
-			os.Exit(1)
-		}
-	}
-	st, err := store.OpenSQLite(dbPath)
-	if err != nil {
-		log.Error("open database", slog.Any("err", err))
-		os.Exit(1)
-	}
-	defer st.Close()
-
-	ws := webhook.DefaultSender()
-	ws.Log = log
-	hub := fleetmanager.NewWaitHub()
-	cancelHub := fleetmanager.NewRunnerCancelHub()
-	srv := &fleetmanager.Server{
-		Store:                         st,
-		Webhook:                       ws,
-		Log:                           log,
-		TaskNotify:                    hub,
-		RunnerCancel:                  cancelHub,
-		TaskCloudWatchLogGroup:        strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_GROUP")),
-		TaskCloudWatchLogStreamPrefix: strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_STREAM_PREFIX")),
-		TaskCloudWatchRegion:          strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_REGION")),
-	}
+	srv := &fleetmanager.Server{Log: log}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	var launcher *ec2provision.Launcher
 	ecCfg, ecErr := ec2provision.ConfigFromEnv()
 	switch {
 	case ecErr == nil:
-		var err error
-		launcher, err = ec2provision.New(context.Background(), ecCfg, log)
+		launcher, err := ec2provision.New(context.Background(), ecCfg, log)
 		if err != nil {
 			log.Error("ec2 provision init", slog.Any("err", err))
 			os.Exit(1)
 		}
 		srv.EC2Launcher = launcher
-		srv.TerminateRunnerAfterTaskEnabled = ecCfg.RunnerTerminateAfterEachTask
-		if ecCfg.RunnerTerminateAfterEachTask {
-			srv.TerminateRunnerInstance = launcher.TerminateInstance
-		}
 		reconcileEvery := 60 * time.Second
 		if v := getenv("EC2_PROVISION_RECONCILE_INTERVAL_SEC", ""); v != "" {
 			if n, err := strconv.Atoi(v); err == nil && n >= 15 {
@@ -80,13 +44,14 @@ func main() {
 			slog.Int("hot_instance_count", ecCfg.HotInstanceCount),
 			slog.String("reconcile_interval", reconcileEvery.String()))
 	case errors.Is(ecErr, ec2provision.ErrDisabled):
-		// EC2 pool off
+		log.Info("ec2 provisioning disabled — fleet-manager serves diagnostics only when EC2_PROVISION_* is configured")
 	default:
 		log.Error("ec2 provision config", slog.Any("err", ecErr))
 		os.Exit(1)
 	}
-	auth := getenv("AUTH_TOKEN", "")
-	diagTok := getenv("FLEET_DIAGNOSTICS_TOKEN", "")
+
+	auth := strings.TrimSpace(os.Getenv("AUTH_TOKEN"))
+	diagTok := strings.TrimSpace(os.Getenv("FLEET_DIAGNOSTICS_TOKEN"))
 	handler := fleetmanager.NewRouter(srv, fleetmanager.RouterOptions{
 		AuthToken:        auth,
 		DiagnosticsToken: diagTok,
@@ -98,39 +63,6 @@ func main() {
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-
-	reapInterval := 15 * time.Second
-	if v := getenv("REAP_INTERVAL_SEC", ""); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			reapInterval = time.Duration(n) * time.Second
-		}
-	}
-	go func() {
-		t := time.NewTicker(reapInterval)
-		defer t.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t.C:
-				requeued, canceledTasks, err := st.ReapExpiredLeases(context.Background())
-				if err != nil {
-					log.Warn("reap leases", slog.Any("err", err))
-					continue
-				}
-				for _, task := range canceledTasks {
-					t := task
-					go srv.DeliverWebhook(t)
-				}
-				if requeued > 0 {
-					log.Info("reaped expired task leases", slog.Int64("count", requeued))
-				}
-				if len(canceledTasks) > 0 {
-					log.Info("finalized canceled tasks after lease expiry", slog.Int("count", len(canceledTasks)))
-				}
-			}
-		}
-	}()
 
 	go func() {
 		log.Info("fleet-manager listening", slog.String("addr", addr))

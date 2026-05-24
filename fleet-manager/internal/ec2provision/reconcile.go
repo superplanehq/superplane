@@ -45,10 +45,13 @@ func RunReconcileLoop(ctx context.Context, log *slog.Logger, interval time.Durat
 	}
 }
 
-// Reconcile scales pending+running tagged instances toward want (launch or terminate as needed).
+// Reconcile sweeps unhealthy runners, then scales pending+running tagged instances toward want.
 func (l *Launcher) Reconcile(ctx context.Context, want int) error {
 	if want < 0 {
 		return fmt.Errorf("negative hot instance count")
+	}
+	if _, err := l.SweepUnhealthy(ctx); err != nil {
+		return fmt.Errorf("health sweep: %w", err)
 	}
 	live, err := l.listManagedLive(ctx)
 	if err != nil {

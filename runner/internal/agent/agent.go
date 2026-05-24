@@ -23,10 +23,11 @@ import (
 
 // Config controls runner behavior.
 type Config struct {
-	BaseURL  string
+	BaseURL  string // task-broker base URL (TASK_BROKER_URL)
+	FleetID  string // fleet to claim tasks from (RUNNER_FLEET_ID)
 	RunnerID string
 	Token    string
-	// Transport selects fleet-manager API: default WebSocket (GET /v1/runners/stream). Set "http", "polling", or "legacy" for POST claim/complete.
+	// Transport selects task-broker API: default WebSocket (GET /v1/runners/stream). Set "http", "polling", or "legacy" for POST claim/complete.
 	Transport string
 	PollEmpty time.Duration
 	// MaxOutputBytes caps combined stdout+stderr stored and sent back.
@@ -34,8 +35,7 @@ type Config struct {
 	// MaxExecutionSeconds caps the runner's execution wall clock (0 = no cap). It does not change
 	// fleet-manager claim leases, which are derived from execution_timeout_seconds on the task (or the API default).
 	MaxExecutionSeconds int
-	// ExitAfterEachTask stops the runner process after one successful CompleteTask once fleet-manager accepts the result.
-	// Fleet-manager terminates the EC2 instance when runner_id is the instance id (see cloud-init user-data). Local env: RUNNER_TERMINATE_AFTER_EACH_TASK.
+	// ExitAfterEachTask stops the runner process after one successful CompleteTask.
 	ExitAfterEachTask bool
 	Log               *slog.Logger // optional: fleet_manager_http lines for claim / complete
 
@@ -54,7 +54,7 @@ func DefaultConfig() Config {
 	}
 }
 
-// Agent polls fleet-manager, executes tasks, and reports results.
+// Agent connects to task-broker, executes tasks, and reports results.
 type Agent struct {
 	HTTP   *http.Client
 	Config Config
@@ -108,6 +108,7 @@ func (a *Agent) Run(ctx context.Context) error {
 func (a *Agent) claim(ctx context.Context, base string) (*api.TaskPayload, error) {
 	body, err := json.Marshal(api.ClaimTaskRequest{
 		RunnerID:     a.Config.RunnerID,
+		FleetID:      a.Config.FleetID,
 		LeaseSeconds: int((10 * time.Minute).Seconds()),
 	})
 	if err != nil {
@@ -142,7 +143,7 @@ func (a *Agent) claim(ctx context.Context, base string) (*api.TaskPayload, error
 		return nil, err
 	}
 	if out.Task != nil && a.Config.Log != nil {
-		a.Config.Log.Info("fleet_manager_http",
+		a.Config.Log.Info("task_broker_http",
 			slog.String("op", op),
 			slog.Int("http_status", code),
 			slog.Duration("dur", dur),
@@ -189,7 +190,7 @@ func (a *Agent) complete(ctx context.Context, base, id string, exit int, errMsg 
 		return e
 	}
 	if a.Config.Log != nil {
-		a.Config.Log.Info("fleet_manager_http",
+		a.Config.Log.Info("task_broker_http",
 			slog.String("op", op),
 			slog.Int("http_status", code),
 			slog.Duration("dur", dur),
@@ -222,7 +223,7 @@ func (a *Agent) logFleetHTTPWarn(op string, dur time.Duration, status int, taskI
 	if taskID != "" {
 		args = append(args, slog.String("task_id", taskID))
 	}
-	a.Config.Log.Warn("fleet_manager_http", args...)
+	a.Config.Log.Warn("task_broker_http", args...)
 }
 
 const cancelPollInterval = 1500 * time.Millisecond

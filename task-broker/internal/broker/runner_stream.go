@@ -1,4 +1,4 @@
-package fleetmanager
+package broker
 
 import (
 	"context"
@@ -78,6 +78,11 @@ func (s *Server) runnerStream(w http.ResponseWriter, r *http.Request) {
 		_ = writeWSError(writeMu, conn, http.StatusBadRequest, "runner_id required")
 		return
 	}
+	fleetID := strings.TrimSpace(hello.FleetID)
+	if fleetID == "" {
+		_ = writeWSError(writeMu, conn, http.StatusBadRequest, "fleet_id required")
+		return
+	}
 	lease := time.Duration(hello.LeaseSeconds) * time.Second
 	if lease <= 0 {
 		lease = 5 * time.Minute
@@ -91,7 +96,7 @@ func (s *Server) runnerStream(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 	for {
-		task, err := s.Store.ClaimTask(ctx, runnerID, lease)
+		task, err := s.Store.ClaimTask(ctx, runnerID, fleetID, lease)
 		if err != nil {
 			_ = writeWSError(writeMu, conn, http.StatusInternalServerError, "could not claim task")
 			return

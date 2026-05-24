@@ -73,7 +73,6 @@ func (s *Sender) Deliver(ctx context.Context, webhookURL string, payload api.Web
 		base := []any{
 			slog.Int("attempt", attemptNum),
 			slog.String("task_id", payload.TaskID),
-			slog.String("fleet_task_id", payload.FleetTaskID),
 			slog.String("status_outcome", payload.Status),
 			slog.String("url_host", webhookHost(webhookURL)),
 			slog.Duration("dur", dur),

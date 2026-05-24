@@ -51,6 +51,7 @@ type CreateTaskResponse struct {
 // ClaimTaskRequest is POST /v1/tasks/claim.
 type ClaimTaskRequest struct {
 	RunnerID     string `json:"runner_id"`
+	FleetID      string `json:"fleet_id"`
 	LeaseSeconds int    `json:"lease_seconds"`
 }
 
@@ -141,11 +142,10 @@ func ValidateEnvironment(env []EnvironmentVariable) string {
 
 // WebhookPayload is POSTed to the caller webhook URL on terminal status.
 type WebhookPayload struct {
-	TaskID      string `json:"task_id"`
-	FleetTaskID string `json:"fleet_task_id,omitempty"` // when task-broker forwards, fleet-managed id
-	Status      string `json:"status"`
-	ExitCode    int    `json:"exit_code"`
-	Error       string `json:"error,omitempty"`
+	TaskID   string `json:"task_id"`
+	Status   string `json:"status"`
+	ExitCode int    `json:"exit_code"`
+	Error    string `json:"error,omitempty"`
 	// CloudWatch fields mirror TaskStatusResponse when fleet-manager advertises log routing.
 	CloudWatchLogGroup  string `json:"cloudwatch_log_group,omitempty"`
 	CloudWatchLogStream string `json:"cloudwatch_log_stream,omitempty"`
@@ -177,17 +177,5 @@ type CancelTaskResponse struct {
 	Status string `json:"status"` // task status after the operation
 }
 
-// BrokerGetTaskResponse is GET task-broker /v1/tasks/{broker_task_id}.
-type BrokerGetTaskResponse struct {
-	TaskID                  string          `json:"task_id"`
-	FleetTaskID             string          `json:"fleet_task_id,omitempty"`
-	Status                  string          `json:"status"`
-	ExitCode                *int            `json:"exit_code,omitempty"`
-	Error                   string          `json:"error,omitempty"`
-	CancelRequested         bool            `json:"cancel_requested,omitempty"`
-	CloudWatchLogGroup      string          `json:"cloudwatch_log_group,omitempty"`
-	CloudWatchLogStream     string          `json:"cloudwatch_log_stream,omitempty"`
-	TaskLog                 *TaskLogSink    `json:"task_log,omitempty"`
-	ExecutionTimeoutSeconds *int            `json:"execution_timeout_seconds,omitempty"`
-	Result                  json.RawMessage `json:"result,omitempty"`
-}
+// BrokerGetTaskResponse is GET task-broker /v1/tasks/{id} (same shape as TaskStatusResponse).
+type BrokerGetTaskResponse = TaskStatusResponse

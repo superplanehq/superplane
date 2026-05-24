@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -20,7 +21,8 @@ var log = slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: sl
 
 func main() {
 	cfg := agent.DefaultConfig()
-	cfg.BaseURL = getFleetManagerURL()
+	cfg.BaseURL = getTaskBrokerURL()
+	cfg.FleetID = getRunnerFleetID()
 	cfg.RunnerID = getRunnerID()
 	cfg.Token = getAuthToken()
 	cfg.Transport = getTransport()
@@ -33,7 +35,6 @@ func main() {
 
 	cfg.ExitAfterEachTask = envTruthy("RUNNER_TERMINATE_AFTER_EACH_TASK")
 	if v := strings.TrimSpace(os.Getenv("RUNNER_MAX_EXECUTION_SECONDS")); v != "" {
-		// Caps local run wall clock only; fleet-manager lease still uses task execution_timeout_seconds (see README).
 		sec, err := strconv.Atoi(v)
 		switch {
 		case err != nil:
@@ -50,15 +51,25 @@ func main() {
 	cfg.CloudWatchRegion = strings.TrimSpace(os.Getenv("RUNNER_CLOUDWATCH_REGION"))
 	cfg.CloudWatchLogStreamPrefix = strings.TrimSpace(os.Getenv("RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX"))
 
-	a := &agent.Agent{Config: cfg}
-
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	log.Info("runner starting", slog.String("runner_id", cfg.RunnerID), slog.String("fleet_manager", cfg.BaseURL), slog.String("transport", transportLabel(cfg)), slog.Bool("cloudwatch_logs", strings.TrimSpace(cfg.CloudWatchLogGroup) != ""))
+	healthAddr := strings.TrimSpace(os.Getenv("RUNNER_HEALTH_ADDR"))
+	if healthAddr == "" {
+		healthAddr = "0.0.0.0:9090"
+	}
+	go serveHealth(ctx, healthAddr)
 
-	// Remove containers leftover from a previous crashed run of this
-	// runner_id. Best-effort: a missing docker CLI or daemon is a no-op.
+	a := &agent.Agent{Config: cfg}
+
+	log.Info("runner starting",
+		slog.String("runner_id", cfg.RunnerID),
+		slog.String("fleet_id", cfg.FleetID),
+		slog.String("task_broker", cfg.BaseURL),
+		slog.String("transport", transportLabel(cfg)),
+		slog.String("health_addr", healthAddr),
+		slog.Bool("cloudwatch_logs", strings.TrimSpace(cfg.CloudWatchLogGroup) != ""))
+
 	if removed, err := agent.SweepDockerOrphans(ctx, cfg.RunnerID); err != nil {
 		log.Warn("docker_orphan_sweep failed", slog.Any("err", err))
 	} else if removed > 0 {
@@ -83,6 +94,28 @@ func main() {
 		os.Exit(1)
 	}
 	log.Info("runner stopped")
+}
+
+func serveHealth(ctx context.Context, addr string) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok\n"))
+	})
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	go func() {
+		<-ctx.Done()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = srv.Shutdown(shutdownCtx)
+	}()
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Error("health server", slog.Any("err", err))
+	}
 }
 
 func envTruthy(key string) bool {
@@ -111,14 +144,22 @@ func getRunnerID() string {
 	return runnerID
 }
 
-func getFleetManagerURL() string {
-	base := strings.TrimSpace(os.Getenv("FLEET_MANAGER_URL"))
+func getTaskBrokerURL() string {
+	base := strings.TrimSpace(os.Getenv("TASK_BROKER_URL"))
 	if base == "" {
-		log.Error("FLEET_MANAGER_URL is required")
+		log.Error("TASK_BROKER_URL is required")
 		os.Exit(1)
 	}
-
 	return base
+}
+
+func getRunnerFleetID() string {
+	fleetID := strings.TrimSpace(os.Getenv("RUNNER_FLEET_ID"))
+	if fleetID == "" {
+		log.Error("RUNNER_FLEET_ID is required")
+		os.Exit(1)
+	}
+	return fleetID
 }
 
 func getAuthToken() string {
@@ -127,7 +168,6 @@ func getAuthToken() string {
 		log.Error("AUTH_TOKEN is required")
 		os.Exit(1)
 	}
-
 	return token
 }
 
@@ -136,6 +176,5 @@ func getTransport() string {
 	if transport == "" {
 		return "websocket"
 	}
-
 	return transport
 }

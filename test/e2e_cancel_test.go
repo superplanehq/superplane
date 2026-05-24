@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -23,39 +22,8 @@ func TestCancelQueuedImmediateWebhook(t *testing.T) {
 
 	root := moduleRoot(t)
 	binDir := t.TempDir()
-	fleetPath := filepath.Join(binDir, "fleet-manager")
-	cmd := exec.Command("go", "build", "-o", fleetPath, "./fleet-manager/cmd/fleet-manager")
-	cmd.Dir = root
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("go build fleet-manager: %v\n%s", err, out)
-	}
-
-	dbPath := filepath.Join(t.TempDir(), "fleet-cancel-queued.db")
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	addr := ln.Addr().String()
-	_ = ln.Close()
-
-	fleetCmd := exec.Command(fleetPath)
-	fleetCmd.Env = subprocessEnv(
-		"DATABASE_PATH="+dbPath,
-		"LISTEN_ADDR="+addr,
-		"REAP_INTERVAL_SEC=3600",
-	)
-	fleetCmd.Stdout = io.Discard
-	fleetCmd.Stderr = newTestLogWriter(t, "fleet-manager")
-	if err := fleetCmd.Start(); err != nil {
-		t.Fatalf("start fleet-manager: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = fleetCmd.Process.Signal(syscall.SIGTERM)
-		_, _ = fleetCmd.Process.Wait()
-	})
-
-	baseURL := "http://" + addr
-	waitReady(t, baseURL+"/healthz", 5*time.Second)
+	stack := startBrokerStack(t, root, binDir)
+	baseURL := stack.BrokerURL
 
 	received := make(chan api.WebhookPayload, 1)
 	whSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -74,9 +42,12 @@ func TestCancelQueuedImmediateWebhook(t *testing.T) {
 	}))
 	t.Cleanup(whSrv.Close)
 
-	createBody, err := json.Marshal(api.CreateTaskRequest{
-		Command:    []string{"echo", "never-runs"},
-		WebhookURL: whSrv.URL,
+	createBody, err := json.Marshal(api.BrokerCreateTaskRequest{
+		CreateTaskRequest: api.CreateTaskRequest{
+			Command:    []string{"echo", "never-runs"},
+			WebhookURL: whSrv.URL,
+		},
+		FleetID: stack.FleetID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -89,7 +60,7 @@ func TestCancelQueuedImmediateWebhook(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	setE2EFleetAuth(req)
+	setE2EBrokerAuth(req, stack.AuthToken)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -108,7 +79,7 @@ func TestCancelQueuedImmediateWebhook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	setE2EFleetAuth(cancelReq)
+	setE2EBrokerAuth(cancelReq, stack.AuthToken)
 	cancelResp, err := http.DefaultClient.Do(cancelReq)
 	if err != nil {
 		t.Fatal(err)
@@ -145,48 +116,15 @@ func TestCancelClaimedStopsArgvSleep(t *testing.T) {
 
 	root := moduleRoot(t)
 	binDir := t.TempDir()
-	fleetPath := filepath.Join(binDir, "fleet-manager")
 	runnerPath := filepath.Join(binDir, "worker")
-	for _, b := range []struct {
-		pkg string
-		out string
-	}{
-		{"./fleet-manager/cmd/fleet-manager", fleetPath},
-		{"./runner/cmd/runner", runnerPath},
-	} {
-		cmd := exec.Command("go", "build", "-o", b.out, b.pkg)
-		cmd.Dir = root
-		if out, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("go build %s: %v\n%s", b.pkg, err, out)
-		}
+	cmd := exec.Command("go", "build", "-o", runnerPath, "./runner/cmd/runner")
+	cmd.Dir = root
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("go build runner: %v\n%s", err, out)
 	}
 
-	dbPath := filepath.Join(t.TempDir(), "fleet-cancel-mid.db")
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("listen: %v", err)
-	}
-	addr := ln.Addr().String()
-	_ = ln.Close()
-
-	fleetCmd := exec.Command(fleetPath)
-	fleetCmd.Env = subprocessEnv(
-		"DATABASE_PATH="+dbPath,
-		"LISTEN_ADDR="+addr,
-		"REAP_INTERVAL_SEC=3600",
-	)
-	fleetCmd.Stdout = io.Discard
-	fleetCmd.Stderr = newTestLogWriter(t, "fleet-manager")
-	if err := fleetCmd.Start(); err != nil {
-		t.Fatalf("start fleet-manager: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = fleetCmd.Process.Signal(syscall.SIGTERM)
-		_, _ = fleetCmd.Process.Wait()
-	})
-
-	baseURL := "http://" + addr
-	waitReady(t, baseURL+"/healthz", 5*time.Second)
+	stack := startBrokerStack(t, root, binDir)
+	baseURL := stack.BrokerURL
 
 	received := make(chan api.WebhookPayload, 1)
 	whSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -207,7 +145,8 @@ func TestCancelClaimedStopsArgvSleep(t *testing.T) {
 
 	runnerCmd := exec.Command(runnerPath)
 	runnerCmd.Env = runnerSubprocessEnv(
-		"FLEET_MANAGER_URL="+baseURL,
+		"TASK_BROKER_URL="+baseURL,
+		"RUNNER_FLEET_ID="+stack.FleetID,
 		"RUNNER_ID=e2e-cancel-runner",
 		"POLL_EMPTY_MS=20",
 	)
@@ -221,9 +160,12 @@ func TestCancelClaimedStopsArgvSleep(t *testing.T) {
 		_, _ = runnerCmd.Process.Wait()
 	})
 
-	createBody, err := json.Marshal(api.CreateTaskRequest{
-		Command:    []string{"sleep", "120"},
-		WebhookURL: whSrv.URL,
+	createBody, err := json.Marshal(api.BrokerCreateTaskRequest{
+		CreateTaskRequest: api.CreateTaskRequest{
+			Command:    []string{"sleep", "120"},
+			WebhookURL: whSrv.URL,
+		},
+		FleetID: stack.FleetID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -236,7 +178,7 @@ func TestCancelClaimedStopsArgvSleep(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	setE2EFleetAuth(req)
+	setE2EBrokerAuth(req, stack.AuthToken)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -257,7 +199,7 @@ func TestCancelClaimedStopsArgvSleep(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	setE2EFleetAuth(cancelReq)
+	setE2EBrokerAuth(cancelReq, stack.AuthToken)
 	cancelResp, err := http.DefaultClient.Do(cancelReq)
 	if err != nil {
 		t.Fatal(err)

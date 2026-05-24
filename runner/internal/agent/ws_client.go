@@ -22,11 +22,11 @@ const wsClientWriteWait = 10 * time.Second
 
 const wsClientReadIdle = 90 * time.Second
 
-func fleetStreamURL(base string) (string, error) {
+func brokerStreamURL(base string) (string, error) {
 	b := strings.TrimSpace(base)
 	b = strings.TrimRight(b, "/")
 	if b == "" {
-		return "", errors.New("empty fleet manager base URL")
+		return "", errors.New("empty task broker base URL")
 	}
 	switch {
 	case strings.HasPrefix(b, "https://"):
@@ -34,11 +34,11 @@ func fleetStreamURL(base string) (string, error) {
 	case strings.HasPrefix(b, "http://"):
 		return "ws://" + strings.TrimPrefix(b, "http://") + "/v1/runners/stream", nil
 	default:
-		return "", fmt.Errorf("FLEET_MANAGER_URL must start with http:// or https://")
+		return "", fmt.Errorf("TASK_BROKER_URL must start with http:// or https://")
 	}
 }
 
-// transportWebSocket reports whether to use fleet-manager WebSocket (GET /v1/runners/stream).
+// transportWebSocket reports whether to use task-broker WebSocket (GET /v1/runners/stream).
 // Default is WebSocket. Set Transport to "http", "polling", or "legacy" (case-insensitive) for HTTP claim/complete.
 func transportWebSocket(c Config) bool {
 	switch strings.ToLower(strings.TrimSpace(c.Transport)) {
@@ -49,7 +49,7 @@ func transportWebSocket(c Config) bool {
 	}
 }
 
-// RunWebSocket runs the agent against fleet-manager using GET /v1/runners/stream.
+// RunWebSocket runs the agent against task-broker using GET /v1/runners/stream.
 // It reconnects with a fixed delay after session errors. Returns nil after one task when ExitAfterEachTask is set.
 func RunWebSocket(ctx context.Context, a *Agent) error {
 	for {
@@ -64,7 +64,7 @@ func RunWebSocket(ctx context.Context, a *Agent) error {
 			return err
 		}
 		if a.Config.Log != nil {
-			a.Config.Log.Warn("fleet_manager_ws", slog.String("op", "session"), slog.Any("err", err))
+			a.Config.Log.Warn("task_broker_ws", slog.String("op", "session"), slog.Any("err", err))
 		}
 		select {
 		case <-ctx.Done():
@@ -75,7 +75,7 @@ func RunWebSocket(ctx context.Context, a *Agent) error {
 }
 
 func runWebSocketSession(ctx context.Context, a *Agent) error {
-	wsURL, err := fleetStreamURL(a.Config.BaseURL)
+	wsURL, err := brokerStreamURL(a.Config.BaseURL)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 	defer func() { _ = conn.Close() }()
 
 	if a.Config.Log != nil {
-		a.Config.Log.Info("fleet_manager_ws", slog.String("op", "connect"), slog.String("url", wsURL))
+		a.Config.Log.Info("task_broker_ws", slog.String("op", "connect"), slog.String("url", wsURL))
 	}
 
 	var writeMu sync.Mutex
@@ -111,6 +111,7 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 	hello := wsrunner.Hello{
 		Type:         wsrunner.TypeHello,
 		RunnerID:     a.Config.RunnerID,
+		FleetID:      a.Config.FleetID,
 		LeaseSeconds: int((10 * time.Minute).Seconds()),
 	}
 	writeMu.Lock()
@@ -186,7 +187,7 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 			return fmt.Errorf("complete failed: %d %s", wse.Code, wse.Message)
 		case wsrunner.TypeAck:
 			if a.Config.Log != nil {
-				a.Config.Log.Info("fleet_manager_ws",
+				a.Config.Log.Info("task_broker_ws",
 					slog.String("op", "complete_task"),
 					slog.String("runner_id", a.Config.RunnerID),
 					slog.String("task_id", task.ID),

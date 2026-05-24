@@ -1,14 +1,10 @@
 DOCKER_SERVICES := fleet-manager task-broker runner
 
-# Local dev defaults (override: make runner LOCAL_FLEET_URL=http://host.docker.internal:8080)
+# Local dev defaults (override on the command line)
 LOCAL_TMP ?= /tmp
-LOCAL_FLEET_DB ?= $(LOCAL_TMP)/superplane-fleet-local.db
 LOCAL_BROKER_DATABASE_URL ?= postgres://broker:broker@127.0.0.1:5432/broker?sslmode=disable
-LOCAL_FLEET_LISTEN ?= :8080
 LOCAL_BROKER_LISTEN ?= :8081
-LOCAL_FLEET_URL ?= http://127.0.0.1:8080
 LOCAL_BROKER_URL ?= http://127.0.0.1:8081
-LOCAL_BROKER_PUBLIC_URL ?= http://127.0.0.1:8081
 LOCAL_STACK_AUTH_TOKEN ?= dev-local-token
 LOCAL_FLEET_ID ?= local
 LOCAL_RUNNER_TRANSPORT ?= http
@@ -30,38 +26,38 @@ test:
 
 local-dev-help:
 	@echo "Local dev (separate terminals):"
-	@echo "  make fleet-manager"
 	@echo "  make task-broker"
 	@echo "  make register-local-fleet"
 	@echo "  make runner N=3"
 	@echo "Defaults are LOCAL_* / LOCAL_STACK_* / LOCAL_RUNNER_* / N in the Makefile (override on the command line)."
 
-# Long-running: run in its own terminal.
+# Long-running: run in its own terminal (EC2 hot pool only; optional for local dev).
 fleet-manager: build
-	DATABASE_PATH=$(LOCAL_FLEET_DB) LISTEN_ADDR=$(LOCAL_FLEET_LISTEN) AUTH_TOKEN= ./bin/fleet-manager
+	AUTH_TOKEN= ./bin/fleet-manager
 
 # Long-running: run in its own terminal.
 task-broker: build
 	DATABASE_URL=$(LOCAL_BROKER_DATABASE_URL) LISTEN_ADDR=$(LOCAL_BROKER_LISTEN) \
-		BROKER_PUBLIC_URL=$(LOCAL_BROKER_PUBLIC_URL) AUTH_TOKEN=$(LOCAL_STACK_AUTH_TOKEN) ./bin/task-broker
+		AUTH_TOKEN=$(LOCAL_STACK_AUTH_TOKEN) ./bin/task-broker
 
-# After fleet-manager + task-broker are listening; registers LOCAL_FLEET_ID → LOCAL_FLEET_URL on the broker.
+# After task-broker is listening; registers LOCAL_FLEET_ID on the broker.
 register-local-fleet:
 	curl -fsS -X POST "$(LOCAL_BROKER_URL)/v1/fleets" \
 		-H "Content-Type: application/json" \
 		-H "Authorization: Bearer $(LOCAL_STACK_AUTH_TOKEN)" \
-		-d '{"id":"$(LOCAL_FLEET_ID)","base_url":"$(LOCAL_FLEET_URL)"}'
+		-d '{"id":"$(LOCAL_FLEET_ID)","labels":["local"]}'
 
 # Blocks until all N runner processes exit. N=1 is one foreground-equivalent worker.
 runner: build
 	@set -e; n="$(N)"; i=1; \
 	while [ "$$i" -le "$$n" ]; do \
 	  ( cd "$(CURDIR)" && \
-	    FLEET_MANAGER_URL="$(LOCAL_FLEET_URL)" \
+	    TASK_BROKER_URL="$(LOCAL_BROKER_URL)" \
+	    RUNNER_FLEET_ID="$(LOCAL_FLEET_ID)" \
 	    RUNNER_TRANSPORT="$(LOCAL_RUNNER_TRANSPORT)" \
 	    RUNNER_SHELL_USE_PIPE="$(LOCAL_RUNNER_SHELL_USE_PIPE)" \
 	    RUNNER_ID="runner-$$i" \
-	    AUTH_TOKEN= \
+	    AUTH_TOKEN="$(LOCAL_STACK_AUTH_TOKEN)" \
 	    exec ./bin/runner ) & \
 	  i=$$((i+1)); \
 	done; \

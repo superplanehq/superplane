@@ -2,9 +2,9 @@
 
 Monorepo (single Go module) for **task-broker**, **fleet-manager**, and the **runner** worker.
 
-- **Task-broker** — optional front door: registers downstream fleet-manager instances (per region/cloud), routes `POST /v1/tasks`, and relays completion webhooks to callers (`task_id` is broker-scoped; `fleet_task_id` identifies the upstream task).
-- **Fleet-manager** — durable queue per fleet; runners use **WebSocket** by default (`GET /v1/runners/stream`) or optional HTTP claim/complete when **`RUNNER_TRANSPORT=http`**. Completions POST to either the caller webhook or the broker relay URL.
-- **Runner** — long-lived worker: claims tasks, executes `command` argv or multi-line **`commands`** shell scripts, completes results.
+- **Task-broker** — SuperPlane front door: registers runner fleets, owns the Postgres task queue, serves runner WebSocket/HTTP APIs, and delivers completion webhooks to callers.
+- **Fleet-manager** — EC2-only: maintains a hot pool of runner VMs, health-sweeps `GET /healthz` on private IPs, and reconciles capacity. No task queue.
+- **Runner** — worker: connects to **task-broker** (`TASK_BROKER_URL`, `RUNNER_FLEET_ID`), claims tasks, executes `command` or **`commands`**, completes results. Exposes **`GET /healthz`** on `RUNNER_HEALTH_ADDR` (default `:9090`).
 
 Shared JSON types live under **`shared/`**; webhook retries use **`shared/webhook`**.
 
@@ -14,10 +14,10 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for design detail.
 
 ```
 .
-├── task-broker/            # proxy + fleet registry + webhook relay
+├── task-broker/            # fleet registry + Postgres queue + runner API + webhooks
 │   ├── cmd/task-broker/
 │   └── internal/…
-├── fleet-manager/          # queue + HTTP API (per fleet)
+├── fleet-manager/          # EC2 hot pool + health reconcile (optional)
 │   ├── cmd/fleet-manager/
 │   └── internal/…
 ├── runner/                 # worker agent
@@ -27,7 +27,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for design detail.
 │   ├── api/               # REST DTOs (incl. broker types)
 │   ├── models/
 │   └── webhook/           # retrying POST client
-├── test/                  # e2e tests (fleet-only and broker+fleet stacks)
+├── test/                  # e2e tests (task-broker + runner)
 ├── go.mod
 └── Makefile
 ```
