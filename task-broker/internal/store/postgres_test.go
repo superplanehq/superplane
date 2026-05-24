@@ -127,3 +127,42 @@ func TestPostgresStoreFindFleetByLabelsEmpty(t *testing.T) {
 		t.Fatalf("expected nil, got %#v", match)
 	}
 }
+
+func TestPostgresStoreListActiveTasks(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	create := func(id string, status models.TaskStatus) {
+		t.Helper()
+		if err := st.CreateTask(ctx, &models.Task{
+			ID:         id,
+			FleetID:    "fleet-a",
+			Command:    []string{"echo"},
+			WebhookURL: "https://example.com/hook",
+			Status:     status,
+			CreatedAt:  now,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	create("queued-1", models.StatusQueued)
+	create("claimed-1", models.StatusClaimed)
+	create("done-1", models.StatusSucceeded)
+	create("failed-1", models.StatusFailed)
+	create("canceled-1", models.StatusCanceled)
+
+	active, err := st.ListActiveTasks(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(active) != 2 {
+		t.Fatalf("active tasks: got %d want 2: %#v", len(active), active)
+	}
+	if active[0].ID != "queued-1" || active[1].ID != "claimed-1" {
+		t.Fatalf("order/ids: %#v", active)
+	}
+}

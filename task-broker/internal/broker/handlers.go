@@ -228,6 +228,20 @@ func (s *Server) claimTask(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, api.ClaimTaskResponse{Task: payload})
 }
 
+func (s *Server) listTasks(w http.ResponseWriter, r *http.Request) {
+	tasks, err := s.Store.ListActiveTasks(r.Context())
+	if err != nil {
+		s.logErr("list active tasks", err)
+		writeError(w, http.StatusInternalServerError, "could not list tasks")
+		return
+	}
+	out := make([]api.TaskStatusResponse, 0, len(tasks))
+	for _, task := range tasks {
+		out = append(out, taskStatusResponse(task, s))
+	}
+	writeJSON(w, http.StatusOK, api.ListTasksResponse{Tasks: out})
+}
+
 func (s *Server) getTask(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
 	if id == "" {

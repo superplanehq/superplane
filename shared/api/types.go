@@ -185,5 +185,10 @@ type CancelTaskResponse struct {
 	Status string `json:"status"` // task status after the operation
 }
 
+// ListTasksResponse is GET task-broker /v1/tasks (non-terminal tasks only).
+type ListTasksResponse struct {
+	Tasks []TaskStatusResponse `json:"tasks"`
+}
+
 // BrokerGetTaskResponse is GET task-broker /v1/tasks/{id} (same shape as TaskStatusResponse).
 type BrokerGetTaskResponse = TaskStatusResponse
