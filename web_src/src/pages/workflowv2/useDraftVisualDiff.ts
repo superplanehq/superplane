@@ -128,7 +128,7 @@ export function useDraftVisualDiff({
 }: UseDraftVisualDiffArgs) {
   const { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff } = useDiffSubToggles();
   const draftDiffResult = useMemo(() => {
-    if (!enabled || !isViewingDraftVersion || !canvas?.spec) {
+    if (!isViewingDraftVersion || !canvas?.spec) {
       return undefined;
     }
 
@@ -138,10 +138,10 @@ export function useDraftVisualDiff({
     } as CanvasesCanvasVersion;
 
     return buildDraftDiffMap(liveCanvasVersion, draftVersionForDiff);
-  }, [enabled, canvas?.spec, isViewingDraftVersion, latestDraftVersion, liveCanvasVersion, selectedCanvasVersion]);
+  }, [canvas?.spec, isViewingDraftVersion, latestDraftVersion, liveCanvasVersion, selectedCanvasVersion]);
 
   const nodes = useMemo(() => {
-    const nodesWithStatuses = applyNodeStatuses(preparedNodes, draftDiffResult?.statusMap);
+    const nodesWithStatuses = enabled ? applyNodeStatuses(preparedNodes, draftDiffResult?.statusMap) : preparedNodes;
     if (!showDeletedNodes || !draftDiffResult?.removedNodes.length || !liveCanvasVersion?.spec?.nodes || !canvasId) {
       return nodesWithStatuses;
     }
@@ -182,6 +182,7 @@ export function useDraftVisualDiff({
     canvasId,
     draftDiffResult?.removedNodes,
     draftDiffResult?.statusMap,
+    enabled,
     liveCanvasVersion?.spec,
     preparedNodes,
     queryClient,
@@ -197,39 +198,23 @@ export function useDraftVisualDiff({
   }, [enabled, isViewingDraftVersion, showEdgeDiff, liveCanvasVersion, preparedEdges]);
 
   const diffCounts = useMemo(() => {
-    if (!isViewingDraftVersion || !canvas?.spec) return { added: 0, updated: 0, removed: 0 };
-
     let added = 0;
     let updated = 0;
     let removed = 0;
 
-    // Node diffs
-    const draftVersionForDiff = {
-      ...(latestDraftVersion || selectedCanvasVersion || {}),
-      spec: canvas.spec,
-    } as CanvasesCanvasVersion;
-    const diffResult = buildDraftDiffMap(liveCanvasVersion, draftVersionForDiff);
-    if (diffResult?.statusMap) {
-      const values = Object.values(diffResult.statusMap);
+    if (draftDiffResult?.statusMap) {
+      const values = Object.values(draftDiffResult.statusMap);
       added = values.filter((s) => s === "added").length;
       updated = values.filter((s) => s === "updated").length;
-      removed = diffResult.removedNodes?.length || 0;
+      removed = draftDiffResult.removedNodes?.length || 0;
     }
 
-    // Edge diffs
     const { addedEdges, removedEdges } = countEdgeDiffs(preparedEdges, liveCanvasVersion);
     added += addedEdges;
     removed += removedEdges;
 
     return { added, updated, removed };
-  }, [
-    isViewingDraftVersion,
-    canvas?.spec,
-    liveCanvasVersion,
-    latestDraftVersion,
-    selectedCanvasVersion,
-    preparedEdges,
-  ]);
+  }, [draftDiffResult, preparedEdges, liveCanvasVersion]);
 
   return {
     nodes,
