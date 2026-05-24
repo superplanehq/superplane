@@ -277,6 +277,7 @@ func runFleetWebhookE2E(t *testing.T, makeReq func(webhookURL string) api.Create
 		t.Fatalf("new request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	setE2EFleetAuth(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("create task: %v", err)

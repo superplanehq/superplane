@@ -1,6 +1,7 @@
 package e2e_test
 
 import (
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -10,9 +11,12 @@ import (
 	"github.com/creack/pty"
 )
 
+// E2EAuthToken is shared by fleet-manager and runner subprocesses in e2e tests.
+const E2EAuthToken = "e2e-test-token"
+
 // subprocessEnv builds an environment for child processes spawned in tests.
-// It drops AUTH_TOKEN so a developer shell exporting fleet-manager AUTH_TOKEN
-// does not make unauthenticated POST /v1/tasks return 401.
+// It drops inherited AUTH_TOKEN (so a developer shell does not leak into tests)
+// and sets E2EAuthToken when extra does not already specify AUTH_TOKEN.
 func subprocessEnv(extra ...string) []string {
 	var out []string
 	for _, kv := range os.Environ() {
@@ -21,7 +25,26 @@ func subprocessEnv(extra ...string) []string {
 		}
 		out = append(out, kv)
 	}
-	return append(out, extra...)
+	out = append(out, extra...)
+	if !envHasKey(out, "AUTH_TOKEN") {
+		out = append(out, "AUTH_TOKEN="+E2EAuthToken)
+	}
+	return out
+}
+
+func envHasKey(env []string, key string) bool {
+	prefix := key + "="
+	for _, kv := range env {
+		if strings.HasPrefix(kv, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// setE2EFleetAuth adds the bearer token expected by fleet-manager in e2e tests.
+func setE2EFleetAuth(req *http.Request) {
+	req.Header.Set("Authorization", "Bearer "+E2EAuthToken)
 }
 
 // runnerSubprocessEnv is like subprocessEnv but adjusts the worker for CI builders where

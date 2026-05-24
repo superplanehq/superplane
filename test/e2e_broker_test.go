@@ -95,9 +95,10 @@ func TestBrokerRoutesTaskAndForwardsWebhook(t *testing.T) {
 	fleetBase := "http://" + fleetAddr
 
 	regBody, err := json.Marshal(api.RegisterFleetRequest{
-		ID:      "e2e-fleet",
-		BaseURL: fleetBase,
-		Labels:  []string{"e2e", "tier-test"},
+		ID:        "e2e-fleet",
+		BaseURL:   fleetBase,
+		AuthToken: E2EAuthToken,
+		Labels:    []string{"e2e", "tier-test"},
 	})
 	if err != nil {
 		t.Fatal(err)

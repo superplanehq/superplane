@@ -89,6 +89,7 @@ func TestCancelQueuedImmediateWebhook(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	setE2EFleetAuth(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +108,7 @@ func TestCancelQueuedImmediateWebhook(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	setE2EFleetAuth(cancelReq)
 	cancelResp, err := http.DefaultClient.Do(cancelReq)
 	if err != nil {
 		t.Fatal(err)
@@ -234,6 +236,7 @@ func TestCancelClaimedStopsArgvSleep(t *testing.T) {
 		t.Fatal(err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	setE2EFleetAuth(req)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -254,6 +257,7 @@ func TestCancelClaimedStopsArgvSleep(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	setE2EFleetAuth(cancelReq)
 	cancelResp, err := http.DefaultClient.Do(cancelReq)
 	if err != nil {
 		t.Fatal(err)
