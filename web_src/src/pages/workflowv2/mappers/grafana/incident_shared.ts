@@ -83,12 +83,13 @@ export function formatDetailTimestamp(value?: string, fallback?: string): string
   return date.toLocaleString();
 }
 
-export function truncate(value: string | undefined, maxLength: number): string | undefined {
-  if (!value) {
+export function truncate(value: unknown, maxLength: number): string | undefined {
+  const str = typeof value === "string" ? value : value == null ? undefined : String(value);
+  if (!str) {
     return undefined;
   }
 
-  return value.length > maxLength ? value.substring(0, maxLength).trimEnd() + "..." : value;
+  return str.length > maxLength ? str.substring(0, maxLength).trimEnd() + "..." : str;
 }
 
 function formatIncidentLabels(incident: GrafanaIncident): string | undefined {
