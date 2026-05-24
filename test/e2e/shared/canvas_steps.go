@@ -95,12 +95,16 @@ func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
 func (s *CanvasSteps) Create() {
 	s.session.Visit("/" + s.session.OrgID.String() + "/")
 	s.session.Click(q.Text("New App"))
-	s.session.Sleep(300)
-	s.session.FillIn(q.TestID("create-app-name-input"), s.CanvasName)
-	s.session.Click(q.TestID("create-app-save-button"))
-	s.session.Sleep(1000)
+	s.session.Sleep(3000)
 
 	s.WorkflowID = extractCanvasIDFromURL(s.t, s.session.Page().URL())
+
+	// Rename the canvas to the desired name (instant create uses random names)
+	err := database.Conn().
+		Model(&models.Canvas{}).
+		Where("workflow_id = ?", s.WorkflowID).
+		Update("name", s.CanvasName).Error
+	require.NoError(s.t, err)
 }
 
 func extractCanvasIDFromURL(t *testing.T, rawURL string) uuid.UUID {
