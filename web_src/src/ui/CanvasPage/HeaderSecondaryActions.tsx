@@ -17,8 +17,7 @@ export function SecondaryHeaderActions({
   hasUnpublishedDraftChanges,
   onShowDiff,
   visualDiffEnabled,
-  diffCounts,
-  diffToggles,
+  draftVisualDiff,
   onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
@@ -72,8 +71,7 @@ export function SecondaryHeaderActions({
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
           onShowDiff={onShowDiff}
           visualDiffEnabled={visualDiffEnabled}
-          diffCounts={diffCounts}
-          diffToggles={diffToggles}
+          draftVisualDiff={draftVisualDiff}
           onToggleVisualDiff={onToggleVisualDiff}
           onDiscardVersion={onDiscardVersion}
           discardVersionDisabled={discardVersionDisabled}
@@ -176,8 +174,7 @@ function EditModeVersionActions({
   hasUnpublishedDraftChanges,
   onShowDiff,
   visualDiffEnabled,
-  diffCounts,
-  diffToggles,
+  draftVisualDiff,
   onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
@@ -194,8 +191,7 @@ function EditModeVersionActions({
   | "hasUnpublishedDraftChanges"
   | "onShowDiff"
   | "visualDiffEnabled"
-  | "diffCounts"
-  | "diffToggles"
+  | "draftVisualDiff"
   | "onToggleVisualDiff"
   | "onDiscardVersion"
   | "discardVersionDisabled"
@@ -212,12 +208,12 @@ function EditModeVersionActions({
     <div className="flex items-center gap-2">
       {hasUnpublishedDraftChanges ? (
         <>
-          {diffCounts && (
+          {draftVisualDiff?.diffCounts && (
             <DiffSummaryHoverCard
-              diffCounts={diffCounts}
+              diffCounts={draftVisualDiff.diffCounts}
               visualDiffEnabled={visualDiffEnabled}
               onToggleVisualDiff={onToggleVisualDiff}
-              diffToggles={diffToggles}
+              diffToggles={draftVisualDiff.diffToggles}
               onShowDiff={onShowDiff}
             />
           )}

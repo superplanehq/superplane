@@ -20,12 +20,14 @@ export interface HeaderProps {
   onShowDiff?: () => void;
   visualDiffEnabled?: boolean;
   onToggleVisualDiff?: () => void;
-  diffCounts?: { added: number; updated: number; removed: number };
-  diffToggles?: {
-    showDeletedNodes: boolean;
-    toggleShowDeletedNodes: () => void;
-    showEdgeDiff: boolean;
-    toggleShowEdgeDiff: () => void;
+  draftVisualDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
+    diffToggles: {
+      showDeletedNodes: boolean;
+      toggleShowDeletedNodes: () => void;
+      showEdgeDiff: boolean;
+      toggleShowEdgeDiff: () => void;
+    };
   };
   organizationId?: string;
   saveIsPrimary?: boolean;

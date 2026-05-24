@@ -13,7 +13,6 @@ import { buildDraftDiffMap } from "./draftNodeDiff";
 import { prepareNode } from "./workflowPageHelpers";
 
 type UseDraftVisualDiffArgs = {
-  enabled: boolean;
   isViewingDraftVersion: boolean;
   canvas: CanvasesCanvas | null | undefined;
   liveCanvasVersion?: CanvasesCanvasVersion;
@@ -112,8 +111,9 @@ function buildEdgesWithDiff(preparedEdges: CanvasEdge[], liveCanvasVersion?: Can
   return [...styledEdges, ...removedEdges];
 }
 
+export type DraftVisualDiffResult = ReturnType<typeof useDraftVisualDiff>;
+
 export function useDraftVisualDiff({
-  enabled,
   isViewingDraftVersion,
   canvas,
   liveCanvasVersion,
@@ -126,6 +126,7 @@ export function useDraftVisualDiff({
   canvasId,
   queryClient,
 }: UseDraftVisualDiffArgs) {
+  const { visualDiffEnabled: enabled, toggleVisualDiff } = useVisualDiffToggle();
   const { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff } = useDiffSubToggles();
   const draftDiffResult = useMemo(() => {
     if (!isViewingDraftVersion || !canvas?.spec) {
@@ -142,7 +143,13 @@ export function useDraftVisualDiff({
 
   const nodes = useMemo(() => {
     const nodesWithStatuses = enabled ? applyNodeStatuses(preparedNodes, draftDiffResult?.statusMap) : preparedNodes;
-    if (!showDeletedNodes || !draftDiffResult?.removedNodes.length || !liveCanvasVersion?.spec?.nodes || !canvasId) {
+    if (
+      !enabled ||
+      !showDeletedNodes ||
+      !draftDiffResult?.removedNodes.length ||
+      !liveCanvasVersion?.spec?.nodes ||
+      !canvasId
+    ) {
       return nodesWithStatuses;
     }
 
@@ -220,6 +227,8 @@ export function useDraftVisualDiff({
     nodes,
     edges,
     diffCounts,
+    visualDiffEnabled: enabled,
+    toggleVisualDiff,
     diffToggles: { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff },
   };
 }
