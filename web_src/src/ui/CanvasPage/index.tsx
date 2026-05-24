@@ -160,6 +160,13 @@ export interface CanvasPageProps {
   onShowDiff?: () => void;
   onShowNodeDiff?: (nodeId: string) => void;
   visualDiffEnabled?: boolean;
+  diffCounts?: { added: number; updated: number; removed: number };
+  diffToggles?: {
+    showDeletedNodes: boolean;
+    toggleShowDeletedNodes: () => void;
+    showEdgeDiff: boolean;
+    toggleShowEdgeDiff: () => void;
+  };
   onToggleVisualDiff?: () => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
@@ -1253,7 +1260,9 @@ function CanvasPage(props: CanvasPageProps) {
           onDiscardVersion={props.onDiscardVersion}
           onShowDiff={props.onShowDiff}
           visualDiffEnabled={props.visualDiffEnabled}
+          diffCounts={props.diffCounts}
           onToggleVisualDiff={props.onToggleVisualDiff}
+          diffToggles={props.diffToggles}
           publishVersionDisabled={props.publishVersionDisabled}
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
           discardVersionDisabled={props.discardVersionDisabled}
@@ -1761,7 +1770,9 @@ function CanvasContentHeader({
   onDiscardVersion,
   onShowDiff,
   visualDiffEnabled,
+  diffCounts,
   onToggleVisualDiff,
+  diffToggles,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
   discardVersionDisabled,
@@ -1797,6 +1808,13 @@ function CanvasContentHeader({
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
   visualDiffEnabled?: boolean;
+  diffCounts?: { added: number; updated: number; removed: number };
+  diffToggles?: {
+    showDeletedNodes: boolean;
+    toggleShowDeletedNodes: () => void;
+    showEdgeDiff: boolean;
+    toggleShowEdgeDiff: () => void;
+  };
   onToggleVisualDiff?: () => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
@@ -1844,7 +1862,9 @@ function CanvasContentHeader({
       onShowDiff={onShowDiff}
       visualDiffEnabled={visualDiffEnabled}
       onToggleVisualDiff={onToggleVisualDiff}
+      diffCounts={diffCounts}
       publishVersionDisabled={publishVersionDisabled}
+      diffToggles={diffToggles}
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
