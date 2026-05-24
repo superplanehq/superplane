@@ -12,7 +12,7 @@ import (
 
 // DefaultExecutionTimeoutSeconds is used when create omits execution_timeout_seconds
 // (runner wall-clock limit and fleet-manager lease lower bound for COALESCE).
-const DefaultExecutionTimeoutSeconds = 540 // 9 minutes
+const DefaultExecutionTimeoutSeconds = 3600 // 1 hour
 
 // MaxExecutionTimeoutSecondsRequest is the largest execution_timeout_seconds accepted on create.
 const MaxExecutionTimeoutSecondsRequest = 86400 // 24 hours
