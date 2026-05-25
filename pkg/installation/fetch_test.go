@@ -51,3 +51,29 @@ func TestFetchCanvasFromPublicRepo(t *testing.T) {
 	assert.NotEmpty(t, canvas.GetMetadata().GetName())
 	assert.NotEmpty(t, canvas.GetSpec().GetNodes())
 }
+
+func TestFetchConsoleRequiresRef(t *testing.T) {
+	_, err := FetchConsole(&Repository{Owner: "acme", Name: "demo"}, "")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "resolved ref")
+}
+
+func TestFetchConsoleReturnsNilWhenMissing(t *testing.T) {
+	// The reference app repo ships a canvas.yaml but no console.yaml.
+	// FetchConsole must treat the missing file as opt-in (nil, nil) so that
+	// apps without a bundled console still install cleanly.
+	repo, err := ParseRepository("github.com/superplanehq/preview-env-github-digitalocean")
+	require.NoError(t, err)
+
+	console, err := FetchConsole(repo, "main")
+	require.NoError(t, err)
+	assert.Nil(t, console)
+}
+
+func TestRawFileURLBuildsExpectedPath(t *testing.T) {
+	repo := &Repository{Owner: "acme", Name: "demo"}
+	assert.Equal(t,
+		"https://raw.githubusercontent.com/acme/demo/main/console.yaml",
+		rawFileURL(repo, "main", consoleFileName),
+	)
+}

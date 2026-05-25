@@ -46,6 +46,49 @@ function comparableEdgesSnapshot(edges: unknown): string {
   return JSON.stringify(normalized);
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeComparableValue(value: unknown): unknown {
+  if (value === undefined) {
+    return null;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(normalizeComparableValue);
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  const normalized = Object.keys(value)
+    .sort((left, right) => left.localeCompare(right))
+    .reduce<Record<string, unknown>>((acc, key) => {
+      if (value[key] === undefined) {
+        return acc;
+      }
+
+      acc[key] = normalizeComparableValue(value[key]);
+      return acc;
+    }, {});
+
+  return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+function comparableNode(node: Record<string, unknown>) {
+  return {
+    name: node.name || null,
+    type: node.type || null,
+    ref: node.ref || null,
+    configuration: normalizeComparableValue(node.configuration),
+    position: normalizeComparableValue(node.position),
+    isCollapsed: node.isCollapsed || false,
+    integrationId: getComparableIntegrationId(node),
+  };
+}
+
 /** True when draft workflow graph differs from live (nodes and/or edges). */
 export function hasDraftVersusLiveGraphDiff(
   liveVersion?: CanvasesCanvasVersion,
@@ -76,16 +119,6 @@ export function buildDraftNodeDiffSummary(
     });
     return map;
   };
-
-  const comparableNode = (node: Record<string, unknown>) => ({
-    name: node.name || null,
-    type: node.type || null,
-    ref: node.ref || null,
-    configuration: node.configuration || null,
-    position: node.position || null,
-    isCollapsed: node.isCollapsed || false,
-    integrationId: getComparableIntegrationId(node),
-  });
 
   const formatDiffValueLines = (value: unknown): string[] => {
     const normalizedValue = value === undefined ? null : value;
@@ -242,7 +275,7 @@ export function buildDraftDiffMap(
       name: node.name || null,
       type: node.type || null,
       ref: node.ref || null,
-      configuration: node.configuration || null,
+      configuration: normalizeComparableValue(node.configuration),
       isCollapsed: node.isCollapsed || false,
       integrationId: getComparableIntegrationId(node),
     });

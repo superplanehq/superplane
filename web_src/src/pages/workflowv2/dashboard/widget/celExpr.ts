@@ -95,6 +95,7 @@ const BUILTIN_FUNCTIONS: Record<string, CallableFunction> = {
   upper: (s: unknown) => (s == null ? "" : String(s).toUpperCase()),
   duration: (seconds: unknown) => formatDurationSeconds(Number(seconds)),
   timestamp: (seconds: unknown) => formatTimestampSeconds(Number(seconds)),
+  formatDate,
 };
 
 function toInt(value: unknown): number {
@@ -148,6 +149,91 @@ function formatTimestampSeconds(value: number): string {
   const date = new Date(ms);
   if (Number.isNaN(date.getTime())) return "";
   return date.toISOString();
+}
+
+/**
+ * Format a date value using a small token pattern (e.g. `MM/dd`, `yyyy-MM-dd HH:mm`).
+ *
+ * The value may be an ISO-8601 string, a `Date` instance, an epoch number in
+ * seconds (`< 1e12`), or an epoch number in milliseconds (`>= 1e12`). All
+ * tokens render in the viewer's local time, matching the rest of the
+ * dashboard's display conventions (`widgetFormat.ts` also uses `toLocale*`).
+ *
+ * Returns an empty string when the value cannot be parsed or when the pattern
+ * is missing — this is consistent with the other builtins and keeps widgets
+ * resilient to malformed source data.
+ *
+ * Supported tokens (longest matched first):
+ *   yyyy, yy        – four / two digit year
+ *   MM, M           – two / one-or-two digit month (1-12)
+ *   dd, d           – two / one-or-two digit day of month
+ *   HH, H           – two / one-or-two digit hour (0-23)
+ *   mm, m           – two / one-or-two digit minute
+ *   ss, s           – two / one-or-two digit second
+ *
+ * Other characters in the pattern are preserved literally. Authors who need a
+ * literal letter that overlaps a token should pick a different separator.
+ */
+function formatDate(value: unknown, pattern: unknown): string {
+  if (typeof pattern !== "string" || pattern === "") return "";
+  const date = coerceToDate(value);
+  if (!date) return "";
+  return formatDateTokens(date, pattern);
+}
+
+function coerceToDate(value: unknown): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    const parsed = Date.parse(trimmed);
+    return Number.isFinite(parsed) ? new Date(parsed) : null;
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null;
+    const ms = value >= 1e12 ? value : value * 1000;
+    const date = new Date(ms);
+    return Number.isFinite(date.getTime()) ? date : null;
+  }
+  return null;
+}
+
+const DATE_TOKEN_RE = /yyyy|yy|MM|M|dd|d|HH|H|mm|m|ss|s/g;
+
+function formatDateTokens(date: Date, pattern: string): string {
+  return pattern.replace(DATE_TOKEN_RE, (token) => {
+    switch (token) {
+      case "yyyy":
+        return String(date.getFullYear());
+      case "yy":
+        return String(date.getFullYear() % 100).padStart(2, "0");
+      case "MM":
+        return String(date.getMonth() + 1).padStart(2, "0");
+      case "M":
+        return String(date.getMonth() + 1);
+      case "dd":
+        return String(date.getDate()).padStart(2, "0");
+      case "d":
+        return String(date.getDate());
+      case "HH":
+        return String(date.getHours()).padStart(2, "0");
+      case "H":
+        return String(date.getHours());
+      case "mm":
+        return String(date.getMinutes()).padStart(2, "0");
+      case "m":
+        return String(date.getMinutes());
+      case "ss":
+        return String(date.getSeconds()).padStart(2, "0");
+      case "s":
+        return String(date.getSeconds());
+      default:
+        return token;
+    }
+  });
 }
 
 export type EvalResult = { ok: true; value: unknown } | { ok: false; error: string };

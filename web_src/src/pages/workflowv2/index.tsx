@@ -97,6 +97,7 @@ import { WorkflowTemplateBanner } from "./WorkflowTemplateBanner";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
+import { activateDraftVersion, clearPublishedDraftVersion as clearDraftVersion } from "./lib/draft-spec-cache";
 import {
   isDraftVersion,
   isPublishedVersion,
@@ -1408,7 +1409,7 @@ export function WorkflowPageV2() {
       }
 
       activeCanvasVersionIdRef.current = version.metadata?.id || "";
-      setActiveCanvasVersion(version);
+      activateDraftVersion(draftCanvasSpecsRef.current, setActiveCanvasVersion, setDraftCanvasSpec, version);
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
       setLastSavedWorkflowSnapshot(null);
@@ -4266,7 +4267,7 @@ export function WorkflowPageV2() {
 
       await publishCanvasVersionMutation.mutateAsync(versionIdToPublish);
       activeCanvasVersionIdRef.current = "";
-      setActiveCanvasVersion(null);
+      clearDraftVersion(draftCanvasSpecsRef.current, setActiveCanvasVersion, setDraftCanvasSpec, versionIdToPublish);
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.delete("version");
