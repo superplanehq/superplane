@@ -6,6 +6,10 @@ export type RunnerLiveLogDialogProps = {
   execution: ExecutionInfo | null;
 };
 
+export function isExecutionInFlight(execution: ExecutionInfo): boolean {
+  return execution.state === "STATE_PENDING" || execution.state === "STATE_STARTED";
+}
+
 export type LiveLogRecord =
   | { type: "line"; text: string }
   | { type: "error"; message: string }
@@ -26,6 +30,5 @@ export type LogState = {
   sections: CommandSection[];
   orphanLines: string[];
   error: string | null;
-  streamWarning: string | null;
   isStreaming: boolean;
 };

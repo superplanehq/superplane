@@ -11,7 +11,6 @@ const initialLogState: LogState = {
   sections: [],
   orphanLines: [],
   error: null,
-  streamWarning: null,
   isStreaming: false,
 };
 
@@ -19,11 +18,14 @@ function hasRunningCommand(state: LogState): boolean {
   return state.sections.some((section) => section.status === "running");
 }
 
-function applyStreamFailure(state: LogState, message: string): LogState {
-  if (hasRunningCommand(state)) {
+function applyStreamFailure(state: LogState, message: string, executionInFlight: boolean): LogState {
+  if (
+    hasRunningCommand(state) ||
+    (executionInFlight && state.sections.length === 0 && state.orphanLines.length === 0)
+  ) {
     return {
       ...state,
-      streamWarning: "Live log stream interrupted. Reconnecting…",
+      error: null,
     };
   }
 
@@ -58,7 +60,6 @@ function appendLineToLatestSection(state: LogState, text: string, replayLineSkip
   return {
     ...state,
     sections: nextSections,
-    streamWarning: null,
   };
 }
 
@@ -80,7 +81,6 @@ function pushCommandSection(state: LogState, index: number, text: string, starte
   return {
     ...state,
     sections: [...state.sections, section],
-    streamWarning: null,
   };
 }
 
@@ -110,18 +110,18 @@ function completeCommandSection(
   return {
     ...state,
     sections: nextSections,
-    streamWarning: null,
   };
 }
 
 function createStreamHandlers(
   reconnecting: boolean,
   replayLineSkip: Map<number, number>,
+  executionInFlight: boolean,
   setState: Dispatch<SetStateAction<LogState>>,
 ): LiveLogStreamHandlers {
   return {
     onLogLine: (text) => setState((prev) => appendLineToLatestSection(prev, text, replayLineSkip)),
-    onStreamError: (message) => setState((prev) => applyStreamFailure(prev, message)),
+    onStreamError: (message) => setState((prev) => applyStreamFailure(prev, message, executionInFlight)),
     onCmdStart: (index, text, startedAtMs) => {
       setState((prev) => {
         const existing = prev.sections.find((section) => section.index === index);
@@ -164,6 +164,7 @@ type LiveLogSessionParams = {
   organizationId: string;
   canvasId: string;
   executionId: string;
+  executionInFlight: boolean;
   sessionAbort: AbortController;
   stateRef: { current: LogState };
   setState: Dispatch<SetStateAction<LogState>>;
@@ -174,6 +175,7 @@ async function runLiveLogSession({
   organizationId,
   canvasId,
   executionId,
+  executionInFlight,
   sessionAbort,
   stateRef,
   setState,
@@ -187,20 +189,24 @@ async function runLiveLogSession({
     const replayLineSkip = new Map<number, number>();
 
     try {
-      await stream.pump(createStreamHandlers(reconnecting, replayLineSkip, setState));
+      await stream.pump(createStreamHandlers(reconnecting, replayLineSkip, executionInFlight, setState));
     } catch (error) {
       if ((error as Error).name === "AbortError") {
         return;
       }
       if (!sessionAbort.signal.aborted) {
-        setState((prev) => applyStreamFailure(prev, (error as Error).message));
+        setState((prev) => applyStreamFailure(prev, (error as Error).message, executionInFlight));
       }
     } finally {
       stream.stop();
       setActiveStream(null);
     }
 
-    if (sessionAbort.signal.aborted || !hasRunningCommand(stateRef.current)) {
+    if (sessionAbort.signal.aborted) {
+      return;
+    }
+
+    if (!executionInFlight && !hasRunningCommand(stateRef.current)) {
       return;
     }
 
@@ -208,7 +214,6 @@ async function runLiveLogSession({
     setState((prev) => ({
       ...prev,
       isStreaming: false,
-      streamWarning: "Live log stream interrupted. Reconnecting…",
     }));
 
     try {
@@ -221,7 +226,7 @@ async function runLiveLogSession({
   }
 }
 
-export function useLiveLogStream(executionId: string) {
+export function useLiveLogStream(executionId: string, executionInFlight: boolean) {
   const organizationId = useOrganizationId();
   const canvasId = useCanvasId();
   const [state, setState] = useState<LogState>(initialLogState);
@@ -263,6 +268,7 @@ export function useLiveLogStream(executionId: string) {
       organizationId,
       canvasId,
       executionId,
+      executionInFlight,
       sessionAbort,
       stateRef,
       setState,
@@ -279,7 +285,7 @@ export function useLiveLogStream(executionId: string) {
       sessionAbort.abort();
       activeStream?.stop();
     };
-  }, [organizationId, canvasId, executionId]);
+  }, [organizationId, canvasId, executionId, executionInFlight]);
 
   return { ...state, toggleSection, scrollRef };
 }

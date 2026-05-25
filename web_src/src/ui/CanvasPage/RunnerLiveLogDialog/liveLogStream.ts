@@ -1,4 +1,5 @@
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
+
 type LiveLogRecordEnvelope = {
   type?: string;
   text?: string;
@@ -9,6 +10,12 @@ type LiveLogRecordEnvelope = {
   started_at?: number;
 };
 
+type LiveLogSessionResponse = {
+  stream_url?: string;
+  token?: string;
+  expires_at?: string;
+};
+
 export type LiveLogStreamHandlers = {
   onLogLine: (text: string) => void;
   onStreamError: (message: string) => void;
@@ -16,15 +23,39 @@ export type LiveLogStreamHandlers = {
   onCmdEnd?: (index: number, status: "passed" | "failed", durationMs: number) => void;
 };
 
-async function fetchRunnerLiveLogResponse(url: string, organizationId: string, signal: AbortSignal): Promise<Response> {
+async function fetchRunnerLiveLogSession(
+  sessionUrl: string,
+  organizationId: string,
+  signal: AbortSignal,
+): Promise<LiveLogSessionResponse> {
+  const res = await fetch(
+    sessionUrl,
+    withOrganizationHeader({
+      organizationId,
+      signal,
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    }),
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(body.trim() || res.statusText || `Request failed (${res.status})`);
+  }
+
+  return (await res.json()) as LiveLogSessionResponse;
+}
+
+async function fetchRunnerLiveLogResponse(url: string, token: string, signal: AbortSignal): Promise<Response> {
   const res = await fetch(url, {
     method: "GET",
-    credentials: "include",
+    credentials: "omit",
     signal,
-    ...withOrganizationHeader({
-      organizationId,
-      headers: { Accept: "application/x-ndjson" },
-    }),
+    headers: {
+      Accept: "application/x-ndjson",
+      Authorization: `Bearer ${token}`,
+      "Accept-Encoding": "identity",
+    },
   });
 
   if (!res.ok) {
@@ -140,17 +171,27 @@ async function pumpReaderNdjson(
   }
 }
 
+function requireLiveLogSession(session: LiveLogSessionResponse): { streamUrl: string; token: string } {
+  const streamUrl = session.stream_url?.trim();
+  const token = session.token?.trim();
+  if (!streamUrl || !token) {
+    throw new Error("Live log session response is incomplete");
+  }
+  return { streamUrl, token };
+}
+
 /**
- * Fetches runner NDJSON live logs and dispatches parsed records to handlers until the stream ends or aborts.
+ * Fetches a short-lived task-broker stream session from SuperPlane, then consumes NDJSON live logs
+ * directly from the task broker until the stream ends or aborts.
  */
 export class LiveLogStream {
   private readonly organizationId: string;
-  private readonly url: string;
+  private readonly sessionUrl: string;
   private readonly abortController: AbortController;
 
   constructor(organizationId: string, canvasId: string, executionId: string) {
     this.organizationId = organizationId;
-    this.url = `/api/v1/canvases/${encodeURIComponent(canvasId)}/node-executions/${encodeURIComponent(executionId)}/runner-live-logs`;
+    this.sessionUrl = `/api/v1/canvases/${encodeURIComponent(canvasId)}/node-executions/${encodeURIComponent(executionId)}/runner-live-logs/session`;
     this.abortController = new AbortController();
   }
 
@@ -159,7 +200,9 @@ export class LiveLogStream {
   }
 
   async pump(handlers: LiveLogStreamHandlers): Promise<void> {
-    const res = await fetchRunnerLiveLogResponse(this.url, this.organizationId, this.abortController.signal);
+    const session = await fetchRunnerLiveLogSession(this.sessionUrl, this.organizationId, this.abortController.signal);
+    const { streamUrl, token } = requireLiveLogSession(session);
+    const res = await fetchRunnerLiveLogResponse(streamUrl, token, this.abortController.signal);
     const reader = requireBodyReader(res);
     await pumpReaderNdjson(reader, handlers);
   }
