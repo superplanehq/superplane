@@ -226,7 +226,7 @@ func (c *AddMemory) executeListMode(ctx core.ExecutionContext, spec Spec, mode m
 
 	metadata := map[string]any{
 		"namespace":    spec.Namespace,
-		"fields":       extractFieldNames(spec.ValueList),
+		"fields":       memorywrite.FieldNames(spec.ValueList),
 		"iterateList":  true,
 		"itemVariable": mode.ItemVariable,
 		"count":        len(writtenValues),
@@ -251,23 +251,6 @@ func (c *AddMemory) executeListMode(ctx core.ExecutionContext, spec Spec, mode m
 	)
 }
 
-func extractFieldNames(pairs []ValuePair) []string {
-	fields := make([]string, 0, len(pairs))
-	seen := map[string]struct{}{}
-	for _, pair := range pairs {
-		name := strings.TrimSpace(pair.Name)
-		if name == "" {
-			continue
-		}
-		if _, ok := seen[name]; ok {
-			continue
-		}
-		seen[name] = struct{}{}
-		fields = append(fields, name)
-	}
-	return fields
-}
-
 func buildValues(spec Spec) any {
 	if len(spec.ValueList) == 0 {
 		return spec.Values
@@ -287,20 +270,7 @@ func buildValues(spec Spec) any {
 
 func buildFieldNames(spec Spec, values any) []string {
 	if len(spec.ValueList) > 0 {
-		fields := make([]string, 0, len(spec.ValueList))
-		seen := map[string]struct{}{}
-		for _, pair := range spec.ValueList {
-			name := strings.TrimSpace(pair.Name)
-			if name == "" {
-				continue
-			}
-			if _, ok := seen[name]; ok {
-				continue
-			}
-			seen[name] = struct{}{}
-			fields = append(fields, name)
-		}
-		return fields
+		return memorywrite.FieldNames(spec.ValueList)
 	}
 
 	valueMap, ok := values.(map[string]any)

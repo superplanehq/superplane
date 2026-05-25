@@ -103,8 +103,8 @@ func TestAddMemoryExecute(t *testing.T) {
 
 		expressions := &contexts.ExpressionContext{
 			Output: items,
-			ScopedOutputFn: func(expression string, scope map[string]any) (any, error) {
-				item, ok := scope["item"].(map[string]any)
+			WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+				item, ok := variables["item"].(map[string]any)
 				require.True(t, ok)
 				switch expression {
 				case "item.name":

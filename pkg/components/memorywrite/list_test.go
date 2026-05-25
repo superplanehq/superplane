@@ -9,16 +9,16 @@ import (
 )
 
 type fakeExpressionContext struct {
-	listOutput any
-	listErr    error
-	runCalls   []string
-	scopeCalls []scopeCall
-	scopeFunc  func(expression string, scope map[string]any) (any, error)
+	listOutput         any
+	listErr            error
+	runCalls           []string
+	withVariablesCalls []withVariablesCall
+	withVariablesFn    func(expression string, variables map[string]any) (any, error)
 }
 
-type scopeCall struct {
+type withVariablesCall struct {
 	expression string
-	scope      map[string]any
+	variables  map[string]any
 }
 
 func (f *fakeExpressionContext) Run(expression string) (any, error) {
@@ -26,10 +26,10 @@ func (f *fakeExpressionContext) Run(expression string) (any, error) {
 	return f.listOutput, f.listErr
 }
 
-func (f *fakeExpressionContext) RunWithScope(expression string, scope map[string]any) (any, error) {
-	f.scopeCalls = append(f.scopeCalls, scopeCall{expression: expression, scope: scope})
-	if f.scopeFunc != nil {
-		return f.scopeFunc(expression, scope)
+func (f *fakeExpressionContext) RunWithExtraVariables(expression string, variables map[string]any) (any, error) {
+	f.withVariablesCalls = append(f.withVariablesCalls, withVariablesCall{expression: expression, variables: variables})
+	if f.withVariablesFn != nil {
+		return f.withVariablesFn(expression, variables)
 	}
 	return nil, nil
 }
@@ -70,6 +70,9 @@ func TestListMode_EvaluateListCoercesShapes(t *testing.T) {
 		{"any slice", []any{1, 2}, []any{1, 2}},
 		{"maps slice", []map[string]any{{"a": 1}}, []any{map[string]any{"a": 1}}},
 		{"string slice", []string{"x", "y"}, []any{"x", "y"}},
+		{"int slice", []int{1, 2, 3}, []any{1, 2, 3}},
+		{"float64 slice", []float64{1.5, 2.5}, []any{1.5, 2.5}},
+		{"int array", [3]int{4, 5, 6}, []any{4, 5, 6}},
 		{"nil", nil, []any{}},
 	}
 	for _, tc := range cases {
@@ -92,11 +95,11 @@ func TestListMode_EvaluateListRejectsNonList(t *testing.T) {
 	assert.Contains(t, err.Error(), "listSource must evaluate to a list")
 }
 
-func TestResolveValue_StringEvaluatedWithScope(t *testing.T) {
+func TestResolveValue_StringEvaluatedWithExtraVariables(t *testing.T) {
 	expressions := &fakeExpressionContext{
-		scopeFunc: func(expression string, scope map[string]any) (any, error) {
+		withVariablesFn: func(expression string, variables map[string]any) (any, error) {
 			assert.Equal(t, "item.service", expression)
-			assert.Equal(t, "api", scope["item"].(map[string]any)["service"])
+			assert.Equal(t, "api", variables["item"].(map[string]any)["service"])
 			return "api", nil
 		},
 	}
@@ -111,7 +114,7 @@ func TestResolveValue_NonStringPassThrough(t *testing.T) {
 	got, err := ResolveValue(42, map[string]any{"item": "x"}, expressions)
 	require.NoError(t, err)
 	assert.Equal(t, 42, got)
-	assert.Empty(t, expressions.scopeCalls)
+	assert.Empty(t, expressions.withVariablesCalls)
 }
 
 func TestResolveValue_EmptyStringIsLiteral(t *testing.T) {
@@ -119,12 +122,12 @@ func TestResolveValue_EmptyStringIsLiteral(t *testing.T) {
 	got, err := ResolveValue("   ", map[string]any{}, expressions)
 	require.NoError(t, err)
 	assert.Equal(t, "   ", got)
-	assert.Empty(t, expressions.scopeCalls)
+	assert.Empty(t, expressions.withVariablesCalls)
 }
 
 func TestResolvePairs_TrimsNamesAndSkipsEmpty(t *testing.T) {
 	expressions := &fakeExpressionContext{
-		scopeFunc: func(expression string, _ map[string]any) (any, error) {
+		withVariablesFn: func(expression string, _ map[string]any) (any, error) {
 			if expression == "expr" {
 				return 42, nil
 			}
@@ -147,8 +150,8 @@ func TestResolveAllItemValues_ResolvesBeforeWrites(t *testing.T) {
 		map[string]any{"name": "worker"},
 	}
 	expressions := &fakeExpressionContext{
-		scopeFunc: func(expression string, scope map[string]any) (any, error) {
-			return scope["item"].(map[string]any)["name"], nil
+		withVariablesFn: func(expression string, variables map[string]any) (any, error) {
+			return variables["item"].(map[string]any)["name"], nil
 		},
 	}
 
@@ -165,7 +168,7 @@ func TestResolveAllItemValues_ResolvesBeforeWrites(t *testing.T) {
 func TestResolveAllItemValues_FailsOnSecondItem(t *testing.T) {
 	items := []any{map[string]any{"name": "api"}, map[string]any{"name": "worker"}}
 	expressions := &fakeExpressionContext{
-		scopeFunc: func(expression string, _ map[string]any) (any, error) {
+		withVariablesFn: func(expression string, _ map[string]any) (any, error) {
 			if expression == "bad" {
 				return nil, fmt.Errorf("boom")
 			}
@@ -185,7 +188,7 @@ func TestResolveAllItemValues_FailsOnSecondItem(t *testing.T) {
 
 func TestResolvePairs_WrapsResolveErrors(t *testing.T) {
 	expressions := &fakeExpressionContext{
-		scopeFunc: func(string, map[string]any) (any, error) {
+		withVariablesFn: func(string, map[string]any) (any, error) {
 			return nil, fmt.Errorf("boom")
 		},
 	}

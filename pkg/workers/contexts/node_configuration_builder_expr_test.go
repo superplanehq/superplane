@@ -17,20 +17,20 @@ func TestNodeConfigurationBuilder_ResolveExpression_DateWithTimezoneOption(t *te
 	require.Equal(t, "2026-03-17T01:02:03.000000001Z", out)
 }
 
-func TestNodeConfigurationBuilder_ResolveExpressionWithScope_BindsIterationVariable(t *testing.T) {
+func TestNodeConfigurationBuilder_ResolveExpressionWithExtraVariables_BindsIterationVariable(t *testing.T) {
 	b := NewNodeConfigurationBuilder(nil, uuid.Nil).WithInput(map[string]any{})
 
-	out, err := b.ResolveExpressionWithScope(`item.service`, map[string]any{
+	out, err := b.ResolveExpressionWithExtraVariables(`item.service`, map[string]any{
 		"item": map[string]any{"service": "api"},
 	})
 	require.NoError(t, err)
 	require.Equal(t, "api", out)
 }
 
-func TestNodeConfigurationBuilder_ResolveExpressionWithScope_RejectsReservedNames(t *testing.T) {
+func TestNodeConfigurationBuilder_ResolveExpressionWithExtraVariables_RejectsReservedNames(t *testing.T) {
 	b := NewNodeConfigurationBuilder(nil, uuid.Nil).WithInput(map[string]any{})
 
-	_, err := b.ResolveExpressionWithScope(`memory`, map[string]any{
+	_, err := b.ResolveExpressionWithExtraVariables(`memory`, map[string]any{
 		"memory": "hijacked",
 	})
 	require.Error(t, err)

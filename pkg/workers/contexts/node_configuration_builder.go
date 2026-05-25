@@ -245,14 +245,14 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
-	return b.ResolveExpressionWithScope(expression, nil)
+	return b.ResolveExpressionWithExtraVariables(expression, nil)
 }
 
-// ResolveExpressionWithScope evaluates an expression with extra variables
-// merged into the eval environment. Scope keys override no built-ins; we
-// reject any attempt to shadow reserved names so that `$`, `memory`, `config`,
-// `root`, and `previous` stay deterministic.
-func (b *NodeConfigurationBuilder) ResolveExpressionWithScope(expression string, scope map[string]any) (any, error) {
+// ResolveExpressionWithExtraVariables evaluates an expression with extra
+// variables merged into the eval environment. Provided keys cannot override
+// built-ins; we reject any attempt to shadow reserved names so that `$`,
+// `memory`, `config`, `root`, and `previous` stay deterministic.
+func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expression string, variables map[string]any) (any, error) {
 	referencedNodes, err := expressionvalidation.ParseReferencedNodes(expression)
 	if err != nil {
 		return "", err
@@ -272,9 +272,9 @@ func (b *NodeConfigurationBuilder) ResolveExpressionWithScope(expression string,
 		env["config"] = b.parentBlueprintNode.Configuration.Data()
 	}
 
-	for key, value := range scope {
+	for key, value := range variables {
 		if isReservedExpressionIdentifier(key) {
-			return "", fmt.Errorf("scope variable %q is reserved", key)
+			return "", fmt.Errorf("variable %q is reserved", key)
 		}
 		env[key] = value
 	}

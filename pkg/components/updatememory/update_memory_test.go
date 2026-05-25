@@ -170,8 +170,8 @@ func TestUpdateMemoryExecute(t *testing.T) {
 
 		expressions := &contexts.ExpressionContext{
 			Output: items,
-			ScopedOutputFn: func(expression string, scope map[string]any) (any, error) {
-				item := scope["item"].(map[string]any)
+			WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+				item := variables["item"].(map[string]any)
 				switch expression {
 				case "item.name":
 					return item["name"], nil
@@ -244,8 +244,8 @@ func TestUpdateMemoryExecute(t *testing.T) {
 			ExecutionState: execState,
 			Expressions: &contexts.ExpressionContext{
 				Output: items,
-				ScopedOutputFn: func(expression string, scope map[string]any) (any, error) {
-					return scope["item"].(map[string]any)["name"], nil
+				WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+					return variables["item"].(map[string]any)["name"], nil
 				},
 			},
 		})

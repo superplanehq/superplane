@@ -179,7 +179,7 @@ func (c *sequenceExpressionContext) Run(expression string) (any, error) {
 	return output, nil
 }
 
-func (c *sequenceExpressionContext) RunWithScope(expression string, _ map[string]any) (any, error) {
+func (c *sequenceExpressionContext) RunWithExtraVariables(expression string, _ map[string]any) (any, error) {
 	return c.Run(expression)
 }
 

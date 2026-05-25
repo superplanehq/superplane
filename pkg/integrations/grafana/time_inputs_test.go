@@ -15,7 +15,7 @@ func (t testExpressionContext) Run(expression string) (any, error) {
 	return t.run(expression)
 }
 
-func (t testExpressionContext) RunWithScope(expression string, _ map[string]any) (any, error) {
+func (t testExpressionContext) RunWithExtraVariables(expression string, _ map[string]any) (any, error) {
 	return t.run(expression)
 }
 

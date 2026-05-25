@@ -12,6 +12,6 @@ func (c *ExpressionContext) Run(expression string) (any, error) {
 	return c.configurationBuilder.ResolveExpression(expression)
 }
 
-func (c *ExpressionContext) RunWithScope(expression string, scope map[string]any) (any, error) {
-	return c.configurationBuilder.ResolveExpressionWithScope(expression, scope)
+func (c *ExpressionContext) RunWithExtraVariables(expression string, variables map[string]any) (any, error) {
+	return c.configurationBuilder.ResolveExpressionWithExtraVariables(expression, variables)
 }

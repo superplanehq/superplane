@@ -8,6 +8,7 @@ package memorywrite
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -101,24 +102,35 @@ func coerceToList(value any) ([]any, error) {
 			out[i] = item
 		}
 		return out, nil
-	default:
-		return nil, fmt.Errorf("listSource must evaluate to a list, got %T", value)
 	}
+
+	// Fall back to reflection so any typed slice/array (for example []int,
+	// []float64, []MyStruct) is accepted, not just the explicit fast paths above.
+	rv := reflect.ValueOf(value)
+	if rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
+		out := make([]any, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			out[i] = rv.Index(i).Interface()
+		}
+		return out, nil
+	}
+
+	return nil, fmt.Errorf("listSource must evaluate to a list, got %T", value)
 }
 
-// Scope builds the per-item expression scope (just the iteration variable
-// for now; future enhancements can add index/totalCount).
-func (m ListMode) Scope(item any) map[string]any {
+// Variables builds the per-item set of extra expression variables (just the
+// iteration variable for now; future enhancements can add index/totalCount).
+func (m ListMode) Variables(item any) map[string]any {
 	return map[string]any{m.ItemVariable: item}
 }
 
 // ResolveValue evaluates a single value field for a per-item iteration.
 //
 // String values are evaluated as bare expr expressions with the iteration
-// scope merged in. Anything else (already resolved at Build time, for
+// variables merged in. Anything else (already resolved at Build time, for
 // example via a {{ }} template) is returned unchanged so that the same
 // resolved value is written for every list element.
-func ResolveValue(value any, scope map[string]any, expressions core.ExpressionContext) (any, error) {
+func ResolveValue(value any, variables map[string]any, expressions core.ExpressionContext) (any, error) {
 	raw, ok := value.(string)
 	if !ok {
 		return value, nil
@@ -129,7 +141,7 @@ func ResolveValue(value any, scope map[string]any, expressions core.ExpressionCo
 		return raw, nil
 	}
 
-	resolved, err := expressions.RunWithScope(trimmed, scope)
+	resolved, err := expressions.RunWithExtraVariables(trimmed, variables)
 	if err != nil {
 		return nil, err
 	}
@@ -142,16 +154,35 @@ type NameValuePair struct {
 	Value any    `json:"value"`
 }
 
-// ResolvePairs evaluates each pair's value in scope and returns a map keyed by
-// trimmed name. Pairs with empty names are skipped.
-func ResolvePairs(pairs []NameValuePair, scope map[string]any, expressions core.ExpressionContext) (map[string]any, error) {
+// FieldNames returns the trimmed, deduplicated field names from a list of
+// pairs in declaration order. Pairs with empty names are skipped.
+func FieldNames(pairs []NameValuePair) []string {
+	fields := make([]string, 0, len(pairs))
+	seen := map[string]struct{}{}
+	for _, pair := range pairs {
+		name := strings.TrimSpace(pair.Name)
+		if name == "" {
+			continue
+		}
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		fields = append(fields, name)
+	}
+	return fields
+}
+
+// ResolvePairs evaluates each pair's value with the provided variables and
+// returns a map keyed by trimmed name. Pairs with empty names are skipped.
+func ResolvePairs(pairs []NameValuePair, variables map[string]any, expressions core.ExpressionContext) (map[string]any, error) {
 	values := make(map[string]any, len(pairs))
 	for _, pair := range pairs {
 		name := strings.TrimSpace(pair.Name)
 		if name == "" {
 			continue
 		}
-		resolved, err := ResolveValue(pair.Value, scope, expressions)
+		resolved, err := ResolveValue(pair.Value, variables, expressions)
 		if err != nil {
 			return nil, fmt.Errorf("field %q: %w", name, err)
 		}
@@ -170,7 +201,7 @@ func ResolveAllItemValues(
 ) ([]map[string]any, error) {
 	resolved := make([]map[string]any, 0, len(items))
 	for i, item := range items {
-		values, err := ResolvePairs(pairs, mode.Scope(item), expressions)
+		values, err := ResolvePairs(pairs, mode.Variables(item), expressions)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve values for list item %d: %w", i, err)
 		}

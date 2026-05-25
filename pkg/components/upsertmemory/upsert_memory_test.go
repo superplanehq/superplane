@@ -270,8 +270,8 @@ func TestUpsertMemoryExecute(t *testing.T) {
 
 		expressions := &contexts.ExpressionContext{
 			Output: items,
-			ScopedOutputFn: func(expression string, scope map[string]any) (any, error) {
-				return scope["item"].(map[string]any)["name"], nil
+			WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+				return variables["item"].(map[string]any)["name"], nil
 			},
 		}
 
@@ -343,8 +343,8 @@ func TestUpsertMemoryExecute(t *testing.T) {
 
 		expressions := &contexts.ExpressionContext{
 			Output: items,
-			ScopedOutputFn: func(expression string, scope map[string]any) (any, error) {
-				return scope["item"].(map[string]any)["name"], nil
+			WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+				return variables["item"].(map[string]any)["name"], nil
 			},
 		}
 

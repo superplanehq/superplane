@@ -250,8 +250,8 @@ func (c *UpdateMemory) Execute(ctx core.ExecutionContext) error {
 
 	metadata := map[string]any{
 		"namespace":    spec.Namespace,
-		"matchFields":  extractFieldNames(spec.MatchList),
-		"valueFields":  extractFieldNames(spec.ValueList),
+		"matchFields":  memorywrite.FieldNames(spec.MatchList),
+		"valueFields":  memorywrite.FieldNames(spec.ValueList),
 		"matches":      matches,
 		"updatedCount": len(updatedValues),
 	}
@@ -307,8 +307,8 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 
 	metadata := map[string]any{
 		"namespace":    spec.Namespace,
-		"matchFields":  extractFieldNames(spec.MatchList),
-		"valueFields":  extractFieldNames(spec.ValueList),
+		"matchFields":  memorywrite.FieldNames(spec.MatchList),
+		"valueFields":  memorywrite.FieldNames(spec.ValueList),
 		"matches":      matches,
 		"updatedCount": len(allUpdated),
 		"iterateList":  true,
@@ -378,23 +378,6 @@ func buildPairs(pairs []FieldPair) map[string]any {
 		values[name] = pair.Value
 	}
 	return values
-}
-
-func extractFieldNames(pairs []FieldPair) []string {
-	fields := make([]string, 0, len(pairs))
-	seen := map[string]struct{}{}
-	for _, pair := range pairs {
-		name := strings.TrimSpace(pair.Name)
-		if name == "" {
-			continue
-		}
-		if _, ok := seen[name]; ok {
-			continue
-		}
-		seen[name] = struct{}{}
-		fields = append(fields, name)
-	}
-	return fields
 }
 
 func (c *UpdateMemory) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {

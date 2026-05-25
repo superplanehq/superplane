@@ -420,22 +420,22 @@ func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
 }
 
 type ExpressionContext struct {
-	Output         any
-	Error          error
-	ScopedOutputs  map[string]any
-	ScopedOutputFn func(expression string, scope map[string]any) (any, error)
+	Output                any
+	Error                 error
+	WithVariablesOutputs  map[string]any
+	WithVariablesOutputFn func(expression string, variables map[string]any) (any, error)
 }
 
 func (c *ExpressionContext) Run(expression string) (any, error) {
 	return c.Output, c.Error
 }
 
-func (c *ExpressionContext) RunWithScope(expression string, scope map[string]any) (any, error) {
-	if c.ScopedOutputFn != nil {
-		return c.ScopedOutputFn(expression, scope)
+func (c *ExpressionContext) RunWithExtraVariables(expression string, variables map[string]any) (any, error) {
+	if c.WithVariablesOutputFn != nil {
+		return c.WithVariablesOutputFn(expression, variables)
 	}
-	if c.ScopedOutputs != nil {
-		if v, ok := c.ScopedOutputs[expression]; ok {
+	if c.WithVariablesOutputs != nil {
+		if v, ok := c.WithVariablesOutputs[expression]; ok {
 			return v, nil
 		}
 	}
