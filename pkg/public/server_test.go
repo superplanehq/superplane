@@ -27,12 +27,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type fakePublicUsageService struct {
 	checkAccountResponse *usagepb.CheckAccountLimitsResponse
+	checkAccountErr      error
 }
 
 func (s *fakePublicUsageService) Enabled() bool {
@@ -64,6 +67,10 @@ func (s *fakePublicUsageService) CheckAccountLimits(
 	string,
 	*usagepb.AccountState,
 ) (*usagepb.CheckAccountLimitsResponse, error) {
+	if s.checkAccountErr != nil {
+		return nil, s.checkAccountErr
+	}
+
 	if s.checkAccountResponse != nil {
 		return s.checkAccountResponse, nil
 	}
@@ -749,5 +756,49 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 		assert.True(t, data.UsageEnabled)
 		assert.Equal(t, int32(1), data.MaxOrganizations)
 		assert.Equal(t, "account organization limit exceeded", data.Message)
+	})
+
+	t.Run("returns 500 with diagnostic context when the usage service is unavailable", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		account, err := models.CreateAccount("status-unavailable@example.com", "Status Unavailable")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test")
+		token, err := signer.Generate(account.ID.String(), time.Hour)
+		require.NoError(t, err)
+
+		authService, err := authorization.NewAuthService()
+		require.NoError(t, err)
+
+		encryptor := &crypto.NoOpEncryptor{}
+		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+		require.NoError(t, err)
+		oidcProvider := support.NewOIDCProvider()
+		usageService := &fakePublicUsageService{
+			checkAccountErr: status.Error(codes.Unavailable, "usage service unreachable"),
+		}
+		server, err := NewServer(
+			encryptor,
+			r,
+			signer,
+			oidcProvider,
+			"",
+			"localhost",
+			"",
+			"test",
+			"/app/templates",
+			authService,
+			usageService,
+			false,
+		)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/account/limits",
+			authCookie: token,
+		})
+
+		require.Equal(t, http.StatusInternalServerError, response.Code)
 	})
 }
