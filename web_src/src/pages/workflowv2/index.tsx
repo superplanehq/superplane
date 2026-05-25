@@ -4891,6 +4891,23 @@ export function WorkflowPageV2() {
     }
   }, [handleExitDashboardMode, handleExitMemoryMode, handleExitRunsMode, isDashboardMode, isMemoryMode, isRunsMode]);
 
+  const handleDashboardAddPanelRequest = useCallback(async () => {
+    if (!hasEditableVersion) {
+      await handleToggleEditMode();
+    }
+    setIsDashboardAddPanelOpen(true);
+  }, [hasEditableVersion, handleToggleEditMode, setIsDashboardAddPanelOpen]);
+  const handleDashboardAddPanelDialogOpenChange = useCallback(
+    (open: boolean) => {
+      if (open) {
+        void handleDashboardAddPanelRequest();
+        return;
+      }
+      setIsDashboardAddPanelOpen(false);
+    },
+    [handleDashboardAddPanelRequest, setIsDashboardAddPanelOpen],
+  );
+
   const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader } = useWorkflowHeaderEditActions({
     isRunsMode,
     handleToggleEditMode,
@@ -5470,22 +5487,6 @@ export function WorkflowPageV2() {
     isRunsMode,
     isMemoryMode,
   });
-  const handleDashboardAddPanelRequest = useCallback(async () => {
-    if (!hasEditableVersion) {
-      await handleToggleEditMode();
-    }
-    setIsDashboardAddPanelOpen(true);
-  }, [hasEditableVersion, handleToggleEditMode, setIsDashboardAddPanelOpen]);
-  const handleDashboardAddPanelDialogOpenChange = useCallback(
-    (open: boolean) => {
-      if (open) {
-        void handleDashboardAddPanelRequest();
-        return;
-      }
-      setIsDashboardAddPanelOpen(false);
-    },
-    [handleDashboardAddPanelRequest, setIsDashboardAddPanelOpen],
-  );
   const { onDashboardAddPanel, onDashboardOpenYaml, dashboardYamlReadOnly } = getDashboardHeaderActions({
     isEditing: hasEditableVersion,
     isDashboardMode,
