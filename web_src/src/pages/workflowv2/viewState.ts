@@ -23,13 +23,11 @@ export function getWorkflowHeaderMode({
   dashboardsFeatureEnabled,
   isRunsMode,
   isMemoryMode,
-  canvasMode,
 }: {
   isDashboardMode: boolean;
   dashboardsFeatureEnabled: boolean;
   isRunsMode: boolean;
   isMemoryMode: boolean;
-  canvasMode: "edit" | "live";
 }): WorkflowHeaderMode {
   if (isDashboardMode) {
     return dashboardsFeatureEnabled ? "dashboard" : "version-live";
@@ -43,7 +41,7 @@ export function getWorkflowHeaderMode({
     return "runs";
   }
 
-  return canvasMode === "edit" ? "version-edit" : "version-live";
+  return "version-live";
 }
 
 export function getWorkflowCanvasStateMode({
@@ -68,6 +66,33 @@ export function getWorkflowCanvasStateMode({
   }
 
   return "default";
+}
+
+export function getWorkflowViewPresentation({
+  isDashboardMode,
+  dashboardsFeatureEnabled,
+  isRunsMode,
+  isMemoryMode,
+  hasEditableVersion,
+  isViewingPendingApprovalVersion,
+  isViewingCurrentLiveVersion,
+}: {
+  isDashboardMode: boolean;
+  dashboardsFeatureEnabled: boolean;
+  isRunsMode: boolean;
+  isMemoryMode: boolean;
+  hasEditableVersion: boolean;
+  isViewingPendingApprovalVersion: boolean;
+  isViewingCurrentLiveVersion: boolean;
+}) {
+  return {
+    headerMode: getWorkflowHeaderMode({ isDashboardMode, dashboardsFeatureEnabled, isRunsMode, isMemoryMode }),
+    canvasStateMode: getWorkflowCanvasStateMode({
+      hasEditableVersion,
+      isViewingPendingApprovalVersion,
+      isViewingCurrentLiveVersion,
+    }),
+  };
 }
 
 export function getExitEditModeDisabledTooltip({

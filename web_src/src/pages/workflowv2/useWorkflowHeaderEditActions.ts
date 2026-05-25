@@ -2,12 +2,7 @@ import { useCallback } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 interface WorkflowHeaderEditActionsConfig {
-  isDashboardMode: boolean;
-  isMemoryMode: boolean;
   isRunsMode: boolean;
-  handleExitDashboardMode: () => void;
-  handleExitMemoryMode: () => void;
-  handleExitRunsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
   setIsRunsMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
@@ -16,12 +11,7 @@ interface WorkflowHeaderEditActionsConfig {
 }
 
 export function useWorkflowHeaderEditActions({
-  isDashboardMode,
-  isMemoryMode,
   isRunsMode,
-  handleExitDashboardMode,
-  handleExitMemoryMode,
-  handleExitRunsMode,
   handleToggleEditMode,
   setIsRunsMode,
   setSelectedRunId,
@@ -29,61 +19,19 @@ export function useWorkflowHeaderEditActions({
   setSearchParams,
 }: WorkflowHeaderEditActionsConfig) {
   const handleEnterEditModeFromHeader = useCallback(async () => {
-    if (isDashboardMode) {
-      handleExitDashboardMode();
-      await handleToggleEditMode();
-      return;
-    }
-    if (isMemoryMode) {
-      handleExitMemoryMode();
-      await handleToggleEditMode();
-      return;
-    }
     if (isRunsMode) {
       setIsRunsMode(false);
       setSelectedRunId(null);
       setRunDetailNodeId(null);
-      await handleToggleEditMode();
       setSearchParams(clearRunsViewSearchParams, { replace: true });
-      return;
     }
+
     await handleToggleEditMode();
-  }, [
-    handleExitDashboardMode,
-    handleExitMemoryMode,
-    handleToggleEditMode,
-    isDashboardMode,
-    isMemoryMode,
-    isRunsMode,
-    setIsRunsMode,
-    setRunDetailNodeId,
-    setSearchParams,
-    setSelectedRunId,
-  ]);
+  }, [handleToggleEditMode, isRunsMode, setIsRunsMode, setRunDetailNodeId, setSearchParams, setSelectedRunId]);
 
   const handleExitEditModeFromHeader = useCallback(async () => {
-    if (isDashboardMode) {
-      handleExitDashboardMode();
-      return;
-    }
-    if (isMemoryMode) {
-      handleExitMemoryMode();
-      return;
-    }
-    if (isRunsMode) {
-      handleExitRunsMode();
-      return;
-    }
     await handleToggleEditMode();
-  }, [
-    handleExitDashboardMode,
-    handleExitMemoryMode,
-    handleExitRunsMode,
-    handleToggleEditMode,
-    isDashboardMode,
-    isMemoryMode,
-    isRunsMode,
-  ]);
+  }, [handleToggleEditMode]);
 
   return { handleEnterEditModeFromHeader, handleExitEditModeFromHeader };
 }

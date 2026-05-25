@@ -80,7 +80,6 @@ import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
-import { getDashboardHeaderActions } from "./dashboard/dashboardHeaderActions";
 import { deriveDashboardNodeStatuses } from "./dashboard/deriveNodeStatuses";
 import { useDashboardModeActions } from "./dashboard/useDashboardModeActions";
 import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
@@ -88,6 +87,7 @@ import { WorkflowDashboardOverlay } from "./dashboard/WorkflowDashboardOverlay";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
+import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
 import { CanvasPageModals } from "./CanvasPageModals";
@@ -123,8 +123,7 @@ import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
   getExitEditModeDisabledTooltip,
   getRunActionState,
-  getWorkflowCanvasStateMode,
-  getWorkflowHeaderMode,
+  getWorkflowViewPresentation,
   readStoredBoolean,
 } from "./viewState";
 import {
@@ -4858,9 +4857,6 @@ export function WorkflowPageV2() {
 
   const { handleSelectDashboardMode, handleExitDashboardMode } = useDashboardModeActions({
     dashboardsFeatureEnabled,
-    handleUseVersion,
-    hasEditableVersion,
-    liveCanvasVersionId,
     setIsDashboardMode,
     setIsDashboardAddPanelOpen,
     setIsDashboardYamlOpen,
@@ -4871,9 +4867,6 @@ export function WorkflowPageV2() {
   });
 
   const { handleSelectMemoryMode, handleExitMemoryMode } = useMemoryModeActions({
-    handleUseVersion,
-    hasEditableVersion,
-    liveCanvasVersionId,
     setIsMemoryMode,
     setIsDashboardMode,
     setIsDashboardAddPanelOpen,
@@ -4883,13 +4876,31 @@ export function WorkflowPageV2() {
     setSelectedRunId,
   });
 
-  const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader } = useWorkflowHeaderEditActions({
+  const {
+    handleSelectCanvasView,
+    handleDashboardAddPanelDialogOpenChange,
+    onDashboardAddPanel,
+    onDashboardOpenYaml,
+    dashboardYamlReadOnly,
+  } = useWorkflowViewModeActions({
     isDashboardMode,
     isMemoryMode,
     isRunsMode,
+    hasEditableVersion,
+    dashboardsFeatureEnabled,
+    isTemplate,
+    canUpdateCanvas,
+    canvasDeletedRemotely,
     handleExitDashboardMode,
     handleExitMemoryMode,
     handleExitRunsMode,
+    handleToggleEditMode,
+    setIsDashboardAddPanelOpen,
+    setIsDashboardYamlOpen,
+  });
+
+  const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader } = useWorkflowHeaderEditActions({
+    isRunsMode,
     handleToggleEditMode,
     setIsRunsMode,
     setSelectedRunId,
@@ -5461,23 +5472,11 @@ export function WorkflowPageV2() {
     isPreparingVersionAction,
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftGraphDiffVersusLive,
   });
-  const headerMode = getWorkflowHeaderMode({
+  const { headerMode, canvasStateMode } = getWorkflowViewPresentation({
     isDashboardMode,
     dashboardsFeatureEnabled,
     isRunsMode,
     isMemoryMode,
-    canvasMode,
-  });
-  const { onDashboardAddPanel, onDashboardOpenYaml, dashboardYamlReadOnly } = getDashboardHeaderActions({
-    isDashboardMode,
-    dashboardsFeatureEnabled,
-    isTemplate,
-    canUpdateCanvas,
-    canvasDeletedRemotely,
-    openAddPanel: () => setIsDashboardAddPanelOpen(true),
-    openYaml: () => setIsDashboardYamlOpen(true),
-  });
-  const canvasStateMode = getWorkflowCanvasStateMode({
     hasEditableVersion,
     isViewingPendingApprovalVersion,
     isViewingCurrentLiveVersion,
@@ -5512,7 +5511,7 @@ export function WorkflowPageV2() {
           dashboardQuery={dashboardQuery}
           updateDashboardMutation={updateDashboardMutation}
           addPanelDialogOpen={isDashboardAddPanelOpen}
-          onAddPanelDialogOpenChange={setIsDashboardAddPanelOpen}
+          onAddPanelDialogOpenChange={handleDashboardAddPanelDialogOpenChange}
           yamlModalOpen={isDashboardYamlOpen}
           onYamlModalOpenChange={setIsDashboardYamlOpen}
           canvasId={canvasId || undefined}
@@ -5635,6 +5634,7 @@ export function WorkflowPageV2() {
           onDiscardDraftAndStartEdit={handleDiscardDraftAndStartEdit}
           unpublishedDraftUpdatedAt={latestDraftVersion?.metadata?.updatedAt || latestDraftVersion?.metadata?.createdAt}
           headerMode={headerMode}
+          onSelectCanvasView={handleSelectCanvasView}
           onEnterEditMode={handleEnterEditModeFromHeader}
           enterEditModeDisabled={toggleEditModeDisabled}
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
