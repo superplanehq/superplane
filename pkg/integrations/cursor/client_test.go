@@ -38,6 +38,32 @@ func Test__Client__VerifyLaunchAgent(t *testing.T) {
 		assert.Equal(t, "Bearer test-key", httpContext.Requests[0].Header.Get("Authorization"))
 	})
 
+	t.Run("trims whitespace in key for runtime client", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"agents":[]}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{
+				"launchAgentKey": "  test-key  ",
+			},
+		}
+
+		client, err := NewClient(httpContext, integrationCtx)
+		require.NoError(t, err)
+
+		err = client.VerifyLaunchAgent()
+		require.NoError(t, err)
+
+		require.Len(t, httpContext.Requests, 1)
+		assert.Equal(t, "Bearer test-key", httpContext.Requests[0].Header.Get("Authorization"))
+	})
+
 	t.Run("unauthorized", func(t *testing.T) {
 		httpContext := &contexts.HTTPContext{
 			Responses: []*http.Response{
