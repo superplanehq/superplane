@@ -29,8 +29,8 @@ func New(baseURL, authToken string) *Client {
 	return &Client{
 		httpClient: &http.Client{Timeout: 5 * time.Second},
 		//This prevents breaking when the base url is provided with a trailing / already
-		baseURL:    strings.TrimRight(strings.TrimSpace(baseURL), "/"),
-		authToken:  strings.TrimSpace(authToken),
+		baseURL:   strings.TrimRight(strings.TrimSpace(baseURL), "/"),
+		authToken: strings.TrimSpace(authToken),
 	}
 }
 

@@ -33,7 +33,7 @@ There is **no** task-broker → fleet-manager path, no runner → fleet-manager 
 
 ## fleet-manager (EC2)
 
-- **Reconcile loop** — Health sweep (`GET /healthz` after boot grace) then scale toward a target. Target is **`EC2_PROVISION_HOT_INSTANCE_COUNT`** by default, or **`claimed_tasks + EC2_PROVISION_RUNNER_HEADROOM`** when headroom is set (pulled from task-broker per fleet). On broker failure, the tick falls back to the static count.
+- **Reconcile loop** — Health sweep (`GET /healthz` after boot grace) then scale toward a target. Target is **`EC2_PROVISION_HOT_INSTANCE_COUNT`** by default, or **`queued + claimed + EC2_PROVISION_RUNNER_HEADROOM`** when headroom is set (counts pulled from task-broker per fleet). On broker failure, the tick falls back to the static count.
 - **User-data** — Installs runner from S3, sets `TASK_BROKER_URL`, `RUNNER_FLEET_ID`, `RUNNER_HEALTH_ADDR`, optional `RUNNER_TERMINATE_AFTER_EACH_TASK`.
 - **Admin** — Optional `/v1/admin/*` diagnostics (managed instances, console output).
 

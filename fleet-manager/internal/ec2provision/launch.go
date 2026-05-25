@@ -23,16 +23,15 @@ import (
 	"github.com/superplane/runner/shared/api"
 )
 
-
 type TaskCountsClient interface {
 	FleetTaskCounts(ctx context.Context, fleetID string) (api.FleetTaskCountsResponse, error)
 }
 
 // Launcher calls EC2 RunInstances with a deterministic cloud-init user-data starter.
 type Launcher struct {
-	Client *ec2.Client
-	Config Config
-	Log    *slog.Logger
+	Client       *ec2.Client
+	Config       Config
+	Log          *slog.Logger
 	BrokerClient TaskCountsClient
 }
 
@@ -52,7 +51,7 @@ type Config struct {
 	KeyName                string // optional EC2 key pair name
 	RunnersIAMProfName     string // optional IAM instance profile name for runners
 	HotInstanceCount       int    // target pending+running managed instances (from EC2_PROVISION_HOT_INSTANCE_COUNT)
-	// Headroom > 0 enables dynamic scaling: want = claimed_tasks + Headroom each tick
+	// Headroom > 0 enables dynamic scaling: want = queued + claimed + Headroom each tick
 	Headroom int
 	// RunnerTerminateAfterEachTask sets RUNNER_TERMINATE_AFTER_EACH_TASK; fleet-manager terminates the EC2 instance after one task.
 	RunnerTerminateAfterEachTask bool

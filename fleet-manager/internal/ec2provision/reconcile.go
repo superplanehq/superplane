@@ -18,9 +18,9 @@ type instanceSnap struct {
 }
 
 // RunReconcileLoop periodically reconciles managed instances toward a target.
-// Target is dynamic when Config.Headroom > 0 (want = claimed + headroom, pulled from
-// task-broker) and falls back to Config.HotInstanceCount when headroom is unset or
-// the broker call fails.
+// Target is dynamic when Config.Headroom > 0 (want = queued + claimed + headroom,
+// pulled from task-broker) and falls back to Config.HotInstanceCount when headroom
+// is unset or the broker call fails.
 func RunReconcileLoop(ctx context.Context, log *slog.Logger, interval time.Duration, l *Launcher) {
 	if interval <= 0 {
 		return
@@ -63,7 +63,7 @@ func (l *Launcher) desiredWant(ctx context.Context) int {
 		}
 		return l.Config.HotInstanceCount
 	}
-	return counts.Claimed + l.Config.Headroom
+	return counts.Queued + counts.Claimed + l.Config.Headroom
 }
 
 // Reconcile sweeps unhealthy runners, then scales pending+running tagged instances toward want.
