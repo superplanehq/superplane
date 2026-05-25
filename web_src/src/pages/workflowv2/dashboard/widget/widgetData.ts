@@ -1,10 +1,12 @@
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 
+import { buildEnv } from "./celExpr";
 import { getValueAtPath } from "./fieldPath";
 import { flattenMemoryEntries } from "./memoryRow";
+import { compileFieldResolver } from "./resolveCellValue";
 import { evaluateShow } from "./showExpression";
 import type { MemoryNumberSource, WidgetNumberCombine } from "../panelTypes";
-import type { WidgetNumberAggregation } from "./types";
+import type { WidgetNumberAggregation, WidgetSort } from "./types";
 
 /**
  * Apply a list of filter expressions to a row collection. Each expression is
@@ -16,6 +18,71 @@ import type { WidgetNumberAggregation } from "./types";
 export function applyFilters<T>(rows: T[], filters: string[] | undefined): T[] {
   if (!filters || filters.length === 0) return rows;
   return rows.filter((row) => filters.every((expr) => evaluateShow(expr, row, false)));
+}
+
+/**
+ * Sort `rows` by a widget-level `sort` spec. Returns the input unchanged when
+ * no sort is configured or the field is blank. The field is compiled once and
+ * reused across rows, supporting either a literal dot path or a full `{{ cel }}`
+ * expression.
+ *
+ * Comparison rules — picked in order, per-pair:
+ *  1. Both finite numeric values → numeric compare.
+ *  2. Both parse as valid `Date.parse` timestamps → millisecond compare.
+ *  3. Otherwise → `String(a).localeCompare(String(b))`.
+ *
+ * `null` / `undefined` values always sort to the end regardless of `order` so
+ * empty rows don't poison the visible head of the dataset (a common
+ * expectation in dashboards displaying time series).
+ */
+export function applySort<T>(rows: T[], sort: WidgetSort | undefined): T[] {
+  if (!sort || !sort.field.trim()) return rows;
+  const resolver = compileFieldResolver(sort.field);
+  const directionMultiplier = sort.order === "desc" ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const valueA = resolver.resolve(a);
+    const valueB = resolver.resolve(b);
+    const aMissing = valueA == null;
+    const bMissing = valueB == null;
+    if (aMissing && bMissing) return 0;
+    if (aMissing) return 1;
+    if (bMissing) return -1;
+    return compareSortValues(valueA, valueB) * directionMultiplier;
+  });
+}
+
+function compareSortValues(a: unknown, b: unknown): number {
+  const numericA = toFiniteNumber(a);
+  const numericB = toFiniteNumber(b);
+  if (numericA !== null && numericB !== null) {
+    return numericA === numericB ? 0 : numericA < numericB ? -1 : 1;
+  }
+  const dateA = toEpochMillis(a);
+  const dateB = toEpochMillis(b);
+  if (dateA !== null && dateB !== null) {
+    return dateA === dateB ? 0 : dateA < dateB ? -1 : 1;
+  }
+  return String(a).localeCompare(String(b));
+}
+
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function toEpochMillis(value: unknown): number | null {
+  if (value instanceof Date) {
+    const t = value.getTime();
+    return Number.isFinite(t) ? t : null;
+  }
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : null;
 }
 
 /**
@@ -102,18 +169,30 @@ export function combinePartials(partials: Array<number | null>, combine: WidgetN
 
 /**
  * Build the dataset consumed by chart widgets. Given the parsed rows, the
- * xField, and a list of series field paths, produces an array of `{ x, …series }`
- * objects ready for charting libraries like Recharts.
+ * xField, and a list of series field references, produces an array of
+ * `{ x, …series }` objects ready for charting libraries like Recharts.
+ *
+ * `xField` and each `series.field` accept either a literal dot path (e.g.
+ * `createdAt`) or a full `{{ cel }}` expression (e.g.
+ * `{{ formatDate(createdAt, "MM/dd") }}`). Expressions are compiled once per
+ * call and share a single `ExprEnv` so all rows observe the same `now()` and
+ * builtin context, matching how the table renderer evaluates column fields.
  */
 export function buildChartData(
   rows: unknown[],
   xField: string,
   seriesFields: Array<{ key: string; field?: string }>,
 ): Array<Record<string, unknown>> {
+  const env = buildEnv();
+  const xResolver = compileFieldResolver(xField, env);
+  const seriesResolvers = seriesFields.map((series) => ({
+    key: series.key,
+    resolver: series.field ? compileFieldResolver(series.field, env) : null,
+  }));
   return rows.map((row) => {
-    const entry: Record<string, unknown> = { x: getValueAtPath(row, xField) ?? "" };
-    for (const series of seriesFields) {
-      entry[series.key] = series.field ? getValueAtPath(row, series.field) : 1;
+    const entry: Record<string, unknown> = { x: xResolver.resolve(row) ?? "" };
+    for (const s of seriesResolvers) {
+      entry[s.key] = s.resolver ? s.resolver.resolve(row) : 1;
     }
     return entry;
   });
