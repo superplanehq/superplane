@@ -11,13 +11,15 @@ import (
 )
 
 type canvasMemoryContext struct {
-	namespace      string
-	matches        map[string]any
-	values         []any
-	first          any
-	findCalls      int
-	findFirstCalls int
-	err            error
+	namespace                 string
+	matches                   map[string]any
+	values                    []any
+	first                     any
+	findCalls                 int
+	findFirstCalls            int
+	findAllCalls              int
+	findFirstInNamespaceCalls int
+	err                       error
 }
 
 func (c *canvasMemoryContext) Add(namespace string, values any) error {
@@ -38,6 +40,24 @@ func (c *canvasMemoryContext) FindFirst(namespace string, matches map[string]any
 	c.findFirstCalls++
 	c.namespace = namespace
 	c.matches = matches
+	if c.err != nil {
+		return nil, c.err
+	}
+	return c.first, nil
+}
+
+func (c *canvasMemoryContext) FindAll(namespace string) ([]any, error) {
+	c.findAllCalls++
+	c.namespace = namespace
+	if c.err != nil {
+		return nil, c.err
+	}
+	return c.values, nil
+}
+
+func (c *canvasMemoryContext) FindFirstInNamespace(namespace string) (any, error) {
+	c.findFirstInNamespaceCalls++
+	c.namespace = namespace
 	if c.err != nil {
 		return nil, c.err
 	}
@@ -220,8 +240,77 @@ func TestReadMemoryExecute(t *testing.T) {
 		assert.Contains(t, err.Error(), "namespace is required")
 	})
 
-	t.Run("returns error when no matches are provided", func(t *testing.T) {
+	t.Run("reads all rows in namespace when matchList is empty", func(t *testing.T) {
 		component := &ReadMemory{}
+		execState := &contexts.ExecutionStateContext{}
+		memoryCtx := &canvasMemoryContext{
+			values: []any{
+				map[string]any{"creator": "igor", "sandbox_id": "sbx-001"},
+				map[string]any{"creator": "alex", "sandbox_id": "sbx-002"},
+			},
+		}
+		execMetadata := &contexts.MetadataContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"namespace": "machines",
+				"matchList": []map[string]any{},
+			},
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
+			CanvasMemory:   memoryCtx,
+			ExecutionState: execState,
+		})
+
+		assert.NoError(t, err)
+		assert.Equal(t, 0, memoryCtx.findCalls)
+		assert.Equal(t, 1, memoryCtx.findAllCalls)
+		assert.Equal(t, "machines", memoryCtx.namespace)
+		assert.Equal(t, ChannelNameFound, execState.Channel)
+
+		payload, ok := execState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		data, ok := payload["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "machines", data["namespace"])
+		assert.Equal(t, map[string]any{}, data["matches"])
+		assert.Equal(t, memoryCtx.values, data["values"])
+		assert.Equal(t, 2, data["count"])
+
+		assert.Equal(t, []string{}, execMetadata.Get().(map[string]any)["fields"])
+		assert.Equal(t, map[string]any{}, execMetadata.Get().(map[string]any)["matches"])
+	})
+
+	t.Run("reads latest row in namespace when matchList is empty", func(t *testing.T) {
+		component := &ReadMemory{}
+		execState := &contexts.ExecutionStateContext{}
+		memoryCtx := &canvasMemoryContext{
+			first: map[string]any{"creator": "igor", "sandbox_id": "sbx-latest"},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"namespace":  "machines",
+				"resultMode": ResultModeLatest,
+				"matchList":  []map[string]any{},
+			},
+			Metadata:       &contexts.MetadataContext{},
+			NodeMetadata:   &contexts.MetadataContext{},
+			CanvasMemory:   memoryCtx,
+			ExecutionState: execState,
+		})
+
+		assert.NoError(t, err)
+		assert.Equal(t, 0, memoryCtx.findFirstCalls)
+		assert.Equal(t, 1, memoryCtx.findFirstInNamespaceCalls)
+		assert.Equal(t, "machines", memoryCtx.namespace)
+		assert.Equal(t, ChannelNameFound, execState.Channel)
+	})
+
+	t.Run("emits notFound when matchList is empty and namespace has no rows", func(t *testing.T) {
+		component := &ReadMemory{}
+		execState := &contexts.ExecutionStateContext{}
+		memoryCtx := &canvasMemoryContext{values: []any{}}
 
 		err := component.Execute(core.ExecutionContext{
 			Configuration: map[string]any{
@@ -230,12 +319,13 @@ func TestReadMemoryExecute(t *testing.T) {
 			},
 			Metadata:       &contexts.MetadataContext{},
 			NodeMetadata:   &contexts.MetadataContext{},
-			CanvasMemory:   &canvasMemoryContext{},
-			ExecutionState: &contexts.ExecutionStateContext{},
+			CanvasMemory:   memoryCtx,
+			ExecutionState: execState,
 		})
 
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "at least one memory match is required")
+		assert.NoError(t, err)
+		assert.Equal(t, 1, memoryCtx.findAllCalls)
+		assert.Equal(t, ChannelNameNotFound, execState.Channel)
 	})
 
 	t.Run("returns error when reading memory fails", func(t *testing.T) {
@@ -311,15 +401,14 @@ func TestReadMemorySetup(t *testing.T) {
 		assert.Contains(t, err.Error(), "namespace is required")
 	})
 
-	t.Run("missing matches fails", func(t *testing.T) {
+	t.Run("empty matches are allowed", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
 			Configuration: map[string]any{
 				"namespace": "machines",
 				"matchList": []map[string]any{},
 			},
 		})
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "at least one memory match is required")
+		assert.NoError(t, err)
 	})
 
 	t.Run("invalid result mode fails", func(t *testing.T) {

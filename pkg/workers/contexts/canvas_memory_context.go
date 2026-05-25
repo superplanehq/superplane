@@ -63,6 +63,42 @@ func (c *CanvasMemoryContext) FindFirst(namespace string, matches map[string]any
 	return record.Values.Data(), nil
 }
 
+func (c *CanvasMemoryContext) FindAll(namespace string) ([]any, error) {
+	namespace = strings.TrimSpace(namespace)
+	if namespace == "" {
+		return nil, fmt.Errorf("namespace is required")
+	}
+
+	records, err := models.ListCanvasMemoriesByNamespaceInTransaction(c.tx, c.canvasID, namespace)
+	if err != nil {
+		return nil, err
+	}
+
+	values := make([]any, 0, len(records))
+	for _, record := range records {
+		values = append(values, record.Values.Data())
+	}
+
+	return values, nil
+}
+
+func (c *CanvasMemoryContext) FindFirstInNamespace(namespace string) (any, error) {
+	namespace = strings.TrimSpace(namespace)
+	if namespace == "" {
+		return nil, fmt.Errorf("namespace is required")
+	}
+
+	record, err := models.FindFirstCanvasMemoryByNamespaceInTransaction(c.tx, c.canvasID, namespace)
+	if err != nil {
+		return nil, err
+	}
+	if record == nil {
+		return nil, nil
+	}
+
+	return record.Values.Data(), nil
+}
+
 func (c *CanvasMemoryContext) Delete(namespace string, matches map[string]any) ([]any, error) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {

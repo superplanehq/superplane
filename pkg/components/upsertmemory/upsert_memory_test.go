@@ -38,6 +38,14 @@ func (c *canvasMemoryContext) FindFirst(namespace string, matches map[string]any
 	return nil, nil
 }
 
+func (c *canvasMemoryContext) FindAll(namespace string) ([]any, error) {
+	return []any{}, nil
+}
+
+func (c *canvasMemoryContext) FindFirstInNamespace(namespace string) (any, error) {
+	return nil, nil
+}
+
 func (c *canvasMemoryContext) Update(namespace string, matches map[string]any, values map[string]any) ([]any, error) {
 	c.updateCalls++
 	c.namespace = namespace

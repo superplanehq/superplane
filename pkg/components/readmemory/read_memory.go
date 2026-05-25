@@ -59,12 +59,14 @@ func (c *ReadMemory) Documentation() string {
 - Retrieve previously stored IDs before cleanup actions
 - Check whether related data already exists
 - Rehydrate context from prior runs
+- Enumerate every record in a namespace (for bulk processing or fan-out)
 
 ## How It Works
 
-1. Reads ` + "`namespace`" + `, ` + "`resultMode`" + `, ` + "`emitMode`" + `, and ` + "`matchList`" + ` from configuration
-2. Finds memory rows matching all configured key/value pairs
-3. Emits ` + "`memory.read`" + ` to the ` + "`found`" + ` or ` + "`notFound`" + ` channel
+1. Reads ` + "`namespace`" + `, ` + "`resultMode`" + `, ` + "`emitMode`" + `, and optional ` + "`matchList`" + ` from configuration
+2. When ` + "`matchList`" + ` is provided, finds memory rows matching all configured key/value pairs
+3. When ` + "`matchList`" + ` is omitted or empty, returns all rows in the namespace (or the most recently created row when ` + "`resultMode = latest`" + `)
+4. Emits ` + "`memory.read`" + ` to the ` + "`found`" + ` or ` + "`notFound`" + ` channel
 
 ## Output Channels
 
@@ -121,8 +123,9 @@ func (c *ReadMemory) Configuration() []configuration.Field {
 			Name:        "matchList",
 			Label:       "Matches",
 			Type:        configuration.FieldTypeList,
-			Description: "List of exact field/value matches used for lookup",
-			Required:    true,
+			Description: "Optional exact field/value matches used for lookup. When omitted, all rows in the namespace are returned.",
+			Required:    false,
+			Togglable:   true,
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Match",
@@ -193,7 +196,15 @@ func (c *ReadMemory) Execute(ctx core.ExecutionContext) error {
 	matches := buildMatches(spec.MatchList)
 	values := []any{}
 	if spec.ResultMode == ResultModeLatest {
-		value, findErr := ctx.CanvasMemory.FindFirst(spec.Namespace, matches)
+		var (
+			value   any
+			findErr error
+		)
+		if len(matches) == 0 {
+			value, findErr = ctx.CanvasMemory.FindFirstInNamespace(spec.Namespace)
+		} else {
+			value, findErr = ctx.CanvasMemory.FindFirst(spec.Namespace, matches)
+		}
 		if findErr != nil {
 			return fmt.Errorf("failed to read canvas memory: %w", findErr)
 		}
@@ -202,7 +213,11 @@ func (c *ReadMemory) Execute(ctx core.ExecutionContext) error {
 		}
 	} else {
 		var findErr error
-		values, findErr = ctx.CanvasMemory.Find(spec.Namespace, matches)
+		if len(matches) == 0 {
+			values, findErr = ctx.CanvasMemory.FindAll(spec.Namespace)
+		} else {
+			values, findErr = ctx.CanvasMemory.Find(spec.Namespace, matches)
+		}
 		if findErr != nil {
 			return fmt.Errorf("failed to read canvas memory: %w", findErr)
 		}
@@ -265,11 +280,6 @@ func validateSpec(spec Spec) error {
 	}
 	if spec.EmitMode != EmitModeAllAtOnce && spec.EmitMode != EmitModeOneByOne {
 		return fmt.Errorf("emitMode must be either %q or %q", EmitModeAllAtOnce, EmitModeOneByOne)
-	}
-
-	matches := buildMatches(spec.MatchList)
-	if len(matches) == 0 {
-		return fmt.Errorf("at least one memory match is required")
 	}
 
 	return nil
