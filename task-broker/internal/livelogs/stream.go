@@ -135,9 +135,9 @@ func parseRunnerControlRecord(message string) (map[string]any, bool) {
 	switch envelope.Type {
 	case "cmd_start":
 		var rec struct {
-			Type  string `json:"type"`
-			Index int    `json:"index"`
-			Text  string `json:"text"`
+			Type      string `json:"type"`
+			Index     int    `json:"index"`
+			Text      string `json:"text"`
 			StartedAt *int64 `json:"started_at"`
 		}
 		if err := json.Unmarshal([]byte(message), &rec); err != nil {
