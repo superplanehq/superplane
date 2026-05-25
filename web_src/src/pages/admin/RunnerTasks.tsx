@@ -22,6 +22,7 @@ type RunnerTask = {
 type RunnerTasksResponse = {
   configured: boolean;
   tasks: RunnerTask[];
+  error?: string;
 };
 
 const REFRESH_INTERVAL_MS = 5000;
@@ -120,6 +121,7 @@ const RunnerTasksTable = ({ tasks }: { tasks: RunnerTask[] }) => (
 const RunnerTasks: React.FC = () => {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [tasks, setTasks] = useState<RunnerTask[]>([]);
+  const [brokerError, setBrokerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadTasks = useCallback(async (showLoading: boolean) => {
@@ -137,6 +139,7 @@ const RunnerTasks: React.FC = () => {
       const data: RunnerTasksResponse = await response.json();
       setConfigured(data.configured);
       setTasks(data.tasks ?? []);
+      setBrokerError(data.error?.trim() ? data.error : null);
     } catch (error) {
       showErrorToast(error instanceof Error ? error.message : "Failed to load runner tasks");
     } finally {
@@ -188,6 +191,12 @@ const RunnerTasks: React.FC = () => {
             <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs">TASK_BROKER_AUTH_TOKEN</code> on the
             app server.
           </Text>
+        </div>
+      ) : brokerError ? (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-center shadow-sm">
+          <Terminal size={24} className="mx-auto text-amber-500" />
+          <Text className="mt-3 text-sm text-amber-800">{brokerError}</Text>
+          <Text className="mt-1 text-xs text-amber-700">Retrying every {REFRESH_INTERVAL_MS / 1000} seconds.</Text>
         </div>
       ) : tasks.length === 0 ? (
         <div className="rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">

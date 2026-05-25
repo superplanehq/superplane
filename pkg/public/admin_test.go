@@ -916,11 +916,45 @@ func TestAdminListRunnerTasks(t *testing.T) {
 				ID     string `json:"id"`
 				Status string `json:"status"`
 			} `json:"tasks"`
+			Error string `json:"error"`
 		}
 		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
 		assert.True(t, body.Configured)
 		require.Len(t, body.Tasks, 1)
 		assert.Equal(t, "active-1", body.Tasks[0].ID)
 		assert.Equal(t, "queued", body.Tasks[0].Status)
+		assert.Empty(t, body.Error)
+	})
+
+	t.Run("returns 200 with error when broker is unreachable", func(t *testing.T) {
+		// We deliberately do NOT return a 5xx from the admin endpoint when
+		// the upstream broker errors out, because this endpoint is polled
+		// every few seconds by the admin UI and a 5xx response triggers
+		// Sentry alerting for what is a transient external-dependency issue.
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, "broker down", http.StatusInternalServerError)
+		}))
+		defer upstream.Close()
+
+		t.Setenv("TASK_BROKER_BASE_URL", upstream.URL)
+		t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
+		t.Setenv("TASK_BROKER_AUTH_TOKEN", "broker-token")
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/runner/tasks",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body struct {
+			Configured bool   `json:"configured"`
+			Tasks      []any  `json:"tasks"`
+			Error      string `json:"error"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.True(t, body.Configured)
+		assert.Equal(t, []any{}, body.Tasks)
+		assert.NotEmpty(t, body.Error)
 	})
 }

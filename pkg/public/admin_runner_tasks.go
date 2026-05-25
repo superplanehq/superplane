@@ -10,6 +10,7 @@ import (
 type adminRunnerTasksResponse struct {
 	Configured bool                `json:"configured"`
 	Tasks      []runner.ActiveTask `json:"tasks"`
+	Error      string              `json:"error,omitempty"`
 }
 
 func (s *Server) adminListRunnerTasks(w http.ResponseWriter, r *http.Request) {
@@ -24,8 +25,17 @@ func (s *Server) adminListRunnerTasks(w http.ResponseWriter, r *http.Request) {
 
 	tasks, err := broker.ListActiveTasks()
 	if err != nil {
-		log.Errorf("admin: failed to list runner tasks: %v", err)
-		http.Error(w, "Failed to list runner tasks", http.StatusBadGateway)
+		// The admin UI polls this endpoint every few seconds. Returning a 5xx
+		// for transient broker failures floods Sentry with noise (the broker
+		// is an external dependency, not a SuperPlane bug). Surface the error
+		// to the UI inline with a 200 response so it can be displayed without
+		// triggering server-error alerting.
+		log.Warnf("admin: failed to list runner tasks: %v", err)
+		respondJSON(w, adminRunnerTasksResponse{
+			Configured: true,
+			Tasks:      []runner.ActiveTask{},
+			Error:      "Failed to list runner tasks from the task broker.",
+		})
 		return
 	}
 
