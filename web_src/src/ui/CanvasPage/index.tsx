@@ -221,6 +221,8 @@ export interface CanvasPageProps {
   hideAddControls?: boolean;
   /** Hide the Agent / Runs / Versions left panel toggle (templates only); runs view keeps the tool sidebar visible. */
   hideCanvasToolSidebar?: boolean;
+  /** Full-surface overlay for alternate canvas modes such as Console and Memory. */
+  modeOverlay?: React.ReactNode;
   canReadIntegrations?: boolean;
   canCreateIntegrations?: boolean;
   canUpdateIntegrations?: boolean;
@@ -1459,6 +1461,7 @@ function CanvasPage(props: CanvasPageProps) {
               canCreateIntegrations={props.canCreateIntegrations}
             />
           </ReactFlowProvider>
+          {props.modeOverlay}
           {props.headerMode === "runs" ? null : (
             <Sidebar
               state={state}

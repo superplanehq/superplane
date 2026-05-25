@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useRef } from "react";
 import type { CanvasesDashboardLayoutItem, CanvasesDashboardPanel } from "@/api-client";
-import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type {
@@ -111,16 +110,11 @@ export function DashboardOverlay({
   }, []);
 
   const contextNodes = canvasNodes ?? [];
-  const leftOffset = useEffectiveLeftSidebarWidth();
   // The YAML modal is opened from the canvas page header (next to "Add panel").
   // The dashboard overlay no longer renders its own toolbar so the white
   // strip is gone and the grid fills the available area.
   const overlayContent = (
-    <div
-      className="absolute bottom-0 top-[5rem] z-10 flex flex-col bg-slate-100"
-      style={{ left: leftOffset, right: 0 }}
-      data-testid="dashboard-overlay"
-    >
+    <div className="absolute inset-0 z-10 flex flex-col bg-slate-100" data-testid="dashboard-overlay">
       <div className="min-h-0 flex-1 overflow-auto">
         <DashboardView
           panels={panels}
