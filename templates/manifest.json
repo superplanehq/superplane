@@ -1,0 +1,9 @@
+[
+  {
+    "repo": "github.com/superplanehq/preview-env-github-digitalocean",
+    "title": "Preview Environments (GitHub + DigitalOcean)",
+    "description": "Spin up a live preview environment for every pull request. Comment /start on a PR, get a running app in ~2 minutes.",
+    "integrations": ["github", "digitalocean"],
+    "tags": ["CI/CD", "Preview"]
+  }
+]
