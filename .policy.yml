@@ -148,6 +148,7 @@ approval_rules:
         - lucaspin
         - shiroyasha
         - forestileao
+        - andrecalil
 
   - name: other_changes_do_not_require_approval
     if:
