@@ -38,12 +38,12 @@ export const baseMapper: ComponentBaseMapper = {
     const payload = getFirstOutputPayload(context.execution.outputs);
 
     if (!payload) {
-      return { Response: "No data returned" };
+      return { Response: "Pending…" };
     }
     const responseData = payload?.data as Record<string, any> | undefined;
 
     if (!responseData) {
-      return { Response: "No data returned" };
+      return { Response: "Pending…" };
     }
 
     const details: Record<string, string> = {};
