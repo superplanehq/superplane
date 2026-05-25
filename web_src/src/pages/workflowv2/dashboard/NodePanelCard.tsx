@@ -55,7 +55,6 @@ export function NodePanelCard({ panel, readOnly, onDelete, onChange }: NodePanel
       <TypedPanelShell
         title={content.title}
         fallbackTitle={panel.id}
-        typeLabel="Node"
         readOnly={readOnly}
         onEdit={() => setEditing(true)}
         onDelete={onDelete}
