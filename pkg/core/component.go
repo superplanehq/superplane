@@ -46,6 +46,7 @@ type ExecutionContext struct {
 
 type ExpressionContext interface {
 	Run(expression string) (any, error)
+	RunWithExtraVariables(expression string, variables map[string]any) (any, error)
 }
 
 /*
