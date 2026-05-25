@@ -150,6 +150,30 @@ describe("CanvasToolSidebar", () => {
     expect(onVersionControlAutoOpened).toHaveBeenCalledTimes(1);
   });
 
+  it("does not auto-open version control while the sidebar is closed", () => {
+    const onOpenVersionControl = vi.fn();
+    const onVersionControlAutoOpened = vi.fn();
+    const openToolSidebar = vi.fn();
+
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={makeToolSidebarState({
+          isAgentEnabled: false,
+          isToolSidebarOpen: false,
+          openToolSidebar,
+        })}
+        mode="version-live"
+        onOpenVersionControl={onOpenVersionControl}
+        onVersionControlAutoOpened={onVersionControlAutoOpened}
+      />,
+    );
+
+    expect(screen.queryByRole("tab", { name: "Versions" })).not.toBeInTheDocument();
+    expect(openToolSidebar).not.toHaveBeenCalled();
+    expect(onOpenVersionControl).not.toHaveBeenCalled();
+    expect(onVersionControlAutoOpened).not.toHaveBeenCalled();
+  });
+
   it("does not auto-open version control after it already auto-opened for the canvas", () => {
     const onOpenVersionControl = vi.fn();
     const onVersionControlAutoOpened = vi.fn();
