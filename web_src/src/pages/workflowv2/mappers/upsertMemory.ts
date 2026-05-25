@@ -85,25 +85,31 @@ export const upsertMemoryMapper: ComponentBaseMapper = {
     if ((metadata.operation || "").trim().length > 0) {
       details["Operation"] = metadata.operation || "";
     }
-    if (metadata.iterateList) {
-      details["List Mode"] = "Enabled";
-      if (metadata.itemVariable) {
-        details["Item Variable"] = metadata.itemVariable;
-      }
-      if (typeof metadata.count === "number") {
-        details["Iterations"] = String(metadata.count);
-      }
-      if (typeof metadata.updatedCount === "number") {
-        details["Rows Updated"] = String(metadata.updatedCount);
-      }
-      if (typeof metadata.createdCount === "number") {
-        details["Rows Created"] = String(metadata.createdCount);
-      }
-    }
+    appendListModeDetails(details, metadata);
 
     return details;
   },
 };
+
+function appendListModeDetails(details: Record<string, string>, metadata: UpsertMemoryMetadata): void {
+  if (!metadata.iterateList) {
+    return;
+  }
+
+  details["List Mode"] = "Enabled";
+  if (metadata.itemVariable) {
+    details["Item Variable"] = metadata.itemVariable;
+  }
+  if (typeof metadata.count === "number") {
+    details["Iterations"] = String(metadata.count);
+  }
+  if (typeof metadata.updatedCount === "number") {
+    details["Rows Updated"] = String(metadata.updatedCount);
+  }
+  if (typeof metadata.createdCount === "number") {
+    details["Rows Created"] = String(metadata.createdCount);
+  }
+}
 
 function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
