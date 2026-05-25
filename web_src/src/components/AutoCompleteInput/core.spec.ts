@@ -40,6 +40,27 @@ describe("getSuggestions", () => {
     expect(suggestions.some((item) => item.label === "trim")).toBe(true);
   });
 
+  it("suggests memory.find and memory.findFirst by prefix", () => {
+    const suggestions = getSuggestions("mem", 3, {});
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("memory.find");
+    expect(labels).toContain("memory.findFirst");
+  });
+
+  it("suggests memory methods after memory dot", () => {
+    const suggestions = getSuggestions("memory.", "memory.".length, {});
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("find");
+    expect(labels).toContain("findFirst");
+  });
+
+  it("filters memory methods by member prefix", () => {
+    const suggestions = getSuggestions("memory.findF", "memory.findF".length, {});
+    const labels = suggestions.map((item) => item.label);
+    expect(labels).toContain("findFirst");
+    expect(labels).not.toContain("find");
+  });
+
   it("suggests root() payload fields after dot", () => {
     const suggestions = getSuggestions("root().", "root().".length, {
       __root: { github: { ref: "main" }, user: "alice" },

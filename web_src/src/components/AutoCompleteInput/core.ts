@@ -74,6 +74,21 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
       "Returns the payload from the immediate predecessor that emitted this event. Provide depth to walk upstream.",
     example: "previous(2).data.image.version",
   },
+  // Memory
+  {
+    name: "memory.find",
+    snippet: 'memory.find(${1:"namespace"}, ${2:{key: "value"\\}})',
+    description:
+      "Returns all canvas memory entries in the given namespace whose fields match every key/value in the matches map.",
+    example: 'memory.find("machines", {sandbox_id: "12121"})',
+  },
+  {
+    name: "memory.findFirst",
+    snippet: 'memory.findFirst(${1:"namespace"}, ${2:{key: "value"\\}})',
+    description:
+      "Returns the first canvas memory entry in the given namespace whose fields match every key/value in the matches map, or nil if none match.",
+    example: 'memory.findFirst("machines", {creator: "igor"}).sandbox_id',
+  },
   // String
   {
     name: "trim",
@@ -528,6 +543,30 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   },
 ] as const;
 
+type MemoryMethod = {
+  name: string;
+  snippet: string;
+  description: string;
+  example: string;
+};
+
+const MEMORY_METHODS: readonly MemoryMethod[] = [
+  {
+    name: "find",
+    snippet: 'find(${1:"namespace"}, ${2:{key: "value"\\}})',
+    description:
+      "Returns all canvas memory entries in the given namespace whose fields match every key/value in the matches map.",
+    example: 'memory.find("machines", {sandbox_id: "12121"})',
+  },
+  {
+    name: "findFirst",
+    snippet: 'findFirst(${1:"namespace"}, ${2:{key: "value"\\}})',
+    description:
+      "Returns the first canvas memory entry in the given namespace whose fields match every key/value in the matches map, or nil if none match.",
+    example: 'memory.findFirst("machines", {creator: "igor"}).sandbox_id',
+  },
+] as const;
+
 export function getSuggestions<TGlobals extends Record<string, unknown>>(
   text: string,
   cursor: number,
@@ -608,6 +647,20 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
             description: m.description,
           }));
       }
+    }
+
+    // Handle memory namespace method suggestions (e.g., memory.find)
+    if (!isFunctionCall && baseExpr === "memory") {
+      return MEMORY_METHODS.filter((m) => m.name.toLowerCase().startsWith(mp) && mp !== m.name.toLowerCase())
+        .slice(0, limit)
+        .map((m) => ({
+          label: m.name,
+          kind: "function" as const,
+          insertText: m.snippet,
+          detail: "function",
+          description: m.description,
+          example: m.example,
+        }));
     }
 
     const resolvableBase = isFunctionCall ? baseExpr : extractTailPathExpression(baseExpr);
