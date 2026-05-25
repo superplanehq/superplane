@@ -27,11 +27,6 @@ export function SecondaryHeaderActions({
   onCanvasAddComponent,
 }: HeaderProps) {
   const onCanvasTab = mode === "version-live" || mode === "version-edit";
-  const showCanvasDiff = isEditing && onCanvasTab && hasUnpublishedDraftChanges && draftVisualDiff?.diffCounts;
-  const showCanvasYaml = isEditing && onCanvasTab && !!onCanvasOpenYaml;
-  const showCanvasAddComponent = isEditing && onCanvasTab && !!onCanvasAddComponent;
-  const showDashboardAddPanel = isEditing && mode === "dashboard" && !!onDashboardAddPanel;
-  const showDashboardYaml = isEditing && mode === "dashboard" && !!onDashboardOpenYaml;
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
@@ -44,24 +39,67 @@ export function SecondaryHeaderActions({
         />
       ) : null}
 
-      {showCanvasDiff ? (
+      {isEditing && onCanvasTab ? (
+        <EditModeCanvasSecondaryActions
+          hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+          onShowDiff={onShowDiff}
+          visualDiffEnabled={visualDiffEnabled}
+          draftVisualDiff={draftVisualDiff}
+          onToggleVisualDiff={onToggleVisualDiff}
+          onCanvasOpenYaml={onCanvasOpenYaml}
+          onCanvasAddComponent={onCanvasAddComponent}
+        />
+      ) : null}
+
+      {isEditing && mode === "dashboard" ? (
+        <EditModeDashboardSecondaryActions
+          onDashboardAddPanel={onDashboardAddPanel}
+          onDashboardOpenYaml={onDashboardOpenYaml}
+          dashboardYamlReadOnly={dashboardYamlReadOnly}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function EditModeCanvasSecondaryActions({
+  hasUnpublishedDraftChanges,
+  onShowDiff,
+  visualDiffEnabled,
+  draftVisualDiff,
+  onToggleVisualDiff,
+  onCanvasOpenYaml,
+  onCanvasAddComponent,
+}: Pick<
+  HeaderProps,
+  | "hasUnpublishedDraftChanges"
+  | "onShowDiff"
+  | "visualDiffEnabled"
+  | "draftVisualDiff"
+  | "onToggleVisualDiff"
+  | "onCanvasOpenYaml"
+  | "onCanvasAddComponent"
+>) {
+  return (
+    <>
+      {hasUnpublishedDraftChanges && draftVisualDiff?.diffCounts ? (
         <DiffSummaryHoverCard
-          diffCounts={draftVisualDiff!.diffCounts}
+          diffCounts={draftVisualDiff.diffCounts}
           visualDiffEnabled={visualDiffEnabled}
           onToggleVisualDiff={onToggleVisualDiff}
-          diffToggles={draftVisualDiff!.diffToggles}
+          diffToggles={draftVisualDiff.diffToggles}
           onShowDiff={onShowDiff}
         />
       ) : null}
 
-      {showCanvasYaml ? (
+      {onCanvasOpenYaml ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <UIButton
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => onCanvasOpenYaml!()}
+              onClick={() => onCanvasOpenYaml()}
               data-testid="canvas-yaml-button"
               aria-label="View / Import YAML"
             >
@@ -73,27 +111,37 @@ export function SecondaryHeaderActions({
         </Tooltip>
       ) : null}
 
-      {showCanvasAddComponent ? (
+      {onCanvasAddComponent ? (
         <UIButton
           type="button"
           size="sm"
           variant="default"
-          onClick={() => onCanvasAddComponent!()}
+          onClick={() => onCanvasAddComponent()}
           data-testid="canvas-add-component-button"
         >
           <Plus className="mr-1 h-3.5 w-3.5" />
           Add component
         </UIButton>
       ) : null}
+    </>
+  );
+}
 
-      {showDashboardYaml ? (
+function EditModeDashboardSecondaryActions({
+  onDashboardAddPanel,
+  onDashboardOpenYaml,
+  dashboardYamlReadOnly,
+}: Pick<HeaderProps, "onDashboardAddPanel" | "onDashboardOpenYaml" | "dashboardYamlReadOnly">) {
+  return (
+    <>
+      {onDashboardOpenYaml ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <UIButton
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => onDashboardOpenYaml!()}
+              onClick={() => onDashboardOpenYaml()}
               data-testid="dashboard-yaml-button"
               aria-label={dashboardYamlReadOnly ? "View YAML" : "View / Import YAML"}
             >
@@ -109,19 +157,19 @@ export function SecondaryHeaderActions({
         </Tooltip>
       ) : null}
 
-      {showDashboardAddPanel ? (
+      {onDashboardAddPanel ? (
         <UIButton
           type="button"
           size="sm"
           variant="default"
-          onClick={() => onDashboardAddPanel!()}
+          onClick={() => onDashboardAddPanel()}
           data-testid="dashboard-add-panel"
         >
           <Plus className="mr-1 h-3.5 w-3.5" />
           Add panel
         </UIButton>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -234,7 +282,7 @@ function EnterEditButton({
   const button = (
     <UIButton
       type="button"
-      variant="default"
+      variant="outline"
       size="sm"
       onClick={onClick}
       disabled={disabled}
