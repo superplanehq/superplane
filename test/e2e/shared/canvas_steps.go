@@ -132,8 +132,9 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 		return
 	}
 
-	openButton := q.TestID("open-sidebar-button").Run(s.session)
 	editButton := q.TestID("canvas-edit-button").Run(s.session)
+	addComponentButton := q.TestID("canvas-add-component-button").Run(s.session)
+	openButton := q.TestID("open-sidebar-button").Run(s.session)
 
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
@@ -152,6 +153,12 @@ func (s *CanvasSteps) OpenBuildingBlocksSidebar() {
 
 		if isVisible, _ := editButton.IsVisible(); isVisible {
 			if err := editButton.Click(); err == nil {
+				s.session.Sleep(250)
+			}
+		}
+
+		if isVisible, _ := addComponentButton.IsVisible(); isVisible {
+			if err := addComponentButton.Click(); err == nil {
 				s.session.Sleep(250)
 			}
 		}
