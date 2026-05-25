@@ -48,6 +48,12 @@ type canvasMemoryUpsertContext interface {
 	UpdateNamespace(namespace string, values map[string]any) ([]any, error)
 }
 
+type canvasMemoryUpsertRecordsContext interface {
+	AddRecord(namespace string, values any) (core.CanvasMemoryRecord, error)
+	UpdateRecords(namespace string, matches map[string]any, values map[string]any) ([]core.CanvasMemoryRecord, error)
+	UpdateNamespaceRecords(namespace string, values map[string]any) ([]core.CanvasMemoryRecord, error)
+}
+
 func (c *UpsertMemory) Name() string {
 	return ComponentName
 }
@@ -306,41 +312,62 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 		return err
 	}
 
-	records := make([]any, 0)
+	recordCtx, ok := upsertCtx.(canvasMemoryUpsertRecordsContext)
+	if !ok {
+		return fmt.Errorf("canvas memory record upsert operations are not supported")
+	}
+
+	return executeListModeWithRecords(ctx, spec, mode, recordCtx, matches, insertOnly, resolved)
+}
+
+func executeListModeWithRecords(
+	ctx core.ExecutionContext,
+	spec Spec,
+	mode memorywrite.ListMode,
+	upsertCtx canvasMemoryUpsertRecordsContext,
+	matches map[string]any,
+	insertOnly bool,
+	resolved []map[string]any,
+) error {
+	records := make([]core.CanvasMemoryRecord, 0)
+	recordPositions := map[uuid.UUID]int{}
+	updatedRecords := make([]core.CanvasMemoryRecord, 0)
+	updatedPositions := map[uuid.UUID]int{}
+	createdRecords := make([]core.CanvasMemoryRecord, 0)
+	createdPositions := map[uuid.UUID]int{}
 	perItemValues := make([]any, 0, len(resolved))
 	itemResults := make([]any, 0, len(resolved))
-	updatedTotal := 0
-	createdTotal := 0
 
 	for i, values := range resolved {
 		perItemValues = append(perItemValues, values)
 
-		operation, affected, upsertErr := upsertMemoryRow(ctx, spec.Namespace, matches, values, upsertCtx, insertOnly)
+		operation, affected, upsertErr := upsertMemoryRecord(spec.Namespace, matches, values, upsertCtx, insertOnly)
 		if upsertErr != nil {
 			return fmt.Errorf("failed to upsert canvas memory for list item %d: %w", i, upsertErr)
 		}
 
+		records = memorywrite.AppendUniqueRecords(records, recordPositions, affected)
 		if operation == OperationCreated {
-			createdTotal++
+			createdRecords = memorywrite.AppendUniqueRecords(createdRecords, createdPositions, affected)
 		} else {
-			updatedTotal += len(affected)
+			updatedRecords = memorywrite.AppendUniqueRecords(updatedRecords, updatedPositions, affected)
 		}
 
-		records = append(records, affected...)
 		itemResults = append(itemResults, map[string]any{
 			"operation": operation,
 			"values":    values,
-			"records":   affected,
+			"records":   memorywrite.RecordValues(affected),
 		})
 	}
 
+	recordValues := memorywrite.RecordValues(records)
 	metadata := map[string]any{
 		"namespace":    spec.Namespace,
 		"matchFields":  memorywrite.FieldNames(spec.MatchList),
 		"valueFields":  memorywrite.FieldNames(spec.ValueList),
 		"matches":      matches,
-		"updatedCount": updatedTotal,
-		"createdCount": createdTotal,
+		"updatedCount": len(updatedRecords),
+		"createdCount": len(createdRecords),
 		"iterateList":  true,
 		"itemVariable": mode.ItemVariable,
 		"count":        len(resolved),
@@ -360,8 +387,8 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 					"matches":   matches,
 					"values":    perItemValues,
 					"items":     itemResults,
-					"records":   records,
-					"count":     len(records),
+					"records":   recordValues,
+					"count":     len(recordValues),
 				},
 			},
 		},
@@ -400,6 +427,41 @@ func upsertMemoryRow(
 		return "", nil, err
 	}
 	return OperationCreated, []any{values}, nil
+}
+
+func upsertMemoryRecord(
+	namespace string,
+	matches map[string]any,
+	values map[string]any,
+	upsertCtx canvasMemoryUpsertRecordsContext,
+	insertOnly bool,
+) (operation string, affected []core.CanvasMemoryRecord, err error) {
+	if insertOnly {
+		record, err := upsertCtx.AddRecord(namespace, values)
+		if err != nil {
+			return "", nil, err
+		}
+		return OperationCreated, []core.CanvasMemoryRecord{record}, nil
+	}
+
+	var updated []core.CanvasMemoryRecord
+	if len(matches) == 0 {
+		updated, err = upsertCtx.UpdateNamespaceRecords(namespace, values)
+	} else {
+		updated, err = upsertCtx.UpdateRecords(namespace, matches, values)
+	}
+	if err != nil {
+		return "", nil, err
+	}
+	if len(updated) > 0 {
+		return OperationUpdated, updated, nil
+	}
+
+	record, err := upsertCtx.AddRecord(namespace, values)
+	if err != nil {
+		return "", nil, err
+	}
+	return OperationCreated, []core.CanvasMemoryRecord{record}, nil
 }
 
 func decodeSpec(raw any) (Spec, error) {

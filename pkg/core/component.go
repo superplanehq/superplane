@@ -81,6 +81,11 @@ type CanvasMemoryContext interface {
 	FindFirst(namespace string, matches map[string]any) (any, error)
 }
 
+type CanvasMemoryRecord struct {
+	ID     uuid.UUID
+	Values any
+}
+
 /*
  * ExecutionStateContext allows components to control execution lifecycle.
  */

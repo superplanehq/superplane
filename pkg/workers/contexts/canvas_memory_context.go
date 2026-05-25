@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -19,12 +20,22 @@ func NewCanvasMemoryContext(tx *gorm.DB, canvasID uuid.UUID) *CanvasMemoryContex
 }
 
 func (c *CanvasMemoryContext) Add(namespace string, values any) error {
+	_, err := c.AddRecord(namespace, values)
+	return err
+}
+
+func (c *CanvasMemoryContext) AddRecord(namespace string, values any) (core.CanvasMemoryRecord, error) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
-		return fmt.Errorf("namespace is required")
+		return core.CanvasMemoryRecord{}, fmt.Errorf("namespace is required")
 	}
 
-	return models.AddCanvasMemoryInTransaction(c.tx, c.canvasID, namespace, values)
+	record, err := models.AddCanvasMemoryRecordInTransaction(c.tx, c.canvasID, namespace, values)
+	if err != nil {
+		return core.CanvasMemoryRecord{}, err
+	}
+
+	return canvasMemoryRecord(record), nil
 }
 
 func (c *CanvasMemoryContext) Find(namespace string, matches map[string]any) ([]any, error) {
@@ -83,6 +94,15 @@ func (c *CanvasMemoryContext) Delete(namespace string, matches map[string]any) (
 }
 
 func (c *CanvasMemoryContext) Update(namespace string, matches map[string]any, values map[string]any) ([]any, error) {
+	records, err := c.UpdateRecords(namespace, matches, values)
+	if err != nil {
+		return nil, err
+	}
+
+	return canvasMemoryRecordValues(records), nil
+}
+
+func (c *CanvasMemoryContext) UpdateRecords(namespace string, matches map[string]any, values map[string]any) ([]core.CanvasMemoryRecord, error) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
 		return nil, fmt.Errorf("namespace is required")
@@ -93,15 +113,19 @@ func (c *CanvasMemoryContext) Update(namespace string, matches map[string]any, v
 		return nil, err
 	}
 
-	updatedValues := make([]any, 0, len(records))
-	for _, record := range records {
-		updatedValues = append(updatedValues, record.Values.Data())
-	}
-
-	return updatedValues, nil
+	return canvasMemoryRecords(records), nil
 }
 
 func (c *CanvasMemoryContext) UpdateNamespace(namespace string, values map[string]any) ([]any, error) {
+	records, err := c.UpdateNamespaceRecords(namespace, values)
+	if err != nil {
+		return nil, err
+	}
+
+	return canvasMemoryRecordValues(records), nil
+}
+
+func (c *CanvasMemoryContext) UpdateNamespaceRecords(namespace string, values map[string]any) ([]core.CanvasMemoryRecord, error) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
 		return nil, fmt.Errorf("namespace is required")
@@ -112,10 +136,28 @@ func (c *CanvasMemoryContext) UpdateNamespace(namespace string, values map[strin
 		return nil, err
 	}
 
-	updatedValues := make([]any, 0, len(records))
-	for _, record := range records {
-		updatedValues = append(updatedValues, record.Values.Data())
-	}
+	return canvasMemoryRecords(records), nil
+}
 
-	return updatedValues, nil
+func canvasMemoryRecord(record models.CanvasMemory) core.CanvasMemoryRecord {
+	return core.CanvasMemoryRecord{
+		ID:     record.ID,
+		Values: record.Values.Data(),
+	}
+}
+
+func canvasMemoryRecords(records []models.CanvasMemory) []core.CanvasMemoryRecord {
+	out := make([]core.CanvasMemoryRecord, 0, len(records))
+	for _, record := range records {
+		out = append(out, canvasMemoryRecord(record))
+	}
+	return out
+}
+
+func canvasMemoryRecordValues(records []core.CanvasMemoryRecord) []any {
+	values := make([]any, 0, len(records))
+	for _, record := range records {
+		values = append(values, record.Values)
+	}
+	return values
 }

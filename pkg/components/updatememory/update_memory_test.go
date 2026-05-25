@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -18,6 +19,7 @@ type canvasMemoryContext struct {
 	matchesPerCall []map[string]any
 	updatedValues  []any
 	updatedPerCall [][]any
+	recordsPerCall [][]core.CanvasMemoryRecord
 	updateCalls    int
 	err            error
 }
@@ -52,6 +54,34 @@ func (c *canvasMemoryContext) Update(namespace string, matches map[string]any, v
 		return c.updatedPerCall[idx], nil
 	}
 	return c.updatedValues, nil
+}
+
+func (c *canvasMemoryContext) UpdateRecords(namespace string, matches map[string]any, values map[string]any) ([]core.CanvasMemoryRecord, error) {
+	c.updateCalls++
+	c.namespace = namespace
+	c.matches = matches
+	c.values = values
+	c.valuesPerCall = append(c.valuesPerCall, values)
+	c.matchesPerCall = append(c.matchesPerCall, matches)
+	if c.err != nil {
+		return nil, c.err
+	}
+	if len(c.recordsPerCall) == 0 {
+		return nil, nil
+	}
+
+	idx := c.updateCalls - 1
+	if idx >= len(c.recordsPerCall) {
+		idx = len(c.recordsPerCall) - 1
+	}
+	return c.recordsPerCall[idx], nil
+}
+
+func memoryRecord(id string, values any) core.CanvasMemoryRecord {
+	return core.CanvasMemoryRecord{
+		ID:     uuid.MustParse(id),
+		Values: values,
+	}
 }
 
 func TestUpdateMemoryExecute(t *testing.T) {
@@ -156,9 +186,9 @@ func TestUpdateMemoryExecute(t *testing.T) {
 		component := &UpdateMemory{}
 		execState := &contexts.ExecutionStateContext{}
 		memoryCtx := &canvasMemoryContext{
-			updatedPerCall: [][]any{
-				{map[string]any{"name": "api", "status": "running"}},
-				{map[string]any{"name": "worker", "status": "running"}},
+			recordsPerCall: [][]core.CanvasMemoryRecord{
+				{memoryRecord("11111111-1111-1111-1111-111111111111", map[string]any{"name": "api", "status": "running"})},
+				{memoryRecord("22222222-2222-2222-2222-222222222222", map[string]any{"name": "worker", "status": "running"})},
 			},
 		}
 		execMetadata := &contexts.MetadataContext{}
@@ -216,6 +246,64 @@ func TestUpdateMemoryExecute(t *testing.T) {
 		assert.Equal(t, "item", metadata["itemVariable"])
 		assert.Equal(t, 2, metadata["count"])
 		assert.Equal(t, 2, metadata["updatedCount"])
+	})
+
+	t.Run("list mode deduplicates repeated updated record", func(t *testing.T) {
+		component := &UpdateMemory{}
+		execState := &contexts.ExecutionStateContext{}
+		execMetadata := &contexts.MetadataContext{}
+		memoryCtx := &canvasMemoryContext{
+			recordsPerCall: [][]core.CanvasMemoryRecord{
+				{memoryRecord("11111111-1111-1111-1111-111111111111", map[string]any{"name": "api", "status": "starting"})},
+				{memoryRecord("11111111-1111-1111-1111-111111111111", map[string]any{"name": "api", "status": "running"})},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"namespace":    "services",
+				"iterateList":  true,
+				"listSource":   "list",
+				"itemVariable": "item",
+				"matchList": []map[string]any{
+					{"name": "env", "value": "prod"},
+				},
+				"valueList": []map[string]any{
+					{"name": "status", "value": "item.status"},
+				},
+			},
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
+			CanvasMemory:   memoryCtx,
+			ExecutionState: execState,
+			Expressions: &contexts.ExpressionContext{
+				Output: []any{
+					map[string]any{"status": "starting"},
+					map[string]any{"status": "running"},
+				},
+				WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+					return variables["item"].(map[string]any)["status"], nil
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, 2, memoryCtx.updateCalls)
+		metadata, ok := execMetadata.Get().(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 1, metadata["updatedCount"])
+
+		require.Len(t, execState.Payloads, 1)
+		payload, ok := execState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		outerData, ok := payload["data"].(map[string]any)
+		require.True(t, ok)
+		innerData, ok := outerData["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 1, innerData["count"])
+		assert.Equal(t, []any{
+			map[string]any{"name": "api", "status": "running"},
+		}, innerData["updated"])
 	})
 
 	t.Run("list mode emits notFound when nothing matches", func(t *testing.T) {

@@ -47,6 +47,10 @@ type canvasMemoryUpdateContext interface {
 	Update(namespace string, matches map[string]any, values map[string]any) ([]any, error)
 }
 
+type canvasMemoryUpdateRecordsContext interface {
+	UpdateRecords(namespace string, matches map[string]any, values map[string]any) ([]core.CanvasMemoryRecord, error)
+}
+
 func (c *UpdateMemory) Name() string {
 	return ComponentName
 }
@@ -294,17 +298,36 @@ func executeListMode(ctx core.ExecutionContext, spec Spec, mode memorywrite.List
 		return err
 	}
 
-	allUpdated := make([]any, 0)
+	recordCtx, ok := updateCtx.(canvasMemoryUpdateRecordsContext)
+	if !ok {
+		return fmt.Errorf("canvas memory record update operations are not supported")
+	}
+
+	return executeListModeWithRecords(ctx, spec, mode, recordCtx, items, matches, resolved)
+}
+
+func executeListModeWithRecords(
+	ctx core.ExecutionContext,
+	spec Spec,
+	mode memorywrite.ListMode,
+	updateCtx canvasMemoryUpdateRecordsContext,
+	items []any,
+	matches map[string]any,
+	resolved []map[string]any,
+) error {
+	allUpdatedRecords := make([]core.CanvasMemoryRecord, 0)
+	updatedPositions := map[uuid.UUID]int{}
 	perItemValues := make([]any, 0, len(resolved))
 	for i, values := range resolved {
 		perItemValues = append(perItemValues, values)
-		updated, updateErr := updateCtx.Update(spec.Namespace, matches, values)
+		updated, updateErr := updateCtx.UpdateRecords(spec.Namespace, matches, values)
 		if updateErr != nil {
 			return fmt.Errorf("failed to update canvas memory for list item %d: %w", i, updateErr)
 		}
-		allUpdated = append(allUpdated, updated...)
+		allUpdatedRecords = memorywrite.AppendUniqueRecords(allUpdatedRecords, updatedPositions, updated)
 	}
 
+	allUpdated := memorywrite.RecordValues(allUpdatedRecords)
 	metadata := map[string]any{
 		"namespace":    spec.Namespace,
 		"matchFields":  memorywrite.FieldNames(spec.MatchList),

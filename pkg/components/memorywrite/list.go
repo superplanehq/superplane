@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
@@ -208,4 +209,40 @@ func ResolveAllItemValues(
 		resolved = append(resolved, values)
 	}
 	return resolved, nil
+}
+
+// AppendUniqueRecords appends records by physical memory ID. If a record is
+// seen again, its latest values replace the previous entry without increasing
+// the reported count.
+func AppendUniqueRecords(
+	records []core.CanvasMemoryRecord,
+	positions map[uuid.UUID]int,
+	next []core.CanvasMemoryRecord,
+) []core.CanvasMemoryRecord {
+	for _, record := range next {
+		if record.ID == uuid.Nil {
+			records = append(records, record)
+			continue
+		}
+
+		if position, ok := positions[record.ID]; ok {
+			records[position] = record
+			continue
+		}
+
+		positions[record.ID] = len(records)
+		records = append(records, record)
+	}
+
+	return records
+}
+
+// RecordValues returns the value payloads used by component outputs while
+// keeping record IDs internal to the execution context.
+func RecordValues(records []core.CanvasMemoryRecord) []any {
+	values := make([]any, 0, len(records))
+	for _, record := range records {
+		values = append(values, record.Values)
+	}
+	return values
 }

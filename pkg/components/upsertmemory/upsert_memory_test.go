@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -18,6 +19,7 @@ type canvasMemoryContext struct {
 	updatedValues          []any
 	namespaceUpdatedValues []any
 	updatedPerCall         [][]any
+	updatedRecordsPerCall  [][]core.CanvasMemoryRecord
 	updateCalls            int
 	namespaceUpdateCalls   int
 	addCalls               int
@@ -34,6 +36,18 @@ func (c *canvasMemoryContext) Add(namespace string, values any) error {
 	}
 	c.addedValues = append(c.addedValues, values)
 	return c.addErr
+}
+
+func (c *canvasMemoryContext) AddRecord(namespace string, values any) (core.CanvasMemoryRecord, error) {
+	err := c.Add(namespace, values)
+	if err != nil {
+		return core.CanvasMemoryRecord{}, err
+	}
+
+	return core.CanvasMemoryRecord{
+		ID:     uuid.New(),
+		Values: values,
+	}, nil
 }
 
 func (c *canvasMemoryContext) Find(namespace string, matches map[string]any) ([]any, error) {
@@ -65,6 +79,28 @@ func (c *canvasMemoryContext) Update(namespace string, matches map[string]any, v
 	return c.updatedValues, nil
 }
 
+func (c *canvasMemoryContext) UpdateRecords(namespace string, matches map[string]any, values map[string]any) ([]core.CanvasMemoryRecord, error) {
+	c.updateCalls++
+	c.namespace = namespace
+	c.matches = matches
+	c.values = values
+	if c.err != nil {
+		return nil, c.err
+	}
+	if len(matches) == 0 {
+		return nil, errors.New("at least one match expression is required")
+	}
+	if len(c.updatedRecordsPerCall) == 0 {
+		return nil, nil
+	}
+
+	idx := c.updateCalls - 1
+	if idx >= len(c.updatedRecordsPerCall) {
+		idx = len(c.updatedRecordsPerCall) - 1
+	}
+	return c.updatedRecordsPerCall[idx], nil
+}
+
 func (c *canvasMemoryContext) UpdateNamespace(namespace string, values map[string]any) ([]any, error) {
 	c.namespaceUpdateCalls++
 	c.namespace = namespace
@@ -76,6 +112,23 @@ func (c *canvasMemoryContext) UpdateNamespace(namespace string, values map[strin
 		return c.namespaceUpdatedValues, nil
 	}
 	return c.updatedValues, nil
+}
+
+func (c *canvasMemoryContext) UpdateNamespaceRecords(namespace string, values map[string]any) ([]core.CanvasMemoryRecord, error) {
+	c.namespaceUpdateCalls++
+	c.namespace = namespace
+	c.values = values
+	if c.err != nil {
+		return nil, c.err
+	}
+	return nil, nil
+}
+
+func memoryRecord(id string, values any) core.CanvasMemoryRecord {
+	return core.CanvasMemoryRecord{
+		ID:     uuid.MustParse(id),
+		Values: values,
+	}
 }
 
 func TestUpsertMemoryExecute(t *testing.T) {
@@ -257,8 +310,8 @@ func TestUpsertMemoryExecute(t *testing.T) {
 		component := &UpsertMemory{}
 		execState := &contexts.ExecutionStateContext{}
 		memoryCtx := &canvasMemoryContext{
-			updatedPerCall: [][]any{
-				{map[string]any{"environment": "production", "name": "api"}},
+			updatedRecordsPerCall: [][]core.CanvasMemoryRecord{
+				{memoryRecord("11111111-1111-1111-1111-111111111111", map[string]any{"environment": "production", "name": "api"})},
 			},
 		}
 		execMetadata := &contexts.MetadataContext{}
@@ -329,8 +382,8 @@ func TestUpsertMemoryExecute(t *testing.T) {
 		component := &UpsertMemory{}
 		execState := &contexts.ExecutionStateContext{}
 		memoryCtx := &canvasMemoryContext{
-			updatedPerCall: [][]any{
-				{map[string]any{"environment": "production", "name": "api"}},
+			updatedRecordsPerCall: [][]core.CanvasMemoryRecord{
+				{memoryRecord("11111111-1111-1111-1111-111111111111", map[string]any{"environment": "production", "name": "api"})},
 				nil,
 			},
 		}
@@ -376,6 +429,65 @@ func TestUpsertMemoryExecute(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, 1, metadata["updatedCount"])
 		assert.Equal(t, 1, metadata["createdCount"])
+	})
+
+	t.Run("list mode deduplicates repeated updated record", func(t *testing.T) {
+		component := &UpsertMemory{}
+		execState := &contexts.ExecutionStateContext{}
+		execMetadata := &contexts.MetadataContext{}
+		memoryCtx := &canvasMemoryContext{
+			updatedRecordsPerCall: [][]core.CanvasMemoryRecord{
+				{memoryRecord("11111111-1111-1111-1111-111111111111", map[string]any{"environment": "production", "name": "api"})},
+				{memoryRecord("11111111-1111-1111-1111-111111111111", map[string]any{"environment": "production", "name": "worker"})},
+			},
+		}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"namespace":    "deployments",
+				"iterateList":  true,
+				"listSource":   "list",
+				"itemVariable": "item",
+				"matchList": []map[string]any{
+					{"name": "environment", "value": "production"},
+				},
+				"valueList": []map[string]any{
+					{"name": "name", "value": "item.name"},
+				},
+			},
+			Metadata:       execMetadata,
+			NodeMetadata:   &contexts.MetadataContext{},
+			CanvasMemory:   memoryCtx,
+			ExecutionState: execState,
+			Expressions: &contexts.ExpressionContext{
+				Output: []any{
+					map[string]any{"name": "api"},
+					map[string]any{"name": "worker"},
+				},
+				WithVariablesOutputFn: func(expression string, variables map[string]any) (any, error) {
+					return variables["item"].(map[string]any)["name"], nil
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, 2, memoryCtx.updateCalls)
+		metadata, ok := execMetadata.Get().(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 1, metadata["updatedCount"])
+		assert.Equal(t, 0, metadata["createdCount"])
+
+		require.Len(t, execState.Payloads, 1)
+		payload, ok := execState.Payloads[0].(map[string]any)
+		require.True(t, ok)
+		outerData, ok := payload["data"].(map[string]any)
+		require.True(t, ok)
+		innerData, ok := outerData["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, 1, innerData["count"])
+		assert.Equal(t, []any{
+			map[string]any{"environment": "production", "name": "worker"},
+		}, innerData["records"])
 	})
 }
 

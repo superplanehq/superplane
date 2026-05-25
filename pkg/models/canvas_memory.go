@@ -24,14 +24,20 @@ func (CanvasMemory) TableName() string {
 	return "canvas_memories"
 }
 
-func AddCanvasMemoryInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, values any) error {
+func AddCanvasMemoryRecordInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, values any) (CanvasMemory, error) {
 	record := CanvasMemory{
 		CanvasID:  canvasID,
 		Namespace: namespace,
 		Values:    datatypes.NewJSONType(values),
 	}
 
-	return tx.Create(&record).Error
+	err := tx.Create(&record).Error
+	return record, err
+}
+
+func AddCanvasMemoryInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, values any) error {
+	_, err := AddCanvasMemoryRecordInTransaction(tx, canvasID, namespace, values)
+	return err
 }
 
 func AddCanvasMemory(canvasID uuid.UUID, namespace string, values any) error {
