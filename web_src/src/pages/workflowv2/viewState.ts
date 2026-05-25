@@ -68,6 +68,33 @@ export function getWorkflowCanvasStateMode({
   return "default";
 }
 
+export function getWorkflowViewPresentation({
+  isDashboardMode,
+  dashboardsFeatureEnabled,
+  isRunsMode,
+  isMemoryMode,
+  hasEditableVersion,
+  isViewingPendingApprovalVersion,
+  isViewingCurrentLiveVersion,
+}: {
+  isDashboardMode: boolean;
+  dashboardsFeatureEnabled: boolean;
+  isRunsMode: boolean;
+  isMemoryMode: boolean;
+  hasEditableVersion: boolean;
+  isViewingPendingApprovalVersion: boolean;
+  isViewingCurrentLiveVersion: boolean;
+}) {
+  return {
+    headerMode: getWorkflowHeaderMode({ isDashboardMode, dashboardsFeatureEnabled, isRunsMode, isMemoryMode }),
+    canvasStateMode: getWorkflowCanvasStateMode({
+      hasEditableVersion,
+      isViewingPendingApprovalVersion,
+      isViewingCurrentLiveVersion,
+    }),
+  };
+}
+
 export function getExitEditModeDisabledTooltip({
   canUpdateCanvas,
   canvasDeletedRemotely,

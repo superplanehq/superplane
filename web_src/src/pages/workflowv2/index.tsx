@@ -80,7 +80,6 @@ import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
-import { getDashboardHeaderActions } from "./dashboard/dashboardHeaderActions";
 import { deriveDashboardNodeStatuses } from "./dashboard/deriveNodeStatuses";
 import { useDashboardModeActions } from "./dashboard/useDashboardModeActions";
 import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
@@ -88,6 +87,7 @@ import { WorkflowDashboardOverlay } from "./dashboard/WorkflowDashboardOverlay";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
+import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
 import { CanvasPageModals } from "./CanvasPageModals";
@@ -123,8 +123,7 @@ import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
   getExitEditModeDisabledTooltip,
   getRunActionState,
-  getWorkflowCanvasStateMode,
-  getWorkflowHeaderMode,
+  getWorkflowViewPresentation,
   readStoredBoolean,
 } from "./viewState";
 import {
@@ -4877,36 +4876,28 @@ export function WorkflowPageV2() {
     setSelectedRunId,
   });
 
-  const handleSelectCanvasView = useCallback(() => {
-    if (isDashboardMode) {
-      handleExitDashboardMode();
-      return;
-    }
-    if (isMemoryMode) {
-      handleExitMemoryMode();
-      return;
-    }
-    if (isRunsMode) {
-      handleExitRunsMode();
-    }
-  }, [handleExitDashboardMode, handleExitMemoryMode, handleExitRunsMode, isDashboardMode, isMemoryMode, isRunsMode]);
-
-  const handleDashboardAddPanelRequest = useCallback(async () => {
-    if (!hasEditableVersion) {
-      await handleToggleEditMode();
-    }
-    setIsDashboardAddPanelOpen(true);
-  }, [hasEditableVersion, handleToggleEditMode, setIsDashboardAddPanelOpen]);
-  const handleDashboardAddPanelDialogOpenChange = useCallback(
-    (open: boolean) => {
-      if (open) {
-        void handleDashboardAddPanelRequest();
-        return;
-      }
-      setIsDashboardAddPanelOpen(false);
-    },
-    [handleDashboardAddPanelRequest, setIsDashboardAddPanelOpen],
-  );
+  const {
+    handleSelectCanvasView,
+    handleDashboardAddPanelDialogOpenChange,
+    onDashboardAddPanel,
+    onDashboardOpenYaml,
+    dashboardYamlReadOnly,
+  } = useWorkflowViewModeActions({
+    isDashboardMode,
+    isMemoryMode,
+    isRunsMode,
+    hasEditableVersion,
+    dashboardsFeatureEnabled,
+    isTemplate,
+    canUpdateCanvas,
+    canvasDeletedRemotely,
+    handleExitDashboardMode,
+    handleExitMemoryMode,
+    handleExitRunsMode,
+    handleToggleEditMode,
+    setIsDashboardAddPanelOpen,
+    setIsDashboardYamlOpen,
+  });
 
   const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader } = useWorkflowHeaderEditActions({
     isRunsMode,
@@ -5481,25 +5472,11 @@ export function WorkflowPageV2() {
     isPreparingVersionAction,
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftGraphDiffVersusLive,
   });
-  const headerMode = getWorkflowHeaderMode({
+  const { headerMode, canvasStateMode } = getWorkflowViewPresentation({
     isDashboardMode,
     dashboardsFeatureEnabled,
     isRunsMode,
     isMemoryMode,
-  });
-  const { onDashboardAddPanel, onDashboardOpenYaml, dashboardYamlReadOnly } = getDashboardHeaderActions({
-    isEditing: hasEditableVersion,
-    isDashboardMode,
-    dashboardsFeatureEnabled,
-    isTemplate,
-    canUpdateCanvas,
-    canvasDeletedRemotely,
-    openAddPanel: () => {
-      void handleDashboardAddPanelRequest();
-    },
-    openYaml: () => setIsDashboardYamlOpen(true),
-  });
-  const canvasStateMode = getWorkflowCanvasStateMode({
     hasEditableVersion,
     isViewingPendingApprovalVersion,
     isViewingCurrentLiveVersion,
