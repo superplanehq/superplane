@@ -7,7 +7,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
 import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
-import { SecondaryHeaderActions } from "./HeaderSecondaryActions";
+import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
 
 export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
 
@@ -76,6 +76,23 @@ export function Header(props: HeaderProps) {
         organizationId={props.organizationId}
         headerTitle={headerTitle}
         showCanvasSettingsMenu={props.showCanvasSettingsMenu}
+        mode={props.mode}
+        hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
+        onDiscardVersion={props.onDiscardVersion}
+        discardVersionDisabled={props.discardVersionDisabled}
+        discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
+        onExitEditMode={props.onExitEditMode}
+        exitEditModeDisabled={props.exitEditModeDisabled}
+        exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
+        onPublishVersion={props.onPublishVersion}
+        publishVersionLabel={props.publishVersionLabel}
+        publishVersionDisabled={props.publishVersionDisabled}
+        publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+        onEnterEditMode={props.onEnterEditMode}
+        enterEditModeDisabled={props.enterEditModeDisabled}
+        enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+        onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
+        unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
       />
 
       <SecondaryHeader {...props} />
@@ -87,10 +104,44 @@ function PageHeader({
   organizationId,
   headerTitle,
   showCanvasSettingsMenu = true,
+  mode,
+  hasUnpublishedDraftChanges,
+  onDiscardVersion,
+  discardVersionDisabled,
+  discardVersionDisabledTooltip,
+  onExitEditMode,
+  exitEditModeDisabled,
+  exitEditModeDisabledTooltip,
+  onPublishVersion,
+  publishVersionLabel,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
+  onEnterEditMode,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
+  onDiscardDraftAndStartEdit,
+  unpublishedDraftUpdatedAt,
 }: {
   organizationId?: string;
   headerTitle: string;
   showCanvasSettingsMenu?: boolean;
+  mode?: HeaderMode;
+  hasUnpublishedDraftChanges?: boolean;
+  onDiscardVersion?: () => void;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
+  onExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
+  onPublishVersion?: () => void;
+  publishVersionLabel?: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+  onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
+  onDiscardDraftAndStartEdit?: () => void;
+  unpublishedDraftUpdatedAt?: string;
 }) {
   const navigate = useNavigate();
   const { workflowId, canvasId: canvasIdParam } = useParams<{ workflowId?: string; canvasId?: string }>();
@@ -114,7 +165,32 @@ function PageHeader({
           )}
         </div>
       </div>
-      <div className="relative z-10 ml-auto flex shrink-0 items-center">
+      <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
+        {mode === "version-live" && onEnterEditMode ? (
+          <LiveModeTopHeaderActions
+            onEnterEditMode={onEnterEditMode}
+            enterEditModeDisabled={enterEditModeDisabled}
+            enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+            hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+            onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
+            unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
+          />
+        ) : null}
+        {mode === "version-edit" ? (
+          <EditModeTopHeaderActions
+            hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+            onDiscardVersion={onDiscardVersion}
+            discardVersionDisabled={discardVersionDisabled}
+            discardVersionDisabledTooltip={discardVersionDisabledTooltip}
+            onExitEditMode={onExitEditMode}
+            exitEditModeDisabled={exitEditModeDisabled}
+            exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+            onPublishVersion={onPublishVersion}
+            publishVersionLabel={publishVersionLabel}
+            publishVersionDisabled={publishVersionDisabled}
+            publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          />
+        ) : null}
         {showCanvasSettingsMenu && organizationId && activeCanvasId ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

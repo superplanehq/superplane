@@ -19,44 +19,15 @@ export function SecondaryHeaderActions({
   visualDiffEnabled,
   draftVisualDiff,
   onToggleVisualDiff,
-  onDiscardVersion,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
-  onPublishVersion,
-  publishVersionLabel,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
-  onEnterEditMode,
-  enterEditModeDisabled,
-  enterEditModeDisabledTooltip,
-  onExitEditMode,
-  exitEditModeDisabled,
-  exitEditModeDisabledTooltip,
-  unpublishedDraftUpdatedAt,
-  onDiscardDraftAndStartEdit,
   onDashboardAddPanel,
   onDashboardOpenYaml,
   dashboardYamlReadOnly,
 }: HeaderProps) {
-  const showEditButton = mode === "version-live" && !!onEnterEditMode;
-  const showDraftDropdown =
-    showEditButton && !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
   const showDashboardAddPanel = mode === "dashboard" && !!onDashboardAddPanel;
   const showDashboardYaml = mode === "dashboard" && !!onDashboardOpenYaml;
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-      <LiveModeEditControls
-        showEditButton={showEditButton}
-        showDraftDropdown={showDraftDropdown}
-        onEnterEditMode={onEnterEditMode}
-        enterEditModeDisabled={enterEditModeDisabled}
-        enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-        hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
-        onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
-        unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
-      />
-
       {mode === "default" && onSave && !saveButtonHidden ? (
         <SaveButton
           onSave={onSave}
@@ -66,23 +37,13 @@ export function SecondaryHeaderActions({
         />
       ) : null}
 
-      {mode === "version-edit" ? (
-        <EditModeVersionActions
-          hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
-          onShowDiff={onShowDiff}
+      {mode === "version-edit" && hasUnpublishedDraftChanges && draftVisualDiff?.diffCounts ? (
+        <DiffSummaryHoverCard
+          diffCounts={draftVisualDiff.diffCounts}
           visualDiffEnabled={visualDiffEnabled}
-          draftVisualDiff={draftVisualDiff}
           onToggleVisualDiff={onToggleVisualDiff}
-          onDiscardVersion={onDiscardVersion}
-          discardVersionDisabled={discardVersionDisabled}
-          discardVersionDisabledTooltip={discardVersionDisabledTooltip}
-          onExitEditMode={onExitEditMode}
-          exitEditModeDisabled={exitEditModeDisabled}
-          exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          onPublishVersion={onPublishVersion}
-          publishVersionLabel={publishVersionLabel}
-          publishVersionDisabled={publishVersionDisabled}
-          publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          diffToggles={draftVisualDiff.diffToggles}
+          onShowDiff={onShowDiff}
         />
       ) : null}
 
@@ -125,9 +86,7 @@ export function SecondaryHeaderActions({
   );
 }
 
-function LiveModeEditControls({
-  showEditButton,
-  showDraftDropdown,
+export function LiveModeTopHeaderActions({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -142,13 +101,12 @@ function LiveModeEditControls({
   | "hasUnpublishedDraftChanges"
   | "onDiscardDraftAndStartEdit"
   | "unpublishedDraftUpdatedAt"
-> & {
-  showEditButton: boolean;
-  showDraftDropdown: boolean;
-}) {
-  if (!showEditButton || !onEnterEditMode) {
+>) {
+  if (!onEnterEditMode) {
     return null;
   }
+
+  const showDraftDropdown = !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
 
   if (showDraftDropdown && onDiscardDraftAndStartEdit) {
     return (
@@ -170,12 +128,8 @@ function LiveModeEditControls({
   );
 }
 
-function EditModeVersionActions({
+export function EditModeTopHeaderActions({
   hasUnpublishedDraftChanges,
-  onShowDiff,
-  visualDiffEnabled,
-  draftVisualDiff,
-  onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -189,10 +143,6 @@ function EditModeVersionActions({
 }: Pick<
   HeaderProps,
   | "hasUnpublishedDraftChanges"
-  | "onShowDiff"
-  | "visualDiffEnabled"
-  | "draftVisualDiff"
-  | "onToggleVisualDiff"
   | "onDiscardVersion"
   | "discardVersionDisabled"
   | "discardVersionDisabledTooltip"
@@ -207,22 +157,11 @@ function EditModeVersionActions({
   return (
     <div className="flex items-center gap-2">
       {hasUnpublishedDraftChanges ? (
-        <>
-          {draftVisualDiff?.diffCounts && (
-            <DiffSummaryHoverCard
-              diffCounts={draftVisualDiff.diffCounts}
-              visualDiffEnabled={visualDiffEnabled}
-              onToggleVisualDiff={onToggleVisualDiff}
-              diffToggles={draftVisualDiff.diffToggles}
-              onShowDiff={onShowDiff}
-            />
-          )}
-          <DiscardDraftButton
-            onDiscard={() => onDiscardVersion?.()}
-            disabled={discardVersionDisabled || !onDiscardVersion}
-            disabledTooltip={discardVersionDisabledTooltip}
-          />
-        </>
+        <DiscardDraftButton
+          onDiscard={() => onDiscardVersion?.()}
+          disabled={discardVersionDisabled || !onDiscardVersion}
+          disabledTooltip={discardVersionDisabledTooltip}
+        />
       ) : null}
       {onExitEditMode ? (
         <ExitEditButton
