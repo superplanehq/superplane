@@ -51,7 +51,11 @@ func main() {
 		log.Error("AUTH_TOKEN is required — set a non-empty secret; clients send Authorization: Bearer <token> for /v1")
 		os.Exit(1)
 	}
-	handler := broker.NewRouter(srv, broker.RouterOptions{AuthToken: auth})
+	liveLogsCORSOrigins := broker.ParseLiveLogsCORSOrigins(os.Getenv("TASK_BROKER_LIVE_LOGS_CORS_ORIGINS"))
+	handler := broker.NewRouter(srv, broker.RouterOptions{
+		AuthToken:           auth,
+		LiveLogsCORSOrigins: liveLogsCORSOrigins,
+	})
 
 	addr := getenv("LISTEN_ADDR", ":8081")
 	httpSrv := &http.Server{

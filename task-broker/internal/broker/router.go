@@ -12,7 +12,8 @@ import (
 
 // RouterOptions configures HTTP middleware.
 type RouterOptions struct {
-	AuthToken string
+	AuthToken           string
+	LiveLogsCORSOrigins []string
 }
 
 // NewRouter builds chi routes for task-broker.
@@ -32,6 +33,16 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 		if auth == "" {
 			panic("broker: AuthToken is required — use mandatory AUTH_TOKEN from main")
 		}
+
+		r.Route("/tasks/{id}/live-logs", func(r chi.Router) {
+			r.Use(liveLogsCORS(opt.LiveLogsCORSOrigins))
+			r.Use(liveLogsAuth(auth))
+			r.Get("/", s.getTaskLiveLogs)
+			r.Options("/", func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(http.StatusNoContent)
+			})
+		})
+
 		r.Group(func(r chi.Router) {
 			r.Use(bearerAuth(auth))
 			r.Get("/fleets", s.listFleets)
@@ -40,7 +51,6 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 			r.Get("/tasks", s.listTasks)
 			r.Post("/tasks", s.createTask)
 			r.Post("/tasks/claim", s.claimTask)
-			r.Get("/tasks/{id}/live-logs", s.getTaskLiveLogs)
 			r.Get("/tasks/{id}", s.getTask)
 			r.Post("/tasks/{id}/cancel", s.cancelTask)
 			r.Post("/tasks/{id}/complete", s.completeTask)
