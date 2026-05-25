@@ -183,6 +183,8 @@ export interface CanvasPageProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
+  /** Switches back to the Canvas tab without changing edit mode. */
+  onSelectCanvasView?: () => void;
   onSelectRuns?: () => void;
   onExitRunsMode?: () => void;
   onSelectDashboard?: () => void;
@@ -192,6 +194,10 @@ export interface CanvasPageProps {
   onDashboardAddPanel?: () => void;
   /** Opens the dashboard YAML modal when `headerMode` is `dashboard`. */
   onDashboardOpenYaml?: () => void;
+  /** Opens the canvas YAML modal from the secondary header when editing on the Canvas tab. */
+  onCanvasOpenYaml?: () => void;
+  /** Opens the add-component sidebar from the secondary header when editing on the Canvas tab. */
+  onCanvasAddComponent?: () => void;
   /** Whether the dashboard YAML modal will open in read-only mode (no apply). */
   dashboardYamlReadOnly?: boolean;
   publishVersionLabel?: string;
@@ -278,7 +284,7 @@ export interface CanvasPageProps {
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
-  /** When true with a non-empty `activeCanvasVersionId`, the agent may run in build mode. */
+  /** When true, the canvas draft is active across Canvas, Console, and Memory tabs. */
   isEditing: boolean;
   /** Active canvas version id (draft when editing); drives agent build mode. */
   activeCanvasVersionId: string;
@@ -1154,7 +1160,7 @@ function CanvasPage(props: CanvasPageProps) {
     disabled:
       readOnly ||
       Boolean(props.hideAddControls) ||
-      props.headerMode === "version-live" ||
+      !props.isEditing ||
       props.headerMode === "dashboard" ||
       props.headerMode === "memory" ||
       props.headerMode === "runs" ||
@@ -1269,6 +1275,8 @@ function CanvasPage(props: CanvasPageProps) {
           discardVersionDisabled={props.discardVersionDisabled}
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           headerMode={props.headerMode}
+          isEditing={props.isEditing}
+          onSelectCanvasView={props.onSelectCanvasView}
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
           enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
@@ -1279,6 +1287,8 @@ function CanvasPage(props: CanvasPageProps) {
           onSelectMemory={props.onSelectMemory}
           onDashboardAddPanel={props.onDashboardAddPanel}
           onDashboardOpenYaml={props.onDashboardOpenYaml}
+          onCanvasOpenYaml={props.isEditing ? props.onYamlOpen : undefined}
+          onCanvasAddComponent={props.isEditing ? handleBuildingBlocksShortcutOpen : undefined}
           dashboardYamlReadOnly={props.dashboardYamlReadOnly}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
@@ -1306,7 +1316,7 @@ function CanvasPage(props: CanvasPageProps) {
           versionsContent={props.toolSidebarVersionsContent}
         />
 
-        {props.headerMode === "runs" || props.headerMode === "memory" ? null : (
+        {props.headerMode === "runs" || props.headerMode === "memory" || props.isEditing ? null : (
           <RightSideControls
             mode={readOnly ? "live" : "edit"}
             onSidebarOpen={handleBuildingBlocksShortcutOpen}
@@ -1318,7 +1328,7 @@ function CanvasPage(props: CanvasPageProps) {
           <BuildingBlocksSidebar
             isOpen={
               isBuildingBlocksSidebarOpen &&
-              props.headerMode !== "version-live" &&
+              !!props.isEditing &&
               props.headerMode !== "dashboard" &&
               props.headerMode !== "memory" &&
               props.headerMode !== "runs"
@@ -1416,6 +1426,7 @@ function CanvasPage(props: CanvasPageProps) {
               setCurrentTab={setCurrentTab}
               showBottomStatusControls={props.showBottomStatusControls}
               headerMode={props.headerMode}
+              isEditing={props.isEditing}
               isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
               onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
               autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
@@ -1465,11 +1476,7 @@ function CanvasPage(props: CanvasPageProps) {
               configurationSaveMode={props.configurationSaveMode}
               currentTab={currentTab}
               onTabChange={setCurrentTab}
-              canvasMode={
-                props.headerMode === "version-live" || props.headerMode === "dashboard" || props.headerMode === "memory"
-                  ? "live"
-                  : "edit"
-              }
+              canvasMode={props.isEditing ? "edit" : "live"}
               organizationId={props.organizationId}
               getCustomField={props.getCustomField}
               integrations={props.integrations}
@@ -1778,6 +1785,8 @@ function CanvasContentHeader({
   discardVersionDisabled,
   discardVersionDisabledTooltip,
   headerMode,
+  isEditing,
+  onSelectCanvasView,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -1788,6 +1797,8 @@ function CanvasContentHeader({
   onSelectMemory,
   onDashboardAddPanel,
   onDashboardOpenYaml,
+  onCanvasOpenYaml,
+  onCanvasAddComponent,
   dashboardYamlReadOnly,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
@@ -1823,6 +1834,8 @@ function CanvasContentHeader({
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   headerMode?: CanvasPageProps["headerMode"];
+  isEditing?: boolean;
+  onSelectCanvasView?: () => void;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -1833,6 +1846,8 @@ function CanvasContentHeader({
   onSelectMemory?: () => void;
   onDashboardAddPanel?: () => void;
   onDashboardOpenYaml?: () => void;
+  onCanvasOpenYaml?: () => void;
+  onCanvasAddComponent?: () => void;
   dashboardYamlReadOnly?: boolean;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
@@ -1870,6 +1885,8 @@ function CanvasContentHeader({
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       mode={headerMode}
+      isEditing={isEditing}
+      onSelectCanvasView={onSelectCanvasView}
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
@@ -1880,6 +1897,8 @@ function CanvasContentHeader({
       onSelectMemory={onSelectMemory}
       onDashboardAddPanel={onDashboardAddPanel}
       onDashboardOpenYaml={onDashboardOpenYaml}
+      onCanvasOpenYaml={onCanvasOpenYaml}
+      onCanvasAddComponent={onCanvasAddComponent}
       dashboardYamlReadOnly={dashboardYamlReadOnly}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
@@ -1955,6 +1974,7 @@ function CanvasContent({
   setCurrentTab,
   showBottomStatusControls = true,
   headerMode,
+  isEditing = false,
   isAutoLayoutOnUpdateEnabled,
   onToggleAutoLayoutOnUpdate,
   autoLayoutOnUpdateDisabled,
@@ -2011,6 +2031,7 @@ function CanvasContent({
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   showBottomStatusControls?: boolean;
   headerMode?: CanvasPageProps["headerMode"];
+  isEditing?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -2092,7 +2113,7 @@ function CanvasContent({
     return saved ? parseInt(saved, 10) : 320;
   });
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
-  const isEditMode = headerMode === "version-edit";
+  const isEditMode = isEditing;
   const runSelectableSet = useMemo(() => {
     if (headerMode !== "runs" || !runParticipantNodeIds || runParticipantNodeIds.length === 0) {
       return null;
