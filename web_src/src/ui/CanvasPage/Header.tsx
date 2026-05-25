@@ -5,10 +5,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { MoreVertical, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
+import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions } from "./HeaderSecondaryActions";
 
-export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard";
+export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
 
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). */
@@ -16,6 +17,18 @@ export interface HeaderProps {
   onSave?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
+  onShowDiff?: () => void;
+  visualDiffEnabled?: boolean;
+  onToggleVisualDiff?: () => void;
+  draftVisualDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
+    diffToggles: {
+      showDeletedNodes: boolean;
+      toggleShowDeletedNodes: () => void;
+      showEdgeDiff: boolean;
+      toggleShowEdgeDiff: () => void;
+    };
+  };
   organizationId?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
@@ -33,6 +46,8 @@ export interface HeaderProps {
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectDashboard?: () => void;
+  /** Provided when Memory is available as a first-class tab; opens the Memory view. */
+  onSelectMemory?: () => void;
   /** When set with `mode === "dashboard"`, shows Add panel in the secondary header. */
   onDashboardAddPanel?: () => void;
   /** When set with `mode === "dashboard"`, shows the YAML button in the secondary header. */
@@ -86,8 +101,18 @@ function PageHeader({
       <div className="relative z-10 flex min-w-0 shrink-0 items-center">
         <OrganizationMenuButton organizationId={organizationId} />
       </div>
-      <div className="pointer-events-none absolute inset-x-0 flex justify-center px-24">
-        <span className="truncate text-center text-sm font-medium text-slate-900">{headerTitle}</span>
+      <div className="pointer-events-none absolute inset-x-0 flex items-center justify-center px-24">
+        <div className="pointer-events-auto">
+          {organizationId && activeCanvasId ? (
+            <CanvasProjectSwitcher
+              organizationId={organizationId}
+              activeCanvasId={activeCanvasId}
+              canvasName={headerTitle}
+            />
+          ) : (
+            <span className="block truncate text-center text-[13px] font-medium text-slate-900">{headerTitle}</span>
+          )}
+        </div>
       </div>
       <div className="relative z-10 ml-auto flex shrink-0 items-center">
         {showCanvasSettingsMenu && organizationId && activeCanvasId ? (
@@ -118,12 +143,20 @@ function PageHeader({
 
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle =
-    !!props.onSelectDashboard &&
+    (!!props.onSelectDashboard || !!props.onSelectMemory) &&
     (props.mode === "version-live" ||
       props.mode === "version-edit" ||
       props.mode === "runs" ||
-      props.mode === "dashboard");
-  const canvasViewMode = props.mode === "runs" ? "runs" : props.mode === "dashboard" ? "dashboard" : "version-live";
+      props.mode === "dashboard" ||
+      props.mode === "memory");
+  const canvasViewMode =
+    props.mode === "runs"
+      ? "runs"
+      : props.mode === "dashboard"
+        ? "dashboard"
+        : props.mode === "memory"
+          ? "memory"
+          : "version-live";
   const editing = props.mode === "version-edit";
 
   return (
@@ -137,6 +170,7 @@ function SecondaryHeader(props: HeaderProps) {
               mode={canvasViewMode}
               onSelectLive={props.onExitEditMode}
               onSelectDashboard={props.onSelectDashboard}
+              onSelectMemory={props.onSelectMemory}
               editing={editing}
               hasDraft={!!props.hasUnpublishedDraftChanges}
             />

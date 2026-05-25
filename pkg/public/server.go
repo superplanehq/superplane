@@ -340,8 +340,8 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	}).Methods("GET")
 
 	s.Router.Handle(
-		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs",
-		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogStream)),
+		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
+		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogSession)),
 	).Methods("GET")
 
 	// Protect the gRPC gateway routes with organization authentication
@@ -589,6 +589,8 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
 	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
+	accountRoute.HandleFunc("/apps/install/preview", s.appInstallPreview).Methods("GET")
+	accountRoute.HandleFunc("/apps/install", s.installApp).Methods("POST")
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
@@ -602,6 +604,7 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminDisableOrgExperimentalFeature).Methods("DELETE")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminUpdateInstallationNetworkSettings).Methods("PATCH")
+	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
 	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
 	adminRoute.HandleFunc("/impersonate/end", s.endImpersonation).Methods("POST")
 	adminRoute.HandleFunc("/impersonate/status", s.impersonationStatus).Methods("GET")

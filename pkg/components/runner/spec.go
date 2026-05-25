@@ -20,6 +20,9 @@ const (
 	maxExecutionTimeoutSecondsRequest = 86400
 	// maxDockerImageReferenceChars caps OCI image references (name:tag, registry/repo@digest, etc.).
 	maxDockerImageReferenceChars = 2048
+
+	// DefaultExecutionTimeoutSeconds is the wall-clock limit when a node omits execution_timeout_seconds.
+	DefaultExecutionTimeoutSeconds = 3600 // 1 hour
 )
 
 // EnvironmentVariable is one row in the Runner "Environment variables" list.
@@ -37,7 +40,7 @@ type Spec struct {
 	ExecutionMode           string                `mapstructure:"execution_mode"`
 	DockerImagePreset       string                `mapstructure:"docker_image_preset"`
 	DockerImage             string                `mapstructure:"docker_image"`
-	ExecutionTimeoutSeconds int                   `mapstructure:"execution_timeout_seconds"` // 0 = omit (broker default)
+	ExecutionTimeoutSeconds int                   `mapstructure:"execution_timeout_seconds"` // 0 = DefaultExecutionTimeoutSeconds
 }
 
 func decodeRunnerSpec(raw any) (Spec, error) {
@@ -61,6 +64,9 @@ func decodeRunnerSpec(raw any) (Spec, error) {
 func applyRunnerSpecDefaults(spec *Spec) {
 	if strings.TrimSpace(spec.ExecutionMode) == "" {
 		spec.ExecutionMode = ExecutionModeHost
+	}
+	if spec.ExecutionTimeoutSeconds <= 0 {
+		spec.ExecutionTimeoutSeconds = DefaultExecutionTimeoutSeconds
 	}
 }
 
@@ -112,7 +118,7 @@ func validateRunnerSpec(spec Spec) error {
 
 	if spec.ExecutionTimeoutSeconds != 0 {
 		if spec.ExecutionTimeoutSeconds < 1 || spec.ExecutionTimeoutSeconds > maxExecutionTimeoutSecondsRequest {
-			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the broker default", maxExecutionTimeoutSecondsRequest)
+			return fmt.Errorf("execution timeout must be between 1 and %d seconds, or 0 to use the default (%d seconds)", maxExecutionTimeoutSecondsRequest, DefaultExecutionTimeoutSeconds)
 		}
 	}
 

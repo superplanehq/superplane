@@ -3,7 +3,7 @@
 // Strings wrapped in `{{ ... }}` are compiled once and evaluated per row.
 // Strings without braces use legacy dot-path semantics via callers.
 import { type CstNode } from "chevrotain";
-import { evaluate as celEvaluate, parse as celParse } from "cel-js";
+import { CelTypeError, evaluate as celEvaluate, parse as celParse } from "cel-js";
 
 export type CompiledExpr = { ok: true; raw: string; cst: CstNode } | { ok: false; raw: string; error: string };
 
@@ -95,6 +95,7 @@ const BUILTIN_FUNCTIONS: Record<string, CallableFunction> = {
   upper: (s: unknown) => (s == null ? "" : String(s).toUpperCase()),
   duration: (seconds: unknown) => formatDurationSeconds(Number(seconds)),
   timestamp: (seconds: unknown) => formatTimestampSeconds(Number(seconds)),
+  formatDate,
 };
 
 function toInt(value: unknown): number {
@@ -150,14 +151,153 @@ function formatTimestampSeconds(value: number): string {
   return date.toISOString();
 }
 
+/**
+ * Format a date value using a small token pattern (e.g. `MM/dd`, `yyyy-MM-dd HH:mm`).
+ *
+ * The value may be an ISO-8601 string, a `Date` instance, an epoch number in
+ * seconds (`< 1e12`), or an epoch number in milliseconds (`>= 1e12`). All
+ * tokens render in the viewer's local time, matching the rest of the
+ * dashboard's display conventions (`widgetFormat.ts` also uses `toLocale*`).
+ *
+ * Returns an empty string when the value cannot be parsed or when the pattern
+ * is missing — this is consistent with the other builtins and keeps widgets
+ * resilient to malformed source data.
+ *
+ * Supported tokens (longest matched first):
+ *   yyyy, yy        – four / two digit year
+ *   MM, M           – two / one-or-two digit month (1-12)
+ *   dd, d           – two / one-or-two digit day of month
+ *   HH, H           – two / one-or-two digit hour (0-23)
+ *   mm, m           – two / one-or-two digit minute
+ *   ss, s           – two / one-or-two digit second
+ *
+ * Other characters in the pattern are preserved literally. Authors who need a
+ * literal letter that overlaps a token should pick a different separator.
+ */
+function formatDate(value: unknown, pattern: unknown): string {
+  if (typeof pattern !== "string" || pattern === "") return "";
+  const date = coerceToDate(value);
+  if (!date) return "";
+  return formatDateTokens(date, pattern);
+}
+
+function coerceToDate(value: unknown): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? value : null;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return null;
+    const parsed = Date.parse(trimmed);
+    return Number.isFinite(parsed) ? new Date(parsed) : null;
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null;
+    const ms = value >= 1e12 ? value : value * 1000;
+    const date = new Date(ms);
+    return Number.isFinite(date.getTime()) ? date : null;
+  }
+  return null;
+}
+
+const DATE_TOKEN_RE = /yyyy|yy|MM|M|dd|d|HH|H|mm|m|ss|s/g;
+
+function formatDateTokens(date: Date, pattern: string): string {
+  return pattern.replace(DATE_TOKEN_RE, (token) => {
+    switch (token) {
+      case "yyyy":
+        return String(date.getFullYear());
+      case "yy":
+        return String(date.getFullYear() % 100).padStart(2, "0");
+      case "MM":
+        return String(date.getMonth() + 1).padStart(2, "0");
+      case "M":
+        return String(date.getMonth() + 1);
+      case "dd":
+        return String(date.getDate()).padStart(2, "0");
+      case "d":
+        return String(date.getDate());
+      case "HH":
+        return String(date.getHours()).padStart(2, "0");
+      case "H":
+        return String(date.getHours());
+      case "mm":
+        return String(date.getMinutes()).padStart(2, "0");
+      case "m":
+        return String(date.getMinutes());
+      case "ss":
+        return String(date.getSeconds()).padStart(2, "0");
+      case "s":
+        return String(date.getSeconds());
+      default:
+        return token;
+    }
+  });
+}
+
+export type EvalResult = { ok: true; value: unknown } | { ok: false; error: string };
+
+/**
+ * Evaluate a compiled CEL expression. Returns `undefined` on any error so
+ * existing callers (column rendering, payload merging, etc.) keep failing
+ * gracefully. Numeric-looking string fields are silently retried as numbers
+ * when a `CelTypeError` is raised — memory rows commonly stringify scalars,
+ * and authors expect `{{ value / 2 }}` to "just work" on those rows.
+ */
 export function evalExpr(compiled: CompiledExpr, row: Record<string, unknown>, env: ExprEnv): unknown {
-  if (!compiled.ok) return undefined;
+  const detailed = evalExprDetailed(compiled, row, env);
+  return detailed.ok ? detailed.value : undefined;
+}
+
+/**
+ * Same as `evalExpr` but surfaces compile/eval errors so the editor can
+ * display them in inline previews. The error string is the first compile
+ * error or the message from the underlying eval error.
+ */
+export function evalExprDetailed(compiled: CompiledExpr, row: Record<string, unknown>, env: ExprEnv): EvalResult {
+  if (!compiled.ok) return { ok: false, error: compiled.error };
   const vars = { ...env.globals, ...row };
   try {
-    return celEvaluate(compiled.cst, vars, env.functions);
-  } catch {
-    return undefined;
+    return { ok: true, value: celEvaluate(compiled.cst, vars, env.functions) };
+  } catch (initial) {
+    if (!(initial instanceof CelTypeError)) {
+      return { ok: false, error: initial instanceof Error ? initial.message : String(initial) };
+    }
+    const coerced = coerceNumericStrings(vars);
+    if (coerced === vars) {
+      return { ok: false, error: initial.message };
+    }
+    try {
+      return { ok: true, value: celEvaluate(compiled.cst, coerced, env.functions) };
+    } catch (retry) {
+      const message = retry instanceof Error ? retry.message : String(retry);
+      return { ok: false, error: message };
+    }
   }
+}
+
+/**
+ * Returns a new vars object with string values that parse cleanly as finite
+ * numbers replaced with their numeric form. Non-numeric strings are left
+ * alone so equality and substring checks still work. When nothing changes
+ * the original object is returned so callers can short-circuit.
+ */
+function coerceNumericStrings(vars: Record<string, unknown>): Record<string, unknown> {
+  let changed = false;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(vars)) {
+    if (typeof value === "string" && value.trim() !== "") {
+      const n = Number(value);
+      if (Number.isFinite(n)) {
+        out[key] = n;
+        changed = true;
+        continue;
+      }
+    }
+    out[key] = value;
+  }
+  return changed ? out : vars;
 }
 
 export function evalRowField(
@@ -187,6 +327,31 @@ export function evalTemplate(
     out += stringify(value);
   }
   return out;
+}
+
+/**
+ * Render a template like `evalTemplate` but surface the first compile/eval
+ * error encountered. Useful for the payload editor preview where authors
+ * benefit from a concrete error string instead of silent emptiness.
+ */
+export function evalTemplateDetailed(
+  template: CompiledTemplate,
+  row: Record<string, unknown>,
+  env: ExprEnv,
+  stringify: (value: unknown) => string,
+): { ok: true; value: string } | { ok: false; error: string } {
+  let out = "";
+  for (const seg of template.segments) {
+    if (seg.kind === "literal") {
+      out += seg.value;
+      continue;
+    }
+    const detailed = evalExprDetailed(seg.expr, row, env);
+    if (!detailed.ok) return { ok: false, error: detailed.error };
+    if (detailed.value === undefined) continue;
+    out += stringify(detailed.value);
+  }
+  return { ok: true, value: out };
 }
 
 export function evalBoolExpr(raw: string | undefined, row: Record<string, unknown>, env: ExprEnv): boolean {

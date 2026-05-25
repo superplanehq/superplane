@@ -2,6 +2,8 @@ package shared
 
 import (
 	"fmt"
+	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -11,7 +13,9 @@ import (
 	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/pkg/workers/contexts"
 
 	"github.com/superplanehq/superplane/test/e2e/queries"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
@@ -89,14 +93,33 @@ func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
 }
 
 func (s *CanvasSteps) Create() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/new")
-	s.session.FillIn(q.TestID("canvas-name-input"), s.CanvasName)
-	s.session.Click(q.TestID("create-canvas-button"))
-	s.session.Sleep(500)
+	s.session.Visit("/" + s.session.OrgID.String() + "/")
+	s.session.Click(q.Text("New App"))
+	s.session.Sleep(3000)
 
-	wf, err := models.FindCanvasByName(s.CanvasName, s.session.OrgID)
+	s.WorkflowID = extractCanvasIDFromURL(s.t, s.session.Page().URL())
+
+	// Rename the canvas to the desired name (instant create uses random names)
+	err := database.Conn().
+		Model(&models.Canvas{}).
+		Where("id = ?", s.WorkflowID).
+		Update("name", s.CanvasName).Error
 	require.NoError(s.t, err)
-	s.WorkflowID = wf.ID
+}
+
+func extractCanvasIDFromURL(t *testing.T, rawURL string) uuid.UUID {
+	t.Helper()
+
+	parsedURL, err := url.Parse(rawURL)
+	require.NoError(t, err)
+
+	matches := regexp.MustCompile(`/canvases/([0-9a-f-]{36})`).FindStringSubmatch(parsedURL.Path)
+	require.Len(t, matches, 2, "expected canvas ID in URL %q", rawURL)
+
+	canvasID, err := uuid.Parse(matches[1])
+	require.NoError(t, err)
+
+	return canvasID
 }
 
 func (s *CanvasSteps) Visit() {
@@ -191,8 +214,10 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(500)
 
+	s.selectLatestNoopNode()
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.Sleep(300)
+	s.waitForDraftNodeID(name)
 }
 
 func (s *CanvasSteps) AddNote() {
@@ -216,6 +241,8 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 	source := q.TestID("building-block-noop")
 	s.addBlockFromSidebar(source, pos)
 	s.session.Sleep(500)
+
+	s.selectLatestNoopNode()
 
 	// Get the auto-generated name from the input field
 	nameInput := q.TestID("node-name-input")
@@ -339,6 +366,16 @@ func (s *CanvasSteps) addBlockFromSidebar(source queries.Query, pos models.Posit
 	s.session.DragAndDrop(source, target, pos.X, pos.Y)
 }
 
+func (s *CanvasSteps) selectLatestNoopNode() {
+	headers := s.session.Page().Locator(`.react-flow__node [data-testid^="node-noop"][data-testid$="-header"]`)
+	count, err := headers.Count()
+	require.NoError(s.t, err)
+	require.Greater(s.t, count, 0, "expected at least one noop node after adding a noop block")
+
+	require.NoError(s.t, headers.Nth(count-1).Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	s.session.Sleep(150)
+}
+
 func (s *CanvasSteps) Connect(sourceName, targetName string) {
 	sourceNodeID := s.waitForDraftNodeID(sourceName)
 	targetNodeID := s.waitForDraftNodeID(targetName)
@@ -351,7 +388,7 @@ func (s *CanvasSteps) Connect(sourceName, targetName string) {
 }
 
 func (s *CanvasSteps) waitForDraftNodeID(nodeName string) string {
-	deadline := time.Now().Add(10 * time.Second)
+	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
 		draft := s.FindCurrentDraft()
 		if draft != nil {
@@ -402,6 +439,17 @@ func (s *CanvasSteps) RunManualTrigger(name string) {
 	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(name) + `-header"]) [data-testid="start-template-run"]`)
 	s.session.Click(startTemplateRun)
 	s.session.Click(q.TestID("emit-event-submit-button"))
+}
+
+func (s *CanvasSteps) EmitManualTrigger(name string) {
+	node := s.GetNodeFromDB(name)
+	context := contexts.NewEventContext(database.Conn(), node, func(events []models.CanvasEvent) {
+		for i := range events {
+			require.NoError(s.t, messages.PublishCanvasEventCreatedMessage(&events[i]))
+		}
+	})
+
+	require.NoError(s.t, context.Emit("manual.run", map[string]any{"message": "Hello, World!"}))
 }
 
 func (s *CanvasSteps) RenameNode(name string, newName string) {

@@ -23,6 +23,14 @@ type OwnerStepProps = {
   onNext: (event: React.FormEvent) => void;
 };
 
+const OwnerStepHeader = (
+  <div className="mb-8 text-center">
+    <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8" />
+    <h4 className="mb-1 text-xl font-medium text-gray-800 dark:text-white">Set up owner account</h4>
+    <Text className="text-gray-800 dark:text-gray-300">Create an account for this SuperPlane instance.</Text>
+  </div>
+);
+
 export const OwnerStep: React.FC<OwnerStepProps> = ({
   email,
   firstName,
@@ -40,11 +48,7 @@ export const OwnerStep: React.FC<OwnerStepProps> = ({
   onNext,
 }) => (
   <>
-    <div className="mb-8 text-center">
-      <img src={superplaneLogo} alt="SuperPlane logo" className="mx-auto mb-4 h-8 w-8" />
-      <h4 className="mb-1 text-xl font-medium text-gray-800 dark:text-white">Set up owner account</h4>
-      <Text className="text-gray-800 dark:text-gray-300">Create an account for this SuperPlane instance.</Text>
-    </div>
+    {OwnerStepHeader}
     <form onSubmit={onNext} className="space-y-4">
       <ErrorBanner message={error} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

@@ -3,6 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { FileCode, Plus } from "lucide-react";
 
 import { Button } from "../button";
+import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
 import type { HeaderProps } from "./Header";
 
@@ -14,6 +15,10 @@ export function SecondaryHeaderActions({
   saveDisabledTooltip,
   saveIsPrimary,
   hasUnpublishedDraftChanges,
+  onShowDiff,
+  visualDiffEnabled,
+  draftVisualDiff,
+  onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -47,6 +52,7 @@ export function SecondaryHeaderActions({
         onEnterEditMode={onEnterEditMode}
         enterEditModeDisabled={enterEditModeDisabled}
         enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+        hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
         onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
         unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       />
@@ -63,6 +69,10 @@ export function SecondaryHeaderActions({
       {mode === "version-edit" ? (
         <EditModeVersionActions
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+          onShowDiff={onShowDiff}
+          visualDiffEnabled={visualDiffEnabled}
+          draftVisualDiff={draftVisualDiff}
+          onToggleVisualDiff={onToggleVisualDiff}
           onDiscardVersion={onDiscardVersion}
           discardVersionDisabled={discardVersionDisabled}
           discardVersionDisabledTooltip={discardVersionDisabledTooltip}
@@ -93,8 +103,8 @@ export function SecondaryHeaderActions({
           </TooltipTrigger>
           <TooltipContent side="bottom">
             {dashboardYamlReadOnly
-              ? "View the dashboard as YAML"
-              : "View, copy, download, or import this dashboard as YAML"}
+              ? "View the console as YAML"
+              : "View, copy, download, or import this console as YAML"}
           </TooltipContent>
         </Tooltip>
       ) : null}
@@ -121,6 +131,7 @@ function LiveModeEditControls({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
+  hasUnpublishedDraftChanges,
   onDiscardDraftAndStartEdit,
   unpublishedDraftUpdatedAt,
 }: Pick<
@@ -128,6 +139,7 @@ function LiveModeEditControls({
   | "onEnterEditMode"
   | "enterEditModeDisabled"
   | "enterEditModeDisabledTooltip"
+  | "hasUnpublishedDraftChanges"
   | "onDiscardDraftAndStartEdit"
   | "unpublishedDraftUpdatedAt"
 > & {
@@ -151,6 +163,7 @@ function LiveModeEditControls({
   return (
     <EnterEditButton
       onClick={onEnterEditMode}
+      label={hasUnpublishedDraftChanges ? "Continue Editing" : "Edit"}
       disabled={!!enterEditModeDisabled}
       disabledTooltip={enterEditModeDisabledTooltip}
     />
@@ -159,6 +172,10 @@ function LiveModeEditControls({
 
 function EditModeVersionActions({
   hasUnpublishedDraftChanges,
+  onShowDiff,
+  visualDiffEnabled,
+  draftVisualDiff,
+  onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -172,6 +189,10 @@ function EditModeVersionActions({
 }: Pick<
   HeaderProps,
   | "hasUnpublishedDraftChanges"
+  | "onShowDiff"
+  | "visualDiffEnabled"
+  | "draftVisualDiff"
+  | "onToggleVisualDiff"
   | "onDiscardVersion"
   | "discardVersionDisabled"
   | "discardVersionDisabledTooltip"
@@ -186,11 +207,22 @@ function EditModeVersionActions({
   return (
     <div className="flex items-center gap-2">
       {hasUnpublishedDraftChanges ? (
-        <DiscardDraftButton
-          onDiscard={() => onDiscardVersion?.()}
-          disabled={discardVersionDisabled || !onDiscardVersion}
-          disabledTooltip={discardVersionDisabledTooltip}
-        />
+        <>
+          {draftVisualDiff?.diffCounts && (
+            <DiffSummaryHoverCard
+              diffCounts={draftVisualDiff.diffCounts}
+              visualDiffEnabled={visualDiffEnabled}
+              onToggleVisualDiff={onToggleVisualDiff}
+              diffToggles={draftVisualDiff.diffToggles}
+              onShowDiff={onShowDiff}
+            />
+          )}
+          <DiscardDraftButton
+            onDiscard={() => onDiscardVersion?.()}
+            disabled={discardVersionDisabled || !onDiscardVersion}
+            disabledTooltip={discardVersionDisabledTooltip}
+          />
+        </>
       ) : null}
       {onExitEditMode ? (
         <ExitEditButton
@@ -212,23 +244,25 @@ function EditModeVersionActions({
 
 function EnterEditButton({
   onClick,
+  label,
   disabled,
   disabledTooltip,
 }: {
   onClick: () => void;
+  label: string;
   disabled: boolean;
   disabledTooltip?: string;
 }) {
   const button = (
     <UIButton
       type="button"
-      variant="default"
+      variant="outline"
       size="sm"
       onClick={onClick}
       disabled={disabled}
       data-testid="canvas-edit-button"
     >
-      Edit
+      {label}
     </UIButton>
   );
 

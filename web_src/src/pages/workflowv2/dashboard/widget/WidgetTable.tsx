@@ -4,24 +4,18 @@ import { ExternalLink, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-r
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 import { useDashboardContext, resolveDashboardNode } from "../DashboardContext";
-import { buildEnv, compileTemplate, evalTemplate } from "./celExpr";
 import { applyTableWhere } from "./evalTableWhere";
 import { interpolate } from "./fieldPath";
 import { mergeTriggerParameters } from "./mergeTriggerPayload";
+import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
 import { evaluateRowShow } from "./rowVisibility";
 import { resolveCellValue } from "./resolveCellValue";
-import { applyFilters } from "./widgetData";
+import { applyFilters, applySort } from "./widgetData";
 import { formatValue } from "./widgetFormat";
+import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
+import { useWidgetTableActionLock } from "./WidgetTableActionLockContext";
 import type { WidgetRowAction, WidgetTableRender } from "./types";
 
 interface WidgetTableProps {
@@ -50,6 +44,7 @@ const ACTION_ICONS = {
 } as const;
 
 export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
+  const ctx = useDashboardContext();
   const recordRows = useMemo(
     () => rows.filter((r): r is Record<string, unknown> => Boolean(r) && typeof r === "object" && !Array.isArray(r)),
     [rows],
@@ -57,8 +52,20 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
 
   const filtered = useMemo(() => {
     const afterWhere = applyTableWhere(recordRows, render.where);
-    return applyFilters(afterWhere, render.filters);
-  }, [recordRows, render.where, render.filters]);
+    const afterFilters = applyFilters(afterWhere, render.filters);
+    return applySort(afterFilters, render.sort);
+  }, [recordRows, render.where, render.filters, render.sort]);
+
+  // Collect the unique trigger node ids referenced by this table's row actions
+  // so the action lock can subscribe to the runs query only when needed.
+  const triggerNodeIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const action of render.rowActions ?? []) {
+      const resolved = resolveDashboardNode(ctx, action.node);
+      if (resolved?.node.id && resolved.node.type === "TYPE_TRIGGER") ids.add(resolved.node.id);
+    }
+    return Array.from(ids);
+  }, [render.rowActions, ctx]);
 
   if (isLoading) return <WidgetSpinner />;
   if (render.columns.length === 0) {
@@ -77,48 +84,52 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
   }
 
   return (
-    <div className="overflow-auto" data-testid="widget-table">
-      <table className="w-full border-collapse text-xs">
-        <thead className="bg-slate-50">
-          <tr>
-            {render.columns.map((col, i) => (
-              <th
-                key={`${col.field}-${i}`}
-                className="border-b border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-700"
-              >
-                {col.label ?? col.field}
-              </th>
-            ))}
-            {render.rowActions && render.rowActions.length > 0 ? (
-              <th className="border-b border-slate-200 px-3 py-1.5 text-right font-semibold text-slate-700">Actions</th>
-            ) : null}
-          </tr>
-        </thead>
-        <tbody>
-          {filtered.map((row, idx) => (
-            <tr
-              key={(row.id as string | undefined) ?? idx}
-              className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
-            >
-              {render.columns.map((col, ci) => (
-                <Cell key={`${col.field}-${ci}`} col={col} row={row} />
+    <WidgetTableActionLockProvider triggerNodeIds={triggerNodeIds}>
+      <div className="overflow-auto" data-testid="widget-table">
+        <table className="w-full border-collapse text-xs">
+          <thead className="bg-slate-50">
+            <tr>
+              {render.columns.map((col, i) => (
+                <th
+                  key={`${col.field}-${i}`}
+                  className="border-b border-slate-200 px-3 py-1.5 text-left font-semibold text-slate-700"
+                >
+                  {col.label ?? col.field}
+                </th>
               ))}
               {render.rowActions && render.rowActions.length > 0 ? (
-                <td className="px-3 py-1.5 text-right">
-                  <div className="inline-flex items-center gap-1">
-                    {render.rowActions
-                      .filter((action) => evaluateRowShow(action.show, row))
-                      .map((action, ai) => (
-                        <RowActionButton key={ai} action={action} row={row} />
-                      ))}
-                  </div>
-                </td>
+                <th className="border-b border-slate-200 px-3 py-1.5 text-right font-semibold text-slate-700">
+                  Actions
+                </th>
               ) : null}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {filtered.map((row, idx) => (
+              <tr
+                key={(row.id as string | undefined) ?? idx}
+                className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
+              >
+                {render.columns.map((col, ci) => (
+                  <Cell key={`${col.field}-${ci}`} col={col} row={row} />
+                ))}
+                {render.rowActions && render.rowActions.length > 0 ? (
+                  <td className="px-3 py-1.5 text-right">
+                    <div className="inline-flex items-center gap-1">
+                      {render.rowActions
+                        .filter((action) => evaluateRowShow(action.show, row))
+                        .map((action, ai) => (
+                          <RowActionButton key={ai} action={action} row={row} />
+                        ))}
+                    </div>
+                  </td>
+                ) : null}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </WidgetTableActionLockProvider>
   );
 }
 
@@ -179,25 +190,44 @@ function formatAbsoluteTitle(value: unknown): string | undefined {
   return formatTimestampInUserTimezone(new Date(ms).toISOString());
 }
 
-function actionDisabledTooltip({
+type ActionDisabledReason = "no-perm" | "no-node" | "not-trigger" | "run-in-flight" | "submitting" | null;
+
+function disabledReason({
   canRun,
   hasResolvedNode,
   isTrigger,
-  node,
+  runInFlight,
+  submitting,
 }: {
   canRun: boolean;
   hasResolvedNode: boolean;
   isTrigger: boolean;
-  node: string;
-}): string | undefined {
-  if (!canRun) return "You do not have permission to run actions in this canvas";
-  if (!hasResolvedNode) return `Node "${node}" not found on this canvas`;
-  if (!isTrigger) return "Only trigger nodes can be run from the dashboard. Pick the trigger that starts your flow.";
-  return undefined;
+  runInFlight: boolean;
+  submitting: boolean;
+}): ActionDisabledReason {
+  if (!canRun) return "no-perm";
+  if (!hasResolvedNode) return "no-node";
+  if (!isTrigger) return "not-trigger";
+  if (runInFlight) return "run-in-flight";
+  if (submitting) return "submitting";
+  return null;
 }
 
-function isActionDisabled(canRun: boolean, hasResolvedNode: boolean, isTrigger: boolean): boolean {
-  return !canRun || !hasResolvedNode || !isTrigger;
+function disabledTooltip(reason: ActionDisabledReason, node: string): string | undefined {
+  switch (reason) {
+    case "no-perm":
+      return "You do not have permission to run actions in this canvas";
+    case "no-node":
+      return `Node "${node}" not found on this canvas`;
+    case "not-trigger":
+      return "Only trigger nodes can be run from the console. Pick the trigger that starts your flow.";
+    case "run-in-flight":
+      return "A run for this trigger is already in progress.";
+    case "submitting":
+      return "Submitting trigger…";
+    default:
+      return undefined;
+  }
 }
 
 function actionVariantClass(variant: WidgetRowAction["variant"]): string | undefined {
@@ -206,30 +236,37 @@ function actionVariantClass(variant: WidgetRowAction["variant"]): string | undef
   return undefined;
 }
 
-function RowActionButton({ action, row }: { action: WidgetRowAction; row: Record<string, unknown> }) {
+type ResolvedNode = NonNullable<ReturnType<typeof resolveDashboardNode>>;
+
+function useRowActionFire({
+  action,
+  row,
+  resolved,
+  hookName,
+  label,
+  setConfirmOpen,
+}: {
+  action: WidgetRowAction;
+  row: Record<string, unknown>;
+  resolved: ResolvedNode | undefined;
+  hookName: string;
+  label: string;
+  setConfirmOpen: (open: boolean) => void;
+}) {
   const ctx = useDashboardContext();
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const lock = useWidgetTableActionLock();
   const [error, setError] = useState<string | undefined>();
   const [pending, setPending] = useState(false);
 
-  const canRun = ctx?.canRunNodes ?? false;
-  const resolved = resolveDashboardNode(ctx, action.node);
-  const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
-  const label = action.label ?? "Run";
-  const hookName = action.hook ?? "run";
-  const Icon = action.icon ? ACTION_ICONS[action.icon] : undefined;
-
-  const disabled = isActionDisabled(canRun, Boolean(resolved), isTrigger);
-  const tooltip = actionDisabledTooltip({ canRun, hasResolvedNode: Boolean(resolved), isTrigger, node: action.node });
-  const variantClass = actionVariantClass(action.variant);
-
   const fire = async () => {
     if (!ctx?.onTriggerNode || !resolved?.node.id) return;
+    const triggerNodeId = resolved.node.id;
     setError(undefined);
     setPending(true);
+    lock.beginSubmission(triggerNodeId);
     try {
       const parameters = mergeTriggerParameters(resolved.node, hookName, action.template, row, action.payload);
-      await ctx.onTriggerNode(resolved.node.id, {
+      await ctx.onTriggerNode(triggerNodeId, {
         hookName,
         templateName: action.template,
         parameters,
@@ -240,8 +277,46 @@ function RowActionButton({ action, row }: { action: WidgetRowAction; row: Record
       setError(err instanceof Error ? err.message : "Failed to trigger");
     } finally {
       setPending(false);
+      lock.endSubmission(triggerNodeId);
     }
   };
+
+  return { fire, error, pending };
+}
+
+function useRowActionGate(action: WidgetRowAction) {
+  const ctx = useDashboardContext();
+  const lock = useWidgetTableActionLock();
+  const canRun = ctx?.canRunNodes ?? false;
+  const resolved = resolveDashboardNode(ctx, action.node);
+  const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
+  const runInFlight = Boolean(resolved?.node.id && lock.runInFlightIds.has(resolved.node.id));
+  const reason = disabledReason({
+    canRun,
+    hasResolvedNode: Boolean(resolved),
+    isTrigger,
+    runInFlight,
+    submitting: lock.submitting,
+  });
+  return {
+    resolved,
+    isTrigger,
+    disabled: reason !== null,
+    reason,
+    tooltip: disabledTooltip(reason, action.node),
+  };
+}
+
+function RowActionButton({ action, row }: { action: WidgetRowAction; row: Record<string, unknown> }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
+  const { resolved, isTrigger, disabled, reason, tooltip } = useRowActionGate(action);
+  const label = action.label ?? "Run";
+  const hookName = action.hook ?? "run";
+  const Icon = action.icon ? ACTION_ICONS[action.icon] : undefined;
+  const variantClass = actionVariantClass(action.variant);
+
+  const { fire, error, pending } = useRowActionFire({ action, row, resolved, hookName, label, setConfirmOpen });
 
   const handleClick = () => {
     if (disabled) return;
@@ -251,12 +326,6 @@ function RowActionButton({ action, row }: { action: WidgetRowAction; row: Record
     }
     void fire();
   };
-
-  const confirmBody = useMemo(() => {
-    if (!action.confirm) return "";
-    const env = buildEnv();
-    return evalTemplate(compileTemplate(action.confirm), row, env, (v) => String(v ?? ""));
-  }, [action.confirm, row]);
 
   const testId = `widget-row-action-${action.node || "trigger"}`;
 
@@ -273,6 +342,7 @@ function RowActionButton({ action, row }: { action: WidgetRowAction; row: Record
         className={variantClass}
         data-testid={testId}
         data-variant={action.variant ?? "default"}
+        data-disabled-reason={reason ?? undefined}
       >
         {Icon ? <Icon className="mr-1 h-3 w-3" /> : null}
         {label}
@@ -283,28 +353,19 @@ function RowActionButton({ action, row }: { action: WidgetRowAction; row: Record
         </span>
       ) : null}
       {action.confirm ? (
-        <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{label}</DialogTitle>
-              <DialogDescription>{confirmBody}</DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => setConfirmOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                variant={action.variant === "danger" ? "destructive" : "default"}
-                onClick={() => void fire()}
-                disabled={pending}
-                data-testid={`${testId}-confirm`}
-              >
-                {label}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <RowActionConfirmDialog
+          action={action}
+          row={row}
+          resolved={resolved}
+          isTrigger={isTrigger}
+          hookName={hookName}
+          label={label}
+          open={confirmOpen}
+          onOpenChange={setConfirmOpen}
+          confirmDisabled={pending || disabled}
+          onConfirm={() => void fire()}
+          testId={testId}
+        />
       ) : null}
     </div>
   );

@@ -20,6 +20,7 @@ const {
   useCanvases,
   useCanvasFolders,
   useDeleteCanvas,
+  useCreateCanvas,
   useCreateCanvasFolder,
   useUpdateCanvasFolder,
   useMoveCanvasFolder,
@@ -29,6 +30,7 @@ const {
   useCanvases: vi.fn(),
   useCanvasFolders: vi.fn(),
   useDeleteCanvas: vi.fn(),
+  useCreateCanvas: vi.fn(),
   useCreateCanvasFolder: vi.fn(),
   useUpdateCanvasFolder: vi.fn(),
   useMoveCanvasFolder: vi.fn(),
@@ -39,6 +41,8 @@ const {
 const mutationMocks = vi.hoisted(() => ({
   deleteCanvas: vi.fn(),
   deleteCanvasAsync: vi.fn(),
+  createCanvas: vi.fn(),
+  createCanvasAsync: vi.fn(),
   createCanvasFolder: vi.fn(),
   updateCanvasFolder: vi.fn(),
   moveCanvasFolder: vi.fn(),
@@ -57,8 +61,8 @@ vi.mock("@/components/Dialog/dialog", () => ({
   DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
 }));
 
-vi.mock("@/components/CreateCanvasModal", () => ({
-  CreateCanvasModal: () => null,
+vi.mock("./EditAppModal", () => ({
+  EditAppModal: () => null,
 }));
 
 vi.mock("@/contexts/useAccount", () => ({
@@ -72,9 +76,14 @@ vi.mock("@/contexts/usePermissions", () => ({
   }),
 }));
 
-vi.mock("./useCreateCanvasModalState", () => ({
-  useCreateCanvasModalState: () => ({
-    onOpenEdit: vi.fn(),
+vi.mock("./useEditApp", () => ({
+  useEditApp: () => ({
+    editingCanvas: null,
+    openEdit: vi.fn(),
+    closeEdit: vi.fn(),
+    saveApp: vi.fn(),
+    isSaving: false,
+    isOpen: false,
   }),
 }));
 
@@ -92,6 +101,7 @@ vi.mock("@/hooks/useCanvasData", () => ({
   useCanvases,
   useCanvasFolders,
   useDeleteCanvas,
+  useCreateCanvas,
   useCreateCanvasFolder,
   useUpdateCanvasFolder,
   useMoveCanvasFolder,
@@ -159,6 +169,11 @@ describe("HomePage canvas folders", () => {
       mutateAsync: mutationMocks.deleteCanvasAsync,
       isPending: false,
     });
+    useCreateCanvas.mockReturnValue({
+      mutate: mutationMocks.createCanvas,
+      mutateAsync: mutationMocks.createCanvasAsync,
+      isPending: false,
+    });
     useCreateCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.createCanvasFolder, isPending: false });
     useUpdateCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.updateCanvasFolder, isPending: false });
     useMoveCanvasFolder.mockReturnValue({ mutateAsync: mutationMocks.moveCanvasFolder, isPending: false });
@@ -169,16 +184,26 @@ describe("HomePage canvas folders", () => {
     });
   });
 
-  it("uses the toolbar as the canvas creation entrypoint", () => {
+  it("uses the toolbar as the canvas creation entrypoint", async () => {
+    const user = userEvent.setup();
+    mutationMocks.createCanvasAsync.mockResolvedValue({
+      data: { canvas: { metadata: { id: "canvas-new" } } },
+    });
     useCanvases.mockReturnValue({ data: [], isLoading: false, error: null });
     useCanvasFolders.mockReturnValue({ data: [], isLoading: false, error: null });
 
     renderHome();
 
-    expect(screen.getByRole("link", { name: /new canvas/i })).toHaveAttribute("href", "/org-123/canvases/new");
-    expect(screen.queryByText("Point & Click")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Grid view")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("List view")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /new app/i }));
+
+    await waitFor(() => {
+      expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: expect.stringMatching(/^[a-z]+-[a-z]+$/),
+          method: "ui",
+        }),
+      );
+    });
   });
 
   it("renders folders before free canvases using the manual folder order", () => {

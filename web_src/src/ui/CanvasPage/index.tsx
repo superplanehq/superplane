@@ -57,6 +57,7 @@ import { countUnacknowledgedErrors } from "@/pages/workflowv2/lib/canvas-runs";
 import { findFreePositionInViewport } from "@/pages/workflowv2/lib/find-free-position-in-viewport";
 import { CANVAS_NODE_FALLBACK_MESSAGE } from "@/pages/workflowv2/mappers/safeMappers";
 import { Sentry } from "@/sentry";
+import { useSidebarLayoutStore, useSidebarMount } from "@/stores/sidebarLayoutStore";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import type { BuildingBlock, BuildingBlockCategory } from "../BuildingBlocksSidebar";
 import { BuildingBlocksSidebar } from "../BuildingBlocksSidebar";
@@ -156,11 +157,24 @@ export interface CanvasPageProps {
   saveDisabledTooltip?: string;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
+  onShowDiff?: () => void;
+  onShowNodeDiff?: (nodeId: string) => void;
+  visualDiffEnabled?: boolean;
+  draftVisualDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
+    diffToggles: {
+      showDeletedNodes: boolean;
+      toggleShowDeletedNodes: () => void;
+      showEdgeDiff: boolean;
+      toggleShowEdgeDiff: () => void;
+    };
+  };
+  onToggleVisualDiff?: () => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "dashboard";
+  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
@@ -172,6 +186,8 @@ export interface CanvasPageProps {
   onSelectRuns?: () => void;
   onExitRunsMode?: () => void;
   onSelectDashboard?: () => void;
+  /** Switches the canvas surface to the Memory tab. Omitted on templates. */
+  onSelectMemory?: () => void;
   /** Opens the canvas dashboard add-panel dialog when `headerMode` is `dashboard`. */
   onDashboardAddPanel?: () => void;
   /** Opens the dashboard YAML modal when `headerMode` is `dashboard`. */
@@ -187,12 +203,13 @@ export interface CanvasPageProps {
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
-  memoryItemCount?: number;
   showCanvasSettingsMenu?: boolean;
   onYamlOpen: () => void;
-  onMemoryOpen: () => void;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
+  hasAutoOpenedVersionControl?: boolean;
+  onVersionControlAutoOpened?: () => void;
+  onCloseVersionControl?: () => void;
   showBottomStatusControls?: boolean;
   readOnly?: boolean;
   hideAddControls?: boolean;
@@ -360,9 +377,32 @@ export interface CanvasPageProps {
 }
 
 export const CANVAS_SIDEBAR_STORAGE_KEY = "canvasSidebarOpen";
+/**
+ * @deprecated Width is now coordinated by the shared sidebar layout store.
+ *  Kept exported for backward compatibility with existing test mocks.
+ */
 export const COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY = "componentSidebarWidth";
 export const CONSOLE_OPEN_STORAGE_KEY = "consoleOpen";
 export const CONSOLE_HEIGHT_STORAGE_KEY = "consoleHeight";
+
+function ComponentSidebarLoadingSkeleton() {
+  const sidebarWidth = useSidebarLayoutStore((state) => state.rightWidth);
+  useSidebarMount("right");
+
+  return (
+    <div
+      className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white"
+      style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
+    >
+      <div className="flex items-center justify-center h-full">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+          <p className="text-sm text-gray-500">Loading events...</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const EDGE_STYLE = {
   type: "custom",
@@ -393,6 +433,7 @@ type CanvasNodeRendererCallbacks = {
   onDeactivate: React.MutableRefObject<CanvasPageProps["onDeactivate"] | undefined>;
   onTogglePause: React.MutableRefObject<CanvasPageProps["onTogglePause"] | undefined>;
   onToggleView: React.MutableRefObject<((nodeId: string) => void) | undefined>;
+  onShowNodeDiff: React.MutableRefObject<CanvasPageProps["onShowNodeDiff"] | undefined>;
   onAnnotationUpdate: React.MutableRefObject<CanvasPageProps["onAnnotationUpdate"] | undefined>;
   onAnnotationBlur: React.MutableRefObject<CanvasPageProps["onAnnotationBlur"] | undefined>;
   runDisabled?: boolean;
@@ -575,6 +616,7 @@ function buildInteractiveNodeBlockProps(
     onDeactivate: getNodeAction(callbacks.onDeactivate, nodeId),
     onTogglePause: getNodeAction(callbacks.onTogglePause, nodeId),
     onToggleView: getNodeAction(callbacks.onToggleView, nodeId),
+    onShowDiff: getNodeAction(callbacks.onShowNodeDiff, nodeId),
     onAnnotationUpdate: getAnnotationUpdateAction(callbacks),
     onAnnotationBlur: getVoidAction(callbacks.onAnnotationBlur),
   };
@@ -750,7 +792,7 @@ function CanvasPage(props: CanvasPageProps) {
     organizationId: props.organizationId,
     onBeforeClose: () => {
       if (props.headerMode === "runs") props.onExitRunsMode?.();
-      if (props.isVersionControlOpen) props.onOpenVersionControl?.();
+      if (props.isVersionControlOpen) props.onCloseVersionControl?.();
     },
   });
   const { isToolSidebarOpen, openToolSidebar } = toolSidebarState;
@@ -1114,6 +1156,7 @@ function CanvasPage(props: CanvasPageProps) {
       Boolean(props.hideAddControls) ||
       props.headerMode === "version-live" ||
       props.headerMode === "dashboard" ||
+      props.headerMode === "memory" ||
       props.headerMode === "runs" ||
       state.componentSidebar.isOpen,
     isSidebarOpen: isBuildingBlocksSidebarOpen,
@@ -1199,7 +1242,8 @@ function CanvasPage(props: CanvasPageProps) {
       ref={canvasWrapperRef}
       className={cn(
         "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
-        (props.headerMode === "version-live" || props.headerMode === "dashboard") && "sp-canvas-live",
+        (props.headerMode === "version-live" || props.headerMode === "dashboard" || props.headerMode === "memory") &&
+          "sp-canvas-live",
         props.headerMode === "runs" && "sp-canvas-live",
       )}
     >
@@ -1216,6 +1260,10 @@ function CanvasPage(props: CanvasPageProps) {
           saveDisabledTooltip={props.saveDisabledTooltip}
           onPublishVersion={props.onPublishVersion}
           onDiscardVersion={props.onDiscardVersion}
+          onShowDiff={props.onShowDiff}
+          visualDiffEnabled={props.visualDiffEnabled}
+          draftVisualDiff={props.draftVisualDiff}
+          onToggleVisualDiff={props.onToggleVisualDiff}
           publishVersionDisabled={props.publishVersionDisabled}
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
           discardVersionDisabled={props.discardVersionDisabled}
@@ -1228,6 +1276,7 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabled={props.exitEditModeDisabled}
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           onSelectDashboard={props.onSelectDashboard}
+          onSelectMemory={props.onSelectMemory}
           onDashboardAddPanel={props.onDashboardAddPanel}
           onDashboardOpenYaml={props.onDashboardOpenYaml}
           dashboardYamlReadOnly={props.dashboardYamlReadOnly}
@@ -1250,18 +1299,19 @@ function CanvasPage(props: CanvasPageProps) {
           onExitRunsMode={props.onExitRunsMode}
           runsContent={props.toolSidebarRunsContent}
           isVersionControlOpen={props.isVersionControlOpen}
-          onToggleVersionControl={props.onOpenVersionControl}
+          onOpenVersionControl={props.onOpenVersionControl}
+          hasAutoOpenedVersionControl={props.hasAutoOpenedVersionControl}
+          onVersionControlAutoOpened={props.onVersionControlAutoOpened}
+          onCloseVersionControl={props.onCloseVersionControl}
           versionsContent={props.toolSidebarVersionsContent}
         />
 
-        {props.headerMode === "runs" ? null : (
+        {props.headerMode === "runs" || props.headerMode === "memory" ? null : (
           <RightSideControls
             mode={readOnly ? "live" : "edit"}
             onSidebarOpen={handleBuildingBlocksShortcutOpen}
             onAddNote={handleAddNote}
-            onMemoryOpen={props.onMemoryOpen}
             onYamlOpen={props.onYamlOpen}
-            showMemoryButton={props.headerMode !== "dashboard"}
           />
         )}
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
@@ -1270,6 +1320,7 @@ function CanvasPage(props: CanvasPageProps) {
               isBuildingBlocksSidebarOpen &&
               props.headerMode !== "version-live" &&
               props.headerMode !== "dashboard" &&
+              props.headerMode !== "memory" &&
               props.headerMode !== "runs"
             }
             onToggle={handleSidebarToggle}
@@ -1344,6 +1395,7 @@ function CanvasPage(props: CanvasPageProps) {
               onAutoLayoutNodes={props.onAutoLayoutNodes}
               onEdgeCreate={props.onEdgeCreate}
               onToggleView={handleToggleView}
+              onShowNodeDiff={props.onShowNodeDiff}
               onDuplicate={props.onDuplicate}
               onDeactivate={props.onDeactivate}
               onAnnotationUpdate={props.onAnnotationUpdate}
@@ -1413,7 +1465,11 @@ function CanvasPage(props: CanvasPageProps) {
               configurationSaveMode={props.configurationSaveMode}
               currentTab={currentTab}
               onTabChange={setCurrentTab}
-              canvasMode={props.headerMode === "version-live" || props.headerMode === "dashboard" ? "live" : "edit"}
+              canvasMode={
+                props.headerMode === "version-live" || props.headerMode === "dashboard" || props.headerMode === "memory"
+                  ? "live"
+                  : "edit"
+              }
               organizationId={props.organizationId}
               getCustomField={props.getCustomField}
               integrations={props.integrations}
@@ -1556,10 +1612,10 @@ function Sidebar({
 
   // Trigger data loading when sidebar opens for a node
   useEffect(() => {
-    if (state.componentSidebar.selectedNodeId && loadSidebarData) {
+    if (shouldShowRunsSidebar && state.componentSidebar.selectedNodeId && loadSidebarData) {
       loadSidebarData(state.componentSidebar.selectedNodeId);
     }
-  }, [state.componentSidebar.selectedNodeId, loadSidebarData]);
+  }, [state.componentSidebar.selectedNodeId, loadSidebarData, shouldShowRunsSidebar]);
 
   useEffect(() => {
     if (sidebarData?.latestEvents) {
@@ -1610,22 +1666,7 @@ function Sidebar({
 
   // Show loading state when data is being fetched (skip for annotation nodes)
   if (sidebarData.isLoading && currentTab === "latest" && shouldShowRunsSidebar) {
-    const saved = localStorage.getItem(COMPONENT_SIDEBAR_WIDTH_STORAGE_KEY);
-    const sidebarWidth = saved ? parseInt(saved, 10) : 450;
-
-    return (
-      <div
-        className="border-l-1 border-border absolute right-0 top-0 h-full z-21 overflow-y-auto overflow-x-hidden bg-white"
-        style={{ width: `${sidebarWidth}px`, minWidth: `${sidebarWidth}px`, maxWidth: `${sidebarWidth}px` }}
-      >
-        <div className="flex items-center justify-center h-full">
-          <div className="flex flex-col items-center gap-3">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
-            <p className="text-sm text-gray-500">Loading events...</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <ComponentSidebarLoadingSkeleton />;
   }
 
   return (
@@ -1728,6 +1769,10 @@ function CanvasContentHeader({
   saveDisabledTooltip,
   onPublishVersion,
   onDiscardVersion,
+  onShowDiff,
+  visualDiffEnabled,
+  draftVisualDiff,
+  onToggleVisualDiff,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
   discardVersionDisabled,
@@ -1740,6 +1785,7 @@ function CanvasContentHeader({
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
   onSelectDashboard,
+  onSelectMemory,
   onDashboardAddPanel,
   onDashboardOpenYaml,
   dashboardYamlReadOnly,
@@ -1760,6 +1806,18 @@ function CanvasContentHeader({
   saveDisabledTooltip?: string;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
+  onShowDiff?: () => void;
+  visualDiffEnabled?: boolean;
+  draftVisualDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
+    diffToggles: {
+      showDeletedNodes: boolean;
+      toggleShowDeletedNodes: () => void;
+      showEdgeDiff: boolean;
+      toggleShowEdgeDiff: () => void;
+    };
+  };
+  onToggleVisualDiff?: () => void;
   publishVersionDisabled?: boolean;
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
@@ -1772,6 +1830,7 @@ function CanvasContentHeader({
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
   onSelectDashboard?: () => void;
+  onSelectMemory?: () => void;
   onDashboardAddPanel?: () => void;
   onDashboardOpenYaml?: () => void;
   dashboardYamlReadOnly?: boolean;
@@ -1802,6 +1861,10 @@ function CanvasContentHeader({
       saveDisabledTooltip={saveDisabledTooltip}
       onPublishVersion={onPublishVersion}
       onDiscardVersion={onDiscardVersion}
+      onShowDiff={onShowDiff}
+      visualDiffEnabled={visualDiffEnabled}
+      onToggleVisualDiff={onToggleVisualDiff}
+      draftVisualDiff={draftVisualDiff}
       publishVersionDisabled={publishVersionDisabled}
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}
@@ -1814,6 +1877,7 @@ function CanvasContentHeader({
       exitEditModeDisabled={exitEditModeDisabled}
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       onSelectDashboard={onSelectDashboard}
+      onSelectMemory={onSelectMemory}
       onDashboardAddPanel={onDashboardAddPanel}
       onDashboardOpenYaml={onDashboardOpenYaml}
       dashboardYamlReadOnly={dashboardYamlReadOnly}
@@ -1873,6 +1937,7 @@ function CanvasContent({
   onDeactivate,
   onTogglePause,
   onToggleView,
+  onShowNodeDiff,
   onAnnotationUpdate,
   onAnnotationBlur,
   onBuildingBlockDrop,
@@ -1922,6 +1987,7 @@ function CanvasContent({
   onDeactivate?: (nodeId: string) => void;
   onTogglePause?: (nodeId: string) => void;
   onToggleView?: (nodeId: string) => void;
+  onShowNodeDiff?: (nodeId: string) => void;
   onAnnotationUpdate?: (
     nodeId: string,
     updates: { text?: string; color?: string; width?: number; height?: number; x?: number; y?: number },
@@ -2183,6 +2249,8 @@ function CanvasContent({
 
   const onToggleViewRef = useRef(onToggleView);
   onToggleViewRef.current = onToggleView;
+  const onShowNodeDiffRef = useRef(onShowNodeDiff);
+  onShowNodeDiffRef.current = onShowNodeDiff;
 
   const onAnnotationUpdateRef = useRef(onAnnotationUpdate);
   onAnnotationUpdateRef.current = onAnnotationUpdate;
@@ -2472,6 +2540,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
+    onShowNodeDiff: onShowNodeDiffRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     runDisabled,
@@ -2489,6 +2558,7 @@ function CanvasContent({
     onDeactivate: onDeactivateRef,
     onTogglePause: onTogglePauseRef,
     onToggleView: onToggleViewRef,
+    onShowNodeDiff: onShowNodeDiffRef,
     onAnnotationUpdate: onAnnotationUpdateRef,
     onAnnotationBlur: onAnnotationBlurRef,
     runDisabled,
@@ -2686,18 +2756,28 @@ function CanvasContent({
     [],
   );
   const styledEdges = useMemo(() => {
-    return state.edges?.map((e) => ({
-      ...e,
-      ...EDGE_STYLE,
-      style: { ...EDGE_STYLE.style },
-      data: {
-        ...e.data,
-        isHovered: e.id === hoveredEdgeId,
-        canDelete: isEditMode && !isReadOnly,
-        onDelete: isEditMode && !isReadOnly ? stableEdgeDelete : undefined,
-      },
-      zIndex: e.id === hoveredEdgeId ? 1000 : 0,
-    }));
+    return state.edges?.map((e) => {
+      const diffStatus = (e.data as Record<string, unknown> | undefined)?._draftDiffStatus;
+      const diffStyle =
+        diffStatus === "removed"
+          ? { stroke: "#FDA4AF", strokeDasharray: "8 4" }
+          : diffStatus === "added"
+            ? { stroke: "#86EFAC" }
+            : {};
+
+      return {
+        ...e,
+        ...EDGE_STYLE,
+        style: { ...EDGE_STYLE.style, ...diffStyle },
+        data: {
+          ...e.data,
+          isHovered: e.id === hoveredEdgeId,
+          canDelete: isEditMode && !isReadOnly && diffStatus !== "removed",
+          onDelete: isEditMode && !isReadOnly && diffStatus !== "removed" ? stableEdgeDelete : undefined,
+        },
+        zIndex: e.id === hoveredEdgeId ? 1000 : 0,
+      };
+    });
   }, [state.edges, hoveredEdgeId, stableEdgeDelete, isEditMode, isReadOnly]);
 
   const isConnectionEditingEnabled = isEditMode && !isReadOnly && !!onEdgeCreate;

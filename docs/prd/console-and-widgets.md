@@ -1,0 +1,501 @@
+# Console and Widgets
+
+> Naming note: the product surfaces this feature as **Console**. In the
+> codebase and persisted data it is still called "Dashboard" (file names,
+> Go types, DB table `canvas_dashboards`, YAML helper modules, etc.). The
+> YAML `kind` is `Console`; legacy `kind: Dashboard` files exported before
+> the rename are no longer accepted on import.
+
+## Overview
+
+Canvas consoles are per-canvas views for turning workflow state into an operational surface: notes, pinned nodes, tables, charts, and numbers. They are useful for release consoles, preview environments, incident views, and any workflow where the canvas itself is not the best day-to-day status display.
+
+This guide is written for both humans configuring consoles and agents changing the implementation. It explains what users see, how console data is stored, how widgets fetch and render rows, and which files must stay in sync.
+
+## What Users See
+
+- A console belongs to one canvas. Templates do not have editable consoles.
+- Users enter console mode from the workflow v2 header (URL `?view=console`) when the Console feature is enabled.
+- The canvas graph is hidden and replaced by a 12-column draggable grid.
+- Users with `canvases:update` can add, move, resize, edit, delete, import, and export panels.
+- Users without edit permission can still view consoles and export YAML.
+- Runtime actions, such as node-panel runs and table row actions, require `canvases:update`; disabled controls explain why they cannot run.
+- Importing console YAML is replace-all: all panels and layout items are replaced in one update.
+
+## Implementation Map
+
+> Internal code still uses the legacy "dashboard" naming. The folder name,
+> file names, and Go symbols below are the actual identifiers in the
+> codebase; only user-facing text was rebranded to Console.
+
+Primary frontend paths:
+
+```text
+web_src/src/pages/workflowv2/
+  index.tsx
+  dashboard/
+    WorkflowDashboardOverlay.tsx
+    DashboardOverlay.tsx
+    DashboardView.tsx
+    DashboardContext.tsx
+    DashboardContextProvider.tsx
+    useDashboardPanelState.ts
+    panelTypes.ts
+    dashboardYaml.ts
+    DashboardYamlModal.tsx
+    useDashboardModeActions.ts
+    useDashboardTriggerNode.ts
+    dashboardHeaderActions.ts
+    dashboardTriggerParameters.ts
+    deriveNodeStatuses.ts
+    TypedPanelShell.tsx
+    PanelEditorDialog.tsx
+    MarkdownPanelCard.tsx
+    NodePanelCard.tsx
+    TablePanelCard.tsx
+    ChartPanelCard.tsx
+    NumberPanelCard.tsx
+    TablePanelForm.tsx
+    TablePanelFormRows.tsx
+    DataSourceForm.tsx
+    MemoryDiscoveryPanel.tsx
+    widget/
+      types.ts
+      useWidgetData.ts
+      WidgetTable.tsx
+      WidgetChart.tsx
+      WidgetNumber.tsx
+      celExpr.ts
+      evalTableWhere.ts
+      mergeTriggerPayload.ts
+      rowVisibility.ts
+      showExpression.ts
+```
+
+Primary backend paths:
+
+```text
+pkg/models/
+  canvas_dashboard.go
+  canvas_dashboard_yml.go
+  canvas_dashboard_yml_test.go
+
+pkg/grpc/actions/canvases/
+  get_canvas_dashboard.go
+  update_canvas_dashboard.go
+  dashboard_serialization.go
+  canvas_dashboard_test.go
+
+protos/canvases.proto
+```
+
+The Console feature flag is registered in `pkg/features/features.go` with the
+backend id `dashboards` and the user-facing label **Console**. The id is kept
+for back-compat with existing per-organization enablement records.
+
+## Architecture
+
+| Layer | Responsibility |
+| --- | --- |
+| Workflow host | `index.tsx` owns workflow mode, feature flag checks, and header wiring. It delegates console-specific work to small dashboard modules. |
+| Overlay | `WorkflowDashboardOverlay` decides whether to render. `DashboardOverlay` maps API data, wires query/mutation state, and provides context. |
+| Context | `DashboardContext` exposes canvas nodes, node statuses, run permission, and trigger callbacks. `resolveDashboardNode` accepts node id or node name. |
+| Grid | `DashboardView` renders the 12-column `react-grid-layout` surface and routes each panel to its card. |
+| Panel cards | One card per panel type. Cards use `TypedPanelShell`, optional runtime body, and `PanelEditorDialog`. |
+| Panel schema | `panelTypes.ts` defines content types, default templates, normalization, and fast frontend validation. |
+| YAML | `dashboardYaml.ts` and `pkg/models/canvas_dashboard_yml.go` parse, export, and validate the canonical YAML shape. |
+| Widgets | `widget/useWidgetData.ts` fetches rows. `WidgetTable`, `WidgetChart`, and `WidgetNumber` render rows. |
+| Persistence | `canvas_dashboards` stores JSON panels and layout for one canvas. |
+
+When changing panel shapes, keep frontend validation, backend validation, YAML tests, and widget types aligned. Do not let the frontend accept a shape the backend later rejects.
+
+## Stored Data Model
+
+Console data is stored as arbitrary JSON content plus a layout:
+
+- `DashboardPanel`: `id`, `type`, `content`
+- `DashboardLayoutItem`: `i`, `x`, `y`, `w`, `h`, optional `minW`, `minH`
+- `CanvasDashboard`: `canvasId`, `panels[]`, `layout[]`, `updatedAt`
+
+The panel `content` object is intentionally flexible, but every known panel type has a typed shape in `panelTypes.ts` and matching backend validation in `canvas_dashboard_yml.go`.
+
+## Panel Types
+
+| Type | Purpose | Main content fields |
+| --- | --- | --- |
+| `markdown` | Notes, runbooks, links, status explanations | `title?`, `body?` |
+| `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `showRun?`, `triggerName?` |
+| `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
+| `chart` | Render grouped data as bar, stacked bar, line, area, or donut | `title?`, `dataSource`, `render.kind: "chart"` |
+| `number` | Render one aggregate KPI | `title?`, `dataSource`, `render.kind: "number"` |
+
+New panels start as valid drafts where possible. For example, a new table panel may have an empty memory namespace and no columns while the user is still configuring it.
+
+## Data Sources
+
+Table, chart, and number panels share these data sources:
+
+```ts
+{ kind: "memory", namespace: string, fieldPath?: string }
+{ kind: "executions", node?: string, limit?: number }
+{ kind: "runs", limit?: number }
+```
+
+| Source | Query | Result rows |
+| --- | --- | --- |
+| `memory` | `useCanvasMemoryEntries` | Canvas memory entries filtered by namespace. Optional `fieldPath` flattens a nested value or list. |
+| `executions` | `useInfiniteCanvasEvents` | Flattened `event.executions[]`, optionally filtered to one resolved node. Rows include `status`, `nodeName`, and `durationMs`. |
+| `runs` | `useInfiniteCanvasRuns` | Raw run objects. Number widgets can use API `totalCount` for count KPIs. |
+
+Execution widgets eager-load more event pages until they have enough execution rows for the configured `limit`, or until a bounded page cap is reached. This avoids count widgets flashing an intermediate value when the first event page has few executions.
+
+## Table Panels
+
+Table panels are the most configurable widget type. They can display canvas memory, executions, or runs. Memory-backed tables are the recommended pattern for ephemeral environment consoles.
+
+### Memory Table Example
+
+```yaml
+type: table
+content:
+  dataSource:
+    kind: memory
+    namespace: environments
+  render:
+    kind: table
+    columns:
+      - field: pr_number
+        label: PR
+      - field: status
+        label: Health
+        format: status
+      - field: created_at
+        label: Uptime
+        format: relative
+    where:
+      - field: status
+        op: neq
+        value: destroyed
+    rowActions:
+      - kind: trigger
+        label: Destroy
+        node: start
+        template: destroy
+        variant: danger
+        confirm: "Destroy PR #{{ pr_number }}?"
+        show: 'status == "running"'
+        payload:
+          issue.number: "{{ pr_number }}"
+```
+
+The editor scans live canvas memory and suggests namespaces and field names. Suggestions are only editor assistance; YAML import still uses the validators.
+
+### Columns
+
+Each column needs a non-empty `field`. Optional fields:
+
+| Field | Meaning |
+| --- | --- |
+| `label` | Header text. Falls back to `field`. |
+| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `code`, or `link`. |
+| `show` | Row expression controlling whether the cell is visible. |
+| `href` | Link template for `link` columns. |
+
+Column fields can be direct paths such as `status` or expression templates where supported by the widget helpers.
+
+### Structured Filters
+
+`render.where` is an AND list. Each filter has `field`, `op`, and sometimes `value`.
+
+| Operator | Meaning |
+| --- | --- |
+| `eq` / `neq` | String equality / inequality |
+| `contains` / `not_contains` | Substring match |
+| `gt` / `lt` | Numeric comparison |
+| `exists` / `not_exists` | Non-empty / empty field |
+
+Filters are validated in both `panelTypes.ts` and `canvas_dashboard_yml.go`.
+
+### Row Actions
+
+Row actions invoke a trigger node on the canvas through `InvokeNodeTriggerHook`. They do not call HTTP Request nodes directly. Downstream steps run because the trigger fires, just like a normal manual run.
+
+Supported action fields:
+
+| Field | Meaning |
+| --- | --- |
+| `kind` | Must be `trigger`. |
+| `node` | Trigger node id or name. Required. Legacy `target` can still be normalized in the frontend. |
+| `hook` | Trigger hook name. Defaults to `run`. |
+| `template` | Start template name when the trigger supports templates. Legacy `triggerName` can still be normalized. |
+| `label` | Button label. Defaults to `Run`. |
+| `payload` | Map of dot paths to literals or `{{ CEL }}` templates, merged into trigger parameters. |
+| `confirm` | Optional confirmation dialog text. Supports interpolation. |
+| `show` | Optional expression controlling button visibility for each row. |
+| `variant` | `default`, `primary`, or `danger`. |
+| `icon` | `play`, `stop`, `trash`, `refresh`, or `external-link`. |
+
+Runtime flow:
+
+1. `WidgetTable` filters visible actions for the row.
+2. Optional `confirm` text is interpolated.
+3. `mergeTriggerParameters` builds hook parameters from the trigger template, row data, and action payload.
+4. `DashboardContext.onTriggerNode` calls `useDashboardTriggerNode`.
+5. `InvokeNodeTriggerHook` fires and console-related queries are invalidated.
+
+## Expressions And Templates
+
+Console widgets support two related expression styles:
+
+- `{{ CEL }}` templates use CEL through `cel-js`. The row environment contains row fields and `now` as Unix seconds.
+- Legacy expressions such as `status == "running"` are supported in `show` and some filters.
+
+Use CEL templates for new payloads, confirmation text, and rich interpolation. Use structured `where` filters when the condition is simple and should be validated.
+
+Loose equality in legacy expressions is implemented explicitly by normalizing scalar strings, numbers, booleans, and `null`; do not add `eslint-disable-next-line` directives for equality checks.
+
+## Chart Panels
+
+Chart render shape:
+
+```yaml
+render:
+  kind: chart
+  type: bar
+  xField: service
+  series:
+    - field: cost
+      label: Cost
+      format: number
+      prefix: "$"
+  legend: auto
+```
+
+Supported `type` values:
+
+- `bar` — one bar per category, grouped side-by-side when multiple series are configured.
+- `stacked-bar` — multiple series stacked on top of each other per category. Visually identical to `bar` with a single series; the editor surfaces a hint until you add a second series.
+- `line`
+- `area`
+- `donut` — one slice per row, keyed by `xField`, valued by the first series.
+
+If a series omits `field`, the chart counts rows per `xField` bucket. If `field` is present, the chart reads numeric values from that field.
+
+### Series formatting
+
+Each series supports optional display fields used by the hover tooltip (and the donut value rows):
+
+- `format` — one of `text`, `number`, `percent`, `duration`. Defaults to `number` when omitted.
+- `prefix` — literal string rendered before the formatted value (for example `"$"`).
+- `suffix` — literal string rendered after the formatted value (for example `" MWh"`).
+
+Tooltips show the category in the header and one row per series with `label — prefix{value}suffix`. Donut tooltips append the slice's share of the total (for example `ec2 — $1,200 (52%)`).
+
+### Legend
+
+`render.legend` controls legend visibility:
+
+- `auto` (default) — visible for donut charts or when 2+ series are configured; hidden otherwise.
+- `show` — always visible (useful when you want consistent labels even for a single-series chart).
+- `hide` — never rendered.
+
+`WidgetChart` is implemented with Recharts via the shared shadcn `ChartContainer`. Category labels live in the tooltip rather than on the chart surface so densely-packed x-axes don't overlap.
+
+## Number Panels
+
+Number panels aggregate rows into a single KPI. Supported aggregations are:
+
+- `count`
+- `sum`
+- `avg`
+- `min`
+- `max`
+- `first`
+- `last`
+
+Aggregations other than `count` require a non-empty `field`.
+
+### Display Symbols
+
+`render.prefix` and `render.suffix` wrap the formatted value with a literal string. Use them for currency or unit hints — e.g. `prefix: "R$"`, `suffix: " MWh"`. They apply after `render.format`, so locale-aware formatting (`number`, `percent`, `duration`) is preserved. When the aggregate is null/empty the widget still renders the em-dash placeholder without symbols.
+
+```yaml
+render:
+  kind: number
+  aggregation: sum
+  field: cost
+  format: number
+  prefix: "R$"
+```
+
+### Composite Memory Sources
+
+Number panels backed by memory accept a composite data source that aggregates each namespace with its own configuration and then merges the partials. This is useful when the contributing namespaces have different schemas (for example "sum of cost" in one namespace and "count of tests" in another).
+
+```yaml
+type: number
+content:
+  dataSource:
+    kind: memory
+    combine: sum
+    sources:
+      - namespace: expenses
+        aggregation: sum
+        field: cost
+      - namespace: tests
+        aggregation: count
+  render:
+    kind: number
+    format: number
+    prefix: "R$"
+```
+
+Rules:
+
+- `sources` is a non-empty array. Each entry needs a non-empty `namespace`, an `aggregation` from the standard set, and a `field` when the aggregation is anything other than `count`. An optional `fieldPath` flattens the entry the same way the single-namespace memory source does.
+- `combine` is one of `sum`, `min`, `max`, or `avg`. `sum` is the default the form seeds when switching to the composite mode.
+- When `sources` is set, `render.aggregation` and `render.field` must be absent — the per-source configuration is the source of truth.
+- Partial values that are `null` (for example a namespace with no numeric rows under `sum`) are skipped during combine; the panel only renders the em-dash placeholder when every partial is null.
+- `avg` is an unweighted mean of the available partials, not a row-weighted average across namespaces. Pick `sum` when row-level math is required.
+- Sparklines are only available for the single-source mode in this iteration.
+
+The editor exposes a Single / Multiple toggle in the Number panel form. Switching to Multiple seeds one source from the current single-source configuration so existing panels do not lose context.
+
+## Node Panels
+
+Node panels resolve the configured `node` by id or name. They display the latest status from `deriveDashboardNodeStatuses` and can optionally show a manual Run button.
+
+`showRun` only exposes the button. The actual click still requires `canRunNodes`, and the backend authorization remains the source of truth.
+
+## YAML Import And Export
+
+Canonical Console YAML:
+
+```yaml
+apiVersion: v1
+kind: Console
+metadata:
+  canvasId: 00000000-0000-0000-0000-000000000000
+  name: Example canvas
+spec:
+  panels:
+    - id: envs
+      type: table
+      content:
+        dataSource:
+          kind: memory
+          namespace: environments
+        render:
+          kind: table
+          columns:
+            - field: service
+              label: Service
+  layout:
+    - i: envs
+      x: 0
+      y: 0
+      w: 12
+      h: 6
+```
+
+Rules:
+
+- `apiVersion` must be `v1`.
+- `kind` must be `Console`. Legacy `kind: Dashboard` files exported before the rename are not accepted; re-export from the current UI to upgrade them.
+- Unknown top-level, metadata, panel, and layout fields are rejected.
+- `metadata.canvasId` and `metadata.name` are informational on export.
+- Missing `spec.panels` or `spec.layout` means an empty list.
+- Maximum panel count is 50.
+- Maximum panel payload size is 1 MiB.
+- Import replaces the whole console.
+
+Frontend YAML parsing lives in `dashboardYaml.ts`. Backend YAML parsing and validation lives in `canvas_dashboard_yml.go`. Keep error behavior and accepted shapes aligned.
+
+## Bundling A Console With An Installable App
+
+Apps installed from a public GitHub repository (`POST /apps/install`) can ship an optional `console.yaml` alongside `canvas.yaml`. When present, the install flow loads it from the same ref and writes it as the new canvas's console.
+
+- File path: `console.yaml` at the repo root, same branch (`main` or `master`) that `canvas.yaml` is read from.
+- Schema: same `apiVersion: v1`, `kind: Console` shape documented above; parsed and validated by `models.DashboardFromYML`. A malformed file aborts the install with HTTP 400 before any canvas is created.
+- Optional: a missing file is fine — the new canvas just starts with an empty console.
+- Replace-all on install: `metadata.canvasId` is ignored; the panels and layout become the canvas's full console.
+
+Implementation lives in `pkg/installation/fetch.go` (`FetchConsole`) and `pkg/installation/install.go` (`persistInstalledConsole`).
+
+## Authorization
+
+| Operation | Expected permission / state |
+| --- | --- |
+| View console | Canvas read access. |
+| Edit panels or layout | `canvases:update`, not a template, and canvas not deleted remotely. |
+| Import YAML | Same as edit. |
+| Export YAML | Available in console mode, including read-only viewers. |
+| Run node panel or table row action | `canvases:update`, not a template, and canvas not deleted remotely. |
+
+The UI disables unavailable controls, but server-side authorization is authoritative. Check `pkg/authorization/interceptor.go` when adding new RPCs.
+
+## Extension Checklist For Agents
+
+When adding a panel type:
+
+1. Add the type to `PANEL_TYPES` and `PANEL_TYPE_META` in `panelTypes.ts`.
+2. Add a content interface, default template, normalization if needed, and a `validatePanelContent` branch.
+3. Add backend validation in `canvas_dashboard_yml.go`.
+4. Add a panel card and route it from `DashboardView`.
+5. Add YAML round-trip tests and backend validator tests.
+6. Update this document.
+
+When adding a data source:
+
+1. Extend widget data-source types.
+2. Add frontend and backend validation.
+3. Add editor support in `DataSourceForm`.
+4. Implement fetching in `useWidgetData`.
+5. Add tests for normalization, validation, and rendering.
+
+When adding row action kinds:
+
+1. Extend `WidgetRowAction` and `normalizeRowAction`.
+2. Validate the new action in `panelTypes.ts` and `canvas_dashboard_yml.go`.
+3. Add runtime UI and permission behavior in `WidgetTable`.
+4. Prefer routing runtime behavior through `DashboardContext` so panel code stays testable.
+
+## Testing And Verification
+
+Focused checks for console work:
+
+```bash
+cd web_src
+npm run test:run -- src/pages/workflowv2/dashboard
+```
+
+Repository checks after frontend changes:
+
+```bash
+make format.js
+make check.lint.ui
+make check.build.ui
+```
+
+Backend checks after changing Go validation or API behavior:
+
+```bash
+make format.go
+make lint
+make check.build.app
+go test ./pkg/models -run 'TestDashboard|TestValidateDashboardContent'
+```
+
+Add or update tests in these areas:
+
+- `web_src/src/pages/workflowv2/dashboard/**/*.spec.ts`
+- `pkg/models/canvas_dashboard_yml_test.go`
+- `pkg/grpc/actions/canvases/canvas_dashboard_test.go`
+
+## Maintenance Notes
+
+- The console code has strict lint-budget pressure. Prefer small helpers and component-only files where Fast Refresh applies.
+- Do not update the ESLint budget to hide console regressions. Refactor the touched code instead.
+- Keep draft panel states valid when possible so users can add a panel before fully configuring it.
+- Keep user-facing text using `SuperPlane` capitalization.
+- Do not manually create migrations. If console persistence changes, use `make db.migration.create NAME=<name>` and leave rollback files empty.
