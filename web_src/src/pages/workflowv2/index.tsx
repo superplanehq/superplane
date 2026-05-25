@@ -5502,35 +5502,6 @@ export function WorkflowPageV2() {
   return (
     <>
       <div className="relative h-full w-full">
-        <WorkflowDashboardOverlay
-          isDashboardMode={isDashboardMode}
-          dashboardsFeatureEnabled={dashboardsFeatureEnabled}
-          canUpdateCanvas={canUpdateCanvas}
-          isTemplate={isTemplate}
-          canvasDeletedRemotely={canvasDeletedRemotely}
-          dashboardQuery={dashboardQuery}
-          updateDashboardMutation={updateDashboardMutation}
-          addPanelDialogOpen={isDashboardAddPanelOpen}
-          onAddPanelDialogOpenChange={handleDashboardAddPanelDialogOpenChange}
-          yamlModalOpen={isDashboardYamlOpen}
-          onYamlModalOpenChange={setIsDashboardYamlOpen}
-          canvasId={canvasId || undefined}
-          canvasName={canvas?.metadata?.name || undefined}
-          organizationId={organizationId || undefined}
-          canvasNodes={canvasNodes}
-          nodeStatuses={dashboardNodeStatuses}
-          onTriggerNode={handleDashboardTriggerNode}
-        />
-        <WorkflowMemoryOverlayLayer
-          isMemoryMode={isMemoryMode}
-          isViewingDraftVersion={isViewingDraftVersion}
-          isViewingLiveVersion={isViewingLiveVersion}
-          canUpdateCanvas={canUpdateCanvas}
-          entries={canvasMemoryEntries}
-          isLoading={canvasMemoryLoading}
-          error={canvasMemoryError}
-          deleteCanvasMemoryEntry={deleteCanvasMemoryEntry}
-        />
         <CanvasPage
           key={canvasRenderKey}
           // Persist right sidebar in query params
@@ -5554,6 +5525,39 @@ export function WorkflowPageV2() {
           showBottomStatusControls={!isTemplate && !isRunsMode && !isMemoryMode}
           hideAddControls={isTemplate || isRunsMode || isMemoryMode}
           hideCanvasToolSidebar={isTemplate}
+          modeOverlay={
+            <>
+              <WorkflowDashboardOverlay
+                isDashboardMode={isDashboardMode}
+                dashboardsFeatureEnabled={dashboardsFeatureEnabled}
+                canUpdateCanvas={canUpdateCanvas}
+                isTemplate={isTemplate}
+                canvasDeletedRemotely={canvasDeletedRemotely}
+                dashboardQuery={dashboardQuery}
+                updateDashboardMutation={updateDashboardMutation}
+                addPanelDialogOpen={isDashboardAddPanelOpen}
+                onAddPanelDialogOpenChange={handleDashboardAddPanelDialogOpenChange}
+                yamlModalOpen={isDashboardYamlOpen}
+                onYamlModalOpenChange={setIsDashboardYamlOpen}
+                canvasId={canvasId || undefined}
+                canvasName={canvas?.metadata?.name || undefined}
+                organizationId={organizationId || undefined}
+                canvasNodes={canvasNodes}
+                nodeStatuses={dashboardNodeStatuses}
+                onTriggerNode={handleDashboardTriggerNode}
+              />
+              <WorkflowMemoryOverlayLayer
+                isMemoryMode={isMemoryMode}
+                isViewingDraftVersion={isViewingDraftVersion}
+                isViewingLiveVersion={isViewingLiveVersion}
+                canUpdateCanvas={canUpdateCanvas}
+                entries={canvasMemoryEntries}
+                isLoading={canvasMemoryLoading}
+                error={canvasMemoryError}
+                deleteCanvasMemoryEntry={deleteCanvasMemoryEntry}
+              />
+            </>
+          }
           onSelectMemory={isTemplate ? undefined : handleSelectMemoryMode}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           nodes={nodes}

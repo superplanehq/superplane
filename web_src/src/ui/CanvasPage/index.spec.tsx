@@ -69,7 +69,7 @@ vi.mock("../componentSidebar", () => ({
 }));
 
 vi.mock("@/components/CanvasToolSidebar", () => ({
-  CanvasToolSidebar: () => null,
+  CanvasToolSidebar: () => <aside data-testid="canvas-tool-sidebar" />,
 }));
 
 vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
@@ -195,6 +195,36 @@ describe("CanvasPage connection drop", () => {
       unobserve() {}
       disconnect() {}
     };
+  });
+
+  it("renders mode overlays in the canvas region after the tool sidebar", () => {
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="dashboard"
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+          onYamlOpen={vi.fn()}
+          modeOverlay={<div data-testid="mode-overlay" />}
+        />
+      </MemoryRouter>,
+    );
+
+    const toolSidebar = screen.getByTestId("canvas-tool-sidebar");
+    const overlay = screen.getByTestId("mode-overlay");
+    const mainContentRow = toolSidebar.parentElement;
+    const canvasRegion = overlay.parentElement;
+
+    expect(mainContentRow).toContainElement(toolSidebar);
+    expect(mainContentRow).toContainElement(overlay);
+    expect(canvasRegion).not.toBe(mainContentRow);
+    expect(Array.from(mainContentRow?.children ?? []).indexOf(toolSidebar)).toBeLessThan(
+      Array.from(mainContentRow?.children ?? []).indexOf(canvasRegion as Element),
+    );
   });
 
   it("does not close the building blocks sidebar from the pane click that follows a connection drop", () => {
