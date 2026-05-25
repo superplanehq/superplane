@@ -23,7 +23,6 @@ import {
 export function TypedPanelShell({
   title,
   fallbackTitle,
-  typeLabel,
   readOnly,
   onEdit,
   onDelete,
@@ -32,7 +31,6 @@ export function TypedPanelShell({
 }: {
   title?: string;
   fallbackTitle: string;
-  typeLabel: string;
   readOnly: boolean;
   onEdit: () => void;
   onDelete: () => void;
@@ -55,9 +53,6 @@ export function TypedPanelShell({
           <div className="flex min-w-0 items-center gap-2">
             <span className="truncate text-xs font-medium text-slate-700" title={displayTitle}>
               {displayTitle}
-            </span>
-            <span className="hidden shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-500 sm:inline">
-              {typeLabel}
             </span>
           </div>
           {!readOnly ? (
