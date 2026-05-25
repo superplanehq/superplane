@@ -45,8 +45,8 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 		cmd.Stdout = &buf
 		cmd.Stderr = &buf
 	}
-	writeLiveLogCommandStart(live, 0, strings.Join(task.Command, " "))
 	startedAt := time.Now()
+	writeLiveLogCommandStart(live, 0, strings.Join(task.Command, " "), startedAt)
 	err = cmd.Run()
 	out := truncateString(buf.String(), max)
 	exit := 0

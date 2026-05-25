@@ -4,12 +4,22 @@ import "testing"
 
 func TestParseRunnerControlRecord(t *testing.T) {
 	t.Run("cmd_start", func(t *testing.T) {
+		rec, ok := parseRunnerControlRecord(`{"type":"cmd_start","index":2,"text":"echo hello","started_at":1710000000123}`)
+		if !ok {
+			t.Fatalf("expected cmd_start to parse")
+		}
+		if rec["type"] != "cmd_start" || rec["index"] != 2 || rec["text"] != "echo hello" || rec["started_at"] != int64(1710000000123) {
+			t.Fatalf("unexpected cmd_start record: %#v", rec)
+		}
+	})
+
+	t.Run("cmd_start without started_at", func(t *testing.T) {
 		rec, ok := parseRunnerControlRecord(`{"type":"cmd_start","index":2,"text":"echo hello"}`)
 		if !ok {
 			t.Fatalf("expected cmd_start to parse")
 		}
-		if rec["type"] != "cmd_start" || rec["index"] != 2 || rec["text"] != "echo hello" {
-			t.Fatalf("unexpected cmd_start record: %#v", rec)
+		if _, hasStartedAt := rec["started_at"]; hasStartedAt {
+			t.Fatalf("expected started_at to be omitted: %#v", rec)
 		}
 	})
 

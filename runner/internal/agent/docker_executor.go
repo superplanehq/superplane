@@ -133,10 +133,10 @@ func (d *DockerExecutor) Execute(ctx context.Context, task *api.TaskPayload, liv
 	}
 
 	singleCommandText, hasSingleCommand := dockerSingleCommandText(task)
-	if hasSingleCommand {
-		writeLiveLogCommandStart(live, 0, singleCommandText)
-	}
 	startedAt := time.Now()
+	if hasSingleCommand {
+		writeLiveLogCommandStart(live, 0, singleCommandText, startedAt)
+	}
 	exitCode, execOut, runErr := dockerExecTask(ctx, name, task, live)
 	if hasSingleCommand {
 		writeLiveLogCommandEnd(live, 0, exitCode, time.Since(startedAt))
@@ -226,15 +226,14 @@ func dockerCommandsScript(directives []string) string {
 	script.WriteString("}\n")
 
 	for i, directive := range directives {
-		startRecord, _ := json.Marshal(liveLogCommandStartRecord{
-			Type:  "cmd_start",
-			Index: i,
-			Text:  directive,
-		})
-		script.WriteString("printf '%s\\n' ")
-		script.WriteString(shellSingleQuote(string(startRecord)))
-		script.WriteString("\n")
+		textJSON, _ := json.Marshal(directive)
 		script.WriteString("__sp_cmd_start=\"$(sp_now_ms)\"\n")
+		script.WriteString(`printf '{"type":"cmd_start","index":`)
+		script.WriteString(strconv.Itoa(i))
+		script.WriteString(`,"text":`)
+		script.WriteString(string(textJSON))
+		script.WriteString(`,"started_at":%s}\n' "$__sp_cmd_start"`)
+		script.WriteString("\n")
 		script.WriteString("if {\n")
 		script.WriteString(directive)
 		script.WriteString("\n}; then\n")
@@ -253,10 +252,6 @@ func dockerCommandsScript(directives []string) string {
 	}
 
 	return script.String()
-}
-
-func shellSingleQuote(s string) string {
-	return "'" + strings.ReplaceAll(s, "'", `'"'"'`) + "'"
 }
 
 func stripLiveLogControlLines(output string) string {

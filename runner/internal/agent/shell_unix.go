@@ -344,8 +344,8 @@ func runShellPTYSession(ctx context.Context, maxOut int, shellCmd *exec.Cmd, dir
 		if err := os.WriteFile(dPath, []byte(dir+"\n"), 0600); err != nil {
 			return 1, truncateString(sess.out.String(), max), err
 		}
-		writeLiveLogCommandStart(sess.live, i, dir)
 		commandStart := time.Now()
+		writeLiveLogCommandStart(sess.live, i, dir, commandStart)
 		start := randomMark("s")
 		end := randomMark("e")
 		// ANSI-C $'…' emits SOH reliably on Bash 3.2 (macOS) and modern Linux; avoid echo -e (\001 via $').
