@@ -575,9 +575,9 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 
 func (s *CanvasPageSteps) openYamlPreviewModal() {
 	// Adding a node opens the component sidebar over the canvas chrome; dismiss it so
-	// the floating YAML control (same corner as the sidebar) is clickable.
+	// the header YAML control is clickable.
 	s.canvas.ClickOnEmptyCanvasArea()
-	s.session.Click(q.TestID("open-yaml-modal-button"))
+	s.session.Click(q.TestID("canvas-yaml-button"))
 }
 
 func (s *CanvasPageSteps) closeYamlPreviewModal() {
