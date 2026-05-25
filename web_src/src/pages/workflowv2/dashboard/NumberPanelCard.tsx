@@ -33,7 +33,6 @@ export function NumberPanelCard({ panel, readOnly, onDelete, onChange }: NumberP
       <TypedPanelShell
         title={content.title}
         fallbackTitle={panel.id}
-        typeLabel="Number"
         readOnly={readOnly}
         onEdit={() => setEditing(true)}
         onDelete={onDelete}

@@ -411,6 +411,17 @@ Rules:
 
 Frontend YAML parsing lives in `dashboardYaml.ts`. Backend YAML parsing and validation lives in `canvas_dashboard_yml.go`. Keep error behavior and accepted shapes aligned.
 
+## Bundling A Console With An Installable App
+
+Apps installed from a public GitHub repository (`POST /apps/install`) can ship an optional `console.yaml` alongside `canvas.yaml`. When present, the install flow loads it from the same ref and writes it as the new canvas's console.
+
+- File path: `console.yaml` at the repo root, same branch (`main` or `master`) that `canvas.yaml` is read from.
+- Schema: same `apiVersion: v1`, `kind: Console` shape documented above; parsed and validated by `models.DashboardFromYML`. A malformed file aborts the install with HTTP 400 before any canvas is created.
+- Optional: a missing file is fine — the new canvas just starts with an empty console.
+- Replace-all on install: `metadata.canvasId` is ignored; the panels and layout become the canvas's full console.
+
+Implementation lives in `pkg/installation/fetch.go` (`FetchConsole`) and `pkg/installation/install.go` (`persistInstalledConsole`).
+
 ## Authorization
 
 | Operation | Expected permission / state |
