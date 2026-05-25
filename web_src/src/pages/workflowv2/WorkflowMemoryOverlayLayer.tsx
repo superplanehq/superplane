@@ -33,11 +33,13 @@ export function WorkflowMemoryOverlayLayer({
 
   return (
     <CanvasMemoryView
-      entries={isViewingDraftVersion ? [] : entries}
-      isLoading={isViewingDraftVersion ? false : isLoading}
-      errorMessage={isViewingDraftVersion ? undefined : error instanceof Error ? error.message : undefined}
+      entries={entries}
+      isLoading={isLoading}
+      errorMessage={error instanceof Error ? error.message : undefined}
       onDeleteEntry={
-        canUpdateCanvas && isViewingLiveVersion ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined
+        canUpdateCanvas && isViewingLiveVersion && !isViewingDraftVersion
+          ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId)
+          : undefined
       }
       deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
     />

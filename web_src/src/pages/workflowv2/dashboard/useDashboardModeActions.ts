@@ -3,9 +3,6 @@ import type { SetURLSearchParams } from "react-router-dom";
 
 interface DashboardModeActionsConfig {
   dashboardsFeatureEnabled: boolean;
-  hasEditableVersion: boolean;
-  liveCanvasVersionId: string | undefined;
-  handleUseVersion: (versionId: string) => void;
   setIsDashboardMode: (value: boolean) => void;
   setIsDashboardAddPanelOpen: (value: boolean) => void;
   setIsDashboardYamlOpen: (value: boolean) => void;
@@ -17,9 +14,6 @@ interface DashboardModeActionsConfig {
 
 export function useDashboardModeActions({
   dashboardsFeatureEnabled,
-  hasEditableVersion,
-  liveCanvasVersionId,
-  handleUseVersion,
   setIsDashboardMode,
   setIsDashboardAddPanelOpen,
   setIsDashboardYamlOpen,
@@ -30,24 +24,13 @@ export function useDashboardModeActions({
 }: DashboardModeActionsConfig) {
   const handleSelectDashboardMode = useCallback(() => {
     if (!dashboardsFeatureEnabled) return;
-    if (hasEditableVersion && liveCanvasVersionId) handleUseVersion(liveCanvasVersionId);
 
     setIsDashboardMode(true);
     setIsRunsMode(false);
     setIsMemoryMode(false);
     setSelectedRunId(null);
     setSearchParams(toDashboardSearchParams, { replace: true });
-  }, [
-    dashboardsFeatureEnabled,
-    handleUseVersion,
-    hasEditableVersion,
-    liveCanvasVersionId,
-    setIsDashboardMode,
-    setIsMemoryMode,
-    setIsRunsMode,
-    setSearchParams,
-    setSelectedRunId,
-  ]);
+  }, [dashboardsFeatureEnabled, setIsDashboardMode, setIsMemoryMode, setIsRunsMode, setSearchParams, setSelectedRunId]);
 
   const handleExitDashboardMode = useCallback(() => {
     setIsDashboardMode(false);
