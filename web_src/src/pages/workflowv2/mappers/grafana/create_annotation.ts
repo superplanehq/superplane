@@ -78,8 +78,7 @@ function metadataList(context: ComponentBaseContext): MetadataItem[] {
   const nodeMetadata = context.node.metadata as AnnotationNodeMetadata | undefined;
 
   if (configuration?.text) {
-    const preview = configuration.text.length > 50 ? configuration.text.substring(0, 50) + "..." : configuration.text;
-    metadata.push({ icon: "bookmark", label: preview });
+    metadata.push({ icon: "bookmark", label: truncate(configuration.text, 50) });
   }
 
   if (configuration?.tags && configuration.tags.length > 0) {
