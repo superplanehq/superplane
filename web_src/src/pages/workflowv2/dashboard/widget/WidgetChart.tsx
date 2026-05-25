@@ -24,7 +24,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 
-import { applyFilters, buildChartData } from "./widgetData";
+import { applyFilters, applySort, buildChartData } from "./widgetData";
 import { formatPercentOfTotal, formatSeriesValue } from "./chartFormat";
 import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries } from "./types";
 
@@ -51,6 +51,7 @@ interface ChartSeries extends WidgetChartSeries {
  */
 export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   const filtered = useMemo(() => applyFilters(rows, render.filters), [rows, render.filters]);
+  const sorted = useMemo(() => applySort(filtered, render.sort), [filtered, render.sort]);
   const series = useMemo<ChartSeries[]>(
     () =>
       render.series.map((s, idx) => ({
@@ -61,10 +62,10 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
     [render.series],
   );
   const data = useMemo(() => {
-    const built = buildChartData(filtered, render.xField, series);
+    const built = buildChartData(sorted, render.xField, series);
     if (render.limit) return built.slice(0, render.limit);
     return built;
-  }, [filtered, render.xField, render.limit, series]);
+  }, [sorted, render.xField, render.limit, series]);
 
   if (isLoading) {
     return (
