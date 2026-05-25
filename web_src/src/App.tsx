@@ -7,6 +7,7 @@ import "./App.css";
 
 // Import pages
 import AuthGuard from "./components/AuthGuard";
+import { GlobalCommandPalette } from "./components/GlobalCommandPalette";
 import { AccountProvider } from "./contexts/AccountProvider";
 import { useAccount } from "./contexts/useAccount";
 import { PermissionsProvider } from "./contexts/PermissionsProvider";
@@ -75,6 +76,7 @@ function AppRouter() {
         <ImpersonationBanner />
         <div className="flex-1 overflow-auto">
           <SetupGuard>
+            <GlobalCommandPalette />
             <Routes>
               {/* public routes */}
               <Route path="login" element={<Login />} />
