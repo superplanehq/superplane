@@ -7,10 +7,7 @@ import { useLiveLogStream } from "./useLiveLogStream";
 
 export function LiveLogStreamView({ execution }: { execution: ExecutionInfo }) {
   const executionInFlight = isExecutionInFlight(execution);
-  const { sections, orphanLines, error, toggleSection, scrollRef } = useLiveLogStream(
-    execution.id,
-    executionInFlight,
-  );
+  const { sections, orphanLines, error, toggleSection, scrollRef } = useLiveLogStream(execution.id, executionInFlight);
   const hasAnyLogs = orphanLines.length > 0 || sections.length > 0;
   const lastSectionIndex = sections.length - 1;
   const waitingForLogs = executionInFlight && !hasAnyLogs && !error;

@@ -19,7 +19,10 @@ function hasRunningCommand(state: LogState): boolean {
 }
 
 function applyStreamFailure(state: LogState, message: string, executionInFlight: boolean): LogState {
-  if (hasRunningCommand(state) || (executionInFlight && state.sections.length === 0 && state.orphanLines.length === 0)) {
+  if (
+    hasRunningCommand(state) ||
+    (executionInFlight && state.sections.length === 0 && state.orphanLines.length === 0)
+  ) {
     return {
       ...state,
       error: null,
