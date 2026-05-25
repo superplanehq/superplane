@@ -190,7 +190,7 @@ export const graphqlMapper: ComponentBaseMapper = {
     return {
       iconSrc: graphqlIcon,
       iconSlug: context.componentDefinition.icon || "network",
-      iconColor: getColorClass("black"),
+      iconColor: getColorClass(context.componentDefinition.color),
       collapsed: context.node.isCollapsed,
       collapsedBackground: "bg-white",
       title:
