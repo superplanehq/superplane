@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/triggers/start/params"
 )
 
 const HookRun = "run"
@@ -43,20 +44,46 @@ func (s *Start) Documentation() string {
 ## How It Works
 
 1. Add the Manual Run trigger as the starting node of your workflow
-2. Configure one or more templates, each with a name and a default payload
+2. Configure one or more templates, each with a name and a default payload; use ` + "`param()`" + ` syntax on leaf string values to define run-time parameters (see below)
 3. Click the "Run" button in the workflow UI, or invoke the ` + "`run`" + ` hook via the API/CLI to start an execution
-4. The workflow begins immediately with either the configured payload or an override supplied at run time
+4. The workflow begins immediately with the template payload, optionally supplying run-time parameter values
 
 ## Configuration
 
 Each Manual Run trigger exposes a list of templates. A template has:
 
 - ` + "`name`" + ` (required): a label used as the run target (and the event channel)
-- ` + "`payload`" + ` (required): a default JSON object emitted when the template is used
+- ` + "`payload`" + ` (required): a default JSON object emitted when the template is used. Leaf string values may be static literals or ` + "`param(...)`" + ` declarations (see below).
+
+### ` + "`param()`" + ` syntax
+
+Use ` + "`param(...)`" + ` on **leaf string values** in the template ` + "`payload`" + ` to prompt for run-time input (canvas form) or accept values via hook ` + "`params`" + `. Each param is identified by its dot-path from the payload root (for example ` + "`body.name`" + `).
+
+Example template payload:
+
+` + "```json" + `
+{
+  "body": {
+    "name": "param(type:string, title:'Enter a machine name', default:'machine-1', required:false)",
+    "size": "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Select size', required:true)"
+  }
+}
+` + "```" + `
+
+Rules:
+
+- The whole leaf value must match ` + "`param(...)`" + ` (whitespace around the call is allowed).
+- Arguments are comma-separated ` + "`key:value`" + ` pairs.
+- **String values** use **single quotes**: ` + "`'...'`" + ` (no escape sequences). Characters ` + "`'`" + `, ` + "`\"`" + `, and ` + "`,`" + ` are not allowed inside quoted strings.
+- **Booleans** (` + "`required`" + `, boolean ` + "`default`" + `): bare ` + "`true`" + ` or ` + "`false`" + `.
+- Supported keys: ` + "`type`" + ` (` + "`string`" + `, ` + "`number`" + `, ` + "`boolean`" + `, ` + "`select`" + `), ` + "`title`" + `, ` + "`default`" + `, ` + "`required`" + `, ` + "`values`" + ` (select only).
+- For ` + "`type:select`" + `, ` + "`values`" + ` is one single-quoted string with options separated by ` + "`|`" + ` (for example ` + "`'2 vCPU|4 vCPU|8 vCPU'`" + `). Whitespace around each option is trimmed.
+
+Invalid ` + "`param()`" + ` syntax is rejected when the canvas is saved.
 
 ## Event Data
 
-Manual runs emit an event with type ` + "`manual.run`" + `. The data is either the template's saved payload or the override passed in the run request.`
+Manual runs emit an event with type ` + "`manual.run`" + `. The data is the merged template payload after applying run-time ` + "`params`" + `.`
 }
 
 func (s *Start) Icon() string {
@@ -126,8 +153,8 @@ func (s *Start) Hooks() []core.Hook {
 					Required: true,
 				},
 				{
-					Name:  "payload",
-					Label: "Payload Override",
+					Name:  "params",
+					Label: "Parameter values",
 					Type:  configuration.FieldTypeObject,
 				},
 			},
@@ -177,12 +204,18 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 		return nil, fmt.Errorf("template %q not found; available: %s", templateName, strings.Join(names, ", "))
 	}
 
-	if override, ok := ctx.Parameters["payload"].(map[string]any); ok {
-		payload = override
+	if payload == nil {
+		return nil, fmt.Errorf("template %q has no payload", templateName)
 	}
 
-	if payload == nil {
-		return nil, fmt.Errorf("template %q has no payload and no override was provided", templateName)
+	runParams, _ := ctx.Parameters["params"].(map[string]any)
+
+	if params.HasParams(payload) || len(runParams) > 0 {
+		merged, err := params.ApplyParams(payload, runParams)
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply parameters: %w", err)
+		}
+		payload = merged
 	}
 
 	if err := ctx.Events.Emit("manual.run", payload); err != nil {
