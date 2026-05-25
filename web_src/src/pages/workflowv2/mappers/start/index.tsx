@@ -11,27 +11,9 @@ import type { TriggerProps } from "@/ui/trigger";
 import { flattenObject } from "@/lib/utils";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import React from "react";
-import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
 
-import { StartRunModal } from "./runModal";
-
-interface StartTemplate {
-  name: string;
-  payload: Record<string, unknown>;
-}
-
-interface StartConfiguration {
-  templates?: StartTemplate[];
-}
-
-function payloadForTemplateRun(template: StartTemplate): Record<string, unknown> {
-  const p = template.payload;
-  if (p && typeof p === "object" && !Array.isArray(p)) {
-    return p as Record<string, unknown>;
-  }
-  return {};
-}
+import { StartTemplatesField, type StartConfiguration } from "./StartTemplatesField";
 
 /**
  * Default renderer for the start trigger
@@ -93,54 +75,21 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
     const actions = context?.actions;
     const showTemplateRun = mode === "live" && !!actions;
 
-    return (
-      <div className="px-2 py-1.5 flex flex-col gap-1.5">
-        {templates.map((template, index) => (
-          <div key={index} className="flex items-center justify-between min-w-0">
-            <div className="flex items-center min-w-0 flex-1">
+    if (!showTemplateRun || !actions) {
+      return (
+        <div className="px-2 py-1.5 flex flex-col gap-1.5">
+          {templates.map((template, index) => (
+            <div key={index} className="flex items-center min-w-0">
               <div className="w-4 h-4 mr-2 flex-shrink-0">
                 <Play size={16} className="text-gray-500" />
               </div>
               <span className="text-[13px] font-medium font-inter text-gray-500 truncate">{template.name}</span>
             </div>
-            {showTemplateRun && actions && (
-              <Button
-                size="sm"
-                data-testid="start-template-run"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  actions.openModal({
-                    title: "Run trigger",
-                    description: (
-                      <>
-                        Run template <strong>{template.name}</strong> on node{" "}
-                        <strong>{node.name || "Unnamed trigger"}</strong>. Edit the payload below to override the
-                        template default.
-                      </>
-                    ),
-                    content: ({ close }) => (
-                      <StartRunModal
-                        initialPayload={payloadForTemplateRun(template)}
-                        onClose={close}
-                        onRun={async (payload) => {
-                          await actions.invokeNodeTriggerHook("run", {
-                            template: template.name,
-                            payload,
-                          });
-                        }}
-                      />
-                    ),
-                  });
-                }}
-                className="flex-shrink-0 h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
-              >
-                Run
-              </Button>
-            )}
-          </div>
-        ))}
-      </div>
-    );
+          ))}
+        </div>
+      );
+    }
+
+    return <StartTemplatesField node={node} templates={templates} actions={actions} />;
   },
 };
