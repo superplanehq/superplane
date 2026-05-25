@@ -1,19 +1,26 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { cn } from "../../../lib/utils";
-import type { CommandSection } from "./types";
+import type { ExecutionInfo } from "../../../pages/workflowv2/mappers/types";
+import { isExecutionInFlight, type CommandSection } from "./types";
 import { useLiveLogStream } from "./useLiveLogStream";
 
-export function LiveLogStreamView({ executionId }: { executionId: string }) {
-  const { sections, orphanLines, error, streamWarning, toggleSection, scrollRef } = useLiveLogStream(executionId);
+export function LiveLogStreamView({ execution }: { execution: ExecutionInfo }) {
+  const executionInFlight = isExecutionInFlight(execution);
+  const { sections, orphanLines, error, toggleSection, scrollRef } = useLiveLogStream(
+    execution.id,
+    executionInFlight,
+  );
   const hasAnyLogs = orphanLines.length > 0 || sections.length > 0;
   const lastSectionIndex = sections.length - 1;
+  const waitingForLogs = executionInFlight && !hasAnyLogs && !error;
+  const showError = Boolean(error) && !executionInFlight;
 
   return (
     <div ref={scrollRef} className="h-full min-h-0 overflow-y-auto bg-slate-50">
-      {error ? <ErrorMessage /> : null}
-      {!error && streamWarning ? <StreamWarningMessage message={streamWarning} /> : null}
-      {!error && !hasAnyLogs ? <NoLogsMessage /> : null}
+      {showError ? <ErrorMessage /> : null}
+      {waitingForLogs ? <WaitingForLogsMessage /> : null}
+      {!showError && !waitingForLogs && !hasAnyLogs ? <NoLogsMessage /> : null}
 
       {sections.map((section, index) => (
         <CommandSectionView
@@ -31,16 +38,16 @@ function NoLogsMessage() {
   return <div className="px-4 py-3 text-left text-muted-foreground">No log lines yet.</div>;
 }
 
+function WaitingForLogsMessage() {
+  return <div className="px-4 py-3 text-left text-muted-foreground">Waiting for logs…</div>;
+}
+
 function ErrorMessage() {
   return (
     <div className="px-4 py-3 text-left text-destructive">
       Something went wrong while fetching logs. Please try again later.
     </div>
   );
-}
-
-function StreamWarningMessage({ message }: { message: string }) {
-  return <div className="px-4 py-3 text-left text-amber-700">{message}</div>;
 }
 
 function CommandSectionView({
