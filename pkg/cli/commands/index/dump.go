@@ -31,6 +31,7 @@ type indexDump struct {
 	Integrations []openapi_client.IntegrationsIntegrationDefinition `json:"integrations"`
 	Actions      []openapi_client.SuperplaneActionsAction           `json:"actions"`
 	Triggers     []openapi_client.TriggersTrigger                   `json:"triggers"`
+	Widgets      []openapi_client.WidgetsWidget                     `json:"widgets"`
 }
 
 type dumpCommand struct {
@@ -74,6 +75,17 @@ func (c *dumpCommand) Execute(ctx core.CommandContext) error {
 		}
 		mu.Lock()
 		dump.Triggers = resp.GetTriggers()
+		mu.Unlock()
+		return nil
+	})
+
+	g.Go(func() error {
+		resp, _, err := ctx.API.WidgetAPI.WidgetsListWidgets(gctx).Execute()
+		if err != nil {
+			return fmt.Errorf("fetching widgets: %w", err)
+		}
+		mu.Lock()
+		dump.Widgets = resp.GetWidgets()
 		mu.Unlock()
 		return nil
 	})

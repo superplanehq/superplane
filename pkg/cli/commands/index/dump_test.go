@@ -34,6 +34,7 @@ func TestDumpWritesFullRegistryToFile(t *testing.T) {
 		"/api/v1/integrations": integrationsListResponse,
 		"/api/v1/actions":      actionsListResponse,
 		"/api/v1/triggers":     triggersListResponse,
+		"/api/v1/widgets":      widgetsListResponse,
 	})
 
 	outFile := filepath.Join(t.TempDir(), "index.json")
@@ -47,7 +48,7 @@ func TestDumpWritesFullRegistryToFile(t *testing.T) {
 	require.Contains(t, stdout.String(), outFile)
 	require.Contains(t, stdout.String(), "Index downloaded to")
 
-	// The file must exist and be valid JSON with all three sections.
+	// The file must exist and be valid JSON with all four sections.
 	raw, err := os.ReadFile(outFile)
 	require.NoError(t, err)
 
@@ -62,6 +63,9 @@ func TestDumpWritesFullRegistryToFile(t *testing.T) {
 
 	require.Len(t, dump.Triggers, 1)
 	require.Equal(t, "cron", dump.Triggers[0].GetName())
+
+	require.Len(t, dump.Widgets, 1)
+	require.Equal(t, "annotation", dump.Widgets[0].GetName())
 }
 
 func TestDumpIntegrationContainsNestedFields(t *testing.T) {
@@ -69,6 +73,7 @@ func TestDumpIntegrationContainsNestedFields(t *testing.T) {
 		"/api/v1/integrations": integrationsListResponse,
 		"/api/v1/actions":      actionsListResponse,
 		"/api/v1/triggers":     triggersListResponse,
+		"/api/v1/widgets":      widgetsListResponse,
 	})
 
 	outFile := filepath.Join(t.TempDir(), "index.json")
@@ -109,6 +114,7 @@ func TestDumpFullComponentFields(t *testing.T) {
 		"/api/v1/integrations": integrationsListResponse,
 		"/api/v1/actions":      actionsListResponse,
 		"/api/v1/triggers":     triggersListResponse,
+		"/api/v1/widgets":      widgetsListResponse,
 	})
 
 	outFile := filepath.Join(t.TempDir(), "index.json")
@@ -140,6 +146,7 @@ func TestDumpFullTriggerFields(t *testing.T) {
 		"/api/v1/integrations": integrationsListResponse,
 		"/api/v1/actions":      actionsListResponse,
 		"/api/v1/triggers":     triggersListResponse,
+		"/api/v1/widgets":      widgetsListResponse,
 	})
 
 	outFile := filepath.Join(t.TempDir(), "index.json")
@@ -196,6 +203,7 @@ func TestDumpErrorOnUnwritablePath(t *testing.T) {
 		"/api/v1/integrations": integrationsListResponse,
 		"/api/v1/actions":      actionsListResponse,
 		"/api/v1/triggers":     triggersListResponse,
+		"/api/v1/widgets":      widgetsListResponse,
 	})
 
 	// A directory that doesn't exist cannot be written to.
@@ -213,6 +221,7 @@ func TestDumpUsesProvidedOpenAPITypes(t *testing.T) {
 		"/api/v1/integrations": integrationsListResponse,
 		"/api/v1/actions":      actionsListResponse,
 		"/api/v1/triggers":     triggersListResponse,
+		"/api/v1/widgets":      widgetsListResponse,
 	})
 
 	outFile := filepath.Join(t.TempDir(), "index.json")
@@ -236,4 +245,7 @@ func TestDumpUsesProvidedOpenAPITypes(t *testing.T) {
 
 	var trigger openapi_client.TriggersTrigger
 	require.IsType(t, trigger, dump.Triggers[0])
+
+	var widget openapi_client.WidgetsWidget
+	require.IsType(t, widget, dump.Widgets[0])
 }

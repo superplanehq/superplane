@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	canvases "github.com/superplanehq/superplane/pkg/cli/commands/canvases"
+	console "github.com/superplanehq/superplane/pkg/cli/commands/console"
 	events "github.com/superplanehq/superplane/pkg/cli/commands/events"
 	executions "github.com/superplanehq/superplane/pkg/cli/commands/executions"
 	groups "github.com/superplanehq/superplane/pkg/cli/commands/groups"
@@ -22,6 +23,7 @@ import (
 	roles "github.com/superplanehq/superplane/pkg/cli/commands/roles"
 	secrets "github.com/superplanehq/superplane/pkg/cli/commands/secrets"
 	usage "github.com/superplanehq/superplane/pkg/cli/commands/usage"
+	widgets "github.com/superplanehq/superplane/pkg/cli/commands/widgets"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -58,6 +60,7 @@ func init() {
 
 	options := defaultBindOptions()
 	RootCmd.AddCommand(canvases.NewCommand(options))
+	RootCmd.AddCommand(console.NewCommand(options))
 	RootCmd.AddCommand(executions.NewCommand(options))
 	RootCmd.AddCommand(events.NewCommand(options))
 	RootCmd.AddCommand(groups.NewCommand(options))
@@ -69,6 +72,7 @@ func init() {
 	RootCmd.AddCommand(roles.NewCommand(options))
 	RootCmd.AddCommand(secrets.NewCommand(options))
 	RootCmd.AddCommand(usage.NewCommand(options))
+	RootCmd.AddCommand(widgets.NewCommand(options))
 }
 
 func initConfig() {

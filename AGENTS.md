@@ -34,6 +34,7 @@
 - After adding new API endpoints, ensure the new endpoints have their authorization covered in `pkg/authorization/interceptor.go`
 - For UI component workflow, see [web_src/AGENTS.md](web_src/AGENTS.md)
 - For new components or triggers, see [docs/contributing/component-implementations.md](docs/contributing/component-implementations.md)
+- For the first-time CLI workflow (build, connect, exercise console/widgets), see [docs/contributing/cli-quickstart.md](docs/contributing/cli-quickstart.md)
 - For component design guidelines and quality standards, see [docs/contributing/component-design.md](docs/contributing/component-design.md)
 - After updating the proto definitions in protos/, always regenerate them, the OpenAPI spec for the API, and SDKs for the CLI and the UI (requires a running `app` container from `make dev.up`):
   - `make pb.gen` to regenerate protobuf files

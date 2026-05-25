@@ -23,7 +23,8 @@ func TestWidgetsCommandExecuteListText(t *testing.T) {
 
 	ctx, stdout := newWidgetsCommandContextForTest(t, server, "text")
 	name := ""
-	command := widgetsCommand{name: &name}
+	full := false
+	command := widgetsCommand{name: &name, full: &full}
 
 	err := command.Execute(ctx)
 	require.NoError(t, err)
@@ -43,7 +44,8 @@ func TestWidgetsCommandExecuteDescribeJSON(t *testing.T) {
 
 	ctx, stdout := newWidgetsCommandContextForTest(t, server, "json")
 	name := "annotation"
-	command := widgetsCommand{name: &name}
+	full := false
+	command := widgetsCommand{name: &name, full: &full}
 
 	err := command.Execute(ctx)
 	require.NoError(t, err)
@@ -62,7 +64,8 @@ func TestWidgetsCommandExecuteDescribeText(t *testing.T) {
 
 	ctx, stdout := newWidgetsCommandContextForTest(t, server, "text")
 	name := "annotation"
-	command := widgetsCommand{name: &name}
+	full := false
+	command := widgetsCommand{name: &name, full: &full}
 
 	err := command.Execute(ctx)
 	require.NoError(t, err)
@@ -83,7 +86,8 @@ func TestWidgetsCommandExecuteListYAML(t *testing.T) {
 
 	ctx, stdout := newWidgetsCommandContextForTest(t, server, "yaml")
 	name := ""
-	command := widgetsCommand{name: &name}
+	full := false
+	command := widgetsCommand{name: &name, full: &full}
 
 	err := command.Execute(ctx)
 	require.NoError(t, err)
@@ -103,7 +107,8 @@ func TestWidgetsCommandExecuteReturnsAPIError(t *testing.T) {
 
 	ctx, _ := newWidgetsCommandContextForTest(t, server, "text")
 	name := "annotation"
-	command := widgetsCommand{name: &name}
+	full := false
+	command := widgetsCommand{name: &name, full: &full}
 
 	err := command.Execute(ctx)
 	require.Error(t, err)

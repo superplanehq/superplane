@@ -61,6 +61,26 @@ const triggersListResponse = `{
 	]
 }`
 
+const widgetsListResponse = `{
+	"widgets": [
+		{
+			"name": "annotation",
+			"label": "Annotation",
+			"description": "Add text annotations and notes to your workflow",
+			"icon": "sticky-note",
+			"color": "yellow",
+			"configuration": [
+				{
+					"name": "text",
+					"type": "text",
+					"required": true,
+					"description": "Text content for the annotation"
+				}
+			]
+		}
+	]
+}`
+
 // Integrations tests
 
 func TestIntegrationsListReturnsSummaryJSON(t *testing.T) {
