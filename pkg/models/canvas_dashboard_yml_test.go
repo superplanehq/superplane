@@ -568,6 +568,99 @@ func TestValidateDashboardContent_AcceptsChartSeriesFormatAndLegend(t *testing.T
 	require.NoError(t, err)
 }
 
+func TestValidateDashboardContent_AcceptsWidgetSort(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "runs",
+			Type: DashboardPanelTypeTable,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "executions"},
+				"render": map[string]any{
+					"kind":    "table",
+					"columns": []any{map[string]any{"field": "status"}},
+					"sort":    map[string]any{"field": "createdAt", "order": "desc"},
+				},
+			},
+		},
+		{
+			ID:   "perf",
+			Type: DashboardPanelTypeChart,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "executions"},
+				"render": map[string]any{
+					"kind":   "chart",
+					"type":   "bar",
+					"xField": "service",
+					"series": []any{map[string]any{"field": "cost"}},
+					"sort":   map[string]any{"field": `{{ formatDate(createdAt, "yyyy-MM-dd") }}`},
+				},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateDashboardContent_RejectsSortWithoutField(t *testing.T) {
+	panel := DashboardPanel{
+		ID:   "runs",
+		Type: DashboardPanelTypeTable,
+		Content: map[string]any{
+			"dataSource": map[string]any{"kind": "executions"},
+			"render": map[string]any{
+				"kind":    "table",
+				"columns": []any{map[string]any{"field": "status"}},
+				"sort":    map[string]any{"order": "asc"},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent([]DashboardPanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `render.sort.field must be a non-empty string`)
+}
+
+func TestValidateDashboardContent_RejectsSortWithBlankField(t *testing.T) {
+	panel := DashboardPanel{
+		ID:   "runs",
+		Type: DashboardPanelTypeTable,
+		Content: map[string]any{
+			"dataSource": map[string]any{"kind": "executions"},
+			"render": map[string]any{
+				"kind":    "table",
+				"columns": []any{map[string]any{"field": "status"}},
+				"sort":    map[string]any{"field": "   "},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent([]DashboardPanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `render.sort.field must be a non-empty string`)
+}
+
+func TestValidateDashboardContent_RejectsUnknownSortOrder(t *testing.T) {
+	panel := DashboardPanel{
+		ID:   "perf",
+		Type: DashboardPanelTypeChart,
+		Content: map[string]any{
+			"dataSource": map[string]any{"kind": "executions"},
+			"render": map[string]any{
+				"kind":   "chart",
+				"type":   "bar",
+				"xField": "service",
+				"series": []any{map[string]any{"field": "cost"}},
+				"sort":   map[string]any{"field": "createdAt", "order": "random"},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent([]DashboardPanel{panel}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `render.sort.order must be one of asc/desc`)
+}
+
 func TestValidateDashboardContent_AcceptsCompositeNumberPanel(t *testing.T) {
 	panels := []DashboardPanel{
 		{

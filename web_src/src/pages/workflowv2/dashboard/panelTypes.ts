@@ -20,8 +20,8 @@ import type {
   WidgetTableFilter,
   WidgetTableRender,
 } from "./widget/types";
-import { normalizeRowAction, WIDGET_CHART_LEGEND_MODES, WIDGET_FILTER_OPS } from "./widget/types";
-import type { WidgetChartLegendMode } from "./widget/types";
+import { normalizeRowAction, WIDGET_CHART_LEGEND_MODES, WIDGET_FILTER_OPS, WIDGET_SORT_ORDERS } from "./widget/types";
+import type { WidgetChartLegendMode, WidgetSort, WidgetSortOrder } from "./widget/types";
 
 /** All panel kinds the dashboard currently understands. */
 export const PANEL_TYPES = ["markdown", "node", "table", "chart", "number"] as const;
@@ -364,6 +364,8 @@ function validateTableContent(content: unknown): string | null {
   if (columnsError) return columnsError;
   const whereError = validateTableWhere(render.where);
   if (whereError) return whereError;
+  const sortError = validateSort(render.sort);
+  if (sortError) return sortError;
   return validateTableRowActions(render.rowActions);
 }
 
@@ -398,8 +400,26 @@ export function normalizeTablePanelContent(raw: Record<string, unknown> | undefi
       where: normalizeTableWhere(renderRaw.where),
       filters: Array.isArray(renderRaw.filters) ? (renderRaw.filters as string[]) : undefined,
       emptyMessage: typeof renderRaw.emptyMessage === "string" ? renderRaw.emptyMessage : undefined,
+      sort: normalizeSort(renderRaw.sort),
     },
   };
+}
+
+/**
+ * Coerce the persisted `render.sort` into our typed shape, dropping it
+ * entirely when the field is missing/blank so editors that simply clear the
+ * field don't leave dangling `{ field: "" }` objects in the YAML output.
+ */
+function normalizeSort(raw: unknown): WidgetSort | undefined {
+  const obj = asObject(raw);
+  if (!obj) return undefined;
+  const field = typeof obj.field === "string" ? obj.field.trim() : "";
+  if (!field) return undefined;
+  const order =
+    typeof obj.order === "string" && WIDGET_SORT_ORDERS.includes(obj.order as WidgetSortOrder)
+      ? (obj.order as WidgetSortOrder)
+      : undefined;
+  return order ? { field, order } : { field };
 }
 
 function normalizeTableColumns(raw: unknown): WidgetTableColumn[] {
@@ -512,13 +532,30 @@ function validateChartRender(render: Record<string, unknown>): string | null {
     const seriesError = validateChartSeries(render.series[i], i);
     if (seriesError) return seriesError;
   }
-  return validateChartLegend(render.legend);
+  const legendError = validateChartLegend(render.legend);
+  if (legendError) return legendError;
+  return validateSort(render.sort);
 }
 
 function validateChartLegend(legend: unknown): string | null {
   if (legend === undefined) return null;
   if (typeof legend !== "string" || !WIDGET_CHART_LEGEND_MODES.includes(legend as WidgetChartLegendMode)) {
     return `render.legend must be one of ${WIDGET_CHART_LEGEND_MODES.join(", ")}.`;
+  }
+  return null;
+}
+
+function validateSort(sort: unknown): string | null {
+  if (sort === undefined || sort === null) return null;
+  const obj = asObject(sort);
+  if (!obj) return "render.sort must be an object.";
+  if (typeof obj.field !== "string" || obj.field.trim() === "") {
+    return "render.sort.field must be a non-empty string.";
+  }
+  if (obj.order !== undefined && obj.order !== null) {
+    if (typeof obj.order !== "string" || !WIDGET_SORT_ORDERS.includes(obj.order as WidgetSortOrder)) {
+      return `render.sort.order must be one of ${WIDGET_SORT_ORDERS.join(", ")}.`;
+    }
   }
   return null;
 }

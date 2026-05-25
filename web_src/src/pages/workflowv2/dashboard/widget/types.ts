@@ -88,6 +88,8 @@ export interface WidgetTableRender {
   /** Legacy string filters — still supported for backwards compatibility. */
   filters?: string[];
   emptyMessage?: string;
+  /** Optional widget-level row sort applied after filters. */
+  sort?: WidgetSort;
 }
 
 export type WidgetChartKind = "bar" | "stacked-bar" | "line" | "area" | "donut";
@@ -117,6 +119,25 @@ export interface WidgetChartRender {
   filters?: string[];
   /** Legend visibility. Defaults to "auto" — visible for donut charts or when 2+ series exist. */
   legend?: WidgetChartLegendMode;
+  /** Optional widget-level row sort applied after filters, before chart binning. */
+  sort?: WidgetSort;
+}
+
+/** Sort direction. Defaults to `"asc"` when omitted on a `WidgetSort`. */
+export type WidgetSortOrder = "asc" | "desc";
+export const WIDGET_SORT_ORDERS: WidgetSortOrder[] = ["asc", "desc"];
+
+/**
+ * Widget-level row sort. `field` accepts the same surface as chart/table
+ * fields: a literal dot path (e.g. `createdAt`) or a full `{{ cel }}`
+ * expression (e.g. `{{ formatDate(createdAt, "yyyy-MM-dd") }}`).
+ *
+ * Null / undefined values always sort to the end so empty rows don't poison
+ * the visible ordering regardless of direction.
+ */
+export interface WidgetSort {
+  field: string;
+  order?: WidgetSortOrder;
 }
 
 export type WidgetNumberAggregation = "count" | "sum" | "avg" | "min" | "max" | "first" | "last";
