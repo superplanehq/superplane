@@ -247,6 +247,33 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	}
 	core.Bind(deleteCmd, &deleteCommand{}, options)
 
+	var runTemplate string
+	var runPayload string
+	var runReplay string
+	runCmd := &cobra.Command{
+		Use:   "run <name-or-id> <node-id>",
+		Short: "Run a Manual Run node or replay one of its root events",
+		Long: `Start a Manual Run node via its "run" hook, or re-emit an existing root event from that node.
+
+The second argument is the Manual Run node id on the canvas (same id shown in the canvas YAML).
+
+Examples:
+  superplane canvases run my-canvas start-node-nc5ajn --template "Hello World"
+  superplane canvases run my-canvas start-node-nc5ajn --template "Hello World" --payload '{"message":"one-off"}'
+  superplane canvases run my-canvas start-node-nc5ajn --template "Hello World" --payload ./payload.json
+  superplane canvases run my-canvas start-node-nc5ajn --template "Hello World" --payload @./payload.json
+  superplane canvases run 4e9ae08d-0363-40d2-ba2c-5f6389a418d8 start-node-nc5ajn --replay evt-uuid`,
+		Args: cobra.ExactArgs(2),
+	}
+	runCmd.Flags().StringVar(&runTemplate, "template", "", "manual run template name (required unless using --replay)")
+	runCmd.Flags().StringVar(&runPayload, "payload", "", `JSON object override for the template payload: inline '{"k":"v"}', a file path, or @path to read from a file`)
+	runCmd.Flags().StringVar(&runReplay, "replay", "", "id of an existing root event to re-emit from this Manual Run node (mutually exclusive with --template)")
+	core.Bind(runCmd, &runCommand{
+		template: &runTemplate,
+		payload:  &runPayload,
+		replay:   &runReplay,
+	}, options)
+
 	root.AddCommand(listCmd)
 	root.AddCommand(getCmd)
 	root.AddCommand(activeCmd)
@@ -254,6 +281,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	root.AddCommand(createCmd)
 	root.AddCommand(updateCmd)
 	root.AddCommand(deleteCmd)
+	root.AddCommand(runCmd)
 	root.AddCommand(changeRequestsCmd)
 
 	return root
