@@ -28,7 +28,6 @@ export function TablePanelCard({ panel, readOnly, onDelete, onChange }: TablePan
       <TypedPanelShell
         title={content.title}
         fallbackTitle={panel.id}
-        typeLabel="Table"
         readOnly={readOnly}
         onEdit={() => setEditing(true)}
         onDelete={onDelete}

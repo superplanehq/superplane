@@ -2,6 +2,7 @@ package installation
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,11 +11,21 @@ import (
 	"time"
 
 	"github.com/ghodss/yaml"
+	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-const canvasFileName = "canvas.yaml"
+const (
+	canvasFileName  = "canvas.yaml"
+	consoleFileName = "console.yaml"
+)
+
+// errFileNotFound is returned (wrapped) by fetchURL when the upstream
+// raw.githubusercontent.com responds with 404. Callers that treat a missing
+// file as a non-error (for example, the optional console.yaml in installable
+// apps) can detect it with errors.Is.
+var errFileNotFound = errors.New("file not found")
 
 var defaultRefs = []string{"main", "master"}
 
@@ -48,20 +59,50 @@ func FetchCanvas(repo *Repository) (*pb.Canvas, string, error) {
 }
 
 func fetchCanvasAtRef(repo *Repository, ref string) (*pb.Canvas, error) {
-	rawURL := fmt.Sprintf(
-		"https://raw.githubusercontent.com/%s/%s/%s/%s",
-		repo.Owner,
-		repo.Name,
-		ref,
-		canvasFileName,
-	)
-
-	body, err := fetchURL(rawURL)
+	body, err := fetchURL(rawFileURL(repo, ref, canvasFileName))
 	if err != nil {
 		return nil, err
 	}
 
 	return parseCanvasYAML(body)
+}
+
+// FetchConsole loads and parses an optional console.yaml from a public GitHub
+// repository at the given ref. The console is opt-in: a missing file returns
+// (nil, nil) so callers can install the app without one. Parse and validation
+// errors from models.DashboardFromYML are wrapped and surfaced to the caller.
+//
+// Callers must pass a non-empty ref. Resolve it via FetchCanvas first so the
+// canvas and console are read from the same commit.
+func FetchConsole(repo *Repository, ref string) (*models.DashboardYAML, error) {
+	if ref == "" {
+		return nil, fmt.Errorf("console fetch requires a resolved ref")
+	}
+
+	body, err := fetchURL(rawFileURL(repo, ref, consoleFileName))
+	if err != nil {
+		if errors.Is(err, errFileNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	console, err := models.DashboardFromYML(body)
+	if err != nil {
+		return nil, fmt.Errorf("parse console yaml: %w", err)
+	}
+
+	return console, nil
+}
+
+func rawFileURL(repo *Repository, ref, filename string) string {
+	return fmt.Sprintf(
+		"https://raw.githubusercontent.com/%s/%s/%s/%s",
+		repo.Owner,
+		repo.Name,
+		ref,
+		filename,
+	)
 }
 
 func fetchURL(rawURL string) ([]byte, error) {
@@ -82,7 +123,7 @@ func fetchURL(rawURL string) ([]byte, error) {
 	defer response.Body.Close()
 
 	if response.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("%s not found", rawURL)
+		return nil, fmt.Errorf("%s not found: %w", rawURL, errFileNotFound)
 	}
 
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
