@@ -357,6 +357,9 @@ func validateTablePanelContent(panel DashboardPanel) error {
 	if err := validateTableWhere(panel.ID, render["where"]); err != nil {
 		return err
 	}
+	if err := validateSort(panel.ID, render["sort"]); err != nil {
+		return err
+	}
 	return validateTableRowActions(panel.ID, render["rowActions"])
 }
 
@@ -391,6 +394,33 @@ func validateChartPanelContent(panel DashboardPanel) error {
 		legendStr, isString := legend.(string)
 		if !isString || !slices.Contains([]string{"auto", "show", "hide"}, legendStr) {
 			return fmt.Errorf("panel %q render.legend must be one of auto/show/hide", panel.ID)
+		}
+	}
+	return validateSort(panel.ID, render["sort"])
+}
+
+var allowedSortOrders = []string{"asc", "desc"}
+
+// validateSort enforces the shape of the optional `render.sort` widget-level
+// sort spec. `field` is a non-empty string (literal path or `{{ expr }}`),
+// `order` is an optional asc/desc enum. Mirrors the frontend `validateSort`
+// in `web_src/src/pages/workflowv2/dashboard/panelTypes.ts`.
+func validateSort(panelID string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+	sort, ok := raw.(map[string]any)
+	if !ok {
+		return fmt.Errorf("panel %q render.sort must be an object", panelID)
+	}
+	field, ok := sort["field"].(string)
+	if !ok || strings.TrimSpace(field) == "" {
+		return fmt.Errorf("panel %q render.sort.field must be a non-empty string", panelID)
+	}
+	if order, present := sort["order"]; present && order != nil {
+		orderStr, isString := order.(string)
+		if !isString || !slices.Contains(allowedSortOrders, orderStr) {
+			return fmt.Errorf("panel %q render.sort.order must be one of %s", panelID, strings.Join(allowedSortOrders, "/"))
 		}
 	}
 	return nil

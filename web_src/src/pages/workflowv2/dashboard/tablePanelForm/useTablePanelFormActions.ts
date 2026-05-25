@@ -2,7 +2,7 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import { draftToPayload, type PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
 
 import type { TablePanelContent } from "../panelTypes";
-import type { WidgetRowAction, WidgetTableColumn, WidgetTableFilter } from "../widget/types";
+import type { WidgetRowAction, WidgetSort, WidgetTableColumn, WidgetTableFilter } from "../widget/types";
 import { suggestColumnFormat } from "../widget/useMemoryCatalog";
 import type { TablePanelPayloadDrafts } from "./useTablePanelPayloadDrafts";
 
@@ -99,6 +99,24 @@ export function useTablePanelFormActions({
     });
   };
 
+  /**
+   * Set or update the table's widget-level sort. Passing a sort whose `field`
+   * is blank clears the sort entirely, keeping persisted YAML free of empty
+   * `{ field: "" }` stubs.
+   */
+  const setSort = (nextSort: WidgetSort | undefined) => {
+    const trimmedField = nextSort?.field.trim() ?? "";
+    if (!nextSort || !trimmedField) {
+      const { sort: _omit, ...rest } = value.render;
+      void _omit;
+      onChange({ ...value, render: rest });
+      return;
+    }
+    const sort: WidgetSort = { field: nextSort.field };
+    if (nextSort.order) sort.order = nextSort.order;
+    onChange({ ...value, render: { ...value.render, sort } });
+  };
+
   const payloadActions = makePayloadActions({ payloadDrafts, updateAction });
 
   return {
@@ -113,6 +131,7 @@ export function useTablePanelFormActions({
     updateAction,
     addAction,
     removeAction,
+    setSort,
     ...payloadActions,
   };
 }

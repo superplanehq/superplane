@@ -12,7 +12,7 @@ import { mergeTriggerParameters } from "./mergeTriggerPayload";
 import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
 import { evaluateRowShow } from "./rowVisibility";
 import { resolveCellValue } from "./resolveCellValue";
-import { applyFilters } from "./widgetData";
+import { applyFilters, applySort } from "./widgetData";
 import { formatValue } from "./widgetFormat";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
 import { useWidgetTableActionLock } from "./WidgetTableActionLockContext";
@@ -52,8 +52,9 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
 
   const filtered = useMemo(() => {
     const afterWhere = applyTableWhere(recordRows, render.where);
-    return applyFilters(afterWhere, render.filters);
-  }, [recordRows, render.where, render.filters]);
+    const afterFilters = applyFilters(afterWhere, render.filters);
+    return applySort(afterFilters, render.sort);
+  }, [recordRows, render.where, render.filters, render.sort]);
 
   // Collect the unique trigger node ids referenced by this table's row actions
   // so the action lock can subscribe to the runs query only when needed.

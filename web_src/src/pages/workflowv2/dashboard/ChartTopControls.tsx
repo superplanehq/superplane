@@ -4,7 +4,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { CHART_KIND_LABELS, CHART_KINDS, CHART_LEGEND_MODE_LABELS } from "./chartPanelFormConstants";
 import type { ChartPanelContent } from "./panelTypes";
-import { WIDGET_CHART_LEGEND_MODES, type WidgetChartKind, type WidgetChartLegendMode } from "./widget/types";
+import {
+  WIDGET_CHART_LEGEND_MODES,
+  WIDGET_SORT_ORDERS,
+  type WidgetChartKind,
+  type WidgetChartLegendMode,
+  type WidgetSort,
+  type WidgetSortOrder,
+} from "./widget/types";
 
 export function ChartTopControls({
   value,
@@ -16,48 +23,119 @@ export function ChartTopControls({
   fieldListId: string | undefined;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-3">
-      <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Chart type</Label>
-        <Select
-          value={value.render.type}
-          onValueChange={(v) => onChange({ ...value, render: { ...value.render, type: v as WidgetChartKind } })}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {CHART_KINDS.map((k) => (
-              <SelectItem key={k} value={k}>
-                {CHART_KIND_LABELS[k]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+    <div className="space-y-3">
+      <div className="grid grid-cols-3 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-slate-600">Chart type</Label>
+          <Select
+            value={value.render.type}
+            onValueChange={(v) => onChange({ ...value, render: { ...value.render, type: v as WidgetChartKind } })}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CHART_KINDS.map((k) => (
+                <SelectItem key={k} value={k}>
+                  {CHART_KIND_LABELS[k]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-slate-600">X-axis field</Label>
+          <Input
+            list={fieldListId}
+            value={value.render.xField}
+            onChange={(e) => onChange({ ...value, render: { ...value.render, xField: e.target.value } })}
+            placeholder='e.g. status or {{ formatDate(createdAt, "MM/dd") }}'
+            data-testid="chart-x-field"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs font-medium text-slate-600">Legend</Label>
+          <Select
+            value={value.render.legend ?? "auto"}
+            onValueChange={(v) =>
+              onChange({ ...value, render: { ...value.render, legend: v as WidgetChartLegendMode } })
+            }
+          >
+            <SelectTrigger className="w-full" data-testid="chart-legend-mode">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {WIDGET_CHART_LEGEND_MODES.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {CHART_LEGEND_MODE_LABELS[m]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">X-axis field</Label>
+      <ChartSortRow value={value} onChange={onChange} fieldListId={fieldListId} />
+    </div>
+  );
+}
+
+function ChartSortRow({
+  value,
+  onChange,
+  fieldListId,
+}: {
+  value: ChartPanelContent;
+  onChange: (next: ChartPanelContent) => void;
+  fieldListId: string | undefined;
+}) {
+  const sort = value.render.sort;
+  const sortField = sort?.field ?? "";
+  const sortOrder: WidgetSortOrder = sort?.order ?? "asc";
+  const hasSortField = sortField.trim() !== "";
+
+  const updateField = (nextField: string) => {
+    const trimmed = nextField.trim();
+    if (!trimmed) {
+      const { sort: _omit, ...rest } = value.render;
+      void _omit;
+      onChange({ ...value, render: rest });
+      return;
+    }
+    const nextSort: WidgetSort = { field: nextField };
+    if (sort?.order) nextSort.order = sort.order;
+    onChange({ ...value, render: { ...value.render, sort: nextSort } });
+  };
+
+  const updateOrder = (nextOrder: WidgetSortOrder) => {
+    if (!hasSortField) return;
+    onChange({
+      ...value,
+      render: { ...value.render, sort: { field: sortField, order: nextOrder } },
+    });
+  };
+
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      <div className="space-y-1.5 col-span-2">
+        <Label className="text-xs font-medium text-slate-600">Sort by (optional)</Label>
         <Input
           list={fieldListId}
-          value={value.render.xField}
-          onChange={(e) => onChange({ ...value, render: { ...value.render, xField: e.target.value } })}
-          placeholder="e.g. status"
-          data-testid="chart-x-field"
+          value={sortField}
+          onChange={(e) => updateField(e.target.value)}
+          placeholder="e.g. createdAt or {{ expr }} (blank = unsorted)"
+          data-testid="chart-sort-field"
         />
       </div>
       <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Legend</Label>
-        <Select
-          value={value.render.legend ?? "auto"}
-          onValueChange={(v) => onChange({ ...value, render: { ...value.render, legend: v as WidgetChartLegendMode } })}
-        >
-          <SelectTrigger className="w-full" data-testid="chart-legend-mode">
+        <Label className="text-xs font-medium text-slate-600">Order</Label>
+        <Select value={sortOrder} onValueChange={(v) => updateOrder(v as WidgetSortOrder)} disabled={!hasSortField}>
+          <SelectTrigger className="w-full" data-testid="chart-sort-order">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {WIDGET_CHART_LEGEND_MODES.map((m) => (
-              <SelectItem key={m} value={m}>
-                {CHART_LEGEND_MODE_LABELS[m]}
+            {WIDGET_SORT_ORDERS.map((o) => (
+              <SelectItem key={o} value={o}>
+                {o === "asc" ? "Ascending" : "Descending"}
               </SelectItem>
             ))}
           </SelectContent>
