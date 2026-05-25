@@ -226,6 +226,18 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_GUARDRAIL_GUARDIAN_WORKER") == "yes" {
+		log.Println("Starting Guardrail Guardian Worker")
+		w := workers.NewGuardrailGuardianWorker()
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_CLASSIFIER_WORKER") == "yes" {
+		log.Println("Starting Classifier Worker")
+		w := workers.NewClassifierWorkerFromEnv()
+		go w.Start(context.Background())
+	}
+
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
 		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL)

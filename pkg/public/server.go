@@ -611,6 +611,14 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/accounts/{accountId}/promote", s.promoteAdmin).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/demote", s.demoteAdmin).Methods("POST")
 
+	// Guardrail policy management
+	adminRoute.HandleFunc("/organizations/{orgId}/guardrails/policy", s.adminGetOrgGuardrailPolicy).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/guardrails/policy", s.adminUpsertOrgGuardrailPolicy).Methods("PUT")
+	adminRoute.HandleFunc("/organizations/{orgId}/guardrails/overrides", s.adminListGuardrailOverrides).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/guardrails/overrides/{scanResultId}/approve", s.adminApproveGuardrailOverride).Methods("POST")
+	adminRoute.HandleFunc("/organizations/{orgId}/canvases/{canvasId}/guardrails/policy", s.adminGetWorkflowGuardrailPolicy).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/canvases/{canvasId}/guardrails/policy", s.adminUpsertWorkflowGuardrailPolicy).Methods("PUT")
+
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
 		publicRoute.Use(middleware)

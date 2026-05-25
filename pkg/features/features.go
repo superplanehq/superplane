@@ -25,12 +25,17 @@ const (
 	FeatureWebhookReconciler        = "webhook_reconciler"
 )
 
+// FeaturePromptGuardrails gates the prompt guardrail scanning system.
+// When enabled, resolved prompt fields are scanned for secrets and injection patterns.
+const FeaturePromptGuardrails = "prompt_guardrails"
+
 var registry = []Feature{
 	{ID: "runner", Label: "Runners", Description: "Sandboxed Runners"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas"},
 	{ID: FeatureDashboards, Label: "Console", Description: "Console panels and widgets on canvases"},
 	{ID: FeatureWebhookBindingsDualWrite, Label: "Webhook Bindings Dual-Write", Description: "Shadow-write WebhookSubscriptionBinding rows alongside legacy webhook creation"},
 	{ID: FeatureWebhookReconciler, Label: "Webhook Reconciler", Description: "Reconcile webhook subscription bindings into registrations and operations"},
+	{ID: FeaturePromptGuardrails, Label: "Prompt Guardrails", Description: "Scan AI prompt fields for secrets and injection patterns"},
 }
 
 func All() []Feature {

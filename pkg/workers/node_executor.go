@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
+	"github.com/superplanehq/superplane/pkg/guardrails"
 	"github.com/superplanehq/superplane/pkg/logging"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -31,13 +32,14 @@ import (
 var ErrRecordLocked = errors.New("record locked")
 
 type NodeExecutor struct {
-	encryptor      crypto.Encryptor
-	registry       *registry.Registry
-	authService    authorization.Authorization
-	baseURL        string
-	webhookBaseURL string
-	semaphore      *semaphore.Weighted
-	logger         *logrus.Entry
+	encryptor            crypto.Encryptor
+	registry             *registry.Registry
+	authService          authorization.Authorization
+	baseURL              string
+	webhookBaseURL       string
+	semaphore            *semaphore.Weighted
+	logger               *logrus.Entry
+	guardrailInterceptor *guardrails.Interceptor
 
 	rabbitMQURL string
 	consumer    *tackle.Consumer
@@ -45,14 +47,15 @@ type NodeExecutor struct {
 
 func NewNodeExecutor(encryptor crypto.Encryptor, registry *registry.Registry, baseURL string, webhookBaseURL string, rabbitMQURL string, authService authorization.Authorization) *NodeExecutor {
 	return &NodeExecutor{
-		encryptor:      encryptor,
-		registry:       registry,
-		baseURL:        baseURL,
-		webhookBaseURL: webhookBaseURL,
-		semaphore:      semaphore.NewWeighted(25),
-		logger:         logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"}),
-		rabbitMQURL:    rabbitMQURL,
-		authService:    authService,
+		encryptor:            encryptor,
+		registry:             registry,
+		baseURL:              baseURL,
+		webhookBaseURL:       webhookBaseURL,
+		semaphore:            semaphore.NewWeighted(25),
+		logger:               logrus.WithFields(logrus.Fields{"worker": "NodeExecutor"}),
+		rabbitMQURL:          rabbitMQURL,
+		authService:          authService,
+		guardrailInterceptor: guardrails.NewInterceptor(),
 	}
 }
 
@@ -360,6 +363,26 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 		builder = builder.WithPreviousExecution(execution.PreviousExecutionID)
 	}
 
+	// Guardrail scan: scan the already-resolved prompt fields before executing.
+	if w.guardrailInterceptor != nil && ref.Component != nil {
+		guardrailCtx := guardrails.ScanContext{
+			OrgID:         workflow.OrganizationID,
+			WorkflowID:    execution.WorkflowID,
+			ExecutionID:   execution.ID,
+			NodeID:        execution.NodeID,
+			Provider:      providerFromComponentName(ref.Component.Name),
+			ComponentType: ref.Component.Name,
+		}
+		blocked, blockErr := w.runGuardrailScan(tx, logger, execution, action, guardrailCtx)
+		if blockErr != nil {
+			return blockErr
+		}
+		if blocked {
+			// Execution is blocked (soft-block awaiting admin review); do not execute.
+			return nil
+		}
+	}
+
 	ctx := core.ExecutionContext{
 		ID:             execution.ID,
 		WorkflowID:     execution.WorkflowID.String(),
@@ -410,4 +433,60 @@ func (w *NodeExecutor) executeActionNode(tx *gorm.DB, execution *models.CanvasNo
 	logger.Info("Action executed successfully")
 
 	return tx.Save(execution).Error
+}
+
+// runGuardrailScan invokes the interceptor and returns (blocked, error).
+// blocked=true means execution must stop (either hard-fail or soft-block).
+// error is non-nil only when the block itself fails to persist.
+func (w *NodeExecutor) runGuardrailScan(
+	tx *gorm.DB,
+	logger interface {
+		Warnf(string, ...any)
+		Errorf(string, ...any)
+	},
+	execution *models.CanvasNodeExecution,
+	action core.Action,
+	guardrailCtx guardrails.ScanContext,
+) (bool, error) {
+	outcome, scanErr := w.guardrailInterceptor.ScanConfiguration(
+		tx,
+		execution.Configuration.Data(),
+		action.Configuration(),
+		guardrailCtx,
+	)
+	if scanErr == nil {
+		if outcome != nil && outcome.Warned {
+			if warnErr := execution.WarnForGuardrailInTransaction(tx, outcome.ScanResultID, outcome.RiskScore, outcome.FindingsCount); warnErr != nil {
+				logger.Errorf("guardrail: failed to annotate execution with warning: %v", warnErr)
+			}
+		}
+		return false, nil
+	}
+
+	var guardrailErr *guardrails.GuardrailBlockedError
+	if !errors.As(scanErr, &guardrailErr) {
+		// Non-blocking scan error (e.g., DB unavailable); log and continue.
+		logger.Warnf("guardrail scan error (non-blocking): %v", scanErr)
+		return false, nil
+	}
+
+	if guardrailErr.Enforcement == guardrails.EnforcementHardBlock {
+		return true, execution.FailInTransaction(tx, models.CanvasNodeExecutionResultReasonGuardrailHardBlock, "guardrail hard block")
+	}
+	// Soft-block: transition to guardrail_blocked state for admin review.
+	return true, execution.BlockForGuardrailInTransaction(tx, guardrailErr.ScanResultID)
+}
+
+// providerFromComponentName maps a component name prefix to an LLM provider string.
+func providerFromComponentName(name string) string {
+	switch {
+	case len(name) >= 6 && name[:6] == "claude":
+		return "claude"
+	case len(name) >= 6 && name[:6] == "openai":
+		return "openai"
+	case len(name) >= 6 && name[:6] == "gemini":
+		return "gemini"
+	default:
+		return ""
+	}
 }
