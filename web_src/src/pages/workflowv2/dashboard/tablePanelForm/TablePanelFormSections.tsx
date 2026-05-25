@@ -1,11 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SuperplaneComponentsNode } from "@/api-client";
 
 import { MemoryDiscoveryPanel } from "../MemoryDiscoveryPanel";
 import type { TablePanelContent } from "../panelTypes";
 import { ActionRow, ColumnRow, FilterRow } from "../TablePanelFormRows";
+import { WIDGET_SORT_ORDERS, type WidgetSortOrder } from "../widget/types";
 import type { TablePanelFormActions } from "./useTablePanelFormActions";
 import type { TablePanelPayloadDrafts } from "./useTablePanelPayloadDrafts";
 
@@ -160,6 +162,63 @@ export function TablePanelFiltersSection({
           />
         ))}
       </div>
+    </div>
+  );
+}
+
+export function TablePanelSortSection({
+  value,
+  fieldOptions,
+  actions,
+}: {
+  value: TablePanelContent;
+  fieldOptions: string[];
+  actions: TablePanelFormActions;
+}) {
+  const sort = value.render.sort;
+  const sortField = sort?.field ?? "";
+  const sortOrder: WidgetSortOrder = sort?.order ?? "asc";
+  const hasSortField = sortField.trim() !== "";
+  const datalistId = fieldOptions.length > 0 ? "table-sort-field-options" : undefined;
+
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-medium text-slate-600">Sort by (optional)</Label>
+      <div className="grid grid-cols-3 gap-2">
+        <Input
+          className="col-span-2 h-8"
+          list={datalistId}
+          value={sortField}
+          onChange={(e) =>
+            actions.setSort(e.target.value.trim() ? { field: e.target.value, order: sort?.order } : undefined)
+          }
+          placeholder="e.g. createdAt or {{ expr }} (blank = unsorted)"
+          data-testid="table-sort-field"
+        />
+        <Select
+          value={sortOrder}
+          onValueChange={(v) => actions.setSort({ field: sortField, order: v as WidgetSortOrder })}
+          disabled={!hasSortField}
+        >
+          <SelectTrigger className="h-8 w-full" data-testid="table-sort-order">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {WIDGET_SORT_ORDERS.map((o) => (
+              <SelectItem key={o} value={o}>
+                {o === "asc" ? "Ascending" : "Descending"}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {datalistId ? (
+        <datalist id={datalistId}>
+          {fieldOptions.map((f) => (
+            <option key={f} value={f} />
+          ))}
+        </datalist>
+      ) : null}
     </div>
   );
 }
