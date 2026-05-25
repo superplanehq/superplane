@@ -87,7 +87,21 @@ vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
 }));
 
 vi.mock("./Header", () => ({
-  Header: () => <header data-testid="canvas-header" />,
+  Header: ({
+    isEditing,
+    onCanvasAddComponent,
+  }: {
+    isEditing?: boolean;
+    onCanvasAddComponent?: () => void;
+  }) => (
+    <header data-testid="canvas-header">
+      {isEditing && onCanvasAddComponent ? (
+        <button type="button" data-testid="canvas-add-component-button" onClick={() => onCanvasAddComponent()}>
+          Add component
+        </button>
+      ) : null}
+    </header>
+  ),
 }));
 
 import { CanvasNodeErrorBoundary, CanvasPage } from "./index";
@@ -297,6 +311,7 @@ describe("CanvasPage connection drop", () => {
       <MemoryRouter>
         <CanvasPage
           title="Canvas"
+          headerMode="version-live"
           nodes={[]}
           edges={[]}
           buildingBlocks={[]}
@@ -310,7 +325,7 @@ describe("CanvasPage connection drop", () => {
     );
 
     await act(async () => {
-      fireEvent.click(screen.getByTestId("open-sidebar-button"));
+      fireEvent.click(screen.getByTestId("canvas-add-component-button"));
     });
 
     expect(onPlaceholderAdd).toHaveBeenCalledTimes(1);
