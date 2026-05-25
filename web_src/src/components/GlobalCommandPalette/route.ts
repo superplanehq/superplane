@@ -1,0 +1,35 @@
+import { PUBLIC_TOP_LEVEL_SEGMENTS } from "./constants";
+import type { CommandPage } from "./types";
+
+export function getRouteContext(pathname: string): { organizationId: string | null; canvasId: string | null } {
+  const segments = pathname.split("/").filter(Boolean);
+  const firstSegment = segments[0] || "";
+  const organizationId = PUBLIC_TOP_LEVEL_SEGMENTS.has(firstSegment) ? null : firstSegment;
+  const canvasIndex = segments.indexOf("canvases");
+  const canvasId = canvasIndex >= 0 ? segments[canvasIndex + 1] || null : null;
+  return { organizationId, canvasId };
+}
+
+export function pageTitle(page: CommandPage): string {
+  switch (page) {
+    case "organization-settings":
+      return "Search organization settings";
+    case "canvas-settings":
+      return "Search canvas settings";
+    case "open-canvas":
+      return "Search canvases";
+    case "node-search":
+      return "Search components";
+    case "admin":
+      return "Search admin pages";
+    default:
+      return "What can we help with?";
+  }
+}
+
+export function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  const tagName = target.tagName.toLowerCase();
+  return tagName === "input" || tagName === "textarea" || tagName === "select";
+}

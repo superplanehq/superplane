@@ -15,7 +15,7 @@ import {
   type Viewport,
 } from "@xyflow/react";
 
-import { NodeSearch } from "@/components/node-search";
+import { GlobalCommandPaletteCanvasNodeSearch } from "@/components/GlobalCommandPalette/canvasNodeSearch";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -2941,15 +2941,7 @@ function CanvasContent({
     isAutoLayoutToggleDisabled,
     isEditMode,
   ]);
-  const zoomSliderContent = useMemo(
-    () => (
-      <>
-        {autoLayoutToggleControl}
-        <NodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
-      </>
-    ),
-    [autoLayoutToggleControl, handleNodeSearch, handleNodeSearchSelect],
-  );
+  const zoomSliderContent = useMemo(() => <>{autoLayoutToggleControl}</>, [autoLayoutToggleControl]);
   const reactFlowStyle = useMemo(() => ({ opacity: isInitialized ? 1 : 0 }), [isInitialized]);
   const handleSelectionStart = useCallback(() => {
     setIsSelecting(true);
@@ -3008,6 +3000,7 @@ function CanvasContent({
             className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
+            <GlobalCommandPaletteCanvasNodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
             <Panel
               position="bottom-left"
               className="!bg-transparent !outline-none !shadow-none p-0 flex flex-col items-start gap-4"
