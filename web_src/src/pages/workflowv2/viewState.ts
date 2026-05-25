@@ -23,13 +23,11 @@ export function getWorkflowHeaderMode({
   dashboardsFeatureEnabled,
   isRunsMode,
   isMemoryMode,
-  canvasMode,
 }: {
   isDashboardMode: boolean;
   dashboardsFeatureEnabled: boolean;
   isRunsMode: boolean;
   isMemoryMode: boolean;
-  canvasMode: "edit" | "live";
 }): WorkflowHeaderMode {
   if (isDashboardMode) {
     return dashboardsFeatureEnabled ? "dashboard" : "version-live";
@@ -43,7 +41,7 @@ export function getWorkflowHeaderMode({
     return "runs";
   }
 
-  return canvasMode === "edit" ? "version-edit" : "version-live";
+  return "version-live";
 }
 
 export function getWorkflowCanvasStateMode({

@@ -39,6 +39,10 @@ export interface HeaderProps {
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   mode?: HeaderMode;
+  /** When true, the canvas draft is active regardless of the current Console / Canvas / Memory tab. */
+  isEditing?: boolean;
+  /** Switches back to the Canvas tab without changing edit mode. */
+  onSelectCanvasView?: () => void;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -48,10 +52,14 @@ export interface HeaderProps {
   onSelectDashboard?: () => void;
   /** Provided when Memory is available as a first-class tab; opens the Memory view. */
   onSelectMemory?: () => void;
-  /** When set with `mode === "dashboard"`, shows Add panel in the secondary header. */
+  /** When set with `mode === "dashboard"` and editing, shows Add panel in the secondary header. */
   onDashboardAddPanel?: () => void;
-  /** When set with `mode === "dashboard"`, shows the YAML button in the secondary header. */
+  /** When set with `mode === "dashboard"` and editing, shows the YAML button in the secondary header. */
   onDashboardOpenYaml?: () => void;
+  /** When set with the Canvas tab active and editing, opens the canvas YAML modal. */
+  onCanvasOpenYaml?: () => void;
+  /** When set with the Canvas tab active and editing, opens the add-component sidebar. */
+  onCanvasAddComponent?: () => void;
   /** When true, the YAML button advertises read-only YAML view. Defaults to editable copy. */
   dashboardYamlReadOnly?: boolean;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
@@ -77,6 +85,7 @@ export function Header(props: HeaderProps) {
         headerTitle={headerTitle}
         showCanvasSettingsMenu={props.showCanvasSettingsMenu}
         mode={props.mode}
+        isEditing={props.isEditing}
         hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
         onDiscardVersion={props.onDiscardVersion}
         discardVersionDisabled={props.discardVersionDisabled}
@@ -105,6 +114,7 @@ function PageHeader({
   headerTitle,
   showCanvasSettingsMenu = true,
   mode,
+  isEditing = false,
   hasUnpublishedDraftChanges,
   onDiscardVersion,
   discardVersionDisabled,
@@ -126,6 +136,7 @@ function PageHeader({
   headerTitle: string;
   showCanvasSettingsMenu?: boolean;
   mode?: HeaderMode;
+  isEditing?: boolean;
   hasUnpublishedDraftChanges?: boolean;
   onDiscardVersion?: () => void;
   discardVersionDisabled?: boolean;
@@ -166,7 +177,7 @@ function PageHeader({
         </div>
       </div>
       <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-        {mode === "version-live" && onEnterEditMode ? (
+        {mode !== "runs" && !isEditing && onEnterEditMode ? (
           <LiveModeTopHeaderActions
             onEnterEditMode={onEnterEditMode}
             enterEditModeDisabled={enterEditModeDisabled}
@@ -176,7 +187,7 @@ function PageHeader({
             unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
           />
         ) : null}
-        {mode === "version-edit" ? (
+        {isEditing ? (
           <EditModeTopHeaderActions
             hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
             onDiscardVersion={onDiscardVersion}
@@ -220,11 +231,7 @@ function PageHeader({
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle =
     (!!props.onSelectDashboard || !!props.onSelectMemory) &&
-    (props.mode === "version-live" ||
-      props.mode === "version-edit" ||
-      props.mode === "runs" ||
-      props.mode === "dashboard" ||
-      props.mode === "memory");
+    (props.mode === "version-live" || props.mode === "runs" || props.mode === "dashboard" || props.mode === "memory");
   const canvasViewMode =
     props.mode === "runs"
       ? "runs"
@@ -233,7 +240,7 @@ function SecondaryHeader(props: HeaderProps) {
         : props.mode === "memory"
           ? "memory"
           : "version-live";
-  const editing = props.mode === "version-edit";
+  const editing = props.isEditing ?? props.mode === "version-edit";
 
   return (
     <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-4">
@@ -241,14 +248,13 @@ function SecondaryHeader(props: HeaderProps) {
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
         <div className="pointer-events-auto">
-          {showCanvasViewModeToggle && props.onExitEditMode ? (
+          {showCanvasViewModeToggle && props.onSelectCanvasView ? (
             <CanvasModeToggle
               mode={canvasViewMode}
-              onSelectLive={props.onExitEditMode}
+              onSelectLive={props.onSelectCanvasView}
               onSelectDashboard={props.onSelectDashboard}
               onSelectMemory={props.onSelectMemory}
               editing={editing}
-              hasDraft={!!props.hasUnpublishedDraftChanges}
             />
           ) : null}
         </div>
