@@ -72,8 +72,8 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "john", result["user"])
 	assert.Equal(t, "login", result["action"])
-	assert.Equal(t, "true", result["success"])
-	assert.Equal(t, "42", result["count"])
+	assert.Equal(t, true, result["success"])
+	assert.Equal(t, 42, result["count"])
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_RootFunction(t *testing.T) {
@@ -128,8 +128,8 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_RootFunction(t *testing.T) 
 	require.NoError(t, err)
 	assert.Equal(t, "john", result["user"])
 	assert.Equal(t, "login", result["action"])
-	assert.Equal(t, "true", result["success"])
-	assert.Equal(t, "42", result["count"])
+	assert.Equal(t, true, result["success"])
+	assert.Equal(t, float64(42), result["count"])
 }
 
 func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_ByName(t *testing.T) {
@@ -185,8 +185,8 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Root_ByName(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "john", result["user"])
 	assert.Equal(t, "login", result["action"])
-	assert.Equal(t, "true", result["success"])
-	assert.Equal(t, "42", result["count"])
+	assert.Equal(t, true, result["success"])
+	assert.Equal(t, 42, result["count"])
 }
 
 func Test_NodeConfigurationBuilder_NodeNameNotUnique_UsesClosestInChain(t *testing.T) {
@@ -448,7 +448,7 @@ func Test_NodeConfigurationBuilder_WorkflowLevelNode_Chain(t *testing.T) {
 	result, err := builder.Build(configuration)
 	require.NoError(t, err)
 	assert.Equal(t, "first", result["from_node1"])
-	assert.Equal(t, "2", result["from_node2"])
+	assert.Equal(t, 2, result["from_node2"])
 }
 
 func Test_NodeConfigurationBuilder_Chain_IncludesParallelUpstreamExecutions(t *testing.T) {
@@ -804,7 +804,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Root(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "alice", result["username"])
 	assert.Equal(t, "alice@example.com", result["email"])
-	assert.Equal(t, "30", result["age"])
+	assert.Equal(t, 30, result["age"])
 }
 
 func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
@@ -934,7 +934,7 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Chain(t *testing.T) {
 
 	result, err := builder.Build(configuration)
 	require.NoError(t, err)
-	assert.Equal(t, "true", result["processed"])
+	assert.Equal(t, true, result["processed"])
 	assert.Equal(t, "from-first-node", result["value"])
 }
 
@@ -1015,8 +1015,8 @@ func Test_NodeConfigurationBuilder_BlueprintLevelNode_Config(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "secret-key-123", result["key"])
 	assert.Equal(t, "https://api.example.com", result["url"])
-	assert.Equal(t, "30", result["timeout"])
-	assert.Equal(t, "3", result["retries"])
+	assert.Equal(t, float64(30), result["timeout"])
+	assert.Equal(t, float64(3), result["retries"])
 	assert.Equal(t, "nested-data", result["nested"])
 	assert.Equal(t, "API: https://api.example.com, Key: secret-key-123", result["combined"])
 }
@@ -1153,8 +1153,8 @@ func Test_NodeConfigurationBuilder_InputVariable(t *testing.T) {
 	result, err := builder.Build(configuration)
 	require.NoError(t, err)
 	assert.Equal(t, "Alice", result["name"])
-	assert.Equal(t, "25", result["age"])
-	assert.Equal(t, "true", result["active"])
+	assert.Equal(t, 25, result["age"])
+	assert.Equal(t, true, result["active"])
 	assert.Equal(t, "admin", result["role"])
 	assert.Equal(t, "User Alice is 25 years old", result["combined"])
 }
