@@ -62,16 +62,57 @@ func (p *LocalGitProvider) EnsureRepository(ctx context.Context, spec Repository
 		return nil, err
 	}
 
+	created := false
 	if _, err := os.Stat(repoPath); errors.Is(err, os.ErrNotExist) {
 		if _, err := runGit(ctx, "", "init", "--bare", "--initial-branch", branch, repoPath); err != nil {
 			return nil, err
 		}
+		created = true
 	} else if err != nil {
 		return nil, err
 	}
 
+	if created {
+		result, err := p.initializeRepository(ctx, repoID, branch)
+		if err != nil {
+			return nil, err
+		}
+
+		return &Repository{RepoID: repoID, DefaultBranch: branch, HeadSHA: result.NewSHA}, nil
+	}
+
 	head, _ := p.currentHead(ctx, repoID, branch)
 	return &Repository{RepoID: repoID, DefaultBranch: branch, HeadSHA: head}, nil
+}
+
+func (p *LocalGitProvider) initializeRepository(ctx context.Context, repoID, branch string) (*CommitResult, error) {
+	return p.CommitFiles(ctx, RepositoryRef{RepoID: repoID, DefaultBranch: branch}, CommitFilesOptions{
+		Message: initialRepositoryCommitMessage,
+		Author: CommitAuthor{
+			Name:  initialRepositoryAuthorName,
+			Email: initialRepositoryAuthorEmail,
+		},
+		Operations: []FileOperation{
+			{
+				Path:      initialRepositoryFilePath,
+				Content:   strings.NewReader(""),
+				SizeBytes: 0,
+			},
+		},
+	})
+}
+
+func (p *LocalGitProvider) DeleteRepository(ctx context.Context, ref RepositoryRef) error {
+	repoID := strings.TrimSpace(ref.RepoID)
+	repoPath, err := p.repoPath(repoID)
+	if err != nil {
+		return err
+	}
+
+	unlock := p.lock(repoID)
+	defer unlock()
+
+	return os.RemoveAll(repoPath)
 }
 
 func (p *LocalGitProvider) ListFiles(ctx context.Context, ref RepositoryRef, options ListFilesOptions) (*ListFilesResult, error) {

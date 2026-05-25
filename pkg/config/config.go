@@ -68,10 +68,7 @@ type CanvasStorageConfig struct {
 	MaxFileBytes              int64
 	MaxCommitBytes            int64
 	CodeStorageName           string
-	CodeStoragePrivateKey     string
 	CodeStoragePrivateKeyPath string
-	CodeStorageAPIBaseURL     string
-	CodeStorageStorageBaseURL string
 }
 
 func LoadCanvasStorageConfig() CanvasStorageConfig {
@@ -97,10 +94,7 @@ func LoadCanvasStorageConfig() CanvasStorageConfig {
 		MaxFileBytes:              loadInt64Env("CANVAS_STORAGE_MAX_FILE_BYTES", defaultCanvasStorageMaxFileBytes),
 		MaxCommitBytes:            loadInt64Env("CANVAS_STORAGE_MAX_COMMIT_BYTES", defaultCanvasStorageMaxCommitBytes),
 		CodeStorageName:           strings.TrimSpace(os.Getenv("CODE_STORAGE_NAME")),
-		CodeStoragePrivateKey:     strings.TrimSpace(os.Getenv("CODE_STORAGE_PRIVATE_KEY")),
 		CodeStoragePrivateKeyPath: strings.TrimSpace(os.Getenv("CODE_STORAGE_PRIVATE_KEY_PATH")),
-		CodeStorageAPIBaseURL:     strings.TrimSpace(os.Getenv("CODE_STORAGE_API_BASE_URL")),
-		CodeStorageStorageBaseURL: strings.TrimSpace(os.Getenv("CODE_STORAGE_STORAGE_BASE_URL")),
 	}
 }
 

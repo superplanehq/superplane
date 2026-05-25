@@ -50,6 +50,7 @@ import type {
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
   CanvasesCanvasRepositoryFileOperation,
+  CanvasesListCanvasRepositoryFilesResponse,
   CanvasChangeManagement,
   SuperplaneComponentsNode,
   ComponentsPosition,
@@ -1718,11 +1719,39 @@ export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
       );
       return response.data;
     },
-    onSuccess: (data) => {
+    onSuccess: (data, input) => {
+      const repository = data?.repository;
+      queryClient.setQueryData<CanvasesListCanvasRepositoryFilesResponse | undefined>(
+        canvasKeys.repositoryFiles(canvasId),
+        (current) => {
+          const paths = new Set(
+            (current?.files || []).map((file) => file.path).filter((path): path is string => !!path),
+          );
+
+          for (const operation of input.operations) {
+            const path = operation.path;
+            if (!path) continue;
+
+            if (operation.delete) {
+              paths.delete(path);
+              continue;
+            }
+
+            paths.add(path);
+          }
+
+          return {
+            ...current,
+            repository: repository ?? current?.repository,
+            files: Array.from(paths)
+              .sort((left, right) => left.localeCompare(right))
+              .map((path) => ({ path })),
+          };
+        },
+      );
       queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
       queryClient.invalidateQueries({ queryKey: [...canvasKeys.repository(canvasId), "file"] });
-      const repository = data?.repository;
       if (repository) {
         queryClient.setQueryData(canvasKeys.repository(canvasId), repository);
       }

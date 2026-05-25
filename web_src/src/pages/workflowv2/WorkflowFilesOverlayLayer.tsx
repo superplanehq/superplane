@@ -31,6 +31,11 @@ const repositoryFileTreeStyle = {
   "--trees-focus-ring-color-override": "#0f172a",
   "--trees-selected-bg-override": "#e2e8f0",
   "--trees-selected-fg-override": "#020617",
+  "--trees-padding-inline-override": "0px",
+  "--trees-item-margin-x-override": "0px",
+  "--trees-border-radius-override": "0px",
+  "--trees-scrollbar-gutter-override": "0px",
+  "--trees-action-lane-width-override": "0px",
 } as CSSProperties;
 
 const fileEditorOptions = {
@@ -338,7 +343,19 @@ function CanvasFilesView({
       showSuccessToast("Files committed.");
       setPendingChangesByPath({});
       setCommitMessage("");
-      setLoadedContentByPath({});
+      setLoadedContentByPath((current) => {
+        const next = { ...current };
+        for (const change of pendingChanges) {
+          if (change.type === "deleted") {
+            delete next[change.path];
+            continue;
+          }
+
+          next[change.path] = change.content;
+        }
+
+        return next;
+      });
       setIsCommitPopoverOpen(false);
       if (response?.branch) {
         setCommitBranch(response.branch);
@@ -352,10 +369,10 @@ function CanvasFilesView({
     <div className="absolute inset-x-0 bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50">
       <aside className="flex min-h-0 flex-col border-r border-slate-950/15 bg-white">
         {canWrite ? (
-          <div className="flex h-9 shrink-0 items-center gap-1 border-b border-slate-950/10 px-2">
+          <div className="flex h-7 shrink-0 items-center gap-1 border-b border-slate-950/10 px-2">
             <div className="ml-auto flex shrink-0 items-center">
-              <EditorIconButton label="New file" onClick={startNewFile}>
-                <FilePlus2 className="h-4 w-4" />
+              <EditorIconButton label="New file" onClick={startNewFile} className="size-6 hover:bg-transparent">
+                <FilePlus2 className="h-3.5 w-3.5" />
               </EditorIconButton>
             </div>
           </div>
@@ -523,11 +540,13 @@ function EditorIconButton({
   label,
   disabled,
   onClick,
+  className,
   children,
 }: {
   label: string;
   disabled?: boolean;
   onClick: () => void;
+  className?: string;
   children: ReactNode;
 }) {
   return (
@@ -540,7 +559,7 @@ function EditorIconButton({
           aria-label={label}
           disabled={disabled}
           onClick={onClick}
-          className="text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+          className={`text-slate-600 hover:bg-slate-100 hover:text-slate-950 ${className ?? ""}`}
         >
           {children}
         </Button>
@@ -769,7 +788,7 @@ function NewFileTreeInput({
   }, []);
 
   return (
-    <div className="flex h-7 shrink-0 items-center px-2 font-mono text-xs text-slate-700">
+    <div className="flex h-7 shrink-0 items-center px-2 text-xs text-slate-700">
       <Input
         ref={inputRef}
         value={path}
@@ -787,7 +806,7 @@ function NewFileTreeInput({
             onCancel();
           }
         }}
-        className="h-6 rounded border-slate-300 px-2 font-mono text-xs shadow-none focus-visible:ring-1"
+        className="h-6 rounded border-slate-300 px-2 text-xs shadow-none focus-visible:ring-1"
       />
     </div>
   );
@@ -829,7 +848,13 @@ function RepositoryFileTree({
     icons: { set: "minimal", colored: false },
     initialExpansion: "open",
     initialSelectedPaths: selectedPath ? [selectedPath] : [],
-    unsafeCSS: ":host { color-scheme: light; }",
+    unsafeCSS: `
+      :host { color-scheme: light; }
+      [data-file-tree-virtualized-scroll='true'] {
+        scrollbar-gutter: auto;
+        padding-inline-end: 0;
+      }
+    `,
     onSelectionChange: (selectedPaths) => {
       const path = selectedPaths.at(-1);
       if (!path || !filePathSetRef.current.has(path)) return;
@@ -858,7 +883,7 @@ function RepositoryFileTree({
   return (
     <TreesFileTree
       model={model}
-      className="h-full w-full bg-white font-mono text-xs text-slate-700"
+      className="h-full w-full bg-white text-xs text-slate-700"
       renderContextMenu={
         canWrite
           ? (item, context) => (
@@ -885,13 +910,13 @@ function FileTreeContextMenu({
   return (
     <div
       data-file-tree-context-menu-root="true"
-      className="min-w-36 rounded border border-slate-950/15 bg-white p-1 text-sm text-slate-700 shadow-lg"
+      className="min-w-36 rounded border border-slate-950/15 bg-white p-1 text-xs text-slate-700 shadow-lg"
       role="menu"
     >
       <button
         type="button"
         role="menuitem"
-        className="flex h-8 w-full items-center rounded px-2 text-left hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+        className="flex h-7 w-full items-center rounded px-2 text-left hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
         disabled={!canDelete}
         onClick={() => {
           if (!canDelete) return;

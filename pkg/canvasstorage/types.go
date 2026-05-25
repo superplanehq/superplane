@@ -27,6 +27,7 @@ var (
 
 type Provider interface {
 	EnsureRepository(ctx context.Context, spec RepositorySpec) (*Repository, error)
+	DeleteRepository(ctx context.Context, ref RepositoryRef) error
 	ListFiles(ctx context.Context, ref RepositoryRef, options ListFilesOptions) (*ListFilesResult, error)
 	GetFile(ctx context.Context, ref RepositoryRef, options GetFileOptions) (io.ReadCloser, error)
 	CommitFiles(ctx context.Context, ref RepositoryRef, options CommitFilesOptions) (*CommitResult, error)

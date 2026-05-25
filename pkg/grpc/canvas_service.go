@@ -281,7 +281,7 @@ func (s *CanvasService) ResolveCanvasChangeRequest(ctx context.Context, req *pb.
 
 func (s *CanvasService) DeleteCanvas(ctx context.Context, req *pb.DeleteCanvasRequest) (*pb.DeleteCanvasResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.DeleteCanvas(ctx, s.registry, uuid.MustParse(organizationID), req.Id)
+	return canvases.DeleteCanvas(ctx, s.registry, uuid.MustParse(organizationID), req.Id, s.canvasStorage)
 }
 
 func (s *CanvasService) ListNodeQueueItems(ctx context.Context, req *pb.ListNodeQueueItemsRequest) (*pb.ListNodeQueueItemsResponse, error) {

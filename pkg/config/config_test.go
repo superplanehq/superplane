@@ -35,10 +35,7 @@ func TestLoadCanvasStorageConfigEnv(t *testing.T) {
 	t.Setenv("CANVAS_STORAGE_MAX_FILE_BYTES", "123")
 	t.Setenv("CANVAS_STORAGE_MAX_COMMIT_BYTES", "456")
 	t.Setenv("CODE_STORAGE_NAME", "acme")
-	t.Setenv("CODE_STORAGE_PRIVATE_KEY", "secret")
 	t.Setenv("CODE_STORAGE_PRIVATE_KEY_PATH", "/keys/code-storage.pem")
-	t.Setenv("CODE_STORAGE_API_BASE_URL", "https://api.example")
-	t.Setenv("CODE_STORAGE_STORAGE_BASE_URL", "git.example")
 
 	cfg := LoadCanvasStorageConfig()
 
@@ -48,10 +45,7 @@ func TestLoadCanvasStorageConfigEnv(t *testing.T) {
 		cfg.MaxFileBytes != 123 ||
 		cfg.MaxCommitBytes != 456 ||
 		cfg.CodeStorageName != "acme" ||
-		cfg.CodeStoragePrivateKey != "secret" ||
-		cfg.CodeStoragePrivateKeyPath != "/keys/code-storage.pem" ||
-		cfg.CodeStorageAPIBaseURL != "https://api.example" ||
-		cfg.CodeStorageStorageBaseURL != "git.example" {
+		cfg.CodeStoragePrivateKeyPath != "/keys/code-storage.pem" {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 }

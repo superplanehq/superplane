@@ -13,6 +13,13 @@ import (
 	codestorage "github.com/pierrecomputer/sdk/packages/code-storage-go"
 )
 
+const (
+	initialRepositoryFilePath      = "README.md"
+	initialRepositoryCommitMessage = "Initialize repository"
+	initialRepositoryAuthorName    = "SuperPlane"
+	initialRepositoryAuthorEmail   = "bot@superplane.local"
+)
+
 type CodeStorageProvider struct {
 	client        *codestorage.Client
 	defaultBranch string
@@ -20,21 +27,20 @@ type CodeStorageProvider struct {
 }
 
 func NewCodeStorageProvider(cfg config.CanvasStorageConfig) (*CodeStorageProvider, error) {
-	key := cfg.CodeStoragePrivateKey
-	if key == "" && cfg.CodeStoragePrivateKeyPath != "" {
-		bytes, err := os.ReadFile(cfg.CodeStoragePrivateKeyPath)
-		if err != nil {
-			return nil, fmt.Errorf("read Code Storage private key: %w", err)
-		}
-		key = string(bytes)
+	if cfg.CodeStoragePrivateKeyPath == "" {
+		return nil, fmt.Errorf("CODE_STORAGE_PRIVATE_KEY_PATH is required")
+	}
+
+	key, err := os.ReadFile(cfg.CodeStoragePrivateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("read Code Storage private key: %w", err)
 	}
 
 	client, err := codestorage.NewClient(codestorage.Options{
-		Name:           cfg.CodeStorageName,
-		Key:            key,
-		APIBaseURL:     cfg.CodeStorageAPIBaseURL,
-		StorageBaseURL: cfg.CodeStorageStorageBaseURL,
+		Name: cfg.CodeStorageName,
+		Key:  string(key),
 	})
+
 	if err != nil {
 		return nil, err
 	}
@@ -64,9 +70,9 @@ func (p *CodeStorageProvider) EnsureRepository(ctx context.Context, spec Reposit
 		ID:            repoID,
 		DefaultBranch: branch,
 	})
+	created := err == nil
 	if err != nil {
-		var apiErr *codestorage.APIError
-		if !errors.As(err, &apiErr) || apiErr.Status != 409 {
+		if !isCodeStorageRepositoryAlreadyExists(err) {
 			return nil, err
 		}
 
@@ -79,10 +85,74 @@ func (p *CodeStorageProvider) EnsureRepository(ctx context.Context, spec Reposit
 		}
 	}
 
+	repoBranch := defaultBranch(repo.DefaultBranch)
+	headSHA := ""
+	if created {
+		result, err := p.initializeRepository(ctx, repo, repoBranch)
+		if err != nil {
+			return nil, err
+		}
+
+		headSHA = result.NewSHA
+		if headSHA == "" {
+			headSHA = result.CommitSHA
+		}
+	}
+
 	return &Repository{
 		RepoID:        repo.ID,
-		DefaultBranch: defaultBranch(repo.DefaultBranch),
+		DefaultBranch: repoBranch,
+		HeadSHA:       headSHA,
 	}, nil
+}
+
+func (p *CodeStorageProvider) initializeRepository(ctx context.Context, repo *codestorage.Repo, branch string) (*CommitResult, error) {
+	builder, err := repo.CreateCommit(codestorage.CommitOptions{
+		TargetBranch:  defaultBranch(branch),
+		CommitMessage: initialRepositoryCommitMessage,
+		Author: codestorage.CommitSignature{
+			Name:  initialRepositoryAuthorName,
+			Email: initialRepositoryAuthorEmail,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	builder.AddFile(initialRepositoryFilePath, strings.NewReader(""), nil)
+	if err := builder.Err(); err != nil {
+		return nil, err
+	}
+
+	result, err := builder.Send(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CommitResult{
+		CommitSHA: result.CommitSHA,
+		OldSHA:    result.RefUpdate.OldSHA,
+		NewSHA:    result.RefUpdate.NewSHA,
+		Branch:    result.RefUpdate.Branch,
+	}, nil
+}
+
+func (p *CodeStorageProvider) DeleteRepository(ctx context.Context, ref RepositoryRef) error {
+	repoID, err := ValidateRepositoryID(ref.RepoID)
+	if err != nil {
+		return err
+	}
+
+	_, err = p.client.DeleteRepo(ctx, codestorage.DeleteRepoOptions{ID: repoID})
+	if err != nil {
+		if isCodeStorageRepositoryAlreadyDeleted(err) {
+			return nil
+		}
+
+		return err
+	}
+
+	return nil
 }
 
 func (p *CodeStorageProvider) ListFiles(ctx context.Context, ref RepositoryRef, options ListFilesOptions) (*ListFilesResult, error) {
@@ -200,4 +270,19 @@ func (p *CodeStorageProvider) repo(ref RepositoryRef) (*codestorage.Repo, error)
 		ID:            strings.TrimSpace(ref.RepoID),
 		DefaultBranch: defaultBranch(ref.DefaultBranch),
 	})
+}
+
+func isCodeStorageRepositoryAlreadyExists(err error) bool {
+	var apiErr *codestorage.APIError
+	if errors.As(err, &apiErr) && apiErr.Status == 409 {
+		return true
+	}
+
+	return strings.Contains(strings.ToLower(strings.TrimSpace(err.Error())), "repository already exists")
+}
+
+func isCodeStorageRepositoryAlreadyDeleted(err error) bool {
+	message := strings.ToLower(strings.TrimSpace(err.Error()))
+	return strings.Contains(message, "repository not found") ||
+		strings.Contains(message, "repository already deleted")
 }
