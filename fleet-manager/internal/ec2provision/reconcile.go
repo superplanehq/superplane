@@ -17,7 +17,10 @@ type instanceSnap struct {
 	launchUTC time.Time
 }
 
-// RunReconcileLoop periodically matches managed instances to Config.HotInstanceCount.
+// RunReconcileLoop periodically reconciles managed instances toward a target.
+// Target is dynamic when Config.Headroom > 0 (want = claimed + headroom, pulled from
+// task-broker) and falls back to Config.HotInstanceCount when headroom is unset or
+// the broker call fails.
 func RunReconcileLoop(ctx context.Context, log *slog.Logger, interval time.Duration, l *Launcher) {
 	if interval <= 0 {
 		return
@@ -27,10 +30,11 @@ func RunReconcileLoop(ctx context.Context, log *slog.Logger, interval time.Durat
 
 	tick := func() {
 		runCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-		err := l.Reconcile(runCtx, l.Config.HotInstanceCount)
+		want := l.desiredWant(runCtx)
+		err := l.Reconcile(runCtx, want)
 		cancel()
 		if err != nil && log != nil {
-			log.Warn("ec2 reconcile", slog.Any("err", err), slog.Int("want", l.Config.HotInstanceCount))
+			log.Warn("ec2 reconcile", slog.Any("err", err), slog.Int("want", want))
 		}
 	}
 	tick()
@@ -43,6 +47,23 @@ func RunReconcileLoop(ctx context.Context, log *slog.Logger, interval time.Durat
 			tick()
 		}
 	}
+}
+
+func (l *Launcher) desiredWant(ctx context.Context) int {
+	if l.Config.Headroom <= 0 || l.BrokerClient == nil {
+		return l.Config.HotInstanceCount
+	}
+	counts, err := l.BrokerClient.FleetTaskCounts(ctx, l.Config.RunnerFleetID)
+	if err != nil {
+		if l.Log != nil {
+			l.Log.Warn("ec2 reconcile: broker task-counts failed, falling back to hot instance count",
+				slog.Any("err", err),
+				slog.String("fleet_id", l.Config.RunnerFleetID),
+				slog.Int("fallback_want", l.Config.HotInstanceCount))
+		}
+		return l.Config.HotInstanceCount
+	}
+	return counts.Claimed + l.Config.Headroom
 }
 
 // Reconcile sweeps unhealthy runners, then scales pending+running tagged instances toward want.

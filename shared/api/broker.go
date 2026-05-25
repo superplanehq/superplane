@@ -27,3 +27,8 @@ type FleetResponse struct {
 	Labels    []string `json:"labels,omitempty"`
 	CreatedAt int64    `json:"created_at_unix,omitempty"`
 }
+
+type FleetTaskCountsResponse struct {
+	Queued  int `json:"queued"`
+	Claimed int `json:"claimed"`
+}

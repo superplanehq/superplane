@@ -18,9 +18,10 @@ Caller → task-broker (POST /v1/tasks, cancel, GET status, webhook)
 Runner → task-broker (WS stream or claim/complete; scoped by fleet_id)
 fleet-manager → EC2 (reconcile: health probe + RunInstances/TerminateInstances)
 fleet-manager → runner private IP:9090/healthz
+fleet-manager → task-broker (GET /v1/fleets/{id}/task-counts, only when EC2_PROVISION_RUNNER_HEADROOM is set)
 ```
 
-There is **no** task-broker → fleet-manager path, no runner → fleet-manager shutdown callback, and no `fleet_task_id` correlation field.
+There is **no** task-broker → fleet-manager path, no runner → fleet-manager shutdown callback, and no `fleet_task_id` correlation field. The optional `fleet-manager → task-broker` direction is pull-only.
 
 ## task-broker
 
@@ -32,7 +33,7 @@ There is **no** task-broker → fleet-manager path, no runner → fleet-manager 
 
 ## fleet-manager (EC2)
 
-- **Reconcile loop** — Health sweep (`GET /healthz` after boot grace) then scale to `EC2_PROVISION_HOT_INSTANCE_COUNT`.
+- **Reconcile loop** — Health sweep (`GET /healthz` after boot grace) then scale toward a target. Target is **`EC2_PROVISION_HOT_INSTANCE_COUNT`** by default, or **`claimed_tasks + EC2_PROVISION_RUNNER_HEADROOM`** when headroom is set (pulled from task-broker per fleet). On broker failure, the tick falls back to the static count.
 - **User-data** — Installs runner from S3, sets `TASK_BROKER_URL`, `RUNNER_FLEET_ID`, `RUNNER_HEALTH_ADDR`, optional `RUNNER_TERMINATE_AFTER_EACH_TASK`.
 - **Admin** — Optional `/v1/admin/*` diagnostics (managed instances, console output).
 

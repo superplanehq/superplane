@@ -29,6 +29,7 @@ type Store interface {
 	CreateTask(ctx context.Context, t *models.Task) error
 	GetTask(ctx context.Context, id string) (*models.Task, error)
 	ListActiveTasks(ctx context.Context) ([]*models.Task, error)
+	CountTasksByFleet(ctx context.Context, fleetID string) (queued, claimed int, err error)
 	ClaimTask(ctx context.Context, runnerID, fleetID string, lease time.Duration) (*models.Task, error)
 	RequestCancelTask(ctx context.Context, id string) (*models.Task, CancelOutcome, error)
 	CompleteTask(ctx context.Context, id, runnerID string, exitCode int, resultJSON, errMsg string, canceled bool) (*models.Task, error)

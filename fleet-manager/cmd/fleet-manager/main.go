@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/superplane/runner/fleet-manager/internal/brokerclient"
 	"github.com/superplane/runner/fleet-manager/internal/ec2provision"
 	"github.com/superplane/runner/fleet-manager/internal/fleetmanager"
 )
@@ -33,6 +34,9 @@ func main() {
 			os.Exit(1)
 		}
 		srv.EC2Launcher = launcher
+		if ecCfg.Headroom > 0 {
+			launcher.BrokerClient = brokerclient.New(ecCfg.TaskBrokerURL, ecCfg.RunnersAuthToken)
+		}
 		reconcileEvery := 60 * time.Second
 		if v := getenv("EC2_PROVISION_RECONCILE_INTERVAL_SEC", ""); v != "" {
 			if n, err := strconv.Atoi(v); err == nil && n >= 15 {
@@ -42,6 +46,8 @@ func main() {
 		go ec2provision.RunReconcileLoop(ctx, log, reconcileEvery, launcher)
 		log.Info("ec2 hot runner pool enabled",
 			slog.Int("hot_instance_count", ecCfg.HotInstanceCount),
+			slog.Int("runner_headroom", ecCfg.Headroom),
+			slog.Bool("dynamic_scaling", ecCfg.Headroom > 0),
 			slog.String("reconcile_interval", reconcileEvery.String()))
 	case errors.Is(ecErr, ec2provision.ErrDisabled):
 		log.Info("ec2 provisioning disabled — fleet-manager serves diagnostics only when EC2_PROVISION_* is configured")

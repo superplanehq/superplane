@@ -119,6 +119,8 @@ Optional: **`EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_GROUP`**, **`EC2_PROVISION_RUNN
 
 Fleet-manager **reconciles in the background** (default **60** s, **`EC2_PROVISION_RECONCILE_INTERVAL_SEC`**, minimum **15**). Optional: **`EC2_PROVISION_INSTANCE_TYPE`**, **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**, **`EC2_PROVISION_KEY_NAME`**, **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`**.
 
+**Dynamic scaling (optional)** — set **`EC2_PROVISION_RUNNER_HEADROOM=N`** to make fleet-manager target **`want = claimed_tasks + N`** for its **`EC2_PROVISION_RUNNER_FLEET_ID`** each reconcile tick (claimed counts pulled from task-broker via **`GET /v1/fleets/{id}/task-counts`** using **`EC2_PROVISION_TASK_BROKER_URL`** + **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**). Scale-down is automatic — when claimed drops, want drops, and the existing oldest-first terminate logic removes excess VMs. When the broker call fails, the tick falls back to **`EC2_PROVISION_HOT_INSTANCE_COUNT`**. Leave **`EC2_PROVISION_RUNNER_HEADROOM`** unset for the previous static behavior. task-broker never initiates HTTP toward fleet-manager; communication is fleet-manager pull only.
+
 Provisioner **user-data** installs **`/usr/local/bin/runner`** and starts **`superplane-runner.service`** on **Ubuntu** (**`docker.io`** remains for **`execution_mode: docker`**).
 
 #### Runner binary via S3 (typical setup)
