@@ -5475,7 +5475,7 @@ export function WorkflowPageV2() {
       await handleToggleEditMode();
     }
     setIsDashboardAddPanelOpen(true);
-  }, [hasEditableVersion, handleToggleEditMode]);
+  }, [hasEditableVersion, handleToggleEditMode, setIsDashboardAddPanelOpen]);
   const handleDashboardAddPanelDialogOpenChange = useCallback(
     (open: boolean) => {
       if (open) {
@@ -5484,7 +5484,7 @@ export function WorkflowPageV2() {
       }
       setIsDashboardAddPanelOpen(false);
     },
-    [handleDashboardAddPanelRequest],
+    [handleDashboardAddPanelRequest, setIsDashboardAddPanelOpen],
   );
   const { onDashboardAddPanel, onDashboardOpenYaml, dashboardYamlReadOnly } = getDashboardHeaderActions({
     isEditing: hasEditableVersion,
