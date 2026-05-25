@@ -15,7 +15,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs"
 )
 
-const pollQuiet = 2 * time.Second
+const (
+	// pageSize is the max events per GetLogEvents call (CloudWatch allows up to 10_000).
+	pageSize int32 = 10_000
+	// pollQuiet waits when tailing and no new events have arrived.
+	pollQuiet = 750 * time.Millisecond
+	// pollActive waits after a partial page before polling again.
+	pollActive = 300 * time.Millisecond
+)
 
 type ndjsonWriter struct {
 	w io.Writer
@@ -27,13 +34,14 @@ func (n *ndjsonWriter) writeRecord(rec map[string]any) error {
 	if err != nil {
 		return err
 	}
-	if _, err := n.w.Write(append(b, '\n')); err != nil {
-		return err
-	}
+	_, err = n.w.Write(append(b, '\n'))
+	return err
+}
+
+func (n *ndjsonWriter) flush() {
 	if n.f != nil {
 		n.f.Flush()
 	}
-	return nil
 }
 
 // StreamCloudWatchLogToNDJSON tails a CloudWatch Logs stream and writes newline-delimited JSON records:
@@ -78,13 +86,14 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 			LogStreamName: awsString(stream),
 			NextToken:     nextForward,
 			StartFromHead: awsBool(nextForward == nil),
-			Limit:         awsInt32(256),
+			Limit:         awsInt32(pageSize),
 		})
 		if err != nil {
 			_ = nw.writeRecord(map[string]any{
 				"type":    "error",
 				"message": err.Error(),
 			})
+			nw.flush()
 			return err
 		}
 
@@ -116,11 +125,19 @@ func StreamCloudWatchLogToNDJSON(ctx context.Context, w io.Writer, flusher http.
 				return err
 			}
 		}
+		if len(out.Events) > 0 {
+			nw.flush()
+		}
+
+		// Full page means more backlog may remain; poll immediately.
+		if len(out.Events) >= int(pageSize) {
+			continue
+		}
 
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(400 * time.Millisecond):
+		case <-time.After(pollActive):
 		}
 	}
 }
