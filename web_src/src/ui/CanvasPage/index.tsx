@@ -1316,7 +1316,17 @@ function CanvasPage(props: CanvasPageProps) {
           versionsContent={props.toolSidebarVersionsContent}
         />
 
-        {props.headerMode === "runs" || props.headerMode === "memory" || props.isEditing ? null : (
+        {props.headerMode === "runs" || props.headerMode === "memory" ? null : props.isEditing ? (
+          props.headerMode === "dashboard" ? null : (
+            <RightSideControls
+              mode="edit"
+              addNoteOnly
+              onSidebarOpen={handleBuildingBlocksShortcutOpen}
+              onAddNote={handleAddNote}
+              onYamlOpen={props.onYamlOpen}
+            />
+          )
+        ) : (
           <RightSideControls
             mode={readOnly ? "live" : "edit"}
             onSidebarOpen={handleBuildingBlocksShortcutOpen}

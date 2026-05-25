@@ -310,7 +310,7 @@ describe("CanvasPage connection drop", () => {
     );
 
     await act(async () => {
-      fireEvent.click(screen.getByTestId("open-sidebar-button"));
+      fireEvent.click(screen.getByTestId("canvas-add-component-button"));
     });
 
     expect(onPlaceholderAdd).toHaveBeenCalledTimes(1);
