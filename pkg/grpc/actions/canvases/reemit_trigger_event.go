@@ -11,7 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
-	"gorm.io/datatypes"
 )
 
 func ReemitTriggerEvent(
@@ -53,7 +52,7 @@ func ReemitTriggerEvent(
 		WorkflowID: canvas.ID,
 		NodeID:     nodeID,
 		Channel:    sourceEvent.Channel,
-		Data:       datatypes.NewJSONType[any](sourceEvent.Data.Data()),
+		Data:       models.NewJSONValue(sourceEvent.Data.Data()),
 		State:      models.CanvasEventStatePending,
 		CreatedAt:  &now,
 		CustomName: sourceEvent.CustomName,

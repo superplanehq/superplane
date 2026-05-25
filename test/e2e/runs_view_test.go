@@ -15,7 +15,6 @@ import (
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -125,7 +124,7 @@ func (s *runsViewSteps) givenFinishedRuns(count int) {
 			NodeID:     triggerID,
 			Channel:    "default",
 			CustomName: &customName,
-			Data:       datatypes.NewJSONType[any](map[string]any{}),
+			Data:       models.NewJSONValue(map[string]any{}),
 			RunID:      run.ID,
 			State:      models.CanvasEventStateRouted,
 			CreatedAt:  &createdAt,
