@@ -2953,12 +2953,12 @@ function CanvasContent({
             variant="ghost"
             size="icon-sm"
             onClick={handleOpenCommandPalette}
-            aria-label="Search commands and components"
+            aria-label="Search components (Ctrl/Cmd + K)"
           >
             <Search className="h-3 w-3" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Search commands and components</TooltipContent>
+        <TooltipContent>Search components (Ctrl/Cmd + K)</TooltipContent>
       </Tooltip>
     ),
     [handleOpenCommandPalette],
