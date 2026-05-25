@@ -5,6 +5,8 @@ import { memo, type ReactNode } from "react";
 
 export type RightSideControlsProps = {
   mode: "live" | "edit";
+  /** When true, only the floating Add note control is shown (component/YAML live in the header while editing). */
+  addNoteOnly?: boolean;
 
   onSidebarOpen: () => void;
   onAddNote: () => void | Promise<void>;
@@ -20,7 +22,11 @@ export const RightSideControls = memo(function RightSideControls(props: RightSid
   );
 });
 
-function EditCanvasButtons({ onSidebarOpen, onAddNote, onYamlOpen }: RightSideControlsProps) {
+function EditCanvasButtons({ addNoteOnly, onSidebarOpen, onAddNote, onYamlOpen }: RightSideControlsProps) {
+  if (addNoteOnly) {
+    return <ControlButton tooltip="Add note" onClick={onAddNote} testId="add-note-button" icon={<StickyNote />} />;
+  }
+
   return (
     <>
       <ControlButton tooltip="Add component" onClick={onSidebarOpen} testId="open-sidebar-button" icon={<Plus />} />
