@@ -87,7 +87,7 @@ func BuildProcessQueueContext(
 		RootEventID:   queueItem.RootEventID.String(),
 		EventID:       event.ID.String(),
 		SourceNodeID:  event.NodeID,
-		Input:         event.Data.Data(),
+		Input:         map[string]any{event.NodeID: normalizeExpressionValue(event.Data.Data())},
 		Expressions:   NewExpressionContext(builder),
 	}
 
