@@ -344,6 +344,25 @@ func (c *Client) ListDroplets() ([]Droplet, error) {
 	return response.Droplets, nil
 }
 
+// ListDropletsByName retrieves droplets that match a specific name
+func (c *Client) ListDropletsByName(name string) ([]Droplet, error) {
+	url := fmt.Sprintf("%s/droplets?name=%s&per_page=200", c.BaseURL, url.QueryEscape(name))
+	responseBody, err := c.execRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var response struct {
+		Droplets []Droplet `json:"droplets"`
+	}
+
+	if err := json.Unmarshal(responseBody, &response); err != nil {
+		return nil, fmt.Errorf("error parsing response: %v", err)
+	}
+
+	return response.Droplets, nil
+}
+
 // DeleteDroplet deletes a droplet by its ID
 func (c *Client) DeleteDroplet(dropletID int) error {
 	url := fmt.Sprintf("%s/droplets/%d", c.BaseURL, dropletID)

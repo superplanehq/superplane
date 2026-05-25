@@ -26,7 +26,7 @@ func (d *DeleteApp) Label() string {
 }
 
 func (d *DeleteApp) Description() string {
-	return "Delete a DigitalOcean App Platform application"
+	return "Delete a DigitalOcean App Platform application by ID or name"
 }
 
 func (d *DeleteApp) Documentation() string {
@@ -40,16 +40,18 @@ func (d *DeleteApp) Documentation() string {
 
 ## Configuration
 
-- **App**: The app to delete (required)
+- **App**: The app ID or exact name to delete (required, supports expressions)
 
 ## Output
 
 Returns confirmation of the deleted app including:
 - **appId**: The ID of the deleted app
+- **appName**: The name of the deleted app, when resolved by name
 
 ## Notes
 
 - This operation is idempotent - deleting an already deleted app will succeed
+- Names must match exactly; if multiple apps have the same name, use the app ID
 - All deployments and associated resources will be removed
 - This action cannot be undone`
 }
@@ -74,7 +76,7 @@ func (d *DeleteApp) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
 			Placeholder: "Select an app",
-			Description: "The app to delete",
+			Description: "The app ID or exact name to delete",
 			TypeOptions: &configuration.TypeOptions{
 				Resource: &configuration.ResourceTypeOptions{
 					Type: "app",
@@ -95,7 +97,7 @@ func (d *DeleteApp) Setup(ctx core.SetupContext) error {
 		return errors.New("app is required")
 	}
 
-	err = resolveAppMetadata(ctx, spec.App)
+	err = resolveAppDeleteMetadata(ctx, spec.App)
 	if err != nil {
 		return fmt.Errorf("error resolving app metadata: %v", err)
 	}
@@ -115,13 +117,18 @@ func (d *DeleteApp) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("error creating client: %v", err)
 	}
 
-	err = client.DeleteApp(spec.App)
+	target, err := resolveAppDeleteExecutionTarget(client, spec.App, ctx.NodeMetadata)
+	if err != nil {
+		return fmt.Errorf("failed to resolve app: %w", err)
+	}
+
+	err = client.DeleteApp(target.ID)
 	if err != nil {
 		if doErr, ok := err.(*DOAPIError); ok && doErr.StatusCode == http.StatusNotFound {
 			return ctx.ExecutionState.Emit(
 				core.DefaultOutputChannel.Name,
 				"digitalocean.app.deleted",
-				[]any{map[string]any{"appId": spec.App}},
+				[]any{appDeletedPayload(target)},
 			)
 		}
 		return fmt.Errorf("failed to delete app: %v", err)
@@ -130,7 +137,7 @@ func (d *DeleteApp) Execute(ctx core.ExecutionContext) error {
 	return ctx.ExecutionState.Emit(
 		core.DefaultOutputChannel.Name,
 		"digitalocean.app.deleted",
-		[]any{map[string]any{"appId": spec.App}},
+		[]any{appDeletedPayload(target)},
 	)
 }
 

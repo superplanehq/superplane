@@ -63,8 +63,8 @@ function metadataList(node: NodeInfo): MetadataItem[] {
 
   if (nodeMetadata?.dropletName) {
     metadata.push({ icon: "trash-2", label: nodeMetadata.dropletName });
-  } else if (configuration?.dropletId) {
-    metadata.push({ icon: "trash-2", label: `Droplet ID: ${configuration.dropletId}` });
+  } else if (configuration?.droplet) {
+    metadata.push({ icon: "trash-2", label: `Droplet: ${configuration.droplet}` });
   }
 
   return metadata;
