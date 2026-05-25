@@ -420,11 +420,25 @@ func (c *SecretsContext) GetKey(secretName, keyName string) ([]byte, error) {
 }
 
 type ExpressionContext struct {
-	Output any
-	Error  error
+	Output                any
+	Error                 error
+	WithVariablesOutputs  map[string]any
+	WithVariablesOutputFn func(expression string, variables map[string]any) (any, error)
 }
 
 func (c *ExpressionContext) Run(expression string) (any, error) {
+	return c.Output, c.Error
+}
+
+func (c *ExpressionContext) RunWithExtraVariables(expression string, variables map[string]any) (any, error) {
+	if c.WithVariablesOutputFn != nil {
+		return c.WithVariablesOutputFn(expression, variables)
+	}
+	if c.WithVariablesOutputs != nil {
+		if v, ok := c.WithVariablesOutputs[expression]; ok {
+			return v, nil
+		}
+	}
 	return c.Output, c.Error
 }
 
