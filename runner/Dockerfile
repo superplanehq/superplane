@@ -4,7 +4,7 @@
 # Docker execution tasks need the daemon socket mounted, e.g. -v /var/run/docker.sock:/var/run/docker.sock
 # Default user is root so the client can use a typical docker.sock permission setup.
 
-FROM golang:1.22-alpine AS build
+FROM golang:1.23-alpine AS build
 RUN apk add --no-cache git
 WORKDIR /workspace
 
