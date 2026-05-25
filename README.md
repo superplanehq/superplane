@@ -183,7 +183,7 @@ Installation admins can enable private network access during owner setup or late
 
 ## Contributing
 
-We welcome your bug reports, ideas for improvement, and focused PRs.
+We welcome your bug reports, and focused PRs.
 
 - Read the **[Contributing Guide](CONTRIBUTING.md)** to get started.
 - Issues: use GitHub issues for bugs and feature requests.
