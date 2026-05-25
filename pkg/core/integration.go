@@ -104,6 +104,16 @@ type WebhookHandler interface {
 	Merge(current, requested any) (merged any, changed bool, err error)
 }
 
+// ScopeKeyer is an optional interface that WebhookHandler implementations may
+// satisfy to return a canonical scope key for a given webhook configuration.
+// The scope key identifies the provider-side "container" that owns the webhook
+// (e.g. a GitHub repo, a Bitbucket workspace, or an app-level installation).
+// Handlers that do not implement ScopeKeyer fall back to legacy grouping and
+// are not processed by the reconciler.
+type ScopeKeyer interface {
+	ScopeKey(config any) (string, error)
+}
+
 type WebhookHandlerContext struct {
 	Logger      *logrus.Entry
 	HTTP        HTTPContext

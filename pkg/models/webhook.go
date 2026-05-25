@@ -11,10 +11,14 @@ import (
 )
 
 const (
-	WebhookStatePending      = "pending"
-	WebhookStateProvisioning = "provisioning"
-	WebhookStateReady        = "ready"
-	WebhookStateFailed       = "failed"
+	WebhookStatePending        = "pending"
+	WebhookStateProvisioning   = "provisioning"
+	WebhookStateReady          = "ready"
+	WebhookStateFailed         = "failed"
+	WebhookStateDeletingPending = "deleting_pending"
+
+	WebhookProvisioningModeLegacy = "legacy"
+	WebhookProvisioningModeOps    = "ops"
 )
 
 type Webhook struct {
@@ -29,6 +33,21 @@ type Webhook struct {
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 	DeletedAt         gorm.DeletedAt `gorm:"index"`
+
+	// Phase 0: registration identity and error tracking (all nullable; unused by legacy path).
+	ScopeKey           *string
+	ConfigHash         *string
+	ProviderWebhookID  *string
+	ProviderEtag       *string
+	SecretVersion      int `gorm:"default:1"`
+	LastProvisionedAt  *time.Time
+	LastErrorCode      *string
+	LastErrorMessage   *string
+	LastErrorAt        *time.Time
+
+	// Phase 2: which provisioning path owns this registration.
+	// 'legacy' = legacy webhooks.state polling; 'ops' = webhook_operations path.
+	ProvisioningMode string `gorm:"default:'legacy'"`
 }
 
 type WebhookResource struct {
@@ -76,6 +95,21 @@ func (w *Webhook) MarkFailed(tx *gorm.DB) error {
 
 func (w *Webhook) HasExceededRetries() bool {
 	return w.RetryCount >= w.MaxRetries
+}
+
+// FindWebhookByScope returns the active webhook for a given (app_installation_id, scope_key)
+// pair. Returns gorm.ErrRecordNotFound when no match exists, which callers interpret as
+// "no registration yet."
+func FindWebhookByScope(tx *gorm.DB, appInstallationID uuid.UUID, scopeKey string) (*Webhook, error) {
+	var webhook Webhook
+	err := tx.
+		Where("app_installation_id = ? AND scope_key = ?", appInstallationID, scopeKey).
+		First(&webhook).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &webhook, nil
 }
 
 func FindWebhook(id uuid.UUID) (*Webhook, error) {
@@ -149,7 +183,7 @@ func FindActiveWebhookNodesInTransaction(tx *gorm.DB, webhookID uuid.UUID) ([]Ca
 func ListPendingWebhooks() ([]Webhook, error) {
 	var webhooks []Webhook
 	err := database.Conn().
-		Where("state = ?", WebhookStatePending).
+		Where("state = ? AND provisioning_mode = ?", WebhookStatePending, WebhookProvisioningModeLegacy).
 		Find(&webhooks).
 		Error
 
@@ -160,18 +194,62 @@ func ListPendingWebhooks() ([]Webhook, error) {
 	return webhooks, nil
 }
 
+// ListOrphanedOpsWebhooks returns ops-mode registrations that have no active
+// WebhookSubscriptionBindings and are not already in a terminal / deleting state.
+// The reconciler uses this to detect and schedule deletion of abandoned registrations.
+func ListOrphanedOpsWebhooks() ([]Webhook, error) {
+	var webhooks []Webhook
+	err := database.Conn().
+		Where(`provisioning_mode = ?
+			AND state NOT IN (?, ?, ?)
+			AND NOT EXISTS (
+				SELECT 1 FROM webhook_subscription_bindings
+				WHERE webhook_subscription_bindings.webhook_id = webhooks.id
+				  AND webhook_subscription_bindings.active = true
+				  AND webhook_subscription_bindings.deleted_at IS NULL
+			)`,
+			WebhookProvisioningModeOps,
+			WebhookStateDeletingPending, WebhookStateFailed, "deleted",
+		).
+		Find(&webhooks).
+		Error
+	return webhooks, err
+}
+
+// ListOpsWebhooksWithoutPendingOp returns ops-mode registrations whose state
+// suggests they need a new operation but none is currently queued or running.
+// Used by the reconciler to recover registrations that lost their operation
+// (e.g. process crash between registration creation and operation insert).
+func ListOpsWebhooksWithoutPendingOp() ([]Webhook, error) {
+	var webhooks []Webhook
+	err := database.Conn().
+		Where(`provisioning_mode = ?
+			AND state IN (?, ?)
+			AND NOT EXISTS (
+				SELECT 1 FROM webhook_operations
+				WHERE webhook_operations.webhook_id = webhooks.id
+				  AND webhook_operations.state IN (?, ?)
+			)`,
+			WebhookProvisioningModeOps,
+			WebhookStatePending, WebhookStateDeletingPending,
+			WebhookOperationStateQueued, WebhookOperationStateRunning,
+		).
+		Find(&webhooks).
+		Error
+	return webhooks, err
+}
+
+// ListDeletedWebhooks returns soft-deleted legacy-mode webhooks that still need
+// provider-side cleanup. Ops-mode webhooks are excluded because the ops provisioner
+// calls handler.Cleanup before soft-deleting them; processing them here would result
+// in a redundant provider call.
 func ListDeletedWebhooks() ([]Webhook, error) {
 	var webhooks []Webhook
 	err := database.Conn().Unscoped().
-		Where("deleted_at IS NOT NULL").
+		Where("deleted_at IS NOT NULL AND provisioning_mode = ?", WebhookProvisioningModeLegacy).
 		Find(&webhooks).
 		Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return webhooks, nil
+	return webhooks, err
 }
 
 func LockWebhook(tx *gorm.DB, ID uuid.UUID) (*Webhook, error) {

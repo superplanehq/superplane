@@ -19,10 +19,18 @@ const FeatureClaudeManagedAgents = "claude_managed_agents"
 // is released or enabled for the organization.
 const FeatureDashboards = "dashboards"
 
+// Webhook reconciler feature flags.
+const (
+	FeatureWebhookBindingsDualWrite = "webhook_bindings_dualwrite"
+	FeatureWebhookReconciler        = "webhook_reconciler"
+)
+
 var registry = []Feature{
 	{ID: "runner", Label: "Runners", Description: "Sandboxed Runners"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas"},
 	{ID: FeatureDashboards, Label: "Console", Description: "Console panels and widgets on canvases"},
+	{ID: FeatureWebhookBindingsDualWrite, Label: "Webhook Bindings Dual-Write", Description: "Shadow-write WebhookSubscriptionBinding rows alongside legacy webhook creation"},
+	{ID: FeatureWebhookReconciler, Label: "Webhook Reconciler", Description: "Reconcile webhook subscription bindings into registrations and operations"},
 }
 
 func All() []Feature {

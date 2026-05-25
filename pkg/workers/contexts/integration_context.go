@@ -2,7 +2,9 @@ package contexts
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"gorm.io/datatypes"
@@ -81,11 +84,14 @@ func (c *IntegrationContext) RequestWebhook(configuration any) error {
 			}
 
 			c.node.WebhookID = &hook.ID
-			return nil
+			return c.upsertBindingIfEnabled(handler, configuration)
 		}
 	}
 
-	return c.createWebhook(configuration)
+	if err := c.createWebhook(configuration); err != nil {
+		return err
+	}
+	return c.upsertBindingIfEnabled(handler, configuration)
 }
 
 func (c *IntegrationContext) replaceMismatchedWebhook(configuration any, handler core.WebhookHandler) error {
@@ -145,6 +151,86 @@ func (c *IntegrationContext) createWebhook(configuration any) error {
 
 	c.node.WebhookID = &webhookID
 	return nil
+}
+
+// upsertBindingIfEnabled writes a WebhookSubscriptionBinding for the current node
+// when FeatureWebhookBindingsDualWrite is enabled and the handler implements ScopeKeyer.
+// It is a pure shadow write — the legacy webhook path is unaffected regardless of errors here.
+func (c *IntegrationContext) upsertBindingIfEnabled(handler core.WebhookHandler, config any) error {
+	if c.node == nil {
+		return nil
+	}
+
+	enabled, err := models.HasExperimentalFeature(c.integration.OrganizationID, features.FeatureWebhookBindingsDualWrite)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return nil
+	}
+
+	sk, ok := handler.(core.ScopeKeyer)
+	if !ok {
+		// Handler doesn't support scope keys yet; skip binding creation.
+		return nil
+	}
+
+	return c.upsertBinding(sk, config)
+}
+
+// upsertBinding deactivates any previous binding for this node and inserts a fresh one.
+// Deactivation soft-deletes the old row so the unique partial index stays consistent.
+func (c *IntegrationContext) upsertBinding(sk core.ScopeKeyer, config any) error {
+	scopeKey, err := sk.ScopeKey(config)
+	if err != nil {
+		return fmt.Errorf("deriving scope key: %w", err)
+	}
+
+	hash, err := configHash(config)
+	if err != nil {
+		return fmt.Errorf("hashing webhook config: %w", err)
+	}
+
+	now := time.Now()
+
+	// Soft-delete (deactivate) the current active binding for this node so the
+	// unique partial index (workflow_id, node_id) WHERE active=true permits the insert.
+	if err := c.tx.Model(&models.WebhookSubscriptionBinding{}).
+		Where("workflow_id = ? AND node_id = ? AND active = true", c.node.WorkflowID, c.node.NodeID).
+		Updates(map[string]any{
+			"active":     false,
+			"deleted_at": now,
+			"updated_at": now,
+		}).Error; err != nil {
+		return fmt.Errorf("deactivating old binding: %w", err)
+	}
+
+	binding := models.WebhookSubscriptionBinding{
+		OrganizationID:    c.integration.OrganizationID,
+		AppInstallationID: c.integration.ID,
+		WorkflowID:        c.node.WorkflowID,
+		NodeID:            c.node.NodeID,
+		WebhookID:         c.node.WebhookID,
+		ScopeKey:          scopeKey,
+		RequestedConfig:   datatypes.NewJSONType(config),
+		RequestedHash:     hash,
+		Active:            true,
+		CreatedAt:         &now,
+		UpdatedAt:         &now,
+	}
+
+	return c.tx.Create(&binding).Error
+}
+
+// configHash returns the hex-encoded SHA-256 of the JSON-marshaled config.
+// encoding/json marshals map keys in sorted order, making this deterministic.
+func configHash(config any) (string, error) {
+	b, err := json.Marshal(config)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 func (c *IntegrationContext) mergeWebhookConfiguration(
