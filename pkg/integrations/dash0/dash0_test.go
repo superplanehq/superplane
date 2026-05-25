@@ -155,3 +155,14 @@ func Test__Dash0__Sync(t *testing.T) {
 		assert.NotContains(t, httpContext.Requests[0].URL.String(), "/api/prometheus/api/prometheus")
 	})
 }
+
+func Test__Dash0__Instructions(t *testing.T) {
+	instructions := (&Dash0{}).Instructions()
+
+	require.NotEmpty(t, instructions)
+	assert.Contains(t, instructions, "Auth Tokens")
+	assert.Contains(t, instructions, "Read/query permissions")
+	assert.Contains(t, instructions, "Log ingestion permissions")
+	assert.Contains(t, instructions, "Prometheus API endpoint")
+	assert.Contains(t, instructions, "webhook URL")
+}
