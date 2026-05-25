@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
+import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
 import { ChevronDown, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -13,9 +14,12 @@ export type CanvasMemoryViewProps = {
 };
 
 export function CanvasMemoryView(props: CanvasMemoryViewProps) {
+  const leftOffset = useEffectiveLeftSidebarWidth();
+
   return (
     <div
-      className="absolute inset-x-0 bottom-0 top-[5rem] z-10 flex flex-col overflow-hidden bg-slate-50"
+      className="absolute bottom-0 top-[5rem] z-10 flex flex-col overflow-hidden bg-slate-50"
+      style={{ left: leftOffset, right: 0 }}
       data-testid="memory-overlay"
     >
       <CanvasMemoryViewBody {...props} />

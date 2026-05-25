@@ -228,3 +228,13 @@ export function useSidebarLayoutViewport(): void {
     return () => window.removeEventListener("resize", handler);
   }, [recompute]);
 }
+
+/**
+ * Horizontal inset for absolutely positioned canvas overlays (Console, Memory)
+ * so they sit beside the tool sidebar instead of underneath it.
+ */
+export function useEffectiveLeftSidebarWidth(): number {
+  const leftWidth = useSidebarLayoutStore((state) => state.leftWidth);
+  const leftMounted = useSidebarLayoutStore((state) => state.leftMountCount > 0);
+  return leftMounted ? leftWidth : 0;
+}
