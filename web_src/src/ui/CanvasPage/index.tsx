@@ -15,7 +15,6 @@ import {
   type Viewport,
 } from "@xyflow/react";
 
-import { NodeSearch } from "@/components/node-search";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -2888,24 +2887,6 @@ function CanvasContent({
     setIsLogSidebarOpen(true);
   }, []);
   const handleSnapToGridToggle = useCallback(() => setIsSnapToGridEnabled((prev) => !prev), []);
-  const handleNodeSearch = useCallback((searchString: string) => {
-    const query = searchString.toLowerCase();
-    return stateRef.current.nodes.filter((node) => {
-      const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
-      const label = (nodeData?.label || "").toLowerCase();
-      const nodeName = (nodeData?.nodeName || "").toLowerCase();
-      const id = (node.id || "").toLowerCase();
-      return label.includes(query) || nodeName.includes(query) || id.includes(query);
-    });
-  }, []);
-  const handleNodeSearchSelect = useCallback((node: ReactFlowNode) => {
-    const nodeData = node.data as unknown as CanvasBlockNodeData | undefined;
-    const isAnnotationNode = nodeData?.type === "annotation";
-    if (isAnnotationNode) {
-      return;
-    }
-    stateRef.current.componentSidebar.open(node.id);
-  }, []);
   const autoLayoutToggleControl = useMemo(() => {
     if (!isEditMode) {
       return null;
@@ -2941,15 +2922,7 @@ function CanvasContent({
     isAutoLayoutToggleDisabled,
     isEditMode,
   ]);
-  const zoomSliderContent = useMemo(
-    () => (
-      <>
-        {autoLayoutToggleControl}
-        <NodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
-      </>
-    ),
-    [autoLayoutToggleControl, handleNodeSearch, handleNodeSearchSelect],
-  );
+  const zoomSliderContent = autoLayoutToggleControl;
   const reactFlowStyle = useMemo(() => ({ opacity: isInitialized ? 1 : 0 }), [isInitialized]);
   const handleSelectionStart = useCallback(() => {
     setIsSelecting(true);
