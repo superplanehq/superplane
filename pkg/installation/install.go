@@ -147,9 +147,14 @@ func persistInstalledConsole(canvasID string, console *models.DashboardYAML) err
 	}
 
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		_, err := models.UpsertCanvasDashboardInTransaction(
+		version, findErr := models.FindLiveCanvasVersionInTransaction(tx, canvasUUID)
+		if findErr != nil {
+			return findErr
+		}
+
+		_, err := models.UpdateCanvasVersionDashboardInTransaction(
 			tx,
-			canvasUUID,
+			version,
 			console.Spec.Panels,
 			console.Spec.Layout,
 		)
