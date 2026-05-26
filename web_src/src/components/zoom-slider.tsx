@@ -132,7 +132,7 @@ export const ZoomSlider = memo(function ZoomSlider({
   }, [zoomIn, zoomOut, zoomTo, fitView, handleScreenshot, screenshotName]);
 
   const baseClassName = cn(
-    "bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-0.5 rounded-md p-0.5 h-8",
+    "bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-0.5 rounded-md p-0.5 h-7",
     orientation === "horizontal" ? "flex-row" : "flex-col",
     className,
   );
@@ -142,7 +142,7 @@ export const ZoomSlider = memo(function ZoomSlider({
       <div className={cn("flex items-center gap-1", orientation === "horizontal" ? "flex-row" : "flex-col-reverse")}>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => zoomOut({ duration: 300 })}>
+            <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => zoomOut({ duration: 300 })}>
               <Minus className="h-3 w-3" />
             </Button>
           </TooltipTrigger>
@@ -166,7 +166,7 @@ export const ZoomSlider = memo(function ZoomSlider({
         </Tooltip>
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => zoomIn({ duration: 300 })}>
+            <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => zoomIn({ duration: 300 })}>
               <Plus className="h-3 w-3" />
             </Button>
           </TooltipTrigger>
@@ -178,7 +178,7 @@ export const ZoomSlider = memo(function ZoomSlider({
           <Button
             className={cn(
               "tabular-nums text-xs",
-              orientation === "horizontal" ? "w-[50px] min-w-[50px] h-8" : "h-[40px] w-[40px]",
+              orientation === "horizontal" ? "w-[50px] min-w-[50px] h-7" : "h-[40px] w-[40px]",
             )}
             variant="ghost"
             onClick={() => zoomTo(1, { duration: 300 })}
@@ -190,7 +190,7 @@ export const ZoomSlider = memo(function ZoomSlider({
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => fitView({ duration: 300 })}>
+          <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={() => fitView({ duration: 300 })}>
             <Eye className="h-3 w-3" />
           </Button>
         </TooltipTrigger>
@@ -200,7 +200,7 @@ export const ZoomSlider = memo(function ZoomSlider({
       {screenshotName && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={handleScreenshot}>
+            <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={handleScreenshot}>
               <Camera className="h-3 w-3" />
             </Button>
           </TooltipTrigger>
@@ -210,7 +210,7 @@ export const ZoomSlider = memo(function ZoomSlider({
       {onSnapToGridToggle && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={onSnapToGridToggle}>
+            <Button variant="ghost" size="icon-sm" className="h-7 w-7" onClick={onSnapToGridToggle}>
               {isSnapToGridEnabled ? <CircleDot className="h-3 w-3" /> : <CircleDotDashed className="h-3 w-3" />}
             </Button>
           </TooltipTrigger>
