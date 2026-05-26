@@ -90,6 +90,7 @@ import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
+import { canEditCanvasMemory } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { CanvasYamlModal } from "./CanvasYamlModal";
@@ -581,7 +582,9 @@ export function WorkflowPageV2() {
   const updateDashboardMutation = useUpdateCanvasConsole(canvasId!);
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
-  const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
+  const canvasAccess = { canUpdateCanvas, isTemplate, canvasDeletedRemotely };
+  const canActOnCanvas = canUpdateCanvas && !isTemplate && !canvasDeletedRemotely;
+  const isReadOnly = !canActOnCanvas || !hasEditableVersion;
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
   const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() =>
@@ -4476,7 +4479,7 @@ export function WorkflowPageV2() {
         setIsVersionControlOpen(true);
       },
       onViewNodeDiff: handleOpenAwaitingApprovalNodeDiff,
-      canAct: canUpdateCanvas && !isTemplate && !canvasDeletedRemotely,
+      canAct: canActOnCanvas,
       actionPending: actOnCanvasChangeRequestMutation.isPending,
       reviewUi,
     };
@@ -4489,9 +4492,7 @@ export function WorkflowPageV2() {
     handleRejectChangeRequest,
     handlePublishChangeRequest,
     handleOpenAwaitingApprovalNodeDiff,
-    canUpdateCanvas,
-    isTemplate,
-    canvasDeletedRemotely,
+    canActOnCanvas,
     actOnCanvasChangeRequestMutation.isPending,
   ]);
 
@@ -5490,9 +5491,7 @@ export function WorkflowPageV2() {
   });
   const { disabled: runDisabled, tooltip: runDisabledTooltip } = getRunActionState({
     hasRunBlockingChanges,
-    isTemplate,
-    canUpdateCanvas,
-    canvasDeletedRemotely,
+    ...canvasAccess,
     isViewingDraftVersion,
     isViewingCurrentLiveVersion,
   });
@@ -5505,9 +5504,8 @@ export function WorkflowPageV2() {
         <WorkflowDashboardOverlay
           isDashboardMode={isDashboardMode}
           dashboardsFeatureEnabled={dashboardsFeatureEnabled}
-          canUpdateCanvas={canUpdateCanvas}
-          isTemplate={isTemplate}
-          canvasDeletedRemotely={canvasDeletedRemotely}
+          canActOnCanvas={canActOnCanvas}
+          editLocked={isReadOnly}
           dashboardQuery={dashboardQuery}
           updateDashboardMutation={updateDashboardMutation}
           addPanelDialogOpen={isDashboardAddPanelOpen}
@@ -5523,9 +5521,11 @@ export function WorkflowPageV2() {
         />
         <WorkflowMemoryOverlayLayer
           isMemoryMode={isMemoryMode}
-          isViewingDraftVersion={isViewingDraftVersion}
-          isViewingLiveVersion={isViewingLiveVersion}
-          canUpdateCanvas={canUpdateCanvas}
+          canDelete={canEditCanvasMemory({
+            ...canvasAccess,
+            isViewingLiveVersion,
+            isViewingDraftVersion,
+          })}
           entries={canvasMemoryEntries}
           isLoading={canvasMemoryLoading}
           error={canvasMemoryError}
