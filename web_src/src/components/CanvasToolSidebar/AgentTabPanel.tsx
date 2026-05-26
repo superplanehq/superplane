@@ -32,6 +32,31 @@ import type { AgentMessage } from "./types";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 import { groupMessages } from "./agentMessageGroups";
 
+const BOOT_CONTEXT_KEY = "agent-boot-context";
+
+const DEFAULT_BOOT_MESSAGE =
+  "Session ready. Read the current canvas state, check connected integrations, and greet the user.";
+
+const BLANK_BOOT_MESSAGE =
+  "The user just created a new blank app. Greet them warmly, introduce yourself, and ask what they want to build. Suggest that they describe their workflow and you will help set it up.";
+
+function getBootMessage(): string {
+  if (typeof window === "undefined") return DEFAULT_BOOT_MESSAGE;
+  const ctx = sessionStorage.getItem(BOOT_CONTEXT_KEY);
+  sessionStorage.removeItem(BOOT_CONTEXT_KEY);
+  if (!ctx) return DEFAULT_BOOT_MESSAGE;
+  if (ctx === "blank") return BLANK_BOOT_MESSAGE;
+  // Template install: ctx is a JSON string with app info
+  try {
+    const app = JSON.parse(ctx) as { title: string; description: string };
+    return `The user just installed the "${app.title}" app: ${app.description}. Read the canvas state, check which integrations need to be connected, and guide the user through getting started.`;
+  } catch {
+    return DEFAULT_BOOT_MESSAGE;
+  }
+}
+
+export { BOOT_CONTEXT_KEY };
+
 type ChatConversationProps = {
   chatId: string;
   canvasId: string;
@@ -144,9 +169,7 @@ function ChatConversation({
       void sendMutation
         .mutateAsync({
           chatId,
-          content: createSystemMessage(
-            "Session ready. Read the current canvas state, check connected integrations, and greet the user.",
-          ),
+          content: createSystemMessage(getBootMessage()),
           mode: agentMode,
         })
         .then(() => {

@@ -33,6 +33,7 @@ export function useCreateApp({ onCreated }: UseCreateAppOptions = {}) {
         if (canvasId) {
           onCreated?.();
           localStorage.setItem("canvasAgentSidebarOpen", "true");
+          sessionStorage.setItem("agent-boot-context", "blank");
           navigate(`/${organizationId}/canvases/${canvasId}?edit=1`);
         }
       } catch (error) {

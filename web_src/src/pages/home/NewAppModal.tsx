@@ -68,10 +68,10 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
     void createApp(generateCanvasName());
   };
 
-  const handleInstall = (e: React.MouseEvent, repo: string) => {
+  const handleInstall = (e: React.MouseEvent, app: AppEntry) => {
     e.stopPropagation();
     if (busy) return;
-    void installTemplate(repo);
+    void installTemplate(app.repo, { title: app.title, description: app.description });
   };
 
   const handleClose = () => {
@@ -86,7 +86,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
         app={selectedApp}
         busy={busy}
         onBack={() => setSelectedApp(null)}
-        onInstall={(e) => handleInstall(e, selectedApp.repo)}
+        onInstall={(e) => handleInstall(e, selectedApp)}
         onClose={handleClose}
       />
     );
@@ -122,11 +122,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
           </div>
         </CommandItem>
       </div>
-      <CommandList
-        ref={listRef}
-        onScroll={handleScroll}
-        className="max-h-[360px] scroll-py-2 px-3 py-3"
-      >
+      <CommandList ref={listRef} onScroll={handleScroll} className="max-h-[360px] scroll-py-2 px-3 py-3">
         <CommandEmpty>No apps found.</CommandEmpty>
 
         {visible.length > 0 && (
@@ -150,12 +146,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
                     </div>
                     <p className="text-xs text-muted-foreground line-clamp-1">{app.description}</p>
                   </div>
-                  <Button
-                    size="sm"
-                    className="shrink-0 text-xs"
-                    onClick={(e) => handleInstall(e, app.repo)}
-                    disabled={busy}
-                  >
+                  <Button size="sm" className="shrink-0 text-xs" onClick={(e) => handleInstall(e, app)} disabled={busy}>
                     Install
                     <ArrowRight className="ml-1 h-3 w-3" />
                   </Button>
