@@ -571,7 +571,7 @@ export function WorkflowPageV2() {
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
     error: canvasMemoryError,
-  } = useCanvasMemoryEntries(canvasId!, isViewingLiveVersion);
+  } = useCanvasMemoryEntries(canvasId!, isMemoryMode || isViewingLiveVersion);
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
   const canUpdateCanvas = canAct("canvases", "update");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
@@ -5523,8 +5523,7 @@ export function WorkflowPageV2() {
           isMemoryMode={isMemoryMode}
           canDelete={canEditCanvasMemory({
             ...canvasAccess,
-            isViewingLiveVersion,
-            isViewingDraftVersion,
+            hasEditableVersion,
           })}
           entries={canvasMemoryEntries}
           isLoading={canvasMemoryLoading}
