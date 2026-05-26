@@ -46,6 +46,11 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el || search) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setVisibleCount(filtered.length);
+      return;
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {

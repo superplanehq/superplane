@@ -48,7 +48,7 @@ export function HomePage() {
     return <ErrorView />;
   }
 
-  if (canvases.length === 0 && !canvasError) {
+  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError) {
     return (
       <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
         <header className="bg-white border-b border-slate-950/15 px-4 h-12 flex items-center">
