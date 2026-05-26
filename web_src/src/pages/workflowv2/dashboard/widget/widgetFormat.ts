@@ -23,6 +23,7 @@ export function formatValue(value: unknown, format: WidgetColumnFormat | undefin
     case "duration":
       return formatDuration(value);
     case "status":
+    case "badge":
       return String(value).toLowerCase();
     case "code":
     case "text":

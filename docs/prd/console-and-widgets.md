@@ -125,6 +125,7 @@ The panel `content` object is intentionally flexible, but every known panel type
 | --- | --- | --- |
 | `markdown` | Notes, runbooks, links, status explanations | `title?`, `body?` |
 | `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `showRun?`, `triggerName?` |
+| `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `nodes[]` |
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
 | `chart` | Render grouped data as bar, stacked bar, line, area, or donut | `title?`, `dataSource`, `render.kind: "chart"` |
 | `number` | Render one aggregate KPI | `title?`, `dataSource`, `render.kind: "number"` |
@@ -197,7 +198,7 @@ Each column needs a non-empty `field`. Optional fields:
 | Field | Meaning |
 | --- | --- |
 | `label` | Header text. Falls back to `field`. |
-| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `code`, or `link`. |
+| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, or `link`. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). |
 | `show` | Row expression controlling whether the cell is visible. |
 | `href` | Link template for `link` columns. |
 
@@ -361,11 +362,75 @@ Rules:
 
 The editor exposes a Single / Multiple toggle in the Number panel form. Switching to Multiple seeds one source from the current single-source configuration so existing panels do not lose context.
 
+## Markdown Panels
+
+Markdown panels render `content.body` using `react-markdown` with `remark-gfm`, `remark-breaks`, `rehype-raw`, and `rehype-sanitize`.
+
+Supported authoring features:
+
+- **GitHub-flavored markdown**, including hand-written pipe tables:
+
+  ```markdown
+  | Service | Status |
+  | --- | --- |
+  | api | passed |
+  | web | failed |
+  ```
+
+- **Collapsible sections** using raw `<details>` / `<summary>` HTML:
+
+  ```markdown
+  <details>
+  <summary>Troubleshooting</summary>
+
+  - Flush the cache.
+  - Roll back via the **Rollback** node panel.
+
+  </details>
+  ```
+
+  Use `<details open>` to pre-expand a section. The body of a `<details>` is still parsed as markdown, so links, lists, and other formatting work inside accordions.
+
+- **Safe-by-default raw HTML.** `rehype-sanitize` strips `<script>`, inline event handlers (`onclick`, `onerror`, …), and any tag outside the allowlist. The only raw HTML tags explicitly added on top of the default allowlist are `<details>` and `<summary>` (plus the `open` attribute on `<details>`). If you need a new tag, extend `MARKDOWN_SANITIZE_SCHEMA` in `MarkdownPanelCard.tsx` rather than disabling sanitization.
+
 ## Node Panels
 
 Node panels resolve the configured `node` by id or name. They display the latest status from `deriveDashboardNodeStatuses` and can optionally show a manual Run button.
 
 `showRun` only exposes the button. The actual click still requires `canRunNodes`, and the backend authorization remains the source of truth.
+
+## Multi-Node Panels
+
+The plural `nodes` panel type renders several pinned canvas nodes in a single card, each with their live status and an optional purpose line. Use it for "Key Nodes" style summaries (for example, the entry/exit nodes of a preview-environment workflow) instead of stamping out one `node` panel per row.
+
+```yaml
+type: nodes
+content:
+  title: Key Nodes
+  nodes:
+    - node: pr-opened
+      description: GitHub PR trigger that boots a new environment.
+    - node: create-droplet
+      description: Provisions the DigitalOcean droplet.
+    - node: health-check
+      description: Confirms the preview is responsive.
+    - node: delete-droplet
+      label: Tear Down
+      description: Releases the droplet when the PR closes.
+      showRun: true
+```
+
+Per-entry fields:
+
+| Field | Meaning |
+| --- | --- |
+| `node` | Required. Canvas node id or name. |
+| `label` | Optional override for the displayed row name. Falls back to the resolved canvas node name. |
+| `description` | Optional short purpose line shown under the row name. |
+| `showRun` | When true, surface a manual "Run" button. Still gated by `canRunNodes`. |
+| `triggerName` | Optional start template name when the trigger exposes multiple templates. |
+
+`content.nodes` may be an empty array on a freshly added panel; the card renders a "configure me" hint until the author adds at least one entry through the form.
 
 ## YAML Import And Export
 
