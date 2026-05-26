@@ -1,4 +1,5 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
 
 type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
@@ -9,7 +10,6 @@ interface CanvasModeToggleProps {
   onSelectDashboard?: () => void;
   onSelectMemory?: () => void;
   editing?: boolean;
-  hasDraft?: boolean;
 }
 
 const CANVAS_TAB = "canvas";
@@ -23,7 +23,6 @@ export function CanvasModeToggle({
   onSelectDashboard,
   onSelectMemory,
   editing = false,
-  hasDraft = false,
 }: CanvasModeToggleProps) {
   const showDashboard = Boolean(onSelectDashboard);
   const showMemory = Boolean(onSelectMemory);
@@ -79,7 +78,12 @@ export function CanvasModeToggle({
     >
       <TabsList
         aria-label="Canvas view"
-        className="h-7 min-h-7 bg-slate-100 [&_[data-slot=tabs-trigger][data-state=inactive]]:text-slate-500 [&_[data-slot=tabs-trigger]]:text-[13px]"
+        className={cn(
+          "h-7 min-h-7 p-1 [&_[data-slot=tabs-trigger]]:text-[13px]",
+          editing
+            ? "rounded-full bg-[var(--purple)] text-white [&_[data-slot=tabs-trigger]]:transition-none [&_[data-slot=tabs-trigger][data-state=inactive]]:bg-transparent [&_[data-slot=tabs-trigger][data-state=inactive]]:text-white/90 [&_[data-slot=tabs-trigger][data-state=inactive]]:hover:text-white [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full [&_[data-slot=tabs-trigger][data-state=active]]:bg-white [&_[data-slot=tabs-trigger][data-state=active]]:text-slate-900 [&_[data-slot=tabs-trigger][data-state=active]]:shadow-none"
+            : "bg-slate-100 [&_[data-slot=tabs-trigger][data-state=inactive]]:text-slate-500",
+        )}
       >
         {showDashboard ? (
           <TabsTrigger value={DASHBOARD_TAB} data-testid="canvas-view-mode-dashboard" aria-label="Console">
@@ -89,18 +93,9 @@ export function CanvasModeToggle({
         <TabsTrigger
           value={CANVAS_TAB}
           data-testid="canvas-view-mode-live"
-          aria-label={editing ? "Canvas (editing)" : hasDraft ? "Canvas (unpublished draft)" : "Canvas"}
+          aria-label={editing ? "Canvas (editing)" : "Canvas"}
         >
-          <span className="inline-flex items-center gap-1.5">
-            Canvas
-            {hasDraft ? (
-              <span
-                className="inline-flex size-1.5 shrink-0 rounded-full bg-muted-foreground/70"
-                aria-hidden="true"
-                data-testid="canvas-view-mode-live-draft-dot"
-              />
-            ) : null}
-          </span>
+          Canvas
         </TabsTrigger>
         {showMemory ? (
           <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory">
