@@ -3,7 +3,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { ArrowRight, Plus, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import templateManifest from "../../../../templates/manifest.json";
 import { useCreateApp } from "./useCreateApp";
 import { useInstallTemplate } from "./useInstallTemplate";
@@ -28,6 +28,8 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
   const { createApp, isSaving } = useCreateApp();
   const { installTemplate, isInstalling } = useInstallTemplate();
   const [search, setSearch] = useState("");
+  const [visibleCount, setVisibleCount] = useState(7);
+  const sentinelRef = useRef<HTMLDivElement>(null);
   const busy = isSaving || isInstalling;
 
   const firstName = userName.split(" ")[0] || "there";
@@ -42,6 +44,23 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
         t.integrations.some((i) => i.toLowerCase().includes(q)),
     );
   }, [search]);
+
+  const visible = search ? filtered : filtered.slice(0, visibleCount);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || search) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + 7, filtered.length));
+        }
+      },
+      { rootMargin: "100px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [filtered.length, search]);
 
   const handleBlankCreate = () => {
     if (busy) return;
@@ -98,7 +117,7 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
       </div>
 
       <div className="flex flex-col gap-2">
-        {filtered.map((app) => (
+        {visible.map((app) => (
           <div
             key={app.repo}
             className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50"
@@ -119,6 +138,7 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
             </Button>
           </div>
         ))}
+        {!search && visibleCount < filtered.length && <div ref={sentinelRef} className="h-1" />}
         {search && filtered.length === 0 && (
           <p className="py-8 text-center text-sm text-slate-500">No apps matching &ldquo;{search}&rdquo;</p>
         )}
