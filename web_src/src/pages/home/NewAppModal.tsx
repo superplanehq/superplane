@@ -156,7 +156,13 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
                     </div>
                     <p className="text-xs text-muted-foreground line-clamp-1">{app.description}</p>
                   </div>
-                  <Button size="sm" className="shrink-0 text-xs" onClick={(e) => handleInstall(e, app)} disabled={busy}>
+                  <Button
+                    size="sm"
+                    className="shrink-0 text-xs"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => handleInstall(e, app)}
+                    disabled={busy}
+                  >
                     Install
                     <ArrowRight className="ml-1 h-3 w-3" />
                   </Button>
