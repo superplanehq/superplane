@@ -17,6 +17,7 @@ import {
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
+import { clearAgentBootContext, getAgentBootMessage } from "@/lib/agentBootContext";
 import { ConversationTranscript } from "./AgentConversationTranscript";
 import {
   buildRubricText,
@@ -144,19 +145,18 @@ function ChatConversation({
       void sendMutation
         .mutateAsync({
           chatId,
-          content: createSystemMessage(
-            "Session ready. Read the current canvas state, check connected integrations, and greet the user.",
-          ),
+          content: createSystemMessage(getAgentBootMessage(canvasId)),
           mode: agentMode,
         })
         .then(() => {
           bootState.current = "sent";
+          clearAgentBootContext();
         })
         .catch(() => {
           bootState.current = "idle";
         });
     }
-  }, [messagesQuery.data, messagesQuery.isLoading, chatId, agentMode, sendMutation]);
+  }, [messagesQuery.data, messagesQuery.isLoading, chatId, canvasId, agentMode, sendMutation]);
   const handlers = useConversationHandlers({
     agentMode,
     chatId,
