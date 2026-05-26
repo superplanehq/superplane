@@ -19,12 +19,19 @@ type UpsertMemoryMetadata = {
   matches?: Record<string, unknown>;
   operation?: string;
   updatedCount?: number;
+  createdCount?: number;
+  iterateList?: boolean;
+  itemVariable?: string;
+  count?: number;
 };
 
 type UpsertMemoryConfiguration = {
   namespace?: string;
   matchList?: Array<{ name?: string; value?: unknown }>;
   valueList?: Array<{ name?: string; value?: unknown }>;
+  iterateList?: boolean;
+  listSource?: string;
+  itemVariable?: string;
 };
 
 export const upsertMemoryMapper: ComponentBaseMapper = {
@@ -78,10 +85,31 @@ export const upsertMemoryMapper: ComponentBaseMapper = {
     if ((metadata.operation || "").trim().length > 0) {
       details["Operation"] = metadata.operation || "";
     }
+    appendListModeDetails(details, metadata);
 
     return details;
   },
 };
+
+function appendListModeDetails(details: Record<string, string>, metadata: UpsertMemoryMetadata): void {
+  if (!metadata.iterateList) {
+    return;
+  }
+
+  details["List Mode"] = "Enabled";
+  if (metadata.itemVariable) {
+    details["Item Variable"] = metadata.itemVariable;
+  }
+  if (typeof metadata.count === "number") {
+    details["Iterations"] = String(metadata.count);
+  }
+  if (typeof metadata.updatedCount === "number") {
+    details["Rows Updated"] = String(metadata.updatedCount);
+  }
+  if (typeof metadata.createdCount === "number") {
+    details["Rows Created"] = String(metadata.createdCount);
+  }
+}
 
 function getEventSections(nodes: NodeInfo[], execution: ExecutionInfo): EventSection[] {
   const rootTriggerNode = nodes.find((n) => n.id === execution.rootEvent?.nodeId);
@@ -117,6 +145,9 @@ function getUpsertMemoryMetadataList(node: NodeInfo): Array<{ icon: string; labe
   }
   if (valueFields.length > 0) {
     items.push({ icon: "list", label: `set: ${valueFields.join(", ")}` });
+  }
+  if (config.iterateList || metadata.iterateList) {
+    items.push({ icon: "repeat", label: "List mode" });
   }
 
   return items;
