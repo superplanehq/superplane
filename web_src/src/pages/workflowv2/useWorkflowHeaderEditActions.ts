@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 import type { CanvasesCanvas } from "@/api-client";
-import { PLACEHOLDER_NODE_CONTEXT_KEY } from "@/lib/agentBootContext";
+import { markAgentBootReady, PLACEHOLDER_NODE_CONTEXT_KEY } from "@/lib/agentBootContext";
 
 type PlaceholderAddHandler = (data: { position: { x: number; y: number } }) => Promise<string>;
 
@@ -108,7 +108,7 @@ function useAutoPlaceholderNode(startup: WorkflowStartupActionsConfig | undefine
     addedRef.current = true;
 
     void handlePlaceholderAdd({ position: { x: 400, y: 300 } }).then(() => {
-      sessionStorage.removeItem(PLACEHOLDER_NODE_CONTEXT_KEY);
+      markAgentBootReady(canvasId);
     });
   }, [hasEditableVersion, canvasHasSpec, canvasId, handlePlaceholderAdd]);
 }

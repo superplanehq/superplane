@@ -1,5 +1,6 @@
 export const AGENT_BOOT_CONTEXT_KEY = "agent-boot-context";
 export const PLACEHOLDER_NODE_CONTEXT_KEY = "add-placeholder-node";
+export const AGENT_BOOT_CONTEXT_READY_EVENT = "agent-boot-context-ready";
 
 const DEFAULT_BOOT_MESSAGE =
   "Session ready. Read the current canvas state, check connected integrations, and greet the user.";
@@ -24,6 +25,19 @@ export function getAgentBootMessage(canvasId: string): string {
   } catch {
     return DEFAULT_BOOT_MESSAGE;
   }
+}
+
+export function isAgentBootReady(canvasId: string): boolean {
+  if (typeof window === "undefined") return true;
+  return sessionStorage.getItem(PLACEHOLDER_NODE_CONTEXT_KEY) !== canvasId;
+}
+
+export function markAgentBootReady(canvasId: string) {
+  if (typeof window === "undefined") return;
+  if (sessionStorage.getItem(PLACEHOLDER_NODE_CONTEXT_KEY) === canvasId) {
+    sessionStorage.removeItem(PLACEHOLDER_NODE_CONTEXT_KEY);
+  }
+  window.dispatchEvent(new CustomEvent(AGENT_BOOT_CONTEXT_READY_EVENT, { detail: { canvasId } }));
 }
 
 export function clearAgentBootContext() {
