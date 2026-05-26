@@ -158,12 +158,7 @@ const MessageRow = memo(function MessageRow({
   }
 
   if (message.role === "system" || (message.role === "user" && isSystemNotification(message.content))) {
-    const text = message.role === "system" ? formatSystemNotification(message.content) : message.content;
-    return (
-      <div className="flex justify-center">
-        <span className="text-xs text-slate-500">{text}</span>
-      </div>
-    );
+    return null;
   }
 
   const isUser = message.role === "user";
