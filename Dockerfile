@@ -15,7 +15,6 @@ ARG PLAYWRIGHT_GO_VERSION
 
 WORKDIR /opt/install
 COPY scripts/docker /opt/install-scripts
-COPY --from=ghcr.io/astral-sh/uv:0.6.6 /uv /uvx /bin/
 
 ENV GO_VERSION=${GO_VERSION}
 ENV PATH="/usr/local/go/bin:${PATH}"
@@ -53,7 +52,6 @@ RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
 RUN playwright install chromium-headless-shell --with-deps
 RUN rm -rf /opt/install /opt/install-scripts /tmp/*
 
-WORKDIR /app
 CMD [ "/bin/bash",  "-c", "sleep infinity" ]
 
 # ----------------------------------------------------------------------------------------------------------------------
