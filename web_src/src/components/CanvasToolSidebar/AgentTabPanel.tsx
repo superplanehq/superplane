@@ -38,7 +38,7 @@ const DEFAULT_BOOT_MESSAGE =
   "Session ready. Read the current canvas state, check connected integrations, and greet the user.";
 
 const BLANK_BOOT_MESSAGE =
-  "The user just created a new blank app. Greet them warmly, introduce yourself, and ask what they want to build. Suggest that they describe their workflow and you will help set it up.";
+  "The user just created a new blank app with a placeholder node on the canvas. Greet them briefly, then tell them to click on the 'New Component' node on the canvas and pick a component from the sidebar to get started. You can also ask what they want to build and help them choose the right component.";
 
 function getBootMessage(): string {
   if (typeof window === "undefined") return DEFAULT_BOOT_MESSAGE;
