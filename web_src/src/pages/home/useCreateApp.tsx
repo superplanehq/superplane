@@ -32,7 +32,7 @@ export function useCreateApp({ onCreated }: UseCreateAppOptions = {}) {
         const canvasId = result?.data?.canvas?.metadata?.id;
         if (canvasId) {
           onCreated?.();
-          sessionStorage.setItem("open-agent-sidebar", "1");
+          localStorage.setItem("canvasSidebarOpen", "true");
           navigate(`/${organizationId}/canvases/${canvasId}?edit=1`);
         }
       } catch (error) {

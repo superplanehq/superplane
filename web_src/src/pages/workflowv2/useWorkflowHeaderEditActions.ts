@@ -60,7 +60,6 @@ export function useAutoEnterEditMode(
     const next = new URLSearchParams(searchParams);
     next.delete("edit");
     setSearchParams(next, { replace: true });
-    sessionStorage.removeItem("open-agent-sidebar");
 
     void handleToggleEditMode();
   }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, handleToggleEditMode]);

@@ -5537,7 +5537,7 @@ export function WorkflowPageV2() {
           key={canvasRenderKey}
           // Persist right sidebar in query params
           initialSidebar={{
-            isOpen: searchParams.get("sidebar") === "1" || sessionStorage.getItem("open-agent-sidebar") === "1",
+            isOpen: searchParams.get("sidebar") === "1",
             nodeId: searchParams.get("node") || null,
           }}
           onSidebarChange={handleSidebarChange}
