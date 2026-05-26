@@ -44,6 +44,8 @@ type Config struct {
 	CloudWatchLogGroup        string
 	CloudWatchRegion          string // optional; uses default AWS credential chain region when empty
 	CloudWatchLogStreamPrefix string // optional prefix for log stream name (must match TASK_CLOUDWATCH_LOG_STREAM_PREFIX on fleet-manager for callers)
+	// TaskWorkDir is the initial working directory for host-mode tasks (runner user's $HOME).
+	TaskWorkDir string
 }
 
 // DefaultConfig returns safe defaults.
@@ -357,7 +359,10 @@ func (a *Agent) executorFor(task *api.TaskPayload) (Executor, error) {
 	}
 	switch mode {
 	case models.ExecutionHost:
-		return &HostExecutor{MaxOutputBytes: a.Config.MaxOutputBytes}, nil
+		return &HostExecutor{
+			MaxOutputBytes: a.Config.MaxOutputBytes,
+			TaskWorkDir:    a.Config.TaskWorkDir,
+		}, nil
 	case models.ExecutionDocker:
 		return &DockerExecutor{
 			MaxOutputBytes: a.Config.MaxOutputBytes,

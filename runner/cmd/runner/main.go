@@ -51,6 +51,13 @@ func main() {
 	cfg.CloudWatchRegion = strings.TrimSpace(os.Getenv("RUNNER_CLOUDWATCH_REGION"))
 	cfg.CloudWatchLogStreamPrefix = strings.TrimSpace(os.Getenv("RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX"))
 
+	taskWorkDir, err := agent.ResolveTaskWorkDir()
+	if err != nil {
+		log.Error("invalid task work dir", slog.Any("err", err))
+		os.Exit(1)
+	}
+	cfg.TaskWorkDir = taskWorkDir
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -68,6 +75,7 @@ func main() {
 		slog.String("task_broker", cfg.BaseURL),
 		slog.String("transport", transportLabel(cfg)),
 		slog.String("health_addr", healthAddr),
+		slog.String("task_work_dir", cfg.TaskWorkDir),
 		slog.Bool("cloudwatch_logs", strings.TrimSpace(cfg.CloudWatchLogGroup) != ""))
 
 	if removed, err := agent.SweepDockerOrphans(ctx, cfg.RunnerID); err != nil {
