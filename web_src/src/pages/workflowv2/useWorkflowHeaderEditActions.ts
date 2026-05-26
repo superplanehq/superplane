@@ -19,6 +19,7 @@ interface WorkflowStartupActionsConfig {
 
 interface WorkflowHeaderEditActionsConfig {
   isRunsMode: boolean;
+  handleExitRunsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
   setIsRunsMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
@@ -29,6 +30,7 @@ interface WorkflowHeaderEditActionsConfig {
 
 export function useWorkflowHeaderEditActions({
   isRunsMode,
+  handleExitRunsMode,
   handleToggleEditMode,
   setIsRunsMode,
   setSelectedRunId,
@@ -48,8 +50,12 @@ export function useWorkflowHeaderEditActions({
   }, [handleToggleEditMode, isRunsMode, setIsRunsMode, setRunDetailNodeId, setSearchParams, setSelectedRunId]);
 
   const handleExitEditModeFromHeader = useCallback(async () => {
+    if (isRunsMode) {
+      handleExitRunsMode();
+      return;
+    }
     await handleToggleEditMode();
-  }, [handleToggleEditMode]);
+  }, [handleExitRunsMode, handleToggleEditMode, isRunsMode]);
 
   useAutoEditMode(startup, handleToggleEditMode, setSearchParams);
   useAutoPlaceholderNode(startup);
