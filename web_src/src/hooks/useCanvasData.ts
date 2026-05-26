@@ -37,7 +37,7 @@ import {
   canvasesListCanvasRepositoryFiles,
   canvasesGetCanvasRepositoryFile,
   canvasesCommitCanvasRepositoryFiles,
-  canvasesCreateCanvasRepositoryGitUrl,
+  canvasesGenerateCanvasRepositoryCredentials,
   triggersListTriggers,
   triggersDescribeTrigger,
   widgetsListWidgets,
@@ -1759,10 +1759,10 @@ export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
   });
 };
 
-export const useCreateCanvasRepositoryGitUrl = (canvasId: string) => {
+export const useGenerateCanvasRepositoryCredentials = (canvasId: string) => {
   return useMutation({
     mutationFn: async (input: { readOnly?: boolean; ttlSeconds?: number; allowForcePush?: boolean } = {}) => {
-      const response = await canvasesCreateCanvasRepositoryGitUrl(
+      const response = await canvasesGenerateCanvasRepositoryCredentials(
         withOrganizationHeader({
           path: { canvasId },
           body: {

@@ -24,7 +24,6 @@ type CanvasRepository struct {
 	Provider       string
 	RepoID         string
 	DefaultBranch  string
-	HeadSHA        *string
 	Status         string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
@@ -59,7 +58,6 @@ func UpsertCanvasRepositoryInTransaction(tx *gorm.DB, repository *CanvasReposito
 			"provider",
 			"repo_id",
 			"default_branch",
-			"head_sha",
 			"status",
 			"updated_at",
 		}),

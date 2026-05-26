@@ -31,7 +31,9 @@ type Provider interface {
 	ListFiles(ctx context.Context, ref RepositoryRef, options ListFilesOptions) (*ListFilesResult, error)
 	GetFile(ctx context.Context, ref RepositoryRef, options GetFileOptions) (io.ReadCloser, error)
 	CommitFiles(ctx context.Context, ref RepositoryRef, options CommitFilesOptions) (*CommitResult, error)
-	RemoteURL(ctx context.Context, ref RepositoryRef, options RemoteURLOptions) (string, error)
+	CurrentHead(ctx context.Context, ref RepositoryRef, branch string) (string, error)
+	GitURL(ctx context.Context, ref RepositoryRef) (string, error)
+	GenerateGitCredentials(ctx context.Context, ref RepositoryRef, options GitCredentialsOptions) (*GitCredentials, error)
 }
 
 type Limits struct {
@@ -49,7 +51,6 @@ type RepositorySpec struct {
 type Repository struct {
 	RepoID        string
 	DefaultBranch string
-	HeadSHA       string
 }
 
 type RepositoryRef struct {
@@ -99,10 +100,15 @@ type CommitResult struct {
 	Branch    string
 }
 
-type RemoteURLOptions struct {
+type GitCredentialsOptions struct {
 	ReadOnly       bool
 	TTL            time.Duration
 	AllowForcePush bool
+}
+
+type GitCredentials struct {
+	Username string
+	Password string
 }
 
 type validatedOperation struct {

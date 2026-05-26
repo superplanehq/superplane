@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS canvas_repositories (
   provider       TEXT NOT NULL,
   repo_id        TEXT NOT NULL,
   default_branch TEXT NOT NULL DEFAULT 'main',
-  head_sha       TEXT,
   status         TEXT NOT NULL DEFAULT 'ready',
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),

@@ -209,6 +209,14 @@ func (s *deleteCanvasRepositoryStorage) CommitFiles(context.Context, canvasstora
 	return nil, nil
 }
 
-func (s *deleteCanvasRepositoryStorage) RemoteURL(context.Context, canvasstorage.RepositoryRef, canvasstorage.RemoteURLOptions) (string, error) {
+func (s *deleteCanvasRepositoryStorage) CurrentHead(context.Context, canvasstorage.RepositoryRef, string) (string, error) {
 	return "", nil
+}
+
+func (s *deleteCanvasRepositoryStorage) GitURL(context.Context, canvasstorage.RepositoryRef) (string, error) {
+	return "", nil
+}
+
+func (s *deleteCanvasRepositoryStorage) GenerateGitCredentials(context.Context, canvasstorage.RepositoryRef, canvasstorage.GitCredentialsOptions) (*canvasstorage.GitCredentials, error) {
+	return nil, nil
 }

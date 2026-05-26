@@ -118,14 +118,14 @@ service Canvases {
     };
   }
 
-  rpc CreateCanvasRepositoryGitURL(CreateCanvasRepositoryGitURLRequest) returns (CreateCanvasRepositoryGitURLResponse) {
+  rpc GenerateCanvasRepositoryCredentials(GenerateCanvasRepositoryCredentialsRequest) returns (GenerateCanvasRepositoryCredentialsResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/repository/git-url"
+      post: "/api/v1/canvases/{canvas_id}/repository/credentials"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create canvas repository Git URL";
-      description: "Creates a short-lived authenticated Git URL for the repository attached to a canvas";
+      summary: "Generate canvas repository credentials";
+      description: "Generates short-lived Git credentials for the repository attached to a canvas";
       tags: "CanvasRepository";
     };
   }
@@ -538,6 +538,7 @@ message CanvasRepository {
   string head_sha = 5;
   string status = 6;
   google.protobuf.Timestamp updated_at = 7;
+  string git_url = 8;
 }
 
 message GetCanvasRepositoryRequest {
@@ -599,17 +600,18 @@ message CommitCanvasRepositoryFilesResponse {
   string branch = 5;
 }
 
-message CreateCanvasRepositoryGitURLRequest {
+message GenerateCanvasRepositoryCredentialsRequest {
   string canvas_id = 1;
   bool read_only = 2;
   int64 ttl_seconds = 3;
   bool allow_force_push = 4;
 }
 
-message CreateCanvasRepositoryGitURLResponse {
+message GenerateCanvasRepositoryCredentialsResponse {
   CanvasRepository repository = 1;
-  string url = 2;
-  google.protobuf.Timestamp expires_at = 3;
+  string username = 2;
+  string password = 3;
+  google.protobuf.Timestamp expires_at = 4;
 }
 
 message CreateCanvasRequest {

@@ -281,7 +281,6 @@ CREATE TABLE public.canvas_repositories (
     provider text NOT NULL,
     repo_id text NOT NULL,
     default_branch text DEFAULT 'main'::text NOT NULL,
-    head_sha text,
     status text DEFAULT 'ready'::text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,

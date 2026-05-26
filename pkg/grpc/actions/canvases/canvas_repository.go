@@ -19,7 +19,7 @@ import (
 	"gorm.io/gorm"
 )
 
-const maxCanvasRepositoryGitURLTTL = 24 * time.Hour
+const maxCanvasRepositoryCredentialsTTL = 24 * time.Hour
 
 type CanvasRepositoryStorageOptions struct {
 	ProviderName  string
@@ -39,7 +39,7 @@ func GetCanvasRepository(
 		return nil, err
 	}
 
-	return &pb.GetCanvasRepositoryResponse{Repository: serializeCanvasRepository(repository)}, nil
+	return &pb.GetCanvasRepositoryResponse{Repository: serializeCanvasRepository(ctx, repository, storage)}, nil
 }
 
 func ListCanvasRepositoryFiles(
@@ -66,7 +66,7 @@ func ListCanvasRepositoryFiles(
 	}
 
 	return &pb.ListCanvasRepositoryFilesResponse{
-		Repository: serializeCanvasRepository(repository),
+		Repository: serializeCanvasRepository(ctx, repository, storage),
 		Files:      files,
 		Ref:        result.Ref,
 	}, nil
@@ -111,7 +111,7 @@ func GetCanvasRepositoryFile(
 	}
 
 	return &pb.GetCanvasRepositoryFileResponse{
-		Repository: serializeCanvasRepository(repository),
+		Repository: serializeCanvasRepository(ctx, repository, storage),
 		Path:       normalizedPath,
 		Content:    content,
 		Ref:        ref,
@@ -166,7 +166,6 @@ func CommitCanvasRepositoryFiles(
 
 	if result.NewSHA != "" {
 		now := time.Now()
-		repository.HeadSHA = &result.NewSHA
 		repository.Status = models.CanvasRepositoryStatusReady
 		repository.UpdatedAt = now
 		if err := models.UpsertCanvasRepository(repository); err != nil {
@@ -175,7 +174,7 @@ func CommitCanvasRepositoryFiles(
 	}
 
 	return &pb.CommitCanvasRepositoryFilesResponse{
-		Repository: serializeCanvasRepository(repository),
+		Repository: serializeCanvasRepository(ctx, repository, storage),
 		CommitSha:  result.CommitSHA,
 		OldSha:     result.OldSHA,
 		NewSha:     result.NewSHA,
@@ -183,20 +182,20 @@ func CommitCanvasRepositoryFiles(
 	}, nil
 }
 
-func CreateCanvasRepositoryGitURL(
+func GenerateCanvasRepositoryCredentials(
 	ctx context.Context,
 	organizationID string,
 	canvasID string,
-	req *pb.CreateCanvasRepositoryGitURLRequest,
+	req *pb.GenerateCanvasRepositoryCredentialsRequest,
 	storage canvasstorage.Provider,
 	options CanvasRepositoryStorageOptions,
-) (*pb.CreateCanvasRepositoryGitURLResponse, error) {
+) (*pb.GenerateCanvasRepositoryCredentialsResponse, error) {
 	if req.GetReadOnly() {
 		repository, err := ensureCanvasRepository(ctx, organizationID, canvasID, storage, options)
 		if err != nil {
 			return nil, err
 		}
-		return createCanvasRepositoryGitURL(ctx, repository, req, storage)
+		return generateCanvasRepositoryCredentials(ctx, repository, req, storage)
 	}
 
 	repository, _, err := ensureWritableCanvasRepository(ctx, organizationID, canvasID, storage, options)
@@ -204,24 +203,24 @@ func CreateCanvasRepositoryGitURL(
 		return nil, err
 	}
 
-	return createCanvasRepositoryGitURL(ctx, repository, req, storage)
+	return generateCanvasRepositoryCredentials(ctx, repository, req, storage)
 }
 
-func createCanvasRepositoryGitURL(
+func generateCanvasRepositoryCredentials(
 	ctx context.Context,
 	repository *models.CanvasRepository,
-	req *pb.CreateCanvasRepositoryGitURLRequest,
+	req *pb.GenerateCanvasRepositoryCredentialsRequest,
 	storage canvasstorage.Provider,
-) (*pb.CreateCanvasRepositoryGitURLResponse, error) {
+) (*pb.GenerateCanvasRepositoryCredentialsResponse, error) {
 	ttl := time.Duration(req.GetTtlSeconds()) * time.Second
 	if ttl <= 0 {
 		ttl = time.Hour
 	}
-	if ttl > maxCanvasRepositoryGitURLTTL {
-		ttl = maxCanvasRepositoryGitURLTTL
+	if ttl > maxCanvasRepositoryCredentialsTTL {
+		ttl = maxCanvasRepositoryCredentialsTTL
 	}
 
-	url, err := storage.RemoteURL(ctx, canvasRepositoryRef(repository), canvasstorage.RemoteURLOptions{
+	credentials, err := storage.GenerateGitCredentials(ctx, canvasRepositoryRef(repository), canvasstorage.GitCredentialsOptions{
 		ReadOnly:       req.GetReadOnly(),
 		TTL:            ttl,
 		AllowForcePush: req.GetAllowForcePush(),
@@ -230,9 +229,10 @@ func createCanvasRepositoryGitURL(
 		return nil, canvasStorageStatusError(err)
 	}
 
-	return &pb.CreateCanvasRepositoryGitURLResponse{
-		Repository: serializeCanvasRepository(repository),
-		Url:        url,
+	return &pb.GenerateCanvasRepositoryCredentialsResponse{
+		Repository: serializeCanvasRepository(ctx, repository, storage),
+		Username:   credentials.Username,
+		Password:   credentials.Password,
 		ExpiresAt:  timestamppb.New(time.Now().Add(ttl)),
 	}, nil
 }
@@ -294,9 +294,6 @@ func ensureCanvasRepository(
 		Status:         models.CanvasRepositoryStatusReady,
 		CreatedAt:      now,
 		UpdatedAt:      now,
-	}
-	if storageRepo.HeadSHA != "" {
-		repository.HeadSHA = &storageRepo.HeadSHA
 	}
 
 	if err := models.UpsertCanvasRepository(repository); err != nil {
@@ -361,7 +358,7 @@ func canvasRepositoryRef(repository *models.CanvasRepository) canvasstorage.Repo
 	}
 }
 
-func serializeCanvasRepository(repository *models.CanvasRepository) *pb.CanvasRepository {
+func serializeCanvasRepository(ctx context.Context, repository *models.CanvasRepository, storage canvasstorage.Provider) *pb.CanvasRepository {
 	pbRepository := &pb.CanvasRepository{
 		CanvasId:      repository.CanvasID.String(),
 		Provider:      repository.Provider,
@@ -370,9 +367,20 @@ func serializeCanvasRepository(repository *models.CanvasRepository) *pb.CanvasRe
 		Status:        repository.Status,
 		UpdatedAt:     timestamppb.New(repository.UpdatedAt),
 	}
-	if repository.HeadSHA != nil {
-		pbRepository.HeadSha = *repository.HeadSHA
+
+	if storage != nil {
+		ref := canvasRepositoryRef(repository)
+		head, err := storage.CurrentHead(ctx, ref, repository.DefaultBranch)
+		if err == nil {
+			pbRepository.HeadSha = head
+		}
+
+		gitURL, err := storage.GitURL(ctx, ref)
+		if err == nil {
+			pbRepository.GitUrl = gitURL
+		}
 	}
+
 	return pbRepository
 }
 

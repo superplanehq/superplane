@@ -91,9 +91,9 @@ func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb
 	return canvases.CommitCanvasRepositoryFiles(ctx, organizationID, req.CanvasId, req, s.canvasStorage, s.canvasStorageOptions)
 }
 
-func (s *CanvasService) CreateCanvasRepositoryGitURL(ctx context.Context, req *pb.CreateCanvasRepositoryGitURLRequest) (*pb.CreateCanvasRepositoryGitURLResponse, error) {
+func (s *CanvasService) GenerateCanvasRepositoryCredentials(ctx context.Context, req *pb.GenerateCanvasRepositoryCredentialsRequest) (*pb.GenerateCanvasRepositoryCredentialsResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
-	return canvases.CreateCanvasRepositoryGitURL(ctx, organizationID, req.CanvasId, req, s.canvasStorage, s.canvasStorageOptions)
+	return canvases.GenerateCanvasRepositoryCredentials(ctx, organizationID, req.CanvasId, req, s.canvasStorage, s.canvasStorageOptions)
 }
 
 func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRequest) (*pb.CreateCanvasResponse, error) {

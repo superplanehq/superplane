@@ -247,6 +247,30 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	}
 	core.Bind(deleteCmd, &deleteCommand{}, options)
 
+	gitURLCmd := &cobra.Command{
+		Use:   "git-url <name-or-id>",
+		Short: "Print the stable Git URL for a canvas repository",
+		Args:  cobra.ExactArgs(1),
+	}
+	core.Bind(gitURLCmd, &repositoryGitURLCommand{}, options)
+
+	var gitCredentialHelperReadOnly bool
+	var gitCredentialHelperTTLSeconds int64
+	var gitCredentialHelperAllowForcePush bool
+	gitCredentialHelperCmd := &cobra.Command{
+		Use:   "git-credential-helper [get|store|erase]",
+		Short: "Git credential helper for canvas repositories",
+		Args:  cobra.MaximumNArgs(1),
+	}
+	gitCredentialHelperCmd.Flags().BoolVar(&gitCredentialHelperReadOnly, "read-only", false, "generate read-only Git credentials")
+	gitCredentialHelperCmd.Flags().Int64Var(&gitCredentialHelperTTLSeconds, "ttl-seconds", 3600, "credential TTL in seconds")
+	gitCredentialHelperCmd.Flags().BoolVar(&gitCredentialHelperAllowForcePush, "allow-force-push", false, "allow force pushes for generated write credentials")
+	core.Bind(gitCredentialHelperCmd, &repositoryCredentialHelperCommand{
+		readOnly:       &gitCredentialHelperReadOnly,
+		ttlSeconds:     &gitCredentialHelperTTLSeconds,
+		allowForcePush: &gitCredentialHelperAllowForcePush,
+	}, options)
+
 	root.AddCommand(listCmd)
 	root.AddCommand(getCmd)
 	root.AddCommand(activeCmd)
@@ -255,6 +279,8 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	root.AddCommand(updateCmd)
 	root.AddCommand(deleteCmd)
 	root.AddCommand(changeRequestsCmd)
+	root.AddCommand(gitURLCmd)
+	root.AddCommand(gitCredentialHelperCmd)
 
 	return root
 }

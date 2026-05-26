@@ -73,16 +73,14 @@ func (p *LocalGitProvider) EnsureRepository(ctx context.Context, spec Repository
 	}
 
 	if created {
-		result, err := p.initializeRepository(ctx, repoID, branch)
-		if err != nil {
+		if _, err := p.initializeRepository(ctx, repoID, branch); err != nil {
 			return nil, err
 		}
 
-		return &Repository{RepoID: repoID, DefaultBranch: branch, HeadSHA: result.NewSHA}, nil
+		return &Repository{RepoID: repoID, DefaultBranch: branch}, nil
 	}
 
-	head, _ := p.currentHead(ctx, repoID, branch)
-	return &Repository{RepoID: repoID, DefaultBranch: branch, HeadSHA: head}, nil
+	return &Repository{RepoID: repoID, DefaultBranch: branch}, nil
 }
 
 func (p *LocalGitProvider) initializeRepository(ctx context.Context, repoID, branch string) (*CommitResult, error) {
@@ -257,8 +255,16 @@ func (p *LocalGitProvider) CommitFiles(ctx context.Context, ref RepositoryRef, o
 	return &CommitResult{CommitSHA: newSHA, OldSHA: oldSHA, NewSHA: newSHA, Branch: branch}, nil
 }
 
-func (p *LocalGitProvider) RemoteURL(ctx context.Context, ref RepositoryRef, options RemoteURLOptions) (string, error) {
+func (p *LocalGitProvider) CurrentHead(ctx context.Context, ref RepositoryRef, branch string) (string, error) {
+	return p.currentHead(ctx, strings.TrimSpace(ref.RepoID), refOrDefault(branch, ref.DefaultBranch))
+}
+
+func (p *LocalGitProvider) GitURL(ctx context.Context, ref RepositoryRef) (string, error) {
 	return "", ErrRemoteURLUnsupported
+}
+
+func (p *LocalGitProvider) GenerateGitCredentials(ctx context.Context, ref RepositoryRef, options GitCredentialsOptions) (*GitCredentials, error) {
+	return nil, ErrRemoteURLUnsupported
 }
 
 func (p *LocalGitProvider) repoPath(repoID string) (string, error) {

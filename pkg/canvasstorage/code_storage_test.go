@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -87,8 +88,8 @@ func TestCodeStorageProviderEnsureRepositoryInitializesReadme(t *testing.T) {
 		t.Fatalf("ensure repository: %v", err)
 	}
 
-	if repo.HeadSHA != "abc123" {
-		t.Fatalf("expected initialized head, got %q", repo.HeadSHA)
+	if repo.DefaultBranch != "main" {
+		t.Fatalf("expected default branch main, got %q", repo.DefaultBranch)
 	}
 	if createBody["default_branch"] != "main" {
 		t.Fatalf("expected default branch main, got %#v", createBody["default_branch"])
@@ -202,5 +203,72 @@ func TestCodeStorageProviderDeleteRepositoryAlreadyDeleted(t *testing.T) {
 	err = provider.DeleteRepository(context.Background(), RepositoryRef{RepoID: repoID, DefaultBranch: "main"})
 	if err != nil {
 		t.Fatalf("delete repository: %v", err)
+	}
+}
+
+func TestCodeStorageProviderCurrentHead(t *testing.T) {
+	repoID := CanvasRepoID(uuid.New(), uuid.New())
+	rawQuery := ""
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/repos/branches" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		rawQuery = r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"branches":[
+				{"name":"feature","head_sha":"feature-sha"},
+				{"name":"main","head_sha":"main-sha"}
+			],
+			"has_more":false
+		}`))
+	}))
+	defer server.Close()
+
+	client, err := codestorage.NewClient(codestorage.Options{Name: "acme", Key: testCodeStorageKey, APIBaseURL: server.URL})
+	if err != nil {
+		t.Fatalf("client error: %v", err)
+	}
+	provider := &CodeStorageProvider{client: client, defaultBranch: "main"}
+
+	head, err := provider.CurrentHead(context.Background(), RepositoryRef{RepoID: repoID, DefaultBranch: "main"}, "")
+	if err != nil {
+		t.Fatalf("current head: %v", err)
+	}
+	if head != "main-sha" {
+		t.Fatalf("expected main head, got %q", head)
+	}
+	if !strings.Contains(rawQuery, "limit=100") {
+		t.Fatalf("expected branch query limit, got %q", rawQuery)
+	}
+}
+
+func TestCodeStorageProviderGitURLAndCredentials(t *testing.T) {
+	client, err := codestorage.NewClient(codestorage.Options{
+		Name:           "acme",
+		Key:            testCodeStorageKey,
+		StorageBaseURL: "acme.code.storage",
+	})
+	if err != nil {
+		t.Fatalf("client error: %v", err)
+	}
+	provider := &CodeStorageProvider{client: client, defaultBranch: "main"}
+	ref := RepositoryRef{RepoID: CanvasRepoID(uuid.New(), uuid.New()), DefaultBranch: "main"}
+
+	gitURL, err := provider.GitURL(context.Background(), ref)
+	if err != nil {
+		t.Fatalf("git url: %v", err)
+	}
+	if strings.Contains(gitURL, "@") || !strings.HasPrefix(gitURL, "https://acme.code.storage/") {
+		t.Fatalf("unexpected git url: %s", gitURL)
+	}
+
+	credentials, err := provider.GenerateGitCredentials(context.Background(), ref, GitCredentialsOptions{})
+	if err != nil {
+		t.Fatalf("generate credentials: %v", err)
+	}
+	if credentials.Username != "t" || credentials.Password == "" {
+		t.Fatalf("unexpected credentials: %+v", credentials)
 	}
 }

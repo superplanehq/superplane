@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"strings"
 
@@ -86,23 +87,15 @@ func (p *CodeStorageProvider) EnsureRepository(ctx context.Context, spec Reposit
 	}
 
 	repoBranch := defaultBranch(repo.DefaultBranch)
-	headSHA := ""
 	if created {
-		result, err := p.initializeRepository(ctx, repo, repoBranch)
-		if err != nil {
+		if _, err := p.initializeRepository(ctx, repo, repoBranch); err != nil {
 			return nil, err
-		}
-
-		headSHA = result.NewSHA
-		if headSHA == "" {
-			headSHA = result.CommitSHA
 		}
 	}
 
 	return &Repository{
 		RepoID:        repo.ID,
 		DefaultBranch: repoBranch,
-		HeadSHA:       headSHA,
 	}, nil
 }
 
@@ -243,7 +236,71 @@ func (p *CodeStorageProvider) CommitFiles(ctx context.Context, ref RepositoryRef
 	}, nil
 }
 
-func (p *CodeStorageProvider) RemoteURL(ctx context.Context, ref RepositoryRef, options RemoteURLOptions) (string, error) {
+func (p *CodeStorageProvider) CurrentHead(ctx context.Context, ref RepositoryRef, branch string) (string, error) {
+	repo, err := p.repo(ref)
+	if err != nil {
+		return "", err
+	}
+
+	target := refOrDefault(branch, ref.DefaultBranch)
+	cursor := ""
+	for {
+		result, err := repo.ListBranches(ctx, codestorage.ListBranchesOptions{
+			Cursor: cursor,
+			Limit:  100,
+		})
+		if err != nil {
+			return "", err
+		}
+
+		for _, candidate := range result.Branches {
+			if candidate.Name == target {
+				return candidate.HeadSHA, nil
+			}
+		}
+
+		if !result.HasMore || result.NextCursor == "" {
+			return "", nil
+		}
+
+		cursor = result.NextCursor
+	}
+}
+
+func (p *CodeStorageProvider) GitURL(ctx context.Context, ref RepositoryRef) (string, error) {
+	remote, err := p.authenticatedRemoteURL(ctx, ref, GitCredentialsOptions{ReadOnly: true})
+	if err != nil {
+		return "", err
+	}
+
+	u, err := url.Parse(remote)
+	if err != nil {
+		return "", err
+	}
+
+	u.User = nil
+	return u.String(), nil
+}
+
+func (p *CodeStorageProvider) GenerateGitCredentials(ctx context.Context, ref RepositoryRef, options GitCredentialsOptions) (*GitCredentials, error) {
+	remote, err := p.authenticatedRemoteURL(ctx, ref, options)
+	if err != nil {
+		return nil, err
+	}
+
+	u, err := url.Parse(remote)
+	if err != nil {
+		return nil, err
+	}
+
+	password, _ := u.User.Password()
+	return &GitCredentials{
+		Username: u.User.Username(),
+		Password: password,
+	}, nil
+}
+
+func (p *CodeStorageProvider) authenticatedRemoteURL(ctx context.Context, ref RepositoryRef, options GitCredentialsOptions) (string, error) {
 	permissions := []codestorage.Permission{codestorage.PermissionGitRead}
 	var ops codestorage.Ops
 	if !options.ReadOnly {

@@ -224,7 +224,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_CreateCanvasRepositoryGitURL_FullMethodName: {
+		pbCanvases.Canvases_GenerateCanvasRepositoryCredentials_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "update",
 			DomainType:       models.DomainTypeOrganization,

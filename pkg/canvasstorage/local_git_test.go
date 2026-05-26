@@ -36,7 +36,11 @@ func TestLocalGitProviderCommitListAndRead(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ensure repository: %v", err)
 	}
-	if repo.HeadSHA == "" {
+	initialHead, err := provider.CurrentHead(ctx, RepositoryRef{RepoID: repo.RepoID, DefaultBranch: repo.DefaultBranch}, repo.DefaultBranch)
+	if err != nil {
+		t.Fatalf("current head: %v", err)
+	}
+	if initialHead == "" {
 		t.Fatal("expected repository to be initialized")
 	}
 
@@ -53,6 +57,14 @@ func TestLocalGitProviderCommitListAndRead(t *testing.T) {
 	}
 	if result.NewSHA == "" || result.NewSHA == result.OldSHA {
 		t.Fatalf("unexpected commit result: %+v", result)
+	}
+
+	head, err := provider.CurrentHead(ctx, RepositoryRef{RepoID: repo.RepoID, DefaultBranch: repo.DefaultBranch}, repo.DefaultBranch)
+	if err != nil {
+		t.Fatalf("current head: %v", err)
+	}
+	if head != result.NewSHA {
+		t.Fatalf("expected current head %q, got %q", result.NewSHA, head)
 	}
 
 	files, err := provider.ListFiles(ctx, RepositoryRef{RepoID: repo.RepoID, DefaultBranch: repo.DefaultBranch}, ListFilesOptions{})
@@ -215,7 +227,7 @@ func TestLocalGitProviderExpectedHeadMismatch(t *testing.T) {
 	}
 }
 
-func TestLocalGitProviderRemoteURLUnsupported(t *testing.T) {
+func TestLocalGitProviderGitAccessUnsupported(t *testing.T) {
 	provider, err := NewLocalGitProvider(config.CanvasStorageConfig{
 		LocalRoot:     t.TempDir(),
 		DefaultBranch: "main",
@@ -224,7 +236,12 @@ func TestLocalGitProviderRemoteURLUnsupported(t *testing.T) {
 		t.Fatalf("provider error: %v", err)
 	}
 
-	_, err = provider.RemoteURL(context.Background(), RepositoryRef{}, RemoteURLOptions{})
+	_, err = provider.GitURL(context.Background(), RepositoryRef{})
+	if !errors.Is(err, ErrRemoteURLUnsupported) {
+		t.Fatalf("expected remote URL unsupported, got %v", err)
+	}
+
+	_, err = provider.GenerateGitCredentials(context.Background(), RepositoryRef{}, GitCredentialsOptions{})
 	if !errors.Is(err, ErrRemoteURLUnsupported) {
 		t.Fatalf("expected remote URL unsupported, got %v", err)
 	}
