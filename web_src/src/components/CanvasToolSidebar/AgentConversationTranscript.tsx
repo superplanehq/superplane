@@ -1,6 +1,6 @@
 import { Bot, ChevronRight, Loader2, Terminal } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState, type RefObject } from "react";
-import { formatSystemNotification, isSystemNotification } from "@/components/AgentSidebar/systemMessages";
+import { isSystemNotification } from "@/components/AgentSidebar/systemMessages";
 import type { RubricCategory } from "@/components/AgentSidebar/widgets/parser";
 import { RichMessage } from "@/components/AgentSidebar/widgets/RichMessage";
 import { cn } from "@/lib/utils";

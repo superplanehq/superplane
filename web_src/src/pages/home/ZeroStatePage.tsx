@@ -2,12 +2,10 @@ import { Button } from "@/components/ui/button";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { ArrowRight, Plus, Search } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import templateManifest from "../../../../templates/manifest.json";
 import { AppDetailModal, IntegrationIcons, LeadIcon, type AppEntry } from "./AppDetailModal";
+import { filterAppCatalog } from "./appCatalog";
 import { useCreateApp } from "./useCreateApp";
 import { useInstallTemplate } from "./useInstallTemplate";
-
-const allApps: AppEntry[] = templateManifest;
 
 interface ZeroStatePageProps {
   userName: string;
@@ -25,14 +23,7 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
   const firstName = userName.split(" ")[0] || "there";
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return allApps;
-    return allApps.filter(
-      (t) =>
-        t.title.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q) ||
-        t.integrations.some((i) => i.toLowerCase().includes(q)),
-    );
+    return filterAppCatalog(search, false);
   }, [search]);
 
   const visible = search ? filtered : filtered.slice(0, visibleCount);
@@ -82,20 +73,7 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
           <p className="mt-2 text-sm text-slate-500">Create a blank app or pick one from the catalog below.</p>
         </div>
 
-        <button
-          type="button"
-          disabled={busy}
-          onClick={handleBlankCreate}
-          className="flex w-full items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 text-left transition-colors hover:bg-slate-50 disabled:opacity-50"
-        >
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100">
-            <Plus className="h-5 w-5 text-slate-600" />
-          </div>
-          <div>
-            <p className="text-base font-medium text-slate-900">Start from scratch</p>
-            <p className="mt-0.5 text-sm text-slate-500">Create a blank app and build your workflow</p>
-          </div>
-        </button>
+        <BlankAppButton busy={busy} onCreate={handleBlankCreate} />
 
         <div className="relative my-8">
           <div className="absolute inset-0 flex items-center">
@@ -121,34 +99,7 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
 
         <div className="flex flex-col gap-2">
           {visible.map((app) => (
-            <div
-              key={app.repo}
-              onClick={() => setSelectedApp(app)}
-              className="flex cursor-pointer items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50"
-            >
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-                <LeadIcon integrations={app.integrations} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium text-slate-900">{app.title}</p>
-                  <IntegrationIcons integrations={app.integrations} />
-                </div>
-                <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{app.description}</p>
-              </div>
-              <Button
-                size="sm"
-                className="shrink-0 text-xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleInstall(app);
-                }}
-                disabled={busy}
-              >
-                Install
-                <ArrowRight className="ml-1 h-3 w-3" />
-              </Button>
-            </div>
+            <AppListItem key={app.repo} app={app} busy={busy} onSelect={setSelectedApp} onInstall={handleInstall} />
           ))}
           {!search && visibleCount < filtered.length && <div ref={sentinelRef} className="h-1" />}
           {search && filtered.length === 0 && (
@@ -157,5 +108,66 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
         </div>
       </div>
     </>
+  );
+}
+
+function BlankAppButton({ busy, onCreate }: { busy: boolean; onCreate: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={onCreate}
+      className="flex w-full items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 text-left transition-colors hover:bg-slate-50 disabled:opacity-50"
+    >
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100">
+        <Plus className="h-5 w-5 text-slate-600" />
+      </div>
+      <div>
+        <p className="text-base font-medium text-slate-900">Start from scratch</p>
+        <p className="mt-0.5 text-sm text-slate-500">Create a blank app and build your workflow</p>
+      </div>
+    </button>
+  );
+}
+
+function AppListItem({
+  app,
+  busy,
+  onInstall,
+  onSelect,
+}: {
+  app: AppEntry;
+  busy: boolean;
+  onInstall: (app: AppEntry) => void;
+  onSelect: (app: AppEntry) => void;
+}) {
+  return (
+    <div
+      onClick={() => onSelect(app)}
+      className="flex cursor-pointer items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50"
+    >
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+        <LeadIcon integrations={app.integrations} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium text-slate-900">{app.title}</p>
+          <IntegrationIcons integrations={app.integrations} />
+        </div>
+        <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{app.description}</p>
+      </div>
+      <Button
+        size="sm"
+        className="shrink-0 text-xs"
+        onClick={(e) => {
+          e.stopPropagation();
+          onInstall(app);
+        }}
+        disabled={busy}
+      >
+        Install
+        <ArrowRight className="ml-1 h-3 w-3" />
+      </Button>
+    </div>
   );
 }

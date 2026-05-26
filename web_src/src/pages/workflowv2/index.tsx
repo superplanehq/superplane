@@ -86,7 +86,7 @@ import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
 import { WorkflowDashboardOverlay } from "./dashboard/WorkflowDashboardOverlay";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useMemoryModeActions } from "./useMemoryModeActions";
-import { useAutoEnterEditMode, useAutoPlaceholderNode, useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
+import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
@@ -229,7 +229,6 @@ export function WorkflowPageV2() {
   const { data: widgets = [], isLoading: widgetsLoading } = useWidgets();
   const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
   const canReadIntegrations = canAct("integrations", "read");
-  const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const {
@@ -4906,11 +4905,8 @@ export function WorkflowPageV2() {
     setSelectedRunId,
     setRunDetailNodeId,
     setSearchParams,
+    startup: { hasEditableVersion, canUpdateCanvas, canvas, handlePlaceholderAdd, searchParams },
   });
-
-  useAutoEnterEditMode(hasEditableVersion, canUpdateCanvas, !!canvas, handleToggleEditMode, searchParams, setSearchParams);
-  useAutoPlaceholderNode(hasEditableVersion, !!canvas?.spec, canvasId, handlePlaceholderAdd);
-
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
       if (!isRunsMode || !selectedRun) return;
@@ -5596,7 +5592,7 @@ export function WorkflowPageV2() {
           onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
           integrations={canReadIntegrations ? integrations : []}
           canReadIntegrations={canReadIntegrations}
-          canCreateIntegrations={canCreateIntegrations}
+          canCreateIntegrations={canAct("integrations", "create")}
           canUpdateIntegrations={canUpdateIntegrations}
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}

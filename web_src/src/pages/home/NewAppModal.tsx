@@ -7,26 +7,13 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
-import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
-import { ArrowLeft, ArrowRight, ExternalLink, Plus } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import templateManifest from "../../../../templates/manifest.json";
+import { AppDetailModal, IntegrationIcons, LeadIcon, type AppEntry } from "./AppDetailModal";
+import { filterAppCatalog } from "./appCatalog";
 import { useCreateApp } from "./useCreateApp";
 import { useInstallTemplate } from "./useInstallTemplate";
-
-interface AppEntry {
-  repo: string;
-  title: string;
-  description: string;
-  integrations: string[];
-  tags: string[];
-  requirements: string[];
-  agentInstructions: string;
-}
-
-const allApps: AppEntry[] = templateManifest;
 
 interface NewAppModalProps {
   open: boolean;
@@ -50,15 +37,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
   }, [open]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return allApps;
-    return allApps.filter(
-      (t) =>
-        t.title.toLowerCase().includes(q) ||
-        t.description.toLowerCase().includes(q) ||
-        t.integrations.some((i) => i.toLowerCase().includes(q)) ||
-        t.tags.some((tag) => tag.toLowerCase().includes(q)),
-    );
+    return filterAppCatalog(search);
   }, [search]);
 
   const visible = search ? filtered : filtered.slice(0, visibleCount);
@@ -99,7 +78,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
 
   if (selectedApp) {
     return (
-      <AppDetailView
+      <AppDetailModal
         app={selectedApp}
         busy={busy}
         onBack={() => setSelectedApp(null)}
@@ -129,15 +108,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
         className="h-12"
       />
       <div className="border-b border-slate-200 px-3 py-2">
-        <CommandItem onSelect={handleBlankCreate} disabled={busy} className="gap-3 px-3 py-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-            <Plus className="h-4 w-4 text-slate-600" />
-          </div>
-          <div>
-            <p className="text-sm font-medium">Start from scratch</p>
-            <p className="text-xs text-muted-foreground">Create a blank app</p>
-          </div>
-        </CommandItem>
+        <BlankAppCommandItem busy={busy} onCreate={handleBlankCreate} />
       </div>
       <CommandList className="max-h-[360px] scroll-py-2 px-3 py-3">
         <CommandEmpty>No apps found.</CommandEmpty>
@@ -146,34 +117,13 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
           <>
             <CommandGroup heading="Apps">
               {visible.map((app) => (
-                <CommandItem
+                <AppCommandItem
                   key={app.repo}
-                  value={`${app.title} ${app.description} ${app.integrations.join(" ")} ${app.tags.join(" ")}`}
-                  onSelect={() => setSelectedApp(app)}
-                  disabled={busy}
-                  className="gap-3 px-3 py-3"
-                >
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-                    <LeadIntegrationIcon integrations={app.integrations} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">{app.title}</p>
-                      <IntegrationIcons integrations={app.integrations} />
-                    </div>
-                    <p className="text-xs text-muted-foreground line-clamp-1">{app.description}</p>
-                  </div>
-                  <Button
-                    size="sm"
-                    className="shrink-0 text-xs"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => handleInstall(e, app)}
-                    disabled={busy}
-                  >
-                    Install
-                    <ArrowRight className="ml-1 h-3 w-3" />
-                  </Button>
-                </CommandItem>
+                  app={app}
+                  busy={busy}
+                  onSelect={setSelectedApp}
+                  onInstall={handleInstall}
+                />
               ))}
             </CommandGroup>
             {!search && visibleCount < filtered.length && <div ref={sentinelRef} className="h-1" />}
@@ -184,127 +134,58 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
   );
 }
 
-function AppDetailView({
-  app,
-  busy,
-  onBack,
-  onInstall,
-  onClose,
-}: {
-  app: AppEntry;
-  busy: boolean;
-  onBack: () => void;
-  onInstall: (e: React.MouseEvent) => void;
-  onClose: () => void;
-}) {
-  const repoUrl = `https://${app.repo}`;
-
+function BlankAppCommandItem({ busy, onCreate }: { busy: boolean; onCreate: () => void }) {
   return (
-    <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[12vh] sm:pt-[14vh]">
-      <div className="fixed inset-0 bg-gray-950/20" onClick={onClose} />
-      <div className="relative w-[calc(100vw-2rem)] max-w-3xl rounded-xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back
-          </button>
-        </div>
-
-        <div className="px-6 py-5">
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100">
-              <LeadIntegrationIcon integrations={app.integrations} size="lg" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="text-lg font-semibold text-slate-900">{app.title}</h3>
-              <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                <IntegrationIcons integrations={app.integrations} />
-                {app.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600"
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Description</h4>
-            <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{app.description}</p>
-          </div>
-
-          {app.requirements.length > 0 && (
-            <div className="mt-4">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Requirements</h4>
-              <ul className="mt-1.5 space-y-1">
-                {app.requirements.map((req) => (
-                  <li key={req} className="flex items-start gap-2 text-sm text-slate-600">
-                    <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-slate-400" />
-                    {req}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
-          <a
-            href={repoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            View on GitHub
-          </a>
-          <Button onClick={onInstall} disabled={busy}>
-            Install
-            <ArrowRight className="ml-1.5 h-4 w-4" />
-          </Button>
-        </div>
+    <CommandItem onSelect={onCreate} disabled={busy} className="gap-3 px-3 py-3">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+        <Plus className="h-4 w-4 text-slate-600" />
       </div>
-    </div>
+      <div>
+        <p className="text-sm font-medium">Start from scratch</p>
+        <p className="text-xs text-muted-foreground">Create a blank app</p>
+      </div>
+    </CommandItem>
   );
 }
 
-function LeadIntegrationIcon({ integrations, size = "sm" }: { integrations: string[]; size?: "sm" | "lg" }) {
-  const first = integrations[0];
-  const cls = size === "lg" ? "h-7 w-7" : "h-5 w-5";
-  if (!first) return <Plus className={`${cls} text-slate-400`} />;
-  const icon = getIntegrationIconSrc(first.toLowerCase());
-  if (!icon) return <Plus className={`${cls} text-slate-400`} />;
-  return <img src={icon} alt={first} className={cls} />;
-}
-
-function IntegrationIcons({ integrations }: { integrations: string[] }) {
-  if (integrations.length === 0) return null;
-
+function AppCommandItem({
+  app,
+  busy,
+  onInstall,
+  onSelect,
+}: {
+  app: AppEntry;
+  busy: boolean;
+  onInstall: (e: React.MouseEvent, app: AppEntry) => void;
+  onSelect: (app: AppEntry) => void;
+}) {
   return (
-    <div className="flex items-center gap-1 shrink-0">
-      {integrations.map((name) => {
-        const iconSrc = getIntegrationIconSrc(name.toLowerCase());
-        if (!iconSrc) return null;
-        return (
-          <Tooltip key={name}>
-            <TooltipTrigger asChild>
-              <span className="inline-block h-3.5 w-3.5 shrink-0">
-                <img src={iconSrc} alt={name} className="h-full w-full object-contain" />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <span className="capitalize">{name}</span>
-            </TooltipContent>
-          </Tooltip>
-        );
-      })}
-    </div>
+    <CommandItem
+      value={`${app.title} ${app.description} ${app.integrations.join(" ")} ${app.tags.join(" ")}`}
+      onSelect={() => onSelect(app)}
+      disabled={busy}
+      className="gap-3 px-3 py-3"
+    >
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100">
+        <LeadIcon integrations={app.integrations} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium">{app.title}</p>
+          <IntegrationIcons integrations={app.integrations} />
+        </div>
+        <p className="text-xs text-muted-foreground line-clamp-1">{app.description}</p>
+      </div>
+      <Button
+        size="sm"
+        className="shrink-0 text-xs"
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => onInstall(e, app)}
+        disabled={busy}
+      >
+        Install
+        <ArrowRight className="ml-1 h-3 w-3" />
+      </Button>
+    </CommandItem>
   );
 }
