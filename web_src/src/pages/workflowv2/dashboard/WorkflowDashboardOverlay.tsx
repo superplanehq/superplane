@@ -6,6 +6,9 @@ type WorkflowDashboardOverlayProps = Omit<DashboardOverlayProps, "readOnly" | "c
   canUpdateCanvas: boolean;
   isTemplate: boolean;
   canvasDeletedRemotely: boolean;
+  // Mirrors the workflow page's app-wide read-only state so hover/edit
+  // affordances stay hidden when the canvas is not in edit mode.
+  isReadOnly: boolean;
 };
 
 export function WorkflowDashboardOverlay({
@@ -14,16 +17,23 @@ export function WorkflowDashboardOverlay({
   canUpdateCanvas,
   isTemplate,
   canvasDeletedRemotely,
+  isReadOnly,
   ...dashboardProps
 }: WorkflowDashboardOverlayProps) {
   if (!isDashboardMode || !dashboardsFeatureEnabled) return null;
 
-  const dashboardLocked = !canUpdateCanvas || isTemplate || canvasDeletedRemotely;
+  // Authoring affordances (panel edit/delete, drag/resize, YAML import) are
+  // hidden whenever the app is in read mode. Runtime triggers (widget row
+  // actions, Node panel Run button) only depend on permission/template state,
+  // not on whether the canvas is in edit mode — the in-flight run lock
+  // disables them when a run is already executing.
+  const dashboardEditLocked = isReadOnly || !canUpdateCanvas || isTemplate || canvasDeletedRemotely;
+  const dashboardRunLocked = !canUpdateCanvas || isTemplate || canvasDeletedRemotely;
   return (
     <DashboardOverlay
-      readOnly={dashboardLocked}
-      canImportYaml={!dashboardLocked}
-      canRunNodes={!dashboardLocked}
+      readOnly={dashboardEditLocked}
+      canImportYaml={!dashboardEditLocked}
+      canRunNodes={!dashboardRunLocked}
       {...dashboardProps}
     />
   );

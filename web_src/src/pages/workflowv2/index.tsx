@@ -5508,6 +5508,7 @@ export function WorkflowPageV2() {
           canUpdateCanvas={canUpdateCanvas}
           isTemplate={isTemplate}
           canvasDeletedRemotely={canvasDeletedRemotely}
+          isReadOnly={isReadOnly}
           dashboardQuery={dashboardQuery}
           updateDashboardMutation={updateDashboardMutation}
           addPanelDialogOpen={isDashboardAddPanelOpen}
@@ -5526,6 +5527,7 @@ export function WorkflowPageV2() {
           isViewingDraftVersion={isViewingDraftVersion}
           isViewingLiveVersion={isViewingLiveVersion}
           canUpdateCanvas={canUpdateCanvas}
+          isReadOnly={isReadOnly}
           entries={canvasMemoryEntries}
           isLoading={canvasMemoryLoading}
           error={canvasMemoryError}

@@ -13,6 +13,9 @@ interface WorkflowMemoryOverlayLayerProps {
   isViewingDraftVersion: boolean;
   isViewingLiveVersion: boolean;
   canUpdateCanvas: boolean;
+  // Mirrors the workflow page's app-wide read-only state so the trash
+  // affordance disappears entirely when the canvas is not in edit mode.
+  isReadOnly: boolean;
   entries: CanvasMemoryEntry[];
   isLoading: boolean;
   error: unknown;
@@ -24,6 +27,7 @@ export function WorkflowMemoryOverlayLayer({
   isViewingDraftVersion,
   isViewingLiveVersion,
   canUpdateCanvas,
+  isReadOnly,
   entries,
   isLoading,
   error,
@@ -31,16 +35,14 @@ export function WorkflowMemoryOverlayLayer({
 }: WorkflowMemoryOverlayLayerProps) {
   if (!isMemoryMode) return null;
 
+  const canDeleteEntry = !isReadOnly && canUpdateCanvas && isViewingLiveVersion && !isViewingDraftVersion;
+
   return (
     <CanvasMemoryView
       entries={entries}
       isLoading={isLoading}
       errorMessage={error instanceof Error ? error.message : undefined}
-      onDeleteEntry={
-        canUpdateCanvas && isViewingLiveVersion && !isViewingDraftVersion
-          ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId)
-          : undefined
-      }
+      onDeleteEntry={canDeleteEntry ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined}
       deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
     />
   );
