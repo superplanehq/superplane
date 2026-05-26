@@ -54,6 +54,13 @@ func walkFieldValue(path string, field configuration.Field, value any, visit str
 		}
 		walkUntypedValue(path, value, visit)
 
+	case configuration.FieldTypeManualRunPayload:
+		if obj, ok := asAnyMap(value); ok {
+			walkUntypedValue(path, obj, visit)
+			return
+		}
+		walkUntypedValue(path, value, visit)
+
 	default:
 		if str, ok := value.(string); ok {
 			visit(path, field.Type, str)

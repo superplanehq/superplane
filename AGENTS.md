@@ -45,6 +45,7 @@
 
 - Tests end with \_test.go
 - Always prefer early returns over else blocks when possible
+- Use top-down declaration order in each file — exported classes, functions and types first, then unexported helpers — so readers see the public API before implementation details
 - GoLang: prefer `any` over `interface{}` types
 - GoLang: when checking for the existence of an item on a list, use `slice.Contains` or `slice.ContainsFunc`
 - When naming variables, avoid names like `*Str` or `*UUID`; Go is a typed language, we don't need types in the variables names

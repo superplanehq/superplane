@@ -33,6 +33,7 @@ const (
 	FieldTypeAnyPredicateList    = "any-predicate-list"
 	FieldTypeGitRef              = "git-ref"
 	FieldTypeSecretKey           = "secret-key"
+	FieldTypeManualRunPayload    = "manual-run-payload"
 )
 
 type Field struct {

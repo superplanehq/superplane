@@ -339,16 +339,17 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 			return nil
 		}
 
-		err = configuration.ValidateConfiguration(schema, node.GetConfiguration().AsMap())
+		nodeConfiguration := node.GetConfiguration().AsMap()
+		err = configuration.ValidateConfiguration(schema, nodeConfiguration)
 		if err != nil {
 			errorMessage := err.Error()
 			currentNode.ErrorMessage = &errorMessage
-			currentNode.Configuration = node.GetConfiguration().AsMap()
+			currentNode.Configuration = nodeConfiguration
 			p.nodes[nodeID] = currentNode
 			return nil
 		}
 
-		currentNode.Configuration = node.GetConfiguration().AsMap()
+		currentNode.Configuration = nodeConfiguration
 		currentNode.ErrorMessage = nil
 	}
 
