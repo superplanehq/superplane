@@ -3,9 +3,11 @@ package canvases
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -14,7 +16,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateCanvasDashboard(ctx context.Context, organizationID, canvasID string, panels []*pb.DashboardPanel, layout []*pb.DashboardLayoutItem) (*pb.UpdateCanvasDashboardResponse, error) {
+func UpdateCanvasDashboard(
+	ctx context.Context,
+	organizationID,
+	canvasID string,
+	versionID string,
+	panels []*pb.DashboardPanel,
+	layout []*pb.DashboardLayoutItem,
+) (*pb.UpdateCanvasDashboardResponse, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization_id")
@@ -24,6 +33,12 @@ func UpdateCanvasDashboard(ctx context.Context, organizationID, canvasID string,
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas_id")
 	}
+
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+	userUUID := uuid.MustParse(userID)
 
 	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
 	if err != nil {
@@ -49,14 +64,45 @@ func UpdateCanvasDashboard(ctx context.Context, organizationID, canvasID string,
 
 	var saved *models.CanvasDashboard
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		record, upsertErr := models.UpsertCanvasDashboardInTransaction(tx, canvas.ID, modelPanels, modelLayout)
-		if upsertErr != nil {
-			return upsertErr
+		resolvedVersionID, resolveErr := resolveDashboardVersionID(tx, canvas, strings.TrimSpace(versionID))
+		if resolveErr != nil {
+			return resolveErr
+		}
+
+		version, loadErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, resolvedVersionID)
+		if loadErr != nil {
+			if errors.Is(loadErr, gorm.ErrRecordNotFound) {
+				return status.Error(codes.NotFound, "version not found")
+			}
+			return loadErr
+		}
+
+		if version.State == models.CanvasVersionStatePublished {
+			return status.Error(codes.FailedPrecondition, "published versions are immutable")
+		}
+
+		if version.OwnerID == nil || *version.OwnerID != userUUID {
+			return status.Error(codes.PermissionDenied, "version owner mismatch")
+		}
+
+		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvas.ID, userUUID, version.ID); draftErr != nil {
+			if errors.Is(draftErr, gorm.ErrRecordNotFound) {
+				return status.Error(codes.FailedPrecondition, "version is not your current edit version")
+			}
+			return draftErr
+		}
+
+		record, updateErr := models.UpdateCanvasVersionDashboardInTransaction(tx, version, modelPanels, modelLayout)
+		if updateErr != nil {
+			return updateErr
 		}
 		saved = record
 		return nil
 	})
 	if err != nil {
+		if status.Code(err) != codes.Unknown {
+			return nil, err
+		}
 		log.WithError(err).Error("failed to update canvas dashboard")
 		return nil, status.Error(codes.Internal, "failed to update canvas dashboard")
 	}
