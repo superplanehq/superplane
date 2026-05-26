@@ -11,8 +11,19 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
+
+// coreHTTPTransport wraps core.HTTPContext as an http.RoundTripper so that
+// the Google OAuth2 library uses the injected HTTP client for token fetching.
+type coreHTTPTransport struct {
+	ctx core.HTTPContext
+}
+
+func (t *coreHTTPTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	return t.ctx.Do(req)
+}
 
 const defaultComputeBaseURL = "https://compute.googleapis.com/compute/v1"
 
@@ -21,6 +32,23 @@ type Client struct {
 	http      core.HTTPContext
 	projectID string
 	baseURL   string
+}
+
+func NewClientFromKeyJSON(httpClient core.HTTPContext, keyJSON []byte, projectID string) (*Client, error) {
+	// Inject httpClient as the OAuth2 transport so token fetching goes through the same mock in tests.
+	oauthCtx := context.WithValue(context.Background(), oauth2.HTTPClient, &http.Client{
+		Transport: &coreHTTPTransport{httpClient},
+	})
+	creds, err := google.CredentialsFromJSONWithType(oauthCtx, keyJSON, google.ServiceAccount, ScopeCloudPlatform)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse service account key: %w", err)
+	}
+	return &Client{
+		creds:     creds,
+		http:      httpClient,
+		projectID: projectID,
+		baseURL:   defaultComputeBaseURL,
+	}, nil
 }
 
 func NewClient(httpClient core.HTTPContext, integration core.IntegrationContext) (*Client, error) {

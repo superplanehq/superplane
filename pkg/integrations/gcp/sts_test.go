@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -120,5 +121,72 @@ func Test_ExchangeToken(t *testing.T) {
 		_, _, err := ExchangeToken(ctx, httpCtx, oidcToken, audience)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "STS request failed")
+	})
+}
+
+func Test_GenerateServiceAccountAccessToken(t *testing.T) {
+	ctx := context.Background()
+	serviceAccountEmail := "superplane@my-project.iam.gserviceaccount.com"
+
+	t.Run("success returns impersonated access token and expiry", func(t *testing.T) {
+		expireTime := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"accessToken":"sa-token","expireTime":"` + expireTime + `"}`)),
+				},
+			},
+		}
+
+		token, expiresIn, err := GenerateServiceAccountAccessToken(ctx, httpCtx, "federated-token", serviceAccountEmail, "scope-a", "scope-b")
+		require.NoError(t, err)
+		assert.Equal(t, "sa-token", token)
+		assert.Greater(t, expiresIn, 59*time.Minute)
+		assert.LessOrEqual(t, expiresIn, time.Hour)
+
+		require.Len(t, httpCtx.Requests, 1)
+		req := httpCtx.Requests[0]
+		assert.Equal(t, http.MethodPost, req.Method)
+		assert.Equal(t, "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/superplane@my-project.iam.gserviceaccount.com:generateAccessToken", req.URL.String())
+		assert.Equal(t, "Bearer federated-token", req.Header.Get("Authorization"))
+		assert.Equal(t, "application/json", req.Header.Get("Content-Type"))
+
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(req.Body).Decode(&body))
+		assert.Equal(t, []any{"scope-a", "scope-b"}, body["scope"])
+		assert.Equal(t, "3600s", body["lifetime"])
+	})
+
+	t.Run("non-200 status returns API message", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusForbidden,
+					Body:       io.NopCloser(strings.NewReader(`{"error":{"code":403,"message":"Permission 'iam.serviceAccounts.getAccessToken' denied","status":"PERMISSION_DENIED"}}`)),
+				},
+			},
+		}
+
+		_, _, err := GenerateServiceAccountAccessToken(ctx, httpCtx, "federated-token", serviceAccountEmail)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "403")
+		assert.Contains(t, err.Error(), "iam.serviceAccounts.getAccessToken")
+	})
+
+	t.Run("empty accessToken returns error", func(t *testing.T) {
+		expireTime := time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"accessToken":"","expireTime":"` + expireTime + `"}`)),
+				},
+			},
+		}
+
+		_, _, err := GenerateServiceAccountAccessToken(ctx, httpCtx, "federated-token", serviceAccountEmail)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "missing accessToken")
 	})
 }

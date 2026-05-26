@@ -37,6 +37,41 @@ func Test_TokenSourceFromIntegration(t *testing.T) {
 		assert.Contains(t, err.Error(), "no GCP credentials found")
 	})
 
+	t.Run("WIF with access token in setup-provider storage returns token source", func(t *testing.T) {
+		ctx := &contexts.IntegrationContext{
+			NewSetupFlow: true,
+			Metadata:     map[string]any{"authMethod": AuthMethodWIF},
+		}
+		require.NoError(t, ctx.Secrets().Create(core.IntegrationSecretDefinition{
+			Name:        SecretNameAccessToken,
+			Label:       "token",
+			Description: "test",
+			Value:       "wif-access-token",
+			Editable:    false,
+		}))
+		ts, err := TokenSourceFromIntegration(ctx)
+		require.NoError(t, err)
+		require.NotNil(t, ts)
+		tok, err := ts.Token()
+		require.NoError(t, err)
+		assert.Equal(t, "wif-access-token", tok.AccessToken)
+		assert.Equal(t, "Bearer", tok.TokenType)
+	})
+
+	t.Run("WIF access token used when metadata omits authMethod", func(t *testing.T) {
+		ctx := &contexts.IntegrationContext{
+			CurrentSecrets: map[string]core.IntegrationSecret{
+				SecretNameAccessToken: {Name: SecretNameAccessToken, Value: []byte("wif-access-token")},
+			},
+			Metadata: map[string]any{"projectId": "p1"},
+		}
+		ts, err := TokenSourceFromIntegration(ctx)
+		require.NoError(t, err)
+		tok, err := ts.Token()
+		require.NoError(t, err)
+		assert.Equal(t, "wif-access-token", tok.AccessToken)
+	})
+
 	t.Run("WIF with access token returns token source", func(t *testing.T) {
 		ctx := &contexts.IntegrationContext{
 			CurrentSecrets: map[string]core.IntegrationSecret{
