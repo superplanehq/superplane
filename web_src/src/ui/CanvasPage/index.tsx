@@ -193,12 +193,12 @@ export interface CanvasPageProps {
   onSelectMemory?: () => void;
   /** Switches the canvas surface to the Files tab. Omitted on templates. */
   onSelectFiles?: () => void;
+  /** Opens the canvas YAML modal. */
+  onYamlOpen?: () => void;
   /** Opens the canvas dashboard add-panel dialog when `headerMode` is `dashboard`. */
   onDashboardAddPanel?: () => void;
   /** Opens the dashboard YAML modal when `headerMode` is `dashboard`. */
   onDashboardOpenYaml?: () => void;
-  /** Opens the add-component sidebar from the secondary header when editing on the Canvas tab. */
-  onCanvasAddComponent?: () => void;
   /** Whether the dashboard YAML modal will open in read-only mode (no apply). */
   dashboardYamlReadOnly?: boolean;
   publishVersionLabel?: string;
@@ -1292,7 +1292,6 @@ function CanvasPage(props: CanvasPageProps) {
           onSelectFiles={props.onSelectFiles}
           onDashboardAddPanel={props.onDashboardAddPanel}
           onDashboardOpenYaml={props.onDashboardOpenYaml}
-          onCanvasAddComponent={props.isEditing ? handleBuildingBlocksShortcutOpen : undefined}
           dashboardYamlReadOnly={props.dashboardYamlReadOnly}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
@@ -1326,9 +1325,10 @@ function CanvasPage(props: CanvasPageProps) {
           props.headerMode === "dashboard" ? null : (
             <RightSideControls
               mode="edit"
-              addNoteOnly
+              canvasEditControls
               onSidebarOpen={handleBuildingBlocksShortcutOpen}
               onAddNote={handleAddNote}
+              onYamlOpen={props.onYamlOpen}
             />
           )
         ) : (
@@ -1336,6 +1336,7 @@ function CanvasPage(props: CanvasPageProps) {
             mode={readOnly ? "live" : "edit"}
             onSidebarOpen={handleBuildingBlocksShortcutOpen}
             onAddNote={handleAddNote}
+            onYamlOpen={props.onYamlOpen}
           />
         )}
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
@@ -1813,7 +1814,6 @@ function CanvasContentHeader({
   onSelectFiles,
   onDashboardAddPanel,
   onDashboardOpenYaml,
-  onCanvasAddComponent,
   dashboardYamlReadOnly,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
@@ -1862,7 +1862,6 @@ function CanvasContentHeader({
   onSelectFiles?: () => void;
   onDashboardAddPanel?: () => void;
   onDashboardOpenYaml?: () => void;
-  onCanvasAddComponent?: () => void;
   dashboardYamlReadOnly?: boolean;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
@@ -1913,7 +1912,6 @@ function CanvasContentHeader({
       onSelectFiles={onSelectFiles}
       onDashboardAddPanel={onDashboardAddPanel}
       onDashboardOpenYaml={onDashboardOpenYaml}
-      onCanvasAddComponent={onCanvasAddComponent}
       dashboardYamlReadOnly={dashboardYamlReadOnly}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
