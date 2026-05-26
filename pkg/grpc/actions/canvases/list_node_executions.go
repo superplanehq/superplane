@@ -179,12 +179,12 @@ func SerializeNodeExecutions(executions []models.CanvasNodeExecution, childExecu
 		}
 
 		metadataMap := execution.Metadata.Data()
-		metadata, err := structpb.NewStruct(metadataMap)
+		metadata, err := newStructpbStruct(metadataMap)
 		if err != nil {
 			return nil, err
 		}
 
-		configuration, err := structpb.NewStruct(execution.Configuration.Data())
+		configuration, err := newStructpbStruct(execution.Configuration.Data())
 		if err != nil {
 			return nil, err
 		}
@@ -424,7 +424,7 @@ func getRootEventForExecution(execution models.CanvasNodeExecution, rootEvents m
 		return nil, fmt.Errorf("event data is not a map[string]any")
 	}
 
-	s, err := structpb.NewStruct(data)
+	s, err := newStructpbStruct(data)
 	if err != nil {
 		return nil, err
 	}
@@ -449,7 +449,7 @@ func getOutputsForExecution(execution models.CanvasNodeExecution, events map[str
 	// since some executions may not have outputs.
 	//
 	if !ok {
-		data, err := structpb.NewStruct(map[string]any{})
+		data, err := newStructpbStruct(map[string]any{})
 		if err != nil {
 			return nil, err
 		}
@@ -471,7 +471,7 @@ func getOutputsForExecution(execution models.CanvasNodeExecution, events map[str
 		outputs[k] = v
 	}
 
-	data, err := structpb.NewStruct(outputs)
+	data, err := newStructpbStruct(outputs)
 	if err != nil {
 		return nil, err
 	}

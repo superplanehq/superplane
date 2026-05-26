@@ -8,7 +8,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -77,7 +76,7 @@ func SerializeCanvasEvent(event models.CanvasEvent) (*pb.CanvasEvent, error) {
 		return nil, fmt.Errorf("event data is not a map[string]any")
 	}
 
-	s, err := structpb.NewStruct(data)
+	s, err := newStructpbStruct(data)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +99,7 @@ func SerializeCanvasEventWithExecutions(event models.CanvasEvent, executions []m
 		return nil, fmt.Errorf("event data is not a map[string]any")
 	}
 
-	s, err := structpb.NewStruct(data)
+	s, err := newStructpbStruct(data)
 	if err != nil {
 		return nil, err
 	}
