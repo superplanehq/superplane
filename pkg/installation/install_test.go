@@ -3,7 +3,6 @@ package installation
 import (
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -147,8 +146,8 @@ func TestPersistInstalledConsoleUsesUUIDAsPrimaryKey(t *testing.T) {
 
 	require.NoError(t, persistInstalledConsole(canvas.ID.String(), console))
 
-	// A different (random) canvas id should not see this console.
-	unrelated, err := models.FindCanvasDashboard(uuid.New())
+	otherCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	unrelated, err := models.FindCanvasDashboard(otherCanvas.ID)
 	require.NoError(t, err)
 	assert.Empty(t, unrelated.Panels.Data())
 	assert.Empty(t, unrelated.Layout.Data())
