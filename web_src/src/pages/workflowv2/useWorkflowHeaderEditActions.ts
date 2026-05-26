@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 interface WorkflowHeaderEditActionsConfig {
@@ -34,6 +34,36 @@ export function useWorkflowHeaderEditActions({
   }, [handleToggleEditMode]);
 
   return { handleEnterEditModeFromHeader, handleExitEditModeFromHeader };
+}
+
+/**
+ * Auto-enters edit mode when `?edit=1` is in the URL.
+ * Removes the param after triggering to avoid re-entering on refresh.
+ */
+export function useAutoEnterEditMode(
+  hasEditableVersion: boolean,
+  canUpdateCanvas: boolean,
+  handleToggleEditMode: () => Promise<void>,
+  searchParams: URLSearchParams,
+  setSearchParams: SetURLSearchParams,
+) {
+  const triggeredRef = useRef(false);
+
+  useEffect(() => {
+    if (triggeredRef.current) return;
+    if (searchParams.get("edit") !== "1") return;
+    if (hasEditableVersion) return;
+    if (!canUpdateCanvas) return;
+
+    triggeredRef.current = true;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
+    sessionStorage.removeItem("open-agent-sidebar");
+
+    void handleToggleEditMode();
+  }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, handleToggleEditMode]);
 }
 
 function clearRunsViewSearchParams(current: URLSearchParams): URLSearchParams {

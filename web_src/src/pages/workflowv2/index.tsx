@@ -86,7 +86,7 @@ import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
 import { WorkflowDashboardOverlay } from "./dashboard/WorkflowDashboardOverlay";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useMemoryModeActions } from "./useMemoryModeActions";
-import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
+import { useAutoEnterEditMode, useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
@@ -4908,6 +4908,8 @@ export function WorkflowPageV2() {
     setSearchParams,
   });
 
+  useAutoEnterEditMode(hasEditableVersion, canUpdateCanvas, handleToggleEditMode, searchParams, setSearchParams);
+
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
       if (!isRunsMode || !selectedRun) return;
@@ -5535,7 +5537,7 @@ export function WorkflowPageV2() {
           key={canvasRenderKey}
           // Persist right sidebar in query params
           initialSidebar={{
-            isOpen: searchParams.get("sidebar") === "1",
+            isOpen: searchParams.get("sidebar") === "1" || sessionStorage.getItem("open-agent-sidebar") === "1",
             nodeId: searchParams.get("node") || null,
           }}
           onSidebarChange={handleSidebarChange}
