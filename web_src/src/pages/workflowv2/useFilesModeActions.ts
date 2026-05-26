@@ -2,9 +2,6 @@ import { useCallback } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 interface FilesModeActionsConfig {
-  hasEditableVersion: boolean;
-  liveCanvasVersionId: string | undefined;
-  handleUseVersion: (versionId: string) => void;
   setIsFilesMode: (value: boolean) => void;
   setIsDashboardMode: (value: boolean) => void;
   setIsDashboardAddPanelOpen: (value: boolean) => void;
@@ -16,9 +13,6 @@ interface FilesModeActionsConfig {
 }
 
 export function useFilesModeActions({
-  hasEditableVersion,
-  liveCanvasVersionId,
-  handleUseVersion,
   setIsFilesMode,
   setIsDashboardMode,
   setIsDashboardAddPanelOpen,
@@ -29,8 +23,6 @@ export function useFilesModeActions({
   setSearchParams,
 }: FilesModeActionsConfig) {
   const handleSelectFilesMode = useCallback(() => {
-    if (hasEditableVersion && liveCanvasVersionId) handleUseVersion(liveCanvasVersionId);
-
     setIsFilesMode(true);
     setIsDashboardMode(false);
     setIsDashboardAddPanelOpen(false);
@@ -40,9 +32,6 @@ export function useFilesModeActions({
     setSelectedRunId(null);
     setSearchParams(toFilesSearchParams, { replace: true });
   }, [
-    handleUseVersion,
-    hasEditableVersion,
-    liveCanvasVersionId,
     setIsDashboardAddPanelOpen,
     setIsDashboardMode,
     setIsDashboardYamlOpen,

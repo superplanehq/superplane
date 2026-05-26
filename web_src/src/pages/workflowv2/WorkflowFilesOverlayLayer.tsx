@@ -12,13 +12,21 @@ import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Editor } from "@monaco-editor/react";
 import { MultiFileDiff, Virtualizer } from "@pierre/diffs/react";
-import { FilePlus2, GitCommitHorizontal, GitCompareArrows, RotateCcw, X } from "lucide-react";
 import { FileTree as TreesFileTree, useFileTree } from "@pierre/trees/react";
+import { FilePlus2, GitCommitHorizontal, GitCompareArrows, RotateCcw, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 import type { FileContents } from "@pierre/diffs/react";
 import type { ContextMenuItem, ContextMenuOpenContext } from "@pierre/trees";
+
+export type WorkflowFile = {
+  path: string;
+  content: string;
+  language?: string;
+  loading?: boolean;
+  errorMessage?: string;
+};
 
 const repositoryFileTreeStyle = {
   height: "100%",
@@ -59,7 +67,8 @@ const fileEditorOptions = {
 interface WorkflowFilesOverlayLayerProps {
   isFilesMode: boolean;
   canvasId?: string;
-  canWrite: boolean;
+  canWrite?: boolean;
+  files: WorkflowFile[];
   headerActionsSlotId?: string;
 }
 
@@ -82,25 +91,43 @@ type PendingFileChange =
 export function WorkflowFilesOverlayLayer({
   isFilesMode,
   canvasId,
-  canWrite,
+  canWrite = false,
+  files,
   headerActionsSlotId,
 }: WorkflowFilesOverlayLayerProps) {
-  if (!isFilesMode || !canvasId) return null;
+  if (!isFilesMode) return null;
 
-  return <CanvasFilesView canvasId={canvasId} canWrite={canWrite} headerActionsSlotId={headerActionsSlotId} />;
+  return (
+    <CanvasFilesView canvasId={canvasId} canWrite={canWrite} files={files} headerActionsSlotId={headerActionsSlotId} />
+  );
 }
 
 function CanvasFilesView({
   canvasId,
   canWrite,
+  files,
   headerActionsSlotId,
 }: {
-  canvasId: string;
+  canvasId?: string;
   canWrite: boolean;
+  files: WorkflowFile[];
   headerActionsSlotId?: string;
 }) {
-  const filesQuery = useCanvasRepositoryFiles(canvasId, true);
-  const commitFiles = useCommitCanvasRepositoryFiles(canvasId);
+  const canUseRepository = !!canvasId;
+  const canManageRepositoryFiles = canWrite && canUseRepository;
+  const filesQuery = useCanvasRepositoryFiles(canvasId ?? "", canUseRepository);
+  const commitFiles = useCommitCanvasRepositoryFiles(canvasId ?? "");
+  const generatedPaths = useMemo(() => files.map((file) => file.path), [files]);
+  const generatedPathSet = useMemo(() => new Set(generatedPaths), [generatedPaths]);
+  const generatedFilesByPath = useMemo(() => {
+    const generatedFiles = new Map<string, WorkflowFile>();
+    for (const file of files) {
+      generatedFiles.set(file.path, file);
+    }
+    return generatedFiles;
+  }, [files]);
+  const initialPath = generatedPaths[0] ?? null;
+  const hasAutoOpenedInitialFileRef = useRef(Boolean(initialPath));
   const repository = filesQuery.data?.repository;
   const defaultBranch = repository?.defaultBranch || "main";
   const headSha = repository?.headSha;
@@ -108,32 +135,33 @@ function CanvasFilesView({
     () =>
       (filesQuery.data?.files || [])
         .map((file) => file.path)
-        .filter((path): path is string => !!path)
+        .filter((path): path is string => !!path && !generatedPathSet.has(path))
         .sort(),
-    [filesQuery.data?.files],
+    [filesQuery.data?.files, generatedPathSet],
   );
   const repositoryPathSet = useMemo(() => new Set(repositoryPaths), [repositoryPaths]);
   const [loadedContentByPath, setLoadedContentByPath] = useState<Record<string, string>>({});
   const [pendingChangesByPath, setPendingChangesByPath] = useState<Record<string, PendingFileChange>>({});
-  const [openTabs, setOpenTabs] = useState<string[]>([]);
-  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [openTabs, setOpenTabs] = useState<string[]>(() => (initialPath ? [initialPath] : []));
+  const [selectedPath, setSelectedPath] = useState<string | null>(() => initialPath);
   const [newFilePath, setNewFilePath] = useState<string | null>(null);
   const [commitMessage, setCommitMessage] = useState("");
   const [commitBranch, setCommitBranch] = useState("");
   const [isCommitPopoverOpen, setIsCommitPopoverOpen] = useState(false);
   const [isDiffOpen, setIsDiffOpen] = useState(false);
   const [headerActionsHost, setHeaderActionsHost] = useState<HTMLElement | null>(null);
+  const selectedGeneratedFile = selectedPath ? generatedFilesByPath.get(selectedPath) : undefined;
   const selectedPathExistsInRepository = selectedPath ? repositoryPathSet.has(selectedPath) : false;
   const selectedFileQuery = useCanvasRepositoryFile(
-    canvasId,
+    canvasId ?? "",
     selectedPath,
-    !!selectedPath && selectedPathExistsInRepository,
+    !!selectedPath && selectedPathExistsInRepository && !selectedGeneratedFile,
   );
   const pendingChanges = useMemo(
     () => Object.values(pendingChangesByPath).sort((left, right) => left.path.localeCompare(right.path)),
     [pendingChangesByPath],
   );
-  const allPaths = useMemo(() => {
+  const repositoryAndPendingPaths = useMemo(() => {
     return Array.from(
       new Set([
         ...repositoryPaths,
@@ -141,26 +169,43 @@ function CanvasFilesView({
       ]),
     ).sort();
   }, [pendingChanges, repositoryPaths]);
+  const allPaths = useMemo(
+    () => Array.from(new Set([...generatedPaths, ...repositoryAndPendingPaths])).sort(),
+    [generatedPaths, repositoryAndPendingPaths],
+  );
   const visiblePaths = useMemo(() => {
-    return buildRenderableTreePaths(repositoryPaths, pendingChanges);
-  }, [pendingChanges, repositoryPaths]);
-  const finalPaths = useMemo(
+    return Array.from(
+      new Set([...generatedPaths, ...buildRenderableTreePaths(repositoryPaths, pendingChanges)]),
+    ).sort();
+  }, [generatedPaths, pendingChanges, repositoryPaths]);
+  const finalRepositoryPaths = useMemo(
     () => buildFinalRepositoryPaths(repositoryPaths, pendingChanges),
     [pendingChanges, repositoryPaths],
   );
-  const commitPathError = useMemo(() => getPathValidationError(finalPaths), [finalPaths]);
+  const commitPathError = useMemo(
+    () => getPathValidationError([...generatedPaths, ...finalRepositoryPaths]),
+    [finalRepositoryPaths, generatedPaths],
+  );
   const selectedChange = selectedPath ? pendingChangesByPath[selectedPath] : undefined;
   const selectedIsDeleted = selectedChange?.type === "deleted";
-  const selectedContent =
-    selectedChange?.type === "added" || selectedChange?.type === "modified"
+  const selectedContent = selectedGeneratedFile
+    ? selectedGeneratedFile.content
+    : selectedChange?.type === "added" || selectedChange?.type === "modified"
       ? selectedChange.content
       : selectedPath
         ? (loadedContentByPath[selectedPath] ?? "")
         : "";
   const selectedContentLoaded =
-    !selectedPath || !selectedPathExistsInRepository || loadedContentByPath[selectedPath] !== undefined;
+    !!selectedGeneratedFile ||
+    !selectedPath ||
+    !selectedPathExistsInRepository ||
+    loadedContentByPath[selectedPath] !== undefined;
   const canCommit =
-    canWrite && pendingChanges.length > 0 && commitMessage.trim() !== "" && !commitPathError && !commitFiles.isPending;
+    canManageRepositoryFiles &&
+    pendingChanges.length > 0 &&
+    commitMessage.trim() !== "" &&
+    !commitPathError &&
+    !commitFiles.isPending;
   const targetBranch = commitBranch.trim();
 
   useEffect(() => {
@@ -176,6 +221,17 @@ function CanvasFilesView({
 
     setHeaderActionsHost(document.getElementById(headerActionsSlotId));
   }, [headerActionsSlotId]);
+
+  useEffect(() => {
+    if (hasAutoOpenedInitialFileRef.current) return;
+
+    const nextInitialPath = generatedPaths[0];
+    if (!nextInitialPath) return;
+
+    hasAutoOpenedInitialFileRef.current = true;
+    setOpenTabs([nextInitialPath]);
+    setSelectedPath(nextInitialPath);
+  }, [generatedPaths]);
 
   useEffect(() => {
     const allPathSet = new Set(allPaths);
@@ -244,7 +300,7 @@ function CanvasFilesView({
       return;
     }
 
-    const errorMessage = getPathValidationError([...finalPaths, path]);
+    const errorMessage = getPathValidationError([...generatedPaths, ...finalRepositoryPaths, path]);
     if (errorMessage) {
       showErrorToast(errorMessage);
       return;
@@ -256,7 +312,7 @@ function CanvasFilesView({
     }));
     setNewFilePath(null);
     openFile(path);
-  }, [finalPaths, newFilePath, openFile]);
+  }, [finalRepositoryPaths, generatedPaths, newFilePath, openFile]);
 
   const cancelNewFile = useCallback(() => {
     setNewFilePath(null);
@@ -264,7 +320,7 @@ function CanvasFilesView({
 
   const updateSelectedContent = useCallback(
     (value: string) => {
-      if (!selectedPath) return;
+      if (!selectedPath || generatedPathSet.has(selectedPath)) return;
 
       setPendingChangesByPath((current) => {
         const currentChange = current[selectedPath];
@@ -286,23 +342,28 @@ function CanvasFilesView({
         };
       });
     },
-    [loadedContentByPath, selectedPath],
+    [generatedPathSet, loadedContentByPath, selectedPath],
   );
 
-  const deleteFile = useCallback((path: string) => {
-    setPendingChangesByPath((current) => {
-      const currentChange = current[path];
-      if (currentChange?.type === "added") {
-        const { [path]: _removed, ...remaining } = current;
-        return remaining;
-      }
+  const deleteFile = useCallback(
+    (path: string) => {
+      if (generatedPathSet.has(path)) return;
 
-      return {
-        ...current,
-        [path]: { type: "deleted", path },
-      };
-    });
-  }, []);
+      setPendingChangesByPath((current) => {
+        const currentChange = current[path];
+        if (currentChange?.type === "added") {
+          const { [path]: _removed, ...remaining } = current;
+          return remaining;
+        }
+
+        return {
+          ...current,
+          [path]: { type: "deleted", path },
+        };
+      });
+    },
+    [generatedPathSet],
+  );
 
   const discardChange = useCallback((path: string) => {
     setPendingChangesByPath((current) => {
@@ -366,9 +427,12 @@ function CanvasFilesView({
   }, [commitFiles, commitMessage, commitPathError, defaultBranch, headSha, pendingChanges, targetBranch]);
 
   return (
-    <div className="absolute inset-x-0 bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50">
+    <div
+      className="absolute inset-x-0 bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50"
+      data-testid="workflow-files-overlay"
+    >
       <aside className="flex min-h-0 flex-col border-r border-slate-950/15 bg-white">
-        {canWrite ? (
+        {canManageRepositoryFiles ? (
           <div className="flex h-7 shrink-0 items-center gap-1 border-b border-slate-950/10 px-2">
             <div className="ml-auto flex shrink-0 items-center">
               <EditorIconButton label="New file" onClick={startNewFile} className="size-6 hover:bg-transparent">
@@ -380,10 +444,11 @@ function CanvasFilesView({
         <FileList
           paths={visiblePaths}
           selectedPath={selectedPath}
-          loading={filesQuery.isLoading}
+          loading={canUseRepository && filesQuery.isLoading}
           errorMessage={filesQuery.error ? getApiErrorMessage(filesQuery.error, "Failed to load files.") : undefined}
-          canWrite={canWrite}
+          canWrite={canManageRepositoryFiles}
           newFilePath={newFilePath}
+          readOnlyPaths={generatedPathSet}
           onDelete={deleteFile}
           onNewFileCancel={cancelNewFile}
           onNewFileCommit={createNewFile}
@@ -434,13 +499,22 @@ function CanvasFilesView({
           path={selectedPath}
           content={selectedContent}
           deleted={selectedIsDeleted}
+          language={selectedGeneratedFile?.language}
           loading={
-            !!selectedPath && selectedPathExistsInRepository && !selectedContentLoaded && selectedFileQuery.isLoading
+            !!selectedGeneratedFile?.loading ||
+            (!!selectedPath && selectedPathExistsInRepository && !selectedContentLoaded && selectedFileQuery.isLoading)
           }
           errorMessage={
-            selectedFileQuery.error ? getApiErrorMessage(selectedFileQuery.error, "Failed to load file.") : undefined
+            selectedGeneratedFile?.errorMessage ||
+            (selectedFileQuery.error ? getApiErrorMessage(selectedFileQuery.error, "Failed to load file.") : undefined)
           }
-          disabled={!canWrite || !selectedPath || selectedIsDeleted || !selectedContentLoaded}
+          disabled={
+            !!selectedGeneratedFile ||
+            !canManageRepositoryFiles ||
+            !selectedPath ||
+            selectedIsDeleted ||
+            !selectedContentLoaded
+          }
           onChange={updateSelectedContent}
         />
       </main>
@@ -451,7 +525,7 @@ function CanvasFilesView({
         open={isDiffOpen}
         onOpenChange={setIsDiffOpen}
       />
-      {canWrite && headerActionsHost
+      {canManageRepositoryFiles && headerActionsHost
         ? createPortal(
             <FilesHeaderActions
               pendingChanges={pendingChanges}
@@ -718,6 +792,7 @@ function FileList({
   errorMessage,
   canWrite,
   newFilePath,
+  readOnlyPaths,
   onDelete,
   onNewFileCancel,
   onNewFileCommit,
@@ -730,6 +805,7 @@ function FileList({
   errorMessage?: string;
   canWrite: boolean;
   newFilePath: string | null;
+  readOnlyPaths: Set<string>;
   onDelete: (path: string) => void;
   onNewFileCancel: () => void;
   onNewFileCommit: () => void;
@@ -762,6 +838,7 @@ function FileList({
         paths={paths}
         selectedPath={selectedPath}
         canWrite={canWrite}
+        readOnlyPaths={readOnlyPaths}
         onDelete={onDelete}
         onSelect={onSelect}
       />
@@ -816,22 +893,29 @@ function RepositoryFileTree({
   paths,
   selectedPath,
   canWrite,
+  readOnlyPaths,
   onDelete,
   onSelect,
 }: {
   paths: string[];
   selectedPath: string | null;
   canWrite: boolean;
+  readOnlyPaths: Set<string>;
   onDelete: (path: string) => void;
   onSelect: (path: string) => void;
 }) {
   const filePathSetRef = useRef(new Set(paths));
+  const readOnlyPathSetRef = useRef(readOnlyPaths);
   const onSelectRef = useRef(onSelect);
   const onDeleteRef = useRef(onDelete);
 
   useEffect(() => {
     filePathSetRef.current = new Set(paths);
   }, [paths]);
+
+  useEffect(() => {
+    readOnlyPathSetRef.current = readOnlyPaths;
+  }, [readOnlyPaths]);
 
   useEffect(() => {
     onSelectRef.current = onSelect;
@@ -887,7 +971,12 @@ function RepositoryFileTree({
       renderContextMenu={
         canWrite
           ? (item, context) => (
-              <FileTreeContextMenu item={item} context={context} onDelete={(path) => onDeleteRef.current(path)} />
+              <FileTreeContextMenu
+                item={item}
+                context={context}
+                readOnlyPaths={readOnlyPathSetRef.current}
+                onDelete={(path) => onDeleteRef.current(path)}
+              />
             )
           : undefined
       }
@@ -899,13 +988,15 @@ function RepositoryFileTree({
 function FileTreeContextMenu({
   item,
   context,
+  readOnlyPaths,
   onDelete,
 }: {
   item: ContextMenuItem;
   context: ContextMenuOpenContext;
+  readOnlyPaths: Set<string>;
   onDelete: (path: string) => void;
 }) {
-  const canDelete = item.kind === "file";
+  const canDelete = item.kind === "file" && !readOnlyPaths.has(item.path);
 
   return (
     <div
@@ -934,6 +1025,7 @@ function FileEditor({
   path,
   content,
   deleted,
+  language,
   loading,
   errorMessage,
   disabled,
@@ -942,6 +1034,7 @@ function FileEditor({
   path: string | null;
   content: string;
   deleted: boolean;
+  language?: string;
   loading: boolean;
   errorMessage?: string;
   disabled: boolean;
@@ -970,10 +1063,10 @@ function FileEditor({
   }
 
   return (
-    <div className="min-h-0 flex-1 bg-white">
+    <div className="min-h-0 flex-1 bg-white" data-testid="workflow-file-editor">
       <Editor
         height="100%"
-        language={getMonacoLanguage(path)}
+        language={language ?? getMonacoLanguage(path)}
         value={content}
         theme="vs"
         onChange={(value) => onChange(value ?? "")}

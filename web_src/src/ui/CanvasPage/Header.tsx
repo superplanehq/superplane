@@ -58,8 +58,6 @@ export interface HeaderProps {
   onDashboardAddPanel?: () => void;
   /** When set with `mode === "dashboard"` and editing, shows the YAML button in the secondary header. */
   onDashboardOpenYaml?: () => void;
-  /** When set with the Canvas tab active and editing, opens the canvas YAML modal. */
-  onCanvasOpenYaml?: () => void;
   /** When set with the Canvas tab active and editing, opens the add-component sidebar. */
   onCanvasAddComponent?: () => void;
   /** When true, the YAML button advertises read-only YAML view. Defaults to editable copy. */

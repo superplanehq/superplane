@@ -1,6 +1,6 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileCode, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
@@ -21,10 +21,7 @@ export function SecondaryHeaderActions({
   draftVisualDiff,
   onToggleVisualDiff,
   onDashboardAddPanel,
-  onDashboardOpenYaml,
-  dashboardYamlReadOnly,
   filesHeaderActionsSlotId,
-  onCanvasOpenYaml,
   onCanvasAddComponent,
 }: HeaderProps) {
   const onCanvasTab = mode === "version-live" || mode === "version-edit";
@@ -47,17 +44,12 @@ export function SecondaryHeaderActions({
           visualDiffEnabled={visualDiffEnabled}
           draftVisualDiff={draftVisualDiff}
           onToggleVisualDiff={onToggleVisualDiff}
-          onCanvasOpenYaml={onCanvasOpenYaml}
           onCanvasAddComponent={onCanvasAddComponent}
         />
       ) : null}
 
       {isEditing && mode === "dashboard" ? (
-        <EditModeDashboardSecondaryActions
-          onDashboardAddPanel={onDashboardAddPanel}
-          onDashboardOpenYaml={onDashboardOpenYaml}
-          dashboardYamlReadOnly={dashboardYamlReadOnly}
-        />
+        <EditModeDashboardSecondaryActions onDashboardAddPanel={onDashboardAddPanel} />
       ) : null}
 
       {mode === "files" && filesHeaderActionsSlotId ? (
@@ -73,7 +65,6 @@ function EditModeCanvasSecondaryActions({
   visualDiffEnabled,
   draftVisualDiff,
   onToggleVisualDiff,
-  onCanvasOpenYaml,
   onCanvasAddComponent,
 }: Pick<
   HeaderProps,
@@ -82,7 +73,6 @@ function EditModeCanvasSecondaryActions({
   | "visualDiffEnabled"
   | "draftVisualDiff"
   | "onToggleVisualDiff"
-  | "onCanvasOpenYaml"
   | "onCanvasAddComponent"
 >) {
   return (
@@ -95,25 +85,6 @@ function EditModeCanvasSecondaryActions({
           diffToggles={draftVisualDiff.diffToggles}
           onShowDiff={onShowDiff}
         />
-      ) : null}
-
-      {onCanvasOpenYaml ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <UIButton
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => onCanvasOpenYaml()}
-              data-testid="canvas-yaml-button"
-              aria-label="View / Import YAML"
-            >
-              <FileCode className="mr-1 h-3.5 w-3.5" />
-              YAML
-            </UIButton>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">View, copy, download, or import this canvas as YAML</TooltipContent>
-        </Tooltip>
       ) : null}
 
       {onCanvasAddComponent ? (
@@ -132,36 +103,9 @@ function EditModeCanvasSecondaryActions({
   );
 }
 
-function EditModeDashboardSecondaryActions({
-  onDashboardAddPanel,
-  onDashboardOpenYaml,
-  dashboardYamlReadOnly,
-}: Pick<HeaderProps, "onDashboardAddPanel" | "onDashboardOpenYaml" | "dashboardYamlReadOnly">) {
+function EditModeDashboardSecondaryActions({ onDashboardAddPanel }: Pick<HeaderProps, "onDashboardAddPanel">) {
   return (
     <>
-      {onDashboardOpenYaml ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <UIButton
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => onDashboardOpenYaml()}
-              data-testid="dashboard-yaml-button"
-              aria-label={dashboardYamlReadOnly ? "View YAML" : "View / Import YAML"}
-            >
-              <FileCode className="mr-1 h-3.5 w-3.5" />
-              YAML
-            </UIButton>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            {dashboardYamlReadOnly
-              ? "View the console as YAML"
-              : "View, copy, download, or import this console as YAML"}
-          </TooltipContent>
-        </Tooltip>
-      ) : null}
-
       {onDashboardAddPanel ? (
         <UIButton
           type="button"

@@ -210,7 +210,6 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={true}
           activeCanvasVersionId="draft-version"
-          onYamlOpen={vi.fn()}
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
         />
@@ -267,7 +266,6 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={true}
           activeCanvasVersionId="draft-version"
-          onYamlOpen={vi.fn()}
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
         />
@@ -311,7 +309,6 @@ describe("CanvasPage connection drop", () => {
           buildingBlocks={[]}
           isEditing={true}
           activeCanvasVersionId="draft-version"
-          onYamlOpen={vi.fn()}
           onEdgeCreate={vi.fn()}
           onPlaceholderAdd={onPlaceholderAdd}
         />
@@ -367,7 +364,6 @@ describe("CanvasPage connection drop", () => {
           getSidebarData={getSidebarData}
           loadSidebarData={loadSidebarData}
           workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
-          onYamlOpen={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -400,7 +396,6 @@ describe("CanvasPage connection drop", () => {
           getSidebarData={getSidebarData}
           loadSidebarData={loadSidebarData}
           workflowNodes={[{ id: "node-1", type: "TYPE_ACTION", name: "Node" }]}
-          onYamlOpen={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -440,7 +435,6 @@ describe("CanvasPage connection drop", () => {
           activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           fitAllRequest={0}
-          onYamlOpen={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -480,7 +474,6 @@ describe("CanvasPage connection drop", () => {
           activeCanvasVersionId="live-version"
           hasFitToViewRef={hasFitToViewRef}
           fitAllRequest={0}
-          onYamlOpen={vi.fn()}
         />
       </MemoryRouter>,
     );
