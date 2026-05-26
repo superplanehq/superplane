@@ -1,6 +1,5 @@
-CREATE TABLE IF NOT EXISTS canvas_dashboards (
-  canvas_id  UUID PRIMARY KEY REFERENCES workflows(id) ON DELETE CASCADE,
-  panels     JSONB NOT NULL DEFAULT '[]'::jsonb,
-  layout     JSONB NOT NULL DEFAULT '[]'::jsonb,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+ALTER TABLE public.workflow_versions
+  ADD COLUMN IF NOT EXISTS console_panels JSONB NOT NULL DEFAULT '[]'::jsonb,
+  ADD COLUMN IF NOT EXISTS console_layout JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+DROP TABLE IF EXISTS public.canvas_dashboards;
