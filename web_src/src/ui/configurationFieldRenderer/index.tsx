@@ -404,6 +404,7 @@ export const ConfigurationFieldRenderer = ({
         return <AnyPredicateListFieldRenderer {...commonProps} />;
 
       case "object":
+      case "manual-run-payload":
         return <ObjectFieldRenderer {...commonProps} domainId={domainId} domainType={domainType} />;
 
       case "timezone":

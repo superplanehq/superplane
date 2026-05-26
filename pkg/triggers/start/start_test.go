@@ -20,20 +20,20 @@ func TestStart_Hooks_DeclaresUserAccessibleRun(t *testing.T) {
 
 	var paramNames []string
 	var templateRequired bool
-	var payloadRequired bool
+	var paramsRequired bool
 	for _, param := range hook.Parameters {
 		paramNames = append(paramNames, param.Name)
 		if param.Name == "template" {
 			templateRequired = param.Required
 		}
-		if param.Name == "payload" {
-			payloadRequired = param.Required
+		if param.Name == "params" {
+			paramsRequired = param.Required
 		}
 	}
 
-	assert.ElementsMatch(t, []string{"template", "payload"}, paramNames)
+	assert.ElementsMatch(t, []string{"template", "params"}, paramNames)
 	assert.True(t, templateRequired, "template parameter must be required")
-	assert.False(t, payloadRequired, "payload parameter must be optional")
+	assert.False(t, paramsRequired, "params parameter must be optional")
 }
 
 func TestStart_HandleHook_EmitsWithConfiguredPayload(t *testing.T) {
@@ -64,7 +64,7 @@ func TestStart_HandleHook_EmitsWithConfiguredPayload(t *testing.T) {
 	assert.Equal(t, "Hello, World!", payload["message"])
 }
 
-func TestStart_HandleHook_PayloadOverride(t *testing.T) {
+func TestStart_HandleHook_ParamsStaticLeafOverride(t *testing.T) {
 	s := &Start{}
 	events := &contexts.EventContext{}
 
@@ -78,7 +78,7 @@ func TestStart_HandleHook_PayloadOverride(t *testing.T) {
 		Name: HookRun,
 		Parameters: map[string]any{
 			"template": "Hello",
-			"payload":  map[string]any{"message": "Override"},
+			"params":   map[string]any{"message": "Override"},
 		},
 		Configuration: config,
 		Events:        events,
@@ -88,6 +88,71 @@ func TestStart_HandleHook_PayloadOverride(t *testing.T) {
 	require.Len(t, events.Payloads, 1)
 	payload := events.Payloads[0].Data.(map[string]any)
 	assert.Equal(t, "Override", payload["message"])
+}
+
+func TestStart_HandleHook_ParamsSubstitutesParamLeaves(t *testing.T) {
+	s := &Start{}
+	events := &contexts.EventContext{}
+
+	config := map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name": "Deploy",
+				"payload": map[string]any{
+					"body": map[string]any{
+						"name": "param(type:string, title:'Name', default:'machine-1', required:false)",
+						"size": "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Size', required:true)",
+					},
+				},
+			},
+		},
+	}
+
+	_, err := s.HandleHook(core.TriggerHookContext{
+		Name: HookRun,
+		Parameters: map[string]any{
+			"template": "Deploy",
+			"params": map[string]any{
+				"body.size": "4 vCPU",
+			},
+		},
+		Configuration: config,
+		Events:        events,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, events.Payloads, 1)
+	payload := events.Payloads[0].Data.(map[string]any)
+	body := payload["body"].(map[string]any)
+	assert.Equal(t, "machine-1", body["name"])
+	assert.Equal(t, "4 vCPU", body["size"])
+}
+
+func TestStart_HandleHook_RejectsMissingRequiredParam(t *testing.T) {
+	s := &Start{}
+	events := &contexts.EventContext{}
+
+	config := map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name": "Deploy",
+				"payload": map[string]any{
+					"size": "param(type:select, values:'2 vCPU|4 vCPU', title:'Size', required:true)",
+				},
+			},
+		},
+	}
+
+	_, err := s.HandleHook(core.TriggerHookContext{
+		Name:          HookRun,
+		Parameters:    map[string]any{"template": "Deploy"},
+		Configuration: config,
+		Events:        events,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "size")
+	assert.Empty(t, events.Payloads)
 }
 
 func TestStart_HandleHook_UnknownTemplateListsAvailable(t *testing.T) {
@@ -142,7 +207,7 @@ func TestStart_HandleHook_RejectsNoTemplatesConfigured(t *testing.T) {
 	assert.Contains(t, err.Error(), "no templates configured")
 }
 
-func TestStart_HandleHook_RejectsNilPayloadWithoutOverride(t *testing.T) {
+func TestStart_HandleHook_RejectsNilPayload(t *testing.T) {
 	s := &Start{}
 	events := &contexts.EventContext{}
 

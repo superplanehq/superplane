@@ -129,7 +129,7 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		assert.Equal(t, "Hello, World!", inner["message"])
 	})
 
-	t.Run("payload override replaces configured payload", func(t *testing.T) {
+	t.Run("params override static leaf in configured payload", func(t *testing.T) {
 		resp, err := InvokeNodeTriggerHook(
 			authedCtx,
 			r.AuthService,
@@ -141,7 +141,7 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 			"run",
 			map[string]any{
 				"template": "Hello World",
-				"payload":  map[string]any{"message": "Override"},
+				"params":   map[string]any{"message": "Override"},
 			},
 			"http://localhost",
 		)
