@@ -64,17 +64,27 @@ function CanvasYamlFilesView({ files }: { files: WorkflowFile[] }) {
   const filePaths = useMemo(() => files.map((file) => file.path), [files]);
   const [selectedPath, setSelectedPath] = useState<string | null>(() => filePaths[0] ?? null);
   const [openTabs, setOpenTabs] = useState<string[]>(() => (filePaths[0] ? [filePaths[0]] : []));
+  const previousFileCountRef = useRef(filePaths.length);
   const selectedFile = files.find((file) => file.path === selectedPath) ?? null;
 
   useEffect(() => {
     const filePathSet = new Set(filePaths);
+    const filesLoaded = previousFileCountRef.current === 0 && filePaths.length > 0;
+    const nextOpenTabs = openTabs.filter((path) => filePathSet.has(path));
+    const ensuredOpenTabs = filesLoaded && nextOpenTabs.length === 0 ? [filePaths[0]] : nextOpenTabs;
+    const nextSelectedPath =
+      selectedPath && filePathSet.has(selectedPath) ? selectedPath : (ensuredOpenTabs[0] ?? null);
 
-    setOpenTabs((current) => {
-      const nextTabs = current.filter((path) => filePathSet.has(path));
-      return nextTabs.length === current.length ? current : nextTabs;
-    });
-    setSelectedPath((current) => (current && filePathSet.has(current) ? current : null));
-  }, [filePaths]);
+    previousFileCountRef.current = filePaths.length;
+
+    if (ensuredOpenTabs.length !== openTabs.length || ensuredOpenTabs.some((path, index) => path !== openTabs[index])) {
+      setOpenTabs(ensuredOpenTabs);
+    }
+
+    if (nextSelectedPath !== selectedPath) {
+      setSelectedPath(nextSelectedPath);
+    }
+  }, [filePaths, openTabs, selectedPath]);
 
   const openFile = (path: string) => {
     setSelectedPath(path);
