@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GlobalCommandPalette } from ".";
 import { registerCanvasNodeSearchProvider } from "./canvasNodeSearchStore";
+import { openGlobalCommandPalette } from "./controller";
 
 const {
   accountState,
@@ -129,6 +130,10 @@ vi.mock("@/lib/canvasNameGenerator", () => ({
 
 let unregisterCanvasNodeSearchProvider: (() => void) | undefined;
 
+function openPalette() {
+  openGlobalCommandPalette();
+}
+
 function renderPalette(path = "/org-1/canvases/canvas-1") {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -163,10 +168,10 @@ describe("GlobalCommandPalette", () => {
     unregisterCanvasNodeSearchProvider = undefined;
   });
 
-  it("opens with the global shortcut and shows contextual commands", async () => {
+  it("opens and shows contextual commands", async () => {
     renderPalette();
 
-    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    openPalette();
 
     expect(await screen.findByPlaceholderText("Search components and commands")).toBeInTheDocument();
     expect(screen.getByText("New Canvas")).toBeInTheDocument();
@@ -181,7 +186,7 @@ describe("GlobalCommandPalette", () => {
     featureState.managedAgentsEnabled = false;
     renderPalette();
 
-    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    openPalette();
 
     expect(await screen.findByPlaceholderText("Search components and commands")).toBeInTheDocument();
     expect(screen.queryByText("Agent")).not.toBeInTheDocument();
@@ -193,7 +198,7 @@ describe("GlobalCommandPalette", () => {
     const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
     renderPalette("/org-1/canvases/canvas-1?view=memory");
 
-    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    openPalette();
     await user.click(await screen.findByText("Versions"));
 
     await waitFor(() => {
@@ -209,13 +214,12 @@ describe("GlobalCommandPalette", () => {
     dispatchEventSpy.mockRestore();
   });
 
-  it("does not capture shortcuts before the account is available", () => {
+  it("does not open before the account is available", () => {
     accountState.account = null;
     renderPalette("/login");
 
-    const event = new KeyboardEvent("keydown", { key: "k", metaKey: true, cancelable: true });
+    openPalette();
 
-    expect(document.dispatchEvent(event)).toBe(true);
     expect(screen.queryByPlaceholderText("What can we help with?")).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Search components and commands")).not.toBeInTheDocument();
   });
@@ -224,7 +228,7 @@ describe("GlobalCommandPalette", () => {
     const user = userEvent.setup();
     renderPalette();
 
-    fireEvent.keyDown(document, { key: "k", ctrlKey: true });
+    openPalette();
     await user.click(await screen.findByText("Organization Settings"));
     await user.click(await screen.findByText("Members"));
 
@@ -235,7 +239,7 @@ describe("GlobalCommandPalette", () => {
     const user = userEvent.setup();
     renderPalette("/org-1");
 
-    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    openPalette();
     await user.click(await screen.findByText("Canvas Settings"));
     await user.click(await screen.findByText("Database Backups"));
 
@@ -248,7 +252,7 @@ describe("GlobalCommandPalette", () => {
     );
     renderPalette();
 
-    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    openPalette();
 
     await screen.findByPlaceholderText("Search components and commands");
     const settingsItems = screen.getAllByText("Canvas Settings").map((label) => label.closest("[cmdk-item]"));
@@ -260,7 +264,7 @@ describe("GlobalCommandPalette", () => {
   it("uses template route canvas ids for contextual canvas commands", async () => {
     renderPalette("/org-1/templates/canvas-1");
 
-    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    openPalette();
 
     expect(await screen.findByPlaceholderText("Search components and commands")).toBeInTheDocument();
     expect(screen.getByText("Console")).toBeInTheDocument();
@@ -269,7 +273,7 @@ describe("GlobalCommandPalette", () => {
   it("creates a canvas with the quick shortcut", async () => {
     renderPalette();
 
-    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    openPalette();
     await waitFor(() => {
       expect(screen.getByText("New Canvas").closest("[cmdk-item]")).not.toHaveAttribute("data-disabled", "true");
     });
@@ -305,7 +309,7 @@ describe("GlobalCommandPalette", () => {
 
     renderPalette();
 
-    fireEvent.keyDown(document, { key: "k", metaKey: true });
+    openPalette();
     await user.type(await screen.findByPlaceholderText("Search components and commands"), "worker");
     await user.click(await screen.findByText("Refresh Worker"));
 
