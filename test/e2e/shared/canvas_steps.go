@@ -2,8 +2,6 @@ package shared
 
 import (
 	"fmt"
-	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -20,6 +18,7 @@ import (
 	"github.com/superplanehq/superplane/test/e2e/queries"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
+	"github.com/superplanehq/superplane/test/support"
 )
 
 type CanvasSteps struct {
@@ -93,33 +92,18 @@ func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
 }
 
 func (s *CanvasSteps) Create() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/")
-	s.session.Click(q.Text("New App"))
-	s.session.Sleep(3000)
+	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	require.NoError(s.t, err)
+	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, nil, nil)
+	s.WorkflowID = canvas.ID
 
-	s.WorkflowID = extractCanvasIDFromURL(s.t, s.session.Page().URL())
-
-	// Rename the canvas to the desired name (instant create uses random names)
-	err := database.Conn().
+	err = database.Conn().
 		Model(&models.Canvas{}).
 		Where("id = ?", s.WorkflowID).
 		Update("name", s.CanvasName).Error
 	require.NoError(s.t, err)
-}
 
-func extractCanvasIDFromURL(t *testing.T, rawURL string) uuid.UUID {
-	t.Helper()
-
-	parsedURL, err := url.Parse(rawURL)
-	require.NoError(t, err)
-
-	matches := regexp.MustCompile(`/canvases/([0-9a-f-]{36})`).FindStringSubmatch(parsedURL.Path)
-	require.Len(t, matches, 2, "expected canvas ID in URL %q", rawURL)
-
-	canvasID, err := uuid.Parse(matches[1])
-	require.NoError(t, err)
-
-	return canvasID
+	s.Visit()
 }
 
 func (s *CanvasSteps) Visit() {

@@ -72,7 +72,7 @@ func (steps *TestHomePageSteps) AssertCanvasFolderVisible(folderTitle, canvasNam
 }
 
 func (steps *TestHomePageSteps) ClickNewApp() {
-	steps.session.Click(q.Text("New App"))
+	steps.session.Click(q.Text("Start from scratch"))
 	steps.session.Sleep(3000)
 }
 
