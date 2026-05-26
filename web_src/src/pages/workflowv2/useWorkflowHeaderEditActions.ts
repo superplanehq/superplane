@@ -79,19 +79,20 @@ function clearRunsViewSearchParams(current: URLSearchParams): URLSearchParams {
 export function useAutoPlaceholderNode(
   hasEditableVersion: boolean,
   canvasHasSpec: boolean,
+  canvasId: string | undefined,
   handlePlaceholderAdd?: (data: { position: { x: number; y: number } }) => Promise<string>,
 ) {
   const addedRef = useRef(false);
 
   useEffect(() => {
     if (addedRef.current) return;
-    if (typeof window === "undefined") return;
-    if (sessionStorage.getItem("add-placeholder-node") !== "1") return;
+    if (typeof window === "undefined" || !canvasId) return;
+    if (sessionStorage.getItem("add-placeholder-node") !== canvasId) return;
     if (!hasEditableVersion || !canvasHasSpec || !handlePlaceholderAdd) return;
 
     addedRef.current = true;
     sessionStorage.removeItem("add-placeholder-node");
 
     void handlePlaceholderAdd({ position: { x: 400, y: 300 } });
-  }, [hasEditableVersion, canvasHasSpec, handlePlaceholderAdd]);
+  }, [hasEditableVersion, canvasHasSpec, canvasId, handlePlaceholderAdd]);
 }

@@ -4909,7 +4909,7 @@ export function WorkflowPageV2() {
   });
 
   useAutoEnterEditMode(hasEditableVersion, canUpdateCanvas, handleToggleEditMode, searchParams, setSearchParams);
-  useAutoPlaceholderNode(hasEditableVersion, !!canvas?.spec, handlePlaceholderAdd);
+  useAutoPlaceholderNode(hasEditableVersion, !!canvas?.spec, canvasId, handlePlaceholderAdd);
 
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
