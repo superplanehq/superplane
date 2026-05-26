@@ -59,11 +59,11 @@ export function useAutoEnterEditMode(
 
     triggeredRef.current = true;
 
-    const next = new URLSearchParams(searchParams);
-    next.delete("edit");
-    setSearchParams(next, { replace: true });
-
-    void handleToggleEditMode();
+    void handleToggleEditMode().then(() => {
+      const next = new URLSearchParams(searchParams);
+      next.delete("edit");
+      setSearchParams(next, { replace: true });
+    });
   }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, versionsLoaded, handleToggleEditMode]);
 }
 
