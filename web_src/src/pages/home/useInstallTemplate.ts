@@ -38,7 +38,7 @@ export function useInstallTemplate() {
         }
 
         const result = (await response.json()) as InstallResult;
-        navigate(`/${result.organizationId}/canvases/${result.canvasId}?sidebar=1`);
+        navigate(`/${result.organizationId}/canvases/${result.canvasId}?edit=1&sidebar=1`);
       } catch (error) {
         const message = getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install template"));
         showErrorToast(message);
