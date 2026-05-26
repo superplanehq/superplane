@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Code2, Plus, StickyNote } from "lucide-react";
+import { Plus, StickyNote } from "lucide-react";
 import { memo, type ReactNode } from "react";
 
 export type RightSideControlsProps = {
@@ -10,7 +10,6 @@ export type RightSideControlsProps = {
 
   onSidebarOpen: () => void;
   onAddNote: () => void | Promise<void>;
-  onYamlOpen: () => void;
 };
 
 export const RightSideControls = memo(function RightSideControls(props: RightSideControlsProps) {
@@ -22,7 +21,7 @@ export const RightSideControls = memo(function RightSideControls(props: RightSid
   );
 });
 
-function EditCanvasButtons({ addNoteOnly, onSidebarOpen, onAddNote, onYamlOpen }: RightSideControlsProps) {
+function EditCanvasButtons({ addNoteOnly, onSidebarOpen, onAddNote }: RightSideControlsProps) {
   if (addNoteOnly) {
     return <ControlButton tooltip="Add note" onClick={onAddNote} testId="add-note-button" icon={<StickyNote />} />;
   }
@@ -31,7 +30,6 @@ function EditCanvasButtons({ addNoteOnly, onSidebarOpen, onAddNote, onYamlOpen }
     <>
       <ControlButton tooltip="Add component" onClick={onSidebarOpen} testId="open-sidebar-button" icon={<Plus />} />
       <ControlButton tooltip="Add note" onClick={onAddNote} testId="add-note-button" icon={<StickyNote />} />
-      <ControlButton tooltip="YAML" onClick={onYamlOpen} testId="open-yaml-modal-button" icon={<Code2 />} />
     </>
   );
 }

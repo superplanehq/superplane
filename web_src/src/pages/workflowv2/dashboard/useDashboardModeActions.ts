@@ -8,6 +8,7 @@ interface DashboardModeActionsConfig {
   setIsDashboardYamlOpen: (value: boolean) => void;
   setIsRunsMode: (value: boolean) => void;
   setIsMemoryMode: (value: boolean) => void;
+  setIsFilesMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
 }
@@ -19,6 +20,7 @@ export function useDashboardModeActions({
   setIsDashboardYamlOpen,
   setIsRunsMode,
   setIsMemoryMode,
+  setIsFilesMode,
   setSelectedRunId,
   setSearchParams,
 }: DashboardModeActionsConfig) {
@@ -28,9 +30,18 @@ export function useDashboardModeActions({
     setIsDashboardMode(true);
     setIsRunsMode(false);
     setIsMemoryMode(false);
+    setIsFilesMode(false);
     setSelectedRunId(null);
     setSearchParams(toDashboardSearchParams, { replace: true });
-  }, [dashboardsFeatureEnabled, setIsDashboardMode, setIsMemoryMode, setIsRunsMode, setSearchParams, setSelectedRunId]);
+  }, [
+    dashboardsFeatureEnabled,
+    setIsDashboardMode,
+    setIsFilesMode,
+    setIsMemoryMode,
+    setIsRunsMode,
+    setSearchParams,
+    setSelectedRunId,
+  ]);
 
   const handleExitDashboardMode = useCallback(() => {
     setIsDashboardMode(false);
