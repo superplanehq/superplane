@@ -91,7 +91,10 @@ function CanvasYamlFilesView({ files }: { files: WorkflowFile[] }) {
   };
 
   return (
-    <div className="absolute inset-x-0 bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50">
+    <div
+      className="absolute inset-x-0 bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50"
+      data-testid="workflow-files-overlay"
+    >
       <aside className="flex min-h-0 flex-col border-r border-slate-950/15 bg-white">
         <div className="flex h-7 shrink-0 items-center border-b border-slate-950/10 px-2 text-xs font-medium text-slate-500">
           Files
@@ -256,7 +259,7 @@ function FileEditor({ file }: { file: WorkflowFile | null }) {
   }
 
   return (
-    <div className="min-h-0 flex-1 bg-white">
+    <div className="min-h-0 flex-1 bg-white" data-testid="workflow-file-editor">
       <Editor
         height="100%"
         language={file.language ?? getMonacoLanguage(file.path)}
