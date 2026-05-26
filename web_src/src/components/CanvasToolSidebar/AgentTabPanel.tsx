@@ -46,13 +46,7 @@ function getBootMessage(): string {
   sessionStorage.removeItem(BOOT_CONTEXT_KEY);
   if (!ctx) return DEFAULT_BOOT_MESSAGE;
   if (ctx === "blank") return BLANK_BOOT_MESSAGE;
-  // Template install: ctx is a JSON string with app info
-  try {
-    const app = JSON.parse(ctx) as { title: string; description: string };
-    return `The user just installed the "${app.title}" app: ${app.description}. Read the canvas state, check which integrations need to be connected, and guide the user through getting started.`;
-  } catch {
-    return DEFAULT_BOOT_MESSAGE;
-  }
+  return ctx;
 }
 
 export { BOOT_CONTEXT_KEY };

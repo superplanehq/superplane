@@ -16,7 +16,7 @@ export function useInstallTemplate() {
   const [isInstalling, setIsInstalling] = useState(false);
 
   const installTemplate = useCallback(
-    async (repo: string, appMeta?: { title: string; description: string }) => {
+    async (repo: string, agentInstructions?: string) => {
       if (!organizationId || isInstalling) return;
 
       setIsInstalling(true);
@@ -39,7 +39,7 @@ export function useInstallTemplate() {
 
         const result = (await response.json()) as InstallResult;
         localStorage.setItem("canvasAgentSidebarOpen", "true");
-        if (appMeta) sessionStorage.setItem("agent-boot-context", JSON.stringify(appMeta));
+        if (agentInstructions) sessionStorage.setItem("agent-boot-context", agentInstructions);
         navigate(`/${result.organizationId}/canvases/${result.canvasId}?edit=1`);
       } catch (error) {
         const message = getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install template"));

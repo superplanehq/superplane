@@ -23,6 +23,7 @@ interface AppEntry {
   integrations: string[];
   tags: string[];
   requirements: string[];
+  agentInstructions: string;
 }
 
 const allApps: AppEntry[] = templateManifest;
@@ -71,7 +72,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
   const handleInstall = (e: React.MouseEvent, app: AppEntry) => {
     e.stopPropagation();
     if (busy) return;
-    void installTemplate(app.repo, { title: app.title, description: app.description });
+    void installTemplate(app.repo, app.agentInstructions);
   };
 
   const handleClose = () => {
