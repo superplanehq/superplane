@@ -87,15 +87,7 @@ vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
 }));
 
 vi.mock("./Header", () => ({
-  Header: ({ isEditing, onCanvasAddComponent }: { isEditing?: boolean; onCanvasAddComponent?: () => void }) => (
-    <header data-testid="canvas-header">
-      {isEditing && onCanvasAddComponent ? (
-        <button type="button" data-testid="canvas-add-component-button" onClick={() => onCanvasAddComponent()}>
-          Add component
-        </button>
-      ) : null}
-    </header>
-  ),
+  Header: () => <header data-testid="canvas-header" />,
 }));
 
 import { CanvasNodeErrorBoundary, CanvasPage } from "./index";

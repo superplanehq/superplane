@@ -120,6 +120,7 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
+  clearComponentSidebarSearchParams,
   getExitEditModeDisabledTooltip,
   getRunActionState,
   getWorkflowViewPresentation,
@@ -151,12 +152,6 @@ const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
 const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
-
-function clearComponentSidebarSearchParams(params: URLSearchParams): URLSearchParams {
-  params.delete("sidebar");
-  params.delete("node");
-  return params;
-}
 
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
 type CanvasSaveResult = {
@@ -5505,6 +5500,10 @@ export function WorkflowPageV2() {
           dashboardsFeatureEnabled={dashboardsFeatureEnabled}
           canActOnCanvas={canActOnCanvas}
           editLocked={isReadOnly}
+          showDashboardEditControls={isEditing}
+          onDashboardAddPanel={onDashboardAddPanel}
+          onDashboardOpenYaml={onDashboardOpenYaml}
+          dashboardYamlReadOnly={dashboardYamlReadOnly}
           dashboardQuery={dashboardQuery}
           updateDashboardMutation={updateDashboardMutation}
           addPanelDialogOpen={isDashboardAddPanelOpen}
@@ -5544,7 +5543,6 @@ export function WorkflowPageV2() {
           canvasStateMode={canvasStateMode}
           onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
           awaitingApprovalBanner={awaitingApprovalBanner}
-          showCanvasSettingsMenu={canUpdateCanvas}
           isVersionControlOpen={isVersionControlOpen}
           onOpenVersionControl={handleOpenVersionControl}
           hasAutoOpenedVersionControl={hasAutoOpenedVersionControl}
