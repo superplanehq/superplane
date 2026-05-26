@@ -1,5 +1,6 @@
 import { Editor } from "@monaco-editor/react";
 import { FileTree as TreesFileTree, useFileTree } from "@pierre/trees/react";
+import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 
@@ -59,6 +60,7 @@ export function WorkflowFilesOverlayLayer({ isFilesMode, files }: WorkflowFilesO
 }
 
 function CanvasYamlFilesView({ files }: { files: WorkflowFile[] }) {
+  const leftOffset = useEffectiveLeftSidebarWidth();
   const filePaths = useMemo(() => files.map((file) => file.path), [files]);
   const [selectedPath, setSelectedPath] = useState<string | null>(() => filePaths[0] ?? null);
   const [openTabs, setOpenTabs] = useState<string[]>(() => (filePaths[0] ? [filePaths[0]] : []));
@@ -92,7 +94,8 @@ function CanvasYamlFilesView({ files }: { files: WorkflowFile[] }) {
 
   return (
     <div
-      className="absolute inset-x-0 bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50"
+      className="absolute bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50"
+      style={{ left: leftOffset, right: 0 }}
       data-testid="workflow-files-overlay"
     >
       <aside className="flex min-h-0 flex-col border-r border-slate-950/15 bg-white">
