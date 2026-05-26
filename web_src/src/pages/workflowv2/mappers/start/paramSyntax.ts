@@ -1,7 +1,7 @@
-/** Mirrors `params.ParamType` in pkg/triggers/start/params/definition.go. */
+/** Mirrors `manualrun.ParamType` in pkg/configuration/manualrun/definition.go. */
 export type ParamType = "string" | "number" | "boolean" | "select";
 
-/** Mirrors `params.Definition` in pkg/triggers/start/params/definition.go. */
+/** Mirrors `manualrun.Definition` in pkg/configuration/manualrun/definition.go. */
 export type ParamDefinition = {
   path: string;
   type: ParamType;
@@ -12,12 +12,12 @@ export type ParamDefinition = {
   order: number;
 };
 
-/** Mirrors `params.IsParamString` in pkg/triggers/start/params/parser.go. */
+/** Mirrors `manualrun.IsParamString` in pkg/configuration/manualrun/parser.go. */
 export function isParamString(value: string): boolean {
   return paramExprRe.test(value.trim());
 }
 
-/** Mirrors `params.HasParams` in pkg/triggers/start/params/parser.go. */
+/** Mirrors `manualrun.HasParams` in pkg/configuration/manualrun/parser.go. */
 export function hasParams(payload: Record<string, unknown>): boolean {
   return (
     walkPayload(payload, "", (_path, leaf) => {
@@ -29,7 +29,7 @@ export function hasParams(payload: Record<string, unknown>): boolean {
   );
 }
 
-/** Mirrors `params.ParseParams` in pkg/triggers/start/params/parser.go. */
+/** Mirrors `manualrun.ParseParams` in pkg/configuration/manualrun/parser.go. */
 export function parseParams(payload: Record<string, unknown>): ParamDefinition[] {
   const defs: ParamDefinition[] = [];
   let parseError: Error | undefined;
@@ -70,7 +70,7 @@ function sortDefinitions(defs: ParamDefinition[]): void {
   });
 }
 
-/** Mirrors `params.ParseParamString` in pkg/triggers/start/params/parser.go. */
+/** Mirrors `manualrun.ParseParamString` in pkg/configuration/manualrun/parser.go. */
 export function parseParamString(path: string, expression: string): ParamDefinition {
   const trimmed = expression.trim();
   const match = paramExprRe.exec(trimmed);
@@ -123,7 +123,7 @@ export function parseParamString(path: string, expression: string): ParamDefinit
   return newDefinition(path, paramType, title, defaultValue, required, values, order);
 }
 
-/** Mirrors `params.NewDefinition` in pkg/triggers/start/params/definition.go. */
+/** Mirrors `manualrun.NewDefinition` in pkg/configuration/manualrun/definition.go. */
 export function newDefinition(
   path: string,
   paramType: ParamType | "",
@@ -176,7 +176,7 @@ export function newDefinition(
   };
 }
 
-/** Test/story fixture; same payload as `issueExamplePayload()` in pkg/triggers/start/params/apply_test.go. */
+/** Test/story fixture; same payload as `issueExamplePayload()` in pkg/configuration/manualrun/apply_test.go. */
 export function issueExamplePayload(): Record<string, unknown> {
   return {
     body: {

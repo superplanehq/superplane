@@ -366,3 +366,58 @@ func Test__ValidateList__MaxItems(t *testing.T) {
 func ptrInt(v int) *int {
 	return &v
 }
+
+func TestValidateManualRunPayload(t *testing.T) {
+	validPayload := map[string]any{
+		"body": map[string]any{
+			"name": "param(type:string, title:'Name', required:true)",
+		},
+	}
+
+	t.Run("valid map payload", func(t *testing.T) {
+		err := validateManualRunPayload(validPayload)
+		assert.NoError(t, err)
+	})
+
+	t.Run("invalid param syntax", func(t *testing.T) {
+		err := validateManualRunPayload(map[string]any{
+			"name": "param(type:unknown, title:'Name')",
+		})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unsupported type")
+	})
+
+	t.Run("valid JSON string payload", func(t *testing.T) {
+		err := validateManualRunPayload(`{"body":{"name":"param(type:string, title:'Name', required:true)"}}`)
+		assert.NoError(t, err)
+	})
+
+	t.Run("nested in start trigger schema", func(t *testing.T) {
+		fields := []Field{
+			{
+				Name: "templates",
+				Type: FieldTypeList,
+				TypeOptions: &TypeOptions{
+					List: &ListTypeOptions{
+						ItemDefinition: &ListItemDefinition{
+							Type: FieldTypeObject,
+							Schema: []Field{
+								{Name: "name", Type: FieldTypeString, Required: true},
+								{Name: "payload", Type: FieldTypeManualRunPayload, Required: true},
+							},
+						},
+					},
+				},
+			},
+		}
+		config := map[string]any{
+			"templates": []any{
+				map[string]any{
+					"name":    "Deploy",
+					"payload": validPayload,
+				},
+			},
+		}
+		assert.NoError(t, ValidateConfiguration(fields, config))
+	})
+}

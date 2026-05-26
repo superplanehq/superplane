@@ -11,6 +11,7 @@ import (
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/robfig/cron/v3"
+	"github.com/superplanehq/superplane/pkg/configuration/manualrun"
 )
 
 var ExpressionPlaceholderRegex = regexp.MustCompile(`(?s)\{\{.*?\}\}`)
@@ -245,6 +246,46 @@ func validateDaysOfWeek(_ Field, value any) error {
 		if !slices.Contains(validDays, day) {
 			return fmt.Errorf("invalid day '%s': must be one of monday, tuesday, wednesday, thursday, friday, saturday, sunday", day)
 		}
+	}
+
+	return nil
+}
+
+func validateManualRunPayload(value any) error {
+	if text, ok := value.(string); ok {
+		normalized := text
+		hasExpressions := ExpressionPlaceholderRegex.MatchString(text)
+		if hasExpressions {
+			normalized = ExpressionPlaceholderRegex.ReplaceAllString(text, "{}")
+		}
+
+		var parsed any
+		if err := json.Unmarshal([]byte(normalized), &parsed); err != nil {
+			return fmt.Errorf("must be valid JSON")
+		}
+
+		obj, ok := parsed.(map[string]any)
+		if !ok {
+			return fmt.Errorf("must be an object")
+		}
+		if hasExpressions {
+			return nil
+		}
+
+		if _, err := manualrun.ParseParams(obj); err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	obj, ok := value.(map[string]any)
+	if !ok {
+		return fmt.Errorf("must be an object")
+	}
+
+	if _, err := manualrun.ParseParams(obj); err != nil {
+		return err
 	}
 
 	return nil
@@ -697,6 +738,9 @@ func validateFieldValue(field Field, value any) error {
 
 	case FieldTypeObject:
 		return validateObject(field, value)
+
+	case FieldTypeManualRunPayload:
+		return validateManualRunPayload(value)
 
 	case FieldTypeTime:
 		return validateTime(field, value)

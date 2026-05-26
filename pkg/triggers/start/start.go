@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
+	"github.com/superplanehq/superplane/pkg/configuration/manualrun"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
-	"github.com/superplanehq/superplane/pkg/triggers/start/params"
 )
 
 const HookRun = "run"
@@ -64,8 +64,8 @@ Example template payload:
 ` + "```json" + `
 {
   "body": {
-    "name": "param(type:string, title:'Enter a machine name', default:'machine-1', required:false, order:1)",
-    "size": "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Select size', required:true, order:2)"
+    "name": "param(type:string, title:'Enter a machine name', default:'machine-1', required:false)",
+    "size": "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Select size', required:true)"
   }
 }
 ` + "```" + `
@@ -116,7 +116,7 @@ func (s *Start) Configuration() []configuration.Field {
 							{
 								Name:     "payload",
 								Label:    "Payload",
-								Type:     configuration.FieldTypeObject,
+								Type:     configuration.FieldTypeManualRunPayload,
 								Required: true,
 							},
 						},
@@ -211,8 +211,8 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 
 	runParams, _ := ctx.Parameters["params"].(map[string]any)
 
-	if params.HasParams(payload) || len(runParams) > 0 {
-		merged, err := params.ApplyParams(payload, runParams)
+	if manualrun.HasParams(payload) || len(runParams) > 0 {
+		merged, err := manualrun.ApplyParams(payload, runParams)
 		if err != nil {
 			return nil, fmt.Errorf("failed to apply parameters: %w", err)
 		}

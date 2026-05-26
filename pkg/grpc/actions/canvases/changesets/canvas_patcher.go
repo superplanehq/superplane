@@ -10,7 +10,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
-	startparams "github.com/superplanehq/superplane/pkg/triggers/start/params"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
@@ -230,14 +229,6 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 		return nil
 	}
 
-	if err := validateStartTriggerConfiguration(*nodeRef, nodeConfiguration); err != nil {
-		errorMessage := err.Error()
-		newNode.ErrorMessage = &errorMessage
-		newNode.Configuration = nodeConfiguration
-		p.nodes[nodeID] = newNode
-		return nil
-	}
-
 	newNode.Configuration = nodeConfiguration
 	p.nodes[nodeID] = newNode
 	return nil
@@ -358,48 +349,11 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 			return nil
 		}
 
-		if err := validateStartTriggerConfiguration(currentNode.Ref, nodeConfiguration); err != nil {
-			errorMessage := err.Error()
-			currentNode.ErrorMessage = &errorMessage
-			currentNode.Configuration = nodeConfiguration
-			p.nodes[nodeID] = currentNode
-			return nil
-		}
-
 		currentNode.Configuration = nodeConfiguration
 		currentNode.ErrorMessage = nil
 	}
 
 	p.nodes[nodeID] = currentNode
-	return nil
-}
-
-func validateStartTriggerConfiguration(nodeRef models.NodeRef, config map[string]any) error {
-	if nodeRef.Trigger == nil || nodeRef.Trigger.Name != "start" {
-		return nil
-	}
-
-	rawTemplates, _ := config["templates"].([]any)
-	for i, raw := range rawTemplates {
-		tmpl, ok := raw.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		payload, ok := tmpl["payload"].(map[string]any)
-		if !ok {
-			continue
-		}
-
-		if _, err := startparams.ParseParams(payload); err != nil {
-			name, _ := tmpl["name"].(string)
-			if name != "" {
-				return fmt.Errorf("template %q payload: %w", name, err)
-			}
-			return fmt.Errorf("templates[%d] payload: %w", i, err)
-		}
-	}
-
 	return nil
 }
 
