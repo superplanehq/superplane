@@ -101,7 +101,7 @@ function getInstanceMetadata(node: NodeInfo): MetadataItem[] {
     metadata.push({ icon: "server", label: instanceLabel });
   }
 
-  if (metaInstanceId && metaInstanceName) {
+  if (metaInstanceId && metaInstanceName && metaInstanceName !== metaInstanceId) {
     metadata.push({ icon: "hash", label: metaInstanceId });
   }
 

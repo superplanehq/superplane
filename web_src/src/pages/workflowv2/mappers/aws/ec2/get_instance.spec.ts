@@ -83,21 +83,23 @@ describe("getInstanceMapper.props", () => {
     );
   });
 
-  it("shows the raw instance ID as label when no name was resolved", () => {
+  it("shows only the instance ID when no distinct name was resolved (name === id)", () => {
+    // resolveInstanceName falls back to the raw instance ID, never an empty string,
+    // so the realistic "no name" case is instanceName === instanceId.
     const props = getInstanceMapper.props(
       buildComponentCtx({
         configuration: { region: "eu-west-1", instance: "i-xyz999" },
         metadata: {
           region: "eu-west-1",
           instanceId: "i-xyz999",
-          instanceName: "",
+          instanceName: "i-xyz999",
         },
       }),
     );
 
     const serverItem = props.metadata?.find((m) => m.icon === "server");
     expect(serverItem?.label).toBe("i-xyz999");
-    // hash row must not appear when there is no resolved name
+    // hash row must not appear when name and id are the same value
     const hashItem = props.metadata?.find((m) => m.icon === "hash");
     expect(hashItem).toBeUndefined();
   });
