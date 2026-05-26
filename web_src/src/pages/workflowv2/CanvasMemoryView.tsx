@@ -159,6 +159,7 @@ function renderNamespaceTable(
     return <div className="px-3 py-2 text-xs text-gray-500">No items</div>;
   }
 
+  const showActions = !!onDeleteEntry;
   const objectValues = values.map((entry) => entry.values).filter(isRecord) as Record<string, unknown>[];
   if (objectValues.length === values.length) {
     const columns = collectColumns(objectValues);
@@ -172,7 +173,9 @@ function renderNamespaceTable(
                   {column}
                 </th>
               ))}
-              <th className="w-12 px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase"></th>
+              {showActions ? (
+                <th className="w-12 px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase"></th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
@@ -185,21 +188,23 @@ function renderNamespaceTable(
                       {formatValue(item[column])}
                     </td>
                   ))}
-                  <td className="px-3 py-2 text-right align-middle">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={!onDeleteEntry || !entry.id || deletingId === entry.id}
-                      onClick={() => {
-                        if (entry.id) onDeleteEntry?.(entry.id);
-                      }}
-                      className="text-gray-500 hover:text-red-600"
-                      title="Delete entry"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </td>
+                  {showActions ? (
+                    <td className="px-3 py-2 text-right align-middle">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        disabled={!entry.id || deletingId === entry.id}
+                        onClick={() => {
+                          if (entry.id) onDeleteEntry?.(entry.id);
+                        }}
+                        className="text-gray-500 hover:text-red-600"
+                        title="Delete entry"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </td>
+                  ) : null}
                 </tr>
               );
             })}
@@ -210,33 +215,37 @@ function renderNamespaceTable(
   }
 
   return (
-    <div className="overflow-x-auto bg-red-500">
+    <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-950/15 bg-slate-50">
             <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Value</th>
-            <th className="w-12 px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase"></th>
+            {showActions ? (
+              <th className="w-12 px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase"></th>
+            ) : null}
           </tr>
         </thead>
         <tbody>
           {values.map((entry, index) => (
             <tr key={entry.id || index} className="border-b border-slate-950/15">
               <td className="px-3 py-2 align-middle font-mono text-xs text-gray-700">{formatValue(entry.values)}</td>
-              <td className="px-3 py-2 text-right align-middle">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  disabled={!onDeleteEntry || !entry.id || deletingId === entry.id}
-                  onClick={() => {
-                    if (entry.id) onDeleteEntry?.(entry.id);
-                  }}
-                  className="text-gray-500 hover:text-red-600"
-                  title="Delete entry"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </td>
+              {showActions ? (
+                <td className="px-3 py-2 text-right align-middle">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    disabled={!entry.id || deletingId === entry.id}
+                    onClick={() => {
+                      if (entry.id) onDeleteEntry?.(entry.id);
+                    }}
+                    className="text-gray-500 hover:text-red-600"
+                    title="Delete entry"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
