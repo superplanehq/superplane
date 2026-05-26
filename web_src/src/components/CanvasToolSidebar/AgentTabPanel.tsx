@@ -32,6 +32,25 @@ import type { AgentMessage } from "./types";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 import { groupMessages } from "./agentMessageGroups";
 
+const BOOT_CONTEXT_KEY = "agent-boot-context";
+
+const DEFAULT_BOOT_MESSAGE =
+  "Session ready. Read the current canvas state, check connected integrations, and greet the user.";
+
+const BLANK_BOOT_MESSAGE =
+  "The user just created a new blank app with a placeholder node on the canvas. Greet them briefly, then tell them to click on the 'New Component' node on the canvas and pick a component from the sidebar to get started. You can also ask what they want to build and help them choose the right component.";
+
+function getBootMessage(): string {
+  if (typeof window === "undefined") return DEFAULT_BOOT_MESSAGE;
+  const ctx = sessionStorage.getItem(BOOT_CONTEXT_KEY);
+  sessionStorage.removeItem(BOOT_CONTEXT_KEY);
+  if (!ctx) return DEFAULT_BOOT_MESSAGE;
+  if (ctx === "blank") return BLANK_BOOT_MESSAGE;
+  return ctx;
+}
+
+export { BOOT_CONTEXT_KEY };
+
 type ChatConversationProps = {
   chatId: string;
   canvasId: string;
@@ -144,9 +163,7 @@ function ChatConversation({
       void sendMutation
         .mutateAsync({
           chatId,
-          content: createSystemMessage(
-            "Session ready. Read the current canvas state, check connected integrations, and greet the user.",
-          ),
+          content: createSystemMessage(getBootMessage()),
           mode: agentMode,
         })
         .then(() => {
