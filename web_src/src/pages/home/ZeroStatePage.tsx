@@ -1,22 +1,11 @@
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
-import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { ArrowRight, Plus, Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import templateManifest from "../../../../templates/manifest.json";
+import { AppDetailModal, IntegrationIcons, LeadIcon, type AppEntry } from "./AppDetailModal";
 import { useCreateApp } from "./useCreateApp";
 import { useInstallTemplate } from "./useInstallTemplate";
-
-interface AppEntry {
-  repo: string;
-  title: string;
-  description: string;
-  integrations: string[];
-  tags: string[];
-  requirements: string[];
-  agentInstructions: string;
-}
 
 const allApps: AppEntry[] = templateManifest;
 
@@ -29,6 +18,7 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
   const { installTemplate, isInstalling } = useInstallTemplate();
   const [search, setSearch] = useState("");
   const [visibleCount, setVisibleCount] = useState(7);
+  const [selectedApp, setSelectedApp] = useState<AppEntry | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const busy = isSaving || isInstalling;
 
@@ -71,6 +61,21 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
     if (busy) return;
     void installTemplate(app.repo, app.agentInstructions);
   };
+
+  if (selectedApp) {
+    return (
+      <AppDetailModal
+        app={selectedApp}
+        busy={busy}
+        onBack={() => setSelectedApp(null)}
+        onInstall={(e) => {
+          e.stopPropagation();
+          handleInstall(selectedApp);
+        }}
+        onClose={() => setSelectedApp(null)}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto w-full max-w-3xl px-8 py-16">
@@ -120,7 +125,8 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
         {visible.map((app) => (
           <div
             key={app.repo}
-            className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50"
+            onClick={() => setSelectedApp(app)}
+            className="flex cursor-pointer items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100">
               <LeadIcon integrations={app.integrations} />
@@ -132,7 +138,15 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
               </div>
               <p className="mt-0.5 text-xs text-slate-500 line-clamp-1">{app.description}</p>
             </div>
-            <Button size="sm" className="shrink-0 text-xs" onClick={() => handleInstall(app)} disabled={busy}>
+            <Button
+              size="sm"
+              className="shrink-0 text-xs"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleInstall(app);
+              }}
+              disabled={busy}
+            >
               Install
               <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
@@ -143,38 +157,6 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
           <p className="py-8 text-center text-sm text-slate-500">No apps matching &ldquo;{search}&rdquo;</p>
         )}
       </div>
-    </div>
-  );
-}
-
-function LeadIcon({ integrations }: { integrations: string[] }) {
-  const first = integrations[0];
-  if (!first) return <Plus className="h-4 w-4 text-slate-400" />;
-  const icon = getIntegrationIconSrc(first.toLowerCase());
-  if (!icon) return <Plus className="h-4 w-4 text-slate-400" />;
-  return <img src={icon} alt={first} className="h-5 w-5" />;
-}
-
-function IntegrationIcons({ integrations }: { integrations: string[] }) {
-  if (integrations.length === 0) return null;
-  return (
-    <div className="flex items-center gap-1 shrink-0">
-      {integrations.map((name) => {
-        const iconSrc = getIntegrationIconSrc(name.toLowerCase());
-        if (!iconSrc) return null;
-        return (
-          <Tooltip key={name}>
-            <TooltipTrigger asChild>
-              <span className="inline-block h-3.5 w-3.5 shrink-0">
-                <img src={iconSrc} alt={name} className="h-full w-full object-contain" />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <span className="capitalize">{name}</span>
-            </TooltipContent>
-          </Tooltip>
-        );
-      })}
     </div>
   );
 }
