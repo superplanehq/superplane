@@ -1,36 +1,36 @@
 import { useCallback } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
-interface MemoryModeActionsConfig {
-  setIsMemoryMode: (value: boolean) => void;
+interface FilesModeActionsConfig {
+  setIsFilesMode: (value: boolean) => void;
   setIsDashboardMode: (value: boolean) => void;
   setIsDashboardAddPanelOpen: (value: boolean) => void;
   setIsDashboardYamlOpen: (value: boolean) => void;
   setIsRunsMode: (value: boolean) => void;
-  setIsFilesMode: (value: boolean) => void;
+  setIsMemoryMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
 }
 
-export function useMemoryModeActions({
-  setIsMemoryMode,
+export function useFilesModeActions({
+  setIsFilesMode,
   setIsDashboardMode,
   setIsDashboardAddPanelOpen,
   setIsDashboardYamlOpen,
   setIsRunsMode,
-  setIsFilesMode,
+  setIsMemoryMode,
   setSelectedRunId,
   setSearchParams,
-}: MemoryModeActionsConfig) {
-  const handleSelectMemoryMode = useCallback(() => {
-    setIsMemoryMode(true);
+}: FilesModeActionsConfig) {
+  const handleSelectFilesMode = useCallback(() => {
+    setIsFilesMode(true);
     setIsDashboardMode(false);
     setIsDashboardAddPanelOpen(false);
     setIsDashboardYamlOpen(false);
     setIsRunsMode(false);
-    setIsFilesMode(false);
+    setIsMemoryMode(false);
     setSelectedRunId(null);
-    setSearchParams(toMemorySearchParams, { replace: true });
+    setSearchParams(toFilesSearchParams, { replace: true });
   }, [
     setIsDashboardAddPanelOpen,
     setIsDashboardMode,
@@ -42,24 +42,24 @@ export function useMemoryModeActions({
     setSelectedRunId,
   ]);
 
-  const handleExitMemoryMode = useCallback(() => {
-    setIsMemoryMode(false);
-    setSearchParams(removeMemorySearchParam, { replace: true });
-  }, [setIsMemoryMode, setSearchParams]);
+  const handleExitFilesMode = useCallback(() => {
+    setIsFilesMode(false);
+    setSearchParams(removeFilesSearchParam, { replace: true });
+  }, [setIsFilesMode, setSearchParams]);
 
-  return { handleSelectMemoryMode, handleExitMemoryMode };
+  return { handleSelectFilesMode, handleExitFilesMode };
 }
 
-function toMemorySearchParams(current: URLSearchParams): URLSearchParams {
+function toFilesSearchParams(current: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(current);
-  next.set("view", "memory");
+  next.set("view", "files");
   next.delete("run");
   next.delete("sidebar");
   next.delete("node");
   return next;
 }
 
-function removeMemorySearchParam(current: URLSearchParams): URLSearchParams {
+function removeFilesSearchParam(current: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(current);
   next.delete("view");
   return next;

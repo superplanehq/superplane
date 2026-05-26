@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 /**
- * Keeps runs/dashboard view mode and selected run in sync with `view` and `run` search params.
+ * Keeps runs/dashboard/memory/files view mode and selected run in sync with `view` and `run` search params.
  */
 export function useWorkflowViewSearchParams(
   searchParams: URLSearchParams,
@@ -12,6 +12,7 @@ export function useWorkflowViewSearchParams(
   const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
   const [isDashboardMode, setIsDashboardMode] = useState(() => searchParams.get("view") === "dashboard");
   const [isMemoryMode, setIsMemoryMode] = useState(() => searchParams.get("view") === "memory");
+  const [isFilesMode, setIsFilesMode] = useState(() => searchParams.get("view") === "files");
   const [isDashboardAddPanelOpen, setIsDashboardAddPanelOpen] = useState(false);
   const [isDashboardYamlOpen, setIsDashboardYamlOpen] = useState(false);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(() => searchParams.get("run"));
@@ -25,6 +26,7 @@ export function useWorkflowViewSearchParams(
   useEffect(() => {
     setIsRunsMode(viewParam === "runs");
     setIsMemoryMode(viewParam === "memory");
+    setIsFilesMode(viewParam === "files");
     if (viewParam === "dashboard") {
       if (dashboardsFeatureEnabled) {
         setIsDashboardMode(true);
@@ -61,6 +63,8 @@ export function useWorkflowViewSearchParams(
     setIsDashboardMode,
     isMemoryMode,
     setIsMemoryMode,
+    isFilesMode,
+    setIsFilesMode,
     isDashboardAddPanelOpen,
     setIsDashboardAddPanelOpen,
     isDashboardYamlOpen,
