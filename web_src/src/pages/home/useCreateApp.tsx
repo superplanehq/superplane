@@ -5,15 +5,6 @@ import { useCreateCanvas } from "@/hooks/useCanvasData";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { showErrorToast } from "@/lib/toast";
 
-const PLACEHOLDER_NODE = {
-  id: "new-component",
-  name: "New Component",
-  type: "TYPE_ACTION" as const,
-  configuration: {},
-  metadata: {},
-  position: { x: 400, y: 300 },
-};
-
 interface UseCreateAppOptions {
   onCreated?: () => void;
 }
@@ -36,7 +27,6 @@ export function useCreateApp({ onCreated }: UseCreateAppOptions = {}) {
         const result = await createCanvasMutation.mutateAsync({
           name,
           method: "ui",
-          nodes: [PLACEHOLDER_NODE],
         });
 
         const canvasId = result?.data?.canvas?.metadata?.id;
@@ -45,6 +35,7 @@ export function useCreateApp({ onCreated }: UseCreateAppOptions = {}) {
           localStorage.setItem("canvasAgentSidebarOpen", "true");
           localStorage.setItem("canvasSidebarOpen", "false");
           sessionStorage.setItem("agent-boot-context", "blank");
+          sessionStorage.setItem("add-placeholder-node", "1");
           navigate(`/${organizationId}/canvases/${canvasId}?edit=1`);
         }
       } catch (error) {

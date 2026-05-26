@@ -86,7 +86,7 @@ import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
 import { WorkflowDashboardOverlay } from "./dashboard/WorkflowDashboardOverlay";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useMemoryModeActions } from "./useMemoryModeActions";
-import { useAutoEnterEditMode, useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
+import { useAutoEnterEditMode, useAutoPlaceholderNode, useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
@@ -4909,6 +4909,7 @@ export function WorkflowPageV2() {
   });
 
   useAutoEnterEditMode(hasEditableVersion, canUpdateCanvas, handleToggleEditMode, searchParams, setSearchParams);
+  useAutoPlaceholderNode(hasEditableVersion, !!canvas?.spec, handlePlaceholderAdd);
 
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {

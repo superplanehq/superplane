@@ -71,3 +71,27 @@ function clearRunsViewSearchParams(current: URLSearchParams): URLSearchParams {
   next.delete("run");
   return next;
 }
+
+/**
+ * After a blank canvas is created, automatically adds a placeholder "New Component" node.
+ * Waits until edit mode is active and canvas is loaded.
+ */
+export function useAutoPlaceholderNode(
+  hasEditableVersion: boolean,
+  canvasHasSpec: boolean,
+  handlePlaceholderAdd?: (data: { position: { x: number; y: number } }) => Promise<string>,
+) {
+  const addedRef = useRef(false);
+
+  useEffect(() => {
+    if (addedRef.current) return;
+    if (typeof window === "undefined") return;
+    if (sessionStorage.getItem("add-placeholder-node") !== "1") return;
+    if (!hasEditableVersion || !canvasHasSpec || !handlePlaceholderAdd) return;
+
+    addedRef.current = true;
+    sessionStorage.removeItem("add-placeholder-node");
+
+    void handlePlaceholderAdd({ position: { x: 400, y: 300 } });
+  }, [hasEditableVersion, canvasHasSpec, handlePlaceholderAdd]);
+}
