@@ -23,11 +23,9 @@ import (
 )
 
 const (
-	SetupStepCapabilitySelection    = "capabilitySelection"
-	SetupStepSelectConnectionMethod = "selectConnectionMethod"
-	SetupStepServiceAccountKey      = "enterServiceAccountKey"
-	SetupStepWIFProvider            = "enterWIFProvider"
-	SetupStepWIFServiceAccount      = "enterWIFServiceAccount"
+	SetupStepCapabilitySelection = "capabilitySelection"
+	SetupStepWIFProvider         = "enterWIFProvider"
+	SetupStepWIFServiceAccount   = "enterWIFServiceAccount"
 
 	PropertyConnectionMethod    = "connectionMethod"
 	PropertyProjectID           = "projectId"
@@ -36,17 +34,11 @@ const (
 	PropertyServiceAccountEmail = "serviceAccountEmail"
 )
 
-//go:embed templates/sa-key-instructions.tpl
-var saKeyInstructionsTemplate []byte
-
 //go:embed templates/wif-provider-instructions.tpl
 var wifProviderInstructionsTemplate []byte
 
 //go:embed templates/wif-service-account-instructions.tpl
 var wifServiceAccountInstructionsTemplate []byte
-
-//go:embed templates/setup-complete-sak.tpl
-var setupCompleteSAKTemplate []byte
 
 //go:embed templates/setup-complete-wif.tpl
 var setupCompleteWIFTemplate []byte
@@ -163,10 +155,6 @@ func (s *SetupProvider) OnStepSubmit(ctx core.SetupStepContext) (*core.SetupStep
 	switch ctx.Step.Name {
 	case SetupStepCapabilitySelection:
 		return s.onCapabilitySelectionSubmit(ctx)
-	case SetupStepSelectConnectionMethod:
-		return s.onSelectConnectionMethodSubmit(ctx)
-	case SetupStepServiceAccountKey:
-		return s.onEnterServiceAccountKeySubmit(ctx)
 	case SetupStepWIFProvider:
 		return s.onEnterWIFProviderSubmit(ctx)
 	case SetupStepWIFServiceAccount:
@@ -180,13 +168,8 @@ func (s *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 	case SetupStepCapabilitySelection:
 		ctx.Capabilities.Clear()
 		return nil
-	case SetupStepSelectConnectionMethod:
-		return ctx.Properties.Delete(PropertyConnectionMethod)
-	case SetupStepServiceAccountKey:
-		_ = ctx.Secrets.Delete(gcpcommon.SecretNameServiceAccountKey)
-		return ctx.Properties.Delete(PropertyProjectID, PropertyClientEmail)
 	case SetupStepWIFProvider:
-		return ctx.Properties.Delete(PropertyWIFProvider, PropertyProjectID)
+		return ctx.Properties.Delete(PropertyConnectionMethod, PropertyWIFProvider, PropertyProjectID)
 	case SetupStepWIFServiceAccount:
 		return ctx.Properties.Delete(PropertyServiceAccountEmail)
 	}
@@ -245,169 +228,47 @@ func (s *SetupProvider) onCapabilitySelectionSubmit(ctx core.SetupStepContext) (
 	ctx.Capabilities.Request(ctx.Step.Capabilities...)
 	ctx.Capabilities.Available(s.capabilityDiff(ctx.Step.Capabilities)...)
 
-	return &core.SetupStep{
-		Type:  core.SetupStepTypeInputs,
-		Name:  SetupStepSelectConnectionMethod,
-		Label: "How do you want to connect to Google Cloud?",
-		Inputs: []configuration.Field{
-			{
-				Name:        PropertyConnectionMethod,
-				Label:       "Connection method",
-				Type:        configuration.FieldTypeSelect,
-				Required:    true,
-				Description: "Authenticate with a Service Account JSON key or Workload Identity Federation (keyless).",
-				Default:     ConnectionMethodServiceAccountKey,
-				TypeOptions: &configuration.TypeOptions{
-					Select: &configuration.SelectTypeOptions{
-						Options: []configuration.FieldOption{
-							{Label: "Service Account Key", Value: ConnectionMethodServiceAccountKey},
-							{Label: "Workload Identity Federation", Value: ConnectionMethodWIF},
-						},
-					},
-				},
-			},
-		},
-	}, nil
-}
-
-func (s *SetupProvider) onSelectConnectionMethodSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
-	m, ok := ctx.Step.Inputs.(map[string]any)
-	if !ok {
-		return nil, errors.New("invalid input")
-	}
-
-	method, ok := m[PropertyConnectionMethod].(string)
-	if !ok || strings.TrimSpace(method) == "" {
-		return nil, errors.New("connection method is required")
-	}
-
-	if method != ConnectionMethodServiceAccountKey && method != ConnectionMethodWIF {
-		return nil, fmt.Errorf("unknown connection method: %s", method)
-	}
-
 	if err := ctx.Properties.Create(core.IntegrationPropertyDefinition{
 		Name:        PropertyConnectionMethod,
 		Label:       "Connection Method",
 		Description: "Authentication method used to connect to Google Cloud",
 		Type:        core.IntegrationPropertyTypeString,
-		Value:       method,
+		Value:       ConnectionMethodWIF,
 		Editable:    false,
 	}); err != nil {
 		return nil, fmt.Errorf("error storing connection method: %w", err)
 	}
 
-	if method == ConnectionMethodWIF {
-		wifInstructions, err := renderTemplate("wifProvider", wifProviderInstructionsTemplate, map[string]any{
-			"IssuerURL": integrationOIDCIssuerURL(ctx),
-		})
-		if err != nil {
-			return nil, err
-		}
-		return &core.SetupStep{
-			Type:         core.SetupStepTypeInputs,
-			Name:         SetupStepWIFProvider,
-			Label:        "Enter Workload Identity Federation details",
-			Instructions: wifInstructions,
-			Inputs: []configuration.Field{
-				{
-					Name:        PropertyWIFProvider,
-					Label:       "Pool provider (resource name or URL)",
-					Type:        configuration.FieldTypeString,
-					Required:    true,
-					Description: "OIDC provider resource name or full IAM URL from Google Cloud Console (for example https://iam.googleapis.com/v1/projects/…/providers/…). SuperPlane normalizes this to the //iam.googleapis.com/… resource name.",
-					Placeholder: "https://iam.googleapis.com/v1/projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/superplane",
-				},
-				{
-					Name:        PropertyProjectID,
-					Label:       "Project ID",
-					Type:        configuration.FieldTypeString,
-					Required:    true,
-					Description: "GCP project ID (e.g. my-project)",
-					Placeholder: "e.g. my-project",
-				},
-			},
-		}, nil
-	}
-
-	return &core.SetupStep{
-		Type:         core.SetupStepTypeInputs,
-		Name:         SetupStepServiceAccountKey,
-		Label:        "Enter Service Account key",
-		Instructions: string(saKeyInstructionsTemplate),
-		Inputs: []configuration.Field{
-			{
-				Name:      gcpcommon.SecretNameServiceAccountKey,
-				Label:     "Service Account Key (JSON)",
-				Type:      configuration.FieldTypeString,
-				Required:  true,
-				Sensitive: true,
-			},
-		},
-	}, nil
-}
-
-func (s *SetupProvider) onEnterServiceAccountKeySubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
-	m, ok := ctx.Step.Inputs.(map[string]any)
-	if !ok {
-		return nil, errors.New("invalid input")
-	}
-
-	keyStr, ok := m[gcpcommon.SecretNameServiceAccountKey].(string)
-	if !ok {
-		return nil, errors.New("invalid service account key")
-	}
-	keyStr = strings.TrimSpace(keyStr)
-	if keyStr == "" {
-		return nil, errors.New("service account key is required")
-	}
-
-	metadata, err := validateAndParseServiceAccountKey([]byte(keyStr))
-	if err != nil {
-		return nil, fmt.Errorf("invalid service account key: %w", err)
-	}
-
-	client, err := gcpcommon.NewClientFromKeyJSON(ctx.HTTP, []byte(keyStr), metadata.ProjectID)
-	if err != nil {
-		return nil, err
-	}
-
-	crmURL := fmt.Sprintf("https://cloudresourcemanager.googleapis.com/v3/projects/%s", metadata.ProjectID)
-	if _, err := client.GetURL(context.Background(), crmURL); err != nil {
-		return nil, fmt.Errorf("connection failed. Ensure the 'Cloud Resource Manager API' is enabled and the service account has 'Viewer' permissions: %w", err)
-	}
-
-	if err := ctx.Secrets.Create(core.IntegrationSecretDefinition{
-		Name:        gcpcommon.SecretNameServiceAccountKey,
-		Label:       "Service Account Key",
-		Description: "GCP service account JSON key",
-		Value:       keyStr,
-		Editable:    true,
-	}); err != nil {
-		return nil, fmt.Errorf("error storing service account key: %w", err)
-	}
-
-	if err := ctx.Properties.CreateMany([]core.IntegrationPropertyDefinition{
-		{Name: PropertyProjectID, Label: "Project ID", Type: core.IntegrationPropertyTypeString, Value: metadata.ProjectID, Editable: false},
-		{Name: PropertyClientEmail, Label: "Service Account", Type: core.IntegrationPropertyTypeString, Value: metadata.ClientEmail, Editable: false},
-	}); err != nil {
-		return nil, fmt.Errorf("error storing properties: %w", err)
-	}
-
-	ctx.Capabilities.Enable(ctx.Capabilities.Requested()...)
-
-	instructions, err := renderTemplate("setupCompleteSAK", setupCompleteSAKTemplate, map[string]any{
-		"ProjectID":   metadata.ProjectID,
-		"ClientEmail": metadata.ClientEmail,
+	wifInstructions, err := renderTemplate("wifProvider", wifProviderInstructionsTemplate, map[string]any{
+		"IssuerURL": integrationOIDCIssuerURL(ctx),
 	})
 	if err != nil {
 		return nil, err
 	}
 
 	return &core.SetupStep{
-		Type:         core.SetupStepTypeDone,
-		Name:         "done",
-		Label:        "Setup complete",
-		Instructions: instructions,
+		Type:         core.SetupStepTypeInputs,
+		Name:         SetupStepWIFProvider,
+		Label:        "Set up Workload Identity Federation",
+		Instructions: wifInstructions,
+		Inputs: []configuration.Field{
+			{
+				Name:        PropertyWIFProvider,
+				Label:       "Pool provider (resource name or URL)",
+				Type:        configuration.FieldTypeString,
+				Required:    true,
+				Description: "OIDC provider resource name or full IAM URL from Google Cloud Console. SuperPlane normalizes this to the //iam.googleapis.com/… resource name.",
+				Placeholder: "https://iam.googleapis.com/v1/projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/superplane",
+			},
+			{
+				Name:        PropertyProjectID,
+				Label:       "Project ID",
+				Type:        configuration.FieldTypeString,
+				Required:    true,
+				Description: "GCP project ID",
+				Placeholder: "e.g. my-project",
+			},
+		},
 	}, nil
 }
 
