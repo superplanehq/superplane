@@ -18,6 +18,12 @@ export function readStoredBoolean(key: string): boolean {
   }
 }
 
+export function clearComponentSidebarSearchParams(params: URLSearchParams): URLSearchParams {
+  params.delete("sidebar");
+  params.delete("node");
+  return params;
+}
+
 export function getWorkflowHeaderMode({
   isDashboardMode,
   dashboardsFeatureEnabled,
