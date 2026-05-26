@@ -692,6 +692,78 @@ func Test__CanvasPatcher(t *testing.T) {
 		steps.assertNodeErrorContains("node-a", "field 'text' is required")
 	})
 
+	t.Run("add start trigger with invalid param() in template payload -> sets node error", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(nil, nil)
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:    "start-node",
+						Name:  "Start",
+						Block: "start",
+						Configuration: structFromMap(t, map[string]any{
+							"templates": []any{
+								map[string]any{
+									"name": "Deploy",
+									"payload": map[string]any{
+										"name": "param(type:unknown, title:'Name')",
+									},
+								},
+							},
+						}),
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertNoError()
+		steps.assertNodeCount(1)
+		steps.assertHasNodeBlock("start-node", "start")
+		steps.assertNodeErrorContains("start-node", "unsupported type")
+	})
+
+	t.Run("add start trigger with valid param() in template payload -> no node error", func(t *testing.T) {
+		steps := &CanvasPatcherSteps{t: t, registry: r.Registry}
+		steps.givenCanvasVersion(nil, nil)
+
+		nodeConfig := map[string]any{
+			"templates": []any{
+				map[string]any{
+					"name": "Deploy",
+					"payload": map[string]any{
+						"body": map[string]any{
+							"name": "param(type:string, title:'Enter a machine name', default:'machine-1', required:false)",
+							"size": "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Select size', required:true)",
+						},
+					},
+				},
+			},
+		}
+
+		steps.whenHandling(&pb.CanvasChangeset{
+			Changes: []*pb.CanvasChangeset_Change{
+				{
+					Type: pb.CanvasChangeset_Change_ADD_NODE,
+					Node: &pb.CanvasChangeset_Change_Node{
+						Id:            "start-node",
+						Name:          "Start",
+						Block:         "start",
+						Configuration: structFromMap(t, nodeConfig),
+					},
+				},
+			},
+		}, nil)
+
+		steps.assertNoError()
+		steps.assertNodeCount(1)
+		steps.assertHasNodeBlock("start-node", "start")
+		steps.assertNodeHasNoError("start-node")
+		steps.assertHasNode("start-node", "Start", nodeConfig)
+	})
+
 	t.Run("add integration component without integration id -> sets node error without returning error", func(t *testing.T) {
 		steps := &CanvasPatcherSteps{t: t, registry: r.Registry, orgID: r.Organization.ID}
 		steps.givenCanvasVersion(nil, nil)
@@ -989,6 +1061,15 @@ func (s *CanvasPatcherSteps) assertNodeErrorContains(nodeID string, text string)
 	require.True(s.t, i != -1, "expected node %s", nodeID)
 	require.NotNil(s.t, s.finalVersion.Nodes[i].ErrorMessage)
 	require.Contains(s.t, *s.finalVersion.Nodes[i].ErrorMessage, text)
+}
+
+func (s *CanvasPatcherSteps) assertNodeHasNoError(nodeID string) {
+	i := slices.IndexFunc(s.finalVersion.Nodes, func(node models.Node) bool {
+		return node.ID == nodeID
+	})
+
+	require.True(s.t, i != -1, "expected node %s", nodeID)
+	require.Nil(s.t, s.finalVersion.Nodes[i].ErrorMessage)
 }
 
 func (s *CanvasPatcherSteps) assertNodePosition(nodeID string, x int, y int) {
