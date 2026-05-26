@@ -106,7 +106,7 @@ function CopyButton(props: CanvasYamlModalProps) {
   if (!props.onCopy) return null;
 
   return (
-    <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(props.yamlText)}>
+    <Button variant="outline" size="sm" onClick={props.onCopy}>
       <Copy />
       Copy
     </Button>
