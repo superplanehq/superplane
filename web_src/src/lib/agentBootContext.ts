@@ -40,6 +40,30 @@ export function markAgentBootReady(canvasId: string) {
   window.dispatchEvent(new CustomEvent(AGENT_BOOT_CONTEXT_READY_EVENT, { detail: { canvasId } }));
 }
 
-export function clearAgentBootContext() {
+export function abandonPendingPlaceholderBoot(canvasId: string) {
+  if (typeof window === "undefined") return;
+  if (sessionStorage.getItem(PLACEHOLDER_NODE_CONTEXT_KEY) === canvasId) {
+    sessionStorage.removeItem(PLACEHOLDER_NODE_CONTEXT_KEY);
+  }
+  clearAgentBootContext(canvasId);
+  window.dispatchEvent(new CustomEvent(AGENT_BOOT_CONTEXT_READY_EVENT, { detail: { canvasId } }));
+}
+
+export function clearAgentBootContext(canvasId?: string) {
+  if (!canvasId) {
+    sessionStorage.removeItem(AGENT_BOOT_CONTEXT_KEY);
+    return;
+  }
+
+  const raw = sessionStorage.getItem(AGENT_BOOT_CONTEXT_KEY);
+  if (!raw) return;
+
+  try {
+    const context = JSON.parse(raw) as { canvasId: string };
+    if (context.canvasId !== canvasId) return;
+  } catch {
+    return;
+  }
+
   sessionStorage.removeItem(AGENT_BOOT_CONTEXT_KEY);
 }
