@@ -123,7 +123,7 @@ export function IntegrationIcons({ integrations }: { integrations: string[] }) {
                 <img src={iconSrc} alt={name} className="h-full w-full object-contain" />
               </span>
             </TooltipTrigger>
-            <TooltipContent side="bottom">
+            <TooltipContent side="bottom" className="z-[300]">
               <span className="capitalize">{name}</span>
             </TooltipContent>
           </Tooltip>
