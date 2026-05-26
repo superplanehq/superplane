@@ -20,8 +20,8 @@ blocks:
       jobs:
         - name: ECS deploy task-broker
           commands:
-            - aws ecs update-service --cluster default --service task-broker --force-new-deployment
-            - aws ecs wait services-stable --cluster default --services task-broker
+            - aws ecs update-service --cluster default --service task-broker-v2 --force-new-deployment
+            - aws ecs wait services-stable --cluster default --services task-broker-v2
 
   - name: Deploy fleet-manager
     dependencies: []
