@@ -249,6 +249,14 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
+	return b.ResolveExpressionWithExtraVariables(expression, nil)
+}
+
+// ResolveExpressionWithExtraVariables evaluates an expression with extra
+// variables merged into the eval environment. Provided keys cannot override
+// built-ins; we reject any attempt to shadow reserved names so that `$`,
+// `memory`, `config`, `root`, and `previous` stay deterministic.
+func (b *NodeConfigurationBuilder) ResolveExpressionWithExtraVariables(expression string, variables map[string]any) (any, error) {
 	referencedNodes, err := expressionvalidation.ParseReferencedNodes(expression)
 	if err != nil {
 		return "", err
@@ -266,6 +274,13 @@ func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, er
 
 	if b.parentBlueprintNode != nil {
 		env["config"] = normalizeExpressionValue(b.parentBlueprintNode.Configuration.Data())
+	}
+
+	for key, value := range variables {
+		if isReservedExpressionIdentifier(key) {
+			return "", fmt.Errorf("variable %q is reserved", key)
+		}
+		env[key] = value
 	}
 
 	exprOptions := []expr.Option{
@@ -720,6 +735,20 @@ func latestEventByExecution(events []models.CanvasEvent, executionIDs []uuid.UUI
 	}
 
 	return latestByExecution
+}
+
+var reservedExpressionIdentifiers = map[string]struct{}{
+	"$":        {},
+	"memory":   {},
+	"config":   {},
+	"root":     {},
+	"previous": {},
+	"ctx":      {},
+}
+
+func isReservedExpressionIdentifier(name string) bool {
+	_, ok := reservedExpressionIdentifiers[name]
+	return ok
 }
 
 func parseDepth(param any) (int, error) {
