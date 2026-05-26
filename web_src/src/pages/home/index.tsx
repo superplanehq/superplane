@@ -11,6 +11,7 @@ import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { CanvasFolderSection } from "./CanvasFolderSection";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { EditAppModal } from "./EditAppModal";
+import { ZeroStatePage } from "./ZeroStatePage";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 import { useEditApp } from "./useEditApp";
 import { useHomePageCanvasList } from "./useHomePageCanvasList";
@@ -32,7 +33,7 @@ export function HomePage() {
     isOpen: isEditAppModalOpen,
   } = useEditApp();
 
-  const { canvasFolders, filteredCanvases, isLoading, canvasError } = useHomePageCanvasList(
+  const { canvases, canvasFolders, filteredCanvases, isLoading, canvasError } = useHomePageCanvasList(
     organizationId,
     searchQuery,
   );
@@ -45,6 +46,21 @@ export function HomePage() {
 
   if (!account || !organizationId) {
     return <ErrorView />;
+  }
+
+  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
+        <header className="bg-white border-b border-slate-950/15 px-4 h-12 flex items-center">
+          <OrganizationMenuButton organizationId={organizationId} />
+        </header>
+        <main className="w-full h-full flex flex-column flex-grow-1">
+          <div className="bg-slate-100 w-full flex-grow-1">
+            <ZeroStatePage userName={account.name} />
+          </div>
+        </main>
+      </div>
+    );
   }
 
   return (

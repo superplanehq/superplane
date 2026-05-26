@@ -184,7 +184,7 @@ describe("HomePage canvas folders", () => {
     });
   });
 
-  it("uses the toolbar as the canvas creation entrypoint", async () => {
+  it("uses the zero-state as the canvas creation entrypoint", async () => {
     const user = userEvent.setup();
     mutationMocks.createCanvasAsync.mockResolvedValue({
       data: { canvas: { metadata: { id: "canvas-new" } } },
@@ -194,7 +194,7 @@ describe("HomePage canvas folders", () => {
 
     renderHome();
 
-    await user.click(screen.getByRole("button", { name: /new app/i }));
+    await user.click(screen.getByRole("button", { name: /start from scratch/i }));
 
     await waitFor(() => {
       expect(mutationMocks.createCanvasAsync).toHaveBeenCalledWith(
