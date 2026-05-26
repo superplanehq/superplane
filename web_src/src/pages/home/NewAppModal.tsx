@@ -37,7 +37,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
   const { installTemplate, isInstalling } = useInstallTemplate();
   const [search, setSearch] = useState("");
   const [selectedApp, setSelectedApp] = useState<AppEntry | null>(null);
-  const [visibleCount, setVisibleCount] = useState(10);
+  const [visibleCount, setVisibleCount] = useState(5);
   const listRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
@@ -59,7 +59,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
     const el = listRef.current;
     if (!el || search) return;
     if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
-      setVisibleCount((prev) => Math.min(prev + 10, filtered.length));
+      setVisibleCount((prev) => Math.min(prev + 5, filtered.length));
     }
   }, [filtered.length, search]);
 
