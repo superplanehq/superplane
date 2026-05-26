@@ -40,13 +40,20 @@ const DEFAULT_BOOT_MESSAGE =
 const BLANK_BOOT_MESSAGE =
   "The user just created a new blank app with a placeholder node on the canvas. Greet them briefly, then tell them to click on the 'New Component' node on the canvas and pick a component from the sidebar to get started. You can also ask what they want to build and help them choose the right component.";
 
-function getBootMessage(): string {
+function getBootMessage(canvasId: string): string {
   if (typeof window === "undefined") return DEFAULT_BOOT_MESSAGE;
-  const ctx = sessionStorage.getItem(BOOT_CONTEXT_KEY);
-  sessionStorage.removeItem(BOOT_CONTEXT_KEY);
-  if (!ctx) return DEFAULT_BOOT_MESSAGE;
-  if (ctx === "blank") return BLANK_BOOT_MESSAGE;
-  return ctx;
+  const raw = sessionStorage.getItem(BOOT_CONTEXT_KEY);
+  if (!raw) return DEFAULT_BOOT_MESSAGE;
+  try {
+    const ctx = JSON.parse(raw) as { canvasId: string; message: string };
+    if (ctx.canvasId !== canvasId) return DEFAULT_BOOT_MESSAGE;
+    sessionStorage.removeItem(BOOT_CONTEXT_KEY);
+    if (ctx.message === "blank") return BLANK_BOOT_MESSAGE;
+    return ctx.message;
+  } catch {
+    sessionStorage.removeItem(BOOT_CONTEXT_KEY);
+    return DEFAULT_BOOT_MESSAGE;
+  }
 }
 
 export { BOOT_CONTEXT_KEY };
@@ -163,7 +170,7 @@ function ChatConversation({
       void sendMutation
         .mutateAsync({
           chatId,
-          content: createSystemMessage(getBootMessage()),
+          content: createSystemMessage(getBootMessage(canvasId)),
           mode: agentMode,
         })
         .then(() => {

@@ -40,7 +40,7 @@ export function useInstallTemplate() {
         const result = (await response.json()) as InstallResult;
         localStorage.setItem("canvasAgentSidebarOpen", "true");
         localStorage.setItem("canvasSidebarOpen", "false");
-        if (agentInstructions) sessionStorage.setItem("agent-boot-context", agentInstructions);
+        if (agentInstructions) sessionStorage.setItem("agent-boot-context", JSON.stringify({ canvasId: result.canvasId, message: agentInstructions }));
         navigate(`/${result.organizationId}/canvases/${result.canvasId}?edit=1`);
       } catch (error) {
         const message = getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install template"));
