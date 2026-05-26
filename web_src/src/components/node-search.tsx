@@ -1,4 +1,4 @@
-import { memo, useCallback, useState, useEffect } from "react";
+import { memo, useCallback, useState } from "react";
 import { Search } from "lucide-react";
 
 import { useReactFlow, type BuiltInEdge, type Node, type PanelProps } from "@xyflow/react";
@@ -144,18 +144,6 @@ export function NodeSearchInternal({ onSearch, onSelectNode, open, onOpenChange 
 export const NodeSearch = memo(function NodeSearch({ onSearch, onSelectNode }: NodeSearchProps) {
   const [open, setOpen] = useState(false);
 
-  // Add keyboard shortcut Ctrl+K / Cmd+K
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
-        e.preventDefault();
-        setOpen(true);
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
   return (
     <>
       <Tooltip>
@@ -164,7 +152,7 @@ export const NodeSearch = memo(function NodeSearch({ onSearch, onSelectNode }: N
             <Search className="h-3 w-3" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Search components (Ctrl/Cmd + K)</TooltipContent>
+        <TooltipContent>Search Components</TooltipContent>
       </Tooltip>
       <CommandDialog open={open} onOpenChange={setOpen} className="max-w-xl sm:max-w-2xl md:max-w-3xl">
         <NodeSearchInternal onSearch={onSearch} onSelectNode={onSelectNode} open={open} onOpenChange={setOpen} />

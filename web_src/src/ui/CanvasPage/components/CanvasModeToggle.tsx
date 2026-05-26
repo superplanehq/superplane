@@ -95,7 +95,7 @@ export function CanvasModeToggle({
             Canvas
             {hasDraft ? (
               <span
-                className="inline-flex size-1.5 shrink-0 rounded-full bg-muted-foreground/70"
+                className="inline-flex size-1.5 shrink-0 rounded-full bg-slate-400"
                 aria-hidden="true"
                 data-testid="canvas-view-mode-live-draft-dot"
               />
