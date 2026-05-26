@@ -20,10 +20,12 @@ import {
 import { onMessageTriggerRenderer } from "./on_message";
 import { cloudDNSMapper } from "./clouddns";
 import { deleteVMInstanceMapper } from "./delete_vm_instance";
+import { getVMInstanceMapper } from "./get_vm_instance";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: baseMapper,
   deleteVMInstance: deleteVMInstanceMapper,
+  getVMInstance: getVMInstanceMapper,
   "cloudbuild.createBuild": cloudBuildBaseMapper,
   "cloudbuild.getBuild": cloudBuildBaseMapper,
   "cloudbuild.runTrigger": runTriggerMapper,
@@ -51,6 +53,7 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createVM: buildActionStateRegistry("completed"),
   deleteVMInstance: buildActionStateRegistry("completed"),
+  getVMInstance: buildActionStateRegistry("completed"),
   "cloudbuild.createBuild": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
   "cloudbuild.getBuild": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
   "cloudbuild.runTrigger": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
