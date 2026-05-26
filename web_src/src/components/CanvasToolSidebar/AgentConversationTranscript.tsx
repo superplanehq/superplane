@@ -1,6 +1,6 @@
 import { Bot, ChevronRight, Loader2, Terminal } from "lucide-react";
 import { memo, useCallback, useEffect, useMemo, useState, type RefObject } from "react";
-import { formatSystemNotification, isSystemNotification } from "@/components/AgentSidebar/systemMessages";
+import { isSystemNotification } from "@/components/AgentSidebar/systemMessages";
 import type { RubricCategory } from "@/components/AgentSidebar/widgets/parser";
 import { RichMessage } from "@/components/AgentSidebar/widgets/RichMessage";
 import { cn } from "@/lib/utils";
@@ -158,12 +158,7 @@ const MessageRow = memo(function MessageRow({
   }
 
   if (message.role === "system" || (message.role === "user" && isSystemNotification(message.content))) {
-    const text = message.role === "system" ? formatSystemNotification(message.content) : message.content;
-    return (
-      <div className="flex justify-center">
-        <span className="text-xs text-slate-500">{text}</span>
-      </div>
-    );
+    return null;
   }
 
   const isUser = message.role === "user";
