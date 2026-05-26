@@ -11,13 +11,18 @@ interface InstallResult {
   organizationId: string;
 }
 
+interface TemplateAgentContext {
+  instructions?: string;
+  initialMessage?: string;
+}
+
 export function useInstallTemplate() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const navigate = useNavigate();
   const [isInstalling, setIsInstalling] = useState(false);
 
   const installTemplate = useCallback(
-    async (repo: string, agentInstructions?: string) => {
+    async (repo: string, agentContext?: TemplateAgentContext) => {
       if (!organizationId || isInstalling) return;
 
       setIsInstalling(true);
@@ -41,7 +46,9 @@ export function useInstallTemplate() {
         const result = (await response.json()) as InstallResult;
         localStorage.setItem("canvasAgentSidebarOpen", "true");
         localStorage.setItem("canvasSidebarOpen", "false");
-        if (agentInstructions) setAgentBootContext(result.canvasId, agentInstructions);
+        if (agentContext?.instructions || agentContext?.initialMessage) {
+          setAgentBootContext(result.canvasId, agentContext);
+        }
         navigate(`/${result.organizationId}/canvases/${result.canvasId}?edit=1`);
       } catch (error) {
         const message = getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install template"));

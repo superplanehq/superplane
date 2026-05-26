@@ -20,6 +20,7 @@ import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
   clearAgentBootContext,
+  getAgentBootInitialMessage,
   getAgentBootMessage,
   isAgentBootReady,
 } from "@/lib/agentBootContext";
@@ -121,6 +122,7 @@ function ChatConversation({
   const rawMessages = useConversationMessages(messagesQuery.data);
   const { account } = useContext(AccountContext);
   const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
+  const bootInitialMessage = useMemo(() => getAgentBootInitialMessage(canvasId), [canvasId]);
 
   // Prepend a synthetic greeting as the first message so it never disappears
   const messages = useMemo(() => {
@@ -133,8 +135,23 @@ function ChatConversation({
       toolName: "",
       toolStatus: "",
     };
-    return [greeting, ...rawMessages];
-  }, [rawMessages, greetingFirstName]);
+
+    if (!bootInitialMessage) {
+      return [greeting, ...rawMessages];
+    }
+
+    const templateIntro: AgentMessage = {
+      id: "__boot_initial_message__",
+      role: "assistant",
+      content: bootInitialMessage,
+      createdAt: rawMessages[0]?.createdAt ?? null,
+      toolCallId: "",
+      toolName: "",
+      toolStatus: "",
+    };
+
+    return [greeting, templateIntro, ...rawMessages];
+  }, [rawMessages, greetingFirstName, bootInitialMessage]);
 
   const showThinking = useThinkingIndicator(rawMessages, status);
   useAgentBootKickoff({ messagesQuery, sendMutation, chatId, canvasId, agentMode });

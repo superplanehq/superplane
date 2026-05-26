@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
   abandonPendingPlaceholderBoot,
+  clearAgentBootContext,
+  getAgentBootInitialMessage,
   getAgentBootMessage,
   isAgentBootReady,
   markAgentBootReady,
@@ -51,5 +53,34 @@ describe("agent boot context", () => {
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ detail: { canvasId: "canvas-1" } }));
 
     window.removeEventListener(AGENT_BOOT_CONTEXT_READY_EVENT, listener);
+  });
+
+  it("stores template intro text separately from the constrained agent prompt", () => {
+    setAgentBootContext("canvas-1", {
+      instructions: "This template deploys preview environments.",
+      initialMessage: "Here's what you've got on this canvas.",
+    });
+
+    expect(getAgentBootInitialMessage("canvas-1")).toBe("Here's what you've got on this canvas.");
+    expect(getAgentBootMessage("canvas-1")).not.toContain("This template deploys preview environments.");
+    expect(getAgentBootMessage("canvas-1")).not.toContain("Read the current canvas state and connected integrations.");
+    expect(getAgentBootMessage("canvas-1")).toContain(
+      "Do not inspect the canvas, integrations, files, or run any commands or tools.",
+    );
+    expect(getAgentBootMessage("canvas-1")).toContain('Reply only with: "What do you want to do next in the canvas?"');
+  });
+
+  it("keeps template intro text after the one-time boot context is cleared", () => {
+    setAgentBootContext("canvas-1", {
+      instructions: "This template deploys preview environments.",
+      initialMessage: "Here's what you've got on this canvas.",
+    });
+
+    clearAgentBootContext("canvas-1");
+
+    expect(getAgentBootInitialMessage("canvas-1")).toBe("Here's what you've got on this canvas.");
+    expect(getAgentBootMessage("canvas-1")).toBe(
+      "Session ready. Read the current canvas state, check connected integrations, and greet the user.",
+    );
   });
 });

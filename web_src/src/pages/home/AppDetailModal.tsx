@@ -11,6 +11,7 @@ export interface AppEntry {
   tags: string[];
   requirements: string[];
   agentInstructions: string;
+  agentInitialMessage?: string;
 }
 
 interface AppDetailModalProps {

@@ -56,7 +56,10 @@ export function ZeroStatePage({ userName }: ZeroStatePageProps) {
 
   const handleInstall = (app: AppEntry) => {
     if (busy) return;
-    void installTemplate(app.repo, app.agentInstructions);
+    void installTemplate(app.repo, {
+      instructions: app.agentInstructions,
+      initialMessage: app.agentInitialMessage,
+    });
   };
 
   return (

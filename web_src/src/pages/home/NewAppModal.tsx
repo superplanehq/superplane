@@ -71,7 +71,10 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
   const handleInstall = (e: React.MouseEvent, app: AppEntry) => {
     e.stopPropagation();
     if (busy) return;
-    void installTemplate(app.repo, app.agentInstructions);
+    void installTemplate(app.repo, {
+      instructions: app.agentInstructions,
+      initialMessage: app.agentInitialMessage,
+    });
   };
 
   const handleClose = () => {
