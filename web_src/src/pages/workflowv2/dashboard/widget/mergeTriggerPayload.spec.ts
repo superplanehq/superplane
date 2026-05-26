@@ -29,4 +29,16 @@ describe("mergeTriggerPayload", () => {
     const out = buildRowPayloadFromTemplates({ "data.issue.number": "{{ pr_number }}" }, { pr_number: "7" });
     expect(out).toEqual({ data: { issue: { number: "7" } } });
   });
+
+  it("coerces numeric strings for arithmetic templates like `{{ value / 2 }}`", () => {
+    const out = buildRowPayloadFromTemplates({ amount: "{{ value / 2 }}" }, { value: "10" });
+    expect(out).toEqual({ amount: "5" });
+  });
+
+  it("falls back to an empty string when a CEL operand cannot be coerced", () => {
+    const out = buildRowPayloadFromTemplates({ amount: "{{ value / 2 }}" }, { value: "abc" });
+    // evalExpr returns undefined → evalTemplate skips that segment, leaving an
+    // empty string (the literal prefix in this template is also empty).
+    expect(out).toEqual({ amount: "" });
+  });
 });

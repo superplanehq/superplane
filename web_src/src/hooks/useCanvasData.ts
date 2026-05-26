@@ -134,7 +134,9 @@ export const canvasKeys = {
   nodeQueueItemHistory: (canvasId: string, nodeId: string) =>
     [...canvasKeys.nodeQueueItems(), "infinite", canvasId, nodeId] as const,
   canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
-  dashboard: (canvasId: string) => [...canvasKeys.all, "dashboard", canvasId] as const,
+  dashboard: (canvasId: string, versionId?: string) =>
+    [...canvasKeys.all, "dashboard", canvasId, versionId ?? "live"] as const,
+  dashboardAll: (canvasId: string) => [...canvasKeys.all, "dashboard", canvasId] as const,
   repository: (canvasId: string) => [...canvasKeys.all, "repository", canvasId] as const,
   repositoryFiles: (canvasId: string) => [...canvasKeys.repository(canvasId), "files"] as const,
   repositoryFile: (canvasId: string, path: string, ref?: string) =>
@@ -884,6 +886,7 @@ export const usePublishCanvasVersion = (organizationId: string, canvasId: string
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.dashboardAll(canvasId) });
     },
   });
 };
@@ -1591,13 +1594,14 @@ export const useInfiniteNodeQueueItems = (canvasId: string, nodeId: string, enab
   });
 };
 
-export const useCanvasDashboard = (canvasId: string, enabled: boolean = true) => {
+export const useCanvasConsole = (canvasId: string, versionId: string | undefined, enabled: boolean = true) => {
   return useQuery({
-    queryKey: canvasKeys.dashboard(canvasId),
+    queryKey: canvasKeys.dashboard(canvasId, versionId),
     queryFn: async () => {
       const response = await canvasesGetCanvasDashboard(
         withOrganizationHeader({
           path: { canvasId },
+          query: versionId ? { versionId } : undefined,
         }),
       );
       return response.data?.dashboard;
@@ -1607,7 +1611,7 @@ export const useCanvasDashboard = (canvasId: string, enabled: boolean = true) =>
   });
 };
 
-export const useUpdateCanvasDashboard = (canvasId: string) => {
+export const useUpdateCanvasConsole = (canvasId: string, versionId: string | undefined) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
@@ -1615,6 +1619,7 @@ export const useUpdateCanvasDashboard = (canvasId: string) => {
         withOrganizationHeader({
           path: { canvasId },
           body: {
+            versionId,
             panels: input.panels.map((p) => ({
               id: p.id,
               type: p.type,
@@ -1635,7 +1640,7 @@ export const useUpdateCanvasDashboard = (canvasId: string) => {
       return response.data?.dashboard;
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(canvasKeys.dashboard(canvasId), data);
+      queryClient.setQueryData(canvasKeys.dashboard(canvasId, versionId), data);
     },
   });
 };
@@ -1777,8 +1782,8 @@ export const useGenerateCanvasRepositoryCredentials = (canvasId: string) => {
   });
 };
 
-export type CanvasDashboardQueryResult = ReturnType<typeof useCanvasDashboard>;
-export type UpdateCanvasDashboardMutationResult = ReturnType<typeof useUpdateCanvasDashboard>;
+export type CanvasConsoleQueryResult = ReturnType<typeof useCanvasConsole>;
+export type UpdateCanvasConsoleMutationResult = ReturnType<typeof useUpdateCanvasConsole>;
 export type CanvasRepositoryFilesQueryResult = ReturnType<typeof useCanvasRepositoryFiles>;
 export type CanvasRepositoryFileQueryResult = ReturnType<typeof useCanvasRepositoryFile>;
 export type CommitCanvasRepositoryFilesMutationResult = ReturnType<typeof useCommitCanvasRepositoryFiles>;

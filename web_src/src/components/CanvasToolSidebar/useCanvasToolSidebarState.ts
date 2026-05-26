@@ -3,7 +3,7 @@ import { persistAgentMode, readInitialAgentMode, type AgentMode } from "@/compon
 import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 
 // Keep in sync with pkg/features/features.go.
-const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
+export const FEATURE_CLAUDE_MANAGED_AGENTS = "claude_managed_agents";
 /** Key unchanged so existing browser state continues to work. */
 const CANVAS_TOOL_SIDEBAR_OPEN_STORAGE_KEY = "canvasAgentSidebarOpen";
 

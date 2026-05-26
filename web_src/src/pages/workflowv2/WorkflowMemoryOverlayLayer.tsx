@@ -10,9 +10,10 @@ interface DeleteCanvasMemoryMutation {
 
 interface WorkflowMemoryOverlayLayerProps {
   isMemoryMode: boolean;
-  isViewingDraftVersion: boolean;
-  isViewingLiveVersion: boolean;
-  canUpdateCanvas: boolean;
+  // True when the viewer is allowed to delete memory entries. Computed by the
+  // workflow page via `canEditCanvasMemory` so the gating logic stays in one
+  // place.
+  canDelete: boolean;
   entries: CanvasMemoryEntry[];
   isLoading: boolean;
   error: unknown;
@@ -21,9 +22,7 @@ interface WorkflowMemoryOverlayLayerProps {
 
 export function WorkflowMemoryOverlayLayer({
   isMemoryMode,
-  isViewingDraftVersion,
-  isViewingLiveVersion,
-  canUpdateCanvas,
+  canDelete,
   entries,
   isLoading,
   error,
@@ -33,12 +32,10 @@ export function WorkflowMemoryOverlayLayer({
 
   return (
     <CanvasMemoryView
-      entries={isViewingDraftVersion ? [] : entries}
-      isLoading={isViewingDraftVersion ? false : isLoading}
-      errorMessage={isViewingDraftVersion ? undefined : error instanceof Error ? error.message : undefined}
-      onDeleteEntry={
-        canUpdateCanvas && isViewingLiveVersion ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined
-      }
+      entries={entries}
+      isLoading={isLoading}
+      errorMessage={error instanceof Error ? error.message : undefined}
+      onDeleteEntry={canDelete ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined}
       deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
     />
   );

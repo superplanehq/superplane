@@ -16,7 +16,7 @@ func TestHomePage(t *testing.T) {
 		steps.Start()
 		steps.VisitHomePage()
 		steps.ClickNewApp()
-		steps.AssertCanvasSavedInDB("Untitled App 1")
+		steps.AssertNavigatedToCanvas()
 	})
 
 	t.Run("showing canvases in folders", func(t *testing.T) {
@@ -41,6 +41,11 @@ func (steps *TestHomePageSteps) Start() {
 
 func (steps *TestHomePageSteps) VisitHomePage() {
 	steps.session.Visit("/" + steps.session.OrgID.String() + "/")
+}
+
+func (steps *TestHomePageSteps) AssertNavigatedToCanvas() {
+	url := steps.session.Page().URL()
+	assert.Regexp(steps.t, `/canvases/[0-9a-f-]{36}`, url)
 }
 
 func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
@@ -68,10 +73,7 @@ func (steps *TestHomePageSteps) AssertCanvasFolderVisible(folderTitle, canvasNam
 
 func (steps *TestHomePageSteps) ClickNewApp() {
 	steps.session.Click(q.Text("New App"))
-	steps.session.Sleep(300)
-	steps.session.FillIn(q.TestID("create-app-name-input"), "Untitled App 1")
-	steps.session.Click(q.TestID("create-app-save-button"))
-	steps.session.Sleep(1000)
+	steps.session.Sleep(3000)
 }
 
 func (steps *TestHomePageSteps) AssertComponentSavedInDB(s string) {

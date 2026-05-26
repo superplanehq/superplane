@@ -88,14 +88,25 @@ export interface WidgetTableRender {
   /** Legacy string filters — still supported for backwards compatibility. */
   filters?: string[];
   emptyMessage?: string;
+  /** Optional widget-level row sort applied after filters. */
+  sort?: WidgetSort;
 }
 
 export type WidgetChartKind = "bar" | "stacked-bar" | "line" | "area" | "donut";
+
+export type WidgetChartLegendMode = "auto" | "show" | "hide";
+export const WIDGET_CHART_LEGEND_MODES: WidgetChartLegendMode[] = ["auto", "show", "hide"];
 
 export interface WidgetChartSeries {
   field?: string;
   label?: string;
   color?: string;
+  /** Optional value format applied in tooltips (and in donut value rows). */
+  format?: WidgetColumnFormat;
+  /** Optional display string prepended to the formatted value (e.g. "$"). */
+  prefix?: string;
+  /** Optional display string appended to the formatted value (e.g. " MWh"). */
+  suffix?: string;
 }
 
 export interface WidgetChartRender {
@@ -106,18 +117,44 @@ export interface WidgetChartRender {
   title?: string;
   limit?: number;
   filters?: string[];
+  /** Legend visibility. Defaults to "auto" — visible for donut charts or when 2+ series exist. */
+  legend?: WidgetChartLegendMode;
+  /** Optional widget-level row sort applied after filters, before chart binning. */
+  sort?: WidgetSort;
+}
+
+/** Sort direction. Defaults to `"asc"` when omitted on a `WidgetSort`. */
+export type WidgetSortOrder = "asc" | "desc";
+export const WIDGET_SORT_ORDERS: WidgetSortOrder[] = ["asc", "desc"];
+
+/**
+ * Widget-level row sort. `field` accepts the same surface as chart/table
+ * fields: a literal dot path (e.g. `createdAt`) or a full `{{ cel }}`
+ * expression (e.g. `{{ formatDate(createdAt, "yyyy-MM-dd") }}`).
+ *
+ * Null / undefined values always sort to the end so empty rows don't poison
+ * the visible ordering regardless of direction.
+ */
+export interface WidgetSort {
+  field: string;
+  order?: WidgetSortOrder;
 }
 
 export type WidgetNumberAggregation = "count" | "sum" | "avg" | "min" | "max" | "first" | "last";
 
 export interface WidgetNumberRender {
   kind: "number";
-  aggregation: WidgetNumberAggregation;
+  /** Required for simple data sources. Composite memory sources carry their own per-source aggregation. */
+  aggregation?: WidgetNumberAggregation;
   field?: string;
   filters?: string[];
   format?: WidgetColumnFormat;
   label?: string;
   sparklineField?: string;
+  /** Optional display string rendered before the formatted value (e.g. "R$"). */
+  prefix?: string;
+  /** Optional display string rendered after the formatted value (e.g. " MWh"). */
+  suffix?: string;
 }
 
 export type WidgetRender = WidgetTableRender | WidgetChartRender | WidgetNumberRender;

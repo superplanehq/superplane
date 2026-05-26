@@ -8,6 +8,7 @@ export interface ComponentActionsProps {
   onEdit?: () => void;
   onDeactivate?: () => void;
   onToggleView?: () => void;
+  onShowDiff?: () => void;
   onDelete?: () => void;
   isCompactView?: boolean;
 }

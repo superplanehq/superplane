@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import GridLayout, { type Layout, WidthProvider } from "react-grid-layout";
-import { Plus, Loader2, LayoutGrid, FileText, Hash, LineChart, Table2, Workflow } from "lucide-react";
+import { Loader2, LayoutGrid, FileText, Hash, LineChart, Table2, Workflow } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -76,7 +76,7 @@ export function DashboardView({
   if (errorMessage) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-sm text-red-600">
-        <p className="font-medium">Failed to load dashboard</p>
+        <p className="font-medium">Failed to load console</p>
         <p className="text-slate-500">{errorMessage}</p>
       </div>
     );
@@ -93,7 +93,7 @@ export function DashboardView({
   if (localPanels.length === 0) {
     return (
       <>
-        <EmptyState readOnly={readOnly} onAdd={() => setAddPanelOpen(true)} />
+        <EmptyState />
         <AddPanelDialog open={addPanelOpen} onConfirm={confirmAddPanel} onCancel={() => setAddPanelOpen(false)} />
       </>
     );
@@ -196,7 +196,7 @@ function toDashboardLayout(next: Layout[]): DashboardLayoutItem[] {
   });
 }
 
-function EmptyState({ readOnly, onAdd }: { readOnly: boolean; onAdd: () => void }) {
+function EmptyState() {
   return (
     <div className="flex flex-1 items-center justify-center p-6 sm:p-8" data-testid="dashboard-empty-state">
       <div className="flex w-full max-w-4xl flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 shadow-sm sm:px-10">
@@ -204,10 +204,10 @@ function EmptyState({ readOnly, onAdd }: { readOnly: boolean; onAdd: () => void 
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
             <LayoutGrid className="h-7 w-7 text-slate-600" />
           </div>
-          <h3 className="mt-5 text-xl font-semibold tracking-tight text-slate-900">Build your dashboard</h3>
+          <h3 className="mt-5 text-xl font-semibold tracking-tight text-slate-900">Build your console</h3>
           <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
-            Dashboard panels surface the most important docs, links, and live data for this canvas. Drag panels into
-            place and resize from the bottom-right corner to lay them out the way your team works.
+            Console panels surface the most important docs, links, and live data for this canvas. Drag panels into place
+            and resize from the bottom-right corner to lay them out the way your team works.
           </p>
         </div>
 
@@ -232,13 +232,6 @@ function EmptyState({ readOnly, onAdd }: { readOnly: boolean; onAdd: () => void 
             </p>
           </div>
         </div>
-
-        {!readOnly ? (
-          <Button variant="default" className="mt-10" onClick={onAdd} data-testid="dashboard-add-first-panel">
-            <Plus className="mr-1.5 h-4 w-4" />
-            Add panel
-          </Button>
-        ) : null}
       </div>
     </div>
   );

@@ -3,55 +3,34 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { FileCode, Plus } from "lucide-react";
 
 import { Button } from "../button";
+import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
 import type { HeaderProps } from "./Header";
 
 export function SecondaryHeaderActions({
   mode,
+  isEditing = false,
   onSave,
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
   saveIsPrimary,
   hasUnpublishedDraftChanges,
-  onDiscardVersion,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
-  onPublishVersion,
-  publishVersionLabel,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
-  onEnterEditMode,
-  enterEditModeDisabled,
-  enterEditModeDisabledTooltip,
-  onExitEditMode,
-  exitEditModeDisabled,
-  exitEditModeDisabledTooltip,
-  unpublishedDraftUpdatedAt,
-  onDiscardDraftAndStartEdit,
+  onShowDiff,
+  visualDiffEnabled,
+  draftVisualDiff,
+  onToggleVisualDiff,
   onDashboardAddPanel,
   onDashboardOpenYaml,
   dashboardYamlReadOnly,
   filesHeaderActionsSlotId,
+  onCanvasOpenYaml,
+  onCanvasAddComponent,
 }: HeaderProps) {
-  const showEditButton = mode === "version-live" && !!onEnterEditMode;
-  const showDraftDropdown =
-    showEditButton && !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
-  const showDashboardAddPanel = mode === "dashboard" && !!onDashboardAddPanel;
-  const showDashboardYaml = mode === "dashboard" && !!onDashboardOpenYaml;
+  const onCanvasTab = mode === "version-live" || mode === "version-edit";
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-      <LiveModeEditControls
-        showEditButton={showEditButton}
-        showDraftDropdown={showDraftDropdown}
-        onEnterEditMode={onEnterEditMode}
-        enterEditModeDisabled={enterEditModeDisabled}
-        enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-        onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
-        unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
-      />
-
       {mode === "default" && onSave && !saveButtonHidden ? (
         <SaveButton
           onSave={onSave}
@@ -61,30 +40,113 @@ export function SecondaryHeaderActions({
         />
       ) : null}
 
-      {mode === "version-edit" ? (
-        <EditModeVersionActions
+      {isEditing && onCanvasTab ? (
+        <EditModeCanvasSecondaryActions
           hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
-          onDiscardVersion={onDiscardVersion}
-          discardVersionDisabled={discardVersionDisabled}
-          discardVersionDisabledTooltip={discardVersionDisabledTooltip}
-          onExitEditMode={onExitEditMode}
-          exitEditModeDisabled={exitEditModeDisabled}
-          exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          onPublishVersion={onPublishVersion}
-          publishVersionLabel={publishVersionLabel}
-          publishVersionDisabled={publishVersionDisabled}
-          publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          onShowDiff={onShowDiff}
+          visualDiffEnabled={visualDiffEnabled}
+          draftVisualDiff={draftVisualDiff}
+          onToggleVisualDiff={onToggleVisualDiff}
+          onCanvasOpenYaml={onCanvasOpenYaml}
+          onCanvasAddComponent={onCanvasAddComponent}
         />
       ) : null}
 
-      {showDashboardYaml ? (
+      {isEditing && mode === "dashboard" ? (
+        <EditModeDashboardSecondaryActions
+          onDashboardAddPanel={onDashboardAddPanel}
+          onDashboardOpenYaml={onDashboardOpenYaml}
+          dashboardYamlReadOnly={dashboardYamlReadOnly}
+        />
+      ) : null}
+
+      {mode === "files" && filesHeaderActionsSlotId ? (
+        <div id={filesHeaderActionsSlotId} className="flex shrink-0 items-center gap-2" />
+      ) : null}
+    </div>
+  );
+}
+
+function EditModeCanvasSecondaryActions({
+  hasUnpublishedDraftChanges,
+  onShowDiff,
+  visualDiffEnabled,
+  draftVisualDiff,
+  onToggleVisualDiff,
+  onCanvasOpenYaml,
+  onCanvasAddComponent,
+}: Pick<
+  HeaderProps,
+  | "hasUnpublishedDraftChanges"
+  | "onShowDiff"
+  | "visualDiffEnabled"
+  | "draftVisualDiff"
+  | "onToggleVisualDiff"
+  | "onCanvasOpenYaml"
+  | "onCanvasAddComponent"
+>) {
+  return (
+    <>
+      {hasUnpublishedDraftChanges && draftVisualDiff?.diffCounts ? (
+        <DiffSummaryHoverCard
+          diffCounts={draftVisualDiff.diffCounts}
+          visualDiffEnabled={visualDiffEnabled}
+          onToggleVisualDiff={onToggleVisualDiff}
+          diffToggles={draftVisualDiff.diffToggles}
+          onShowDiff={onShowDiff}
+        />
+      ) : null}
+
+      {onCanvasOpenYaml ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <UIButton
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => onDashboardOpenYaml!()}
+              onClick={() => onCanvasOpenYaml()}
+              data-testid="canvas-yaml-button"
+              aria-label="View / Import YAML"
+            >
+              <FileCode className="mr-1 h-3.5 w-3.5" />
+              YAML
+            </UIButton>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">View, copy, download, or import this canvas as YAML</TooltipContent>
+        </Tooltip>
+      ) : null}
+
+      {onCanvasAddComponent ? (
+        <UIButton
+          type="button"
+          size="sm"
+          variant="default"
+          onClick={() => onCanvasAddComponent()}
+          data-testid="canvas-add-component-button"
+        >
+          <Plus className="mr-1 h-3.5 w-3.5" />
+          Add component
+        </UIButton>
+      ) : null}
+    </>
+  );
+}
+
+function EditModeDashboardSecondaryActions({
+  onDashboardAddPanel,
+  onDashboardOpenYaml,
+  dashboardYamlReadOnly,
+}: Pick<HeaderProps, "onDashboardAddPanel" | "onDashboardOpenYaml" | "dashboardYamlReadOnly">) {
+  return (
+    <>
+      {onDashboardOpenYaml ? (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <UIButton
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onDashboardOpenYaml()}
               data-testid="dashboard-yaml-button"
               aria-label={dashboardYamlReadOnly ? "View YAML" : "View / Import YAML"}
             >
@@ -94,13 +156,13 @@ export function SecondaryHeaderActions({
           </TooltipTrigger>
           <TooltipContent side="bottom">
             {dashboardYamlReadOnly
-              ? "View the dashboard as YAML"
-              : "View, copy, download, or import this dashboard as YAML"}
+              ? "View the console as YAML"
+              : "View, copy, download, or import this console as YAML"}
           </TooltipContent>
         </Tooltip>
       ) : null}
 
-      {showDashboardAddPanel ? (
+      {onDashboardAddPanel ? (
         <UIButton
           type="button"
           size="sm"
@@ -112,20 +174,15 @@ export function SecondaryHeaderActions({
           Add panel
         </UIButton>
       ) : null}
-
-      {mode === "files" && filesHeaderActionsSlotId ? (
-        <div id={filesHeaderActionsSlotId} className="flex shrink-0 items-center gap-2" />
-      ) : null}
-    </div>
+    </>
   );
 }
 
-function LiveModeEditControls({
-  showEditButton,
-  showDraftDropdown,
+export function LiveModeTopHeaderActions({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
+  hasUnpublishedDraftChanges,
   onDiscardDraftAndStartEdit,
   unpublishedDraftUpdatedAt,
 }: Pick<
@@ -133,15 +190,15 @@ function LiveModeEditControls({
   | "onEnterEditMode"
   | "enterEditModeDisabled"
   | "enterEditModeDisabledTooltip"
+  | "hasUnpublishedDraftChanges"
   | "onDiscardDraftAndStartEdit"
   | "unpublishedDraftUpdatedAt"
-> & {
-  showEditButton: boolean;
-  showDraftDropdown: boolean;
-}) {
-  if (!showEditButton || !onEnterEditMode) {
+>) {
+  if (!onEnterEditMode) {
     return null;
   }
+
+  const showDraftDropdown = !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
 
   if (showDraftDropdown && onDiscardDraftAndStartEdit) {
     return (
@@ -156,13 +213,14 @@ function LiveModeEditControls({
   return (
     <EnterEditButton
       onClick={onEnterEditMode}
+      label={hasUnpublishedDraftChanges ? "Continue Editing" : "Edit"}
       disabled={!!enterEditModeDisabled}
       disabledTooltip={enterEditModeDisabledTooltip}
     />
   );
 }
 
-function EditModeVersionActions({
+export function EditModeTopHeaderActions({
   hasUnpublishedDraftChanges,
   onDiscardVersion,
   discardVersionDisabled,
@@ -217,23 +275,25 @@ function EditModeVersionActions({
 
 function EnterEditButton({
   onClick,
+  label,
   disabled,
   disabledTooltip,
 }: {
   onClick: () => void;
+  label: string;
   disabled: boolean;
   disabledTooltip?: string;
 }) {
   const button = (
     <UIButton
       type="button"
-      variant="default"
+      variant="outline"
       size="sm"
       onClick={onClick}
       disabled={disabled}
       data-testid="canvas-edit-button"
     >
-      Edit
+      {label}
     </UIButton>
   );
 

@@ -162,6 +162,7 @@ func (g *GCP) Configuration() []configuration.Field {
 func (g *GCP) Actions() []core.Action {
 	return []core.Action{
 		&compute.CreateVM{},
+		&compute.DeleteVMInstance{},
 		&cloudbuild.CreateBuild{},
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
@@ -935,6 +936,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListAddressResources(reqCtx, client, p["project"], p["region"])
 	case compute.ResourceTypeFirewall:
 		return compute.ListFirewallResources(reqCtx, client, p["project"])
+	case compute.ResourceTypeInstance:
+		return compute.ListInstanceResources(reqCtx, client, p["project"])
 	case clouddns.ResourceTypeManagedZone:
 		return clouddns.ListManagedZoneResources(reqCtx, client, p["projectId"])
 	case cloudbuild.ResourceTypeTrigger:

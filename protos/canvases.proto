@@ -1331,10 +1331,12 @@ message CanvasDashboard {
   repeated DashboardPanel panels = 2;
   repeated DashboardLayoutItem layout = 3;
   google.protobuf.Timestamp updated_at = 4;
+  string version_id = 5;
 }
 
 message GetCanvasDashboardRequest {
   string canvas_id = 1;
+  optional string version_id = 2;
 }
 
 message GetCanvasDashboardResponse {
@@ -1345,6 +1347,7 @@ message UpdateCanvasDashboardRequest {
   string canvas_id = 1;
   repeated DashboardPanel panels = 2;
   repeated DashboardLayoutItem layout = 3;
+  optional string version_id = 4;
 }
 
 message UpdateCanvasDashboardResponse {

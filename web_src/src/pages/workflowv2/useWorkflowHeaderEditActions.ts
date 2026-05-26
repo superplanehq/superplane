@@ -52,10 +52,9 @@ export function useWorkflowHeaderEditActions({
       setIsRunsMode(false);
       setSelectedRunId(null);
       setRunDetailNodeId(null);
-      await handleToggleEditMode();
       setSearchParams(clearRunsViewSearchParams, { replace: true });
-      return;
     }
+
     await handleToggleEditMode();
   }, [
     handleExitDashboardMode,

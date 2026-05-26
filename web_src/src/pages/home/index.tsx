@@ -32,7 +32,7 @@ export function HomePage() {
     isOpen: isEditAppModalOpen,
   } = useEditApp();
 
-  const { canvasFolders, filteredCanvases, isLoading, canvasError, defaultAppName } = useHomePageCanvasList(
+  const { canvasFolders, filteredCanvases, isLoading, canvasError } = useHomePageCanvasList(
     organizationId,
     searchQuery,
   );
@@ -58,11 +58,7 @@ export function HomePage() {
             <Header />
 
             <div className="mb-6">
-              <CanvasToolbar
-                searchQuery={searchQuery}
-                setSearchQuery={setSearchQuery}
-                defaultAppName={defaultAppName}
-              />
+              <CanvasToolbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
             </div>
 
             {canvasError ? (
