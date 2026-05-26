@@ -46,6 +46,7 @@ type ExecutionContext struct {
 
 type ExpressionContext interface {
 	Run(expression string) (any, error)
+	RunWithExtraVariables(expression string, variables map[string]any) (any, error)
 }
 
 /*
@@ -78,6 +79,11 @@ type CanvasMemoryContext interface {
 	Add(namespace string, values any) error
 	Find(namespace string, matches map[string]any) ([]any, error)
 	FindFirst(namespace string, matches map[string]any) (any, error)
+}
+
+type CanvasMemoryRecord struct {
+	ID     uuid.UUID
+	Values any
 }
 
 /*
