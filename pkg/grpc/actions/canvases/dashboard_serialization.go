@@ -58,9 +58,10 @@ func serializeCanvasDashboard(dashboard *models.CanvasDashboard) (*pb.CanvasDash
 	}
 
 	resp := &pb.CanvasDashboard{
-		CanvasId: dashboard.CanvasID.String(),
-		Panels:   pbPanels,
-		Layout:   pbLayout,
+		CanvasId:  dashboard.CanvasID.String(),
+		VersionId: dashboard.VersionID.String(),
+		Panels:    pbPanels,
+		Layout:    pbLayout,
 	}
 	if !dashboard.UpdatedAt.IsZero() {
 		resp.UpdatedAt = timestamppb.New(dashboard.UpdatedAt)
