@@ -12,7 +12,7 @@ promotions:
     pipeline_file: docker-publish.yml
     auto_promote:
       when: "result = 'passed' and branch = 'main'"
-  - name: Publish runner binary to S3
+  - name: Publish runner binaries to S3
     pipeline_file: runner-binary-s3.yml
     auto_promote:
       when: "result = 'passed' and branch = 'main'"

@@ -27,13 +27,13 @@ INSTANCE_ID=$(curl -sf --max-time 3 -H "X-aws-ec2-metadata-token: $METADATA_TOKE
 apt-get update -qy
 apt-get install -qy bash ca-certificates curl unzip build-essential gnupg lsb-release
 
-# Add Docker's official apt repository
+# Add Docker's official apt repository (docker-ce is not in the default Ubuntu repos)
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" > /etc/apt/sources.list.d/docker.list
 apt-get update -qy
 apt-get install -qy docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
-curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-{{.AWSCLIArch}}.zip" -o /tmp/awscliv2.zip
 unzip -q /tmp/awscliv2.zip -d /tmp
 /tmp/aws/install --update
 
@@ -86,10 +86,12 @@ chmod 644 /etc/default/superplane-runner
 #
 # Install the CloudWatch agent and ship runner process logs (systemd stdout/stderr)
 # to the configured log group under stream {instance_id}/runner-process.
+# Skipped when no log group is configured (EC2_PROVISION_RUNNER_PROCESS_LOG_GROUP unset).
 #
 #########################################################
 
-curl -fsSL https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb -o /tmp/cwa.deb
+{{- if .CloudWatchAgentJSON}}
+curl -fsSL https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/{{.CloudWatchAgentArch}}/latest/amazon-cloudwatch-agent.deb -o /tmp/cwa.deb
 dpkg -i /tmp/cwa.deb
 
 cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF'
@@ -97,6 +99,7 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'CWEOF
 CWEOF
 
 /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json -s
+{{- end}}
 
 #########################################################
 # 

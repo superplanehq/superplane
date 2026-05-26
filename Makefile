@@ -13,7 +13,7 @@ LOCAL_RUNNER_SHELL_USE_PIPE ?= 1
 # Number of runner processes for `make runner` (default 1).
 N ?= 1
 
-.PHONY: build test fmt docker-build docker-build-fleet-manager docker-build-task-broker docker-build-runner docker-publish-ghcr runner-linux-amd64 runner-publish-s3
+.PHONY: build test fmt docker-build docker-build-fleet-manager docker-build-task-broker docker-build-runner docker-publish-ghcr runner-linux-amd64 runner-linux-arm64 runner-linux-all runner-publish-s3 runner-publish-s3-all
 .PHONY: fleet-manager task-broker runner register-local-fleet local-dev-help
 
 build:
@@ -81,16 +81,29 @@ docker-build-runner:
 
 docker-build: docker-build-fleet-manager docker-build-task-broker docker-build-runner
 
-# Static linux/amd64 runner binary (fleet EC2 host + systemd). Same flags as Docker image build stage.
+# Static linux runner binaries (fleet EC2 host + systemd). Same flags as Docker image build stage.
 RUNNER_LINUX_AMD64 ?= bin/runner-linux-amd64
+RUNNER_LINUX_ARM64 ?= bin/runner-linux-arm64
 
 runner-linux-amd64:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o $(RUNNER_LINUX_AMD64) ./runner/cmd/runner
+
+runner-linux-arm64:
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o $(RUNNER_LINUX_ARM64) ./runner/cmd/runner
+
+runner-linux-all: runner-linux-amd64 runner-linux-arm64
 
 # Expects EC2_PROVISION_RUNNER_S3_URI=s3://bucket/key and aws CLI (same env as fleet-manager + Semaphore runner-s3).
 runner-publish-s3: runner-linux-amd64
 	@test -n "$(EC2_PROVISION_RUNNER_S3_URI)" || (echo "EC2_PROVISION_RUNNER_S3_URI=s3://bucket/key is required"; exit 1)
 	aws s3 cp $(RUNNER_LINUX_AMD64) "$(EC2_PROVISION_RUNNER_S3_URI)" --sse AES256
+
+# Expects arch-specific S3 keys for publishing both EC2 runner binaries.
+runner-publish-s3-all: runner-linux-all
+	@test -n "$(EC2_PROVISION_RUNNER_AMD64_S3_URI)" || (echo "EC2_PROVISION_RUNNER_AMD64_S3_URI=s3://bucket/key is required"; exit 1)
+	@test -n "$(EC2_PROVISION_RUNNER_ARM64_S3_URI)" || (echo "EC2_PROVISION_RUNNER_ARM64_S3_URI=s3://bucket/key is required"; exit 1)
+	aws s3 cp $(RUNNER_LINUX_AMD64) "$(EC2_PROVISION_RUNNER_AMD64_S3_URI)" --sse AES256
+	aws s3 cp $(RUNNER_LINUX_ARM64) "$(EC2_PROVISION_RUNNER_ARM64_S3_URI)" --sse AES256
 
 # Expects IMAGE_PREFIX (e.g. ghcr.io/org/repo) and IMAGE_TAG (short SHA). Pushes that tag plus :latest.
 docker-publish-ghcr:

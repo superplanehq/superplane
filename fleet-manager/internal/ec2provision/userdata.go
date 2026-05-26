@@ -21,6 +21,8 @@ type userDataVars struct {
 	RunnerInstallAWSRegion          string
 	TaskBrokerURL                   string
 	RunnerFleetID                   string
+	AWSCLIArch                      string
+	CloudWatchAgentArch             string
 	RunnersAuthToken                string
 	RunnerTerminateAfterEachTask    bool
 	RunnerCloudWatchLogGroup        string
@@ -42,19 +44,38 @@ func userDataVarsFromConfig(c Config) userDataVars {
 	if procRegion == "" {
 		procRegion = "us-east-1"
 	}
+	awsCLIArch, cloudWatchArch := packageArchValues(c.Arch)
 
 	return userDataVars{
 		RunnerS3URI:                     strings.TrimSpace(c.RunnerS3URI),
 		RunnerInstallAWSRegion:          strings.TrimSpace(c.RunnerInstallAWSRegion),
 		TaskBrokerURL:                   c.TaskBrokerURL,
 		RunnerFleetID:                   c.RunnerFleetID,
+		AWSCLIArch:                      awsCLIArch,
+		CloudWatchAgentArch:             cloudWatchArch,
 		RunnersAuthToken:                strings.TrimSpace(c.RunnersAuthToken),
 		RunnerTerminateAfterEachTask:    c.RunnerTerminateAfterEachTask,
 		RunnerCloudWatchLogGroup:        strings.TrimSpace(c.RunnerCloudWatchLogGroup),
 		RunnerCloudWatchLogStreamPrefix: strings.TrimSpace(c.RunnerCloudWatchLogStreamPrefix),
-		CloudWatchAgentJSON:             mustCloudWatchAgentJSON(strings.TrimSpace(c.RunnerProcessLogGroup), procRegion),
+		CloudWatchAgentJSON:             cloudWatchAgentJSON(strings.TrimSpace(c.RunnerProcessLogGroup), procRegion),
 		RestartPolicy:                   restartPolicy,
 	}
+}
+
+func packageArchValues(arch string) (awsCLIArch, cloudWatchArch string) {
+	switch strings.ToLower(strings.TrimSpace(arch)) {
+	case "arm64":
+		return "aarch64", "arm64"
+	default:
+		return "x86_64", "amd64"
+	}
+}
+
+func cloudWatchAgentJSON(logGroup, region string) string {
+	if logGroup == "" {
+		return ""
+	}
+	return mustCloudWatchAgentJSON(logGroup, region)
 }
 
 func mustCloudWatchAgentJSON(logGroup, region string) string {

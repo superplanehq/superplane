@@ -128,6 +128,45 @@ func TestPostgresStoreFindFleetByLabelsEmpty(t *testing.T) {
 	}
 }
 
+func TestPostgresStoreFindFleetByLabelsRoutesArchitectureFleets(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
+		ID:        "aws-linux-amd64",
+		Labels:    []string{"aws", "linux", "arch:amd64"},
+		CreatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
+		ID:        "aws-linux-arm64",
+		Labels:    []string{"aws", "linux", "arch:arm64"},
+		CreatedAt: now,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	match, err := st.FindFleetByLabels(ctx, []string{"arch:arm64"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if match == nil || match.ID != "aws-linux-arm64" {
+		t.Fatalf("match arm64: %#v", match)
+	}
+
+	match, err = st.FindFleetByLabels(ctx, []string{"linux", "arch:amd64"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if match == nil || match.ID != "aws-linux-amd64" {
+		t.Fatalf("match amd64: %#v", match)
+	}
+}
+
 func TestPostgresStoreCountTasksByFleet(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()

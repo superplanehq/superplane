@@ -23,6 +23,10 @@ fleet-manager → task-broker (GET /v1/fleets/{id}/task-counts, only for pools w
 
 There is **no** task-broker → fleet-manager path, no runner → fleet-manager shutdown callback, and no `fleet_task_id` correlation field. The optional `fleet-manager → task-broker` direction is pull-only.
 
+### Architecture routing (amd64 vs arm64)
+
+Architecture selection is done by running **separate fleets** and routing using task-broker fleet labels (for example `arch:amd64` and `arch:arm64`). Each runner pool is homogeneous: use an x86_64 AMI + `t3.*` types for `arch:amd64`, and an arm64 AMI + `t4g.*` Graviton types for `arch:arm64`. Fleet-manager installs the correct runner binary via `EC2_PROVISION_RUNNER_S3_URI` and configures architecture-specific tooling via `EC2_PROVISION_ARCH`.
+
 ## task-broker
 
 - **Queue** — Postgres with `FOR UPDATE SKIP LOCKED` claims scoped by `fleet_id`.
