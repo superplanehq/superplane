@@ -32,7 +32,10 @@ export function useCreateApp({ onCreated }: UseCreateAppOptions = {}) {
         const canvasId = result?.data?.canvas?.metadata?.id;
         if (canvasId) {
           onCreated?.();
-          navigate(`/${organizationId}/canvases/${canvasId}`);
+          localStorage.setItem("canvasAgentSidebarOpen", "true");
+          localStorage.setItem("canvasSidebarOpen", "false");
+          sessionStorage.setItem("agent-boot-context", "blank");
+          navigate(`/${organizationId}/canvases/${canvasId}?edit=1`);
         }
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, "Failed to create app"));
