@@ -37,6 +37,6 @@
       "SSH key added to both AWS and SuperPlane",
       "A setup script at scripts/preview-setup.sh in your repo"
     ],
-    "agentInstructions": "The user just installed the Preview Environments app. This canvas creates ephemeral preview environments for pull requests using GitHub and DigitalOcean. Guide them through: 1) Connecting their GitHub integration (needs Deployments permission), 2) Connecting their DigitalOcean integration, 3) Adding an SSH key as a secret, 4) Updating the repository name and setup script URL in the canvas nodes to match their project. Check which integrations are already connected and which need setup."
+    "agentInstructions": "The user just installed the Preview Environments app. This canvas creates ephemeral preview environments for pull requests using GitHub and AWS. Guide them through: 1) Connecting their GitHub integration (needs Deployments permission), 2) Connecting their AWS integration, 3) Adding an SSH key as a secret, 4) Updating the repository name and setup script URL in the canvas nodes to match their project. Check which integrations are already connected and which need setup."
   }
 ]
