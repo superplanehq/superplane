@@ -43,6 +43,7 @@ export function useWorkflowHeaderEditActions({
 export function useAutoEnterEditMode(
   hasEditableVersion: boolean,
   canUpdateCanvas: boolean,
+  versionsLoaded: boolean,
   handleToggleEditMode: () => Promise<void>,
   searchParams: URLSearchParams,
   setSearchParams: SetURLSearchParams,
@@ -52,6 +53,7 @@ export function useAutoEnterEditMode(
   useEffect(() => {
     if (triggeredRef.current) return;
     if (searchParams.get("edit") !== "1") return;
+    if (!versionsLoaded) return;
     if (hasEditableVersion) return;
     if (!canUpdateCanvas) return;
 
@@ -62,7 +64,7 @@ export function useAutoEnterEditMode(
     setSearchParams(next, { replace: true });
 
     void handleToggleEditMode();
-  }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, handleToggleEditMode]);
+  }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, versionsLoaded, handleToggleEditMode]);
 }
 
 function clearRunsViewSearchParams(current: URLSearchParams): URLSearchParams {

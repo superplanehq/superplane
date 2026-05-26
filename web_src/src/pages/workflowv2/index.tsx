@@ -4908,7 +4908,7 @@ export function WorkflowPageV2() {
     setSearchParams,
   });
 
-  useAutoEnterEditMode(hasEditableVersion, canUpdateCanvas, handleToggleEditMode, searchParams, setSearchParams);
+  useAutoEnterEditMode(hasEditableVersion, canUpdateCanvas, !!canvas, handleToggleEditMode, searchParams, setSearchParams);
   useAutoPlaceholderNode(hasEditableVersion, !!canvas?.spec, canvasId, handlePlaceholderAdd);
 
   const handleRunCanvasNodeClick = useCallback(
