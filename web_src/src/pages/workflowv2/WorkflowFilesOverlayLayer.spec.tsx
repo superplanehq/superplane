@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { useSidebarLayoutStore } from "@/stores/sidebarLayoutStore";
 
 import { WorkflowFilesOverlayLayer } from "./WorkflowFilesOverlayLayer";
 
@@ -21,6 +23,11 @@ vi.mock("@pierre/trees/react", () => ({
 }));
 
 describe("WorkflowFilesOverlayLayer", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useSidebarLayoutStore.getState().hydrateFromStorage();
+  });
+
   it("keeps all editor tabs closed after closing the last tab", async () => {
     const user = userEvent.setup();
 
@@ -48,5 +55,25 @@ describe("WorkflowFilesOverlayLayer", () => {
 
     expect(screen.queryByRole("button", { name: "Close canvas.yaml" })).not.toBeInTheDocument();
     expect(screen.queryByTestId("monaco-stub")).not.toBeInTheDocument();
+  });
+
+  it("offsets the overlay when the left tool sidebar is open", () => {
+    useSidebarLayoutStore.setState({ leftWidth: 420, leftMountCount: 1 });
+
+    render(
+      <WorkflowFilesOverlayLayer
+        isFilesMode
+        files={[
+          {
+            path: "canvas.yaml",
+            content: "canvas: true",
+            language: "yaml",
+          },
+        ]}
+      />,
+    );
+
+    const overlay = screen.getByTestId("workflow-files-overlay");
+    expect(overlay).toHaveStyle({ left: "420px", right: "0px" });
   });
 });
