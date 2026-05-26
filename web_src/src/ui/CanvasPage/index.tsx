@@ -15,13 +15,14 @@ import {
   type Viewport,
 } from "@xyflow/react";
 
-import { NodeSearch } from "@/components/node-search";
+import { GlobalCommandPaletteCanvasNodeSearch } from "@/components/GlobalCommandPalette/canvasNodeSearch";
+import { openGlobalCommandPalette } from "@/components/GlobalCommandPalette/controller";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { cn } from "@/lib/utils";
-import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Trash2, TriangleAlert } from "lucide-react";
+import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Search, Trash2, TriangleAlert } from "lucide-react";
 import {
   Component,
   memo,
@@ -2906,6 +2907,9 @@ function CanvasContent({
     }
     stateRef.current.componentSidebar.open(node.id);
   }, []);
+  const handleOpenCommandPalette = useCallback(() => {
+    openGlobalCommandPalette();
+  }, []);
   const autoLayoutToggleControl = useMemo(() => {
     if (!isEditMode) {
       return null;
@@ -2941,14 +2945,32 @@ function CanvasContent({
     isAutoLayoutToggleDisabled,
     isEditMode,
   ]);
+  const commandPaletteSearchControl = useMemo(
+    () => (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleOpenCommandPalette}
+            aria-label="Search commands and components"
+          >
+            <Search className="h-3 w-3" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Search commands and components</TooltipContent>
+      </Tooltip>
+    ),
+    [handleOpenCommandPalette],
+  );
   const zoomSliderContent = useMemo(
     () => (
       <>
         {autoLayoutToggleControl}
-        <NodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
+        {commandPaletteSearchControl}
       </>
     ),
-    [autoLayoutToggleControl, handleNodeSearch, handleNodeSearchSelect],
+    [autoLayoutToggleControl, commandPaletteSearchControl],
   );
   const reactFlowStyle = useMemo(() => ({ opacity: isInitialized ? 1 : 0 }), [isInitialized]);
   const handleSelectionStart = useCallback(() => {
@@ -3008,6 +3030,7 @@ function CanvasContent({
             className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
+            <GlobalCommandPaletteCanvasNodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
             <Panel
               position="bottom-left"
               className="!bg-transparent !outline-none !shadow-none p-0 flex flex-col items-start gap-4"

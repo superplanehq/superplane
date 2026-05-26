@@ -1,7 +1,9 @@
 import { Sparkles } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { AgentTabPanel } from "./AgentTabPanel";
 import { EmptyToolTab } from "./EmptyToolTab";
+import { CANVAS_TOOL_SIDEBAR_SELECT_TAB_EVENT, canvasToolSidebarTabFromEvent } from "./events";
+import type { CanvasToolSidebarTab } from "./events";
 import { SidebarShell } from "./SidebarShell";
 import { ToolTabsHeader } from "./ToolTabsHeader";
 import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
@@ -39,7 +41,7 @@ export function CanvasToolSidebar({
   onCloseVersionControl,
   versionsContent,
 }: CanvasToolSidebarProps) {
-  if (!toolSidebarState.showToolSidebarToggle || !toolSidebarState.isToolSidebarOpen || !toolSidebarState.canvasId) {
+  if (!toolSidebarState.showToolSidebarToggle || !toolSidebarState.canvasId) {
     return null;
   }
 
@@ -74,61 +76,15 @@ function OpenCanvasToolSidebar({
   versionsContent,
 }: CanvasToolSidebarProps) {
   const hasAgentTab = toolSidebarState.isAgentEnabled;
+  const isToolSidebarOpen = toolSidebarState.isToolSidebarOpen;
   const hasAutoOpenedVersionControlInMountRef = useRef(false);
-  const [activeTab, setActiveTab] = useState(() => defaultToolTab(mode, Boolean(isVersionControlOpen), hasAgentTab));
-
-  useEffect(() => {
-    if (mode === "runs") {
-      setActiveTab(TAB_RUNS);
-      return;
-    }
-    if (isVersionControlOpen) {
-      setActiveTab(TAB_VERSIONS);
-      return;
-    }
-    setActiveTab((currentTab) => {
-      if (currentTab === TAB_AGENT && !hasAgentTab) return TAB_VERSIONS;
-      if ((currentTab === TAB_RUNS || currentTab === TAB_VERSIONS) && hasAgentTab) return TAB_AGENT;
-      return currentTab;
-    });
-  }, [hasAgentTab, isVersionControlOpen, mode]);
-
-  useEffect(() => {
-    if (
-      hasAgentTab ||
-      isVersionControlOpen ||
-      mode === "runs" ||
-      activeTab !== TAB_VERSIONS ||
-      !onOpenVersionControl ||
-      hasAutoOpenedVersionControl ||
-      hasAutoOpenedVersionControlInMountRef.current
-    ) {
-      return;
-    }
-
-    hasAutoOpenedVersionControlInMountRef.current = true;
-    onVersionControlAutoOpened?.();
-    toolSidebarState.openToolSidebar();
-    onOpenVersionControl();
-  }, [
-    activeTab,
-    hasAgentTab,
-    hasAutoOpenedVersionControl,
-    isVersionControlOpen,
-    mode,
-    onOpenVersionControl,
-    onVersionControlAutoOpened,
-    toolSidebarState,
-  ]);
-
-  const tabs = [
-    ...(hasAgentTab ? [{ value: TAB_AGENT, label: "Agent", icon: Sparkles }] : []),
-    { value: TAB_RUNS, label: "Runs" },
-    { value: TAB_VERSIONS, label: "Versions" },
-  ] as const;
-
+  const [activeTab, setActiveTab] = useState<CanvasToolSidebarTab>(() =>
+    defaultToolTab(mode, Boolean(isVersionControlOpen), hasAgentTab),
+  );
   const handleTabSelect = useCallback(
     (nextTab: typeof TAB_AGENT | typeof TAB_RUNS | typeof TAB_VERSIONS) => {
+      if (nextTab === TAB_AGENT && !hasAgentTab) return;
+
       setActiveTab(nextTab);
 
       if (nextTab === TAB_RUNS) {
@@ -150,9 +106,11 @@ function OpenCanvasToolSidebar({
         return;
       }
 
+      toolSidebarState.openToolSidebar();
       if (isVersionControlOpen) onCloseVersionControl?.();
     },
     [
+      hasAgentTab,
       isVersionControlOpen,
       mode,
       onCloseVersionControl,
@@ -162,6 +120,45 @@ function OpenCanvasToolSidebar({
       toolSidebarState,
     ],
   );
+
+  useEffect(() => {
+    if (mode === "runs") {
+      setActiveTab(TAB_RUNS);
+      return;
+    }
+    if (isVersionControlOpen) {
+      setActiveTab(TAB_VERSIONS);
+      return;
+    }
+    setActiveTab((currentTab) => {
+      if (currentTab === TAB_AGENT && !hasAgentTab) return TAB_VERSIONS;
+      if ((currentTab === TAB_RUNS || currentTab === TAB_VERSIONS) && hasAgentTab) return TAB_AGENT;
+      return currentTab;
+    });
+  }, [hasAgentTab, isVersionControlOpen, mode]);
+
+  useAutoOpenVersionControl({
+    activeTab,
+    hasAgentTab,
+    hasAutoOpenedVersionControl,
+    hasAutoOpenedVersionControlInMountRef,
+    isToolSidebarOpen,
+    isVersionControlOpen,
+    mode,
+    onOpenVersionControl,
+    onVersionControlAutoOpened,
+    toolSidebarState,
+  });
+
+  useCanvasToolSidebarTabEvents(handleTabSelect);
+
+  const tabs = [
+    ...(hasAgentTab ? [{ value: TAB_AGENT, label: "Agent", icon: Sparkles }] : []),
+    { value: TAB_RUNS, label: "Runs" },
+    { value: TAB_VERSIONS, label: "Versions" },
+  ] as const;
+
+  if (!isToolSidebarOpen) return null;
 
   return (
     <SidebarShell>
@@ -192,9 +189,81 @@ function OpenCanvasToolSidebar({
   );
 }
 
-function defaultToolTab(mode: CanvasToolSidebarMode, isVersionControlOpen: boolean, hasAgentTab: boolean) {
+function defaultToolTab(
+  mode: CanvasToolSidebarMode,
+  isVersionControlOpen: boolean,
+  hasAgentTab: boolean,
+): CanvasToolSidebarTab {
   if (mode === "runs") return TAB_RUNS;
   if (isVersionControlOpen) return TAB_VERSIONS;
   if (hasAgentTab) return TAB_AGENT;
   return TAB_VERSIONS;
+}
+
+function useAutoOpenVersionControl({
+  activeTab,
+  hasAgentTab,
+  hasAutoOpenedVersionControl,
+  hasAutoOpenedVersionControlInMountRef,
+  isToolSidebarOpen,
+  isVersionControlOpen,
+  mode,
+  onOpenVersionControl,
+  onVersionControlAutoOpened,
+  toolSidebarState,
+}: {
+  activeTab: CanvasToolSidebarTab;
+  hasAgentTab: boolean;
+  hasAutoOpenedVersionControl?: boolean;
+  hasAutoOpenedVersionControlInMountRef: MutableRefObject<boolean>;
+  isToolSidebarOpen: boolean;
+  isVersionControlOpen?: boolean;
+  mode: CanvasToolSidebarMode;
+  onOpenVersionControl?: () => void;
+  onVersionControlAutoOpened?: () => void;
+  toolSidebarState: CanvasToolSidebarState;
+}) {
+  useEffect(() => {
+    if (
+      hasAgentTab ||
+      !isToolSidebarOpen ||
+      isVersionControlOpen ||
+      mode === "runs" ||
+      activeTab !== TAB_VERSIONS ||
+      !onOpenVersionControl ||
+      hasAutoOpenedVersionControl ||
+      hasAutoOpenedVersionControlInMountRef.current
+    ) {
+      return;
+    }
+
+    hasAutoOpenedVersionControlInMountRef.current = true;
+    onVersionControlAutoOpened?.();
+    toolSidebarState.openToolSidebar();
+    onOpenVersionControl();
+  }, [
+    activeTab,
+    hasAgentTab,
+    hasAutoOpenedVersionControl,
+    hasAutoOpenedVersionControlInMountRef,
+    isToolSidebarOpen,
+    isVersionControlOpen,
+    mode,
+    onOpenVersionControl,
+    onVersionControlAutoOpened,
+    toolSidebarState,
+  ]);
+}
+
+function useCanvasToolSidebarTabEvents(handleTabSelect: (tab: CanvasToolSidebarTab) => void) {
+  useEffect(() => {
+    const onSelectTab = (event: Event) => {
+      const tab = canvasToolSidebarTabFromEvent(event);
+      if (!tab) return;
+      handleTabSelect(tab);
+    };
+
+    window.addEventListener(CANVAS_TOOL_SIDEBAR_SELECT_TAB_EVENT, onSelectTab);
+    return () => window.removeEventListener(CANVAS_TOOL_SIDEBAR_SELECT_TAB_EVENT, onSelectTab);
+  }, [handleTabSelect]);
 }
