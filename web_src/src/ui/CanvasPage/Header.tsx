@@ -1,9 +1,6 @@
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import { Button as UIButton } from "@/components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { MoreVertical, Settings } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
 import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
@@ -70,7 +67,7 @@ export interface HeaderProps {
   unpublishedDraftUpdatedAt?: string;
   /** Discard the existing draft and start a new edit session from live. Shown in the Edit dropdown when a draft exists. */
   onDiscardDraftAndStartEdit?: () => void;
-  /** Canvas settings route requires `canvases:update`; hide the menu when the user cannot update. */
+  /** Canvas rename requires `canvases:update`; hide rename when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
 }
@@ -154,7 +151,6 @@ function PageHeader({
   onDiscardDraftAndStartEdit?: () => void;
   unpublishedDraftUpdatedAt?: string;
 }) {
-  const navigate = useNavigate();
   const { workflowId, canvasId: canvasIdParam } = useParams<{ workflowId?: string; canvasId?: string }>();
   const activeCanvasId = canvasIdParam || workflowId;
 
@@ -170,6 +166,7 @@ function PageHeader({
               organizationId={organizationId}
               activeCanvasId={activeCanvasId}
               canvasName={headerTitle}
+              canUpdateCanvas={showCanvasSettingsMenu}
             />
           ) : (
             <span className="block truncate text-center text-[13px] font-medium text-slate-900">{headerTitle}</span>
@@ -201,27 +198,6 @@ function PageHeader({
             publishVersionDisabled={publishVersionDisabled}
             publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           />
-        ) : null}
-        {showCanvasSettingsMenu && organizationId && activeCanvasId ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <UIButton
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-slate-600"
-                aria-label="Canvas menu"
-              >
-                <MoreVertical className="h-4 w-4" />
-              </UIButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={() => navigate(`/${organizationId}/canvases/${activeCanvasId}/settings`)}>
-                <Settings className="h-4 w-4" />
-                Settings
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         ) : null}
       </div>
     </div>
@@ -255,6 +231,7 @@ function SecondaryHeader(props: HeaderProps) {
               onSelectDashboard={props.onSelectDashboard}
               onSelectMemory={props.onSelectMemory}
               editing={editing}
+              hasDraft={!!props.hasUnpublishedDraftChanges}
             />
           ) : null}
         </div>
