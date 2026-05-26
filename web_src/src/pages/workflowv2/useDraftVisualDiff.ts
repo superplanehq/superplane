@@ -275,3 +275,5 @@ function useDiffSubToggles() {
   const [showEdgeDiff, toggleShowEdgeDiff] = useLocalStorageToggle(SHOW_EDGE_DIFF_KEY);
   return { showDeletedNodes, toggleShowDeletedNodes, showEdgeDiff, toggleShowEdgeDiff };
 }
+
+export { useCanvasConsoleVersionDiff, type CanvasConsoleVersionDiffResult } from "./useCanvasConsoleVersionDiff";

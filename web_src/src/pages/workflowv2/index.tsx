@@ -33,7 +33,6 @@ import {
   canvasKeys,
   useActOnCanvasChangeRequest,
   useCanvas,
-  useCanvasConsole,
   useCanvasChangeRequests,
   useCanvasMemoryEntries,
   useCanvasVersion,
@@ -50,7 +49,6 @@ import {
   useInfiniteCanvasLiveVersions,
   useResolveCanvasChangeRequest,
   useTriggers,
-  useUpdateCanvasConsole,
   useUpdateCanvasVersion,
   useWidgets,
 } from "@/hooks/useCanvasData";
@@ -97,7 +95,6 @@ import { CanvasYamlModal } from "./CanvasYamlModal";
 import { WorkflowTemplateBanner } from "./WorkflowTemplateBanner";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
-import { hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
 import { activateDraftVersion, clearPublishedDraftVersion as clearDraftVersion } from "./lib/draft-spec-cache";
 import {
@@ -117,7 +114,7 @@ import type { TriggerActionModal } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
 import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
 import { useCanvasYaml } from "./useCanvasYaml";
-import { useDraftVisualDiff } from "./useDraftVisualDiff";
+import { useCanvasConsoleVersionDiff, useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
@@ -579,22 +576,13 @@ export function WorkflowPageV2() {
   const canUpdateCanvas = canAct("canvases", "update");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
-  const dashboardQuery = useCanvasConsole(
-    canvasId!,
-    activeCanvasVersionId || undefined,
-    !isTemplate && dashboardsFeatureEnabled,
-  );
-  const liveDashboardQuery = useCanvasConsole(
-    canvasId!,
-    liveCanvasVersionId || undefined,
-    !isTemplate && dashboardsFeatureEnabled && !!liveCanvasVersionId,
-  );
-  const hasDraftConsoleDiffVersusLive = useMemo(
-    () => hasDraftVersusLiveConsoleDiff(liveDashboardQuery.data, dashboardQuery.data),
-    [liveDashboardQuery.data, dashboardQuery.data],
-  );
-  const hasDraftDiffVersusLive = hasDraftGraphDiffVersusLive || hasDraftConsoleDiffVersusLive;
-  const updateDashboardMutation = useUpdateCanvasConsole(canvasId!, activeCanvasVersionId || undefined);
+  const { dashboardQuery, updateDashboardMutation, hasDraftDiffVersusLive } = useCanvasConsoleVersionDiff({
+    canvasId: canvasId!,
+    activeCanvasVersionId,
+    liveCanvasVersionId,
+    hasDraftGraphDiffVersusLive,
+    enabled: !isTemplate && dashboardsFeatureEnabled,
+  });
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const canvasAccess = { canUpdateCanvas, isTemplate, canvasDeletedRemotely };
@@ -4256,14 +4244,8 @@ export function WorkflowPageV2() {
         queryKey: canvasKeys.versionHistory(canvasId),
         refetchType: "all",
       }),
-      queryClient.invalidateQueries({
-        queryKey: canvasKeys.changeRequestList(canvasId),
-        refetchType: "all",
-      }),
-      queryClient.invalidateQueries({
-        queryKey: canvasKeys.dashboardAll(canvasId),
-        refetchType: "all",
-      }),
+      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId), refetchType: "all" }),
+      queryClient.invalidateQueries({ queryKey: canvasKeys.dashboardAll(canvasId), refetchType: "all" }),
     ]);
   }, [organizationId, canvasId, queryClient]);
 
