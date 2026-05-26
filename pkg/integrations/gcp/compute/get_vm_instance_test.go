@@ -32,6 +32,10 @@ func (m *mockGetClient) Post(ctx context.Context, path string, body any) ([]byte
 	return nil, fmt.Errorf("not implemented")
 }
 
+func (m *mockGetClient) Delete(ctx context.Context, path string) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 func (m *mockGetClient) GetURL(ctx context.Context, fullURL string) ([]byte, error) {
 	return nil, fmt.Errorf("not implemented")
 }
@@ -61,48 +65,6 @@ func instanceResponse(name, zone, status string) []byte {
 		},
 	})
 	return b
-}
-
-func Test__ParseInstancePath(t *testing.T) {
-	t.Run("relative path", func(t *testing.T) {
-		project, zone, name, err := ParseInstancePath("zones/us-central1-a/instances/my-vm")
-		require.NoError(t, err)
-		assert.Equal(t, "", project)
-		assert.Equal(t, "us-central1-a", zone)
-		assert.Equal(t, "my-vm", name)
-	})
-
-	t.Run("full selfLink URL", func(t *testing.T) {
-		selfLink := "https://www.googleapis.com/compute/v1/projects/elffie/zones/europe-west1-b/instances/web-server-01"
-		project, zone, name, err := ParseInstancePath(selfLink)
-		require.NoError(t, err)
-		assert.Equal(t, "elffie", project)
-		assert.Equal(t, "europe-west1-b", zone)
-		assert.Equal(t, "web-server-01", name)
-	})
-
-	t.Run("project-qualified relative path", func(t *testing.T) {
-		project, zone, name, err := ParseInstancePath("projects/elffie/zones/us-east1-c/instances/db-1")
-		require.NoError(t, err)
-		assert.Equal(t, "elffie", project)
-		assert.Equal(t, "us-east1-c", zone)
-		assert.Equal(t, "db-1", name)
-	})
-
-	t.Run("plain name is rejected", func(t *testing.T) {
-		_, _, _, err := ParseInstancePath("just-a-name")
-		require.Error(t, err)
-	})
-
-	t.Run("empty value is rejected", func(t *testing.T) {
-		_, _, _, err := ParseInstancePath("")
-		require.Error(t, err)
-	})
-
-	t.Run("missing instances segment is rejected", func(t *testing.T) {
-		_, _, _, err := ParseInstancePath("zones/us-central1-a/foo/my-vm")
-		require.Error(t, err)
-	})
 }
 
 func Test__GetVMInstance__Setup(t *testing.T) {

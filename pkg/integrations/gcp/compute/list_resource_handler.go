@@ -1393,48 +1393,6 @@ func ListInstances(ctx context.Context, c Client, project string) ([]Instance, e
 	return all, nil
 }
 
-// ParseInstancePath extracts (project, zone, name) from a value of the form
-// `zones/<zone>/instances/<name>` (relative path) or a full GCE selfLink URL
-// containing `projects/<project>/zones/<zone>/instances/<name>`. The project
-// segment is optional — relative paths from the dropdown have no project, but
-// chained selfLinks do, and the caller must verify it matches the integration's
-// bound project before issuing the API call.
-func ParseInstancePath(value string) (project, zone, name string, err error) {
-	s := strings.TrimSpace(value)
-	if s == "" {
-		return "", "", "", fmt.Errorf("instance is required")
-	}
-	if idx := strings.Index(s, "projects/"); idx >= 0 {
-		rest := s[idx+len("projects/"):]
-		if slash := strings.Index(rest, "/"); slash > 0 {
-			project = rest[:slash]
-		}
-	}
-	idx := strings.Index(s, "zones/")
-	if idx < 0 {
-		return "", "", "", fmt.Errorf("instance %q must be a path like zones/<zone>/instances/<name> or a GCE selfLink URL", value)
-	}
-	rest := s[idx+len("zones/"):]
-	slash := strings.Index(rest, "/")
-	if slash <= 0 {
-		return "", "", "", fmt.Errorf("instance %q is missing a zone segment", value)
-	}
-	zone = rest[:slash]
-	after := rest[slash+1:]
-	const prefix = "instances/"
-	if !strings.HasPrefix(after, prefix) {
-		return "", "", "", fmt.Errorf("instance %q is missing an instances/ segment", value)
-	}
-	name = after[len(prefix):]
-	if q := strings.IndexAny(name, "/?#"); q >= 0 {
-		name = name[:q]
-	}
-	if zone == "" || name == "" {
-		return "", "", "", fmt.Errorf("instance %q is missing a zone or name", value)
-	}
-	return project, zone, name, nil
-}
-
 func ListInstanceResources(ctx context.Context, c Client, project string) ([]core.IntegrationResource, error) {
 	list, err := ListInstances(ctx, c, project)
 	if err != nil {

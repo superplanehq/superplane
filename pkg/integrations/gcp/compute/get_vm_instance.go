@@ -111,7 +111,7 @@ func (g *GetVMInstance) Setup(ctx core.SetupContext) error {
 		})
 	}
 
-	_, zone, name, err := ParseInstancePath(instanceValue)
+	_, zone, name, err := parseInstancePath(instanceValue)
 	if err != nil {
 		return err
 	}
@@ -122,20 +122,13 @@ func (g *GetVMInstance) Setup(ctx core.SetupContext) error {
 	})
 }
 
-// VMInstanceNodeMetadata is stored by Setup so the frontend can display
-// instance name + zone in the collapsed node view.
-type VMInstanceNodeMetadata struct {
-	InstanceName string `json:"instanceName" mapstructure:"instanceName"`
-	Zone         string `json:"zone" mapstructure:"zone"`
-}
-
 func (g *GetVMInstance) Execute(ctx core.ExecutionContext) error {
 	spec := GetVMInstanceSpec{}
 	if err := mapstructure.Decode(ctx.Configuration, &spec); err != nil {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	urlProject, zone, instanceName, err := ParseInstancePath(spec.Instance)
+	urlProject, zone, instanceName, err := parseInstancePath(spec.Instance)
 	if err != nil {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
