@@ -127,7 +127,9 @@ export const canvasKeys = {
   nodeQueueItemHistory: (canvasId: string, nodeId: string) =>
     [...canvasKeys.nodeQueueItems(), "infinite", canvasId, nodeId] as const,
   canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
-  dashboard: (canvasId: string) => [...canvasKeys.all, "dashboard", canvasId] as const,
+  dashboard: (canvasId: string, versionId?: string) =>
+    [...canvasKeys.all, "dashboard", canvasId, versionId ?? "live"] as const,
+  dashboardAll: (canvasId: string) => [...canvasKeys.all, "dashboard", canvasId] as const,
 };
 
 export interface DashboardPanel {
@@ -873,6 +875,7 @@ export const usePublishCanvasVersion = (organizationId: string, canvasId: string
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.dashboardAll(canvasId) });
     },
   });
 };
@@ -1580,13 +1583,14 @@ export const useInfiniteNodeQueueItems = (canvasId: string, nodeId: string, enab
   });
 };
 
-export const useCanvasConsole = (canvasId: string, enabled: boolean = true) => {
+export const useCanvasConsole = (canvasId: string, versionId: string | undefined, enabled: boolean = true) => {
   return useQuery({
-    queryKey: canvasKeys.dashboard(canvasId),
+    queryKey: canvasKeys.dashboard(canvasId, versionId),
     queryFn: async () => {
       const response = await canvasesGetCanvasDashboard(
         withOrganizationHeader({
           path: { canvasId },
+          query: versionId ? { versionId } : undefined,
         }),
       );
       return response.data?.dashboard;
@@ -1596,7 +1600,7 @@ export const useCanvasConsole = (canvasId: string, enabled: boolean = true) => {
   });
 };
 
-export const useUpdateCanvasConsole = (canvasId: string) => {
+export const useUpdateCanvasConsole = (canvasId: string, versionId: string | undefined) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
@@ -1604,6 +1608,7 @@ export const useUpdateCanvasConsole = (canvasId: string) => {
         withOrganizationHeader({
           path: { canvasId },
           body: {
+            versionId,
             panels: input.panels.map((p) => ({
               id: p.id,
               type: p.type,
@@ -1624,7 +1629,7 @@ export const useUpdateCanvasConsole = (canvasId: string) => {
       return response.data?.dashboard;
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(canvasKeys.dashboard(canvasId), data);
+      queryClient.setQueryData(canvasKeys.dashboard(canvasId, versionId), data);
     },
   });
 };
