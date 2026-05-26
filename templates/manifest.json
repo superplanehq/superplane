@@ -1,0 +1,376 @@
+[
+  {
+    "repo": "github.com/superplanehq/preview-env-github-digitalocean",
+    "title": "Preview Environments (GitHub + DigitalOcean)",
+    "description": "Spin up a live preview environment for every pull request. Comment /start on a PR, get a running app in ~2 minutes.",
+    "integrations": [
+      "github",
+      "digitalocean"
+    ],
+    "tags": [
+      "CI/CD",
+      "Preview"
+    ],
+    "requirements": [
+      "GitHub integration with Deployments permission",
+      "DigitalOcean integration",
+      "SSH key added to both DigitalOcean and SuperPlane",
+      "A setup script at scripts/preview-setup.sh in your repo"
+    ],
+    "agentInstructions": "The user just installed the Preview Environments app. This canvas creates ephemeral preview environments for pull requests using GitHub and DigitalOcean. Guide them through: 1) Connecting their GitHub integration (needs Deployments permission), 2) Connecting their DigitalOcean integration, 3) Adding an SSH key as a secret, 4) Updating the repository name and setup script URL in the canvas nodes to match their project. Check which integrations are already connected and which need setup."
+  },
+  {
+    "repo": "github.com/superplanehq/blue-green-deploy-render",
+    "title": "Blue/Green Deploy (Render + Cloudflare)",
+    "description": "Zero-downtime blue/green deployments with canary traffic routing and automated rollback on health check failure.",
+    "integrations": [
+      "render",
+      "cloudflare"
+    ],
+    "tags": [
+      "CI/CD",
+      "Deployment"
+    ],
+    "requirements": [
+      "Render integration with deploy permissions",
+      "Cloudflare integration with DNS and Load Balancer access",
+      "At least two Render services (blue and green)"
+    ],
+    "agentInstructions": "The user just installed the \"Blue/Green Deploy (Render + Cloudflare)\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/incident-router-pagerduty",
+    "title": "Incident Router (PagerDuty + Slack)",
+    "description": "Route incidents by severity to the right on-call team. Auto-create Slack channels and post runbooks.",
+    "integrations": [
+      "pagerduty",
+      "slack"
+    ],
+    "tags": [
+      "Incident Management"
+    ],
+    "requirements": [
+      "PagerDuty integration",
+      "Slack integration with channel creation permissions"
+    ],
+    "agentInstructions": "The user just installed the \"Incident Router (PagerDuty + Slack)\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/health-check-monitor",
+    "title": "Health Check Monitor",
+    "description": "Poll HTTP endpoints every 5 minutes. Alert on failures via Slack and create PagerDuty incidents after 3 consecutive misses.",
+    "integrations": [
+      "http",
+      "slack",
+      "pagerduty"
+    ],
+    "tags": [
+      "Monitoring"
+    ],
+    "requirements": [
+      "Slack integration",
+      "PagerDuty integration (optional, for escalation)",
+      "HTTP endpoints to monitor"
+    ],
+    "agentInstructions": "The user just installed the \"Health Check Monitor\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/github-release-pipeline",
+    "title": "GitHub Release Pipeline",
+    "description": "Tag-driven release flow: run tests, build artifacts, create GitHub release, notify Slack on success or failure.",
+    "integrations": [
+      "github",
+      "slack"
+    ],
+    "tags": [
+      "CI/CD",
+      "Deployment"
+    ],
+    "requirements": [
+      "GitHub integration",
+      "Slack integration"
+    ],
+    "agentInstructions": "The user just installed the \"GitHub Release Pipeline\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/pr-labeler-github",
+    "title": "PR Auto-Labeler",
+    "description": "Automatically label pull requests based on file paths, size, and author. Keep your repo organized without manual work.",
+    "integrations": [
+      "github"
+    ],
+    "tags": [
+      "CI/CD",
+      "Automation"
+    ],
+    "requirements": [
+      "GitHub integration with pull request permissions"
+    ],
+    "agentInstructions": "The user just installed the \"PR Auto-Labeler\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/deploy-approval-gate",
+    "title": "Deploy Approval Gate",
+    "description": "Require manual approval before production deploys. Slack notification to approvers with one-click approve/reject.",
+    "integrations": [
+      "github",
+      "slack"
+    ],
+    "tags": [
+      "CI/CD",
+      "Security"
+    ],
+    "requirements": [
+      "GitHub integration",
+      "Slack integration with message permissions"
+    ],
+    "agentInstructions": "The user just installed the \"Deploy Approval Gate\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/docker-build-push",
+    "title": "Docker Build & Push",
+    "description": "Build Docker images on push to main, tag with git SHA, push to registry, and update deployment manifest.",
+    "integrations": [
+      "github",
+      "docker"
+    ],
+    "tags": [
+      "CI/CD",
+      "Containers"
+    ],
+    "requirements": [
+      "GitHub integration",
+      "Docker registry credentials as a secret"
+    ],
+    "agentInstructions": "The user just installed the \"Docker Build & Push\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/scheduled-db-backup",
+    "title": "Scheduled DB Backup",
+    "description": "Nightly database backups via SSH. Upload to S3 with retention policy. Alert on failure.",
+    "integrations": [
+      "digitalocean",
+      "slack"
+    ],
+    "tags": [
+      "Operations",
+      "Database"
+    ],
+    "requirements": [
+      "DigitalOcean integration or SSH access to DB host",
+      "Slack integration for alerts",
+      "S3-compatible storage credentials"
+    ],
+    "agentInstructions": "The user just installed the \"Scheduled DB Backup\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/ssl-cert-monitor",
+    "title": "SSL Certificate Monitor",
+    "description": "Check SSL certificate expiry daily. Alert via Slack 30, 14, and 7 days before expiration.",
+    "integrations": [
+      "http",
+      "slack"
+    ],
+    "tags": [
+      "Monitoring",
+      "Security"
+    ],
+    "requirements": [
+      "Slack integration",
+      "List of domains to monitor"
+    ],
+    "agentInstructions": "The user just installed the \"SSL Certificate Monitor\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/uptime-status-page",
+    "title": "Uptime Status Page",
+    "description": "Monitor services and update a public status page. Auto-create incidents on downtime, resolve on recovery.",
+    "integrations": [
+      "http",
+      "github"
+    ],
+    "tags": [
+      "Monitoring"
+    ],
+    "requirements": [
+      "GitHub integration (for status page repo)",
+      "HTTP endpoints to monitor"
+    ],
+    "agentInstructions": "The user just installed the \"Uptime Status Page\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/slack-standup-bot",
+    "title": "Slack Standup Bot",
+    "description": "Collect daily standups via Slack at 9am. Summarize and post to a team channel. Track participation.",
+    "integrations": [
+      "slack"
+    ],
+    "tags": [
+      "Automation",
+      "Team"
+    ],
+    "requirements": [
+      "Slack integration with message and channel permissions"
+    ],
+    "agentInstructions": "The user just installed the \"Slack Standup Bot\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/cost-alert-aws",
+    "title": "AWS Cost Alert",
+    "description": "Monitor daily AWS spend. Alert when costs exceed threshold. Weekly summary report to Slack.",
+    "integrations": [
+      "http",
+      "slack"
+    ],
+    "tags": [
+      "Monitoring",
+      "Cost"
+    ],
+    "requirements": [
+      "AWS Cost Explorer API access (HTTP)",
+      "Slack integration"
+    ],
+    "agentInstructions": "The user just installed the \"AWS Cost Alert\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/feature-flag-rollout",
+    "title": "Feature Flag Rollout",
+    "description": "Staged feature flag rollout: 1% -> 10% -> 50% -> 100% with automatic rollback on error rate spike.",
+    "integrations": [
+      "http",
+      "slack"
+    ],
+    "tags": [
+      "CI/CD",
+      "Deployment"
+    ],
+    "requirements": [
+      "Feature flag service API access (HTTP)",
+      "Slack integration",
+      "Error monitoring endpoint"
+    ],
+    "agentInstructions": "The user just installed the \"Feature Flag Rollout\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/dependency-update-bot",
+    "title": "Dependency Update Bot",
+    "description": "Weekly scan for outdated dependencies. Auto-create PRs with updates. Notify team of security advisories.",
+    "integrations": [
+      "github",
+      "slack"
+    ],
+    "tags": [
+      "Security",
+      "Automation"
+    ],
+    "requirements": [
+      "GitHub integration with PR creation permissions",
+      "Slack integration"
+    ],
+    "agentInstructions": "The user just installed the \"Dependency Update Bot\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/gitlab-ci-pipeline",
+    "title": "GitLab CI Pipeline",
+    "description": "Mirror GitHub pushes to GitLab CI. Run tests, deploy on success, post results back to GitHub status checks.",
+    "integrations": [
+      "github",
+      "gitlab"
+    ],
+    "tags": [
+      "CI/CD"
+    ],
+    "requirements": [
+      "GitHub integration",
+      "GitLab integration with pipeline permissions"
+    ],
+    "agentInstructions": "The user just installed the \"GitLab CI Pipeline\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/incident-postmortem",
+    "title": "Incident Postmortem Generator",
+    "description": "Auto-collect incident timeline from PagerDuty and Slack. Generate postmortem doc in Google Docs.",
+    "integrations": [
+      "pagerduty",
+      "slack"
+    ],
+    "tags": [
+      "Incident Management"
+    ],
+    "requirements": [
+      "PagerDuty integration",
+      "Slack integration"
+    ],
+    "agentInstructions": "The user just installed the \"Incident Postmortem Generator\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/terraform-plan-review",
+    "title": "Terraform Plan Review",
+    "description": "Run terraform plan on PR, post diff as comment. Require approval for destructive changes before apply.",
+    "integrations": [
+      "github"
+    ],
+    "tags": [
+      "CI/CD",
+      "Infrastructure"
+    ],
+    "requirements": [
+      "GitHub integration with PR comment permissions",
+      "Terraform state access"
+    ],
+    "agentInstructions": "The user just installed the \"Terraform Plan Review\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/log-alert-datadog",
+    "title": "Log Alert Pipeline (Datadog)",
+    "description": "Monitor Datadog log patterns. Route alerts by severity to Slack channels and create tickets for critical errors.",
+    "integrations": [
+      "datadog",
+      "slack"
+    ],
+    "tags": [
+      "Monitoring",
+      "Observability"
+    ],
+    "requirements": [
+      "Datadog integration",
+      "Slack integration"
+    ],
+    "agentInstructions": "The user just installed the \"Log Alert Pipeline (Datadog)\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/multi-env-promote",
+    "title": "Multi-Environment Promotion",
+    "description": "Promote builds through staging -> UAT -> production with approval gates and smoke tests at each stage.",
+    "integrations": [
+      "github",
+      "slack"
+    ],
+    "tags": [
+      "CI/CD",
+      "Deployment"
+    ],
+    "requirements": [
+      "GitHub integration",
+      "Slack integration",
+      "Access to staging, UAT, and production environments"
+    ],
+    "agentInstructions": "The user just installed the \"Multi-Environment Promotion\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  },
+  {
+    "repo": "github.com/superplanehq/webhook-relay",
+    "title": "Webhook Relay & Transform",
+    "description": "Receive webhooks from any source, transform payloads, and fan out to multiple destinations with retry logic.",
+    "integrations": [
+      "http"
+    ],
+    "tags": [
+      "Integration",
+      "Automation"
+    ],
+    "requirements": [
+      "HTTP endpoints for webhook sources and destinations"
+    ],
+    "agentInstructions": "The user just installed the \"Webhook Relay & Transform\" app. Read the canvas state, check which integrations need to be connected, and guide the user through getting started."
+  }
+]
