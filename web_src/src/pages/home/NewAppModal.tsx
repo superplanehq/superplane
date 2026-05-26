@@ -37,7 +37,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
   const { installTemplate, isInstalling } = useInstallTemplate();
   const [search, setSearch] = useState("");
   const [selectedApp, setSelectedApp] = useState<AppEntry | null>(null);
-  const [visibleCount, setVisibleCount] = useState(5);
+  const [visibleCount, setVisibleCount] = useState(7);
   const listRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
@@ -59,7 +59,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
     const el = listRef.current;
     if (!el || search) return;
     if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
-      setVisibleCount((prev) => Math.min(prev + 5, filtered.length));
+      setVisibleCount((prev) => Math.min(prev + 7, filtered.length));
     }
   }, [filtered.length, search]);
 
@@ -100,7 +100,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
       }}
       title="New App"
       description="Create a blank app or install one from the catalog."
-      className="top-[12vh] max-h-[min(760px,80vh)] w-[calc(100vw-2rem)] max-w-4xl sm:max-w-4xl translate-y-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-0 shadow-2xl sm:top-[14vh]"
+      className="top-[12vh] max-h-[min(760px,80vh)] w-[calc(100vw-2rem)] max-w-3xl sm:max-w-3xl translate-y-0 overflow-hidden rounded-xl border border-slate-200 bg-white p-0 shadow-2xl sm:top-[14vh]"
       showCloseButton={false}
     >
       <CommandInput
@@ -125,7 +125,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
       <CommandList
         ref={listRef}
         onScroll={handleScroll}
-        className="max-h-[min(600px,calc(80vh-4rem))] scroll-py-2 px-3 py-3"
+        className="max-h-[360px] scroll-py-2 px-3 py-3"
       >
         <CommandEmpty>No apps found.</CommandEmpty>
 
@@ -187,7 +187,7 @@ function AppDetailView({
   return (
     <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[12vh] sm:pt-[14vh]">
       <div className="fixed inset-0 bg-gray-950/20" onClick={onClose} />
-      <div className="relative w-[calc(100vw-2rem)] max-w-4xl rounded-xl border border-slate-200 bg-white shadow-2xl">
+      <div className="relative w-[calc(100vw-2rem)] max-w-3xl rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-3">
           <button
             type="button"
