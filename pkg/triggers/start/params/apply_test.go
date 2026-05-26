@@ -10,8 +10,8 @@ import (
 func issueExamplePayload() map[string]any {
 	return map[string]any{
 		"body": map[string]any{
-			"name": "param(type:string, title:'Enter a machine name', default:'machine-1', required:false)",
-			"size": "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Select size', required:true)",
+			"name": "param(type:string, title:'Enter a machine name', default:'machine-1', required:false, order:1)",
+			"size": "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Select size', required:true, order:2)",
 		},
 	}
 }

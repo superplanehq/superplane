@@ -17,11 +17,17 @@ func TestParseParams_issueExample(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, defs, 2)
 
+	assert.Equal(t, []string{"body.name", "body.size"}, pathsFromDefs(defs))
+	assert.Equal(t, 1, defs[0].Order)
+	assert.Equal(t, 2, defs[1].Order)
+}
+
+func pathsFromDefs(defs []Definition) []string {
 	paths := make([]string, len(defs))
 	for i, def := range defs {
 		paths[i] = def.Path
 	}
-	assert.ElementsMatch(t, []string{"body.name", "body.size"}, paths)
+	return paths
 }
 
 func TestIsParamString(t *testing.T) {
@@ -32,23 +38,31 @@ func TestIsParamString(t *testing.T) {
 
 func TestParseParamString_issueExamples(t *testing.T) {
 	t.Run("string param", func(t *testing.T) {
-		def, err := ParseParamString("body.name", "param(type:string, title:'Enter a machine name', default:'machine-1', required:false)")
+		def, err := ParseParamString("body.name", "param(type:string, title:'Enter a machine name', default:'machine-1', required:false, order:1)")
 		require.NoError(t, err)
 		assert.Equal(t, "body.name", def.Path)
 		assert.Equal(t, ParamTypeString, def.Type)
 		assert.Equal(t, "Enter a machine name", def.Title)
 		assert.Equal(t, "machine-1", def.Default)
 		assert.False(t, def.Required)
+		assert.Equal(t, 1, def.Order)
 	})
 
 	t.Run("select param", func(t *testing.T) {
-		def, err := ParseParamString("body.size", "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Select size', required:true)")
+		def, err := ParseParamString("body.size", "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Select size', required:true, order:2)")
 		require.NoError(t, err)
 		assert.Equal(t, "body.size", def.Path)
 		assert.Equal(t, ParamTypeSelect, def.Type)
 		assert.Equal(t, "Select size", def.Title)
 		assert.True(t, def.Required)
 		assert.Equal(t, []string{"2 vCPU", "4 vCPU", "8 vCPU"}, def.Values)
+		assert.Equal(t, 2, def.Order)
+	})
+
+	t.Run("omitted order defaults to zero", func(t *testing.T) {
+		def, err := ParseParamString("body.name", "param(type:string, required:false)")
+		require.NoError(t, err)
+		assert.Equal(t, 0, def.Order)
 	})
 }
 
@@ -209,6 +223,43 @@ func TestParseSelectValues(t *testing.T) {
 	assert.Contains(t, err.Error(), "empty")
 
 	_, err = parseSelectValues("'bad,comma'")
+	require.Error(t, err)
+}
+
+func TestParseParams_sortsByOrderThenPath(t *testing.T) {
+	payload := map[string]any{
+		"z": "param(type:string, order:2)",
+		"a": "param(type:string, order:1)",
+		"m": "param(type:string, order:1)",
+	}
+	defs, err := ParseParams(payload)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"a", "m", "z"}, pathsFromDefs(defs))
+}
+
+func TestParseParamString_rejectsInvalidOrder(t *testing.T) {
+	_, err := ParseParamString("x", "param(type:string, order:-1)")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "order:")
+
+	_, err = ParseParamString("x", "param(type:string, order:1.5)")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "order:")
+
+	_, err = ParseParamString("x", "param(type:string, order:abc)")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "order:")
+}
+
+func TestParseOrder(t *testing.T) {
+	value, err := parseOrder("10")
+	require.NoError(t, err)
+	assert.Equal(t, 10, value)
+
+	_, err = parseOrder("-1")
+	require.Error(t, err)
+
+	_, err = parseOrder("1.5")
 	require.Error(t, err)
 }
 

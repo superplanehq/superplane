@@ -10,7 +10,9 @@ describe("paramSyntax", () => {
   it("parses issue example payload", () => {
     const defs = parseParams(issueExamplePayload());
     expect(defs).toHaveLength(2);
-    expect(defs.map((def) => def.path).sort()).toEqual(["body.name", "body.size"]);
+    expect(defs.map((def) => def.path)).toEqual(["body.name", "body.size"]);
+    expect(defs[0]?.order).toBe(1);
+    expect(defs[1]?.order).toBe(2);
   });
 
   it("recognizes param expressions", () => {
@@ -22,23 +24,45 @@ describe("paramSyntax", () => {
   it("parses issue example param strings", () => {
     const name = parseParamString(
       "body.name",
-      "param(type:string, title:'Enter a machine name', default:'machine-1', required:false)",
+      "param(type:string, title:'Enter a machine name', default:'machine-1', required:false, order:1)",
     );
     expect(name.path).toBe("body.name");
     expect(name.type).toBe("string");
     expect(name.title).toBe("Enter a machine name");
     expect(name.default).toBe("machine-1");
     expect(name.required).toBe(false);
+    expect(name.order).toBe(1);
 
     const size = parseParamString(
       "body.size",
-      "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Select size', required:true)",
+      "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Select size', required:true, order:2)",
     );
     expect(size.path).toBe("body.size");
     expect(size.type).toBe("select");
     expect(size.title).toBe("Select size");
     expect(size.required).toBe(true);
     expect(size.values).toEqual(["2 vCPU", "4 vCPU", "8 vCPU"]);
+    expect(size.order).toBe(2);
+  });
+
+  it("defaults omitted order to zero", () => {
+    const def = parseParamString("body.name", "param(type:string, required:false)");
+    expect(def.order).toBe(0);
+  });
+
+  it("sorts definitions by order then path", () => {
+    const defs = parseParams({
+      z: "param(type:string, order:2)",
+      a: "param(type:string, order:1)",
+      m: "param(type:string, order:1)",
+    });
+    expect(defs.map((def) => def.path)).toEqual(["a", "m", "z"]);
+  });
+
+  it("rejects invalid order tokens", () => {
+    expect(() => parseParamString("x", "param(type:string, order:-1)")).toThrow(/order:/);
+    expect(() => parseParamString("x", "param(type:string, order:1.5)")).toThrow(/order:/);
+    expect(() => parseParamString("x", "param(type:string, order:abc)")).toThrow(/order:/);
   });
 
   it("rejects invalid quoted charset", () => {

@@ -1,8 +1,10 @@
 package params
 
 import (
+	"cmp"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -45,6 +47,9 @@ func ParseParams(payload map[string]any) ([]Definition, error) {
 		return WalkContinue
 	})
 
+	if err == nil && len(defs) > 1 {
+		sortDefinitions(defs)
+	}
 	return defs, err
 }
 
@@ -75,6 +80,7 @@ func ParseParamString(path string, s string) (Definition, error) {
 		defaultValue any
 		required     bool
 		values       []string
+		order        int
 	)
 	for key, raw := range args {
 		switch key {
@@ -106,6 +112,12 @@ func ParseParamString(path string, s string) (Definition, error) {
 				return Definition{}, fmt.Errorf("values: %w", err)
 			}
 			values = parsedValues
+		case "order":
+			parsedOrder, err := parseOrder(raw)
+			if err != nil {
+				return Definition{}, fmt.Errorf("order: %w", err)
+			}
+			order = parsedOrder
 		default:
 			return Definition{}, fmt.Errorf("unknown param() key %q", key)
 		}
@@ -118,7 +130,16 @@ func ParseParamString(path string, s string) (Definition, error) {
 		}
 	}
 
-	return NewDefinition(path, paramType, title, defaultValue, required, values)
+	return NewDefinition(path, paramType, title, defaultValue, required, values, order)
+}
+
+func sortDefinitions(defs []Definition) {
+	slices.SortFunc(defs, func(a, b Definition) int {
+		if a.Order != b.Order {
+			return cmp.Compare(a.Order, b.Order)
+		}
+		return strings.Compare(a.Path, b.Path)
+	})
 }
 
 func splitArgs(inner string) (map[string]string, error) {
@@ -233,4 +254,19 @@ func parseDefaultValue(paramType ParamType, raw string) (any, error) {
 	default:
 		return nil, fmt.Errorf("unsupported type %q", paramType)
 	}
+}
+
+func parseOrder(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, fmt.Errorf("expected non-negative integer, got %q", raw)
+	}
+	n, err := strconv.ParseInt(raw, 10, 0)
+	if err != nil {
+		return 0, fmt.Errorf("expected non-negative integer, got %q", raw)
+	}
+	if n < 0 {
+		return 0, fmt.Errorf("order must be non-negative, got %d", n)
+	}
+	return int(n), nil
 }

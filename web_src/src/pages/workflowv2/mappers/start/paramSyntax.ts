@@ -9,6 +9,7 @@ export type ParamDefinition = {
   default: unknown;
   required: boolean;
   values: string[];
+  order: number;
 };
 
 /** Mirrors `params.IsParamString` in pkg/triggers/start/params/parser.go. */
@@ -54,7 +55,19 @@ export function parseParams(payload: Record<string, unknown>): ParamDefinition[]
   if (parseError) {
     throw parseError;
   }
+  if (defs.length > 1) {
+    sortDefinitions(defs);
+  }
   return defs;
+}
+
+function sortDefinitions(defs: ParamDefinition[]): void {
+  defs.sort((a, b) => {
+    if (a.order !== b.order) {
+      return a.order - b.order;
+    }
+    return a.path.localeCompare(b.path);
+  });
 }
 
 /** Mirrors `params.ParseParamString` in pkg/triggers/start/params/parser.go. */
@@ -73,6 +86,7 @@ export function parseParamString(path: string, expression: string): ParamDefinit
   let defaultValue: unknown;
   let required = false;
   let values: string[] = [];
+  let order = 0;
 
   for (const [key, raw] of Object.entries(args)) {
     switch (key) {
@@ -91,6 +105,9 @@ export function parseParamString(path: string, expression: string): ParamDefinit
       case "values":
         values = parseSelectValues(raw);
         break;
+      case "order":
+        order = parseOrder(raw);
+        break;
       default:
         throw new Error(`unknown param() key "${key}"`);
     }
@@ -103,7 +120,7 @@ export function parseParamString(path: string, expression: string): ParamDefinit
     defaultValue = parseDefaultValue(paramType, defaultRaw);
   }
 
-  return newDefinition(path, paramType, title, defaultValue, required, values);
+  return newDefinition(path, paramType, title, defaultValue, required, values, order);
 }
 
 /** Mirrors `params.NewDefinition` in pkg/triggers/start/params/definition.go. */
@@ -114,6 +131,7 @@ export function newDefinition(
   defaultValue: unknown,
   required: boolean,
   values: string[],
+  order: number,
 ): ParamDefinition {
   if (path === "") {
     throw new Error("param() path is required");
@@ -154,6 +172,7 @@ export function newDefinition(
     default: defaultValue,
     required,
     values,
+    order,
   };
 }
 
@@ -161,8 +180,8 @@ export function newDefinition(
 export function issueExamplePayload(): Record<string, unknown> {
   return {
     body: {
-      name: "param(type:string, title:'Enter a machine name', default:'machine-1', required:false)",
-      size: "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Select size', required:true)",
+      name: "param(type:string, title:'Enter a machine name', default:'machine-1', required:false, order:1)",
+      size: "param(type:select, values:'2 vCPU|4 vCPU|8 vCPU', title:'Select size', required:true, order:2)",
     },
   };
 }
@@ -310,4 +329,16 @@ function parseDefaultValue(paramType: ParamType, raw: string): unknown {
     default:
       throw new Error(`unsupported type "${paramType}"`);
   }
+}
+
+function parseOrder(raw: string): number {
+  const token = raw.trim();
+  if (token === "" || !/^\d+$/.test(token)) {
+    throw new Error(`order: expected non-negative integer, got "${raw}"`);
+  }
+  const value = Number(token);
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`order: expected non-negative integer, got "${raw}"`);
+  }
+  return value;
 }

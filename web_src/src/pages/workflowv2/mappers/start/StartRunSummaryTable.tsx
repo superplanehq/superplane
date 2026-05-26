@@ -1,11 +1,5 @@
 /** Manual-run target: node and template on one line. */
-export function StartRunSummaryTable({
-  nodeName,
-  templateName,
-}: {
-  nodeName: string;
-  templateName: string;
-}) {
+export function StartRunSummaryTable({ nodeName, templateName }: { nodeName: string; templateName: string }) {
   return (
     <p className="text-xs text-slate-700" data-testid="start-run-summary">
       <span className="font-medium text-slate-800">{nodeName}</span>
