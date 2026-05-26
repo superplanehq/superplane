@@ -52,6 +52,7 @@ export function CanvasProjectSwitcher({
   const [draftName, setDraftName] = useState(canvasName);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const isSubmittingRenameRef = useRef(false);
+  const skipRenameBlurSubmitRef = useRef(false);
   const ignoreBlurUntilRef = useRef(0);
   const { data: canvases = [], isLoading } = useCanvases(organizationId);
   const { recentOpens, recordOpen } = useRecentCanvasOpens(organizationId);
@@ -77,7 +78,7 @@ export function CanvasProjectSwitcher({
   }, [canvasName, isRenaming]);
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.key !== "k") {
         return;
       }
@@ -112,6 +113,7 @@ export function CanvasProjectSwitcher({
   }, []);
 
   const cancelRenaming = useCallback(() => {
+    skipRenameBlurSubmitRef.current = true;
     setDraftName(canvasName);
     setIsRenaming(false);
   }, [canvasName]);
@@ -158,6 +160,7 @@ export function CanvasProjectSwitcher({
         ignoreBlurUntilRef.current = Date.now() + 200;
       }
 
+      skipRenameBlurSubmitRef.current = false;
       setDraftName(canvasName);
       setIsRenaming(true);
       focusRenameInput(true);
@@ -230,6 +233,11 @@ export function CanvasProjectSwitcher({
       value={draftName}
       onChange={(event) => setDraftName(event.target.value)}
       onBlur={() => {
+        if (skipRenameBlurSubmitRef.current) {
+          skipRenameBlurSubmitRef.current = false;
+          return;
+        }
+
         if (ignoreBlurUntilRef.current > Date.now()) {
           focusRenameInput();
           return;
