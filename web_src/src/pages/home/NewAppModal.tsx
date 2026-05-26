@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { ArrowLeft, ArrowRight, ExternalLink, Plus } from "lucide-react";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import templateManifest from "../../../../templates/manifest.json";
 import { useCreateApp } from "./useCreateApp";
 import { useInstallTemplate } from "./useInstallTemplate";
@@ -40,6 +40,14 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
   const [selectedApp, setSelectedApp] = useState<AppEntry | null>(null);
   const [visibleCount, setVisibleCount] = useState(7);
   const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      setSearch("");
+      setSelectedApp(null);
+      setVisibleCount(7);
+    }
+  }, [open]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -78,6 +86,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
   const handleClose = () => {
     setSelectedApp(null);
     setSearch("");
+    setVisibleCount(7);
     onClose();
   };
 
