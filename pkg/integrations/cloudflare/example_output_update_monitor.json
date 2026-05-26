@@ -1,0 +1,22 @@
+{
+  "data": {
+    "accountId": "account_abc123",
+    "monitorId": "monitor_abc123",
+    "monitor": {
+      "id": "monitor_abc123",
+      "type": "https",
+      "description": "Updated login page monitor",
+      "method": "GET",
+      "path": "/healthz",
+      "expected_codes": "2xx",
+      "interval": 30,
+      "timeout": 5,
+      "retries": 2,
+      "consecutive_up": 2,
+      "consecutive_down": 3,
+      "port": 443
+    }
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.monitor.updated"
+}

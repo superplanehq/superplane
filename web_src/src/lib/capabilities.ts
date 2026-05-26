@@ -103,5 +103,5 @@ export function buildIntegrationCapabilityGroupSections(
     });
   }
 
-  return sections;
+  return [...sections].sort((left, right) => left.label.localeCompare(right.label));
 }

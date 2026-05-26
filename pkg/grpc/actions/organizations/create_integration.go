@@ -133,7 +133,7 @@ func setupIntegration(registry *registry.Registry, setupProvider core.Integratio
 		firstStep := setupProvider.FirstStep(core.SetupStepContext{
 			IntegrationID:  newIntegration.ID,
 			OrganizationID: newIntegration.OrganizationID.String(),
-			HTTP:           registry.HTTPContext(),
+			HTTP:           registry.HTTPContextInTransaction(tx),
 			Properties:     contexts.NewIntegrationPropertyStorage(newIntegration),
 			Capabilities:   capabilityCtx,
 			Secrets:        contexts.NewIntegrationSecretStorage(tx, registry.Encryptor, newIntegration),
@@ -255,7 +255,7 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 			Metadata:         metadata,
 			UsedIn:           []*pb.Integration_NodeRef{},
 			Capabilities:     serializeCapabilities(registry, instance),
-			LegacySetup:      isLegacySetup(instance),
+			LegacySetup:      instance.IsLegacy(),
 		},
 	}
 
@@ -275,6 +275,7 @@ func serializeIntegration(registry *registry.Registry, instance *models.Integrat
 			CanvasName: nodeRef.CanvasName,
 			NodeId:     nodeRef.NodeID,
 			NodeName:   nodeRef.NodeName,
+			Component:  nodeRef.ComponentName(),
 		})
 	}
 
@@ -522,12 +523,4 @@ func sanitizeConfigurationIfNeeded(integration core.Integration, config map[stri
 	}
 
 	return sanitized
-}
-
-func isLegacySetup(integration *models.Integration) bool {
-	if integration.SetupState != nil {
-		return false
-	}
-
-	return len(integration.Capabilities) == 0
 }

@@ -51,11 +51,11 @@ func (s *sidebarCloseSteps) givenCanvasWithChangeManagementEnabled(name string) 
 	s.canvas.Create()
 	s.canvas.Visit()
 
-	s.session.AssertVisible(q.TestID("canvas-view-mode-editor"))
+	s.session.AssertVisible(q.TestID("canvas-edit-button"))
 }
 
 func (s *sidebarCloseSteps) enterEditMode() {
-	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
+	editButton := q.TestID("canvas-edit-button").Run(s.session)
 	deadline := time.Now().Add(15 * time.Second)
 
 	for {
@@ -66,7 +66,7 @@ func (s *sidebarCloseSteps) enterEditMode() {
 		}
 
 		if time.Now().After(deadline) {
-			s.t.Fatalf("editor control did not become enabled")
+			s.t.Fatalf("edit button did not become enabled")
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -89,20 +89,20 @@ func (s *sidebarCloseSteps) assertSidebarHidden() {
 }
 
 func (s *sidebarCloseSteps) exitEditMode() {
-	liveButton := q.TestID("canvas-view-mode-live").Run(s.session)
+	exitEditButton := q.TestID("canvas-exit-edit-button").Run(s.session)
 	deadline := time.Now().Add(15 * time.Second)
 	for {
-		disabled, err := liveButton.IsDisabled()
+		disabled, err := exitEditButton.IsDisabled()
 		require.NoError(s.t, err)
 		if !disabled {
 			break
 		}
 		if time.Now().After(deadline) {
-			s.t.Fatalf("live canvas control did not become enabled")
+			s.t.Fatalf("exit edit button did not become enabled")
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	require.NoError(s.t, liveButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
-	s.session.AssertVisible(q.TestID("canvas-view-mode-editor"))
+	require.NoError(s.t, exitEditButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	s.session.AssertVisible(q.TestID("canvas-edit-button"))
 	s.session.Sleep(500)
 }

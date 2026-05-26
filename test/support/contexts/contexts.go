@@ -293,8 +293,22 @@ func (c *ExecutionStateContext) Fail(reason, message string) error {
 }
 
 func (c *ExecutionStateContext) SetKV(key, value string) error {
+	if c.KVs == nil {
+		c.KVs = map[string]string{}
+	}
 	c.KVs[key] = value
 	return nil
+}
+
+func (c *ExecutionStateContext) GetKV(key string) (string, error) {
+	if c.KVs == nil {
+		return "", core.ErrExecutionKVNotFound
+	}
+	v, ok := c.KVs[key]
+	if !ok {
+		return "", core.ErrExecutionKVNotFound
+	}
+	return v, nil
 }
 
 type AuthContext struct {

@@ -98,14 +98,14 @@ func (w *WebhookCleanupWorker) processAppInstallationWebhook(tx *gorm.DB, webhoo
 	}
 
 	err = handler.Cleanup(core.WebhookHandlerContext{
-		HTTP:        w.registry.HTTPContext(),
+		HTTP:        w.registry.HTTPContextInTransaction(tx),
 		Integration: contexts.NewIntegrationContext(tx, nil, instance, w.encryptor, w.registry, nil),
 		Webhook:     contexts.NewWebhookContext(tx, webhook, w.encryptor, w.baseURL),
 		Logger:      logging.ForIntegration(*instance),
 	})
 
 	if err != nil {
-		return err
+		w.log("Best-effort cleanup failed for webhook %s: %v", webhook.ID, err)
 	}
 
 	return tx.Unscoped().Delete(webhook).Error

@@ -1,12 +1,41 @@
 package canvases
 
 import (
+	"bytes"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
+
+// fakeConfig is a test stub implementation of core.ConfigContext. The
+// canvas-active accessors are no-ops because the canvas commands under test
+// here do not use them.
+type fakeConfig struct {
+	url string
+}
+
+func (f *fakeConfig) GetActiveCanvas() string               { return "" }
+func (f *fakeConfig) SetActiveCanvas(canvasID string) error { return nil }
+func (f *fakeConfig) GetURL() string                        { return f.url }
+
+// newCommandContextWithConfigForTest builds a command context whose Config is
+// set to the provided stub. Useful for exercising URL output behavior.
+func newCommandContextWithConfigForTest(
+	t *testing.T,
+	server *httptest.Server,
+	outputFormat string,
+	config core.ConfigContext,
+) (core.CommandContext, *bytes.Buffer) {
+	t.Helper()
+
+	ctx, stdout := newCreateCommandContextForTest(t, server, outputFormat)
+	ctx.Config = config
+	return ctx, stdout
+}
 
 func TestFindCurrentUserDraftVersionIDSkipsPublishedVersions(t *testing.T) {
 	server := newAPITestServer(

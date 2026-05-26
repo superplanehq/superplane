@@ -14,12 +14,37 @@ type Account struct {
 	Email             string
 	Name              string
 	InstallationAdmin bool `gorm:"default:false"`
+	PasswordChangedAt *time.Time
 	CreatedAt         *time.Time
 	UpdatedAt         *time.Time
 }
 
 func (a *Account) IsInstallationAdmin() bool {
 	return a.InstallationAdmin
+}
+
+// IsSessionFresh reports whether a token issued at the given Unix timestamp
+// is still valid relative to the most recent password change. Tokens issued
+// strictly before PasswordChangedAt are considered stale.
+func (a *Account) IsSessionFresh(issuedAt int64) bool {
+	if a.PasswordChangedAt == nil {
+		return true
+	}
+
+	return issuedAt >= a.PasswordChangedAt.Unix()
+}
+
+// MarkPasswordChangedInTransaction stamps the password rotation time on the
+// account. Used together with rotating the password hash and clearing API
+// tokens to invalidate every existing session for the account.
+func (a *Account) MarkPasswordChangedInTransaction(tx *gorm.DB, now time.Time) error {
+	err := tx.Model(a).Update("password_changed_at", now).Error
+	if err != nil {
+		return err
+	}
+
+	a.PasswordChangedAt = &now
+	return nil
 }
 
 func PromoteToInstallationAdmin(accountID string) error {

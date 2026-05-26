@@ -1,0 +1,17 @@
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "tunnel": {
+      "account_tag": "90ddd046218bd375f20e9f9082cc0c6d",
+      "config_src": "local",
+      "created_at": "2026-05-12T13:59:00.953876Z",
+      "id": "3c683924-6802-47c9-860a-f27a66e684a2",
+      "metadata": {},
+      "name": "my-test-tunnel",
+      "status": "active"
+    },
+    "tunnelId": "3c683924-6802-47c9-860a-f27a66e684a2"
+  },
+  "timestamp": "2026-05-12T14:01:27.023693818Z",
+  "type": "cloudflare.tunnel.fetched"
+}

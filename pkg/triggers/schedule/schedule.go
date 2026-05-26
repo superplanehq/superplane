@@ -19,6 +19,9 @@ func init() {
 }
 
 const (
+	HookRun       = "run"
+	HookEmitEvent = "emitEvent"
+
 	TypeMinutes = "minutes"
 	TypeHours   = "hours"
 	TypeDays    = "days"
@@ -403,7 +406,11 @@ func (s *Schedule) Setup(ctx core.TriggerContext) error {
 func (s *Schedule) Hooks() []core.Hook {
 	return []core.Hook{
 		{
-			Name: "emitEvent",
+			Name: HookRun,
+			Type: core.HookTypeUser,
+		},
+		{
+			Name: HookEmitEvent,
 			Type: core.HookTypeInternal,
 		},
 	}
@@ -411,7 +418,7 @@ func (s *Schedule) Hooks() []core.Hook {
 
 func (s *Schedule) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	switch ctx.Name {
-	case "emitEvent":
+	case HookRun, HookEmitEvent:
 		return nil, s.emitEvent(ctx)
 	}
 

@@ -229,7 +229,7 @@ func (w *NodeQueueWorker) processNode(tx *gorm.DB, logger *log.Entry, node *mode
 		return nil, nil, err
 	}
 
-	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContext(), tx, node, queueItem, configFields, onNewEvents)
+	ctx, err := contexts.BuildProcessQueueContext(w.registry.HTTPContextInTransaction(tx), tx, node, queueItem, configFields, onNewEvents)
 	if err != nil {
 
 		//
@@ -344,6 +344,7 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.
 		WorkflowID:          configErr.QueueItem.WorkflowID,
 		NodeID:              configErr.Node.NodeID,
 		RootEventID:         configErr.RootEventID,
+		RunID:               configErr.QueueItem.RunID,
 		EventID:             configErr.Event.ID,
 		PreviousExecutionID: configErr.Event.ExecutionID,
 		ParentExecutionID:   parentExecutionID,
@@ -362,6 +363,10 @@ func (w *NodeQueueWorker) handleNodeConfigurationError(tx *gorm.DB, logger *log.
 	}
 
 	if parentExecutionID == nil {
+		if _, err := models.MaybeFinalizeRunInTransaction(tx, execution.RunID); err != nil {
+			return nil, err
+		}
+
 		return []*uuid.UUID{&execution.ID}, nil
 	}
 

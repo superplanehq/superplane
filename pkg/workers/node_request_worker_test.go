@@ -607,3 +607,69 @@ func Test__NodeRequestWorker_DoesNotProcessDeletedWorkflowRequests(t *testing.T)
 
 	assert.False(t, executionConsumer.HasReceivedMessage())
 }
+
+func Test__NodeRequestWorker_DoesNotProcessSoftDeletedOrganizationRequests(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	executionConsumer.Start()
+	defer executionConsumer.Stop()
+
+	worker := NewNodeRequestWorker(r.Encryptor, r.Registry, "", r.AuthService)
+	triggerNode := "trigger-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: triggerNode,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "schedule"}}),
+				Configuration: datatypes.NewJSONType(map[string]any{
+					"type":         "days",
+					"daysInterval": 1,
+					"hour":         12,
+					"minute":       0,
+				}),
+			},
+		},
+		[]models.Edge{},
+	)
+
+	request := models.CanvasNodeRequest{
+		ID:         uuid.New(),
+		WorkflowID: canvas.ID,
+		NodeID:     triggerNode,
+		Type:       models.NodeRequestTypeInvokeAction,
+		Spec: datatypes.NewJSONType(models.NodeExecutionRequestSpec{
+			InvokeAction: &models.InvokeAction{
+				ActionName: "emitEvent",
+				Parameters: map[string]any{},
+			},
+		}),
+		State: models.NodeExecutionRequestStatePending,
+	}
+	require.NoError(t, database.Conn().Create(&request).Error)
+
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+
+	requests, err := models.ListNodeRequests()
+	require.NoError(t, err)
+	for _, pending := range requests {
+		assert.NotEqual(t, request.ID, pending.ID)
+	}
+
+	require.NoError(t, worker.LockAndProcessRequest(request))
+
+	var updatedRequest models.CanvasNodeRequest
+	require.NoError(t, database.Conn().Where("id = ?", request.ID).First(&updatedRequest).Error)
+	assert.Equal(t, models.NodeExecutionRequestStatePending, updatedRequest.State)
+
+	eventCount, err := models.CountCanvasEvents(canvas.ID, triggerNode)
+	require.NoError(t, err)
+	assert.Zero(t, eventCount)
+	assert.False(t, executionConsumer.HasReceivedMessage())
+}

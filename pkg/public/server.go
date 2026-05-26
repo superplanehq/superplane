@@ -39,6 +39,7 @@ import (
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
+	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	pbIntegrations "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -318,6 +319,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		return err
 	}
 
+	err = pbCanvasFolders.RegisterCanvasFoldersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	if err != nil {
+		return err
+	}
+
 	err = pbServiceAccounts.RegisterServiceAccountsHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
@@ -333,6 +339,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 		w.WriteHeader(http.StatusOK)
 	}).Methods("GET")
 
+	s.Router.Handle(
+		"/api/v1/canvases/{canvas_id}/node-executions/{execution_id}/runner-live-logs/session",
+		middleware.OrganizationAuthMiddleware(s.jwt)(http.HandlerFunc(s.handleRunnerLiveLogSession)),
+	).Methods("GET")
+
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
@@ -344,6 +355,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	s.Router.PathPrefix("/api/v1/groups").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/roles").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/canvases").Handler(protectedGRPCHandler)
+	s.Router.PathPrefix("/api/v1/canvas-folders").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/organizations").Handler(protectedGRPCHandler)
 	s.Router.PathPrefix("/api/v1/invite-links").Handler(protectedAccountGRPCHandler)
 	s.Router.PathPrefix("/api/v1/integrations").Handler(protectedGRPCHandler)
@@ -459,6 +471,15 @@ func (s *Server) RegisterWebRoutes(webBasePath string) {
 			Middleware(http.HandlerFunc(s.handleWebSocket)),
 	)
 
+	// Agent-session WebSocket: scoped to the session's owning user. Auth
+	// uses the same middleware; ownership is enforced inside the handler
+	// because sessions are private per user, not per organization.
+	s.Router.Handle(
+		"/ws/agents/sessions/{sessionId}",
+		middleware.OrganizationAuthMiddleware(s.jwt).
+			Middleware(http.HandlerFunc(s.handleAgentSessionWebSocket)),
+	)
+
 	//
 	// In development mode, we proxy to the Vite dev server.
 	//
@@ -564,8 +585,12 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	accountRoute.Use(middleware.AccountAuthMiddleware(s.jwt))
 	accountRoute.HandleFunc("/account", s.getAccount).Methods("GET")
 	accountRoute.HandleFunc("/account/limits", s.getOrganizationCreationStatus).Methods("GET")
+	accountRoute.HandleFunc("/account/password", s.changePassword).Methods("POST")
 	accountRoute.HandleFunc("/organizations", s.listAccountOrganizations).Methods("GET")
 	accountRoute.HandleFunc("/organizations", s.createOrganization).Methods("POST")
+	accountRoute.HandleFunc("/account/experimental-features", s.listExperimentalFeatures).Methods("GET")
+	accountRoute.HandleFunc("/apps/install/preview", s.appInstallPreview).Methods("GET")
+	accountRoute.HandleFunc("/apps/install", s.installApp).Methods("POST")
 
 	// Admin API routes — requires account auth + installation admin
 	adminRoute := r.PathPrefix("/admin/api").Subrouter()
@@ -575,8 +600,11 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/organizations", s.adminListOrganizations).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/canvases", s.adminListCanvases).Methods("GET")
 	adminRoute.HandleFunc("/organizations/{orgId}/users", s.adminListOrgUsers).Methods("GET")
+	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminEnableOrgExperimentalFeature).Methods("POST")
+	adminRoute.HandleFunc("/organizations/{orgId}/experimental-features/{featureId}", s.adminDisableOrgExperimentalFeature).Methods("DELETE")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminGetInstallationNetworkSettings).Methods("GET")
 	adminRoute.HandleFunc("/installation/network-settings", s.adminUpdateInstallationNetworkSettings).Methods("PATCH")
+	adminRoute.HandleFunc("/runner/tasks", s.adminListRunnerTasks).Methods("GET")
 	adminRoute.HandleFunc("/impersonate/start", s.startImpersonation).Methods("POST")
 	adminRoute.HandleFunc("/impersonate/end", s.endImpersonation).Methods("POST")
 	adminRoute.HandleFunc("/impersonate/status", s.impersonationStatus).Methods("GET")
@@ -716,7 +744,11 @@ func (s *Server) getOrganizationCreationStatus(w http.ResponseWriter, r *http.Re
 
 	response, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
 	if err != nil {
-		log.Errorf("Error loading organization creation status for account %s: %v", account.ID, err)
+		// describeOrganizationCreationStatus already logs the underlying
+		// error with stage-specific structured fields, so we don't repeat
+		// the full error chain here.
+		log.WithField("account_id", account.ID.String()).
+			Error("failed to load organization creation status")
 		http.Error(w, "Failed to load organization creation status", http.StatusInternalServerError)
 		return
 	}
@@ -731,6 +763,10 @@ func (s *Server) describeOrganizationCreationStatus(
 ) (*organizationCreationStatusResponse, error) {
 	organizationCount, err := models.CountOrganizationsByBillingAccount(accountID)
 	if err != nil {
+		log.WithError(err).
+			WithField("account_id", accountID).
+			WithField("stage", "count_organizations").
+			Error("failed to count organizations for billing account")
 		return nil, fmt.Errorf("count organizations for account %s: %w", accountID, err)
 	}
 
@@ -750,6 +786,11 @@ func (s *Server) describeOrganizationCreationStatus(
 		&usagepb.AccountState{Organizations: int32(organizationCount + 1)},
 	)
 	if err != nil {
+		log.WithError(err).
+			WithField("account_id", accountID).
+			WithField("stage", "check_account_limits").
+			WithField("grpc_code", status.Code(err).String()).
+			Error("failed to check account organization creation limits")
 		return nil, fmt.Errorf("check account limits for account %s: %w", accountID, err)
 	}
 
@@ -782,10 +823,23 @@ func (s *Server) checkAccountOrganizationCreationLimits(
 	}
 
 	if _, setupErr := s.usageService.SetupAccount(ctx, accountID); setupErr != nil && status.Code(setupErr) != codes.AlreadyExists {
+		log.WithError(setupErr).
+			WithField("account_id", accountID).
+			WithField("grpc_code", status.Code(setupErr).String()).
+			Error("failed to lazily provision account in usage service")
 		return nil, setupErr
 	}
 
-	return s.usageService.CheckAccountLimits(ctx, accountID, state)
+	response, err = s.usageService.CheckAccountLimits(ctx, accountID, state)
+	if err != nil {
+		log.WithError(err).
+			WithField("account_id", accountID).
+			WithField("grpc_code", status.Code(err).String()).
+			Error("failed to check account limits after lazy provisioning")
+		return nil, err
+	}
+
+	return response, nil
 }
 
 func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
@@ -815,7 +869,10 @@ func (s *Server) createOrganization(w http.ResponseWriter, r *http.Request) {
 
 	creationStatus, err := s.describeOrganizationCreationStatus(r.Context(), account.ID.String())
 	if err != nil {
-		log.Errorf("Error checking organization creation status for account %s: %v", account.ID, err)
+		// describeOrganizationCreationStatus already logs the underlying
+		// error with stage-specific structured fields.
+		log.WithField("account_id", account.ID.String()).
+			Error("failed to check organization creation status before creating organization")
 		http.Error(w, "Failed to create organization", http.StatusInternalServerError)
 		return
 	}
@@ -900,6 +957,7 @@ type AccountResponse struct {
 	Email             string                `json:"email"`
 	AvatarURL         string                `json:"avatar_url"`
 	InstallationAdmin bool                  `json:"installation_admin"`
+	HasPassword       bool                  `json:"has_password"`
 	Impersonation     *AccountImpersonation `json:"impersonation,omitempty"`
 }
 
@@ -917,12 +975,20 @@ func (s *Server) getAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	hasPassword, err := accountHasPassword(account.ID)
+	if err != nil {
+		log.Errorf("Error checking password auth for account %s: %v", account.ID, err)
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+
 	accountResponse := AccountResponse{
 		ID:                account.ID.String(),
 		Name:              account.Name,
 		Email:             account.Email,
 		AvatarURL:         getAvatarURL(providers),
 		InstallationAdmin: account.IsInstallationAdmin(),
+		HasPassword:       hasPassword,
 	}
 
 	if info, ok := middleware.GetImpersonationFromContext(r.Context()); ok && info.Active {
@@ -1052,8 +1118,8 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nodes, err := models.FindWebhookNodes(webhookID)
-	if err != nil {
+	nodes, err := models.FindActiveWebhookNodes(webhookID)
+	if err != nil || len(nodes) == 0 {
 		http.Error(w, "webhook not found", http.StatusNotFound)
 		return
 	}

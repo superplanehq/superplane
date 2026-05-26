@@ -1,0 +1,27 @@
+{
+  "data": {
+    "accountId": "account_abc123",
+    "monitorId": "monitor_abc123",
+    "monitor": {
+      "id": "monitor_abc123",
+      "type": "https",
+      "description": "Login page monitor",
+      "method": "GET",
+      "path": "/health",
+      "expected_codes": "2xx",
+      "interval": 60,
+      "timeout": 5,
+      "retries": 0,
+      "consecutive_up": 2,
+      "consecutive_down": 3
+    },
+    "poolId": "pool_xyz789",
+    "pool": {
+      "id": "pool_xyz789",
+      "name": "Production pool",
+      "monitor": "monitor_abc123"
+    }
+  },
+  "timestamp": "2026-03-26T19:29:35.841265352Z",
+  "type": "cloudflare.monitor.created"
+}

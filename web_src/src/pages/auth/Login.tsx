@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import superplaneLogo from "@/assets/superplane.svg";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useAccount } from "../../contexts/AccountContext";
+import { useAccount } from "../../contexts/useAccount";
 
 type AuthConfig = {
   providers: string[];
@@ -93,6 +93,36 @@ export const Login: React.FC = () => {
   }, [safeRedirect]);
 
   const magicLinkToken = searchParams.get("magic_link_token");
+  const redirectTarget = safeRedirect || "";
+
+  const handleRedirectAfterAuth = useCallback(
+    async (response: Response) => {
+      if (redirectTarget) {
+        window.location.href = redirectTarget;
+        return;
+      }
+
+      try {
+        const orgsResponse = await fetch("/organizations", {
+          credentials: "include",
+        });
+
+        if (orgsResponse.ok) {
+          const organizations = await orgsResponse.json();
+          if (organizations.length === 1) {
+            window.location.href = `/${organizations[0].id}`;
+            return;
+          }
+        }
+      } catch {
+        // fall through to default redirect
+      }
+
+      const finalURL = response.url || "/";
+      window.location.href = finalURL;
+    },
+    [redirectTarget],
+  );
 
   useEffect(() => {
     if (!accountLoading && account) {
@@ -133,7 +163,7 @@ export const Login: React.FC = () => {
     };
 
     verifyMagicLink();
-  }, [magicLinkToken, inviteToken]);
+  }, [magicLinkToken, inviteToken, handleRedirectAfterAuth]);
 
   useEffect(() => {
     let canceled = false;
@@ -180,7 +210,6 @@ export const Login: React.FC = () => {
   const canSignupWithPassword = authConfig.passwordLoginEnabled && canSignup;
   const canLoginWithPassword = authConfig.passwordLoginEnabled;
   const redirectQuery = safeRedirect ? `?redirect=${encodeURIComponent(safeRedirect)}` : "";
-  const redirectTarget = safeRedirect || "";
   const showProviderButtons = hasProviders && (!isSignupMode || canSignup);
   const useMagicCodePrimary = authConfig.magicCodeEnabled && !showPasswordLogin;
 
@@ -194,32 +223,6 @@ export const Login: React.FC = () => {
   const handleToggleMode = (nextMode: "login" | "signup") => {
     setIsSignupMode(nextMode === "signup");
     setFormError(null);
-  };
-
-  const handleRedirectAfterAuth = async (response: Response) => {
-    if (redirectTarget) {
-      window.location.href = redirectTarget;
-      return;
-    }
-
-    try {
-      const orgsResponse = await fetch("/organizations", {
-        credentials: "include",
-      });
-
-      if (orgsResponse.ok) {
-        const organizations = await orgsResponse.json();
-        if (organizations.length === 1) {
-          window.location.href = `/${organizations[0].id}`;
-          return;
-        }
-      }
-    } catch {
-      // fall through to default redirect
-    }
-
-    const finalURL = response.url || "/";
-    window.location.href = finalURL;
   };
 
   const handleMagicCodeRequest = async (e: React.FormEvent) => {

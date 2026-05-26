@@ -71,6 +71,14 @@ func NewHandler(jwtSigner *jwt.Signer, encryptor crypto.Encryptor, authService a
 	}
 }
 
+// PasswordLoginEnabled reports whether email/password authentication is
+// currently enabled for this installation. Used by handlers outside this
+// package (e.g. the change-password endpoint) that should refuse work
+// when the feature is disabled.
+func (a *Handler) PasswordLoginEnabled() bool {
+	return a.passwordLoginEnabled
+}
+
 func (a *Handler) InitializeProviders(providers map[string]ProviderConfig) {
 	var gothProviders []goth.Provider
 
@@ -1029,6 +1037,21 @@ func ClearAccountCookie(w http.ResponseWriter, r *http.Request) {
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   r.TLS != nil,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// SetAccountCookie writes the account_token cookie with the same flags
+// used by every login path. Centralized so callers (login, signup, magic
+// code, change-password reissue) cannot drift on cookie attributes.
+func SetAccountCookie(w http.ResponseWriter, r *http.Request, token string, ttl time.Duration) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "account_token",
+		Value:    token,
+		Path:     "/",
+		MaxAge:   int(ttl.Seconds()),
 		HttpOnly: true,
 		Secure:   r.TLS != nil,
 		SameSite: http.SameSiteLaxMode,

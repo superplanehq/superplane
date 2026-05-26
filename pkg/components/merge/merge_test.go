@@ -105,6 +105,35 @@ func Test_Merge_BadStopIfExpression(t *testing.T) {
 	steps.AssertQueueIsEmpty()
 }
 
+func Test_Merge_StopIfExpressionEvaluationError(t *testing.T) {
+	steps := NewMergeTestSteps(t)
+	steps.CreateWorkflow()
+
+	steps.SetMergeConfiguration(map[string]any{
+		"stopIfExpression": "$[\"missing-node\"].result == \"fail\"",
+	})
+
+	steps.CreateEventsWithData(
+		map[string]any{"result": "fail"},
+		map[string]any{"result": "ok"},
+	)
+	steps.CreateQueueItems()
+
+	m := &Merge{}
+
+	steps.ProcessFirstEventExpectFinish(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionFailedWithError("node name missing-node not found in execution chain")
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
+
+	steps.ProcessSecondEventExpectNoFinish(m)
+	steps.AssertNodeExecutionCount(1)
+	steps.AssertExecutionFinished()
+	steps.AssertNodeIsAllowedToProcessNextQueueItem()
+
+	steps.AssertQueueIsEmpty()
+}
+
 func Test_Merge_StopIfExpression_SourceNodeReference(t *testing.T) {
 	steps := NewMergeTestSteps(t)
 

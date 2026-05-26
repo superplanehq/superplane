@@ -6,6 +6,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/actions"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/admin"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/contents"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/deployments"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/issues"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/metadata"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
@@ -24,6 +25,7 @@ const (
 	PermissionPullRequests   = "Pull Requests"
 	PermissionActions        = "Actions"
 	PermissionCommitStatuses = "Commit Statuses"
+	PermissionDeployments    = "Deployments"
 	PermissionMetadata       = "Metadata"
 
 	//
@@ -61,6 +63,13 @@ func NewCapabilityMapper() *CapabilityMapper {
 				PermissionScope: PermissionScopeRepository,
 				Capabilities: []CapabilityDef{
 					{ReadOnly: false, Action: &statuses.PublishCommitStatus{}},
+				},
+			},
+			PermissionDeployments: {
+				PermissionScope: PermissionScopeRepository,
+				Capabilities: []CapabilityDef{
+					{ReadOnly: false, Action: &deployments.CreateDeployment{}},
+					{ReadOnly: false, Action: &deployments.CreateDeploymentStatus{}},
 				},
 			},
 			PermissionContents: {
@@ -349,6 +358,8 @@ func (p *PermissionSet) permissionForAppManifest(r string) string {
 		return "actions"
 	case PermissionCommitStatuses:
 		return "statuses"
+	case PermissionDeployments:
+		return "deployments"
 	case PermissionAdministration:
 		return "organization_administration"
 	case PermissionMetadata:

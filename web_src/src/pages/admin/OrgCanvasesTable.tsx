@@ -46,7 +46,7 @@ export function OrgCanvasesTable({ orgId }: { orgId: string }) {
   }, [search, fetchCanvases]);
 
   return (
-    <div>
+    <div className="mb-8">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Palette size={16} className="text-gray-600" />

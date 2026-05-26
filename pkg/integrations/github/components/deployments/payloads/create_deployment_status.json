@@ -1,0 +1,39 @@
+{
+  "data": {
+    "created_at": "2024-01-01T00:00:00Z",
+    "creator": {
+      "avatar_url": "https://avatars.githubusercontent.com/u/12345678?v=4",
+      "events_url": "https://api.github.com/users/example-user/events{/privacy}",
+      "followers_url": "https://api.github.com/users/example-user/followers",
+      "following_url": "https://api.github.com/users/example-user/following{/other_user}",
+      "gists_url": "https://api.github.com/users/example-user/gists{/gist_id}",
+      "gravatar_id": "",
+      "html_url": "https://github.com/example-user",
+      "id": 12345678,
+      "login": "example-user",
+      "node_id": "MDQ6VXNlcjEyMzQ1Njc4",
+      "organizations_url": "https://api.github.com/users/example-user/orgs",
+      "received_events_url": "https://api.github.com/users/example-user/received_events",
+      "repos_url": "https://api.github.com/users/example-user/repos",
+      "site_admin": false,
+      "starred_url": "https://api.github.com/users/example-user/starred{/owner}{/repo}",
+      "subscriptions_url": "https://api.github.com/users/example-user/subscriptions",
+      "type": "User",
+      "url": "https://api.github.com/users/example-user"
+    },
+    "deployment_url": "https://api.github.com/repos/example-org/example-repo/deployments/1234567890",
+    "description": "Test deployment status check",
+    "environment": "preview-pr-1",
+    "environment_url": "https://example.com",
+    "id": 9876543210,
+    "log_url": "https://example.com",
+    "node_id": "DES_kwDOExampleNodeId12345",
+    "repository_url": "https://api.github.com/repos/example-org/example-repo",
+    "state": "success",
+    "target_url": "https://example.com",
+    "updated_at": "2024-01-01T00:00:00Z",
+    "url": "https://api.github.com/repos/example-org/example-repo/deployments/1234567890/statuses/9876543210"
+  },
+  "timestamp": "2024-01-01T00:00:00.000000000Z",
+  "type": "github.deploymentStatus"
+}

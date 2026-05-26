@@ -1075,3 +1075,258 @@ func Test__ListResources__SpacesBuckets(t *testing.T) {
 		assert.Nil(t, resources)
 	})
 }
+
+func Test__ListResources__GPUDroplets(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("successful GPU droplet listing -> returns resources", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"droplets": [
+							{"id": 11111111, "name": "gpu-node-1", "status": "active", "size_slug": "gpu-h100x1-80gb"},
+							{"id": 22222222, "name": "gpu-node-2", "status": "active", "size_slug": "gpu-h100x1-80gb"}
+						],
+						"links": {},
+						"meta": {"total": 2}
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "test-token"},
+		}
+
+		resources, err := integration.ListResources("gpu_droplet", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "gpu_droplet", resources[0].Type)
+		assert.Equal(t, "gpu-node-1", resources[0].Name)
+		assert.Equal(t, "11111111", resources[0].ID)
+		assert.Equal(t, "gpu-node-2", resources[1].Name)
+		assert.Equal(t, "22222222", resources[1].ID)
+	})
+
+	t.Run("API error -> returns error", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusUnauthorized,
+					Body:       io.NopCloser(strings.NewReader(`{"id":"unauthorized","message":"Unable to authenticate you"}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "bad-token"},
+		}
+
+		resources, err := integration.ListResources("gpu_droplet", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.Error(t, err)
+		assert.Nil(t, resources)
+	})
+}
+
+func Test__ListResources__GPUSizes(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("successful GPU size listing -> returns only GPU sizes", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"sizes": [
+							{"slug": "gpu-h100x1-80gb", "memory": 245760, "vcpus": 20, "disk": 480, "transfer": 10.0, "price_monthly": 4896.00, "available": true},
+							{"slug": "gpu-h100x8-640gb", "memory": 1966080, "vcpus": 160, "disk": 3840, "transfer": 10.0, "price_monthly": 39168.00, "available": true},
+							{"slug": "s-1vcpu-1gb", "memory": 1024, "vcpus": 1, "disk": 25, "transfer": 1.0, "price_monthly": 6.00, "available": true}
+						],
+						"links": {},
+						"meta": {"total": 3}
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "test-token"},
+		}
+
+		resources, err := integration.ListResources("gpu_size", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		// Only GPU sizes (slug prefixed with "gpu-") should be returned
+		assert.Len(t, resources, 2)
+		assert.Equal(t, "gpu_size", resources[0].Type)
+		assert.Equal(t, "gpu-h100x1-80gb", resources[0].ID)
+		assert.Equal(t, "gpu-h100x8-640gb", resources[1].ID)
+	})
+}
+
+func Test__ListResources__GPURegions(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("successful GPU region listing -> returns available GPU-capable regions", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"regions": [
+							{
+								"name": "New York 3",
+								"slug": "nyc3",
+								"available": true,
+								"sizes": ["gpu-h100x1-80gb", "s-1vcpu-1gb"]
+							},
+							{
+								"name": "San Francisco 3",
+								"slug": "sfo3",
+								"available": true,
+								"sizes": ["s-2vcpu-2gb"]
+							},
+							{
+								"name": "Toronto",
+								"slug": "tor1",
+								"available": false,
+								"sizes": ["gpu-h100x1-80gb"]
+							}
+						],
+						"links": {},
+						"meta": {"total": 3}
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "test-token"},
+		}
+
+		resources, err := integration.ListResources("gpu_region", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		// Only available regions with GPU sizes should be returned
+		for _, r := range resources {
+			assert.Equal(t, "gpu_region", r.Type)
+		}
+	})
+}
+
+func Test__ListResources__GPUBaseImages(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("returns only GPU-supported distribution images", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"images": [
+							{"id": 1, "name": "Ubuntu 22.04 (LTS) x64", "slug": "ubuntu-22-04-x64", "type": "distribution", "distribution": "Ubuntu"},
+							{"id": 2, "name": "Ubuntu 24.04 (LTS) x64", "slug": "ubuntu-24-04-x64", "type": "distribution", "distribution": "Ubuntu"},
+							{"id": 3, "name": "Ubuntu 20.04 (LTS) x64", "slug": "ubuntu-20-04-x64", "type": "distribution", "distribution": "Ubuntu"},
+							{"id": 4, "name": "Debian 11 x64", "slug": "debian-11-x64", "type": "distribution", "distribution": "Debian"},
+							{"id": 5, "name": "Debian 10 x64", "slug": "debian-10-x64", "type": "distribution", "distribution": "Debian"},
+							{"id": 6, "name": "Rocky Linux 8 x64", "slug": "rockylinux-8-x64", "type": "distribution", "distribution": "Rocky Linux"},
+							{"id": 7, "name": "Fedora 43 x64", "slug": "fedora-43-x64", "type": "distribution", "distribution": "Fedora"},
+							{"id": 8, "name": "CentOS 7 x64", "slug": "centos-7-x64", "type": "distribution", "distribution": "CentOS"}
+						],
+						"links": {},
+						"meta": {"total": 8}
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "test-token"},
+		}
+
+		resources, err := integration.ListResources("base_gpu_image", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		// ubuntu-22-04, ubuntu-24-04, debian-11, rockylinux-8, fedora-43 pass; ubuntu-20-04, debian-10, centos-7 do not
+		ids := make([]string, len(resources))
+		for i, r := range resources {
+			ids[i] = r.ID
+			assert.Equal(t, "base_gpu_image", r.Type)
+		}
+		assert.Contains(t, ids, "ubuntu-22-04-x64")
+		assert.Contains(t, ids, "ubuntu-24-04-x64")
+		assert.Contains(t, ids, "debian-11-x64")
+		assert.Contains(t, ids, "rockylinux-8-x64")
+		assert.Contains(t, ids, "fedora-43-x64")
+		assert.NotContains(t, ids, "ubuntu-20-04-x64")
+		assert.NotContains(t, ids, "debian-10-x64")
+		assert.NotContains(t, ids, "centos-7-x64")
+	})
+}
+
+func Test__ListResources__GPUOneClickImages(t *testing.T) {
+	integration := &DigitalOcean{}
+
+	t.Run("returns only GPU-related application images", func(t *testing.T) {
+		httpContext := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"images": [
+							{"id": 101, "name": "ML-in-a-Box", "slug": "ml-in-a-box", "type": "application", "distribution": ""},
+							{"id": 102, "name": "NVIDIA CUDA Toolkit", "slug": "nvidia-cuda-toolkit", "type": "application", "distribution": ""},
+							{"id": 103, "name": "PyTorch on Ubuntu", "slug": "pytorch-ubuntu", "type": "application", "distribution": ""},
+							{"id": 104, "name": "WordPress on Ubuntu", "slug": "wordpress-ubuntu", "type": "application", "distribution": ""},
+							{"id": 105, "name": "LAMP Stack", "slug": "lamp-stack", "type": "application", "distribution": ""}
+						],
+						"links": {},
+						"meta": {"total": 5}
+					}`)),
+				},
+			},
+		}
+
+		integrationCtx := &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiToken": "test-token"},
+		}
+
+		resources, err := integration.ListResources("one_click_gpu_image", core.ListResourcesContext{
+			HTTP:        httpContext,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		ids := make([]string, len(resources))
+		for i, r := range resources {
+			ids[i] = r.ID
+			assert.Equal(t, "one_click_gpu_image", r.Type)
+		}
+		// GPU-related images should be included
+		assert.Contains(t, ids, "ml-in-a-box")
+		assert.Contains(t, ids, "nvidia-cuda-toolkit")
+		assert.Contains(t, ids, "pytorch-ubuntu")
+		// Non-GPU marketplace apps should be excluded
+		assert.NotContains(t, ids, "wordpress-ubuntu")
+		assert.NotContains(t, ids, "lamp-stack")
+	})
+}

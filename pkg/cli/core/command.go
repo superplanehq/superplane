@@ -31,6 +31,7 @@ type CommandContext struct {
 type ConfigContext interface {
 	GetActiveCanvas() string
 	SetActiveCanvas(canvasID string) error
+	GetURL() string
 }
 
 // IsInteractive returns true when stdin is a terminal,

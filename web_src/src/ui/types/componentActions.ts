@@ -1,8 +1,6 @@
 // Shared interface for component action handlers
 
 export interface ComponentActionsProps {
-  onRun?: () => void;
-  // When true, shows Run as disabled with tooltip
   runDisabled?: boolean;
   runDisabledTooltip?: string;
   onTogglePause?: () => void;
@@ -10,6 +8,7 @@ export interface ComponentActionsProps {
   onEdit?: () => void;
   onDeactivate?: () => void;
   onToggleView?: () => void;
+  onShowDiff?: () => void;
   onDelete?: () => void;
   isCompactView?: boolean;
 }

@@ -75,6 +75,11 @@ func InvokeNodeTriggerHook(
 	tx := database.Conn()
 	logger := logging.ForNode(*node)
 
+	newEvents := []models.CanvasEvent{}
+	onNewEvents := func(events []models.CanvasEvent) {
+		newEvents = append(newEvents, events...)
+	}
+
 	hookCtx := core.TriggerHookContext{
 		Name:          hookName,
 		Parameters:    parameters,
@@ -83,11 +88,7 @@ func InvokeNodeTriggerHook(
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
 		Webhook:       contexts.NewNodeWebhookContext(ctx, tx, encryptor, node, webhookBaseURL),
-	}
-
-	newEvents := []models.CanvasEvent{}
-	onNewEvents := func(events []models.CanvasEvent) {
-		newEvents = append(newEvents, events...)
+		Events:        contexts.NewEventContext(tx, node, onNewEvents),
 	}
 
 	if node.AppInstallationID != nil {
@@ -105,6 +106,16 @@ func InvokeNodeTriggerHook(
 	result, err := hookProvider.HandleHook(hookCtx)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "hook execution failed: %v", err)
+	}
+
+	if len(newEvents) > 0 {
+		if result == nil {
+			result = map[string]any{}
+		}
+
+		if _, exists := result["event_id"]; !exists {
+			result["event_id"] = newEvents[0].ID.String()
+		}
 	}
 
 	for _, event := range newEvents {

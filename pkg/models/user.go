@@ -62,6 +62,20 @@ func (u *User) UpdateTokenHash(tokenHash string) error {
 	return database.Conn().Save(u).Error
 }
 
+// ClearTokenHashesForAccountInTransaction wipes the API token hash on every
+// user that belongs to the given account. Combined with bumping the account's
+// password_changed_at, this ensures that no previously issued credential
+// (cookie, scoped JWT, or API token) keeps working after a password change.
+func ClearTokenHashesForAccountInTransaction(tx *gorm.DB, accountID uuid.UUID) error {
+	return tx.Model(&User{}).
+		Where("account_id = ?", accountID).
+		Updates(map[string]any{
+			"token_hash": "",
+			"updated_at": time.Now(),
+		}).
+		Error
+}
+
 func CreateUser(orgID, accountID uuid.UUID, email, name string) (*User, error) {
 	return CreateUserInTransaction(database.Conn(), orgID, accountID, email, name)
 }

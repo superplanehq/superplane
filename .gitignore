@@ -2,6 +2,7 @@ junit-report.xml
 pkg/web/assets/dist
 tmp
 build/
+node_modules/
 design/node_modules/
 # macOS Finder metadata
 .DS_Store
@@ -24,9 +25,6 @@ coverage-go.out
 /pkg/protos/
 /pkg/openapi_client/
 /web_src/src/api-client/
-/agent/src/superplaneapi/
-/agent/src/usage_pb2.py
-/agent/src/private/agents_pb2.py
-/agent/src/private/agents_pb2_grpc.py
 /api/swagger/*
 !/api/swagger/swagger-ui.html
+server

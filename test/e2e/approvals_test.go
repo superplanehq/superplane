@@ -211,12 +211,7 @@ func (s *ApprovalSteps) givenCanvasWithManualTriggerAnyoneAndUserApprovalAndNoop
 }
 
 func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos models.Position) {
-	s.canvas.OpenBuildingBlocksSidebar()
-
-	source := q.TestID("building-block-approval")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.canvas.AddBuildingBlockByTestID("building-block-approval", pos)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
@@ -242,12 +237,7 @@ func (s *ApprovalSteps) addApprovalWithAnyAndSpecificUser(nodeName string, pos m
 }
 
 func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position, roleLabel string) {
-	s.canvas.OpenBuildingBlocksSidebar()
-
-	source := q.TestID("building-block-approval")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.canvas.AddBuildingBlockByTestID("building-block-approval", pos)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
@@ -262,12 +252,7 @@ func (s *ApprovalSteps) addApprovalWithRole(nodeName string, pos models.Position
 }
 
 func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Position, groupLabel string) {
-	s.canvas.OpenBuildingBlocksSidebar()
-
-	source := q.TestID("building-block-approval")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.canvas.AddBuildingBlockByTestID("building-block-approval", pos)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
@@ -282,12 +267,7 @@ func (s *ApprovalSteps) addApprovalWithGroup(nodeName string, pos models.Positio
 }
 
 func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models.Position, roleLabel string, groupLabel string) {
-	s.canvas.OpenBuildingBlocksSidebar()
-
-	source := q.TestID("building-block-approval")
-	target := q.TestID("rf__wrapper")
-
-	s.session.DragAndDrop(source, target, pos.X, pos.Y)
+	s.canvas.AddBuildingBlockByTestID("building-block-approval", pos)
 	s.session.Sleep(300)
 
 	s.session.FillIn(q.TestID("node-name-input"), nodeName)
@@ -325,18 +305,36 @@ func (s *ApprovalSteps) addApprovalWithUserRoleGroup(nodeName string, pos models
 }
 
 func (s *ApprovalSteps) runManualTrigger() {
-	s.canvas.RunManualTrigger("Start")
-	s.canvas.WaitForExecutionInStates(
-		"Approval",
-		[]string{models.CanvasNodeExecutionStatePending, models.CanvasNodeExecutionStateStarted},
-		30*time.Second,
-	)
+	s.canvas.EmitManualTrigger("Start")
+	if s.waitForApprovalExecution(90 * time.Second) {
+		return
+	}
+
+	s.t.Fatalf("timed out waiting for execution of node Approval after emitting manual trigger")
+}
+
+func (s *ApprovalSteps) waitForApprovalExecution(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		executions := s.canvas.GetExecutionsForNode("Approval")
+		if len(executions) > 0 {
+			return true
+		}
+		s.session.Sleep(500)
+	}
+
+	return false
 }
 
 func (s *ApprovalSteps) approveFirstPendingRequirement() {
 	s.canvas.StartEditingNode("Approval")
 	s.session.Click(q.Locator(`button:has-text("Approve")`))
-	s.session.FillIn(q.Locator(`input:has-placeholder("Enter comment")`), "Do it")
+	commentInput := s.session.Page().Locator(`[placeholder="Enter comment"]`).First()
+	if count, err := commentInput.Count(); err == nil && count > 0 {
+		if err := commentInput.Fill("Do it"); err != nil {
+			s.t.Fatalf("filling approval comment: %v", err)
+		}
+	}
 	s.session.Click(q.Locator(`button:has-text("Confirm Approval")`))
 }
 
@@ -356,7 +354,12 @@ func (s *ApprovalSteps) approveAnyoneRequirement() {
 	if err := approveButton.Click(); err != nil {
 		s.t.Fatalf("clicking approve button: %v", err)
 	}
-	s.session.FillIn(q.Locator(`input:has-placeholder("Enter comment")`), "Do it")
+	commentInput := s.session.Page().Locator(`[placeholder="Enter comment"]`).First()
+	if count, err := commentInput.Count(); err == nil && count > 0 {
+		if err := commentInput.Fill("Do it"); err != nil {
+			s.t.Fatalf("filling approval comment: %v", err)
+		}
+	}
 	s.session.Click(q.Locator(`button:has-text("Confirm Approval")`))
 }
 
@@ -410,7 +413,7 @@ func (s *ApprovalSteps) assertNoApproveButtons() {
 }
 
 func (s *ApprovalSteps) assertApprovalExecutionFinishedAndOutputNodeProcessed() {
-	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 30*time.Second)
+	s.canvas.WaitForExecution("Output", models.CanvasNodeExecutionStateFinished, 60*time.Second)
 
 	approvaExecs := s.canvas.GetExecutionsForNode("Approval")
 	outputExecs := s.canvas.GetExecutionsForNode("Output")

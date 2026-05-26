@@ -21,6 +21,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/actions"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/admin"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/contents"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/deployments"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/issues"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/metadata"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/pulls"
@@ -125,6 +126,8 @@ func (g *GitHub) Actions() []core.Action {
 		&pulls.CreatePullRequest{},
 		&pulls.AddReaction{},
 		&statuses.PublishCommitStatus{},
+		&deployments.CreateDeployment{},
+		&deployments.CreateDeploymentStatus{},
 	}
 }
 
@@ -878,6 +881,7 @@ func (g *GitHub) appManifest(ctx core.SyncContext) string {
 			"pull_requests":               "write",
 			"repository_hooks":            "write",
 			"statuses":                    "write",
+			"deployments":                 "write",
 			"organization_administration": "read",
 		},
 		"setup_url":    fmt.Sprintf(`%s/api/v1/integrations/%s/setup`, ctx.BaseURL, ctx.Integration.ID().String()),

@@ -20,10 +20,11 @@ All e2e tests live under the `test/e2e` directory.
 
 ## How to run e2e tests
 
-Before running the tests, run the setup steps:
+Before running the tests, use the same Docker setup as CI (`make dev.up` and `make dev.setup` with both databases), then install Playwright browsers:
 
 ```
-make test.setup
+make dev.up
+DEV_SETUP_DBS="superplane_dev superplane_test" make dev.setup
 make setup.playwright
 ```
 

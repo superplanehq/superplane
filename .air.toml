@@ -4,6 +4,8 @@ tmp_dir = "tmp"
 [build]
 cmd = "go build -o ./tmp/superplane cmd/server/main.go"
 bin = "tmp/superplane"
+# Debounce rebuilds when many files change at once (avoids racing builds / missing binary).
+delay = 500
 include_ext = ["go", "yaml", "yml"]
 exclude_dir = ["web_src", "tmp", "build", "api/swagger", "node_modules"]
 stop_on_error = true

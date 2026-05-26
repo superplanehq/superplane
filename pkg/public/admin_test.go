@@ -791,3 +791,136 @@ func TestImpersonationSecurityGuardrails(t *testing.T) {
 		require.NoError(t, models.PromoteToInstallationAdmin(r.Account.ID.String()))
 	})
 }
+
+func TestAdminEnableOrgExperimentalFeature(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Cleanup(func() {
+		_ = models.DisableExperimentalFeature(r.Organization.ID, "runner")
+	})
+
+	t.Run("enables a known feature", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/runner",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.Contains(t, []string(reloaded.EnabledExperimentalFeatures), "runner")
+	})
+
+	t.Run("rejects unknown feature ids", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/does-not-exist",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusBadRequest, response.Code)
+	})
+
+	t.Run("returns 404 for non-existent org", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "POST",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/runner",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+}
+
+func TestAdminDisableOrgExperimentalFeature(t *testing.T) {
+	server, r, token := setupAdminTestServer(t)
+
+	t.Run("disables a previously enabled feature", func(t *testing.T) {
+		require.NoError(t, models.EnableExperimentalFeature(r.Organization.ID, "runner"))
+
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/runner",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		reloaded, err := models.FindOrganizationByID(r.Organization.ID.String())
+		require.NoError(t, err)
+		assert.NotContains(t, []string(reloaded.EnabledExperimentalFeatures), "runner")
+	})
+
+	t.Run("is idempotent for ids not currently enabled", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/organizations/" + r.Organization.ID.String() + "/experimental-features/does-not-exist",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+	})
+
+	t.Run("returns 404 for non-existent org", func(t *testing.T) {
+		response := execRequest(server, requestParams{
+			method:     "DELETE",
+			path:       "/admin/api/organizations/00000000-0000-0000-0000-000000000000/experimental-features/runner",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusNotFound, response.Code)
+	})
+}
+
+func TestAdminListRunnerTasks(t *testing.T) {
+	server, _, token := setupAdminTestServer(t)
+
+	t.Run("broker not configured", func(t *testing.T) {
+		t.Setenv("TASK_BROKER_BASE_URL", "")
+		t.Setenv("TASK_BROKER_FLEET_ID", "")
+		t.Setenv("TASK_BROKER_AUTH_TOKEN", "")
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/runner/tasks",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.Equal(t, false, body["configured"])
+		assert.Equal(t, []any{}, body["tasks"])
+	})
+
+	t.Run("returns active tasks from broker", func(t *testing.T) {
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Equal(t, http.MethodGet, r.Method)
+			assert.Equal(t, "/v1/tasks", r.URL.Path)
+			assert.Equal(t, "Bearer broker-token", r.Header.Get("Authorization"))
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"tasks":[{"id":"active-1","status":"queued","fleet_id":"fleet-1","created_at":"2026-05-24T12:00:00Z"}]}`))
+		}))
+		defer upstream.Close()
+
+		t.Setenv("TASK_BROKER_BASE_URL", upstream.URL)
+		t.Setenv("TASK_BROKER_FLEET_ID", "fleet-1")
+		t.Setenv("TASK_BROKER_AUTH_TOKEN", "broker-token")
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/admin/api/runner/tasks",
+			authCookie: token,
+		})
+		assert.Equal(t, http.StatusOK, response.Code)
+
+		var body struct {
+			Configured bool `json:"configured"`
+			Tasks      []struct {
+				ID     string `json:"id"`
+				Status string `json:"status"`
+			} `json:"tasks"`
+		}
+		require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+		assert.True(t, body.Configured)
+		require.Len(t, body.Tasks, 1)
+		assert.Equal(t, "active-1", body.Tasks[0].ID)
+		assert.Equal(t, "queued", body.Tasks[0].Status)
+	})
+}

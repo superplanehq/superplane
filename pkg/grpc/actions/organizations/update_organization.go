@@ -62,7 +62,8 @@ func UpdateOrganization(ctx context.Context, orgID string, pbOrganization *pb.Or
 				UpdatedAt:   timestamppb.New(*organization.UpdatedAt),
 			},
 			Spec: &pb.Organization_Spec{
-				ChangeManagementEnabled: &organization.ChangeManagementEnabled,
+				ChangeManagementEnabled:     &organization.ChangeManagementEnabled,
+				EnabledExperimentalFeatures: []string(organization.EnabledExperimentalFeatures),
 			},
 		},
 	}

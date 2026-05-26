@@ -123,6 +123,14 @@ func Test__CapabilityMapper__NewPermissionSet(t *testing.T) {
 		ps := m.NewPermissionSet([]string{"github.doesNotExist"})
 		assert.True(t, ps.IsEmpty())
 	})
+
+	t.Run("deployment actions request deployments write permission", func(t *testing.T) {
+		t.Parallel()
+
+		ps := m.NewPermissionSet([]string{"github.createDeployment", "github.createDeploymentStatus"})
+		got := ps.ForAppManifest()
+		assert.Equal(t, "write", got["deployments"])
+	})
 }
 
 func Test__PermissionSet__IsEmpty(t *testing.T) {

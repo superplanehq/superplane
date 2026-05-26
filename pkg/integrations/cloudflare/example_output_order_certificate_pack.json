@@ -1,0 +1,17 @@
+{
+  "data": {
+    "zoneId": "abc123def456abc123def456abc12345",
+    "zoneName": "example.com",
+    "packId": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
+    "pack": {
+      "id": "cc15b64a-e432-4210-a51d-b7042fd55ac0",
+      "certificate_authority": "lets_encrypt",
+      "hosts": ["preview-123.example.com"],
+      "status": "initializing",
+      "type": "advanced",
+      "validation_method": "txt"
+    }
+  },
+  "timestamp": "2026-05-11T10:00:00.000000000Z",
+  "type": "cloudflare.certificate_pack.ordered"
+}

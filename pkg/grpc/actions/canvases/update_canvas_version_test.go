@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -217,6 +218,79 @@ func Test__UpdateCanvasVersion(t *testing.T) {
 		require.NotEmpty(t, errMsg)
 		assert.Contains(t, errMsg, "waitFor")
 	})
+
+	t.Run("integration component with enabled capability -> updates without node error", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		require.NoError(t, err)
+
+		integration := support.CreateIntegrationWithCapabilities(t, r.Organization.ID, []models.CapabilityState{
+			{Name: "github.getIssue", State: core.IntegrationCapabilityStateEnabled},
+		})
+
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		response, err := UpdateCanvasVersion(
+			ctx,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			draftVersion.ID.String(),
+			testPbCanvasWithGitHubIssueNode(t, canvas.Name, integration.ID.String()),
+			nil,
+			"",
+			r.AuthService,
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Version)
+		require.NotNil(t, response.Version.Spec)
+		require.Len(t, response.Version.Spec.Nodes, 1)
+
+		node := response.Version.Spec.Nodes[0]
+		assert.Empty(t, node.GetErrorMessage())
+		require.NotNil(t, node.GetIntegration())
+		require.NotNil(t, node.GetIntegration().Id)
+		assert.Equal(t, integration.ID.String(), *node.GetIntegration().Id)
+	})
+
+	t.Run("integration component with disabled capability -> serialized node carries error_message", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		draftVersion, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, nil, nil)
+		require.NoError(t, err)
+
+		integration := support.CreateIntegrationWithCapabilities(t, r.Organization.ID, []models.CapabilityState{
+			{Name: "github.getIssue", State: core.IntegrationCapabilityStateDisabled},
+		})
+
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		response, err := UpdateCanvasVersion(
+			ctx,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID.String(),
+			canvas.ID.String(),
+			draftVersion.ID.String(),
+			testPbCanvasWithGitHubIssueNode(t, canvas.Name, integration.ID.String()),
+			nil,
+			"",
+			r.AuthService,
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		require.NotNil(t, response.Version)
+		require.NotNil(t, response.Version.Spec)
+		require.Len(t, response.Version.Spec.Nodes, 1)
+
+		errMsg := response.Version.Spec.Nodes[0].GetErrorMessage()
+		require.NotEmpty(t, errMsg)
+		assert.Contains(t, errMsg, "github.getIssue is not enabled for integration "+integration.InstallationName)
+		assert.Contains(t, errMsg, integration.InstallationName)
+	})
 }
 
 func testPbCanvas(name string) *pb.Canvas {
@@ -226,6 +300,31 @@ func testPbCanvas(name string) *pb.Canvas {
 		},
 		Spec: &pb.Canvas_Spec{
 			Nodes: []*componentpb.Node{},
+			Edges: []*componentpb.Edge{},
+		},
+	}
+}
+
+func testPbCanvasWithGitHubIssueNode(t *testing.T, name string, integrationID string) *pb.Canvas {
+	return &pb.Canvas{
+		Metadata: &pb.Canvas_Metadata{
+			Name: name,
+		},
+		Spec: &pb.Canvas_Spec{
+			Nodes: []*componentpb.Node{
+				{
+					Id:        "github-issue",
+					Name:      "Get Issue",
+					Component: "github.getIssue",
+					Integration: &componentpb.IntegrationRef{
+						Id: &integrationID,
+					},
+					Configuration: structFromAnyMap(t, map[string]any{
+						"repository":  "superplanehq/superplane",
+						"issueNumber": "1",
+					}),
+				},
+			},
 			Edges: []*componentpb.Edge{},
 		},
 	}

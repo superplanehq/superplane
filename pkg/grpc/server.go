@@ -12,11 +12,13 @@ import (
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
 	pbActions "github.com/superplanehq/superplane/pkg/protos/actions"
 	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbBlueprints "github.com/superplanehq/superplane/pkg/protos/blueprints"
+	pbCanvasFolders "github.com/superplanehq/superplane/pkg/protos/canvas_folders"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
 	pbGroups "github.com/superplanehq/superplane/pkg/protos/groups"
 	integrationpb "github.com/superplanehq/superplane/pkg/protos/integrations"
@@ -64,6 +66,7 @@ func RunServer(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
+	agentService agentsActions.AgentsService,
 	port int,
 ) {
 	endpoint := fmt.Sprintf("0.0.0.0:%d", port)
@@ -107,7 +110,6 @@ func RunServer(
 
 	organizationService := NewOrganizationService(
 		authService,
-		encryptor,
 		registry,
 		oidcProvider,
 		baseURL,
@@ -146,14 +148,16 @@ func RunServer(
 	canvasService := NewCanvasService(authService, registry, encryptor, webhooksBaseURL, usageService)
 	pbCanvases.RegisterCanvasesServer(grpcServer, canvasService)
 
+	canvasFolderService := NewCanvasFolderService()
+	pbCanvasFolders.RegisterCanvasFoldersServer(grpcServer, canvasFolderService)
+
 	integrationService := NewIntegrationService(encryptor, registry)
 	integrationpb.RegisterIntegrationsServer(grpcServer, integrationService)
 
 	serviceAccountsService := NewServiceAccountsService(authService)
 	pbServiceAccounts.RegisterServiceAccountsServer(grpcServer, serviceAccountsService)
 
-	agentsService := NewAgentsService(authService, jwtSigner)
-	pbAgents.RegisterAgentsServer(grpcServer, agentsService)
+	pbAgents.RegisterAgentsServer(grpcServer, NewAgentsService(agentService))
 
 	reflection.Register(grpcServer)
 

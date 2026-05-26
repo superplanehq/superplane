@@ -23,6 +23,7 @@ import (
 	// Import components, triggers, and integrations to register them via init()
 	_ "github.com/superplanehq/superplane/pkg/components/approval"
 	_ "github.com/superplanehq/superplane/pkg/components/deletememory"
+	_ "github.com/superplanehq/superplane/pkg/components/display"
 	_ "github.com/superplanehq/superplane/pkg/components/filter"
 	_ "github.com/superplanehq/superplane/pkg/components/graphql"
 	_ "github.com/superplanehq/superplane/pkg/components/http"
@@ -30,6 +31,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/components/merge"
 	_ "github.com/superplanehq/superplane/pkg/components/noop"
 	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
+	_ "github.com/superplanehq/superplane/pkg/components/runner"
 	_ "github.com/superplanehq/superplane/pkg/components/send_email"
 	_ "github.com/superplanehq/superplane/pkg/components/ssh"
 	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
@@ -149,6 +151,29 @@ func CreateSecret(t *testing.T, r *ResourceRegistry, secretData map[string]strin
 	secret, err := models.CreateSecret(RandomName("secret"), secrets.ProviderLocal, r.User.String(), models.DomainTypeOrganization, r.Organization.ID, data)
 	require.NoError(t, err)
 	return secret, nil
+}
+
+func CreateIntegrationWithCapabilities(
+	t require.TestingT,
+	organizationID uuid.UUID,
+	capabilities []models.CapabilityState,
+) *models.Integration {
+	integration, err := models.CreateIntegration(
+		uuid.New(),
+		organizationID,
+		"github",
+		RandomName("integration"),
+		nil,
+	)
+	require.NoError(t, err)
+
+	require.NoError(t, database.Conn().
+		Model(integration).
+		Update("capabilities", datatypes.NewJSONSlice(capabilities)).
+		Error)
+
+	integration.Capabilities = datatypes.NewJSONSlice(capabilities)
+	return integration
 }
 
 func RandomName(prefix string) string {

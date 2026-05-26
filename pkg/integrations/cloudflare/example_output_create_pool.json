@@ -1,0 +1,26 @@
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "pool": {
+      "description": "my pool",
+      "enabled": true,
+      "id": "483e85c07a861ae7a8813ef010be7036",
+      "minimum_origins": 1,
+      "name": "my-pool",
+      "origin_steering": {
+        "policy": "random"
+      },
+      "origins": [
+        {
+          "address": "192.0.2.1",
+          "enabled": true,
+          "name": "server-1",
+          "port": 2013,
+          "weight": 1
+        }
+      ]
+    }
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.pool.created"
+}

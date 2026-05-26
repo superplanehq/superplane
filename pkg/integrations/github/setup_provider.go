@@ -181,6 +181,7 @@ func (g *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 					Description:    c.Action.Description(),
 					Configuration:  c.Action.Configuration(),
 					OutputChannels: c.Action.OutputChannels(nil),
+					ExampleOutput:  c.Action.ExampleOutput(),
 				})
 			}
 
@@ -191,6 +192,7 @@ func (g *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 					Label:         c.Trigger.Label(),
 					Description:   c.Trigger.Description(),
 					Configuration: c.Trigger.Configuration(),
+					ExampleData:   c.Trigger.ExampleData(),
 				})
 			}
 		}

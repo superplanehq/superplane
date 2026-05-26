@@ -129,6 +129,10 @@ func (h *GitHubWebhookHandler) Cleanup(ctx core.WebhookHandlerContext) error {
 
 	_, err = client.DeleteHook(context.Background(), configuration.Repository, webhook.ID)
 	if err != nil {
+		if common.IsNotFoundError(err) {
+			return nil
+		}
+
 		return fmt.Errorf("error deleting webhook: %v", err)
 	}
 

@@ -120,6 +120,31 @@ func ListCanvasVersions(workflowID uuid.UUID) ([]CanvasVersion, error) {
 	return ListCanvasVersionsInTransaction(database.Conn(), workflowID)
 }
 
+func ListDraftCanvasVersions(workflowID uuid.UUID) ([]CanvasVersion, error) {
+	var versions []CanvasVersion
+	err := database.Conn().
+		Where("workflow_id = ?", workflowID).
+		Where("state = ?", CanvasVersionStateDraft).
+		Order("created_at DESC").
+		Find(&versions).
+		Error
+	return versions, err
+}
+
+func FindLatestPublishedCanvasVersion(workflowID uuid.UUID) (*CanvasVersion, error) {
+	var version CanvasVersion
+	err := database.Conn().
+		Where("workflow_id = ?", workflowID).
+		Where("state = ?", CanvasVersionStatePublished).
+		Order("published_at DESC").
+		First(&version).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &version, nil
+}
+
 func ListPublishedCanvasVersionsInTransaction(
 	tx *gorm.DB,
 	workflowID uuid.UUID,
@@ -205,6 +230,7 @@ func lockCanvasForVersioningInTransaction(tx *gorm.DB, workflowID uuid.UUID) (*C
 			"id",
 			"organization_id",
 			"live_version_id",
+			"folder_id",
 			"is_template",
 			"name",
 			"created_by",
@@ -242,7 +268,15 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 	canvas.LiveVersionID = &version.ID
 	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
-	return MapCanvasNameUniqueConstraintError(tx.Save(canvas).Error)
+	return MapCanvasNameUniqueConstraintError(tx.
+		Model(&Canvas{}).
+		Where("id = ?", canvas.ID).
+		Updates(map[string]any{
+			"live_version_id": version.ID,
+			"name":            version.Name,
+			"updated_at":      now,
+		}).
+		Error)
 }
 
 func SaveCanvasDraftInTransaction(
@@ -366,7 +400,15 @@ func PublishCanvasDraftInTransaction(
 	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
 
-	if err := tx.Save(canvas).Error; err != nil {
+	if err := tx.
+		Model(&Canvas{}).
+		Where("id = ?", canvas.ID).
+		Updates(map[string]any{
+			"live_version_id": version.ID,
+			"name":            version.Name,
+			"updated_at":      now,
+		}).
+		Error; err != nil {
 		return nil, MapCanvasNameUniqueConstraintError(err)
 	}
 

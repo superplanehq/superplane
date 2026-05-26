@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
 import useWebSocket from "react-use-websocket";
 import { useQueryClient } from "@tanstack/react-query";
-import type { CanvasesCanvasNodeExecution, CanvasesCanvasEvent, CanvasesCanvasNodeQueueItem } from "@/api-client";
+import type {
+  CanvasesCanvasNodeExecution,
+  CanvasesCanvasEvent,
+  CanvasesCanvasNodeQueueItem,
+  CanvasesCanvasRun,
+} from "@/api-client";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
 import { canvasKeys } from "./useCanvasData";
 
@@ -18,6 +23,7 @@ type WebsocketPayload =
   | CanvasesCanvasNodeExecution
   | CanvasesCanvasEvent
   | CanvasesCanvasNodeQueueItem
+  | CanvasesCanvasRun
   | CanvasWebsocketPayload;
 
 interface QueuedMessage {
@@ -93,6 +99,10 @@ export function useCanvasWebsocket(
                 queryKey: canvasKeys.infiniteEvents(canvasId),
               });
 
+              queryClient.invalidateQueries({
+                queryKey: canvasKeys.infiniteRuns(canvasId),
+              });
+
               if (execution.rootEvent?.id) {
                 queryClient.invalidateQueries({
                   queryKey: canvasKeys.eventExecution(canvasId, execution.rootEvent.id),
@@ -119,6 +129,18 @@ export function useCanvasWebsocket(
             onNodeEvent?.(queueItem.nodeId!, data.event);
           }
           break;
+        case "run_started":
+        case "run_finished": {
+          const run = payload as CanvasesCanvasRun;
+          if (!run.canvasId || run.canvasId !== canvasId) {
+            break;
+          }
+
+          queryClient.invalidateQueries({
+            queryKey: canvasKeys.infiniteRuns(canvasId),
+          });
+          break;
+        }
         case "canvas_updated":
         case "canvas_version_updated":
         case "canvas_deleted": {
@@ -175,6 +197,7 @@ export function useCanvasWebsocket(
       onCanvasLifecycleEvent,
       shouldApplyCanvasUpdate,
       processRuntimeEvents,
+      organizationId,
     ],
   );
 
@@ -263,9 +286,11 @@ export function useCanvasWebsocket(
 
   // Cleanup on unmount
   useEffect(() => {
+    const queues = messageQueues.current;
+    const processing = processingNodes.current;
     return () => {
-      messageQueues.current.clear();
-      processingNodes.current.clear();
+      queues.clear();
+      processing.clear();
     };
   }, []);
 

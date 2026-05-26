@@ -106,6 +106,64 @@ func Test__NodeQueueWorker_ComponentNodeQueueIsProcessed(t *testing.T) {
 	assert.True(t, queueConsumedConsumer.HasReceivedMessage())
 }
 
+func Test__NodeQueueWorker_DoesNotProcessQueueForSoftDeletedOrganization(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	amqpURL, _ := config.RabbitMQURL()
+	worker := NewNodeQueueWorker(r.Registry, amqpURL)
+	logger := log.NewEntry(log.New())
+
+	executionConsumer := testconsumer.New(amqpURL, messages.CanvasExecutionRoutingKey)
+	queueConsumedConsumer := testconsumer.New(amqpURL, messages.CanvasQueueItemConsumedRoutingKey)
+	executionConsumer.Start()
+	queueConsumedConsumer.Start()
+	defer executionConsumer.Stop()
+	defer queueConsumedConsumer.Stop()
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: triggerNode, Type: models.NodeTypeTrigger},
+			{NodeID: componentNode, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	support.CreateQueueItem(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID)
+
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+
+	nodes, err := models.ListCanvasNodesReady()
+	require.NoError(t, err)
+	for _, node := range nodes {
+		assert.False(t, node.WorkflowID == canvas.ID && node.NodeID == componentNode)
+	}
+
+	node, err := models.FindCanvasNode(database.Conn(), canvas.ID, componentNode)
+	require.NoError(t, err)
+
+	require.NoError(t, worker.LockAndProcessNode(logger, *node))
+
+	executions, err := models.ListNodeExecutions(canvas.ID, componentNode, nil, nil, 10, nil)
+	require.NoError(t, err)
+	assert.Empty(t, executions)
+
+	queueItems, err := models.ListNodeQueueItems(canvas.ID, componentNode, 10, nil)
+	require.NoError(t, err)
+	assert.Len(t, queueItems, 1)
+
+	assert.False(t, executionConsumer.HasReceivedMessage())
+	assert.False(t, queueConsumedConsumer.HasReceivedMessage())
+}
+
 func Test__NodeQueueWorker_BlueprintNodeQueueIsProcessed(t *testing.T) {
 	r := support.Setup(t)
 	logger := log.NewEntry(log.New())

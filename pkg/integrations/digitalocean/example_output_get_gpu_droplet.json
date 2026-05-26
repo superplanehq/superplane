@@ -1,0 +1,26 @@
+{
+  "data": {
+    "id": 412345678,
+    "name": "my-gpu-droplet",
+    "memory": 245760,
+    "vcpus": 20,
+    "disk": 720,
+    "status": "active",
+    "region": { "name": "Toronto 1", "slug": "tor1" },
+    "image": {
+      "id": 98765,
+      "name": "GPU H100 Base - Ubuntu 22.04",
+      "slug": "gpu-h100-base-ubuntu-22-04"
+    },
+    "size_slug": "gpu-h100x1-80gb",
+    "networks": {
+      "v4": [
+        { "ip_address": "143.198.100.50", "type": "public" },
+        { "ip_address": "10.132.0.5", "type": "private" }
+      ]
+    },
+    "tags": ["gpu", "ml-training"]
+  },
+  "timestamp": "2026-03-12T21:13:32.946693411Z",
+  "type": "digitalocean.gpuDroplet.fetched"
+}

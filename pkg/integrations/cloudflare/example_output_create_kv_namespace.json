@@ -1,0 +1,12 @@
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "namespace": {
+      "id": "0f2ac74b498b48028cb68387c421e279",
+      "title": "my-kv-namespace",
+      "supports_url_encoding": true
+    }
+  },
+  "timestamp": "2026-05-05T06:54:57.198268018Z",
+  "type": "cloudflare.kv.namespace.created"
+}

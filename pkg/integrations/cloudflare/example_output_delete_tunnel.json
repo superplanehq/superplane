@@ -1,0 +1,9 @@
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "deleted": true,
+    "tunnelId": "3c683924-6802-47c9-860a-f27a66e684a2"
+  },
+  "timestamp": "2026-05-12T14:02:15.319225119Z",
+  "type": "cloudflare.tunnel.deleted"
+}

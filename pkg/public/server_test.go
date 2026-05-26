@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -26,11 +27,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type fakePublicUsageService struct {
 	checkAccountResponse *usagepb.CheckAccountLimitsResponse
+	checkAccountErr      error
 }
 
 func (s *fakePublicUsageService) Enabled() bool {
@@ -62,6 +67,10 @@ func (s *fakePublicUsageService) CheckAccountLimits(
 	string,
 	*usagepb.AccountState,
 ) (*usagepb.CheckAccountLimitsResponse, error) {
+	if s.checkAccountErr != nil {
+		return nil, s.checkAccountErr
+	}
+
 	if s.checkAccountResponse != nil {
 		return s.checkAccountResponse, nil
 	}
@@ -193,6 +202,71 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 
 	require.Equal(t, "", response.Body.String())
 	require.Equal(t, 200, response.Code)
+}
+
+func Test__HandleWebhook_DoesNotRunNodesForSoftDeletedOrganization(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	signer := jwt.NewSigner("test")
+	server, err := NewServer(
+		r.Encryptor,
+		r.Registry,
+		signer,
+		support.NewOIDCProvider(),
+		"",
+		"http://localhost",
+		"http://localhost",
+		"test",
+		"/app/templates",
+		r.AuthService,
+		nil,
+		false,
+	)
+	require.NoError(t, err)
+
+	webhookID := uuid.New()
+	webhook := models.Webhook{
+		ID:     webhookID,
+		State:  models.WebhookStateReady,
+		Secret: []byte("secret"),
+	}
+	require.NoError(t, database.Conn().Create(&webhook).Error)
+
+	nodeID := "start-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{
+				NodeID: nodeID,
+				Type:   models.NodeTypeTrigger,
+				Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+			},
+		},
+		[]models.Edge{},
+	)
+	require.NoError(t, database.Conn().
+		Model(&models.CanvasNode{}).
+		Where("workflow_id = ?", canvas.ID).
+		Where("node_id = ?", nodeID).
+		Update("webhook_id", webhookID).
+		Error)
+
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+
+	response := execRequest(server, requestParams{
+		method: "POST",
+		path:   "/webhooks/" + webhookID.String(),
+		body:   []byte(`{"ok": true}`),
+	})
+
+	require.Equal(t, http.StatusNotFound, response.Code)
+
+	eventCount, err := models.CountCanvasEvents(canvas.ID, nodeID)
+	require.NoError(t, err)
+	assert.Zero(t, eventCount)
 }
 
 type canvasesGatewayStubServer struct {
@@ -682,5 +756,49 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 		assert.True(t, data.UsageEnabled)
 		assert.Equal(t, int32(1), data.MaxOrganizations)
 		assert.Equal(t, "account organization limit exceeded", data.Message)
+	})
+
+	t.Run("returns 500 with diagnostic context when the usage service is unavailable", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		account, err := models.CreateAccount("status-unavailable@example.com", "Status Unavailable")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test")
+		token, err := signer.Generate(account.ID.String(), time.Hour)
+		require.NoError(t, err)
+
+		authService, err := authorization.NewAuthService()
+		require.NoError(t, err)
+
+		encryptor := &crypto.NoOpEncryptor{}
+		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+		require.NoError(t, err)
+		oidcProvider := support.NewOIDCProvider()
+		usageService := &fakePublicUsageService{
+			checkAccountErr: status.Error(codes.Unavailable, "usage service unreachable"),
+		}
+		server, err := NewServer(
+			encryptor,
+			r,
+			signer,
+			oidcProvider,
+			"",
+			"localhost",
+			"",
+			"test",
+			"/app/templates",
+			authService,
+			usageService,
+			false,
+		)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/account/limits",
+			authCookie: token,
+		})
+
+		require.Equal(t, http.StatusInternalServerError, response.Code)
 	})
 }

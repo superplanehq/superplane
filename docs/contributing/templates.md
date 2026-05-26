@@ -127,10 +127,10 @@ spec:
 2. **Restart the server**
    - Templates are automatically loaded when the server starts
    - Stop your local development server
-   - Run `make dev.start` to restart
+   - Run `make dev.up` then `make dev.server` to restart
 
 3. **Verify the template**
-   - Navigate to your local SuperPlane instance (typically http://localhost:8000 when using `make dev.start`)
+   - Navigate to your local SuperPlane instance (typically http://localhost:8000 when using `make dev.server` after `make dev.up`)
    - Click "Create Canvas" or similar action
    - Your template should appear in the template selection list
 

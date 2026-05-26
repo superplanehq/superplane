@@ -31,7 +31,6 @@ function getCompactView(data: BlockProps["data"], isCompactView: BlockProps["isC
 
 function getActionProps(data: BlockProps["data"], compactView: boolean, props: Pick<BlockProps, ComponentActionKeys>) {
   return {
-    onRun: props.onRun,
     runDisabled: props.runDisabled,
     runDisabledTooltip: props.runDisabledTooltip,
     onTogglePause: data.type === "trigger" ? undefined : props.onTogglePause,
@@ -51,8 +50,9 @@ function renderFallbackBlock(args: {
   showHeader: boolean | undefined;
   canvasMode: BlockProps["canvasMode"];
   actionProps: ReturnType<typeof getActionProps>;
+  dimBodyBelowHeader?: boolean;
 }) {
-  const { data, fallbackTitle, selected, showHeader, canvasMode, actionProps } = args;
+  const { data, fallbackTitle, selected, showHeader, canvasMode, actionProps, dimBodyBelowHeader } = args;
 
   return (
     <ComponentBase
@@ -60,6 +60,7 @@ function renderFallbackBlock(args: {
       canvasMode={canvasMode}
       selected={selected}
       showHeader={showHeader}
+      dimBodyBelowHeader={dimBodyBelowHeader}
       {...actionProps}
     />
   );
@@ -74,6 +75,7 @@ function AnnotationBlockContent({
   onAnnotationUpdate,
   onAnnotationBlur,
   actionProps,
+  dimBodyBelowHeader,
 }: {
   data: BlockProps["data"];
   nodeId?: string;
@@ -83,6 +85,7 @@ function AnnotationBlockContent({
   onAnnotationUpdate?: BlockProps["onAnnotationUpdate"];
   onAnnotationBlur?: BlockProps["onAnnotationBlur"];
   actionProps: ReturnType<typeof getActionProps>;
+  dimBodyBelowHeader?: boolean;
 }) {
   const safeAnnotationProps = getSafeAnnotationProps(data);
   const handleAnnotationUpdate = (updates: {
@@ -106,6 +109,7 @@ function AnnotationBlockContent({
       showHeader,
       canvasMode,
       actionProps,
+      dimBodyBelowHeader,
     });
   }
 
@@ -116,6 +120,7 @@ function AnnotationBlockContent({
       selected={selected}
       onAnnotationUpdate={handleAnnotationUpdate}
       onAnnotationBlur={onAnnotationBlur}
+      dimBodyBelowHeader={dimBodyBelowHeader}
       {...actionProps}
     />
   );
@@ -130,8 +135,19 @@ function renderBlockByType(args: {
   onAnnotationUpdate?: BlockProps["onAnnotationUpdate"];
   onAnnotationBlur?: BlockProps["onAnnotationBlur"];
   actionProps: ReturnType<typeof getActionProps>;
+  dimBodyBelowHeader?: boolean;
 }) {
-  const { data, nodeId, selected, showHeader, canvasMode, onAnnotationUpdate, onAnnotationBlur, actionProps } = args;
+  const {
+    data,
+    nodeId,
+    selected,
+    showHeader,
+    canvasMode,
+    onAnnotationUpdate,
+    onAnnotationBlur,
+    actionProps,
+    dimBodyBelowHeader,
+  } = args;
 
   switch (data.type) {
     case "trigger":
@@ -143,6 +159,7 @@ function renderBlockByType(args: {
           showHeader,
           canvasMode,
           actionProps,
+          dimBodyBelowHeader,
         });
       }
       return (
@@ -151,6 +168,7 @@ function renderBlockByType(args: {
           canvasMode={canvasMode}
           selected={selected}
           showHeader={showHeader}
+          dimBodyBelowHeader={dimBodyBelowHeader}
           {...actionProps}
         />
       );
@@ -163,6 +181,7 @@ function renderBlockByType(args: {
           paused={safeComponentProps.paused}
           selected={selected}
           showHeader={showHeader}
+          dimBodyBelowHeader={dimBodyBelowHeader}
           {...actionProps}
         />
       );
@@ -174,6 +193,7 @@ function renderBlockByType(args: {
           canvasMode={canvasMode}
           selected={selected}
           showHeader={showHeader}
+          dimBodyBelowHeader={dimBodyBelowHeader}
           {...actionProps}
         />
       );
@@ -188,6 +208,7 @@ function renderBlockByType(args: {
           onAnnotationUpdate={onAnnotationUpdate}
           onAnnotationBlur={onAnnotationBlur}
           actionProps={actionProps}
+          dimBodyBelowHeader={dimBodyBelowHeader}
         />
       );
     default:
@@ -198,6 +219,7 @@ function renderBlockByType(args: {
         showHeader,
         canvasMode,
         actionProps,
+        dimBodyBelowHeader,
       });
   }
 }
@@ -206,7 +228,6 @@ export function BlockContent({
   data,
   nodeId,
   selected = false,
-  onRun,
   runDisabled,
   runDisabledTooltip,
   onTogglePause,
@@ -220,10 +241,10 @@ export function BlockContent({
   isCompactView,
   onAnnotationUpdate,
   onAnnotationBlur,
+  dimBodyBelowHeader,
 }: BlockProps) {
   const compactView = getCompactView(data, isCompactView);
   const actionProps = getActionProps(data, compactView, {
-    onRun,
     runDisabled,
     runDisabledTooltip,
     onTogglePause,
@@ -243,5 +264,6 @@ export function BlockContent({
     onAnnotationUpdate,
     onAnnotationBlur,
     actionProps,
+    dimBodyBelowHeader,
   });
 }

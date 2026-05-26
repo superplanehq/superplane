@@ -1,7 +1,7 @@
 import { Text } from "@/components/Text/text";
 import { Heading } from "@/components/Heading/heading";
 import { Button } from "@/components/ui/button";
-import { useAccount } from "@/contexts/AccountContext";
+import { useAccount } from "@/contexts/useAccount";
 import { Search, User as UserIcon } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import AdminPagination from "./AdminPagination";

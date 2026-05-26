@@ -1,0 +1,18 @@
+{
+  "data": {
+    "accountId": "90ddd046218bd375f20e9f9082cc0c6d",
+    "tunnel": {
+      "account_tag": "90ddd046218bd375f20e9f9082cc0c6d",
+      "config_src": "cloudflare",
+      "created_at": "2026-05-12T14:40:05.379813Z",
+      "id": "432c983d-7934-47a8-923f-bfa017eef9c4",
+      "metadata": {},
+      "name": "my-test-tunnel",
+      "status": "inactive",
+      "token": "eyJhIjoiOTBkZGQwNDYyMThiZDM3NWYy...rTE0rM1hHaHhNMEVpa0QvK2RacE0xQUM1N1dHZEVHMHZxS1h4SHV1UER3PT0ifQ=="
+    },
+    "tunnelId": "432c983d-7934-47a8-923f-bfa017eef9c4"
+  },
+  "timestamp": "2026-05-12T14:40:06.391597638Z",
+  "type": "cloudflare.tunnel.created"
+}

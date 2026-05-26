@@ -158,3 +158,11 @@ func (lrw *loggingResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) 
 	}
 	return hijacker.Hijack()
 }
+
+// Flush implements [http.Flusher] so streaming handlers (e.g. NDJSON live logs) work
+// when this wrapper is the outermost [http.ResponseWriter] seen by the handler.
+func (lrw *loggingResponseWriter) Flush() {
+	if f, ok := lrw.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}

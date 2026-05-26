@@ -7,18 +7,25 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
+	"github.com/superplanehq/superplane/test/e2e/shared"
 )
 
 func TestHomePage(t *testing.T) {
-	steps := &TestHomePageSteps{t: t}
-
 	t.Run("creating a new canvas", func(t *testing.T) {
+		steps := &TestHomePageSteps{t: t}
 		steps.Start()
 		steps.VisitHomePage()
-		steps.FillInNewCanvasForm("Example Canvas")
-		steps.AssertCanvasSavedInDB("Example Canvas")
+		steps.ClickNewApp()
+		steps.AssertNavigatedToCanvas()
 	})
 
+	t.Run("showing canvases in folders", func(t *testing.T) {
+		steps := &TestHomePageSteps{t: t}
+		steps.Start()
+		steps.GivenCanvasInFolder("Foldered Canvas", "Deployments")
+		steps.VisitHomePage()
+		steps.AssertCanvasFolderVisible("Deployments", "Foldered Canvas")
+	})
 }
 
 type TestHomePageSteps struct {
@@ -36,6 +43,11 @@ func (steps *TestHomePageSteps) VisitHomePage() {
 	steps.session.Visit("/" + steps.session.OrgID.String() + "/")
 }
 
+func (steps *TestHomePageSteps) AssertNavigatedToCanvas() {
+	url := steps.session.Page().URL()
+	assert.Regexp(steps.t, `/canvases/[0-9a-f-]{36}`, url)
+}
+
 func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
 	canvas, err := models.FindCanvasByName(canvasName, steps.session.OrgID)
 
@@ -43,11 +55,25 @@ func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
 	assert.Equal(steps.t, canvasName, canvas.Name)
 }
 
-func (steps *TestHomePageSteps) FillInNewCanvasForm(canvasName string) {
-	steps.session.Visit("/" + steps.session.OrgID.String() + "/canvases/new")
-	steps.session.FillIn(q.TestID("canvas-name-input"), canvasName)
-	steps.session.Click(q.TestID("create-canvas-button"))
-	steps.session.Sleep(500)
+func (steps *TestHomePageSteps) GivenCanvasInFolder(canvasName, folderTitle string) {
+	canvas := shared.NewCanvasSteps(canvasName, steps.t, steps.session)
+	canvas.Create()
+
+	folder, err := models.CreateCanvasFolder(steps.session.OrgID, folderTitle, models.CanvasFolderColorBlue)
+	assert.NoError(steps.t, err)
+
+	_, err = models.UpdateCanvasFolderMembership(steps.session.OrgID, canvas.WorkflowID, &folder.ID)
+	assert.NoError(steps.t, err)
+}
+
+func (steps *TestHomePageSteps) AssertCanvasFolderVisible(folderTitle, canvasName string) {
+	steps.session.AssertText(folderTitle)
+	steps.session.AssertText(canvasName)
+}
+
+func (steps *TestHomePageSteps) ClickNewApp() {
+	steps.session.Click(q.Text("New App"))
+	steps.session.Sleep(3000)
 }
 
 func (steps *TestHomePageSteps) AssertComponentSavedInDB(s string) {

@@ -107,16 +107,7 @@ func SerializeCanvasEventWithExecutions(event models.CanvasEvent, executions []m
 
 	executionInfos := make([]*pb.CanvasNodeExecutionRef, 0, len(executions))
 	for _, execution := range executions {
-		executionInfos = append(executionInfos, &pb.CanvasNodeExecutionRef{
-			Id:            execution.ID.String(),
-			NodeId:        execution.NodeID,
-			State:         NodeExecutionStateToProto(execution.State),
-			Result:        NodeExecutionResultToProto(execution.Result),
-			ResultReason:  NodeExecutionResultReasonToProto(execution.ResultReason),
-			ResultMessage: execution.ResultMessage,
-			CreatedAt:     timestamppb.New(*execution.CreatedAt),
-			UpdatedAt:     timestamppb.New(*execution.UpdatedAt),
-		})
+		executionInfos = append(executionInfos, SerializeNodeExecutionRef(execution))
 	}
 
 	return &pb.CanvasEventWithExecutions{
@@ -129,6 +120,19 @@ func SerializeCanvasEventWithExecutions(event models.CanvasEvent, executions []m
 		CreatedAt:  timestamppb.New(*event.CreatedAt),
 		Executions: executionInfos,
 	}, nil
+}
+
+func SerializeNodeExecutionRef(execution models.CanvasNodeExecution) *pb.CanvasNodeExecutionRef {
+	return &pb.CanvasNodeExecutionRef{
+		Id:            execution.ID.String(),
+		NodeId:        execution.NodeID,
+		State:         NodeExecutionStateToProto(execution.State),
+		Result:        NodeExecutionResultToProto(execution.Result),
+		ResultReason:  NodeExecutionResultReasonToProto(execution.ResultReason),
+		ResultMessage: execution.ResultMessage,
+		CreatedAt:     timestamppb.New(*execution.CreatedAt),
+		UpdatedAt:     timestamppb.New(*execution.UpdatedAt),
+	}
 }
 
 func valueOrEmpty(value *string) string {

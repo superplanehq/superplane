@@ -17,7 +17,7 @@ function diff() {
   # Ignore the diff header lines
   # Ignore the pg_dump version line
   # Only show actual schema changes
-  git diff --unified=0 -- db/structure.sql agent/db/structure.sql | grep -E '^\+|^\-' | grep -v "/db/structure.sql" | grep -v "/agent/db/structure.sql" | grep -v "Dumped by pg_dump version "
+  git diff --unified=0 -- db/structure.sql | grep -E '^\+|^\-' | grep -v "/db/structure.sql" | grep -v "Dumped by pg_dump version "
 }
 
 lineCount=$(diff | wc -l)

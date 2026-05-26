@@ -147,4 +147,23 @@ describe("useCanvasWebsocket", () => {
       });
     });
   });
+
+  it("invalidates infinite runs query for run events", async () => {
+    const queryClient = new QueryClient();
+    const invalidateQueriesSpy = vi.spyOn(queryClient, "invalidateQueries").mockResolvedValue();
+
+    renderCanvasWebsocketHook(queryClient);
+    emitWebsocketMessage("run_finished", {
+      id: "run-1",
+      canvasId: testCanvasId,
+      state: "STATE_FINISHED",
+      result: "RESULT_PASSED",
+    });
+
+    await waitFor(() => {
+      expect(invalidateQueriesSpy).toHaveBeenCalledWith({
+        queryKey: canvasKeys.infiniteRuns(testCanvasId),
+      });
+    });
+  });
 });

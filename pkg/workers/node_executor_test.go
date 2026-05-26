@@ -84,6 +84,45 @@ func Test__NodeExecutor_PreventsConcurrentProcessing(t *testing.T) {
 	assert.Equal(t, models.CanvasNodeExecutionResultPassed, updatedExecution.Result)
 }
 
+func Test__NodeExecutor_DoesNotProcessExecutionForSoftDeletedOrganization(t *testing.T) {
+	r := support.Setup(t)
+
+	triggerNode := "trigger-1"
+	componentNode := "component-1"
+	canvas, _ := support.CreateCanvas(
+		t,
+		r.Organization.ID,
+		r.User,
+		[]models.CanvasNode{
+			{NodeID: triggerNode, Type: models.NodeTypeTrigger, Ref: datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}})},
+			{NodeID: componentNode, Type: models.NodeTypeComponent, Ref: datatypes.NewJSONType(models.NodeRef{Component: &models.ComponentRef{Name: "noop"}})},
+		},
+		[]models.Edge{
+			{SourceID: triggerNode, TargetID: componentNode, Channel: "default"},
+		},
+	)
+
+	rootEvent := support.EmitCanvasEventForNode(t, canvas.ID, triggerNode, "default", nil)
+	execution := support.CreateCanvasNodeExecution(t, canvas.ID, componentNode, rootEvent.ID, rootEvent.ID, nil)
+
+	require.NoError(t, models.SoftDeleteOrganization(r.Organization.ID.String()))
+
+	executions, err := models.ListPendingNodeExecutions()
+	require.NoError(t, err)
+	for _, pending := range executions {
+		assert.NotEqual(t, execution.ID, pending.ID)
+	}
+
+	executor := NewNodeExecutor(r.Encryptor, r.Registry, "http://localhost", "http://localhost", "", r.AuthService)
+	err = executor.LockAndProcessNodeExecution(execution.ID)
+	assert.ErrorIs(t, err, ErrRecordLocked)
+
+	updatedExecution, err := models.FindNodeExecution(canvas.ID, execution.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.CanvasNodeExecutionStatePending, updatedExecution.State)
+	assert.Empty(t, updatedExecution.Result)
+}
+
 func Test__NodeExecutor_BlueprintNodeExecution(t *testing.T) {
 	r := support.Setup(t)
 

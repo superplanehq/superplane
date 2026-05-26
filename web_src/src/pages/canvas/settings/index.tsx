@@ -1,5 +1,5 @@
 import type { CanvasesCanvas, OrganizationsOrganization, RolesRole, SuperplaneUsersUser } from "@/api-client";
-import { usePermissions } from "@/contexts/PermissionsContext";
+import { usePermissions } from "@/contexts/usePermissions";
 import { useCanvas, useUpdateCanvas } from "@/hooks/useCanvasData";
 import { useOrganization, useOrganizationRoles, useOrganizationUsers } from "@/hooks/useOrganizationData";
 import { usePageTitle } from "@/hooks/usePageTitle";

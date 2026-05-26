@@ -1,16 +1,19 @@
 {
-  "maxAllowedTotalIssues": 725,
+  "maxAllowedTotalIssues": 648,
   "maxAllowedByRule": {
-    "complexity": 234,
-    "@typescript-eslint/no-explicit-any": 164,
-    "@typescript-eslint/no-non-null-asserted-optional-chain": 83,
-    "max-lines-per-function": 78,
-    "max-statements": 76,
-    "react-hooks/exhaustive-deps": 36,
-    "react-refresh/only-export-components": 23,
-    "max-lines": 18,
-    "max-depth": 7,
-    "max-params": 6
+    "complexity": 228,
+    "@typescript-eslint/no-explicit-any": 155,
+    "@typescript-eslint/no-non-null-asserted-optional-chain": 80,
+    "max-lines-per-function": 76,
+    "max-statements": 74,
+    "max-lines": 17,
+    "max-params": 6,
+    "max-depth": 6,
+    "no-eslint-disable-next-line": 6
   },
-  "updatedAt": "2026-05-02T17:25:43.950Z"
+  "maxAllowedMetricMaximumByRule": {
+    "max-lines": 5088,
+    "complexity": 303
+  },
+  "updatedAt": "2026-05-25T20:53:31.238Z"
 }

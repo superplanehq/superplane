@@ -4,20 +4,23 @@ import { useCanvasTemplates } from "@/hooks/useCanvasData";
 import { Heading } from "@/components/Heading/heading";
 import { Text } from "@/components/Text/text";
 import { Button } from "@/components/ui/button";
-import { TemplateCard } from "./CreateCanvasPage";
+import { TemplateCard } from "./TemplateCard";
+import { ImportYamlDialog } from "./ImportYamlDialog";
 import { ALL_TAGS, getTemplateTags } from "./templateMetadata";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMemo, useState } from "react";
-import { ArrowLeft, LayoutTemplate, Search } from "lucide-react";
+import { ArrowLeft, LayoutTemplate, Search, Upload } from "lucide-react";
 import { Input } from "@/components/Input/input";
 import type { CanvasesCanvas } from "@/api-client";
 
 export function TemplatesPage() {
   usePageTitle(["Templates"]);
   const { organizationId } = useParams<{ organizationId: string }>();
+  const navigate = useNavigate();
   const { data: templates = [], isLoading } = useCanvasTemplates(organizationId || "");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isImportYamlOpen, setIsImportYamlOpen] = useState(false);
 
   const filteredTemplates = useMemo(() => {
     let result = templates;
@@ -52,13 +55,26 @@ export function TemplatesPage() {
       <main className="w-full h-full flex flex-column flex-grow-1">
         <div className="w-full flex-grow-1">
           <div className="p-8 max-w-5xl mx-auto">
-            <div className="mb-6">
-              <Heading level={2} className="!text-2xl mb-1">
-                Templates
-              </Heading>
-              <Text className="text-gray-800 dark:text-gray-400">
-                Pre-built workflows to get you started. Pick one to preview and customize.
-              </Text>
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <Heading level={2} className="!text-2xl mb-1">
+                  Templates
+                </Heading>
+                <Text className="text-gray-800 dark:text-gray-400">
+                  Pre-built workflows to get you started. Pick one to preview and customize.
+                </Text>
+              </div>
+              {organizationId ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  data-testid="import-yaml-button"
+                  onClick={() => setIsImportYamlOpen(true)}
+                >
+                  <Upload className="h-4 w-4" />
+                  Import YAML
+                </Button>
+              ) : null}
             </div>
 
             {!isLoading && templates.length > 0 ? (
@@ -136,6 +152,15 @@ export function TemplatesPage() {
           </div>
         </div>
       </main>
+
+      {organizationId ? (
+        <ImportYamlDialog
+          open={isImportYamlOpen}
+          onOpenChange={setIsImportYamlOpen}
+          organizationId={organizationId}
+          onSuccess={(canvasId) => navigate(`/${organizationId}/canvases/${canvasId}`)}
+        />
+      ) : null}
     </div>
   );
 }

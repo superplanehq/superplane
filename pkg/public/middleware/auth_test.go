@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/test/support"
 )
@@ -123,6 +124,70 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
 		req.Header.Set("Authorization", "Bearer "+rawToken)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusNoContent, res.Code)
+	})
+
+	t.Run("scoped token issued before password change is rejected", func(t *testing.T) {
+		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
+			Subject: r.User.String(),
+			OrgID:   r.Organization.ID.String(),
+			Purpose: "agent-builder",
+			Scopes:  []string{"canvases:read"},
+		}, time.Minute)
+		require.NoError(t, err)
+
+		// Bump the account's password_changed_at to a moment after the
+		// token was issued, simulating a password rotation.
+		require.NoError(t, r.Account.MarkPasswordChangedInTransaction(database.Conn(), time.Now().Add(time.Minute)))
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Code)
+	})
+}
+
+func TestAccountAuthMiddleware_FreshnessCheck(t *testing.T) {
+	r := support.Setup(t)
+	signer := jwt.NewSigner("test-secret")
+
+	handler := AccountAuthMiddleware(signer)(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	t.Run("cookie issued before password change is rejected", func(t *testing.T) {
+		oldToken, err := signer.Generate(r.Account.ID.String(), time.Hour)
+		require.NoError(t, err)
+
+		// Bump password_changed_at so the cookie's iat is now stale.
+		require.NoError(t, r.Account.MarkPasswordChangedInTransaction(database.Conn(), time.Now().Add(time.Minute)))
+
+		req := httptest.NewRequest(http.MethodGet, "/account", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: oldToken})
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusUnauthorized, res.Code)
+	})
+
+	t.Run("cookie issued after password change is accepted", func(t *testing.T) {
+		// Roll password_changed_at into the past so a freshly-issued
+		// cookie's iat is newer than it.
+		require.NoError(t, r.Account.MarkPasswordChangedInTransaction(database.Conn(), time.Now().Add(-time.Hour)))
+
+		freshToken, err := signer.Generate(r.Account.ID.String(), time.Hour)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest(http.MethodGet, "/account", nil)
+		req.AddCookie(&http.Cookie{Name: "account_token", Value: freshToken})
 
 		res := httptest.NewRecorder()
 		handler.ServeHTTP(res, req)

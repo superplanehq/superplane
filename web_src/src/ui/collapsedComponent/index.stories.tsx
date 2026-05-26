@@ -7,7 +7,6 @@ const createCollapsedProps = (
   baseProps: Omit<CollapsedComponentProps, keyof import("../types/componentActions").ComponentActionsProps>,
 ): CollapsedComponentProps => ({
   ...baseProps,
-  onRun: () => console.log("Run clicked!"),
   onDuplicate: () => console.log("Duplicate clicked!"),
   onEdit: () => console.log("Edit clicked!"),
   onDeactivate: () => console.log("Deactivate clicked!"),
@@ -130,7 +129,6 @@ const ToggleableCollapsedComponent = (args: CollapsedComponentProps) => {
           setIsCompactView(!isCompactView);
           console.log(`Toggled to ${!isCompactView ? "Compact" : "Detailed"} view!`);
         }}
-        onRun={() => console.log("Run action triggered!")}
         onDuplicate={() => console.log("Duplicate action triggered!")}
         onEdit={() => console.log("Edit action triggered!")}
         onDeactivate={() => console.log("Deactivate action triggered!")}
@@ -158,7 +156,6 @@ export const WithActionsOnly: Story = {
   args: {
     ...triggerCollapsed,
     title: "Component with Actions",
-    onRun: () => console.log("Run clicked!"),
     onDuplicate: () => console.log("Duplicate clicked!"),
     onEdit: () => console.log("Edit clicked!"),
     onDeactivate: () => console.log("Deactivate clicked!"),

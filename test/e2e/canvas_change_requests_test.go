@@ -82,7 +82,7 @@ func (s *canvasChangeRequestSteps) givenCanvasWithOrganizationChangeManagementEn
 	s.canvas.Create()
 	s.canvas.Visit()
 
-	s.session.AssertVisible(q.TestID("canvas-view-mode-editor"))
+	s.session.AssertVisible(q.TestID("canvas-edit-button"))
 }
 
 func (s *canvasChangeRequestSteps) setOrganizationChangeManagementInDB(enabled bool) {
@@ -95,7 +95,7 @@ func (s *canvasChangeRequestSteps) setOrganizationChangeManagementInDB(enabled b
 }
 
 func (s *canvasChangeRequestSteps) enterEditMode() {
-	editButton := q.TestID("canvas-view-mode-editor").Run(s.session)
+	editButton := q.TestID("canvas-edit-button").Run(s.session)
 	deadline := time.Now().Add(15 * time.Second)
 
 	for {
@@ -106,7 +106,7 @@ func (s *canvasChangeRequestSteps) enterEditMode() {
 		}
 
 		if time.Now().After(deadline) {
-			s.t.Fatalf("editor control did not become enabled")
+			s.t.Fatalf("edit button did not become enabled")
 		}
 
 		time.Sleep(200 * time.Millisecond)
@@ -177,14 +177,8 @@ func (s *canvasChangeRequestSteps) createChangeRequest() {
 }
 
 func (s *canvasChangeRequestSteps) openCreatedChangeRequestFromList() {
-	// After create, the version sidebar may already be open; otherwise use the canvas control.
-	openVersionControl := q.Locator(`button[aria-label="Open version control"]`).Run(s.session)
-	openVisible, err := openVersionControl.IsVisible()
-	require.NoError(s.t, err)
-	if openVisible {
-		s.session.Click(q.Locator(`button[aria-label="Open version control"]`))
-	}
-
+	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
+	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Versions")`))
 	s.session.AssertText("Versions")
 
 	// Pending rows are tagged in CanvasVersionControlSidebar (data-testid) so we do not rely on

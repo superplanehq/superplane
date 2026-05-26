@@ -553,3 +553,70 @@ func TestEmitEvent(t *testing.T) {
 		})
 	}
 }
+
+func TestHooks(t *testing.T) {
+	schedule := &Schedule{}
+	hooks := schedule.Hooks()
+
+	if len(hooks) != 2 {
+		t.Fatalf("expected 2 hooks, got %d", len(hooks))
+	}
+
+	foundRun := false
+	foundEmitEvent := false
+	for _, hook := range hooks {
+		if hook.Name == HookRun {
+			foundRun = true
+			if hook.Type != core.HookTypeUser {
+				t.Errorf("expected %q hook to be user type", HookRun)
+			}
+		}
+		if hook.Name == HookEmitEvent {
+			foundEmitEvent = true
+			if hook.Type != core.HookTypeInternal {
+				t.Errorf("expected %q hook to be internal type", HookEmitEvent)
+			}
+		}
+	}
+
+	if !foundRun {
+		t.Errorf("expected %q hook to be registered", HookRun)
+	}
+	if !foundEmitEvent {
+		t.Errorf("expected %q hook to be registered", HookEmitEvent)
+	}
+}
+
+func TestHandleHookRun(t *testing.T) {
+	schedule := &Schedule{}
+	eventCtx := &contexts.EventContext{}
+
+	ctx := core.TriggerHookContext{
+		Name: HookRun,
+		Configuration: Configuration{
+			Type:            TypeMinutes,
+			MinutesInterval: intPtr(5),
+		},
+		Logger:   log.NewEntry(log.StandardLogger()),
+		Events:   eventCtx,
+		Metadata: &contexts.MetadataContext{},
+		Requests: &contexts.RequestContext{},
+	}
+
+	result, err := schedule.HandleHook(ctx)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if result != nil {
+		t.Errorf("expected nil result, got %#v", result)
+	}
+
+	if len(eventCtx.Payloads) != 1 {
+		t.Fatalf("expected one emitted payload, got %d", len(eventCtx.Payloads))
+	}
+
+	if eventCtx.Payloads[0].Type != "scheduler.tick" {
+		t.Errorf("expected payload type to be scheduler.tick, got %q", eventCtx.Payloads[0].Type)
+	}
+}

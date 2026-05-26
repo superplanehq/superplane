@@ -6,13 +6,15 @@ services:
       cache_from:
         - ghcr.io/superplanehq/superplane-dev-base:app-latest
     tty: true
-    command: bash /app/docker-entrypoint.dev.sh
+    # Idle by default so `make dev.up` does not run installs or the API/UI stack.
+    # Run `make dev.server` to start air + Vite inside this container.
+    command: ["sleep", "infinity"]
     environment:
       DB_HOST: "db"
       DB_PORT: "5432"
       DB_NAME: "superplane_dev"
       DB_USERNAME: "postgres"
-      DB_POOL_SIZE: "2"
+      DB_POOL_SIZE: "20"
       DB_STATEMENT_TIMEOUT: ${DB_STATEMENT_TIMEOUT:-60s}
       DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT: ${DB_IDLE_IN_TRANSACTION_SESSION_TIMEOUT:-30s}
       POSTGRES_DB_SSL: "false"
@@ -23,12 +25,13 @@ services:
       SWAGGER_BASE_PATH: "/app/api/swagger"
       RBAC_MODEL_PATH: "/app/rbac/rbac_model.conf"
       RBAC_ORG_POLICY_PATH: "/app/rbac/rbac_org_policy.csv"
-      # Ensure Go build cache initializes in a writable, persisted location
-      # This fixes: "failed to initialize build cache at /.cache/go-build: permission denied"
-      # and keeps the cache across container restarts (since /app is bind-mounted)
-      GOMODCACHE: "/app/tmp/go/pkg/mod"
-      GOCACHE: "/app/tmp/go-build"
-      XDG_CACHE_HOME: "/app/tmp"
+      # Keep module + build caches on the named Docker volume `go-pkg-cache:/go`, not under /app/tmp.
+      # With GOMODCACHE under the bind-mounted repo, two concurrent `go build` processes (e.g. two Air
+      # instances after interrupted `make dev.server.fg`) corrupt the same module download temp files
+      # (`rename ... .tmp: no such file or directory`), and Air reports `failed to build, error: exit status 1`.
+      GOMODCACHE: "/go/pkg/mod"
+      GOCACHE: "/go/go-build-cache"
+      XDG_CACHE_HOME: "/go/xdg-cache"
       # Lock Playwright browsers location so install and runtime match
       PLAYWRIGHT_BROWSERS_PATH: "/ms-playwright"
       START_PUBLIC_API: "yes"
@@ -69,12 +72,23 @@ services:
       GITHUB_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_ID: 1234567890abcdefghijklmnopqrstuv
       GOOGLE_CLIENT_SECRET: 1234567890abcdefghijklmnopqrstuv
+      # Browser / links. For tunnels: match your public UI URL if you load the app through it.
       BASE_URL: ${BASE_URL:-http://localhost:8000}
+      # Runner + node webhooks: URLs sent to externals use this origin (must reach this process on PUBLIC_API_PORT).
+      # Tunnel example: ngrok http 8000 then set WEBHOOKS_BASE_URL=https://<subdomain>.ngrok-free.app (no trailing slash).
       WEBHOOKS_BASE_URL: ${WEBHOOKS_BASE_URL:-http://localhost:8000}
+      # Task broker /v1 (Runner component). Base URL has no trailing slash.
+      TASK_BROKER_BASE_URL: ${TASK_BROKER_BASE_URL:-}
+      TASK_BROKER_FLEET_ID: ${TASK_BROKER_FLEET_ID:-}
+      # Bearer; must match broker AUTH_TOKEN when auth is enabled
+      TASK_BROKER_AUTH_TOKEN: ${TASK_BROKER_AUTH_TOKEN:-}
       ALLOWED_WS_ORIGINS: ${ALLOWED_WS_ORIGINS:-http://localhost:8000}
-      AGENT_ENABLED: ${AGENT_ENABLED:-yes}
-      AGENT_HTTP_URL: ${AGENT_HTTP_URL:-http://localhost:8090}
-      AGENT_GRPC_URL: ${AGENT_GRPC_URL:-agent:50061}
+      AGENT_ENABLED: ${AGENT_ENABLED:-no}
+      AGENT_HTTP_URL: ${AGENT_HTTP_URL:-}
+      AGENT_GRPC_URL: ${AGENT_GRPC_URL:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_AGENT_ID: ${ANTHROPIC_AGENT_ID:-}
+      ANTHROPIC_ENVIRONMENT_ID: ${ANTHROPIC_ENVIRONMENT_ID:-}
       TEMPLATE_DIR: "/app/templates"
       RESEND_API_KEY: ${RESEND_API_KEY:-}
       EMAIL_FROM_NAME: ${EMAIL_FROM_NAME:-SuperPlane}
@@ -106,67 +120,11 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-      agent:
-        condition: service_healthy
 
     volumes:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
-
-  agent:
-    build:
-      context: agent
-      dockerfile: Dockerfile
-      target: dev
-      cache_from:
-        - ghcr.io/superplanehq/superplane-dev-base:agent-latest
-    working_dir: /app/agent
-    env_file:
-      - agent/.env
-    environment:
-      APP_PORT: ${APP_PORT:-8000}
-      SUPERPLANE_BASE_URL: ${SUPERPLANE_BASE_URL:-http://app:8000}
-      INTERNAL_GRPC_HOST: ${INTERNAL_GRPC_HOST:-0.0.0.0}
-      INTERNAL_GRPC_PORT: ${INTERNAL_GRPC_PORT:-50061}
-      DB_HOST: ${DB_HOST:-db}
-      DB_PORT: ${DB_PORT:-5432}
-      DB_NAME: ${DB_NAME:-agents_dev}
-      DB_USERNAME: ${DB_USERNAME:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-the-cake-is-a-lie}
-      DB_SSLMODE: ${DB_SSLMODE:-disable}
-      APPLICATION_NAME: ${APPLICATION_NAME:-superplane-agent}
-      AGENT_HTTP_DEBUG: ${AGENT_HTTP_DEBUG:-true}
-      JWT_SECRET: 1234567890abcdefghijklmnopqrstuv # must be the same as in the app
-      OTEL_ENABLED: "yes"
-      OTEL_EXPORTER_OTLP_PROTOCOL: "grpc"
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"
-      OTEL_SERVICE_NAME: "superplane-agent"
-      SENTRY_DSN: ""
-      SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
-    command: >-
-      bash -lc "uv run python -m uvicorn ai.web:create_app
-      --factory
-      --host 0.0.0.0
-      --port 8090
-      --timeout-graceful-shutdown ${AGENT_UVICORN_GRACEFUL_SHUTDOWN:-0}
-      --reload
-      --reload-dir /app/agent/src
-      --reload-dir /app/agent/evals"
-    stop_grace_period: ${AGENT_STOP_GRACE_PERIOD:-0s}
-    tty: true
-    stdin_open: true
-    ports:
-      - ${AGENT_HTTP_PORT:-${AGENT_REPL_WEB_PORT:-8090}}:8090
-    volumes:
-      - .:/app
-      - ./tmp/agent/evals:/app/tmp/agent/evals
-      - uv-cache:/root/.cache/uv
-    healthcheck:
-      test: ["CMD", "bash", "-lc", "uv --version >/dev/null && python --version >/dev/null"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
@@ -227,7 +185,4 @@ volumes:
     driver: local
 
   postgres-data:
-    driver: local
-
-  uv-cache:
     driver: local

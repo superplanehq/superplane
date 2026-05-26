@@ -22,6 +22,7 @@ const (
 type Claims struct {
 	AdminAccountID        string
 	ImpersonatedAccountID string
+	IssuedAt              int64
 }
 
 // GenerateToken creates a signed JWT for an impersonation session.
@@ -53,9 +54,12 @@ func ValidateToken(signer *jwt.Signer, tokenString string) (*Claims, error) {
 		return nil, fmt.Errorf("incomplete impersonation claims")
 	}
 
+	iat, _ := jwtClaims["iat"].(float64)
+
 	return &Claims{
 		AdminAccountID:        adminID,
 		ImpersonatedAccountID: accountID,
+		IssuedAt:              int64(iat),
 	}, nil
 }
 

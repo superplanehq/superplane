@@ -1,22 +1,34 @@
-import type { AgentState } from "@/components/AgentSidebar/useAgentState";
+import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { Button as UIButton } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
-import { GitBranch, MoreVertical, Settings } from "lucide-react";
+import { MoreVertical, Settings } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button } from "../button";
-import { AgentSidebarTrigger } from "./components/AgentSidebarTrigger";
 import { CanvasModeToggle } from "./components/CanvasModeToggle";
+import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
+import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
+import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
 
-type HeaderMode = "default" | "version-live" | "version-edit";
+export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
 
-interface HeaderProps {
+export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). */
   canvasName: string;
   onSave?: () => void;
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
+  onShowDiff?: () => void;
+  visualDiffEnabled?: boolean;
+  onToggleVisualDiff?: () => void;
+  draftVisualDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
+    diffToggles: {
+      showDeletedNodes: boolean;
+      toggleShowDeletedNodes: () => void;
+      showEdgeDiff: boolean;
+      toggleShowEdgeDiff: () => void;
+    };
+  };
   organizationId?: string;
   saveIsPrimary?: boolean;
   saveButtonHidden?: boolean;
@@ -27,23 +39,40 @@ interface HeaderProps {
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   mode?: HeaderMode;
+  /** When true, the canvas draft is active regardless of the current Console / Canvas / Memory tab. */
+  isEditing?: boolean;
+  /** Switches back to the Canvas tab without changing edit mode. */
+  onSelectCanvasView?: () => void;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
+  onSelectDashboard?: () => void;
+  /** Provided when Memory is available as a first-class tab; opens the Memory view. */
+  onSelectMemory?: () => void;
+  /** When set with `mode === "dashboard"` and editing, shows Add panel in the secondary header. */
+  onDashboardAddPanel?: () => void;
+  /** When set with `mode === "dashboard"` and editing, shows the YAML button in the secondary header. */
+  onDashboardOpenYaml?: () => void;
+  /** When set with the Canvas tab active and editing, opens the canvas YAML modal. */
+  onCanvasOpenYaml?: () => void;
+  /** When set with the Canvas tab active and editing, opens the add-component sidebar. */
+  onCanvasAddComponent?: () => void;
+  /** When true, the YAML button advertises read-only YAML view. Defaults to editable copy. */
+  dashboardYamlReadOnly?: boolean;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
   publishVersionLabel?: string;
   /** When true, shows the Discard control next to Publish in version edit mode (draft differs from live). */
   hasUnpublishedDraftChanges?: boolean;
+  /** ISO timestamp of the existing unpublished draft, used to label "Last edited X" in the Edit dropdown. */
+  unpublishedDraftUpdatedAt?: string;
+  /** Discard the existing draft and start a new edit session from live. Shown in the Edit dropdown when a draft exists. */
+  onDiscardDraftAndStartEdit?: () => void;
   /** Canvas settings route requires `canvases:update`; hide the menu when the user cannot update. */
   showCanvasSettingsMenu?: boolean;
-  isVersionControlOpen?: boolean;
-  onOpenVersionControl?: () => void;
-  versionControlButtonTooltip?: string;
-  versionControlNotificationCount?: number;
-  agentState: AgentState;
+  toolSidebarState: CanvasToolSidebarState;
 }
 
 export function Header(props: HeaderProps) {
@@ -55,6 +84,24 @@ export function Header(props: HeaderProps) {
         organizationId={props.organizationId}
         headerTitle={headerTitle}
         showCanvasSettingsMenu={props.showCanvasSettingsMenu}
+        mode={props.mode}
+        isEditing={props.isEditing}
+        hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
+        onDiscardVersion={props.onDiscardVersion}
+        discardVersionDisabled={props.discardVersionDisabled}
+        discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
+        onExitEditMode={props.onExitEditMode}
+        exitEditModeDisabled={props.exitEditModeDisabled}
+        exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
+        onPublishVersion={props.onPublishVersion}
+        publishVersionLabel={props.publishVersionLabel}
+        publishVersionDisabled={props.publishVersionDisabled}
+        publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
+        onEnterEditMode={props.onEnterEditMode}
+        enterEditModeDisabled={props.enterEditModeDisabled}
+        enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
+        onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
+        unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
       />
 
       <SecondaryHeader {...props} />
@@ -66,24 +113,95 @@ function PageHeader({
   organizationId,
   headerTitle,
   showCanvasSettingsMenu = true,
+  mode,
+  isEditing = false,
+  hasUnpublishedDraftChanges,
+  onDiscardVersion,
+  discardVersionDisabled,
+  discardVersionDisabledTooltip,
+  onExitEditMode,
+  exitEditModeDisabled,
+  exitEditModeDisabledTooltip,
+  onPublishVersion,
+  publishVersionLabel,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
+  onEnterEditMode,
+  enterEditModeDisabled,
+  enterEditModeDisabledTooltip,
+  onDiscardDraftAndStartEdit,
+  unpublishedDraftUpdatedAt,
 }: {
   organizationId?: string;
   headerTitle: string;
   showCanvasSettingsMenu?: boolean;
+  mode?: HeaderMode;
+  isEditing?: boolean;
+  hasUnpublishedDraftChanges?: boolean;
+  onDiscardVersion?: () => void;
+  discardVersionDisabled?: boolean;
+  discardVersionDisabledTooltip?: string;
+  onExitEditMode?: () => void;
+  exitEditModeDisabled?: boolean;
+  exitEditModeDisabledTooltip?: string;
+  onPublishVersion?: () => void;
+  publishVersionLabel?: string;
+  publishVersionDisabled?: boolean;
+  publishVersionDisabledTooltip?: string;
+  onEnterEditMode?: () => void;
+  enterEditModeDisabled?: boolean;
+  enterEditModeDisabledTooltip?: string;
+  onDiscardDraftAndStartEdit?: () => void;
+  unpublishedDraftUpdatedAt?: string;
 }) {
   const navigate = useNavigate();
   const { workflowId, canvasId: canvasIdParam } = useParams<{ workflowId?: string; canvasId?: string }>();
   const activeCanvasId = canvasIdParam || workflowId;
 
   return (
-    <div className="relative flex h-11 items-center border-b border-slate-950/15 px-3 sm:px-4">
+    <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 px-3 sm:px-4">
       <div className="relative z-10 flex min-w-0 shrink-0 items-center">
         <OrganizationMenuButton organizationId={organizationId} />
       </div>
-      <div className="pointer-events-none absolute inset-x-0 flex justify-center px-24">
-        <span className="truncate text-center text-sm font-medium text-slate-900">{headerTitle}</span>
+      <div className="pointer-events-none absolute inset-x-0 flex items-center justify-center px-24">
+        <div className="pointer-events-auto">
+          {organizationId && activeCanvasId ? (
+            <CanvasProjectSwitcher
+              organizationId={organizationId}
+              activeCanvasId={activeCanvasId}
+              canvasName={headerTitle}
+            />
+          ) : (
+            <span className="block truncate text-center text-[13px] font-medium text-slate-900">{headerTitle}</span>
+          )}
+        </div>
       </div>
-      <div className="relative z-10 ml-auto flex shrink-0 items-center">
+      <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
+        {mode !== "runs" && !isEditing && onEnterEditMode ? (
+          <LiveModeTopHeaderActions
+            onEnterEditMode={onEnterEditMode}
+            enterEditModeDisabled={enterEditModeDisabled}
+            enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
+            hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+            onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
+            unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
+          />
+        ) : null}
+        {isEditing ? (
+          <EditModeTopHeaderActions
+            hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+            onDiscardVersion={onDiscardVersion}
+            discardVersionDisabled={discardVersionDisabled}
+            discardVersionDisabledTooltip={discardVersionDisabledTooltip}
+            onExitEditMode={onExitEditMode}
+            exitEditModeDisabled={exitEditModeDisabled}
+            exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+            onPublishVersion={onPublishVersion}
+            publishVersionLabel={publishVersionLabel}
+            publishVersionDisabled={publishVersionDisabled}
+            publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          />
+        ) : null}
         {showCanvasSettingsMenu && organizationId && activeCanvasId ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -111,20 +229,32 @@ function PageHeader({
 }
 
 function SecondaryHeader(props: HeaderProps) {
-  const showCanvasViewModeToggle = props.mode === "version-live" || props.mode === "version-edit";
-  const canvasViewMode = props.mode === "version-edit" ? "version-edit" : "version-live";
+  const showCanvasViewModeToggle =
+    (!!props.onSelectDashboard || !!props.onSelectMemory) &&
+    (props.mode === "version-live" || props.mode === "runs" || props.mode === "dashboard" || props.mode === "memory");
+  const canvasViewMode =
+    props.mode === "runs"
+      ? "runs"
+      : props.mode === "dashboard"
+        ? "dashboard"
+        : props.mode === "memory"
+          ? "memory"
+          : "version-live";
+  const editing = props.isEditing ?? props.mode === "version-edit";
 
   return (
-    <div className="relative flex h-12 items-center border-b border-slate-950/15 bg-slate-100 px-4 gap-3">
-      <AgentSidebarTrigger agentState={props.agentState} />
+    <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-4">
+      <CanvasToolSidebarTrigger toolSidebarState={props.toolSidebarState} />
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">
         <div className="pointer-events-auto">
-          {showCanvasViewModeToggle && props.onEnterEditMode && props.onExitEditMode ? (
+          {showCanvasViewModeToggle && props.onSelectCanvasView ? (
             <CanvasModeToggle
               mode={canvasViewMode}
-              onSelectEditor={props.onEnterEditMode}
-              onSelectLive={props.onExitEditMode}
+              onSelectLive={props.onSelectCanvasView}
+              onSelectDashboard={props.onSelectDashboard}
+              onSelectMemory={props.onSelectMemory}
+              editing={editing}
             />
           ) : null}
         </div>
@@ -132,218 +262,5 @@ function SecondaryHeader(props: HeaderProps) {
 
       <SecondaryHeaderActions {...props} />
     </div>
-  );
-}
-
-function SecondaryHeaderActions({
-  mode,
-  isVersionControlOpen,
-  onOpenVersionControl,
-  versionControlButtonTooltip,
-  versionControlNotificationCount = 0,
-  onSave,
-  saveButtonHidden,
-  saveDisabled,
-  saveDisabledTooltip,
-  saveIsPrimary,
-  hasUnpublishedDraftChanges,
-  onDiscardVersion,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
-  onPublishVersion,
-  publishVersionLabel,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
-}: HeaderProps) {
-  const showVersionControlTrigger = mode === "version-live" && !!onOpenVersionControl;
-
-  return (
-    <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-      {showVersionControlTrigger ? (
-        <VersionControlButton
-          onToggle={onOpenVersionControl}
-          isOpen={!!isVersionControlOpen}
-          tooltip={versionControlButtonTooltip}
-          notificationCount={versionControlNotificationCount}
-        />
-      ) : null}
-
-      {mode === "default" && onSave && !saveButtonHidden ? (
-        <SaveButton
-          onSave={onSave}
-          saveDisabled={saveDisabled}
-          saveDisabledTooltip={saveDisabledTooltip}
-          saveIsPrimary={saveIsPrimary}
-        />
-      ) : null}
-
-      {mode === "version-edit" ? (
-        <div className="flex items-center gap-2">
-          {hasUnpublishedDraftChanges ? (
-            <DiscardDraftButton
-              onDiscard={() => onDiscardVersion?.()}
-              disabled={discardVersionDisabled || !onDiscardVersion}
-              disabledTooltip={discardVersionDisabledTooltip}
-            />
-          ) : null}
-          <PublishVersionButton
-            onPublish={() => onPublishVersion?.()}
-            label={publishVersionLabel || "Publish"}
-            disabled={publishVersionDisabled || !onPublishVersion}
-            publishVersionDisabled={!!publishVersionDisabled}
-            publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-          />
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function VersionControlButton({
-  onToggle,
-  isOpen,
-  tooltip,
-  notificationCount,
-}: {
-  onToggle: () => void;
-  isOpen: boolean;
-  tooltip?: string;
-  notificationCount: number;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="relative inline-flex">
-          <UIButton
-            type="button"
-            variant="outline"
-            size="icon"
-            className={isOpen ? "h-8 w-8 bg-slate-200 border-slate-300" : "h-8 w-8"}
-            onClick={onToggle}
-            aria-label={isOpen ? "Close version control" : "Open version control"}
-            aria-pressed={isOpen}
-          >
-            <GitBranch className="h-4 w-4" />
-          </UIButton>
-          {notificationCount > 0 ? (
-            <span className="absolute left-5 -top-1.5 inline-flex min-w-[1.125rem] items-center justify-center rounded-full bg-orange-600 px-1 text-[10px] font-semibold leading-4 text-white">
-              {notificationCount > 99 ? "99+" : notificationCount}
-            </span>
-          ) : null}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="top">{tooltip || "Open version control"}</TooltipContent>
-    </Tooltip>
-  );
-}
-
-function SaveButton({
-  onSave,
-  saveDisabled,
-  saveDisabledTooltip,
-  saveIsPrimary,
-}: {
-  onSave: () => void;
-  saveDisabled?: boolean;
-  saveDisabledTooltip?: string;
-  saveIsPrimary?: boolean;
-}) {
-  if (saveDisabled && saveDisabledTooltip) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="inline-flex">
-            <Button
-              onClick={onSave}
-              size="sm"
-              variant={saveIsPrimary ? "default" : "outline"}
-              data-testid="save-canvas-button"
-              disabled={saveDisabled}
-            >
-              Save
-            </Button>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top">{saveDisabledTooltip}</TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <Button
-      onClick={onSave}
-      size="sm"
-      variant={saveIsPrimary ? "default" : "outline"}
-      data-testid="save-canvas-button"
-      disabled={saveDisabled}
-    >
-      Save
-    </Button>
-  );
-}
-
-function DiscardDraftButton({
-  onDiscard,
-  disabled,
-  disabledTooltip,
-}: {
-  onDiscard: () => void;
-  disabled: boolean;
-  disabledTooltip?: string;
-}) {
-  if (disabled && disabledTooltip) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="inline-flex">
-            <UIButton type="button" variant="outline" size="sm" onClick={onDiscard} disabled={disabled}>
-              Discard
-            </UIButton>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top">{disabledTooltip}</TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <UIButton type="button" variant="outline" size="sm" onClick={onDiscard} disabled={disabled}>
-      Discard
-    </UIButton>
-  );
-}
-
-function PublishVersionButton({
-  onPublish,
-  label,
-  disabled,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
-}: {
-  onPublish: () => void;
-  label: string;
-  disabled: boolean;
-  publishVersionDisabled: boolean;
-  publishVersionDisabledTooltip?: string;
-}) {
-  if (publishVersionDisabled && publishVersionDisabledTooltip) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="inline-flex">
-            <UIButton type="button" variant="default" size="sm" onClick={onPublish} disabled={disabled}>
-              {label}
-            </UIButton>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top">{publishVersionDisabledTooltip}</TooltipContent>
-      </Tooltip>
-    );
-  }
-
-  return (
-    <UIButton type="button" variant="default" size="sm" onClick={onPublish} disabled={disabled}>
-      {label}
-    </UIButton>
   );
 }

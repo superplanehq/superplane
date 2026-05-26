@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import React from "react";
 import { Link, useParams } from "react-router-dom";
 import { OrgCanvasesTable } from "./OrgCanvasesTable";
+import { OrgExperimentalFeaturesTable } from "./OrgExperimentalFeaturesTable";
 import { OrgUsersTable } from "./OrgUsersTable";
 
 const OrganizationDetail: React.FC = () => {
@@ -15,6 +16,7 @@ const OrganizationDetail: React.FC = () => {
       </Link>
       <OrgUsersTable orgId={orgId!} />
       <OrgCanvasesTable orgId={orgId!} />
+      <OrgExperimentalFeaturesTable orgId={orgId!} />
     </div>
   );
 };

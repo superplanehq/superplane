@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -31,6 +32,18 @@ type Client struct {
 	ownerType  string
 	owner      string
 	underlying *github.Client
+}
+
+func IsNotFoundError(err error) bool {
+	var githubErr *github.ErrorResponse
+	if errors.As(err, &githubErr) && githubErr.Response != nil && githubErr.Response.StatusCode == http.StatusNotFound {
+		return true
+	}
+
+	var installationErr *ghinstallation.HTTPError
+	return errors.As(err, &installationErr) &&
+		installationErr.Response != nil &&
+		installationErr.Response.StatusCode == http.StatusNotFound
 }
 
 func (c *Client) FindRepository(repository string) (*github.Repository, error) {
@@ -157,6 +170,14 @@ func (c *Client) CreatePullRequest(ctx context.Context, repository string, pullR
 
 func (c *Client) CreateStatus(ctx context.Context, repository string, sha string, status github.RepoStatus) (*github.RepoStatus, *github.Response, error) {
 	return c.underlying.Repositories.CreateStatus(ctx, c.owner, repository, sha, status)
+}
+
+func (c *Client) CreateDeployment(ctx context.Context, repository string, request *github.DeploymentRequest) (*github.Deployment, *github.Response, error) {
+	return c.underlying.Repositories.CreateDeployment(ctx, c.owner, repository, request)
+}
+
+func (c *Client) CreateDeploymentStatus(ctx context.Context, repository string, deploymentID int64, request *github.DeploymentStatusRequest) (*github.DeploymentStatus, *github.Response, error) {
+	return c.underlying.Repositories.CreateDeploymentStatus(ctx, c.owner, repository, deploymentID, request)
 }
 
 func (c *Client) CreateWorkflowDispatchEvent(ctx context.Context, repository string, workflowFile string, request github.CreateWorkflowDispatchEventRequest) (*github.WorkflowDispatchRunDetails, *github.Response, error) {

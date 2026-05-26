@@ -7,9 +7,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/features"
 	"github.com/superplanehq/superplane/pkg/models"
+	pbAgents "github.com/superplanehq/superplane/pkg/protos/agents"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
+	"gorm.io/datatypes"
 )
 
 func TestDefaultResourceResolver(t *testing.T) {
@@ -30,10 +35,42 @@ func TestCanvasResourceResolver(t *testing.T) {
 		require.Equal(t, []string{"canvas-123"}, resourceIDs)
 	})
 
+	t.Run("returns canvas id for list runs", func(t *testing.T) {
+		resourceIDs := canvasResourceResolver(&pbCanvases.ListRunsRequest{CanvasId: "canvas-123"})
+		require.Equal(t, []string{"canvas-123"}, resourceIDs)
+	})
+
 	t.Run("returns nil when request does not expose a canvas id", func(t *testing.T) {
 		resourceIDs := canvasResourceResolver(&pbCanvases.ListCanvasesRequest{})
 		assert.Nil(t, resourceIDs)
 	})
+}
+
+func TestCanvasAuthorizationRulesSeparateDraftAndLiveActions(t *testing.T) {
+	interceptor := NewAuthorizationInterceptor(nil)
+
+	tests := []struct {
+		method string
+		action string
+	}{
+		{pbCanvases.Canvases_CreateCanvasVersion_FullMethodName, "update_version"},
+		{pbCanvases.Canvases_UpdateCanvasVersion_FullMethodName, "update_version"},
+		{pbCanvases.Canvases_ApplyCanvasVersionChangeset_FullMethodName, "update_version"},
+		{pbCanvases.Canvases_DeleteCanvasVersion_FullMethodName, "update_version"},
+		{pbCanvases.Canvases_PublishCanvasVersion_FullMethodName, "publish"},
+		{pbCanvases.Canvases_ActOnCanvasChangeRequest_FullMethodName, "publish"},
+		{pbCanvases.Canvases_UpdateCanvas_FullMethodName, "update"},
+		{pbCanvases.Canvases_DeleteCanvas_FullMethodName, "delete"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.method, func(t *testing.T) {
+			rule, ok := interceptor.rules[tt.method]
+			require.True(t, ok)
+			assert.Equal(t, "canvases", rule.Resource)
+			assert.Equal(t, tt.action, rule.Action)
+		})
+	}
 }
 
 func TestHasRequiredScopedTokenPermission(t *testing.T) {
@@ -190,6 +227,36 @@ func TestMetadataScopedTokenPermissions(t *testing.T) {
 		assert.Equal(t, "read", permissions[0].Action)
 		assert.Equal(t, []string{"canvas-123"}, permissions[0].Resources)
 	})
+}
+
+func TestAgentRoutesRequireManagedAgentsFeature(t *testing.T) {
+	interceptor := NewAuthorizationInterceptor(nil)
+	routes := []string{
+		pbAgents.Agents_GetCanvasAgentChat_FullMethodName,
+		pbAgents.Agents_SendAgentChatMessage_FullMethodName,
+		pbAgents.Agents_ListAgentChatMessages_FullMethodName,
+	}
+
+	for _, route := range routes {
+		rule, ok := interceptor.rules[route]
+		require.True(t, ok)
+		assert.Equal(t, []string{features.FeatureClaudeManagedAgents}, rule.RequiredExperimentalFeatures)
+	}
+}
+
+func TestCheckRequiredExperimentalFeatures(t *testing.T) {
+	rule := AuthorizationRule{
+		RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
+	}
+
+	err := checkRequiredExperimentalFeatures(&models.Organization{}, rule)
+	require.Error(t, err)
+	assert.Equal(t, codes.PermissionDenied, status.Code(err))
+
+	err = checkRequiredExperimentalFeatures(&models.Organization{
+		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{features.FeatureClaudeManagedAgents},
+	}, rule)
+	require.NoError(t, err)
 }
 
 func marshalScopes(t *testing.T, scopes []string) string {
