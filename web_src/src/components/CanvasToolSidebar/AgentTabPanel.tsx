@@ -47,11 +47,9 @@ function getBootMessage(canvasId: string): string {
   try {
     const ctx = JSON.parse(raw) as { canvasId: string; message: string };
     if (ctx.canvasId !== canvasId) return DEFAULT_BOOT_MESSAGE;
-    sessionStorage.removeItem(BOOT_CONTEXT_KEY);
     if (ctx.message === "blank") return BLANK_BOOT_MESSAGE;
     return ctx.message;
   } catch {
-    sessionStorage.removeItem(BOOT_CONTEXT_KEY);
     return DEFAULT_BOOT_MESSAGE;
   }
 }
@@ -175,6 +173,7 @@ function ChatConversation({
         })
         .then(() => {
           bootState.current = "sent";
+          sessionStorage.removeItem(BOOT_CONTEXT_KEY);
         })
         .catch(() => {
           bootState.current = "idle";
