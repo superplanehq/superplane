@@ -39,6 +39,7 @@ export function useInstallTemplate() {
 
         const result = (await response.json()) as InstallResult;
         localStorage.setItem("canvasAgentSidebarOpen", "true");
+        localStorage.setItem("canvasSidebarOpen", "false");
         if (agentInstructions) sessionStorage.setItem("agent-boot-context", agentInstructions);
         navigate(`/${result.organizationId}/canvases/${result.canvasId}?edit=1`);
       } catch (error) {
