@@ -141,7 +141,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
               {visible.map((app) => (
                 <CommandItem
                   key={app.repo}
-                  value={`${app.title} ${app.description} ${app.integrations.join(" ")}`}
+                  value={`${app.title} ${app.description} ${app.integrations.join(" ")} ${app.tags.join(" ")}`}
                   onSelect={() => setSelectedApp(app)}
                   disabled={busy}
                   className="gap-3 px-3 py-3"
