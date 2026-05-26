@@ -1,16 +1,16 @@
 import type { CanvasesCanvas } from "@/api-client";
 import { Input } from "@/components/Input/input";
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCanvases, useUpdateCanvas } from "@/hooks/useCanvasData";
 import { useRecentCanvasOpens } from "@/hooks/useRecentCanvasOpens";
 import { getApiErrorMessage } from "@/lib/errors";
 import { sortCanvasProjectsByRecentOpen, type CanvasProjectOption } from "@/lib/recentCanvasOpens";
 import { showErrorToast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/dropdownMenu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Command as CommandPrimitive } from "cmdk";
-import { Check, Pencil, Search } from "lucide-react";
+import { Check, MoreVertical, Pencil, Search, Settings } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -168,14 +168,13 @@ export function CanvasProjectSwitcher({
     [activeCanvasId, canUpdateCanvas, canvasName, focusRenameInput, updateCanvasMutation.isPending],
   );
 
-  const handleRenameClick = () => {
-    if (isRenaming) {
-      focusRenameInput(true);
+  const handleOpenSettings = useCallback(() => {
+    if (!activeCanvasId) {
       return;
     }
 
-    startRenaming();
-  };
+    navigate(`/${organizationId}/canvases/${activeCanvasId}/settings`);
+  }, [activeCanvasId, navigate, organizationId]);
 
   const handleRenameKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
@@ -211,7 +210,7 @@ export function CanvasProjectSwitcher({
   );
 
   const triggerIconClassName = "size-3.5 shrink-0 text-slate-400 transition-colors group-hover/trigger:text-slate-800";
-  const renameIconClassName = "size-3.5 shrink-0 text-slate-400 transition-colors group-hover/rename:text-slate-800";
+  const actionsIconClassName = "size-3.5 shrink-0 text-slate-400 transition-colors group-hover/actions:text-slate-800";
 
   const triggerClassName = cn(
     "group/trigger flex items-center gap-2 px-2.5 text-[13px]",
@@ -220,8 +219,8 @@ export function CanvasProjectSwitcher({
     triggerSurfaceClassName,
   );
 
-  const iconTriggerClassName = cn(
-    "group/rename flex items-center justify-center text-[13px]",
+  const actionsTriggerClassName = cn(
+    "group/actions flex items-center justify-center text-[13px]",
     SWITCHER_HEIGHT_CLASS,
     "w-7 shrink-0",
     triggerSurfaceClassName,
@@ -264,7 +263,7 @@ export function CanvasProjectSwitcher({
           className={cn(triggerClassName, open && "pointer-events-none invisible")}
         >
           <Search className={triggerIconClassName} aria-hidden="true" />
-          <span className="min-w-0 truncate font-medium text-slate-700">{displayName}</span>
+          <span className="min-w-0 truncate font-medium text-slate-800">{displayName}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -322,26 +321,32 @@ export function CanvasProjectSwitcher({
     >
       <div className={cn("relative", SWITCHER_WIDTH_CLASS)}>{switcherSurface}</div>
       {canUpdateCanvas && activeCanvasId && !isRenaming ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <button
               type="button"
-              aria-label="Rename app"
-              data-testid="canvas-rename-trigger"
+              aria-label="App actions"
+              data-testid="canvas-actions-trigger"
               className={cn(
-                iconTriggerClassName,
+                actionsTriggerClassName,
                 "pointer-events-none opacity-0 group-hover/switcher:pointer-events-auto group-hover/switcher:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100",
               )}
               disabled={updateCanvasMutation.isPending}
-              onClick={handleRenameClick}
             >
-              <Pencil className={renameIconClassName} aria-hidden="true" />
+              <MoreVertical className={actionsIconClassName} aria-hidden="true" />
             </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={6}>
-            Rename
-          </TooltipContent>
-        </Tooltip>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => startRenaming()}>
+              <Pencil size={16} />
+              Rename
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleOpenSettings}>
+              <Settings size={16} />
+              App Settings
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ) : null}
     </div>
   );
