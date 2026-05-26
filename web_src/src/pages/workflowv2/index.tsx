@@ -90,6 +90,7 @@ import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
+import { canEditCanvasMemory } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { CanvasYamlModal } from "./CanvasYamlModal";
@@ -5508,6 +5509,7 @@ export function WorkflowPageV2() {
           canUpdateCanvas={canUpdateCanvas}
           isTemplate={isTemplate}
           canvasDeletedRemotely={canvasDeletedRemotely}
+          editLocked={isReadOnly}
           dashboardQuery={dashboardQuery}
           updateDashboardMutation={updateDashboardMutation}
           addPanelDialogOpen={isDashboardAddPanelOpen}
@@ -5523,9 +5525,13 @@ export function WorkflowPageV2() {
         />
         <WorkflowMemoryOverlayLayer
           isMemoryMode={isMemoryMode}
-          isViewingDraftVersion={isViewingDraftVersion}
-          isViewingLiveVersion={isViewingLiveVersion}
-          canUpdateCanvas={canUpdateCanvas}
+          canDelete={canEditCanvasMemory({
+            canUpdateCanvas,
+            isTemplate,
+            canvasDeletedRemotely,
+            isViewingLiveVersion,
+            isViewingDraftVersion,
+          })}
           entries={canvasMemoryEntries}
           isLoading={canvasMemoryLoading}
           error={canvasMemoryError}
