@@ -17,6 +17,7 @@ import (
 // pipe-bundle via RUNNER_SHELL_USE_PIPE) and the argv-subprocess path.
 type HostExecutor struct {
 	MaxOutputBytes int
+	TaskWorkDir    string
 }
 
 func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live io.Writer, resultHostPath string) (int, string, error) {
@@ -29,12 +30,13 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 		return 1, "", err
 	}
 	if len(task.Commands) > 0 {
-		return runHostShellDirectives(ctx, max, task.Commands, env, live, resultHostPath)
+		return runHostShellDirectives(ctx, max, h.TaskWorkDir, task.Commands, env, live, resultHostPath)
 	}
 	if len(task.Command) == 0 {
 		return 1, "", errors.New("empty command")
 	}
 	cmd := exec.CommandContext(ctx, task.Command[0], task.Command[1:]...)
+	cmd.Dir = h.TaskWorkDir
 	applyCmdEnv(cmd, env, resultHostPath)
 	var buf bytes.Buffer
 	if live != nil {

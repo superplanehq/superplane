@@ -34,13 +34,13 @@ func usePipeShell() bool {
 	}
 }
 
-func runHostShellDirectives(ctx context.Context, maxOut int, scripts []string, env []string, live io.Writer, resultHostPath string) (int, string, error) {
+func runHostShellDirectives(ctx context.Context, maxOut int, workDir string, scripts []string, env []string, live io.Writer, resultHostPath string) (int, string, error) {
 	bash, err := resolveBash()
 	if err != nil {
 		return 1, "", err
 	}
 	if usePipeShell() {
-		return runHostShellDirectivesPipe(ctx, maxOut, bash, scripts, env, live, resultHostPath)
+		return runHostShellDirectivesPipe(ctx, maxOut, workDir, bash, scripts, env, live, resultHostPath)
 	}
 	// Plain exec.Command (not CommandContext): attaching ctx to os/exec races with creack/pty on
 	// some Darwin setups; cancellation is handled inside runShellPTYSession via ctx + Process.Kill().
@@ -48,6 +48,7 @@ func runHostShellDirectives(ctx context.Context, maxOut int, scripts []string, e
 	// `/bin/bash: --: invalid option`). Keep job-control off (`+m`) for non-interactive scripts but
 	// omit `--noediting`; readline editing is irrelevant on our PTY-driven line protocol anyway.
 	cmd := exec.Command(bash, "--norc", "--noprofile", "+m", "-i")
+	cmd.Dir = workDir
 	if env != nil {
 		cmd.Env = env
 	}
@@ -96,7 +97,7 @@ func writeDirectiveBundle(tmpRoot string, parts []string) (metaPath string, err 
 
 // runHostShellDirectivesPipe runs directives in one bash process without a PTY (same source bundle
 // semantics as the PTY path: cwd/env persist across sources).
-func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, scripts []string, env []string, live io.Writer, resultHostPath string) (int, string, error) {
+func runHostShellDirectivesPipe(ctx context.Context, maxOut int, workDir string, bash string, scripts []string, env []string, live io.Writer, resultHostPath string) (int, string, error) {
 	parts := normalizeDirectiveLines(scripts)
 	if len(parts) == 0 {
 		return 1, "", errEmptyCommands()
@@ -113,6 +114,7 @@ func runHostShellDirectivesPipe(ctx context.Context, maxOut int, bash string, sc
 	}
 
 	cmd := exec.CommandContext(ctx, bash, "--norc", "--noprofile", metaPath)
+	cmd.Dir = workDir
 	applyCmdEnv(cmd, env, resultHostPath)
 	max := maxOut
 	if max <= 0 {

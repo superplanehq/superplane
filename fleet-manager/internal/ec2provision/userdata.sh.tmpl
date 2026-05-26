@@ -38,6 +38,7 @@ unzip -q /tmp/awscliv2.zip -d /tmp
 /tmp/aws/install --update
 
 systemctl enable --now docker
+usermod -aG docker ubuntu
 
 #########################################################
 # 
@@ -101,7 +102,7 @@ CWEOF
 # 
 # Systemd unit
 #
-# Run the runner as superplane-runner.service. Sandbox restrictions are relaxed so
+# Run the runner as the ubuntu user (default on Ubuntu EC2 AMIs). Sandbox restrictions are relaxed so
 # host-mode tasks can use PTY + bash without fork/exec EPERM.
 #
 #########################################################
@@ -113,6 +114,9 @@ Wants=docker.service
 
 [Service]
 Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 EnvironmentFile=/etc/default/superplane-runner
 PrivateUsers=no
@@ -129,6 +133,10 @@ StandardError=append:/var/log/superplane-runner.log
 [Install]
 WantedBy=multi-user.target
 UNITEOF
+
+touch /var/log/superplane-runner.log
+chown ubuntu:ubuntu /var/log/superplane-runner.log
+chmod 644 /var/log/superplane-runner.log
 
 #########################################################
 # 
