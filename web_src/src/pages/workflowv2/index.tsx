@@ -5525,7 +5525,13 @@ export function WorkflowPageV2() {
         />
         <WorkflowMemoryOverlayLayer
           isMemoryMode={isMemoryMode}
-          canDelete={canEditCanvasMemory({ isReadOnly, canUpdateCanvas, isViewingLiveVersion, isViewingDraftVersion })}
+          canDelete={canEditCanvasMemory({
+            canUpdateCanvas,
+            isTemplate,
+            canvasDeletedRemotely,
+            isViewingLiveVersion,
+            isViewingDraftVersion,
+          })}
           entries={canvasMemoryEntries}
           isLoading={canvasMemoryLoading}
           error={canvasMemoryError}

@@ -1,18 +1,20 @@
 /**
  * Resolves whether the canvas memory delete affordance should be exposed for
- * the current viewer + version. Centralized so the workflow page and overlay
- * stay aligned on a single gating rule.
+ * the current viewer + version. Memory belongs to the live canvas, so this
+ * should not depend on draft edit mode.
  */
 export function canEditCanvasMemory({
-  isReadOnly,
   canUpdateCanvas,
+  isTemplate,
+  canvasDeletedRemotely,
   isViewingLiveVersion,
   isViewingDraftVersion,
 }: {
-  isReadOnly: boolean;
   canUpdateCanvas: boolean;
+  isTemplate: boolean;
+  canvasDeletedRemotely: boolean;
   isViewingLiveVersion: boolean;
   isViewingDraftVersion: boolean;
 }): boolean {
-  return !isReadOnly && canUpdateCanvas && isViewingLiveVersion && !isViewingDraftVersion;
+  return canUpdateCanvas && !isTemplate && !canvasDeletedRemotely && isViewingLiveVersion && !isViewingDraftVersion;
 }
