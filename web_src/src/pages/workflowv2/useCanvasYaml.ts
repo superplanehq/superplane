@@ -4,11 +4,9 @@ import type {
   SuperplaneComponentsEdge as ComponentsEdge,
   SuperplaneComponentsNode as ComponentsNode,
 } from "@/api-client";
-import { canvasKeys } from "@/hooks/useCanvasData";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { analytics } from "@/lib/analytics";
 import type { CanvasNode } from "@/ui/CanvasPage";
-import type { QueryClient } from "@tanstack/react-query";
 import type { CanvasYamlModalProps } from "./CanvasYamlModal";
 
 interface UseCanvasYamlParams {
@@ -25,7 +23,7 @@ interface UseCanvasYamlParams {
     workflowToSave?: CanvasesCanvas,
     options?: { showToast?: boolean },
   ) => Promise<{ status: "saved" | "replaced" | "stale" } | undefined | void>;
-  queryClient: QueryClient;
+  onWorkflowImported: (workflow: CanvasesCanvas) => void;
 }
 
 export function useCanvasYaml({
@@ -39,7 +37,7 @@ export function useCanvasYaml({
   canvas,
   isReadOnly,
   handleSaveWorkflow,
-  queryClient,
+  onWorkflowImported,
 }: UseCanvasYamlParams) {
   const yamlPayload = useMemo(() => getYamlExportPayload(nodes), [getYamlExportPayload, nodes]);
 
@@ -87,12 +85,12 @@ export function useCanvasYaml({
 
       const result = await handleSaveWorkflow(updatedWorkflow);
       if (result?.status !== "saved") {
-        return;
+        throw new Error(getImportFailureMessage(result?.status));
       }
 
-      queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), updatedWorkflow);
+      onWorkflowImported(updatedWorkflow);
     },
-    [importYamlGuardError, canvas, handleSaveWorkflow, queryClient, organizationId, canvasId],
+    [importYamlGuardError, canvas, handleSaveWorkflow, onWorkflowImported],
   );
 
   return {
@@ -108,4 +106,16 @@ export function useCanvasYaml({
       isImporting,
     } satisfies CanvasYamlModalProps,
   };
+}
+
+function getImportFailureMessage(status?: "replaced" | "stale") {
+  if (status === "stale") {
+    return "The canvas changed while importing. Refresh and try again.";
+  }
+
+  if (status === "replaced") {
+    return "A newer canvas save replaced this import. Try importing again.";
+  }
+
+  return "YAML import could not be saved. Try again.";
 }

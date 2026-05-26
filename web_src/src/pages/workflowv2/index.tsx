@@ -5273,7 +5273,7 @@ export function WorkflowPageV2() {
     canvas,
     isReadOnly,
     handleSaveWorkflow,
-    queryClient,
+    onWorkflowImported: applyLocalWorkflowUpdate,
   });
 
   const workflowFiles = useMemo(
