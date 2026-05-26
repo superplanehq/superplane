@@ -15,13 +15,14 @@ import {
   type Viewport,
 } from "@xyflow/react";
 
-import { NodeSearch } from "@/components/node-search";
+import { GlobalCommandPaletteCanvasNodeSearch } from "@/components/GlobalCommandPalette/canvasNodeSearch";
+import { openGlobalCommandPalette } from "@/components/GlobalCommandPalette/controller";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
 import { cn } from "@/lib/utils";
-import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Trash2, TriangleAlert } from "lucide-react";
+import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Search, Trash2, TriangleAlert } from "lucide-react";
 import {
   Component,
   memo,
@@ -183,6 +184,8 @@ export interface CanvasPageProps {
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
+  /** Switches back to the Canvas tab without changing edit mode. */
+  onSelectCanvasView?: () => void;
   onSelectRuns?: () => void;
   onExitRunsMode?: () => void;
   onSelectDashboard?: () => void;
@@ -192,6 +195,10 @@ export interface CanvasPageProps {
   onDashboardAddPanel?: () => void;
   /** Opens the dashboard YAML modal when `headerMode` is `dashboard`. */
   onDashboardOpenYaml?: () => void;
+  /** Opens the canvas YAML modal from the secondary header when editing on the Canvas tab. */
+  onCanvasOpenYaml?: () => void;
+  /** Opens the add-component sidebar from the secondary header when editing on the Canvas tab. */
+  onCanvasAddComponent?: () => void;
   /** Whether the dashboard YAML modal will open in read-only mode (no apply). */
   dashboardYamlReadOnly?: boolean;
   publishVersionLabel?: string;
@@ -278,7 +285,7 @@ export interface CanvasPageProps {
 
   // Building blocks for adding new nodes
   buildingBlocks: BuildingBlockCategory[];
-  /** When true with a non-empty `activeCanvasVersionId`, the agent may run in build mode. */
+  /** When true, the canvas draft is active across Canvas, Console, and Memory tabs. */
   isEditing: boolean;
   /** Active canvas version id (draft when editing); drives agent build mode. */
   activeCanvasVersionId: string;
@@ -1154,7 +1161,7 @@ function CanvasPage(props: CanvasPageProps) {
     disabled:
       readOnly ||
       Boolean(props.hideAddControls) ||
-      props.headerMode === "version-live" ||
+      !props.isEditing ||
       props.headerMode === "dashboard" ||
       props.headerMode === "memory" ||
       props.headerMode === "runs" ||
@@ -1269,6 +1276,8 @@ function CanvasPage(props: CanvasPageProps) {
           discardVersionDisabled={props.discardVersionDisabled}
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
           headerMode={props.headerMode}
+          isEditing={props.isEditing}
+          onSelectCanvasView={props.onSelectCanvasView}
           onEnterEditMode={props.onEnterEditMode}
           enterEditModeDisabled={props.enterEditModeDisabled}
           enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
@@ -1279,6 +1288,8 @@ function CanvasPage(props: CanvasPageProps) {
           onSelectMemory={props.onSelectMemory}
           onDashboardAddPanel={props.onDashboardAddPanel}
           onDashboardOpenYaml={props.onDashboardOpenYaml}
+          onCanvasOpenYaml={props.isEditing ? props.onYamlOpen : undefined}
+          onCanvasAddComponent={props.isEditing ? handleBuildingBlocksShortcutOpen : undefined}
           dashboardYamlReadOnly={props.dashboardYamlReadOnly}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
@@ -1306,7 +1317,17 @@ function CanvasPage(props: CanvasPageProps) {
           versionsContent={props.toolSidebarVersionsContent}
         />
 
-        {props.headerMode === "runs" || props.headerMode === "memory" ? null : (
+        {props.headerMode === "runs" || props.headerMode === "memory" ? null : props.isEditing ? (
+          props.headerMode === "dashboard" ? null : (
+            <RightSideControls
+              mode="edit"
+              addNoteOnly
+              onSidebarOpen={handleBuildingBlocksShortcutOpen}
+              onAddNote={handleAddNote}
+              onYamlOpen={props.onYamlOpen}
+            />
+          )
+        ) : (
           <RightSideControls
             mode={readOnly ? "live" : "edit"}
             onSidebarOpen={handleBuildingBlocksShortcutOpen}
@@ -1318,7 +1339,7 @@ function CanvasPage(props: CanvasPageProps) {
           <BuildingBlocksSidebar
             isOpen={
               isBuildingBlocksSidebarOpen &&
-              props.headerMode !== "version-live" &&
+              !!props.isEditing &&
               props.headerMode !== "dashboard" &&
               props.headerMode !== "memory" &&
               props.headerMode !== "runs"
@@ -1416,6 +1437,7 @@ function CanvasPage(props: CanvasPageProps) {
               setCurrentTab={setCurrentTab}
               showBottomStatusControls={props.showBottomStatusControls}
               headerMode={props.headerMode}
+              isEditing={props.isEditing}
               isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
               onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
               autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
@@ -1465,11 +1487,7 @@ function CanvasPage(props: CanvasPageProps) {
               configurationSaveMode={props.configurationSaveMode}
               currentTab={currentTab}
               onTabChange={setCurrentTab}
-              canvasMode={
-                props.headerMode === "version-live" || props.headerMode === "dashboard" || props.headerMode === "memory"
-                  ? "live"
-                  : "edit"
-              }
+              canvasMode={props.isEditing ? "edit" : "live"}
               organizationId={props.organizationId}
               getCustomField={props.getCustomField}
               integrations={props.integrations}
@@ -1778,6 +1796,8 @@ function CanvasContentHeader({
   discardVersionDisabled,
   discardVersionDisabledTooltip,
   headerMode,
+  isEditing,
+  onSelectCanvasView,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -1788,6 +1808,8 @@ function CanvasContentHeader({
   onSelectMemory,
   onDashboardAddPanel,
   onDashboardOpenYaml,
+  onCanvasOpenYaml,
+  onCanvasAddComponent,
   dashboardYamlReadOnly,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
@@ -1823,6 +1845,8 @@ function CanvasContentHeader({
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
   headerMode?: CanvasPageProps["headerMode"];
+  isEditing?: boolean;
+  onSelectCanvasView?: () => void;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -1833,6 +1857,8 @@ function CanvasContentHeader({
   onSelectMemory?: () => void;
   onDashboardAddPanel?: () => void;
   onDashboardOpenYaml?: () => void;
+  onCanvasOpenYaml?: () => void;
+  onCanvasAddComponent?: () => void;
   dashboardYamlReadOnly?: boolean;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
@@ -1870,6 +1896,8 @@ function CanvasContentHeader({
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
       mode={headerMode}
+      isEditing={isEditing}
+      onSelectCanvasView={onSelectCanvasView}
       onEnterEditMode={onEnterEditMode}
       enterEditModeDisabled={enterEditModeDisabled}
       enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
@@ -1880,6 +1908,8 @@ function CanvasContentHeader({
       onSelectMemory={onSelectMemory}
       onDashboardAddPanel={onDashboardAddPanel}
       onDashboardOpenYaml={onDashboardOpenYaml}
+      onCanvasOpenYaml={onCanvasOpenYaml}
+      onCanvasAddComponent={onCanvasAddComponent}
       dashboardYamlReadOnly={dashboardYamlReadOnly}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
@@ -1955,6 +1985,7 @@ function CanvasContent({
   setCurrentTab,
   showBottomStatusControls = true,
   headerMode,
+  isEditing = false,
   isAutoLayoutOnUpdateEnabled,
   onToggleAutoLayoutOnUpdate,
   autoLayoutOnUpdateDisabled,
@@ -2011,6 +2042,7 @@ function CanvasContent({
   setCurrentTab?: (tab: "latest" | "settings" | "docs") => void;
   showBottomStatusControls?: boolean;
   headerMode?: CanvasPageProps["headerMode"];
+  isEditing?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -2092,7 +2124,7 @@ function CanvasContent({
     return saved ? parseInt(saved, 10) : 320;
   });
   const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(true);
-  const isEditMode = headerMode === "version-edit";
+  const isEditMode = isEditing;
   const runSelectableSet = useMemo(() => {
     if (headerMode !== "runs" || !runParticipantNodeIds || runParticipantNodeIds.length === 0) {
       return null;
@@ -2875,6 +2907,9 @@ function CanvasContent({
     }
     stateRef.current.componentSidebar.open(node.id);
   }, []);
+  const handleOpenCommandPalette = useCallback(() => {
+    openGlobalCommandPalette();
+  }, []);
   const autoLayoutToggleControl = useMemo(() => {
     if (!isEditMode) {
       return null;
@@ -2910,14 +2945,27 @@ function CanvasContent({
     isAutoLayoutToggleDisabled,
     isEditMode,
   ]);
+  const commandPaletteSearchControl = useMemo(
+    () => (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="ghost" size="icon-sm" onClick={handleOpenCommandPalette} aria-label="Search Components">
+            <Search className="h-3 w-3" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Search Components</TooltipContent>
+      </Tooltip>
+    ),
+    [handleOpenCommandPalette],
+  );
   const zoomSliderContent = useMemo(
     () => (
       <>
         {autoLayoutToggleControl}
-        <NodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
+        {commandPaletteSearchControl}
       </>
     ),
-    [autoLayoutToggleControl, handleNodeSearch, handleNodeSearchSelect],
+    [autoLayoutToggleControl, commandPaletteSearchControl],
   );
   const reactFlowStyle = useMemo(() => ({ opacity: isInitialized ? 1 : 0 }), [isInitialized]);
   const handleSelectionStart = useCallback(() => {
@@ -2977,6 +3025,7 @@ function CanvasContent({
             className="h-full w-full"
           >
             <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
+            <GlobalCommandPaletteCanvasNodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
             <Panel
               position="bottom-left"
               className="!bg-transparent !outline-none !shadow-none p-0 flex flex-col items-start gap-4"

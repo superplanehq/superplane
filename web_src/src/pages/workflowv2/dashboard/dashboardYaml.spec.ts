@@ -60,6 +60,7 @@ spec:
               { field: "status", label: "Status", format: "status" },
               { field: "createdAt", label: "Started", format: "datetime" },
             ],
+            sort: { field: "createdAt", order: "desc" },
           },
         },
       },
@@ -68,7 +69,13 @@ spec:
         type: "chart",
         content: {
           dataSource: { kind: "executions", limit: 100 },
-          render: { kind: "chart", type: "bar", xField: "status", series: [{ label: "Count" }] },
+          render: {
+            kind: "chart",
+            type: "bar",
+            xField: "status",
+            series: [{ label: "Count" }],
+            sort: { field: "createdAt", order: "asc" },
+          },
         },
       },
       {
@@ -87,6 +94,55 @@ spec:
     if (!result.ok) throw new Error(result.error);
     expect(result.data.spec.panels).toEqual(panels);
     expect(result.data.spec.layout).toEqual(layout);
+  });
+
+  it("rejects render.sort when field is missing", () => {
+    const text = `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels:
+    - id: runs
+      type: table
+      content:
+        dataSource: { kind: executions, limit: 25 }
+        render:
+          kind: table
+          columns:
+            - field: status
+          sort:
+            order: asc
+  layout: []
+`;
+    const result = parseDashboardYaml(text);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/render\.sort\.field/);
+  });
+
+  it("rejects render.sort.order with an unknown value", () => {
+    const text = `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels:
+    - id: perf
+      type: chart
+      content:
+        dataSource: { kind: executions, limit: 100 }
+        render:
+          kind: chart
+          type: bar
+          xField: status
+          series:
+            - label: Count
+          sort:
+            field: createdAt
+            order: random
+  layout: []
+`;
+    const result = parseDashboardYaml(text);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/render\.sort\.order/);
   });
 
   it("rejects a node panel whose node field is not a string", () => {

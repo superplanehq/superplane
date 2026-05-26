@@ -27,7 +27,6 @@ export function ChartPanelCard({ panel, readOnly, onDelete, onChange }: ChartPan
       <TypedPanelShell
         title={content.title}
         fallbackTitle={panel.id}
-        typeLabel="Chart"
         readOnly={readOnly}
         onEdit={() => setEditing(true)}
         onDelete={onDelete}

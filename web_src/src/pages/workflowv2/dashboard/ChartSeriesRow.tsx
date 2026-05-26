@@ -28,7 +28,7 @@ export function ChartSeriesRow({
           className="col-span-5 h-8"
           value={series.field ?? ""}
           onChange={(e) => onChange({ field: e.target.value || undefined })}
-          placeholder="field (blank = count)"
+          placeholder="field or {{ expr }} (blank = count)"
           aria-label={`Series ${index + 1} field`}
         />
         <Input
