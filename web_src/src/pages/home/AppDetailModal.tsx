@@ -27,7 +27,7 @@ export function AppDetailModal({ app, busy, onBack, onInstall, onClose }: AppDet
   return (
     <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[12vh] sm:pt-[14vh]">
       <div className="fixed inset-0 bg-gray-950/20" onClick={onClose} />
-      <div className="relative w-[calc(100vw-2rem)] max-w-3xl rounded-xl border border-slate-200 bg-white shadow-2xl">
+      <div className="relative z-10 w-[calc(100vw-2rem)] max-w-3xl rounded-xl border border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-3">
           <button
             type="button"
