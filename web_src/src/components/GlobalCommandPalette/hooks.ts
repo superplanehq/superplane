@@ -86,13 +86,6 @@ export function useCommandPaletteShortcuts({
 
     const onKeyDown = (event: KeyboardEvent) => {
       const usesModifier = event.metaKey || event.ctrlKey;
-      const key = event.key.toLowerCase();
-
-      if (usesModifier && key === "k") {
-        event.preventDefault();
-        setOpen((current) => !current);
-        return;
-      }
 
       if (usesModifier && event.key === COMMAND_SHORTCUT && !isEditableTarget(event.target)) {
         if (createCanvasDisabled) return;
