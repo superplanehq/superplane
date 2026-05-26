@@ -93,8 +93,9 @@ export function useAutoPlaceholderNode(
     if (!hasEditableVersion || !canvasHasSpec || !handlePlaceholderAdd) return;
 
     addedRef.current = true;
-    sessionStorage.removeItem("add-placeholder-node");
 
-    void handlePlaceholderAdd({ position: { x: 400, y: 300 } });
+    void handlePlaceholderAdd({ position: { x: 400, y: 300 } }).then(() => {
+      sessionStorage.removeItem("add-placeholder-node");
+    });
   }, [hasEditableVersion, canvasHasSpec, canvasId, handlePlaceholderAdd]);
 }
