@@ -76,6 +76,34 @@ func (s *Server) listFleets(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+func (s *Server) getFleetTaskCounts(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	if id == "" {
+		writeError(w, http.StatusBadRequest, "id required")
+		return
+	}
+	fleet, err := s.Store.GetFleet(r.Context(), id)
+	if err != nil {
+		s.logErr("get fleet for counts", err)
+		writeError(w, http.StatusInternalServerError, "could not load fleet")
+		return
+	}
+	if fleet == nil {
+		writeError(w, http.StatusNotFound, "fleet not found")
+		return
+	}
+	queued, claimed, err := s.Store.CountTasksByFleet(r.Context(), id)
+	if err != nil {
+		s.logErr("count tasks by fleet", err)
+		writeError(w, http.StatusInternalServerError, "could not count tasks")
+		return
+	}
+	writeJSON(w, http.StatusOK, api.FleetTaskCountsResponse{
+		Queued:  queued,
+		Claimed: claimed,
+	})
+}
+
 func (s *Server) deleteFleet(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
 	if id == "" {

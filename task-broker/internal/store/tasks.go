@@ -53,6 +53,27 @@ func (s *PostgresStore) ListActiveTasks(ctx context.Context) ([]*models.Task, er
 	return out, nil
 }
 
+func (s *PostgresStore) CountTasksByFleet(ctx context.Context, fleetID string) (int, int, error) {
+	fleetID = strings.TrimSpace(fleetID)
+	if fleetID == "" {
+		return 0, 0, fmt.Errorf("fleet_id required for count")
+	}
+	db := s.db.WithContext(ctx)
+	var queued int64
+	if err := db.Model(&brokermodels.Task{}).
+		Where("fleet_id = ? AND status = ?", fleetID, string(models.StatusQueued)).
+		Count(&queued).Error; err != nil {
+		return 0, 0, err
+	}
+	var claimed int64
+	if err := db.Model(&brokermodels.Task{}).
+		Where("fleet_id = ? AND status = ?", fleetID, string(models.StatusClaimed)).
+		Count(&claimed).Error; err != nil {
+		return 0, 0, err
+	}
+	return int(queued), int(claimed), nil
+}
+
 func (s *PostgresStore) ClaimTask(ctx context.Context, runnerID, fleetID string, lease time.Duration) (*models.Task, error) {
 	fleetID = strings.TrimSpace(fleetID)
 	if fleetID == "" {

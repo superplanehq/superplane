@@ -128,6 +128,68 @@ func TestPostgresStoreFindFleetByLabelsEmpty(t *testing.T) {
 	}
 }
 
+func TestPostgresStoreCountTasksByFleet(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+
+	create := func(id, fleetID string, status models.TaskStatus) {
+		t.Helper()
+		if err := st.CreateTask(ctx, &models.Task{
+			ID:         id,
+			FleetID:    fleetID,
+			Command:    []string{"echo"},
+			WebhookURL: "https://example.com/hook",
+			Status:     status,
+			CreatedAt:  now,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	create("a-queued-1", "fleet-a", models.StatusQueued)
+	create("a-queued-2", "fleet-a", models.StatusQueued)
+	create("a-claimed-1", "fleet-a", models.StatusClaimed)
+	create("a-done-1", "fleet-a", models.StatusSucceeded)
+	create("a-failed-1", "fleet-a", models.StatusFailed)
+	create("a-canceled-1", "fleet-a", models.StatusCanceled)
+
+	create("b-queued-1", "fleet-b", models.StatusQueued)
+	create("b-claimed-1", "fleet-b", models.StatusClaimed)
+	create("b-claimed-2", "fleet-b", models.StatusClaimed)
+	create("b-claimed-3", "fleet-b", models.StatusClaimed)
+
+	qa, ca, err := st.CountTasksByFleet(ctx, "fleet-a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if qa != 2 || ca != 1 {
+		t.Fatalf("fleet-a counts: got queued=%d claimed=%d, want 2/1", qa, ca)
+	}
+
+	qb, cb, err := st.CountTasksByFleet(ctx, "fleet-b")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if qb != 1 || cb != 3 {
+		t.Fatalf("fleet-b counts: got queued=%d claimed=%d, want 1/3", qb, cb)
+	}
+
+	qc, cc, err := st.CountTasksByFleet(ctx, "fleet-missing")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if qc != 0 || cc != 0 {
+		t.Fatalf("fleet-missing counts: got queued=%d claimed=%d, want 0/0", qc, cc)
+	}
+
+	if _, _, err := st.CountTasksByFleet(ctx, ""); err == nil {
+		t.Fatalf("expected error for empty fleet id")
+	}
+}
+
 func TestPostgresStoreListActiveTasks(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()

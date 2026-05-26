@@ -19,13 +19,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
+	"github.com/superplane/runner/shared/api"
 )
+
+type TaskCountsClient interface {
+	FleetTaskCounts(ctx context.Context, fleetID string) (api.FleetTaskCountsResponse, error)
+}
 
 // Launcher calls EC2 RunInstances with a deterministic cloud-init user-data starter.
 type Launcher struct {
-	Client *ec2.Client
-	Config Config
-	Log    *slog.Logger
+	Client       *ec2.Client
+	Config       Config
+	Log          *slog.Logger
+	BrokerClient TaskCountsClient
 }
 
 // Config is filled from EC2_PROVISION_* environment variables.
@@ -44,6 +51,8 @@ type Config struct {
 	KeyName                string // optional EC2 key pair name
 	RunnersIAMProfName     string // optional IAM instance profile name for runners
 	HotInstanceCount       int    // target pending+running managed instances (from EC2_PROVISION_HOT_INSTANCE_COUNT)
+	// Headroom > 0 enables dynamic scaling: want = queued + claimed + Headroom each tick
+	Headroom int
 	// RunnerTerminateAfterEachTask sets RUNNER_TERMINATE_AFTER_EACH_TASK; fleet-manager terminates the EC2 instance after one task.
 	RunnerTerminateAfterEachTask bool
 	// RunnerCloudWatchLogGroup sets RUNNER_CLOUDWATCH_LOG_GROUP in EC2 user-data (optional).
@@ -86,6 +95,7 @@ const (
 	envVolumeSizeGB        = "EC2_PROVISION_VOLUME_SIZE_GB"
 	envBootGraceSec        = "EC2_PROVISION_BOOT_GRACE_SEC"
 	envRunnerHealthPort    = "EC2_PROVISION_RUNNER_HEALTH_PORT"
+	envRunnerHeadroom      = "EC2_PROVISION_RUNNER_HEADROOM"
 
 	defaultInstanceType     = "t3.micro"
 	defaultVolumeSizeGB     = 30
@@ -178,6 +188,14 @@ func ConfigFromEnv() (Config, error) {
 		}
 		healthPort = n
 	}
+	headroom := 0
+	if v := strings.TrimSpace(os.Getenv(envRunnerHeadroom)); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n < 0 {
+			return Config{}, fmt.Errorf("%s must be a non-negative integer", envRunnerHeadroom)
+		}
+		headroom = n
+	}
 	return Config{
 		AMI:                             ami,
 		InstanceType:                    itype,
@@ -199,6 +217,7 @@ func ConfigFromEnv() (Config, error) {
 		VolumeSizeGB:                    volumeSizeGB,
 		BootGraceSec:                    bootGrace,
 		RunnerHealthPort:                healthPort,
+		Headroom:                        headroom,
 	}, nil
 }
 
