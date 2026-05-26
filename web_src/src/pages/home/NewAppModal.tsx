@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { ArrowLeft, ArrowRight, ExternalLink, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import templateManifest from "../../../../templates/manifest.json";
 import { useCreateApp } from "./useCreateApp";
 import { useInstallTemplate } from "./useInstallTemplate";
@@ -39,7 +39,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
   const [search, setSearch] = useState("");
   const [selectedApp, setSelectedApp] = useState<AppEntry | null>(null);
   const [visibleCount, setVisibleCount] = useState(7);
-  const listRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) {
@@ -64,13 +64,20 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
   const visible = search ? filtered : filtered.slice(0, visibleCount);
   const busy = isSaving || isInstalling;
 
-  const handleScroll = useCallback(() => {
-    const el = listRef.current;
+  useEffect(() => {
+    const el = sentinelRef.current;
     if (!el || search) return;
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 40) {
-      setVisibleCount((prev) => Math.min(prev + 7, filtered.length));
-    }
-  }, [filtered.length, search]);
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + 7, filtered.length));
+        }
+      },
+      { rootMargin: "100px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [filtered.length, search, visibleCount]);
 
   const handleBlankCreate = () => {
     if (busy) return;
@@ -132,7 +139,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
           </div>
         </CommandItem>
       </div>
-      <CommandList ref={listRef} onScroll={handleScroll} className="max-h-[360px] scroll-py-2 px-3 py-3">
+      <CommandList className="max-h-[360px] scroll-py-2 px-3 py-3">
         <CommandEmpty>No apps found.</CommandEmpty>
 
         {visible.length > 0 && (
@@ -169,6 +176,7 @@ export function NewAppModal({ open, onClose }: NewAppModalProps) {
                 </CommandItem>
               ))}
             </CommandGroup>
+            {!search && visibleCount < filtered.length && <div ref={sentinelRef} className="h-1" />}
           </>
         )}
       </CommandList>
