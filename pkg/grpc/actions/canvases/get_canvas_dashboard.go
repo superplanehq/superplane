@@ -3,8 +3,10 @@ package canvases
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -12,7 +14,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func GetCanvasDashboard(ctx context.Context, organizationID, canvasID string) (*pb.GetCanvasDashboardResponse, error) {
+func GetCanvasDashboard(ctx context.Context, organizationID, canvasID string, versionID string) (*pb.GetCanvasDashboardResponse, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization_id")
@@ -23,7 +25,7 @@ func GetCanvasDashboard(ctx context.Context, organizationID, canvasID string) (*
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas_id")
 	}
 
-	_, err = models.FindCanvas(orgUUID, canvasUUID)
+	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "canvas not found")
@@ -31,8 +33,32 @@ func GetCanvasDashboard(ctx context.Context, organizationID, canvasID string) (*
 		return nil, status.Error(codes.Internal, "failed to load canvas")
 	}
 
-	dashboard, err := models.FindCanvasDashboard(canvasUUID)
+	var dashboard *models.CanvasDashboard
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		resolvedVersionID, resolveErr := resolveDashboardVersionID(tx, canvas, strings.TrimSpace(versionID))
+		if resolveErr != nil {
+			return resolveErr
+		}
+
+		version, loadErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, resolvedVersionID)
+		if loadErr != nil {
+			if errors.Is(loadErr, gorm.ErrRecordNotFound) {
+				return status.Error(codes.NotFound, "version not found")
+			}
+			return loadErr
+		}
+
+		if accessErr := ensureDashboardVersionReadable(ctx, tx, canvas, version); accessErr != nil {
+			return accessErr
+		}
+
+		dashboard = models.CanvasDashboardFromVersion(version)
+		return nil
+	})
 	if err != nil {
+		if status.Code(err) != codes.Unknown {
+			return nil, err
+		}
 		return nil, status.Error(codes.Internal, "failed to load canvas dashboard")
 	}
 

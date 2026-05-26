@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -17,27 +18,35 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+func dashboardDraftVersionID(t *testing.T, canvasID, userID uuid.UUID) string {
+	t.Helper()
+
+	draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvasID, userID, nil, nil)
+	require.NoError(t, err)
+	return draft.ID.String()
+}
+
 func Test__GetCanvasDashboard(t *testing.T) {
 	r := support.Setup(t)
-	ctx := context.Background()
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 
 	t.Run("invalid organization id -> error", func(t *testing.T) {
-		_, err := GetCanvasDashboard(ctx, "not-a-uuid", uuid.New().String())
+		_, err := GetCanvasDashboard(ctx, "not-a-uuid", uuid.New().String(), "")
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
-		_, err := GetCanvasDashboard(ctx, orgID, "bad-canvas")
+		_, err := GetCanvasDashboard(ctx, orgID, "bad-canvas", "")
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 	})
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
-		_, err := GetCanvasDashboard(ctx, orgID, uuid.New().String())
+		_, err := GetCanvasDashboard(ctx, orgID, uuid.New().String(), "")
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
@@ -45,13 +54,12 @@ func Test__GetCanvasDashboard(t *testing.T) {
 
 	t.Run("empty dashboard when none stored", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		resp, err := GetCanvasDashboard(ctx, orgID, canvas.ID.String())
+		resp, err := GetCanvasDashboard(ctx, orgID, canvas.ID.String(), "")
 		require.NoError(t, err)
 		require.NotNil(t, resp.GetDashboard())
 		assert.Equal(t, canvas.ID.String(), resp.GetDashboard().GetCanvasId())
 		assert.Empty(t, resp.GetDashboard().GetPanels())
 		assert.Empty(t, resp.GetDashboard().GetLayout())
-		assert.Nil(t, resp.GetDashboard().GetUpdatedAt())
 	})
 
 	t.Run("returns stored panels and layout", func(t *testing.T) {
@@ -64,7 +72,7 @@ func Test__GetCanvasDashboard(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		resp, err := GetCanvasDashboard(ctx, orgID, canvas.ID.String())
+		resp, err := GetCanvasDashboard(ctx, orgID, canvas.ID.String(), "")
 		require.NoError(t, err)
 		d := resp.GetDashboard()
 		require.Len(t, d.GetPanels(), 1)
@@ -84,25 +92,25 @@ func Test__GetCanvasDashboard(t *testing.T) {
 
 func Test__UpdateCanvasDashboard(t *testing.T) {
 	r := support.Setup(t)
-	ctx := context.Background()
+	ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 	orgID := r.Organization.ID.String()
 
 	t.Run("invalid organization id -> error", func(t *testing.T) {
-		_, err := UpdateCanvasDashboard(ctx, "not-a-uuid", uuid.New().String(), nil, nil)
+		_, err := UpdateCanvasDashboard(ctx, "not-a-uuid", uuid.New().String(), "", nil, nil)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 	})
 
 	t.Run("invalid canvas id -> error", func(t *testing.T) {
-		_, err := UpdateCanvasDashboard(ctx, orgID, "bad", nil, nil)
+		_, err := UpdateCanvasDashboard(ctx, orgID, "bad", "", nil, nil)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 	})
 
 	t.Run("canvas not found -> error", func(t *testing.T) {
-		_, err := UpdateCanvasDashboard(ctx, orgID, uuid.New().String(), nil, nil)
+		_, err := UpdateCanvasDashboard(ctx, orgID, uuid.New().String(), "", nil, nil)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.NotFound, s.Code())
@@ -114,7 +122,7 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 			Where("id = ?", canvas.ID).
 			Update("is_template", true).Error)
 
-		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), []*pb.DashboardPanel{
+		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), "", []*pb.DashboardPanel{
 			{Id: "a", Type: "markdown"},
 		}, []*pb.DashboardLayoutItem{{I: "a", X: 0, Y: 0, W: 1, H: 1}})
 		s, ok := status.FromError(err)
@@ -126,7 +134,7 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
 		strVal, err := structpb.NewValue("not-an-object")
 		require.NoError(t, err)
-		_, err = UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), []*pb.DashboardPanel{
+		_, err = UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), "", []*pb.DashboardPanel{
 			{Id: "x", Type: "markdown", Content: strVal},
 		}, []*pb.DashboardLayoutItem{{I: "x", X: 0, Y: 0, W: 1, H: 1}})
 		s, ok := status.FromError(err)
@@ -136,7 +144,7 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 
 	t.Run("validation: panel id required", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), []*pb.DashboardPanel{
+		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), "", []*pb.DashboardPanel{
 			{Id: "", Type: "markdown"},
 		}, nil)
 		s, ok := status.FromError(err)
@@ -146,7 +154,7 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 
 	t.Run("validation: panel type required", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), []*pb.DashboardPanel{
+		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), "", []*pb.DashboardPanel{
 			{Id: "p", Type: ""},
 		}, nil)
 		s, ok := status.FromError(err)
@@ -156,7 +164,7 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 
 	t.Run("validation: duplicate panel id", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), []*pb.DashboardPanel{
+		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), "", []*pb.DashboardPanel{
 			{Id: "dup", Type: "markdown"},
 			{Id: "dup", Type: "markdown"},
 		}, nil)
@@ -167,7 +175,7 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 
 	t.Run("validation: layout i required", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), []*pb.DashboardPanel{
+		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), "", []*pb.DashboardPanel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.DashboardLayoutItem{{I: "", X: 0, Y: 0, W: 1, H: 1}})
 		s, ok := status.FromError(err)
@@ -177,7 +185,7 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 
 	t.Run("validation: duplicate layout id", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), []*pb.DashboardPanel{
+		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), "", []*pb.DashboardPanel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.DashboardLayoutItem{
 			{I: "p", X: 0, Y: 0, W: 1, H: 1},
@@ -190,7 +198,7 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 
 	t.Run("validation: layout references unknown panel", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), []*pb.DashboardPanel{
+		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), "", []*pb.DashboardPanel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.DashboardLayoutItem{{I: "other", X: 0, Y: 0, W: 1, H: 1}})
 		s, ok := status.FromError(err)
@@ -200,7 +208,7 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 
 	t.Run("validation: layout w/h must be positive", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), []*pb.DashboardPanel{
+		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), "", []*pb.DashboardPanel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.DashboardLayoutItem{{I: "p", X: 0, Y: 0, W: 0, H: 1}})
 		s, ok := status.FromError(err)
@@ -210,7 +218,7 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 
 	t.Run("validation: layout x/y must be non-negative", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
-		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), []*pb.DashboardPanel{
+		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), "", []*pb.DashboardPanel{
 			{Id: "p", Type: "markdown"},
 		}, []*pb.DashboardLayoutItem{{I: "p", X: -1, Y: 0, W: 1, H: 1}})
 		s, ok := status.FromError(err)
@@ -227,7 +235,7 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 			panels = append(panels, &pb.DashboardPanel{Id: id, Type: "markdown"})
 			layout = append(layout, &pb.DashboardLayoutItem{I: id, X: int32(i), Y: 0, W: 1, H: 1})
 		}
-		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), panels, layout)
+		_, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), "", panels, layout)
 		s, ok := status.FromError(err)
 		assert.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
@@ -238,7 +246,7 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 		huge := strings.Repeat("x", MaxDashboardPayloadBytes+1)
 		content, err := structpb.NewValue(map[string]any{"body": huge})
 		require.NoError(t, err)
-		_, err = UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), []*pb.DashboardPanel{
+		_, err = UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), "", []*pb.DashboardPanel{
 			{Id: "p", Type: "markdown", Content: content},
 		}, []*pb.DashboardLayoutItem{{I: "p", X: 0, Y: 0, W: 1, H: 1}})
 		s, ok := status.FromError(err)
@@ -248,9 +256,10 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 
 	t.Run("persists and returns dashboard", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+		versionID := dashboardDraftVersionID(t, canvas.ID, r.User)
 		content, err := structpb.NewValue(map[string]any{"body": "hello"})
 		require.NoError(t, err)
-		resp, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), []*pb.DashboardPanel{
+		resp, err := UpdateCanvasDashboard(ctx, orgID, canvas.ID.String(), versionID, []*pb.DashboardPanel{
 			{Id: "a", Type: "markdown", Content: content},
 			{Id: "b", Type: "markdown"},
 		}, []*pb.DashboardLayoutItem{
@@ -263,11 +272,17 @@ func Test__UpdateCanvasDashboard(t *testing.T) {
 		assert.NotNil(t, d.GetPanels()[0].GetContent())
 		assert.NotNil(t, d.GetPanels()[1].GetContent())
 		require.Len(t, d.GetLayout(), 2)
+		assert.Equal(t, versionID, d.GetVersionId())
 
-		got, err := GetCanvasDashboard(ctx, orgID, canvas.ID.String())
+		got, err := GetCanvasDashboard(ctx, orgID, canvas.ID.String(), versionID)
 		require.NoError(t, err)
 		assert.Len(t, got.GetDashboard().GetPanels(), 2)
 		assert.Len(t, got.GetDashboard().GetLayout(), 2)
+
+		live, err := GetCanvasDashboard(ctx, orgID, canvas.ID.String(), "")
+		require.NoError(t, err)
+		assert.Empty(t, live.GetDashboard().GetPanels())
+		assert.Empty(t, live.GetDashboard().GetLayout())
 	})
 }
 
