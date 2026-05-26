@@ -9,11 +9,12 @@ import { NewAppModal } from "./NewAppModal";
 interface CanvasToolbarProps {
   searchQuery: string;
   setSearchQuery: (query: string) => void;
+  autoOpenNewApp?: boolean;
 }
 
-export function CanvasToolbar({ searchQuery, setSearchQuery }: CanvasToolbarProps) {
+export function CanvasToolbar({ searchQuery, setSearchQuery, autoOpenNewApp = false }: CanvasToolbarProps) {
   const { canAct, isLoading: permissionsLoading } = usePermissions();
-  const [isNewAppModalOpen, setIsNewAppModalOpen] = useState(false);
+  const [isNewAppModalOpen, setIsNewAppModalOpen] = useState(autoOpenNewApp);
 
   const canCreateCanvases = canAct("canvases", "create");
   const allowed = canCreateCanvases || permissionsLoading;
