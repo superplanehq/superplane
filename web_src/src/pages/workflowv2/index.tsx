@@ -59,7 +59,6 @@ import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { analytics } from "@/lib/analytics";
-// getColorClass moved to workflowPageHelpers
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
@@ -120,6 +119,7 @@ import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
+  clearComponentSidebarSearchParams,
   getExitEditModeDisabledTooltip,
   getRunActionState,
   getWorkflowViewPresentation,
@@ -149,12 +149,6 @@ const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
 const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
-
-function clearComponentSidebarSearchParams(params: URLSearchParams): URLSearchParams {
-  params.delete("sidebar");
-  params.delete("node");
-  return params;
-}
 
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
 type CanvasSaveResult = {
@@ -608,10 +602,6 @@ export function WorkflowPageV2() {
   }, [canvasChangeRequests, resolvingConflictChangeRequestId]);
   const createWorkflowMutation = useCreateCanvas(organizationId!);
 
-  // Warm up org users and roles cache so approval specs can pretty-print
-  // user IDs as emails and role names as display names.
-  // We don't use the values directly here; loading them populates the
-  // react-query cache which prepareApprovalNode reads from.
   useOrganizationRoles(organizationId!);
 
   /**
@@ -5485,6 +5475,10 @@ export function WorkflowPageV2() {
           isDashboardMode={isDashboardMode}
           canActOnCanvas={canActOnCanvas}
           editLocked={isReadOnly}
+          showDashboardEditControls={isEditing}
+          onDashboardAddPanel={onDashboardAddPanel}
+          onDashboardOpenYaml={onDashboardOpenYaml}
+          dashboardYamlReadOnly={dashboardYamlReadOnly}
           dashboardQuery={dashboardQuery}
           updateDashboardMutation={updateDashboardMutation}
           addPanelDialogOpen={isDashboardAddPanelOpen}
@@ -5522,9 +5516,9 @@ export function WorkflowPageV2() {
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || (isTemplate ? "Template" : "Canvas")}
           headerBanner={headerBanner}
           canvasStateMode={canvasStateMode}
+          showCanvasSettingsMenu={canUpdateCanvas}
           onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
           awaitingApprovalBanner={awaitingApprovalBanner}
-          showCanvasSettingsMenu={canUpdateCanvas}
           isVersionControlOpen={isVersionControlOpen}
           onOpenVersionControl={handleOpenVersionControl}
           hasAutoOpenedVersionControl={hasAutoOpenedVersionControl}
@@ -5621,6 +5615,7 @@ export function WorkflowPageV2() {
           onExitRunsMode={handleExitRunsMode}
           onSelectDashboard={isTemplate ? undefined : handleSelectDashboardMode}
           onSelectFiles={isTemplate ? undefined : handleSelectFilesMode}
+          onYamlOpen={handleSelectFilesMode}
           onDashboardAddPanel={onDashboardAddPanel}
           onDashboardOpenYaml={onDashboardOpenYaml}
           dashboardYamlReadOnly={dashboardYamlReadOnly}
