@@ -65,6 +65,7 @@ describe("useCanvasYaml", () => {
           edges: [{ source: "new-node", target: "next-node" }],
         }),
       }),
+      { showToast: false },
     );
     expect(onWorkflowImported).toHaveBeenCalledWith(
       expect.objectContaining({

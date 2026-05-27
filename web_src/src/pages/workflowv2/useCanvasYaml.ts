@@ -83,7 +83,7 @@ export function useCanvasYaml({
         },
       };
 
-      const result = await handleSaveWorkflow(updatedWorkflow);
+      const result = await handleSaveWorkflow(updatedWorkflow, { showToast: false });
       if (result?.status !== "saved") {
         throw new Error(getImportFailureMessage(result?.status));
       }
