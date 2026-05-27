@@ -15,7 +15,7 @@ This guide is written for both humans configuring consoles and agents changing t
 ## What Users See
 
 - A console belongs to one canvas. Templates do not have editable consoles.
-- Users enter console mode from the workflow v2 header (URL `?view=console`) when the Console feature is enabled.
+- Users enter console mode from the workflow v2 header (URL `?view=console`).
 - The canvas graph is hidden and replaced by a 12-column draggable grid.
 - Users with `canvases:update` can add, move, resize, edit, delete, import, and export panels.
 - Users without edit permission can still view consoles and export YAML.
@@ -89,15 +89,12 @@ pkg/grpc/actions/canvases/
 protos/canvases.proto
 ```
 
-The Console feature flag is registered in `pkg/features/features.go` with the
-backend id `dashboards` and the user-facing label **Console**. The id is kept
-for back-compat with existing per-organization enablement records.
 
 ## Architecture
 
 | Layer | Responsibility |
 | --- | --- |
-| Workflow host | `index.tsx` owns workflow mode, feature flag checks, and header wiring. It delegates console-specific work to small dashboard modules. |
+| Workflow host | `index.tsx` owns workflow mode and header wiring. It delegates console-specific work to small dashboard modules. |
 | Overlay | `WorkflowDashboardOverlay` decides whether to render. `DashboardOverlay` maps API data, wires query/mutation state, and provides context. |
 | Context | `DashboardContext` exposes canvas nodes, node statuses, run permission, and trigger callbacks. `resolveDashboardNode` accepts node id or node name. |
 | Grid | `DashboardView` renders the 12-column `react-grid-layout` surface and routes each panel to its card. |

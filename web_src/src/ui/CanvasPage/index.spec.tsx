@@ -87,15 +87,7 @@ vi.mock("@/components/CanvasToolSidebar/useCanvasToolSidebarState", () => ({
 }));
 
 vi.mock("./Header", () => ({
-  Header: ({ isEditing, onCanvasAddComponent }: { isEditing?: boolean; onCanvasAddComponent?: () => void }) => (
-    <header data-testid="canvas-header">
-      {isEditing && onCanvasAddComponent ? (
-        <button type="button" data-testid="canvas-add-component-button" onClick={() => onCanvasAddComponent()}>
-          Add component
-        </button>
-      ) : null}
-    </header>
-  ),
+  Header: () => <header data-testid="canvas-header" />,
 }));
 
 import { CanvasNodeErrorBoundary, CanvasPage } from "./index";
@@ -327,6 +319,34 @@ describe("CanvasPage connection drop", () => {
     });
     expect(payload?.sourceNodeId).toBeUndefined();
     expect(payload?.sourceHandleId).toBeUndefined();
+  });
+
+  it("opens the canvas YAML modal without switching to the Files tab", async () => {
+    const onYamlOpen = vi.fn();
+    const onSelectFiles = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={[]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          onYamlOpen={onYamlOpen}
+          onSelectFiles={onSelectFiles}
+        />
+      </MemoryRouter>,
+    );
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("canvas-yaml-button"));
+    });
+
+    expect(onYamlOpen).toHaveBeenCalledTimes(1);
+    expect(onSelectFiles).not.toHaveBeenCalled();
   });
 
   it("loads node run data only while the component sidebar is open in live mode", async () => {
