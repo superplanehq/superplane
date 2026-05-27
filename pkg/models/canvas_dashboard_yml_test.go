@@ -661,6 +661,95 @@ func TestValidateDashboardContent_RejectsUnknownSortOrder(t *testing.T) {
 	assert.Contains(t, err.Error(), `render.sort.order must be one of asc/desc`)
 }
 
+func TestValidateDashboardContent_AcceptsNodesPanel(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "key-nodes",
+			Type: DashboardPanelTypeNodes,
+			Content: map[string]any{
+				"title": "Key Nodes",
+				"nodes": []any{
+					map[string]any{
+						"node":        "deploy-prod",
+						"description": "Promotes the latest build",
+						"showRun":     true,
+					},
+					map[string]any{
+						"node":  "rollback",
+						"label": "Rollback",
+					},
+				},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateDashboardContent_AcceptsDraftNodesPanel(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:      "key-nodes",
+			Type:    DashboardPanelTypeNodes,
+			Content: map[string]any{"nodes": []any{}},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateDashboardContent_RejectsNodesPanelMissingNodeRef(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "key-nodes",
+			Type: DashboardPanelTypeNodes,
+			Content: map[string]any{
+				"nodes": []any{
+					map[string]any{"description": "missing"},
+				},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.nodes[0].node must be a non-empty string")
+}
+
+func TestValidateDashboardContent_RejectsNodesPanelWithNonArrayNodes(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:      "key-nodes",
+			Type:    DashboardPanelTypeNodes,
+			Content: map[string]any{"nodes": map[string]any{"oops": true}},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.nodes must be an array")
+}
+
+func TestValidateDashboardContent_RejectsNodesPanelWithBadShowRun(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "key-nodes",
+			Type: DashboardPanelTypeNodes,
+			Content: map[string]any{
+				"nodes": []any{
+					map[string]any{"node": "deploy-prod", "showRun": "yes"},
+				},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.nodes[0].showRun must be a boolean")
+}
+
 func TestValidateDashboardContent_AcceptsCompositeNumberPanel(t *testing.T) {
 	panels := []DashboardPanel{
 		{

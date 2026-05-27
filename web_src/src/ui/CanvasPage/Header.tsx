@@ -51,14 +51,6 @@ export interface HeaderProps {
   onSelectMemory?: () => void;
   /** Provided when Files is available as a first-class tab; opens the Files view. */
   onSelectFiles?: () => void;
-  /** When set with `mode === "dashboard"` and editing, shows Add panel in the secondary header. */
-  onDashboardAddPanel?: () => void;
-  /** When set with `mode === "dashboard"` and editing, shows the YAML button in the secondary header. */
-  onDashboardOpenYaml?: () => void;
-  /** When set with the Canvas tab active and editing, opens the add-component sidebar. */
-  onCanvasAddComponent?: () => void;
-  /** When true, the YAML button advertises read-only YAML view. Defaults to editable copy. */
-  dashboardYamlReadOnly?: boolean;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
   publishVersionLabel?: string;
   /** When true, shows the Discard control next to Publish in version edit mode (draft differs from live). */
@@ -80,25 +72,18 @@ export function Header(props: HeaderProps) {
       <PageHeader
         organizationId={props.organizationId}
         headerTitle={headerTitle}
-        showCanvasSettingsMenu={props.showCanvasSettingsMenu}
         mode={props.mode}
         isEditing={props.isEditing}
         hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
-        onDiscardVersion={props.onDiscardVersion}
-        discardVersionDisabled={props.discardVersionDisabled}
-        discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
         onExitEditMode={props.onExitEditMode}
         exitEditModeDisabled={props.exitEditModeDisabled}
         exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
-        onPublishVersion={props.onPublishVersion}
-        publishVersionLabel={props.publishVersionLabel}
-        publishVersionDisabled={props.publishVersionDisabled}
-        publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
         onEnterEditMode={props.onEnterEditMode}
         enterEditModeDisabled={props.enterEditModeDisabled}
         enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
         onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
         unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
+        showCanvasSettingsMenu={props.showCanvasSettingsMenu}
       />
 
       <SecondaryHeader {...props} />
@@ -109,25 +94,18 @@ export function Header(props: HeaderProps) {
 function PageHeader({
   organizationId,
   headerTitle,
-  showCanvasSettingsMenu = true,
   mode,
   isEditing = false,
   hasUnpublishedDraftChanges,
-  onDiscardVersion,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  onPublishVersion,
-  publishVersionLabel,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
   onDiscardDraftAndStartEdit,
   unpublishedDraftUpdatedAt,
+  showCanvasSettingsMenu = true,
 }: {
   organizationId?: string;
   headerTitle: string;
@@ -135,16 +113,9 @@ function PageHeader({
   mode?: HeaderMode;
   isEditing?: boolean;
   hasUnpublishedDraftChanges?: boolean;
-  onDiscardVersion?: () => void;
-  discardVersionDisabled?: boolean;
-  discardVersionDisabledTooltip?: string;
   onExitEditMode?: () => void;
   exitEditModeDisabled?: boolean;
   exitEditModeDisabledTooltip?: string;
-  onPublishVersion?: () => void;
-  publishVersionLabel?: string;
-  publishVersionDisabled?: boolean;
-  publishVersionDisabledTooltip?: string;
   onEnterEditMode?: () => void;
   enterEditModeDisabled?: boolean;
   enterEditModeDisabledTooltip?: string;
@@ -155,7 +126,7 @@ function PageHeader({
   const activeCanvasId = canvasIdParam || workflowId;
 
   return (
-    <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 px-3 sm:px-4">
+    <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 px-2 sm:px-3">
       <div className="relative z-10 flex min-w-0 shrink-0 items-center">
         <OrganizationMenuButton organizationId={organizationId} />
       </div>
@@ -186,17 +157,9 @@ function PageHeader({
         ) : null}
         {isEditing ? (
           <EditModeTopHeaderActions
-            hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
-            onDiscardVersion={onDiscardVersion}
-            discardVersionDisabled={discardVersionDisabled}
-            discardVersionDisabledTooltip={discardVersionDisabledTooltip}
             onExitEditMode={onExitEditMode}
             exitEditModeDisabled={exitEditModeDisabled}
             exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-            onPublishVersion={onPublishVersion}
-            publishVersionLabel={publishVersionLabel}
-            publishVersionDisabled={publishVersionDisabled}
-            publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           />
         ) : null}
       </div>
@@ -225,7 +188,7 @@ function SecondaryHeader(props: HeaderProps) {
   const editing = props.isEditing ?? props.mode === "version-edit";
 
   return (
-    <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-4">
+    <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-3">
       <CanvasToolSidebarTrigger toolSidebarState={props.toolSidebarState} />
 
       <div className="pointer-events-none absolute inset-x-0 flex justify-center px-16 sm:px-24">

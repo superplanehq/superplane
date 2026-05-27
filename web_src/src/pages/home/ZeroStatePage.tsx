@@ -155,7 +155,7 @@ function AppListItem({
       className="flex cursor-pointer items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 transition-colors hover:bg-slate-50"
     >
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-100">
-        <LeadIcon integrations={app.integrations} />
+        <LeadIcon icon={app.icon} integrations={app.integrations} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">

@@ -23,6 +23,7 @@ export function formatValue(value: unknown, format: WidgetColumnFormat | undefin
     case "duration":
       return formatDuration(value);
     case "status":
+    case "badge":
       return String(value).toLowerCase();
     case "code":
     case "text":
@@ -70,16 +71,43 @@ function formatDate(value: unknown, includeTime: boolean): string {
   return date.toLocaleDateString();
 }
 
+/**
+ * Format a numeric duration. The input is **always interpreted as
+ * milliseconds** so the heuristic that used to silently switch units based
+ * on magnitude can't mis-classify small ms values (e.g. 4527 ms used to be
+ * read as seconds and printed as `1h 15m`).
+ *
+ * Use CEL to convert other units before passing them in, e.g.
+ * `{{ seconds * 1000 }}` or `{{ minutes * 60000 }}`. Negative values are
+ * formatted with a leading `-`.
+ *
+ * Output rules:
+ * - `< 1000 ms`        → `547ms`
+ * - `< 60 s`           → `4.5s` (one decimal under 10s, integer otherwise)
+ * - `< 60 min`         → `1m 23s`
+ * - `< 24 h`           → `2h 5m`
+ * - `>= 24 h`          → `3d 4h`
+ */
 function formatDuration(value: unknown): string {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return String(value);
-  // Heuristic: treat very large numbers (>10000) as milliseconds, others as seconds.
-  const seconds = n > 10000 ? n / 1000 : n;
+  if (n === 0) return "0ms";
+  const sign = n < 0 ? "-" : "";
+  const ms = Math.abs(n);
+  return `${sign}${formatPositiveDurationMs(ms)}`;
+}
+
+function formatPositiveDurationMs(ms: number): string {
+  if (ms < 1000) return `${Math.round(ms)}ms`;
+  const seconds = ms / 1000;
   if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;
-  const minutes = Math.floor(seconds / 60);
-  const rem = Math.floor(seconds % 60);
-  if (minutes < 60) return `${minutes}m ${rem}s`;
-  const hours = Math.floor(minutes / 60);
-  const remMin = minutes % 60;
-  return `${hours}h ${remMin}m`;
+  const totalMinutes = Math.floor(seconds / 60);
+  const remSec = Math.floor(seconds % 60);
+  if (totalMinutes < 60) return `${totalMinutes}m ${remSec}s`;
+  const totalHours = Math.floor(totalMinutes / 60);
+  const remMin = totalMinutes % 60;
+  if (totalHours < 24) return `${totalHours}h ${remMin}m`;
+  const days = Math.floor(totalHours / 24);
+  const remHours = totalHours % 24;
+  return `${days}d ${remHours}h`;
 }
