@@ -33,6 +33,7 @@ const COLUMN_FORMATS: WidgetColumnFormat[] = [
   "relative",
   "duration",
   "status",
+  "badge",
   "code",
   "link",
 ];
