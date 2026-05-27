@@ -13,7 +13,8 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
-import type { StartConfiguration } from "./templatePayload";
+import { StartRunModal } from "./runModal";
+import { payloadForTemplateRun, type StartConfiguration } from "./templatePayload";
 
 /**
  * Default renderer for the start trigger
@@ -92,6 +93,26 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
+                  if ((template.parameters?.length ?? 0) > 0) {
+                    actions.openModal({
+                      title: `Run ${template.name}`,
+                      description: "Provide parameter values for this manual run.",
+                      content: ({ close }) => (
+                        <StartRunModal
+                          parameters={template.parameters}
+                          initialPayload={payloadForTemplateRun(template)}
+                          onClose={close}
+                          onRun={async (payload) =>
+                            actions.invokeNodeTriggerHook("run", {
+                              template: template.name,
+                              ...payload,
+                            })
+                          }
+                        />
+                      ),
+                    });
+                    return;
+                  }
                   void actions.invokeNodeTriggerHook("run", {
                     template: template.name,
                   });

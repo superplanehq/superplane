@@ -182,11 +182,9 @@ func (s *Start) Configuration() []configuration.Field {
 			},
 			Default: []map[string]any{
 				{
-					"name":    "Hello World",
-					"payload": map[string]any{"message": "Hello, World!"},
-					"parameters": []map[string]any{
-						{"name": "message", "type": configuration.FieldTypeString, "defaultString": "Hello, World!"},
-					},
+					"name":       "Hello World",
+					"payload":    map[string]any{"message": "Hello, World!"},
+					"parameters": []map[string]any{},
 				},
 			},
 		},

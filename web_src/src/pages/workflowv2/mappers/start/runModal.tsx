@@ -91,30 +91,37 @@ export function StartRunModal({
             const id = `start-run-param-${param.name}`;
             return (
               <div key={param.name} className="space-y-1.5">
-                <Label htmlFor={id}>{param.name}</Label>
                 {param.type === "boolean" ? (
-                  <Checkbox
-                    id={id}
-                    checked={Boolean(parameterValues[param.name])}
-                    onCheckedChange={(checked) =>
-                      setParameterValues((prev) => ({
-                        ...prev,
-                        [param.name]: checked === true,
-                      }))
-                    }
-                  />
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id={id}
+                      checked={Boolean(parameterValues[param.name])}
+                      onCheckedChange={(checked) =>
+                        setParameterValues((prev) => ({
+                          ...prev,
+                          [param.name]: checked === true,
+                        }))
+                      }
+                    />
+                    <Label htmlFor={id} className="cursor-pointer">
+                      {param.name}
+                    </Label>
+                  </div>
                 ) : (
-                  <Input
-                    id={id}
-                    type={param.type === "number" ? "number" : "text"}
-                    value={String(parameterValues[param.name] ?? "")}
-                    onChange={(e) =>
-                      setParameterValues((prev) => ({
-                        ...prev,
-                        [param.name]: e.target.value,
-                      }))
-                    }
-                  />
+                  <>
+                    <Label htmlFor={id}>{param.name}</Label>
+                    <Input
+                      id={id}
+                      type={param.type === "number" ? "number" : "text"}
+                      value={String(parameterValues[param.name] ?? "")}
+                      onChange={(e) =>
+                        setParameterValues((prev) => ({
+                          ...prev,
+                          [param.name]: e.target.value,
+                        }))
+                      }
+                    />
+                  </>
                 )}
               </div>
             );
