@@ -2,7 +2,6 @@ import { DashboardOverlay, type DashboardOverlayProps } from "./DashboardOverlay
 
 type WorkflowDashboardOverlayProps = Omit<DashboardOverlayProps, "readOnly" | "canImportYaml" | "canRunNodes"> & {
   isDashboardMode: boolean;
-  dashboardsFeatureEnabled: boolean;
   canActOnCanvas: boolean;
   // Hides authoring affordances (panel edit/delete, drag/resize, YAML import)
   // when the app is in read mode.
@@ -11,12 +10,11 @@ type WorkflowDashboardOverlayProps = Omit<DashboardOverlayProps, "readOnly" | "c
 
 export function WorkflowDashboardOverlay({
   isDashboardMode,
-  dashboardsFeatureEnabled,
   canActOnCanvas,
   editLocked,
   ...dashboardProps
 }: WorkflowDashboardOverlayProps) {
-  if (!isDashboardMode || !dashboardsFeatureEnabled) return null;
+  if (!isDashboardMode) return null;
 
   // Runtime triggers (widget row actions, Node panel Run button) only depend
   // on permission/template state — not on edit mode. The in-flight run lock

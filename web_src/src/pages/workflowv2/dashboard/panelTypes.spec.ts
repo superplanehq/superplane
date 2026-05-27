@@ -3,13 +3,14 @@ import { describe, expect, it } from "vitest";
 import { isPanelType, PANEL_TYPES, templateForPanelType, validatePanelContent } from "./panelTypes";
 
 describe("PANEL_TYPES", () => {
-  it("includes the five supported types", () => {
-    expect(PANEL_TYPES).toEqual(["markdown", "node", "table", "chart", "number"]);
+  it("includes the six supported types", () => {
+    expect(PANEL_TYPES).toEqual(["markdown", "node", "nodes", "table", "chart", "number"]);
   });
 
   it("isPanelType narrows to the union", () => {
     expect(isPanelType("markdown")).toBe(true);
     expect(isPanelType("node")).toBe(true);
+    expect(isPanelType("nodes")).toBe(true);
     expect(isPanelType("timeline")).toBe(false);
     expect(isPanelType(42)).toBe(false);
   });
@@ -261,6 +262,49 @@ describe("validatePanelContent", () => {
       render: { kind: "number", aggregation: "count" },
     });
     expect(error).toMatch(/dataSource\.sources must be an array/);
+  });
+});
+
+describe("validatePanelContent — nodes panels", () => {
+  it("accepts a valid nodes panel with multiple entries", () => {
+    expect(
+      validatePanelContent("nodes", {
+        title: "Key nodes",
+        nodes: [
+          { node: "deploy-prod", description: "Promotes the latest build" },
+          { node: "rollback", label: "Rollback", showRun: true },
+        ],
+      }),
+    ).toBeNull();
+  });
+
+  it("accepts a draft nodes panel with an empty nodes array", () => {
+    expect(validatePanelContent("nodes", { nodes: [] })).toBeNull();
+  });
+
+  it("rejects nodes content where nodes is not an array", () => {
+    expect(validatePanelContent("nodes", { nodes: {} })).toMatch(/content\.nodes must be an array/);
+  });
+
+  it("rejects nodes entries without a node reference", () => {
+    expect(validatePanelContent("nodes", { nodes: [{ description: "missing" }] })).toMatch(
+      /content\.nodes\[0\]\.node must be a non-empty string/,
+    );
+    expect(validatePanelContent("nodes", { nodes: [{ node: "" }] })).toMatch(
+      /content\.nodes\[0\]\.node must be a non-empty string/,
+    );
+  });
+
+  it("rejects nodes entries with a non-string description", () => {
+    expect(validatePanelContent("nodes", { nodes: [{ node: "deploy", description: 42 }] })).toMatch(
+      /content\.nodes\[0\]\.description must be a string/,
+    );
+  });
+
+  it("rejects nodes entries with a non-boolean showRun", () => {
+    expect(validatePanelContent("nodes", { nodes: [{ node: "deploy", showRun: "yes" }] })).toMatch(
+      /content\.nodes\[0\]\.showRun must be a boolean/,
+    );
   });
 });
 

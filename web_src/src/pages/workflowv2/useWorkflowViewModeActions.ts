@@ -8,7 +8,6 @@ interface WorkflowViewModeActionsConfig {
   isFilesMode: boolean;
   isRunsMode: boolean;
   hasEditableVersion: boolean;
-  dashboardsFeatureEnabled: boolean;
   isTemplate: boolean;
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
@@ -27,7 +26,6 @@ export function useWorkflowViewModeActions({
   isFilesMode,
   isRunsMode,
   hasEditableVersion,
-  dashboardsFeatureEnabled,
   isTemplate,
   canUpdateCanvas,
   canvasDeletedRemotely,
@@ -91,7 +89,6 @@ export function useWorkflowViewModeActions({
     ...getDashboardHeaderActions({
       isEditing: hasEditableVersion,
       isDashboardMode,
-      dashboardsFeatureEnabled,
       isTemplate,
       canUpdateCanvas,
       canvasDeletedRemotely,

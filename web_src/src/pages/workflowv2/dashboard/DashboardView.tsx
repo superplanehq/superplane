@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import GridLayout, { type Layout, WidthProvider } from "react-grid-layout";
-import { Loader2, LayoutGrid, FileText, Hash, LineChart, Table2, Workflow } from "lucide-react";
+import { Loader2, LayoutGrid, FileText, Hash, LineChart, Network, Table2, Workflow } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import type { DashboardPanel, DashboardLayoutItem } from "@/hooks/useCanvasData"
 
 import { MarkdownPanelCard } from "./MarkdownPanelCard";
 import { NodePanelCard } from "./NodePanelCard";
+import { NodesPanelCard } from "./NodesPanelCard";
 import { TablePanelCard } from "./TablePanelCard";
 import { ChartPanelCard } from "./ChartPanelCard";
 import { NumberPanelCard } from "./NumberPanelCard";
@@ -240,6 +241,7 @@ function EmptyState() {
 const PANEL_TYPE_ICONS: Record<PanelType, typeof FileText> = {
   markdown: FileText,
   node: Workflow,
+  nodes: Network,
   table: Table2,
   chart: LineChart,
   number: Hash,
@@ -259,6 +261,8 @@ function PanelCardRouter({
   switch (panel.type) {
     case "node":
       return <NodePanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
+    case "nodes":
+      return <NodesPanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
     case "table":
       return <TablePanelCard panel={panel} readOnly={readOnly} onDelete={onDelete} onChange={onChange} />;
     case "chart":
