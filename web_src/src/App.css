@@ -220,6 +220,12 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  input:focus::selection,
+  textarea:focus::selection {
+    background-color: revert;
+    color: revert;
+  }
 }
 
 .json-viewer-hide-types .w-rjv-type:not([data-type="null"]) {
