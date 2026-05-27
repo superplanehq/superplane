@@ -1,7 +1,6 @@
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Checkbox } from "@/ui/checkbox";
 import { Switch } from "@/ui/switch";
-import { Minus, Pencil, Plus } from "lucide-react";
 
 interface DiffSummaryHoverCardProps {
   diffCounts: { added: number; updated: number; removed: number };
@@ -20,26 +19,9 @@ function DiffBadgeSegments({ diffCounts }: Pick<DiffSummaryHoverCardProps, "diff
   const { added, updated, removed } = diffCounts;
   return (
     <>
-      {added > 0 && (
-        <span className="flex items-center gap-0.5 px-1 text-emerald-600">
-          <Plus className="h-3 w-3" />
-          {added}
-        </span>
-      )}
-      {added > 0 && (updated > 0 || removed > 0) && <span className="text-slate-300">|</span>}
-      {updated > 0 && (
-        <span className="flex items-center gap-0.5 px-1 text-sky-600">
-          <Pencil className="h-3 w-3" />
-          {updated}
-        </span>
-      )}
-      {updated > 0 && removed > 0 && <span className="text-slate-300">|</span>}
-      {removed > 0 && (
-        <span className="flex items-center gap-0.5 px-1 text-red-600">
-          <Minus className="h-3 w-3" />
-          {removed}
-        </span>
-      )}
+      {added > 0 && <span className="tabular-nums text-emerald-600">+{added}</span>}
+      {updated > 0 && <span className="tabular-nums text-sky-600">±{updated}</span>}
+      {removed > 0 && <span className="tabular-nums text-red-600">-{removed}</span>}
     </>
   );
 }
@@ -59,7 +41,7 @@ export function DiffSummaryHoverCard({
       <HoverCardTrigger asChild>
         <button
           type="button"
-          className="flex cursor-default items-center gap-0 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs font-medium transition-colors hover:bg-slate-100"
+          className="flex h-7 cursor-default items-center gap-0.5 rounded-md border border-slate-950/15 bg-white px-1.5 py-1 text-[13px] font-medium transition-colors hover:bg-slate-50"
         >
           <DiffBadgeSegments diffCounts={diffCounts} />
         </button>
