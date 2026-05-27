@@ -97,8 +97,9 @@ func (s *Start) Configuration() []configuration.Field {
 								Type:  configuration.FieldTypeList,
 								TypeOptions: &configuration.TypeOptions{
 									List: &configuration.ListTypeOptions{
-										ItemLabel: "Parameter",
-										Accordion: true,
+										ItemLabel:   "Parameter",
+										Accordion:   true,
+										Reorderable: true,
 										ItemDefinition: &configuration.ListItemDefinition{
 											Type: configuration.FieldTypeObject,
 											Schema: []configuration.Field{

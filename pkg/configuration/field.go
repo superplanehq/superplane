@@ -207,6 +207,9 @@ type ListTypeOptions struct {
 
 	// When true, list items render in a single-expand accordion instead of stacked cards.
 	Accordion bool `json:"accordion,omitempty"`
+
+	// When true, list items can be reordered with move up/down controls.
+	Reorderable bool `json:"reorderable,omitempty"`
 }
 
 /*
