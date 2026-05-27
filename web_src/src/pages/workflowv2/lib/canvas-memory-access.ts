@@ -1,20 +1,30 @@
 /**
  * Resolves whether the canvas memory delete affordance should be exposed for
- * the current viewer + version. Memory belongs to the live canvas, so this
- * should not depend on draft edit mode.
+ * the current viewer. Memory belongs to the live canvas, but the delete
+ * action mutates live data, so we only expose it while the app is in edit
+ * mode (the user has explicitly switched out of read mode by entering an
+ * editable draft session) and the viewer is otherwise authorized to act on
+ * the canvas.
  */
 export function canEditCanvasMemory({
   canUpdateCanvas,
   isTemplate,
   canvasDeletedRemotely,
-  isViewingLiveVersion,
-  isViewingDraftVersion,
+  hasEditableVersion,
 }: {
   canUpdateCanvas: boolean;
   isTemplate: boolean;
   canvasDeletedRemotely: boolean;
-  isViewingLiveVersion: boolean;
-  isViewingDraftVersion: boolean;
+  hasEditableVersion: boolean;
 }): boolean {
-  return canUpdateCanvas && !isTemplate && !canvasDeletedRemotely && isViewingLiveVersion && !isViewingDraftVersion;
+  return canUpdateCanvas && !isTemplate && !canvasDeletedRemotely && hasEditableVersion;
+}
+
+/**
+ * Decides whether the workflow page should fetch canvas memory entries: when
+ * the memory overlay is open, or when the user is viewing the live canvas
+ * (memory belongs to the live canvas).
+ */
+export function shouldLoadCanvasMemoryEntries(isMemoryMode: boolean, isViewingLiveVersion: boolean): boolean {
+  return isMemoryMode || isViewingLiveVersion;
 }

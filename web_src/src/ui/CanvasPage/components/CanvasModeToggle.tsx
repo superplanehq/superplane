@@ -11,6 +11,7 @@ interface CanvasModeToggleProps {
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
   editing?: boolean;
+  hasDraft?: boolean;
 }
 
 const CANVAS_TAB = "canvas";
@@ -26,6 +27,7 @@ export function CanvasModeToggle({
   onSelectMemory,
   onSelectFiles,
   editing = false,
+  hasDraft = false,
 }: CanvasModeToggleProps) {
   const showDashboard = Boolean(onSelectDashboard);
   const showMemory = Boolean(onSelectMemory);
@@ -110,7 +112,16 @@ export function CanvasModeToggle({
           data-testid="canvas-view-mode-live"
           aria-label={editing ? "Canvas (editing)" : "Canvas"}
         >
-          Canvas
+          <span className="inline-flex items-center gap-1.5">
+            Canvas
+            {hasDraft ? (
+              <span
+                className="inline-flex size-1.5 shrink-0 rounded-full bg-slate-400"
+                aria-hidden="true"
+                data-testid="canvas-view-mode-live-draft-dot"
+              />
+            ) : null}
+          </span>
         </TabsTrigger>
         {showMemory ? (
           <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory">

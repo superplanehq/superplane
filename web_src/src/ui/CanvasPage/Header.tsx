@@ -65,6 +65,8 @@ export interface HeaderProps {
   unpublishedDraftUpdatedAt?: string;
   /** Discard the existing draft and start a new edit session from live. Shown in the Edit dropdown when a draft exists. */
   onDiscardDraftAndStartEdit?: () => void;
+  /** Canvas rename requires `canvases:update`; hide rename when the user cannot update. */
+  showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
 }
 
@@ -87,6 +89,7 @@ export function Header(props: HeaderProps) {
         enterEditModeDisabledTooltip={props.enterEditModeDisabledTooltip}
         onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
         unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
+        showCanvasSettingsMenu={props.showCanvasSettingsMenu}
       />
 
       <SecondaryHeader {...props} />
@@ -108,9 +111,11 @@ function PageHeader({
   enterEditModeDisabledTooltip,
   onDiscardDraftAndStartEdit,
   unpublishedDraftUpdatedAt,
+  showCanvasSettingsMenu = true,
 }: {
   organizationId?: string;
   headerTitle: string;
+  showCanvasSettingsMenu?: boolean;
   mode?: HeaderMode;
   isEditing?: boolean;
   hasUnpublishedDraftChanges?: boolean;
@@ -138,6 +143,7 @@ function PageHeader({
               organizationId={organizationId}
               activeCanvasId={activeCanvasId}
               canvasName={headerTitle}
+              canUpdateCanvas={showCanvasSettingsMenu}
             />
           ) : (
             <span className="block truncate text-center text-[13px] font-medium text-slate-900">{headerTitle}</span>
@@ -201,6 +207,7 @@ function SecondaryHeader(props: HeaderProps) {
               onSelectMemory={props.onSelectMemory}
               onSelectFiles={props.onSelectFiles}
               editing={editing}
+              hasDraft={!!props.hasUnpublishedDraftChanges}
             />
           ) : null}
         </div>

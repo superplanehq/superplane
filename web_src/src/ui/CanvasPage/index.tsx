@@ -210,6 +210,8 @@ export interface CanvasPageProps {
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
+  /** When true, enables inline rename and app settings in the project switcher. */
+  showCanvasSettingsMenu?: boolean;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
   hasAutoOpenedVersionControl?: boolean;
@@ -1296,6 +1298,7 @@ function CanvasPage(props: CanvasPageProps) {
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
           onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
+          showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           toolSidebarState={toolSidebarState}
         />
         {props.headerBanner ? <div className="border-b border-black/20">{props.headerBanner}</div> : null}
@@ -1817,6 +1820,7 @@ function CanvasContentHeader({
   hasUnpublishedDraftChanges,
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
+  showCanvasSettingsMenu,
   toolSidebarState,
 }: {
   state: CanvasPageState;
@@ -1864,6 +1868,7 @@ function CanvasContentHeader({
   hasUnpublishedDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
+  showCanvasSettingsMenu?: boolean;
   toolSidebarState: CanvasToolSidebarState;
 }) {
   const stateRef = useRef(state);
@@ -1913,6 +1918,7 @@ function CanvasContentHeader({
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
+      showCanvasSettingsMenu={showCanvasSettingsMenu}
       toolSidebarState={toolSidebarState}
     />
   );
@@ -2956,7 +2962,7 @@ function CanvasContent({
             <Search className="h-3 w-3" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Search commands and components</TooltipContent>
+        <TooltipContent>Search Components</TooltipContent>
       </Tooltip>
     ),
     [handleOpenCommandPalette],
