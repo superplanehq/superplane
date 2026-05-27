@@ -10,7 +10,7 @@ export interface StartTemplateParameter {
 
 export interface StartTemplate {
   name: string;
-  payload: Record<string, unknown>;
+  payload: Record<string, unknown> | string;
   parameters?: StartTemplateParameter[];
 }
 
@@ -37,10 +37,28 @@ export function parameterDefaultValue(param: StartTemplateParameter): unknown | 
   }
 }
 
-export function payloadForTemplateRun(template: StartTemplate): Record<string, unknown> {
+export function payloadForTemplateRun(template: StartTemplate): Record<string, unknown> | string {
   const payload = template.payload;
+  if (typeof payload === "string") {
+    return payload;
+  }
   if (payload && typeof payload === "object" && !Array.isArray(payload)) {
     return payload;
+  }
+  return {};
+}
+
+export function payloadRecordForParameters(payload: Record<string, unknown> | string): Record<string, unknown> {
+  if (typeof payload !== "string") {
+    return payload;
+  }
+  try {
+    const parsed = JSON.parse(payload) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    // Expression placeholders make the payload invalid JSON until run time.
   }
   return {};
 }

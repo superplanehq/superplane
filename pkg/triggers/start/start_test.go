@@ -20,20 +20,15 @@ func TestStart_Hooks_DeclaresUserAccessibleRun(t *testing.T) {
 
 	var paramNames []string
 	var templateRequired bool
-	var payloadRequired bool
 	for _, param := range hook.Parameters {
 		paramNames = append(paramNames, param.Name)
 		if param.Name == "template" {
 			templateRequired = param.Required
 		}
-		if param.Name == "payload" {
-			payloadRequired = param.Required
-		}
 	}
 
-	assert.ElementsMatch(t, []string{"template", "payload"}, paramNames)
+	assert.ElementsMatch(t, []string{"template"}, paramNames)
 	assert.True(t, templateRequired, "template parameter must be required")
-	assert.False(t, payloadRequired, "payload parameter must be optional")
 }
 
 func TestStart_HandleHook_EmitsWithConfiguredPayload(t *testing.T) {
@@ -62,32 +57,6 @@ func TestStart_HandleHook_EmitsWithConfiguredPayload(t *testing.T) {
 	payload, ok := events.Payloads[0].Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "Hello, World!", payload["message"])
-}
-
-func TestStart_HandleHook_PayloadOverride(t *testing.T) {
-	s := &Start{}
-	events := &contexts.EventContext{}
-
-	config := map[string]any{
-		"templates": []any{
-			map[string]any{"name": "Hello", "payload": map[string]any{"message": "Hello, World!"}},
-		},
-	}
-
-	_, err := s.HandleHook(core.TriggerHookContext{
-		Name: HookRun,
-		Parameters: map[string]any{
-			"template": "Hello",
-			"payload":  map[string]any{"message": "Override"},
-		},
-		Configuration: config,
-		Events:        events,
-	})
-
-	require.NoError(t, err)
-	require.Len(t, events.Payloads, 1)
-	payload := events.Payloads[0].Data.(map[string]any)
-	assert.Equal(t, "Override", payload["message"])
 }
 
 func TestStart_HandleHook_UnknownTemplateListsAvailable(t *testing.T) {
@@ -202,7 +171,7 @@ func TestStart_HandleHook_PrefersPayloadOverParameters(t *testing.T) {
 	assert.Equal(t, "from payload", payload["message"])
 }
 
-func TestStart_HandleHook_RejectsNilPayloadWithoutOverride(t *testing.T) {
+func TestStart_HandleHook_RejectsNilPayload(t *testing.T) {
 	s := &Start{}
 	events := &contexts.EventContext{}
 

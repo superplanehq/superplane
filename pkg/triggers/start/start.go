@@ -1,6 +1,7 @@
 package manual
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -45,21 +46,21 @@ func (s *Start) Documentation() string {
 1. Add the Manual Run trigger as the starting node of your workflow
 2. Configure one or more templates, each with a name, default payload, and optional parameters
 3. Click the "Run" button in the workflow UI, or invoke the ` + "`run`" + ` hook via the API/CLI to start an execution
-4. The workflow begins immediately with either the configured payload or an override supplied at run time
+4. The workflow begins immediately with the configured payload for the selected template
 
 ## Configuration
 
 Each Manual Run trigger exposes a list of templates. A template has:
 
 - ` + "`name`" + ` (required): a label used as the run target (and the event channel)
-- ` + "`payload`" + ` (required): a default JSON object emitted when the template is used
-- ` + "`parameters`" + ` (optional): a list of typed parameters shown when running the template manually
+- ` + "`payload`" + ` (required): a default JSON object emitted when the template is used. Supports expressions such as ` + "`{{ now() }}`" + ` in JSON values.
+- ` + "`parameters`" + ` (optional): a list of typed parameters for UI display
 
 Each parameter has a ` + "`name`" + ` (plain text), required ` + "`type`" + ` (` + "`string`" + `, ` + "`number`" + `, or ` + "`boolean`" + `), and an optional default (` + "`defaultString`" + `, ` + "`defaultNumber`" + `, or ` + "`defaultBoolean`" + `) whose editor matches the selected type.
 
 ## Event Data
 
-Manual runs emit an event with type ` + "`manual.run`" + `. The data is either the template's saved payload or the override passed in the run request.`
+Manual runs emit an event with type ` + "`manual.run`" + `. The data is the selected template's payload after expression resolution.`
 }
 
 func (s *Start) Icon() string {
@@ -166,10 +167,14 @@ func (s *Start) Configuration() []configuration.Field {
 								},
 							},
 							{
-								Name:     "payload",
-								Label:    "Payload",
-								Type:     configuration.FieldTypeObject,
-								Required: true,
+								Name:        "payload",
+								Label:       "Payload",
+								Type:        configuration.FieldTypeObject,
+								Required:    true,
+								Description: "JSON object emitted when the template runs. Supports expressions such as {{ now() }} in field values.",
+								Placeholder: `{
+  "message": "Hello, World!"
+}`,
 							},
 						},
 					},
@@ -208,11 +213,6 @@ func (s *Start) Hooks() []core.Hook {
 					Type:     configuration.FieldTypeString,
 					Required: true,
 				},
-				{
-					Name:  "payload",
-					Label: "Payload Override",
-					Type:  configuration.FieldTypeObject,
-				},
 			},
 		},
 	}
@@ -240,7 +240,7 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 	}
 
 	var names []string
-	var payload map[string]any
+	var payload any
 	found := false
 
 	for _, raw := range rawTemplates {
@@ -260,15 +260,16 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 		return nil, fmt.Errorf("template %q not found; available: %s", templateName, strings.Join(names, ", "))
 	}
 
-	if override, ok := ctx.Parameters["payload"].(map[string]any); ok {
-		payload = override
-	}
-
 	if payload == nil {
-		return nil, fmt.Errorf("template %q has no payload and no override was provided", templateName)
+		return nil, fmt.Errorf("template %q has no payload", templateName)
 	}
 
-	if err := ctx.Events.Emit("manual.run", payload); err != nil {
+	resolvedPayload, err := payloadObject(payload)
+	if err != nil {
+		return nil, fmt.Errorf("template %q payload must be a JSON object: %w", templateName, err)
+	}
+
+	if err := ctx.Events.Emit("manual.run", resolvedPayload); err != nil {
 		return nil, fmt.Errorf("failed to emit event: %w", err)
 	}
 
@@ -279,7 +280,24 @@ func (s *Start) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
 
-func templatePayload(tmpl map[string]any) map[string]any {
-	payload, _ := tmpl["payload"].(map[string]any)
-	return payload
+func templatePayload(tmpl map[string]any) any {
+	return tmpl["payload"]
+}
+
+func payloadObject(value any) (map[string]any, error) {
+	switch payload := value.(type) {
+	case map[string]any:
+		return payload, nil
+	case string:
+		var parsed map[string]any
+		if err := json.Unmarshal([]byte(payload), &parsed); err != nil {
+			return nil, err
+		}
+		if parsed == nil {
+			return nil, fmt.Errorf("empty payload")
+		}
+		return parsed, nil
+	default:
+		return nil, fmt.Errorf("unsupported payload type")
+	}
 }

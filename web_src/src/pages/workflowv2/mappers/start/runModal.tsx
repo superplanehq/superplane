@@ -7,7 +7,12 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { showErrorToast } from "@/lib/toast";
 import { Checkbox } from "@/ui/checkbox";
 
-import { coerceParameterValue, initialParameterValue, type StartTemplateParameter } from "./templatePayload";
+import {
+  coerceParameterValue,
+  initialParameterValue,
+  payloadRecordForParameters,
+  type StartTemplateParameter,
+} from "./templatePayload";
 
 export function StartRunModal({
   parameters,
@@ -16,20 +21,23 @@ export function StartRunModal({
   onClose,
 }: {
   parameters?: StartTemplateParameter[];
-  initialPayload: Record<string, unknown>;
+  initialPayload: Record<string, unknown> | string;
   onRun: (payload: Record<string, unknown>) => Promise<void>;
   onClose: () => void;
 }) {
   const useParameterForm = Boolean(parameters?.length);
+  const parameterPayload = React.useMemo(() => payloadRecordForParameters(initialPayload), [initialPayload]);
   const [parameterValues, setParameterValues] = React.useState<Record<string, string | number | boolean>>(() => {
     const values: Record<string, string | number | boolean> = {};
     for (const param of parameters ?? []) {
       if (!param.name || !param.type) continue;
-      values[param.name] = initialParameterValue(param, initialPayload);
+      values[param.name] = initialParameterValue(param, parameterPayload);
     }
     return values;
   });
-  const [eventData, setEventData] = React.useState<string>(() => JSON.stringify(initialPayload, null, 2));
+  const [eventData, setEventData] = React.useState<string>(() =>
+    typeof initialPayload === "string" ? initialPayload : JSON.stringify(initialPayload, null, 2),
+  );
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const handleSubmit = async () => {
