@@ -78,6 +78,10 @@ func stringTypeOptionsToProto(opts *configuration.StringTypeOptions) *configpb.S
 		pbOpts.MaxLength = &maxLength
 	}
 
+	if opts.AllowExpressions != nil {
+		pbOpts.AllowExpressions = opts.AllowExpressions
+	}
+
 	return pbOpts
 }
 
@@ -358,6 +362,10 @@ func protoToStringTypeOptions(pbOpts *configpb.StringTypeOptions) *configuration
 	if pbOpts.MaxLength != nil {
 		maxLength := int(*pbOpts.MaxLength)
 		opts.MaxLength = &maxLength
+	}
+
+	if pbOpts.AllowExpressions != nil {
+		opts.AllowExpressions = pbOpts.AllowExpressions
 	}
 
 	return opts

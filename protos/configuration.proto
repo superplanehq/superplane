@@ -43,6 +43,7 @@ message NumberTypeOptions {
 message StringTypeOptions {
   optional int32 min_length = 1;
   optional int32 max_length = 2;
+  optional bool allow_expressions = 3;
 }
 
 message ExpressionTypeOptions {

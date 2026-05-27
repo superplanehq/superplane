@@ -43,7 +43,7 @@ func (s *Start) Documentation() string {
 ## How It Works
 
 1. Add the Manual Run trigger as the starting node of your workflow
-2. Configure one or more templates, each with a name and a default payload
+2. Configure one or more templates, each with a name, default payload, and optional parameters
 3. Click the "Run" button in the workflow UI, or invoke the ` + "`run`" + ` hook via the API/CLI to start an execution
 4. The workflow begins immediately with either the configured payload or an override supplied at run time
 
@@ -53,6 +53,9 @@ Each Manual Run trigger exposes a list of templates. A template has:
 
 - ` + "`name`" + ` (required): a label used as the run target (and the event channel)
 - ` + "`payload`" + ` (required): a default JSON object emitted when the template is used
+- ` + "`parameters`" + ` (optional): a list of typed parameters shown when running the template manually
+
+Each parameter has a ` + "`name`" + ` (plain text), required ` + "`type`" + ` (` + "`string`" + `, ` + "`number`" + `, or ` + "`boolean`" + `), and an optional default (` + "`defaultString`" + `, ` + "`defaultNumber`" + `, or ` + "`defaultBoolean`" + `) whose editor matches the selected type.
 
 ## Event Data
 
@@ -68,6 +71,8 @@ func (s *Start) Color() string {
 }
 
 func (s *Start) Configuration() []configuration.Field {
+	disallowExpressions := false
+
 	return []configuration.Field{
 		{
 			Name:  "templates",
@@ -86,6 +91,80 @@ func (s *Start) Configuration() []configuration.Field {
 								Required: true,
 							},
 							{
+								Name:  "parameters",
+								Label: "Parameters",
+								Type:  configuration.FieldTypeList,
+								TypeOptions: &configuration.TypeOptions{
+									List: &configuration.ListTypeOptions{
+										ItemLabel: "Parameter",
+										ItemDefinition: &configuration.ListItemDefinition{
+											Type: configuration.FieldTypeObject,
+											Schema: []configuration.Field{
+												{
+													Name:     "name",
+													Label:    "Name",
+													Type:     configuration.FieldTypeString,
+													Required: true,
+													TypeOptions: &configuration.TypeOptions{
+														String: &configuration.StringTypeOptions{
+															AllowExpressions: &disallowExpressions,
+														},
+													},
+												},
+												{
+													Name:     "type",
+													Label:    "Type",
+													Type:     configuration.FieldTypeSelect,
+													Required: true,
+													Default:  configuration.FieldTypeString,
+													TypeOptions: &configuration.TypeOptions{
+														Select: &configuration.SelectTypeOptions{
+															Options: []configuration.FieldOption{
+																{Label: "String", Value: configuration.FieldTypeString},
+																{Label: "Number", Value: configuration.FieldTypeNumber},
+																{Label: "Boolean", Value: configuration.FieldTypeBool},
+															},
+														},
+													},
+												},
+												{
+													Name:      "defaultString",
+													Label:     "Default Value",
+													Type:      configuration.FieldTypeString,
+													Togglable: true,
+													VisibilityConditions: []configuration.VisibilityCondition{
+														{Field: "type", Values: []string{configuration.FieldTypeString}},
+													},
+													TypeOptions: &configuration.TypeOptions{
+														String: &configuration.StringTypeOptions{
+															AllowExpressions: &disallowExpressions,
+														},
+													},
+												},
+												{
+													Name:      "defaultNumber",
+													Label:     "Default Value",
+													Type:      configuration.FieldTypeNumber,
+													Togglable: true,
+													VisibilityConditions: []configuration.VisibilityCondition{
+														{Field: "type", Values: []string{configuration.FieldTypeNumber}},
+													},
+												},
+												{
+													Name:      "defaultBoolean",
+													Label:     "Default Value",
+													Type:      configuration.FieldTypeBool,
+													Togglable: true,
+													VisibilityConditions: []configuration.VisibilityCondition{
+														{Field: "type", Values: []string{configuration.FieldTypeBool}},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+							{
 								Name:     "payload",
 								Label:    "Payload",
 								Type:     configuration.FieldTypeObject,
@@ -99,6 +178,9 @@ func (s *Start) Configuration() []configuration.Field {
 				{
 					"name":    "Hello World",
 					"payload": map[string]any{"message": "Hello, World!"},
+					"parameters": []map[string]any{
+						{"name": "message", "type": configuration.FieldTypeString, "defaultString": "Hello, World!"},
+					},
 				},
 			},
 		},
@@ -168,7 +250,7 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 		name, _ := tmpl["name"].(string)
 		names = append(names, name)
 		if name == templateName {
-			payload, _ = tmpl["payload"].(map[string]any)
+			payload = templatePayload(tmpl)
 			found = true
 		}
 	}
@@ -194,4 +276,9 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 
 func (s *Start) Cleanup(ctx core.TriggerContext) error {
 	return nil
+}
+
+func templatePayload(tmpl map[string]any) map[string]any {
+	payload, _ := tmpl["payload"].(map[string]any)
+	return payload
 }
