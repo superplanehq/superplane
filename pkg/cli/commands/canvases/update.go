@@ -5,6 +5,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/superplanehq/superplane/pkg/cli/canvasresolve"
 	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
@@ -75,7 +76,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases change-requests create`")
 	}
 
-	targetVersionID, err := ensureCurrentUserDraftVersionID(ctx, canvasID)
+	targetVersionID, err := canvasresolve.EnsureCurrentUserDraftVersionID(ctx, canvasID)
 	if err != nil {
 		return err
 	}

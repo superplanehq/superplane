@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/cli/canvasresolve"
 	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
@@ -186,7 +187,7 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 			return fmt.Errorf("change management is disabled for this canvas; enable it in canvas settings to use change requests")
 		}
 
-		versionID, err = findCurrentUserDraftVersionID(ctx, canvasID)
+		versionID, err = canvasresolve.FindCurrentUserDraftVersionID(ctx, canvasID)
 		if err != nil {
 			return err
 		}
@@ -372,15 +373,7 @@ func parseCanvasChangeRequestTargetArgs(args []string) (string, string, error) {
 }
 
 func resolveCanvasTargetFromOptionalArg(ctx core.CommandContext, target string) (string, error) {
-	trimmedTarget := strings.TrimSpace(target)
-	if trimmedTarget == "" && ctx.Config != nil {
-		trimmedTarget = strings.TrimSpace(ctx.Config.GetActiveCanvas())
-	}
-	if trimmedTarget == "" {
-		return "", fmt.Errorf("<name-or-id> is required (or set an active canvas)")
-	}
-
-	return findCanvasID(ctx, ctx.API, trimmedTarget)
+	return canvasresolve.ResolveCanvasNameOrIDArg(ctx, target)
 }
 
 func loadCanvasForChangeRequestResolve(filePath string) (openapi_client.CanvasesCanvas, error) {
