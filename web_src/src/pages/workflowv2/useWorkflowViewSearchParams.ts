@@ -1,14 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import type { SetURLSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
 
 /**
  * Keeps runs/dashboard view mode and selected run in sync with `view` and `run` search params.
  */
-export function useWorkflowViewSearchParams(
-  searchParams: URLSearchParams,
-  setSearchParams: SetURLSearchParams,
-  dashboardsFeatureEnabled: boolean,
-) {
+export function useWorkflowViewSearchParams(searchParams: URLSearchParams) {
   const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
   const [isDashboardMode, setIsDashboardMode] = useState(() => searchParams.get("view") === "dashboard");
   const [isMemoryMode, setIsMemoryMode] = useState(() => searchParams.get("view") === "memory");
@@ -19,31 +14,11 @@ export function useWorkflowViewSearchParams(
   const viewParam = searchParams.get("view") ?? "";
   const runParam = searchParams.get("run") ?? "";
 
-  const setSearchParamsRef = useRef(setSearchParams);
-  setSearchParamsRef.current = setSearchParams;
-
   useEffect(() => {
     setIsRunsMode(viewParam === "runs");
     setIsMemoryMode(viewParam === "memory");
     if (viewParam === "dashboard") {
-      if (dashboardsFeatureEnabled) {
-        setIsDashboardMode(true);
-      } else {
-        setIsDashboardMode(false);
-        setIsDashboardAddPanelOpen(false);
-        setIsDashboardYamlOpen(false);
-        setSearchParamsRef.current(
-          (current) => {
-            const next = new URLSearchParams(current);
-            if (next.get("view") !== "dashboard") {
-              return current;
-            }
-            next.delete("view");
-            return next;
-          },
-          { replace: true },
-        );
-      }
+      setIsDashboardMode(true);
     } else {
       setIsDashboardMode(false);
     }
@@ -52,7 +27,7 @@ export function useWorkflowViewSearchParams(
       setIsDashboardAddPanelOpen(false);
       setIsDashboardYamlOpen(false);
     }
-  }, [viewParam, runParam, dashboardsFeatureEnabled]);
+  }, [viewParam, runParam]);
 
   return {
     isRunsMode,

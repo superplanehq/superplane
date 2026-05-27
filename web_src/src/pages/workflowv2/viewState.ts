@@ -20,17 +20,15 @@ export function readStoredBoolean(key: string): boolean {
 
 export function getWorkflowHeaderMode({
   isDashboardMode,
-  dashboardsFeatureEnabled,
   isRunsMode,
   isMemoryMode,
 }: {
   isDashboardMode: boolean;
-  dashboardsFeatureEnabled: boolean;
   isRunsMode: boolean;
   isMemoryMode: boolean;
 }): WorkflowHeaderMode {
   if (isDashboardMode) {
-    return dashboardsFeatureEnabled ? "dashboard" : "version-live";
+    return "dashboard";
   }
 
   if (isMemoryMode) {
@@ -70,7 +68,6 @@ export function getWorkflowCanvasStateMode({
 
 export function getWorkflowViewPresentation({
   isDashboardMode,
-  dashboardsFeatureEnabled,
   isRunsMode,
   isMemoryMode,
   hasEditableVersion,
@@ -78,7 +75,6 @@ export function getWorkflowViewPresentation({
   isViewingCurrentLiveVersion,
 }: {
   isDashboardMode: boolean;
-  dashboardsFeatureEnabled: boolean;
   isRunsMode: boolean;
   isMemoryMode: boolean;
   hasEditableVersion: boolean;
@@ -86,7 +82,7 @@ export function getWorkflowViewPresentation({
   isViewingCurrentLiveVersion: boolean;
 }) {
   return {
-    headerMode: getWorkflowHeaderMode({ isDashboardMode, dashboardsFeatureEnabled, isRunsMode, isMemoryMode }),
+    headerMode: getWorkflowHeaderMode({ isDashboardMode, isRunsMode, isMemoryMode }),
     canvasStateMode: getWorkflowCanvasStateMode({
       hasEditableVersion,
       isViewingPendingApprovalVersion,

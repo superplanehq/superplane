@@ -54,7 +54,6 @@ import {
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -143,8 +142,6 @@ import {
   prepareData,
   prepareSidebarData,
 } from "./workflowPageHelpers";
-/** Backend flag id (`FeatureDashboards`); the registry label is "Console". */
-const EXPERIMENTAL_FEATURE_DASHBOARDS = "dashboards";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
@@ -187,8 +184,6 @@ export function WorkflowPageV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
-  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const dashboardsFeatureEnabled = hasExperimentalFeature(EXPERIMENTAL_FEATURE_DASHBOARDS);
   const {
     isRunsMode,
     setIsRunsMode,
@@ -202,7 +197,7 @@ export function WorkflowPageV2() {
     setIsDashboardYamlOpen,
     selectedRunId,
     setSelectedRunId,
-  } = useWorkflowViewSearchParams(searchParams, setSearchParams, dashboardsFeatureEnabled);
+  } = useWorkflowViewSearchParams(searchParams);
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
@@ -581,7 +576,7 @@ export function WorkflowPageV2() {
     activeCanvasVersionId,
     liveCanvasVersionId,
     hasDraftGraphDiffVersusLive,
-    enabled: !isTemplate && dashboardsFeatureEnabled,
+    enabled: !isTemplate,
   });
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
@@ -4858,7 +4853,6 @@ export function WorkflowPageV2() {
   }, []);
 
   const { handleSelectDashboardMode, handleExitDashboardMode } = useDashboardModeActions({
-    dashboardsFeatureEnabled,
     setIsDashboardMode,
     setIsDashboardAddPanelOpen,
     setIsDashboardYamlOpen,
@@ -4889,7 +4883,6 @@ export function WorkflowPageV2() {
     isMemoryMode,
     isRunsMode,
     hasEditableVersion,
-    dashboardsFeatureEnabled,
     isTemplate,
     canUpdateCanvas,
     canvasDeletedRemotely,
@@ -5475,7 +5468,6 @@ export function WorkflowPageV2() {
   });
   const { headerMode, canvasStateMode } = getWorkflowViewPresentation({
     isDashboardMode,
-    dashboardsFeatureEnabled,
     isRunsMode,
     isMemoryMode,
     hasEditableVersion,
@@ -5503,7 +5495,6 @@ export function WorkflowPageV2() {
       <div className="relative h-full w-full">
         <WorkflowDashboardOverlay
           isDashboardMode={isDashboardMode}
-          dashboardsFeatureEnabled={dashboardsFeatureEnabled}
           canActOnCanvas={canActOnCanvas}
           editLocked={isReadOnly}
           dashboardQuery={dashboardQuery}
@@ -5641,7 +5632,7 @@ export function WorkflowPageV2() {
           onExitEditMode={handleExitEditModeFromHeader}
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
           onExitRunsMode={handleExitRunsMode}
-          onSelectDashboard={isTemplate || !dashboardsFeatureEnabled ? undefined : handleSelectDashboardMode}
+          onSelectDashboard={isTemplate ? undefined : handleSelectDashboardMode}
           onDashboardAddPanel={onDashboardAddPanel}
           onDashboardOpenYaml={onDashboardOpenYaml}
           dashboardYamlReadOnly={dashboardYamlReadOnly}
