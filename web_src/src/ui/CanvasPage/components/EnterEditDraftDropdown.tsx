@@ -21,7 +21,7 @@ export function EnterEditDraftDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <UIButton type="button" variant="default" size="sm" data-testid="canvas-edit-button">
+        <UIButton type="button" variant="outline" size="sm" data-testid="canvas-edit-button">
           Continue Editing
         </UIButton>
       </DropdownMenuTrigger>

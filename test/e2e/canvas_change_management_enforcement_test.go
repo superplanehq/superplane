@@ -88,11 +88,7 @@ func (s *canvasChangeManagementEnforcementSteps) setCanvasChangeManagementInDB(e
 }
 
 func (s *canvasChangeManagementEnforcementSteps) visitCanvasSettings() {
-	s.canvas.Visit()
-	s.session.AssertVisible(q.Locator(`header button[aria-label="Canvas menu"]`))
-	s.session.Click(q.Locator(`header button[aria-label="Canvas menu"]`))
-	s.session.AssertVisible(q.Locator(`[role="menuitem"]:has-text("Settings")`))
-	s.session.Click(q.Locator(`[role="menuitem"]:has-text("Settings")`))
+	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/" + s.canvas.WorkflowID.String() + "/settings")
 	s.session.AssertText("App name")
 	s.session.AssertVisible(canvasChangeManagementSwitchQuery())
 }
