@@ -94,6 +94,8 @@ Allow service cloudEvents to use ons-topics in tenancy
 
 ## On Compute Instance Created
 
+**Trigger key:** `oci.onComputeInstanceCreated`
+
 The On Compute Instance Created trigger starts a workflow execution whenever an OCI Compute instance launch completes.
 
 ### How It Works
@@ -152,6 +154,8 @@ Each event payload includes:
 <a id="on-instance-state-change"></a>
 
 ## On Instance State Change
+
+**Trigger key:** `oci.onInstanceStateChange`
 
 The On Instance State Change trigger starts a workflow execution whenever an Oracle Cloud Infrastructure Compute instance completes a power or termination operation.
 
@@ -215,6 +219,8 @@ Each event payload includes:
 
 ## Create Application
 
+**Component key:** `oci.createApplication`
+
 The Create Application component creates a new Oracle Cloud Infrastructure Functions application.
 
 ### Use Cases
@@ -256,6 +262,8 @@ Emits the created application details including:
 <a id="create-compute-instance"></a>
 
 ## Create Compute Instance
+
+**Component key:** `oci.createComputeInstance`
 
 The Create Compute Instance component provisions a new Oracle Cloud Infrastructure Compute instance and waits until it reaches **RUNNING** state before emitting.
 
@@ -315,6 +323,8 @@ Emits the created instance details on the default output channel, including:
 
 ## Create Function
 
+**Component key:** `oci.createFunction`
+
 The Create Function component deploys a new serverless function within an existing OCI Functions application.
 
 ### Use Cases
@@ -366,6 +376,8 @@ Emits the created function details including:
 
 ## Create Image
 
+**Component key:** `oci.createImage`
+
 The Create Image component creates an OCI Compute boot disk image.
 
 ### Use Cases
@@ -416,6 +428,8 @@ The component waits for the image to reach `AVAILABLE` before emitting.
 
 ## Delete Application
 
+**Component key:** `oci.deleteApplication`
+
 The Delete Application component removes an Oracle Cloud Infrastructure Functions application.
 
 > **Important:** OCI will reject the deletion with a 409 Conflict if the application still contains functions.
@@ -451,6 +465,8 @@ Emits the deleted application ID on the default output channel:
 
 ## Delete Function
 
+**Component key:** `oci.deleteFunction`
+
 The Delete Function component removes a function from an Oracle Cloud Infrastructure Functions application.
 
 ### Configuration
@@ -482,6 +498,8 @@ Emits the deleted function ID on the default output channel:
 
 ## Delete Image
 
+**Component key:** `oci.deleteImage`
+
 The Delete Image component deletes an OCI Compute custom image. Oracle-provided platform images cannot be deleted.
 
 ### Use Cases
@@ -507,6 +525,8 @@ The Delete Image component deletes an OCI Compute custom image. Oracle-provided 
 <a id="delete-instance"></a>
 
 ## Delete Instance
+
+**Component key:** `oci.deleteInstance`
 
 The Delete Instance component terminates an Oracle Cloud Infrastructure Compute instance and waits until OCI reports it as terminated.
 
@@ -544,6 +564,8 @@ Emits a minimal deletion payload on the default output channel:
 
 ## Get Image
 
+**Component key:** `oci.getImage`
+
 The Get Image component retrieves metadata for an OCI Compute custom image. Oracle-provided platform images are not returned by this component.
 
 ### Use Cases
@@ -579,6 +601,8 @@ The Get Image component retrieves metadata for an OCI Compute custom image. Orac
 <a id="get-instance"></a>
 
 ## Get Instance
+
+**Component key:** `oci.getInstance`
 
 The Get Instance component fetches the latest details for an Oracle Cloud Infrastructure Compute instance.
 
@@ -631,6 +655,8 @@ Emits the instance details on the default output channel, including:
 
 ## Invoke Function
 
+**Component key:** `oci.invokeFunction`
+
 The Invoke Function component executes an Oracle Cloud Infrastructure serverless function and emits its response.
 
 ### Use Cases
@@ -670,6 +696,8 @@ Emits the function response on the default output channel:
 <a id="manage-instance-power"></a>
 
 ## Manage Instance Power
+
+**Component key:** `oci.manageInstancePower`
 
 The Manage Instance Power component performs a power lifecycle action on an Oracle Cloud Infrastructure Compute instance and waits for the target state.
 
@@ -719,6 +747,8 @@ Emits the instance details on the default output channel once the instance reach
 
 ## Update Image
 
+**Component key:** `oci.updateImage`
+
 The Update Image component updates the display name of an OCI Compute custom image. Oracle-provided platform images cannot be updated.
 
 ### Use Cases
@@ -754,6 +784,8 @@ The Update Image component updates the display name of an OCI Compute custom ima
 <a id="update-instance"></a>
 
 ## Update Instance
+
+**Component key:** `oci.updateInstance`
 
 The Update Instance component updates mutable attributes on an Oracle Cloud Infrastructure Compute instance.
 
