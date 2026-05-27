@@ -191,6 +191,18 @@ content:
 
 The editor scans live canvas memory and suggests namespaces and field names. Suggestions are only editor assistance; YAML import still uses the validators.
 
+### Field Suggestions
+
+The table editor populates the column dropdown, the filter / sort field datalists, and the row-action payload quick-insert chips with a field catalog derived from the data source:
+
+| Data source | Field catalog |
+| --- | --- |
+| `memory` | Discovered live from canvas memory entries in the chosen namespace. |
+| `executions` | Static catalog mirroring the execution row shape (`status`, `nodeName`, `durationMs`, `state`, `result`, `resultReason`, `resultMessage`, `id`, `nodeId`, `canvasId`, `parentExecutionId`, `previousExecutionId`, `createdAt`, `updatedAt`). |
+| `runs` | Static catalog mirroring `CanvasesCanvasRun` (`state`, `result`, `id`, `canvasId`, `versionId`, `createdAt`, `updatedAt`, `finishedAt`). |
+
+When suggestions are available, the column header bar also exposes an **Add all fields** button and quick-add chips that insert a column for each catalog field with `suggestColumnFormat`-derived formatting (e.g. `status` → `status`, `createdAt` → `relative`). Authors can still type a custom field (or `{{ CEL }}` template) — the dropdown switches to a free-text input via the `Custom…` option.
+
 ### Columns
 
 Each column needs a non-empty `field`. Optional fields:
@@ -198,7 +210,7 @@ Each column needs a non-empty `field`. Optional fields:
 | Field | Meaning |
 | --- | --- |
 | `label` | Header text. Falls back to `field`. |
-| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, or `link`. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). |
+| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, or `link`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). |
 | `show` | Row expression controlling whether the cell is visible. |
 | `href` | Link template for `link` columns. |
 
@@ -286,7 +298,7 @@ If a series omits `field`, the chart counts rows per `xField` bucket. If `field`
 
 Each series supports optional display fields used by the hover tooltip (and the donut value rows):
 
-- `format` — one of `text`, `number`, `percent`, `duration`. Defaults to `number` when omitted.
+- `format` — one of `text`, `number`, `percent`, `duration`. Defaults to `number` when omitted. `duration` always interprets its input as **milliseconds** (so an average of `4527` renders as `4.5s`, not `1h 15m`); convert other units in CEL before aggregating.
 - `prefix` — literal string rendered before the formatted value (for example `"$"`).
 - `suffix` — literal string rendered after the formatted value (for example `" MWh"`).
 
