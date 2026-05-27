@@ -17,6 +17,13 @@ import {
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
+import {
+  AGENT_BOOT_CONTEXT_READY_EVENT,
+  clearAgentBootContext,
+  getAgentBootInitialMessage,
+  getAgentBootMessage,
+  isAgentBootReady,
+} from "@/lib/agentBootContext";
 import { ConversationTranscript } from "./AgentConversationTranscript";
 import {
   buildRubricText,
@@ -115,6 +122,7 @@ function ChatConversation({
   const rawMessages = useConversationMessages(messagesQuery.data);
   const { account } = useContext(AccountContext);
   const greetingFirstName = account?.name?.split(" ")[0] ?? "there";
+  const bootInitialMessage = useMemo(() => getAgentBootInitialMessage(canvasId), [canvasId]);
 
   // Prepend a synthetic greeting as the first message so it never disappears
   const messages = useMemo(() => {
@@ -127,36 +135,26 @@ function ChatConversation({
       toolName: "",
       toolStatus: "",
     };
-    return [greeting, ...rawMessages];
-  }, [rawMessages, greetingFirstName]);
+
+    if (!bootInitialMessage) {
+      return [greeting, ...rawMessages];
+    }
+
+    const templateIntro: AgentMessage = {
+      id: "__boot_initial_message__",
+      role: "assistant",
+      content: bootInitialMessage,
+      createdAt: rawMessages[0]?.createdAt ?? null,
+      toolCallId: "",
+      toolName: "",
+      toolStatus: "",
+    };
+
+    return [greeting, templateIntro, ...rawMessages];
+  }, [rawMessages, greetingFirstName, bootInitialMessage]);
 
   const showThinking = useThinkingIndicator(rawMessages, status);
-
-  // Auto-kickoff: send a boot message when session is new (no messages yet)
-  const bootState = useRef<"idle" | "sending" | "sent">("idle");
-  useEffect(() => {
-    if (bootState.current !== "idle") return;
-    if (!messagesQuery.data || messagesQuery.isLoading) return;
-
-    const allMessages = messagesQuery.data.pages?.flatMap((p) => p.messages) ?? [];
-    if (allMessages.length === 0) {
-      bootState.current = "sending";
-      void sendMutation
-        .mutateAsync({
-          chatId,
-          content: createSystemMessage(
-            "Session ready. Read the current canvas state, check connected integrations, and greet the user.",
-          ),
-          mode: agentMode,
-        })
-        .then(() => {
-          bootState.current = "sent";
-        })
-        .catch(() => {
-          bootState.current = "idle";
-        });
-    }
-  }, [messagesQuery.data, messagesQuery.isLoading, chatId, agentMode, sendMutation]);
+  useAgentBootKickoff({ messagesQuery, sendMutation, chatId, canvasId, agentMode });
   const handlers = useConversationHandlers({
     agentMode,
     chatId,
@@ -224,6 +222,59 @@ function ChatConversation({
       />
     </div>
   );
+}
+
+function useAgentBootKickoff({
+  messagesQuery,
+  sendMutation,
+  chatId,
+  canvasId,
+  agentMode,
+}: {
+  messagesQuery: ReturnType<typeof useAgentChatMessages>;
+  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
+  chatId: string;
+  canvasId: string;
+  agentMode: AgentMode;
+}) {
+  const [bootReadinessSignal, setBootReadinessSignal] = useState(0);
+  const bootState = useRef<"idle" | "sending" | "sent">("idle");
+
+  useEffect(() => {
+    const handleBootReady = (event: Event) => {
+      const detail = (event as CustomEvent<{ canvasId?: string }>).detail;
+      if (detail?.canvasId === canvasId) {
+        setBootReadinessSignal((current) => current + 1);
+      }
+    };
+
+    window.addEventListener(AGENT_BOOT_CONTEXT_READY_EVENT, handleBootReady);
+    return () => window.removeEventListener(AGENT_BOOT_CONTEXT_READY_EVENT, handleBootReady);
+  }, [canvasId]);
+
+  useEffect(() => {
+    if (bootState.current !== "idle") return;
+    if (!messagesQuery.data || messagesQuery.isLoading) return;
+    if (!isAgentBootReady(canvasId)) return;
+
+    const allMessages = messagesQuery.data.pages?.flatMap((p) => p.messages) ?? [];
+    if (allMessages.length > 0) return;
+
+    bootState.current = "sending";
+    void sendMutation
+      .mutateAsync({
+        chatId,
+        content: createSystemMessage(getAgentBootMessage(canvasId)),
+        mode: agentMode,
+      })
+      .then(() => {
+        bootState.current = "sent";
+        clearAgentBootContext();
+      })
+      .catch(() => {
+        bootState.current = "idle";
+      });
+  }, [messagesQuery.data, messagesQuery.isLoading, bootReadinessSignal, chatId, canvasId, agentMode, sendMutation]);
 }
 
 function useConversationHandlers({

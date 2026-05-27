@@ -143,24 +143,25 @@ func TestCanvasPage(t *testing.T) {
 }
 
 func TestCanvasPageYamlViewer(t *testing.T) {
-	t.Run("YAML preview modal shows canvas definition", func(t *testing.T) {
+	t.Run("Files tab shows canvas YAML definition", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("YamlTestNode")
-		steps.openYamlPreviewModal()
+		steps.openFilesTab()
+		steps.assertFileIsOpen("canvas.yaml")
 		steps.assertYamlContentVisible("YamlTestNode")
 		steps.assertYamlContentVisible("metadata:")
 	})
 
-	t.Run("YAML preview modal can be closed to return to canvas", func(t *testing.T) {
+	t.Run("Files tab can return to canvas", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("SwitchTest")
-		steps.openYamlPreviewModal()
+		steps.openFilesTab()
 		steps.assertYamlContentVisible("SwitchTest")
-		steps.closeYamlPreviewModal()
+		steps.returnToCanvasTab()
 		steps.assertNodeIsAdded("SwitchTest")
 	})
 }
@@ -573,16 +574,20 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 	}
 }
 
-func (s *CanvasPageSteps) openYamlPreviewModal() {
-	// Adding a node opens the component sidebar over the canvas chrome; dismiss it so
-	// the header YAML control is clickable.
+func (s *CanvasPageSteps) openFilesTab() {
 	s.canvas.ClickOnEmptyCanvasArea()
-	s.session.Click(q.TestID("canvas-yaml-button"))
+	s.session.Click(q.TestID("canvas-view-mode-files"))
+	s.session.AssertVisible(q.TestID("workflow-files-overlay"))
 }
 
-func (s *CanvasPageSteps) closeYamlPreviewModal() {
-	s.session.PressKey("Escape")
+func (s *CanvasPageSteps) returnToCanvasTab() {
+	s.session.Click(q.TestID("canvas-view-mode-live"))
 	s.session.Sleep(500)
+}
+
+func (s *CanvasPageSteps) assertFileIsOpen(name string) {
+	s.session.AssertText(name)
+	s.session.AssertVisible(q.TestID("workflow-file-editor"))
 }
 
 func (s *CanvasPageSteps) assertYamlContentVisible(text string) {

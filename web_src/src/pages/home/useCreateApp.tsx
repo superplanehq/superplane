@@ -4,6 +4,7 @@ import { usePermissions } from "@/contexts/usePermissions";
 import { useCreateCanvas } from "@/hooks/useCanvasData";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { showErrorToast } from "@/lib/toast";
+import { PLACEHOLDER_NODE_CONTEXT_KEY, setAgentBootContext } from "@/lib/agentBootContext";
 
 interface UseCreateAppOptions {
   onCreated?: () => void;
@@ -32,7 +33,11 @@ export function useCreateApp({ onCreated }: UseCreateAppOptions = {}) {
         const canvasId = result?.data?.canvas?.metadata?.id;
         if (canvasId) {
           onCreated?.();
-          navigate(`/${organizationId}/canvases/${canvasId}`);
+          localStorage.setItem("canvasAgentSidebarOpen", "true");
+          localStorage.setItem("canvasSidebarOpen", "false");
+          setAgentBootContext(canvasId, "blank");
+          sessionStorage.setItem(PLACEHOLDER_NODE_CONTEXT_KEY, canvasId);
+          navigate(`/${organizationId}/canvases/${canvasId}?edit=1`);
         }
       } catch (error) {
         showErrorToast(getUsageLimitToastMessage(error, "Failed to create app"));
