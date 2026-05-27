@@ -161,10 +161,18 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 		return fmt.Errorf("failed to find hook: %v", err)
 	}
 
+	resolvedConfiguration, err := contexts.NewNodeConfigurationBuilder(tx, node.WorkflowID).
+		WithNodeID(node.NodeID).
+		WithConfigurationFields(hookProvider.Configuration()).
+		Build(node.Configuration.Data())
+	if err != nil {
+		return fmt.Errorf("failed to resolve trigger configuration: %w", err)
+	}
+
 	hookCtx := core.TriggerHookContext{
 		Name:          spec.InvokeAction.ActionName,
 		Parameters:    spec.InvokeAction.Parameters,
-		Configuration: node.Configuration.Data(),
+		Configuration: resolvedConfiguration,
 		Logger:        logging.ForNode(*node),
 		HTTP:          w.registry.HTTPContextInTransaction(tx),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),

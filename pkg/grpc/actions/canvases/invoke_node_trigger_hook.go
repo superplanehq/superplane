@@ -80,10 +80,18 @@ func InvokeNodeTriggerHook(
 		newEvents = append(newEvents, events...)
 	}
 
+	resolvedConfiguration, err := contexts.NewNodeConfigurationBuilder(tx, node.WorkflowID).
+		WithNodeID(node.NodeID).
+		WithConfigurationFields(hookProvider.Configuration()).
+		Build(node.Configuration.Data())
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "failed to resolve trigger configuration: %v", err)
+	}
+
 	hookCtx := core.TriggerHookContext{
 		Name:          hookName,
 		Parameters:    parameters,
-		Configuration: node.Configuration.Data(),
+		Configuration: resolvedConfiguration,
 		HTTP:          registry.HTTPContext(),
 		Metadata:      contexts.NewNodeMetadataContext(tx, node),
 		Requests:      contexts.NewNodeRequestContext(tx, node),
