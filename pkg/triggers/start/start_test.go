@@ -164,6 +164,82 @@ func TestStart_HandleHook_RejectsNilPayloadWithoutOverride(t *testing.T) {
 	assert.Empty(t, events.Payloads)
 }
 
+func TestStart_Setup_ValidatesParamSyntax(t *testing.T) {
+	s := &Start{}
+	err := s.Setup(core.TriggerContext{
+		Configuration: map[string]any{
+			"templates": []any{
+				map[string]any{
+					"name": "Bad",
+					"payload": map[string]any{
+						"name": "param(type:string, default:'x')",
+					},
+				},
+			},
+		},
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "title")
+}
+
+func TestStart_HandleHook_RejectsUnresolvedParams(t *testing.T) {
+	s := &Start{}
+	events := &contexts.EventContext{}
+
+	config := map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name": "Hello",
+				"payload": map[string]any{
+					"name": "param(type:string, title:'Name', default:'machine-1')",
+				},
+			},
+		},
+	}
+
+	_, err := s.HandleHook(core.TriggerHookContext{
+		Name:          HookRun,
+		Parameters:    map[string]any{"template": "Hello"},
+		Configuration: config,
+		Events:        events,
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unresolved param")
+	assert.Empty(t, events.Payloads)
+}
+
+func TestStart_HandleHook_EmitsMergedPayloadOverride(t *testing.T) {
+	s := &Start{}
+	events := &contexts.EventContext{}
+
+	config := map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name": "Hello",
+				"payload": map[string]any{
+					"name": "param(type:string, title:'Name', default:'machine-1')",
+				},
+			},
+		},
+	}
+
+	_, err := s.HandleHook(core.TriggerHookContext{
+		Name: HookRun,
+		Parameters: map[string]any{
+			"template": "Hello",
+			"payload":  map[string]any{"name": "machine-9"},
+		},
+		Configuration: config,
+		Events:        events,
+	})
+
+	require.NoError(t, err)
+	require.Len(t, events.Payloads, 1)
+	payload := events.Payloads[0].Data.(map[string]any)
+	assert.Equal(t, "machine-9", payload["name"])
+}
+
 func TestStart_HandleHook_RejectsUnknownHook(t *testing.T) {
 	s := &Start{}
 

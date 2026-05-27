@@ -8,6 +8,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/triggers/start/params"
 )
 
 const HookRun = "run"
@@ -45,18 +46,29 @@ func (s *Start) Documentation() string {
 1. Add the Manual Run trigger as the starting node of your workflow
 2. Configure one or more templates, each with a name and a default payload
 3. Click the "Run" button in the workflow UI, or invoke the ` + "`run`" + ` hook via the API/CLI to start an execution
-4. The workflow begins immediately with either the configured payload or an override supplied at run time
+4. Click **Run** on a template: if the payload has no parameters, the run starts immediately; otherwise a form collects parameterized values before starting
+5. The workflow begins with the resolved payload (static values plus submitted parameter values)
 
 ## Configuration
 
 Each Manual Run trigger exposes a list of templates. A template has:
 
 - ` + "`name`" + ` (required): a label used as the run target (and the event channel)
-- ` + "`payload`" + ` (required): a default JSON object emitted when the template is used
+- ` + "`payload`" + ` (required): a JSON object emitted when the template is used
+
+### Parameterized payload values
+
+String values in the payload may use ` + "`param(...)`" + ` placeholders. At run time the UI renders a typed form for those fields.
+
+Example:
+
+` + "`param(type:string, title:'Enter a machine name', default:'machine-1', required:false)`" + `
+
+Supported types: ` + "`string`" + `, ` + "`number`" + `, ` + "`boolean`" + `, and ` + "`select`" + ` (with ` + "`values:'opt1|opt2'`" + `).
 
 ## Event Data
 
-Manual runs emit an event with type ` + "`manual.run`" + `. The data is either the template's saved payload or the override passed in the run request.`
+Manual runs emit an event with type ` + "`manual.run`" + `. The data is the template payload with all ` + "`param(...)`" + ` placeholders replaced by submitted values.`
 }
 
 func (s *Start) Icon() string {
@@ -110,6 +122,25 @@ func (s *Start) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.Webhoo
 }
 
 func (s *Start) Setup(ctx core.TriggerContext) error {
+	config, _ := ctx.Configuration.(map[string]any)
+	rawTemplates, _ := config["templates"].([]any)
+	for _, raw := range rawTemplates {
+		tmpl, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := tmpl["name"].(string)
+		payload, ok := tmpl["payload"].(map[string]any)
+		if !ok || payload == nil {
+			continue
+		}
+		if _, err := params.ValidatePayload(payload); err != nil {
+			if name == "" {
+				return err
+			}
+			return fmt.Errorf("template %q: %w", name, err)
+		}
+	}
 	return nil
 }
 
@@ -183,6 +214,10 @@ func (s *Start) run(ctx core.TriggerHookContext) (map[string]any, error) {
 
 	if payload == nil {
 		return nil, fmt.Errorf("template %q has no payload and no override was provided", templateName)
+	}
+
+	if params.ContainsUnresolvedParams(payload) {
+		return nil, fmt.Errorf("template %q payload still contains unresolved param(...) placeholders", templateName)
 	}
 
 	if err := ctx.Events.Emit("manual.run", payload); err != nil {
