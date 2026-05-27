@@ -309,12 +309,6 @@ export const ConfigurationFieldRenderer = ({
     return hasError;
   }, [allFieldErrors, isRequired, value, validationErrors, enableRealtimeValidation, hasError]);
 
-  if (!isVisible) {
-    return null;
-  }
-  const fieldAllowsExpressions =
-    allowExpressions && !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false);
-
   const resolvedAutocompleteExampleObj = React.useMemo(() => {
     if (field.name !== "payload") {
       return autocompleteExampleObj;
@@ -330,6 +324,13 @@ export const ConfigurationFieldRenderer = ({
       parameters,
     };
   }, [field.name, allValues, autocompleteExampleObj]);
+
+  if (!isVisible) {
+    return null;
+  }
+
+  const fieldAllowsExpressions =
+    allowExpressions && !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false);
 
   const commonProps = {
     field,

@@ -4,7 +4,9 @@ import {
   coerceParameterValue,
   initialParameterValue,
   parameterDefaultValue,
+  parameterDisplayLabel,
   payloadForTemplateRun,
+  payloadRecordForParameters,
 } from "./templatePayload";
 
 describe("payloadForTemplateRun", () => {
@@ -20,6 +22,28 @@ describe("payloadForTemplateRun", () => {
 
   it("returns empty object when payload is missing or invalid", () => {
     expect(payloadForTemplateRun({ name: "t", payload: undefined as unknown as Record<string, unknown> })).toEqual({});
+  });
+});
+
+describe("payloadRecordForParameters", () => {
+  it("returns objects as-is", () => {
+    expect(payloadRecordForParameters({ a: 1 })).toEqual({ a: 1 });
+  });
+
+  it("parses JSON strings and returns empty object on failure", () => {
+    expect(payloadRecordForParameters('{"a":1}')).toEqual({ a: 1 });
+    expect(payloadRecordForParameters("not json")).toEqual({});
+  });
+});
+
+describe("parameterDisplayLabel", () => {
+  it("uses title when set", () => {
+    expect(parameterDisplayLabel({ name: "msg", title: "Message", type: "string" })).toBe("Message");
+  });
+
+  it("falls back to name when title is missing or blank", () => {
+    expect(parameterDisplayLabel({ name: "msg", type: "string" })).toBe("msg");
+    expect(parameterDisplayLabel({ name: "msg", title: "  ", type: "string" })).toBe("msg");
   });
 });
 
@@ -40,11 +64,12 @@ describe("parameterDefaultValue", () => {
 });
 
 describe("initialParameterValue", () => {
-  it("prefers payload values over parameter defaults", () => {
-    expect(initialParameterValue({ name: "count", type: "number", defaultNumber: 1 }, { count: 5 })).toBe(5);
+  it("uses configured parameter defaults", () => {
+    expect(initialParameterValue({ name: "count", type: "number", defaultNumber: 1 })).toBe(1);
+    expect(initialParameterValue({ name: "redundancy", type: "string", defaultString: "dual" })).toBe("dual");
   });
 
   it("uses false when a boolean default is explicitly set to false", () => {
-    expect(initialParameterValue({ name: "flag", type: "boolean", defaultBoolean: false }, {})).toBe(false);
+    expect(initialParameterValue({ name: "flag", type: "boolean", defaultBoolean: false })).toBe(false);
   });
 });
