@@ -1,6 +1,6 @@
 import React from "react";
 import * as AccordionPrimitive from "@radix-ui/react-accordion";
-import { ChevronDown, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, GripVertical, Plus, Trash2 } from "lucide-react";
 import { Button } from "../button";
 import { Input } from "@/components/ui/input";
 import { Accordion, AccordionContent, AccordionItem } from "@/ui/accordion";
@@ -8,6 +8,7 @@ import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
 import type { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
 import { listFieldItemTitle } from "./listFieldItemTitle";
+import { reorderListItems } from "@/lib/reorderListItems";
 import { cn } from "@/lib/utils";
 import { showErrorToast } from "@/lib/toast";
 
@@ -34,6 +35,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   const itemDefinition = listOptions?.itemDefinition;
   const maxItems = listOptions?.maxItems;
   const useAccordion = listOptions?.accordion === true;
+  const allowReorder = listOptions?.reorderable === true;
   const items = Array.isArray(value)
     ? itemDefinition?.type === "day-in-year"
       ? value.filter((item) => typeof item === "string" && item.trim().length > 0)
@@ -51,6 +53,19 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
 
   const [openItem, setOpenItem] = React.useState<string | undefined>(undefined);
 
+  type DragState = {
+    items: unknown[];
+    activeIndex: number;
+    openAtStart: boolean;
+  };
+  const [dragState, setDragState] = React.useState<DragState | null>(null);
+  const dragStateRef = React.useRef<DragState | null>(null);
+  dragStateRef.current = dragState;
+
+  const rowRefs = React.useRef<Array<HTMLDivElement | null>>([]);
+
+  const renderedItems = dragState ? dragState.items : items;
+
   React.useEffect(() => {
     if (items.length === 0) {
       setOpenItem(undefined);
@@ -64,6 +79,57 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     }
     setOpenItem(undefined);
   }, [items.length, openItem]);
+
+  React.useEffect(() => {
+    if (!dragState) {
+      return;
+    }
+
+    const handleMove = (event: MouseEvent) => {
+      setDragState((current) => {
+        if (!current) return current;
+        for (let i = 0; i < rowRefs.current.length; i++) {
+          const el = rowRefs.current[i];
+          if (!el) continue;
+          const rect = el.getBoundingClientRect();
+          if (event.clientY >= rect.top && event.clientY <= rect.bottom) {
+            if (i === current.activeIndex) {
+              return current;
+            }
+            const nextItems = reorderListItems(current.items, current.activeIndex, i);
+            return { ...current, items: nextItems, activeIndex: i };
+          }
+        }
+        return current;
+      });
+    };
+
+    const handleUp = () => {
+      const current = dragStateRef.current;
+      if (!current) return;
+      itemsRef.current = current.items;
+      onChange(current.items);
+      if (useAccordion && current.openAtStart) {
+        setOpenItem(String(current.activeIndex));
+      }
+      setDragState(null);
+    };
+
+    const previousCursor = document.body.style.cursor;
+    const previousUserSelect = document.body.style.userSelect;
+    document.body.style.cursor = "grabbing";
+    document.body.style.userSelect = "none";
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousUserSelect;
+    };
+  }, [dragState !== null, onChange, useAccordion]);
 
   const getApproverKey = (item: Record<string, unknown>) => {
     const type = typeof item.type === "string" ? item.type : "";
@@ -96,6 +162,24 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     if (useAccordion) {
       setOpenItem(String(newItems.length - 1));
     }
+  };
+
+  const startDrag = (event: React.MouseEvent, index: number) => {
+    if (!allowReorder || items.length < 2) return;
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+
+    const wasOpen = openItem === String(index);
+    if (wasOpen) {
+      setOpenItem(undefined);
+    }
+
+    setDragState({
+      items: [...items],
+      activeIndex: index,
+      openAtStart: wasOpen,
+    });
   };
 
   const removeItem = (index: number) => {
@@ -213,6 +297,31 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     );
   };
 
+  const renderDragHandle = (index: number, className?: string) => {
+    if (!allowReorder || items.length < 2) {
+      return null;
+    }
+
+    const title = listFieldItemTitle(renderedItems[index], index, itemLabel);
+    const isActive = dragState?.activeIndex === index;
+
+    return (
+      <button
+        type="button"
+        aria-label={`Drag to reorder ${title}`}
+        className={cn(
+          "mt-1 flex h-9 w-8 shrink-0 items-center justify-center rounded-sm text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800",
+          dragState ? "cursor-grabbing" : "cursor-grab",
+          className,
+        )}
+        onClick={(event) => event.stopPropagation()}
+        onMouseDown={(event) => startDrag(event, index)}
+      >
+        <GripVertical className={cn("h-4 w-4", isActive && "text-gray-900 dark:text-gray-100")} aria-hidden />
+      </button>
+    );
+  };
+
   const renderRemoveButton = (index: number, className?: string) => (
     <Button
       variant="ghost"
@@ -222,7 +331,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
         removeItem(index);
       }}
       className={className}
-      aria-label={`Remove ${listFieldItemTitle(items[index], index, itemLabel)}`}
+      aria-label={`Remove ${listFieldItemTitle(renderedItems[index], index, itemLabel)}`}
     >
       <Trash2 className="h-4 w-4 text-red-500" />
     </Button>
@@ -232,11 +341,18 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     return (
       <div className="space-y-3">
         <Accordion type="single" collapsible value={openItem} onValueChange={setOpenItem} className="space-y-2">
-          {items.map((item, index) => {
+          {renderedItems.map((item, index) => {
             const isItemOpen = openItem === String(index);
             return (
               <AccordionItem key={index} value={String(index)} className="border-0">
-                <div className="flex items-start gap-2">
+                <div
+                  ref={(el) => {
+                    rowRefs.current[index] = el;
+                  }}
+                  data-testid="list-item-row"
+                  className="flex items-start gap-2"
+                >
+                  {renderDragHandle(index)}
                   <div className="relative min-w-0 flex-1 rounded-md border border-gray-300 dark:border-gray-700">
                     <AccordionPrimitive.Header
                       className={cn(
@@ -283,20 +399,30 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
 
   return (
     <div className="space-y-3">
-      {items.map((item, index) => (
-        <div key={index} className="flex gap-2 items-center">
-          <div className="flex-1">
-            {itemDefinition?.type === "object" && itemDefinition.schema ? (
-              <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
-                {renderObjectItemFields(item, index)}
-              </div>
-            ) : (
-              renderListItemBody(item, index)
-            )}
+      {renderedItems.map((item, index) => {
+        return (
+          <div
+            key={index}
+            ref={(el) => {
+              rowRefs.current[index] = el;
+            }}
+            data-testid="list-item-row"
+            className="flex items-center gap-2"
+          >
+            {renderDragHandle(index)}
+            <div className="flex-1">
+              {itemDefinition?.type === "object" && itemDefinition.schema ? (
+                <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
+                  {renderObjectItemFields(item, index)}
+                </div>
+              ) : (
+                renderListItemBody(item, index)
+              )}
+            </div>
+            {renderRemoveButton(index, "mt-1")}
           </div>
-          {renderRemoveButton(index, "mt-1")}
-        </div>
-      ))}
+        );
+      })}
       <Button variant="outline" onClick={addItem} className="w-full mt-3" disabled={!canAddMore}>
         <Plus className="h-4 w-4 mr-2" />
         Add {itemLabel}

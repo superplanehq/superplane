@@ -99,6 +99,7 @@ message ListTypeOptions {
   string item_label = 2;
   optional int32 max_items = 3;
   optional bool accordion = 4;
+  optional bool reorderable = 5;
 }
 
 message ObjectTypeOptions {
