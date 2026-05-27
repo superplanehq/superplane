@@ -24,7 +24,7 @@ func serializeCanvasDashboard(dashboard *models.CanvasDashboard) (*pb.CanvasDash
 	for _, panel := range panels {
 		var content *structpb.Value
 		if panel.Content != nil {
-			value, err := structpb.NewValue(toStructpbCompatible(panel.Content))
+			value, err := newStructpbValue(panel.Content)
 			if err != nil {
 				return nil, fmt.Errorf("invalid content for panel %q: %w", panel.ID, err)
 			}
@@ -116,23 +116,4 @@ func deserializeDashboardLayout(in []*pb.DashboardLayoutItem) []models.Dashboard
 		out = append(out, converted)
 	}
 	return out
-}
-
-func toStructpbCompatible(v any) any {
-	switch t := v.(type) {
-	case map[string]any:
-		out := make(map[string]any, len(t))
-		for k, item := range t {
-			out[k] = toStructpbCompatible(item)
-		}
-		return out
-	case []any:
-		out := make([]any, len(t))
-		for i, item := range t {
-			out[i] = toStructpbCompatible(item)
-		}
-		return out
-	default:
-		return v
-	}
 }
