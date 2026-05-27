@@ -1,4 +1,4 @@
-export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
+export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
 
 export function readStoredBoolean(key: string): boolean {
@@ -22,10 +22,12 @@ export function getWorkflowHeaderMode({
   isDashboardMode,
   isRunsMode,
   isMemoryMode,
+  isFilesMode,
 }: {
   isDashboardMode: boolean;
   isRunsMode: boolean;
   isMemoryMode: boolean;
+  isFilesMode: boolean;
 }): WorkflowHeaderMode {
   if (isDashboardMode) {
     return "dashboard";
@@ -33,6 +35,10 @@ export function getWorkflowHeaderMode({
 
   if (isMemoryMode) {
     return "memory";
+  }
+
+  if (isFilesMode) {
+    return "files";
   }
 
   if (isRunsMode) {
@@ -70,6 +76,7 @@ export function getWorkflowViewPresentation({
   isDashboardMode,
   isRunsMode,
   isMemoryMode,
+  isFilesMode,
   hasEditableVersion,
   isViewingPendingApprovalVersion,
   isViewingCurrentLiveVersion,
@@ -77,12 +84,13 @@ export function getWorkflowViewPresentation({
   isDashboardMode: boolean;
   isRunsMode: boolean;
   isMemoryMode: boolean;
+  isFilesMode: boolean;
   hasEditableVersion: boolean;
   isViewingPendingApprovalVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
 }) {
   return {
-    headerMode: getWorkflowHeaderMode({ isDashboardMode, isRunsMode, isMemoryMode }),
+    headerMode: getWorkflowHeaderMode({ isDashboardMode, isRunsMode, isMemoryMode, isFilesMode }),
     canvasStateMode: getWorkflowCanvasStateMode({
       hasEditableVersion,
       isViewingPendingApprovalVersion,
