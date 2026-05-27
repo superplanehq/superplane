@@ -142,6 +142,66 @@ func TestStart_HandleHook_RejectsNoTemplatesConfigured(t *testing.T) {
 	assert.Contains(t, err.Error(), "no templates configured")
 }
 
+func TestStart_HandleHook_EmitsWithConfiguredParameters(t *testing.T) {
+	s := &Start{}
+	events := &contexts.EventContext{}
+
+	config := map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name":    "Hello",
+				"payload": map[string]any{"message": "Hello, World!"},
+				"parameters": []any{
+					map[string]any{"name": "message", "type": "string", "defaultString": "Hello, World!"},
+				},
+			},
+		},
+	}
+
+	result, err := s.HandleHook(core.TriggerHookContext{
+		Name:          HookRun,
+		Parameters:    map[string]any{"template": "Hello"},
+		Configuration: config,
+		Events:        events,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "Hello", result["template"])
+
+	require.Len(t, events.Payloads, 1)
+	payload, ok := events.Payloads[0].Data.(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Hello, World!", payload["message"])
+}
+
+func TestStart_HandleHook_PrefersPayloadOverParameters(t *testing.T) {
+	s := &Start{}
+	events := &contexts.EventContext{}
+
+	config := map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name":    "Hello",
+				"payload": map[string]any{"message": "from payload"},
+				"parameters": []any{
+					map[string]any{"name": "message", "type": "string", "defaultString": "from parameters"},
+				},
+			},
+		},
+	}
+
+	_, err := s.HandleHook(core.TriggerHookContext{
+		Name:          HookRun,
+		Parameters:    map[string]any{"template": "Hello"},
+		Configuration: config,
+		Events:        events,
+	})
+
+	require.NoError(t, err)
+	payload := events.Payloads[0].Data.(map[string]any)
+	assert.Equal(t, "from payload", payload["message"])
+}
+
 func TestStart_HandleHook_RejectsNilPayloadWithoutOverride(t *testing.T) {
 	s := &Start{}
 	events := &contexts.EventContext{}

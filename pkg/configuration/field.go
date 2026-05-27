@@ -146,6 +146,9 @@ type NumberTypeOptions struct {
 type StringTypeOptions struct {
 	MinLength *int `json:"minLength,omitempty"`
 	MaxLength *int `json:"maxLength,omitempty"`
+
+	// When false, the field is edited as a plain string without expression placeholders.
+	AllowExpressions *bool `json:"allowExpressions,omitempty"`
 }
 
 type ExpressionTypeOptions struct {

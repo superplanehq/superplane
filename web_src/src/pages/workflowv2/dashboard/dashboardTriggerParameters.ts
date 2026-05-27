@@ -1,4 +1,5 @@
 import type { SuperplaneComponentsNode as ComponentsNode } from "@/api-client/types.gen";
+import { payloadForTemplateRun, type StartTemplate } from "@/pages/workflowv2/mappers/start/templatePayload";
 
 /** A Start trigger template as exposed by `node.configuration.templates`. */
 export interface DashboardTriggerTemplate {
@@ -15,17 +16,13 @@ export interface DashboardTriggerTemplate {
  */
 export function getTriggerTemplates(node: ComponentsNode | undefined): DashboardTriggerTemplate[] {
   if (!node) return [];
-  const config = node.configuration as { templates?: Array<{ name?: string; payload?: unknown }> } | undefined;
+  const config = node.configuration as { templates?: StartTemplate[] } | undefined;
   const templates = config?.templates;
   if (!templates || templates.length === 0) return [];
   const out: DashboardTriggerTemplate[] = [];
   for (const tpl of templates) {
     if (!tpl?.name) continue;
-    const payload =
-      tpl.payload && typeof tpl.payload === "object" && !Array.isArray(tpl.payload)
-        ? (tpl.payload as Record<string, unknown>)
-        : {};
-    out.push({ name: tpl.name, payload });
+    out.push({ name: tpl.name, payload: payloadForTemplateRun(tpl) });
   }
   return out;
 }

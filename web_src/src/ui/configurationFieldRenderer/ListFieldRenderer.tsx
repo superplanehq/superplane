@@ -108,7 +108,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           <div className="flex-1">
             {itemDefinition?.type === "object" && itemDefinition.schema ? (
               <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
-                {itemDefinition.schema.map((schemaField) => {
+                {itemDefinition.schema.map((schemaField, schemaIndex) => {
                   const nestedFieldPath = `${fieldPath}[${index}].${schemaField.name}`;
                   const hasNestedError = (() => {
                     if (!validationErrors) return false;
@@ -136,7 +136,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
                   return (
                     <ConfigurationFieldRenderer
                       allowExpressions={allowExpressions}
-                      key={schemaField.name}
+                      key={schemaField.name ?? `field-${schemaIndex}`}
                       field={schemaField}
                       value={itemValues[schemaField.name!]}
                       onChange={(val) => {

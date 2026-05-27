@@ -263,10 +263,10 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
 
   return (
     <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
-      {schema.map((schemaField) => (
+      {schema.map((schemaField, schemaIndex) => (
         <ConfigurationFieldRenderer
           allowExpressions={allowExpressions}
-          key={schemaField.name}
+          key={schemaField.name ?? `field-${schemaIndex}`}
           field={schemaField}
           value={objValue[schemaField.name!]}
           onChange={(val) => {
