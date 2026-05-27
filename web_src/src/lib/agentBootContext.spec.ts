@@ -67,7 +67,9 @@ describe("agent boot context", () => {
     expect(getAgentBootMessage("canvas-1")).toContain(
       "Do not inspect the canvas, integrations, files, or run any commands or tools.",
     );
-    expect(getAgentBootMessage("canvas-1")).toContain('Reply only with: "What do you want to do next in the canvas?"');
+    expect(getAgentBootMessage("canvas-1")).toContain(
+      'Reply only with: "Tell me what you would like to do next in the canvas."',
+    );
   });
 
   it("keeps template intro text after the one-time boot context is cleared", () => {
