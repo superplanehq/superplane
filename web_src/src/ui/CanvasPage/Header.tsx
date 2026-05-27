@@ -6,7 +6,7 @@ import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
 
-export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
+export type HeaderMode = "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
 
 export interface HeaderProps {
   /** Shown centered in the top bar (canvas or template display name). */
@@ -49,6 +49,8 @@ export interface HeaderProps {
   onSelectDashboard?: () => void;
   /** Provided when Memory is available as a first-class tab; opens the Memory view. */
   onSelectMemory?: () => void;
+  /** Provided when Files is available as a first-class tab; opens the Files view. */
+  onSelectFiles?: () => void;
   /** When set with `mode === "dashboard"` and editing, shows Add panel in the secondary header. */
   onDashboardAddPanel?: () => void;
   /** When set with `mode === "dashboard"` and editing, shows the YAML button in the secondary header. */
@@ -167,8 +169,12 @@ function PageHeader({
 
 function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle =
-    (!!props.onSelectDashboard || !!props.onSelectMemory) &&
-    (props.mode === "version-live" || props.mode === "runs" || props.mode === "dashboard" || props.mode === "memory");
+    (!!props.onSelectDashboard || !!props.onSelectMemory || !!props.onSelectFiles) &&
+    (props.mode === "version-live" ||
+      props.mode === "runs" ||
+      props.mode === "dashboard" ||
+      props.mode === "memory" ||
+      props.mode === "files");
   const canvasViewMode =
     props.mode === "runs"
       ? "runs"
@@ -176,7 +182,9 @@ function SecondaryHeader(props: HeaderProps) {
         ? "dashboard"
         : props.mode === "memory"
           ? "memory"
-          : "version-live";
+          : props.mode === "files"
+            ? "files"
+            : "version-live";
   const editing = props.isEditing ?? props.mode === "version-edit";
 
   return (
@@ -191,6 +199,7 @@ function SecondaryHeader(props: HeaderProps) {
               onSelectLive={props.onSelectCanvasView}
               onSelectDashboard={props.onSelectDashboard}
               onSelectMemory={props.onSelectMemory}
+              onSelectFiles={props.onSelectFiles}
               editing={editing}
             />
           ) : null}

@@ -83,13 +83,15 @@ function EditModeButtons({
           testId="canvas-add-component-button"
           icon={<Plus className="h-3.5 w-3.5" />}
         />
-        <ControlButton
-          tooltip="View, copy, download, or import this canvas as YAML"
-          onClick={() => onYamlOpen?.()}
-          testId="canvas-yaml-button"
-          ariaLabel="View / Import YAML"
-          icon={<FileCode className="h-3.5 w-3.5" />}
-        />
+        {onYamlOpen ? (
+          <ControlButton
+            tooltip="View, copy, download, or import this canvas as YAML"
+            onClick={onYamlOpen}
+            testId="canvas-yaml-button"
+            ariaLabel="View / Import YAML"
+            icon={<FileCode className="h-3.5 w-3.5" />}
+          />
+        ) : null}
         <ControlButton
           tooltip="Add Note"
           onClick={() => onAddNote?.()}
@@ -114,12 +116,14 @@ function EditModeButtons({
         testId="add-note-button"
         icon={<FilePlus className="h-3.5 w-3.5" />}
       />
-      <ControlButton
-        tooltip="YAML"
-        onClick={() => onYamlOpen?.()}
-        testId="open-yaml-modal-button"
-        icon={<Code2 className="h-3.5 w-3.5" />}
-      />
+      {onYamlOpen ? (
+        <ControlButton
+          tooltip="YAML"
+          onClick={onYamlOpen}
+          testId="open-yaml-modal-button"
+          icon={<Code2 className="h-3.5 w-3.5" />}
+        />
+      ) : null}
     </>
   );
 }

@@ -175,7 +175,7 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
-  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
+  headerMode?: "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
   onEnterEditMode?: () => void;
@@ -191,6 +191,10 @@ export interface CanvasPageProps {
   onSelectDashboard?: () => void;
   /** Switches the canvas surface to the Memory tab. Omitted on templates. */
   onSelectMemory?: () => void;
+  /** Switches the canvas surface to the Files tab. Omitted on templates. */
+  onSelectFiles?: () => void;
+  /** Opens the canvas YAML modal. */
+  onYamlOpen?: () => void;
   /** Opens the canvas dashboard add-panel dialog when `headerMode` is `dashboard`. */
   onDashboardAddPanel?: () => void;
   /** Opens the dashboard YAML modal when `headerMode` is `dashboard`. */
@@ -206,7 +210,6 @@ export interface CanvasPageProps {
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
-  onYamlOpen: () => void;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
   hasAutoOpenedVersionControl?: boolean;
@@ -1159,6 +1162,7 @@ function CanvasPage(props: CanvasPageProps) {
       !props.isEditing ||
       props.headerMode === "dashboard" ||
       props.headerMode === "memory" ||
+      props.headerMode === "files" ||
       props.headerMode === "runs" ||
       state.componentSidebar.isOpen,
     isSidebarOpen: isBuildingBlocksSidebarOpen,
@@ -1244,7 +1248,10 @@ function CanvasPage(props: CanvasPageProps) {
       ref={canvasWrapperRef}
       className={cn(
         "h-full w-full overflow-hidden sp-canvas relative flex flex-col",
-        (props.headerMode === "version-live" || props.headerMode === "dashboard" || props.headerMode === "memory") &&
+        (props.headerMode === "version-live" ||
+          props.headerMode === "dashboard" ||
+          props.headerMode === "memory" ||
+          props.headerMode === "files") &&
           "sp-canvas-live",
         props.headerMode === "runs" && "sp-canvas-live",
       )}
@@ -1281,6 +1288,7 @@ function CanvasPage(props: CanvasPageProps) {
           exitEditModeDisabledTooltip={props.exitEditModeDisabledTooltip}
           onSelectDashboard={props.onSelectDashboard}
           onSelectMemory={props.onSelectMemory}
+          onSelectFiles={props.onSelectFiles}
           onDashboardAddPanel={props.onDashboardAddPanel}
           onDashboardOpenYaml={props.onDashboardOpenYaml}
           dashboardYamlReadOnly={props.dashboardYamlReadOnly}
@@ -1309,7 +1317,9 @@ function CanvasPage(props: CanvasPageProps) {
           versionsContent={props.toolSidebarVersionsContent}
         />
 
-        {props.headerMode === "runs" || props.headerMode === "memory" ? null : props.isEditing ? (
+        {props.headerMode === "runs" ||
+        props.headerMode === "memory" ||
+        props.headerMode === "files" ? null : props.isEditing ? (
           props.headerMode === "dashboard" ? null : (
             <RightSideControls
               mode="edit"
@@ -1334,6 +1344,7 @@ function CanvasPage(props: CanvasPageProps) {
               !!props.isEditing &&
               props.headerMode !== "dashboard" &&
               props.headerMode !== "memory" &&
+              props.headerMode !== "files" &&
               props.headerMode !== "runs"
             }
             onToggle={handleSidebarToggle}
@@ -1798,6 +1809,7 @@ function CanvasContentHeader({
   exitEditModeDisabledTooltip,
   onSelectDashboard,
   onSelectMemory,
+  onSelectFiles,
   onDashboardAddPanel,
   onDashboardOpenYaml,
   dashboardYamlReadOnly,
@@ -1844,6 +1856,7 @@ function CanvasContentHeader({
   exitEditModeDisabledTooltip?: string;
   onSelectDashboard?: () => void;
   onSelectMemory?: () => void;
+  onSelectFiles?: () => void;
   onDashboardAddPanel?: () => void;
   onDashboardOpenYaml?: () => void;
   dashboardYamlReadOnly?: boolean;
@@ -1892,6 +1905,7 @@ function CanvasContentHeader({
       exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
       onSelectDashboard={onSelectDashboard}
       onSelectMemory={onSelectMemory}
+      onSelectFiles={onSelectFiles}
       onDashboardAddPanel={onDashboardAddPanel}
       onDashboardOpenYaml={onDashboardOpenYaml}
       dashboardYamlReadOnly={dashboardYamlReadOnly}
