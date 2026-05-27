@@ -91,7 +91,6 @@ export function CanvasProjectSwitcher({
     activeCanvasId,
     canvasName,
     canUpdateCanvas,
-    displayName,
     setProjectSearchOpen: setOpen,
   });
   useCanvasProjectShortcut(rename.isRenaming, setOpen);
@@ -201,14 +200,12 @@ function useCanvasProjectRename({
   activeCanvasId,
   canvasName,
   canUpdateCanvas,
-  displayName,
   setProjectSearchOpen,
 }: {
   organizationId: string;
   activeCanvasId?: string;
   canvasName: string;
   canUpdateCanvas: boolean;
-  displayName: string;
   setProjectSearchOpen: (open: boolean) => void;
 }) {
   const [isRenaming, setIsRenaming] = useState(false);
@@ -251,7 +248,7 @@ function useCanvasProjectRename({
       return;
     }
 
-    if (name === displayName) {
+    if (name === canvasName.trim()) {
       cancelRenaming();
       return;
     }
@@ -260,6 +257,7 @@ function useCanvasProjectRename({
 
     try {
       await updateCanvasMutation.mutateAsync({ name });
+      skipBlurSubmitRef.current = true;
       setIsRenaming(false);
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to rename app"));
@@ -267,7 +265,7 @@ function useCanvasProjectRename({
     } finally {
       isSubmittingRef.current = false;
     }
-  }, [activeCanvasId, cancelRenaming, canUpdateCanvas, displayName, draftName, focusInput, updateCanvasMutation]);
+  }, [activeCanvasId, cancelRenaming, canUpdateCanvas, canvasName, draftName, focusInput, updateCanvasMutation]);
 
   const startRenaming = useCallback(() => {
     if (!canUpdateCanvas || !activeCanvasId || updateCanvasMutation.isPending) {
