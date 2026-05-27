@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from "react";
 
+import type { SuperplaneComponentsNode } from "@/api-client";
 import { useCanvasMemoryEntries, useInfiniteCanvasEvents, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 
 import { resolveDashboardNode, useDashboardContext } from "../DashboardContext";
@@ -108,8 +109,8 @@ export function useWidgetData(canvasId: string, dataSource: WidgetDataSource): W
     const pages = eventsData?.pages ?? [];
     const targetNode = dataSource.node ? resolveDashboardNode(ctx, dataSource.node) : undefined;
     const targetNodeId = targetNode?.node.id;
-    const targetLabel = targetNode?.label;
-    return collectExecutionRows(pages, targetNodeId, targetLabel, executionLimit);
+    const nodeNameById = buildNodeNameMap(ctx?.nodes);
+    return collectExecutionRows(pages, targetNodeId, nodeNameById, executionLimit);
   }, [dataSource, eventsData, ctx, executionLimit]);
 
   const runRows = useMemo(() => {
@@ -291,12 +292,14 @@ function errorMessage(error: unknown): string | undefined {
  * execution fields plus three derived conveniences:
  *
  * - `status`: lowercase canonical status string (see {@link deriveExecutionStatus}).
- * - `nodeName`: friendly node label when a target node is resolved.
+ * - `nodeName`: friendly node label resolved per-row via `nodeNameById`,
+ *   falling back to the raw `nodeId` when the canvas no longer contains
+ *   that node (e.g. it was deleted after the execution ran).
  * - `durationMs`: created-to-updated elapsed time in milliseconds.
  *
  * Iteration stops as soon as `rows.length >= limit`.
  */
-function collectExecutionRows(
+export function collectExecutionRows(
   pages: Array<
     | {
         events?: Array<{
@@ -314,7 +317,7 @@ function collectExecutionRows(
     | undefined
   >,
   targetNodeId: string | undefined,
-  targetLabel: string | undefined,
+  nodeNameById: Map<string, string>,
   limit: number,
 ): unknown[] {
   const rows: unknown[] = [];
@@ -325,7 +328,7 @@ function collectExecutionRows(
         rows.push({
           ...exec,
           status: deriveExecutionStatus(exec.state, exec.result),
-          nodeName: targetLabel ?? exec.nodeId,
+          nodeName: (exec.nodeId && nodeNameById.get(exec.nodeId)) || exec.nodeId,
           durationMs:
             exec.updatedAt && exec.createdAt ? Date.parse(exec.updatedAt) - Date.parse(exec.createdAt) : undefined,
         });
@@ -334,6 +337,22 @@ function collectExecutionRows(
     }
   }
   return rows;
+}
+
+/**
+ * Build a `nodeId -> friendly name` lookup from the canvas nodes available
+ * on the dashboard context. We index by id only (not name) because event
+ * executions always carry `nodeId`. Falls back to the node id when the
+ * canvas node has no `name`, so the widget never shows a blank label.
+ */
+export function buildNodeNameMap(nodes: SuperplaneComponentsNode[] | undefined): Map<string, string> {
+  const map = new Map<string, string>();
+  if (!nodes) return map;
+  for (const node of nodes) {
+    if (!node.id) continue;
+    map.set(node.id, node.name || node.id);
+  }
+  return map;
 }
 
 /**
