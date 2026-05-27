@@ -296,6 +296,122 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		assert.Regexp(t, `^\d{4}-\d{2}-\d{2}$`, generatedAt)
 	})
 
+	t.Run("run resolves template payload expressions using hook parameters", func(t *testing.T) {
+		expressionNodeID := "start-node-expression-parameters"
+		expressionCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: expressionNodeID,
+					Name:   expressionNodeID,
+					Type:   models.NodeTypeTrigger,
+					Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{
+						"templates": []any{
+							map[string]any{
+								"name": "Parameterized",
+								"payload": map[string]any{
+									"message": `{{ parameters["message"] }}`,
+								},
+							},
+						},
+					}),
+				},
+			},
+			nil,
+		)
+
+		_, err := InvokeNodeTriggerHook(
+			authedCtx,
+			r.AuthService,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID,
+			expressionCanvas.ID,
+			expressionNodeID,
+			"run",
+			map[string]any{
+				"template": "Parameterized",
+				"message":  "Hello from hook parameter",
+			},
+			"http://localhost",
+		)
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		data, ok := events[0].Data.Data().(map[string]any)
+		require.True(t, ok)
+		inner, ok := data["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "Hello from hook parameter", inner["message"])
+	})
+
+	t.Run("run resolves template payload expressions using configured template parameter defaults", func(t *testing.T) {
+		expressionNodeID := "start-node-expression-parameter-default"
+		expressionCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: expressionNodeID,
+					Name:   expressionNodeID,
+					Type:   models.NodeTypeTrigger,
+					Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{
+						"templates": []any{
+							map[string]any{
+								"name": "Parameterized",
+								"payload": map[string]any{
+									"message": `{{ parameters["message"] }}`,
+								},
+								"parameters": []any{
+									map[string]any{
+										"name":          "message",
+										"type":          "string",
+										"defaultString": "Hello from configured defaults",
+									},
+								},
+							},
+						},
+					}),
+				},
+			},
+			nil,
+		)
+
+		_, err := InvokeNodeTriggerHook(
+			authedCtx,
+			r.AuthService,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID,
+			expressionCanvas.ID,
+			expressionNodeID,
+			"run",
+			map[string]any{
+				"template": "Parameterized",
+			},
+			"http://localhost",
+		)
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		data, ok := events[0].Data.Data().(map[string]any)
+		require.True(t, ok)
+		inner, ok := data["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "Hello from configured defaults", inner["message"])
+	})
+
 	t.Run("non-trigger node -> error", func(t *testing.T) {
 		componentNodeID := "component-node"
 		canvasWithComponent, _ := support.CreateCanvas(

@@ -2,6 +2,7 @@ package expressionvalidation
 
 import (
 	"fmt"
+	"regexp"
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	componentpb "github.com/superplanehq/superplane/pkg/protos/components"
@@ -111,9 +112,10 @@ func validateString(fieldPath string, field configuration.Field, value string, k
 	}
 
 	var errs []ExpressionError
+	extraEnv := expressionValidationExtraEnv(fieldPath)
 	for _, match := range matches {
 		body := match[2 : len(match)-2]
-		if err := ValidateExpression(body, knownNodeNames); err != nil {
+		if err := ValidateExpressionWithExtraEnv(body, knownNodeNames, extraEnv); err != nil {
 			errs = append(errs, ExpressionError{
 				FieldPath:  fieldPath,
 				Expression: match,
@@ -122,4 +124,13 @@ func validateString(fieldPath string, field configuration.Field, value string, k
 		}
 	}
 	return errs
+}
+
+var startTemplatePayloadFieldPattern = regexp.MustCompile(`^templates\[\d+\]\.payload(\.|$)`)
+
+func expressionValidationExtraEnv(fieldPath string) map[string]any {
+	if startTemplatePayloadFieldPattern.MatchString(fieldPath) {
+		return map[string]any{"parameters": map[string]any{}}
+	}
+	return nil
 }

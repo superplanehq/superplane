@@ -80,8 +80,13 @@ func InvokeNodeTriggerHook(
 		newEvents = append(newEvents, events...)
 	}
 
+	expressionParameters := buildHookExpressionParameters(node.Ref.Data().Trigger.Name, hookName, node.Configuration.Data(), parameters)
+
 	resolvedConfiguration, err := contexts.NewNodeConfigurationBuilder(tx, node.WorkflowID).
 		WithNodeID(node.NodeID).
+		WithExpressionVariables(map[string]any{
+			"parameters": expressionParameters,
+		}).
 		WithConfigurationFields(hookProvider.Configuration()).
 		Build(node.Configuration.Data())
 	if err != nil {
@@ -139,4 +144,86 @@ func InvokeNodeTriggerHook(
 	return &pb.InvokeNodeTriggerHookResponse{
 		Result: resultStruct,
 	}, nil
+}
+
+func buildHookExpressionParameters(triggerName string, hookName string, configuration map[string]any, hookParameters map[string]any) map[string]any {
+	parameters := map[string]any{}
+
+	if triggerName == "start" && hookName == "run" {
+		for key, value := range startTemplateDefaultParameters(configuration, hookParameters) {
+			parameters[key] = value
+		}
+	}
+
+	for key, value := range hookParameters {
+		parameters[key] = value
+	}
+
+	return parameters
+}
+
+func startTemplateDefaultParameters(configuration map[string]any, hookParameters map[string]any) map[string]any {
+	templateName, _ := hookParameters["template"].(string)
+	if templateName == "" {
+		return nil
+	}
+
+	rawTemplates, _ := configuration["templates"].([]any)
+	for _, rawTemplate := range rawTemplates {
+		template, ok := rawTemplate.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := template["name"].(string)
+		if name != templateName {
+			continue
+		}
+		return defaultsFromTemplateParameters(template)
+	}
+
+	return nil
+}
+
+func defaultsFromTemplateParameters(template map[string]any) map[string]any {
+	rawParameters, _ := template["parameters"].([]any)
+	if len(rawParameters) == 0 {
+		return nil
+	}
+
+	parameters := map[string]any{}
+	for _, rawParameter := range rawParameters {
+		parameter, ok := rawParameter.(map[string]any)
+		if !ok {
+			continue
+		}
+
+		name, _ := parameter["name"].(string)
+		if name == "" {
+			continue
+		}
+
+		switch parameterType, _ := parameter["type"].(string); parameterType {
+		case configuration.FieldTypeNumber:
+			if value, exists := parameter["defaultNumber"]; exists && value != nil {
+				parameters[name] = value
+			}
+		case configuration.FieldTypeBool:
+			if value, exists := parameter["defaultBoolean"]; exists && value != nil {
+				parameters[name] = value
+			}
+		default:
+			if value, exists := parameter["defaultString"]; exists && value != nil {
+				if textValue, isString := value.(string); isString && textValue == "" {
+					continue
+				}
+				parameters[name] = value
+			}
+		}
+	}
+
+	if len(parameters) == 0 {
+		return nil
+	}
+
+	return parameters
 }
