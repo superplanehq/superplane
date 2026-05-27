@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/ghodss/yaml"
 	"github.com/stretchr/testify/require"
 )
 
@@ -61,7 +62,8 @@ spec:
 	require.NotNil(t, parsed.Spec.Layout[0].MinW)
 	require.Equal(t, 2, *parsed.Spec.Layout[0].MinW)
 
-	encoded, err := MarshalConsoleYAML(*parsed)
+	// Production YAML output uses core.Renderer (ghodss/yaml), not yaml.v3.
+	encoded, err := yaml.Marshal(parsed)
 	require.NoError(t, err)
 	output := string(encoded)
 	require.True(t, strings.HasPrefix(output, "apiVersion: v1"))

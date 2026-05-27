@@ -107,29 +107,3 @@ func ParseConsoleYAML(raw []byte) (*ConsoleYAML, error) {
 
 	return &resource, nil
 }
-
-// MarshalConsoleYAML serializes the resource with stable field ordering.
-// Output passes through JSON first so map keys inside panel `content` are
-// sorted deterministically.
-func MarshalConsoleYAML(resource ConsoleYAML) ([]byte, error) {
-	jsonBytes, err := json.Marshal(resource)
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize console: %w", err)
-	}
-
-	var generic any
-	if err := json.Unmarshal(jsonBytes, &generic); err != nil {
-		return nil, fmt.Errorf("failed to serialize console: %w", err)
-	}
-
-	var buf bytes.Buffer
-	encoder := yaml.NewEncoder(&buf)
-	encoder.SetIndent(2)
-	if err := encoder.Encode(generic); err != nil {
-		return nil, fmt.Errorf("failed to encode console yaml: %w", err)
-	}
-	if err := encoder.Close(); err != nil {
-		return nil, fmt.Errorf("failed to encode console yaml: %w", err)
-	}
-	return buf.Bytes(), nil
-}
