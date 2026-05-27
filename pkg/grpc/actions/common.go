@@ -183,6 +183,11 @@ func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListT
 		},
 	}
 
+	if opts.Accordion {
+		accordion := true
+		pbOpts.Accordion = &accordion
+	}
+
 	if opts.MaxItems != nil {
 		maxItems := int32(*opts.MaxItems)
 		pbOpts.MaxItems = &maxItems
@@ -512,7 +517,8 @@ func protoToListTypeOptions(pbOpts *configpb.ListTypeOptions) *configuration.Lis
 	}
 
 	opts := &configuration.ListTypeOptions{
-		ItemLabel: pbOpts.ItemLabel,
+		ItemLabel: pbOpts.GetItemLabel(),
+		Accordion: pbOpts.GetAccordion(),
 		ItemDefinition: &configuration.ListItemDefinition{
 			Type: pbOpts.ItemDefinition.Type,
 		},

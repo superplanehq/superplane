@@ -97,6 +97,7 @@ func (s *Start) Configuration() []configuration.Field {
 								TypeOptions: &configuration.TypeOptions{
 									List: &configuration.ListTypeOptions{
 										ItemLabel: "Parameter",
+										Accordion: true,
 										ItemDefinition: &configuration.ListItemDefinition{
 											Type: configuration.FieldTypeObject,
 											Schema: []configuration.Field{
