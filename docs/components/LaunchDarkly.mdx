@@ -32,6 +32,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## On Feature Flag Change
 
+**Trigger key:** `launchdarkly.onFeatureFlagChange`
+
 The On Feature Flag Change trigger starts a workflow execution when LaunchDarkly sends webhooks for feature flags in a project.
 
 ### Use Cases
@@ -96,6 +98,8 @@ SuperPlane uses the LaunchDarkly API (via your configured API access token) to c
 
 ## Delete Feature Flag
 
+**Component key:** `launchdarkly.deleteFeatureFlag`
+
 The Delete Feature Flag component permanently deletes a feature flag from a LaunchDarkly project.
 
 ### Use Cases
@@ -132,6 +136,8 @@ Returns a confirmation payload with the deleted flag's project and flag keys.
 <a id="get-feature-flag"></a>
 
 ## Get Feature Flag
+
+**Component key:** `launchdarkly.getFeatureFlag`
 
 The Get Feature Flag component retrieves a specific feature flag from a LaunchDarkly project.
 

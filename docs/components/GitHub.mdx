@@ -51,6 +51,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## On Branch Created
 
+**Trigger key:** `github.onBranchCreated`
+
 The On Branch Created trigger starts a workflow execution when a new branch is created in a GitHub repository.
 
 ### Use Cases
@@ -106,6 +108,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 <a id="on-issue"></a>
 
 ## On Issue
+
+**Trigger key:** `github.onIssue`
 
 The On Issue trigger starts a workflow execution when issue events occur in a GitHub repository.
 
@@ -169,6 +173,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 ## On Issue Comment
 
+**Trigger key:** `github.onIssueComment`
+
 The On Issue Comment trigger starts a workflow execution when comments are added to issues.
 
 ### Use Cases
@@ -230,6 +236,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 <a id="on-pr-comment"></a>
 
 ## On PR Comment
+
+**Trigger key:** `github.onPRComment`
 
 The On PR Comment trigger starts a workflow execution when comments are added on a pull request conversation.
 
@@ -538,6 +546,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 <a id="on-pr-review-comment"></a>
 
 ## On PR Review Comment
+
+**Trigger key:** `github.onPRReviewComment`
 
 The On PR Review Comment trigger starts a workflow execution when review comments are added to pull requests.
 
@@ -990,6 +1000,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 ## On Pull Request
 
+**Trigger key:** `github.onPullRequest`
+
 The On Pull Request trigger starts a workflow execution when pull request events occur in a GitHub repository.
 
 ### Use Cases
@@ -1052,6 +1064,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 <a id="on-push"></a>
 
 ## On Push
+
+**Trigger key:** `github.onPush`
 
 The On Push trigger starts a workflow execution when code is pushed to a GitHub repository.
 
@@ -1312,6 +1326,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 ## On Release
 
+**Trigger key:** `github.onRelease`
+
 The On Release trigger starts a workflow execution when release events occur in a GitHub repository.
 
 ### Use Cases
@@ -1370,6 +1386,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 ## On Tag Created
 
+**Trigger key:** `github.onTagCreated`
+
 The On Tag Created trigger starts a workflow execution when a new tag is created in a GitHub repository.
 
 ### Use Cases
@@ -1425,6 +1443,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 <a id="on-workflow-run"></a>
 
 ## On Workflow Run
+
+**Trigger key:** `github.onWorkflowRun`
 
 The On Workflow Run trigger starts a workflow execution when GitHub Actions workflow runs complete.
 
@@ -1649,6 +1669,8 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 
 ## Add Issue Assignee
 
+**Component key:** `github.addIssueAssignee`
+
 The Add Issue Assignee component adds one or more assignees to an existing GitHub issue without affecting existing assignees.
 
 ### Use Cases
@@ -1692,6 +1714,8 @@ Returns the updated issue object with all current information.
 <a id="add-issue-label"></a>
 
 ## Add Issue Label
+
+**Component key:** `github.addIssueLabel`
 
 The Add Issue Label component adds one or more labels to an existing GitHub issue without affecting existing labels.
 
@@ -1740,6 +1764,8 @@ Returns the full list of labels currently on the issue after the addition.
 
 ## Add Reaction
 
+**Component key:** `github.addReaction`
+
 The Add Reaction component adds a reaction emoji to a GitHub comment.
 
 ### Use Cases
@@ -1779,6 +1805,8 @@ Returns the created GitHub reaction object, including id, content, user, and tim
 <a id="create-deployment"></a>
 
 ## Create Deployment
+
+**Component key:** `github.createDeployment`
 
 The Create Deployment component registers a deployment with GitHub for a given ref and environment. This drives the **View deployment** button and environment box on pull requests—the same surface area used by Railway, Vercel, and Netlify.
 
@@ -1852,6 +1880,8 @@ Emits github.deployment with the created deployment, including id for **Create D
 
 ## Create Deployment Status
 
+**Component key:** `github.createDeploymentStatus`
+
 The Create Deployment Status component posts a new status for an existing deployment. Use it after provisioning succeeds or fails, or to mark a preview as **inactive** when tearing down.
 
 ### Use Cases
@@ -1922,6 +1952,8 @@ Emits github.deploymentStatus with the created status record.
 
 ## Create Issue
 
+**Component key:** `github.createIssue`
+
 The Create Issue component creates a new issue in a specified GitHub repository.
 
 ### Use Cases
@@ -1971,6 +2003,8 @@ Returns the created issue object with details including:
 
 ## Create Issue Comment
 
+**Component key:** `github.createIssueComment`
+
 The Create Issue Comment component adds a comment to an existing GitHub issue or pull request.
 Issues and pull requests share the same comment API in GitHub.
 
@@ -2017,6 +2051,8 @@ Returns the created comment object including:
 <a id="create-pull-request"></a>
 
 ## Create Pull Request
+
+**Component key:** `github.createPullRequest`
 
 The Create Pull Request component creates a new pull request in a specified GitHub repository.
 
@@ -2086,6 +2122,8 @@ Returns the created pull request object with details including:
 
 ## Create Release
 
+**Component key:** `github.createRelease`
+
 The Create Release component creates a new release in a GitHub repository.
 
 ### Use Cases
@@ -2130,6 +2168,8 @@ Returns the created release object with all release information including tag, a
 <a id="create-review"></a>
 
 ## Create Review
+
+**Component key:** `github.createReview`
 
 The Create Review component submits a pull request review (approve, request changes, or comment) on a GitHub pull request.
 
@@ -2177,6 +2217,8 @@ Emits the submitted review object including:
 
 ## Delete Release
 
+**Component key:** `github.deleteRelease`
+
 The Delete Release component removes a release from a GitHub repository.
 
 ### Use Cases
@@ -2219,6 +2261,8 @@ Returns confirmation of the deletion.
 <a id="get-issue"></a>
 
 ## Get Issue
+
+**Component key:** `github.getIssue`
 
 The Get Issue component retrieves a specific issue from a GitHub repository by its issue number.
 
@@ -2267,6 +2311,8 @@ Returns the complete issue object including:
 <a id="get-release"></a>
 
 ## Get Release
+
+**Component key:** `github.getRelease`
 
 The Get Release component retrieves release information from a GitHub repository.
 
@@ -2335,6 +2381,8 @@ Returns release information including:
 
 ## Get Repository Permission
 
+**Component key:** `github.getRepositoryPermission`
+
 The Get Repository Permission component retrieves a user's effective permission level for a GitHub repository.
 
 ### Use Cases
@@ -2365,6 +2413,8 @@ The Get Repository Permission component retrieves a user's effective permission 
 <a id="get-workflow-usage"></a>
 
 ## Get Workflow Usage
+
+**Component key:** `github.getWorkflowUsage`
 
 The Get Workflow Usage component retrieves billable GitHub Actions usage (minutes) for the installation's organization.
 
@@ -2448,6 +2498,8 @@ The component stores repository information in node metadata:
 
 ## Publish Commit Status
 
+**Component key:** `github.publishCommitStatus`
+
 The Publish Commit Status component creates a status check on a GitHub commit, commonly used for CI/CD integrations.
 
 ### Use Cases
@@ -2491,6 +2543,8 @@ Returns the created status object with all status information.
 
 ## Remove Issue Assignee
 
+**Component key:** `github.removeIssueAssignee`
+
 The Remove Issue Assignee component removes one or more assignees from an existing GitHub issue without affecting other assignees.
 
 ### Use Cases
@@ -2529,6 +2583,8 @@ Returns the updated issue object with all current information.
 <a id="remove-issue-label"></a>
 
 ## Remove Issue Label
+
+**Component key:** `github.removeIssueLabel`
 
 The Remove Issue Label component removes one or more labels from an existing GitHub issue without affecting other labels.
 
@@ -2569,6 +2625,8 @@ Returns the remaining list of labels on the issue after the removal.
 <a id="run-workflow"></a>
 
 ## Run Workflow
+
+**Component key:** `github.runWorkflow`
 
 The Run Workflow component triggers a GitHub Actions workflow and waits for it to complete.
 
@@ -2626,6 +2684,8 @@ The Run Workflow component triggers a GitHub Actions workflow and waits for it t
 
 ## Update Issue
 
+**Component key:** `github.updateIssue`
+
 The Update Issue component modifies an existing GitHub issue with new information.
 
 ### Use Cases
@@ -2669,6 +2729,8 @@ Returns the updated issue object with all current information.
 <a id="update-release"></a>
 
 ## Update Release
+
+**Component key:** `github.updateRelease`
 
 The Update Release component modifies an existing GitHub release.
 
