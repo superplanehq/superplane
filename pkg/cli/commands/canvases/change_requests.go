@@ -179,11 +179,11 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if versionID == "" {
-		cmContext, err := resolveChangeManagementContext(ctx, canvasID)
+		changeManagementEnabled, err := canvasresolve.ChangeManagementEnabled(ctx, canvasID)
 		if err != nil {
 			return err
 		}
-		if !cmContext.changeManagementEnabled {
+		if !changeManagementEnabled {
 			return fmt.Errorf("change management is disabled for this canvas; enable it in canvas settings to use change requests")
 		}
 

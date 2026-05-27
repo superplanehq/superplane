@@ -1,8 +1,9 @@
 // Package canvasresolve groups the small set of helpers used by multiple
-// CLI command packages to resolve a canvas (by name or id) and to find or
-// create the current user's draft version. Keeping these in one place lets
-// the `canvases` and `console` command packages share behavior without
-// either depending on the other.
+// CLI command packages to resolve a canvas (by name or id), read canvas
+// settings such as change management, and find or create the current user's
+// draft version. Keeping these in one place lets the `canvases` and
+// `console` command packages share behavior without either depending on the
+// other.
 package canvasresolve
 
 import (
@@ -40,6 +41,22 @@ func ResolveCanvasNameOrIDArg(ctx core.CommandContext, arg string) (string, erro
 	}
 
 	return FindCanvasID(ctx, ctx.API, trimmed)
+}
+
+// ChangeManagementEnabled reports whether change management is enabled on
+// the canvas identified by `canvasID`.
+func ChangeManagementEnabled(ctx core.CommandContext, canvasID string) (bool, error) {
+	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, canvasID).Execute()
+	if err != nil {
+		return false, err
+	}
+	if response.Canvas == nil {
+		return false, fmt.Errorf("canvas %q not found", canvasID)
+	}
+
+	spec := response.Canvas.GetSpec()
+	cm := spec.GetChangeManagement()
+	return cm.GetEnabled(), nil
 }
 
 func findCanvasIDByName(ctx core.CommandContext, client *openapi_client.APIClient, name string) (string, error) {

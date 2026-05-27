@@ -67,12 +67,12 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	cmContext, err := resolveChangeManagementContext(ctx, canvasID)
+	changeManagementEnabled, err := canvasresolve.ChangeManagementEnabled(ctx, canvasID)
 	if err != nil {
 		return err
 	}
 
-	if cmContext.changeManagementEnabled && !draftMode {
+	if changeManagementEnabled && !draftMode {
 		return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases change-requests create`")
 	}
 

@@ -50,7 +50,7 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	changeManagementEnabled, err := resolveChangeManagementEnabled(ctx, canvasID)
+	changeManagementEnabled, err := canvasresolve.ChangeManagementEnabled(ctx, canvasID)
 	if err != nil {
 		return err
 	}
@@ -110,23 +110,6 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		_, err := fmt.Fprintln(stdout, "Run `superplane canvases update` (without --draft) to publish a draft that includes this console.")
 		return err
 	})
-}
-
-// resolveChangeManagementEnabled describes the canvas and reports whether
-// change management is enabled. Errors from the underlying API are
-// returned unchanged.
-func resolveChangeManagementEnabled(ctx core.CommandContext, canvasID string) (bool, error) {
-	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, canvasID).Execute()
-	if err != nil {
-		return false, err
-	}
-	if response.Canvas == nil {
-		return false, fmt.Errorf("canvas %q not found", canvasID)
-	}
-
-	spec := response.Canvas.GetSpec()
-	cm := spec.GetChangeManagement()
-	return cm.GetEnabled(), nil
 }
 
 // createChangeRequestForDraft opens a change request for the supplied
