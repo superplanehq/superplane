@@ -28,6 +28,28 @@ describe("WorkflowFilesOverlayLayer", () => {
     useSidebarLayoutStore.getState().hydrateFromStorage();
   });
 
+  it("opens the first file when files load after the overlay mounts", () => {
+    const { rerender } = render(<WorkflowFilesOverlayLayer isFilesMode files={[]} />);
+
+    expect(screen.queryByTestId("monaco-stub")).not.toBeInTheDocument();
+
+    rerender(
+      <WorkflowFilesOverlayLayer
+        isFilesMode
+        files={[
+          {
+            path: "canvas.yaml",
+            content: "canvas: true",
+            language: "yaml",
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Close canvas.yaml" })).toBeInTheDocument();
+    expect(screen.getByTestId("monaco-stub")).toHaveTextContent("canvas: true");
+  });
+
   it("keeps all editor tabs closed after closing the last tab", async () => {
     const user = userEvent.setup();
 
