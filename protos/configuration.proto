@@ -98,6 +98,7 @@ message ListTypeOptions {
   ListItemDefinition item_definition = 1;
   string item_label = 2;
   optional int32 max_items = 3;
+  optional bool accordion = 4;
 }
 
 message ObjectTypeOptions {

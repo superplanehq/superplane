@@ -1,10 +1,14 @@
 import React from "react";
-import { Plus, Trash2 } from "lucide-react";
+import * as AccordionPrimitive from "@radix-ui/react-accordion";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { Button } from "../button";
 import { Input } from "@/components/ui/input";
+import { Accordion, AccordionContent, AccordionItem } from "@/ui/accordion";
 import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
 import type { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
+import { listFieldItemTitle } from "./listFieldItemTitle";
+import { cn } from "@/lib/utils";
 import { showErrorToast } from "@/lib/toast";
 
 interface ExtendedFieldRendererProps extends FieldRendererProps {
@@ -29,6 +33,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
   const listOptions = field.typeOptions?.list;
   const itemDefinition = listOptions?.itemDefinition;
   const maxItems = listOptions?.maxItems;
+  const useAccordion = listOptions?.accordion === true;
   const items = Array.isArray(value)
     ? itemDefinition?.type === "day-in-year"
       ? value.filter((item) => typeof item === "string" && item.trim().length > 0)
@@ -43,6 +48,22 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     Array.isArray(itemDefinition.schema) &&
     itemDefinition.schema.some((schemaField) => schemaField.name === "type") &&
     itemDefinition.schema.some((schemaField) => ["user", "role", "group"].includes(schemaField.name || ""));
+
+  const [openItem, setOpenItem] = React.useState<string | undefined>(undefined);
+
+  React.useEffect(() => {
+    if (items.length === 0) {
+      setOpenItem(undefined);
+      return;
+    }
+    if (openItem === undefined) {
+      return;
+    }
+    if (Number(openItem) < items.length) {
+      return;
+    }
+    setOpenItem(undefined);
+  }, [items.length, openItem]);
 
   const getApproverKey = (item: Record<string, unknown>) => {
     const type = typeof item.type === "string" ? item.type : "";
@@ -72,12 +93,24 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     const newItems = [...itemsRef.current, newItem];
     itemsRef.current = newItems;
     onChange(newItems);
+    if (useAccordion) {
+      setOpenItem(String(newItems.length - 1));
+    }
   };
 
   const removeItem = (index: number) => {
     const newItems = itemsRef.current.filter((_, i) => i !== index);
     itemsRef.current = newItems;
     onChange(newItems.length > 0 ? newItems : undefined);
+    if (!useAccordion) return;
+
+    setOpenItem((current) => {
+      if (newItems.length === 0 || current === undefined) return undefined;
+      const openIndex = Number(current);
+      if (openIndex === index) return undefined;
+      if (openIndex > index) return String(openIndex - 1);
+      return current;
+    });
   };
 
   const updateItem = (index: number, newValue: unknown) => {
@@ -101,6 +134,153 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     onChange(newItems);
   };
 
+  const renderObjectItemFields = (item: unknown, index: number) => {
+    if (!itemDefinition?.schema) return null;
+
+    const itemValues =
+      item && typeof item === "object" ? (item as Record<string, unknown>) : ({} as Record<string, unknown>);
+    const nestedValues = isApprovalItemsList
+      ? {
+          ...itemValues,
+          __listItems: items,
+          __itemIndex: index,
+          __isApprovalList: true,
+        }
+      : itemValues;
+
+    return itemDefinition.schema.map((schemaField, schemaIndex) => {
+      const nestedFieldPath = `${fieldPath}[${index}].${schemaField.name}`;
+      const hasNestedError = (() => {
+        if (!validationErrors) return false;
+
+        if (validationErrors instanceof Set) {
+          return validationErrors.has(nestedFieldPath);
+        }
+        return validationErrors.some((error) => error.field === nestedFieldPath);
+      })();
+
+      return (
+        <ConfigurationFieldRenderer
+          allowExpressions={allowExpressions}
+          key={schemaField.name ?? `field-${schemaIndex}`}
+          field={schemaField}
+          value={itemValues[schemaField.name!]}
+          onChange={(val) => {
+            const newItem = { ...itemValues, [schemaField.name!]: val };
+            updateItem(index, newItem);
+          }}
+          allValues={nestedValues}
+          domainId={domainId}
+          domainType={domainType}
+          integrationId={integrationId}
+          organizationId={organizationId}
+          hasError={hasNestedError}
+          autocompleteExampleObj={autocompleteExampleObj}
+        />
+      );
+    });
+  };
+
+  const renderListItemBody = (item: unknown, index: number) => {
+    if (itemDefinition?.type === "object" && itemDefinition.schema) {
+      return <div className="space-y-4">{renderObjectItemFields(item, index)}</div>;
+    }
+
+    if (itemDefinition?.type === "day-in-year") {
+      return (
+        <DayInYearFieldRenderer
+          field={{ name: `${field.name || "item"}-${index}`, label: itemLabel, type: "day-in-year" }}
+          value={item}
+          onChange={(val) => updateItem(index, val)}
+        />
+      );
+    }
+
+    return (
+      <Input
+        type={itemDefinition?.type === "number" ? "number" : "text"}
+        value={(item as string | number) ?? ""}
+        onChange={(e) => {
+          const val =
+            itemDefinition?.type === "number"
+              ? e.target.value === ""
+                ? undefined
+                : Number(e.target.value)
+              : e.target.value;
+          updateItem(index, val);
+        }}
+      />
+    );
+  };
+
+  const renderRemoveButton = (index: number, className?: string) => (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={(event) => {
+        event.stopPropagation();
+        removeItem(index);
+      }}
+      className={className}
+      aria-label={`Remove ${listFieldItemTitle(items[index], index, itemLabel)}`}
+    >
+      <Trash2 className="h-4 w-4 text-red-500" />
+    </Button>
+  );
+
+  if (useAccordion && itemDefinition?.type === "object" && itemDefinition.schema) {
+    return (
+      <div className="space-y-3">
+        <Accordion type="single" collapsible value={openItem} onValueChange={setOpenItem} className="space-y-2">
+          {items.map((item, index) => {
+            const isItemOpen = openItem === String(index);
+            return (
+              <AccordionItem key={index} value={String(index)} className="border-0">
+                <div className="flex items-start gap-2">
+                  <div className="relative min-w-0 flex-1 rounded-md border border-gray-300 dark:border-gray-700">
+                    <AccordionPrimitive.Header
+                      className={cn(
+                        "relative z-10 flex h-11 shrink-0",
+                        isItemOpen && "pointer-events-none absolute inset-x-0 top-0",
+                      )}
+                    >
+                      <AccordionPrimitive.Trigger
+                        className={cn(
+                          "group relative flex h-11 w-full items-center pl-4 text-left text-sm font-medium hover:no-underline focus-visible:outline-none focus-visible:ring-0",
+                          isItemOpen && "pointer-events-auto",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "min-w-0 flex-1 truncate pr-2 font-medium text-gray-800",
+                            isItemOpen && "sr-only",
+                          )}
+                        >
+                          {listFieldItemTitle(item, index, itemLabel)}
+                        </span>
+                        <span className="absolute top-1/2 right-2 flex size-8 -translate-y-1/2 items-center justify-center rounded-sm group-focus-visible:ring-2 group-focus-visible:ring-ring/50">
+                          <ChevronDown className={cn("size-4 text-gray-500", isItemOpen && "rotate-180")} />
+                        </span>
+                      </AccordionPrimitive.Trigger>
+                    </AccordionPrimitive.Header>
+                    <AccordionContent className={cn("px-4 pb-4 pr-12", isItemOpen ? "pt-4" : "pt-0")}>
+                      {renderListItemBody(item, index)}
+                    </AccordionContent>
+                  </div>
+                  {renderRemoveButton(index, "mt-1 shrink-0")}
+                </div>
+              </AccordionItem>
+            );
+          })}
+        </Accordion>
+        <Button variant="outline" onClick={addItem} className="w-full mt-3" disabled={!canAddMore}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add {itemLabel}
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
       {items.map((item, index) => (
@@ -108,77 +288,13 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           <div className="flex-1">
             {itemDefinition?.type === "object" && itemDefinition.schema ? (
               <div className="border border-gray-300 dark:border-gray-700 rounded-md p-4 space-y-4">
-                {itemDefinition.schema.map((schemaField, schemaIndex) => {
-                  const nestedFieldPath = `${fieldPath}[${index}].${schemaField.name}`;
-                  const hasNestedError = (() => {
-                    if (!validationErrors) return false;
-
-                    if (validationErrors instanceof Set) {
-                      return validationErrors.has(nestedFieldPath);
-                    } else {
-                      return validationErrors.some((error) => error.field === nestedFieldPath);
-                    }
-                  })();
-
-                  const itemValues =
-                    item && typeof item === "object"
-                      ? (item as Record<string, unknown>)
-                      : ({} as Record<string, unknown>);
-                  const nestedValues = isApprovalItemsList
-                    ? {
-                        ...itemValues,
-                        __listItems: items,
-                        __itemIndex: index,
-                        __isApprovalList: true,
-                      }
-                    : itemValues;
-
-                  return (
-                    <ConfigurationFieldRenderer
-                      allowExpressions={allowExpressions}
-                      key={schemaField.name ?? `field-${schemaIndex}`}
-                      field={schemaField}
-                      value={itemValues[schemaField.name!]}
-                      onChange={(val) => {
-                        const newItem = { ...itemValues, [schemaField.name!]: val };
-                        updateItem(index, newItem);
-                      }}
-                      allValues={nestedValues}
-                      domainId={domainId}
-                      domainType={domainType}
-                      integrationId={integrationId}
-                      organizationId={organizationId}
-                      hasError={hasNestedError}
-                      autocompleteExampleObj={autocompleteExampleObj}
-                    />
-                  );
-                })}
+                {renderObjectItemFields(item, index)}
               </div>
-            ) : itemDefinition?.type === "day-in-year" ? (
-              <DayInYearFieldRenderer
-                field={{ name: `${field.name || "item"}-${index}`, label: itemLabel, type: "day-in-year" }}
-                value={item}
-                onChange={(val) => updateItem(index, val)}
-              />
             ) : (
-              <Input
-                type={itemDefinition?.type === "number" ? "number" : "text"}
-                value={item ?? ""}
-                onChange={(e) => {
-                  const val =
-                    itemDefinition?.type === "number"
-                      ? e.target.value === ""
-                        ? undefined
-                        : Number(e.target.value)
-                      : e.target.value;
-                  updateItem(index, val);
-                }}
-              />
+              renderListItemBody(item, index)
             )}
           </div>
-          <Button variant="ghost" size="icon" onClick={() => removeItem(index)} className="mt-1">
-            <Trash2 className="h-4 w-4 text-red-500" />
-          </Button>
+          {renderRemoveButton(index, "mt-1")}
         </div>
       ))}
       <Button variant="outline" onClick={addItem} className="w-full mt-3" disabled={!canAddMore}>

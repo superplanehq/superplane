@@ -281,7 +281,6 @@ export const ConfigurationFieldRenderer = ({
   };
 
   const renderField = () => {
-
     switch (field.type) {
       case "string":
         return <StringFieldRenderer {...commonProps} />;

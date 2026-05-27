@@ -204,6 +204,9 @@ type ListTypeOptions struct {
 	ItemDefinition *ListItemDefinition `json:"itemDefinition"`
 	ItemLabel      string              `json:"itemLabel,omitempty"`
 	MaxItems       *int                `json:"maxItems,omitempty"`
+
+	// When true, list items render in a single-expand accordion instead of stacked cards.
+	Accordion bool `json:"accordion,omitempty"`
 }
 
 /*
