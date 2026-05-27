@@ -1214,9 +1214,9 @@ export const AutoCompleteInput = forwardRef<HTMLTextAreaElement, AutoCompleteInp
             placeholder={placeholder}
             disabled={disabled || previewMode}
             className={twMerge([
-              "font-sm bg-transparent border-gray-300 shadow-xs placeholder:text-gray-500 selection:bg-primary/30",
+              "font-sm bg-transparent border-gray-300 placeholder:text-gray-500",
               "relative block w-full min-w-0 appearance-none rounded-md border px-3 py-2 text-base outline-none resize-none overflow-hidden",
-              "focus-visible:border-gray-500 focus-visible:ring-ring/50",
+              "focus:border-gray-500 focus:shadow-none focus:ring-0",
               "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
               "disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
               // Make text transparent but keep caret visible
