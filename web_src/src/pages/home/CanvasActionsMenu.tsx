@@ -102,7 +102,7 @@ export function CanvasActionsMenu({
               <PermissionTooltip allowed={canUpdateCanvases} message="You don't have permission to update canvases.">
                 <DropdownMenuItem onClick={handleChangeName} disabled={!canUpdateCanvases}>
                   <Pencil size={16} />
-                  Change Name
+                  Rename
                 </DropdownMenuItem>
               </PermissionTooltip>
 
