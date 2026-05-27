@@ -91,7 +91,7 @@ import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
 import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
-import { canEditCanvasMemory } from "./lib/canvas-memory-access";
+import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
 import { WorkflowTemplateBanner } from "./WorkflowTemplateBanner";
@@ -573,7 +573,7 @@ export function WorkflowPageV2() {
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
     error: canvasMemoryError,
-  } = useCanvasMemoryEntries(canvasId!, isMemoryMode || isViewingLiveVersion);
+  } = useCanvasMemoryEntries(canvasId!, shouldLoadCanvasMemoryEntries(isMemoryMode, isViewingLiveVersion));
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
   const canUpdateCanvas = canAct("canvases", "update");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);

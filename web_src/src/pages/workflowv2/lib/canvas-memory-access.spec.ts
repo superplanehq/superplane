@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canEditCanvasMemory } from "./canvas-memory-access";
+import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./canvas-memory-access";
 
 describe("canEditCanvasMemory", () => {
   const editingState = {
@@ -22,6 +22,20 @@ describe("canEditCanvasMemory", () => {
     "blocks memory edits when %o",
     (override) => {
       expect(canEditCanvasMemory({ ...editingState, ...override })).toBe(false);
+    },
+  );
+});
+
+describe("shouldLoadCanvasMemoryEntries", () => {
+  it.each([
+    { isMemoryMode: true, isViewingLiveVersion: false, expected: true },
+    { isMemoryMode: false, isViewingLiveVersion: true, expected: true },
+    { isMemoryMode: true, isViewingLiveVersion: true, expected: true },
+    { isMemoryMode: false, isViewingLiveVersion: false, expected: false },
+  ])(
+    "returns $expected when isMemoryMode=$isMemoryMode and isViewingLiveVersion=$isViewingLiveVersion",
+    ({ isMemoryMode, isViewingLiveVersion, expected }) => {
+      expect(shouldLoadCanvasMemoryEntries(isMemoryMode, isViewingLiveVersion)).toBe(expected);
     },
   );
 });

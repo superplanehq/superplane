@@ -19,3 +19,12 @@ export function canEditCanvasMemory({
 }): boolean {
   return canUpdateCanvas && !isTemplate && !canvasDeletedRemotely && hasEditableVersion;
 }
+
+/**
+ * Decides whether the workflow page should fetch canvas memory entries: when
+ * the memory overlay is open, or when the user is viewing the live canvas
+ * (memory belongs to the live canvas).
+ */
+export function shouldLoadCanvasMemoryEntries(isMemoryMode: boolean, isViewingLiveVersion: boolean): boolean {
+  return isMemoryMode || isViewingLiveVersion;
+}
