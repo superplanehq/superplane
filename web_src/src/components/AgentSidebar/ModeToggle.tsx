@@ -19,14 +19,14 @@ const modeConfig = {
 } as const;
 
 function indicatorClasses(mode: AgentMode): string {
-  if (mode === "builder") return "bg-orange-100 border-orange-900";
+  if (mode === "builder") return "border-0 bg-[var(--purple)]";
   if (mode === "operator") return "bg-slate-500 border-transparent";
   return "bg-white border-transparent";
 }
 
 function labelColor(key: AgentMode, isActive: boolean): string {
   if (!isActive) return "text-slate-600 hover:text-slate-700";
-  if (key === "builder") return "text-orange-900";
+  if (key === "builder") return "text-white";
   if (key === "operator") return "text-white";
   return "text-slate-900";
 }
