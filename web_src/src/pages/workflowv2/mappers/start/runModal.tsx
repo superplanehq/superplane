@@ -10,7 +10,7 @@ import { Checkbox } from "@/ui/checkbox";
 import {
   coerceParameterValue,
   initialParameterValue,
-  payloadRecordForParameters,
+  parameterDisplayLabel,
   type StartTemplateParameter,
 } from "./templatePayload";
 
@@ -26,12 +26,11 @@ export function StartRunModal({
   onClose: () => void;
 }) {
   const useParameterForm = Boolean(parameters?.length);
-  const parameterPayload = React.useMemo(() => payloadRecordForParameters(initialPayload), [initialPayload]);
   const [parameterValues, setParameterValues] = React.useState<Record<string, string | number | boolean>>(() => {
     const values: Record<string, string | number | boolean> = {};
     for (const param of parameters ?? []) {
       if (!param.name || !param.type) continue;
-      values[param.name] = initialParameterValue(param, parameterPayload);
+      values[param.name] = initialParameterValue(param);
     }
     return values;
   });
@@ -53,7 +52,7 @@ export function StartRunModal({
           typeof parsedData[param.name] === "number" &&
           Number.isNaN(parsedData[param.name])
         ) {
-          showErrorToast(`"${param.name}" must be a valid number`);
+          showErrorToast(`"${parameterDisplayLabel(param)}" must be a valid number`);
           return;
         }
       }
@@ -89,6 +88,7 @@ export function StartRunModal({
           {(parameters ?? []).map((param) => {
             if (!param.name || !param.type) return null;
             const id = `start-run-param-${param.name}`;
+            const label = parameterDisplayLabel(param);
             return (
               <div key={param.name} className="space-y-1.5">
                 {param.type === "boolean" ? (
@@ -104,12 +104,12 @@ export function StartRunModal({
                       }
                     />
                     <Label htmlFor={id} className="cursor-pointer">
-                      {param.name}
+                      {label}
                     </Label>
                   </div>
                 ) : (
                   <>
-                    <Label htmlFor={id}>{param.name}</Label>
+                    <Label htmlFor={id}>{label}</Label>
                     <Input
                       id={id}
                       type={param.type === "number" ? "number" : "text"}

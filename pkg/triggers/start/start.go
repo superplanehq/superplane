@@ -56,7 +56,7 @@ Each Manual Run trigger exposes a list of templates. A template has:
 - ` + "`parameters`" + ` (optional): a list of typed parameters exposed to payload expressions as ` + "`parameters[\"name\"]`" + ` and used by the run form
 - ` + "`payload`" + ` (required): a default JSON object emitted when the template is used. Supports expressions such as ` + "`{{ now() }}`" + ` and ` + "`{{ parameters[\"my parameter\"] }}`" + ` in JSON values.
 
-Each parameter has a ` + "`name`" + ` (plain text), required ` + "`type`" + ` (` + "`string`" + `, ` + "`number`" + `, or ` + "`boolean`" + `), and an optional default (` + "`defaultString`" + `, ` + "`defaultNumber`" + `, or ` + "`defaultBoolean`" + `) whose editor matches the selected type.
+Each parameter has a ` + "`name`" + ` (plain text), required ` + "`type`" + ` (` + "`string`" + `, ` + "`number`" + `, or ` + "`boolean`" + `), an optional ` + "`title`" + ` for the run form label (defaults to ` + "`name`" + ` when unset), and an optional default (` + "`defaultString`" + `, ` + "`defaultNumber`" + `, or ` + "`defaultBoolean`" + `) whose editor matches the selected type.
 
 ## Event Data
 
@@ -160,6 +160,17 @@ func (s *Start) Configuration() []configuration.Field {
 													Togglable: true,
 													VisibilityConditions: []configuration.VisibilityCondition{
 														{Field: "type", Values: []string{configuration.FieldTypeBool}},
+													},
+												},
+												{
+													Name:      "title",
+													Label:     "Display Title",
+													Togglable: true,
+													Type:      configuration.FieldTypeString,
+													TypeOptions: &configuration.TypeOptions{
+														String: &configuration.StringTypeOptions{
+															AllowExpressions: &disallowExpressions,
+														},
 													},
 												},
 											},
