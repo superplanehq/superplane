@@ -18,7 +18,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/workers/contexts"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func InvokeNodeTriggerHook(
@@ -123,7 +122,7 @@ func InvokeNodeTriggerHook(
 	}
 
 	// Convert result to protobuf struct
-	resultStruct, err := structpb.NewStruct(result)
+	resultStruct, err := newStructpbStruct(result)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create result struct: %v", err)
 	}
