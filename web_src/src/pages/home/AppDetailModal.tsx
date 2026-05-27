@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, ExternalLink, Plus } from "lucide-react";
 
 export interface AppEntry {
   repo: string;
+  icon: string;
   title: string;
   description: string;
   integrations: string[];
@@ -43,7 +44,7 @@ export function AppDetailModal({ app, busy, onBack, onInstall, onClose }: AppDet
         <div className="px-6 py-5">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100">
-              <LeadIcon integrations={app.integrations} size="lg" />
+              <LeadIcon icon={app.icon} integrations={app.integrations} size="lg" />
             </div>
             <div className="min-w-0 flex-1">
               <h3 className="text-lg font-semibold text-slate-900">{app.title}</h3>
@@ -101,13 +102,21 @@ export function AppDetailModal({ app, busy, onBack, onInstall, onClose }: AppDet
   );
 }
 
-export function LeadIcon({ integrations, size = "sm" }: { integrations: string[]; size?: "sm" | "lg" }) {
-  const first = integrations[0];
+export function LeadIcon({
+  icon,
+  integrations,
+  size = "sm",
+}: {
+  icon?: string;
+  integrations: string[];
+  size?: "sm" | "lg";
+}) {
+  const iconName = icon || integrations[0];
   const cls = size === "lg" ? "h-7 w-7" : "h-5 w-5";
-  if (!first) return <Plus className={`${cls} text-slate-400`} />;
-  const icon = getIntegrationIconSrc(first.toLowerCase());
-  if (!icon) return <Plus className={`${cls} text-slate-400`} />;
-  return <img src={icon} alt={first} className={cls} />;
+  if (!iconName) return <Plus className={`${cls} text-slate-400`} />;
+  const iconSrc = getIntegrationIconSrc(iconName.toLowerCase());
+  if (!iconSrc) return <Plus className={`${cls} text-slate-400`} />;
+  return <img src={iconSrc} alt={iconName} className={cls} />;
 }
 
 export function IntegrationIcons({ integrations }: { integrations: string[] }) {
