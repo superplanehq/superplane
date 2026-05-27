@@ -2953,16 +2953,11 @@ function CanvasContent({
     () => (
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={handleOpenCommandPalette}
-            aria-label="Search commands and components"
-          >
+          <Button variant="ghost" size="icon-sm" onClick={handleOpenCommandPalette} aria-label="Search Components">
             <Search className="h-3 w-3" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Search commands and components</TooltipContent>
+        <TooltipContent>Search Components</TooltipContent>
       </Tooltip>
     ),
     [handleOpenCommandPalette],
