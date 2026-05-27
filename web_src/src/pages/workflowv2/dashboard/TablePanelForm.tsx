@@ -11,7 +11,8 @@ import {
 } from "./tablePanelForm/TablePanelFormSections";
 import { useTablePanelFormActions } from "./tablePanelForm/useTablePanelFormActions";
 import { useTablePanelPayloadDrafts } from "./tablePanelForm/useTablePanelPayloadDrafts";
-import { sampleRowFromFields, useMemoryCatalog } from "./widget/useMemoryCatalog";
+import { staticFieldsForDataSource } from "./widget/staticFieldCatalogs";
+import { sampleRowFromFields, useMemoryCatalog, type MemoryFieldSummary } from "./widget/useMemoryCatalog";
 
 interface TablePanelFormProps {
   value: TablePanelContent;
@@ -23,7 +24,8 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
   const canvasId = ctx?.canvasId;
   const triggerNodes = (ctx?.nodes ?? []).filter((n) => n.type === "TYPE_TRIGGER");
   const namespace = value.dataSource.kind === "memory" ? value.dataSource.namespace : "";
-  const { fields } = useMemoryCatalog(canvasId, namespace);
+  const { fields: memoryFields } = useMemoryCatalog(canvasId, namespace);
+  const fields = resolveFieldCatalog(value, memoryFields);
   const fieldOptions = fields.map((f) => f.field);
   const sampleRow = sampleRowFromFields(fields);
   const payloadDrafts = useTablePanelPayloadDrafts(value);
@@ -47,4 +49,16 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
       />
     </div>
   );
+}
+
+/**
+ * Pick the right field catalog for the configured data source. Memory rows
+ * are dynamic (discovered from the live canvas memory), while executions
+ * and runs have fixed shapes — see `staticFieldsForDataSource` for the
+ * hard-coded catalogs. Returns an empty list when no suggestions are
+ * available, so the form falls back to free-text input cleanly.
+ */
+function resolveFieldCatalog(value: TablePanelContent, memoryFields: MemoryFieldSummary[]): MemoryFieldSummary[] {
+  if (value.dataSource.kind === "memory") return memoryFields;
+  return staticFieldsForDataSource(value.dataSource.kind);
 }
