@@ -140,7 +140,10 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
   }
   const value = resolveCellValue(col.field, row);
   const formatted = formatValue(value, col.format);
-  if (col.format === "status") {
+  // `badge` is an alias for `status`: both render the value as a colored
+  // pill so authors can pick whichever name reads more naturally for the
+  // column (e.g. "status" for run outcomes, "badge" for arbitrary tags).
+  if (col.format === "status" || col.format === "badge") {
     const classes = STATUS_PILL_CLASS[formatted.toLowerCase()] ?? "bg-slate-100 text-slate-600 ring-slate-300";
     return (
       <td className="px-3 py-1.5">
