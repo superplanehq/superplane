@@ -32,6 +32,7 @@ export type WidgetColumnFormat =
   | "relative"
   | "duration"
   | "status"
+  | "badge"
   | "code"
   | "link";
 

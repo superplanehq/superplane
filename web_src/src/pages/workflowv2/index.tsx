@@ -200,7 +200,7 @@ export function WorkflowPageV2() {
     setIsDashboardYamlOpen,
     selectedRunId,
     setSelectedRunId,
-  } = useWorkflowViewSearchParams(searchParams);
+  } = useWorkflowViewSearchParams(searchParams, setSearchParams);
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
