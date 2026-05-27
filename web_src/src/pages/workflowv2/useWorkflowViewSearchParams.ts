@@ -16,11 +16,7 @@ function isConsoleView(view: string): boolean {
 /**
  * Keeps runs/console/memory/files view mode and selected run in sync with `view` and `run` search params.
  */
-export function useWorkflowViewSearchParams(
-  searchParams: URLSearchParams,
-  setSearchParams: SetURLSearchParams,
-  dashboardsFeatureEnabled: boolean,
-) {
+export function useWorkflowViewSearchParams(searchParams: URLSearchParams, setSearchParams: SetURLSearchParams) {
   const [isRunsMode, setIsRunsMode] = useState(() => searchParams.get("view") === "runs");
   const [isDashboardMode, setIsDashboardMode] = useState(() => isConsoleView(searchParams.get("view") ?? ""));
   const [isMemoryMode, setIsMemoryMode] = useState(() => searchParams.get("view") === "memory");
@@ -41,35 +37,18 @@ export function useWorkflowViewSearchParams(
     setIsMemoryMode(viewParam === "memory");
     setIsFilesMode(viewParam === "files");
     if (consoleViewActive) {
-      if (dashboardsFeatureEnabled) {
-        setIsDashboardMode(true);
-        // Migrate legacy `?view=dashboard` to the canonical `?view=console`
-        // in-place so the address bar and any future link sharing reflect
-        // the renamed feature without breaking existing bookmarks.
-        if (viewParam === LEGACY_CONSOLE_VIEW) {
-          setSearchParamsRef.current(
-            (current) => {
-              const next = new URLSearchParams(current);
-              if (next.get("view") !== LEGACY_CONSOLE_VIEW) {
-                return current;
-              }
-              next.set("view", CONSOLE_VIEW);
-              return next;
-            },
-            { replace: true },
-          );
-        }
-      } else {
-        setIsDashboardMode(false);
-        setIsDashboardAddPanelOpen(false);
-        setIsDashboardYamlOpen(false);
+      setIsDashboardMode(true);
+      // Migrate legacy `?view=dashboard` to the canonical `?view=console`
+      // in-place so the address bar and any future link sharing reflect
+      // the renamed feature without breaking existing bookmarks.
+      if (viewParam === LEGACY_CONSOLE_VIEW) {
         setSearchParamsRef.current(
           (current) => {
             const next = new URLSearchParams(current);
-            if (!isConsoleView(next.get("view") ?? "")) {
+            if (next.get("view") !== LEGACY_CONSOLE_VIEW) {
               return current;
             }
-            next.delete("view");
+            next.set("view", CONSOLE_VIEW);
             return next;
           },
           { replace: true },
@@ -83,7 +62,7 @@ export function useWorkflowViewSearchParams(
       setIsDashboardAddPanelOpen(false);
       setIsDashboardYamlOpen(false);
     }
-  }, [viewParam, runParam, consoleViewActive, dashboardsFeatureEnabled]);
+  }, [viewParam, runParam, consoleViewActive]);
 
   return {
     isRunsMode,

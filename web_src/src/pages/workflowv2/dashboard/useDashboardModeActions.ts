@@ -2,7 +2,6 @@ import { useCallback } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 interface DashboardModeActionsConfig {
-  dashboardsFeatureEnabled: boolean;
   setIsDashboardMode: (value: boolean) => void;
   setIsDashboardAddPanelOpen: (value: boolean) => void;
   setIsDashboardYamlOpen: (value: boolean) => void;
@@ -14,7 +13,6 @@ interface DashboardModeActionsConfig {
 }
 
 export function useDashboardModeActions({
-  dashboardsFeatureEnabled,
   setIsDashboardMode,
   setIsDashboardAddPanelOpen,
   setIsDashboardYamlOpen,
@@ -25,23 +23,13 @@ export function useDashboardModeActions({
   setSearchParams,
 }: DashboardModeActionsConfig) {
   const handleSelectDashboardMode = useCallback(() => {
-    if (!dashboardsFeatureEnabled) return;
-
     setIsDashboardMode(true);
     setIsRunsMode(false);
     setIsMemoryMode(false);
     setIsFilesMode(false);
     setSelectedRunId(null);
     setSearchParams(toDashboardSearchParams, { replace: true });
-  }, [
-    dashboardsFeatureEnabled,
-    setIsDashboardMode,
-    setIsFilesMode,
-    setIsMemoryMode,
-    setIsRunsMode,
-    setSearchParams,
-    setSelectedRunId,
-  ]);
+  }, [setIsDashboardMode, setIsFilesMode, setIsMemoryMode, setIsRunsMode, setSearchParams, setSelectedRunId]);
 
   const handleExitDashboardMode = useCallback(() => {
     setIsDashboardMode(false);
