@@ -50,4 +50,22 @@ describe("CanvasModeToggle", () => {
 
     expect(screen.queryByRole("tab", { name: "Memory" })).not.toBeInTheDocument();
   });
+
+  it("invokes onSelectFiles when clicking the Files tab", async () => {
+    const user = userEvent.setup();
+    const onSelectFiles = vi.fn();
+
+    render(
+      <CanvasModeToggle
+        mode="version-live"
+        onSelectLive={vi.fn()}
+        onSelectDashboard={vi.fn()}
+        onSelectFiles={onSelectFiles}
+      />,
+    );
+
+    await user.click(screen.getByRole("tab", { name: "Files" }));
+
+    expect(onSelectFiles).toHaveBeenCalledTimes(1);
+  });
 });
