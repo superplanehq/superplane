@@ -36,6 +36,8 @@ To connect Elastic to SuperPlane:
 
 ## When Alert Fires
 
+**Trigger key:** `elastic.onAlertFires`
+
 The When Alert Fires trigger starts a workflow execution when a Kibana alert rule fires via a webhook connector.
 
 ### Shared Connector
@@ -111,6 +113,8 @@ Each received alert emits the parsed JSON body sent by Kibana directly as the ev
 
 ## When Case Status Changes
 
+**Trigger key:** `elastic.onCaseStatusChange`
+
 The When Case Status Changes trigger fires a workflow execution when a Kibana Security case changes status.
 
 ### Shared Connector
@@ -169,6 +173,8 @@ The trigger emits the full case details including id, title, status, severity, v
 
 ## On Document Indexed
 
+**Trigger key:** `elastic.onDocumentIndexed`
+
 The On Document Indexed trigger starts a workflow execution when a new document is indexed into an Elasticsearch index.
 
 ### Shared Connector
@@ -225,6 +231,8 @@ The webhook acts as a signal. When it fires, SuperPlane queries Elasticsearch fo
 
 ## Create Case
 
+**Component key:** `elastic.createCase`
+
 The Create Case component opens a new case in Kibana Security.
 
 ### Configuration
@@ -265,6 +273,8 @@ The component emits an event containing:
 <a id="get-case"></a>
 
 ## Get Case
+
+**Component key:** `elastic.getCase`
 
 The Get Case component retrieves an existing case from Kibana Security by its ID.
 
@@ -312,6 +322,8 @@ The component emits an event containing:
 
 ## Get Document
 
+**Component key:** `elastic.getDocument`
+
 The Get Document component retrieves a JSON document from an Elasticsearch index by its ID.
 
 ### Configuration
@@ -348,6 +360,8 @@ The component emits an event containing:
 <a id="index-document"></a>
 
 ## Index Document
+
+**Component key:** `elastic.indexDocument`
 
 The Index Document component writes a JSON document to an Elasticsearch index.
 
@@ -390,6 +404,8 @@ The component emits an event containing:
 
 ## Update Case
 
+**Component key:** `elastic.updateCase`
+
 The Update Case component applies a partial update to an existing Kibana Security case.
 
 ### Configuration
@@ -431,6 +447,8 @@ The component emits an event containing:
 <a id="update-document"></a>
 
 ## Update Document
+
+**Component key:** `elastic.updateDocument`
 
 The Update Document component applies a partial update to an existing document in an Elasticsearch index.
 
