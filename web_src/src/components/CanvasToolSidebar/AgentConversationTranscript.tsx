@@ -263,12 +263,16 @@ function truncateQuestion(question: string): string {
 }
 
 function ToolGroupRow({ messages }: { messages: AgentMessage[] }) {
-  const [expanded, setExpanded] = useState(true);
   const hasRunning = messages.some((message) => message.toolStatus === "started");
+  const [expanded, setExpanded] = useState(hasRunning);
   const count = messages.length;
   const label = hasRunning
     ? `Running command${count > 1 ? ` (${count})` : ""}...`
     : `Ran ${count} command${count !== 1 ? "s" : ""}`;
+
+  useEffect(() => {
+    setExpanded(hasRunning);
+  }, [hasRunning]);
 
   return (
     <div className={cn("py-1 text-xs", hasRunning && "animate-tool-glow")} data-testid="agent-tool-group">

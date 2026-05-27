@@ -43,6 +43,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Schedule
 
+**Trigger key:** `schedule`
+
 The Schedule trigger starts workflow executions automatically based on a configured schedule.
 
 ### Use Cases
@@ -109,6 +111,8 @@ Each scheduled execution includes calendar information:
 
 ## Manual Run
 
+**Trigger key:** `start`
+
 The Manual Run trigger allows you to start workflow executions manually from the SuperPlane UI or CLI.
 
 ### Use Cases
@@ -151,6 +155,8 @@ Manual runs emit an event with type `manual.run`. The data is either the templat
 <a id="webhook"></a>
 
 ## Webhook
+
+**Trigger key:** `webhook`
 
 The Webhook trigger starts a new workflow execution when an HTTP request is received at the generated webhook URL.
 
@@ -215,6 +221,8 @@ Send a POST request to the webhook URL with your payload. The workflow will rece
 
 ## Add Memory
 
+**Component key:** `addMemory`
+
 The Add Memory component appends one or more items to canvas-level memory storage.
 
 ### Use Cases
@@ -259,6 +267,8 @@ A single `memory.added` event is emitted with all written rows and the total `co
 <a id="approval"></a>
 
 ## Approval
+
+**Component key:** `approval`
 
 The Approval component pauses workflow execution and waits for manual approval from specified users, groups, or roles before continuing.
 
@@ -328,6 +338,8 @@ The Approval component pauses workflow execution and waits for manual approval f
 
 ## Delete Memory
 
+**Component key:** `deleteMemory`
+
 The Delete Memory component removes memory rows from canvas-level memory storage.
 
 ### Use Cases
@@ -376,6 +388,8 @@ The Delete Memory component removes memory rows from canvas-level memory storage
 
 ## Display
 
+**Component key:** `display`
+
 The Display component displays a debug message from the latest execution.
 
 ### Use Cases
@@ -399,6 +413,8 @@ The Display component displays a debug message from the latest execution.
 <a id="filter"></a>
 
 ## Filter
+
+**Component key:** `filter`
 
 The Filter component evaluates a boolean expression against incoming events and only forwards events that match the condition.
 
@@ -441,6 +457,8 @@ The expression has access to:
 <a id="graph-ql-request"></a>
 
 ## GraphQL Request
+
+**Component key:** `graphql`
 
 The GraphQL component runs a GraphQL document against a URL using the standard **GraphQL over HTTP** JSON body shape.
 
@@ -485,6 +503,8 @@ The GraphQL component runs a GraphQL document against a URL using the standard *
 <a id="http-request"></a>
 
 ## HTTP Request
+
+**Component key:** `http`
 
 The HTTP component allows you to make HTTP requests to external APIs and services as part of your workflow.
 
@@ -548,6 +568,8 @@ The component emits the response with:
 
 ## If
 
+**Component key:** `if`
+
 The If component evaluates a boolean expression and routes events to different output channels based on the result.
 
 ### Use Cases
@@ -594,6 +616,8 @@ The expression has access to:
 <a id="merge"></a>
 
 ## Merge
+
+**Component key:** `merge`
 
 The Merge component waits for events from all upstream nodes before forwarding a combined result downstream.
 
@@ -653,6 +677,8 @@ The Merge component waits for events from all upstream nodes before forwarding a
 
 ## No Operation
 
+**Component key:** `noop`
+
 The No Operation component is a pass-through component that forwards events to downstream nodes without any modification or processing.
 
 ### Use Cases
@@ -678,6 +704,8 @@ When executed, the No Operation component immediately emits the incoming event d
 <a id="read-memory"></a>
 
 ## Read Memory
+
+**Component key:** `readMemory`
 
 The Read Memory component looks up values from canvas-level memory storage.
 
@@ -728,6 +756,8 @@ The Read Memory component looks up values from canvas-level memory storage.
 
 ## Runner
 
+**Component key:** `runner`
+
 Runs shell commands on a fleet runner.
 
 ### Execution
@@ -770,6 +800,8 @@ If the completed broker task includes valid JSON in **result**, SuperPlane inclu
 <a id="send-email-notification"></a>
 
 ## Send Email Notification
+
+**Component key:** `sendEmail`
 
 The Send Email Notification component sends emails through the system's configured email provider (Resend or SMTP) without requiring a separate integration setup.
 
@@ -816,6 +848,8 @@ Emits the list of recipients and the subject to the default output channel.
 
 ## SSH Command
 
+**Component key:** `ssh`
+
 Run one or more commands on a remote host via SSH.
 
 ### Authentication
@@ -857,6 +891,8 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 
 ## Time Gate
 
+**Component key:** `timeGate`
+
 The Time Gate component delays event processing until the next valid day and time window, with optional excluded dates.
 
 ### Use Cases
@@ -893,6 +929,8 @@ The Time Gate component delays event processing until the next valid day and tim
 <a id="update-memory"></a>
 
 ## Update Memory
+
+**Component key:** `updateMemory`
 
 The Update Memory component updates matching rows in canvas-level memory storage.
 
@@ -955,6 +993,8 @@ The `matchList` is evaluated once (same matches for every iteration), while each
 <a id="upsert-memory"></a>
 
 ## Upsert Memory
+
+**Component key:** `upsertMemory`
 
 The Upsert Memory component updates matching rows in canvas-level memory storage, and creates a new row when no matches are found.
 
@@ -1026,6 +1066,8 @@ update the same matched rows. List mode is most useful for inserting multiple ro
 <a id="wait"></a>
 
 ## Wait
+
+**Component key:** `wait`
 
 The Wait component pauses workflow execution for a specified duration or until a specific time is reached.
 
