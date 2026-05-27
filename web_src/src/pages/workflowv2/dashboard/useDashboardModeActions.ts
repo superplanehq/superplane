@@ -55,7 +55,7 @@ export function useDashboardModeActions({
 
 function toDashboardSearchParams(current: URLSearchParams): URLSearchParams {
   const next = new URLSearchParams(current);
-  next.set("view", "dashboard");
+  next.set("view", "console");
   next.delete("run");
   next.delete("sidebar");
   next.delete("node");
