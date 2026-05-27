@@ -53,8 +53,8 @@ func (s *Start) Documentation() string {
 Each Manual Run trigger exposes a list of templates. A template has:
 
 - ` + "`name`" + ` (required): a label used as the run target (and the event channel)
-- ` + "`payload`" + ` (required): a default JSON object emitted when the template is used. Supports expressions such as ` + "`{{ now() }}`" + ` in JSON values.
-- ` + "`parameters`" + ` (optional): a list of typed parameters for UI display
+- ` + "`parameters`" + ` (optional): a list of typed parameters exposed to payload expressions as ` + "`parameters[\"name\"]`" + ` and used by the run form
+- ` + "`payload`" + ` (required): a default JSON object emitted when the template is used. Supports expressions such as ` + "`{{ now() }}`" + ` and ` + "`{{ parameters[\"my parameter\"] }}`" + ` in JSON values.
 
 Each parameter has a ` + "`name`" + ` (plain text), required ` + "`type`" + ` (` + "`string`" + `, ` + "`number`" + `, or ` + "`boolean`" + `), and an optional default (` + "`defaultString`" + `, ` + "`defaultNumber`" + `, or ` + "`defaultBoolean`" + `) whose editor matches the selected type.
 
@@ -171,7 +171,7 @@ func (s *Start) Configuration() []configuration.Field {
 								Label:       "Payload",
 								Type:        configuration.FieldTypeObject,
 								Required:    true,
-								Description: "JSON object emitted when the template runs. Supports expressions such as {{ now() }} in field values.",
+								Description: "JSON object emitted when the template runs. Supports expressions such as {{ now() }} and {{ parameters[\"my parameter\"] }} in field values.",
 								Placeholder: `{
   "message": "Hello, World!"
 }`,

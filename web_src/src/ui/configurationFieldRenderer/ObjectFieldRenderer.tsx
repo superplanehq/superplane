@@ -47,6 +47,7 @@ export const ObjectFieldRenderer: React.FC<FieldRendererProps> = ({
   const { handleEditorMount } = useMonacoExpressionAutocomplete({
     autocompleteExampleObj,
     languageId: "json",
+    includeTopLevelGlobals: field.name === "payload",
   });
 
   const objectOptions = field.typeOptions?.object;

@@ -163,6 +163,9 @@ func (w *NodeRequestWorker) invokeTriggerHook(tx *gorm.DB, request *models.Canva
 
 	resolvedConfiguration, err := contexts.NewNodeConfigurationBuilder(tx, node.WorkflowID).
 		WithNodeID(node.NodeID).
+		WithExpressionVariables(map[string]any{
+			"parameters": spec.InvokeAction.Parameters,
+		}).
 		WithConfigurationFields(hookProvider.Configuration()).
 		Build(node.Configuration.Data())
 	if err != nil {
