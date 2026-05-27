@@ -484,7 +484,7 @@ func (e *CanvasNodeExecution) PassInTransaction(tx *gorm.DB, channelOutputs map[
 				WorkflowID:  e.WorkflowID,
 				NodeID:      e.NodeID,
 				Channel:     channel,
-				Data:        datatypes.NewJSONType(event),
+				Data:        NewJSONValue(event),
 				ExecutionID: &e.ID,
 				RunID:       e.RunID,
 				State:       CanvasEventStatePending,

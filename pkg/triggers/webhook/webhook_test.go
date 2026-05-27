@@ -3,6 +3,7 @@ package webhook
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -219,6 +220,35 @@ func Test__Webhook__HandleWebhook(t *testing.T) {
 		require.True(t, ok)
 		require.Contains(t, data, "body")
 		require.Contains(t, data, "headers")
+	})
+
+	t.Run("preserves JSON number tokens", func(t *testing.T) {
+		webhook := &Webhook{}
+		body := []byte(`{"plain":14000000,"large":12345678901234567890,"small":0.0000001}`)
+		ctx, eventCtx := webhookRequestContext(body, "none", "secret")
+
+		status, _, err := webhook.HandleWebhook(ctx)
+		require.Equal(t, http.StatusOK, status)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, eventCtx.Count())
+		data, ok := eventCtx.Payloads[0].Data.(map[string]any)
+		require.True(t, ok)
+
+		payload, ok := data["body"].(map[string]any)
+		require.True(t, ok)
+
+		plain, ok := payload["plain"].(json.Number)
+		require.True(t, ok)
+		require.Equal(t, "14000000", plain.String())
+
+		large, ok := payload["large"].(json.Number)
+		require.True(t, ok)
+		require.Equal(t, "12345678901234567890", large.String())
+
+		small, ok := payload["small"].(json.Number)
+		require.True(t, ok)
+		require.Equal(t, "0.0000001", small.String())
 	})
 
 	t.Run("accepts valid signature on configured header e.g. GitHub", func(t *testing.T) {
