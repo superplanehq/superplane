@@ -45,7 +45,7 @@ func main() {
 	// (same broker URL + token across all pools in this FM process).
 	var sharedBroker *brokerclient.Client
 	if hasDynamicPool(cfg) {
-		sharedBroker = brokerclient.New(cfg.TaskBrokerURL, cfg.RunnerAuthToken)
+		sharedBroker = brokerclient.New(cfg.TaskBrokerURL, cfg.TaskBrokerAuthToken)
 	}
 	launchers := make([]*ec2provision.Launcher, 0, len(cfg.Pools))
 	for _, p := range cfg.Pools {

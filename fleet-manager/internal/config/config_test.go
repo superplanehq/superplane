@@ -13,7 +13,7 @@ func validConfigJSON() string {
 	return `{
 		"aws_region": "us-east-1",
 		"task_broker_url": "http://broker.internal:8081",
-		"runner_auth_token": "broker-bearer-token",
+		"task_broker_auth_token": "broker-bearer-token",
 		"listen_addr": ":8080",
 		"auth_token": "",
 		"diagnostics_token": "fleet-admin-token",

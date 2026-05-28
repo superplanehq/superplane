@@ -75,7 +75,7 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 if docker info >/dev/null 2>&1; then DOCKER=(docker); else DOCKER=(sudo docker); fi
 
-# Config file holds the runner_auth_token etc. — keep it tight.
+# Config file holds the task_broker_auth_token etc. — keep it tight.
 chmod 600 "$REMOTE_CONFIG_PATH" 2>/dev/null || true
 
 "${DOCKER[@]}" pull "$IMAGE"

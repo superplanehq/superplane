@@ -1,7 +1,7 @@
 {
   "aws_region": "us-east-1",
   "task_broker_url": "http://broker.internal:8081",
-  "runner_auth_token": "CHANGEME_SAME_AS_BROKER_AUTH_TOKEN",
+  "task_broker_auth_token": "CHANGEME_SAME_AS_BROKER_AUTH_TOKEN",
 
   "listen_addr": ":8080",
   "auth_token": "",
