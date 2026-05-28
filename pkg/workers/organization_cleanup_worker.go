@@ -11,6 +11,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/git"
 	"github.com/superplanehq/superplane/pkg/models"
 )
 
@@ -20,11 +21,11 @@ type OrganizationCleanupWorker struct {
 	canvasWorker *CanvasCleanupWorker
 }
 
-func NewOrganizationCleanupWorker(providers ...agents.Provider) *OrganizationCleanupWorker {
+func NewOrganizationCleanupWorker(canvasStorage git.Provider, providers ...agents.Provider) *OrganizationCleanupWorker {
 	return &OrganizationCleanupWorker{
 		semaphore:    semaphore.NewWeighted(10),
 		logger:       log.WithFields(log.Fields{"worker": "OrganizationCleanupWorker"}),
-		canvasWorker: NewCanvasCleanupWorker(providers...),
+		canvasWorker: NewCanvasCleanupWorker(canvasStorage, providers...),
 	}
 }
 
@@ -71,6 +72,7 @@ func (w *OrganizationCleanupWorker) LockAndProcessOrganization(organization mode
 	}
 
 	var sessionsToClean []models.AgentSession
+	var repositoriesToClean []*models.CanvasRepository
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
 		lockedOrganization, err := models.LockDeletedOrganization(tx, organization.ID)
 		if err != nil {
@@ -78,12 +80,13 @@ func (w *OrganizationCleanupWorker) LockAndProcessOrganization(organization mode
 			return nil
 		}
 
-		sessions, err := w.processOrganization(tx, *lockedOrganization)
+		sessions, repositories, err := w.processOrganization(tx, *lockedOrganization)
 		if err != nil {
 			return err
 		}
 
 		sessionsToClean = sessions
+		repositoriesToClean = repositories
 		return nil
 	})
 	if err != nil {
@@ -91,54 +94,61 @@ func (w *OrganizationCleanupWorker) LockAndProcessOrganization(organization mode
 	}
 
 	w.canvasWorker.cleanupProviderSessions(context.Background(), sessionsToClean)
+	for _, repository := range repositoriesToClean {
+		w.canvasWorker.cleanupCanvasRepository(context.Background(), repository)
+	}
 	return nil
 }
 
-func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, organization models.Organization) ([]models.AgentSession, error) {
+func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, organization models.Organization) ([]models.AgentSession, []*models.CanvasRepository, error) {
 	if !organization.DeletedAt.Valid {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	canvases, err := models.ListMaybeDeletedCanvasesByOrganizationInTransaction(tx, organization.ID)
 	if err != nil {
-		return nil, fmt.Errorf("list organization canvases: %w", err)
+		return nil, nil, fmt.Errorf("list organization canvases: %w", err)
 	}
 
 	var sessionsToClean []models.AgentSession
+	var repositoriesToClean []*models.CanvasRepository
 	for _, canvas := range canvases {
 		if !canvas.DeletedAt.Valid {
 			if err := canvas.SoftDeleteInTransaction(tx); err != nil {
-				return nil, fmt.Errorf("soft delete canvas %s: %w", canvas.ID, err)
+				return nil, nil, fmt.Errorf("soft delete canvas %s: %w", canvas.ID, err)
 			}
 
 			canvasInDB, err := models.FindUnscopedCanvasInTransaction(tx, canvas.ID)
 			if err != nil {
-				return nil, fmt.Errorf("reload soft-deleted canvas %s: %w", canvas.ID, err)
+				return nil, nil, fmt.Errorf("reload soft-deleted canvas %s: %w", canvas.ID, err)
 			}
 
 			canvas = *canvasInDB
 		}
 
-		sessions, err := w.canvasWorker.processCanvas(tx, canvas)
+		sessions, repository, err := w.canvasWorker.processCanvas(tx, canvas)
 		if err != nil {
-			return nil, fmt.Errorf("process canvas %s: %w", canvas.ID, err)
+			return nil, nil, fmt.Errorf("process canvas %s: %w", canvas.ID, err)
 		}
 		sessionsToClean = append(sessionsToClean, sessions...)
+		if repository != nil {
+			repositoriesToClean = append(repositoriesToClean, repository)
+		}
 	}
 
 	var remainingCanvases int64
 	err = tx.Unscoped().Model(&models.Canvas{}).Where("organization_id = ?", organization.ID).Count(&remainingCanvases).Error
 	if err != nil {
-		return nil, fmt.Errorf("count remaining canvases: %w", err)
+		return nil, nil, fmt.Errorf("count remaining canvases: %w", err)
 	}
 
 	if remainingCanvases > 0 {
-		return sessionsToClean, nil
+		return sessionsToClean, repositoriesToClean, nil
 	}
 
 	integrations, err := models.ListMaybeDeletedIntegrationsByOrganizationInTransaction(tx, organization.ID)
 	if err != nil {
-		return nil, fmt.Errorf("list organization integrations: %w", err)
+		return nil, nil, fmt.Errorf("list organization integrations: %w", err)
 	}
 
 	for _, integration := range integrations {
@@ -148,60 +158,60 @@ func (w *OrganizationCleanupWorker) processOrganization(tx *gorm.DB, organizatio
 
 		webhooks, err := models.ListIntegrationWebhooks(tx, integration.ID)
 		if err != nil {
-			return nil, fmt.Errorf("list integration webhooks for %s: %w", integration.ID, err)
+			return nil, nil, fmt.Errorf("list integration webhooks for %s: %w", integration.ID, err)
 		}
 
 		for _, webhook := range webhooks {
 			if err := tx.Delete(&webhook).Error; err != nil {
-				return nil, fmt.Errorf("soft delete webhook %s: %w", webhook.ID, err)
+				return nil, nil, fmt.Errorf("soft delete webhook %s: %w", webhook.ID, err)
 			}
 		}
 
 		if err := integration.SoftDeleteInTransaction(tx); err != nil {
-			return nil, fmt.Errorf("soft delete integration %s: %w", integration.ID, err)
+			return nil, nil, fmt.Errorf("soft delete integration %s: %w", integration.ID, err)
 		}
 	}
 
 	var remainingIntegrations int64
 	err = tx.Unscoped().Model(&models.Integration{}).Where("organization_id = ?", organization.ID).Count(&remainingIntegrations).Error
 	if err != nil {
-		return nil, fmt.Errorf("count remaining integrations: %w", err)
+		return nil, nil, fmt.Errorf("count remaining integrations: %w", err)
 	}
 
 	if remainingIntegrations > 0 {
-		return sessionsToClean, nil
+		return sessionsToClean, repositoriesToClean, nil
 	}
 
 	organizationSessions, err := models.ListAgentSessionsForOrganizationInTransaction(tx, organization.ID)
 	if err != nil {
-		return nil, fmt.Errorf("list organization agent sessions: %w", err)
+		return nil, nil, fmt.Errorf("list organization agent sessions: %w", err)
 	}
 	sessionsToClean = append(sessionsToClean, organizationSessions...)
 
 	if err := models.DeleteAgentSessionsForOrganizationInTransaction(tx, organization.ID); err != nil {
-		return nil, fmt.Errorf("delete organization agent sessions: %w", err)
+		return nil, nil, fmt.Errorf("delete organization agent sessions: %w", err)
 	}
 
 	if err := models.DeleteMetadataForOrganization(tx, models.DomainTypeOrganization, organization.ID.String()); err != nil {
-		return nil, fmt.Errorf("delete organization role metadata: %w", err)
+		return nil, nil, fmt.Errorf("delete organization role metadata: %w", err)
 	}
 
 	if err := tx.Where("organization_id = ?", organization.ID).Delete(&models.Blueprint{}).Error; err != nil {
-		return nil, fmt.Errorf("delete organization blueprints: %w", err)
+		return nil, nil, fmt.Errorf("delete organization blueprints: %w", err)
 	}
 
 	if err := tx.Where("domain_type = ?", models.DomainTypeOrganization).Where("domain_id = ?", organization.ID).Delete(&models.Secret{}).Error; err != nil {
-		return nil, fmt.Errorf("delete organization secrets: %w", err)
+		return nil, nil, fmt.Errorf("delete organization secrets: %w", err)
 	}
 
 	if err := tx.Unscoped().Where("organization_id = ?", organization.ID).Delete(&models.User{}).Error; err != nil {
-		return nil, fmt.Errorf("delete organization users: %w", err)
+		return nil, nil, fmt.Errorf("delete organization users: %w", err)
 	}
 
 	if err := tx.Unscoped().Delete(&organization).Error; err != nil {
-		return nil, fmt.Errorf("hard delete organization: %w", err)
+		return nil, nil, fmt.Errorf("hard delete organization: %w", err)
 	}
 
 	w.logger.Infof("Successfully cleaned up organization %s", organization.ID)
-	return sessionsToClean, nil
+	return sessionsToClean, repositoriesToClean, nil
 }

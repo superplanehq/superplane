@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/git"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -97,6 +98,11 @@ func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.S
 func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization, agentProvider agents.Provider) {
 	log.Println("Starting Workers")
 
+	canvasStorage, err := git.NewProvider(config.LoadCanvasStorageConfig())
+	if err != nil {
+		log.Fatalf("failed to initialize canvas storage for cleanup worker: %v", err)
+	}
+
 	rabbitMQURL, err := config.RabbitMQURL()
 	if err != nil {
 		panic(err)
@@ -172,14 +178,14 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" || os.Getenv("START_CANVAS_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Canvas Cleanup Worker")
 
-		w := workers.NewCanvasCleanupWorker(agentProvider)
+		w := workers.NewCanvasCleanupWorker(canvasStorage, agentProvider)
 		go w.Start(context.Background())
 	}
 
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 
-		w := workers.NewOrganizationCleanupWorker(agentProvider)
+		w := workers.NewOrganizationCleanupWorker(canvasStorage, agentProvider)
 		go w.Start(context.Background())
 	}
 

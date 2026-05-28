@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"errors"
+	"io"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/agents"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/git"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
 	"gorm.io/datatypes"
@@ -47,6 +49,36 @@ func (p *cleanupProvider) StreamEvents(context.Context, string, func(agents.Prov
 func (p *cleanupProvider) DeleteSession(_ context.Context, providerSessionID string) error {
 	p.deleted = append(p.deleted, providerSessionID)
 	return p.err
+}
+
+type canvasRepositoryCleaner struct {
+	deleted []string
+	err     error
+}
+
+func (c *canvasRepositoryCleaner) CreateRepository(context.Context, git.RepositorySpec) (*git.Repository, error) {
+	return nil, errors.New("not used")
+}
+
+func (c *canvasRepositoryCleaner) DeleteRepository(_ context.Context, ref git.RepositoryRef) error {
+	c.deleted = append(c.deleted, ref.RepoID)
+	return c.err
+}
+
+func (c *canvasRepositoryCleaner) ListFiles(context.Context, git.RepositoryRef, git.ListFilesOptions) (*git.ListFilesResult, error) {
+	return nil, errors.New("not used")
+}
+
+func (c *canvasRepositoryCleaner) GetFile(context.Context, git.RepositoryRef, git.GetFileOptions) (io.ReadCloser, error) {
+	return nil, errors.New("not used")
+}
+
+func (c *canvasRepositoryCleaner) Commit(context.Context, git.RepositoryRef, git.CommitOptions) (*git.CommitResult, error) {
+	return nil, errors.New("not used")
+}
+
+func (c *canvasRepositoryCleaner) Head(context.Context, git.RepositoryRef, string) (string, error) {
+	return "", errors.New("not used")
 }
 
 func createAgentSessionWithMessage(t *testing.T, organizationID, userID, canvasID uuid.UUID) *models.AgentSession {
@@ -96,7 +128,7 @@ func Test__CanvasCleanupWorker_ProcessesDeletedWorkflow(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	cleaner := &cleanupProvider{}
-	worker := NewCanvasCleanupWorker(cleaner)
+	worker := NewCanvasCleanupWorker(nil, cleaner)
 
 	//
 	// Create a canvas with nodes, events, executions, and queue items
@@ -247,7 +279,7 @@ func Test__CanvasCleanupWorker_ProviderCleanupFailureDoesNotBlockDatabaseCleanup
 	defer r.Close()
 
 	cleaner := &cleanupProvider{err: errors.New("provider unavailable")}
-	worker := NewCanvasCleanupWorker(cleaner)
+	worker := NewCanvasCleanupWorker(nil, cleaner)
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 	session := createAgentSessionWithMessage(t, r.Organization.ID, r.User, canvas.ID)
 
@@ -267,10 +299,76 @@ func Test__CanvasCleanupWorker_ProviderCleanupFailureDoesNotBlockDatabaseCleanup
 	assert.Contains(t, cleaner.deleted, session.ProviderSessionID)
 }
 
+func Test__CanvasCleanupWorker_DeletesCanvasRepositoryAfterDatabaseCleanup(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	storageCleaner := &canvasRepositoryCleaner{}
+	worker := NewCanvasCleanupWorker(storageCleaner)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+	repoID := git.CanvasRepoID(r.Organization.ID, canvas.ID)
+	require.NoError(t, database.Conn().Create(&models.CanvasRepository{
+		CanvasID:       canvas.ID,
+		OrganizationID: r.Organization.ID,
+		Provider:       models.CanvasRepositoryProviderSupergit,
+		RepoID:         repoID,
+		Status:         models.CanvasRepositoryStatusReady,
+	}).Error)
+
+	require.NoError(t, canvas.SoftDelete())
+	deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("deleted_at", deletedAtOutsideGracePeriod).Error)
+
+	deletedCanvas, err := models.FindUnscopedCanvas(canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, worker.LockAndProcessCanvas(*deletedCanvas))
+
+	var canvasCount int64
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Count(&canvasCount).Error)
+	assert.Equal(t, int64(0), canvasCount)
+
+	var repositoryCount int64
+	require.NoError(t, database.Conn().Model(&models.CanvasRepository{}).Where("canvas_id = ?", canvas.ID).Count(&repositoryCount).Error)
+	assert.Equal(t, int64(0), repositoryCount)
+	assert.Contains(t, storageCleaner.deleted, repoID)
+}
+
+func Test__CanvasCleanupWorker_RepositoryCleanupFailureDoesNotBlockDatabaseCleanup(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+
+	storageCleaner := &canvasRepositoryCleaner{err: errors.New("storage unavailable")}
+	worker := NewCanvasCleanupWorker(storageCleaner)
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+	repoID := git.CanvasRepoID(r.Organization.ID, canvas.ID)
+	require.NoError(t, database.Conn().Create(&models.CanvasRepository{
+		CanvasID:       canvas.ID,
+		OrganizationID: r.Organization.ID,
+		Provider:       models.CanvasRepositoryProviderSupergit,
+		RepoID:         repoID,
+		Status:         models.CanvasRepositoryStatusReady,
+	}).Error)
+
+	require.NoError(t, canvas.SoftDelete())
+	deletedAtOutsideGracePeriod := time.Now().AddDate(0, 0, -31)
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Update("deleted_at", deletedAtOutsideGracePeriod).Error)
+
+	deletedCanvas, err := models.FindUnscopedCanvas(canvas.ID)
+	require.NoError(t, err)
+	require.NoError(t, worker.LockAndProcessCanvas(*deletedCanvas))
+
+	var canvasCount int64
+	require.NoError(t, database.Conn().Unscoped().Model(&models.Canvas{}).Where("id = ?", canvas.ID).Count(&canvasCount).Error)
+	assert.Equal(t, int64(0), canvasCount)
+	assert.Contains(t, storageCleaner.deleted, repoID)
+}
+
 func Test__CanvasCleanupWorker_ProcessesWorkflowFromSoftDeletedOrganization(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewCanvasCleanupWorker()
+	worker := NewCanvasCleanupWorker(nil)
 
 	canvas, _ := support.CreateCanvas(
 		t,
@@ -349,7 +447,7 @@ func Test__CanvasCleanupWorker_ProcessesWorkflowFromSoftDeletedOrganization(t *t
 func Test__CanvasCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewCanvasCleanupWorker()
+	worker := NewCanvasCleanupWorker(nil)
 
 	//
 	// Create webhook
@@ -433,7 +531,7 @@ func Test__CanvasCleanupWorker_ProcessesWorkflowWithWebhook(t *testing.T) {
 func Test__CanvasCleanupWorker_HandlesEmptyWorkflow(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewCanvasCleanupWorker()
+	worker := NewCanvasCleanupWorker(nil)
 
 	//
 	// Create a minimal canvas with no nodes, events, etc.
@@ -524,12 +622,12 @@ func Test__CanvasCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	results := make(chan error, 2)
 
 	go func() {
-		worker1 := NewCanvasCleanupWorker()
+		worker1 := NewCanvasCleanupWorker(nil)
 		results <- worker1.LockAndProcessCanvas(*deletedCanvas)
 	}()
 
 	go func() {
-		worker2 := NewCanvasCleanupWorker()
+		worker2 := NewCanvasCleanupWorker(nil)
 		results <- worker2.LockAndProcessCanvas(*deletedCanvas)
 	}()
 
@@ -542,7 +640,7 @@ func Test__CanvasCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 	// Process remaining work until fully cleaned up
 	maxAttempts := 10
 	for i := 0; i < maxAttempts; i++ {
-		worker := NewCanvasCleanupWorker()
+		worker := NewCanvasCleanupWorker(nil)
 		err := worker.LockAndProcessCanvas(*deletedCanvas)
 		require.NoError(t, err)
 
@@ -569,7 +667,7 @@ func Test__CanvasCleanupWorker_HandlesConcurrentProcessing(t *testing.T) {
 func Test__CanvasCleanupWorker_IgnoresNonDeletedWorkflows(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
-	worker := NewCanvasCleanupWorker()
+	worker := NewCanvasCleanupWorker(nil)
 
 	//
 	// Create a normal (non-deleted) canvas
