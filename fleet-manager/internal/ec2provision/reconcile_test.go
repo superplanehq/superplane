@@ -3,6 +3,7 @@ package ec2provision
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"testing"
 
 	"github.com/superplane/runner/shared/api"
@@ -88,5 +89,38 @@ func TestDesiredWant_OnlyQueued_PrewarmsForBurst(t *testing.T) {
 	}
 	if got := l.desiredWant(context.Background()); got != 7 {
 		t.Fatalf("want 7 (5 queued + 0 claimed + 2 headroom), got %d", got)
+	}
+}
+
+func TestTickAll_TicksEveryLauncherInOrder(t *testing.T) {
+	// Multi-pool guarantee: one tick visits every launcher exactly once, preserving
+	// the order in the input slice. Spy replaces reconcileLauncher to avoid EC2.
+	var seen []string
+	spy := func(_ context.Context, _ *slog.Logger, l *Launcher) {
+		seen = append(seen, l.Config.RunnerFleetID)
+	}
+	launchers := []*Launcher{
+		{Config: Config{RunnerFleetID: "aws-amd64"}},
+		{Config: Config{RunnerFleetID: "aws-arm64"}},
+		{Config: Config{RunnerFleetID: "aws-gpu"}},
+	}
+
+	tickAll(context.Background(), nil, launchers, spy)
+
+	if len(seen) != 3 {
+		t.Fatalf("expected 3 ticks, got %d (%v)", len(seen), seen)
+	}
+	if seen[0] != "aws-amd64" || seen[1] != "aws-arm64" || seen[2] != "aws-gpu" {
+		t.Errorf("tick order = %v, want [aws-amd64 aws-arm64 aws-gpu]", seen)
+	}
+}
+
+func TestTickAll_EmptyLauncherSliceIsNoOp(t *testing.T) {
+	called := 0
+	spy := func(_ context.Context, _ *slog.Logger, _ *Launcher) { called++ }
+	tickAll(context.Background(), nil, nil, spy)
+	tickAll(context.Background(), nil, []*Launcher{}, spy)
+	if called != 0 {
+		t.Errorf("expected 0 ticks, got %d", called)
 	}
 }

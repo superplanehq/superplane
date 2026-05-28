@@ -33,18 +33,22 @@ func main() {
 			log.Error("ec2 provision init", slog.Any("err", err))
 			os.Exit(1)
 		}
-		srv.EC2Launcher = launcher
 		if ecCfg.Headroom > 0 {
 			launcher.BrokerClient = brokerclient.New(ecCfg.TaskBrokerURL, ecCfg.RunnersAuthToken)
 		}
+		// Single-pool today: slice of one. Multi-pool wires more launchers here once the
+		// JSON config (FM_CONFIG_FILE) replaces ConfigFromEnv.
+		launchers := []*ec2provision.Launcher{launcher}
+		srv.EC2Launchers = launchers
 		reconcileEvery := 60 * time.Second
 		if v := getenv("EC2_PROVISION_RECONCILE_INTERVAL_SEC", ""); v != "" {
 			if n, err := strconv.Atoi(v); err == nil && n >= 15 {
 				reconcileEvery = time.Duration(n) * time.Second
 			}
 		}
-		go ec2provision.RunReconcileLoop(ctx, log, reconcileEvery, launcher)
+		go ec2provision.RunReconcileLoop(ctx, log, reconcileEvery, launchers)
 		log.Info("ec2 hot runner pool enabled",
+			slog.Int("pools", len(launchers)),
 			slog.Int("hot_instance_count", ecCfg.HotInstanceCount),
 			slog.Int("runner_headroom", ecCfg.Headroom),
 			slog.Bool("dynamic_scaling", ecCfg.Headroom > 0),

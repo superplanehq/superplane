@@ -10,8 +10,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 )
 
-// ManagedRunnerSummary is a minimal row for admin listing.
+// ManagedRunnerSummary is a minimal row for admin listing. FleetID is stamped by the
+// listing Launcher so callers aggregating across pools can tell rows apart.
 type ManagedRunnerSummary struct {
+	FleetID    string `json:"fleet_id"`
 	InstanceID string `json:"instance_id"`
 	State      string `json:"state"`
 	PrivateIP  string `json:"private_ip,omitempty"`
@@ -34,6 +36,7 @@ func (l *Launcher) ListManagedRunners(ctx context.Context) ([]ManagedRunnerSumma
 		for _, rv := range page.Reservations {
 			for _, inst := range rv.Instances {
 				s := ManagedRunnerSummary{
+					FleetID:    l.Config.RunnerFleetID,
 					InstanceID: aws.ToString(inst.InstanceId),
 					State:      string(inst.State.Name),
 				}

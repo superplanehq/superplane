@@ -16,35 +16,51 @@ type instanceSnap struct {
 	launchUTC time.Time
 }
 
-// RunReconcileLoop periodically reconciles managed instances toward a target.
-// Target is dynamic when Config.Headroom > 0 (want = queued + claimed + headroom,
-// pulled from task-broker) and falls back to Config.HotInstanceCount when headroom
-// is unset or the broker call fails.
-func RunReconcileLoop(ctx context.Context, log *slog.Logger, interval time.Duration, l *Launcher) {
+// RunReconcileLoop periodically reconciles every launcher's pool toward its target.
+// Each tick walks `launchers` serially; a per-launcher failure is logged and skipped so
+// one pool's broker / EC2 hiccup cannot stall reconciles for the other pools. Each
+// launcher's target is dynamic when its Config.Headroom > 0 (want = queued + claimed +
+// headroom, pulled from task-broker) and falls back to HotInstanceCount on broker
+// failure (see desiredWant).
+func RunReconcileLoop(ctx context.Context, log *slog.Logger, interval time.Duration, launchers []*Launcher) {
 	if interval <= 0 {
 		return
 	}
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	tick := func() {
-		runCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
-		want := l.desiredWant(runCtx)
-		err := l.Reconcile(runCtx, want)
-		cancel()
-		if err != nil && log != nil {
-			log.Warn("ec2 reconcile", slog.Any("err", err), slog.Int("want", want))
-		}
-	}
-	tick()
+	tickAll(ctx, log, launchers, reconcileLauncher)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			tick()
+			tickAll(ctx, log, launchers, reconcileLauncher)
 		}
+	}
+}
+
+// tickAll runs `tick` against every launcher serially. Extracted so tests can inject a
+// spy in place of reconcileLauncher and assert iteration order/coverage without standing
+// up an EC2 client.
+func tickAll(ctx context.Context, log *slog.Logger, launchers []*Launcher, tick func(context.Context, *slog.Logger, *Launcher)) {
+	for _, l := range launchers {
+		tick(ctx, log, l)
+	}
+}
+
+// reconcileLauncher is the default per-launcher tick: bounded-timeout desiredWant +
+// Reconcile, logging on failure with the owning fleet id for cross-pool diagnostics.
+func reconcileLauncher(ctx context.Context, log *slog.Logger, l *Launcher) {
+	runCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	want := l.desiredWant(runCtx)
+	if err := l.Reconcile(runCtx, want); err != nil && log != nil {
+		log.Warn("ec2 reconcile",
+			slog.String("fleet_id", l.Config.RunnerFleetID),
+			slog.Int("want", want),
+			slog.Any("err", err))
 	}
 }
 

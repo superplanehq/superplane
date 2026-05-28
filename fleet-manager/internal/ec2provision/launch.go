@@ -35,6 +35,12 @@ type Launcher struct {
 	BrokerClient TaskCountsClient
 }
 
+// FleetID returns the broker fleet id this launcher manages (the partition key used in
+// the superplane_fleet_id EC2 tag). Stable accessor so callers don't reach into Config.
+func (l *Launcher) FleetID() string {
+	return l.Config.RunnerFleetID
+}
+
 // Config is filled from EC2_PROVISION_* environment variables.
 type Config struct {
 	AMI              string
