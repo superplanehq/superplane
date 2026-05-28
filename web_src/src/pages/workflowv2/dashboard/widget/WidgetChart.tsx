@@ -63,8 +63,8 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
       const distinct = distinctSeriesKeys(sorted, seriesField);
       return distinct.map((key, idx) => ({
         ...valueSeries,
-        key: key === "" ? "(empty)" : key,
-        label: key === "" ? "(empty)" : key,
+        key,
+        label: key,
         color: DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
       }));
     }

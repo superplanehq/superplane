@@ -158,6 +158,19 @@ describe("buildChartData", () => {
     expect(data).toEqual([{ x: "2026-05-26", ec2: 15, s3: 1 }]);
   });
 
+  it("uses (empty) as the series key when seriesField is missing on a row", () => {
+    const rows = [
+      { date: "2026-05-26", service: "ec2", cost_usd: 10 },
+      { date: "2026-05-26", cost_usd: 3 },
+      { date: "2026-05-27", service: "ec2", cost_usd: 5 },
+    ];
+    const data = buildChartData(rows, "date", [{ key: "cost", field: "cost_usd" }], { seriesField: "service" });
+    expect(data).toEqual([
+      { x: "2026-05-26", ec2: 10, "(empty)": 3 },
+      { x: "2026-05-27", ec2: 5, "(empty)": 0 },
+    ]);
+  });
+
   it("counts rows per `(x, seriesField)` bucket when the value series omits `field`", () => {
     const rows = [
       { date: "2026-05-26", service: "ec2" },
@@ -179,9 +192,9 @@ describe("distinctSeriesKeys", () => {
     expect(distinctSeriesKeys(rows, "service")).toEqual(["ec2", "s3", "rds"]);
   });
 
-  it("uses the empty string for rows where the seriesField is missing", () => {
+  it("uses (empty) for rows where the seriesField is missing", () => {
     const rows = [{ service: "ec2" }, { other: 1 }, { service: "s3" }];
-    expect(distinctSeriesKeys(rows, "service")).toEqual(["ec2", "", "s3"]);
+    expect(distinctSeriesKeys(rows, "service")).toEqual(["ec2", "(empty)", "s3"]);
   });
 });
 

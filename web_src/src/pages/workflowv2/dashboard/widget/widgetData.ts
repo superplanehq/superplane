@@ -233,6 +233,13 @@ export function buildChartData(
   return orderedKeys.map((key) => buckets.get(key)!);
 }
 
+/** Object key used in pivoted chart rows when `seriesField` resolves empty. */
+export const EMPTY_PIVOTED_SERIES_KEY = "(empty)";
+
+function pivotedSeriesDataKey(raw: string): string {
+  return raw === "" ? EMPTY_PIVOTED_SERIES_KEY : raw;
+}
+
 function buildPivotedChartData(
   rows: unknown[],
   xResolver: ReturnType<typeof compileFieldResolver>,
@@ -248,7 +255,7 @@ function buildPivotedChartData(
   const buckets = new Map<string, Record<string, unknown>>();
   for (const row of rows) {
     const xKey = String(xResolver.resolve(row) ?? "");
-    const seriesKey = String(seriesResolver.resolve(row) ?? "");
+    const seriesKey = pivotedSeriesDataKey(String(seriesResolver.resolve(row) ?? ""));
     let entry = buckets.get(xKey);
     if (!entry) {
       entry = { x: xKey };
@@ -287,7 +294,7 @@ export function distinctSeriesKeys(rows: unknown[], seriesField: string): string
   const ordered: string[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
-    const key = String(resolver.resolve(row) ?? "");
+    const key = pivotedSeriesDataKey(String(resolver.resolve(row) ?? ""));
     if (!seen.has(key)) {
       seen.add(key);
       ordered.push(key);

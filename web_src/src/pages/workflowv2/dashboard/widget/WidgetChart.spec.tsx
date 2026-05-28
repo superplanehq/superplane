@@ -126,6 +126,24 @@ describe("WidgetChart bar variants", () => {
     const layers = container.querySelectorAll(".recharts-bar");
     expect(layers.length).toBe(3);
   });
+
+  it("renders a bar layer for rows with a missing seriesField value", () => {
+    const rows = [
+      { date: "2026-05-26", service: "ec2", cost_usd: 10 },
+      { date: "2026-05-26", cost_usd: 3 },
+    ];
+    const { container } = renderChart(
+      {
+        kind: "chart",
+        type: "bar",
+        xField: "date",
+        seriesField: "service",
+        series: [{ field: "cost_usd", label: "Cost" }],
+      },
+      { rows },
+    );
+    expect(container.querySelectorAll(".recharts-bar").length).toBe(2);
+  });
 });
 
 describe("WidgetChart legend visibility", () => {
