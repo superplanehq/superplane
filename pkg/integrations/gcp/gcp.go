@@ -163,6 +163,7 @@ func (g *GCP) Actions() []core.Action {
 	return []core.Action{
 		&compute.CreateVM{},
 		&compute.DeleteVMInstance{},
+		&compute.GetVMInstance{},
 		&cloudbuild.CreateBuild{},
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
