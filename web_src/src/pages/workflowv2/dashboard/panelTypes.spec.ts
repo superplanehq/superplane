@@ -49,7 +49,7 @@ describe("templateForPanelType", () => {
   });
 });
 
-describe("validatePanelContent", () => {
+describe("validatePanelContent — markdown and node", () => {
   it("accepts a valid markdown body", () => {
     expect(validatePanelContent("markdown", { body: "# Hi" })).toBeNull();
   });
@@ -63,7 +63,9 @@ describe("validatePanelContent", () => {
     expect(validatePanelContent("node", { node: "" })).toBeNull();
     expect(validatePanelContent("node", { node: "deploy-prod" })).toBeNull();
   });
+});
 
+describe("validatePanelContent — table", () => {
   it("requires a data source on table panels", () => {
     expect(validatePanelContent("table", {})).toMatch(/dataSource must be an object/);
   });
@@ -109,7 +111,9 @@ describe("validatePanelContent", () => {
     });
     expect(error).toMatch(/render\.rowActions\[0\]\.node/);
   });
+});
 
+describe("validatePanelContent — chart", () => {
   it("requires a known chart type", () => {
     const error = validatePanelContent("chart", {
       dataSource: { kind: "executions" },
@@ -154,7 +158,9 @@ describe("validatePanelContent", () => {
     });
     expect(error).toMatch(/render\.seriesField must be a string/);
   });
+});
 
+describe("validatePanelContent — number and data sources", () => {
   it("requires a known aggregation on number panels", () => {
     const error = validatePanelContent("number", {
       dataSource: { kind: "executions" },

@@ -12,7 +12,7 @@ import type { DashboardPanel } from "@/hooks/useCanvasData";
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { useDashboardContext, resolveDashboardNode, type DashboardNodeStatus } from "./DashboardContext";
-import { DASHBOARD_TRIGGER_NODE_EVENT } from "./dashboardEvents";
+import { confirmDashboardTriggerNode } from "./confirmDashboardTriggerNode";
 import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
 import type { NodePanelContent } from "./panelTypes";
 
@@ -148,7 +148,7 @@ function NodePanelRunControl({
         templateName={content.triggerName}
         onConfirm={async (parameters) => {
           if (!resolved?.node?.id) return;
-          confirmTriggerNode(ctx, resolved.node.id, content.triggerName, parameters);
+          confirmDashboardTriggerNode(ctx, resolved.node.id, content.triggerName, parameters);
         }}
         testId="node-panel-run-dialog"
       />
@@ -159,35 +159,6 @@ function NodePanelRunControl({
 function resolveStatus(ctx: ReturnType<typeof useDashboardContext>, nodeId: string | undefined): DashboardNodeStatus {
   if (!nodeId) return "unknown";
   return ctx?.nodeStatuses?.[nodeId] ?? "unknown";
-}
-
-/**
- * Fire the configured trigger after the user confirms in the run dialog.
- * Forwards the pre-built parameters object (already in the
- * `{ template, ...values }` shape that the backend expects) so the host
- * skips the default `mergeTriggerParameters` step it would normally apply
- * when no parameters are provided. Falls back to the legacy window event
- * when there is no live dashboard context.
- */
-function confirmTriggerNode(
-  ctx: ReturnType<typeof useDashboardContext>,
-  nodeId: string,
-  triggerName: string | undefined,
-  parameters: Record<string, unknown>,
-) {
-  if (ctx?.onTriggerNode) {
-    ctx.onTriggerNode(nodeId, {
-      hookName: "run",
-      templateName: triggerName,
-      parameters,
-    });
-    return;
-  }
-  window.dispatchEvent(
-    new CustomEvent(DASHBOARD_TRIGGER_NODE_EVENT, {
-      detail: { nodeId, triggerName, parameters },
-    }),
-  );
 }
 
 function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange: (next: NodePanelContent) => void }) {
