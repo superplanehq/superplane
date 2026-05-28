@@ -159,6 +159,7 @@ export interface CanvasPageProps {
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
+  onShowConsoleDiff?: () => void;
   onShowNodeDiff?: (nodeId: string) => void;
   visualDiffEnabled?: boolean;
   draftVisualDiff?: {
@@ -169,6 +170,9 @@ export interface CanvasPageProps {
       showEdgeDiff: boolean;
       toggleShowEdgeDiff: () => void;
     };
+  };
+  draftConsoleDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
   };
   onToggleVisualDiff?: () => void;
   publishVersionDisabled?: boolean;
@@ -197,6 +201,8 @@ export interface CanvasPageProps {
   onYamlOpen?: () => void;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
+  hasUnpublishedCanvasDraftChanges?: boolean;
+  hasUnpublishedConsoleDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   isAutoLayoutOnUpdateEnabled?: boolean;
@@ -1266,8 +1272,10 @@ function CanvasPage(props: CanvasPageProps) {
           onPublishVersion={props.onPublishVersion}
           onDiscardVersion={props.onDiscardVersion}
           onShowDiff={props.onShowDiff}
+          onShowConsoleDiff={props.onShowConsoleDiff}
           visualDiffEnabled={props.visualDiffEnabled}
           draftVisualDiff={props.draftVisualDiff}
+          draftConsoleDiff={props.draftConsoleDiff}
           onToggleVisualDiff={props.onToggleVisualDiff}
           publishVersionDisabled={props.publishVersionDisabled}
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
@@ -1287,6 +1295,8 @@ function CanvasPage(props: CanvasPageProps) {
           onSelectFiles={props.onSelectFiles}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
+          hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
+          hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
           onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
@@ -1785,8 +1795,10 @@ function CanvasContentHeader({
   onPublishVersion,
   onDiscardVersion,
   onShowDiff,
+  onShowConsoleDiff,
   visualDiffEnabled,
   draftVisualDiff,
+  draftConsoleDiff,
   onToggleVisualDiff,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
@@ -1806,6 +1818,8 @@ function CanvasContentHeader({
   onSelectFiles,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
+  hasUnpublishedCanvasDraftChanges,
+  hasUnpublishedConsoleDraftChanges,
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
   showCanvasSettingsMenu,
@@ -1822,6 +1836,7 @@ function CanvasContentHeader({
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
+  onShowConsoleDiff?: () => void;
   visualDiffEnabled?: boolean;
   draftVisualDiff?: {
     diffCounts: { added: number; updated: number; removed: number };
@@ -1831,6 +1846,9 @@ function CanvasContentHeader({
       showEdgeDiff: boolean;
       toggleShowEdgeDiff: () => void;
     };
+  };
+  draftConsoleDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
   };
   onToggleVisualDiff?: () => void;
   publishVersionDisabled?: boolean;
@@ -1851,6 +1869,8 @@ function CanvasContentHeader({
   onSelectFiles?: () => void;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
+  hasUnpublishedCanvasDraftChanges?: boolean;
+  hasUnpublishedConsoleDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   showCanvasSettingsMenu?: boolean;
@@ -1877,9 +1897,11 @@ function CanvasContentHeader({
       onPublishVersion={onPublishVersion}
       onDiscardVersion={onDiscardVersion}
       onShowDiff={onShowDiff}
+      onShowConsoleDiff={onShowConsoleDiff}
       visualDiffEnabled={visualDiffEnabled}
       onToggleVisualDiff={onToggleVisualDiff}
       draftVisualDiff={draftVisualDiff}
+      draftConsoleDiff={draftConsoleDiff}
       publishVersionDisabled={publishVersionDisabled}
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}
@@ -1898,6 +1920,8 @@ function CanvasContentHeader({
       onSelectFiles={onSelectFiles}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+      hasUnpublishedCanvasDraftChanges={hasUnpublishedCanvasDraftChanges}
+      hasUnpublishedConsoleDraftChanges={hasUnpublishedConsoleDraftChanges}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
