@@ -159,6 +159,7 @@ export interface CanvasPageProps {
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
+  onShowConsoleDiff?: () => void;
   onShowNodeDiff?: (nodeId: string) => void;
   visualDiffEnabled?: boolean;
   draftVisualDiff?: {
@@ -169,6 +170,9 @@ export interface CanvasPageProps {
       showEdgeDiff: boolean;
       toggleShowEdgeDiff: () => void;
     };
+  };
+  draftConsoleDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
   };
   onToggleVisualDiff?: () => void;
   publishVersionDisabled?: boolean;
@@ -1268,8 +1272,10 @@ function CanvasPage(props: CanvasPageProps) {
           onPublishVersion={props.onPublishVersion}
           onDiscardVersion={props.onDiscardVersion}
           onShowDiff={props.onShowDiff}
+          onShowConsoleDiff={props.onShowConsoleDiff}
           visualDiffEnabled={props.visualDiffEnabled}
           draftVisualDiff={props.draftVisualDiff}
+          draftConsoleDiff={props.draftConsoleDiff}
           onToggleVisualDiff={props.onToggleVisualDiff}
           publishVersionDisabled={props.publishVersionDisabled}
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
@@ -1789,8 +1795,10 @@ function CanvasContentHeader({
   onPublishVersion,
   onDiscardVersion,
   onShowDiff,
+  onShowConsoleDiff,
   visualDiffEnabled,
   draftVisualDiff,
+  draftConsoleDiff,
   onToggleVisualDiff,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
@@ -1828,6 +1836,7 @@ function CanvasContentHeader({
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
+  onShowConsoleDiff?: () => void;
   visualDiffEnabled?: boolean;
   draftVisualDiff?: {
     diffCounts: { added: number; updated: number; removed: number };
@@ -1837,6 +1846,9 @@ function CanvasContentHeader({
       showEdgeDiff: boolean;
       toggleShowEdgeDiff: () => void;
     };
+  };
+  draftConsoleDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
   };
   onToggleVisualDiff?: () => void;
   publishVersionDisabled?: boolean;
@@ -1885,9 +1897,11 @@ function CanvasContentHeader({
       onPublishVersion={onPublishVersion}
       onDiscardVersion={onDiscardVersion}
       onShowDiff={onShowDiff}
+      onShowConsoleDiff={onShowConsoleDiff}
       visualDiffEnabled={visualDiffEnabled}
       onToggleVisualDiff={onToggleVisualDiff}
       draftVisualDiff={draftVisualDiff}
+      draftConsoleDiff={draftConsoleDiff}
       publishVersionDisabled={publishVersionDisabled}
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}
