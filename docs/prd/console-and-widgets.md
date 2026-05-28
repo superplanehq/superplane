@@ -283,13 +283,31 @@ render:
 
 Supported `type` values:
 
-- `bar` — one bar per category, grouped side-by-side when multiple series are configured.
-- `stacked-bar` — multiple series stacked on top of each other per category. Visually identical to `bar` with a single series; the editor surfaces a hint until you add a second series.
+- `bar` — one bar per `xField` bucket, with each configured series rendered side-by-side.
+- `stacked-bar` — multiple series stacked on top of each other per `xField` bucket. Visually identical to `bar` with a single series; the editor surfaces a hint until you add a second series (or set `seriesField`).
 - `line`
 - `area`
-- `donut` — one slice per row, keyed by `xField`, valued by the first series.
+- `donut` — one slice per distinct `xField` value, valued by the first series.
 
-If a series omits `field`, the chart counts rows per `xField` bucket. If `field` is present, the chart reads numeric values from that field.
+Rows that share the same resolved `xField` value are merged into a single chart point. If a series omits `field`, the chart counts rows per `xField` bucket. If `field` is present, the chart sums numeric values from that field across each bucket. Non-numeric values are ignored.
+
+### Pivoting long-format rows with `seriesField`
+
+Some data sources emit one row per (X, series) combination — e.g. one row per `(date, service)` cost line. Configure `seriesField` to pivot those rows into one series per distinct value:
+
+```yaml
+render:
+  kind: chart
+  type: stacked-bar
+  xField: date
+  seriesField: service
+  series:
+    - field: cost_usd
+      label: Cost
+      prefix: "$"
+```
+
+When `seriesField` is set, the chart uses the numeric `field` of the **first** configured series for values (summed per `(xField, seriesField)` bucket) and ignores additional series entries for shaping — colors and order come from the data, not the configured series list.
 
 ### Series formatting
 
