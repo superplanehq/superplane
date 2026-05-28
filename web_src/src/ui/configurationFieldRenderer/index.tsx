@@ -30,6 +30,7 @@ import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
 import { TimeRangeFieldRenderer } from "./TimeRangeFieldRenderer";
 import { isFieldVisible, isFieldRequired, parseDefaultValues, validateFieldForSubmission } from "../../lib/components";
 import type { AuthorizationDomainType } from "@/api-client";
+import { buildTemplateParametersAutocompleteObject } from "./templateParametersAutocomplete";
 
 interface ConfigurationFieldRendererProps extends FieldRendererProps {
   allowExpressions?: boolean;
@@ -261,23 +262,43 @@ export const ConfigurationFieldRenderer = ({
     return hasError;
   }, [allFieldErrors, isRequired, value, validationErrors, enableRealtimeValidation, hasError]);
 
+  const resolvedAutocompleteExampleObj = React.useMemo(() => {
+    if (field.name !== "payload") {
+      return autocompleteExampleObj;
+    }
+
+    const parameters = buildTemplateParametersAutocompleteObject(allValues);
+    if (!parameters) {
+      return autocompleteExampleObj;
+    }
+
+    return {
+      ...(autocompleteExampleObj ?? {}),
+      parameters,
+    };
+  }, [field.name, allValues, autocompleteExampleObj]);
+
   if (!isVisible) {
     return null;
   }
-  const renderField = () => {
-    const commonProps = {
-      field,
-      value,
-      onChange,
-      allValues,
-      hasError: hasFieldError,
-      autocompleteExampleObj,
-      integrationId,
-      organizationId,
-      allowExpressions,
-      excludedSuggestions: field.name === "customName" ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
-    };
 
+  const fieldAllowsExpressions =
+    allowExpressions && !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false);
+
+  const commonProps = {
+    field,
+    value,
+    onChange,
+    allValues,
+    hasError: hasFieldError,
+    autocompleteExampleObj: resolvedAutocompleteExampleObj,
+    integrationId,
+    organizationId,
+    allowExpressions: fieldAllowsExpressions,
+    excludedSuggestions: field.name === "customName" ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
+  };
+
+  const renderField = () => {
     switch (field.type) {
       case "string":
         return <StringFieldRenderer {...commonProps} />;
@@ -433,13 +454,57 @@ export const ConfigurationFieldRenderer = ({
     }
   };
 
-  // For boolean fields, render label inline with switch
+  // Togglable booleans use the standard label row plus an optional labeled value switch.
+  if (field.type === "boolean" && isTogglable) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />
+          <Label className="block text-left flex-1 min-w-0">
+            {field.label || field.name}
+            {isRequired && <span className="text-gray-800 ml-1">*</span>}
+            {hasFieldError &&
+              ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
+                (!enableRealtimeValidation &&
+                  validationErrors &&
+                  isRequired &&
+                  (value === undefined || value === null || value === ""))) && (
+                <span className="text-red-500 text-xs ml-2 leading-0">Required</span>
+              )}
+          </Label>
+        </div>
+        {isEnabled && (
+          <div className="flex items-center gap-3">
+            <BooleanFieldRenderer {...commonProps} labeled />
+          </div>
+        )}
+
+        {allFieldErrors.filter((error) => error.message && !error.message.toLowerCase().includes("required")).length >
+          0 && (
+          <div className="space-y-1">
+            {allFieldErrors
+              .filter((error) => error.message && !error.message.toLowerCase().includes("required"))
+              .map((error, index) => (
+                <p key={index} className="text-xs text-red-500 dark:text-red-400 text-left">
+                  {error.message}
+                </p>
+              ))}
+          </div>
+        )}
+
+        {field.description && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
+        )}
+      </div>
+    );
+  }
+
+  // Non-togglable booleans render the switch inline with the label.
   if (field.type === "boolean") {
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
-          {isEnabled && renderField()}
+          {renderField()}
           <Label className="text-left cursor-pointer">
             {field.label || field.name}
             {isRequired && <span className="text-gray-800 ml-1">*</span>}
@@ -454,7 +519,6 @@ export const ConfigurationFieldRenderer = ({
           </Label>
         </div>
 
-        {/* Display validation errors */}
         {allFieldErrors.filter((error) => error.message && !error.message.toLowerCase().includes("required")).length >
           0 && (
           <div className="space-y-1">
@@ -468,7 +532,6 @@ export const ConfigurationFieldRenderer = ({
           </div>
         )}
 
-        {/* Display field description */}
         {field.description && (
           <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
         )}

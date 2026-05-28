@@ -78,6 +78,10 @@ func stringTypeOptionsToProto(opts *configuration.StringTypeOptions) *configpb.S
 		pbOpts.MaxLength = &maxLength
 	}
 
+	if opts.AllowExpressions != nil {
+		pbOpts.AllowExpressions = opts.AllowExpressions
+	}
+
 	return pbOpts
 }
 
@@ -177,6 +181,16 @@ func listTypeOptionsToProto(opts *configuration.ListTypeOptions) *configpb.ListT
 		ItemDefinition: &configpb.ListItemDefinition{
 			Type: opts.ItemDefinition.Type,
 		},
+	}
+
+	if opts.Accordion {
+		accordion := true
+		pbOpts.Accordion = &accordion
+	}
+
+	if opts.Reorderable {
+		reorderable := true
+		pbOpts.Reorderable = &reorderable
 	}
 
 	if opts.MaxItems != nil {
@@ -360,6 +374,10 @@ func protoToStringTypeOptions(pbOpts *configpb.StringTypeOptions) *configuration
 		opts.MaxLength = &maxLength
 	}
 
+	if pbOpts.AllowExpressions != nil {
+		opts.AllowExpressions = pbOpts.AllowExpressions
+	}
+
 	return opts
 }
 
@@ -504,7 +522,9 @@ func protoToListTypeOptions(pbOpts *configpb.ListTypeOptions) *configuration.Lis
 	}
 
 	opts := &configuration.ListTypeOptions{
-		ItemLabel: pbOpts.ItemLabel,
+		ItemLabel:   pbOpts.GetItemLabel(),
+		Accordion:   pbOpts.GetAccordion(),
+		Reorderable: pbOpts.GetReorderable(),
 		ItemDefinition: &configuration.ListItemDefinition{
 			Type: pbOpts.ItemDefinition.Type,
 		},
