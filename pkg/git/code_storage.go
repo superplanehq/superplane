@@ -12,13 +12,6 @@ import (
 	codestorage "github.com/pierrecomputer/sdk/packages/code-storage-go"
 )
 
-const (
-	initialRepositoryFilePath      = "README.md"
-	initialRepositoryCommitMessage = "Initialize repository"
-	initialRepositoryAuthorName    = "SuperPlane"
-	initialRepositoryAuthorEmail   = "bot@superplane.local"
-)
-
 type CodeStorageProvider struct {
 	client        *codestorage.Client
 	defaultBranch string
@@ -75,9 +68,6 @@ func (p *CodeStorageProvider) CreateRepository(ctx context.Context, spec Reposit
 	}
 
 	repoBranch := defaultBranch(repo.DefaultBranch)
-	if _, err := p.initializeRepository(ctx, repo, repoBranch); err != nil {
-		return nil, err
-	}
 
 	return &Repository{
 		RepoID:        repo.ID,
@@ -85,32 +75,37 @@ func (p *CodeStorageProvider) CreateRepository(ctx context.Context, spec Reposit
 	}, nil
 }
 
-func (p *CodeStorageProvider) initializeRepository(ctx context.Context, repo *codestorage.Repo, branch string) (*CommitResult, error) {
+func (p *CodeStorageProvider) InitRepository(ctx context.Context, ref RepositoryRef, branch string) error {
+	repo, err := p.repo(ref)
+	if err != nil {
+		return err
+	}
+
+	branch = defaultBranch(branch)
+	options := initialRepositoryCommitOptions(branch)
+
 	builder, err := repo.CreateCommit(codestorage.CommitOptions{
-		TargetBranch:  defaultBranch(branch),
-		CommitMessage: initialRepositoryCommitMessage,
+		TargetBranch:  branch,
+		CommitMessage: options.Message,
 		Author: codestorage.CommitSignature{
-			Name:  initialRepositoryAuthorName,
-			Email: initialRepositoryAuthorEmail,
+			Name:  options.Author.Name,
+			Email: options.Author.Email,
 		},
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	builder.AddFile(initialRepositoryFilePath, strings.NewReader(""), nil)
+	for _, operation := range options.Operations {
+		builder.AddFile(operation.Path, operation.Content, nil)
+	}
+
 	if err := builder.Err(); err != nil {
-		return nil, err
+		return err
 	}
 
-	result, err := builder.Send(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return &CommitResult{
-		CommitSHA: result.CommitSHA,
-	}, nil
+	_, err = builder.Send(ctx)
+	return err
 }
 
 func (p *CodeStorageProvider) DeleteRepository(ctx context.Context, ref RepositoryRef) error {

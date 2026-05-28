@@ -13,9 +13,10 @@ const (
 	CanvasRepositoryProviderCodeStorage = "code_storage"
 	CanvasRepositoryProviderSupergit    = "supergit"
 
-	CanvasRepositoryStatusPending = "pending"
-	CanvasRepositoryStatusReady   = "ready"
-	CanvasRepositoryStatusError   = "error"
+	CanvasRepositoryStatusPending      = "pending"
+	CanvasRepositoryStatusProvisioning = "provisioning"
+	CanvasRepositoryStatusReady        = "ready"
+	CanvasRepositoryStatusError        = "error"
 )
 
 type CanvasRepository struct {
@@ -46,19 +47,74 @@ func FindCanvasRepository(canvasID uuid.UUID) (*CanvasRepository, error) {
 	return FindCanvasRepositoryInTransaction(database.Conn(), canvasID)
 }
 
-func UpsertCanvasRepositoryInTransaction(tx *gorm.DB, repository *CanvasRepository) error {
-	return tx.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "canvas_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{
-			"organization_id",
-			"provider",
-			"repo_id",
-			"status",
-			"updated_at",
-		}),
-	}).Create(repository).Error
+func CreateCanvasRepositoryInTransaction(tx *gorm.DB, repository *CanvasRepository) error {
+	return tx.Create(repository).Error
 }
 
-func UpsertCanvasRepository(repository *CanvasRepository) error {
-	return UpsertCanvasRepositoryInTransaction(database.Conn(), repository)
+func ListPendingCanvasRepositories(limit int) ([]CanvasRepository, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	var repositories []CanvasRepository
+	err := database.Conn().
+		Where("status = ?", CanvasRepositoryStatusPending).
+		Order("created_at ASC").
+		Limit(limit).
+		Find(&repositories).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return repositories, nil
+}
+
+func LockPendingCanvasRepository(tx *gorm.DB, canvasID uuid.UUID) (*CanvasRepository, error) {
+	var repository CanvasRepository
+
+	err := tx.
+		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where("canvas_id = ?", canvasID).
+		Where("status = ?", CanvasRepositoryStatusPending).
+		First(&repository).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &repository, nil
+}
+
+func ResetStuckProvisioningCanvasRepositories() (int64, error) {
+	result := database.Conn().
+		Model(&CanvasRepository{}).
+		Where("status = ?", CanvasRepositoryStatusProvisioning).
+		Updates(map[string]any{
+			"status":     CanvasRepositoryStatusPending,
+			"updated_at": time.Now(),
+		})
+
+	return result.RowsAffected, result.Error
+}
+
+func (r *CanvasRepository) MarkProvisioning(tx *gorm.DB) error {
+	return tx.Model(r).Updates(map[string]any{
+		"status":     CanvasRepositoryStatusProvisioning,
+		"updated_at": time.Now(),
+	}).Error
+}
+
+func (r *CanvasRepository) MarkReady(tx *gorm.DB) error {
+	return tx.Model(r).Updates(map[string]any{
+		"status":     CanvasRepositoryStatusReady,
+		"updated_at": time.Now(),
+	}).Error
+}
+
+func (r *CanvasRepository) MarkError(tx *gorm.DB) error {
+	return tx.Model(r).Updates(map[string]any{
+		"status":     CanvasRepositoryStatusError,
+		"updated_at": time.Now(),
+	}).Error
 }

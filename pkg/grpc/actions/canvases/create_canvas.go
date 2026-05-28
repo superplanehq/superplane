@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/git"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -37,6 +38,7 @@ func CreateCanvas(
 	pbCanvas *pb.Canvas,
 	autoLayout *pb.CanvasAutoLayout,
 	usageService usage.Service,
+	storageOptions *CanvasRepositoryStorageOptions,
 ) (*pb.CreateCanvasResponse, error) {
 	if pbCanvas == nil {
 		return nil, status.Error(codes.InvalidArgument, "canvas is required")
@@ -167,6 +169,12 @@ func CreateCanvas(
 			return err
 		}
 
+		if !canvas.IsTemplate {
+			if err := createPendingCanvasRepositoryInTransaction(tx, organizationID, canvasID, storageOptions, now); err != nil {
+				return err
+			}
+		}
+
 		//
 		// If this is a canvas creation with no nodes,
 		// nothing else to do here.
@@ -239,4 +247,26 @@ func CreateCanvas(
 	return &pb.CreateCanvasResponse{
 		Canvas: proto,
 	}, nil
+}
+
+func createPendingCanvasRepositoryInTransaction(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	canvasID uuid.UUID,
+	storageOptions *CanvasRepositoryStorageOptions,
+	now time.Time,
+) error {
+	if storageOptions == nil || storageOptions.ProviderName == "" {
+		return nil
+	}
+
+	return models.CreateCanvasRepositoryInTransaction(tx, &models.CanvasRepository{
+		CanvasID:       canvasID,
+		OrganizationID: organizationID,
+		Provider:       storageOptions.ProviderName,
+		RepoID:         git.CanvasRepoID(organizationID, canvasID),
+		Status:         models.CanvasRepositoryStatusPending,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	})
 }

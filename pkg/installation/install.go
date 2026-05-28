@@ -38,6 +38,7 @@ type Service struct {
 	AuthService     authorization.Authorization
 	WebhooksBaseURL string
 	UsageService    usage.Service
+	StorageOptions  *canvases.CanvasRepositoryStorageOptions
 }
 
 func (s *Service) Preview(repoParam string) (*Preview, error) {
@@ -105,6 +106,7 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		canvas,
 		nil,
 		s.UsageService,
+		s.StorageOptions,
 	)
 	if err != nil {
 		return nil, err

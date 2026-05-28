@@ -17,6 +17,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/git"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/networkpolicy"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -180,6 +181,31 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 
 		w := workers.NewCanvasCleanupWorker(canvasStorage, agentProvider)
 		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_CANVAS_REPOSITORY_PROVISIONER_WORKER") == "yes" {
+		if canvasStorage == nil {
+			log.Println("Canvas repository provisioner not started because canvas storage is disabled")
+		} else {
+			log.Println("Starting Canvas Repository Provisioner Worker")
+
+			canvasStorageConfig := config.LoadCanvasStorageConfig()
+			providerName := canvasStorageConfig.Driver
+			if providerName == config.CanvasStorageDriverDisabled {
+				providerName = ""
+			}
+
+			w := workers.NewCanvasRepositoryProvisionerWorker(
+				rabbitMQURL,
+				canvasStorage,
+				canvases.CanvasRepositoryStorageOptions{
+					ProviderName:  providerName,
+					DefaultBranch: canvasStorageConfig.DefaultBranch,
+					MaxFileBytes:  canvasStorageConfig.MaxFileBytes,
+				},
+			)
+			go w.Start(context.Background())
+		}
 	}
 
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {

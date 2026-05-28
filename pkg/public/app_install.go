@@ -32,6 +32,7 @@ func (s *Server) installationService() *installation.Service {
 		AuthService:     s.authService,
 		WebhooksBaseURL: s.WebhooksBaseURL,
 		UsageService:    s.usageService,
+		StorageOptions:  &s.canvasStorageOptions,
 	}
 }
 

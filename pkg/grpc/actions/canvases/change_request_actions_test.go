@@ -322,7 +322,7 @@ func createCanvasWithNoopNode(ctx context.Context, t *testing.T, r *support.Reso
 			},
 			Edges: []*componentpb.Edge{},
 		},
-	}, nil, nil)
+	}, nil, nil, nil)
 	require.NoError(t, err)
 	return createCanvasResponse.Canvas.Metadata.Id
 }

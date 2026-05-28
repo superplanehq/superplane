@@ -57,9 +57,6 @@ func (p *SupergitProvider) CreateRepository(ctx context.Context, spec Repository
 	}
 
 	repoBranch := defaultBranch(repo.DefaultBranch)
-	if _, err := p.initializeRepository(ctx, repoID, repoBranch); err != nil {
-		return nil, err
-	}
 
 	return &Repository{
 		RepoID:        repoID,
@@ -67,21 +64,11 @@ func (p *SupergitProvider) CreateRepository(ctx context.Context, spec Repository
 	}, nil
 }
 
-func (p *SupergitProvider) initializeRepository(ctx context.Context, repoID, branch string) (*CommitResult, error) {
-	return p.Commit(ctx, RepositoryRef{RepoID: repoID, DefaultBranch: branch}, CommitOptions{
-		Message: initialRepositoryCommitMessage,
-		Author: CommitAuthor{
-			Name:  initialRepositoryAuthorName,
-			Email: initialRepositoryAuthorEmail,
-		},
-		Operations: []FileOperation{
-			{
-				Path:      initialRepositoryFilePath,
-				Content:   strings.NewReader(""),
-				SizeBytes: 0,
-			},
-		},
-	})
+func (p *SupergitProvider) InitRepository(ctx context.Context, ref RepositoryRef, branch string) error {
+	branch = defaultBranch(branch)
+	ref.DefaultBranch = branch
+	_, err := p.Commit(ctx, ref, initialRepositoryCommitOptions(branch))
+	return err
 }
 
 func (p *SupergitProvider) DeleteRepository(ctx context.Context, ref RepositoryRef) error {

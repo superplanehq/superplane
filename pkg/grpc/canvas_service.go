@@ -106,6 +106,7 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 		req.Canvas,
 		req.AutoLayout,
 		s.usageService,
+		&s.canvasStorageOptions,
 	)
 }
 

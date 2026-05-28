@@ -60,6 +60,10 @@ func (c *canvasRepositoryCleaner) CreateRepository(context.Context, git.Reposito
 	return nil, errors.New("not used")
 }
 
+func (c *canvasRepositoryCleaner) InitRepository(context.Context, git.RepositoryRef, string) error {
+	return errors.New("not used")
+}
+
 func (c *canvasRepositoryCleaner) DeleteRepository(_ context.Context, ref git.RepositoryRef) error {
 	c.deleted = append(c.deleted, ref.RepoID)
 	return c.err

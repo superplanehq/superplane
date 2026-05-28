@@ -236,14 +236,14 @@ function CanvasFilesView({
   useEffect(() => {
     const data = selectedFileQuery.data;
     const path = data?.path;
-    if (!path) return;
+    if (!path || path !== selectedPath) return;
 
     const content = data.content || "";
     setLoadedContentByPath((current) => {
       if (current[path] === content) return current;
       return { ...current, [path]: content };
     });
-  }, [selectedFileQuery.data?.content, selectedFileQuery.data?.path]);
+  }, [selectedFileQuery.data?.content, selectedFileQuery.data?.path, selectedPath]);
 
   const openFile = useCallback((path: string) => {
     setOpenTabs((current) => (current.includes(path) ? current : [...current, path]));
@@ -1007,6 +1007,28 @@ function FileEditor({
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
+  const suppressNextChangeRef = useRef(false);
+  const previousPathRef = useRef<string | null>(path);
+
+  useEffect(() => {
+    if (previousPathRef.current === path) return;
+
+    previousPathRef.current = path;
+    suppressNextChangeRef.current = true;
+  }, [path]);
+
+  const handleChange = useCallback(
+    (value: string | undefined) => {
+      if (suppressNextChangeRef.current) {
+        suppressNextChangeRef.current = false;
+        return;
+      }
+
+      onChange(value ?? "");
+    },
+    [onChange],
+  );
+
   if (!path) {
     return <div className="min-h-0 flex-1 bg-white" />;
   }
@@ -1032,11 +1054,12 @@ function FileEditor({
   return (
     <div className="min-h-0 flex-1 bg-white" data-testid="workflow-file-editor">
       <Editor
+        key={path}
         height="100%"
         language={language ?? getMonacoLanguage(path)}
         value={content}
         theme="vs"
-        onChange={(value) => onChange(value ?? "")}
+        onChange={handleChange}
         options={{
           ...fileEditorOptions,
           readOnly: disabled,

@@ -28,6 +28,7 @@ var (
 
 type Provider interface {
 	CreateRepository(ctx context.Context, spec RepositorySpec) (*Repository, error)
+	InitRepository(ctx context.Context, ref RepositoryRef, branch string) error
 	DeleteRepository(ctx context.Context, ref RepositoryRef) error
 	ListFiles(ctx context.Context, ref RepositoryRef, options ListFilesOptions) (*ListFilesResult, error)
 	GetFile(ctx context.Context, ref RepositoryRef, options GetFileOptions) (io.ReadCloser, error)
@@ -251,6 +252,31 @@ func validateCommitOperations(operations []FileOperation, limits Limits) ([]vali
 	}
 
 	return validated, nil
+}
+
+const (
+	initialRepositoryFilePath      = "README.md"
+	initialRepositoryCommitMessage = "Initialize repository"
+	initialRepositoryAuthorName    = "SuperPlane"
+	initialRepositoryAuthorEmail   = "bot@superplane.local"
+)
+
+func initialRepositoryCommitOptions(branch string) CommitOptions {
+	return CommitOptions{
+		Branch:  defaultBranch(branch),
+		Message: initialRepositoryCommitMessage,
+		Author: CommitAuthor{
+			Name:  initialRepositoryAuthorName,
+			Email: initialRepositoryAuthorEmail,
+		},
+		Operations: []FileOperation{
+			{
+				Path:      initialRepositoryFilePath,
+				Content:   strings.NewReader(""),
+				SizeBytes: 0,
+			},
+		},
+	}
 }
 
 func validateCommitMetadata(message string, author CommitAuthor) error {
