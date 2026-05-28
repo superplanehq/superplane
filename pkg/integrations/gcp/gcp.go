@@ -96,20 +96,20 @@ func (g *GCP) Instructions() string {
 func (g *GCP) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "workloadIdentityProvider",
-			Label:       "Workload Identity pool provider (resource name or URL)",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Description: "OIDC provider resource name or full IAM URL from Google Cloud Console; must match the audience configured in the provider. SuperPlane normalizes this to //iam.googleapis.com/…",
-			Placeholder: "https://iam.googleapis.com/v1/projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/superplane",
-		},
-		{
 			Name:        "workloadIdentityProjectId",
 			Label:       "Project ID",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "GCP project ID",
 			Placeholder: "e.g. my-project",
+		},
+		{
+			Name:        "workloadIdentityProvider",
+			Label:       "Workload Identity pool provider (resource name or URL)",
+			Type:        configuration.FieldTypeString,
+			Required:    true,
+			Description: "OIDC provider resource name or full IAM URL from Google Cloud Console; must match the audience configured in the provider. SuperPlane normalizes this to //iam.googleapis.com/…",
+			Placeholder: "https://iam.googleapis.com/v1/projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/superplane",
 		},
 		{
 			Name:        "workloadIdentityServiceAccountEmail",

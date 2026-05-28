@@ -209,20 +209,20 @@ func (s *SetupProvider) onCapabilitySelectionSubmit(ctx core.SetupStepContext) (
 		Instructions: wifInstructions,
 		Inputs: []configuration.Field{
 			{
-				Name:        PropertyWIFProvider,
-				Label:       "Pool provider (resource name or URL)",
-				Type:        configuration.FieldTypeString,
-				Required:    true,
-				Description: "OIDC provider resource name or full IAM URL from Google Cloud Console. SuperPlane normalizes this to the //iam.googleapis.com/… resource name.",
-				Placeholder: "https://iam.googleapis.com/v1/projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/superplane",
-			},
-			{
 				Name:        PropertyProjectID,
 				Label:       "Project ID",
 				Type:        configuration.FieldTypeString,
 				Required:    true,
 				Description: "GCP project ID",
 				Placeholder: "e.g. my-project",
+			},
+			{
+				Name:        PropertyWIFProvider,
+				Label:       "Pool provider (resource name or URL)",
+				Type:        configuration.FieldTypeString,
+				Required:    true,
+				Description: "OIDC provider resource name or full IAM URL from Google Cloud Console. SuperPlane normalizes this to the //iam.googleapis.com/… resource name.",
+				Placeholder: "https://iam.googleapis.com/v1/projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/superplane",
 			},
 		},
 	}, nil

@@ -16,8 +16,8 @@
 - **Issuer (URL):** `{{ .IssuerURL }}`
 - **Audience:** select **Default audience**
 
+Copy the provider's IAM URL _before_ configuring the provider attributes on the next step and paste it in the **Pool Provider** input above. e.g., `https://iam.googleapis.com/projects/<project-number>/locations/global/workloadIdentityPools/superplane/providers/<providerId>`.
+
 Click **Continue**.
 
-**5. Configure attribute mapping.** Add a single mapping where the **Google 1** column is `google.subject` and the **OIDC 1** column is `assertion.sub` — so `assertion.sub` is the value you enter for the `google.subject` attribute.
-
-**6. Copy the provider's IAM URL _before_ clicking Save.** After attribute mapping, the form shows the full provider URL — something like `https://iam.googleapis.com/projects/.../locations/global/workloadIdentityPools/.../providers/...`. Copy it now, **then** click **Save**. Paste the URL into the **Pool provider** field above. SuperPlane accepts either the resource name (`//iam.googleapis.com/…`) or the full IAM URL.
+**6. Configure attribute mapping.** Add a single mapping where the **Google 1** column is `google.subject` and the **OIDC 1** column is `assertion.sub` — so `assertion.sub` is the value you enter for the `google.subject` attribute.
