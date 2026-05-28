@@ -123,7 +123,6 @@ export function DashboardView({
             handleLayoutChange(toDashboardLayout(next));
           }}
           useCSSTransforms
-          measureBeforeMount
           compactType="vertical"
           preventCollision={false}
         >
