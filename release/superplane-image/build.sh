@@ -32,6 +32,7 @@ docker buildx build \
   --progress=plain \
   --provenance=false \
   --push \
+  --target runner \
   --cache-from ghcr.io/superplanehq/superplane-dev-base:app-latest \
   -t "${IMAGE_REPO}:${VERSION}-${ARCH}" \
   -f Dockerfile \
