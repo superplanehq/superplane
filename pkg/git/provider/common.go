@@ -4,36 +4,7 @@ import (
 	"fmt"
 	"path"
 	"strings"
-
-	"github.com/google/uuid"
 )
-
-func ValidateRepositoryID(value string) (string, error) {
-	value = strings.TrimSpace(value)
-	if strings.HasPrefix(strings.ReplaceAll(value, "\\", "/"), "/") {
-		return "", ErrInvalidRepositoryID
-	}
-
-	normalized, err := NormalizePath(value)
-	if err != nil {
-		return "", ErrInvalidRepositoryID
-	}
-
-	segments := strings.Split(normalized, "/")
-	if len(segments) != 4 || segments[0] != "orgs" || segments[2] != "canvases" {
-		return "", ErrInvalidRepositoryID
-	}
-
-	if _, err := uuid.Parse(segments[1]); err != nil {
-		return "", ErrInvalidRepositoryID
-	}
-
-	if _, err := uuid.Parse(segments[3]); err != nil {
-		return "", ErrInvalidRepositoryID
-	}
-
-	return normalized, nil
-}
 
 func NormalizePath(value string) (string, error) {
 	value = strings.TrimSpace(value)

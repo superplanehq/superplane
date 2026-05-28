@@ -2,6 +2,7 @@ package git
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -18,8 +19,10 @@ func NewProvider() (provider.Provider, error) {
 
 	switch gitProvider {
 	case provider.CodeStorageProvider:
+		log.Println("Creating Code Storage Provider")
 		return codestorage.NewProvider()
 	case provider.SuperGitProvider:
+		log.Println("Creating SuperGit Provider")
 		return supergit.NewProvider()
 	default:
 		return nil, fmt.Errorf("unsupported git storage provider %q", gitProvider)

@@ -18,19 +18,14 @@ type Provider struct {
 }
 
 func NewProvider() (*Provider, error) {
-	name := strings.TrimSpace(os.Getenv("CODE_STORAGE_NAME"))
+	name := strings.TrimSpace(os.Getenv("GIT_STORAGE_CODE_STORAGE_NAME"))
 	if name == "" {
-		return nil, fmt.Errorf("CODE_STORAGE_NAME is required")
+		return nil, fmt.Errorf("GIT_STORAGE_CODE_STORAGE_NAME is required")
 	}
 
-	privateKeyPath := strings.TrimSpace(os.Getenv("CODE_STORAGE_PRIVATE_KEY_PATH"))
-	if privateKeyPath == "" {
-		return nil, fmt.Errorf("CODE_STORAGE_PRIVATE_KEY_PATH is required")
-	}
-
-	key, err := os.ReadFile(privateKeyPath)
+	key, err := getPrivateKey()
 	if err != nil {
-		return nil, fmt.Errorf("error reading private key for code storage: %w", err)
+		return nil, err
 	}
 
 	client, err := codestorage.NewClient(codestorage.Options{
@@ -48,6 +43,24 @@ func NewProvider() (*Provider, error) {
 	}, nil
 }
 
+func getPrivateKey() ([]byte, error) {
+	if key := strings.TrimSpace(os.Getenv("GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY")); key != "" {
+		return []byte(key), nil
+	}
+
+	privateKeyPath := strings.TrimSpace(os.Getenv("GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY_PATH"))
+	if privateKeyPath == "" {
+		return nil, fmt.Errorf("either GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY or GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY_PATH are required")
+	}
+
+	key, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading private key for code storage: %w", err)
+	}
+
+	return key, nil
+}
+
 func (p *Provider) CreateRepository(ctx context.Context, options provider.CreateRepositoryOptions) (*provider.Repository, error) {
 	repoID := p.getRepositoryID(options.OrganizationID, options.CanvasID)
 	repo, err := p.client.CreateRepo(ctx, codestorage.CreateRepoOptions{
@@ -59,17 +72,9 @@ func (p *Provider) CreateRepository(ctx context.Context, options provider.Create
 		return nil, err
 	}
 
-	return &provider.Repository{
-		ID: repo.ID,
-	}, nil
-}
-
-func (p *Provider) InitRepository(ctx context.Context, repoID string, branch string) error {
-	repo, err := p.repo(repoID)
-	if err != nil {
-		return err
-	}
-
+	//
+	// Initialize repository
+	//
 	initialCommit := provider.InitialRepositoryCommitOptions(p.defaultBranch)
 	builder, err := repo.CreateCommit(codestorage.CommitOptions{
 		TargetBranch:  p.defaultBranch,
@@ -81,7 +86,7 @@ func (p *Provider) InitRepository(ctx context.Context, repoID string, branch str
 	})
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, operation := range initialCommit.Operations {
@@ -89,11 +94,17 @@ func (p *Provider) InitRepository(ctx context.Context, repoID string, branch str
 	}
 
 	if err := builder.Err(); err != nil {
-		return err
+		return nil, err
 	}
 
 	_, err = builder.Send(ctx)
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	return &provider.Repository{
+		ID: repo.ID,
+	}, nil
 }
 
 func (p *Provider) DeleteRepository(ctx context.Context, repoID string) error {
@@ -194,6 +205,10 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 		builder.AddFile(operation.Path, operation.Content, nil)
 	}
 
+	if err := builder.Err(); err != nil {
+		return nil, err
+	}
+
 	result, err := builder.Send(ctx)
 	if err != nil {
 		return nil, err
@@ -204,7 +219,7 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 	}, nil
 }
 
-func (p *Provider) Head(ctx context.Context, repoID string, branch string) (string, error) {
+func (p *Provider) Head(ctx context.Context, repoID string) (string, error) {
 	repo, err := p.repo(repoID)
 	if err != nil {
 		return "", err

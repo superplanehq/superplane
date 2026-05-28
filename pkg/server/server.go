@@ -453,7 +453,7 @@ func Start() {
 	log.Println("Creating Git Provider")
 	_, err = git.NewProvider()
 	if err != nil {
-		panic(fmt.Sprintf("failed to create git provider: %v", err))
+		log.Errorf("failed to create git provider: %v", err)
 	}
 
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{

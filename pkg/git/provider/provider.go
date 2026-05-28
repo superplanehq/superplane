@@ -39,7 +39,7 @@ type Provider interface {
 	ListFiles(ctx context.Context, repoID string) (*ListFilesResult, error)
 	GetFile(ctx context.Context, repoID string, path string) (io.ReadCloser, error)
 	Commit(ctx context.Context, repoID string, options CommitOptions) (*CommitResult, error)
-	Head(ctx context.Context, repoID string, branch string) (string, error)
+	Head(ctx context.Context, repoID string) (string, error)
 }
 
 type CreateRepositoryOptions struct {

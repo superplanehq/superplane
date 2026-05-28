@@ -97,9 +97,8 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 	}, nil
 }
 
-func (p *Provider) Head(ctx context.Context, repoID string, branch string) (string, error) {
-	target := provider.RefOrDefault(branch, p.defaultBranch)
-	commit, err := p.client.getCommit(ctx, repoID, target)
+func (p *Provider) Head(ctx context.Context, repoID string) (string, error) {
+	commit, err := p.client.getCommit(ctx, repoID, p.defaultBranch)
 	if err != nil {
 		return "", err
 	}
