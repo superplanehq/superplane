@@ -244,20 +244,16 @@ func Test__ManageInstancePower__PollStart_ReschedulesWhenPending(t *testing.T) {
 	assert.Equal(t, "poll", requests.Action)
 }
 
-func Test__ManageInstancePower__PollStart_ErrorsWhenTerminated(t *testing.T) {
-	component := &ManageInstancePower{}
-	ctx := managePowerHookCtx("start", "terminated")
+func Test__ManageInstancePower__PollStart_FailsImmediatelyOnNonRecoverableState(t *testing.T) {
+	for _, state := range []string{"terminated", "shutting-down", "stopped", "stopping"} {
+		t.Run(state, func(t *testing.T) {
+			component := &ManageInstancePower{}
+			ctx := managePowerHookCtx("start", state)
 
-	err := component.HandleHook(ctx)
-	require.ErrorContains(t, err, "unexpectedly")
-}
-
-func Test__ManageInstancePower__PollStart_ErrorsWhenShuttingDown(t *testing.T) {
-	component := &ManageInstancePower{}
-	ctx := managePowerHookCtx("start", "shutting-down")
-
-	err := component.HandleHook(ctx)
-	require.ErrorContains(t, err, "unexpectedly")
+			err := component.HandleHook(ctx)
+			require.ErrorContains(t, err, "will not reach running without intervention")
+		})
+	}
 }
 
 func Test__ManageInstancePower__PollStop_EmitsWhenStopped(t *testing.T) {

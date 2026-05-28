@@ -329,8 +329,8 @@ func (c *ManageInstancePower) pollStart(ctx core.ActionHookContext, instance *In
 			ManageInstancePowerStartPayloadType,
 			[]any{instanceDetailsToMap(instance)},
 		)
-	case InstanceStateTerminated, InstanceStateShuttingDown:
-		return fmt.Errorf("instance %s entered state %q unexpectedly while starting", instance.InstanceID, instance.State)
+	case InstanceStateTerminated, InstanceStateShuttingDown, InstanceStateStopped, InstanceStateStopping:
+		return fmt.Errorf("instance %s entered state %q and will not reach running without intervention", instance.InstanceID, instance.State)
 	}
 
 	if metadata.PollAttempts >= maxInstancePollAttempts {
