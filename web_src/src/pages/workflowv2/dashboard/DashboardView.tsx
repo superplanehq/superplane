@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import GridLayout, { type Layout, WidthProvider } from "react-grid-layout";
 import { Loader2, LayoutGrid, FileText, Hash, LineChart, Network, Table2, Workflow } from "lucide-react";
 
@@ -74,6 +74,49 @@ export function DashboardView({
 
   const layoutItems = useMemo(() => buildRGLLayout(localPanels, localLayout), [localPanels, localLayout]);
 
+  const gridVisible = !errorMessage && !isLoading && localPanels.length > 0;
+
+  // Suppress the default react-grid-layout 200ms transitions until the grid
+  // has settled on its real width. `WidthProvider` mounts with a hardcoded
+  // 1280px width and only learns the actual container size via a
+  // ResizeObserver callback that fires asynchronously after layout — by which
+  // time a fixed `requestAnimationFrame` delay has already re-enabled
+  // transitions and every tile animates from the 1280px layout to the real
+  // one. We instead observe the wrapper directly and arm transitions only
+  // after the first non-zero width measurement has been painted, so drag /
+  // resize still feel responsive without the tab-switch stretch animation.
+  // The effect must not arm while the grid is unmounted (loading / error /
+  // empty early returns leave `gridWrapperRef` null).
+  const [transitionsArmed, setTransitionsArmed] = useState(false);
+  const gridWrapperRef = useRef<HTMLDivElement>(null);
+  const armFrameRef = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    if (!gridVisible) {
+      setTransitionsArmed(false);
+      return undefined;
+    }
+    if (transitionsArmed) return undefined;
+    const el = gridWrapperRef.current;
+    if (!el) return undefined;
+    if (typeof ResizeObserver === "undefined") {
+      armFrameRef.current = requestAnimationFrame(() => setTransitionsArmed(true));
+      return () => {
+        if (armFrameRef.current != null) cancelAnimationFrame(armFrameRef.current);
+      };
+    }
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0;
+      if (width <= 0) return;
+      armFrameRef.current = requestAnimationFrame(() => setTransitionsArmed(true));
+      observer.disconnect();
+    });
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      if (armFrameRef.current != null) cancelAnimationFrame(armFrameRef.current);
+    };
+  }, [gridVisible, transitionsArmed]);
+
   if (errorMessage) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-sm text-red-600">
@@ -102,9 +145,9 @@ export function DashboardView({
 
   return (
     <div className="flex h-full w-full flex-col overflow-auto">
-      <div className="px-4 py-3">
+      <div ref={gridWrapperRef} className="px-4 py-3">
         <ResponsiveGridLayout
-          className="dashboard-grid"
+          className={cn("dashboard-grid", !transitionsArmed && "dashboard-grid--instant")}
           layout={layoutItems}
           cols={DASHBOARD_GRID_COLS}
           rowHeight={DASHBOARD_ROW_HEIGHT}
