@@ -5669,7 +5669,6 @@ export function WorkflowPageV2() {
                 onRetry={() => infiniteRunsQuery.refetch()}
                 workflowNodes={canvasNodes}
                 componentIconMap={componentIconMap}
-                totalCount={runsData.totalCount}
                 onStatusFiltersChange={setRunStatusFilters}
               />
             ) : null
