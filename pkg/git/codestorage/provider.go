@@ -173,7 +173,8 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 		return nil, err
 	}
 
-	if err := provider.ValidateCommitOperations(options.Operations); err != nil {
+	operations, err := provider.ValidateCommitOperations(options.Operations)
+	if err != nil {
 		return nil, err
 	}
 
@@ -197,7 +198,7 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 		return nil, err
 	}
 
-	for _, operation := range options.Operations {
+	for _, operation := range operations {
 		if operation.Delete {
 			builder.DeletePath(operation.Path)
 			continue

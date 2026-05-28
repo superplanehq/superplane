@@ -45,31 +45,36 @@ func ValidateUserPath(value string) (string, error) {
 	return normalized, nil
 }
 
-func ValidateCommitOperations(operations []FileOperation) error {
+func ValidateCommitOperations(operations []FileOperation) ([]FileOperation, error) {
 	if len(operations) == 0 {
-		return fmt.Errorf("%w: at least one file operation is required", ErrInvalidCommit)
+		return nil, fmt.Errorf("%w: at least one file operation is required", ErrInvalidCommit)
 	}
 
+	normalized := make([]FileOperation, 0, len(operations))
 	for _, operation := range operations {
 		path, err := ValidateUserPath(operation.Path)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		operation.Path = path
 
 		if operation.Delete {
+			normalized = append(normalized, operation)
 			continue
 		}
 
 		if operation.Content == nil {
-			return fmt.Errorf("%w: content is required for %q", ErrInvalidPath, path)
+			return nil, fmt.Errorf("%w: content is required for %q", ErrInvalidCommit, path)
 		}
 
 		if operation.SizeBytes < 0 {
-			return fmt.Errorf("%w: size is required for %q", ErrInvalidPath, path)
+			return nil, fmt.Errorf("%w: size is required for %q", ErrInvalidCommit, path)
 		}
+
+		normalized = append(normalized, operation)
 	}
 
-	return nil
+	return normalized, nil
 }
 
 func DefaultBranch(branch string) string {

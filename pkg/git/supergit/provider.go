@@ -44,6 +44,11 @@ func (p *Provider) CreateRepository(ctx context.Context, options provider.Create
 		return nil, err
 	}
 
+	_, err = p.Commit(ctx, repo.ID, provider.InitialRepositoryCommitOptions(p.defaultBranch))
+	if err != nil {
+		return nil, err
+	}
+
 	return &provider.Repository{
 		ID: repo.ID,
 	}, nil
@@ -71,11 +76,12 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 		return nil, err
 	}
 
-	if err := provider.ValidateCommitOperations(options.Operations); err != nil {
+	operations, err := provider.ValidateCommitOperations(options.Operations)
+	if err != nil {
 		return nil, err
 	}
 
-	body, err := buildCommitNDJSON(options.Operations, provider.CommitOptions{
+	body, err := buildCommitNDJSON(operations, provider.CommitOptions{
 		Branch:          provider.RefOrDefault(options.Branch, p.defaultBranch),
 		BaseBranch:      strings.TrimSpace(options.BaseBranch),
 		ExpectedHeadSHA: strings.TrimSpace(options.ExpectedHeadSHA),
