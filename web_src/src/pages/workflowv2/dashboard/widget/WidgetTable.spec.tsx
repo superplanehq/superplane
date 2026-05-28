@@ -187,10 +187,11 @@ describe("WidgetTable row actions — confirm dialog preview", () => {
     expect(preview.textContent).toMatch(/run/);
     expect(preview.textContent).toMatch(/default/);
 
-    // Manual run hooks pass template selection only; row payload templates are not merged.
+    // Row payload templates are merged into run-hook parameters so authors
+    // can wire per-row values (e.g. pr_number) into the trigger payload.
     const params = screen.getByTestId("widget-row-action-start-parameters");
     expect(params.textContent).toContain('"template": "default"');
-    expect(params.textContent).not.toContain('"number"');
+    expect(params.textContent).toContain('"number": "42"');
   });
 });
 

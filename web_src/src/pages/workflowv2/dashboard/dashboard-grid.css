@@ -5,14 +5,21 @@
 }
 
 /*
- * react-grid-layout applies a 200ms transition on `transform`, `width`, and
- * `height` for every grid item. The first time the grid mounts (e.g. when
- * the user opens the Console tab) the WidthProvider measures the container
- * one frame later and tiles animate from their initial 0,0 sizing to their
- * real positions, which looks like every widget is stretching to fit. We
- * suppress those transitions for the initial paint and let them re-enable
- * after the first measured layout settles.
+ * react-grid-layout applies a 200ms transition on `height` to the container
+ * and on `transform`, `width`, and `height` to every grid item. The first
+ * time the grid mounts (e.g. when the user opens the Console tab) the
+ * WidthProvider mounts with a hardcoded 1280px width and only learns the
+ * real width asynchronously via a ResizeObserver, after which the tiles
+ * re-lay-out and visibly stretch into their final spots. We suppress those
+ * transitions until the wrapper has been measured for real (see
+ * `transitionsArmed` in DashboardView.tsx) so the Console tab opens with
+ * tiles already in place. Drag / resize transitions resume immediately
+ * after.
  */
+.dashboard-grid.dashboard-grid--instant {
+  transition: none !important;
+}
+
 .dashboard-grid.dashboard-grid--instant .react-grid-item {
   transition: none !important;
 }
