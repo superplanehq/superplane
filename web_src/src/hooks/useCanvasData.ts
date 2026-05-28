@@ -41,6 +41,7 @@ import {
 import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
+  CanvasesCanvasDashboard,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
@@ -1604,6 +1605,33 @@ type UseUpdateCanvasConsoleOptions = {
   registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
 };
 
+function toCanvasDashboard(
+  canvasId: string,
+  versionId: string | undefined,
+  input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] },
+  previous?: CanvasesCanvasDashboard,
+): CanvasesCanvasDashboard {
+  return {
+    ...previous,
+    canvasId: previous?.canvasId ?? canvasId,
+    ...(versionId ? { versionId: previous?.versionId ?? versionId } : {}),
+    panels: input.panels.map((panel) => ({
+      id: panel.id,
+      type: panel.type,
+      content: panel.content,
+    })),
+    layout: input.layout.map((item) => ({
+      i: item.i,
+      x: item.x,
+      y: item.y,
+      w: item.w,
+      h: item.h,
+      ...(item.minW !== undefined ? { minW: item.minW } : {}),
+      ...(item.minH !== undefined ? { minH: item.minH } : {}),
+    })),
+  };
+}
+
 export const useUpdateCanvasConsole = (
   canvasId: string,
   versionId: string | undefined,
@@ -1611,6 +1639,13 @@ export const useUpdateCanvasConsole = (
 ) => {
   const queryClient = useQueryClient();
   return useMutation({
+    onMutate: async (input) => {
+      const queryKey = canvasKeys.dashboard(canvasId, versionId);
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<CanvasesCanvasDashboard>(queryKey);
+      queryClient.setQueryData(queryKey, toCanvasDashboard(canvasId, versionId, input, previous));
+      return { previous, queryKey };
+    },
     mutationFn: async (input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
       const releaseCanvasVersionUpdatedEcho = options?.registerIgnoredCanvasVersionUpdatedEcho?.(versionId);
       try {
@@ -1641,6 +1676,10 @@ export const useUpdateCanvasConsole = (
         releaseCanvasVersionUpdatedEcho?.();
         throw error;
       }
+    },
+    onError: (_error, _input, context) => {
+      if (!context) return;
+      queryClient.setQueryData(context.queryKey, context.previous);
     },
     onSuccess: (data) => {
       queryClient.setQueryData(canvasKeys.dashboard(canvasId, versionId), data);
