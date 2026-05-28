@@ -529,6 +529,32 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   },
 ] as const;
 
+function suggestTopLevelGlobals<TGlobals extends Record<string, unknown>>(
+  globals: TGlobals,
+  prefix: string,
+): Suggestion[] {
+  const out: Suggestion[] = [];
+  const globalKeys = listGlobalKeys(globals);
+  for (const key of globalKeys) {
+    if (key === "$" || key.startsWith("__") || needsQuotingAsIdentifier(key)) {
+      continue;
+    }
+    if (prefix && !key.toLowerCase().startsWith(prefix)) {
+      continue;
+    }
+
+    const value = (globals as Record<string, unknown>)[key];
+    const tailDot = isExpandableValue(value) ? "." : "";
+    out.push({
+      label: key,
+      kind: "variable",
+      insertText: `${key}${tailDot}`,
+      detail: getValueTypeLabel(value),
+    });
+  }
+  return out;
+}
+
 export function getSuggestions<TGlobals extends Record<string, unknown>>(
   text: string,
   cursor: number,
@@ -670,24 +696,7 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
     }
 
     if (includeTopLevelGlobals) {
-      const globalKeys = listGlobalKeys(globals);
-      for (const key of globalKeys) {
-        if (key === "$" || key.startsWith("__") || needsQuotingAsIdentifier(key)) {
-          continue;
-        }
-        if (prefix && !key.toLowerCase().startsWith(prefix)) {
-          continue;
-        }
-
-        const value = (globals as Record<string, unknown>)[key];
-        const tailDot = isExpandableValue(value) ? "." : "";
-        out.push({
-          label: key,
-          kind: "variable",
-          insertText: `${key}${tailDot}`,
-          detail: getValueTypeLabel(value),
-        });
-      }
+      out.push(...suggestTopLevelGlobals(globals, prefix));
     }
   }
 
