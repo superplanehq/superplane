@@ -104,9 +104,35 @@ const (
 
 	// TagKeyManaged is applied to fleet-manager-managed runner instances for Describe/Reconcile filtering.
 	TagKeyManaged = "superplane_managed_runner"
+	// TagKeyFleetID partitions managed runners by their owning fleet. Multiple pools
+	// (different VM arches / instance types) inside one fleet-manager process must filter
+	// Describe results by this tag so they don't reconcile each other's instances.
+	TagKeyFleetID = "superplane_fleet_id"
 
 	maxLaunch = 50
 )
+
+// managedRunInstancesTags returns the tags applied at launch to every managed runner instance.
+// Includes the per-fleet partition key (TagKeyFleetID) so multiple pools managed by one
+// fleet-manager process do not reconcile each other's instances.
+func managedRunInstancesTags(fleetID string) []types.Tag {
+	return []types.Tag{
+		{Key: aws.String("Name"), Value: aws.String("superplane-runner")},
+		{Key: aws.String(TagKeyManaged), Value: aws.String("true")},
+		{Key: aws.String(TagKeyFleetID), Value: aws.String(fleetID)},
+	}
+}
+
+// managedDescribeFilters returns DescribeInstances filters that scope results to the
+// fleet-manager-managed runners owned by this pool (fleetID), restricted to the given
+// instance-state-name values.
+func managedDescribeFilters(fleetID string, states []string) []types.Filter {
+	return []types.Filter{
+		{Name: aws.String("tag:" + TagKeyManaged), Values: []string{"true"}},
+		{Name: aws.String("tag:" + TagKeyFleetID), Values: []string{fleetID}},
+		{Name: aws.String("instance-state-name"), Values: states},
+	}
+}
 
 // ConfigFromEnv validates required provisioning settings.
 func ConfigFromEnv() (Config, error) {
@@ -284,10 +310,7 @@ func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 		TagSpecifications: []types.TagSpecification{
 			{
 				ResourceType: types.ResourceTypeInstance,
-				Tags: []types.Tag{
-					{Key: aws.String("Name"), Value: aws.String("superplane-runner")},
-					{Key: aws.String(TagKeyManaged), Value: aws.String("true")},
-				},
+				Tags:         managedRunInstancesTags(l.Config.RunnerFleetID),
 			},
 		},
 	}

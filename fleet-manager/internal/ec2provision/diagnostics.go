@@ -8,7 +8,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
 // ManagedRunnerSummary is a minimal row for admin listing.
@@ -19,13 +18,11 @@ type ManagedRunnerSummary struct {
 	PublicIP   string `json:"public_ip,omitempty"`
 }
 
-// ListManagedRunners returns pending/running instances tagged as fleet-managed runners.
+// ListManagedRunners returns pending/running instances tagged as fleet-managed runners
+// for this launcher's pool (scoped by TagKeyFleetID).
 func (l *Launcher) ListManagedRunners(ctx context.Context) ([]ManagedRunnerSummary, error) {
 	in := &ec2.DescribeInstancesInput{
-		Filters: []types.Filter{
-			{Name: aws.String("tag:" + TagKeyManaged), Values: []string{"true"}},
-			{Name: aws.String("instance-state-name"), Values: []string{"pending", "running", "stopping", "shutting-down"}},
-		},
+		Filters: managedDescribeFilters(l.Config.RunnerFleetID, []string{"pending", "running", "stopping", "shutting-down"}),
 	}
 	pager := ec2.NewDescribeInstancesPaginator(l.Client, in)
 	var out []ManagedRunnerSummary

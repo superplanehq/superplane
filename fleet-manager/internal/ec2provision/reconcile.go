@@ -9,7 +9,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 )
 
 type instanceSnap struct {
@@ -121,10 +120,7 @@ func (l *Launcher) Reconcile(ctx context.Context, want int) error {
 
 func (l *Launcher) listManagedLive(ctx context.Context) ([]instanceSnap, error) {
 	in := &ec2.DescribeInstancesInput{
-		Filters: []types.Filter{
-			{Name: aws.String("tag:" + TagKeyManaged), Values: []string{"true"}},
-			{Name: aws.String("instance-state-name"), Values: []string{"pending", "running"}},
-		},
+		Filters: managedDescribeFilters(l.Config.RunnerFleetID, []string{"pending", "running"}),
 	}
 	pager := ec2.NewDescribeInstancesPaginator(l.Client, in)
 	var out []instanceSnap

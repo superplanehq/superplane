@@ -34,6 +34,7 @@ There is **no** task-broker → fleet-manager path, no runner → fleet-manager 
 ## fleet-manager (EC2)
 
 - **Reconcile loop** — Health sweep (`GET /healthz` after boot grace) then scale toward a target. Target is **`EC2_PROVISION_HOT_INSTANCE_COUNT`** by default, or **`queued + claimed + EC2_PROVISION_RUNNER_HEADROOM`** when headroom is set (counts pulled from task-broker per fleet). On broker failure, the tick falls back to the static count.
+- **Instance partitioning** — Every managed EC2 instance is tagged with `superplane_managed_runner=true` *and* `superplane_fleet_id=<fleet-id>`. All Describe calls (reconcile, sweep, admin listing) filter by both tags, so a future multi-pool fleet-manager process can host several fleets in one AWS account without pools terminating each other's instances. Existing in-flight instances must be retagged or terminated before rolling out a fleet-manager build that filters on `superplane_fleet_id`.
 - **User-data** — Installs runner from S3, sets `TASK_BROKER_URL`, `RUNNER_FLEET_ID`, `RUNNER_HEALTH_ADDR`, optional `RUNNER_TERMINATE_AFTER_EACH_TASK`.
 - **Admin** — Optional `/v1/admin/*` diagnostics (managed instances, console output).
 
