@@ -11,8 +11,8 @@ export type CanvasYamlModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 
-  yamlText: string;
-  filename: string;
+  yamlText?: string;
+  filename?: string;
   onCopy?: () => void;
   onDownload?: () => void;
   onImport?: (data: { nodes: unknown[]; edges: unknown[] }) => Promise<void>;
@@ -22,13 +22,13 @@ export type CanvasYamlModalProps = {
 export function CanvasYamlModal(props: CanvasYamlModalProps) {
   return (
     <Dialog open={props.open} onOpenChange={props.onOpenChange}>
-      <DialogContent size="large" className="flex max-h-[90vh] w-[90vw] h-full flex-col gap-0 overflow-hidden p-0">
+      <DialogContent size="large" className="flex h-full max-h-[90vh] w-[90vw] flex-col gap-0 overflow-hidden p-0">
         <DialogTitle className="sr-only">Canvas YAML</DialogTitle>
 
         <div className="flex h-full flex-col">
           <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-2">
-            <span className="font-mono text-sm text-gray-600">{props.filename}</span>
-            <div className="flex items-center gap-2 mr-8">
+            <span className="font-mono text-sm text-gray-600">{props.filename ?? "Canvas YAML"}</span>
+            <div className="mr-8 flex items-center gap-2">
               <ImportButton {...props} />
               <CopyButton {...props} />
               <DownloadButton {...props} />
@@ -43,6 +43,14 @@ export function CanvasYamlModal(props: CanvasYamlModalProps) {
 }
 
 function YamlEditor(props: CanvasYamlModalProps) {
+  if (props.yamlText === undefined) {
+    return (
+      <div className="flex h-full min-h-0 items-center justify-center bg-white p-8 text-sm text-gray-500">
+        Canvas YAML is not available yet.
+      </div>
+    );
+  }
+
   return (
     <div className="canvas-yaml-monaco h-full min-h-0 min-w-0">
       <Editor
@@ -106,7 +114,7 @@ function CopyButton(props: CanvasYamlModalProps) {
   if (!props.onCopy) return null;
 
   return (
-    <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(props.yamlText)}>
+    <Button variant="outline" size="sm" onClick={props.onCopy} disabled={props.yamlText === undefined}>
       <Copy />
       Copy
     </Button>
@@ -117,7 +125,7 @@ function DownloadButton(props: CanvasYamlModalProps) {
   if (!props.onDownload) return null;
 
   return (
-    <Button variant="outline" size="sm" onClick={props.onDownload}>
+    <Button variant="outline" size="sm" onClick={props.onDownload} disabled={props.yamlText === undefined}>
       <Download />
       Download
     </Button>

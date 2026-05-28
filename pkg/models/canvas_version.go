@@ -31,6 +31,8 @@ type CanvasVersion struct {
 	PublishedAt             *time.Time
 	Nodes                   datatypes.JSONSlice[Node]
 	Edges                   datatypes.JSONSlice[Edge]
+	ConsolePanels           datatypes.JSONType[[]DashboardPanel]
+	ConsoleLayout           datatypes.JSONType[[]DashboardLayoutItem]
 	CreatedAt               *time.Time
 	UpdatedAt               *time.Time
 }
@@ -326,6 +328,7 @@ func SaveCanvasDraftInTransaction(
 		CreatedAt:               &now,
 		UpdatedAt:               &now,
 	}
+	copyVersionConsoleFields(liveVersion, &version)
 
 	if err := tx.Create(&version).Error; err != nil {
 		return nil, err
@@ -361,6 +364,7 @@ func CreateCanvasSnapshotVersionInTransaction(
 		CreatedAt:               &now,
 		UpdatedAt:               &now,
 	}
+	copyVersionConsoleFields(sourceVersion, &version)
 
 	if err := tx.Create(&version).Error; err != nil {
 		return nil, err

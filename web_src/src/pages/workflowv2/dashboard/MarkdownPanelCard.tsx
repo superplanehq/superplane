@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
@@ -38,7 +40,12 @@ const MARKDOWN_CLASSES =
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
   "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current " +
   "[&_table]:my-2 [&_table]:text-xs [&_table]:border-collapse [&_th]:border [&_th]:border-slate-200 [&_th]:px-2 [&_th]:py-1 " +
-  "[&_td]:border [&_td]:border-slate-100 [&_td]:px-2 [&_td]:py-1";
+  "[&_td]:border [&_td]:border-slate-100 [&_td]:px-2 [&_td]:py-1 " +
+  "[&_details]:my-3 [&_details]:rounded-md [&_details]:border [&_details]:border-slate-200 [&_details]:bg-slate-50/60 [&_details]:p-3 " +
+  "[&_details>summary]:flex [&_details>summary]:items-center [&_details>summary]:cursor-pointer [&_details>summary]:select-none [&_details>summary]:text-sm [&_details>summary]:font-semibold [&_details>summary]:text-slate-900 [&_details>summary]:list-none [&_details>summary]:marker:hidden [&_details>summary]:hover:text-sky-700 " +
+  "[&_details>summary]:before:content-['▸'] [&_details>summary]:before:mr-2 [&_details>summary]:before:text-slate-500 [&_details>summary]:before:transition-transform [&_details>summary]:before:duration-200 " +
+  "[&_details[open]>summary]:mb-3 [&_details[open]>summary]:before:rotate-90 " +
+  "[&_details>*:last-child]:mb-0";
 
 /**
  * Which field auto-focuses when the user enters edit mode. Driven by which
@@ -171,12 +178,37 @@ export function MarkdownPanelCard({
   );
 }
 
+/**
+ * Sanitize schema allowlist for the markdown panel.
+ *
+ * Extends the default `rehype-sanitize` schema to permit the small set of
+ * raw HTML tags we want authors to be able to use inside markdown panels —
+ * currently `<details>` / `<summary>` for collapsible sections, with the
+ * `open` attribute so authors can pre-expand items.
+ *
+ * Everything else still goes through the default allowlist, which strips
+ * scripts, event handlers, inline styles, and other unsafe content.
+ */
+const MARKDOWN_SANITIZE_SCHEMA = {
+  ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
+  attributes: {
+    ...(defaultSchema.attributes ?? {}),
+    details: [...((defaultSchema.attributes ?? {}).details ?? []), "open"],
+  },
+};
+
 function MarkdownBody({ body }: { body: string }) {
   const normalized = useMemo(() => body.replace(/\r\n/g, "\n").trim(), [body]);
   if (!normalized) return null;
   return (
     <div className={cn(MARKDOWN_CLASSES)} data-testid="dashboard-markdown">
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{normalized}</ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]]}
+      >
+        {normalized}
+      </ReactMarkdown>
     </div>
   );
 }

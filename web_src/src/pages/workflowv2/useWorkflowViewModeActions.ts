@@ -5,14 +5,15 @@ import { getDashboardHeaderActions } from "./dashboard/dashboardHeaderActions";
 interface WorkflowViewModeActionsConfig {
   isDashboardMode: boolean;
   isMemoryMode: boolean;
+  isFilesMode: boolean;
   isRunsMode: boolean;
   hasEditableVersion: boolean;
-  dashboardsFeatureEnabled: boolean;
   isTemplate: boolean;
   canUpdateCanvas: boolean;
   canvasDeletedRemotely: boolean;
   handleExitDashboardMode: () => void;
   handleExitMemoryMode: () => void;
+  handleExitFilesMode: () => void;
   handleExitRunsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
   setIsDashboardAddPanelOpen: (value: boolean) => void;
@@ -22,14 +23,15 @@ interface WorkflowViewModeActionsConfig {
 export function useWorkflowViewModeActions({
   isDashboardMode,
   isMemoryMode,
+  isFilesMode,
   isRunsMode,
   hasEditableVersion,
-  dashboardsFeatureEnabled,
   isTemplate,
   canUpdateCanvas,
   canvasDeletedRemotely,
   handleExitDashboardMode,
   handleExitMemoryMode,
+  handleExitFilesMode,
   handleExitRunsMode,
   handleToggleEditMode,
   setIsDashboardAddPanelOpen,
@@ -44,10 +46,23 @@ export function useWorkflowViewModeActions({
       handleExitMemoryMode();
       return;
     }
+    if (isFilesMode) {
+      handleExitFilesMode();
+      return;
+    }
     if (isRunsMode) {
       handleExitRunsMode();
     }
-  }, [handleExitDashboardMode, handleExitMemoryMode, handleExitRunsMode, isDashboardMode, isMemoryMode, isRunsMode]);
+  }, [
+    handleExitDashboardMode,
+    handleExitFilesMode,
+    handleExitMemoryMode,
+    handleExitRunsMode,
+    isDashboardMode,
+    isFilesMode,
+    isMemoryMode,
+    isRunsMode,
+  ]);
 
   const handleDashboardAddPanelRequest = useCallback(async () => {
     if (!hasEditableVersion) {
@@ -74,7 +89,6 @@ export function useWorkflowViewModeActions({
     ...getDashboardHeaderActions({
       isEditing: hasEditableVersion,
       isDashboardMode,
-      dashboardsFeatureEnabled,
       isTemplate,
       canUpdateCanvas,
       canvasDeletedRemotely,

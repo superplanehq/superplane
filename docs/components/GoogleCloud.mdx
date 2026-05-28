@@ -52,6 +52,8 @@ SuperPlane connects to Google Cloud using Workload Identity Federation — no lo
 
 ## Artifact Registry • On Artifact Analysis
 
+**Trigger key:** `gcp.artifactregistry.onArtifactAnalysis`
+
 The On Artifact Analysis trigger starts a workflow execution when Google Container Analysis publishes a new occurrence (e.g. vulnerability finding, build provenance, or attestation) for an artifact.
 
 **Trigger behavior:** SuperPlane subscribes to the `container-analysis-occurrences-v1` Pub/Sub topic that Container Analysis automatically publishes to.
@@ -111,6 +113,8 @@ Each event contains the full Container Analysis Occurrence resource, including `
 
 ## Artifact Registry • On Artifact Push
 
+**Trigger key:** `gcp.artifactregistry.onArtifactPush`
+
 The On Artifact Push trigger starts a workflow execution when a Docker image or other container artifact is pushed to Artifact Registry.
 
 **Trigger behavior:** SuperPlane subscribes to the `gcr` Pub/Sub topic that Artifact Registry automatically publishes to for container image push events.
@@ -154,6 +158,8 @@ Each event contains:
 <a id="cloud-build-•-on-build-complete"></a>
 
 ## Cloud Build • On Build Complete
+
+**Trigger key:** `gcp.cloudbuild.onBuildComplete`
 
 The On Build Complete trigger starts a workflow execution when a GCP Cloud Build build finishes.
 
@@ -201,6 +207,8 @@ Each event contains the full Cloud Build resource, including `id`, `status` (SUC
 
 ## Compute • On VM Instance
 
+**Trigger key:** `gcp.compute.onVMInstance`
+
 The On VM Instance trigger starts a workflow execution when a Compute Engine VM instance lifecycle event occurs.
 
 **Trigger behavior:** SuperPlane creates a Cloud Logging sink that captures Compute Engine audit log events and routes them to a shared Pub/Sub topic. Events are pushed to SuperPlane and matched to this trigger automatically.
@@ -247,6 +255,8 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
 <a id="pub/sub-•-on-message"></a>
 
 ## Pub/Sub • On Message
+
+**Trigger key:** `gcp.pubsub.onMessage`
 
 The On Message trigger starts a workflow execution when a message is published to a GCP Pub/Sub topic.
 
@@ -296,6 +306,8 @@ Each event contains the decoded message payload plus Pub/Sub metadata:
 <a id="artifact-registry-•-get-artifact"></a>
 
 ## Artifact Registry • Get Artifact
+
+**Component key:** `gcp.artifactregistry.getArtifact`
 
 Retrieves the details of a specific artifact version from Google Artifact Registry.
 
@@ -349,6 +361,8 @@ Artifact Registry supports all package formats when using **Select from Registry
 
 ## Artifact Registry • Get Artifact Analysis
 
+**Component key:** `gcp.artifactregistry.getArtifactAnalysis`
+
 Retrieves existing Container Analysis occurrences for an artifact from Google Container Analysis.
 
 ### Configuration
@@ -399,6 +413,8 @@ An analysis summary for the artifact, including:
 
 ## Cloud Build • Create Build
 
+**Component key:** `gcp.cloudbuild.createBuild`
+
 Creates and starts a Google Cloud Build build, then waits for the build to reach a terminal status.
 
 ### Configuration
@@ -448,6 +464,8 @@ The terminal Build resource, including `id`, `status`, `logUrl`, `createTime`, `
 
 ## Cloud Build • Get Build
 
+**Component key:** `gcp.cloudbuild.getBuild`
+
 Retrieves the details of a specific Google Cloud Build build.
 
 ### Configuration
@@ -479,6 +497,8 @@ The full Build resource, including `id`, `status` (SUCCESS, FAILURE, WORKING, QU
 <a id="cloud-build-•-run-trigger"></a>
 
 ## Cloud Build • Run Trigger
+
+**Component key:** `gcp.cloudbuild.runTrigger`
 
 Runs an existing Cloud Build trigger and waits for the resulting build to reach a terminal status.
 
@@ -524,6 +544,8 @@ The terminal Build resource, including `id`, `status`, `logUrl`, `createTime`, `
 <a id="cloud-dns-•-create-record"></a>
 
 ## Cloud DNS • Create Record
+
+**Component key:** `gcp.clouddns.createRecord`
 
 The Create Record component creates a new DNS record set in a Google Cloud DNS managed zone.
 
@@ -571,6 +593,8 @@ The service account must have `roles/dns.admin` or `roles/dns.editor` on the pro
 
 ## Cloud DNS • Delete Record
 
+**Component key:** `gcp.clouddns.deleteRecord`
+
 The Delete Record component deletes a DNS record set from a Google Cloud DNS managed zone.
 
 ### Configuration
@@ -614,6 +638,8 @@ The service account must have `roles/dns.admin` or `roles/dns.editor` on the pro
 <a id="cloud-dns-•-update-record"></a>
 
 ## Cloud DNS • Update Record
+
+**Component key:** `gcp.clouddns.updateRecord`
 
 The Update Record component updates an existing DNS record set in a Google Cloud DNS managed zone.
 
@@ -661,6 +687,8 @@ The service account must have `roles/dns.admin` or `roles/dns.editor` on the pro
 
 ## Cloud Functions • Invoke Function
 
+**Component key:** `gcp.cloudfunctions.invokeFunction`
+
 Invokes a Google Cloud Function and waits for the response.
 
 ### Configuration
@@ -707,6 +735,8 @@ The invocation result, including:
 
 ## Compute • Create Virtual Machine
 
+**Component key:** `gcp.createVM`
+
 Creates a new Google Compute Engine VM.
 
 ### Steps
@@ -745,6 +775,8 @@ Emits a payload with instance details: instanceId, selfLink, internalIP, externa
 <a id="compute-•-delete-vm-instance"></a>
 
 ## Compute • Delete VM Instance
+
+**Component key:** `gcp.deleteVMInstance`
 
 The Delete VM Instance component permanently deletes a Compute Engine VM instance.
 
@@ -789,6 +821,8 @@ Returns information about the deleted instance:
 
 ## Pub/Sub • Create Subscription
 
+**Component key:** `gcp.pubsub.createSubscription`
+
 The Create Subscription component creates a new GCP Pub/Sub subscription on a topic.
 
 ### Use Cases
@@ -816,6 +850,8 @@ The Create Subscription component creates a new GCP Pub/Sub subscription on a to
 
 ## Pub/Sub • Create Topic
 
+**Component key:** `gcp.pubsub.createTopic`
+
 The Create Topic component creates a new GCP Pub/Sub topic.
 
 ### Use Cases
@@ -840,6 +876,8 @@ The Create Topic component creates a new GCP Pub/Sub topic.
 <a id="pub/sub-•-delete-subscription"></a>
 
 ## Pub/Sub • Delete Subscription
+
+**Component key:** `gcp.pubsub.deleteSubscription`
 
 The Delete Subscription component deletes a GCP Pub/Sub subscription.
 
@@ -866,6 +904,8 @@ The Delete Subscription component deletes a GCP Pub/Sub subscription.
 
 ## Pub/Sub • Delete Topic
 
+**Component key:** `gcp.pubsub.deleteTopic`
+
 The Delete Topic component deletes a GCP Pub/Sub topic.
 
 ### Use Cases
@@ -890,6 +930,8 @@ The Delete Topic component deletes a GCP Pub/Sub topic.
 <a id="pub/sub-•-publish-message"></a>
 
 ## Pub/Sub • Publish Message
+
+**Component key:** `gcp.pubsub.publishMessage`
 
 The Publish Message component sends a message to a GCP Pub/Sub topic.
 

@@ -7,6 +7,7 @@ interface MemoryModeActionsConfig {
   setIsDashboardAddPanelOpen: (value: boolean) => void;
   setIsDashboardYamlOpen: (value: boolean) => void;
   setIsRunsMode: (value: boolean) => void;
+  setIsFilesMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
 }
@@ -17,6 +18,7 @@ export function useMemoryModeActions({
   setIsDashboardAddPanelOpen,
   setIsDashboardYamlOpen,
   setIsRunsMode,
+  setIsFilesMode,
   setSelectedRunId,
   setSearchParams,
 }: MemoryModeActionsConfig) {
@@ -26,12 +28,14 @@ export function useMemoryModeActions({
     setIsDashboardAddPanelOpen(false);
     setIsDashboardYamlOpen(false);
     setIsRunsMode(false);
+    setIsFilesMode(false);
     setSelectedRunId(null);
     setSearchParams(toMemorySearchParams, { replace: true });
   }, [
     setIsDashboardAddPanelOpen,
     setIsDashboardMode,
     setIsDashboardYamlOpen,
+    setIsFilesMode,
     setIsMemoryMode,
     setIsRunsMode,
     setSearchParams,

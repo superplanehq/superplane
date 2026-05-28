@@ -75,6 +75,7 @@ func TestAgentE2E(t *testing.T) {
 		steps.openAgent()
 		steps.sendMessage("Inspect the canvas")
 		steps.assertVisible(q.TestID("agent-tool-group"))
+		steps.expandToolGroupIfNeeded()
 		steps.assertVisible(q.TestID("agent-tool-message"))
 		steps.assertAssistantMessage("Tool run complete")
 	})
@@ -361,6 +362,17 @@ func (s *agentSteps) assertUserMessage(message string) {
 
 func (s *agentSteps) assertAssistantMessage(message string) {
 	s.assertVisible(q.Locator(fmt.Sprintf(`[data-testid="agent-assistant-message"]:has-text("%s")`, message)))
+}
+
+func (s *agentSteps) expandToolGroupIfNeeded() {
+	toolMessage := s.session.Page().GetByTestId("agent-tool-message").First()
+	visible, err := toolMessage.IsVisible()
+	require.NoError(s.t, err)
+	if visible {
+		return
+	}
+
+	s.session.Click(q.Locator(`[data-testid="agent-tool-group"] button`))
 }
 
 func (s *agentSteps) assertText(text string) {

@@ -46,6 +46,8 @@ func TestDefaultResourceSourcesForSkillsBaseURL(t *testing.T) {
 		"https://example.test/root/skills/superplane-monitor/SKILL.md",
 		byMountPath["ref/skills/superplane-monitor/SKILL.md"].SourceURL,
 	)
+	assert.Contains(t, byMountPath, "ref/components/Index.md")
+	assert.Contains(t, string(byMountPath["ref/components/Index.md"].SourceData), "aws.ec2.createInstance")
 
 	componentSourceCount := 0
 	for _, source := range sources {
