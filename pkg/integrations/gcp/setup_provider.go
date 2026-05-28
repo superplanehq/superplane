@@ -46,7 +46,7 @@ func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 		{
 			Label: "Compute Engine",
 			Capabilities: genCapabilities(
-				[]core.Action{&compute.CreateVM{}},
+				[]core.Action{&compute.CreateVM{}, &compute.DeleteVMInstance{}},
 				[]core.Trigger{&compute.OnVMInstance{}},
 			),
 		},
