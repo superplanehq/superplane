@@ -43,6 +43,21 @@ func TestDefaultResourceSourcesForSkillsBaseURL(t *testing.T) {
 	)
 	assert.Equal(
 		t,
+		"https://example.test/root/skills/superplane-cli/references/console-yaml-spec.md",
+		byMountPath["ref/skills/superplane-cli/references/console-yaml-spec.md"].SourceURL,
+	)
+	assert.Equal(
+		t,
+		"https://raw.githubusercontent.com/superplanehq/superplane/main/docs/prd/console-and-widgets.md",
+		byMountPath["ref/docs/prd/console-and-widgets.md"].SourceURL,
+	)
+	assert.Equal(
+		t,
+		"docs/prd/console-and-widgets.md",
+		byMountPath["ref/docs/prd/console-and-widgets.md"].SourceKey,
+	)
+	assert.Equal(
+		t,
 		"https://example.test/root/skills/superplane-monitor/SKILL.md",
 		byMountPath["ref/skills/superplane-monitor/SKILL.md"].SourceURL,
 	)
