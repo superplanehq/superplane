@@ -32,6 +32,7 @@ docker buildx build \
   --progress=plain \
   --provenance=false \
   --push \
+  --target demo \
   -t "${IMAGE_REPO}:${VERSION}-${ARCH}" \
-  -f release/superplane-demo-image/Dockerfile \
+  -f Dockerfile \
   .
