@@ -1130,39 +1130,32 @@ export function WorkflowPageV2() {
 
     return release;
   }, []);
+  const canvasConsoleVersionDiff = useCanvasConsoleVersionDiff({
+    canvasId: canvasId!,
+    versionIds: { active: activeCanvasVersionId, draft: latestDraftVersion?.metadata?.id, live: liveCanvasVersionId },
+    hasDraftGraphDiffVersusLive,
+    suppressUnpublishedDraftDiscard,
+    enabled: !isTemplate,
+    registerIgnoredCanvasVersionUpdatedEcho,
+  });
   const { dashboardQuery, updateDashboardMutation, draftChangeIndicators, hasDraftDiffVersusLive } =
-    useCanvasConsoleVersionDiff({
-      canvasId: canvasId!,
-      versionIds: { active: activeCanvasVersionId, draft: latestDraftVersion?.metadata?.id, live: liveCanvasVersionId },
-      hasDraftGraphDiffVersusLive,
-      suppressUnpublishedDraftDiscard,
-      enabled: !isTemplate,
-      registerIgnoredCanvasVersionUpdatedEcho,
-    });
+    canvasConsoleVersionDiff;
   const consumeIgnoredCanvasUpdatedEcho = useCallback(() => {
     const release = ignoredCanvasUpdatedEchoReleasesRef.current.pop();
-    if (!release) {
-      return false;
-    }
+    if (!release) return false;
 
     release();
     return true;
   }, []);
 
   const consumeIgnoredCanvasVersionUpdatedEcho = useCallback((versionId?: string) => {
-    if (!versionId) {
-      return false;
-    }
+    if (!versionId) return false;
 
     const releases = ignoredCanvasVersionUpdatedEchoReleasesRef.current.get(versionId);
-    if (!releases) {
-      return false;
-    }
+    if (!releases) return false;
 
     const release = releases.pop();
-    if (!release) {
-      return false;
-    }
+    if (!release) return false;
 
     if (releases.length === 0) {
       ignoredCanvasVersionUpdatedEchoReleasesRef.current.delete(versionId);
@@ -5609,6 +5602,7 @@ export function WorkflowPageV2() {
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           onShowDiff={onShowDiff}
+          {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
           visualDiffEnabled={draftVisualDiff.visualDiffEnabled}
           draftVisualDiff={draftVisualDiff}
           onToggleVisualDiff={draftVisualDiff.toggleVisualDiff}
@@ -5726,6 +5720,7 @@ export function WorkflowPageV2() {
       </div>
       <CanvasYamlModal {...canvasYamlModalProps} />
       {yamlDiffModal}
+      {canvasConsoleVersionDiff.consoleYamlDiffModal}
       {resolvingConflictChangeRequest ? (
         <div className="fixed inset-0 z-[100] min-h-0 bg-slate-50">
           <CanvasChangeRequestConflictResolver

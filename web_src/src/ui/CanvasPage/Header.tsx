@@ -15,6 +15,7 @@ export interface HeaderProps {
   onPublishVersion?: () => void;
   onDiscardVersion?: () => void;
   onShowDiff?: () => void;
+  onShowConsoleDiff?: () => void;
   visualDiffEnabled?: boolean;
   onToggleVisualDiff?: () => void;
   draftVisualDiff?: {
@@ -25,6 +26,9 @@ export interface HeaderProps {
       showEdgeDiff: boolean;
       toggleShowEdgeDiff: () => void;
     };
+  };
+  draftConsoleDiff?: {
+    diffCounts: { added: number; updated: number; removed: number };
   };
   organizationId?: string;
   saveIsPrimary?: boolean;
