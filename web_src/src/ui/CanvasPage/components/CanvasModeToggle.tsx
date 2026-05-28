@@ -2,7 +2,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
 
-type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
+export type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
@@ -12,6 +12,7 @@ interface CanvasModeToggleProps {
   onSelectFiles?: () => void;
   editing?: boolean;
   hasDraft?: boolean;
+  hasDashboardDraft?: boolean;
 }
 
 const CANVAS_TAB = "canvas";
@@ -28,6 +29,7 @@ export function CanvasModeToggle({
   onSelectFiles,
   editing = false,
   hasDraft = false,
+  hasDashboardDraft = false,
 }: CanvasModeToggleProps) {
   const showDashboard = Boolean(onSelectDashboard);
   const showMemory = Boolean(onSelectMemory);
@@ -104,7 +106,10 @@ export function CanvasModeToggle({
       >
         {showDashboard ? (
           <TabsTrigger value={DASHBOARD_TAB} data-testid="canvas-view-mode-dashboard" aria-label="Console">
-            Console
+            <span className="inline-flex items-center gap-1.5">
+              Console
+              <DraftDot show={hasDashboardDraft} testId="canvas-view-mode-dashboard-draft-dot" />
+            </span>
           </TabsTrigger>
         ) : null}
         <TabsTrigger
@@ -114,13 +119,7 @@ export function CanvasModeToggle({
         >
           <span className="inline-flex items-center gap-1.5">
             Canvas
-            {hasDraft ? (
-              <span
-                className="inline-flex size-1.5 shrink-0 rounded-full bg-slate-400"
-                aria-hidden="true"
-                data-testid="canvas-view-mode-live-draft-dot"
-              />
-            ) : null}
+            <DraftDot show={hasDraft} testId="canvas-view-mode-live-draft-dot" />
           </span>
         </TabsTrigger>
         {showMemory ? (
@@ -135,5 +134,15 @@ export function CanvasModeToggle({
         ) : null}
       </TabsList>
     </Tabs>
+  );
+}
+
+function DraftDot({ show, testId }: { show: boolean; testId: string }) {
+  if (!show) {
+    return null;
+  }
+
+  return (
+    <span className="inline-flex size-1.5 shrink-0 rounded-full bg-slate-400" aria-hidden="true" data-testid={testId} />
   );
 }
