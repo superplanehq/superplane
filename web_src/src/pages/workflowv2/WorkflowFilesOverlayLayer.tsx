@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
+  useCanvasRepository,
   useCanvasRepositoryFile,
   useCanvasRepositoryFiles,
   useCommitCanvasRepositoryFiles,
@@ -115,6 +116,7 @@ function CanvasFilesView({
 }) {
   const canUseRepository = !!canvasId;
   const canManageRepositoryFiles = canWrite && canUseRepository;
+  const repositoryQuery = useCanvasRepository(canvasId ?? "", canUseRepository);
   const filesQuery = useCanvasRepositoryFiles(canvasId ?? "", canUseRepository);
   const commitFiles = useCommitCanvasRepositoryFiles(canvasId ?? "");
   const generatedPaths = useMemo(() => files.map((file) => file.path), [files]);
@@ -128,9 +130,7 @@ function CanvasFilesView({
   }, [files]);
   const initialPath = generatedPaths[0] ?? null;
   const hasAutoOpenedInitialFileRef = useRef(Boolean(initialPath));
-  const repository = filesQuery.data?.repository;
-  const defaultBranch = repository?.defaultBranch || "main";
-  const headSha = repository?.headSha;
+  const headSha = repositoryQuery.data?.status?.headSha;
   const repositoryPaths = useMemo(
     () =>
       (filesQuery.data?.files || [])
@@ -146,7 +146,6 @@ function CanvasFilesView({
   const [selectedPath, setSelectedPath] = useState<string | null>(() => initialPath);
   const [newFilePath, setNewFilePath] = useState<string | null>(null);
   const [commitMessage, setCommitMessage] = useState("");
-  const [commitBranch, setCommitBranch] = useState("");
   const [isCommitPopoverOpen, setIsCommitPopoverOpen] = useState(false);
   const [isDiffOpen, setIsDiffOpen] = useState(false);
   const [headerActionsHost, setHeaderActionsHost] = useState<HTMLElement | null>(null);
@@ -206,13 +205,6 @@ function CanvasFilesView({
     commitMessage.trim() !== "" &&
     !commitPathError &&
     !commitFiles.isPending;
-  const targetBranch = commitBranch.trim();
-
-  useEffect(() => {
-    if (commitBranch || !repository?.defaultBranch) return;
-    setCommitBranch(repository.defaultBranch);
-  }, [commitBranch, repository?.defaultBranch]);
-
   useEffect(() => {
     if (!headerActionsSlotId) {
       setHeaderActionsHost(null);
@@ -246,7 +238,7 @@ function CanvasFilesView({
     const path = data?.path;
     if (!path) return;
 
-    const content = decodeBase64(data.content || "");
+    const content = data.content || "";
     setLoadedContentByPath((current) => {
       if (current[path] === content) return current;
       return { ...current, [path]: content };
@@ -384,14 +376,10 @@ function CanvasFilesView({
       return;
     }
 
-    const branch = targetBranch || defaultBranch;
-
     try {
-      const response = await commitFiles.mutateAsync({
+      await commitFiles.mutateAsync({
         message,
-        branch,
-        baseBranch: branch === defaultBranch ? undefined : defaultBranch,
-        expectedHeadSha: branch === defaultBranch ? headSha : undefined,
+        expectedHeadSha: headSha,
         operations: pendingChanges.map((change) => {
           if (change.type === "deleted") {
             return { path: change.path, delete: true };
@@ -418,13 +406,10 @@ function CanvasFilesView({
         return next;
       });
       setIsCommitPopoverOpen(false);
-      if (response?.branch) {
-        setCommitBranch(response.branch);
-      }
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to commit files."));
     }
-  }, [commitFiles, commitMessage, commitPathError, defaultBranch, headSha, pendingChanges, targetBranch]);
+  }, [commitFiles, commitMessage, commitPathError, headSha, pendingChanges]);
 
   return (
     <div
@@ -444,8 +429,14 @@ function CanvasFilesView({
         <FileList
           paths={visiblePaths}
           selectedPath={selectedPath}
-          loading={canUseRepository && filesQuery.isLoading}
-          errorMessage={filesQuery.error ? getApiErrorMessage(filesQuery.error, "Failed to load files.") : undefined}
+          loading={canUseRepository && (filesQuery.isLoading || repositoryQuery.isLoading)}
+          errorMessage={
+            filesQuery.error
+              ? getApiErrorMessage(filesQuery.error, "Failed to load files.")
+              : repositoryQuery.error
+                ? getApiErrorMessage(repositoryQuery.error, "Failed to load repository.")
+                : undefined
+          }
           canWrite={canManageRepositoryFiles}
           newFilePath={newFilePath}
           readOnlyPaths={generatedPathSet}
@@ -531,12 +522,10 @@ function CanvasFilesView({
               pendingChanges={pendingChanges}
               commitFilesPending={commitFiles.isPending}
               canCommit={canCommit}
-              commitBranch={commitBranch}
               commitMessage={commitMessage}
               commitPathError={commitPathError}
               isCommitPopoverOpen={isCommitPopoverOpen}
               onCommitPopoverOpenChange={setIsCommitPopoverOpen}
-              onBranchChange={setCommitBranch}
               onCommit={commitChanges}
               onDiscardChange={discardChange}
               onDiffOpen={() => setIsDiffOpen(true)}
@@ -553,12 +542,10 @@ function FilesHeaderActions({
   pendingChanges,
   commitFilesPending,
   canCommit,
-  commitBranch,
   commitMessage,
   commitPathError,
   isCommitPopoverOpen,
   onCommitPopoverOpenChange,
-  onBranchChange,
   onCommit,
   onDiscardChange,
   onDiffOpen,
@@ -567,12 +554,10 @@ function FilesHeaderActions({
   pendingChanges: PendingFileChange[];
   commitFilesPending: boolean;
   canCommit: boolean;
-  commitBranch: string;
   commitMessage: string;
   commitPathError?: string;
   isCommitPopoverOpen: boolean;
   onCommitPopoverOpenChange: (open: boolean) => void;
-  onBranchChange: (value: string) => void;
   onCommit: () => void;
   onDiscardChange: (path: string) => void;
   onDiffOpen: () => void;
@@ -593,13 +578,11 @@ function FilesHeaderActions({
         </PopoverTrigger>
         <PopoverContent align="end" className="w-80" sideOffset={8}>
           <CommitPopoverContent
-            branch={commitBranch}
             changes={pendingChanges}
             committing={commitFilesPending}
             canCommit={canCommit}
             message={commitMessage}
             validationError={commitPathError}
-            onBranchChange={onBranchChange}
             onMessageChange={onMessageChange}
             onCommit={onCommit}
             onDiscardChange={onDiscardChange}
@@ -644,42 +627,26 @@ function EditorIconButton({
 }
 
 function CommitPopoverContent({
-  branch,
   changes,
   committing,
   canCommit,
   message,
   validationError,
-  onBranchChange,
   onMessageChange,
   onCommit,
   onDiscardChange,
 }: {
-  branch: string;
   changes: PendingFileChange[];
   committing: boolean;
   canCommit: boolean;
   message: string;
   validationError?: string;
-  onBranchChange: (value: string) => void;
   onMessageChange: (value: string) => void;
   onCommit: () => void;
   onDiscardChange: (path: string) => void;
 }) {
   return (
     <div className="flex max-h-[min(70vh,520px)] min-h-0 flex-col gap-4">
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-slate-600" htmlFor="canvas-files-commit-branch">
-          Branch
-        </label>
-        <Input
-          id="canvas-files-commit-branch"
-          value={branch}
-          onChange={(event) => onBranchChange(event.target.value)}
-          className="h-8 font-mono text-sm"
-        />
-      </div>
-
       <div className="space-y-1.5">
         <label className="text-xs font-medium text-slate-600" htmlFor="canvas-files-commit-message">
           Message
@@ -1229,12 +1196,6 @@ function changeTypeLabel(type: PendingFileChange["type"]): string {
   if (type === "added") return "A";
   if (type === "modified") return "M";
   return "D";
-}
-
-function decodeBase64(value: string): string {
-  const binary = atob(value);
-  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
 }
 
 function encodeBase64(value: string): string {

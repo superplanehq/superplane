@@ -2,13 +2,11 @@ package canvases
 
 import (
 	"context"
-	"io"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/canvasstorage"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/test/support"
@@ -160,63 +158,4 @@ func Test__DeleteCanvas(t *testing.T) {
 		_, err = models.FindWebhook(webhookID)
 		require.NoError(t, err)
 	})
-
-	t.Run("deletes canvas repository before soft delete", func(t *testing.T) {
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		repoID := canvasstorage.CanvasRepoID(r.Organization.ID, canvas.ID)
-		repository := &models.CanvasRepository{
-			CanvasID:       canvas.ID,
-			OrganizationID: r.Organization.ID,
-			Provider:       models.CanvasRepositoryProviderLocalGit,
-			RepoID:         repoID,
-			DefaultBranch:  "main",
-			Status:         models.CanvasRepositoryStatusReady,
-		}
-		require.NoError(t, models.UpsertCanvasRepository(repository))
-
-		storage := &deleteCanvasRepositoryStorage{}
-		_, err := DeleteCanvas(context.Background(), r.Registry, r.Organization.ID, canvas.ID.String(), storage)
-		require.NoError(t, err)
-
-		require.Len(t, storage.deletedRefs, 1)
-		assert.Equal(t, repoID, storage.deletedRefs[0].RepoID)
-		assert.Equal(t, "main", storage.deletedRefs[0].DefaultBranch)
-	})
-}
-
-type deleteCanvasRepositoryStorage struct {
-	deletedRefs []canvasstorage.RepositoryRef
-}
-
-func (s *deleteCanvasRepositoryStorage) EnsureRepository(context.Context, canvasstorage.RepositorySpec) (*canvasstorage.Repository, error) {
-	return nil, nil
-}
-
-func (s *deleteCanvasRepositoryStorage) DeleteRepository(_ context.Context, ref canvasstorage.RepositoryRef) error {
-	s.deletedRefs = append(s.deletedRefs, ref)
-	return nil
-}
-
-func (s *deleteCanvasRepositoryStorage) ListFiles(context.Context, canvasstorage.RepositoryRef, canvasstorage.ListFilesOptions) (*canvasstorage.ListFilesResult, error) {
-	return nil, nil
-}
-
-func (s *deleteCanvasRepositoryStorage) GetFile(context.Context, canvasstorage.RepositoryRef, canvasstorage.GetFileOptions) (io.ReadCloser, error) {
-	return nil, nil
-}
-
-func (s *deleteCanvasRepositoryStorage) CommitFiles(context.Context, canvasstorage.RepositoryRef, canvasstorage.CommitFilesOptions) (*canvasstorage.CommitResult, error) {
-	return nil, nil
-}
-
-func (s *deleteCanvasRepositoryStorage) CurrentHead(context.Context, canvasstorage.RepositoryRef, string) (string, error) {
-	return "", nil
-}
-
-func (s *deleteCanvasRepositoryStorage) GitURL(context.Context, canvasstorage.RepositoryRef) (string, error) {
-	return "", nil
-}
-
-func (s *deleteCanvasRepositoryStorage) GenerateGitCredentials(context.Context, canvasstorage.RepositoryRef, canvasstorage.GitCredentialsOptions) (*canvasstorage.GitCredentials, error) {
-	return nil, nil
 }

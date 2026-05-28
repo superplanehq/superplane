@@ -1,0 +1,91 @@
+{{- if .Values.supergit.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-supergit
+  namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    app: superplane
+    service: {{ .Release.Name }}-supergit
+  ports:
+    - name: http
+      port: {{ .Values.supergit.port }}
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-supergit
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: superplane
+    service: {{ .Release.Name }}-supergit
+spec:
+  serviceName: {{ .Release.Name }}-supergit
+  replicas: {{ .Values.supergit.replicas }}
+  selector:
+    matchLabels:
+      app: superplane
+      service: {{ .Release.Name }}-supergit
+  template:
+    metadata:
+      labels:
+        app: superplane
+        service: {{ .Release.Name }}-supergit
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: supergit
+          image: "{{ .Values.supergit.image.registry }}/{{ .Values.supergit.image.name }}:{{ .Values.supergit.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.supergit.image.pullPolicy }}
+          env:
+            - name: SUPERGIT_ROOT
+              value: /var/lib/supergit/repos
+            - name: SUPERGIT_PORT
+              value: {{ .Values.supergit.port | quote }}
+            - name: SUPERGIT_DEFAULT_BRANCH
+              value: {{ .Values.supergit.defaultBranch | quote }}
+            - name: SUPERGIT_MAX_FILE_BYTES
+              value: {{ .Values.supergit.maxFileBytes | quote }}
+            - name: SUPERGIT_MAX_COMMIT_BYTES
+              value: {{ .Values.supergit.maxCommitBytes | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.supergit.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 5
+          volumeMounts:
+            - name: supergit-storage
+              mountPath: /var/lib/supergit/repos
+          {{- with .Values.supergit.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: supergit-storage
+      spec:
+        accessModes: [ "ReadWriteOnce" ]
+        resources:
+          requests:
+            storage: {{ .Values.supergit.storageSize }}
+{{- end }}

@@ -124,6 +124,16 @@ spec:
               value: {{ ternary "yes" "no" .Values.installation.beaconEnabled | quote }}
             - name: SUPERPLANE_INSTALLATION_TYPE
               value: {{ .Values.installation.type | quote }}
+            - name: CANVAS_STORAGE_DRIVER
+              value: {{ .Values.canvasStorage.driver | quote }}
+            - name: CANVAS_STORAGE_DEFAULT_BRANCH
+              value: {{ .Values.canvasStorage.defaultBranch | quote }}
+            - name: CANVAS_STORAGE_MAX_FILE_BYTES
+              value: {{ .Values.canvasStorage.maxFileBytes | quote }}
+            - name: CANVAS_STORAGE_MAX_COMMIT_BYTES
+              value: {{ .Values.canvasStorage.maxCommitBytes | quote }}
+            - name: CANVAS_STORAGE_SUPERGIT_BASE_URL
+              value: "http://{{ .Release.Name }}-supergit:{{ .Values.supergit.port }}/api"
 
           volumeMounts:
             - name: oidc-keys

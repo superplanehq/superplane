@@ -98,13 +98,6 @@ LABEL org.opencontainers.image.title="superplane" \
 
 # postgresql-client needs to be installed here too,
 # otherwise the createdb command won't work.
-# git is needed by the local_git canvas storage driver.
-# Install PostgreSQL 17.5 client tools
-RUN apt-get update && \
-  apt-get install -y --no-install-recommends git && \
-  apt-get clean && \
-  rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
-
 COPY scripts/docker/install-postgresql-client.sh install-postgresql-client.sh
 RUN bash install-postgresql-client.sh
 

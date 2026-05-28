@@ -48,14 +48,14 @@ func (c AnthropicAgentConfig) Enabled() bool {
 const (
 	CanvasStorageDriverDisabled    = "disabled"
 	CanvasStorageDriverCodeStorage = "code_storage"
-	CanvasStorageDriverLocalGit    = "local_git"
+	CanvasStorageDriverSupergit    = "supergit"
 )
 
 const (
-	defaultCanvasStorageLocalRoot      = "/var/lib/superplane/canvas-repos"
 	defaultCanvasStorageDefaultBranch  = "main"
 	defaultCanvasStorageMaxFileBytes   = 10 * 1024 * 1024
 	defaultCanvasStorageMaxCommitBytes = 25 * 1024 * 1024
+	defaultSupergitBaseURL             = "http://supergit:8080/api"
 )
 
 // CanvasStorageConfig holds the configuration for Git-backed canvas files.
@@ -63,12 +63,12 @@ const (
 // DB-only behavior until canvas file storage is explicitly enabled.
 type CanvasStorageConfig struct {
 	Driver                    string
-	LocalRoot                 string
 	DefaultBranch             string
 	MaxFileBytes              int64
 	MaxCommitBytes            int64
 	CodeStorageName           string
 	CodeStoragePrivateKeyPath string
+	SupergitBaseURL           string
 }
 
 func LoadCanvasStorageConfig() CanvasStorageConfig {
@@ -77,24 +77,24 @@ func LoadCanvasStorageConfig() CanvasStorageConfig {
 		driver = CanvasStorageDriverDisabled
 	}
 
-	localRoot := strings.TrimSpace(os.Getenv("CANVAS_STORAGE_LOCAL_ROOT"))
-	if localRoot == "" {
-		localRoot = defaultCanvasStorageLocalRoot
-	}
-
 	defaultBranch := strings.TrimSpace(os.Getenv("CANVAS_STORAGE_DEFAULT_BRANCH"))
 	if defaultBranch == "" {
 		defaultBranch = defaultCanvasStorageDefaultBranch
 	}
 
+	supergitBaseURL := strings.TrimSpace(os.Getenv("CANVAS_STORAGE_SUPERGIT_BASE_URL"))
+	if supergitBaseURL == "" {
+		supergitBaseURL = defaultSupergitBaseURL
+	}
+
 	return CanvasStorageConfig{
 		Driver:                    driver,
-		LocalRoot:                 localRoot,
 		DefaultBranch:             defaultBranch,
 		MaxFileBytes:              loadInt64Env("CANVAS_STORAGE_MAX_FILE_BYTES", defaultCanvasStorageMaxFileBytes),
 		MaxCommitBytes:            loadInt64Env("CANVAS_STORAGE_MAX_COMMIT_BYTES", defaultCanvasStorageMaxCommitBytes),
 		CodeStorageName:           strings.TrimSpace(os.Getenv("CODE_STORAGE_NAME")),
 		CodeStoragePrivateKeyPath: strings.TrimSpace(os.Getenv("CODE_STORAGE_PRIVATE_KEY_PATH")),
+		SupergitBaseURL:           supergitBaseURL,
 	}
 }
 

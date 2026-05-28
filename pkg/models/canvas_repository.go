@@ -11,26 +11,22 @@ import (
 
 const (
 	CanvasRepositoryProviderCodeStorage = "code_storage"
-	CanvasRepositoryProviderLocalGit    = "local_git"
+	CanvasRepositoryProviderSupergit    = "supergit"
 
-	CanvasRepositoryStatusProvisioning = "provisioning"
-	CanvasRepositoryStatusReady        = "ready"
-	CanvasRepositoryStatusError        = "error"
+	CanvasRepositoryStatusPending = "pending"
+	CanvasRepositoryStatusReady   = "ready"
+	CanvasRepositoryStatusError   = "error"
 )
 
 type CanvasRepository struct {
-	CanvasID       uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ID             uuid.UUID `gorm:"type:uuid;primaryKey;default:uuid_generate_v4()"`
+	CanvasID       uuid.UUID
 	OrganizationID uuid.UUID
 	Provider       string
 	RepoID         string
-	DefaultBranch  string
 	Status         string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
-}
-
-func (CanvasRepository) TableName() string {
-	return "canvas_repositories"
 }
 
 func FindCanvasRepositoryInTransaction(tx *gorm.DB, canvasID uuid.UUID) (*CanvasRepository, error) {
@@ -57,7 +53,6 @@ func UpsertCanvasRepositoryInTransaction(tx *gorm.DB, repository *CanvasReposito
 			"organization_id",
 			"provider",
 			"repo_id",
-			"default_branch",
 			"status",
 			"updated_at",
 		}),

@@ -21,9 +21,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/git"
 	"github.com/superplanehq/superplane/pkg/grpc"
+	canvasActions "github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/logging"
@@ -90,6 +93,8 @@ type Server struct {
 	authHandler           *authentication.Handler
 	isDev                 bool
 	usageService          usage.Service
+	canvasStorage         git.Provider
+	canvasStorageOptions  canvasActions.CanvasRepositoryStorageOptions
 }
 
 // WebsocketHub returns the websocket hub for this server
@@ -237,6 +242,23 @@ func newGRPCGatewayMarshaler() runtime.Marshaler {
 
 func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	ctx := context.Background()
+	canvasStorageConfig := config.LoadCanvasStorageConfig()
+	canvasStorage, err := git.NewProvider(canvasStorageConfig)
+	if err != nil {
+		return err
+	}
+
+	providerName := canvasStorageConfig.Driver
+	if providerName == config.CanvasStorageDriverDisabled {
+		providerName = ""
+	}
+
+	s.canvasStorage = canvasStorage
+	s.canvasStorageOptions = canvasActions.CanvasRepositoryStorageOptions{
+		ProviderName:  providerName,
+		DefaultBranch: canvasStorageConfig.DefaultBranch,
+		MaxFileBytes:  canvasStorageConfig.MaxFileBytes,
+	}
 
 	grpcGatewayMux := runtime.NewServeMux(
 		runtime.WithMarshalerOption(runtime.MIMEWildcard, newGRPCGatewayMarshaler()),
@@ -259,7 +281,7 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	opts := []grpcLib.DialOption{grpcLib.WithTransportCredentials(insecure.NewCredentials())}
 
-	err := pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
+	err = pbUsers.RegisterUsersHandlerFromEndpoint(ctx, grpcGatewayMux, grpcServerAddr, opts)
 	if err != nil {
 		return err
 	}
@@ -346,6 +368,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
+	s.Router.Handle(
+		"/api/v1/canvases/{canvas_id}/repository/file/{path:.*}",
+		orgAuthMiddleware(http.HandlerFunc(s.handleCanvasRepositoryFile)),
+	).Methods(http.MethodGet)
+
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
 	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)

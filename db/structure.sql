@@ -264,16 +264,14 @@ CREATE TABLE public.canvas_memories (
 --
 
 CREATE TABLE public.canvas_repositories (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     canvas_id uuid NOT NULL,
     organization_id uuid NOT NULL,
     provider text NOT NULL,
     repo_id text NOT NULL,
-    default_branch text DEFAULT 'main'::text NOT NULL,
-    status text DEFAULT 'ready'::text NOT NULL,
+    status character varying(40) DEFAULT 'pending'::character varying NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT canvas_repositories_provider_check CHECK ((provider = ANY (ARRAY['code_storage'::text, 'local_git'::text]))),
-    CONSTRAINT canvas_repositories_status_check CHECK ((status = ANY (ARRAY['provisioning'::text, 'ready'::text, 'error'::text])))
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -890,7 +888,7 @@ ALTER TABLE ONLY public.canvas_memories
 --
 
 ALTER TABLE ONLY public.canvas_repositories
-    ADD CONSTRAINT canvas_repositories_pkey PRIMARY KEY (canvas_id);
+    ADD CONSTRAINT canvas_repositories_pkey PRIMARY KEY (id);
 
 
 --
@@ -1320,10 +1318,10 @@ CREATE INDEX idx_canvas_memories_canvas_namespace ON public.canvas_memories USIN
 
 
 --
--- Name: idx_canvas_repositories_organization_id; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_canvas_repositories_canvas_id; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_canvas_repositories_organization_id ON public.canvas_repositories USING btree (organization_id);
+CREATE INDEX idx_canvas_repositories_canvas_id ON public.canvas_repositories USING btree (canvas_id);
 
 
 --
@@ -2195,7 +2193,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260526171445	f
+20260527124329	f
 \.
 
 
@@ -2240,3 +2238,4 @@ COPY public.data_migrations (version, dirty) FROM stdin;
 --
 
 \unrestrict abcdef123
+

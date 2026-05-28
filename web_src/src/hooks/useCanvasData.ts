@@ -35,9 +35,7 @@ import {
   canvasesUpdateCanvasDashboard,
   canvasesGetCanvasRepository,
   canvasesListCanvasRepositoryFiles,
-  canvasesGetCanvasRepositoryFile,
   canvasesCommitCanvasRepositoryFiles,
-  canvasesGenerateCanvasRepositoryCredentials,
   triggersListTriggers,
   triggersDescribeTrigger,
   widgetsListWidgets,
@@ -1687,13 +1685,22 @@ export const useCanvasRepositoryFile = (
   return useQuery({
     queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, ref),
     queryFn: async () => {
-      const response = await canvasesGetCanvasRepositoryFile(
+      const query = ref ? `?ref=${encodeURIComponent(ref)}` : "";
+      const response = await fetch(
+        `/api/v1/canvases/${encodeURIComponent(canvasId)}/repository/file/${encodeRepositoryFilePath(normalizedPath)}${query}`,
         withOrganizationHeader({
-          path: { canvasId, path: normalizedPath },
-          query: ref ? { ref } : undefined,
+          headers: { Accept: "application/octet-stream" },
         }),
       );
-      return response.data;
+
+      if (!response.ok) {
+        throw new Error((await response.text()) || "Failed to load file.");
+      }
+
+      return {
+        path: normalizedPath,
+        content: await response.text(),
+      };
     },
     enabled: enabled && !!canvasId && !!normalizedPath,
     staleTime: 15_000,
@@ -1707,8 +1714,6 @@ export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
       message: string;
       operations: CanvasesCanvasRepositoryFileOperation[];
       expectedHeadSha?: string;
-      branch?: string;
-      baseBranch?: string;
     }) => {
       const response = await canvasesCommitCanvasRepositoryFiles(
         withOrganizationHeader({
@@ -1717,15 +1722,12 @@ export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
             message: input.message,
             operations: input.operations,
             expectedHeadSha: input.expectedHeadSha,
-            branch: input.branch,
-            baseBranch: input.baseBranch,
           },
         }),
       );
       return response.data;
     },
-    onSuccess: (data, input) => {
-      const repository = data?.repository;
+    onSuccess: (_data, input) => {
       queryClient.setQueryData<CanvasesListCanvasRepositoryFilesResponse | undefined>(
         canvasKeys.repositoryFiles(canvasId),
         (current) => {
@@ -1747,7 +1749,6 @@ export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
 
           return {
             ...current,
-            repository: repository ?? current?.repository,
             files: Array.from(paths)
               .sort((left, right) => left.localeCompare(right))
               .map((path) => ({ path })),
@@ -1757,27 +1758,6 @@ export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
       queryClient.invalidateQueries({ queryKey: [...canvasKeys.repository(canvasId), "file"] });
-      if (repository) {
-        queryClient.setQueryData(canvasKeys.repository(canvasId), repository);
-      }
-    },
-  });
-};
-
-export const useGenerateCanvasRepositoryCredentials = (canvasId: string) => {
-  return useMutation({
-    mutationFn: async (input: { readOnly?: boolean; ttlSeconds?: number; allowForcePush?: boolean } = {}) => {
-      const response = await canvasesGenerateCanvasRepositoryCredentials(
-        withOrganizationHeader({
-          path: { canvasId },
-          body: {
-            readOnly: input.readOnly,
-            ttlSeconds: String(input.ttlSeconds ?? 3600),
-            allowForcePush: input.allowForcePush,
-          },
-        }),
-      );
-      return response.data;
     },
   });
 };
@@ -1787,3 +1767,7 @@ export type UpdateCanvasConsoleMutationResult = ReturnType<typeof useUpdateCanva
 export type CanvasRepositoryFilesQueryResult = ReturnType<typeof useCanvasRepositoryFiles>;
 export type CanvasRepositoryFileQueryResult = ReturnType<typeof useCanvasRepositoryFile>;
 export type CommitCanvasRepositoryFilesMutationResult = ReturnType<typeof useCommitCanvasRepositoryFiles>;
+
+function encodeRepositoryFilePath(path: string): string {
+  return path.split("/").map(encodeURIComponent).join("/");
+}

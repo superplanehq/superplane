@@ -4,18 +4,18 @@ import "testing"
 
 func TestLoadCanvasStorageConfigDefaults(t *testing.T) {
 	t.Setenv("CANVAS_STORAGE_DRIVER", "")
-	t.Setenv("CANVAS_STORAGE_LOCAL_ROOT", "")
 	t.Setenv("CANVAS_STORAGE_DEFAULT_BRANCH", "")
 	t.Setenv("CANVAS_STORAGE_MAX_FILE_BYTES", "")
 	t.Setenv("CANVAS_STORAGE_MAX_COMMIT_BYTES", "")
+	t.Setenv("CANVAS_STORAGE_SUPERGIT_BASE_URL", "")
 
 	cfg := LoadCanvasStorageConfig()
 
 	if cfg.Driver != CanvasStorageDriverDisabled {
 		t.Fatalf("expected disabled driver, got %q", cfg.Driver)
 	}
-	if cfg.LocalRoot != defaultCanvasStorageLocalRoot {
-		t.Fatalf("expected default local root, got %q", cfg.LocalRoot)
+	if cfg.SupergitBaseURL != defaultSupergitBaseURL {
+		t.Fatalf("expected default supergit base URL, got %q", cfg.SupergitBaseURL)
 	}
 	if cfg.DefaultBranch != defaultCanvasStorageDefaultBranch {
 		t.Fatalf("expected default branch, got %q", cfg.DefaultBranch)
@@ -29,21 +29,21 @@ func TestLoadCanvasStorageConfigDefaults(t *testing.T) {
 }
 
 func TestLoadCanvasStorageConfigEnv(t *testing.T) {
-	t.Setenv("CANVAS_STORAGE_DRIVER", "local_git")
-	t.Setenv("CANVAS_STORAGE_LOCAL_ROOT", "/tmp/canvas-repos")
+	t.Setenv("CANVAS_STORAGE_DRIVER", "supergit")
 	t.Setenv("CANVAS_STORAGE_DEFAULT_BRANCH", "trunk")
 	t.Setenv("CANVAS_STORAGE_MAX_FILE_BYTES", "123")
 	t.Setenv("CANVAS_STORAGE_MAX_COMMIT_BYTES", "456")
+	t.Setenv("CANVAS_STORAGE_SUPERGIT_BASE_URL", "http://supergit:9090/api")
 	t.Setenv("CODE_STORAGE_NAME", "acme")
 	t.Setenv("CODE_STORAGE_PRIVATE_KEY_PATH", "/keys/code-storage.pem")
 
 	cfg := LoadCanvasStorageConfig()
 
-	if cfg.Driver != "local_git" ||
-		cfg.LocalRoot != "/tmp/canvas-repos" ||
+	if cfg.Driver != "supergit" ||
 		cfg.DefaultBranch != "trunk" ||
 		cfg.MaxFileBytes != 123 ||
 		cfg.MaxCommitBytes != 456 ||
+		cfg.SupergitBaseURL != "http://supergit:9090/api" ||
 		cfg.CodeStorageName != "acme" ||
 		cfg.CodeStoragePrivateKeyPath != "/keys/code-storage.pem" {
 		t.Fatalf("unexpected config: %+v", cfg)

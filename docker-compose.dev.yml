@@ -101,11 +101,11 @@ services:
       OTEL_SERVICE_NAME: "superplane-dev"
       OWNER_SETUP_ENABLED: "yes"
       USAGE_GRPC_URL: ${USAGE_GRPC_URL:-}
-      CANVAS_STORAGE_DRIVER: ${CANVAS_STORAGE_DRIVER:-local_git}
-      CANVAS_STORAGE_LOCAL_ROOT: ${CANVAS_STORAGE_LOCAL_ROOT:-/var/lib/superplane/canvas-repos}
+      CANVAS_STORAGE_DRIVER: ${CANVAS_STORAGE_DRIVER:-supergit}
       CANVAS_STORAGE_DEFAULT_BRANCH: ${CANVAS_STORAGE_DEFAULT_BRANCH:-main}
       CANVAS_STORAGE_MAX_FILE_BYTES: ${CANVAS_STORAGE_MAX_FILE_BYTES:-10485760}
       CANVAS_STORAGE_MAX_COMMIT_BYTES: ${CANVAS_STORAGE_MAX_COMMIT_BYTES:-26214400}
+      CANVAS_STORAGE_SUPERGIT_BASE_URL: ${CANVAS_STORAGE_SUPERGIT_BASE_URL:-http://supergit:8080/api}
       CODE_STORAGE_NAME: ${CODE_STORAGE_NAME:-}
       CODE_STORAGE_PRIVATE_KEY_PATH: ${CODE_STORAGE_PRIVATE_KEY_PATH:-}
       VITE_FORCE_USAGE_PAGE: ${VITE_FORCE_USAGE_PAGE:-true}
@@ -127,12 +127,32 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      supergit:
+        condition: service_healthy
 
     volumes:
       - go-pkg-cache:/go
-      - repo-data:/var/lib/superplane/canvas-repos
       - .:/app
       - /tmp:/tmp
+
+  supergit:
+    build:
+      context: ./supergit
+    environment:
+      SUPERGIT_ROOT: /var/lib/supergit/repos
+      SUPERGIT_PORT: "8080"
+      SUPERGIT_DEFAULT_BRANCH: ${CANVAS_STORAGE_DEFAULT_BRANCH:-main}
+      SUPERGIT_MAX_FILE_BYTES: ${CANVAS_STORAGE_MAX_FILE_BYTES:-10485760}
+      SUPERGIT_MAX_COMMIT_BYTES: ${CANVAS_STORAGE_MAX_COMMIT_BYTES:-26214400}
+    ports:
+      - ${SUPERGIT_PORT:-8080}:8080
+    volumes:
+      - supergit-data:/var/lib/supergit/repos
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
@@ -186,7 +206,7 @@ services:
       retries: 5
 
 volumes:
-  repo-data:
+  supergit-data:
     driver: local
 
   go-pkg-cache:

@@ -205,3 +205,33 @@ email:
   resendApiKey: ""
   fromName: ""
   fromAddress: ""
+
+#
+# Supergit configuration
+#
+supergit:
+  enabled: true
+  image:
+    registry: ghcr.io/superplanehq
+    name: supergit
+    tag: ""
+    pullPolicy: IfNotPresent
+  replicas: 1
+  port: 8080
+  defaultBranch: main
+  maxFileBytes: 10485760
+  maxCommitBytes: 26214400
+  storageSize: 4Gi
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+canvasStorage:
+  driver: supergit
+  defaultBranch: main
+  maxFileBytes: 10485760
+  maxCommitBytes: 26214400

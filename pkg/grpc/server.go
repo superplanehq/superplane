@@ -11,9 +11,9 @@ import (
 
 	recovery "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/superplanehq/superplane/pkg/authorization"
-	"github.com/superplanehq/superplane/pkg/canvasstorage"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/git"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -111,7 +111,7 @@ func RunServer(
 	}
 
 	canvasStorageConfig := config.LoadCanvasStorageConfig()
-	canvasStorage, err := canvasstorage.NewProvider(canvasStorageConfig)
+	canvasStorage, err := git.NewProvider(canvasStorageConfig)
 	if err != nil {
 		log.Fatalf("failed to initialize canvas storage: %v", err)
 	}
