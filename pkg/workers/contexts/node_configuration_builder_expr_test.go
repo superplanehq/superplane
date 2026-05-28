@@ -36,3 +36,17 @@ func TestNodeConfigurationBuilder_ResolveExpressionWithExtraVariables_RejectsRes
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "reserved")
 }
+
+func TestNodeConfigurationBuilder_ResolveExpression_UsesConfiguredExpressionVariables(t *testing.T) {
+	b := NewNodeConfigurationBuilder(nil, uuid.Nil).
+		WithInput(map[string]any{}).
+		WithExpressionVariables(map[string]any{
+			"parameters": map[string]any{
+				"message": "hello",
+			},
+		})
+
+	out, err := b.ResolveExpression(`parameters["message"]`)
+	require.NoError(t, err)
+	require.Equal(t, "hello", out)
+}

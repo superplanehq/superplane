@@ -50,6 +50,54 @@ type ConfigurationField = FieldRendererProps["field"];
 /** Stable reference for trigger run-title fields — hides node/previous sources that don't apply. */
 const RUN_TITLE_EXCLUDED_SUGGESTIONS = ["$", "previous"];
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function templateParameterValue(parameter: Record<string, unknown>): unknown {
+  const parameterType = parameter.type;
+  if (parameterType === "number") {
+    const value = parameter.defaultNumber;
+    return value === null || value === undefined ? 0 : value;
+  }
+  if (parameterType === "boolean") {
+    const value = parameter.defaultBoolean;
+    return value === null || value === undefined ? false : value;
+  }
+  const value = parameter.defaultString;
+  if (value === null || value === undefined) return "";
+  return value;
+}
+
+export function buildTemplateParametersAutocompleteObject(
+  allValues: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const rawParameters = allValues.parameters;
+  if (!Array.isArray(rawParameters) || rawParameters.length === 0) {
+    return null;
+  }
+
+  const parameters: Record<string, unknown> = {};
+  for (const rawParameter of rawParameters) {
+    if (!isRecord(rawParameter)) {
+      continue;
+    }
+
+    const name = rawParameter.name;
+    if (typeof name !== "string" || name.trim() === "") {
+      continue;
+    }
+
+    parameters[name] = templateParameterValue(rawParameter);
+  }
+
+  if (Object.keys(parameters).length === 0) {
+    return null;
+  }
+
+  return parameters;
+}
+
 function getInitialSelectValue(field: ConfigurationField, parsedDefaultValue: unknown): unknown {
   const selectOptions = field.typeOptions?.select?.options;
   if (!selectOptions) {
@@ -261,23 +309,43 @@ export const ConfigurationFieldRenderer = ({
     return hasError;
   }, [allFieldErrors, isRequired, value, validationErrors, enableRealtimeValidation, hasError]);
 
+  const resolvedAutocompleteExampleObj = React.useMemo(() => {
+    if (field.name !== "payload") {
+      return autocompleteExampleObj;
+    }
+
+    const parameters = buildTemplateParametersAutocompleteObject(allValues);
+    if (!parameters) {
+      return autocompleteExampleObj;
+    }
+
+    return {
+      ...(autocompleteExampleObj ?? {}),
+      parameters,
+    };
+  }, [field.name, allValues, autocompleteExampleObj]);
+
   if (!isVisible) {
     return null;
   }
-  const renderField = () => {
-    const commonProps = {
-      field,
-      value,
-      onChange,
-      allValues,
-      hasError: hasFieldError,
-      autocompleteExampleObj,
-      integrationId,
-      organizationId,
-      allowExpressions,
-      excludedSuggestions: field.name === "customName" ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
-    };
 
+  const fieldAllowsExpressions =
+    allowExpressions && !(field.type === "string" && field.typeOptions?.string?.allowExpressions === false);
+
+  const commonProps = {
+    field,
+    value,
+    onChange,
+    allValues,
+    hasError: hasFieldError,
+    autocompleteExampleObj: resolvedAutocompleteExampleObj,
+    integrationId,
+    organizationId,
+    allowExpressions: fieldAllowsExpressions,
+    excludedSuggestions: field.name === "customName" ? RUN_TITLE_EXCLUDED_SUGGESTIONS : undefined,
+  };
+
+  const renderField = () => {
     switch (field.type) {
       case "string":
         return <StringFieldRenderer {...commonProps} />;
@@ -433,13 +501,57 @@ export const ConfigurationFieldRenderer = ({
     }
   };
 
-  // For boolean fields, render label inline with switch
+  // Togglable booleans use the standard label row plus an optional labeled value switch.
+  if (field.type === "boolean" && isTogglable) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-3">
+          <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />
+          <Label className="block text-left flex-1 min-w-0">
+            {field.label || field.name}
+            {isRequired && <span className="text-gray-800 ml-1">*</span>}
+            {hasFieldError &&
+              ((enableRealtimeValidation && isRequired && (value === undefined || value === null || value === "")) ||
+                (!enableRealtimeValidation &&
+                  validationErrors &&
+                  isRequired &&
+                  (value === undefined || value === null || value === ""))) && (
+                <span className="text-red-500 text-xs ml-2 leading-0">Required</span>
+              )}
+          </Label>
+        </div>
+        {isEnabled && (
+          <div className="flex items-center gap-3">
+            <BooleanFieldRenderer {...commonProps} labeled />
+          </div>
+        )}
+
+        {allFieldErrors.filter((error) => error.message && !error.message.toLowerCase().includes("required")).length >
+          0 && (
+          <div className="space-y-1">
+            {allFieldErrors
+              .filter((error) => error.message && !error.message.toLowerCase().includes("required"))
+              .map((error, index) => (
+                <p key={index} className="text-xs text-red-500 dark:text-red-400 text-left">
+                  {error.message}
+                </p>
+              ))}
+          </div>
+        )}
+
+        {field.description && (
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
+        )}
+      </div>
+    );
+  }
+
+  // Non-togglable booleans render the switch inline with the label.
   if (field.type === "boolean") {
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-3">
-          {isTogglable && <Switch checked={isEnabled} onCheckedChange={handleToggleChange} />}
-          {isEnabled && renderField()}
+          {renderField()}
           <Label className="text-left cursor-pointer">
             {field.label || field.name}
             {isRequired && <span className="text-gray-800 ml-1">*</span>}
@@ -454,7 +566,6 @@ export const ConfigurationFieldRenderer = ({
           </Label>
         </div>
 
-        {/* Display validation errors */}
         {allFieldErrors.filter((error) => error.message && !error.message.toLowerCase().includes("required")).length >
           0 && (
           <div className="space-y-1">
@@ -468,7 +579,6 @@ export const ConfigurationFieldRenderer = ({
           </div>
         )}
 
-        {/* Display field description */}
         {field.description && (
           <p className="text-xs text-gray-500 dark:text-gray-400 text-left leading-normal">{field.description}</p>
         )}

@@ -32,7 +32,7 @@ describe("buildDashboardTriggerParameters", () => {
       component: "github",
       configuration: { templates: [{ name: "default" }] } as ComponentsNode["configuration"],
     } as ComponentsNode;
-    expect(buildDashboardTriggerParameters(node, "run")).toEqual({ template: "default", payload: {} });
+    expect(buildDashboardTriggerParameters(node, "run")).toEqual({ template: "default" });
   });
 
   it("returns empty parameters when the start node has no templates", () => {
@@ -41,7 +41,7 @@ describe("buildDashboardTriggerParameters", () => {
     expect(buildDashboardTriggerParameters(makeStartNode(undefined), "run")).toEqual({});
   });
 
-  it("returns the first template's name with its payload when present", () => {
+  it("returns the first template's name when present", () => {
     const node = makeStartNode({
       templates: [
         { name: "deploy", payload: { branch: "main", env: "prod" } },
@@ -50,7 +50,6 @@ describe("buildDashboardTriggerParameters", () => {
     });
     expect(buildDashboardTriggerParameters(node, "run")).toEqual({
       template: "deploy",
-      payload: { branch: "main", env: "prod" },
     });
   });
 
@@ -63,21 +62,19 @@ describe("buildDashboardTriggerParameters", () => {
     });
     expect(buildDashboardTriggerParameters(node, "run", "rollback")).toEqual({
       template: "rollback",
-      payload: { branch: "main" },
     });
   });
 
-  it("defaults payload to an empty object when the template payload is missing or invalid", () => {
+  it("does not depend on template payload shape", () => {
     expect(buildDashboardTriggerParameters(makeStartNode({ templates: [{ name: "deploy" }] }), "run")).toEqual({
       template: "deploy",
-      payload: {},
     });
     expect(
       buildDashboardTriggerParameters(makeStartNode({ templates: [{ name: "deploy", payload: null }] }), "run"),
-    ).toEqual({ template: "deploy", payload: {} });
+    ).toEqual({ template: "deploy" });
     expect(
       buildDashboardTriggerParameters(makeStartNode({ templates: [{ name: "deploy", payload: [1, 2] }] }), "run"),
-    ).toEqual({ template: "deploy", payload: {} });
+    ).toEqual({ template: "deploy" });
   });
 
   it("returns empty parameters when the first template has no name", () => {
