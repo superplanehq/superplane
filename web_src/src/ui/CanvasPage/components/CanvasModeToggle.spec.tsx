@@ -51,6 +51,15 @@ describe("CanvasModeToggle", () => {
     expect(screen.queryByRole("tab", { name: "Memory" })).not.toBeInTheDocument();
   });
 
+  it("shows a draft indicator on the Console tab when the console draft is dirty", () => {
+    render(
+      <CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectDashboard={vi.fn()} hasDashboardDraft />,
+    );
+
+    expect(screen.getByTestId("canvas-view-mode-dashboard-draft-dot")).toBeInTheDocument();
+    expect(screen.queryByTestId("canvas-view-mode-live-draft-dot")).not.toBeInTheDocument();
+  });
+
   it("invokes onSelectFiles when clicking the Files tab", async () => {
     const user = userEvent.setup();
     const onSelectFiles = vi.fn();
