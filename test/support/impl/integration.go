@@ -82,6 +82,7 @@ func (t *DummyIntegration) HandleHook(ctx core.IntegrationHookContext) error {
 
 func (t *DummyIntegration) Sync(ctx core.SyncContext) error {
 	if t.onSync == nil {
+		ctx.Integration.Ready()
 		return nil
 	}
 	return t.onSync(ctx)
