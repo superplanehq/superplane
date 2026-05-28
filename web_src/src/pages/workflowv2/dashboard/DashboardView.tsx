@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import GridLayout, { type Layout, WidthProvider } from "react-grid-layout";
 import { Loader2, LayoutGrid, FileText, Hash, LineChart, Network, Table2, Workflow } from "lucide-react";
 
@@ -15,6 +15,7 @@ import { NodesPanelCard } from "./NodesPanelCard";
 import { TablePanelCard } from "./TablePanelCard";
 import { ChartPanelCard } from "./ChartPanelCard";
 import { NumberPanelCard } from "./NumberPanelCard";
+import { useDashboardGridTransitionArming } from "./useDashboardGridTransitionArming";
 import { useDashboardPanelState } from "./useDashboardPanelState";
 import { PANEL_TYPE_META, PANEL_TYPES, type PanelType } from "./panelTypes";
 
@@ -75,47 +76,7 @@ export function DashboardView({
   const layoutItems = useMemo(() => buildRGLLayout(localPanels, localLayout), [localPanels, localLayout]);
 
   const gridVisible = !errorMessage && !isLoading && localPanels.length > 0;
-
-  // Suppress the default react-grid-layout 200ms transitions until the grid
-  // has settled on its real width. `WidthProvider` mounts with a hardcoded
-  // 1280px width and only learns the actual container size via a
-  // ResizeObserver callback that fires asynchronously after layout — by which
-  // time a fixed `requestAnimationFrame` delay has already re-enabled
-  // transitions and every tile animates from the 1280px layout to the real
-  // one. We instead observe the wrapper directly and arm transitions only
-  // after the first non-zero width measurement has been painted, so drag /
-  // resize still feel responsive without the tab-switch stretch animation.
-  // The effect must not arm while the grid is unmounted (loading / error /
-  // empty early returns leave `gridWrapperRef` null).
-  const [transitionsArmed, setTransitionsArmed] = useState(false);
-  const gridWrapperRef = useRef<HTMLDivElement>(null);
-  const armFrameRef = useRef<number | null>(null);
-  useLayoutEffect(() => {
-    if (!gridVisible) {
-      setTransitionsArmed(false);
-      return undefined;
-    }
-    if (transitionsArmed) return undefined;
-    const el = gridWrapperRef.current;
-    if (!el) return undefined;
-    if (typeof ResizeObserver === "undefined") {
-      armFrameRef.current = requestAnimationFrame(() => setTransitionsArmed(true));
-      return () => {
-        if (armFrameRef.current != null) cancelAnimationFrame(armFrameRef.current);
-      };
-    }
-    const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width ?? 0;
-      if (width <= 0) return;
-      armFrameRef.current = requestAnimationFrame(() => setTransitionsArmed(true));
-      observer.disconnect();
-    });
-    observer.observe(el);
-    return () => {
-      observer.disconnect();
-      if (armFrameRef.current != null) cancelAnimationFrame(armFrameRef.current);
-    };
-  }, [gridVisible, transitionsArmed]);
+  const { transitionsArmed, gridWrapperRef } = useDashboardGridTransitionArming(gridVisible);
 
   if (errorMessage) {
     return (
