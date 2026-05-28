@@ -1,4 +1,5 @@
-import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { Search, X } from "lucide-react";
 import { RunFiltersPopover, type TriggerOption } from "./RunFiltersPopover";
@@ -40,29 +41,29 @@ export function RunsToolbar({
         onClearTriggers={onClearTriggers}
       />
 
-      <InputGroup className="h-7 flex-1 border border-slate-200 shadow-none !ring-0 focus-within:!ring-0 focus-within:ring-offset-0 [&_[data-slot=input-group-control]]:!text-[12px]">
-        <InputGroupAddon className="!text-[12px]">
-          <Search className="h-3.5 w-3.5 text-gray-500" />
-        </InputGroupAddon>
-        <InputGroupInput
+      <div className="relative min-w-0 flex-1">
+        <Search
+          className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-gray-400"
+          aria-hidden="true"
+        />
+        <Input
+          type="text"
           placeholder="Search runs..."
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
-          className="h-6 !border-0 !text-[12px] shadow-none focus:ring-0 focus-visible:ring-0"
+          className={cn("h-7 text-xs shadow-none focus:ring-0 focus-visible:ring-0", hasSearch ? "pl-8 pr-8" : "pl-8")}
         />
         {hasSearch ? (
-          <InputGroupAddon>
-            <button
-              type="button"
-              aria-label="Clear search"
-              onClick={() => onSearchChange("")}
-              className="rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </InputGroupAddon>
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => onSearchChange("")}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+          >
+            <X className="size-3.5" />
+          </button>
         ) : null}
-      </InputGroup>
+      </div>
     </div>
   );
 }

@@ -138,7 +138,7 @@ function buildPlaceholderComponentNode(node: ComponentsNode): CanvasNode {
       state: "pending" as const,
       outputChannels: ["default"],
       component: {
-        iconSlug: "box-dashed",
+        iconSlug: "plus",
         iconColor: getColorClass("gray"),
         collapsedBackground: getBackgroundColorClass("gray"),
         collapsed: false,
