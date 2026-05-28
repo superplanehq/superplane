@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   Dialog,
@@ -20,6 +20,7 @@ import {
   parameterDisplayLabel,
   type StartTemplateParameter,
 } from "../mappers/start/templatePayload";
+import { ConfirmFact, formatParameters } from "./confirmDialogPreview";
 import { resolveStartTemplate } from "./dashboardTriggerParameters";
 
 interface NodeRunConfirmDialogProps {
@@ -71,12 +72,16 @@ export function NodeRunConfirmDialog({
     seedParameterValues(parameters),
   );
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | undefined>();
 
   // Re-seed parameter values whenever the dialog opens on a different
   // template — keeps stale inputs from leaking across templates when a
   // single panel hosts multiple Run buttons.
   useEffect(() => {
-    if (open) setParameterValues(seedParameterValues(parameters));
+    if (open) {
+      setParameterValues(seedParameterValues(parameters));
+      setSubmitError(undefined);
+    }
   }, [open, parameters]);
 
   const previewParameters = useMemo(() => {
@@ -95,12 +100,13 @@ export function NodeRunConfirmDialog({
         }
       }
     }
+    setSubmitError(undefined);
     setSubmitting(true);
     try {
       await onConfirm(previewParameters ?? { template: template.name });
       onOpenChange(false);
-    } catch {
-      // Keep the dialog open so the user can retry with the same values.
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Failed to run");
     } finally {
       setSubmitting(false);
     }
@@ -158,6 +164,7 @@ export function NodeRunConfirmDialog({
               </ConfirmFact>
             </>
           )}
+          <SubmitErrorMessage error={submitError} testId={testId} />
         </div>
         <DialogFooter>
           <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
@@ -179,12 +186,12 @@ export function NodeRunConfirmDialog({
   );
 }
 
-function ConfirmFact({ label, children }: { label: string; children: ReactNode }) {
+function SubmitErrorMessage({ error, testId }: { error: string | undefined; testId: string }) {
+  if (!error) return null;
   return (
-    <div className="space-y-0.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="text-slate-700">{children}</div>
-    </div>
+    <p className="text-red-600" data-testid={`${testId}-error`}>
+      {error}
+    </p>
   );
 }
 
@@ -208,13 +215,4 @@ function buildParameters(
     out[param.name] = coerceParameterValue(param, values[param.name]);
   }
   return out;
-}
-
-function formatParameters(parameters: Record<string, unknown> | undefined): string {
-  if (!parameters || Object.keys(parameters).length === 0) return "(empty)";
-  try {
-    return JSON.stringify(parameters, null, 2);
-  } catch {
-    return String(parameters);
-  }
 }

@@ -57,23 +57,29 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   // When `seriesField` is set, the chart pivots: one series per distinct
   // value in that field, sharing the numeric `field` (and formatting) of the
   // first configured series. Without `seriesField` we keep the historical
-  // behavior of one series per `render.series` entry.
-  const series = useMemo<ChartSeries[]>(() => {
-    if (seriesField) {
-      const distinct = distinctSeriesKeys(sorted, seriesField);
-      return distinct.map((key, idx) => ({
-        ...valueSeries,
-        key,
-        label: key,
-        color: DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
-      }));
-    }
-    return render.series.map((s, idx) => ({
-      ...s,
-      key: s.label ?? s.field ?? `series-${idx}`,
-      color: s.color ?? DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
+  // behavior of one series per `render.series` entry. Split memos so row
+  // updates do not recreate the configured series array (and downstream
+  // chartConfig / Recharts layers) when only data values change.
+  const configuredSeries = useMemo<ChartSeries[]>(
+    () =>
+      render.series.map((s, idx) => ({
+        ...s,
+        key: s.label ?? s.field ?? `series-${idx}`,
+        color: s.color ?? DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
+      })),
+    [render.series],
+  );
+  const pivotedSeries = useMemo<ChartSeries[]>(() => {
+    if (!seriesField) return [];
+    const distinct = distinctSeriesKeys(sorted, seriesField);
+    return distinct.map((key, idx) => ({
+      ...valueSeries,
+      key,
+      label: key,
+      color: DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
     }));
-  }, [render.series, seriesField, sorted, valueSeries]);
+  }, [seriesField, sorted, valueSeries]);
+  const series = seriesField ? pivotedSeries : configuredSeries;
   const data = useMemo(() => {
     const built = buildChartData(
       sorted,

@@ -85,7 +85,7 @@ describe("NodeRunConfirmDialog", () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 
-  it("keeps the dialog open and stays mounted when onConfirm rejects", async () => {
+  it("keeps the dialog open and shows the error when onConfirm rejects", async () => {
     const onConfirm = vi.fn().mockRejectedValue(new Error("boom"));
     const onOpenChange = vi.fn();
     render(
@@ -103,5 +103,6 @@ describe("NodeRunConfirmDialog", () => {
     await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1));
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(screen.getByTestId("node-run-confirm-submit")).toBeTruthy();
+    expect(screen.getByTestId("node-run-confirm-error").textContent).toBe("boom");
   });
 });
