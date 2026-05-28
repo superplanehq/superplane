@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
+import { getDraftConsoleDiffCounts, hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
 
 describe("hasDraftVersusLiveConsoleDiff", () => {
   it("returns false when both consoles are empty", () => {
@@ -38,5 +38,32 @@ describe("hasDraftVersusLiveConsoleDiff", () => {
     };
 
     expect(hasDraftVersusLiveConsoleDiff(console, console)).toBe(false);
+  });
+});
+
+describe("getDraftConsoleDiffCounts", () => {
+  it("counts added, updated, and removed console items", () => {
+    const live = {
+      panels: [
+        { id: "updated", type: "markdown", content: { body: "before" } },
+        { id: "removed", type: "markdown", content: { body: "remove me" } },
+      ],
+      layout: [
+        { i: "updated", x: 0, y: 0, w: 4, h: 2 },
+        { i: "removed", x: 0, y: 2, w: 4, h: 2 },
+      ],
+    };
+    const draft = {
+      panels: [
+        { id: "updated", type: "markdown", content: { body: "after" } },
+        { id: "added", type: "markdown", content: { body: "add me" } },
+      ],
+      layout: [
+        { i: "updated", x: 0, y: 0, w: 4, h: 3 },
+        { i: "added", x: 0, y: 2, w: 4, h: 2 },
+      ],
+    };
+
+    expect(getDraftConsoleDiffCounts(live, draft)).toEqual({ added: 1, updated: 1, removed: 1 });
   });
 });
