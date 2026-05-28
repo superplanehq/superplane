@@ -151,7 +151,18 @@ func componentResourceSources() ([]resourceSource, error) {
 		return nil, err
 	}
 
-	sources := make([]resourceSource, 0, len(files))
+	indexFile, err := docs.GenerateComponentIndexFile()
+	if err != nil {
+		return nil, err
+	}
+
+	sources := make([]resourceSource, 0, len(files)+1)
+	sources = append(sources, resourceSource{
+		MountPath:  filepath.ToSlash(filepath.Join("ref", "components", indexFile.Name)),
+		SourceKey:  filepath.ToSlash(filepath.Join("docs", "components", indexFile.Name)),
+		SourceData: indexFile.Content,
+	})
+
 	for _, file := range files {
 		sources = append(sources, resourceSource{
 			MountPath:  filepath.ToSlash(filepath.Join("ref", "components", file.Name)),
