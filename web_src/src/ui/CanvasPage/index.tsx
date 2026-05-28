@@ -878,11 +878,38 @@ function CanvasPage(props: CanvasPageProps) {
 
   const handleNodeDelete = useCallback(
     (nodeId: string) => {
-      if (props.onNodeDelete) {
-        props.onNodeDelete(nodeId);
+      if (templateNodeId === nodeId) {
+        setTemplateNodeId(null);
+        setIsBuildingBlocksSidebarOpen(false);
+        isSidebarOpenRef.current = false;
       }
+
+      if (state.componentSidebar.selectedNodeId === nodeId) {
+        state.componentSidebar.close();
+      }
+
+      props.onNodeDelete?.(nodeId);
     },
-    [props],
+    [props, templateNodeId, state.componentSidebar, setTemplateNodeId],
+  );
+
+  const handleNodesDelete = useCallback(
+    (nodeIds: string[]) => {
+      nodeIds.forEach((nodeId) => {
+        if (templateNodeId === nodeId) {
+          setTemplateNodeId(null);
+          setIsBuildingBlocksSidebarOpen(false);
+          isSidebarOpenRef.current = false;
+        }
+
+        if (state.componentSidebar.selectedNodeId === nodeId) {
+          state.componentSidebar.close();
+        }
+      });
+
+      props.onNodesDelete?.(nodeIds);
+    },
+    [props, templateNodeId, state.componentSidebar, setTemplateNodeId],
   );
 
   const handleConnectionDropInEmptySpace = useCallback(
@@ -1250,6 +1277,7 @@ function CanvasPage(props: CanvasPageProps) {
           props.headerMode === "files") &&
           "sp-canvas-live",
         props.headerMode === "runs" && "sp-canvas-live",
+        props.isEditing && "sp-canvas-editing",
       )}
     >
       {/* Header at the top spanning full width */}
@@ -1408,7 +1436,7 @@ function CanvasPage(props: CanvasPageProps) {
               state={state}
               onNodeEdit={handleNodeEdit}
               onNodeDelete={handleNodeDelete}
-              onNodesDelete={props.onNodesDelete}
+              onNodesDelete={handleNodesDelete}
               onDuplicateNodes={props.onDuplicateNodes}
               onAutoLayoutNodes={props.onAutoLayoutNodes}
               onEdgeCreate={props.onEdgeCreate}
