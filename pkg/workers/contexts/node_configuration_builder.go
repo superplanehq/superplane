@@ -26,6 +26,7 @@ type NodeConfigurationBuilder struct {
 	rootEventID         *uuid.UUID
 	rootPayload         any
 	input               any
+	expressionVariables map[string]any
 	parentBlueprintNode *models.CanvasNode
 	configurationFields []configuration.Field
 }
@@ -64,6 +65,11 @@ func (b *NodeConfigurationBuilder) WithPreviousExecution(previousExecutionID *uu
 
 func (b *NodeConfigurationBuilder) WithInput(input any) *NodeConfigurationBuilder {
 	b.input = input
+	return b
+}
+
+func (b *NodeConfigurationBuilder) WithExpressionVariables(variables map[string]any) *NodeConfigurationBuilder {
+	b.expressionVariables = variables
 	return b
 }
 
@@ -245,7 +251,7 @@ func (b *NodeConfigurationBuilder) ResolveTemplateExpressions(expression string)
 }
 
 func (b *NodeConfigurationBuilder) ResolveExpression(expression string) (any, error) {
-	return b.ResolveExpressionWithExtraVariables(expression, nil)
+	return b.ResolveExpressionWithExtraVariables(expression, b.expressionVariables)
 }
 
 // ResolveExpressionWithExtraVariables evaluates an expression with extra
