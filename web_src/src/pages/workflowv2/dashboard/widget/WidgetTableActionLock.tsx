@@ -1,4 +1,13 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 
 import { useDashboardContext } from "../DashboardContext";
 import { useInFlightTriggers } from "./useInFlightTriggers";
@@ -7,10 +16,11 @@ import { WidgetTableActionLockReactContext, type WidgetTableActionLock } from ".
 const SUBMISSION_GRACE_MS = 1500;
 
 /**
- * Wrap a `WidgetTable` body in this provider to share submission + run-in-flight
- * gating across every `RowActionButton` it renders. `triggerNodeIds` should be
- * the unique, resolved trigger node ids referenced by the table's row actions —
- * passing a non-empty list activates the runs query.
+ * Wrap a `WidgetTable` body in this provider to share submission +
+ * run-in-flight gating across every `RowActionButton` it renders.
+ * `triggerNodeIds` should be the unique, resolved trigger node ids
+ * referenced by the table's row actions — passing a non-empty list activates
+ * the runs query.
  */
 export function WidgetTableActionLockProvider({
   triggerNodeIds,
@@ -34,33 +44,105 @@ export function WidgetTableActionLockProvider({
   );
 }
 
+interface PendingEntry {
+  rowKey: string;
+  triggerNodeId: string | undefined;
+}
+
+type PendingTimers = ReturnType<typeof useRef<Map<string, ReturnType<typeof setTimeout>>>>;
+type PendingByKey = ReturnType<typeof useRef<Map<string, PendingEntry>>>;
+
+function clearPendingRowTimer(rowKey: string, timers: PendingTimers) {
+  const timer = timers.current.get(rowKey);
+  if (timer) {
+    clearTimeout(timer);
+    timers.current.delete(rowKey);
+  }
+}
+
+function dropPendingRow(
+  rowKey: string,
+  timers: PendingTimers,
+  pendingByKey: PendingByKey,
+  setPendingRowKeys: Dispatch<SetStateAction<Set<string>>>,
+) {
+  clearPendingRowTimer(rowKey, timers);
+  pendingByKey.current.delete(rowKey);
+  setPendingRowKeys((prev) => {
+    if (!prev.has(rowKey)) return prev;
+    const next = new Set(prev);
+    next.delete(rowKey);
+    return next;
+  });
+}
+
+function clearTriggerRowMapping(
+  triggerNodeId: string,
+  rowKey: string,
+  setInFlightRowByTrigger: Dispatch<SetStateAction<Map<string, string>>>,
+) {
+  setInFlightRowByTrigger((prev) => {
+    if (prev.get(triggerNodeId) !== rowKey) return prev;
+    const next = new Map(prev);
+    next.delete(triggerNodeId);
+    return next;
+  });
+}
+
 /**
- * Tracks the optimistic submission state: which trigger node ids the user
- * just clicked, and a grace timer that keeps the lock on for a short window
- * after `endSubmission` so the buttons stay disabled across the gap between
- * the HTTP response and the first websocket-driven runs query refresh.
+ * Tracks per-row submission state and the `triggerNodeId → rowKey` mapping
+ * for runs initiated from this table. Each click adds the row key to
+ * `pendingRowKeys` and (when a trigger node id is known) records the
+ * mapping; the mapping persists while the trigger appears in
+ * `runInFlightIds` so the originating row stays disabled across the gap
+ * between the HTTP response and the websocket-driven runs refresh.
+ *
+ * Rows other than the originating one stay clickable even when the same
+ * trigger has a run in flight — that's the "only the affected row" locking
+ * model the console intentionally adopts.
  */
 function useSubmissionLock(inFlightIds: Set<string>): WidgetTableActionLock {
-  const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
+  const [pendingRowKeys, setPendingRowKeys] = useState<Set<string>>(() => new Set());
+  const [inFlightRowByTrigger, setInFlightRowByTrigger] = useState<Map<string, string>>(() => new Map());
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const pendingByKey = useRef<Map<string, PendingEntry>>(new Map());
+  // Grace timers outlive the `endSubmission` call; read the latest websocket-
+  // driven in-flight set when they fire instead of the snapshot from submit time.
+  const inFlightIdsRef = useRef(inFlightIds);
+  inFlightIdsRef.current = inFlightIds;
 
   useEffect(() => {
-    if (pendingIds.size === 0 || inFlightIds.size === 0) return;
-    let mutated = false;
-    const next = new Set(pendingIds);
-    for (const id of pendingIds) {
-      if (inFlightIds.has(id)) {
-        next.delete(id);
-        const t = timers.current.get(id);
-        if (t) {
-          clearTimeout(t);
-          timers.current.delete(id);
+    setInFlightRowByTrigger((prev) => {
+      let mutated = false;
+      const next = new Map(prev);
+      for (const trigger of prev.keys()) {
+        if (!inFlightIds.has(trigger)) {
+          next.delete(trigger);
+          mutated = true;
         }
-        mutated = true;
       }
+      return mutated ? next : prev;
+    });
+  }, [inFlightIds]);
+
+  useEffect(() => {
+    if (pendingRowKeys.size === 0 || inFlightIds.size === 0) return;
+    const toClear: string[] = [];
+    for (const rowKey of pendingRowKeys) {
+      const entry = pendingByKey.current.get(rowKey);
+      if (entry?.triggerNodeId && inFlightIds.has(entry.triggerNodeId)) toClear.push(rowKey);
     }
-    if (mutated) setPendingIds(next);
-  }, [inFlightIds, pendingIds]);
+    if (toClear.length === 0) return;
+    setPendingRowKeys((prev) => {
+      const next = new Set(prev);
+      for (const key of toClear) {
+        next.delete(key);
+        clearPendingRowTimer(key, timers);
+        pendingByKey.current.delete(key);
+      }
+      return next;
+    });
+  }, [inFlightIds, pendingRowKeys]);
 
   useEffect(() => {
     const timersMap = timers.current;
@@ -70,52 +152,54 @@ function useSubmissionLock(inFlightIds: Set<string>): WidgetTableActionLock {
     };
   }, []);
 
-  return useMemo<WidgetTableActionLock>(() => {
-    const beginSubmission = (triggerNodeId: string | undefined) => {
-      const key = triggerNodeId ?? "__unresolved__";
-      const existing = timers.current.get(key);
-      if (existing) {
-        clearTimeout(existing);
-        timers.current.delete(key);
-      }
-      setPendingIds((prev) => {
-        if (prev.has(key)) return prev;
-        const next = new Set(prev);
-        next.add(key);
+  const beginSubmission = useCallback((triggerNodeId: string | undefined, rowKey: string) => {
+    clearPendingRowTimer(rowKey, timers);
+    pendingByKey.current.set(rowKey, { rowKey, triggerNodeId });
+    setPendingRowKeys((prev) => {
+      if (prev.has(rowKey)) return prev;
+      const next = new Set(prev);
+      next.add(rowKey);
+      return next;
+    });
+    if (triggerNodeId) {
+      setInFlightRowByTrigger((prev) => {
+        if (prev.get(triggerNodeId) === rowKey) return prev;
+        const next = new Map(prev);
+        next.set(triggerNodeId, rowKey);
         return next;
       });
-    };
+    }
+  }, []);
 
-    const endSubmission = (triggerNodeId: string | undefined) => {
-      const key = triggerNodeId ?? "__unresolved__";
-      if (triggerNodeId && inFlightIds.has(triggerNodeId)) {
-        setPendingIds((prev) => {
-          if (!prev.has(key)) return prev;
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
-        return;
+  const endSubmission = useCallback((triggerNodeId: string | undefined, rowKey: string, succeeded: boolean) => {
+    if (!succeeded) {
+      dropPendingRow(rowKey, timers, pendingByKey, setPendingRowKeys);
+      if (triggerNodeId) clearTriggerRowMapping(triggerNodeId, rowKey, setInFlightRowByTrigger);
+      return;
+    }
+
+    if (triggerNodeId && inFlightIdsRef.current.has(triggerNodeId)) {
+      dropPendingRow(rowKey, timers, pendingByKey, setPendingRowKeys);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      dropPendingRow(rowKey, timers, pendingByKey, setPendingRowKeys);
+      if (triggerNodeId && !inFlightIdsRef.current.has(triggerNodeId)) {
+        clearTriggerRowMapping(triggerNodeId, rowKey, setInFlightRowByTrigger);
       }
-      const existing = timers.current.get(key);
-      if (existing) clearTimeout(existing);
-      const timer = setTimeout(() => {
-        timers.current.delete(key);
-        setPendingIds((prev) => {
-          if (!prev.has(key)) return prev;
-          const next = new Set(prev);
-          next.delete(key);
-          return next;
-        });
-      }, SUBMISSION_GRACE_MS);
-      timers.current.set(key, timer);
-    };
+    }, SUBMISSION_GRACE_MS);
+    timers.current.set(rowKey, timer);
+  }, []);
 
-    return {
+  return useMemo<WidgetTableActionLock>(
+    () => ({
       runInFlightIds: inFlightIds,
-      submitting: pendingIds.size > 0,
+      pendingRowKeys,
+      inFlightRowByTrigger,
       beginSubmission,
       endSubmission,
-    };
-  }, [inFlightIds, pendingIds]);
+    }),
+    [inFlightIds, pendingRowKeys, inFlightRowByTrigger, beginSubmission, endSubmission],
+  );
 }

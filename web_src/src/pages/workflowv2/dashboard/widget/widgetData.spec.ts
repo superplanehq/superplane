@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 
-import { aggregateNumberPerSource, applySort, buildChartData, combinePartials } from "./widgetData";
+import { aggregateNumberPerSource, applySort, buildChartData, combinePartials, distinctSeriesKeys } from "./widgetData";
 
 const entries: CanvasMemoryEntry[] = [
   { id: "1", namespace: "expenses", values: { amount: 10 } },
@@ -67,7 +67,7 @@ describe("combinePartials", () => {
 });
 
 describe("buildChartData", () => {
-  it("resolves literal field paths for x and series", () => {
+  it("resolves literal field paths for x and series with one row per category", () => {
     const rows = [
       { status: "passed", durationMs: 120 },
       { status: "failed", durationMs: 800 },
@@ -79,27 +79,42 @@ describe("buildChartData", () => {
     ]);
   });
 
-  it("evaluates `{{ formatDate(..) }}` on the xField to bucket rows by day", () => {
-    const day1 = new Date(2026, 2, 15, 8, 0); // Mar 15, 2026 08:00 local
+  it("buckets rows that share the same xField value and sums numeric series", () => {
+    const rows = [
+      { status: "passed", durationMs: 120 },
+      { status: "failed", durationMs: 800 },
+      { status: "passed", durationMs: 30 },
+    ];
+    const data = buildChartData(rows, "status", [{ key: "duration", field: "durationMs" }, { key: "count" }]);
+    expect(data).toEqual([
+      { x: "passed", duration: 150, count: 2 },
+      { x: "failed", duration: 800, count: 1 },
+    ]);
+  });
+
+  it("groups by a `{{ formatDate(..) }}` xField and sums durations within each day", () => {
+    const day1morning = new Date(2026, 2, 15, 8, 0); // Mar 15, 2026 08:00 local
+    const day1afternoon = new Date(2026, 2, 15, 14, 30); // Mar 15, 2026 14:30 local
     const day2 = new Date(2026, 2, 16, 17, 30); // Mar 16, 2026 17:30 local
     const rows = [
-      { createdAt: day1.toISOString(), durationMs: 100 },
+      { createdAt: day1morning.toISOString(), durationMs: 100 },
+      { createdAt: day1afternoon.toISOString(), durationMs: 75 },
       { createdAt: day2.toISOString(), durationMs: 250 },
     ];
     const data = buildChartData(rows, '{{ formatDate(createdAt, "MM/dd") }}', [
       { key: "duration", field: "durationMs" },
     ]);
     expect(data).toEqual([
-      { x: "03/15", duration: 100 },
+      { x: "03/15", duration: 175 },
       { x: "03/16", duration: 250 },
     ]);
   });
 
-  it("evaluates `{{ expr }}` on a series field", () => {
-    const rows = [{ value: "12" }, { value: "8" }];
+  it("evaluates `{{ expr }}` on a series field and aggregates per bucket", () => {
+    const rows = [{ value: "12" }, { value: "8" }, { value: "12" }];
     const data = buildChartData(rows, "value", [{ key: "half", field: "{{ int(value) / 2 }}" }]);
     expect(data).toEqual([
-      { x: "12", half: 6 },
+      { x: "12", half: 12 },
       { x: "8", half: 4 },
     ]);
   });
@@ -107,6 +122,79 @@ describe("buildChartData", () => {
   it("falls back to empty x when the xField resolves to undefined", () => {
     const data = buildChartData([{ foo: 1 }], "missing", [{ key: "count" }]);
     expect(data).toEqual([{ x: "", count: 1 }]);
+  });
+
+  it("ignores non-numeric series values when summing", () => {
+    const rows = [
+      { date: "2026-05-26", cost: 10 },
+      { date: "2026-05-26", cost: "not-a-number" },
+      { date: "2026-05-26", cost: 5 },
+    ];
+    const data = buildChartData(rows, "date", [{ key: "cost", field: "cost" }]);
+    expect(data).toEqual([{ x: "2026-05-26", cost: 15 }]);
+  });
+
+  it("pivots long-format rows by `seriesField` into one series per distinct value", () => {
+    const rows = [
+      { date: "2026-05-26", service: "ec2", cost_usd: 58.45 },
+      { date: "2026-05-26", service: "s3", cost_usd: 0.0034 },
+      { date: "2026-05-27", service: "ec2", cost_usd: 60.0 },
+      { date: "2026-05-27", service: "s3", cost_usd: 0.01 },
+    ];
+    const data = buildChartData(rows, "date", [{ key: "cost", field: "cost_usd" }], { seriesField: "service" });
+    expect(data).toEqual([
+      { x: "2026-05-26", ec2: 58.45, s3: 0.0034 },
+      { x: "2026-05-27", ec2: 60.0, s3: 0.01 },
+    ]);
+  });
+
+  it("sums values within the same `(x, seriesField)` bucket when pivoting", () => {
+    const rows = [
+      { date: "2026-05-26", service: "ec2", cost_usd: 10 },
+      { date: "2026-05-26", service: "ec2", cost_usd: 5 },
+      { date: "2026-05-26", service: "s3", cost_usd: 1 },
+    ];
+    const data = buildChartData(rows, "date", [{ key: "cost", field: "cost_usd" }], { seriesField: "service" });
+    expect(data).toEqual([{ x: "2026-05-26", ec2: 15, s3: 1 }]);
+  });
+
+  it("uses (empty) as the series key when seriesField is missing on a row", () => {
+    const rows = [
+      { date: "2026-05-26", service: "ec2", cost_usd: 10 },
+      { date: "2026-05-26", cost_usd: 3 },
+      { date: "2026-05-27", service: "ec2", cost_usd: 5 },
+    ];
+    const data = buildChartData(rows, "date", [{ key: "cost", field: "cost_usd" }], { seriesField: "service" });
+    expect(data).toEqual([
+      { x: "2026-05-26", ec2: 10, "(empty)": 3 },
+      { x: "2026-05-27", ec2: 5, "(empty)": 0 },
+    ]);
+  });
+
+  it("counts rows per `(x, seriesField)` bucket when the value series omits `field`", () => {
+    const rows = [
+      { date: "2026-05-26", service: "ec2" },
+      { date: "2026-05-26", service: "ec2" },
+      { date: "2026-05-26", service: "s3" },
+      { date: "2026-05-27", service: "ec2" },
+    ];
+    const data = buildChartData(rows, "date", [{ key: "count" }], { seriesField: "service" });
+    expect(data).toEqual([
+      { x: "2026-05-26", ec2: 2, s3: 1 },
+      { x: "2026-05-27", ec2: 1, s3: 0 },
+    ]);
+  });
+});
+
+describe("distinctSeriesKeys", () => {
+  it("returns the first-seen distinct values of the seriesField", () => {
+    const rows = [{ service: "ec2" }, { service: "s3" }, { service: "ec2" }, { service: "rds" }];
+    expect(distinctSeriesKeys(rows, "service")).toEqual(["ec2", "s3", "rds"]);
+  });
+
+  it("uses (empty) for rows where the seriesField is missing", () => {
+    const rows = [{ service: "ec2" }, { other: 1 }, { service: "s3" }];
+    expect(distinctSeriesKeys(rows, "service")).toEqual(["ec2", "(empty)", "s3"]);
   });
 });
 
