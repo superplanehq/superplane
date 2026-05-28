@@ -197,6 +197,8 @@ export interface CanvasPageProps {
   onYamlOpen?: () => void;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
+  hasUnpublishedCanvasDraftChanges?: boolean;
+  hasUnpublishedConsoleDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   isAutoLayoutOnUpdateEnabled?: boolean;
@@ -1287,6 +1289,8 @@ function CanvasPage(props: CanvasPageProps) {
           onSelectFiles={props.onSelectFiles}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
+          hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
+          hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
           onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
@@ -1806,6 +1810,8 @@ function CanvasContentHeader({
   onSelectFiles,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
+  hasUnpublishedCanvasDraftChanges,
+  hasUnpublishedConsoleDraftChanges,
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
   showCanvasSettingsMenu,
@@ -1851,6 +1857,8 @@ function CanvasContentHeader({
   onSelectFiles?: () => void;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
+  hasUnpublishedCanvasDraftChanges?: boolean;
+  hasUnpublishedConsoleDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   showCanvasSettingsMenu?: boolean;
@@ -1898,6 +1906,8 @@ function CanvasContentHeader({
       onSelectFiles={onSelectFiles}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+      hasUnpublishedCanvasDraftChanges={hasUnpublishedCanvasDraftChanges}
+      hasUnpublishedConsoleDraftChanges={hasUnpublishedConsoleDraftChanges}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
