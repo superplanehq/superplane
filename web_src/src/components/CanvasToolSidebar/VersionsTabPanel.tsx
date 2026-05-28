@@ -1,5 +1,5 @@
 import type { CanvasChangeManagement, CanvasesCanvasChangeRequest, CanvasesCanvasVersion } from "@/api-client";
-import { ChevronDown, ChevronRight, GitBranch } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from "react";
 import type { CanvasVersionNodeDiffContext } from "@/pages/workflowv2/CanvasVersionNodeDiffDialog";
 import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
@@ -125,16 +125,9 @@ export function VersionsTabPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-10 shrink-0 items-center border-b border-slate-200 px-3">
-        <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-900">
-          <GitBranch className="h-4 w-4" />
-          Versions
-        </span>
-      </div>
-
       <div
         ref={scrollRef}
-        className="min-h-0 flex-1 overflow-auto p-3"
+        className="min-h-0 flex-1 overflow-auto"
         data-testid="versions-sidebar-scroll"
         onScroll={handleScroll}
       >
@@ -144,9 +137,9 @@ export function VersionsTabPanel({
           isTemplate={isTemplate}
         />
 
-        <section className="mt-3 rounded-md">
+        <section>
           {hasNoVersions ? (
-            <p className="mt-2 text-xs text-slate-600">No published history yet.</p>
+            <p className="px-4 py-2 text-xs text-slate-600">No published history yet.</p>
           ) : (
             <VersionHistorySection
               items={[...pendingItems, ...liveItems]}
@@ -241,12 +234,12 @@ function VersionsNotices({
   return (
     <>
       {!canUpdateCanvas && !canvasDeletedRemotely ? (
-        <p className="text-xs text-slate-600">You do not have permission to edit this canvas.</p>
+        <p className="px-4 py-2 text-xs text-slate-600">You do not have permission to edit this canvas.</p>
       ) : null}
       {canvasDeletedRemotely ? (
-        <p className="text-xs text-red-700">This canvas was deleted from another session.</p>
+        <p className="px-4 py-2 text-xs text-red-700">This canvas was deleted from another session.</p>
       ) : null}
-      {isTemplate ? <p className="text-xs text-slate-600">Template canvases are read-only.</p> : null}
+      {isTemplate ? <p className="px-4 py-2 text-xs text-slate-600">Template canvases are read-only.</p> : null}
     </>
   );
 }
@@ -267,16 +260,12 @@ function VersionHistorySection({
   ) => void;
 }) {
   return (
-    <>
-      <div className="-mt-4 space-y-1">
-        <VersionRowList
-          items={items}
-          changeRequestApprovalConfig={changeRequestApprovalConfig}
-          onUseVersion={onUseVersion}
-          onViewDiff={onViewDiff}
-        />
-      </div>
-    </>
+    <VersionRowList
+      items={items}
+      changeRequestApprovalConfig={changeRequestApprovalConfig}
+      onUseVersion={onUseVersion}
+      onViewDiff={onViewDiff}
+    />
   );
 }
 
@@ -337,10 +326,10 @@ function RejectedVersionsSection({
   if (count === 0) return null;
 
   return (
-    <div className="mt-3 border-t border-slate-200 pt-3">
+    <div className="border-t border-slate-200">
       <button
         type="button"
-        className="flex w-full items-center gap-1 rounded-md py-1.5 text-left text-xs font-medium text-slate-500"
+        className="flex w-full items-center gap-1 px-4 py-2 text-left text-xs font-medium text-slate-500"
         onClick={onToggleExpanded}
         aria-expanded={expanded}
       >
@@ -352,14 +341,12 @@ function RejectedVersionsSection({
         <span>Rejected ({count})</span>
       </button>
       {expanded ? (
-        <div className="mt-1 space-y-1">
-          <VersionRowList
-            items={items}
-            changeRequestApprovalConfig={changeRequestApprovalConfig}
-            onUseVersion={onUseVersion}
-            onViewDiff={onViewDiff}
-          />
-        </div>
+        <VersionRowList
+          items={items}
+          changeRequestApprovalConfig={changeRequestApprovalConfig}
+          onUseVersion={onUseVersion}
+          onViewDiff={onViewDiff}
+        />
       ) : null}
     </div>
   );
