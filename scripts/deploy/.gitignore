@@ -1,2 +1,4 @@
-# Keep templates in-repo; deploy with FLEET_MANAGER_ENV_FILE=./fleet-manager.env
+# Operator-populated deploy files live next to the *.example.{env,json} templates;
+# keep secrets out of git but keep the templates in-repo.
 *.env
+fleet-manager.config.json

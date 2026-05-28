@@ -13,8 +13,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/fleet-m
 
 FROM gcr.io/distroless/static-debian12:nonroot
 
-WORKDIR /home/nonroot
-ENV DATABASE_PATH=/home/nonroot/fleet.db
+# JSON config lives at /etc/fleet-manager/config.json by default — bind-mount it in.
+# Operators can override with -e FM_CONFIG_FILE=/some/other/path.
+ENV FM_CONFIG_FILE=/etc/fleet-manager/config.json
 
 COPY --from=build /out/fleet-manager /fleet-manager
 

@@ -66,7 +66,7 @@ type Pool struct {
 	Headroom         int    `json:"headroom"`
 }
 
-// Defaults applied when fields are absent or zero. Match the env-var loader (ConfigFromEnv).
+// Defaults applied when fields are absent or zero.
 const (
 	defaultInstanceType         = "t3.micro"
 	defaultListenAddr           = ":8080"

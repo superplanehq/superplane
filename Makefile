@@ -31,9 +31,13 @@ local-dev-help:
 	@echo "  make runner N=3"
 	@echo "Defaults are LOCAL_* / LOCAL_STACK_* / LOCAL_RUNNER_* / N in the Makefile (override on the command line)."
 
-# Long-running: run in its own terminal (EC2 hot pool only; optional for local dev).
+# Long-running: run in its own terminal. Requires a JSON config; set FM_CONFIG_FILE.
+# Example:
+#   cp scripts/deploy/fleet-manager.config.example.json /tmp/fleet-manager.config.json
+#   $EDITOR /tmp/fleet-manager.config.json
+#   FM_CONFIG_FILE=/tmp/fleet-manager.config.json make fleet-manager
 fleet-manager: build
-	AUTH_TOKEN= ./bin/fleet-manager
+	./bin/fleet-manager
 
 # Long-running: run in its own terminal.
 task-broker: build

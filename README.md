@@ -92,55 +92,74 @@ Local dev expects Postgres on `127.0.0.1:5432` with database `broker` (see `LOCA
 
 **Inspect upstream task status** (uses `AUTH_TOKEN` and broker base from **`scripts/deploy/task-broker.env`** unless you export overrides): `./scripts/check-broker-task.sh <broker_task_id>`
 
-**Correlate broker + fleet SQLite over SSH** (default EC2 hosts match deploy scripts): `./scripts/show-runner-queue-state.sh` — broker rows require `TASK_BROKER_DATABASE_URL` (Postgres); fleet-manager still uses SQLite on the remote host.
+**Dump recent broker task rows** (Postgres only — fleet-manager has no on-disk state): `TASK_BROKER_DATABASE_URL='postgres://…' ./scripts/show-runner-queue-state.sh`
 
 ## Run fleet-manager
 
-| Environment variable | Default      | Description                                                  |
-| -------------------- | ------------ | ------------------------------------------------------------ |
-| `LISTEN_ADDR`        | `:8080`      | HTTP listen address                                          |
-| `DATABASE_PATH`      | `./fleet.db` | SQLite database file                                         |
-| `AUTH_TOKEN`         | (empty)      | If set, requires `Authorization: Bearer <token>` for `/v1/*` |
-| `REAP_INTERVAL_SEC`  | `15`         | How often to return expired leases to the queue              |
-| `TASK_CLOUDWATCH_LOG_GROUP` | (empty) | When set, `GET /v1/tasks/{id}` and completion webhooks include `cloudwatch_log_group` and `cloudwatch_log_stream` so clients can tail the same stream the runner writes to |
-| `TASK_CLOUDWATCH_LOG_STREAM_PREFIX` | (empty) | Optional; stream name is `{prefix}/{task_id}` (see `shared/cwstream`). Must match `RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX` on workers. |
-| `TASK_CLOUDWATCH_REGION` | (empty) | Optional AWS region included in **`task_log.cloudwatch.region`** for clients (e.g. your log proxy). |
-
-**Task log descriptor:** When **`TASK_CLOUDWATCH_LOG_GROUP`** is set, `GET /v1/tasks/{id}` and completion webhooks include **`task_log`** with `{"type":"cloudwatch","cloudwatch":{"log_group_name","log_stream_name","region"}}`. Otherwise **`task_log`** is omitted. Legacy **`cloudwatch_log_group`** / **`cloudwatch_log_stream`** fields are still present when CloudWatch is enabled.
-
-Optional **EC2 hot runner pool** — set **`AWS_REGION`** (also used as **`AWS_DEFAULT_REGION`** inside user-data for **`aws s3 cp`**), **`EC2_PROVISION_HOT_INSTANCE_COUNT`**, **`EC2_PROVISION_AMI_ID`**, **`EC2_PROVISION_SUBNET_ID`**, **`EC2_PROVISION_SECURITY_GROUP_IDS`**, **`EC2_PROVISION_FLEET_MANAGER_URL`**, plus **either**:
-
-- **`EC2_PROVISION_RUNNER_S3_URI`** — `s3://bucket/key` to a **linux/amd64** static **`runner`** binary (**recommended with private repos**). Requires **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`** on runners with **`s3:GetObject`** on that object; user-data runs **`aws s3 cp`**.
-- **`EC2_PROVISION_RUNNER_BINARY_URL`** — public **http(s)** URL (**curl**).
-
-Do **not** set both.
-
-Optional: **`EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_GROUP`**, **`EC2_PROVISION_RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX`** — written into **`/etc/default/superplane-runner`** as **`RUNNER_CLOUDWATCH_*`** (requires the runner instance profile to allow **`logs:CreateLogGroup`**, **`logs:CreateLogStream`**, **`logs:PutLogEvents`**, **`logs:DescribeLogStreams`** on that log group).
-
-Fleet-manager **reconciles in the background** (default **60** s, **`EC2_PROVISION_RECONCILE_INTERVAL_SEC`**, minimum **15**). Optional: **`EC2_PROVISION_INSTANCE_TYPE`**, **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**, **`EC2_PROVISION_KEY_NAME`**, **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`**.
-
-**Dynamic scaling (optional)** — set **`EC2_PROVISION_RUNNER_HEADROOM=N`** to make fleet-manager target **`want = queued + claimed + N`** for its **`EC2_PROVISION_RUNNER_FLEET_ID`** each reconcile tick (counts pulled from task-broker via **`GET /v1/fleets/{id}/task-counts`** using **`EC2_PROVISION_TASK_BROKER_URL`** + **`EC2_PROVISION_RUNNER_AUTH_TOKEN`**). Counting **queued** tasks (not only **claimed**) pre-warms capacity for a burst — when several tasks arrive at once, fleet-manager launches VMs in parallel instead of waiting for each one to be claimed first. Scale-down is automatic — when claimed/queued drops, want drops, and the existing oldest-first terminate logic removes excess VMs. When the broker call fails, the tick falls back to **`EC2_PROVISION_HOT_INSTANCE_COUNT`**. Leave **`EC2_PROVISION_RUNNER_HEADROOM`** unset for the previous static behavior. task-broker never initiates HTTP toward fleet-manager; communication is fleet-manager pull only.
-
-Provisioner **user-data** installs **`/usr/local/bin/runner`**, runs **`superplane-runner.service`** as the **`ubuntu`** user (host tasks start in **`/home/ubuntu`**), and adds **`ubuntu`** to the **`docker`** group on **Ubuntu** AMIs.
-
-#### Runner binary via S3 (typical setup)
-
-1. **Bucket** (same account/region as runners is simplest). Upload the static binary, e.g. **`runner-linux-amd64`** at **`s3://my-runner-binaries/release/runner-linux-amd64`** (`aws s3 cp bin/runner …` after **`CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/runner ./runner/cmd/runner`**).
-
-2. **IAM role for runners** (**instance profile** name = **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE`**): attach an inline policy allowing **`s3:GetObject`** on **`arn:aws:s3:::my-runner-binaries/release/*`** (tighten to the exact key).
-
-3. **Fleet-manager env**: **`EC2_PROVISION_RUNNER_S3_URI=s3://my-runner-binaries/release/runner-linux-amd64`**, **`AWS_REGION=us-east-1`** (or your region), **`EC2_PROVISION_RUNNER_INSTANCE_PROFILE=…`**.
-
-4. **CI**: on each release, **`aws s3 cp`** / sync the built **`runner`** to that key (OIDC **`aws-actions/configure-aws-credentials`** or long-lived IAM user with **`s3:PutObject`** on that prefix).
-
-By default **`EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK`** is **on** (`true`): **`runner_id`** is the EC2 instance id from IMDS; after **one** successful task, **fleet-manager** calls **`TerminateInstances`** and the systemd unit **`Restart=no`** stops respawn before shutdown. Set **`false`** for long-lived workers (**`Restart=always`**). Runner VMs do **not** need **`TerminateInstances`** on their profile for that flow; **fleet-manager’s** role must **`TerminateInstances`** (reconcile + disposable runners).
-
-Fleet-manager still needs **`ec2:RunInstances`**, **`ec2:DescribeInstances`**, **`ec2:CreateTags`**, **`ec2:TerminateInstances`**, and **`iam:PassRole`** when using an instance profile on runners.
+Fleet-manager is configured by **one JSON file**. The only environment variable it reads is **`FM_CONFIG_FILE`** (default **`/etc/fleet-manager/config.json`**). A working template lives at **`scripts/deploy/fleet-manager.config.example.json`**.
 
 ```bash
-export DATABASE_PATH=./fleet.db
-./bin/fleet-manager
+FM_CONFIG_FILE=./fleet-manager.config.json ./bin/fleet-manager
 ```
+
+### JSON schema
+
+| Field                                    | Required | Default                  | Description                                                                                                                                                              |
+| ---------------------------------------- | -------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `aws_region`                             | yes      | —                        | AWS region for the EC2 / CloudWatch clients and for `aws s3 cp` in runner user-data.                                                                                     |
+| `task_broker_url`                        | yes      | —                        | Broker URL runner VMs talk to (must be reachable from the runner VPC) and that this FM uses for `/v1/fleets/{id}/task-counts` when any pool runs with `headroom > 0`.    |
+| `runner_auth_token`                      | no       | (empty)                  | Bearer token injected into runner user-data **and** used by this FM's broker client. Set when the task-broker has `AUTH_TOKEN`.                                          |
+| `listen_addr`                            | no       | `:8080`                  | HTTP listen address.                                                                                                                                                     |
+| `auth_token`                             | no       | (empty)                  | If set, requires `Authorization: Bearer <token>` for `/v1/*` endpoints.                                                                                                  |
+| `diagnostics_token`                      | no       | (empty)                  | Required (Bearer) for `GET /v1/admin/managed-runners` and `GET /v1/admin/ec2-console-output`.                                                                            |
+| `reconcile_interval_sec`                 | no       | `60` (min `15`)          | How often the FM reconciles each pool serially (health sweep + scale toward target).                                                                                     |
+| `subnet_id`                              | yes      | —                        | VPC subnet runner VMs launch into. Currently shared across pools.                                                                                                        |
+| `security_group_ids`                     | yes      | —                        | Security groups attached to runner VMs.                                                                                                                                  |
+| `iam_instance_profile`                   | yes      | —                        | Instance profile attached to runner VMs (needs `s3:GetObject` for the runner binary, optional `logs:*` for CloudWatch).                                                  |
+| `key_name`                               | no       | (empty)                  | Optional EC2 key pair name.                                                                                                                                              |
+| `volume_size_gb`                         | no       | `30`                     | Root EBS volume size in GiB.                                                                                                                                             |
+| `boot_grace_sec`                         | no       | `300`                    | Health probes are skipped for newly launched instances during this grace window.                                                                                         |
+| `runner_health_port`                     | no       | `9090`                   | TCP port for `GET /healthz` on runner private IP.                                                                                                                        |
+| `runner_terminate_after_each_task`       | no       | `true`                   | `true`: each runner VM exits + FM terminates the instance after one task. `false`: long-lived workers (`Restart=always`).                                                |
+| `cloudwatch.log_group`                   | no       | (empty)                  | Sets `RUNNER_CLOUDWATCH_LOG_GROUP` in runner user-data; runner ships task stdout/stderr there.                                                                           |
+| `cloudwatch.stream_prefix`               | no       | (empty)                  | Sets `RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX`. Must match the broker / FM `TASK_CLOUDWATCH_LOG_STREAM_PREFIX` so completion payloads point at the same stream.              |
+| `cloudwatch.process_log_group`           | no       | (empty)                  | When set, the runner host runs the CloudWatch agent and ships `superplane-runner.service` journald output to this group.                                                 |
+| `cloudwatch.process_log_region`          | no       | `aws_region`             | Region for the runner process log group.                                                                                                                                 |
+| `pools[]`                                | yes      | —                        | One entry per VM pool. At least one required. Each pool maps 1:1 to a broker fleet (`fleet_id`) and is tagged on EC2 as `superplane_fleet_id=<fleet_id>` for partitioning.|
+| `pools[].fleet_id`                       | yes      | —                        | Unique broker fleet id; also the EC2 partition tag value.                                                                                                                |
+| `pools[].ami`                            | yes      | —                        | AMI id for this pool. Per-arch (different AMI for `arm64` vs `amd64`).                                                                                                   |
+| `pools[].instance_type`                  | no       | `t3.micro`               | EC2 instance type. Per-arch and per-size.                                                                                                                                |
+| `pools[].runner_s3_uri`                  | yes      | —                        | `s3://bucket/key` to the static `runner` binary for this pool's arch (e.g. `runner-linux-amd64` vs `runner-linux-arm64`).                                                |
+| `pools[].hot_instance_count`             | no       | `0`                      | Target pending+running managed instances when `headroom == 0`. Also the fallback target when the broker task-counts call fails.                                          |
+| `pools[].headroom`                       | no       | `0`                      | When `> 0`, enables dynamic scaling for that pool: target = `queued + claimed + headroom` each tick (counts from `GET /v1/fleets/{fleet_id}/task-counts`).               |
+
+Unknown fields are rejected at load time, so typos in the config file fail the startup instead of being silently ignored.
+
+### Multi-pool / multi-arch
+
+A single fleet-manager process can manage multiple pools (e.g. one `amd64` pool, one `arm64` pool) by adding entries to `pools[]`. Each pool runs its own reconcile + sweep against EC2 filtered by `superplane_managed_runner=true` AND `superplane_fleet_id=<pool.fleet_id>`, so pools in the same AWS account never terminate each other's instances. Pools are reconciled serially per tick (predictable rate limit on EC2 Describe calls).
+
+### Dynamic scaling
+
+Set `pools[N].headroom = M` to make that pool target `want = queued + claimed + M` each reconcile tick (counts pulled from task-broker via `GET /v1/fleets/{fleet_id}/task-counts` using `task_broker_url` + `runner_auth_token`). Counting **queued** tasks (not only **claimed**) pre-warms capacity for a burst — when several tasks arrive at once, fleet-manager launches VMs in parallel instead of waiting for each one to be claimed first. Scale-down is automatic: when `claimed + queued` drops, `want` drops and the oldest-first terminate logic removes excess VMs. When the broker call fails, that tick falls back to `pools[N].hot_instance_count`. Leave `headroom = 0` for static behavior. task-broker never initiates HTTP toward fleet-manager; communication is fleet-manager pull only.
+
+### Runner binary via S3 (typical setup)
+
+1. **Bucket** (same account/region as runners is simplest). Upload the static binaries, e.g. `runner-linux-amd64` at `s3://my-runner-binaries/release/runner-linux-amd64` (`aws s3 cp bin/runner …` after `CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/runner ./runner/cmd/runner`). Repeat for `arm64` if you have an `arm64` pool.
+
+2. **IAM role for runners** (`iam_instance_profile` in the config): attach an inline policy allowing `s3:GetObject` on `arn:aws:s3:::my-runner-binaries/release/*` (tighten to the exact keys).
+
+3. **CI**: on each release, `aws s3 cp` / sync the built `runner` binaries to those keys (OIDC `aws-actions/configure-aws-credentials` or long-lived IAM user with `s3:PutObject` on that prefix).
+
+### Provisioner user-data
+
+Installs `/usr/local/bin/runner`, runs `superplane-runner.service` as the `ubuntu` user (host tasks start in `/home/ubuntu`), and adds `ubuntu` to the `docker` group on Ubuntu AMIs.
+
+By default `runner_terminate_after_each_task` is on (`true`): `runner_id` is the EC2 instance id from IMDS; after one successful task, fleet-manager calls `TerminateInstances` and the systemd unit `Restart=no` stops respawn before shutdown. Set `false` for long-lived workers (`Restart=always`). Runner VMs do **not** need `TerminateInstances` on their profile for that flow; the fleet-manager host's role must.
+
+### IAM (fleet-manager host)
+
+The fleet-manager process needs `ec2:RunInstances`, `ec2:DescribeInstances`, `ec2:CreateTags`, `ec2:TerminateInstances`, and `iam:PassRole` (when launching with an instance profile on runners).
 
 ## Run the runner
 
@@ -252,7 +271,7 @@ After the first successful push, configure each package under **GitHub → Packa
 
 ### Runner binary → S3 (EC2 host workers)
 
-When **main** is green, [.semaphore/runner-binary-s3.yml](.semaphore/runner-binary-s3.yml) builds a static **linux/amd64** `runner` and uploads it with the AWS CLI. Create a Semaphore secret named **`runner-s3`** with **`AWS_ACCESS_KEY_ID`**, **`AWS_SECRET_ACCESS_KEY`**, **`AWS_DEFAULT_REGION`**, and **`EC2_PROVISION_RUNNER_S3_URI`** (the same `s3://bucket/key` as **fleet-manager** — see **`EC2_PROVISION_RUNNER_S3_URI`** above). Optional: **`AWS_SESSION_TOKEN`**.
+When **main** is green, [.semaphore/runner-binary-s3.yml](.semaphore/runner-binary-s3.yml) builds a static **linux/amd64** `runner` and uploads it with the AWS CLI. Create a Semaphore secret named **`runner-s3`** with **`AWS_ACCESS_KEY_ID`**, **`AWS_SECRET_ACCESS_KEY`**, **`AWS_DEFAULT_REGION`**, and **`EC2_PROVISION_RUNNER_S3_URI`** — the same `s3://bucket/key` you put in `pools[].runner_s3_uri` in the fleet-manager config. Optional: **`AWS_SESSION_TOKEN`**.
 
 ## License
 

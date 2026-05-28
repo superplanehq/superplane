@@ -2,80 +2,96 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/superplane/runner/fleet-manager/internal/brokerclient"
+	"github.com/superplane/runner/fleet-manager/internal/config"
 	"github.com/superplane/runner/fleet-manager/internal/ec2provision"
 	"github.com/superplane/runner/fleet-manager/internal/fleetmanager"
+)
+
+// FM_CONFIG_FILE is the only environment variable the binary reads. Everything else
+// (broker URL, tokens, listen addr, per-pool AMIs, etc.) lives in the JSON config file.
+// Default path matches the bind-mount in the Docker deploy script.
+const (
+	envConfigFile     = "FM_CONFIG_FILE"
+	defaultConfigPath = "/etc/fleet-manager/config.json"
 )
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	srv := &fleetmanager.Server{Log: log}
+	cfgPath := os.Getenv(envConfigFile)
+	if cfgPath == "" {
+		cfgPath = defaultConfigPath
+	}
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		log.Error("config load", slog.String("path", cfgPath), slog.Any("err", err))
+		os.Exit(1)
+	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	ecCfg, ecErr := ec2provision.ConfigFromEnv()
-	switch {
-	case ecErr == nil:
-		launcher, err := ec2provision.New(context.Background(), ecCfg, log)
+	srv := &fleetmanager.Server{Log: log}
+
+	// Build one Launcher per pool. Headroom-enabled pools share a single broker client
+	// (same broker URL + token across all pools in this FM process).
+	var sharedBroker *brokerclient.Client
+	if hasDynamicPool(cfg) {
+		sharedBroker = brokerclient.New(cfg.TaskBrokerURL, cfg.RunnerAuthToken)
+	}
+	launchers := make([]*ec2provision.Launcher, 0, len(cfg.Pools))
+	for _, p := range cfg.Pools {
+		poolCfg := cfg.ToPoolConfig(p)
+		l, err := ec2provision.New(context.Background(), poolCfg, log)
 		if err != nil {
-			log.Error("ec2 provision init", slog.Any("err", err))
+			log.Error("ec2 launcher init",
+				slog.String("fleet_id", p.FleetID),
+				slog.Any("err", err))
 			os.Exit(1)
 		}
-		if ecCfg.Headroom > 0 {
-			launcher.BrokerClient = brokerclient.New(ecCfg.TaskBrokerURL, ecCfg.RunnersAuthToken)
+		if p.Headroom > 0 {
+			l.BrokerClient = sharedBroker
 		}
-		// Single-pool today: slice of one. Multi-pool wires more launchers here once the
-		// JSON config (FM_CONFIG_FILE) replaces ConfigFromEnv.
-		launchers := []*ec2provision.Launcher{launcher}
-		srv.EC2Launchers = launchers
-		reconcileEvery := 60 * time.Second
-		if v := getenv("EC2_PROVISION_RECONCILE_INTERVAL_SEC", ""); v != "" {
-			if n, err := strconv.Atoi(v); err == nil && n >= 15 {
-				reconcileEvery = time.Duration(n) * time.Second
-			}
-		}
-		go ec2provision.RunReconcileLoop(ctx, log, reconcileEvery, launchers)
-		log.Info("ec2 hot runner pool enabled",
-			slog.Int("pools", len(launchers)),
-			slog.Int("hot_instance_count", ecCfg.HotInstanceCount),
-			slog.Int("runner_headroom", ecCfg.Headroom),
-			slog.Bool("dynamic_scaling", ecCfg.Headroom > 0),
-			slog.String("reconcile_interval", reconcileEvery.String()))
-	case errors.Is(ecErr, ec2provision.ErrDisabled):
-		log.Info("ec2 provisioning disabled — fleet-manager serves diagnostics only when EC2_PROVISION_* is configured")
-	default:
-		log.Error("ec2 provision config", slog.Any("err", ecErr))
-		os.Exit(1)
+		launchers = append(launchers, l)
+	}
+	srv.EC2Launchers = launchers
+
+	reconcileEvery := time.Duration(cfg.ReconcileIntervalSec) * time.Second
+	go ec2provision.RunReconcileLoop(ctx, log, reconcileEvery, launchers)
+	log.Info("fleet-manager started",
+		slog.String("config_path", cfgPath),
+		slog.Int("pools", len(launchers)),
+		slog.String("aws_region", cfg.AWSRegion),
+		slog.String("reconcile_interval", reconcileEvery.String()))
+	for _, p := range cfg.Pools {
+		log.Info("pool configured",
+			slog.String("fleet_id", p.FleetID),
+			slog.String("instance_type", p.InstanceType),
+			slog.Int("hot_instance_count", p.HotInstanceCount),
+			slog.Int("headroom", p.Headroom),
+			slog.Bool("dynamic_scaling", p.Headroom > 0))
 	}
 
-	auth := strings.TrimSpace(os.Getenv("AUTH_TOKEN"))
-	diagTok := strings.TrimSpace(os.Getenv("FLEET_DIAGNOSTICS_TOKEN"))
 	handler := fleetmanager.NewRouter(srv, fleetmanager.RouterOptions{
-		AuthToken:        auth,
-		DiagnosticsToken: diagTok,
+		AuthToken:        cfg.AuthToken,
+		DiagnosticsToken: cfg.DiagnosticsToken,
 	})
-
-	addr := getenv("LISTEN_ADDR", ":8080")
 	httpSrv := &http.Server{
-		Addr:              addr,
+		Addr:              cfg.ListenAddr,
 		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
-		log.Info("fleet-manager listening", slog.String("addr", addr))
+		log.Info("fleet-manager listening", slog.String("addr", cfg.ListenAddr))
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Error("http server", slog.Any("err", err))
 			stop()
@@ -89,9 +105,13 @@ func main() {
 	log.Info("shutdown complete")
 }
 
-func getenv(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
+// hasDynamicPool reports whether any pool wants dynamic scaling (Headroom > 0).
+// Used to decide whether to instantiate the shared broker client at startup.
+func hasDynamicPool(cfg *config.File) bool {
+	for _, p := range cfg.Pools {
+		if p.Headroom > 0 {
+			return true
+		}
 	}
-	return def
+	return false
 }
