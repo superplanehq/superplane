@@ -14,7 +14,7 @@ vi.mock("./useInFlightTriggers", () => ({
 
 function wrapper({ children }: { children: ReactNode }) {
   return (
-    <DashboardContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]}>
+    <DashboardContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]} canRunNodes={false}>
       <WidgetTableActionLockProvider triggerNodeIds={["trigger-1"]}>{children}</WidgetTableActionLockProvider>
     </DashboardContextProvider>
   );

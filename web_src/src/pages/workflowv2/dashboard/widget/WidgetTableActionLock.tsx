@@ -5,6 +5,7 @@ import {
   useRef,
   useState,
   type Dispatch,
+  type MutableRefObject,
   type ReactNode,
   type SetStateAction,
 } from "react";
@@ -49,8 +50,8 @@ interface PendingEntry {
   triggerNodeId: string | undefined;
 }
 
-type PendingTimers = ReturnType<typeof useRef<Map<string, ReturnType<typeof setTimeout>>>>;
-type PendingByKey = ReturnType<typeof useRef<Map<string, PendingEntry>>>;
+type PendingTimers = MutableRefObject<Map<string, ReturnType<typeof setTimeout>>>;
+type PendingByKey = MutableRefObject<Map<string, PendingEntry>>;
 
 function clearPendingRowTimer(rowKey: string, timers: PendingTimers) {
   const timer = timers.current.get(rowKey);
