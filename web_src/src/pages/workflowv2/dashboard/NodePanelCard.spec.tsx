@@ -33,7 +33,7 @@ function renderPanel({
   onTriggerNode,
 }: {
   canRunNodes: boolean;
-  onTriggerNode?: (nodeId: string, options?: DashboardTriggerOptions) => void;
+  onTriggerNode?: (nodeId: string, options?: DashboardTriggerOptions) => void | Promise<void>;
 }) {
   return render(
     <DashboardContextProvider
@@ -70,6 +70,17 @@ describe("NodePanelCard run flow", () => {
       templateName: "manual",
       parameters: { template: "manual" },
     });
+  });
+
+  it("keeps the confirm dialog open when onTriggerNode rejects", async () => {
+    const onTrigger = vi.fn().mockRejectedValue(new Error("API failed"));
+    renderPanel({ canRunNodes: true, onTriggerNode: onTrigger });
+    fireEvent.click(screen.getByTestId("node-panel-run"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("node-panel-run-dialog-submit"));
+    });
+    await waitFor(() => expect(onTrigger).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("node-panel-run-dialog-submit")).toBeTruthy();
   });
 
   it("disables the Run button when the viewer cannot run nodes", () => {

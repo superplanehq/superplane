@@ -44,7 +44,7 @@ export interface DashboardContextValue {
    * if undefined the chip falls back to dispatching the
    * `dashboard:trigger-node` window event so a host can react when wired.
    */
-  onTriggerNode?: (nodeId: string, options?: DashboardTriggerOptions) => void;
+  onTriggerNode?: (nodeId: string, options?: DashboardTriggerOptions) => void | Promise<void>;
   /**
    * Optional callback when the user opens a node chip (e.g. to focus / scroll
    * the corresponding canvas node into view). Falls back to navigation.

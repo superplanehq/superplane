@@ -177,7 +177,7 @@ function NodesPanelRunControl({
         templateName={entry.triggerName}
         onConfirm={async (parameters) => {
           if (!resolved?.node?.id) return;
-          confirmDashboardTriggerNode(ctx, resolved.node.id, entry.triggerName, parameters);
+          await confirmDashboardTriggerNode(ctx, resolved.node.id, entry.triggerName, parameters);
         }}
         testId="nodes-panel-row-run-dialog"
       />

@@ -10,14 +10,14 @@ import { DASHBOARD_TRIGGER_NODE_EVENT } from "./dashboardEvents";
  * when there is no live dashboard context (e.g. the dashboard rendered
  * outside the workflow page).
  */
-export function confirmDashboardTriggerNode(
+export async function confirmDashboardTriggerNode(
   ctx: DashboardContextValue | undefined,
   nodeId: string,
   triggerName: string | undefined,
   parameters: Record<string, unknown>,
-): void {
+): Promise<void> {
   if (ctx?.onTriggerNode) {
-    ctx.onTriggerNode(nodeId, {
+    await ctx.onTriggerNode(nodeId, {
       hookName: "run",
       templateName: triggerName,
       parameters,

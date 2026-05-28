@@ -106,6 +106,10 @@ function useSubmissionLock(inFlightIds: Set<string>): WidgetTableActionLock {
   const [inFlightRowByTrigger, setInFlightRowByTrigger] = useState<Map<string, string>>(() => new Map());
   const timers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const pendingByKey = useRef<Map<string, PendingEntry>>(new Map());
+  // Grace timers outlive the `endSubmission` call; read the latest websocket-
+  // driven in-flight set when they fire instead of the snapshot from submit time.
+  const inFlightIdsRef = useRef(inFlightIds);
+  inFlightIdsRef.current = inFlightIds;
 
   useEffect(() => {
     setInFlightRowByTrigger((prev) => {
@@ -167,29 +171,26 @@ function useSubmissionLock(inFlightIds: Set<string>): WidgetTableActionLock {
     }
   }, []);
 
-  const endSubmission = useCallback(
-    (triggerNodeId: string | undefined, rowKey: string, succeeded: boolean) => {
-      if (!succeeded) {
-        dropPendingRow(rowKey, timers, pendingByKey, setPendingRowKeys);
-        if (triggerNodeId) clearTriggerRowMapping(triggerNodeId, rowKey, setInFlightRowByTrigger);
-        return;
-      }
+  const endSubmission = useCallback((triggerNodeId: string | undefined, rowKey: string, succeeded: boolean) => {
+    if (!succeeded) {
+      dropPendingRow(rowKey, timers, pendingByKey, setPendingRowKeys);
+      if (triggerNodeId) clearTriggerRowMapping(triggerNodeId, rowKey, setInFlightRowByTrigger);
+      return;
+    }
 
-      if (triggerNodeId && inFlightIds.has(triggerNodeId)) {
-        dropPendingRow(rowKey, timers, pendingByKey, setPendingRowKeys);
-        return;
-      }
+    if (triggerNodeId && inFlightIdsRef.current.has(triggerNodeId)) {
+      dropPendingRow(rowKey, timers, pendingByKey, setPendingRowKeys);
+      return;
+    }
 
-      const timer = setTimeout(() => {
-        dropPendingRow(rowKey, timers, pendingByKey, setPendingRowKeys);
-        if (triggerNodeId && !inFlightIds.has(triggerNodeId)) {
-          clearTriggerRowMapping(triggerNodeId, rowKey, setInFlightRowByTrigger);
-        }
-      }, SUBMISSION_GRACE_MS);
-      timers.current.set(rowKey, timer);
-    },
-    [inFlightIds],
-  );
+    const timer = setTimeout(() => {
+      dropPendingRow(rowKey, timers, pendingByKey, setPendingRowKeys);
+      if (triggerNodeId && !inFlightIdsRef.current.has(triggerNodeId)) {
+        clearTriggerRowMapping(triggerNodeId, rowKey, setInFlightRowByTrigger);
+      }
+    }, SUBMISSION_GRACE_MS);
+    timers.current.set(rowKey, timer);
+  }, []);
 
   return useMemo<WidgetTableActionLock>(
     () => ({
