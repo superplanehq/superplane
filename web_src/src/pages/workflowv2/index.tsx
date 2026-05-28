@@ -569,13 +569,6 @@ export function WorkflowPageV2() {
   const canUpdateCanvas = canAct("canvases", "update");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
-  const { dashboardQuery, updateDashboardMutation, hasDraftDiffVersusLive } = useCanvasConsoleVersionDiff({
-    canvasId: canvasId!,
-    activeCanvasVersionId,
-    liveCanvasVersionId,
-    hasDraftGraphDiffVersusLive,
-    enabled: !isTemplate,
-  });
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const canvasAccess = { canUpdateCanvas, isTemplate, canvasDeletedRemotely };
@@ -656,7 +649,6 @@ export function WorkflowPageV2() {
     }
   }
   if (isSidebarOpenRef.current === null && canvas) {
-    // Initialize on first render
     isSidebarOpenRef.current = canvas.spec?.nodes?.length === 0;
   }
 
@@ -781,8 +773,7 @@ export function WorkflowPageV2() {
   }, [canvasError, canvasLoading, navigate, organizationId, canvasDeletedRemotely]);
   useEffect(() => {
     if (hasTrackedCanvasView.current) return;
-    if (!canvas || !canvasId || !organizationId) return;
-    if (canvasLoading) return;
+    if (!canvas || !canvasId || !organizationId || canvasLoading) return;
     hasTrackedCanvasView.current = true;
     analytics.canvasView(canvasId, canvas.spec?.nodes?.length ?? 0, canvas.spec?.edges?.length ?? 0, organizationId);
   }, [canvas, canvasId, organizationId, canvasLoading]);
@@ -1140,6 +1131,14 @@ export function WorkflowPageV2() {
     return release;
   }, []);
 
+  const { dashboardQuery, updateDashboardMutation, hasDraftDiffVersusLive } = useCanvasConsoleVersionDiff({
+    canvasId: canvasId!,
+    activeCanvasVersionId,
+    liveCanvasVersionId,
+    hasDraftGraphDiffVersusLive,
+    enabled: !isTemplate,
+    registerIgnoredCanvasVersionUpdatedEcho,
+  });
   const consumeIgnoredCanvasUpdatedEcho = useCallback(() => {
     const release = ignoredCanvasUpdatedEchoReleasesRef.current.pop();
     if (!release) {
