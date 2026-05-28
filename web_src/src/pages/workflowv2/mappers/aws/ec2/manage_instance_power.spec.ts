@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { manageInstancePowerMapper } from "./manage_instance_power";
+import { manageInstancePowerMapper, MANAGE_INSTANCE_POWER_STATE_REGISTRY } from "./manage_instance_power";
 import type { ComponentBaseContext, ExecutionDetailsContext, ExecutionInfo, NodeInfo } from "../../types";
 
 function buildNode(overrides?: Partial<NodeInfo>): NodeInfo {
@@ -153,6 +153,27 @@ describe("manageInstancePowerMapper.getExecutionDetails", () => {
     expect(details["Public IP"]).toBe("54.1.2.3");
   });
 
+  it("omits Public IP when the instance has no public address", () => {
+    const ctx = buildDetailsCtx({
+      node: { configuration: { region: "us-east-1", operation: "stop" } },
+      execution: {
+        outputs: {
+          default: [
+            buildOutput({
+              instanceId: "i-abc123",
+              state: "stopped",
+              publicIpAddress: "",
+              region: "us-east-1",
+            }),
+          ],
+        },
+      },
+    });
+
+    const details = manageInstancePowerMapper.getExecutionDetails(ctx);
+    expect(details["Public IP"]).toBeUndefined();
+  });
+
   it("shows stopped state for stop operation", () => {
     const ctx = buildDetailsCtx({
       node: {
@@ -234,5 +255,70 @@ describe("manageInstancePowerMapper.getExecutionDetails", () => {
 
     const details = manageInstancePowerMapper.getExecutionDetails(ctx);
     expect(details["Region"]).toBe("ap-southeast-1");
+  });
+});
+
+describe("MANAGE_INSTANCE_POWER_STATE_REGISTRY", () => {
+  const successExecution = buildExecution({
+    state: "STATE_FINISHED",
+    result: "RESULT_PASSED",
+  });
+
+  it("returns the payload type as state when a power event is present", () => {
+    const execution = {
+      ...successExecution,
+      outputs: {
+        default: [{ type: "aws.ec2.instance.power.started", timestamp: "", data: {} }],
+      },
+    };
+
+    expect(MANAGE_INSTANCE_POWER_STATE_REGISTRY.getState(execution)).toBe("aws.ec2.instance.power.started");
+  });
+
+  it("returns 'stopped' badge state for stop output", () => {
+    const execution = {
+      ...successExecution,
+      outputs: {
+        default: [{ type: "aws.ec2.instance.power.stopped", timestamp: "", data: {} }],
+      },
+    };
+
+    expect(MANAGE_INSTANCE_POWER_STATE_REGISTRY.getState(execution)).toBe("aws.ec2.instance.power.stopped");
+  });
+
+  it("returns 'rebooted' badge state for reboot output", () => {
+    const execution = {
+      ...successExecution,
+      outputs: {
+        default: [{ type: "aws.ec2.instance.power.rebooted", timestamp: "", data: {} }],
+      },
+    };
+
+    expect(MANAGE_INSTANCE_POWER_STATE_REGISTRY.getState(execution)).toBe("aws.ec2.instance.power.rebooted");
+  });
+
+  it("returns 'hibernated' badge state for hibernate output", () => {
+    const execution = {
+      ...successExecution,
+      outputs: {
+        default: [{ type: "aws.ec2.instance.power.hibernated", timestamp: "", data: {} }],
+      },
+    };
+
+    expect(MANAGE_INSTANCE_POWER_STATE_REGISTRY.getState(execution)).toBe("aws.ec2.instance.power.hibernated");
+  });
+
+  it("falls back to 'success' when no recognised power event is present", () => {
+    const execution = {
+      ...successExecution,
+      outputs: { default: [{ type: "aws.ec2.instance", timestamp: "", data: {} }] },
+    };
+
+    expect(MANAGE_INSTANCE_POWER_STATE_REGISTRY.getState(execution)).toBe("success");
+  });
+
+  it("passes non-success states through unchanged", () => {
+    const failed = buildExecution({ state: "STATE_FINISHED", result: "RESULT_FAILED", resultMessage: "error" });
+    expect(MANAGE_INSTANCE_POWER_STATE_REGISTRY.getState(failed)).toBe("error");
   });
 });

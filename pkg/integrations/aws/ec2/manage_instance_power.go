@@ -232,7 +232,7 @@ func (c *ManageInstancePower) Execute(ctx core.ExecutionContext) error {
 		}
 		return ctx.ExecutionState.Emit(
 			core.DefaultOutputChannel.Name,
-			ManageInstancePowerPayloadType,
+			ManageInstancePowerRebootPayloadType,
 			[]any{instanceDetailsToMap(instance)},
 		)
 	default:
@@ -326,7 +326,7 @@ func (c *ManageInstancePower) pollStart(ctx core.ActionHookContext, instance *In
 	case InstanceStateRunning:
 		return ctx.ExecutionState.Emit(
 			core.DefaultOutputChannel.Name,
-			ManageInstancePowerPayloadType,
+			ManageInstancePowerStartPayloadType,
 			[]any{instanceDetailsToMap(instance)},
 		)
 	case InstanceStateTerminated, InstanceStateShuttingDown:
@@ -343,9 +343,13 @@ func (c *ManageInstancePower) pollStart(ctx core.ActionHookContext, instance *In
 func (c *ManageInstancePower) pollStop(ctx core.ActionHookContext, instance *InstanceDetails, metadata ManageInstancePowerExecutionMetadata) error {
 	switch instance.State {
 	case InstanceStateStopped:
+		payloadType := ManageInstancePowerStopPayloadType
+		if metadata.Operation == powerOperationHibernate {
+			payloadType = ManageInstancePowerHibernatePayloadType
+		}
 		return ctx.ExecutionState.Emit(
 			core.DefaultOutputChannel.Name,
-			ManageInstancePowerPayloadType,
+			payloadType,
 			[]any{instanceDetailsToMap(instance)},
 		)
 	case InstanceStateTerminated, InstanceStateShuttingDown:

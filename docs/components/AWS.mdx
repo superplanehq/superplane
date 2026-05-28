@@ -1409,6 +1409,8 @@ The Get Image component retrieves metadata for an EC2 AMI.
 
 ## EC2 • Get Instance
 
+**Component key:** `aws.ec2.getInstance`
+
 The Get Instance component describes an EC2 instance and emits its current details.
 
 ### Use Cases
@@ -1458,6 +1460,8 @@ Emits the instance details on the default output channel:
 
 ## EC2 • Manage Instance Power
 
+**Component key:** `aws.ec2.manageInstancePower`
+
 The Manage Instance Power component performs power management operations on an EC2 instance.
 
 ### Use Cases
@@ -1493,21 +1497,22 @@ Emits instance details on the default output channel once the operation complete
 ```json
 {
   "data": {
-    "imageId": "ami-07f0e4f3e9c123abc",
+    "imageId": "ami-0215d085326c25744",
     "instanceId": "i-0abc1234567890def",
     "instanceType": "t3.micro",
-    "name": "my-server",
-    "privateDnsName": "ip-10-0-1-25.ec2.internal",
+    "launchTime": "2026-05-28T09:41:14.000Z",
+    "name": "preview-pr-5",
+    "privateDnsName": "ip-10.0.1.25.eu-north-1.compute.internal",
     "privateIpAddress": "10.0.1.25",
-    "publicDnsName": "ec2-54-198-10-42.compute-1.amazonaws.com",
+    "publicDnsName": "ec2-54-198-10-42.eu-north-1.compute.amazonaws.com",
     "publicIpAddress": "54.198.10.42",
-    "region": "us-east-1",
+    "region": "eu-north-1",
     "state": "running",
-    "subnetId": "subnet-0abc1234567890def",
-    "vpcId": "vpc-0abc1234567890def"
+    "subnetId": "subnet-0e7c8aa9b0a82aec5",
+    "vpcId": "vpc-0049650f5a479c14b"
   },
-  "timestamp": "2026-05-21T12:11:00Z",
-  "type": "aws.ec2.instance"
+  "timestamp": "2026-05-28T09:41:26.29656651Z",
+  "type": "aws.ec2.instance.power.started"
 }
 ```
 
