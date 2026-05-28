@@ -20,4 +20,4 @@ Copy the provider's IAM URL _before_ configuring the provider attributes on the 
 
 Click **Continue**.
 
-**6. Configure attribute mapping.** Add a single mapping where the **Google 1** column is `google.subject` and the **OIDC 1** column is `assertion.sub` — so `assertion.sub` is the value you enter for the `google.subject` attribute.
+**5. Configure attribute mapping.** Add a single mapping where the **Google 1** column is `google.subject` and the **OIDC 1** column is `assertion.sub` — so `assertion.sub` is the value you enter for the `google.subject` attribute.
