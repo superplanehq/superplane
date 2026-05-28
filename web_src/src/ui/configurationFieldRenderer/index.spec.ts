@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTemplateParametersAutocompleteObject } from "./index";
+import { buildTemplateParametersAutocompleteObject } from "./templateParametersAutocomplete";
 
 describe("buildTemplateParametersAutocompleteObject", () => {
   it("returns null when parameters are missing", () => {

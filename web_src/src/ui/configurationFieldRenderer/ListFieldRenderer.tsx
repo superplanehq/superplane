@@ -8,13 +8,29 @@ import { DayInYearFieldRenderer } from "./DayInYearFieldRenderer";
 import type { FieldRendererProps, ValidationError } from "./types";
 import { ConfigurationFieldRenderer } from "./index";
 import { listFieldItemTitle } from "./listFieldItemTitle";
-import { reorderListItems } from "@/lib/reorderListItems";
+import { useListFieldDragReorder } from "./useListFieldDragReorder";
 import { cn } from "@/lib/utils";
 import { showErrorToast } from "@/lib/toast";
 
 interface ExtendedFieldRendererProps extends FieldRendererProps {
   validationErrors?: ValidationError[] | Set<string>;
   fieldPath?: string;
+}
+
+function getApproverKey(item: Record<string, unknown>) {
+  const type = typeof item.type === "string" ? item.type : "";
+  if (!type) return undefined;
+
+  if (type === "user" && typeof item.user === "string" && item.user.trim()) {
+    return `user:${item.user}`;
+  }
+  if (type === "role" && typeof item.role === "string" && item.role.trim()) {
+    return `role:${item.role}`;
+  }
+  if (type === "group" && typeof item.group === "string" && item.group.trim()) {
+    return `group:${item.group}`;
+  }
+  return undefined;
 }
 
 export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
@@ -52,100 +68,27 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     itemDefinition.schema.some((schemaField) => ["user", "role", "group"].includes(schemaField.name || ""));
 
   const [openItem, setOpenItem] = React.useState<string | undefined>(undefined);
-
-  type DragState = {
-    items: unknown[];
-    activeIndex: number;
-    openAtStart: boolean;
-  };
-  const [dragState, setDragState] = React.useState<DragState | null>(null);
-  const dragStateRef = React.useRef<DragState | null>(null);
-  dragStateRef.current = dragState;
-
   const rowRefs = React.useRef<Array<HTMLDivElement | null>>([]);
-
-  const renderedItems = dragState ? dragState.items : items;
+  const {
+    dragState,
+    renderedItems,
+    startDrag: beginDrag,
+  } = useListFieldDragReorder({
+    items,
+    allowReorder,
+    useAccordion,
+    onChange,
+    setOpenItem,
+    rowRefs,
+  });
 
   React.useEffect(() => {
     if (items.length === 0) {
       setOpenItem(undefined);
-      return;
+    } else if (openItem !== undefined && Number(openItem) >= items.length) {
+      setOpenItem(undefined);
     }
-    if (openItem === undefined) {
-      return;
-    }
-    if (Number(openItem) < items.length) {
-      return;
-    }
-    setOpenItem(undefined);
   }, [items.length, openItem]);
-
-  React.useEffect(() => {
-    if (!dragState) {
-      return;
-    }
-
-    const handleMove = (event: MouseEvent) => {
-      setDragState((current) => {
-        if (!current) return current;
-        for (let i = 0; i < rowRefs.current.length; i++) {
-          const el = rowRefs.current[i];
-          if (!el) continue;
-          const rect = el.getBoundingClientRect();
-          if (event.clientY >= rect.top && event.clientY <= rect.bottom) {
-            if (i === current.activeIndex) {
-              return current;
-            }
-            const nextItems = reorderListItems(current.items, current.activeIndex, i);
-            return { ...current, items: nextItems, activeIndex: i };
-          }
-        }
-        return current;
-      });
-    };
-
-    const handleUp = () => {
-      const current = dragStateRef.current;
-      if (!current) return;
-      itemsRef.current = current.items;
-      onChange(current.items);
-      if (useAccordion && current.openAtStart) {
-        setOpenItem(String(current.activeIndex));
-      }
-      setDragState(null);
-    };
-
-    const previousCursor = document.body.style.cursor;
-    const previousUserSelect = document.body.style.userSelect;
-    document.body.style.cursor = "grabbing";
-    document.body.style.userSelect = "none";
-
-    window.addEventListener("mousemove", handleMove);
-    window.addEventListener("mouseup", handleUp);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMove);
-      window.removeEventListener("mouseup", handleUp);
-      document.body.style.cursor = previousCursor;
-      document.body.style.userSelect = previousUserSelect;
-    };
-  }, [dragState !== null, onChange, useAccordion]);
-
-  const getApproverKey = (item: Record<string, unknown>) => {
-    const type = typeof item.type === "string" ? item.type : "";
-    if (!type) return undefined;
-
-    if (type === "user" && typeof item.user === "string" && item.user.trim()) {
-      return `user:${item.user}`;
-    }
-    if (type === "role" && typeof item.role === "string" && item.role.trim()) {
-      return `role:${item.role}`;
-    }
-    if (type === "group" && typeof item.group === "string" && item.group.trim()) {
-      return `group:${item.group}`;
-    }
-    return undefined;
-  };
 
   const addItem = () => {
     const newItem =
@@ -162,24 +105,6 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
     if (useAccordion) {
       setOpenItem(String(newItems.length - 1));
     }
-  };
-
-  const startDrag = (event: React.MouseEvent, index: number) => {
-    if (!allowReorder || items.length < 2) return;
-    if (event.button !== 0) return;
-    event.preventDefault();
-    event.stopPropagation();
-
-    const wasOpen = openItem === String(index);
-    if (wasOpen) {
-      setOpenItem(undefined);
-    }
-
-    setDragState({
-      items: [...items],
-      activeIndex: index,
-      openAtStart: wasOpen,
-    });
   };
 
   const removeItem = (index: number) => {
@@ -315,7 +240,7 @@ export const ListFieldRenderer: React.FC<ExtendedFieldRendererProps> = ({
           className,
         )}
         onClick={(event) => event.stopPropagation()}
-        onMouseDown={(event) => startDrag(event, index)}
+        onMouseDown={(event) => beginDrag(event, index, openItem)}
       >
         <GripVertical className={cn("h-4 w-4", isActive && "text-gray-900 dark:text-gray-100")} aria-hidden />
       </button>
