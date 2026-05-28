@@ -51,7 +51,7 @@ export function HomePage() {
   if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError) {
     return (
       <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
-        <header className="bg-white border-b border-slate-950/15 px-4 h-12 flex items-center">
+        <header className="flex h-10 items-center border-b border-slate-950/15 bg-white px-2 sm:px-3">
           <OrganizationMenuButton organizationId={organizationId} />
         </header>
         <main className="w-full h-full flex flex-column flex-grow-1">
@@ -65,7 +65,7 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
-      <header className="bg-white border-b border-slate-950/15 px-4 h-12 flex items-center">
+      <header className="flex h-10 items-center border-b border-slate-950/15 bg-white px-2 sm:px-3">
         <OrganizationMenuButton organizationId={organizationId} />
       </header>
       <main className="w-full h-full flex flex-column flex-grow-1">

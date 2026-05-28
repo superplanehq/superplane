@@ -321,6 +321,68 @@ describe("CanvasPage connection drop", () => {
     expect(payload?.sourceHandleId).toBeUndefined();
   });
 
+  it("closes the building blocks sidebar when a new placeholder component is deleted", () => {
+    const onNodeDelete = vi.fn();
+    const placeholderNode = {
+      id: "placeholder-starter",
+      position: { x: 100, y: 100 },
+      data: {
+        label: "New Component",
+        state: "pending" as const,
+        type: "component",
+        outputChannels: ["default"],
+        component: {
+          title: "New Component",
+          iconSlug: "plus",
+          collapsed: false,
+          includeEmptyState: true,
+        },
+      },
+    };
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="version-live"
+          nodes={[placeholderNode]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={true}
+          activeCanvasVersionId="draft-version"
+          onEdgeCreate={vi.fn()}
+          onNodeDelete={onNodeDelete}
+          workflowNodes={[{ id: "placeholder-starter", type: "TYPE_ACTION", name: "New Component" }]}
+        />
+      </MemoryRouter>,
+    );
+
+    const nodes = reactFlowPropsRef.current?.nodes as Array<{
+      id: string;
+      data: {
+        _callbacksRef?: {
+          current?: {
+            handleNodeClick?: (nodeId: string) => void;
+            onNodeDelete?: { current?: (nodeId: string) => void };
+          };
+        };
+      };
+    }>;
+
+    act(() => {
+      nodes[0].data._callbacksRef?.current?.handleNodeClick?.("placeholder-starter");
+    });
+
+    expect(screen.getByTestId("building-blocks-sidebar")).toBeInTheDocument();
+
+    act(() => {
+      nodes[0].data._callbacksRef?.current?.onNodeDelete?.current?.("placeholder-starter");
+    });
+
+    expect(screen.queryByTestId("building-blocks-sidebar")).not.toBeInTheDocument();
+    expect(onNodeDelete).toHaveBeenCalledWith("placeholder-starter");
+  });
+
   it("opens the canvas YAML modal without switching to the Files tab", async () => {
     const onYamlOpen = vi.fn();
     const onSelectFiles = vi.fn();
