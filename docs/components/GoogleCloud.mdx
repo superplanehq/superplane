@@ -39,27 +39,14 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## Instructions
 
-## Connection method
-
-### Service Account Key
-
-1. Go to [IAM & Admin → Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts) in the Google Cloud Console.
-2. Select a service account → **Keys** → **Add Key** → **JSON**.
-3. Paste the downloaded JSON below.
-
-### Workload Identity Federation (keyless)
-
-1. Create a [Workload Identity Pool](https://cloud.google.com/iam/docs/workload-identity-federation) with an OIDC provider.
-2. Set the **Issuer URL** to this SuperPlane instance's URL.
-3. Set the **Audience** to the pool provider resource name.
-4. Grant the federated identity permission to [impersonate a service account](https://cloud.google.com/iam/docs/workload-identity-federation-with-other-providers#mapping) with the roles your workflows need.
-5. Enter the **pool provider resource name** and **Project ID** below.
+SuperPlane connects to Google Cloud using Workload Identity Federation — no long-lived credentials are stored.
 
 ## Required IAM roles
 
+- `roles/viewer` — validate project access
 - `roles/logging.configWriter` — create logging sinks for event triggers
-- `roles/pubsub.admin` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management)
+- `roles/pubsub.admin` — manage Pub/Sub topics and subscriptions
+- Additional roles depending on which capabilities you use
 
 <a id="artifact-registry-•-on-artifact-analysis"></a>
 
