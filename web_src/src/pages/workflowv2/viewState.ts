@@ -18,21 +18,25 @@ export function readStoredBoolean(key: string): boolean {
   }
 }
 
+export function clearComponentSidebarSearchParams(params: URLSearchParams): URLSearchParams {
+  params.delete("sidebar");
+  params.delete("node");
+  return params;
+}
+
 export function getWorkflowHeaderMode({
   isDashboardMode,
-  dashboardsFeatureEnabled,
   isRunsMode,
   isMemoryMode,
   isFilesMode,
 }: {
   isDashboardMode: boolean;
-  dashboardsFeatureEnabled: boolean;
   isRunsMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
 }): WorkflowHeaderMode {
   if (isDashboardMode) {
-    return dashboardsFeatureEnabled ? "dashboard" : "version-live";
+    return "dashboard";
   }
 
   if (isMemoryMode) {
@@ -76,7 +80,6 @@ export function getWorkflowCanvasStateMode({
 
 export function getWorkflowViewPresentation({
   isDashboardMode,
-  dashboardsFeatureEnabled,
   isRunsMode,
   isMemoryMode,
   isFilesMode,
@@ -85,7 +88,6 @@ export function getWorkflowViewPresentation({
   isViewingCurrentLiveVersion,
 }: {
   isDashboardMode: boolean;
-  dashboardsFeatureEnabled: boolean;
   isRunsMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
@@ -94,13 +96,7 @@ export function getWorkflowViewPresentation({
   isViewingCurrentLiveVersion: boolean;
 }) {
   return {
-    headerMode: getWorkflowHeaderMode({
-      isDashboardMode,
-      dashboardsFeatureEnabled,
-      isRunsMode,
-      isMemoryMode,
-      isFilesMode,
-    }),
+    headerMode: getWorkflowHeaderMode({ isDashboardMode, isRunsMode, isMemoryMode, isFilesMode }),
     canvasStateMode: getWorkflowCanvasStateMode({
       hasEditableVersion,
       isViewingPendingApprovalVersion,

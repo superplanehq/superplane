@@ -19,6 +19,7 @@ const (
 
 	DashboardPanelTypeMarkdown = "markdown"
 	DashboardPanelTypeNode     = "node"
+	DashboardPanelTypeNodes    = "nodes"
 	DashboardPanelTypeTable    = "table"
 	DashboardPanelTypeChart    = "chart"
 	DashboardPanelTypeNumber   = "number"
@@ -33,6 +34,7 @@ const (
 var AllowedDashboardPanelTypes = []string{
 	DashboardPanelTypeMarkdown,
 	DashboardPanelTypeNode,
+	DashboardPanelTypeNodes,
 	DashboardPanelTypeTable,
 	DashboardPanelTypeChart,
 	DashboardPanelTypeNumber,
@@ -236,6 +238,8 @@ func validatePanelContent(panel DashboardPanel) error {
 		return validateMarkdownContent(panel)
 	case DashboardPanelTypeNode:
 		return validateNodePanelContent(panel)
+	case DashboardPanelTypeNodes:
+		return validateNodesPanelContent(panel)
 	case DashboardPanelTypeTable:
 		return validateTablePanelContent(panel)
 	case DashboardPanelTypeChart:
@@ -281,6 +285,55 @@ func validateNodePanelContent(panel DashboardPanel) error {
 	if rawShowRun, ok := panel.Content["showRun"]; ok && rawShowRun != nil {
 		if _, ok := rawShowRun.(bool); !ok {
 			return fmt.Errorf("panel %q content.showRun must be a boolean", panel.ID)
+		}
+	}
+	return nil
+}
+
+// validateNodesPanelContent enforces the shape of a plural "nodes" panel.
+// `nodes` is an array (possibly empty for newly created panels). Each entry
+// must reference a canvas node by id or name; optional fields tighten the
+// rendered row (label, purpose description, manual-run button).
+func validateNodesPanelContent(panel DashboardPanel) error {
+	if panel.Content == nil {
+		return fmt.Errorf("panel %q content is required", panel.ID)
+	}
+	if err := validateOptionalString(panel.ID, "content.title", panel.Content["title"]); err != nil {
+		return err
+	}
+	rawNodes, ok := panel.Content["nodes"]
+	if !ok || rawNodes == nil {
+		return fmt.Errorf("panel %q content.nodes must be an array", panel.ID)
+	}
+	entries, ok := rawNodes.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q content.nodes must be an array", panel.ID)
+	}
+	for i, raw := range entries {
+		if err := validateNodesPanelEntry(panel.ID, i, raw); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateNodesPanelEntry(panelID string, index int, raw any) error {
+	entry, ok := raw.(map[string]any)
+	if !ok || entry == nil {
+		return fmt.Errorf("panel %q content.nodes[%d] must be an object", panelID, index)
+	}
+	node, _ := entry["node"].(string)
+	if strings.TrimSpace(node) == "" {
+		return fmt.Errorf("panel %q content.nodes[%d].node must be a non-empty string", panelID, index)
+	}
+	for _, key := range []string{"label", "description", "triggerName"} {
+		if err := validateOptionalString(panelID, fmt.Sprintf("content.nodes[%d].%s", index, key), entry[key]); err != nil {
+			return err
+		}
+	}
+	if rawShowRun, present := entry["showRun"]; present && rawShowRun != nil {
+		if _, ok := rawShowRun.(bool); !ok {
+			return fmt.Errorf("panel %q content.nodes[%d].showRun must be a boolean", panelID, index)
 		}
 	}
 	return nil

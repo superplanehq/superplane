@@ -203,6 +203,8 @@ export interface CanvasPageProps {
   dashboardYamlReadOnly?: boolean;
   /** DOM slot for Files mode actions owned by the files editor overlay. */
   filesHeaderActionsSlotId?: string;
+  /** Opens the canvas YAML modal. */
+  onYamlOpen?: () => void;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
@@ -212,6 +214,7 @@ export interface CanvasPageProps {
   autoLayoutOnUpdateDisabled?: boolean;
   autoLayoutOnUpdateDisabledTooltip?: string;
   canvasStateMode?: "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
+  /** When true, enables inline rename and app settings in the project switcher. */
   showCanvasSettingsMenu?: boolean;
   isVersionControlOpen?: boolean;
   onOpenVersionControl?: () => void;
@@ -1297,6 +1300,7 @@ function CanvasPage(props: CanvasPageProps) {
           onCanvasAddComponent={props.isEditing ? handleBuildingBlocksShortcutOpen : undefined}
           dashboardYamlReadOnly={props.dashboardYamlReadOnly}
           filesHeaderActionsSlotId={props.filesHeaderActionsSlotId}
+          onYamlOpen={props.onYamlOpen}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
@@ -1329,9 +1333,10 @@ function CanvasPage(props: CanvasPageProps) {
           props.headerMode === "dashboard" ? null : (
             <RightSideControls
               mode="edit"
-              addNoteOnly
+              canvasEditControls
               onSidebarOpen={handleBuildingBlocksShortcutOpen}
               onAddNote={handleAddNote}
+              onYamlOpen={props.onYamlOpen}
             />
           )
         ) : (
@@ -1339,6 +1344,7 @@ function CanvasPage(props: CanvasPageProps) {
             mode={readOnly ? "live" : "edit"}
             onSidebarOpen={handleBuildingBlocksShortcutOpen}
             onAddNote={handleAddNote}
+            onYamlOpen={props.onYamlOpen}
           />
         )}
         {props.hideAddControls || !isBuildingBlocksSidebarOpen ? null : (
@@ -1819,6 +1825,7 @@ function CanvasContentHeader({
   onCanvasAddComponent,
   dashboardYamlReadOnly,
   filesHeaderActionsSlotId,
+  onYamlOpen,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
   unpublishedDraftUpdatedAt,
@@ -1869,6 +1876,7 @@ function CanvasContentHeader({
   onCanvasAddComponent?: () => void;
   dashboardYamlReadOnly?: boolean;
   filesHeaderActionsSlotId?: string;
+  onYamlOpen?: () => void;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
@@ -1921,6 +1929,7 @@ function CanvasContentHeader({
       onCanvasAddComponent={onCanvasAddComponent}
       dashboardYamlReadOnly={dashboardYamlReadOnly}
       filesHeaderActionsSlotId={filesHeaderActionsSlotId}
+      onYamlOpen={onYamlOpen}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
@@ -2932,7 +2941,7 @@ function CanvasContent({
             <Button
               variant="ghost"
               size="sm"
-              className="h-8 w-8 px-0 text-slate-600 hover:text-slate-900"
+              className="h-7 w-7 px-0 text-slate-600 hover:text-slate-900"
               onClick={handleToggleAutoLayoutOnUpdate}
               disabled={isAutoLayoutToggleDisabled}
               aria-pressed={isAutoLayoutOnUpdateEnabled}
@@ -2962,13 +2971,14 @@ function CanvasContent({
           <Button
             variant="ghost"
             size="icon-sm"
+            className="h-7 w-7"
             onClick={handleOpenCommandPalette}
             aria-label="Search commands and components"
           >
             <Search className="h-3 w-3" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Search commands and components</TooltipContent>
+        <TooltipContent>Search Components</TooltipContent>
       </Tooltip>
     ),
     [handleOpenCommandPalette],
@@ -3039,7 +3049,7 @@ function CanvasContent({
             style={reactFlowStyle}
             className="h-full w-full"
           >
-            <Background gap={8} size={2} bgColor="#F1F5F9" color="#d9d9d9ff" />
+            <Background gap={8} size={2} bgColor="#F1F5F9" color="#cbd5e1" />
             <GlobalCommandPaletteCanvasNodeSearch onSearch={handleNodeSearch} onSelectNode={handleNodeSearchSelect} />
             <Panel
               position="bottom-left"
@@ -3055,7 +3065,7 @@ function CanvasContent({
                   />
                 </div>
               )}
-              <div className="flex items-center gap-3">
+              <div className="flex h-7 items-center gap-3">
                 <ZoomSlider
                   orientation="horizontal"
                   className="!static !m-0"
@@ -3065,14 +3075,14 @@ function CanvasContent({
                   {zoomSliderContent}
                 </ZoomSlider>
                 {showBottomStatusControls && !isLogSidebarOpen ? (
-                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex items-center gap-1 rounded-md p-0.5 h-8">
+                  <div className="bg-white text-gray-800 outline-1 outline-slate-950/15 flex h-7 items-center gap-1 rounded-md p-0.5">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
                           size="sm"
                           className={cn(
-                            "h-8 items-center text-xs font-medium",
+                            "h-7 items-center text-xs font-medium",
                             unacknowledgedErrorCount > 0 && "text-red-500",
                           )}
                           onClick={() => handleLogButtonClick("errors")}
@@ -3096,7 +3106,7 @@ function CanvasContent({
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-8 items-center text-xs font-medium"
+                          className="h-7 items-center text-xs font-medium"
                           onClick={() => handleLogButtonClick("warnings")}
                         >
                           <TriangleAlert

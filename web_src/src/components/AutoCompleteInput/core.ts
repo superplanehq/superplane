@@ -48,6 +48,7 @@ export interface Suggestion {
 export interface GetSuggestionsOptions {
   includeFunctions?: boolean;
   includeGlobals?: boolean;
+  includeTopLevelGlobals?: boolean;
   limit?: number;
   allowInStrings?: boolean;
 }
@@ -528,13 +529,45 @@ export const EXPR_FUNCTIONS: readonly ExprFunction[] = [
   },
 ] as const;
 
+function suggestTopLevelGlobals<TGlobals extends Record<string, unknown>>(
+  globals: TGlobals,
+  prefix: string,
+): Suggestion[] {
+  const out: Suggestion[] = [];
+  const globalKeys = listGlobalKeys(globals);
+  for (const key of globalKeys) {
+    if (key === "$" || key.startsWith("__") || needsQuotingAsIdentifier(key)) {
+      continue;
+    }
+    if (prefix && !key.toLowerCase().startsWith(prefix)) {
+      continue;
+    }
+
+    const value = (globals as Record<string, unknown>)[key];
+    const tailDot = isExpandableValue(value) ? "." : "";
+    out.push({
+      label: key,
+      kind: "variable",
+      insertText: `${key}${tailDot}`,
+      detail: getValueTypeLabel(value),
+    });
+  }
+  return out;
+}
+
 export function getSuggestions<TGlobals extends Record<string, unknown>>(
   text: string,
   cursor: number,
   globals: TGlobals,
   options: GetSuggestionsOptions = {},
 ): Suggestion[] {
-  const { includeFunctions = true, includeGlobals = true, limit = 30, allowInStrings = false } = options;
+  const {
+    includeFunctions = true,
+    includeGlobals = true,
+    includeTopLevelGlobals = false,
+    limit = 30,
+    allowInStrings = false,
+  } = options;
   const left = text.slice(0, cursor);
   // 0) Env key trigger: after "$" or "$[" suggest keys immediately
   const envTrigger = detectEnvKeyTrigger(left);
@@ -660,6 +693,10 @@ export function getSuggestions<TGlobals extends Record<string, unknown>>(
         description: "Root selector for accessing payload data from all connected components.",
         nodeCount,
       });
+    }
+
+    if (includeTopLevelGlobals) {
+      out.push(...suggestTopLevelGlobals(globals, prefix));
     }
   }
 

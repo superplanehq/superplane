@@ -10,11 +10,11 @@ import {
 } from "@/hooks/useCanvasData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { Editor } from "@monaco-editor/react";
 import { MultiFileDiff, Virtualizer } from "@pierre/diffs/react";
 import { FileTree as TreesFileTree, useFileTree } from "@pierre/trees/react";
-import { FilePlus2, GitCommitHorizontal, GitCompareArrows, RotateCcw, X } from "lucide-react";
+import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
+import { FilePlus2, GitCompareArrows, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
@@ -65,12 +65,24 @@ const fileEditorOptions = {
   renderLineHighlight: "line" as const,
 };
 
+export type WorkflowFilesHeaderActionsState = {
+  hasPendingChanges: boolean;
+  publishDisabled: boolean;
+  publishDisabledTooltip?: string;
+  discardDisabled: boolean;
+  publishPending: boolean;
+  onPublish: () => void | Promise<void>;
+  onDiscardAll: () => void;
+};
+
 interface WorkflowFilesOverlayLayerProps {
   isFilesMode: boolean;
+  isEditing?: boolean;
   canvasId?: string;
   canWrite?: boolean;
   files: WorkflowFile[];
   headerActionsSlotId?: string;
+  onHeaderActionsChange?: (actions: WorkflowFilesHeaderActionsState | null) => void;
 }
 
 type PendingFileChange =
@@ -91,31 +103,45 @@ type PendingFileChange =
 
 export function WorkflowFilesOverlayLayer({
   isFilesMode,
+  isEditing = false,
   canvasId,
   canWrite = false,
   files,
   headerActionsSlotId,
+  onHeaderActionsChange,
 }: WorkflowFilesOverlayLayerProps) {
   if (!isFilesMode) return null;
 
   return (
-    <CanvasFilesView canvasId={canvasId} canWrite={canWrite} files={files} headerActionsSlotId={headerActionsSlotId} />
+    <CanvasFilesView
+      canvasId={canvasId}
+      isEditing={isEditing}
+      canWrite={canWrite}
+      files={files}
+      headerActionsSlotId={headerActionsSlotId}
+      onHeaderActionsChange={onHeaderActionsChange}
+    />
   );
 }
 
 function CanvasFilesView({
   canvasId,
+  isEditing,
   canWrite,
   files,
   headerActionsSlotId,
+  onHeaderActionsChange,
 }: {
   canvasId?: string;
+  isEditing: boolean;
   canWrite: boolean;
   files: WorkflowFile[];
   headerActionsSlotId?: string;
+  onHeaderActionsChange?: (actions: WorkflowFilesHeaderActionsState | null) => void;
 }) {
+  const leftOffset = useEffectiveLeftSidebarWidth();
   const canUseRepository = !!canvasId;
-  const canManageRepositoryFiles = canWrite && canUseRepository;
+  const canManageRepositoryFiles = canWrite && canUseRepository && isEditing;
   const repositoryQuery = useCanvasRepository(canvasId ?? "", canUseRepository);
   const filesQuery = useCanvasRepositoryFiles(canvasId ?? "", canUseRepository);
   const commitFiles = useCommitCanvasRepositoryFiles(canvasId ?? "");
@@ -145,8 +171,6 @@ function CanvasFilesView({
   const [openTabs, setOpenTabs] = useState<string[]>(() => (initialPath ? [initialPath] : []));
   const [selectedPath, setSelectedPath] = useState<string | null>(() => initialPath);
   const [newFilePath, setNewFilePath] = useState<string | null>(null);
-  const [commitMessage, setCommitMessage] = useState("");
-  const [isCommitPopoverOpen, setIsCommitPopoverOpen] = useState(false);
   const [isDiffOpen, setIsDiffOpen] = useState(false);
   const [headerActionsHost, setHeaderActionsHost] = useState<HTMLElement | null>(null);
   const selectedGeneratedFile = selectedPath ? generatedFilesByPath.get(selectedPath) : undefined;
@@ -199,12 +223,17 @@ function CanvasFilesView({
     !selectedPath ||
     !selectedPathExistsInRepository ||
     loadedContentByPath[selectedPath] !== undefined;
-  const canCommit =
-    canManageRepositoryFiles &&
-    pendingChanges.length > 0 &&
-    commitMessage.trim() !== "" &&
-    !commitPathError &&
-    !commitFiles.isPending;
+  const canPublishFiles =
+    canManageRepositoryFiles && pendingChanges.length > 0 && !commitPathError && !commitFiles.isPending;
+
+  useEffect(() => {
+    if (isEditing) return;
+
+    setPendingChangesByPath({});
+    setNewFilePath(null);
+    setIsDiffOpen(false);
+  }, [isEditing]);
+
   useEffect(() => {
     if (!headerActionsSlotId) {
       setHeaderActionsHost(null);
@@ -357,28 +386,23 @@ function CanvasFilesView({
     [generatedPathSet],
   );
 
-  const discardChange = useCallback((path: string) => {
-    setPendingChangesByPath((current) => {
-      const { [path]: _removed, ...remaining } = current;
-      return remaining;
-    });
+  const discardAllChanges = useCallback(() => {
+    setPendingChangesByPath({});
   }, []);
 
-  const commitChanges = useCallback(async () => {
-    const message = commitMessage.trim();
-    if (!message) {
-      showErrorToast("Commit message is required.");
-      return;
-    }
-
+  const publishChanges = useCallback(async () => {
     if (commitPathError) {
       showErrorToast(commitPathError);
       return;
     }
 
+    if (pendingChanges.length === 0) {
+      return;
+    }
+
     try {
       await commitFiles.mutateAsync({
-        message,
+        message: "Update files",
         expectedHeadSha: headSha,
         operations: pendingChanges.map((change) => {
           if (change.type === "deleted") {
@@ -389,9 +413,8 @@ function CanvasFilesView({
         }),
       });
 
-      showSuccessToast("Files committed.");
+      showSuccessToast("Files published.");
       setPendingChangesByPath({});
-      setCommitMessage("");
       setLoadedContentByPath((current) => {
         const next = { ...current };
         for (const change of pendingChanges) {
@@ -405,15 +428,62 @@ function CanvasFilesView({
 
         return next;
       });
-      setIsCommitPopoverOpen(false);
     } catch (error) {
-      showErrorToast(getApiErrorMessage(error, "Failed to commit files."));
+      showErrorToast(getApiErrorMessage(error, "Failed to publish files."));
     }
-  }, [commitFiles, commitMessage, commitPathError, headSha, pendingChanges]);
+  }, [commitFiles, commitPathError, headSha, pendingChanges]);
+
+  const publishChangesRef = useRef(publishChanges);
+  publishChangesRef.current = publishChanges;
+  const discardAllChangesRef = useRef(discardAllChanges);
+  discardAllChangesRef.current = discardAllChanges;
+
+  const publishFileChanges = useCallback(() => {
+    void publishChangesRef.current();
+  }, []);
+
+  const discardAllFileChanges = useCallback(() => {
+    discardAllChangesRef.current();
+  }, []);
+
+  useEffect(() => {
+    if (!onHeaderActionsChange) {
+      return;
+    }
+
+    if (!canManageRepositoryFiles) {
+      onHeaderActionsChange(null);
+      return;
+    }
+
+    onHeaderActionsChange({
+      hasPendingChanges: pendingChanges.length > 0,
+      publishDisabled: !canPublishFiles,
+      publishDisabledTooltip: commitPathError,
+      discardDisabled: pendingChanges.length === 0,
+      publishPending: commitFiles.isPending,
+      onPublish: publishFileChanges,
+      onDiscardAll: discardAllFileChanges,
+    });
+  }, [
+    canManageRepositoryFiles,
+    canPublishFiles,
+    commitFiles.isPending,
+    commitPathError,
+    discardAllFileChanges,
+    onHeaderActionsChange,
+    pendingChanges.length,
+    publishFileChanges,
+  ]);
+
+  useEffect(() => {
+    return () => onHeaderActionsChange?.(null);
+  }, [onHeaderActionsChange]);
 
   return (
     <div
-      className="absolute inset-x-0 bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50"
+      className="absolute bottom-0 top-[5rem] z-10 grid min-h-0 grid-cols-[minmax(180px,260px)_minmax(0,1fr)] overflow-hidden bg-slate-50"
+      style={{ left: leftOffset, right: 0 }}
       data-testid="workflow-files-overlay"
     >
       <aside className="flex min-h-0 flex-col border-r border-slate-950/15 bg-white">
@@ -518,19 +588,7 @@ function CanvasFilesView({
       />
       {canManageRepositoryFiles && headerActionsHost
         ? createPortal(
-            <FilesHeaderActions
-              pendingChanges={pendingChanges}
-              commitFilesPending={commitFiles.isPending}
-              canCommit={canCommit}
-              commitMessage={commitMessage}
-              commitPathError={commitPathError}
-              isCommitPopoverOpen={isCommitPopoverOpen}
-              onCommitPopoverOpenChange={setIsCommitPopoverOpen}
-              onCommit={commitChanges}
-              onDiscardChange={discardChange}
-              onDiffOpen={() => setIsDiffOpen(true)}
-              onMessageChange={setCommitMessage}
-            />,
+            <FilesHeaderActions hasPendingChanges={pendingChanges.length > 0} onDiffOpen={() => setIsDiffOpen(true)} />,
             headerActionsHost,
           )
         : null}
@@ -538,58 +596,16 @@ function CanvasFilesView({
   );
 }
 
-function FilesHeaderActions({
-  pendingChanges,
-  commitFilesPending,
-  canCommit,
-  commitMessage,
-  commitPathError,
-  isCommitPopoverOpen,
-  onCommitPopoverOpenChange,
-  onCommit,
-  onDiscardChange,
-  onDiffOpen,
-  onMessageChange,
-}: {
-  pendingChanges: PendingFileChange[];
-  commitFilesPending: boolean;
-  canCommit: boolean;
-  commitMessage: string;
-  commitPathError?: string;
-  isCommitPopoverOpen: boolean;
-  onCommitPopoverOpenChange: (open: boolean) => void;
-  onCommit: () => void;
-  onDiscardChange: (path: string) => void;
-  onDiffOpen: () => void;
-  onMessageChange: (value: string) => void;
-}) {
+function FilesHeaderActions({ hasPendingChanges, onDiffOpen }: { hasPendingChanges: boolean; onDiffOpen: () => void }) {
+  if (!hasPendingChanges) {
+    return null;
+  }
+
   return (
-    <>
-      <Button type="button" variant="outline" size="sm" onClick={onDiffOpen} disabled={pendingChanges.length === 0}>
-        <GitCompareArrows className="h-4 w-4" />
-        Diff
-      </Button>
-      <Popover open={isCommitPopoverOpen} onOpenChange={onCommitPopoverOpenChange}>
-        <PopoverTrigger asChild>
-          <Button type="button" size="sm" disabled={pendingChanges.length === 0}>
-            <GitCommitHorizontal className="h-4 w-4" />
-            Commit
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent align="end" className="w-80" sideOffset={8}>
-          <CommitPopoverContent
-            changes={pendingChanges}
-            committing={commitFilesPending}
-            canCommit={canCommit}
-            message={commitMessage}
-            validationError={commitPathError}
-            onMessageChange={onMessageChange}
-            onCommit={onCommit}
-            onDiscardChange={onDiscardChange}
-          />
-        </PopoverContent>
-      </Popover>
-    </>
+    <Button type="button" variant="outline" size="sm" onClick={onDiffOpen}>
+      <GitCompareArrows className="h-4 w-4" />
+      Diff
+    </Button>
   );
 }
 
@@ -623,73 +639,6 @@ function EditorIconButton({
       </TooltipTrigger>
       <TooltipContent side="bottom">{label}</TooltipContent>
     </Tooltip>
-  );
-}
-
-function CommitPopoverContent({
-  changes,
-  committing,
-  canCommit,
-  message,
-  validationError,
-  onMessageChange,
-  onCommit,
-  onDiscardChange,
-}: {
-  changes: PendingFileChange[];
-  committing: boolean;
-  canCommit: boolean;
-  message: string;
-  validationError?: string;
-  onMessageChange: (value: string) => void;
-  onCommit: () => void;
-  onDiscardChange: (path: string) => void;
-}) {
-  return (
-    <div className="flex max-h-[min(70vh,520px)] min-h-0 flex-col gap-4">
-      <div className="space-y-1.5">
-        <label className="text-xs font-medium text-slate-600" htmlFor="canvas-files-commit-message">
-          Message
-        </label>
-        <Input
-          id="canvas-files-commit-message"
-          value={message}
-          onChange={(event) => onMessageChange(event.target.value)}
-          className="h-8 text-sm"
-        />
-      </div>
-
-      <div className="min-h-0 space-y-2 overflow-auto">
-        <p className="text-xs font-medium text-slate-600">Changes</p>
-        {changes.length === 0 ? (
-          <p className="text-sm text-slate-500">No changes</p>
-        ) : (
-          <div className="space-y-1">
-            {changes.map((change) => (
-              <div
-                key={change.path}
-                className="flex min-h-8 items-center gap-2 rounded border border-slate-950/10 px-2 py-1.5"
-              >
-                <span className="flex size-5 shrink-0 items-center justify-center rounded bg-slate-100 font-mono text-[11px] font-medium text-slate-700">
-                  {changeTypeLabel(change.type)}
-                </span>
-                <span className="min-w-0 flex-1 truncate font-mono text-xs text-slate-700">{change.path}</span>
-                <EditorIconButton label="Discard change" onClick={() => onDiscardChange(change.path)}>
-                  <RotateCcw className="h-4 w-4" />
-                </EditorIconButton>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {validationError ? <p className="text-sm text-red-600">{validationError}</p> : null}
-
-      <Button type="button" className="w-full" onClick={onCommit} disabled={!canCommit}>
-        <GitCommitHorizontal className="h-4 w-4" />
-        {committing ? "Committing..." : "Commit"}
-      </Button>
-    </div>
   );
 }
 
@@ -1213,12 +1162,6 @@ function getPathValidationError(paths: string[]): string | undefined {
 
 function normalizeFilePath(path: string): string {
   return path.trim().replace(/\\/g, "/").replace(/^\/+/, "");
-}
-
-function changeTypeLabel(type: PendingFileChange["type"]): string {
-  if (type === "added") return "A";
-  if (type === "modified") return "M";
-  return "D";
 }
 
 function encodeBase64(value: string): string {

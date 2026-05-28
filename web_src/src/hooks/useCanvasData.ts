@@ -1609,33 +1609,47 @@ export const useCanvasConsole = (canvasId: string, versionId: string | undefined
   });
 };
 
-export const useUpdateCanvasConsole = (canvasId: string, versionId: string | undefined) => {
+type UseUpdateCanvasConsoleOptions = {
+  registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
+};
+
+export const useUpdateCanvasConsole = (
+  canvasId: string,
+  versionId: string | undefined,
+  options?: UseUpdateCanvasConsoleOptions,
+) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
-      const response = await canvasesUpdateCanvasDashboard(
-        withOrganizationHeader({
-          path: { canvasId },
-          body: {
-            versionId,
-            panels: input.panels.map((p) => ({
-              id: p.id,
-              type: p.type,
-              content: p.content,
-            })),
-            layout: input.layout.map((l) => ({
-              i: l.i,
-              x: l.x,
-              y: l.y,
-              w: l.w,
-              h: l.h,
-              ...(l.minW !== undefined ? { minW: l.minW } : {}),
-              ...(l.minH !== undefined ? { minH: l.minH } : {}),
-            })),
-          },
-        }),
-      );
-      return response.data?.dashboard;
+      const releaseCanvasVersionUpdatedEcho = options?.registerIgnoredCanvasVersionUpdatedEcho?.(versionId);
+      try {
+        const response = await canvasesUpdateCanvasDashboard(
+          withOrganizationHeader({
+            path: { canvasId },
+            body: {
+              versionId,
+              panels: input.panels.map((p) => ({
+                id: p.id,
+                type: p.type,
+                content: p.content,
+              })),
+              layout: input.layout.map((l) => ({
+                i: l.i,
+                x: l.x,
+                y: l.y,
+                w: l.w,
+                h: l.h,
+                ...(l.minW !== undefined ? { minW: l.minW } : {}),
+                ...(l.minH !== undefined ? { minH: l.minH } : {}),
+              })),
+            },
+          }),
+        );
+        return response.data?.dashboard;
+      } catch (error) {
+        releaseCanvasVersionUpdatedEcho?.();
+        throw error;
+      }
     },
     onSuccess: (data) => {
       queryClient.setQueryData(canvasKeys.dashboard(canvasId, versionId), data);

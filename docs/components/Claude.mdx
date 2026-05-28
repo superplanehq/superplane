@@ -21,6 +21,8 @@ To get new Claude API key, go to [platform.claude.com](https://platform.claude.c
 
 ## Run Claude Agent
 
+**Component key:** `claude.runAgent`
+
 The **Run Claude Agent** component uses [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) to start a **session** with a configured agent and environment, sends your task as a **user message**, and waits until the **session** reaches a terminal state (idle or terminated) by polling. Log streaming is not used.
 
 ### Prerequisites
@@ -56,6 +58,8 @@ Emits a finished payload with **session** status, **session id**, and the final 
 <a id="text-prompt"></a>
 
 ## Text Prompt
+
+**Component key:** `claude.textPrompt`
 
 The Text Prompt component uses Anthropic's Claude models to generate text responses.
 
