@@ -16,8 +16,23 @@ type wifMetadata struct {
 	AccessTokenExpiresAt string `json:"accessTokenExpiresAt" mapstructure:"accessTokenExpiresAt"`
 }
 
+func integrationSecretsForCredentials(ctx core.IntegrationContext) ([]core.IntegrationSecret, error) {
+	if ctx.LegacySetup() {
+		return ctx.GetSecrets()
+	}
+	var secrets []core.IntegrationSecret
+	for _, name := range []string{SecretNameServiceAccountKey, SecretNameAccessToken} {
+		v, err := ctx.Secrets().Get(name)
+		if err != nil || strings.TrimSpace(v) == "" {
+			continue
+		}
+		secrets = append(secrets, core.IntegrationSecret{Name: name, Value: []byte(v)})
+	}
+	return secrets, nil
+}
+
 func TokenSourceFromIntegration(ctx core.IntegrationContext, scopes ...string) (oauth2.TokenSource, error) {
-	secrets, err := ctx.GetSecrets()
+	secrets, err := integrationSecretsForCredentials(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get integration secrets: %w", err)
 	}
@@ -25,6 +40,14 @@ func TokenSourceFromIntegration(ctx core.IntegrationContext, scopes ...string) (
 	authMethod := AuthMethodFromMetadata(ctx.GetMetadata())
 
 	keyJSON := FindSecretValue(secrets, SecretNameServiceAccountKey)
+	accessToken := FindSecretValue(secrets, SecretNameAccessToken)
+
+	// Metadata defaults to service account key. If we only have an access token (typical for WIF)
+	// and no key, use the token even when authMethod was omitted or not yet persisted.
+	if authMethod != AuthMethodWIF && len(accessToken) > 0 && len(keyJSON) == 0 {
+		authMethod = AuthMethodWIF
+	}
+
 	if authMethod != AuthMethodWIF && len(keyJSON) > 0 {
 		if len(scopes) == 0 {
 			scopes = []string{ScopeCloudPlatform}
@@ -36,7 +59,6 @@ func TokenSourceFromIntegration(ctx core.IntegrationContext, scopes ...string) (
 		return creds.TokenSource, nil
 	}
 
-	accessToken := FindSecretValue(secrets, SecretNameAccessToken)
 	if authMethod != AuthMethodWIF || len(accessToken) == 0 {
 		return nil, fmt.Errorf("no GCP credentials found: add a service account key or use Workload Identity Federation and resync")
 	}
