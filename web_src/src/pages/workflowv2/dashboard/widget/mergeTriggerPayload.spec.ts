@@ -14,14 +14,13 @@ const START_NODE: SuperplaneComponentsNode = {
 };
 
 describe("mergeTriggerPayload", () => {
-  it("merges row payload into template defaults", () => {
+  it("uses template selection only for run hooks", () => {
     const row = { pr_number: "99" };
     const params = mergeTriggerParameters(START_NODE, "run", "deploy", row, {
       "issue.number": "{{ pr_number }}",
     });
     expect(params).toEqual({
       template: "deploy",
-      payload: { issue: { number: "99" } },
     });
   });
 
