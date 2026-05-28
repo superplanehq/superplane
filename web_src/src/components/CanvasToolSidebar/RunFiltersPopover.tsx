@@ -52,7 +52,7 @@ export function RunFiltersPopover({
           aria-label="Filter runs"
           title="Filter runs"
         >
-          <Filter className="size-3.5 text-gray-400" />
+          <Filter className={cn("size-3.5", !(hasTriggerFilter || hasStatusFilter) && "text-gray-400")} />
           {hasTriggerFilter || hasStatusFilter ? (
             <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-sky-500 px-1 text-[9px] font-semibold text-white">
               {totalFilters}
