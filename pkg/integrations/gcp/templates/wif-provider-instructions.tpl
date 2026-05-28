@@ -6,11 +6,18 @@
 - [Cloud Resource Manager API](https://console.cloud.google.com/apis/library/cloudresourcemanager.googleapis.com)
 - [Pub/Sub API](https://console.cloud.google.com/apis/library/pubsub.googleapis.com)
 
-**2. Create a Workload Identity Pool** under **IAM & Admin → Workload Identity Federation**.
+**2. Find your Project ID.** Open the project picker at the top of the [Google Cloud Console](https://console.cloud.google.com/) — the **Project ID** is the value shown next to your project (not the display name). You can also find it on the [Dashboard](https://console.cloud.google.com/home/dashboard) under **Project info**. Paste it into the **Project ID** field above.
 
-**3. Add an OIDC provider** to the pool with these settings:
-- **Issuer URL:** `{{.IssuerURL}}`
-- **Audience:** the pool provider resource name
-- **Attribute mapping:** `google.subject=assertion.sub`
+**3. Create a Workload Identity Pool** under [IAM & Admin → Workload Identity Federation](https://console.cloud.google.com/iam-admin/workload-identity-pools). Click **Create Pool**, give it a name (e.g. `superplane`), and click **Continue**.
 
-**4. Copy the provider identifier** from the provider details page and enter it below. SuperPlane accepts the resource name (`//iam.googleapis.com/…`) or the full IAM URL from the console.
+**4. Add an OIDC provider** to the pool with these settings:
+- **Select a provider:** OpenID Connect (OIDC)
+- **Provider name / ID:** any value (e.g. `superplane`)
+- **Issuer (URL):** `{{ .IssuerURL }}`
+- **Audience:** select **Default audience**
+
+Click **Continue**.
+
+**5. Configure attribute mapping.** Add a single mapping where the **Google 1** column is `google.subject` and the **OIDC 1** column is `assertion.sub` — so `assertion.sub` is the value you enter for the `google.subject` attribute.
+
+**6. Copy the provider's IAM URL _before_ clicking Save.** After attribute mapping, the form shows the full provider URL — something like `https://iam.googleapis.com/projects/.../locations/global/workloadIdentityPools/.../providers/...`. Copy it now, **then** click **Save**. Paste the URL into the **Pool provider** field above. SuperPlane accepts either the resource name (`//iam.googleapis.com/…`) or the full IAM URL.
