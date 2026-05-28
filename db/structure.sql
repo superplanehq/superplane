@@ -884,19 +884,19 @@ ALTER TABLE ONLY public.canvas_memories
 
 
 --
+-- Name: canvas_repositories canvas_repositories_canvas_id_provider_repo_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_repositories
+    ADD CONSTRAINT canvas_repositories_canvas_id_provider_repo_id_key UNIQUE (canvas_id, provider, repo_id);
+
+
+--
 -- Name: canvas_repositories canvas_repositories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.canvas_repositories
     ADD CONSTRAINT canvas_repositories_pkey PRIMARY KEY (id);
-
-
---
--- Name: canvas_repositories canvas_repositories_provider_repo_id_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.canvas_repositories
-    ADD CONSTRAINT canvas_repositories_provider_repo_id_key UNIQUE (provider, repo_id);
 
 
 --

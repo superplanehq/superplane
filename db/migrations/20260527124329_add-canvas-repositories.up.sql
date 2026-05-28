@@ -10,8 +10,7 @@ CREATE TABLE IF NOT EXISTS canvas_repositories (
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  UNIQUE (canvas_id),
-  UNIQUE (provider, repo_id)
+  UNIQUE (canvas_id, provider, repo_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_canvas_repositories_canvas_id ON canvas_repositories (canvas_id);

@@ -214,7 +214,7 @@ supergit:
   image:
     registry: ghcr.io/superplanehq
     name: supergit
-    tag: ""
+    tag: "0.1.0"
     pullPolicy: IfNotPresent
   replicas: 1
   port: 8080
