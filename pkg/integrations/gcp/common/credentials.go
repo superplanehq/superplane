@@ -37,7 +37,7 @@ func accessTokenFromIntegration(ctx core.IntegrationContext) ([]byte, error) {
 	return []byte(v), nil
 }
 
-func TokenSourceFromIntegration(ctx core.IntegrationContext, scopes ...string) (oauth2.TokenSource, error) {
+func TokenSourceFromIntegration(ctx core.IntegrationContext) (oauth2.TokenSource, error) {
 	accessToken, err := accessTokenFromIntegration(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get integration secrets: %w", err)
@@ -69,8 +69,8 @@ func TokenSourceFromIntegration(ctx core.IntegrationContext, scopes ...string) (
 	return oauth2.StaticTokenSource(tok), nil
 }
 
-func CredentialsFromIntegration(ctx core.IntegrationContext, scopes ...string) (*google.Credentials, error) {
-	ts, err := TokenSourceFromIntegration(ctx, scopes...)
+func CredentialsFromIntegration(ctx core.IntegrationContext) (*google.Credentials, error) {
+	ts, err := TokenSourceFromIntegration(ctx)
 	if err != nil {
 		return nil, err
 	}

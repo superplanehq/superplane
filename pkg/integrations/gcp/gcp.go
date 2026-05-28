@@ -49,8 +49,6 @@ func init() {
 type GCP struct{}
 
 const (
-	ConnectionMethodWIF = "workloadIdentityFederation"
-
 	PubSubSecretName            = "pubsub.events.secret"
 	CloudBuildSecretName        = "cloudbuild.events.secret"
 	ArtifactPushSecretName      = "artifactregistry.push.secret"
