@@ -51,6 +51,7 @@ export interface AnnotationComponentProps extends ComponentActionsProps {
   noteId?: string;
   selected?: boolean;
   hideActionsButton?: boolean;
+  canvasMode?: "live" | "edit";
   width?: number;
   height?: number;
   onAnnotationUpdate?: (updates: {
@@ -74,6 +75,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
   selected = false,
   onDelete,
   hideActionsButton,
+  canvasMode = "live",
   width: propWidth = DEFAULT_WIDTH,
   height: propHeight = DEFAULT_HEIGHT,
   onAnnotationUpdate,
@@ -221,6 +223,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
 
   // Shared text styling for both modes
   const textStyles = "text-sm leading-normal text-gray-800";
+  const showNoteActions = canvasMode === "edit" && !hideActionsButton;
 
   return (
     <SelectionWrapper selected={selected}>
@@ -250,7 +253,7 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
             <div className="flex-1 min-h-24 shrink-0 bg-slate-200 rounded-b-md" aria-hidden />
           ) : (
             <>
-              {!hideActionsButton && (
+              {showNoteActions && (
                 <>
                   <div className="absolute -top-12 right-0 z-10 h-12 w-44 opacity-0" />
                   <div className="absolute -top-8 right-0 z-10 hidden items-center gap-2 group-hover:flex nodrag">
@@ -357,36 +360,16 @@ const AnnotationComponentBase: React.FC<AnnotationComponentProps> = ({
                           ol: ({ children }) => <ol className="list-decimal pl-4 mb-2">{children}</ol>,
                           li: ({ children }) => <li className="mb-1">{children}</li>,
                           h1: ({ children }) => (
-                            <h1
-                              style={{ fontSize: "2rem" }}
-                              className="mt-2 first:mt-0 mb-2 text-lg font-semibold leading-tight"
-                            >
-                              {children}
-                            </h1>
+                            <h1 className="mt-2 first:mt-0 mb-2 text-lg font-semibold leading-tight">{children}</h1>
                           ),
                           h2: ({ children }) => (
-                            <h2
-                              style={{ fontSize: "1.6rem" }}
-                              className="mt-2 first:mt-0 mb-2 text-base font-semibold leading-tight"
-                            >
-                              {children}
-                            </h2>
+                            <h2 className="mt-2 first:mt-0 mb-2 text-base font-semibold leading-tight">{children}</h2>
                           ),
                           h3: ({ children }) => (
-                            <h3
-                              style={{ fontSize: "1.3rem" }}
-                              className="mt-2 first:mt-0 mb-1 text-sm font-semibold leading-tight"
-                            >
-                              {children}
-                            </h3>
+                            <h3 className="mt-2 first:mt-0 mb-1 text-sm font-semibold leading-tight">{children}</h3>
                           ),
                           h4: ({ children }) => (
-                            <h4
-                              style={{ fontSize: "1.1rem" }}
-                              className="mt-2 first:mt-0 mb-1 text-sm font-medium leading-tight"
-                            >
-                              {children}
-                            </h4>
+                            <h4 className="mt-2 first:mt-0 mb-1 text-xs font-medium leading-tight">{children}</h4>
                           ),
                           code: ({ children }) => <code className="bg-black/10 px-1 rounded text-xs">{children}</code>,
                           pre: ({ children }) => (
@@ -455,6 +438,7 @@ export const AnnotationComponent = React.memo(
     prev.annotationColor === next.annotationColor &&
     prev.selected === next.selected &&
     prev.hideActionsButton === next.hideActionsButton &&
+    prev.canvasMode === next.canvasMode &&
     prev.width === next.width &&
     prev.height === next.height &&
     prev.dimBodyBelowHeader === next.dimBodyBelowHeader,

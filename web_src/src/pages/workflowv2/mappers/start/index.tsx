@@ -77,7 +77,7 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
     const showTemplateRun = mode === "live" && !!actions;
 
     return (
-      <div className="px-2 py-1.5 flex flex-col gap-1.5">
+      <div className="px-2 py-1.5 border-b border-slate-950/20 text-gray-500 flex flex-col gap-1">
         {templates.map((template, index) => (
           <div key={index} className="flex items-center justify-between min-w-0">
             <div className="flex items-center min-w-0 flex-1">
@@ -88,7 +88,7 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
             </div>
             {showTemplateRun && actions && (
               <Button
-                size="sm"
+                size="xs"
                 data-testid="start-template-run"
                 onClick={(e) => {
                   e.preventDefault();
@@ -117,7 +117,7 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
                     template: template.name,
                   });
                 }}
-                className="flex-shrink-0 h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
+                className="flex-shrink-0 bg-black text-white hover:bg-black/80"
               >
                 Run
               </Button>

@@ -179,16 +179,15 @@ func (s *canvasChangeRequestSteps) createChangeRequest() {
 func (s *canvasChangeRequestSteps) openCreatedChangeRequestFromList() {
 	s.session.AssertVisible(q.TestID("canvas-tool-sidebar"))
 	s.session.AssertVisible(q.Locator(`[data-testid="canvas-tool-sidebar"] [role="tab"][aria-selected="true"]:has-text("Versions")`))
-	s.session.AssertText("Versions")
 
 	// Pending rows are tagged in CanvasVersionControlSidebar (data-testid) so we do not rely on
-	// accessible-name collisions between pending and live "Preview v1" rows or on :has() CSS support.
-	// "View details" only mounts after liveVersions[0] exists (VersionRow previousVersion); CI can need >15s.
+	// accessible-name collisions between pending and live preview rows or on :has() CSS support.
+	// "View Diff" only mounts after liveVersions[0] exists (VersionRow previousVersion); CI can need >15s.
 	previewRow := s.session.Page().GetByTestId("canvas-pending-change-request-version-row")
 	require.NoError(s.t, previewRow.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
-	viewDetails := previewRow.Locator(`[aria-label="View details"]`)
-	require.NoError(s.t, viewDetails.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
-	require.NoError(s.t, viewDetails.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	viewDiff := previewRow.Locator(`[aria-label="View Diff"]`)
+	require.NoError(s.t, viewDiff.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(30000)}))
+	require.NoError(s.t, viewDiff.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
 
 	dialogTitle := s.session.Page().Locator(`[role=dialog] [data-slot="dialog-title"]`)
 	require.NoError(s.t, dialogTitle.WaitFor(pw.LocatorWaitForOptions{State: pw.WaitForSelectorStateVisible, Timeout: pw.Float(15000)}))
