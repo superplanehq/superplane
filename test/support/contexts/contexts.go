@@ -470,7 +470,7 @@ type IntegrationSecretStorage struct {
 func (s *IntegrationSecretStorage) Get(name string) (string, error) {
 	v, ok := s.parentContext.CurrentSecrets[name]
 	if !ok {
-		return "", fmt.Errorf("%w: %s", core.ErrSecretNotFound, name)
+		return "", fmt.Errorf("secret %s not found: %w", name, core.ErrSecretNotFound)
 	}
 
 	return string(v.Value), nil

@@ -52,7 +52,7 @@ func (s *IntegrationSecretStorage) findSecret(name string) (*models.IntegrationS
 		}
 	}
 
-	return nil, fmt.Errorf("%w: %s", core.ErrSecretNotFound, name)
+	return nil, fmt.Errorf("secret %s not found: %w", name, core.ErrSecretNotFound)
 }
 
 func (s *IntegrationSecretStorage) Get(name string) (string, error) {
