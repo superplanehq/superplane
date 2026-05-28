@@ -10,6 +10,7 @@ type UseCanvasConsoleVersionDiffArgs = {
   liveCanvasVersionId: string | undefined;
   hasDraftGraphDiffVersusLive: boolean;
   enabled: boolean;
+  registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
 };
 
 export function useCanvasConsoleVersionDiff({
@@ -18,6 +19,7 @@ export function useCanvasConsoleVersionDiff({
   liveCanvasVersionId,
   hasDraftGraphDiffVersusLive,
   enabled,
+  registerIgnoredCanvasVersionUpdatedEcho,
 }: UseCanvasConsoleVersionDiffArgs) {
   const dashboardQuery = useCanvasConsole(canvasId, activeCanvasVersionId || undefined, enabled);
   const liveDashboardQuery = useCanvasConsole(
@@ -30,7 +32,9 @@ export function useCanvasConsoleVersionDiff({
     [liveDashboardQuery.data, dashboardQuery.data],
   );
   const hasDraftDiffVersusLive = hasDraftGraphDiffVersusLive || hasDraftConsoleDiffVersusLive;
-  const updateDashboardMutation = useUpdateCanvasConsole(canvasId, activeCanvasVersionId || undefined);
+  const updateDashboardMutation = useUpdateCanvasConsole(canvasId, activeCanvasVersionId || undefined, {
+    registerIgnoredCanvasVersionUpdatedEcho,
+  });
 
   return {
     dashboardQuery,
