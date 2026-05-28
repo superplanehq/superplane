@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -89,27 +88,12 @@ const postSetupSyncDescriptionGCPWIFDelayed = "Running initial sync shortly (bri
 
 // GCP workload identity: IAM bindings can lag creation; defer first sync so workers do not hit STS before propagation.
 const (
-	gcpIntegrationAppName               = "gcp"
-	gcpPropertyConnectionMethod         = "connectionMethod"
-	gcpConnectionMethodWorkloadIdentity = "workloadIdentityFederation"
-	gcpWIFInitialSyncDelay              = 90 * time.Second
+	gcpIntegrationAppName  = "gcp"
+	gcpWIFInitialSyncDelay = 90 * time.Second
 )
 
 func gcpWorkloadIdentityFederationDeferredSync(integration *models.Integration) bool {
-	if integration.AppName != gcpIntegrationAppName {
-		return false
-	}
-	for _, p := range integration.Properties {
-		if p.Name != gcpPropertyConnectionMethod {
-			continue
-		}
-		v, ok := p.Value.(string)
-		if !ok {
-			v = fmt.Sprint(p.Value)
-		}
-		return strings.TrimSpace(v) == gcpConnectionMethodWorkloadIdentity
-	}
-	return false
+	return integration.AppName == gcpIntegrationAppName
 }
 
 func initialSyncRunAt(integration *models.Integration) time.Time {

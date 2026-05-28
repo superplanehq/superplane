@@ -2,7 +2,6 @@ package gcp
 
 import (
 	"bytes"
-	"context"
 	_ "embed"
 	"errors"
 	"fmt"
@@ -16,7 +15,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudbuild"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/clouddns"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/cloudfunctions"
-	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/compute"
 	gcppubsub "github.com/superplanehq/superplane/pkg/integrations/gcp/pubsub"
 	"github.com/superplanehq/superplane/pkg/oidc"
@@ -27,9 +25,7 @@ const (
 	SetupStepWIFProvider         = "enterWIFProvider"
 	SetupStepWIFServiceAccount   = "enterWIFServiceAccount"
 
-	PropertyConnectionMethod    = "connectionMethod"
 	PropertyProjectID           = "projectId"
-	PropertyClientEmail         = "clientEmail"
 	PropertyWIFProvider         = "workloadIdentityProvider"
 	PropertyServiceAccountEmail = "serviceAccountEmail"
 )
@@ -169,7 +165,7 @@ func (s *SetupProvider) OnStepRevert(ctx core.SetupStepContext) error {
 		ctx.Capabilities.Clear()
 		return nil
 	case SetupStepWIFProvider:
-		return ctx.Properties.Delete(PropertyConnectionMethod, PropertyWIFProvider, PropertyProjectID)
+		return ctx.Properties.Delete(PropertyWIFProvider, PropertyProjectID)
 	case SetupStepWIFServiceAccount:
 		return ctx.Properties.Delete(PropertyServiceAccountEmail)
 	}
@@ -181,36 +177,7 @@ func (s *SetupProvider) OnPropertyUpdate(_ core.PropertyUpdateContext) (*core.Se
 }
 
 func (s *SetupProvider) OnSecretUpdate(ctx core.SecretUpdateContext) (*core.SetupStep, error) {
-	if ctx.SecretName != gcpcommon.SecretNameServiceAccountKey {
-		return nil, fmt.Errorf("unknown secret: %s", ctx.SecretName)
-	}
-
-	keyStr := strings.TrimSpace(ctx.Value)
-	if keyStr == "" {
-		return nil, fmt.Errorf("service account key is required")
-	}
-
-	metadata, err := validateAndParseServiceAccountKey([]byte(keyStr))
-	if err != nil {
-		return nil, fmt.Errorf("invalid service account key: %w", err)
-	}
-
-	storedProjectID, _ := ctx.Properties.GetString(PropertyProjectID)
-	if storedProjectID != "" && storedProjectID != metadata.ProjectID {
-		return nil, fmt.Errorf("key is for project %q but integration is connected to %q", metadata.ProjectID, storedProjectID)
-	}
-
-	client, err := gcpcommon.NewClientFromKeyJSON(ctx.HTTP, []byte(keyStr), metadata.ProjectID)
-	if err != nil {
-		return nil, err
-	}
-
-	crmURL := fmt.Sprintf("https://cloudresourcemanager.googleapis.com/v3/projects/%s", metadata.ProjectID)
-	if _, err := client.GetURL(context.Background(), crmURL); err != nil {
-		return nil, fmt.Errorf("connection failed. Ensure the 'Cloud Resource Manager API' is enabled and the service account has 'Viewer' permissions: %w", err)
-	}
-
-	return nil, ctx.Secrets.Update(gcpcommon.SecretNameServiceAccountKey, keyStr)
+	return nil, fmt.Errorf("unknown secret: %s", ctx.SecretName)
 }
 
 func (s *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*core.SetupStep, error) {
@@ -227,17 +194,6 @@ func (s *SetupProvider) OnCapabilityUpdate(ctx core.CapabilityUpdateContext) (*c
 func (s *SetupProvider) onCapabilitySelectionSubmit(ctx core.SetupStepContext) (*core.SetupStep, error) {
 	ctx.Capabilities.Request(ctx.Step.Capabilities...)
 	ctx.Capabilities.Available(s.capabilityDiff(ctx.Step.Capabilities)...)
-
-	if err := ctx.Properties.Create(core.IntegrationPropertyDefinition{
-		Name:        PropertyConnectionMethod,
-		Label:       "Connection Method",
-		Description: "Authentication method used to connect to Google Cloud",
-		Type:        core.IntegrationPropertyTypeString,
-		Value:       ConnectionMethodWIF,
-		Editable:    false,
-	}); err != nil {
-		return nil, fmt.Errorf("error storing connection method: %w", err)
-	}
 
 	wifInstructions, err := renderTemplate("wifProvider", wifProviderInstructionsTemplate, map[string]any{
 		"IssuerURL": integrationOIDCIssuerURL(ctx),

@@ -49,8 +49,7 @@ func init() {
 type GCP struct{}
 
 const (
-	ConnectionMethodServiceAccountKey = "serviceAccountKey"
-	ConnectionMethodWIF               = "workloadIdentityFederation"
+	ConnectionMethodWIF = "workloadIdentityFederation"
 
 	PubSubSecretName            = "pubsub.events.secret"
 	CloudBuildSecretName        = "cloudbuild.events.secret"
@@ -62,8 +61,6 @@ const (
 )
 
 type Configuration struct {
-	ConnectionMethod                    string `json:"connectionMethod" mapstructure:"connectionMethod"`
-	ServiceAccountKey                   string `json:"serviceAccountKey" mapstructure:"serviceAccountKey"`
 	WorkloadIdentityProvider            string `json:"workloadIdentityProvider" mapstructure:"workloadIdentityProvider"`
 	WorkloadIdentityProjectID           string `json:"workloadIdentityProjectId" mapstructure:"workloadIdentityProjectId"`
 	WorkloadIdentityServiceAccountEmail string `json:"workloadIdentityServiceAccountEmail" mapstructure:"workloadIdentityServiceAccountEmail"`
@@ -99,42 +96,12 @@ func (g *GCP) Instructions() string {
 func (g *GCP) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
-			Name:        "connectionMethod",
-			Label:       "Connection method",
-			Type:        configuration.FieldTypeSelect,
-			Required:    true,
-			Description: "Authenticate with a service account key (JSON) or Workload Identity Federation (keyless).",
-			Default:     ConnectionMethodServiceAccountKey,
-			TypeOptions: &configuration.TypeOptions{
-				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{
-						{Label: "Service Account Key", Value: ConnectionMethodServiceAccountKey},
-						{Label: "Workload Identity Federation", Value: ConnectionMethodWIF},
-					},
-				},
-			},
-		},
-		{
-			Name:        "serviceAccountKey",
-			Label:       "Service Account Key (JSON)",
-			Type:        configuration.FieldTypeString,
-			Required:    true,
-			Sensitive:   true,
-			Description: "Paste the full contents of your GCP service account JSON key file",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "connectionMethod", Values: []string{ConnectionMethodServiceAccountKey}},
-			},
-		},
-		{
 			Name:        "workloadIdentityProvider",
 			Label:       "Workload Identity pool provider (resource name or URL)",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
 			Description: "OIDC provider resource name or full IAM URL from Google Cloud Console; must match the audience configured in the provider. SuperPlane normalizes this to //iam.googleapis.com/…",
 			Placeholder: "https://iam.googleapis.com/v1/projects/123456789/locations/global/workloadIdentityPools/my-pool/providers/superplane",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "connectionMethod", Values: []string{ConnectionMethodWIF}},
-			},
 		},
 		{
 			Name:        "workloadIdentityProjectId",
@@ -143,9 +110,6 @@ func (g *GCP) Configuration() []configuration.Field {
 			Required:    true,
 			Description: "GCP project ID",
 			Placeholder: "e.g. my-project",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "connectionMethod", Values: []string{ConnectionMethodWIF}},
-			},
 		},
 		{
 			Name:        "workloadIdentityServiceAccountEmail",
@@ -154,9 +118,6 @@ func (g *GCP) Configuration() []configuration.Field {
 			Required:    true,
 			Description: "Email of the service account SuperPlane should impersonate with Workload Identity Federation.",
 			Placeholder: "e.g. superplane@my-project.iam.gserviceaccount.com",
-			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "connectionMethod", Values: []string{ConnectionMethodWIF}},
-			},
 		},
 	}
 }
@@ -202,79 +163,19 @@ func (g *GCP) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	switch strings.TrimSpace(config.ConnectionMethod) {
-	case ConnectionMethodServiceAccountKey:
-		return g.syncServiceAccountKey(ctx, config)
-	case ConnectionMethodWIF:
-		return g.syncWIF(ctx, config)
-	default:
-		return fmt.Errorf("unknown connection method: %s", config.ConnectionMethod)
-	}
+	return g.syncWIF(ctx, config)
 }
 
 func (g *GCP) syncFromSetupProvider(ctx core.SyncContext) error {
 	props := ctx.Integration.Properties()
-	connectionMethod, err := props.GetString(PropertyConnectionMethod)
-	if err != nil {
-		return fmt.Errorf("connection method not set: %w", err)
-	}
-
-	switch connectionMethod {
-	case ConnectionMethodServiceAccountKey:
-		return g.syncServiceAccountKeyFromStorage(ctx)
-	case ConnectionMethodWIF:
-		provider, _ := props.GetString(PropertyWIFProvider)
-		projectID, _ := props.GetString(PropertyProjectID)
-		saEmail, _ := props.GetString(PropertyServiceAccountEmail)
-		return g.syncWIF(ctx, Configuration{
-			ConnectionMethod:                    ConnectionMethodWIF,
-			WorkloadIdentityProvider:            provider,
-			WorkloadIdentityProjectID:           projectID,
-			WorkloadIdentityServiceAccountEmail: saEmail,
-		})
-	default:
-		return fmt.Errorf("unknown connection method: %s", connectionMethod)
-	}
-}
-
-func (g *GCP) syncServiceAccountKeyFromStorage(ctx core.SyncContext) error {
-	props := ctx.Integration.Properties()
-	projectID, err := props.GetString(PropertyProjectID)
-	if err != nil {
-		return fmt.Errorf("project ID not found in properties: %w", err)
-	}
-	clientEmail, _ := props.GetString(PropertyClientEmail)
-
-	metadata := gcpcommon.Metadata{
-		ProjectID:   projectID,
-		ClientEmail: clientEmail,
-		AuthMethod:  gcpcommon.AuthMethodServiceAccountKey,
-	}
-	ctx.Integration.SetMetadata(metadata)
-
-	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create GCP client: %w", err)
-	}
-
-	callCtx := context.Background()
-	crmURL := fmt.Sprintf("https://cloudresourcemanager.googleapis.com/v3/projects/%s", projectID)
-	if _, err := client.GetURL(callCtx, crmURL); err != nil {
-		return fmt.Errorf("connection failed. Ensure the 'Cloud Resource Manager API' is enabled and the service account has 'Viewer' permissions: %w", err)
-	}
-
-	if err := g.configurePubSub(ctx, client, &metadata); err != nil {
-		return fmt.Errorf("failed to configure Pub/Sub event bus: %w", err)
-	}
-	if err := g.configureCloudBuild(ctx, client, &metadata); err != nil {
-		ctx.Logger.Warnf("failed to configure Cloud Build subscription: %v", err)
-	}
-	if err := g.configureArtifactRegistry(ctx, client, &metadata); err != nil {
-		ctx.Logger.Warnf("failed to configure Artifact Registry subscription: %v", err)
-	}
-	ctx.Integration.SetMetadata(metadata)
-	ctx.Integration.Ready()
-	return nil
+	provider, _ := props.GetString(PropertyWIFProvider)
+	projectID, _ := props.GetString(PropertyProjectID)
+	saEmail, _ := props.GetString(PropertyServiceAccountEmail)
+	return g.syncWIF(ctx, Configuration{
+		WorkloadIdentityProvider:            provider,
+		WorkloadIdentityProjectID:           projectID,
+		WorkloadIdentityServiceAccountEmail: saEmail,
+	})
 }
 
 func (g *GCP) syncWIF(ctx core.SyncContext, config Configuration) error {
@@ -357,82 +258,6 @@ func (g *GCP) syncWIF(ctx core.SyncContext, config Configuration) error {
 	}
 	ctx.Integration.Ready()
 	return nil
-}
-
-func (g *GCP) syncServiceAccountKey(ctx core.SyncContext, config Configuration) error {
-	keyJSON, err := ctx.Integration.GetConfig("serviceAccountKey")
-	if err != nil {
-		return fmt.Errorf("failed to read service account key: %w", err)
-	}
-
-	if len(keyJSON) == 0 {
-		return fmt.Errorf("service account key is required")
-	}
-
-	metadata, err := validateAndParseServiceAccountKey(keyJSON)
-	if err != nil {
-		return fmt.Errorf("invalid service account key: %w", err)
-	}
-	metadata.AuthMethod = gcpcommon.AuthMethodServiceAccountKey
-
-	if err := ctx.Integration.SetSecret(gcpcommon.SecretNameServiceAccountKey, keyJSON); err != nil {
-		return fmt.Errorf("failed to store service account key: %w", err)
-	}
-
-	ctx.Integration.SetMetadata(metadata)
-	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return fmt.Errorf("failed to create GCP client: %w", err)
-	}
-
-	crmURL := fmt.Sprintf("https://cloudresourcemanager.googleapis.com/v3/projects/%s", metadata.ProjectID)
-	if _, err := client.GetURL(context.Background(), crmURL); err != nil {
-		return fmt.Errorf("connection failed. Ensure the 'Cloud Resource Manager API' is enabled on your project and the service account has 'Viewer' permissions: %w", err)
-	}
-
-	if err := g.configurePubSub(ctx, client, &metadata); err != nil {
-		return fmt.Errorf("failed to configure Pub/Sub event bus: %w", err)
-	}
-	if err := g.configureCloudBuild(ctx, client, &metadata); err != nil {
-		ctx.Logger.Warnf("failed to configure Cloud Build subscription: %v", err)
-	}
-	if err := g.configureArtifactRegistry(ctx, client, &metadata); err != nil {
-		ctx.Logger.Warnf("failed to configure Artifact Registry subscription: %v", err)
-	}
-	ctx.Integration.SetMetadata(metadata)
-
-	ctx.Integration.Ready()
-	return nil
-}
-
-func validateAndParseServiceAccountKey(keyJSON []byte) (gcpcommon.Metadata, error) {
-	var raw map[string]any
-	if err := json.Unmarshal(keyJSON, &raw); err != nil {
-		return gcpcommon.Metadata{}, fmt.Errorf("invalid JSON: %w", err)
-	}
-
-	var projectID, clientEmail string
-
-	if v, ok := raw["project_id"].(string); ok {
-		projectID = strings.TrimSpace(v)
-	}
-
-	if v, ok := raw["client_email"].(string); ok {
-		clientEmail = strings.TrimSpace(v)
-	}
-
-	if projectID == "" {
-		return gcpcommon.Metadata{}, fmt.Errorf("missing required field project_id in service account key")
-	}
-
-	if clientEmail == "" {
-		return gcpcommon.Metadata{}, fmt.Errorf("missing required field client_email in service account key")
-	}
-
-	return gcpcommon.Metadata{
-		ProjectID:   projectID,
-		ClientEmail: clientEmail,
-	}, nil
 }
 
 func (g *GCP) configurePubSub(ctx core.SyncContext, client *gcpcommon.Client, metadata *gcpcommon.Metadata) error {
