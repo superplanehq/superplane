@@ -52,6 +52,7 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 
 	canAccess := false
 	if err := database.Conn().Transaction(func(tx *gorm.DB) error {
+		// Drafts: only the owning user can describe them.
 		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvas.ID, userUUID, version.ID); draftErr == nil {
 			canAccess = true
 			return nil
@@ -59,15 +60,14 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 			return draftErr
 		}
 
-		request, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvas.ID, version.ID)
-		if requestErr != nil {
-			if errors.Is(requestErr, gorm.ErrRecordNotFound) {
-				return nil
-			}
-			return requestErr
-		}
-		if request.OwnerID != nil && *request.OwnerID == userUUID {
+		// Snapshots tied to a change request are visible to any
+		// authenticated org member, mirroring DescribeCanvasChangeRequest
+		// which already returns the snapshot's full spec to reviewers.
+		if _, requestErr := models.FindCanvasChangeRequestByVersionInTransaction(tx, canvas.ID, version.ID); requestErr == nil {
 			canAccess = true
+			return nil
+		} else if !errors.Is(requestErr, gorm.ErrRecordNotFound) {
+			return requestErr
 		}
 		return nil
 	}); err != nil {

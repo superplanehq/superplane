@@ -36,6 +36,8 @@ The SendGrid base integration establishes API access. Actions and triggers will 
 
 ## On Email Event
 
+**Trigger key:** `sendgrid.onEmailEvent`
+
 The On Email Event trigger emits events when SendGrid posts delivery or engagement events to your webhook.
 
 ### Use Cases
@@ -84,6 +86,8 @@ Each event includes fields such as `event`, `email`, `timestamp`, `sg_event_id`,
 
 ## Create or Update Contact
 
+**Component key:** `sendgrid.createOrUpdateContact`
+
 Create or update a contact in SendGrid using the Marketing Contacts API.
 
 ### Use Cases
@@ -127,6 +131,8 @@ Create or update a contact in SendGrid using the Marketing Contacts API.
 <a id="send-email"></a>
 
 ## Send Email
+
+**Component key:** `sendgrid.sendEmail`
 
 Send a single email via SendGrid's Mail Send API.
 
