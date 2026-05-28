@@ -25,6 +25,9 @@ const preambleTemplate = "[SuperPlane session context — refreshed every turn; 
 	"When using the SuperPlane CLI, pass these refreshed values through\n" +
 	"environment variables instead of running `superplane connect`:\n" +
 	"  SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...\n" +
+	"Before the first CLI command in a turn, run `superplane version`.\n" +
+	"If it prints an update notice or is missing expected commands, run\n" +
+	"`superplane upgrade`, then continue with the same environment variables.\n" +
 	"\n" +
 	"api_token scopes (exact strings on the JWT):\n" +
 	"  - org:read\n" +
