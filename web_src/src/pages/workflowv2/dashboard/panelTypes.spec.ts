@@ -126,6 +126,35 @@ describe("validatePanelContent", () => {
     expect(error).toMatch(/dataSource\.limit must be a number/);
   });
 
+  it("accepts an optional seriesField on chart panels", () => {
+    expect(
+      validatePanelContent("chart", {
+        dataSource: { kind: "memory", namespace: "costs" },
+        render: {
+          kind: "chart",
+          type: "stacked-bar",
+          xField: "date",
+          seriesField: "service",
+          series: [{ field: "cost_usd" }],
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects a non-string seriesField on chart panels", () => {
+    const error = validatePanelContent("chart", {
+      dataSource: { kind: "memory", namespace: "costs" },
+      render: {
+        kind: "chart",
+        type: "stacked-bar",
+        xField: "date",
+        seriesField: 42,
+        series: [{ field: "cost_usd" }],
+      },
+    });
+    expect(error).toMatch(/render\.seriesField must be a string/);
+  });
+
   it("requires a known aggregation on number panels", () => {
     const error = validatePanelContent("number", {
       dataSource: { kind: "executions" },

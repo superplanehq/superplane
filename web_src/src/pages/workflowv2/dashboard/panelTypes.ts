@@ -529,6 +529,9 @@ function validateChartRender(render: Record<string, unknown>): string | null {
   if (typeof render.xField !== "string" || render.xField.trim() === "") {
     return "render.xField must be a non-empty string.";
   }
+  if (render.seriesField !== undefined && render.seriesField !== null && typeof render.seriesField !== "string") {
+    return "render.seriesField must be a string.";
+  }
   if (!Array.isArray(render.series) || render.series.length === 0) {
     return "render.series must be a non-empty array.";
   }

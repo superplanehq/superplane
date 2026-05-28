@@ -78,16 +78,22 @@ function Sparkline({ values }: { values: number[] }) {
   const max = Math.max(...values);
   const range = max - min || 1;
   const stepX = values.length > 1 ? width / (values.length - 1) : 0;
-  const points = values
-    .map((v, i) => {
-      const x = i * stepX;
-      const y = height - ((v - min) / range) * height;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+  // Compute the line points and close the path back along the baseline so
+  // the SVG renders as a filled area underneath the line.
+  const linePoints = values.map((v, i) => {
+    const x = i * stepX;
+    const y = height - ((v - min) / range) * height;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const lineCoords = linePoints.join(" ");
+  const firstX = (0).toFixed(1);
+  const lastX = ((values.length - 1) * stepX).toFixed(1);
+  const baselineY = height.toFixed(1);
+  const areaPath = `M${linePoints[0]} L${linePoints.slice(1).join(" L")} L${lastX},${baselineY} L${firstX},${baselineY} Z`;
   return (
     <svg width={width} height={height} className="text-sky-500" viewBox={`0 0 ${width} ${height}`} aria-hidden>
-      <polyline points={points} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
+      <path d={areaPath} fill="currentColor" fillOpacity={0.2} stroke="none" />
+      <polyline points={lineCoords} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinejoin="round" />
     </svg>
   );
 }

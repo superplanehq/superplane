@@ -25,6 +25,15 @@ export function buildRowPayloadFromTemplates(
   return out;
 }
 
+/**
+ * Build the hook parameters for a row action. Always deep-merges the
+ * row-derived `payload` map into the base parameters so authors can wire
+ * per-row values into the trigger using `{{ row_field }}` templates,
+ * including for the default `run` hook. The merged shape stays flat at
+ * the top level (`{ template, ...rowPayload }`) so the backend can resolve
+ * `{{ parameters.<dot.path> }}` placeholders declared in the template
+ * configuration via `InvokeNodeTriggerHook`'s expression resolver.
+ */
 export function mergeTriggerParameters(
   node: ComponentsNode | undefined,
   hookName: string,
@@ -33,9 +42,6 @@ export function mergeTriggerParameters(
   payloadTemplates?: Record<string, string>,
 ): Record<string, unknown> {
   const base = buildDashboardTriggerParameters(node, hookName, templateName);
-  if (hookName === "run") {
-    return base;
-  }
   const rowPayload = buildRowPayloadFromTemplates(payloadTemplates, row);
   return deepMergeObjects(base, rowPayload);
 }

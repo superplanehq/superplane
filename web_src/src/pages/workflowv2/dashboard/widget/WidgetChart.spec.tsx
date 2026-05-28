@@ -103,6 +103,29 @@ describe("WidgetChart bar variants", () => {
     const layers = container.querySelectorAll(".recharts-bar");
     expect(layers.length).toBe(2);
   });
+
+  it("pivots long-format rows into one bar layer per distinct seriesField value", () => {
+    const COST_ROWS = [
+      { date: "2026-05-26", service: "ec2", cost_usd: 58.45 },
+      { date: "2026-05-26", service: "s3", cost_usd: 0.0034 },
+      { date: "2026-05-26", service: "rds", cost_usd: 0.42 },
+      { date: "2026-05-27", service: "ec2", cost_usd: 60.0 },
+      { date: "2026-05-27", service: "s3", cost_usd: 0.01 },
+      { date: "2026-05-27", service: "rds", cost_usd: 0.43 },
+    ];
+    const { container } = renderChart(
+      {
+        kind: "chart",
+        type: "stacked-bar",
+        xField: "date",
+        seriesField: "service",
+        series: [{ field: "cost_usd", label: "Cost", prefix: "$" }],
+      },
+      { rows: COST_ROWS },
+    );
+    const layers = container.querySelectorAll(".recharts-bar");
+    expect(layers.length).toBe(3);
+  });
 });
 
 describe("WidgetChart legend visibility", () => {
