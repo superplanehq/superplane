@@ -34,7 +34,7 @@ export function ToolTabsHeader({
               : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300",
           )}
         >
-          {Icon ? <Icon className="size-3.5 shrink-0" aria-hidden /> : null}
+          {Icon ? <Icon className="size-4 shrink-0 text-gray-400" aria-hidden /> : null}
           {label}
         </button>
       ))}

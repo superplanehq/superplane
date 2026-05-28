@@ -118,6 +118,7 @@ function AnnotationBlockContent({
       {...safeAnnotationProps}
       noteId={nodeId}
       selected={selected}
+      canvasMode={canvasMode}
       onAnnotationUpdate={handleAnnotationUpdate}
       onAnnotationBlur={onAnnotationBlur}
       dimBodyBelowHeader={dimBodyBelowHeader}

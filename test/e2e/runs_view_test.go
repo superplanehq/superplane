@@ -169,7 +169,7 @@ func (s *runsViewSteps) thenTheFinishedRunIsVisible() {
 	s.session.AssertURLContains("run=" + s.run.ID.String())
 	s.session.AssertText("Start")
 	s.session.AssertText("Output")
-	s.session.AssertText("SUCCESS")
+	s.session.AssertText("success")
 	s.session.AssertHidden(q.Locator(`button[aria-label^="Add next component"]`))
 }
 
