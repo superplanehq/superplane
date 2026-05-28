@@ -2,6 +2,16 @@
 
 .dashboard-grid {
   position: relative;
+  transition: none !important;
+}
+
+/* Panels snap immediately when the grid compacts or reflows after drag/resize. */
+.dashboard-grid .react-grid-item {
+  transition: none !important;
+}
+
+.dashboard-grid .react-grid-item.cssTransforms {
+  transition: none !important;
 }
 
 .dashboard-grid .dashboard-grid-item {

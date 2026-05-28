@@ -66,6 +66,11 @@ export function RunRow({
         {triggerName}
       </span>
       <span
+        aria-label={RUN_STATUS_META[status].label}
+        title={RUN_STATUS_META[status].label}
+        className={cn("inline-block h-2 w-2 shrink-0 rounded-full", RUN_STATUS_META[status].dotClassName)}
+      />
+      <span
         className={cn(
           "min-w-0 flex-1 truncate text-xs",
           isSelected ? "font-semibold text-sky-900" : "font-medium text-gray-800",
@@ -73,11 +78,6 @@ export function RunRow({
       >
         {title}
       </span>
-      <span
-        aria-label={RUN_STATUS_META[status].label}
-        title={RUN_STATUS_META[status].label}
-        className={cn("inline-block h-2 w-2 shrink-0 rounded-full", RUN_STATUS_META[status].dotClassName)}
-      />
       <button
         type="button"
         title="Copy link to run"
@@ -94,8 +94,8 @@ export function RunRow({
         <LinkIcon className="h-3 w-3" />
       </button>
       {run.createdAt ? (
-        <span className="shrink-0 text-[10px] tabular-nums text-gray-400">
-          <TimeAgo date={run.createdAt} />
+        <span className="shrink-0 text-xs tabular-nums text-gray-500">
+          <TimeAgo date={run.createdAt} includeAgo={false} />
         </span>
       ) : null}
     </div>
