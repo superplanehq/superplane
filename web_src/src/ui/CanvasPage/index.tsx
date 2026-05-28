@@ -892,7 +892,7 @@ function CanvasPage(props: CanvasPageProps) {
 
       props.onNodeDelete?.(nodeId);
     },
-    [props, templateNodeId, state.componentSidebar, setTemplateNodeId],
+    [props, templateNodeId, state.componentSidebar, setTemplateNodeId, isSidebarOpenRef],
   );
 
   const handleNodesDelete = useCallback(
@@ -911,7 +911,7 @@ function CanvasPage(props: CanvasPageProps) {
 
       props.onNodesDelete?.(nodeIds);
     },
-    [props, templateNodeId, state.componentSidebar, setTemplateNodeId],
+    [props, templateNodeId, state.componentSidebar, setTemplateNodeId, isSidebarOpenRef],
   );
 
   const handleConnectionDropInEmptySpace = useCallback(
