@@ -10,7 +10,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-import { ConfirmFact, formatParameters } from "../confirmDialogPreview";
+import { ConfirmFact } from "../confirmDialogPreview";
+import { formatParameters } from "../formatConfirmDialogParameters";
 import type { resolveDashboardNode } from "../DashboardContext";
 import { buildEnv, compileTemplate, evalTemplate } from "./celExpr";
 import { mergeTriggerParameters } from "./mergeTriggerPayload";

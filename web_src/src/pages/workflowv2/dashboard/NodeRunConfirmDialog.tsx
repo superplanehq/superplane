@@ -20,7 +20,8 @@ import {
   parameterDisplayLabel,
   type StartTemplateParameter,
 } from "../mappers/start/templatePayload";
-import { ConfirmFact, formatParameters } from "./confirmDialogPreview";
+import { ConfirmFact } from "./confirmDialogPreview";
+import { formatParameters } from "./formatConfirmDialogParameters";
 import { resolveStartTemplate } from "./dashboardTriggerParameters";
 
 interface NodeRunConfirmDialogProps {
