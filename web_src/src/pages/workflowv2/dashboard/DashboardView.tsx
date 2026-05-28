@@ -74,6 +74,8 @@ export function DashboardView({
 
   const layoutItems = useMemo(() => buildRGLLayout(localPanels, localLayout), [localPanels, localLayout]);
 
+  const gridVisible = !errorMessage && !isLoading && localPanels.length > 0;
+
   // Suppress the default react-grid-layout 200ms transitions until the grid
   // has settled on its real width. `WidthProvider` mounts with a hardcoded
   // 1280px width and only learns the actual container size via a
@@ -83,13 +85,20 @@ export function DashboardView({
   // one. We instead observe the wrapper directly and arm transitions only
   // after the first non-zero width measurement has been painted, so drag /
   // resize still feel responsive without the tab-switch stretch animation.
+  // The effect must not arm while the grid is unmounted (loading / error /
+  // empty early returns leave `gridWrapperRef` null).
   const [transitionsArmed, setTransitionsArmed] = useState(false);
   const gridWrapperRef = useRef<HTMLDivElement>(null);
   const armFrameRef = useRef<number | null>(null);
   useLayoutEffect(() => {
+    if (!gridVisible) {
+      setTransitionsArmed(false);
+      return undefined;
+    }
     if (transitionsArmed) return undefined;
     const el = gridWrapperRef.current;
-    if (!el || typeof ResizeObserver === "undefined") {
+    if (!el) return undefined;
+    if (typeof ResizeObserver === "undefined") {
       armFrameRef.current = requestAnimationFrame(() => setTransitionsArmed(true));
       return () => {
         if (armFrameRef.current != null) cancelAnimationFrame(armFrameRef.current);
@@ -106,7 +115,7 @@ export function DashboardView({
       observer.disconnect();
       if (armFrameRef.current != null) cancelAnimationFrame(armFrameRef.current);
     };
-  }, [transitionsArmed]);
+  }, [gridVisible, transitionsArmed]);
 
   if (errorMessage) {
     return (
