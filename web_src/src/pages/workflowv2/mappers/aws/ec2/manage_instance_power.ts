@@ -184,17 +184,12 @@ function manageInstancePowerEventSections(nodes: NodeInfo[], execution: Executio
   const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
   const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
 
-  const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
-  const powerEvent = outputs?.default?.find((output) => output.type?.startsWith(powerPayloadPrefix));
-  const eventState =
-    powerEvent?.type && instancePowerStateMap[powerEvent.type] ? powerEvent.type : defaultStateFunction(execution);
-
   return [
     {
       receivedAt: new Date(execution.createdAt!),
       eventTitle: title,
       eventSubtitle: renderTimeAgo(new Date(execution.createdAt!)),
-      eventState,
+      eventState: MANAGE_INSTANCE_POWER_STATE_REGISTRY.getState(execution),
       eventId: execution.rootEvent?.id || "",
     },
   ];
