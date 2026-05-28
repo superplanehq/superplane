@@ -22,6 +22,18 @@ export function ChartTopControls({
   onChange: (next: ChartPanelContent) => void;
   fieldListId: string | undefined;
 }) {
+  const seriesField = value.render.seriesField ?? "";
+  const updateSeriesField = (next: string) => {
+    const trimmed = next.trim();
+    if (!trimmed) {
+      const { seriesField: _omit, ...rest } = value.render;
+      void _omit;
+      onChange({ ...value, render: rest });
+      return;
+    }
+    onChange({ ...value, render: { ...value.render, seriesField: next } });
+  };
+
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-3 gap-3">
@@ -72,6 +84,21 @@ export function ChartTopControls({
               ))}
             </SelectContent>
           </Select>
+        </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="space-y-1.5 col-span-2">
+          <Label className="text-xs font-medium text-slate-600">Stack by field (optional)</Label>
+          <Input
+            list={fieldListId}
+            value={seriesField}
+            onChange={(e) => updateSeriesField(e.target.value)}
+            placeholder="e.g. service (pivots rows into one series per value)"
+            data-testid="chart-series-field"
+          />
+          <p className="text-[11px] text-slate-500">
+            When set, the value comes from the first series&apos; field, summed per (X, Stack) bucket.
+          </p>
         </div>
       </div>
       <ChartSortRow value={value} onChange={onChange} fieldListId={fieldListId} />

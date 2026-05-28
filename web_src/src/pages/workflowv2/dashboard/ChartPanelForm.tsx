@@ -23,7 +23,9 @@ export function ChartPanelForm({
   const { fields } = useMemoryCatalog(canvasId, memoryNamespace);
   const fieldListId = memoryNamespace ? `chart-fields-${memoryNamespace}` : undefined;
   const hasFieldSuggestions = fields.length > 0 && Boolean(fieldListId);
-  const stackedBarNeedsMoreSeries = value.render.type === "stacked-bar" && value.render.series.length < 2;
+  const hasSeriesFieldPivot = Boolean(value.render.seriesField?.trim());
+  const stackedBarNeedsMoreSeries =
+    value.render.type === "stacked-bar" && !hasSeriesFieldPivot && value.render.series.length < 2;
 
   return (
     <div className="space-y-3">
