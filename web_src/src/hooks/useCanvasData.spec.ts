@@ -4,9 +4,10 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { canvasFoldersUpdateCanvasFolder, canvasesListRuns } = vi.hoisted(() => ({
+const { canvasFoldersUpdateCanvasFolder, canvasesListRuns, canvasesUpdateCanvasDashboard } = vi.hoisted(() => ({
   canvasFoldersUpdateCanvasFolder: vi.fn(),
   canvasesListRuns: vi.fn(),
+  canvasesUpdateCanvasDashboard: vi.fn(),
 }));
 
 vi.mock("../api-client/sdk.gen", async (importOriginal) => {
@@ -15,10 +16,16 @@ vi.mock("../api-client/sdk.gen", async (importOriginal) => {
     ...(actual as Record<string, unknown>),
     canvasFoldersUpdateCanvasFolder,
     canvasesListRuns,
+    canvasesUpdateCanvasDashboard,
   };
 });
 
-import { canvasKeys, useInfiniteCanvasRuns, useUpdateCanvasFolderMembership } from "@/hooks/useCanvasData";
+import {
+  canvasKeys,
+  useInfiniteCanvasRuns,
+  useUpdateCanvasConsole,
+  useUpdateCanvasFolderMembership,
+} from "@/hooks/useCanvasData";
 
 type TestCanvasFolder = {
   metadata?: { id?: string };
@@ -268,5 +275,57 @@ describe("useUpdateCanvasFolderMembership", () => {
     expect(getCanvasFolderId(queryClient, organizationId, "canvas-1")).toBe("folder-1");
     expect(getFolderCanvasIds(queryClient, organizationId, "folder-1")).toEqual(["canvas-1"]);
     expect(getFolderCanvasIds(queryClient, organizationId, "folder-2")).toEqual([]);
+  });
+});
+
+describe("useUpdateCanvasConsole", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("registers a canvas version websocket echo before saving dashboard changes", async () => {
+    const queryClient = createQueryClient();
+    const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => vi.fn());
+    canvasesUpdateCanvasDashboard.mockResolvedValue({
+      data: {
+        dashboard: {
+          panels: [],
+          layout: [],
+        },
+      },
+    });
+
+    const { result } = renderHook(
+      () =>
+        useUpdateCanvasConsole("canvas-1", "version-1", {
+          registerIgnoredCanvasVersionUpdatedEcho,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await result.current.mutateAsync({ panels: [], layout: [] });
+
+    expect(registerIgnoredCanvasVersionUpdatedEcho).toHaveBeenCalledWith("version-1");
+    expect(canvasesUpdateCanvasDashboard).toHaveBeenCalledOnce();
+  });
+
+  it("releases the ignored canvas version echo when dashboard save fails", async () => {
+    const queryClient = createQueryClient();
+    const releaseCanvasVersionUpdatedEcho = vi.fn();
+    const registerIgnoredCanvasVersionUpdatedEcho = vi.fn(() => releaseCanvasVersionUpdatedEcho);
+    canvasesUpdateCanvasDashboard.mockRejectedValue(new Error("request failed"));
+
+    const { result } = renderHook(
+      () =>
+        useUpdateCanvasConsole("canvas-1", "version-1", {
+          registerIgnoredCanvasVersionUpdatedEcho,
+        }),
+      { wrapper: createWrapper(queryClient) },
+    );
+
+    await expect(result.current.mutateAsync({ panels: [], layout: [] })).rejects.toThrow("request failed");
+
+    expect(registerIgnoredCanvasVersionUpdatedEcho).toHaveBeenCalledWith("version-1");
+    expect(releaseCanvasVersionUpdatedEcho).toHaveBeenCalledOnce();
   });
 });
