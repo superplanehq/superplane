@@ -138,7 +138,7 @@ describe("WidgetTable row actions — permission gating", () => {
 });
 
 describe("WidgetTable row actions — confirm dialog preview", () => {
-  it("shows resolved trigger node, template, and merged parameters", () => {
+  it("shows resolved trigger node, template, and run hook parameters", () => {
     const onTrigger = vi.fn().mockResolvedValue(undefined);
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const renderWithConfirm = (canvasRender: WidgetTableRender) =>
@@ -187,10 +187,10 @@ describe("WidgetTable row actions — confirm dialog preview", () => {
     expect(preview.textContent).toMatch(/run/);
     expect(preview.textContent).toMatch(/default/);
 
-    // Parameters JSON includes the row-derived issue.number.
+    // Manual run hooks pass template selection only; row payload templates are not merged.
     const params = screen.getByTestId("widget-row-action-start-parameters");
     expect(params.textContent).toContain('"template": "default"');
-    expect(params.textContent).toContain('"number": "42"');
+    expect(params.textContent).not.toContain('"number"');
   });
 });
 
