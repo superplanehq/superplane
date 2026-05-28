@@ -2,19 +2,22 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
 
-type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
+type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
   onSelectLive: () => void;
   onSelectDashboard?: () => void;
   onSelectMemory?: () => void;
+  onSelectFiles?: () => void;
   editing?: boolean;
+  hasDraft?: boolean;
 }
 
 const CANVAS_TAB = "canvas";
 const DASHBOARD_TAB = "dashboard";
 const MEMORY_TAB = "memory";
+const FILES_TAB = "files";
 const RUNS_MODE = "runs";
 
 export function CanvasModeToggle({
@@ -22,18 +25,23 @@ export function CanvasModeToggle({
   onSelectLive,
   onSelectDashboard,
   onSelectMemory,
+  onSelectFiles,
   editing = false,
+  hasDraft = false,
 }: CanvasModeToggleProps) {
   const showDashboard = Boolean(onSelectDashboard);
   const showMemory = Boolean(onSelectMemory);
+  const showFiles = Boolean(onSelectFiles);
   const selected =
     mode === DASHBOARD_TAB
       ? DASHBOARD_TAB
       : mode === MEMORY_TAB
         ? MEMORY_TAB
-        : mode === RUNS_MODE
-          ? RUNS_MODE
-          : CANVAS_TAB;
+        : mode === FILES_TAB
+          ? FILES_TAB
+          : mode === RUNS_MODE
+            ? RUNS_MODE
+            : CANVAS_TAB;
   const valueChangeHandledRef = useRef(false);
 
   useEffect(() => {
@@ -73,6 +81,15 @@ export function CanvasModeToggle({
             valueChangeHandledRef.current = false;
           });
           void onSelectMemory();
+          return;
+        }
+
+        if (next === FILES_TAB && selected !== FILES_TAB && onSelectFiles) {
+          valueChangeHandledRef.current = true;
+          queueMicrotask(() => {
+            valueChangeHandledRef.current = false;
+          });
+          void onSelectFiles();
         }
       }}
     >
@@ -95,11 +112,25 @@ export function CanvasModeToggle({
           data-testid="canvas-view-mode-live"
           aria-label={editing ? "Canvas (editing)" : "Canvas"}
         >
-          Canvas
+          <span className="inline-flex items-center gap-1.5">
+            Canvas
+            {hasDraft ? (
+              <span
+                className="inline-flex size-1.5 shrink-0 rounded-full bg-slate-400"
+                aria-hidden="true"
+                data-testid="canvas-view-mode-live-draft-dot"
+              />
+            ) : null}
+          </span>
         </TabsTrigger>
         {showMemory ? (
           <TabsTrigger value={MEMORY_TAB} data-testid="canvas-view-mode-memory" aria-label="Memory">
             Memory
+          </TabsTrigger>
+        ) : null}
+        {showFiles ? (
+          <TabsTrigger value={FILES_TAB} data-testid="canvas-view-mode-files" aria-label="Files">
+            Files
           </TabsTrigger>
         ) : null}
       </TabsList>

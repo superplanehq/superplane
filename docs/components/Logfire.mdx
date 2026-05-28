@@ -37,6 +37,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 ## On Alert Received
 
+**Trigger key:** `logfire.onAlertReceived`
+
 The On Alert Received trigger starts a workflow execution when Logfire sends an alert payload to your SuperPlane webhook URL.
 
 ### Configuration
@@ -66,6 +68,8 @@ After you save this trigger, SuperPlane provides a webhook URL. Add that URL as 
 <a id="query-logfire"></a>
 
 ## Query Logfire
+
+**Component key:** `logfire.queryLogfire`
 
 The Query Logfire component executes a read-only SQL query against Logfire and returns query results for use in downstream steps.
 

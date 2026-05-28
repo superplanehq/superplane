@@ -9,7 +9,7 @@ import (
 // stringVisitor receives every string leaf reachable from a configuration map,
 // along with the field type derived from the schema (or empty when the value
 // lies outside the schema).
-type stringVisitor func(fieldPath, fieldType, value string)
+type stringVisitor func(fieldPath string, field configuration.Field, value string)
 
 // walkConfiguration traverses a configuration map and calls visit for each
 // string leaf. Schema-aware where possible: keys present in fields recurse
@@ -35,8 +35,8 @@ func walkFieldValue(path string, field configuration.Field, value any, visit str
 	case configuration.FieldTypeObject:
 		if field.TypeOptions != nil && field.TypeOptions.Object != nil && len(field.TypeOptions.Object.Schema) > 0 {
 			if obj, ok := asAnyMap(value); ok {
-				walkConfiguration(obj, field.TypeOptions.Object.Schema, func(p, t, v string) {
-					visit(path+"."+p, t, v)
+				walkConfiguration(obj, field.TypeOptions.Object.Schema, func(p string, f configuration.Field, v string) {
+					visit(path+"."+p, f, v)
 				})
 				return
 			}
@@ -56,7 +56,7 @@ func walkFieldValue(path string, field configuration.Field, value any, visit str
 
 	default:
 		if str, ok := value.(string); ok {
-			visit(path, field.Type, str)
+			visit(path, field, str)
 			return
 		}
 		walkUntypedValue(path, value, visit)
@@ -68,15 +68,15 @@ func walkList(path string, list []any, itemDef *configuration.ListItemDefinition
 		itemPath := fmt.Sprintf("%s[%d]", path, i)
 		if itemDef != nil && itemDef.Type == configuration.FieldTypeObject && len(itemDef.Schema) > 0 {
 			if obj, ok := asAnyMap(item); ok {
-				walkConfiguration(obj, itemDef.Schema, func(p, t, v string) {
-					visit(itemPath+"."+p, t, v)
+				walkConfiguration(obj, itemDef.Schema, func(p string, f configuration.Field, v string) {
+					visit(itemPath+"."+p, f, v)
 				})
 				continue
 			}
 		}
 		if itemDef != nil && itemDef.Type != "" && itemDef.Type != configuration.FieldTypeObject {
 			if str, ok := item.(string); ok {
-				visit(itemPath, itemDef.Type, str)
+				visit(itemPath, configuration.Field{Type: itemDef.Type}, str)
 				continue
 			}
 		}
@@ -87,14 +87,14 @@ func walkList(path string, list []any, itemDef *configuration.ListItemDefinition
 func walkUntypedValue(path string, value any, visit stringVisitor) {
 	switch v := value.(type) {
 	case string:
-		visit(path, "", v)
+		visit(path, configuration.Field{}, v)
 	case map[string]any:
 		for key, child := range v {
 			walkUntypedValue(path+"."+key, child, visit)
 		}
 	case map[string]string:
 		for key, child := range v {
-			visit(path+"."+key, "", child)
+			visit(path+"."+key, configuration.Field{}, child)
 		}
 	case []any:
 		for i, child := range v {

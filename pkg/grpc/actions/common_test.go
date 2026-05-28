@@ -66,6 +66,38 @@ func TestConfigurationFieldToProto(t *testing.T) {
 		}
 	})
 
+	t.Run("roundtrip list type options with Accordion and Reorderable preserves fields", func(t *testing.T) {
+		field := configuration.Field{
+			Name:  "parameters",
+			Label: "Parameters",
+			Type:  configuration.FieldTypeList,
+			TypeOptions: &configuration.TypeOptions{
+				List: &configuration.ListTypeOptions{
+					ItemLabel:   "Parameter",
+					Accordion:   true,
+					Reorderable: true,
+					ItemDefinition: &configuration.ListItemDefinition{
+						Type: configuration.FieldTypeObject,
+					},
+				},
+			},
+		}
+
+		pbField := ConfigurationFieldToProto(field)
+		require.NotNil(t, pbField.TypeOptions)
+		require.NotNil(t, pbField.TypeOptions.List)
+		require.NotNil(t, pbField.TypeOptions.List.Accordion)
+		require.True(t, *pbField.TypeOptions.List.Accordion)
+		require.NotNil(t, pbField.TypeOptions.List.Reorderable)
+		require.True(t, *pbField.TypeOptions.List.Reorderable)
+
+		field2 := ProtoToConfigurationField(pbField)
+		require.NotNil(t, field2.TypeOptions)
+		require.NotNil(t, field2.TypeOptions.List)
+		assert.True(t, field2.TypeOptions.List.Accordion)
+		assert.True(t, field2.TypeOptions.List.Reorderable)
+	})
+
 	t.Run("roundtrip list type options with MaxItems preserves field", func(t *testing.T) {
 		maxItems := 4
 

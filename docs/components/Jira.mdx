@@ -32,6 +32,8 @@ To connect Jira to SuperPlane:
 
 ## Create Incident
 
+**Component key:** `jira.createIncident`
+
 The Create Incident component opens a new incident in Jira Service Management.
 
 ### Use Cases
@@ -83,6 +85,8 @@ Returns **id** (numeric issue id), **key** (e.g. ITSM-30), and **self** (issue R
 <a id="create-issue"></a>
 
 ## Create Issue
+
+**Component key:** `jira.createIssue`
 
 The Create Issue component creates a new issue in Jira.
 
@@ -163,6 +167,8 @@ Returns the created issue including:
 
 ## Delete Incident
 
+**Component key:** `jira.deleteIncident`
+
 The Delete Incident component removes an incident from Jira Service Management.
 
 ### Use Cases
@@ -194,6 +200,8 @@ Confirms deletion with **deleted** set to true.
 <a id="delete-issue"></a>
 
 ## Delete Issue
+
+**Component key:** `jira.deleteIssue`
 
 The Delete Issue component permanently removes an issue from Jira.
 
@@ -230,6 +238,8 @@ Returns the deleted issue's `id` and `key`, plus `deleted: true`.
 
 ## Get Incident
 
+**Component key:** `jira.getIncident`
+
 The Get Incident component returns incident details from Jira Service Management.
 
 ### Use Cases
@@ -265,6 +275,8 @@ Payload type jira.incident.fetched with the incident object returned by Atlassia
 <a id="get-issue"></a>
 
 ## Get Issue
+
+**Component key:** `jira.getIssue`
 
 The Get Issue component retrieves a Jira issue and its fields for downstream routing and inspection.
 
@@ -337,6 +349,8 @@ Returns the Jira issue object including `id`, `key`, `self` and the full `fields
 <a id="update-issue"></a>
 
 ## Update Issue
+
+**Component key:** `jira.updateIssue`
 
 The Update Issue component updates fields on an existing Jira issue.
 

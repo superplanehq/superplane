@@ -64,6 +64,45 @@ function renderTable({
   );
 }
 
+describe("WidgetTable column formatting", () => {
+  it("renders status and badge columns as pills with the same classes", () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const renderWithFormat = (format: "status" | "badge") =>
+      render(
+        <MemoryRouter>
+          <QueryClientProvider client={queryClient}>
+            <DashboardContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]} canRunNodes={false}>
+              <WidgetTable
+                render={{
+                  kind: "table",
+                  columns: [
+                    { field: "service", label: "Service" },
+                    { field: "status", format },
+                  ],
+                }}
+                rows={ROWS}
+                isLoading={false}
+              />
+            </DashboardContextProvider>
+          </QueryClientProvider>
+        </MemoryRouter>,
+      );
+
+    const statusView = renderWithFormat("status");
+    const statusPill = statusView.container.querySelector("table tbody tr td:nth-child(2) span");
+    expect(statusPill).not.toBeNull();
+    expect(statusPill!.textContent).toBe("failed");
+    const statusClass = statusPill!.getAttribute("class") ?? "";
+    statusView.unmount();
+
+    const badgeView = renderWithFormat("badge");
+    const badgePill = badgeView.container.querySelector("table tbody tr td:nth-child(2) span");
+    expect(badgePill).not.toBeNull();
+    expect(badgePill!.textContent).toBe("failed");
+    expect(badgePill!.getAttribute("class")).toBe(statusClass);
+  });
+});
+
 describe("WidgetTable row actions — permission gating", () => {
   it("invokes the trigger callback when canRunNodes is true", async () => {
     const onTrigger = vi.fn().mockResolvedValue(undefined);
@@ -99,7 +138,7 @@ describe("WidgetTable row actions — permission gating", () => {
 });
 
 describe("WidgetTable row actions — confirm dialog preview", () => {
-  it("shows resolved trigger node, template, and merged parameters", () => {
+  it("shows resolved trigger node, template, and run hook parameters", () => {
     const onTrigger = vi.fn().mockResolvedValue(undefined);
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const renderWithConfirm = (canvasRender: WidgetTableRender) =>
@@ -148,10 +187,10 @@ describe("WidgetTable row actions — confirm dialog preview", () => {
     expect(preview.textContent).toMatch(/run/);
     expect(preview.textContent).toMatch(/default/);
 
-    // Parameters JSON includes the row-derived issue.number.
+    // Manual run hooks pass template selection only; row payload templates are not merged.
     const params = screen.getByTestId("widget-row-action-start-parameters");
     expect(params.textContent).toContain('"template": "default"');
-    expect(params.textContent).toContain('"number": "42"');
+    expect(params.textContent).not.toContain('"number"');
   });
 });
 

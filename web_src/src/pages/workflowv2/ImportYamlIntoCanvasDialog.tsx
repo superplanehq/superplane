@@ -39,12 +39,15 @@ function validateCanvasYaml(parsed: ParsedCanvas): string | null {
   if (parsed.apiVersion && parsed.apiVersion !== "v1") {
     return `Unsupported apiVersion "${parsed.apiVersion}". Only "v1" is supported.`;
   }
+
   if (parsed.kind && parsed.kind !== "Canvas") {
     return `Unsupported kind "${parsed.kind}". Only "Canvas" is supported.`;
   }
+
   if (!parsed.spec || !Array.isArray(parsed.spec.nodes)) {
     return "YAML must contain a spec with a nodes array. Is this a valid Canvas definition?";
   }
+
   return null;
 }
 
@@ -55,8 +58,8 @@ function parseCanvasYaml(text: string): { data: { nodes: unknown[]; edges: unkno
   let parsed: ParsedCanvas;
   try {
     parsed = yaml.load(trimmed) as ParsedCanvas;
-  } catch (e) {
-    return { error: `Invalid YAML syntax: ${e instanceof Error ? e.message : "Unknown error"}` };
+  } catch (error) {
+    return { error: `Invalid YAML syntax: ${error instanceof Error ? error.message : "Unknown error"}` };
   }
 
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
@@ -96,7 +99,7 @@ function ImportYamlFileUpload({
         Upload YAML file
       </Label>
       <div
-        className="flex items-center gap-3 rounded-md border border-dashed border-gray-300 p-4 cursor-pointer hover:border-gray-400 transition-colors"
+        className="flex cursor-pointer items-center gap-3 rounded-md border border-dashed border-gray-300 p-4 transition-colors hover:border-gray-400"
         onClick={() => fileInputRef.current?.click()}
       >
         <Upload className="h-5 w-5 text-gray-400" />
@@ -158,8 +161,8 @@ export function ImportYamlIntoCanvasDialog({ open, onOpenChange, onImport, isImp
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const content = e.target?.result as string;
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
       setYamlText(content);
       setFileName(file.name);
       setParseError(null);
@@ -177,18 +180,19 @@ export function ImportYamlIntoCanvasDialog({ open, onOpenChange, onImport, isImp
       setParseError(result.error);
       return;
     }
+
     try {
       await onImport(result.data);
       analytics.yamlImport();
       handleOpenChange(false);
-    } catch (err) {
-      setParseError(err instanceof Error ? err.message : "Import failed. Please try again.");
+    } catch (error) {
+      setParseError(error instanceof Error ? error.message : "Import failed. Please try again.");
     }
   }, [yamlText, onImport, handleOpenChange]);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
+      <DialogContent className="flex max-h-[85vh] flex-col sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Import YAML</DialogTitle>
           <DialogDescription>Upload a YAML file or paste a Canvas definition to update this canvas.</DialogDescription>
@@ -210,23 +214,23 @@ export function ImportYamlIntoCanvasDialog({ open, onOpenChange, onImport, isImp
             <Textarea
               id="yaml-import-paste-input"
               value={yamlText}
-              onChange={(e) => {
-                setYamlText(e.target.value);
+              onChange={(event) => {
+                setYamlText(event.target.value);
                 setParseError(null);
                 setFileName(null);
               }}
               placeholder={`apiVersion: v1\nkind: Canvas\nmetadata:\n  name: my-canvas\nspec:\n  nodes: []\n  edges: []`}
               rows={12}
-              className="font-mono text-sm max-h-[50vh] overflow-y-auto"
+              className="max-h-[50vh] overflow-y-auto font-mono text-sm"
             />
           </div>
 
-          {parseError && (
+          {parseError ? (
             <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 p-3">
-              <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
               <span className="text-sm text-red-700">{parseError}</span>
             </div>
-          )}
+          ) : null}
         </div>
 
         <DialogFooter>

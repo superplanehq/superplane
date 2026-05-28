@@ -67,7 +67,7 @@ export function TablePanelColumnsSection({
       <div className="flex items-center justify-between">
         <Label className="text-xs font-medium text-slate-600">Columns</Label>
         <div className="flex gap-1">
-          {value.dataSource.kind === "memory" && fields.length > 0 ? (
+          {fields.length > 0 ? (
             <Button
               type="button"
               size="sm"
@@ -83,7 +83,7 @@ export function TablePanelColumnsSection({
           </Button>
         </div>
       </div>
-      <TablePanelMemoryFieldButtons value={value} fields={fields} onSelect={actions.addColumnFromField} />
+      <TablePanelFieldQuickAddButtons fields={fields} onSelect={actions.addColumnFromField} />
       <div className="space-y-2">
         {value.render.columns.map((col, idx) => (
           <ColumnRow
@@ -95,28 +95,31 @@ export function TablePanelColumnsSection({
           />
         ))}
         {value.render.columns.length === 0 ? (
-          <p className="text-xs text-slate-500">
-            Add columns to display memory rows. Use discovered fields or custom paths / CEL.
-          </p>
+          <p className="text-xs text-slate-500">{emptyColumnsHint(value.dataSource.kind)}</p>
         ) : null}
       </div>
     </div>
   );
 }
 
-function TablePanelMemoryFieldButtons({
-  value,
+function emptyColumnsHint(kind: string): string {
+  if (kind === "executions")
+    return "Add columns to display execution rows. Use the suggested fields or custom paths / CEL.";
+  if (kind === "runs") return "Add columns to display run rows. Use the suggested fields or custom paths / CEL.";
+  return "Add columns to display memory rows. Use discovered fields or custom paths / CEL.";
+}
+
+function TablePanelFieldQuickAddButtons({
   fields,
   onSelect,
 }: {
-  value: TablePanelContent;
   fields: Array<{ field: string; sample?: string }>;
   onSelect: (field: string) => void;
 }) {
-  if (value.dataSource.kind !== "memory" || fields.length === 0) return null;
+  if (fields.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-1" data-testid="table-field-quick-add">
       {fields.map((f) => (
         <Button
           key={f.field}

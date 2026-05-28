@@ -50,6 +50,17 @@ spec:
       { id: "doc", type: "markdown", content: { title: "Intro", body: "# Hi" } },
       { id: "deploy", type: "node", content: { node: "deploy-prod", showRun: true } },
       {
+        id: "key-nodes",
+        type: "nodes",
+        content: {
+          title: "Key Nodes",
+          nodes: [
+            { node: "deploy-prod", description: "Promotes the latest build", showRun: true },
+            { node: "rollback", label: "Rollback" },
+          ],
+        },
+      },
+      {
         id: "runs",
         type: "table",
         content: {
@@ -143,6 +154,42 @@ spec:
     const result = parseDashboardYaml(text);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toMatch(/render\.sort\.order/);
+  });
+
+  it("rejects a nodes panel entry without a node reference", () => {
+    const text = `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels:
+    - id: key-nodes
+      type: nodes
+      content:
+        nodes:
+          - description: missing node
+  layout: []
+`;
+    const result = parseDashboardYaml(text);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/content\.nodes\[0\]\.node must be a non-empty string/);
+  });
+
+  it("rejects a nodes panel where nodes is not an array", () => {
+    const text = `apiVersion: v1
+kind: Console
+metadata: {}
+spec:
+  panels:
+    - id: key-nodes
+      type: nodes
+      content:
+        nodes:
+          oops: true
+  layout: []
+`;
+    const result = parseDashboardYaml(text);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/content\.nodes must be an array/);
   });
 
   it("rejects a node panel whose node field is not a string", () => {
