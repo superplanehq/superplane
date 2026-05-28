@@ -1,0 +1,233 @@
+package codestorage
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"os"
+	"strings"
+
+	"github.com/google/uuid"
+	codestorage "github.com/pierrecomputer/sdk/packages/code-storage-go"
+	"github.com/superplanehq/superplane/pkg/git/provider"
+)
+
+type Provider struct {
+	client        *codestorage.Client
+	defaultBranch string
+}
+
+func NewProvider() (*Provider, error) {
+	name := strings.TrimSpace(os.Getenv("CODE_STORAGE_NAME"))
+	if name == "" {
+		return nil, fmt.Errorf("CODE_STORAGE_NAME is required")
+	}
+
+	privateKeyPath := strings.TrimSpace(os.Getenv("CODE_STORAGE_PRIVATE_KEY_PATH"))
+	if privateKeyPath == "" {
+		return nil, fmt.Errorf("CODE_STORAGE_PRIVATE_KEY_PATH is required")
+	}
+
+	key, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("error reading private key for code storage: %w", err)
+	}
+
+	client, err := codestorage.NewClient(codestorage.Options{
+		Name: name,
+		Key:  string(key),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &Provider{
+		client:        client,
+		defaultBranch: "main",
+	}, nil
+}
+
+func (p *Provider) CreateRepository(ctx context.Context, options provider.CreateRepositoryOptions) (*provider.Repository, error) {
+	repoID := p.getRepositoryID(options.OrganizationID, options.CanvasID)
+	repo, err := p.client.CreateRepo(ctx, codestorage.CreateRepoOptions{
+		ID:            repoID,
+		DefaultBranch: p.defaultBranch,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &provider.Repository{
+		ID: repo.ID,
+	}, nil
+}
+
+func (p *Provider) InitRepository(ctx context.Context, repoID string, branch string) error {
+	repo, err := p.repo(repoID)
+	if err != nil {
+		return err
+	}
+
+	initialCommit := provider.InitialRepositoryCommitOptions(p.defaultBranch)
+	builder, err := repo.CreateCommit(codestorage.CommitOptions{
+		TargetBranch:  p.defaultBranch,
+		CommitMessage: initialCommit.Message,
+		Author: codestorage.CommitSignature{
+			Name:  initialCommit.Author.Name,
+			Email: initialCommit.Author.Email,
+		},
+	})
+
+	if err != nil {
+		return err
+	}
+
+	for _, operation := range initialCommit.Operations {
+		builder.AddFile(operation.Path, operation.Content, nil)
+	}
+
+	if err := builder.Err(); err != nil {
+		return err
+	}
+
+	_, err = builder.Send(ctx)
+	return err
+}
+
+func (p *Provider) DeleteRepository(ctx context.Context, repoID string) error {
+	repo, err := p.client.FindOne(ctx, codestorage.FindOneOptions{ID: repoID})
+	if err != nil {
+		return err
+	}
+
+	//
+	// If repo does not exist, do not do anything.
+	//
+	if repo == nil {
+		return nil
+	}
+
+	_, err = p.client.DeleteRepo(ctx, codestorage.DeleteRepoOptions{ID: repoID})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *Provider) ListFiles(ctx context.Context, repoID string) (*provider.ListFilesResult, error) {
+	repo, err := p.repo(repoID)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := repo.ListFiles(ctx, codestorage.ListFilesOptions{
+		Ref: p.defaultBranch,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &provider.ListFilesResult{Paths: result.Paths}, nil
+}
+
+func (p *Provider) GetFile(ctx context.Context, repoID string, path string) (io.ReadCloser, error) {
+	filePath, err := provider.NormalizePath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	repo, err := p.repo(repoID)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := repo.FileStream(ctx, codestorage.GetFileOptions{
+		Path: filePath,
+		Ref:  p.defaultBranch,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Body, nil
+}
+
+func (p *Provider) Commit(ctx context.Context, repoID string, options provider.CommitOptions) (*provider.CommitResult, error) {
+	if err := provider.ValidateCommitMetadata(options.Message, options.Author); err != nil {
+		return nil, err
+	}
+
+	if err := provider.ValidateCommitOperations(options.Operations); err != nil {
+		return nil, err
+	}
+
+	repo, err := p.repo(repoID)
+	if err != nil {
+		return nil, err
+	}
+
+	builder, err := repo.CreateCommit(codestorage.CommitOptions{
+		TargetBranch:    provider.RefOrDefault(options.Branch, p.defaultBranch),
+		BaseBranch:      strings.TrimSpace(options.BaseBranch),
+		ExpectedHeadSHA: strings.TrimSpace(options.ExpectedHeadSHA),
+		CommitMessage:   strings.TrimSpace(options.Message),
+		Author: codestorage.CommitSignature{
+			Name:  strings.TrimSpace(options.Author.Name),
+			Email: strings.TrimSpace(options.Author.Email),
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, operation := range options.Operations {
+		if operation.Delete {
+			builder.DeletePath(operation.Path)
+			continue
+		}
+		builder.AddFile(operation.Path, operation.Content, nil)
+	}
+
+	result, err := builder.Send(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &provider.CommitResult{
+		CommitSHA: result.CommitSHA,
+	}, nil
+}
+
+func (p *Provider) Head(ctx context.Context, repoID string, branch string) (string, error) {
+	repo, err := p.repo(repoID)
+	if err != nil {
+		return "", err
+	}
+
+	commit, err := repo.GetCommit(ctx, codestorage.GetCommitOptions{
+		SHA: p.defaultBranch,
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return commit.Commit.SHA, nil
+}
+
+func (p *Provider) repo(repoID string) (*codestorage.Repo, error) {
+	return p.client.Repo(codestorage.RepoOptions{
+		ID:            strings.TrimSpace(repoID),
+		DefaultBranch: p.defaultBranch,
+	})
+}
+
+func (p *Provider) getRepositoryID(organizationID, canvasID uuid.UUID) string {
+	return fmt.Sprintf("orgs/%s/canvases/%s", organizationID.String(), canvasID.String())
+}
