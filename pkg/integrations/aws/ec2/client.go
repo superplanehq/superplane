@@ -125,6 +125,18 @@ type TerminateInstancesOutput struct {
 	State      string `json:"state" mapstructure:"state"`
 }
 
+type StopInstancesOutput struct {
+	RequestID  string `json:"requestId" mapstructure:"requestId"`
+	InstanceID string `json:"instanceId" mapstructure:"instanceId"`
+	State      string `json:"state" mapstructure:"state"`
+}
+
+type StartInstancesOutput struct {
+	RequestID  string `json:"requestId" mapstructure:"requestId"`
+	InstanceID string `json:"instanceId" mapstructure:"instanceId"`
+	State      string `json:"state" mapstructure:"state"`
+}
+
 type CreateImageInput struct {
 	InstanceID  string
 	Name        string
@@ -516,6 +528,78 @@ func (c *Client) TerminateInstances(instanceIDs ...string) (*TerminateInstancesO
 		RequestID:  response.RequestID,
 		InstanceID: instance.InstanceID,
 		State:      instance.stateName(),
+	}, nil
+}
+
+func (c *Client) StopInstances(instanceID string) (*StopInstancesOutput, error) {
+	return c.stopInstances(instanceID, false)
+}
+
+func (c *Client) HibernateInstances(instanceID string) (*StopInstancesOutput, error) {
+	return c.stopInstances(instanceID, true)
+}
+
+func (c *Client) stopInstances(instanceID string, hibernate bool) (*StopInstancesOutput, error) {
+	params := url.Values{}
+	params.Set("InstanceId.1", strings.TrimSpace(instanceID))
+	if hibernate {
+		params.Set("Hibernate", "true")
+	}
+
+	response := stopInstancesResponse{}
+	if err := c.postForm("StopInstances", params, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.Instances) == 0 {
+		return nil, fmt.Errorf("response did not include instance ID")
+	}
+
+	instance := response.Instances[0]
+	return &StopInstancesOutput{
+		RequestID:  response.RequestID,
+		InstanceID: instance.InstanceID,
+		State:      instance.CurrentState.Name,
+	}, nil
+}
+
+func (c *Client) RebootInstances(instanceID string) error {
+	params := url.Values{}
+	params.Set("InstanceId.1", strings.TrimSpace(instanceID))
+
+	response := struct {
+		RequestID string `xml:"requestId"`
+		Return    bool   `xml:"return"`
+	}{}
+	if err := c.postForm("RebootInstances", params, &response); err != nil {
+		return err
+	}
+
+	if !response.Return {
+		return fmt.Errorf("RebootInstances returned false")
+	}
+
+	return nil
+}
+
+func (c *Client) StartInstances(instanceID string) (*StartInstancesOutput, error) {
+	params := url.Values{}
+	params.Set("InstanceId.1", strings.TrimSpace(instanceID))
+
+	response := startInstancesResponse{}
+	if err := c.postForm("StartInstances", params, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.Instances) == 0 {
+		return nil, fmt.Errorf("response did not include instance ID")
+	}
+
+	instance := response.Instances[0]
+	return &StartInstancesOutput{
+		RequestID:  response.RequestID,
+		InstanceID: instance.InstanceID,
+		State:      instance.CurrentState.Name,
 	}, nil
 }
 
@@ -1422,6 +1506,26 @@ type runInstancesResponse struct {
 type terminateInstancesResponse struct {
 	RequestID string        `xml:"requestId"`
 	Instances []xmlInstance `xml:"instancesSet>item"`
+}
+
+type stopInstancesResponse struct {
+	RequestID string                   `xml:"requestId"`
+	Instances []xmlInstanceStateChange `xml:"instancesSet>item"`
+}
+
+type startInstancesResponse struct {
+	RequestID string                   `xml:"requestId"`
+	Instances []xmlInstanceStateChange `xml:"instancesSet>item"`
+}
+
+type xmlInstanceStateChange struct {
+	InstanceID   string `xml:"instanceId"`
+	CurrentState struct {
+		Name string `xml:"name"`
+	} `xml:"currentState"`
+	PreviousState struct {
+		Name string `xml:"name"`
+	} `xml:"previousState"`
 }
 
 type describeSubnetsResponse struct {
