@@ -16,6 +16,42 @@ type VersionActionAvailability = {
   publishVersionDisabledTooltip?: string;
 };
 
+type DraftChangeIndicatorsInput = {
+  suppressUnpublishedDraftDiscard: boolean;
+  hasLatestDraftVersion: boolean;
+  hasDraftGraphDiffVersusLive: boolean;
+  hasDraftConsoleDiffVersusLive: boolean;
+  hasDraftDiffVersusLive: boolean;
+};
+
+type DraftChangeIndicators = {
+  hasUnpublishedDraftChanges: boolean;
+  hasUnpublishedCanvasDraftChanges: boolean;
+  hasUnpublishedConsoleDraftChanges: boolean;
+};
+
+export function getDraftChangeIndicators({
+  suppressUnpublishedDraftDiscard,
+  hasLatestDraftVersion,
+  hasDraftGraphDiffVersusLive,
+  hasDraftConsoleDiffVersusLive,
+  hasDraftDiffVersusLive,
+}: DraftChangeIndicatorsInput): DraftChangeIndicators {
+  if (suppressUnpublishedDraftDiscard || !hasLatestDraftVersion) {
+    return {
+      hasUnpublishedDraftChanges: false,
+      hasUnpublishedCanvasDraftChanges: false,
+      hasUnpublishedConsoleDraftChanges: false,
+    };
+  }
+
+  return {
+    hasUnpublishedDraftChanges: hasDraftDiffVersusLive,
+    hasUnpublishedCanvasDraftChanges: hasDraftGraphDiffVersusLive,
+    hasUnpublishedConsoleDraftChanges: hasDraftConsoleDiffVersusLive,
+  };
+}
+
 function getCreateChangeRequestDisabled({
   isChangeManagementDisabled,
   hasEditableVersion,

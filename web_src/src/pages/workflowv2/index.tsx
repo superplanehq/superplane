@@ -1130,15 +1130,15 @@ export function WorkflowPageV2() {
 
     return release;
   }, []);
-
-  const { dashboardQuery, updateDashboardMutation, hasDraftDiffVersusLive } = useCanvasConsoleVersionDiff({
-    canvasId: canvasId!,
-    activeCanvasVersionId,
-    liveCanvasVersionId,
-    hasDraftGraphDiffVersusLive,
-    enabled: !isTemplate,
-    registerIgnoredCanvasVersionUpdatedEcho,
-  });
+  const { dashboardQuery, updateDashboardMutation, draftChangeIndicators, hasDraftDiffVersusLive } =
+    useCanvasConsoleVersionDiff({
+      canvasId: canvasId!,
+      versionIds: { active: activeCanvasVersionId, draft: latestDraftVersion?.metadata?.id, live: liveCanvasVersionId },
+      hasDraftGraphDiffVersusLive,
+      suppressUnpublishedDraftDiscard,
+      enabled: !isTemplate,
+      registerIgnoredCanvasVersionUpdatedEcho,
+    });
   const consumeIgnoredCanvasUpdatedEcho = useCallback(() => {
     const release = ignoredCanvasUpdatedEchoReleasesRef.current.pop();
     if (!release) {
@@ -5290,10 +5290,8 @@ export function WorkflowPageV2() {
       dashboardQuery.isLoading,
     ],
   );
-
-  const hasUnpublishedDraftChanges = !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftDiffVersusLive;
   const { onShowDiff, onShowNodeDiff, yamlDiffModal } = useCanvasYamlDiffModal({
-    hasUnpublishedDraftChanges,
+    hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
     liveCanvas,
     liveCanvasVersion,
     draftCanvasVersion: latestDraftVersion,
@@ -5633,7 +5631,7 @@ export function WorkflowPageV2() {
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+          {...draftChangeIndicators}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           runDisabled={runDisabled}

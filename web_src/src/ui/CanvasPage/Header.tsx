@@ -1,7 +1,7 @@
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { useParams } from "react-router-dom";
-import { CanvasModeToggle } from "./components/CanvasModeToggle";
+import { CanvasModeToggle, type CanvasMode } from "./components/CanvasModeToggle";
 import { CanvasProjectSwitcher } from "./components/CanvasProjectSwitcher";
 import { CanvasToolSidebarTrigger } from "./components/CanvasToolSidebarTrigger";
 import { SecondaryHeaderActions, EditModeTopHeaderActions, LiveModeTopHeaderActions } from "./HeaderSecondaryActions";
@@ -55,6 +55,10 @@ export interface HeaderProps {
   publishVersionLabel?: string;
   /** When true, shows the Discard control next to Publish in version edit mode (draft differs from live). */
   hasUnpublishedDraftChanges?: boolean;
+  /** Draft indicator for the Canvas tab when workflow graph changes exist. */
+  hasUnpublishedCanvasDraftChanges?: boolean;
+  /** Draft indicator for the Console tab when console changes exist. */
+  hasUnpublishedConsoleDraftChanges?: boolean;
   /** ISO timestamp of the existing unpublished draft, used to label "Last edited X" in the Edit dropdown. */
   unpublishedDraftUpdatedAt?: string;
   /** Discard the existing draft and start a new edit session from live. Shown in the Edit dropdown when a draft exists. */
@@ -168,23 +172,8 @@ function PageHeader({
 }
 
 function SecondaryHeader(props: HeaderProps) {
-  const showCanvasViewModeToggle =
-    (!!props.onSelectDashboard || !!props.onSelectMemory || !!props.onSelectFiles) &&
-    (props.mode === "version-live" ||
-      props.mode === "runs" ||
-      props.mode === "dashboard" ||
-      props.mode === "memory" ||
-      props.mode === "files");
-  const canvasViewMode =
-    props.mode === "runs"
-      ? "runs"
-      : props.mode === "dashboard"
-        ? "dashboard"
-        : props.mode === "memory"
-          ? "memory"
-          : props.mode === "files"
-            ? "files"
-            : "version-live";
+  const showCanvasViewModeToggle = shouldShowCanvasViewModeToggle(props);
+  const canvasViewMode = getCanvasViewMode(props.mode);
   const editing = props.isEditing ?? props.mode === "version-edit";
 
   return (
@@ -201,7 +190,8 @@ function SecondaryHeader(props: HeaderProps) {
               onSelectMemory={props.onSelectMemory}
               onSelectFiles={props.onSelectFiles}
               editing={editing}
-              hasDraft={!!props.hasUnpublishedDraftChanges}
+              hasDraft={props.hasUnpublishedCanvasDraftChanges ?? !!props.hasUnpublishedDraftChanges}
+              hasDashboardDraft={!!props.hasUnpublishedConsoleDraftChanges}
             />
           ) : null}
         </div>
@@ -210,4 +200,24 @@ function SecondaryHeader(props: HeaderProps) {
       <SecondaryHeaderActions {...props} />
     </div>
   );
+}
+
+function shouldShowCanvasViewModeToggle(props: HeaderProps): boolean {
+  if (!props.onSelectDashboard && !props.onSelectMemory && !props.onSelectFiles) {
+    return false;
+  }
+
+  return isCanvasViewMode(props.mode);
+}
+
+function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
+  return mode === "version-live" || mode === "runs" || mode === "dashboard" || mode === "memory" || mode === "files";
+}
+
+function getCanvasViewMode(mode: HeaderMode | undefined): CanvasMode {
+  if (mode === "runs" || mode === "dashboard" || mode === "memory" || mode === "files") {
+    return mode;
+  }
+
+  return "version-live";
 }

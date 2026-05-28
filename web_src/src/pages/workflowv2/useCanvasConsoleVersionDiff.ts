@@ -3,42 +3,57 @@ import { useMemo } from "react";
 import { useCanvasConsole, useUpdateCanvasConsole } from "@/hooks/useCanvasData";
 
 import { hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
+import { getDraftChangeIndicators } from "./lib/version-action-state";
 
 type UseCanvasConsoleVersionDiffArgs = {
   canvasId: string;
-  activeCanvasVersionId: string;
-  liveCanvasVersionId: string | undefined;
+  versionIds: {
+    active: string;
+    draft: string | undefined;
+    live: string | undefined;
+  };
   hasDraftGraphDiffVersusLive: boolean;
+  suppressUnpublishedDraftDiscard: boolean;
   enabled: boolean;
   registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
 };
 
 export function useCanvasConsoleVersionDiff({
   canvasId,
-  activeCanvasVersionId,
-  liveCanvasVersionId,
+  versionIds,
   hasDraftGraphDiffVersusLive,
+  suppressUnpublishedDraftDiscard,
   enabled,
   registerIgnoredCanvasVersionUpdatedEcho,
 }: UseCanvasConsoleVersionDiffArgs) {
-  const dashboardQuery = useCanvasConsole(canvasId, activeCanvasVersionId || undefined, enabled);
-  const liveDashboardQuery = useCanvasConsole(
+  const dashboardQuery = useCanvasConsole(canvasId, versionIds.active || undefined, enabled);
+  const draftDiffVersionId = versionIds.active || versionIds.draft;
+  const draftDashboardQuery = useCanvasConsole(
     canvasId,
-    liveCanvasVersionId || undefined,
-    enabled && !!liveCanvasVersionId,
+    draftDiffVersionId || undefined,
+    enabled && !!draftDiffVersionId,
   );
+  const liveDashboardQuery = useCanvasConsole(canvasId, versionIds.live || undefined, enabled && !!versionIds.live);
   const hasDraftConsoleDiffVersusLive = useMemo(
-    () => hasDraftVersusLiveConsoleDiff(liveDashboardQuery.data, dashboardQuery.data),
-    [liveDashboardQuery.data, dashboardQuery.data],
+    () => !!draftDiffVersionId && hasDraftVersusLiveConsoleDiff(liveDashboardQuery.data, draftDashboardQuery.data),
+    [draftDiffVersionId, liveDashboardQuery.data, draftDashboardQuery.data],
   );
   const hasDraftDiffVersusLive = hasDraftGraphDiffVersusLive || hasDraftConsoleDiffVersusLive;
-  const updateDashboardMutation = useUpdateCanvasConsole(canvasId, activeCanvasVersionId || undefined, {
+  const draftChangeIndicators = getDraftChangeIndicators({
+    suppressUnpublishedDraftDiscard,
+    hasLatestDraftVersion: !!versionIds.draft,
+    hasDraftGraphDiffVersusLive,
+    hasDraftConsoleDiffVersusLive,
+    hasDraftDiffVersusLive,
+  });
+  const updateDashboardMutation = useUpdateCanvasConsole(canvasId, versionIds.active || undefined, {
     registerIgnoredCanvasVersionUpdatedEcho,
   });
 
   return {
     dashboardQuery,
     updateDashboardMutation,
+    draftChangeIndicators,
     hasDraftDiffVersusLive,
   };
 }
