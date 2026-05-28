@@ -174,8 +174,8 @@ func ConfigFromEnv() (Config, error) {
 	if runnerS3 == "" {
 		return Config{}, fmt.Errorf("set %s", envRunnerS3URI)
 	}
-	if err := validateRunnerS3URI(runnerS3); err != nil {
-		return Config{}, err
+	if err := ValidateRunnerS3URI(runnerS3); err != nil {
+		return Config{}, fmt.Errorf("%s: %w", envRunnerS3URI, err)
 	}
 	prof := strings.TrimSpace(os.Getenv(envRunnerIAMProf))
 	if prof == "" {
@@ -247,14 +247,16 @@ func ConfigFromEnv() (Config, error) {
 	}, nil
 }
 
-func validateRunnerS3URI(s string) error {
+// ValidateRunnerS3URI checks that s is a well-formed s3://bucket/key object URI.
+// Callers wrap the returned error with their own field-name (env var name, JSON key, etc.).
+func ValidateRunnerS3URI(s string) error {
 	s = strings.TrimSpace(s)
 	if !strings.HasPrefix(s, "s3://") {
-		return fmt.Errorf("%s must start with s3://", envRunnerS3URI)
+		return fmt.Errorf("must start with s3://")
 	}
 	key := strings.TrimPrefix(s, "s3://")
 	if key == "" || !strings.Contains(key, "/") {
-		return fmt.Errorf("%s must be s3://bucket/key (object path required)", envRunnerS3URI)
+		return fmt.Errorf("must be s3://bucket/key (object path required)")
 	}
 	return nil
 }
