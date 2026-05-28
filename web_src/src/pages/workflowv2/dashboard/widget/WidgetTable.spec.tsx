@@ -247,7 +247,7 @@ describe("WidgetTable row actions — in-flight gating", () => {
     vi.useRealTimers();
   });
 
-  it("disables row-action buttons when a STATE_STARTED run is in cache for the trigger", async () => {
+  it("keeps row-action buttons enabled when a STATE_STARTED run is in cache but was not initiated from a tracked row", async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     seedRunsCache(queryClient, [
       {
@@ -261,12 +261,11 @@ describe("WidgetTable row actions — in-flight gating", () => {
 
     const buttons = screen.getAllByTestId("widget-row-action-start");
     expect(buttons).toHaveLength(2);
+    // Without a recorded source row, the per-row lock model treats the
+    // in-flight run as "we don't know which row started it", so siblings
+    // stay clickable. This is the explicit row-only locking contract.
     await waitFor(() => {
-      for (const b of buttons) {
-        expect(b).toBeDisabled();
-        expect(b.getAttribute("data-disabled-reason")).toBe("run-in-flight");
-        expect(b.getAttribute("title")).toMatch(/already in progress/i);
-      }
+      for (const b of buttons) expect(b).not.toBeDisabled();
     });
   });
 
@@ -288,7 +287,7 @@ describe("WidgetTable row actions — in-flight gating", () => {
     });
   });
 
-  it("disables siblings during the submission grace window, then re-enables when it expires", async () => {
+  it("locks only the clicked row during the submission window; siblings stay enabled", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -307,25 +306,29 @@ describe("WidgetTable row actions — in-flight gating", () => {
     const buttons = screen.getAllByTestId("widget-row-action-start");
     expect(buttons).toHaveLength(2);
 
-    // Click the first row's action; sibling should immediately disable due
-    // to the submission lock (no run in cache yet).
+    // Click the first row's action; only that row should disable. The
+    // sibling row stays clickable because the per-row lock model scopes
+    // submission state to the row that initiated it.
     await act(async () => {
       fireEvent.click(buttons[0]);
     });
 
     await waitFor(() => {
-      expect(buttons[1]).toBeDisabled();
-      expect(buttons[1].getAttribute("data-disabled-reason")).toBe("submitting");
+      expect(buttons[0]).toBeDisabled();
+      expect(buttons[0].getAttribute("data-disabled-reason")).toBe("submitting");
     });
+    expect(buttons[1]).not.toBeDisabled();
 
-    // Resolve the deferred trigger — the per-row `pending` clears, but the
-    // grace timer keeps siblings disabled for ~1500 ms.
+    // Resolve the deferred trigger — the grace timer keeps the clicked row
+    // disabled for ~1500 ms while we wait for the websocket-driven runs
+    // cache to catch up.
     await act(async () => {
       resolveTrigger();
       await Promise.resolve();
     });
 
-    expect(buttons[1]).toBeDisabled();
+    expect(buttons[0]).toBeDisabled();
+    expect(buttons[1]).not.toBeDisabled();
 
     // After the grace window the lock should release.
     await act(async () => {
@@ -333,29 +336,46 @@ describe("WidgetTable row actions — in-flight gating", () => {
     });
 
     await waitFor(() => {
-      expect(buttons[1]).not.toBeDisabled();
+      expect(buttons[0]).not.toBeDisabled();
     });
+    expect(buttons[1]).not.toBeDisabled();
   });
 
-  it("re-enables buttons once the in-flight run leaves the cache", async () => {
+  it("keeps the originating row locked while its STATE_STARTED run is in cache, and unlocks when the run finishes", async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    seedRunsCache(queryClient, [
-      {
-        id: "run-1",
-        state: "STATE_STARTED",
-        rootEvent: { nodeId: START_NODE.id, root: true },
-      },
-    ]);
+    const onTrigger = vi.fn().mockResolvedValue(undefined);
 
-    renderTableWithCache({ queryClient, rows: TWO_FAILED_ROWS });
+    renderTableWithCache({ queryClient, rows: TWO_FAILED_ROWS, onTriggerNode: onTrigger });
 
     const buttons = screen.getAllByTestId("widget-row-action-start");
-    await waitFor(() => {
-      expect(buttons[0]).toBeDisabled();
+
+    // Click the first row to record the rowKey → trigger mapping.
+    await act(async () => {
+      fireEvent.click(buttons[0]);
+      await Promise.resolve();
     });
 
+    // Now seed the runs cache so the trigger appears in flight. The first
+    // row stays locked via the in-flight mapping; the sibling remains
+    // clickable because the mapping points to row 0.
+    act(() => {
+      seedRunsCache(queryClient, [
+        {
+          id: "run-1",
+          state: "STATE_STARTED",
+          rootEvent: { nodeId: START_NODE.id, root: true },
+        },
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(buttons[0]).toBeDisabled();
+      expect(buttons[0].getAttribute("data-disabled-reason")).toBe("run-in-flight");
+    });
+    expect(buttons[1]).not.toBeDisabled();
+
     // Simulate the websocket invalidation flow: the runs query now returns
-    // an empty page (or a finished run filtered out by `STATE_STARTED`).
+    // an empty page (the run finished and is no longer STATE_STARTED).
     act(() => {
       seedRunsCache(queryClient, []);
     });

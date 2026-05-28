@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GridLayout, { type Layout, WidthProvider } from "react-grid-layout";
 import { Loader2, LayoutGrid, FileText, Hash, LineChart, Network, Table2, Workflow } from "lucide-react";
 
@@ -74,6 +74,24 @@ export function DashboardView({
 
   const layoutItems = useMemo(() => buildRGLLayout(localPanels, localLayout), [localPanels, localLayout]);
 
+  // Suppress the default react-grid-layout 200ms transitions on the first
+  // measured layout so opening the Console tab does not animate every tile
+  // from a 0,0 sizing into its final spot. After two frames — one for the
+  // initial mount, one for `WidthProvider` to measure and position tiles —
+  // we re-enable transitions so drag/resize still feels responsive.
+  const [transitionsArmed, setTransitionsArmed] = useState(false);
+  const armFrameRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (transitionsArmed) return undefined;
+    const frame1 = requestAnimationFrame(() => {
+      armFrameRef.current = requestAnimationFrame(() => setTransitionsArmed(true));
+    });
+    return () => {
+      cancelAnimationFrame(frame1);
+      if (armFrameRef.current != null) cancelAnimationFrame(armFrameRef.current);
+    };
+  }, [transitionsArmed]);
+
   if (errorMessage) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-sm text-red-600">
@@ -104,7 +122,7 @@ export function DashboardView({
     <div className="flex h-full w-full flex-col overflow-auto">
       <div className="px-4 py-3">
         <ResponsiveGridLayout
-          className="dashboard-grid"
+          className={cn("dashboard-grid", !transitionsArmed && "dashboard-grid--instant")}
           layout={layoutItems}
           cols={DASHBOARD_GRID_COLS}
           rowHeight={DASHBOARD_ROW_HEIGHT}

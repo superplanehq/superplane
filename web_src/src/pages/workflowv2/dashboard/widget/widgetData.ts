@@ -177,23 +177,121 @@ export function combinePartials(partials: Array<number | null>, combine: WidgetN
  * `{{ formatDate(createdAt, "MM/dd") }}`). Expressions are compiled once per
  * call and share a single `ExprEnv` so all rows observe the same `now()` and
  * builtin context, matching how the table renderer evaluates column fields.
+ *
+ * Rows that resolve to the same `x` value are merged into a single chart
+ * point: series with a `field` are **summed** across rows, series without a
+ * field **count** the rows in that bucket. Bucket order follows the first
+ * appearance of each `x` value, so callers can pre-sort rows to control the
+ * category order on the chart.
+ *
+ * When `seriesField` is provided, the long-format rows are pivoted: each
+ * distinct value of `seriesField` becomes its own series key, the value
+ * comes from the first entry in `seriesFields` (numeric `field` → sum;
+ * undefined `field` → count), and `seriesFields` entries beyond the first
+ * are ignored for shaping (their formatting still applies in tooltips via
+ * caller-provided maps). Without a `seriesField` the chart keeps its
+ * configured series keys as before.
  */
 export function buildChartData(
   rows: unknown[],
   xField: string,
   seriesFields: Array<{ key: string; field?: string }>,
+  options?: { seriesField?: string },
 ): Array<Record<string, unknown>> {
   const env = buildEnv();
   const xResolver = compileFieldResolver(xField, env);
+  const seriesFieldKey = options?.seriesField?.trim();
+  if (seriesFieldKey) {
+    return buildPivotedChartData(rows, xResolver, seriesFieldKey, seriesFields[0], env);
+  }
   const seriesResolvers = seriesFields.map((series) => ({
     key: series.key,
+    hasField: Boolean(series.field),
     resolver: series.field ? compileFieldResolver(series.field, env) : null,
   }));
-  return rows.map((row) => {
-    const entry: Record<string, unknown> = { x: xResolver.resolve(row) ?? "" };
+  const orderedKeys: string[] = [];
+  const buckets = new Map<string, Record<string, unknown>>();
+  for (const row of rows) {
+    const xKey = String(xResolver.resolve(row) ?? "");
+    let entry = buckets.get(xKey);
+    if (!entry) {
+      entry = { x: xKey };
+      for (const s of seriesResolvers) entry[s.key] = 0;
+      buckets.set(xKey, entry);
+      orderedKeys.push(xKey);
+    }
     for (const s of seriesResolvers) {
-      entry[s.key] = s.resolver ? s.resolver.resolve(row) : 1;
+      if (!s.hasField) {
+        entry[s.key] = (entry[s.key] as number) + 1;
+        continue;
+      }
+      const raw = s.resolver!.resolve(row);
+      const numeric = toFiniteNumber(raw);
+      if (numeric !== null) entry[s.key] = (entry[s.key] as number) + numeric;
+    }
+  }
+  return orderedKeys.map((key) => buckets.get(key)!);
+}
+
+function buildPivotedChartData(
+  rows: unknown[],
+  xResolver: ReturnType<typeof compileFieldResolver>,
+  seriesField: string,
+  valueSeries: { key: string; field?: string } | undefined,
+  env: ReturnType<typeof buildEnv>,
+): Array<Record<string, unknown>> {
+  const seriesResolver = compileFieldResolver(seriesField, env);
+  const valueResolver = valueSeries?.field ? compileFieldResolver(valueSeries.field, env) : null;
+  const orderedX: string[] = [];
+  const orderedSeries: string[] = [];
+  const seenSeries = new Set<string>();
+  const buckets = new Map<string, Record<string, unknown>>();
+  for (const row of rows) {
+    const xKey = String(xResolver.resolve(row) ?? "");
+    const seriesKey = String(seriesResolver.resolve(row) ?? "");
+    let entry = buckets.get(xKey);
+    if (!entry) {
+      entry = { x: xKey };
+      buckets.set(xKey, entry);
+      orderedX.push(xKey);
+    }
+    if (!seenSeries.has(seriesKey)) {
+      seenSeries.add(seriesKey);
+      orderedSeries.push(seriesKey);
+    }
+    if (entry[seriesKey] === undefined) entry[seriesKey] = 0;
+    if (!valueResolver) {
+      entry[seriesKey] = (entry[seriesKey] as number) + 1;
+      continue;
+    }
+    const numeric = toFiniteNumber(valueResolver.resolve(row));
+    if (numeric !== null) entry[seriesKey] = (entry[seriesKey] as number) + numeric;
+  }
+  return orderedX.map((xKey) => {
+    const entry = buckets.get(xKey)!;
+    for (const seriesKey of orderedSeries) {
+      if (entry[seriesKey] === undefined) entry[seriesKey] = 0;
     }
     return entry;
   });
+}
+
+/**
+ * Distinct series keys discovered when pivoting `rows` by `seriesField`. Used
+ * by chart renderers to emit one chart layer per pivoted series. Order
+ * matches the first occurrence in the input rows.
+ */
+export function distinctSeriesKeys(rows: unknown[], seriesField: string): string[] {
+  const env = buildEnv();
+  const resolver = compileFieldResolver(seriesField, env);
+  const ordered: string[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    const key = String(resolver.resolve(row) ?? "");
+    if (!seen.has(key)) {
+      seen.add(key);
+      ordered.push(key);
+    }
+  }
+  return ordered;
 }

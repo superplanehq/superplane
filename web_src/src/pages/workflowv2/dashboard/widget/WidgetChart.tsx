@@ -24,7 +24,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 
-import { applyFilters, applySort, buildChartData } from "./widgetData";
+import { applyFilters, applySort, buildChartData, distinctSeriesKeys } from "./widgetData";
 import { formatPercentOfTotal, formatSeriesValue } from "./chartFormat";
 import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries } from "./types";
 
@@ -52,20 +52,38 @@ interface ChartSeries extends WidgetChartSeries {
 export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   const filtered = useMemo(() => applyFilters(rows, render.filters), [rows, render.filters]);
   const sorted = useMemo(() => applySort(filtered, render.sort), [filtered, render.sort]);
-  const series = useMemo<ChartSeries[]>(
-    () =>
-      render.series.map((s, idx) => ({
-        ...s,
-        key: s.label ?? s.field ?? `series-${idx}`,
-        color: s.color ?? DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
-      })),
-    [render.series],
-  );
+  const seriesField = render.seriesField?.trim();
+  const valueSeries = render.series[0];
+  // When `seriesField` is set, the chart pivots: one series per distinct
+  // value in that field, sharing the numeric `field` (and formatting) of the
+  // first configured series. Without `seriesField` we keep the historical
+  // behavior of one series per `render.series` entry.
+  const series = useMemo<ChartSeries[]>(() => {
+    if (seriesField) {
+      const distinct = distinctSeriesKeys(sorted, seriesField);
+      return distinct.map((key, idx) => ({
+        ...valueSeries,
+        key: key === "" ? "(empty)" : key,
+        label: key === "" ? "(empty)" : key,
+        color: DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
+      }));
+    }
+    return render.series.map((s, idx) => ({
+      ...s,
+      key: s.label ?? s.field ?? `series-${idx}`,
+      color: s.color ?? DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
+    }));
+  }, [render.series, seriesField, sorted, valueSeries]);
   const data = useMemo(() => {
-    const built = buildChartData(sorted, render.xField, series);
+    const built = buildChartData(
+      sorted,
+      render.xField,
+      seriesField ? [{ key: "value", field: valueSeries?.field }] : series,
+      seriesField ? { seriesField } : undefined,
+    );
     if (render.limit) return built.slice(0, render.limit);
     return built;
-  }, [sorted, render.xField, render.limit, series]);
+  }, [sorted, render.xField, render.limit, series, seriesField, valueSeries]);
 
   if (isLoading) {
     return (
@@ -301,8 +319,8 @@ function DonutChartView({
           stroke="#fff"
           strokeWidth={1.5}
         >
-          {sliceData.map((slice) => (
-            <Cell key={slice.x} fill={slice.color} />
+          {sliceData.map((slice, idx) => (
+            <Cell key={`${slice.x}-${idx}`} fill={slice.color} />
           ))}
         </Pie>
       </PieChart>
