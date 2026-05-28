@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -792,6 +793,9 @@ func putIntegrationSecret(integration core.IntegrationContext, name, label, desc
 	}
 	_, err := integration.Secrets().Get(name)
 	if err != nil {
+		if !errors.Is(err, core.ErrSecretNotFound) {
+			return fmt.Errorf("check existing secret %s: %w", name, err)
+		}
 		return integration.Secrets().Create(core.IntegrationSecretDefinition{
 			Name:        name,
 			Label:       label,
@@ -816,7 +820,13 @@ func getIntegrationSecretString(integration core.IntegrationContext, name string
 		return string(v), true, nil
 	}
 	v, err := integration.Secrets().Get(name)
-	if err != nil || strings.TrimSpace(v) == "" {
+	if err != nil {
+		if errors.Is(err, core.ErrSecretNotFound) {
+			return "", false, nil
+		}
+		return "", false, err
+	}
+	if strings.TrimSpace(v) == "" {
 		return "", false, nil
 	}
 	return v, true, nil
