@@ -13,7 +13,8 @@ import type { DashboardPanel } from "@/hooks/useCanvasData";
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { useDashboardContext, resolveDashboardNode, type DashboardNodeStatus } from "./DashboardContext";
-import { DASHBOARD_TRIGGER_NODE_EVENT } from "./dashboardEvents";
+import { confirmDashboardTriggerNode } from "./confirmDashboardTriggerNode";
+import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
 import type { NodesPanelContent, NodesPanelNode } from "./nodesPanelContent";
 
 const STATUS_CLASS: Record<DashboardNodeStatus, string> = {
@@ -104,8 +105,6 @@ function NodesPanelRow({ entry }: { entry: NodesPanelNode }) {
   const resolved = resolveDashboardNode(ctx, entry.node);
   const status: DashboardNodeStatus = resolveStatus(ctx, resolved?.node.id);
   const displayName = entry.label?.trim() || resolved?.label || entry.node;
-  const canRun = (ctx?.canRunNodes ?? false) && Boolean(entry.showRun) && Boolean(resolved);
-  const handleRun = () => triggerNode(ctx, resolved?.node.id, entry.triggerName);
 
   return (
     <li className="flex items-center gap-3 px-3 py-2" data-testid="nodes-panel-row">
@@ -134,45 +133,61 @@ function NodesPanelRow({ entry }: { entry: NodesPanelNode }) {
           </p>
         ) : null}
       </div>
-      {entry.showRun ? (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={handleRun}
-          disabled={!canRun}
-          title={canRun ? undefined : "You do not have permission to run this node"}
-          data-testid="nodes-panel-row-run"
-          className="shrink-0"
-        >
-          <Play className="mr-1 h-3 w-3" />
-          Run
-        </Button>
-      ) : null}
+      {entry.showRun ? <NodesPanelRunControl entry={entry} resolved={resolved} /> : null}
     </li>
+  );
+}
+
+/**
+ * Run button + confirm dialog for a single Key Nodes row. Opens
+ * {@link NodeRunConfirmDialog} so the operator can preview the merged
+ * trigger payload (and fill in any declared template parameters) before the
+ * trigger is fired. We never trigger directly from the row click anymore —
+ * the dialog confirm is the single submission path.
+ */
+function NodesPanelRunControl({
+  entry,
+  resolved,
+}: {
+  entry: NodesPanelNode;
+  resolved: ReturnType<typeof resolveDashboardNode>;
+}) {
+  const ctx = useDashboardContext();
+  const [open, setOpen] = useState(false);
+  const canRun = (ctx?.canRunNodes ?? false) && Boolean(resolved);
+  return (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => setOpen(true)}
+        disabled={!canRun}
+        title={canRun ? undefined : "You do not have permission to run this node"}
+        data-testid="nodes-panel-row-run"
+        className="shrink-0"
+      >
+        <Play className="mr-1 h-3 w-3" />
+        Run
+      </Button>
+      <NodeRunConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        resolved={resolved}
+        templateName={entry.triggerName}
+        onConfirm={async (parameters) => {
+          if (!resolved?.node?.id) return;
+          await confirmDashboardTriggerNode(ctx, resolved.node.id, entry.triggerName, parameters);
+        }}
+        testId="nodes-panel-row-run-dialog"
+      />
+    </>
   );
 }
 
 function resolveStatus(ctx: ReturnType<typeof useDashboardContext>, nodeId: string | undefined): DashboardNodeStatus {
   if (!nodeId) return "unknown";
   return ctx?.nodeStatuses?.[nodeId] ?? "unknown";
-}
-
-function triggerNode(
-  ctx: ReturnType<typeof useDashboardContext>,
-  nodeId: string | undefined,
-  triggerName: string | undefined,
-) {
-  if (!nodeId) return;
-  if (ctx?.onTriggerNode) {
-    ctx.onTriggerNode(nodeId, { templateName: triggerName });
-    return;
-  }
-  window.dispatchEvent(
-    new CustomEvent(DASHBOARD_TRIGGER_NODE_EVENT, {
-      detail: { nodeId, triggerName },
-    }),
-  );
 }
 
 function NodesPanelForm({

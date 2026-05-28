@@ -105,27 +105,27 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((row, idx) => (
-              <tr
-                key={(row.id as string | undefined) ?? idx}
-                className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
-              >
-                {render.columns.map((col, ci) => (
-                  <Cell key={`${col.field}-${ci}`} col={col} row={row} />
-                ))}
-                {render.rowActions && render.rowActions.length > 0 ? (
-                  <td className="px-3 py-1.5 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      {render.rowActions
-                        .filter((action) => evaluateRowShow(action.show, row))
-                        .map((action, ai) => (
-                          <RowActionButton key={ai} action={action} row={row} />
-                        ))}
-                    </div>
-                  </td>
-                ) : null}
-              </tr>
-            ))}
+            {filtered.map((row, idx) => {
+              const rowKey = rowKeyForRow(row, idx);
+              return (
+                <tr key={rowKey} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
+                  {render.columns.map((col, ci) => (
+                    <Cell key={`${col.field}-${ci}`} col={col} row={row} />
+                  ))}
+                  {render.rowActions && render.rowActions.length > 0 ? (
+                    <td className="px-3 py-1.5 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        {render.rowActions
+                          .filter((action) => evaluateRowShow(action.show, row))
+                          .map((action, ai) => (
+                            <RowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
+                          ))}
+                      </div>
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -216,6 +216,24 @@ function disabledReason({
   return null;
 }
 
+/**
+ * Stable per-row key used to scope action locks. Prefers the row's `id`
+ * when present (memory rows, executions, runs all expose one) and falls
+ * back to a deterministic JSON encoding when the source rows don't carry
+ * identifiers. The index is only used as a last-resort tiebreaker so
+ * locks don't bleed across rows on re-render.
+ */
+function rowKeyForRow(row: Record<string, unknown>, index: number): string {
+  const id = row.id;
+  if (typeof id === "string" && id.length > 0) return id;
+  if (typeof id === "number") return String(id);
+  try {
+    return `row:${index}:${JSON.stringify(row)}`;
+  } catch {
+    return `row:${index}`;
+  }
+}
+
 function disabledTooltip(reason: ActionDisabledReason, node: string): string | undefined {
   switch (reason) {
     case "no-perm":
@@ -244,6 +262,7 @@ type ResolvedNode = NonNullable<ReturnType<typeof resolveDashboardNode>>;
 function useRowActionFire({
   action,
   row,
+  rowKey,
   resolved,
   hookName,
   label,
@@ -251,6 +270,7 @@ function useRowActionFire({
 }: {
   action: WidgetRowAction;
   row: Record<string, unknown>;
+  rowKey: string;
   resolved: ResolvedNode | undefined;
   hookName: string;
   label: string;
@@ -266,7 +286,8 @@ function useRowActionFire({
     const triggerNodeId = resolved.node.id;
     setError(undefined);
     setPending(true);
-    lock.beginSubmission(triggerNodeId);
+    lock.beginSubmission(triggerNodeId, rowKey);
+    let succeeded = false;
     try {
       const parameters = mergeTriggerParameters(resolved.node, hookName, action.template, row, action.payload);
       await ctx.onTriggerNode(triggerNodeId, {
@@ -275,31 +296,40 @@ function useRowActionFire({
         parameters,
         successLabel: label,
       });
+      succeeded = true;
       setConfirmOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to trigger");
     } finally {
       setPending(false);
-      lock.endSubmission(triggerNodeId);
+      lock.endSubmission(triggerNodeId, rowKey, succeeded);
     }
   };
 
   return { fire, error, pending };
 }
 
-function useRowActionGate(action: WidgetRowAction) {
+function useRowActionGate(action: WidgetRowAction, rowKey: string) {
   const ctx = useDashboardContext();
   const lock = useWidgetTableActionLock();
   const canRun = ctx?.canRunNodes ?? false;
   const resolved = resolveDashboardNode(ctx, action.node);
   const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
-  const runInFlight = Boolean(resolved?.node.id && lock.runInFlightIds.has(resolved.node.id));
+  const triggerNodeId = resolved?.node.id;
+  // Per-row locking: a row's button is disabled by `runInFlight` only when
+  // its own submission produced the in-flight run (i.e. the mapping points
+  // back to this row's key). Other rows sharing the same trigger stay
+  // clickable, matching the "lock only the affected row" model.
+  const runInFlight = Boolean(
+    triggerNodeId && lock.runInFlightIds.has(triggerNodeId) && lock.inFlightRowByTrigger.get(triggerNodeId) === rowKey,
+  );
+  const submitting = lock.pendingRowKeys.has(rowKey);
   const reason = disabledReason({
     canRun,
     hasResolvedNode: Boolean(resolved),
     isTrigger,
     runInFlight,
-    submitting: lock.submitting,
+    submitting,
   });
   return {
     resolved,
@@ -310,16 +340,32 @@ function useRowActionGate(action: WidgetRowAction) {
   };
 }
 
-function RowActionButton({ action, row }: { action: WidgetRowAction; row: Record<string, unknown> }) {
+function RowActionButton({
+  action,
+  row,
+  rowKey,
+}: {
+  action: WidgetRowAction;
+  row: Record<string, unknown>;
+  rowKey: string;
+}) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const { resolved, isTrigger, disabled, reason, tooltip } = useRowActionGate(action);
+  const { resolved, isTrigger, disabled, reason, tooltip } = useRowActionGate(action, rowKey);
   const label = action.label ?? "Run";
   const hookName = action.hook ?? "run";
   const Icon = action.icon ? ACTION_ICONS[action.icon] : undefined;
   const variantClass = actionVariantClass(action.variant);
 
-  const { fire, error, pending } = useRowActionFire({ action, row, resolved, hookName, label, setConfirmOpen });
+  const { fire, error, pending } = useRowActionFire({
+    action,
+    row,
+    rowKey,
+    resolved,
+    hookName,
+    label,
+    setConfirmOpen,
+  });
 
   const handleClick = () => {
     if (disabled) return;

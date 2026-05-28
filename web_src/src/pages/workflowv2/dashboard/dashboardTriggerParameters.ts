@@ -27,6 +27,30 @@ export function getTriggerTemplates(node: ComponentsNode | undefined): Dashboard
 }
 
 /**
+ * Resolve the full `StartTemplate` (including optional `parameters` /
+ * `payload`) declared on a node's configuration. Used by the console Run
+ * dialog to render the parameter form and preview the payload it will
+ * submit. When `templateName` is provided, the matching template is
+ * returned; otherwise we fall back to the first template — matching the
+ * default rule used by {@link buildDashboardTriggerParameters}. Returns
+ * `undefined` when the node is undefined or has no templates.
+ */
+export function resolveStartTemplate(
+  node: ComponentsNode | undefined,
+  templateName?: string,
+): StartTemplate | undefined {
+  if (!node) return undefined;
+  const config = node.configuration as { templates?: StartTemplate[] } | undefined;
+  const templates = config?.templates;
+  if (!templates || templates.length === 0) return undefined;
+  if (templateName) {
+    const match = templates.find((tpl) => tpl?.name === templateName);
+    if (match) return match;
+  }
+  return templates.find((tpl) => Boolean(tpl?.name));
+}
+
+/**
  * Derive the `parameters` body the gRPC `InvokeNodeTriggerHook` endpoint
  * expects when the dashboard fires a quick Run on a referenced node.
  *
