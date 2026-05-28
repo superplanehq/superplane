@@ -1,10 +1,14 @@
 package core
 
 import (
+	"errors"
+
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/configuration"
 )
+
+var ErrSecretNotFound = errors.New("secret not found")
 
 /*
  * IntegrationSetupProvider is the contract for an integration to provide its setup flow.

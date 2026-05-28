@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/organizations"
+	"github.com/superplanehq/superplane/pkg/workers"
 	"github.com/superplanehq/superplane/test/support"
 	"github.com/superplanehq/superplane/test/support/impl"
 	"google.golang.org/grpc/codes"
@@ -138,7 +139,7 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 		assert.False(t, onStepSubmitCalled)
 	})
 
-	t.Run("done step clears setup and marks ready", func(t *testing.T) {
+	t.Run("done step clears setup and enqueues initial sync", func(t *testing.T) {
 		r3 := support.Setup(t)
 		ctx3 := authentication.SetUserIdInMetadata(context.Background(), r3.User.String())
 
@@ -172,6 +173,17 @@ func Test__NextIntegrationSetupStep(t *testing.T) {
 		stored, err := models.FindIntegration(r3.Organization.ID, uuid.MustParse(resp.Integration.Metadata.Id))
 		require.NoError(t, err)
 		assert.Nil(t, stored.SetupState)
-		assert.Equal(t, models.IntegrationStateReady, stored.State)
+		assert.Equal(t, models.IntegrationStatePending, stored.State)
+
+		requests, err := stored.ListRequests(models.IntegrationRequestTypeSync)
+		require.NoError(t, err)
+		require.Len(t, requests, 1)
+
+		worker := workers.NewIntegrationRequestWorker(r3.Encryptor, r3.Registry, nil, baseURL, baseURL)
+		require.NoError(t, worker.LockAndProcessRequest(requests[0]))
+
+		storedAfter, err := models.FindIntegration(r3.Organization.ID, uuid.MustParse(resp.Integration.Metadata.Id))
+		require.NoError(t, err)
+		assert.Equal(t, models.IntegrationStateReady, storedAfter.State)
 	})
 }
