@@ -35,11 +35,14 @@ type AuthSpec struct {
 	Password   configuration.SecretKeyRef `json:"password" mapstructure:"password"`
 }
 
-type ConnectionRetrySpec struct {
+type RetrySpec struct {
 	Enabled         bool `json:"enabled" mapstructure:"enabled"`
 	Retries         int  `json:"retries" mapstructure:"retries"`
 	IntervalSeconds int  `json:"intervalSeconds" mapstructure:"intervalSeconds"`
 }
+
+type ConnectionRetrySpec = RetrySpec
+type ExecutionRetrySpec = RetrySpec
 
 type EnvironmentVariable struct {
 	Name  string `json:"name" mapstructure:"name"`
@@ -56,6 +59,7 @@ type Spec struct {
 	Environment      []EnvironmentVariable `json:"environment,omitempty" mapstructure:"environment"`
 	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
 	ConnectionRetry  *ConnectionRetrySpec  `json:"connectionRetry,omitempty" mapstructure:"connectionRetry"`
+	ExecutionRetry   *ExecutionRetrySpec   `json:"executionRetry,omitempty" mapstructure:"executionRetry"`
 }
 
 type ExecutionMetadata struct {
@@ -68,7 +72,9 @@ type ExecutionMetadata struct {
 	Environment      []EnvironmentVariable `json:"environment" mapstructure:"environment"`
 	Timeout          int                   `json:"timeout" mapstructure:"timeout"`
 	ConnectionRetry  *ConnectionRetrySpec  `json:"connectionRetry" mapstructure:"connectionRetry"`
+	ExecutionRetry   *ExecutionRetrySpec   `json:"executionRetry" mapstructure:"executionRetry"`
 	Attempt          int                   `json:"attempt" mapstructure:"attempt"`
+	ExecutionAttempt int                   `json:"executionAttempt" mapstructure:"executionAttempt"`
 	MaxRetries       int                   `json:"maxRetries" mapstructure:"maxRetries"`
 	IntervalSeconds  int                   `json:"intervalSeconds" mapstructure:"intervalSeconds"`
 	Authentication   AuthSpec              `json:"authentication" mapstructure:"authentication"`
@@ -103,6 +109,7 @@ Choose **SSH key** or **Password**, then select the organization Secret and the 
 - **Environment variables**: Optional list of key/value pairs available during command execution.
 - **Timeout (seconds)**: How long the command may run (default 60).
 - **Connection retry** (optional): Enable to retry connecting when the host is not reachable yet (e.g. server still booting). Set number of retries and interval between attempts.
+- **Execution retry** (optional): Enable to retry running the command when the exit status is not 0. Set number of retries and interval between attempts.
 
 ## Output
 
@@ -305,6 +312,49 @@ func (c *SSHCommand) Configuration() []configuration.Field {
 				},
 			},
 		},
+		{
+			Name:        "executionRetry",
+			Label:       "Execution retry",
+			Type:        configuration.FieldTypeObject,
+			Required:    false,
+			Description: "Optionally retry running the command when the exit status is not 0.",
+			TypeOptions: &configuration.TypeOptions{
+				Object: &configuration.ObjectTypeOptions{
+					Schema: []configuration.Field{
+						{
+							Name:        "enabled",
+							Label:       "Enable execution retry",
+							Type:        configuration.FieldTypeBool,
+							Required:    false,
+							Default:     false,
+							Description: "Retry running the command if the exit status is not 0.",
+						},
+						{
+							Name:        "retries",
+							Label:       "Retries",
+							Type:        configuration.FieldTypeNumber,
+							Required:    false,
+							Default:     5,
+							Description: "Number of retry attempts.",
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "enabled", Values: []string{"true"}},
+							},
+						},
+						{
+							Name:        "intervalSeconds",
+							Label:       "Retry interval (seconds)",
+							Type:        configuration.FieldTypeNumber,
+							Required:    false,
+							Default:     15,
+							Description: "Seconds to wait between command attempts.",
+							VisibilityConditions: []configuration.VisibilityCondition{
+								{Field: "enabled", Values: []string{"true"}},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 }
 
@@ -362,6 +412,14 @@ func (c *SSHCommand) Setup(ctx core.SetupContext) error {
 			return errors.New("connection retry: interval must be at least 1 second")
 		}
 	}
+	if spec.ExecutionRetry != nil && spec.ExecutionRetry.Enabled {
+		if spec.ExecutionRetry.Retries < 0 {
+			return errors.New("execution retry: retries must be 0 or greater")
+		}
+		if spec.ExecutionRetry.IntervalSeconds < 1 {
+			return errors.New("execution retry: interval must be at least 1 second")
+		}
+	}
 
 	return nil
 }
@@ -393,7 +451,9 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 		Environment:      spec.Environment,
 		Timeout:          spec.Timeout,
 		ConnectionRetry:  spec.ConnectionRetry,
+		ExecutionRetry:   spec.ExecutionRetry,
 		Attempt:          0,
+		ExecutionAttempt: 0,
 		MaxRetries:       0,
 		IntervalSeconds:  0,
 		Authentication:   spec.Authentication,
@@ -420,7 +480,8 @@ func (c *SSHCommand) Execute(ctx core.ExecutionContext) error {
 }
 
 func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
-	if ctx.Name == "connectionRetry" {
+	switch ctx.Name {
+	case "connectionRetry", "executionRetry":
 		if ctx.ExecutionState.IsFinished() {
 			return nil
 		}
@@ -440,9 +501,9 @@ func (c *SSHCommand) HandleHook(ctx core.ActionHookContext) error {
 		}
 
 		return c.executeSSH(execCtx)
+	default:
+		return fmt.Errorf("unknown action: %s", ctx.Name)
 	}
-
-	return fmt.Errorf("unknown action: %s", ctx.Name)
 }
 
 type ExecuteSSHContext struct {
@@ -473,7 +534,7 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 	)
 	result, err := client.ExecuteCommand(command, time.Duration(ctx.execMetadata.Timeout)*time.Second)
 	if c.isConnectError(err) {
-		if c.shouldRetry(ctx.execMetadata.ConnectionRetry, ctx.metadataCtx) {
+		if c.shouldRetry(ctx.execMetadata.ConnectionRetry, c.getRetryAttempt(ctx.metadataCtx)) {
 			err = c.incrementRetryCount(ctx.metadataCtx)
 			if err != nil {
 				return err
@@ -502,6 +563,21 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 		return err
 	}
 
+	if result.ExitCode != 0 {
+		if c.shouldRetry(ctx.execMetadata.ExecutionRetry, c.getExecutionAttempt(ctx.metadataCtx)) {
+			err = c.incrementExecutionRetryCount(ctx.metadataCtx)
+			if err != nil {
+				return err
+			}
+
+			return ctx.requestsCtx.ScheduleActionCall(
+				"executionRetry",
+				map[string]any{},
+				time.Duration(ctx.execMetadata.ExecutionRetry.IntervalSeconds)*time.Second,
+			)
+		}
+	}
+
 	err = c.setResultMetadata(ctx.metadataCtx, result)
 	if err != nil {
 		return err
@@ -515,12 +591,12 @@ func (c *SSHCommand) executeSSH(ctx ExecuteSSHContext) error {
 	return ctx.stateCtx.Emit(channel, "ssh.command.executed", []any{result})
 }
 
-func (c *SSHCommand) shouldRetry(retrySpec *ConnectionRetrySpec, metadata core.MetadataWriter) bool {
+func (c *SSHCommand) shouldRetry(retrySpec *RetrySpec, attempt int) bool {
 	if retrySpec == nil || !retrySpec.Enabled {
 		return false
 	}
 
-	return c.getRetryAttempt(metadata) < retrySpec.Retries
+	return attempt < retrySpec.Retries
 }
 
 func (c *SSHCommand) incrementRetryCount(metadata core.MetadataWriter) error {
@@ -530,16 +606,31 @@ func (c *SSHCommand) incrementRetryCount(metadata core.MetadataWriter) error {
 	return metadata.Set(current)
 }
 
+func (c *SSHCommand) incrementExecutionRetryCount(metadata core.MetadataWriter) error {
+	current := c.getMetadataMap(metadata)
+	current["executionAttempt"] = c.getExecutionAttempt(metadata) + 1
+
+	return metadata.Set(current)
+}
+
+func (c *SSHCommand) getExecutionAttempt(metadata core.MetadataWriter) int {
+	return c.getMetadataInt(metadata, "executionAttempt")
+}
+
 func (c *SSHCommand) getRetryAttempt(metadata core.MetadataWriter) int {
+	return c.getMetadataInt(metadata, "attempt")
+}
+
+func (c *SSHCommand) getMetadataInt(metadata core.MetadataWriter, key string) int {
 	meta := c.getMetadataMap(metadata)
 
-	attempt, ok := meta["attempt"]
+	value, ok := meta[key]
 	if !ok {
 		return 0
 	}
 
 	// JSON numbers deserialize as float64
-	switch v := attempt.(type) {
+	switch v := value.(type) {
 	case float64:
 		return int(v)
 	case int:
@@ -649,6 +740,10 @@ func (c *SSHCommand) Hooks() []core.Hook {
 	return []core.Hook{
 		{
 			Name: "connectionRetry",
+			Type: core.HookTypeInternal,
+		},
+		{
+			Name: "executionRetry",
 			Type: core.HookTypeInternal,
 		},
 	}
