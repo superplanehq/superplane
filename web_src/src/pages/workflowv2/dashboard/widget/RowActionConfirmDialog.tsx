@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -10,6 +10,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+import { ConfirmFact } from "../confirmDialogPreview";
+import { formatParameters } from "../formatConfirmDialogParameters";
 import type { resolveDashboardNode } from "../DashboardContext";
 import { buildEnv, compileTemplate, evalTemplate } from "./celExpr";
 import { mergeTriggerParameters } from "./mergeTriggerPayload";
@@ -158,26 +160,8 @@ function ConfirmParametersFact({
   );
 }
 
-function ConfirmFact({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="space-y-0.5">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <div className="text-slate-700">{children}</div>
-    </div>
-  );
-}
-
 function extractTemplateName(parameters: Record<string, unknown> | undefined): string | undefined {
   if (!parameters) return undefined;
   const name = parameters.template;
   return typeof name === "string" && name ? name : undefined;
-}
-
-function formatParameters(parameters: Record<string, unknown> | undefined): string {
-  if (!parameters || Object.keys(parameters).length === 0) return "(empty)";
-  try {
-    return JSON.stringify(parameters, null, 2);
-  } catch {
-    return String(parameters);
-  }
 }

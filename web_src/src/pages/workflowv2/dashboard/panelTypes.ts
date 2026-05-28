@@ -529,6 +529,9 @@ function validateChartRender(render: Record<string, unknown>): string | null {
   if (typeof render.xField !== "string" || render.xField.trim() === "") {
     return "render.xField must be a non-empty string.";
   }
+  if (render.seriesField !== undefined && render.seriesField !== null && typeof render.seriesField !== "string") {
+    return "render.seriesField must be a string.";
+  }
   if (!Array.isArray(render.series) || render.series.length === 0) {
     return "render.series must be a non-empty array.";
   }
@@ -536,13 +539,17 @@ function validateChartRender(render: Record<string, unknown>): string | null {
     const seriesError = validateChartSeries(render.series[i], i);
     if (seriesError) return seriesError;
   }
-  if (render.legend !== undefined) {
-    const legend = render.legend;
-    if (typeof legend !== "string" || !WIDGET_CHART_LEGEND_MODES.includes(legend as WidgetChartLegendMode)) {
-      return `render.legend must be one of ${WIDGET_CHART_LEGEND_MODES.join(", ")}.`;
-    }
-  }
+  const legendError = validateChartLegend(render.legend);
+  if (legendError) return legendError;
   return validateSort(render.sort);
+}
+
+function validateChartLegend(legend: unknown): string | null {
+  if (legend === undefined) return null;
+  if (typeof legend !== "string" || !WIDGET_CHART_LEGEND_MODES.includes(legend as WidgetChartLegendMode)) {
+    return `render.legend must be one of ${WIDGET_CHART_LEGEND_MODES.join(", ")}.`;
+  }
+  return null;
 }
 
 function validateChartSeries(raw: unknown, index: number): string | null {
