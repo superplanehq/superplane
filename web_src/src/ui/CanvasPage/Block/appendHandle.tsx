@@ -14,7 +14,7 @@ const APPEND_HANDLE_STYLE: React.CSSProperties = {
   width: 24,
   height: 24,
   borderRadius: 100,
-  border: `3px solid ${APPEND_CONNECTOR_COLOR}`,
+  border: "3px solid var(--sp-handle-border, #C9D5E1)",
   background: "white",
   pointerEvents: "auto",
   cursor: "pointer",
@@ -127,8 +127,6 @@ export function AppendHandleButton({
   onHoverChange?: (hovered: boolean) => void;
   style: React.CSSProperties;
 }) {
-  const [isHovered, setIsHovered] = useState(false);
-
   return (
     <button
       type="button"
@@ -139,17 +137,10 @@ export function AppendHandleButton({
         event.stopPropagation();
         void onClick();
       }}
-      onMouseEnter={() => {
-        setIsHovered(true);
-        onHoverChange?.(true);
-      }}
-      onMouseLeave={() => {
-        setIsHovered(false);
-        onHoverChange?.(false);
-      }}
+      onMouseEnter={() => onHoverChange?.(true)}
+      onMouseLeave={() => onHoverChange?.(false)}
       style={{
         ...APPEND_HANDLE_STYLE,
-        borderColor: isHovered ? "#94A3B8" : APPEND_CONNECTOR_COLOR,
         ...style,
       }}
     >
