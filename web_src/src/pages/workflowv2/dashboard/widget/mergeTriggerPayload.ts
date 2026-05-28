@@ -33,16 +33,9 @@ export function mergeTriggerParameters(
   payloadTemplates?: Record<string, string>,
 ): Record<string, unknown> {
   const base = buildDashboardTriggerParameters(node, hookName, templateName);
-  const rowPayload = buildRowPayloadFromTemplates(payloadTemplates, row);
-  if (hookName !== "run") {
-    return deepMergeObjects(base, rowPayload);
+  if (hookName === "run") {
+    return base;
   }
-  const basePayload =
-    base.payload && typeof base.payload === "object" && !Array.isArray(base.payload)
-      ? (base.payload as Record<string, unknown>)
-      : {};
-  return {
-    ...base,
-    payload: deepMergeObjects(basePayload, rowPayload),
-  };
+  const rowPayload = buildRowPayloadFromTemplates(payloadTemplates, row);
+  return deepMergeObjects(base, rowPayload);
 }

@@ -125,20 +125,23 @@ The Manual Run trigger allows you to start workflow executions manually from the
 ### How It Works
 
 1. Add the Manual Run trigger as the starting node of your workflow
-2. Configure one or more templates, each with a name and a default payload
+2. Configure one or more templates, each with a name, default payload, and optional parameters
 3. Click the "Run" button in the workflow UI, or invoke the `run` hook via the API/CLI to start an execution
-4. The workflow begins immediately with either the configured payload or an override supplied at run time
+4. The workflow begins immediately with the configured payload for the selected template
 
 ### Configuration
 
 Each Manual Run trigger exposes a list of templates. A template has:
 
 - `name` (required): a label used as the run target (and the event channel)
-- `payload` (required): a default JSON object emitted when the template is used
+- `parameters` (optional): a list of typed parameters exposed to payload expressions as `parameters["name"]` and used by the run form
+- `payload` (required): a default JSON object emitted when the template is used. Supports expressions such as `{{ now() }}` and `{{ parameters["my parameter"] }}` in JSON values.
+
+Each parameter has a `name` (plain text), required `type` (`string`, `number`, or `boolean`), an optional `title` for the run form label (defaults to `name` when unset), and an optional default (`defaultString`, `defaultNumber`, or `defaultBoolean`) whose editor matches the selected type.
 
 ### Event Data
 
-Manual runs emit an event with type `manual.run`. The data is either the template's saved payload or the override passed in the run request.
+Manual runs emit an event with type `manual.run`. The data is the selected template's payload after expression resolution.
 
 ### Example Data
 
