@@ -12,6 +12,20 @@ function templateParameterValue(parameter: Record<string, unknown>): unknown {
     const value = parameter.defaultBoolean;
     return value === null || value === undefined ? false : value;
   }
+  if (parameterType === "select") {
+    const value = parameter.defaultString;
+    if (value === null || value === undefined || value === "") {
+      const rawOptions = parameter.options;
+      if (Array.isArray(rawOptions) && rawOptions.length > 0) {
+        const first = rawOptions[0];
+        if (isRecord(first) && typeof first.value === "string" && first.value !== "") {
+          return first.value;
+        }
+      }
+      return "";
+    }
+    return value;
+  }
   const value = parameter.defaultString;
   if (value === null || value === undefined) return "";
   return value;
