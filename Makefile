@@ -1,6 +1,7 @@
 .PHONY: lint test test.coverage test.license.check check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
 
 MAKE=make
+MAKEFLAGS+=--no-print-directory
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 BASE_URL?=https://app.superplane.com

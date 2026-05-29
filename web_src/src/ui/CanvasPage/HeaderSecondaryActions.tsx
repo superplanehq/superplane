@@ -1,6 +1,6 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { FileCode, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
@@ -9,15 +9,19 @@ import type { HeaderProps } from "./Header";
 
 export function SecondaryHeaderActions({
   mode,
+  isEditing = false,
   onSave,
   saveButtonHidden,
   saveDisabled,
   saveDisabledTooltip,
   saveIsPrimary,
   hasUnpublishedDraftChanges,
+  hasUnpublishedConsoleDraftChanges,
   onShowDiff,
+  onShowConsoleDiff,
   visualDiffEnabled,
   draftVisualDiff,
+  draftConsoleDiff,
   onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
@@ -26,37 +30,12 @@ export function SecondaryHeaderActions({
   publishVersionLabel,
   publishVersionDisabled,
   publishVersionDisabledTooltip,
-  onEnterEditMode,
-  enterEditModeDisabled,
-  enterEditModeDisabledTooltip,
-  onExitEditMode,
-  exitEditModeDisabled,
-  exitEditModeDisabledTooltip,
-  unpublishedDraftUpdatedAt,
-  onDiscardDraftAndStartEdit,
-  onDashboardAddPanel,
-  onDashboardOpenYaml,
-  dashboardYamlReadOnly,
 }: HeaderProps) {
-  const showEditButton = mode === "version-live" && !!onEnterEditMode;
-  const showDraftDropdown =
-    showEditButton && !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
-  const showDashboardAddPanel = mode === "dashboard" && !!onDashboardAddPanel;
-  const showDashboardYaml = mode === "dashboard" && !!onDashboardOpenYaml;
+  const onCanvasTab = mode === "version-live" || mode === "version-edit";
+  const onConsoleTab = mode === "dashboard";
 
   return (
-    <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-      <LiveModeEditControls
-        showEditButton={showEditButton}
-        showDraftDropdown={showDraftDropdown}
-        onEnterEditMode={onEnterEditMode}
-        enterEditModeDisabled={enterEditModeDisabled}
-        enterEditModeDisabledTooltip={enterEditModeDisabledTooltip}
-        hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
-        onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
-        unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
-      />
-
+    <div className="relative z-10 ml-auto flex shrink-0 items-center gap-1.5">
       {mode === "default" && onSave && !saveButtonHidden ? (
         <SaveButton
           onSave={onSave}
@@ -66,68 +45,77 @@ export function SecondaryHeaderActions({
         />
       ) : null}
 
-      {mode === "version-edit" ? (
-        <EditModeVersionActions
-          hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
-          onShowDiff={onShowDiff}
-          visualDiffEnabled={visualDiffEnabled}
-          draftVisualDiff={draftVisualDiff}
-          onToggleVisualDiff={onToggleVisualDiff}
-          onDiscardVersion={onDiscardVersion}
-          discardVersionDisabled={discardVersionDisabled}
-          discardVersionDisabledTooltip={discardVersionDisabledTooltip}
-          onExitEditMode={onExitEditMode}
-          exitEditModeDisabled={exitEditModeDisabled}
-          exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          onPublishVersion={onPublishVersion}
-          publishVersionLabel={publishVersionLabel}
-          publishVersionDisabled={publishVersionDisabled}
-          publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-        />
-      ) : null}
-
-      {showDashboardYaml ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <UIButton
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => onDashboardOpenYaml!()}
-              data-testid="dashboard-yaml-button"
-              aria-label={dashboardYamlReadOnly ? "View YAML" : "View / Import YAML"}
-            >
-              <FileCode className="mr-1 h-3.5 w-3.5" />
-              YAML
-            </UIButton>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            {dashboardYamlReadOnly
-              ? "View the console as YAML"
-              : "View, copy, download, or import this console as YAML"}
-          </TooltipContent>
-        </Tooltip>
-      ) : null}
-
-      {showDashboardAddPanel ? (
-        <UIButton
-          type="button"
-          size="sm"
-          variant="default"
-          onClick={() => onDashboardAddPanel()}
-          data-testid="dashboard-add-panel"
-        >
-          <Plus className="mr-1 h-3.5 w-3.5" />
-          Add panel
-        </UIButton>
+      {isEditing ? (
+        <>
+          {onCanvasTab && hasUnpublishedDraftChanges && draftVisualDiff?.diffCounts ? (
+            <DiffSummaryHoverCard
+              diffCounts={draftVisualDiff.diffCounts}
+              visualDiffEnabled={visualDiffEnabled}
+              onToggleVisualDiff={onToggleVisualDiff}
+              diffToggles={draftVisualDiff.diffToggles}
+              onShowDiff={onShowDiff}
+            />
+          ) : null}
+          {onConsoleTab && hasUnpublishedConsoleDraftChanges && draftConsoleDiff?.diffCounts ? (
+            <DiffSummaryHoverCard diffCounts={draftConsoleDiff.diffCounts} onShowDiff={onShowConsoleDiff} />
+          ) : null}
+          <EditModePublishDiscardActions
+            hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+            onDiscardVersion={onDiscardVersion}
+            discardVersionDisabled={discardVersionDisabled}
+            discardVersionDisabledTooltip={discardVersionDisabledTooltip}
+            onPublishVersion={onPublishVersion}
+            publishVersionLabel={publishVersionLabel}
+            publishVersionDisabled={publishVersionDisabled}
+            publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          />
+        </>
       ) : null}
     </div>
   );
 }
 
-function LiveModeEditControls({
-  showEditButton,
-  showDraftDropdown,
+function EditModePublishDiscardActions({
+  hasUnpublishedDraftChanges,
+  onDiscardVersion,
+  discardVersionDisabled,
+  discardVersionDisabledTooltip,
+  onPublishVersion,
+  publishVersionLabel,
+  publishVersionDisabled,
+  publishVersionDisabledTooltip,
+}: Pick<
+  HeaderProps,
+  | "hasUnpublishedDraftChanges"
+  | "onDiscardVersion"
+  | "discardVersionDisabled"
+  | "discardVersionDisabledTooltip"
+  | "onPublishVersion"
+  | "publishVersionLabel"
+  | "publishVersionDisabled"
+  | "publishVersionDisabledTooltip"
+>) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {hasUnpublishedDraftChanges ? (
+        <DiscardDraftButton
+          onDiscard={() => onDiscardVersion?.()}
+          disabled={discardVersionDisabled || !onDiscardVersion}
+          disabledTooltip={discardVersionDisabledTooltip}
+        />
+      ) : null}
+      <PublishVersionButton
+        onPublish={() => onPublishVersion?.()}
+        label={publishVersionLabel || "Publish"}
+        disabled={publishVersionDisabled || !onPublishVersion}
+        publishVersionDisabled={!!publishVersionDisabled}
+        publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+      />
+    </div>
+  );
+}
+
+export function LiveModeTopHeaderActions({
   onEnterEditMode,
   enterEditModeDisabled,
   enterEditModeDisabledTooltip,
@@ -142,13 +130,12 @@ function LiveModeEditControls({
   | "hasUnpublishedDraftChanges"
   | "onDiscardDraftAndStartEdit"
   | "unpublishedDraftUpdatedAt"
-> & {
-  showEditButton: boolean;
-  showDraftDropdown: boolean;
-}) {
-  if (!showEditButton || !onEnterEditMode) {
+>) {
+  if (!onEnterEditMode) {
     return null;
   }
+
+  const showDraftDropdown = !!hasUnpublishedDraftChanges && !!onDiscardDraftAndStartEdit && !enterEditModeDisabled;
 
   if (showDraftDropdown && onDiscardDraftAndStartEdit) {
     return (
@@ -170,75 +157,21 @@ function LiveModeEditControls({
   );
 }
 
-function EditModeVersionActions({
-  hasUnpublishedDraftChanges,
-  onShowDiff,
-  visualDiffEnabled,
-  draftVisualDiff,
-  onToggleVisualDiff,
-  onDiscardVersion,
-  discardVersionDisabled,
-  discardVersionDisabledTooltip,
+export function EditModeTopHeaderActions({
   onExitEditMode,
   exitEditModeDisabled,
   exitEditModeDisabledTooltip,
-  onPublishVersion,
-  publishVersionLabel,
-  publishVersionDisabled,
-  publishVersionDisabledTooltip,
-}: Pick<
-  HeaderProps,
-  | "hasUnpublishedDraftChanges"
-  | "onShowDiff"
-  | "visualDiffEnabled"
-  | "draftVisualDiff"
-  | "onToggleVisualDiff"
-  | "onDiscardVersion"
-  | "discardVersionDisabled"
-  | "discardVersionDisabledTooltip"
-  | "onExitEditMode"
-  | "exitEditModeDisabled"
-  | "exitEditModeDisabledTooltip"
-  | "onPublishVersion"
-  | "publishVersionLabel"
-  | "publishVersionDisabled"
-  | "publishVersionDisabledTooltip"
->) {
+}: Pick<HeaderProps, "onExitEditMode" | "exitEditModeDisabled" | "exitEditModeDisabledTooltip">) {
+  if (!onExitEditMode) {
+    return null;
+  }
+
   return (
-    <div className="flex items-center gap-2">
-      {hasUnpublishedDraftChanges ? (
-        <>
-          {draftVisualDiff?.diffCounts && (
-            <DiffSummaryHoverCard
-              diffCounts={draftVisualDiff.diffCounts}
-              visualDiffEnabled={visualDiffEnabled}
-              onToggleVisualDiff={onToggleVisualDiff}
-              diffToggles={draftVisualDiff.diffToggles}
-              onShowDiff={onShowDiff}
-            />
-          )}
-          <DiscardDraftButton
-            onDiscard={() => onDiscardVersion?.()}
-            disabled={discardVersionDisabled || !onDiscardVersion}
-            disabledTooltip={discardVersionDisabledTooltip}
-          />
-        </>
-      ) : null}
-      {onExitEditMode ? (
-        <ExitEditButton
-          onClick={() => onExitEditMode()}
-          disabled={!!exitEditModeDisabled}
-          disabledTooltip={exitEditModeDisabledTooltip}
-        />
-      ) : null}
-      <PublishVersionButton
-        onPublish={() => onPublishVersion?.()}
-        label={publishVersionLabel || "Publish"}
-        disabled={publishVersionDisabled || !onPublishVersion}
-        publishVersionDisabled={!!publishVersionDisabled}
-        publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-      />
-    </div>
+    <ExitEditButton
+      onClick={() => onExitEditMode()}
+      disabled={!!exitEditModeDisabled}
+      disabledTooltip={exitEditModeDisabledTooltip}
+    />
   );
 }
 
@@ -297,8 +230,13 @@ function ExitEditButton({
       onClick={onClick}
       disabled={disabled}
       data-testid="canvas-exit-edit-button"
+      className={cn(
+        "rounded-full border-0 bg-[var(--purple)] px-3.5 text-[13px] text-white shadow-none",
+        "hover:bg-[var(--purple)] hover:text-white hover:brightness-95",
+        "focus-visible:border-[var(--purple)] focus-visible:ring-[var(--purple)]/30",
+      )}
     >
-      Exit edit
+      Exit Edit
     </UIButton>
   );
 

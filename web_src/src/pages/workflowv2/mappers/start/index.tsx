@@ -13,25 +13,8 @@ import { renderTimeAgo } from "@/components/TimeAgo";
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
-
 import { StartRunModal } from "./runModal";
-
-interface StartTemplate {
-  name: string;
-  payload: Record<string, unknown>;
-}
-
-interface StartConfiguration {
-  templates?: StartTemplate[];
-}
-
-function payloadForTemplateRun(template: StartTemplate): Record<string, unknown> {
-  const p = template.payload;
-  if (p && typeof p === "object" && !Array.isArray(p)) {
-    return p as Record<string, unknown>;
-  }
-  return {};
-}
+import { payloadForTemplateRun, type StartConfiguration } from "./templatePayload";
 
 /**
  * Default renderer for the start trigger
@@ -94,7 +77,7 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
     const showTemplateRun = mode === "live" && !!actions;
 
     return (
-      <div className="px-2 py-1.5 flex flex-col gap-1.5">
+      <div className="px-2 py-1.5 border-b border-slate-950/20 text-gray-500 flex flex-col gap-1">
         {templates.map((template, index) => (
           <div key={index} className="flex items-center justify-between min-w-0">
             <div className="flex items-center min-w-0 flex-1">
@@ -105,35 +88,36 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
             </div>
             {showTemplateRun && actions && (
               <Button
-                size="sm"
+                size="xs"
                 data-testid="start-template-run"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  actions.openModal({
-                    title: "Run trigger",
-                    description: (
-                      <>
-                        Run template <strong>{template.name}</strong> on node{" "}
-                        <strong>{node.name || "Unnamed trigger"}</strong>. Edit the payload below to override the
-                        template default.
-                      </>
-                    ),
-                    content: ({ close }) => (
-                      <StartRunModal
-                        initialPayload={payloadForTemplateRun(template)}
-                        onClose={close}
-                        onRun={async (payload) => {
-                          await actions.invokeNodeTriggerHook("run", {
-                            template: template.name,
-                            payload,
-                          });
-                        }}
-                      />
-                    ),
+                  if ((template.parameters?.length ?? 0) > 0) {
+                    actions.openModal({
+                      title: `Run ${template.name}`,
+                      description: "Provide parameter values for this manual run.",
+                      content: ({ close }) => (
+                        <StartRunModal
+                          parameters={template.parameters}
+                          initialPayload={payloadForTemplateRun(template)}
+                          onClose={close}
+                          onRun={async (payload) =>
+                            actions.invokeNodeTriggerHook("run", {
+                              template: template.name,
+                              ...payload,
+                            })
+                          }
+                        />
+                      ),
+                    });
+                    return;
+                  }
+                  void actions.invokeNodeTriggerHook("run", {
+                    template: template.name,
                   });
                 }}
-                className="flex-shrink-0 h-7 py-1 px-2 bg-black text-white hover:bg-black/80"
+                className="flex-shrink-0 bg-black text-white hover:bg-black/80"
               >
                 Run
               </Button>

@@ -14,14 +14,24 @@ const START_NODE: SuperplaneComponentsNode = {
 };
 
 describe("mergeTriggerPayload", () => {
-  it("merges row payload into template defaults", () => {
+  it("merges row payload templates into run hook parameters", () => {
     const row = { pr_number: "99" };
     const params = mergeTriggerParameters(START_NODE, "run", "deploy", row, {
       "issue.number": "{{ pr_number }}",
     });
     expect(params).toEqual({
       template: "deploy",
-      payload: { issue: { number: "99" } },
+      issue: { number: "99" },
+    });
+  });
+
+  it("merges row payload templates into custom hook parameters", () => {
+    const row = { reason: "manual" };
+    const params = mergeTriggerParameters(START_NODE, "approve", "deploy", row, {
+      reason: "{{ reason }}",
+    });
+    expect(params).toEqual({
+      reason: "manual",
     });
   });
 

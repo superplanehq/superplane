@@ -22,6 +22,7 @@ import (
 var richUIWidgetsContent []byte
 
 const skillsRepoRawBaseURL = "https://raw.githubusercontent.com/superplanehq/skills/main"
+const superplaneRepoRawBaseURL = "https://raw.githubusercontent.com/superplanehq/superplane/main"
 
 var resourceNameCamelBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
 
@@ -116,6 +117,17 @@ func defaultResourceSourcesForSkillsBaseURL(skillsBaseURL string) ([]resourceSou
 			),
 		},
 		{
+			MountPath: "ref/skills/superplane-cli/references/console-yaml-spec.md",
+			SourceKey: filepath.ToSlash(filepath.Join("skills", "superplane-cli", "references", "console-yaml-spec.md")),
+			SourceURL: skillsRawURL(
+				skillsBaseURL,
+				"skills",
+				"superplane-cli",
+				"references",
+				"console-yaml-spec.md",
+			),
+		},
+		{
 			MountPath: "ref/skills/superplane-monitor/SKILL.md",
 			SourceKey: filepath.ToSlash(filepath.Join("skills", "superplane-monitor", "SKILL.md")),
 			SourceURL: skillsRawURL(
@@ -123,6 +135,16 @@ func defaultResourceSourcesForSkillsBaseURL(skillsBaseURL string) ([]resourceSou
 				"skills",
 				"superplane-monitor",
 				"SKILL.md",
+			),
+		},
+		{
+			MountPath: "ref/docs/prd/console-and-widgets.md",
+			SourceKey: filepath.ToSlash(filepath.Join("docs", "prd", "console-and-widgets.md")),
+			SourceURL: skillsRawURL(
+				superplaneRepoRawBaseURL,
+				"docs",
+				"prd",
+				"console-and-widgets.md",
 			),
 		},
 	}
@@ -151,7 +173,18 @@ func componentResourceSources() ([]resourceSource, error) {
 		return nil, err
 	}
 
-	sources := make([]resourceSource, 0, len(files))
+	indexFile, err := docs.GenerateComponentIndexFile()
+	if err != nil {
+		return nil, err
+	}
+
+	sources := make([]resourceSource, 0, len(files)+1)
+	sources = append(sources, resourceSource{
+		MountPath:  filepath.ToSlash(filepath.Join("ref", "components", indexFile.Name)),
+		SourceKey:  filepath.ToSlash(filepath.Join("docs", "components", indexFile.Name)),
+		SourceData: indexFile.Content,
+	})
+
 	for _, file := range files {
 		sources = append(sources, resourceSource{
 			MountPath:  filepath.ToSlash(filepath.Join("ref", "components", file.Name)),

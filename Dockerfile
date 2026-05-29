@@ -15,7 +15,6 @@ ARG PLAYWRIGHT_GO_VERSION
 
 WORKDIR /opt/install
 COPY scripts/docker /opt/install-scripts
-COPY --from=ghcr.io/astral-sh/uv:0.6.6 /uv /uvx /bin/
 
 ENV GO_VERSION=${GO_VERSION}
 ENV PATH="/usr/local/go/bin:${PATH}"
@@ -53,7 +52,6 @@ RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
 RUN playwright install chromium-headless-shell --with-deps
 RUN rm -rf /opt/install /opt/install-scripts /tmp/*
 
-WORKDIR /app
 CMD [ "/bin/bash",  "-c", "sleep infinity" ]
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -83,6 +81,63 @@ RUN rm -rf build && go build -o build/superplane cmd/server/main.go
 WORKDIR /app/web_src
 RUN npm install
 RUN VITE_BASE_URL=$BASE_URL npm run build
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Demo runner: single-container image with embedded Postgres and RabbitMQ.
+# Used to build the demo image.
+# ----------------------------------------------------------------------------------------------------------------------
+
+FROM ${RUNNER_IMAGE} AS demo
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+LABEL org.opencontainers.image.title="superplane-demo" \
+  org.opencontainers.image.description="SuperPlane demo image with embedded PostgreSQL and RabbitMQ for local trials." \
+  org.opencontainers.image.vendor="SuperPlane" \
+  org.opencontainers.image.source="https://github.com/superplanehq/superplane" \
+  org.opencontainers.image.url="https://superplane.com" \
+  org.opencontainers.image.documentation="https://docs.superplane.com"
+
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+  postgresql \
+  postgresql-contrib \
+  rabbitmq-server \
+  ca-certificates \
+  curl && \
+  ln -s /usr/lib/postgresql/*/bin/* /usr/local/bin/ && \
+  rm -rf /var/lib/apt/lists/*
+
+# Install Node.js for localtunnel.
+COPY scripts/docker/install-nodejs.sh /tmp/install-nodejs.sh
+RUN bash /tmp/install-nodejs.sh && rm /tmp/install-nodejs.sh
+
+# We still need the PostgreSQL client tools (createdb/migrate) as in the main runner.
+COPY scripts/docker/install-postgresql-client.sh /tmp/install-postgresql-client.sh
+RUN bash /tmp/install-postgresql-client.sh && rm /tmp/install-postgresql-client.sh
+
+WORKDIR /app
+
+COPY --from=builder /usr/bin/createdb /usr/bin/createdb
+COPY --from=builder /usr/bin/migrate /usr/bin/migrate
+COPY --from=builder /app/build/superplane /app/build/superplane
+COPY --from=builder /app/docker-entrypoint.sh /app/docker-entrypoint.sh
+COPY --from=builder /app/db/migrations /app/db/migrations
+COPY --from=builder /app/db/data_migrations /app/db/data_migrations
+COPY --from=builder /app/pkg/web/assets/dist /app/pkg/web/assets/dist
+COPY --from=builder /app/api/swagger /app/api/swagger
+COPY --from=builder /app/rbac /app/rbac
+COPY --from=builder /app/templates /app/templates
+
+# Trial entrypoint that runs embedded Postgres and RabbitMQ and then SuperPlane.
+COPY release/superplane-demo-image/entrypoint.sh /app/entrypoint.sh
+COPY release/superplane-demo-image/gen-superplane-env.sh /app/gen-superplane-env.sh
+COPY release/superplane-demo-image/spinner.sh /app/spinner.sh
+RUN chmod +x /app/entrypoint.sh /app/docker-entrypoint.sh /app/gen-superplane-env.sh /app/spinner.sh
+
+EXPOSE 8000
+
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Runner stage to run the application.

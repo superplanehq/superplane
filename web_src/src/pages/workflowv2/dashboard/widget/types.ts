@@ -32,6 +32,7 @@ export type WidgetColumnFormat =
   | "relative"
   | "duration"
   | "status"
+  | "badge"
   | "code"
   | "link";
 
@@ -121,6 +122,13 @@ export interface WidgetChartRender {
   legend?: WidgetChartLegendMode;
   /** Optional widget-level row sort applied after filters, before chart binning. */
   sort?: WidgetSort;
+  /**
+   * Optional field whose distinct values pivot long-format rows into one
+   * series per value (e.g. one stack segment per service). When set, the
+   * chart uses the numeric `field` of the first configured series for
+   * values and ignores additional series entries.
+   */
+  seriesField?: string;
 }
 
 /** Sort direction. Defaults to `"asc"` when omitted on a `WidgetSort`. */

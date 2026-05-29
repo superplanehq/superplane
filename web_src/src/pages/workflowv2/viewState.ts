@@ -1,4 +1,4 @@
-export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
+export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
 
 export function readStoredBoolean(key: string): boolean {
@@ -18,32 +18,40 @@ export function readStoredBoolean(key: string): boolean {
   }
 }
 
+export function clearComponentSidebarSearchParams(params: URLSearchParams): URLSearchParams {
+  params.delete("sidebar");
+  params.delete("node");
+  return params;
+}
+
 export function getWorkflowHeaderMode({
   isDashboardMode,
-  dashboardsFeatureEnabled,
   isRunsMode,
   isMemoryMode,
-  canvasMode,
+  isFilesMode,
 }: {
   isDashboardMode: boolean;
-  dashboardsFeatureEnabled: boolean;
   isRunsMode: boolean;
   isMemoryMode: boolean;
-  canvasMode: "edit" | "live";
+  isFilesMode: boolean;
 }): WorkflowHeaderMode {
   if (isDashboardMode) {
-    return dashboardsFeatureEnabled ? "dashboard" : "version-live";
+    return "dashboard";
   }
 
   if (isMemoryMode) {
     return "memory";
   }
 
+  if (isFilesMode) {
+    return "files";
+  }
+
   if (isRunsMode) {
     return "runs";
   }
 
-  return canvasMode === "edit" ? "version-edit" : "version-live";
+  return "version-live";
 }
 
 export function getWorkflowCanvasStateMode({
@@ -68,6 +76,33 @@ export function getWorkflowCanvasStateMode({
   }
 
   return "default";
+}
+
+export function getWorkflowViewPresentation({
+  isDashboardMode,
+  isRunsMode,
+  isMemoryMode,
+  isFilesMode,
+  hasEditableVersion,
+  isViewingPendingApprovalVersion,
+  isViewingCurrentLiveVersion,
+}: {
+  isDashboardMode: boolean;
+  isRunsMode: boolean;
+  isMemoryMode: boolean;
+  isFilesMode: boolean;
+  hasEditableVersion: boolean;
+  isViewingPendingApprovalVersion: boolean;
+  isViewingCurrentLiveVersion: boolean;
+}) {
+  return {
+    headerMode: getWorkflowHeaderMode({ isDashboardMode, isRunsMode, isMemoryMode, isFilesMode }),
+    canvasStateMode: getWorkflowCanvasStateMode({
+      hasEditableVersion,
+      isViewingPendingApprovalVersion,
+      isViewingCurrentLiveVersion,
+    }),
+  };
 }
 
 export function getExitEditModeDisabledTooltip({

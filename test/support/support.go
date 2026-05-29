@@ -13,6 +13,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/git/inmemory"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/secrets"
@@ -54,6 +56,7 @@ type ResourceRegistry struct {
 	Encryptor    crypto.Encryptor
 	AuthService  *authorization.AuthService
 	Registry     *registry.Registry
+	GitProvider  git.Provider
 }
 
 func (r *ResourceRegistry) Close() {}
@@ -86,6 +89,7 @@ func SetupWithOptions(t require.TestingT, options SetupOptions) *ResourceRegistr
 		Encryptor:   encryptor,
 		Registry:    registry,
 		AuthService: AuthService(t),
+		GitProvider: inmemory.NewProvider(),
 	}
 
 	//
@@ -238,7 +242,7 @@ func EmitCanvasEventForNodeWithData(
 		WorkflowID:  canvasID,
 		NodeID:      nodeID,
 		Channel:     channel,
-		Data:        datatypes.NewJSONType[any](data),
+		Data:        models.NewJSONValue(data),
 		State:       models.CanvasEventStatePending,
 		ExecutionID: executionID,
 		CreatedAt:   &now,

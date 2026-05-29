@@ -22,9 +22,10 @@ import type {
 } from "./widget/types";
 import { normalizeRowAction, WIDGET_CHART_LEGEND_MODES, WIDGET_FILTER_OPS, WIDGET_SORT_ORDERS } from "./widget/types";
 import type { WidgetChartLegendMode, WidgetSort, WidgetSortOrder } from "./widget/types";
+import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
 
 /** All panel kinds the dashboard currently understands. */
-export const PANEL_TYPES = ["markdown", "node", "table", "chart", "number"] as const;
+export const PANEL_TYPES = ["markdown", "node", "nodes", "table", "chart", "number"] as const;
 export type PanelType = (typeof PANEL_TYPES)[number];
 
 export interface PanelTypeMeta {
@@ -47,6 +48,11 @@ export const PANEL_TYPE_META: Record<PanelType, PanelTypeMeta> = {
     type: "node",
     label: "Node",
     description: "A single canvas node with its live status and an optional manual-run button.",
+  },
+  nodes: {
+    type: "nodes",
+    label: "Key Nodes",
+    description: "Multiple canvas nodes in one card with live status and optional descriptions.",
   },
   table: {
     type: "table",
@@ -180,6 +186,8 @@ export function templateForPanelType(type: PanelType, defaultTitle?: string): Re
       return { title: defaultTitle ?? "", body: "" } satisfies MarkdownPanelContent;
     case "node":
       return { title: defaultTitle ?? "", node: "", showRun: false } satisfies NodePanelContent;
+    case "nodes":
+      return { ...templateForNodesPanel(defaultTitle) };
     case "table":
       return {
         title: defaultTitle ?? "",
@@ -216,6 +224,8 @@ export function validatePanelContent(type: PanelType, content: unknown): string 
       return validateMarkdownContent(content);
     case "node":
       return validateNodeContent(content);
+    case "nodes":
+      return validateNodesContent(content);
     case "table":
       return validateTableContent(content);
     case "chart":
@@ -301,15 +311,10 @@ function validateNumberDataSource(value: unknown): string | null {
 const ALLOWED_NUMBER_AGGREGATIONS = ["count", "sum", "avg", "min", "max", "first", "last"];
 
 function validateCompositeMemoryDataSource(obj: Record<string, unknown>): string | null {
-  if (!Array.isArray(obj.sources)) {
-    return "dataSource.sources must be an array.";
-  }
-  const sources = obj.sources;
-  if (sources.length === 0) {
-    return "dataSource.sources must be a non-empty array.";
-  }
-  for (let i = 0; i < sources.length; i += 1) {
-    const sourceError = validateMemoryNumberSource(sources[i], i);
+  if (!Array.isArray(obj.sources)) return "dataSource.sources must be an array.";
+  if (obj.sources.length === 0) return "dataSource.sources must be a non-empty array.";
+  for (let i = 0; i < obj.sources.length; i += 1) {
+    const sourceError = validateMemoryNumberSource(obj.sources[i], i);
     if (sourceError) return sourceError;
   }
   if (typeof obj.combine !== "string" || !WIDGET_NUMBER_COMBINE_OPS.includes(obj.combine as WidgetNumberCombine)) {
@@ -327,10 +332,8 @@ function validateMemoryNumberSource(raw: unknown, index: number): string | null 
   if (typeof source.aggregation !== "string" || !ALLOWED_NUMBER_AGGREGATIONS.includes(source.aggregation)) {
     return `dataSource.sources[${index}].aggregation must be one of ${ALLOWED_NUMBER_AGGREGATIONS.join(", ")}.`;
   }
-  if (source.aggregation !== "count") {
-    if (typeof source.field !== "string" || source.field.trim() === "") {
-      return `dataSource.sources[${index}].field is required when aggregation is "${source.aggregation}".`;
-    }
+  if (source.aggregation !== "count" && (typeof source.field !== "string" || source.field.trim() === "")) {
+    return `dataSource.sources[${index}].field is required when aggregation is "${source.aggregation}".`;
   }
   if (source.fieldPath != null && typeof source.fieldPath !== "string") {
     return `dataSource.sources[${index}].fieldPath must be a string.`;
@@ -516,14 +519,18 @@ function validateChartContent(content: unknown): string | null {
   return validateChartRender(render);
 }
 
+const ALLOWED_CHART_TYPES = ["bar", "stacked-bar", "line", "area", "donut"];
+
 function validateChartRender(render: Record<string, unknown>): string | null {
   if (render.kind !== "chart") return 'render.kind must be "chart".';
-  const allowedTypes = ["bar", "stacked-bar", "line", "area", "donut"];
-  if (typeof render.type !== "string" || !allowedTypes.includes(render.type)) {
-    return `render.type must be one of ${allowedTypes.join(", ")}.`;
+  if (typeof render.type !== "string" || !ALLOWED_CHART_TYPES.includes(render.type)) {
+    return `render.type must be one of ${ALLOWED_CHART_TYPES.join(", ")}.`;
   }
   if (typeof render.xField !== "string" || render.xField.trim() === "") {
     return "render.xField must be a non-empty string.";
+  }
+  if (render.seriesField !== undefined && render.seriesField !== null && typeof render.seriesField !== "string") {
+    return "render.seriesField must be a string.";
   }
   if (!Array.isArray(render.series) || render.series.length === 0) {
     return "render.series must be a non-empty array.";
@@ -545,6 +552,17 @@ function validateChartLegend(legend: unknown): string | null {
   return null;
 }
 
+function validateChartSeries(raw: unknown, index: number): string | null {
+  const series = asObject(raw);
+  if (!series) return `render.series[${index}] must be an object.`;
+  for (const key of ["field", "label", "color", "format", "prefix", "suffix"] as const) {
+    if (series[key] !== undefined && series[key] !== null && typeof series[key] !== "string") {
+      return `render.series[${index}].${key} must be a string.`;
+    }
+  }
+  return null;
+}
+
 function validateSort(sort: unknown): string | null {
   if (sort === undefined || sort === null) return null;
   const obj = asObject(sort);
@@ -555,17 +573,6 @@ function validateSort(sort: unknown): string | null {
   if (obj.order !== undefined && obj.order !== null) {
     if (typeof obj.order !== "string" || !WIDGET_SORT_ORDERS.includes(obj.order as WidgetSortOrder)) {
       return `render.sort.order must be one of ${WIDGET_SORT_ORDERS.join(", ")}.`;
-    }
-  }
-  return null;
-}
-
-function validateChartSeries(raw: unknown, index: number): string | null {
-  const series = asObject(raw);
-  if (!series) return `render.series[${index}] must be an object.`;
-  for (const key of ["field", "label", "color", "format", "prefix", "suffix"] as const) {
-    if (series[key] !== undefined && series[key] !== null && typeof series[key] !== "string") {
-      return `render.series[${index}].${key} must be a string.`;
     }
   }
   return null;
@@ -595,20 +602,18 @@ function validateNumberContent(content: unknown): string | null {
   if (typeof render.aggregation !== "string" || !allowedAggregations.includes(render.aggregation)) {
     return `render.aggregation must be one of ${allowedAggregations.join(", ")}.`;
   }
-  if (render.aggregation !== "count") {
-    if (typeof render.field !== "string" || render.field.trim() === "") {
-      return `render.field is required when aggregation is "${render.aggregation}".`;
-    }
+  if (render.aggregation !== "count" && (typeof render.field !== "string" || render.field.trim() === "")) {
+    return `render.field is required when aggregation is "${render.aggregation}".`;
   }
   return null;
 }
 
 function validateNumberRenderSymbols(render: Record<string, unknown>): string | null {
-  if (render.prefix !== undefined && render.prefix !== null && typeof render.prefix !== "string") {
-    return "render.prefix must be a string.";
-  }
-  if (render.suffix !== undefined && render.suffix !== null && typeof render.suffix !== "string") {
-    return "render.suffix must be a string.";
+  for (const key of ["prefix", "suffix"] as const) {
+    const value = render[key];
+    if (value !== undefined && value !== null && typeof value !== "string") {
+      return `render.${key} must be a string.`;
+    }
   }
   return null;
 }
