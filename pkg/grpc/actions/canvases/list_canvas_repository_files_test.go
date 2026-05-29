@@ -1,0 +1,51 @@
+package canvases
+
+import (
+	"context"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/models"
+	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+func Test__ListCanvasRepositoryFiles(t *testing.T) {
+	r := support.Setup(t)
+
+	t.Run("invalid canvas id -> error", func(t *testing.T) {
+		_, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), "invalid-id")
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.InvalidArgument, s.Code())
+	})
+
+	t.Run("repository missing -> error", func(t *testing.T) {
+		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+
+		_, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.Internal, s.Code())
+	})
+
+	t.Run("list files fails -> error", func(t *testing.T) {
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, false)
+
+		_, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.Internal, s.Code())
+	})
+
+	t.Run("returns repository files", func(t *testing.T) {
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+
+		response, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
+		require.NoError(t, err)
+		require.Len(t, response.Files, 1)
+		assert.Equal(t, "README.md", response.Files[0].Path)
+	})
+}
