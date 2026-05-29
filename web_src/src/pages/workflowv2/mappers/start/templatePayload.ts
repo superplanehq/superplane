@@ -8,6 +8,7 @@ export interface StartTemplateParameterOption {
 export interface StartTemplateParameter {
   name: string;
   title?: string;
+  placeholder?: string;
   type: StartTemplateParameterType;
   options?: StartTemplateParameterOption[];
   defaultString?: unknown;
@@ -33,6 +34,11 @@ export function isValidSelectParameterValue(param: StartTemplateParameter, value
     return true;
   }
   return allowed.includes(value);
+}
+
+export function parameterPlaceholder(param: StartTemplateParameter): string {
+  const placeholder = typeof param.placeholder === "string" ? param.placeholder.trim() : "";
+  return placeholder;
 }
 
 export interface StartTemplate {

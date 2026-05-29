@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/ui/checkbox";
 
-import { parameterDisplayLabel, selectOptionValues, type StartTemplateParameter } from "./templatePayload";
+import { parameterDisplayLabel, selectOptionValues, parameterPlaceholder, type StartTemplateParameter } from "./templatePayload";
 
 export function StartRunParameterFields({
   parameters,
@@ -73,6 +73,7 @@ export function StartRunParameterFields({
                 <Input
                   id={id}
                   type={param.type === "number" ? "number" : "text"}
+                  placeholder={parameterPlaceholder(param)}
                   value={String(parameterValues[param.name] ?? "")}
                   onChange={(e) =>
                     onParameterValuesChange((prev) => ({

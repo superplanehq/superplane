@@ -8,6 +8,7 @@ import {
   parameterDefaultValue,
   parameterDisplayLabel,
   parseJsonEventPayload,
+  parameterPlaceholder,
   payloadForTemplateRun,
   payloadRecordForParameters,
   selectOptionValues,
@@ -49,6 +50,19 @@ describe("parameterDisplayLabel", () => {
   it("falls back to name when title is missing or blank", () => {
     expect(parameterDisplayLabel({ name: "msg", type: "string" })).toBe("msg");
     expect(parameterDisplayLabel({ name: "msg", title: "  ", type: "string" })).toBe("msg");
+  });
+});
+
+describe("parameterPlaceholder", () => {
+  it("returns trimmed placeholder when set", () => {
+    expect(parameterPlaceholder({ name: "agent", placeholder: "  Name of the openclaw agent  ", type: "string" })).toBe(
+      "Name of the openclaw agent",
+    );
+  });
+
+  it("returns empty string when placeholder is missing or blank", () => {
+    expect(parameterPlaceholder({ name: "agent", type: "string" })).toBe("");
+    expect(parameterPlaceholder({ name: "agent", placeholder: "  ", type: "string" })).toBe("");
   });
 });
 

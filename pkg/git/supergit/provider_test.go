@@ -46,11 +46,12 @@ func TestCreateRepositoryCreatesInitialCommit(t *testing.T) {
 		defaultBranch: "main",
 	}
 
-	repo, err := p.CreateRepository(context.Background(), provider.CreateRepositoryOptions{
+	repoID := p.GetRepositoryID(provider.RepositoryOptions{
 		OrganizationID: uuid.New(),
 		CanvasID:       uuid.New(),
 	})
 
+	repo, err := p.CreateRepository(context.Background(), repoID)
 	require.NoError(t, err)
 	require.Equal(t, "repo-id", repo.ID)
 	require.Equal(t, []string{
