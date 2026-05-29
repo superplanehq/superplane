@@ -87,9 +87,6 @@ RUN VITE_BASE_URL=$BASE_URL npm run build
 # Used to build the demo image.
 # ----------------------------------------------------------------------------------------------------------------------
 
-ARG SUPERGIT_VERSION=0.1.0
-FROM ghcr.io/superplanehq/supergit:${SUPERGIT_VERSION} AS supergit
-
 FROM ${RUNNER_IMAGE} AS demo
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -132,8 +129,8 @@ COPY --from=builder /app/api/swagger /app/api/swagger
 COPY --from=builder /app/rbac /app/rbac
 COPY --from=builder /app/templates /app/templates
 
-# Embedded SuperGit for canvas repository storage.
-COPY --from=supergit /app/supergit /app/supergit
+# SuperGit binary is downloaded by release/superplane-demo-image/download-supergit.sh before build.
+COPY build/superplane-demo-supergit/supergit /app/supergit
 RUN chmod +x /app/supergit
 
 # Trial entrypoint that runs embedded Postgres and RabbitMQ and then SuperPlane.
