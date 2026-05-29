@@ -566,3 +566,49 @@ func Test__requestTypeFieldResources__createmetaFallback(t *testing.T) {
 	require.Len(t, resources, 1)
 	assert.Equal(t, "5", resources[0].ID)
 }
+
+func Test__ListResources__Team(t *testing.T) {
+	j := &Jira{}
+	teamID := "4b26961a-a837-49d2-a1fe-0973013e3c3b"
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"platformTeams":[{"teamId":"` + teamID + `","teamName":"On-call"}]}`)),
+			},
+		},
+	}
+
+	resources, err := j.ListResources("team", core.ListResourcesContext{
+		HTTP:        httpContext,
+		Integration: jiraTestIntegration(),
+	})
+	require.NoError(t, err)
+	require.Len(t, resources, 1)
+	assert.Equal(t, "team", resources[0].Type)
+	assert.Equal(t, teamID, resources[0].ID)
+	assert.Equal(t, "On-call", resources[0].Name)
+}
+
+func Test__ListResources__Heartbeat(t *testing.T) {
+	j := &Jira{}
+	teamID := "4b26961a-a837-49d2-a1fe-0973013e3c3b"
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"values":[{"name":"DNS Checker","status":"Responsive"}]}`)),
+			},
+		},
+	}
+
+	resources, err := j.ListResources("heartbeat", core.ListResourcesContext{
+		HTTP:        httpContext,
+		Integration: jiraTestIntegration(),
+		Parameters:  map[string]string{"team": teamID},
+	})
+	require.NoError(t, err)
+	require.Len(t, resources, 1)
+	assert.Equal(t, "DNS Checker", resources[0].ID)
+	assert.Contains(t, resources[0].Name, "DNS Checker")
+}

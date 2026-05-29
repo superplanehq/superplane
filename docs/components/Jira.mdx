@@ -9,12 +9,16 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Heartbeat" href="#create-heartbeat" description="Create a Jira Service Management Operations heartbeat monitor" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a Jira Service Management incident via the Incidents API" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Jira" />
+  <LinkCard title="Delete Heartbeat" href="#delete-heartbeat" description="Delete a Jira Service Management Operations heartbeat" />
   <LinkCard title="Delete Incident" href="#delete-incident" description="Delete a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Delete Issue" href="#delete-issue" description="Delete a Jira issue" />
   <LinkCard title="Get Incident" href="#get-incident" description="Fetch a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Jira issue by its key" />
+  <LinkCard title="Ping Heartbeat" href="#ping-heartbeat" description="Send a ping to a Jira Service Management Operations heartbeat" />
+  <LinkCard title="Update Heartbeat" href="#update-heartbeat" description="Update a Jira Service Management Operations heartbeat" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update fields on a Jira issue" />
 </CardGrid>
 
@@ -27,6 +31,61 @@ To connect Jira to SuperPlane:
 3. Paste your **Jira Site URL** into SuperPlane. For Jira Cloud, this usually looks like `https://your-domain.atlassian.net`.
 4. Paste the Atlassian account **Email** that owns the API token.
 5. Paste the generated **API Token**.
+
+<a id="create-heartbeat"></a>
+
+## Create Heartbeat
+
+**Component key:** `jira.createHeartbeat`
+
+The Create Heartbeat component registers a new heartbeat in Jira Service Management Operations.
+
+### Use Cases
+
+- **Cron monitoring**: Register an expected ping interval for scheduled jobs or agents
+- **Infrastructure checks**: Create heartbeats when provisioning monitored systems
+- **Automation setup**: Pair with Ping Heartbeat in workflows that report liveness
+
+### Configuration
+
+- **Team**: JSM Operations team that owns the heartbeat
+- **Name** (required): Unique heartbeat name within the team
+- **Interval** (required): How often a ping is expected (minimum 1)
+- **Interval unit**: minutes, hours, or days
+- **Enabled**: Whether monitoring is active (defaults to enabled)
+- **Description**, **alert message**, **alert tags**, **alert priority**: Optional expiration alert settings
+
+### Output
+
+Returns the created heartbeat object from the JSM Operations API, including **name**, **interval**, **intervalUnit**, **enabled**, and **status**.
+
+### Notes
+
+- Requires Jira Service Management Operations (Premium) with heartbeats enabled on your site.
+- Re-sync the Jira integration so SuperPlane has your Atlassian cloud id.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alertMessage": "The alert has been raised",
+    "alertPriority": "P3",
+    "alertTags": [
+      "tag1"
+    ],
+    "description": "my new heartbeat",
+    "enabled": true,
+    "interval": 1,
+    "intervalUnit": "minutes",
+    "name": "DNS checker",
+    "ownerTeamId": "b071f2e7-2159-4110-aa25-7718b2713ed5",
+    "status": "Pending"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.created"
+}
+```
 
 <a id="create-incident"></a>
 
@@ -160,6 +219,47 @@ Returns the created issue including:
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "jira.issue"
+}
+```
+
+<a id="delete-heartbeat"></a>
+
+## Delete Heartbeat
+
+**Component key:** `jira.deleteHeartbeat`
+
+The Delete Heartbeat component removes a heartbeat from Jira Service Management Operations.
+
+### Use Cases
+
+- **Decommissioning**: Remove heartbeats when systems are retired
+- **Test cleanup**: Delete heartbeats created during automation tests
+- **Lifecycle management**: Tear down monitoring when workflows are disabled
+
+### Configuration
+
+- **Team**: Team that owns the heartbeat
+- **Heartbeat**: Name of the heartbeat to delete
+
+### Output
+
+Confirms deletion with **deleted** set to true and the **name** of the removed heartbeat.
+
+### Notes
+
+- Requires Jira Service Management Operations with heartbeats enabled.
+- Deletion is permanent; recreate the heartbeat if needed.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "deleted": true,
+    "name": "DNS checker"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.deleted"
 }
 ```
 
@@ -343,6 +443,98 @@ Returns the Jira issue object including `id`, `key`, `self` and the full `fields
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "jira.issue"
+}
+```
+
+<a id="ping-heartbeat"></a>
+
+## Ping Heartbeat
+
+**Component key:** `jira.pingHeartbeat`
+
+The Ping Heartbeat component reports that a monitored system is alive.
+
+### Use Cases
+
+- **Scheduled jobs**: Ping at the end of a cron workflow so JSM detects missed runs
+- **Deploy pipelines**: Confirm a service is up after deployment
+- **Agent check-ins**: Let automation prove an external process completed
+
+### Configuration
+
+- **Team**: Team that owns the heartbeat
+- **Heartbeat**: Heartbeat name to ping (from the team's heartbeat list)
+
+### Output
+
+Returns the API **message** (for example "PONG - Heartbeat received").
+
+### Notes
+
+- Requires Jira Service Management Operations with heartbeats enabled.
+- The heartbeat must already exist (use Create Heartbeat or configure it in JSM).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "message": "PONG - Heartbeat received"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.pinged"
+}
+```
+
+<a id="update-heartbeat"></a>
+
+## Update Heartbeat
+
+**Component key:** `jira.updateHeartbeat`
+
+The Update Heartbeat component changes settings on an existing JSM Operations heartbeat.
+
+### Use Cases
+
+- **Tune intervals**: Adjust expected ping frequency after operational changes
+- **Enable/disable monitoring**: Turn heartbeats on or off from automation
+- **Alert tuning**: Update expiration alert message, tags, or priority
+
+### Configuration
+
+- **Team** and **Heartbeat** (required): Identify the heartbeat to update
+- **Optional fields** use toggles: only enabled fields are sent to the Jira API
+- Heartbeat **name** cannot be changed (create a new heartbeat instead)
+
+### Output
+
+Returns the updated heartbeat object from the JSM Operations API.
+
+### Notes
+
+- Enable at least one optional field toggle before saving or running the node.
+- Requires Jira Service Management Operations with heartbeats enabled.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alertMessage": "The alert has been raised",
+    "alertPriority": "P3",
+    "alertTags": [
+      "tag1"
+    ],
+    "description": "my new heartbeat",
+    "enabled": true,
+    "interval": 5,
+    "intervalUnit": "minutes",
+    "name": "DNS checker",
+    "ownerTeamId": "b071f2e7-2159-4110-aa25-7718b2713ed5",
+    "status": "Responsive"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.heartbeat.updated"
 }
 ```
 
