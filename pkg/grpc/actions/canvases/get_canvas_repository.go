@@ -27,7 +27,12 @@ func GetCanvasRepository(ctx context.Context, gitProvider git.Provider, organiza
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
-	repository, err := models.FindRepository(canvas.ID)
+	orgID, err := uuid.Parse(organizationID)
+	if err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
+	}
+
+	repository, err := models.FindRepository(orgID, canvasID)
 	if err != nil {
 		return handleMissingRepository(gitProvider, canvas, err)
 	}

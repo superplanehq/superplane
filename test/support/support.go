@@ -574,7 +574,7 @@ func CreateCanvasWithRepository(t *testing.T, r *ResourceRegistry, status string
 		require.NoError(t, err)
 	}
 
-	repository, err := models.FindRepository(canvas.ID)
+	repository, err := models.FindRepository(r.Organization.ID, canvas.ID)
 	require.NoError(t, err)
 
 	switch status {
@@ -584,7 +584,7 @@ func CreateCanvasWithRepository(t *testing.T, r *ResourceRegistry, status string
 		require.NoError(t, repository.MarkError(database.Conn()))
 	}
 
-	repository, err = models.FindRepository(canvas.ID)
+	repository, err = models.FindRepository(r.Organization.ID, canvas.ID)
 	require.NoError(t, err)
 
 	return canvas, repository

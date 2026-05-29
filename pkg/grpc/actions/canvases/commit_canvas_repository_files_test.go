@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
-	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -67,7 +66,7 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		)
 		s, ok := status.FromError(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.Internal, s.Code())
+		assert.Equal(t, codes.NotFound, s.Code())
 	})
 
 	t.Run("commit fails -> propagates error", func(t *testing.T) {
@@ -86,7 +85,29 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 			},
 		)
 
-		require.ErrorIs(t, err, git.ErrExpectedHeadMismatch)
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.Internal, s.Code())
+		assert.Contains(t, s.Message(), "failed to commit repository files")
+	})
+
+	t.Run("canvas from different organization -> not found", func(t *testing.T) {
+		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+		otherOrg := support.CreateOrganization(t, r, r.User)
+
+		_, err := CommitCanvasRepositoryFiles(
+			ctx,
+			r.GitProvider,
+			otherOrg.ID.String(),
+			canvas.ID.String(),
+			"abc123",
+			"commit message",
+			nil,
+		)
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.NotFound, s.Code())
 	})
 
 	t.Run("commits files with authenticated user as author", func(t *testing.T) {

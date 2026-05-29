@@ -17,14 +17,19 @@ func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, or
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
-	repository, err := models.FindRepository(canvasID)
+	orgID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to find repository for canvas %s: %v", canvasID, err)
+		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
+	}
+
+	repository, err := models.FindRepository(orgID, canvasID)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
 	}
 
 	files, err := gitProvider.ListFiles(ctx, repository.RepoID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get repository head sha: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to list repository files: %v", err)
 	}
 
 	paths := make([]*pb.CanvasRepositoryFile, 0, len(files))

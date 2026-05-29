@@ -64,7 +64,7 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	repository, err := models.FindRepository(canvas.ID)
+	repository, err := models.FindRepository(user.OrganizationID, canvas.ID)
 	if err != nil {
 		http.Error(w, "Repository not found", http.StatusNotFound)
 		return

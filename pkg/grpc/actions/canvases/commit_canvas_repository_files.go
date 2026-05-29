@@ -33,9 +33,14 @@ func CommitCanvasRepositoryFiles(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
-	repository, err := models.FindRepository(canvasID)
+	orgID, err := uuid.Parse(organizationID)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to find repository for canvas %s: %v", canvasID, err)
+		return nil, status.Errorf(codes.InvalidArgument, "invalid organization id: %v", err)
+	}
+
+	repository, err := models.FindRepository(orgID, canvasID)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
 	}
 
 	user, err := models.FindActiveUserByID(organizationID, userID)
@@ -72,7 +77,7 @@ func CommitCanvasRepositoryFiles(
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to commit repository files: %v", err)
 	}
 
 	return &pb.CommitCanvasRepositoryFilesResponse{

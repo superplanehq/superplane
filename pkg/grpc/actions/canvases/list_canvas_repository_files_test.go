@@ -28,7 +28,7 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 		_, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
 		s, ok := status.FromError(err)
 		require.True(t, ok)
-		assert.Equal(t, codes.Internal, s.Code())
+		assert.Equal(t, codes.NotFound, s.Code())
 	})
 
 	t.Run("list files fails -> error", func(t *testing.T) {
@@ -47,5 +47,15 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, response.Files, 1)
 		assert.Equal(t, "README.md", response.Files[0].Path)
+	})
+
+	t.Run("canvas from different organization -> not found", func(t *testing.T) {
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+		otherOrg := support.CreateOrganization(t, r, r.User)
+
+		_, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, otherOrg.ID.String(), canvas.ID.String())
+		s, ok := status.FromError(err)
+		require.True(t, ok)
+		assert.Equal(t, codes.NotFound, s.Code())
 	})
 }
