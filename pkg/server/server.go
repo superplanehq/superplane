@@ -70,6 +70,16 @@ func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.S
 		return nil, nil
 	}
 
+	if err := anthropic.SyncDefaultAgentPrompt(context.Background(), anthropic.Config{
+		APIKey:        cfg.APIKey,
+		AgentID:       cfg.AgentID,
+		EnvironmentID: cfg.EnvironmentID,
+	}); err != nil {
+		log.WithError(err).Warn("failed to sync Anthropic managed agent prompt; continuing with provider prompt")
+	} else {
+		log.Info("Anthropic managed agent prompt synced")
+	}
+
 	fileResources, err := anthropic.LoadDefaultSessionResources(context.Background(), anthropic.Config{
 		APIKey:        cfg.APIKey,
 		AgentID:       cfg.AgentID,
