@@ -412,6 +412,137 @@ func Test__InvokeNodeTriggerHook__StartRun(t *testing.T) {
 		assert.Equal(t, "Hello from configured defaults", inner["message"])
 	})
 
+	t.Run("run resolves template payload expressions using select parameter defaults", func(t *testing.T) {
+		expressionNodeID := "start-node-expression-select-default"
+		expressionCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: expressionNodeID,
+					Name:   expressionNodeID,
+					Type:   models.NodeTypeTrigger,
+					Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{
+						"templates": []any{
+							map[string]any{
+								"name": "Parameterized",
+								"payload": map[string]any{
+									"provider": `{{ parameters["provider"] }}`,
+								},
+								"parameters": []any{
+									map[string]any{
+										"name":          "provider",
+										"type":          "select",
+										"defaultString": "openai",
+										"options": []any{
+											map[string]any{"label": "OpenAI", "value": "openai"},
+											map[string]any{"label": "Anthropic", "value": "anthropic"},
+										},
+									},
+								},
+							},
+						},
+					}),
+				},
+			},
+			nil,
+		)
+
+		_, err := InvokeNodeTriggerHook(
+			authedCtx,
+			r.AuthService,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID,
+			expressionCanvas.ID,
+			expressionNodeID,
+			"run",
+			map[string]any{
+				"template": "Parameterized",
+			},
+			"http://localhost",
+		)
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		data, ok := events[0].Data.Data().(map[string]any)
+		require.True(t, ok)
+		inner, ok := data["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "openai", inner["provider"])
+	})
+
+	t.Run("run resolves template payload expressions using select hook parameter override", func(t *testing.T) {
+		expressionNodeID := "start-node-expression-select-override"
+		expressionCanvas, _ := support.CreateCanvas(
+			t,
+			r.Organization.ID,
+			r.User,
+			[]models.CanvasNode{
+				{
+					NodeID: expressionNodeID,
+					Name:   expressionNodeID,
+					Type:   models.NodeTypeTrigger,
+					Ref:    datatypes.NewJSONType(models.NodeRef{Trigger: &models.TriggerRef{Name: "start"}}),
+					Configuration: datatypes.NewJSONType(map[string]any{
+						"templates": []any{
+							map[string]any{
+								"name": "Parameterized",
+								"payload": map[string]any{
+									"provider": `{{ parameters["provider"] }}`,
+								},
+								"parameters": []any{
+									map[string]any{
+										"name":          "provider",
+										"type":          "select",
+										"defaultString": "openai",
+										"options": []any{
+											map[string]any{"label": "OpenAI", "value": "openai"},
+											map[string]any{"label": "Anthropic", "value": "anthropic"},
+										},
+									},
+								},
+							},
+						},
+					}),
+				},
+			},
+			nil,
+		)
+
+		_, err := InvokeNodeTriggerHook(
+			authedCtx,
+			r.AuthService,
+			r.Encryptor,
+			r.Registry,
+			r.Organization.ID,
+			expressionCanvas.ID,
+			expressionNodeID,
+			"run",
+			map[string]any{
+				"template": "Parameterized",
+				"provider": "anthropic",
+			},
+			"http://localhost",
+		)
+		require.NoError(t, err)
+
+		events, err := models.ListCanvasEvents(expressionCanvas.ID, expressionNodeID, 1, nil)
+		require.NoError(t, err)
+		require.Len(t, events, 1)
+
+		data, ok := events[0].Data.Data().(map[string]any)
+		require.True(t, ok)
+		inner, ok := data["data"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "anthropic", inner["provider"])
+	})
+
 	t.Run("non-trigger node -> error", func(t *testing.T) {
 		componentNodeID := "component-node"
 		canvasWithComponent, _ := support.CreateCanvas(
