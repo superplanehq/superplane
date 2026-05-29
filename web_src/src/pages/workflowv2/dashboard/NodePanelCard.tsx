@@ -12,7 +12,8 @@ import type { DashboardPanel } from "@/hooks/useCanvasData";
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { useDashboardContext, resolveDashboardNode, type DashboardNodeStatus } from "./DashboardContext";
-import { DASHBOARD_TRIGGER_NODE_EVENT } from "./dashboardEvents";
+import { confirmDashboardTriggerNode } from "./confirmDashboardTriggerNode";
+import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
 import type { NodePanelContent } from "./panelTypes";
 
 const STATUS_CLASS: Record<DashboardNodeStatus, string> = {
@@ -86,8 +87,6 @@ function NodePanelBody({ content }: { content: NodePanelContent }) {
   }
   const resolved = resolveDashboardNode(ctx, content.node);
   const status: DashboardNodeStatus = resolveStatus(ctx, resolved?.node.id);
-  const canRun = (ctx?.canRunNodes ?? false) && Boolean(content.showRun) && Boolean(resolved);
-  const handleRun = () => triggerNode(ctx, resolved?.node.id, content.triggerName);
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
@@ -104,20 +103,7 @@ function NodePanelBody({ content }: { content: NodePanelContent }) {
       <div className="text-sm font-semibold text-slate-800" data-testid="node-panel-name">
         {resolved?.label ?? content.node ?? "—"}
       </div>
-      {content.showRun ? (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={handleRun}
-          disabled={!canRun}
-          title={canRun ? undefined : "You do not have permission to run this node"}
-          data-testid="node-panel-run"
-        >
-          <Play className="mr-1 h-3.5 w-3.5" />
-          Run
-        </Button>
-      ) : null}
+      {content.showRun ? <NodePanelRunControl content={content} resolved={resolved} /> : null}
       {!resolved && content.node ? (
         <p className="text-xs text-amber-600">Node {JSON.stringify(content.node)} not found in this canvas.</p>
       ) : null}
@@ -125,26 +111,54 @@ function NodePanelBody({ content }: { content: NodePanelContent }) {
   );
 }
 
+/**
+ * Run button + confirm dialog for the single-node panel. Mirrors the Key
+ * Nodes panel: the click always opens {@link NodeRunConfirmDialog} (even
+ * when the resolved Start template has no parameters) so the operator gets
+ * a payload preview and a chance to cancel before the trigger fires.
+ */
+function NodePanelRunControl({
+  content,
+  resolved,
+}: {
+  content: NodePanelContent;
+  resolved: ReturnType<typeof resolveDashboardNode>;
+}) {
+  const ctx = useDashboardContext();
+  const [open, setOpen] = useState(false);
+  const canRun = (ctx?.canRunNodes ?? false) && Boolean(resolved);
+  return (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => setOpen(true)}
+        disabled={!canRun}
+        title={canRun ? undefined : "You do not have permission to run this node"}
+        data-testid="node-panel-run"
+      >
+        <Play className="mr-1 h-3.5 w-3.5" />
+        Run
+      </Button>
+      <NodeRunConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        resolved={resolved}
+        templateName={content.triggerName}
+        onConfirm={async (parameters) => {
+          if (!resolved?.node?.id) return;
+          await confirmDashboardTriggerNode(ctx, resolved.node.id, content.triggerName, parameters);
+        }}
+        testId="node-panel-run-dialog"
+      />
+    </>
+  );
+}
+
 function resolveStatus(ctx: ReturnType<typeof useDashboardContext>, nodeId: string | undefined): DashboardNodeStatus {
   if (!nodeId) return "unknown";
   return ctx?.nodeStatuses?.[nodeId] ?? "unknown";
-}
-
-function triggerNode(
-  ctx: ReturnType<typeof useDashboardContext>,
-  nodeId: string | undefined,
-  triggerName: string | undefined,
-) {
-  if (!nodeId) return;
-  if (ctx?.onTriggerNode) {
-    ctx.onTriggerNode(nodeId, { templateName: triggerName });
-    return;
-  }
-  window.dispatchEvent(
-    new CustomEvent(DASHBOARD_TRIGGER_NODE_EVENT, {
-      detail: { nodeId, triggerName },
-    }),
-  );
 }
 
 function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange: (next: NodePanelContent) => void }) {
