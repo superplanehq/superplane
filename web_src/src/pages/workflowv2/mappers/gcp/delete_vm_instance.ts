@@ -1,11 +1,10 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
   ExecutionDetailsContext,
-  ExecutionInfo,
   NodeInfo,
   OutputPayload,
   SubtitleContext,
@@ -13,6 +12,7 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { baseEventSections } from "./event_helpers";
 
 interface VMInstanceNodeMetadata {
   instanceName?: string;
@@ -100,32 +100,4 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootEvent = execution.rootEvent;
-  if (!rootEvent?.nodeId) {
-    return [];
-  }
-
-  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
-  if (!rootTriggerNode?.componentName) {
-    return [];
-  }
-
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
-  const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
-  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const fallbackSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
-  const eventSubtitle = subtitle || fallbackSubtitle;
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventSubtitle,
-      eventState: getState(componentName)(execution),
-      eventId: rootEvent.id!,
-    },
-  ];
 }

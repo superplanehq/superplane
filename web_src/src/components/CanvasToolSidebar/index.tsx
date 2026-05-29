@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { History, Rabbit, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import { AgentTabPanel } from "./AgentTabPanel";
 import { EmptyToolTab } from "./EmptyToolTab";
@@ -154,8 +154,8 @@ function OpenCanvasToolSidebar({
 
   const tabs = [
     ...(hasAgentTab ? [{ value: TAB_AGENT, label: "Agent", icon: Sparkles }] : []),
-    { value: TAB_RUNS, label: "Runs" },
-    { value: TAB_VERSIONS, label: "Versions" },
+    { value: TAB_RUNS, label: "Runs", icon: Rabbit },
+    { value: TAB_VERSIONS, label: "Versions", icon: History },
   ] as const;
 
   if (!isToolSidebarOpen) return null;

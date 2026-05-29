@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -105,6 +106,10 @@ func UpdateCanvasDashboard(
 		}
 		log.WithError(err).Error("failed to update canvas dashboard")
 		return nil, status.Error(codes.Internal, "failed to update canvas dashboard")
+	}
+
+	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), saved.VersionID.String()).PublishVersionUpdated(); err != nil {
+		log.Errorf("failed to publish canvas version update RabbitMQ message: %v", err)
 	}
 
 	serialized, err := serializeCanvasDashboard(saved)

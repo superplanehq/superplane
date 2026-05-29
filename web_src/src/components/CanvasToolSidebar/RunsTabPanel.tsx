@@ -18,7 +18,6 @@ export interface RunsTabPanelProps {
   onRetry?: () => void;
   workflowNodes?: ComponentsNode[];
   componentIconMap?: Record<string, string>;
-  totalCount?: number;
   onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
 }
 
@@ -34,7 +33,6 @@ export function RunsTabPanel({
   onRetry,
   workflowNodes = [],
   componentIconMap = {},
-  totalCount,
   onStatusFiltersChange,
 }: RunsTabPanelProps) {
   const {
@@ -71,13 +69,6 @@ export function RunsTabPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-10 shrink-0 items-center border-b border-slate-200 px-3">
-        <span className="text-sm font-medium text-gray-700">Runs</span>
-        {totalCount != null && totalCount > 0 ? (
-          <span className="ml-1.5 text-xs text-gray-400">({totalCount})</span>
-        ) : null}
-      </div>
-
       <RunsToolbar
         search={search}
         onSearchChange={setSearch}

@@ -23,6 +23,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/database"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -79,6 +80,7 @@ type Server struct {
 	registry              *registry.Registry
 	jwt                   *jwt.Signer
 	oidcProvider          oidc.Provider
+	gitProvider           git.Provider
 	authService           authorization.Authorization
 	timeoutHandlerTimeout time.Duration
 	upgrader              *websocket.Upgrader
@@ -144,6 +146,7 @@ func NewServer(
 	registry *registry.Registry,
 	jwtSigner *jwt.Signer,
 	oidcProvider oidc.Provider,
+	gitProvider git.Provider,
 	basePath string,
 	baseURL string,
 	webhooksBaseURL string,
@@ -167,6 +170,7 @@ func NewServer(
 		WebhooksBaseURL:       webhooksBaseURL,
 		BasePath:              basePath,
 		wsHub:                 ws.NewHub(),
+		gitProvider:           gitProvider,
 		authHandler:           authHandler,
 		isDev:                 appEnv == "development",
 		timeoutHandlerTimeout: 15 * time.Second,
@@ -346,6 +350,18 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
+
+	//
+	// This is not part of the proto APIs and gRPC gateway route,
+	// because of how we need to handle the file streaming.
+	// There is no good way to handle that through the gRPC gateway,
+	// so we need to lift that endpoint here instead.
+	//
+	s.Router.Handle(
+		"/api/v1/canvases/{canvas_id}/repository/file",
+		orgAuthMiddleware(http.HandlerFunc(s.handleRepositoryFileDownload)),
+	).Methods(http.MethodGet)
+
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
 	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)

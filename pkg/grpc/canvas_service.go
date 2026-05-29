@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -18,6 +19,7 @@ type CanvasService struct {
 	registry       *registry.Registry
 	encryptor      crypto.Encryptor
 	authService    authorization.Authorization
+	gitProvider    git.Provider
 	webhookBaseURL string
 	usageService   usage.Service
 }
@@ -26,6 +28,7 @@ func NewCanvasService(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	encryptor crypto.Encryptor,
+	gitProvider git.Provider,
 	webhookBaseURL string,
 	usageService usage.Service,
 ) *CanvasService {
@@ -33,6 +36,7 @@ func NewCanvasService(
 		registry:       registry,
 		encryptor:      encryptor,
 		authService:    authService,
+		gitProvider:    gitProvider,
 		webhookBaseURL: webhookBaseURL,
 		usageService:   usageService,
 	}
@@ -65,6 +69,7 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 		s.registry,
 		s.encryptor,
 		s.authService,
+		s.gitProvider,
 		s.webhookBaseURL,
 		uuid.MustParse(organizationID),
 		req.Canvas,
@@ -440,4 +445,19 @@ func (s *CanvasService) ResolveExecutionErrors(ctx context.Context, req *pb.Reso
 	}
 
 	return canvases.ResolveExecutionErrors(ctx, canvasID, executionIDs)
+}
+
+func (s *CanvasService) GetCanvasRepository(ctx context.Context, req *pb.GetCanvasRepositoryRequest) (*pb.GetCanvasRepositoryResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetCanvasRepository(ctx, s.gitProvider, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) ListCanvasRepositoryFiles(ctx context.Context, req *pb.ListCanvasRepositoryFilesRequest) (*pb.ListCanvasRepositoryFilesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb.CommitCanvasRepositoryFilesRequest) (*pb.CommitCanvasRepositoryFilesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CommitCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId, req.ExpectedHeadSha, req.Message, req.Operations)
 }

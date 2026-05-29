@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
-import { Checkbox } from "@/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/ui/popover";
 import { RunNodeIcon } from "@/ui/Runs/RunNodeIcon";
 import { RUN_STATUS_FILTER_OPTIONS, type RunStatusFilter } from "@/ui/Runs/runPresentation";
@@ -52,7 +52,7 @@ export function RunFiltersPopover({
           aria-label="Filter runs"
           title="Filter runs"
         >
-          <Filter className="h-3.5 w-3.5" />
+          <Filter className={cn("size-3.5", !(hasTriggerFilter || hasStatusFilter) && "text-gray-400")} />
           {hasTriggerFilter || hasStatusFilter ? (
             <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-sky-500 px-1 text-[9px] font-semibold text-white">
               {totalFilters}
@@ -80,8 +80,8 @@ export function RunFiltersPopover({
             >
               <Checkbox
                 checked={selectedStatuses.has(option.id)}
-                onCheckedChange={() => onToggleStatus(option.id)}
-                className="h-3.5 w-3.5"
+                onChange={() => onToggleStatus(option.id)}
+                className="size-3.5"
               />
               <span className={cn("inline-block h-2 w-2 shrink-0 rounded-full", option.dotClassName)} />
               <span className="min-w-0 truncate">{option.label}</span>
@@ -111,8 +111,8 @@ export function RunFiltersPopover({
               >
                 <Checkbox
                   checked={selectedTriggerIds.has(option.id)}
-                  onCheckedChange={() => onToggleTrigger(option.id)}
-                  className="h-3.5 w-3.5"
+                  onChange={() => onToggleTrigger(option.id)}
+                  className="size-3.5"
                 />
                 <RunNodeIcon
                   iconSrc={option.iconSrc}

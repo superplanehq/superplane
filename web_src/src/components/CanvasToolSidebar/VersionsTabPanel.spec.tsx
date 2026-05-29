@@ -46,7 +46,7 @@ describe("VersionsTabPanel", () => {
       />,
     );
 
-    fireEvent.click(screen.getByLabelText("Preview Published version"));
+    fireEvent.click(screen.getAllByTestId("canvas-live-version-row")[0]);
 
     expect(onUseVersion).toHaveBeenCalledWith("version-2");
   });
