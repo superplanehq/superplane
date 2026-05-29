@@ -54,10 +54,7 @@ export function StartRunModal({
           showErrorToast(`"${parameterDisplayLabel(param)}" must be a valid number`);
           return;
         }
-        if (
-          param.type === "select" &&
-          !isValidSelectParameterValue(param, String(parsedData[param.name] ?? ""))
-        ) {
+        if (param.type === "select" && !isValidSelectParameterValue(param, String(parsedData[param.name] ?? ""))) {
           showErrorToast(`"${parameterDisplayLabel(param)}" must be one of the configured options`);
           return;
         }
