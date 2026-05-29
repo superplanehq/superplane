@@ -44,7 +44,7 @@ const repositoryFileTreeStyle = {
   "--trees-fg-override": "#334155",
   "--trees-fg-muted-override": "#64748b",
   "--trees-focus-ring-color-override": "#0f172a",
-  "--trees-selected-bg-override": "#e2e8f0",
+  "--trees-selected-bg-override": "#e0f2fe",
   "--trees-selected-fg-override": "#020617",
   "--trees-padding-inline-override": "0px",
   "--trees-item-margin-x-override": "0px",
@@ -99,7 +99,7 @@ function CanvasYamlFilesView({ files }: { files: WorkflowFile[] }) {
       data-testid="workflow-files-overlay"
     >
       <aside className="flex min-h-0 flex-col border-r border-slate-950/15 bg-white">
-        <div className="flex h-7 shrink-0 items-center border-b border-slate-950/10 px-2 text-xs font-medium text-slate-500">
+        <div className="flex h-7 shrink-0 items-center border-b border-slate-950/15 px-2 text-xs font-medium text-slate-500">
           Files
         </div>
         <FileList paths={filePaths} selectedPath={selectedPath} onSelect={openFile} />
@@ -223,7 +223,7 @@ function FileTab({
     <div
       className={
         active
-          ? "flex h-7 min-w-0 max-w-56 items-center border-x border-t border-slate-950/15 bg-slate-50 text-xs text-slate-950"
+          ? "flex h-7 min-w-0 max-w-56 items-center border-r border-slate-950/15 bg-slate-50 text-xs text-slate-950"
           : "flex h-7 min-w-0 max-w-56 items-center border-r border-slate-950/10 text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-950"
       }
     >
@@ -240,7 +240,7 @@ function FileTab({
         className="mr-1 flex size-4 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-200 hover:text-slate-950"
         onClick={() => onClose(path)}
       >
-        <span aria-hidden>x</span>
+        <span aria-hidden>×</span>
       </button>
     </div>
   );
@@ -262,7 +262,7 @@ function FileEditor({ file }: { file: WorkflowFile | null }) {
   }
 
   return (
-    <div className="min-h-0 flex-1 bg-white" data-testid="workflow-file-editor">
+    <div className="workflow-file-editor-monaco min-h-0 flex-1 bg-white" data-testid="workflow-file-editor">
       <Editor
         height="100%"
         language={file.language ?? getMonacoLanguage(file.path)}
