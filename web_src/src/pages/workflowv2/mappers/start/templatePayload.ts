@@ -114,3 +114,42 @@ export function initialParameterValue(param: StartTemplateParameter): string | n
   }
   return param.type === "boolean" ? false : param.type === "number" ? 0 : "";
 }
+
+export function validateSubmittedParameterValue(param: StartTemplateParameter, coerced: unknown): string | null {
+  if (param.type === "number" && typeof coerced === "number" && Number.isNaN(coerced)) {
+    return `"${parameterDisplayLabel(param)}" must be a valid number`;
+  }
+  if (param.type === "select" && !isValidSelectParameterValue(param, String(coerced ?? ""))) {
+    return `"${parameterDisplayLabel(param)}" must be one of the configured options`;
+  }
+  return null;
+}
+
+export function buildParameterFormPayload(
+  parameters: StartTemplateParameter[] | undefined,
+  parameterValues: Record<string, string | number | boolean>,
+): { payload: Record<string, unknown> } | { error: string } {
+  const payload: Record<string, unknown> = {};
+  for (const param of parameters ?? []) {
+    if (!param.name || !param.type) continue;
+    const coerced = coerceParameterValue(param, parameterValues[param.name]);
+    const validationError = validateSubmittedParameterValue(param, coerced);
+    if (validationError) {
+      return { error: validationError };
+    }
+    payload[param.name] = coerced;
+  }
+  return { payload };
+}
+
+export function parseJsonEventPayload(eventData: string): { payload: Record<string, unknown> } | { error: string } {
+  try {
+    const candidate = JSON.parse(eventData) as unknown;
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      return { error: "Payload must be a JSON object" };
+    }
+    return { payload: candidate as Record<string, unknown> };
+  } catch {
+    return { error: "Invalid JSON format" };
+  }
+}
