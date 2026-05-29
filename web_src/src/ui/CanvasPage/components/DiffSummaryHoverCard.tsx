@@ -1,6 +1,7 @@
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Checkbox } from "@/ui/checkbox";
 import { Switch } from "@/ui/switch";
+import { Eye } from "lucide-react";
 
 interface DiffSummaryHoverCardProps {
   diffCounts: { added: number; updated: number; removed: number };
@@ -26,6 +27,8 @@ function DiffBadgeSegments({ diffCounts }: Pick<DiffSummaryHoverCardProps, "diff
   );
 }
 
+const diffMenuLabelClassName = "text-[13px] font-normal text-gray-800";
+
 export function DiffSummaryHoverCard({
   diffCounts,
   visualDiffEnabled,
@@ -41,60 +44,61 @@ export function DiffSummaryHoverCard({
       <HoverCardTrigger asChild>
         <button
           type="button"
-          className="flex h-7 cursor-default items-center gap-0.5 rounded-md border border-slate-950/15 bg-white px-1.5 py-1 text-[13px] font-medium transition-colors hover:bg-slate-50"
+          className="flex h-7 cursor-default items-center gap-0.5 rounded-full border border-slate-950/15 bg-white px-2.5 py-1 text-[13px] font-medium transition-colors hover:bg-slate-50"
         >
           <DiffBadgeSegments diffCounts={diffCounts} />
         </button>
       </HoverCardTrigger>
-      <HoverCardContent align="start" className="w-auto p-3">
-        <div className="flex flex-col gap-2">
+      <HoverCardContent align="start" className="w-auto p-0">
+        <div className="flex flex-col gap-2 p-3">
           {onToggleVisualDiff && (
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+            <div className="flex items-center gap-1.5">
               <Switch
                 id="visual-diff-toggle"
                 checked={!!visualDiffEnabled}
                 onCheckedChange={onToggleVisualDiff}
                 data-testid="canvas-toggle-visual-diff"
               />
-              <label htmlFor="visual-diff-toggle">Diff X-Ray</label>
+              <label htmlFor="visual-diff-toggle" className={diffMenuLabelClassName}>
+                Diff X-Ray
+              </label>
             </div>
           )}
-          {diffToggles && (
+          {diffToggles && visualDiffEnabled && (
             <>
-              <div
-                className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}
-              >
+              <div className="flex items-center gap-1.5">
                 <Checkbox
                   id="show-deleted-nodes"
                   checked={diffToggles.showDeletedNodes}
                   onCheckedChange={diffToggles.toggleShowDeletedNodes}
-                  disabled={!visualDiffEnabled}
                 />
-                <label htmlFor="show-deleted-nodes">Show deleted nodes</label>
+                <label htmlFor="show-deleted-nodes" className={diffMenuLabelClassName}>
+                  Show deleted nodes
+                </label>
               </div>
-              <div
-                className={`flex items-center gap-1.5 text-xs font-medium ${visualDiffEnabled ? "text-slate-600" : "text-slate-400"}`}
-              >
+              <div className="flex items-center gap-1.5">
                 <Checkbox
                   id="show-edge-diff"
                   checked={diffToggles.showEdgeDiff}
                   onCheckedChange={diffToggles.toggleShowEdgeDiff}
-                  disabled={!visualDiffEnabled}
                 />
-                <label htmlFor="show-edge-diff">Show edges</label>
+                <label htmlFor="show-edge-diff" className={diffMenuLabelClassName}>
+                  Show edges
+                </label>
               </div>
             </>
           )}
         </div>
         {onShowDiff && (
-          <div className="-mx-3 -mb-3 mt-2 border-t border-slate-200 px-3 py-2">
+          <div className="border-t border-slate-950/15 p-2">
             <button
               type="button"
               onClick={onShowDiff}
-              className="text-xs font-medium text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline"
+              className="flex w-full items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-slate-50"
               data-testid="canvas-show-diff-button"
             >
-              View full diff
+              <Eye className="h-4 w-4 shrink-0 text-gray-800" />
+              <span className={diffMenuLabelClassName}>See Full Diff</span>
             </button>
           </div>
         )}

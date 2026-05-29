@@ -78,6 +78,30 @@ export function useCanvasToolSidebarState({
 
   const showToolSidebarToggle = (featureEnabled || forceEnable) && !hideCanvasToolSidebar;
 
+  useEffect(() => {
+    if (!showToolSidebarToggle) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "b" || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
+        return;
+      }
+
+      const target = event.target;
+      if (
+        target instanceof Element &&
+        target.closest('input, textarea, select, [contenteditable="true"], .monaco-editor')
+      ) {
+        return;
+      }
+
+      event.preventDefault();
+      handleToolSidebarToggle();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showToolSidebarToggle, handleToolSidebarToggle]);
+
   return {
     canvasId,
     organizationId,
