@@ -1424,6 +1424,223 @@ func (c *Client) DeleteIncident(cloudID, issueID string) error {
 	return err
 }
 
+// OpsTeam is one JSM Operations team from GET /v1/teams.
+type OpsTeam struct {
+	TeamID   string `json:"teamId"`
+	TeamName string `json:"teamName"`
+}
+
+type listOpsTeamsResponse struct {
+	PlatformTeams []OpsTeam `json:"platformTeams"`
+}
+
+// Heartbeat is a JSM Operations heartbeat monitor.
+type Heartbeat struct {
+	Name          string   `json:"name"`
+	Description   string   `json:"description,omitempty"`
+	Interval      int      `json:"interval"`
+	IntervalUnit  string   `json:"intervalUnit"`
+	Enabled       bool     `json:"enabled"`
+	Status        string   `json:"status,omitempty"`
+	OwnerTeamID   string   `json:"ownerTeamId,omitempty"`
+	AlertMessage  string   `json:"alertMessage,omitempty"`
+	AlertTags     []string `json:"alertTags,omitempty"`
+	AlertPriority string   `json:"alertPriority,omitempty"`
+}
+
+type heartbeatLinks struct {
+	Next string `json:"next,omitempty"`
+}
+
+type heartbeatPaginatedResponse struct {
+	Values []Heartbeat     `json:"values"`
+	Links  *heartbeatLinks `json:"links,omitempty"`
+}
+
+// CreateHeartbeatRequest is the JSON body for POST .../heartbeats.
+type CreateHeartbeatRequest struct {
+	Name          string   `json:"name"`
+	Description   string   `json:"description,omitempty"`
+	Interval      int      `json:"interval"`
+	IntervalUnit  string   `json:"intervalUnit"`
+	Enabled       *bool    `json:"enabled,omitempty"`
+	AlertMessage  string   `json:"alertMessage,omitempty"`
+	AlertTags     []string `json:"alertTags,omitempty"`
+	AlertPriority string   `json:"alertPriority,omitempty"`
+}
+
+// UpdateHeartbeatRequest is the JSON body for PATCH .../heartbeats?name=...
+type UpdateHeartbeatRequest struct {
+	Description   string   `json:"description,omitempty"`
+	Interval      *int     `json:"interval,omitempty"`
+	IntervalUnit  string   `json:"intervalUnit,omitempty"`
+	Enabled       *bool    `json:"enabled,omitempty"`
+	AlertMessage  string   `json:"alertMessage,omitempty"`
+	AlertTags     []string `json:"alertTags,omitempty"`
+	AlertPriority string   `json:"alertPriority,omitempty"`
+}
+
+// PingHeartbeatResponse is returned when a heartbeat ping succeeds.
+type PingHeartbeatResponse struct {
+	Message string `json:"message"`
+}
+
+func (c *Client) opsAPIURL(cloudID, pathSuffix string) string {
+	return fmt.Sprintf("%s/jsm/ops/api/%s/v1%s", atlassianIncidentAPIHost, cloudID, pathSuffix)
+}
+
+// ListOpsTeams returns JSM Operations teams visible to the authenticated user.
+func (c *Client) ListOpsTeams(cloudID string) ([]OpsTeam, error) {
+	u := c.opsAPIURL(cloudID, "/teams")
+	responseBody, err := c.execRequest(http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseOpsTeamsResponse(responseBody)
+}
+
+func parseOpsTeamsResponse(responseBody []byte) ([]OpsTeam, error) {
+	body := bytes.TrimSpace(responseBody)
+	if len(body) == 0 || bytes.Equal(body, []byte("null")) {
+		return []OpsTeam{}, nil
+	}
+
+	// Live Jira Cloud often returns a JSON array; OpenAPI also documents { "platformTeams": [...] }.
+	if body[0] == '[' {
+		var teams []OpsTeam
+		if err := json.Unmarshal(body, &teams); err != nil {
+			return nil, fmt.Errorf("parse ops teams array response: %w", err)
+		}
+		return normalizeOpsTeams(teams), nil
+	}
+
+	var wrapped listOpsTeamsResponse
+	if err := json.Unmarshal(body, &wrapped); err != nil {
+		return nil, fmt.Errorf("parse ops teams response: %w", err)
+	}
+	if wrapped.PlatformTeams == nil {
+		return []OpsTeam{}, nil
+	}
+	return normalizeOpsTeams(wrapped.PlatformTeams), nil
+}
+
+func normalizeOpsTeams(teams []OpsTeam) []OpsTeam {
+	out := make([]OpsTeam, 0, len(teams))
+	for _, team := range teams {
+		id := strings.TrimSpace(team.TeamID)
+		name := strings.TrimSpace(team.TeamName)
+		if id == "" && name == "" {
+			continue
+		}
+		if name == "" {
+			name = id
+		}
+		out = append(out, OpsTeam{TeamID: id, TeamName: name})
+	}
+	return out
+}
+
+// ListHeartbeats returns all heartbeats for an operations team, following links.next pagination.
+func (c *Client) ListHeartbeats(cloudID, teamID string) ([]Heartbeat, error) {
+	nextURL := c.opsAPIURL(cloudID, fmt.Sprintf("/teams/%s/heartbeats", url.PathEscape(teamID)))
+	var all []Heartbeat
+	const maxPages = 100
+	for range maxPages {
+		responseBody, err := c.execRequest(http.MethodGet, nextURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		var page heartbeatPaginatedResponse
+		if err := json.Unmarshal(responseBody, &page); err != nil {
+			return nil, fmt.Errorf("parse heartbeats response: %w", err)
+		}
+
+		all = append(all, page.Values...)
+
+		if page.Links == nil || page.Links.Next == "" || len(page.Values) == 0 {
+			break
+		}
+
+		if strings.HasPrefix(page.Links.Next, "http") {
+			nextURL = page.Links.Next
+		} else {
+			nextURL = atlassianIncidentAPIHost + page.Links.Next
+		}
+	}
+	return all, nil
+}
+
+// CreateHeartbeat creates a heartbeat in JSM Operations.
+func (c *Client) CreateHeartbeat(cloudID, teamID string, req *CreateHeartbeatRequest) (*Heartbeat, error) {
+	u := c.opsAPIURL(cloudID, fmt.Sprintf("/teams/%s/heartbeats", url.PathEscape(teamID)))
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal create heartbeat body: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPost, u, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var out Heartbeat
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("parse create heartbeat response: %w", err)
+	}
+	return &out, nil
+}
+
+// PingHeartbeat sends a ping for the named heartbeat.
+func (c *Client) PingHeartbeat(cloudID, teamID, name string) (*PingHeartbeatResponse, error) {
+	q := url.Values{}
+	q.Set("name", name)
+	u := c.opsAPIURL(cloudID, fmt.Sprintf("/teams/%s/heartbeats/ping?%s", url.PathEscape(teamID), q.Encode()))
+
+	responseBody, err := c.execRequest(http.MethodPost, u, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var out PingHeartbeatResponse
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("parse ping heartbeat response: %w", err)
+	}
+	return &out, nil
+}
+
+// UpdateHeartbeat updates a heartbeat identified by name (name cannot be changed).
+func (c *Client) UpdateHeartbeat(cloudID, teamID, name string, req *UpdateHeartbeatRequest) (*Heartbeat, error) {
+	q := url.Values{}
+	q.Set("name", name)
+	u := c.opsAPIURL(cloudID, fmt.Sprintf("/teams/%s/heartbeats?%s", url.PathEscape(teamID), q.Encode()))
+	body, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshal update heartbeat body: %w", err)
+	}
+
+	responseBody, err := c.execRequest(http.MethodPatch, u, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	var out Heartbeat
+	if err := json.Unmarshal(responseBody, &out); err != nil {
+		return nil, fmt.Errorf("parse update heartbeat response: %w", err)
+	}
+	return &out, nil
+}
+
+// DeleteHeartbeat deletes a heartbeat by name.
+func (c *Client) DeleteHeartbeat(cloudID, teamID, name string) error {
+	q := url.Values{}
+	q.Set("name", name)
+	u := c.opsAPIURL(cloudID, fmt.Sprintf("/teams/%s/heartbeats?%s", url.PathEscape(teamID), q.Encode()))
+	_, err := c.execRequest(http.MethodDelete, u, nil)
+	return err
+}
+
 // ResolveNumericIssueID returns the numeric issue id for the Incidents API path. If ref is all digits it is
 // returned unchanged; otherwise ref is treated as an issue key and resolved with the Jira platform REST API.
 func (c *Client) ResolveNumericIssueID(ref string) (string, error) {
