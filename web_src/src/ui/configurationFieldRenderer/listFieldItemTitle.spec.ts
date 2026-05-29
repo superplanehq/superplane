@@ -7,6 +7,14 @@ describe("listFieldItemTitle", () => {
     expect(listFieldItemTitle({ name: "deploy", type: "string" }, 0, "Parameter")).toBe("deploy");
   });
 
+  it("uses the item label when present", () => {
+    expect(listFieldItemTitle({ label: "OpenAI", value: "openai" }, 0, "Option")).toBe("OpenAI");
+  });
+
+  it("prefers name over label when both are set", () => {
+    expect(listFieldItemTitle({ name: "provider", label: "OpenAI" }, 0, "Option")).toBe("provider");
+  });
+
   it("falls back to type and item label", () => {
     expect(listFieldItemTitle({ type: "boolean" }, 1, "Parameter")).toBe("Parameter (Boolean)");
   });
