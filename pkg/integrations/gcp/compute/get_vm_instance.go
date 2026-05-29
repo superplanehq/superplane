@@ -103,23 +103,9 @@ func (g *GetVMInstance) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("instance is required")
 	}
 
-	// Expressions are resolved at execution time. Store the raw value so the UI
-	// can still display something meaningful in the collapsed node.
-	if strings.Contains(instanceValue, "{{") {
-		return ctx.Metadata.Set(VMInstanceNodeMetadata{
-			InstanceName: instanceValue,
-		})
-	}
-
-	_, zone, name, err := parseInstancePath(instanceValue)
-	if err != nil {
-		return err
-	}
-
-	return ctx.Metadata.Set(VMInstanceNodeMetadata{
-		InstanceName: name,
-		Zone:         zone,
-	})
+	// Reuse the shared instance-metadata resolver (see instance_helpers.go),
+	// which the delete/power/update/metrics components also use.
+	return resolveInstanceNodeMetadata(ctx, instanceValue)
 }
 
 func (g *GetVMInstance) Execute(ctx core.ExecutionContext) error {
