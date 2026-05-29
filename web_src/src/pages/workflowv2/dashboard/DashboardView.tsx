@@ -15,6 +15,7 @@ import { NodesPanelCard } from "./NodesPanelCard";
 import { TablePanelCard } from "./TablePanelCard";
 import { ChartPanelCard } from "./ChartPanelCard";
 import { NumberPanelCard } from "./NumberPanelCard";
+import { useDashboardGridTransitionArming } from "./useDashboardGridTransitionArming";
 import { useDashboardPanelState } from "./useDashboardPanelState";
 import { PANEL_TYPE_META, PANEL_TYPES, type PanelType } from "./panelTypes";
 
@@ -74,6 +75,9 @@ export function DashboardView({
 
   const layoutItems = useMemo(() => buildRGLLayout(localPanels, localLayout), [localPanels, localLayout]);
 
+  const gridVisible = !errorMessage && !isLoading && localPanels.length > 0;
+  const { transitionsArmed, gridWrapperRef } = useDashboardGridTransitionArming(gridVisible);
+
   if (errorMessage) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-sm text-red-600">
@@ -102,9 +106,9 @@ export function DashboardView({
 
   return (
     <div className="flex h-full w-full flex-col overflow-auto">
-      <div className="px-4 py-3">
+      <div ref={gridWrapperRef} className="px-4 py-3">
         <ResponsiveGridLayout
-          className="dashboard-grid"
+          className={cn("dashboard-grid", !transitionsArmed && "dashboard-grid--instant")}
           layout={layoutItems}
           cols={DASHBOARD_GRID_COLS}
           rowHeight={DASHBOARD_ROW_HEIGHT}
