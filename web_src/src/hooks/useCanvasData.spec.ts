@@ -1,6 +1,6 @@
 import type { CanvasesCanvas } from "@/api-client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { createElement, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -327,5 +327,78 @@ describe("useUpdateCanvasConsole", () => {
 
     expect(registerIgnoredCanvasVersionUpdatedEcho).toHaveBeenCalledWith("version-1");
     expect(releaseCanvasVersionUpdatedEcho).toHaveBeenCalledOnce();
+  });
+
+  it("optimistically updates the dashboard cache while console changes are saving", async () => {
+    const queryClient = createQueryClient();
+    const dashboardKey = canvasKeys.dashboard("canvas-1", "version-1");
+    let resolveSave: (value: unknown) => void = () => {};
+    const savePromise = new Promise((resolve) => {
+      resolveSave = resolve;
+    });
+    queryClient.setQueryData(dashboardKey, {
+      canvasId: "canvas-1",
+      versionId: "version-1",
+      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+    });
+    canvasesUpdateCanvasDashboard.mockReturnValue(savePromise);
+
+    const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    act(() => {
+      result.current.mutate({
+        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      });
+    });
+
+    await waitFor(() => {
+      expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
+        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+      });
+    });
+
+    resolveSave({
+      data: {
+        dashboard: {
+          canvasId: "canvas-1",
+          versionId: "version-1",
+          panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+          layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+        },
+      },
+    });
+
+    await waitFor(() => expect(result.current.isPending).toBe(false));
+  });
+
+  it("rolls back the dashboard cache when console save fails", async () => {
+    const queryClient = createQueryClient();
+    const dashboardKey = canvasKeys.dashboard("canvas-1", "version-1");
+    queryClient.setQueryData(dashboardKey, {
+      canvasId: "canvas-1",
+      versionId: "version-1",
+      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+      layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+    });
+    canvasesUpdateCanvasDashboard.mockRejectedValue(new Error("request failed"));
+
+    const { result } = renderHook(() => useUpdateCanvasConsole("canvas-1", "version-1"), {
+      wrapper: createWrapper(queryClient),
+    });
+
+    await expect(
+      result.current.mutateAsync({
+        panels: [{ id: "panel-1", type: "markdown", content: { title: "After" } }],
+        layout: [{ i: "panel-1", x: 0, y: 0, w: 12, h: 6 }],
+      }),
+    ).rejects.toThrow("request failed");
+
+    expect(queryClient.getQueryData(dashboardKey)).toMatchObject({
+      panels: [{ id: "panel-1", type: "markdown", content: { title: "Before" } }],
+    });
   });
 });

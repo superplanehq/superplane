@@ -14,6 +14,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/git"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -447,6 +448,12 @@ func Start() {
 	oidcProvider, err := oidc.NewProviderFromKeyDir(webhooksBaseURL, oidcKeysPath)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
+	}
+
+	log.Println("Creating Git Provider")
+	_, err = git.NewProvider()
+	if err != nil {
+		log.Errorf("failed to create git provider: %v", err)
 	}
 
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
