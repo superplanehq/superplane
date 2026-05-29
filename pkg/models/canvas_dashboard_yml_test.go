@@ -533,6 +533,24 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			},
 			contains: "render.legend must be one of auto/show/hide",
 		},
+		{
+			name: "chart seriesField must be a string",
+			panel: DashboardPanel{
+				ID:   "chart",
+				Type: DashboardPanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "costs"},
+					"render": map[string]any{
+						"kind":        "chart",
+						"type":        "stacked-bar",
+						"xField":      "date",
+						"seriesField": 42,
+						"series":      []any{map[string]any{"field": "cost_usd"}},
+					},
+				},
+			},
+			contains: "render.seriesField must be a string",
+		},
 	}
 
 	for _, tt := range tests {

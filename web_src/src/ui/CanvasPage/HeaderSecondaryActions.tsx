@@ -16,9 +16,12 @@ export function SecondaryHeaderActions({
   saveDisabledTooltip,
   saveIsPrimary,
   hasUnpublishedDraftChanges,
+  hasUnpublishedConsoleDraftChanges,
   onShowDiff,
+  onShowConsoleDiff,
   visualDiffEnabled,
   draftVisualDiff,
+  draftConsoleDiff,
   onToggleVisualDiff,
   onDiscardVersion,
   discardVersionDisabled,
@@ -29,6 +32,7 @@ export function SecondaryHeaderActions({
   publishVersionDisabledTooltip,
 }: HeaderProps) {
   const onCanvasTab = mode === "version-live" || mode === "version-edit";
+  const onConsoleTab = mode === "dashboard";
 
   return (
     <div className="relative z-10 ml-auto flex shrink-0 items-center gap-1.5">
@@ -51,6 +55,9 @@ export function SecondaryHeaderActions({
               diffToggles={draftVisualDiff.diffToggles}
               onShowDiff={onShowDiff}
             />
+          ) : null}
+          {onConsoleTab && hasUnpublishedConsoleDraftChanges && draftConsoleDiff?.diffCounts ? (
+            <DiffSummaryHoverCard diffCounts={draftConsoleDiff.diffCounts} onShowDiff={onShowConsoleDiff} />
           ) : null}
           <EditModePublishDiscardActions
             hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
