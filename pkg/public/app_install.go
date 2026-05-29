@@ -31,6 +31,7 @@ func (s *Server) installationService() *installation.Service {
 		Encryptor:       s.encryptor,
 		AuthService:     s.authService,
 		WebhooksBaseURL: s.WebhooksBaseURL,
+		GitProvider:     s.gitProvider,
 		UsageService:    s.usageService,
 	}
 }

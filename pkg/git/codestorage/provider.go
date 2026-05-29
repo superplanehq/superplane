@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/uuid"
 	codestorage "github.com/pierrecomputer/sdk/packages/code-storage-go"
 	"github.com/superplanehq/superplane/pkg/git/provider"
 )
@@ -61,8 +60,11 @@ func getPrivateKey() ([]byte, error) {
 	return key, nil
 }
 
-func (p *Provider) CreateRepository(ctx context.Context, options provider.CreateRepositoryOptions) (*provider.Repository, error) {
-	repoID := p.getRepositoryID(options.OrganizationID, options.CanvasID)
+func (p *Provider) Name() string {
+	return provider.CodeStorageProvider
+}
+
+func (p *Provider) CreateRepository(ctx context.Context, repoID string) (*provider.Repository, error) {
 	repo, err := p.client.CreateRepo(ctx, codestorage.CreateRepoOptions{
 		ID:            repoID,
 		DefaultBranch: p.defaultBranch,
@@ -128,7 +130,7 @@ func (p *Provider) DeleteRepository(ctx context.Context, repoID string) error {
 	return nil
 }
 
-func (p *Provider) ListFiles(ctx context.Context, repoID string) (*provider.ListFilesResult, error) {
+func (p *Provider) ListFiles(ctx context.Context, repoID string) ([]string, error) {
 	repo, err := p.repo(repoID)
 	if err != nil {
 		return nil, err
@@ -142,7 +144,7 @@ func (p *Provider) ListFiles(ctx context.Context, repoID string) (*provider.List
 		return nil, err
 	}
 
-	return &provider.ListFilesResult{Paths: result.Paths}, nil
+	return result.Paths, nil
 }
 
 func (p *Provider) GetFile(ctx context.Context, repoID string, path string) (io.ReadCloser, error) {
@@ -168,19 +170,19 @@ func (p *Provider) GetFile(ctx context.Context, repoID string, path string) (io.
 	return resp.Body, nil
 }
 
-func (p *Provider) Commit(ctx context.Context, repoID string, options provider.CommitOptions) (*provider.CommitResult, error) {
+func (p *Provider) Commit(ctx context.Context, repoID string, options provider.CommitOptions) (string, error) {
 	if err := provider.ValidateCommitMetadata(options.Message, options.Author); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	operations, err := provider.ValidateCommitOperations(options.Operations)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	repo, err := p.repo(repoID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	builder, err := repo.CreateCommit(codestorage.CommitOptions{
@@ -195,7 +197,7 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 	})
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	for _, operation := range operations {
@@ -207,17 +209,15 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 	}
 
 	if err := builder.Err(); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	result, err := builder.Send(ctx)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return &provider.CommitResult{
-		CommitSHA: result.CommitSHA,
-	}, nil
+	return result.CommitSHA, nil
 }
 
 func (p *Provider) Head(ctx context.Context, repoID string) (string, error) {
@@ -244,6 +244,6 @@ func (p *Provider) repo(repoID string) (*codestorage.Repo, error) {
 	})
 }
 
-func (p *Provider) getRepositoryID(organizationID, canvasID uuid.UUID) string {
-	return fmt.Sprintf("orgs/%s/canvases/%s", organizationID.String(), canvasID.String())
+func (p *Provider) GetRepositoryID(options provider.RepositoryOptions) string {
+	return fmt.Sprintf("orgs/%s/canvases/%s", options.OrganizationID.String(), options.CanvasID.String())
 }

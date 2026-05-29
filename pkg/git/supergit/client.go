@@ -69,7 +69,7 @@ func (c *Client) deleteRepo(ctx context.Context, repoID string) error {
 	return c.doJSON(ctx, http.MethodDelete, repoPath(repoID), nil, nil)
 }
 
-func (c *Client) listFiles(ctx context.Context, repoID, ref string) (*provider.ListFilesResult, error) {
+func (c *Client) listFiles(ctx context.Context, repoID, ref string) ([]string, error) {
 	query := url.Values{}
 	if ref != "" {
 		query.Set("ref", ref)
@@ -80,7 +80,7 @@ func (c *Client) listFiles(ctx context.Context, repoID, ref string) (*provider.L
 		return nil, err
 	}
 
-	return &provider.ListFilesResult{Paths: resp.Paths}, nil
+	return resp.Paths, nil
 }
 
 func (c *Client) getFile(ctx context.Context, repoID, filePath, ref string) (io.ReadCloser, error) {
