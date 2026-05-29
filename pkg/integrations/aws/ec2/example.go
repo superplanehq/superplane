@@ -46,6 +46,12 @@ var exampleOutputGetInstanceBytes []byte
 //go:embed example_output_manage_instance_power.json
 var exampleOutputManageInstancePowerBytes []byte
 
+//go:embed example_output_get_instance_metrics.json
+var exampleOutputGetInstanceMetricsBytes []byte
+
+//go:embed example_output_update_instance.json
+var exampleOutputUpdateInstanceBytes []byte
+
 var exampleDataOnImageOnce sync.Once
 var exampleDataOnImage map[string]any
 
@@ -84,6 +90,12 @@ var exampleOutputGetInstance map[string]any
 
 var exampleOutputManageInstancePowerOnce sync.Once
 var exampleOutputManageInstancePower map[string]any
+
+var exampleOutputGetInstanceMetricsOnce sync.Once
+var exampleOutputGetInstanceMetrics map[string]any
+
+var exampleOutputUpdateInstanceOnce sync.Once
+var exampleOutputUpdateInstance map[string]any
 
 func (t *OnImage) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageOnce, exampleDataOnImageBytes, &exampleDataOnImage)
@@ -162,5 +174,21 @@ func (c *ManageInstancePower) ExampleOutput() map[string]any {
 		&exampleOutputManageInstancePowerOnce,
 		exampleOutputManageInstancePowerBytes,
 		&exampleOutputManageInstancePower,
+	)
+}
+
+func (c *GetInstanceMetrics) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetInstanceMetricsOnce,
+		exampleOutputGetInstanceMetricsBytes,
+		&exampleOutputGetInstanceMetrics,
+	)
+}
+
+func (c *UpdateInstance) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputUpdateInstanceOnce,
+		exampleOutputUpdateInstanceBytes,
+		&exampleOutputUpdateInstance,
 	)
 }
