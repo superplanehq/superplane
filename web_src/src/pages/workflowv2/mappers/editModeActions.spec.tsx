@@ -198,7 +198,7 @@ describe("workflow v2 edit-mode action affordances", () => {
             templates: [
               {
                 name: "Example",
-                payload: { provider: "{{ parameters[\"provider\"] }}" },
+                payload: { provider: '{{ parameters["provider"] }}' },
                 parameters: [
                   {
                     name: "provider",

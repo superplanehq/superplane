@@ -55,9 +55,7 @@ export function StartRunParameterFields({
                 >
                   <SelectTrigger id={id} className="w-full">
                     <SelectValue
-                      placeholder={
-                        selectOptionValues(param).length === 0 ? "No options configured" : `Select ${label}`
-                      }
+                      placeholder={selectOptionValues(param).length === 0 ? "No options configured" : `Select ${label}`}
                     />
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
