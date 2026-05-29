@@ -1,9 +1,16 @@
-export type StartTemplateParameterType = "string" | "number" | "boolean";
+export type StartTemplateParameterType = "string" | "number" | "boolean" | "select";
+
+export interface StartTemplateParameterOption {
+  label: string;
+  value: string;
+}
 
 export interface StartTemplateParameter {
   name: string;
   title?: string;
+  placeholder?: string;
   type: StartTemplateParameterType;
+  options?: StartTemplateParameterOption[];
   defaultString?: unknown;
   defaultNumber?: unknown;
   defaultBoolean?: unknown;
@@ -12,6 +19,26 @@ export interface StartTemplateParameter {
 export function parameterDisplayLabel(param: StartTemplateParameter): string {
   const title = typeof param.title === "string" ? param.title.trim() : "";
   return title || param.name;
+}
+
+export function selectOptionValues(param: StartTemplateParameter): string[] {
+  if (param.type !== "select" || !param.options) {
+    return [];
+  }
+  return param.options.map((opt) => opt.value).filter((value) => value !== "");
+}
+
+export function isValidSelectParameterValue(param: StartTemplateParameter, value: string): boolean {
+  const allowed = selectOptionValues(param);
+  if (allowed.length === 0) {
+    return true;
+  }
+  return allowed.includes(value);
+}
+
+export function parameterPlaceholder(param: StartTemplateParameter): string {
+  const placeholder = typeof param.placeholder === "string" ? param.placeholder.trim() : "";
+  return placeholder;
 }
 
 export interface StartTemplate {
@@ -34,7 +61,8 @@ export function parameterDefaultValue(param: StartTemplateParameter): unknown | 
       const value = param.defaultBoolean;
       return value === null || value === undefined ? undefined : value;
     }
-    default: {
+    case "select":
+    case "string": {
       const value = param.defaultString;
       if (value === null || value === undefined) return undefined;
       if (typeof value === "string" && value === "") return undefined;
@@ -75,7 +103,8 @@ export function coerceParameterValue(param: StartTemplateParameter, raw: unknown
     case "boolean":
       if (typeof raw === "boolean") return raw;
       return raw === true || raw === "true" || raw === "1";
-    default:
+    case "select":
+    case "string":
       return raw == null ? "" : String(raw);
   }
 }
@@ -85,5 +114,48 @@ export function initialParameterValue(param: StartTemplateParameter): string | n
   if (configuredDefault !== undefined) {
     return coerceParameterValue(param, configuredDefault) as string | number | boolean;
   }
+  if (param.type === "select") {
+    const firstOption = selectOptionValues(param)[0];
+    return firstOption ?? "";
+  }
   return param.type === "boolean" ? false : param.type === "number" ? 0 : "";
+}
+
+export function validateSubmittedParameterValue(param: StartTemplateParameter, coerced: unknown): string | null {
+  if (param.type === "number" && typeof coerced === "number" && Number.isNaN(coerced)) {
+    return `"${parameterDisplayLabel(param)}" must be a valid number`;
+  }
+  if (param.type === "select" && !isValidSelectParameterValue(param, String(coerced ?? ""))) {
+    return `"${parameterDisplayLabel(param)}" must be one of the configured options`;
+  }
+  return null;
+}
+
+export function buildParameterFormPayload(
+  parameters: StartTemplateParameter[] | undefined,
+  parameterValues: Record<string, string | number | boolean>,
+): { payload: Record<string, unknown> } | { error: string } {
+  const payload: Record<string, unknown> = {};
+  for (const param of parameters ?? []) {
+    if (!param.name || !param.type) continue;
+    const coerced = coerceParameterValue(param, parameterValues[param.name]);
+    const validationError = validateSubmittedParameterValue(param, coerced);
+    if (validationError) {
+      return { error: validationError };
+    }
+    payload[param.name] = coerced;
+  }
+  return { payload };
+}
+
+export function parseJsonEventPayload(eventData: string): { payload: Record<string, unknown> } | { error: string } {
+  try {
+    const candidate = JSON.parse(eventData) as unknown;
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+      return { error: "Payload must be a JSON object" };
+    }
+    return { payload: candidate as Record<string, unknown> };
+  } catch {
+    return { error: "Invalid JSON format" };
+  }
 }

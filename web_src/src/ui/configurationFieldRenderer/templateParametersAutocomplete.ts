@@ -2,19 +2,52 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function templateParameterValue(parameter: Record<string, unknown>): unknown {
-  const parameterType = parameter.type;
-  if (parameterType === "number") {
-    const value = parameter.defaultNumber;
-    return value === null || value === undefined ? 0 : value;
+function defaultNumberValue(parameter: Record<string, unknown>): unknown {
+  const value = parameter.defaultNumber;
+  return value === null || value === undefined ? 0 : value;
+}
+
+function defaultBooleanValue(parameter: Record<string, unknown>): unknown {
+  const value = parameter.defaultBoolean;
+  return value === null || value === undefined ? false : value;
+}
+
+function firstSelectOptionValue(rawOptions: unknown): string {
+  if (!Array.isArray(rawOptions) || rawOptions.length === 0) {
+    return "";
   }
-  if (parameterType === "boolean") {
-    const value = parameter.defaultBoolean;
-    return value === null || value === undefined ? false : value;
+  const first = rawOptions[0];
+  if (isRecord(first) && typeof first.value === "string" && first.value !== "") {
+    return first.value;
   }
+  return "";
+}
+
+function defaultSelectValue(parameter: Record<string, unknown>): unknown {
+  const value = parameter.defaultString;
+  if (value === null || value === undefined || value === "") {
+    return firstSelectOptionValue(parameter.options);
+  }
+  return value;
+}
+
+function defaultStringValue(parameter: Record<string, unknown>): unknown {
   const value = parameter.defaultString;
   if (value === null || value === undefined) return "";
   return value;
+}
+
+function templateParameterValue(parameter: Record<string, unknown>): unknown {
+  switch (parameter.type) {
+    case "number":
+      return defaultNumberValue(parameter);
+    case "boolean":
+      return defaultBooleanValue(parameter);
+    case "select":
+      return defaultSelectValue(parameter);
+    default:
+      return defaultStringValue(parameter);
+  }
 }
 
 export function buildTemplateParametersAutocompleteObject(
