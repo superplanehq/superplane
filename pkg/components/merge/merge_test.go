@@ -413,7 +413,7 @@ func (s *MergeTestSteps) CreateEvents() {
 		WorkflowID: s.Wf.ID,
 		NodeID:     "start-node",
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 	}
 	require.NoError(s.t, s.Tx.Create(rootEvent).Error)
 
@@ -421,7 +421,7 @@ func (s *MergeTestSteps) CreateEvents() {
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode1.NodeID,
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 	}
 	require.NoError(s.t, s.Tx.Create(event1).Error)
 
@@ -429,7 +429,7 @@ func (s *MergeTestSteps) CreateEvents() {
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode2.NodeID,
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 	}
 	require.NoError(s.t, s.Tx.Create(event2).Error)
 
@@ -443,7 +443,7 @@ func (s *MergeTestSteps) CreateSingleEventForProcess1() {
 		WorkflowID: s.Wf.ID,
 		NodeID:     "start-node",
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 	}
 	require.NoError(s.t, s.Tx.Create(rootEvent).Error)
 
@@ -451,7 +451,7 @@ func (s *MergeTestSteps) CreateSingleEventForProcess1() {
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode1.NodeID,
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 	}
 	require.NoError(s.t, s.Tx.Create(event1).Error)
 
@@ -464,7 +464,7 @@ func (s *MergeTestSteps) CreateEventsWithData(data1 any, data2 any) {
 		WorkflowID: s.Wf.ID,
 		NodeID:     "start-node",
 		Channel:    "default",
-		Data:       datatypes.JSONType[any]{},
+		Data:       models.JSONValue{},
 	}
 	require.NoError(s.t, s.Tx.Create(rootEvent).Error)
 
@@ -472,7 +472,7 @@ func (s *MergeTestSteps) CreateEventsWithData(data1 any, data2 any) {
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode1.NodeID,
 		Channel:    "default",
-		Data:       datatypes.NewJSONType(data1),
+		Data:       models.NewJSONValue(data1),
 	}
 	require.NoError(s.t, s.Tx.Create(event1).Error)
 
@@ -480,7 +480,7 @@ func (s *MergeTestSteps) CreateEventsWithData(data1 any, data2 any) {
 		WorkflowID: s.Wf.ID,
 		NodeID:     s.ProcessNode2.NodeID,
 		Channel:    "default",
-		Data:       datatypes.NewJSONType(data2),
+		Data:       models.NewJSONValue(data2),
 	}
 	require.NoError(s.t, s.Tx.Create(event2).Error)
 

@@ -3,10 +3,13 @@ package canvases
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -14,7 +17,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateCanvasDashboard(ctx context.Context, organizationID, canvasID string, panels []*pb.DashboardPanel, layout []*pb.DashboardLayoutItem) (*pb.UpdateCanvasDashboardResponse, error) {
+func UpdateCanvasDashboard(
+	ctx context.Context,
+	organizationID,
+	canvasID string,
+	versionID string,
+	panels []*pb.DashboardPanel,
+	layout []*pb.DashboardLayoutItem,
+) (*pb.UpdateCanvasDashboardResponse, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization_id")
@@ -24,6 +34,12 @@ func UpdateCanvasDashboard(ctx context.Context, organizationID, canvasID string,
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid canvas_id")
 	}
+
+	userID, ok := authentication.GetUserIdFromMetadata(ctx)
+	if !ok {
+		return nil, status.Error(codes.Unauthenticated, "user not authenticated")
+	}
+	userUUID := uuid.MustParse(userID)
 
 	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
 	if err != nil {
@@ -49,16 +65,51 @@ func UpdateCanvasDashboard(ctx context.Context, organizationID, canvasID string,
 
 	var saved *models.CanvasDashboard
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		record, upsertErr := models.UpsertCanvasDashboardInTransaction(tx, canvas.ID, modelPanels, modelLayout)
-		if upsertErr != nil {
-			return upsertErr
+		resolvedVersionID, resolveErr := resolveDashboardVersionID(tx, canvas, strings.TrimSpace(versionID))
+		if resolveErr != nil {
+			return resolveErr
+		}
+
+		version, loadErr := models.FindCanvasVersionInTransaction(tx, canvas.ID, resolvedVersionID)
+		if loadErr != nil {
+			if errors.Is(loadErr, gorm.ErrRecordNotFound) {
+				return status.Error(codes.NotFound, "version not found")
+			}
+			return loadErr
+		}
+
+		if version.State == models.CanvasVersionStatePublished {
+			return status.Error(codes.FailedPrecondition, "published versions are immutable")
+		}
+
+		if version.OwnerID == nil || *version.OwnerID != userUUID {
+			return status.Error(codes.PermissionDenied, "version owner mismatch")
+		}
+
+		if _, draftErr := models.FindCanvasDraftByVersionInTransaction(tx, canvas.ID, userUUID, version.ID); draftErr != nil {
+			if errors.Is(draftErr, gorm.ErrRecordNotFound) {
+				return status.Error(codes.FailedPrecondition, "version is not your current edit version")
+			}
+			return draftErr
+		}
+
+		record, updateErr := models.UpdateCanvasVersionDashboardInTransaction(tx, version, modelPanels, modelLayout)
+		if updateErr != nil {
+			return updateErr
 		}
 		saved = record
 		return nil
 	})
 	if err != nil {
+		if status.Code(err) != codes.Unknown {
+			return nil, err
+		}
 		log.WithError(err).Error("failed to update canvas dashboard")
 		return nil, status.Error(codes.Internal, "failed to update canvas dashboard")
+	}
+
+	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), saved.VersionID.String()).PublishVersionUpdated(); err != nil {
+		log.Errorf("failed to publish canvas version update RabbitMQ message: %v", err)
 	}
 
 	serialized, err := serializeCanvasDashboard(saved)
@@ -70,52 +121,8 @@ func UpdateCanvasDashboard(ctx context.Context, organizationID, canvasID string,
 }
 
 func validateDashboardInput(panels []models.DashboardPanel, layout []models.DashboardLayoutItem) error {
-	if len(panels) > MaxDashboardPanels {
-		return status.Errorf(codes.InvalidArgument, "too many panels (max %d)", MaxDashboardPanels)
+	if err := models.ValidateDashboardContent(panels, layout); err != nil {
+		return status.Errorf(codes.InvalidArgument, "%v", err)
 	}
-
-	panelIDs := make(map[string]struct{}, len(panels))
-	for _, panel := range panels {
-		if panel.ID == "" {
-			return status.Error(codes.InvalidArgument, "panel id is required")
-		}
-		if panel.Type == "" {
-			return status.Errorf(codes.InvalidArgument, "panel %q type is required", panel.ID)
-		}
-		if _, exists := panelIDs[panel.ID]; exists {
-			return status.Errorf(codes.InvalidArgument, "duplicate panel id %q", panel.ID)
-		}
-		panelIDs[panel.ID] = struct{}{}
-	}
-
-	size, err := encodedDashboardPanelsSize(panels)
-	if err != nil {
-		return status.Error(codes.Internal, "failed to validate panel size")
-	}
-	if size > MaxDashboardPayloadBytes {
-		return status.Errorf(codes.InvalidArgument, "panels payload exceeds %d bytes", MaxDashboardPayloadBytes)
-	}
-
-	layoutIDs := make(map[string]struct{}, len(layout))
-	for _, item := range layout {
-		if item.I == "" {
-			return status.Error(codes.InvalidArgument, "layout item i is required")
-		}
-		if _, exists := layoutIDs[item.I]; exists {
-			return status.Errorf(codes.InvalidArgument, "duplicate layout id %q", item.I)
-		}
-		layoutIDs[item.I] = struct{}{}
-
-		if _, ok := panelIDs[item.I]; !ok {
-			return status.Errorf(codes.InvalidArgument, "layout item %q does not reference any panel", item.I)
-		}
-		if item.W <= 0 || item.H <= 0 {
-			return status.Errorf(codes.InvalidArgument, "layout item %q must have positive width and height", item.I)
-		}
-		if item.X < 0 || item.Y < 0 {
-			return status.Errorf(codes.InvalidArgument, "layout item %q must have non-negative x and y", item.I)
-		}
-	}
-
 	return nil
 }

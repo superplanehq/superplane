@@ -84,10 +84,10 @@ func TestCreateCanvasDuplicateName(t *testing.T) {
 	}
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, nil)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, workflow, nil, nil)
 	require.NoError(t, err)
 
-	_, err = CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, nil)
+	_, err = CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, workflow, nil, nil)
 	require.Error(t, err)
 	require.Equal(t, codes.AlreadyExists, status.Code(err))
 }
@@ -107,7 +107,7 @@ func TestCreateCanvasRejectsWhitespaceOnlyName(t *testing.T) {
 	}
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, canvas, nil, nil)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, canvas, nil, nil)
 	require.Error(t, err)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 	require.Equal(t, "canvas name is required", status.Convert(err).Message())
@@ -131,7 +131,7 @@ func TestCreateCanvasInheritsOrganizationChangeManagementWhenEnabled(t *testing.
 	}
 
 	baseURL := "https://example.com"
-	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, nil)
+	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, workflow, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.NotNil(t, response.Canvas)
@@ -167,7 +167,7 @@ func TestCreateCanvasResponseShowsCanvasLevelChangeManagementWhenEnabled(t *test
 	}
 
 	baseURL := "https://example.com"
-	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, canvas, nil, nil)
+	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, canvas, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.NotNil(t, response.Canvas)
@@ -192,7 +192,7 @@ func TestCreateCanvasOnFreshOrganization(t *testing.T) {
 	}
 
 	baseURL := "https://example.com"
-	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, canvas, nil, nil)
+	response, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, canvas, nil, nil)
 	require.NoError(t, err)
 	require.NotNil(t, response)
 	require.NotNil(t, response.Canvas)
@@ -248,7 +248,7 @@ func TestCreateCanvasRejectsInvalidEdgeChannel(t *testing.T) {
 	}
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, canvas, nil, nil)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, canvas, nil, nil)
 	require.Error(t, err)
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 	require.Contains(t, status.Convert(err).Message(), `source node http-1 does not have output channel "default"`)
@@ -282,7 +282,7 @@ func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
 	}
 
 	baseURL := "https://example.com"
-	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, baseURL, r.Organization.ID, workflow, nil, service)
+	_, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, r.GitProvider, baseURL, r.Organization.ID, workflow, nil, service)
 	require.Error(t, err)
 	require.Equal(t, codes.ResourceExhausted, status.Code(err))
 	require.Equal(t, "organization canvas limit exceeded", status.Convert(err).Message())

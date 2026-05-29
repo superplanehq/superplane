@@ -73,6 +73,40 @@ service Canvases {
     };
   }
 
+   rpc GetCanvasRepository(GetCanvasRepositoryRequest) returns (GetCanvasRepositoryResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/repository"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Get canvas repository";
+      description: "Returns information about the canvas git repository";
+      tags: "CanvasRepository";
+    };
+  }
+
+  rpc ListCanvasRepositoryFiles(ListCanvasRepositoryFilesRequest) returns (ListCanvasRepositoryFilesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/repository/files"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List canvas repository files";
+      description: "Lists files in the git repository attached to a canvas";
+      tags: "CanvasRepository";
+    };
+  }
+
+  rpc CommitCanvasRepositoryFiles(CommitCanvasRepositoryFilesRequest) returns (CommitCanvasRepositoryFilesResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/repository/commits"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Commit canvas repository files";
+      description: "Commits file additions, updates, and deletions to the git repository attached to a canvas";
+      tags: "CanvasRepository";
+    };
+  }
+
   rpc CreateCanvasVersion(CreateCanvasVersionRequest) returns (CreateCanvasVersionResponse) {
     option (google.api.http) = {
       post: "/api/v1/canvases/{canvas_id}/versions"
@@ -497,6 +531,66 @@ message CanvasAutoLayout {
   Algorithm algorithm = 1;
   repeated string node_ids = 2;
   Scope scope = 3;
+}
+
+message CanvasRepository {
+  message Metadata {
+    string canvas_id = 1;
+    google.protobuf.Timestamp updated_at = 7;
+  }
+
+  enum State {
+    STATE_UNSPECIFIED = 0;
+    STATE_PENDING = 1;
+    STATE_READY = 2;
+    STATE_ERROR = 3;
+  }
+
+  message Status {
+    State state = 1;
+    string head_sha = 2;
+    optional string error = 3;
+  }
+
+  Metadata metadata = 1;
+  Status status = 2;
+}
+
+message GetCanvasRepositoryRequest {
+  string canvas_id = 1;
+}
+
+message GetCanvasRepositoryResponse {
+  CanvasRepository repository = 1;
+}
+
+message ListCanvasRepositoryFilesRequest {
+  string canvas_id = 1;
+}
+
+message CanvasRepositoryFile {
+  string path = 1;
+}
+
+message ListCanvasRepositoryFilesResponse {
+  repeated CanvasRepositoryFile files = 1;
+}
+
+message CanvasRepositoryFileOperation {
+  string path = 1;
+  bytes content = 2;
+  bool delete = 3;
+}
+
+message CommitCanvasRepositoryFilesRequest {
+  string canvas_id = 1;
+  string expected_head_sha = 2;
+  string message = 3;
+  repeated CanvasRepositoryFileOperation operations = 4;
+}
+
+message CommitCanvasRepositoryFilesResponse {
+  string commit_sha = 1;
 }
 
 message CreateCanvasVersionRequest {
@@ -1040,6 +1134,7 @@ message CanvasRun {
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
   google.protobuf.Timestamp finished_at = 9;
+  string version_id = 10;
 }
 
 message ListEventExecutionsRequest {
@@ -1189,10 +1284,12 @@ message CanvasDashboard {
   repeated DashboardPanel panels = 2;
   repeated DashboardLayoutItem layout = 3;
   google.protobuf.Timestamp updated_at = 4;
+  string version_id = 5;
 }
 
 message GetCanvasDashboardRequest {
   string canvas_id = 1;
+  optional string version_id = 2;
 }
 
 message GetCanvasDashboardResponse {
@@ -1203,6 +1300,7 @@ message UpdateCanvasDashboardRequest {
   string canvas_id = 1;
   repeated DashboardPanel panels = 2;
   repeated DashboardLayoutItem layout = 3;
+  optional string version_id = 4;
 }
 
 message UpdateCanvasDashboardResponse {

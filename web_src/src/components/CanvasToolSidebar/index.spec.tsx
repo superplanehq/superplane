@@ -1,7 +1,8 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CanvasToolSidebar } from ".";
+import type { CanvasToolSidebarState } from "./useCanvasToolSidebarState";
 
 const richMessageRenderSpy = vi.fn();
 
@@ -53,7 +54,7 @@ vi.mock("@/components/AgentSidebar/widgets/RichMessage", () => ({
   },
 }));
 
-function makeToolSidebarState() {
+function makeToolSidebarState(overrides: Partial<CanvasToolSidebarState> = {}) {
   return {
     canvasId: "canvas-1",
     organizationId: "org-1",
@@ -61,11 +62,13 @@ function makeToolSidebarState() {
     readOnly: false,
     isToolSidebarOpen: true,
     showToolSidebarToggle: true,
+    isAgentEnabled: true,
     handleToolSidebarToggle: vi.fn(),
     openToolSidebar: vi.fn(),
     closeToolSidebar: vi.fn(),
     agentMode: "operator" as const,
     switchAgentMode: vi.fn(),
+    ...overrides,
   };
 }
 
@@ -113,34 +116,155 @@ describe("CanvasToolSidebar", () => {
     expect(screen.getByPlaceholderText("Ask the agent…")).toBeInTheDocument();
   });
 
+  it("hides the agent tab when managed agents are disabled", () => {
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })}
+        versionsContent={<div>Versions content</div>}
+      />,
+    );
+
+    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Runs" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Versions" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Versions" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Versions content")).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Ask the agent…")).not.toBeInTheDocument();
+  });
+
+  it("opens version control on first open when managed agents are disabled", async () => {
+    const onOpenVersionControl = vi.fn();
+    const onVersionControlAutoOpened = vi.fn();
+
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })}
+        mode="version-live"
+        onOpenVersionControl={onOpenVersionControl}
+        onVersionControlAutoOpened={onVersionControlAutoOpened}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Versions" })).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(onOpenVersionControl).toHaveBeenCalledTimes(1));
+    expect(onVersionControlAutoOpened).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not auto-open version control while the sidebar is closed", () => {
+    const onOpenVersionControl = vi.fn();
+    const onVersionControlAutoOpened = vi.fn();
+    const openToolSidebar = vi.fn();
+
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={makeToolSidebarState({
+          isAgentEnabled: false,
+          isToolSidebarOpen: false,
+          openToolSidebar,
+        })}
+        mode="version-live"
+        onOpenVersionControl={onOpenVersionControl}
+        onVersionControlAutoOpened={onVersionControlAutoOpened}
+      />,
+    );
+
+    expect(screen.queryByRole("tab", { name: "Versions" })).not.toBeInTheDocument();
+    expect(openToolSidebar).not.toHaveBeenCalled();
+    expect(onOpenVersionControl).not.toHaveBeenCalled();
+    expect(onVersionControlAutoOpened).not.toHaveBeenCalled();
+  });
+
+  it("does not auto-open version control after it already auto-opened for the canvas", () => {
+    const onOpenVersionControl = vi.fn();
+    const onVersionControlAutoOpened = vi.fn();
+
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })}
+        mode="version-live"
+        hasAutoOpenedVersionControl={true}
+        onOpenVersionControl={onOpenVersionControl}
+        onVersionControlAutoOpened={onVersionControlAutoOpened}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Versions" })).toHaveAttribute("aria-selected", "true");
+    expect(onOpenVersionControl).not.toHaveBeenCalled();
+    expect(onVersionControlAutoOpened).not.toHaveBeenCalled();
+  });
+
+  it("does not switch from runs mode to the agent tab when managed agents are disabled", () => {
+    const onExitRunsMode = vi.fn();
+
+    render(
+      <CanvasToolSidebar
+        toolSidebarState={makeToolSidebarState({ isAgentEnabled: false })}
+        mode="runs"
+        onExitRunsMode={onExitRunsMode}
+        runsContent={<div>Runs content</div>}
+      />,
+    );
+
+    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
+    expect(screen.getByText("Runs content")).toBeInTheDocument();
+  });
+
+  it("keeps versions selected when version control closes and managed agents are disabled", () => {
+    const toolSidebarState = makeToolSidebarState({ isAgentEnabled: false });
+    const { rerender } = render(
+      <CanvasToolSidebar
+        toolSidebarState={toolSidebarState}
+        isVersionControlOpen={true}
+        runsContent={<div>Runs content</div>}
+        versionsContent={<div>Versions content</div>}
+      />,
+    );
+
+    expect(screen.queryByRole("tab", { name: "Agent" })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Versions" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Versions content")).toBeInTheDocument();
+
+    rerender(
+      <CanvasToolSidebar
+        toolSidebarState={toolSidebarState}
+        isVersionControlOpen={false}
+        runsContent={<div>Runs content</div>}
+        versionsContent={<div>Versions content</div>}
+      />,
+    );
+
+    expect(screen.getByRole("tab", { name: "Versions" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText("Versions content")).toBeInTheDocument();
+  });
+
   it("enters versions from the versions tab", () => {
-    const onToggleVersionControl = vi.fn();
+    const onOpenVersionControl = vi.fn();
 
     render(
       <CanvasToolSidebar
         toolSidebarState={makeToolSidebarState()}
         mode="version-live"
         isVersionControlOpen={false}
-        onToggleVersionControl={onToggleVersionControl}
+        onOpenVersionControl={onOpenVersionControl}
         versionsContent={<div>Versions content</div>}
       />,
     );
 
     fireEvent.click(screen.getByRole("tab", { name: "Versions" }));
 
-    expect(onToggleVersionControl).toHaveBeenCalledTimes(1);
+    expect(onOpenVersionControl).toHaveBeenCalledTimes(1);
     expect(screen.getByText("Versions content")).toBeInTheDocument();
   });
 
   it("exits versions when switching back to the agent tab", () => {
-    const onToggleVersionControl = vi.fn();
+    const onCloseVersionControl = vi.fn();
 
     render(
       <CanvasToolSidebar
         toolSidebarState={makeToolSidebarState()}
         mode="version-live"
         isVersionControlOpen={true}
-        onToggleVersionControl={onToggleVersionControl}
+        onCloseVersionControl={onCloseVersionControl}
         versionsContent={<div>Versions content</div>}
       />,
     );
@@ -149,47 +273,8 @@ describe("CanvasToolSidebar", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Agent" }));
 
-    expect(onToggleVersionControl).toHaveBeenCalledTimes(1);
+    expect(onCloseVersionControl).toHaveBeenCalledTimes(1);
     expect(screen.getByPlaceholderText("Ask the agent…")).toBeInTheDocument();
-  });
-
-  it("exits runs mode before closing the sidebar from the runs tab", () => {
-    const toolSidebarState = makeToolSidebarState();
-    const onExitRunsMode = vi.fn();
-
-    render(
-      <CanvasToolSidebar
-        toolSidebarState={toolSidebarState}
-        mode="runs"
-        onExitRunsMode={onExitRunsMode}
-        runsContent={<div>Runs content</div>}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Close sidebar" }));
-
-    expect(onExitRunsMode).toHaveBeenCalledTimes(1);
-    expect(toolSidebarState.closeToolSidebar).toHaveBeenCalledTimes(1);
-  });
-
-  it("exits versions before closing the sidebar from the versions tab", () => {
-    const toolSidebarState = makeToolSidebarState();
-    const onToggleVersionControl = vi.fn();
-
-    render(
-      <CanvasToolSidebar
-        toolSidebarState={toolSidebarState}
-        mode="version-live"
-        isVersionControlOpen={true}
-        onToggleVersionControl={onToggleVersionControl}
-        versionsContent={<div>Versions content</div>}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", { name: "Close sidebar" }));
-
-    expect(onToggleVersionControl).toHaveBeenCalledTimes(1);
-    expect(toolSidebarState.closeToolSidebar).toHaveBeenCalledTimes(1);
   });
 
   it("does not re-render agent messages while typing in the composer", async () => {
@@ -235,7 +320,8 @@ describe("CanvasToolSidebar", () => {
     expect(input).toHaveValue("second");
   });
 
-  it("shows Send and Stop while an outcome is still active after the chat turn ends", () => {
+  it("allows sending while an outcome is still active after the chat turn ends", async () => {
+    const user = userEvent.setup();
     sessionStorage.setItem(
       "outcome-chat-1",
       JSON.stringify({
@@ -251,6 +337,8 @@ describe("CanvasToolSidebar", () => {
     render(<CanvasToolSidebar toolSidebarState={makeToolSidebarState()} />);
 
     expect(screen.getByTestId("agent-stop-button")).toBeInTheDocument();
-    expect(screen.getByTestId("agent-send-message-button")).toBeInTheDocument();
+
+    await user.type(screen.getByTestId("agent-input"), "Keep going");
+    expect(screen.getByTestId("agent-send-message-button")).toBeEnabled();
   });
 });

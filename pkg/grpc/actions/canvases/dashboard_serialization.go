@@ -1,7 +1,6 @@
 package canvases
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/superplanehq/superplane/pkg/models"
@@ -10,8 +9,12 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-const MaxDashboardPanels = 50
-const MaxDashboardPayloadBytes = 1024 * 1024
+// MaxDashboardPanels and MaxDashboardPayloadBytes are re-exported from the
+// models package so existing gRPC tests/callers keep working unchanged.
+const (
+	MaxDashboardPanels       = models.MaxDashboardPanels
+	MaxDashboardPayloadBytes = models.MaxDashboardPayloadBytes
+)
 
 func serializeCanvasDashboard(dashboard *models.CanvasDashboard) (*pb.CanvasDashboard, error) {
 	panels := dashboard.Panels.Data()
@@ -21,7 +24,7 @@ func serializeCanvasDashboard(dashboard *models.CanvasDashboard) (*pb.CanvasDash
 	for _, panel := range panels {
 		var content *structpb.Value
 		if panel.Content != nil {
-			value, err := structpb.NewValue(toStructpbCompatible(panel.Content))
+			value, err := newStructpbValue(panel.Content)
 			if err != nil {
 				return nil, fmt.Errorf("invalid content for panel %q: %w", panel.ID, err)
 			}
@@ -55,9 +58,10 @@ func serializeCanvasDashboard(dashboard *models.CanvasDashboard) (*pb.CanvasDash
 	}
 
 	resp := &pb.CanvasDashboard{
-		CanvasId: dashboard.CanvasID.String(),
-		Panels:   pbPanels,
-		Layout:   pbLayout,
+		CanvasId:  dashboard.CanvasID.String(),
+		VersionId: dashboard.VersionID.String(),
+		Panels:    pbPanels,
+		Layout:    pbLayout,
 	}
 	if !dashboard.UpdatedAt.IsZero() {
 		resp.UpdatedAt = timestamppb.New(dashboard.UpdatedAt)
@@ -112,31 +116,4 @@ func deserializeDashboardLayout(in []*pb.DashboardLayoutItem) []models.Dashboard
 		out = append(out, converted)
 	}
 	return out
-}
-
-func toStructpbCompatible(v any) any {
-	switch t := v.(type) {
-	case map[string]any:
-		out := make(map[string]any, len(t))
-		for k, item := range t {
-			out[k] = toStructpbCompatible(item)
-		}
-		return out
-	case []any:
-		out := make([]any, len(t))
-		for i, item := range t {
-			out[i] = toStructpbCompatible(item)
-		}
-		return out
-	default:
-		return v
-	}
-}
-
-func encodedDashboardPanelsSize(panels []models.DashboardPanel) (int, error) {
-	encoded, err := json.Marshal(panels)
-	if err != nil {
-		return 0, err
-	}
-	return len(encoded), nil
 }

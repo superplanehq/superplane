@@ -10,6 +10,10 @@ import { deleteIncidentMapper } from "./delete_incident";
 import { getWorkflowMapper } from "./get_workflow";
 import { transitionIssueMapper } from "./transition_issue";
 import { approveWorkflowMapper } from "./approve_workflow";
+import { createHeartbeatMapper } from "./create_heartbeat";
+import { pingHeartbeatMapper } from "./ping_heartbeat";
+import { updateHeartbeatMapper } from "./update_heartbeat";
+import { deleteHeartbeatMapper } from "./delete_heartbeat";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createIssue: createIssueMapper,
@@ -22,6 +26,10 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getWorkflow: getWorkflowMapper,
   transitionIssue: transitionIssueMapper,
   approveWorkflow: approveWorkflowMapper,
+  createHeartbeat: createHeartbeatMapper,
+  pingHeartbeat: pingHeartbeatMapper,
+  updateHeartbeat: updateHeartbeatMapper,
+  deleteHeartbeat: deleteHeartbeatMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {};
@@ -37,4 +45,8 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getWorkflow: buildActionStateRegistry("retrieved"),
   transitionIssue: buildActionStateRegistry("transitioned"),
   approveWorkflow: buildActionStateRegistry("decided"),
+  createHeartbeat: buildActionStateRegistry("created"),
+  pingHeartbeat: buildActionStateRegistry("pinged"),
+  updateHeartbeat: buildActionStateRegistry("updated"),
+  deleteHeartbeat: buildActionStateRegistry("deleted"),
 };

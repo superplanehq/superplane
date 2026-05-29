@@ -102,7 +102,7 @@ func (g *GCP) Instructions() string {
 
 - ` + "`roles/logging.configWriter`" + ` — create logging sinks for event triggers
 - ` + "`roles/pubsub.admin`" + ` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management)`
+- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management, ` + "`roles/monitoring.viewer`" + ` to read VM metrics)`
 }
 
 func (g *GCP) Configuration() []configuration.Field {
@@ -162,6 +162,10 @@ func (g *GCP) Configuration() []configuration.Field {
 func (g *GCP) Actions() []core.Action {
 	return []core.Action{
 		&compute.CreateVM{},
+		&compute.DeleteVMInstance{},
+		&compute.ManageVMInstancePower{},
+		&compute.UpdateVMInstanceType{},
+		&compute.GetVMInstanceMetrics{},
 		&cloudbuild.CreateBuild{},
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
@@ -915,6 +919,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListMachineFamilyResources(reqCtx, client, p["zone"])
 	case compute.ResourceTypeMachineType:
 		return compute.ListMachineTypeResources(reqCtx, client, p["zone"], p["machineFamily"])
+	case compute.ResourceTypeInstanceMachineType:
+		return compute.ListMachineTypeResourcesForInstance(reqCtx, client, p["instance"])
 	case compute.ResourceTypePublicImages:
 		return compute.ListPublicImageResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeCustomImages:
@@ -935,6 +941,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListAddressResources(reqCtx, client, p["project"], p["region"])
 	case compute.ResourceTypeFirewall:
 		return compute.ListFirewallResources(reqCtx, client, p["project"])
+	case compute.ResourceTypeInstance:
+		return compute.ListInstanceResources(reqCtx, client, p["project"])
 	case clouddns.ResourceTypeManagedZone:
 		return clouddns.ListManagedZoneResources(reqCtx, client, p["projectId"])
 	case cloudbuild.ResourceTypeTrigger:

@@ -1,9 +1,6 @@
-import { Badge } from "@/components/ui/badge";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
-import { countNodesByType, extractIntegrations, getTemplateTags } from "@/pages/canvas/templateMetadata";
 import { useNodeExecutionStore } from "@/stores/nodeExecutionStore";
-import { getIntegrationIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { useQueryClient } from "@tanstack/react-query";
 import * as yaml from "js-yaml";
 import debounce from "lodash.debounce";
@@ -36,7 +33,6 @@ import {
   canvasKeys,
   useActOnCanvasChangeRequest,
   useCanvas,
-  useCanvasDashboard,
   useCanvasChangeRequests,
   useCanvasMemoryEntries,
   useCanvasVersion,
@@ -53,19 +49,16 @@ import {
   useInfiniteCanvasLiveVersions,
   useResolveCanvasChangeRequest,
   useTriggers,
-  useUpdateCanvasDashboard,
   useUpdateCanvasVersion,
   useWidgets,
 } from "@/hooks/useCanvasData";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
-import { useExperimentalFeature } from "@/hooks/useExperimentalFeature";
 import { useMe } from "@/hooks/useMe";
 import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { analytics } from "@/lib/analytics";
-// getColorClass moved to workflowPageHelpers
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
@@ -74,7 +67,7 @@ import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { getActiveNoteId, restoreActiveNoteFocus } from "@/ui/annotationComponent/noteFocus";
 import { buildBuildingBlockCategories } from "@/ui/buildingBlocks";
 import type { LogEntry } from "@/ui/CanvasLogSidebar";
-import type { CanvasEdge, CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
+import type { CanvasNode, NewNodeData, NodeEditData, SidebarData } from "@/ui/CanvasPage";
 import { CANVAS_SIDEBAR_STORAGE_KEY, CanvasPage, type MissingIntegration } from "@/ui/CanvasPage";
 import type { EventState, EventStateMap } from "@/ui/componentBase";
 import type { TabData } from "@/ui/componentSidebar/SidebarEventItem/SidebarEventItem";
@@ -83,16 +76,28 @@ import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
-import { DashboardOverlay } from "./dashboard/DashboardOverlay";
+import { deriveDashboardNodeStatuses } from "./dashboard/deriveNodeStatuses";
+import { useDashboardModeActions } from "./dashboard/useDashboardModeActions";
+import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
+import { WorkflowDashboardOverlay } from "./dashboard/WorkflowDashboardOverlay";
+import { buildWorkflowFiles } from "./lib/canvas-files";
+import { WorkflowFilesOverlayLayer } from "./WorkflowFilesOverlayLayer";
+import { CanvasYamlModal } from "./CanvasYamlModal";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
+import { useFilesModeActions } from "./useFilesModeActions";
+import { useMemoryModeActions } from "./useMemoryModeActions";
+import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
+import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
-import { CanvasMemoryModal } from "./CanvasMemoryModal";
+import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
+import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
-import { CanvasYamlModal } from "./CanvasYamlModal";
+import { WorkflowTemplateBanner } from "./WorkflowTemplateBanner";
 import { getChangeRequestReviewPhase } from "./changeRequestReviewActions";
 import { buildDraftNodeDiffSummary, hasDraftVersusLiveGraphDiff } from "./draftNodeDiff";
 import { shouldPreserveDraftSpec } from "./lib/draft-canvas-sync";
+import { activateDraftVersion, clearPublishedDraftVersion as clearDraftVersion } from "./lib/draft-spec-cache";
 import {
   isDraftVersion,
   isPublishedVersion,
@@ -101,25 +106,25 @@ import {
   versionSortValue,
 } from "./lib/canvas-versions";
 import { buildChangeRequestVersionRowsForStatus } from "./lib/change-requests";
-import {
-  getNodeIntegrationName,
-  overlayIntegrationWarnings,
-  stripCanvasNodeSetupWarningsForRunsView,
-} from "./lib/node-integrations";
+import { getNodeIntegrationName, overlayIntegrationWarnings } from "./lib/node-integrations";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
 import { getVersionActionAvailability } from "./lib/version-action-state";
 import { getCustomFieldRenderer, getState, getStateMap } from "./mappers";
 import { resolveExecutionErrors } from "./mappers/dash0";
 import type { TriggerActionModal } from "./mappers/types";
 import { useCancelExecutionHandler } from "./useCancelExecutionHandler";
+import { useCanvasYamlDiffModal } from "./useCanvasYamlDiffModal";
 import { useCanvasYaml } from "./useCanvasYaml";
+import { useCanvasConsoleVersionDiff, useDraftVisualDiff } from "./useDraftVisualDiff";
 import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
+import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
+import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
+  clearComponentSidebarSearchParams,
   getExitEditModeDisabledTooltip,
   getRunActionState,
-  getWorkflowCanvasStateMode,
-  getWorkflowHeaderMode,
+  getWorkflowViewPresentation,
   readStoredBoolean,
 } from "./viewState";
 import {
@@ -136,18 +141,17 @@ import { actionsFromCapabilities, triggersFromCapabilities } from "@/lib/capabil
 import {
   getCanvasLogNodesSignature,
   getNodeAnalyticsProps,
-  hydrateRunExecution,
+  isCanvasLoadNotFoundError,
   prepareData,
   prepareSidebarData,
 } from "./workflowPageHelpers";
-/** Experimental feature id; must match `FeatureDashboards` in pkg/features/features.go. */
-const EXPERIMENTAL_FEATURE_DASHBOARDS = "dashboards";
 const CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY = "canvas-auto-layout-on-update-enabled";
 const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const LOCAL_CANVAS_LIFECYCLE_ECHO_TTL_MS = 5000;
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
 const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
+
 type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
 type CanvasSaveResult = {
   status: "saved" | "replaced" | "stale";
@@ -177,18 +181,22 @@ export function WorkflowPageV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { data: me } = useMe();
-  const { has: hasExperimentalFeature } = useExperimentalFeature(organizationId);
-  const dashboardsFeatureEnabled = hasExperimentalFeature(EXPERIMENTAL_FEATURE_DASHBOARDS);
   const {
     isRunsMode,
     setIsRunsMode,
     isDashboardMode,
     setIsDashboardMode,
+    isMemoryMode,
+    setIsMemoryMode,
+    isFilesMode,
+    setIsFilesMode,
     isDashboardAddPanelOpen,
     setIsDashboardAddPanelOpen,
+    isDashboardYamlOpen,
+    setIsDashboardYamlOpen,
     selectedRunId,
     setSelectedRunId,
-  } = useWorkflowViewSearchParams(searchParams, setSearchParams, dashboardsFeatureEnabled);
+  } = useWorkflowViewSearchParams(searchParams, setSearchParams);
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
@@ -214,7 +222,6 @@ export function WorkflowPageV2() {
   const { data: widgets = [], isLoading: widgetsLoading } = useWidgets();
   const { data: availableIntegrations = [], isLoading: integrationsLoading } = useAvailableIntegrations();
   const canReadIntegrations = canAct("integrations", "read");
-  const canCreateIntegrations = canAct("integrations", "create");
   const canUpdateIntegrations = canAct("integrations", "update");
   const { data: integrations = [] } = useConnectedIntegrations(organizationId!, { enabled: canReadIntegrations });
   const {
@@ -231,7 +238,7 @@ export function WorkflowPageV2() {
   });
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
-  const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true, 10);
+  const canvasLiveVersionsQuery = useInfiniteCanvasLiveVersions(organizationId!, canvasId!, true);
   const { data: canvasChangeRequests = [] } = useCanvasChangeRequests(organizationId!, canvasId!);
   const paginatedVersions = useMemo(
     () => (canvasLiveVersionsQuery.data?.pages || []).flatMap((page) => page?.versions || []),
@@ -532,13 +539,17 @@ export function WorkflowPageV2() {
     () => runsData.runs.find((run) => run.id === selectedRunId) || null,
     [runsData.runs, selectedRunId],
   );
-  // Prefetch full executions (with metadata/outputs) for the selected run as soon
-  // as the user picks it in the sidebar. Mappers like wait/timegate compute states
-  // such as "pushed through" from execution.outputs, which selectedRun.executions
-  // (lightweight refs) don't carry. The same query backs RunNodeDetailModal, so the
-  // payload tab also opens without a follow-up fetch.
   const selectedRunExecutionsQuery = useEventExecutions(canvasId!, selectedRun?.rootEvent?.id ?? null);
   const selectedRunFullExecutions = selectedRunExecutionsQuery.data?.executions;
+  const { selectedRunCanvas, isSelectedRunVersionLoading } = useSelectedRunCanvas({
+    organizationId: organizationId!,
+    canvasId: canvasId!,
+    selectedRun,
+    isRunsMode,
+    liveCanvasVersionId,
+    canvas,
+    liveCanvas,
+  });
   const componentIconMap = useMemo(() => {
     const map: Record<string, string> = {};
     for (const c of components) {
@@ -553,25 +564,23 @@ export function WorkflowPageV2() {
     data: canvasMemoryEntries = [],
     isLoading: canvasMemoryLoading,
     error: canvasMemoryError,
-  } = useCanvasMemoryEntries(canvasId!, isViewingLiveVersion);
+  } = useCanvasMemoryEntries(canvasId!, shouldLoadCanvasMemoryEntries(isMemoryMode, isViewingLiveVersion));
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
   const canUpdateCanvas = canAct("canvases", "update");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
-
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
-  const dashboardQuery = useCanvasDashboard(canvasId!, !isTemplate && dashboardsFeatureEnabled);
-  const updateDashboardMutation = useUpdateCanvasDashboard(canvasId!);
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
-  const isReadOnly = isTemplate || !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion;
+  const canvasAccess = { canUpdateCanvas, isTemplate, canvasDeletedRemotely };
+  const canActOnCanvas = canUpdateCanvas && !isTemplate && !canvasDeletedRemotely;
+  const isReadOnly = !canActOnCanvas || !hasEditableVersion;
   const [isUseTemplateOpen, setIsUseTemplateOpen] = useState(false);
-  const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
-  const [isMemoryViewModalOpen, setIsMemoryViewModalOpen] = useState(false);
   const [isVersionControlOpen, setIsVersionControlOpen] = useState(() =>
     readStoredBoolean(CANVAS_VERSION_CONTROL_STORAGE_KEY),
   );
   /** After creating a change request, hide draft Discard until the user enters edit mode again. */
   const [suppressUnpublishedDraftDiscard, setSuppressUnpublishedDraftDiscard] = useState(false);
+  const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
   const [versionNodeDiffContext, setVersionNodeDiffContext] = useState<CanvasVersionNodeDiffContext | null>(null);
   const versionNodeDiffLiveChangeRequest = useMemo(() => {
     const fallback = versionNodeDiffContext?.changeRequest;
@@ -589,10 +598,6 @@ export function WorkflowPageV2() {
   }, [canvasChangeRequests, resolvingConflictChangeRequestId]);
   const createWorkflowMutation = useCreateCanvas(organizationId!);
 
-  // Warm up org users and roles cache so approval specs can pretty-print
-  // user IDs as emails and role names as display names.
-  // We don't use the values directly here; loading them populates the
-  // react-query cache which prepareApprovalNode reads from.
   useOrganizationRoles(organizationId!);
 
   /**
@@ -602,6 +607,15 @@ export function WorkflowPageV2() {
   const hasFitToViewRef = useRef(false);
   const runsHasFitToViewRef = useRef(false);
   const hasSyncedVersionFromURLRef = useRef(false);
+  const autoOpenedVersionControlCanvasIdsRef = useRef<Set<string>>(new Set());
+  const hasAutoOpenedVersionControl = Boolean(canvasId && autoOpenedVersionControlCanvasIdsRef.current.has(canvasId));
+  const handleVersionControlAutoOpened = useCallback(() => {
+    if (!canvasId) {
+      return;
+    }
+
+    autoOpenedVersionControlCanvasIdsRef.current.add(canvasId);
+  }, [canvasId]);
 
   /**
    * Capture the initial node focus from the URL so we only zoom once.
@@ -635,7 +649,6 @@ export function WorkflowPageV2() {
     }
   }
   if (isSidebarOpenRef.current === null && canvas) {
-    // Initialize on first render
     isSidebarOpenRef.current = canvas.spec?.nodes?.length === 0;
   }
 
@@ -681,14 +694,6 @@ export function WorkflowPageV2() {
     setCreateChangeRequestTitle(`v${nextVersionNumber}`);
     setCreateChangeRequestDescription("");
   }, [isCreateChangeRequestMode, canvasChangeRequests.length]);
-
-  useEffect(() => {
-    if (!hasEditableVersion || !isVersionControlOpen) {
-      return;
-    }
-
-    setIsVersionControlOpen(false);
-  }, [hasEditableVersion, isVersionControlOpen]);
 
   const lastSavedWorkflowRef = useRef<CanvasesCanvas | null>(null);
   const lastSavedWorkflowSignatureRef = useRef("");
@@ -759,24 +764,16 @@ export function WorkflowPageV2() {
   // Redirect to home page if workflow is not found (404)
   // Use replace to avoid back button issues and prevent 404 flash
   useEffect(() => {
-    if (canvasError && !canvasLoading) {
-      // Check if it's a 404 error
-      const is404 =
-        (canvasError as any)?.status === 404 ||
-        (canvasError as any)?.response?.status === 404 ||
-        (canvasError as any)?.code === "NOT_FOUND" ||
-        (canvasError as any)?.message?.includes("not found") ||
-        (canvasError as any)?.message?.includes("404");
-
-      if (is404 && organizationId && !canvasDeletedRemotely) {
-        navigate(`/${organizationId}`, { replace: true });
-      }
+    if (!canvasError || canvasLoading) {
+      return;
+    }
+    if (isCanvasLoadNotFoundError(canvasError) && organizationId && !canvasDeletedRemotely) {
+      navigate(`/${organizationId}`, { replace: true });
     }
   }, [canvasError, canvasLoading, navigate, organizationId, canvasDeletedRemotely]);
   useEffect(() => {
     if (hasTrackedCanvasView.current) return;
-    if (!canvas || !canvasId || !organizationId) return;
-    if (canvasLoading) return;
+    if (!canvas || !canvasId || !organizationId || canvasLoading) return;
     hasTrackedCanvasView.current = true;
     analytics.canvasView(canvasId, canvas.spec?.nodes?.length ?? 0, canvas.spec?.edges?.length ?? 0, organizationId);
   }, [canvas, canvasId, organizationId, canvasLoading]);
@@ -888,7 +885,7 @@ export function WorkflowPageV2() {
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.delete("version");
-        return next;
+        return clearComponentSidebarSearchParams(next);
       });
       hasSyncedVersionFromURLRef.current = true;
       return;
@@ -1051,6 +1048,11 @@ export function WorkflowPageV2() {
     () => (isViewingLiveVersion ? nodeExecutionsMap : {}),
     [isViewingLiveVersion, nodeExecutionsMap],
   );
+  const dashboardNodeStatuses = useMemo(
+    () => deriveDashboardNodeStatuses(visibleNodeExecutionsMap),
+    [visibleNodeExecutionsMap],
+  );
+  const handleDashboardTriggerNode = useDashboardTriggerNode({ canvasId, canvas: canvas ?? undefined, queryClient });
   const visibleNodeQueueItemsMap = useMemo(
     () => (isViewingLiveVersion ? nodeQueueItemsMap : {}),
     [isViewingLiveVersion, nodeQueueItemsMap],
@@ -1128,31 +1130,32 @@ export function WorkflowPageV2() {
 
     return release;
   }, []);
-
+  const canvasConsoleVersionDiff = useCanvasConsoleVersionDiff({
+    canvasId: canvasId!,
+    versionIds: { active: activeCanvasVersionId, draft: latestDraftVersion?.metadata?.id, live: liveCanvasVersionId },
+    hasDraftGraphDiffVersusLive,
+    suppressUnpublishedDraftDiscard,
+    enabled: !isTemplate,
+    registerIgnoredCanvasVersionUpdatedEcho,
+  });
+  const { dashboardQuery, updateDashboardMutation, draftChangeIndicators, hasDraftDiffVersusLive } =
+    canvasConsoleVersionDiff;
   const consumeIgnoredCanvasUpdatedEcho = useCallback(() => {
     const release = ignoredCanvasUpdatedEchoReleasesRef.current.pop();
-    if (!release) {
-      return false;
-    }
+    if (!release) return false;
 
     release();
     return true;
   }, []);
 
   const consumeIgnoredCanvasVersionUpdatedEcho = useCallback((versionId?: string) => {
-    if (!versionId) {
-      return false;
-    }
+    if (!versionId) return false;
 
     const releases = ignoredCanvasVersionUpdatedEchoReleasesRef.current.get(versionId);
-    if (!releases) {
-      return false;
-    }
+    if (!releases) return false;
 
     const release = releases.pop();
-    if (!release) {
-      return false;
-    }
+    if (!release) return false;
 
     if (releases.length === 0) {
       ignoredCanvasVersionUpdatedEchoReleasesRef.current.delete(versionId);
@@ -1392,7 +1395,7 @@ export function WorkflowPageV2() {
       }
 
       activeCanvasVersionIdRef.current = version.metadata?.id || "";
-      setActiveCanvasVersion(version);
+      activateDraftVersion(draftCanvasSpecsRef.current, setActiveCanvasVersion, setDraftCanvasSpec, version);
       setHasUnsavedChanges(false);
       setHasNonPositionalUnsavedChanges(false);
       setLastSavedWorkflowSnapshot(null);
@@ -1401,7 +1404,7 @@ export function WorkflowPageV2() {
         if (version.metadata?.id) {
           next.set("version", version.metadata.id);
         }
-        return next;
+        return clearComponentSidebarSearchParams(next);
       });
 
       queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
@@ -1846,74 +1849,33 @@ export function WorkflowPageV2() {
     openTriggerModal,
   ]);
 
+  const draftVisualDiff = useDraftVisualDiff({
+    isViewingDraftVersion,
+    canvas,
+    liveCanvasVersion,
+    latestDraftVersion,
+    selectedCanvasVersion,
+    preparedNodes,
+    preparedEdges,
+    allTriggers,
+    allComponents,
+    canvasId,
+    queryClient,
+  });
+
   const nodesWithIntegrationStatus = useMemo(
-    () => overlayIntegrationWarnings(preparedNodes, integrations, canvasNodes),
-    [preparedNodes, integrations, canvasNodes],
+    () => overlayIntegrationWarnings(draftVisualDiff.nodes, integrations, canvasNodes),
+    [draftVisualDiff.nodes, integrations, canvasNodes],
   );
 
-  const runCanvasData = useMemo<{
-    nodes: CanvasNode[];
-    edges: CanvasEdge[];
-    participantNodeIds: string[];
-  } | null>(() => {
-    if (!isRunsMode || !canvas || canvasLoading || triggersLoading || componentsLoading) {
-      return null;
-    }
-
-    if (!selectedRun) {
-      return { nodes: [], edges: [], participantNodeIds: [] };
-    }
-
-    const runNodeIds = new Set<string>();
-    const nodeEventsMap: Record<string, CanvasesCanvasEvent[]> = {};
-    const nodeExecutionsMap: Record<string, CanvasesCanvasNodeExecution[]> = {};
-
-    if (selectedRun.rootEvent?.nodeId) {
-      runNodeIds.add(selectedRun.rootEvent.nodeId);
-      nodeEventsMap[selectedRun.rootEvent.nodeId] = [selectedRun.rootEvent as CanvasesCanvasEvent];
-    }
-
-    for (const execution of selectedRun.executions || []) {
-      if (!execution.nodeId) continue;
-      runNodeIds.add(execution.nodeId);
-      if (!nodeExecutionsMap[execution.nodeId]) {
-        nodeExecutionsMap[execution.nodeId] = [];
-      }
-
-      nodeExecutionsMap[execution.nodeId].push(
-        hydrateRunExecution(
-          execution,
-          selectedRunFullExecutions,
-          visibleNodeExecutionsMap[execution.nodeId],
-          selectedRun.rootEvent,
-        ),
-      );
-    }
-
-    const prepared = prepareData(
-      canvas,
-      allTriggers,
-      allComponents,
-      nodeEventsMap,
-      nodeExecutionsMap,
-      {},
-      canvasId!,
-      queryClient,
-      me,
-      "live",
-    );
-
-    const nodes = stripCanvasNodeSetupWarningsForRunsView(prepared.nodes);
-    const participantNodeIds = Array.from(runNodeIds);
-
-    return { nodes, edges: prepared.edges, participantNodeIds };
-  }, [
+  const runCanvasData = useRunCanvasData({
     isRunsMode,
     selectedRun,
-    canvas,
+    selectedRunCanvas,
     canvasLoading,
     triggersLoading,
     componentsLoading,
+    isSelectedRunVersionLoading,
     allTriggers,
     allComponents,
     canvasId,
@@ -1921,12 +1883,22 @@ export function WorkflowPageV2() {
     me,
     visibleNodeExecutionsMap,
     selectedRunFullExecutions,
-  ]);
+  });
 
-  const nodes = runCanvasData ? runCanvasData.nodes : nodesWithIntegrationStatus;
-  const renderedEdges = runCanvasData ? runCanvasData.edges : preparedEdges;
+  const {
+    nodes,
+    edges: renderedEdges,
+    runCanvasLoading,
+  } = useRunCanvasPresentation({
+    isRunsMode,
+    selectedRun,
+    runCanvasData,
+    liveNodes: nodesWithIntegrationStatus,
+    liveEdges: draftVisualDiff.edges,
+    isSelectedRunVersionLoading,
+    isSelectedRunExecutionsLoading: selectedRunExecutionsQuery.isLoading,
+  });
   const runsViewportKey = isRunsMode ? "runs" : null;
-
   if (lastRunsViewportKeyRef.current !== runsViewportKey) {
     runsHasFitToViewRef.current = false;
     runsViewportRef.current = undefined;
@@ -3450,8 +3422,8 @@ export function WorkflowPageV2() {
   const handlePlaceholderAdd = useCallback(
     async (data: {
       position: { x: number; y: number };
-      sourceNodeId: string;
-      sourceHandleId: string | null;
+      sourceNodeId?: string;
+      sourceHandleId?: string | null;
     }): Promise<string> => {
       if (!canvas || !organizationId || !canvasId) return "";
 
@@ -3476,18 +3448,21 @@ export function WorkflowPageV2() {
         },
       };
 
-      const newEdge: ComponentsEdge = {
-        sourceId: data.sourceNodeId,
-        targetId: newNodeId,
-        channel: data.sourceHandleId || "default",
-      };
+      const newEdge =
+        data.sourceNodeId && data.sourceHandleId !== undefined
+          ? ({
+              sourceId: data.sourceNodeId,
+              targetId: newNodeId,
+              channel: data.sourceHandleId || "default",
+            } as ComponentsEdge)
+          : null;
 
       const updatedWorkflow = {
         ...latestWorkflow,
         spec: {
           ...latestWorkflow.spec,
           nodes: [...(latestWorkflow.spec?.nodes || []), newNode],
-          edges: [...(latestWorkflow.spec?.edges || []), newEdge],
+          edges: newEdge ? [...(latestWorkflow.spec?.edges || []), newEdge] : [...(latestWorkflow.spec?.edges || [])],
         },
       };
 
@@ -4214,7 +4189,7 @@ export function WorkflowPageV2() {
         setSearchParams((current) => {
           const next = new URLSearchParams(current);
           next.set("version", editVersionID);
-          return next;
+          return clearComponentSidebarSearchParams(next);
         });
       }
 
@@ -4250,10 +4225,8 @@ export function WorkflowPageV2() {
         queryKey: canvasKeys.versionHistory(canvasId),
         refetchType: "all",
       }),
-      queryClient.invalidateQueries({
-        queryKey: canvasKeys.changeRequestList(canvasId),
-        refetchType: "all",
-      }),
+      queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId), refetchType: "all" }),
+      queryClient.invalidateQueries({ queryKey: canvasKeys.dashboardAll(canvasId), refetchType: "all" }),
     ]);
   }, [organizationId, canvasId, queryClient]);
 
@@ -4278,11 +4251,11 @@ export function WorkflowPageV2() {
 
       await publishCanvasVersionMutation.mutateAsync(versionIdToPublish);
       activeCanvasVersionIdRef.current = "";
-      setActiveCanvasVersion(null);
+      clearDraftVersion(draftCanvasSpecsRef.current, setActiveCanvasVersion, setDraftCanvasSpec, versionIdToPublish);
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.delete("version");
-        return next;
+        return clearComponentSidebarSearchParams(next);
       });
       await refreshLatestLiveCanvasData();
       showSuccessToast("Version published");
@@ -4373,7 +4346,7 @@ export function WorkflowPageV2() {
           setSearchParams((current) => {
             const next = new URLSearchParams(current);
             next.delete("version");
-            return next;
+            return clearComponentSidebarSearchParams(next);
           });
           await refreshLatestLiveCanvasData();
         },
@@ -4488,7 +4461,7 @@ export function WorkflowPageV2() {
         setIsVersionControlOpen(true);
       },
       onViewNodeDiff: handleOpenAwaitingApprovalNodeDiff,
-      canAct: canUpdateCanvas && !isTemplate && !canvasDeletedRemotely,
+      canAct: canActOnCanvas,
       actionPending: actOnCanvasChangeRequestMutation.isPending,
       reviewUi,
     };
@@ -4501,9 +4474,7 @@ export function WorkflowPageV2() {
     handleRejectChangeRequest,
     handlePublishChangeRequest,
     handleOpenAwaitingApprovalNodeDiff,
-    canUpdateCanvas,
-    isTemplate,
-    canvasDeletedRemotely,
+    canActOnCanvas,
     actOnCanvasChangeRequestMutation.isPending,
   ]);
 
@@ -4529,7 +4500,7 @@ export function WorkflowPageV2() {
           setSearchParams((current) => {
             const next = new URLSearchParams(current);
             next.set("version", resolvedVersionID);
-            return next;
+            return clearComponentSidebarSearchParams(next);
           });
         }
 
@@ -4612,7 +4583,7 @@ export function WorkflowPageV2() {
         } else {
           next.set("version", versionID);
         }
-        return next;
+        return clearComponentSidebarSearchParams(next);
       });
 
       queryClient.setQueryData<CanvasesCanvas | undefined>(canvasKeys.detail(organizationId, canvasId), (current) => {
@@ -4681,6 +4652,22 @@ export function WorkflowPageV2() {
       setLastSavedWorkflowSnapshot,
       draftCanvasSpec,
     ],
+  );
+
+  const handleUseVersionFromVersionPanel = useCallback(
+    (versionID: string) => {
+      if (hasEditableVersion && hasPendingLocalCanvasState && versionID !== activeCanvasVersionIdRef.current) {
+        const shouldSwitch = window.confirm(
+          "You have unsaved changes in the current draft. Switch versions and discard those unsaved changes?",
+        );
+        if (!shouldSwitch) {
+          return;
+        }
+      }
+
+      handleUseVersion(versionID);
+    },
+    [handleUseVersion, hasEditableVersion, hasPendingLocalCanvasState],
   );
 
   const handleSubmitCreateChangeRequest = useCallback(
@@ -4793,6 +4780,7 @@ export function WorkflowPageV2() {
     (runId: string) => {
       setSelectedRunId(runId);
       setIsRunsMode(true);
+      setIsFilesMode(false);
       setRunDetailNodeId(null);
       setSearchParams(
         (current) => {
@@ -4806,7 +4794,7 @@ export function WorkflowPageV2() {
         { replace: true },
       );
     },
-    [setIsRunsMode, setSearchParams, setSelectedRunId],
+    [setIsFilesMode, setIsRunsMode, setSearchParams, setSelectedRunId],
   );
 
   const handleSelectRunsMode = useCallback(() => {
@@ -4815,6 +4803,8 @@ export function WorkflowPageV2() {
     }
 
     setIsRunsMode(true);
+    setIsMemoryMode(false);
+    setIsFilesMode(false);
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current);
@@ -4825,7 +4815,15 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [handleUseVersion, hasEditableVersion, liveCanvasVersionId, setIsRunsMode, setSearchParams]);
+  }, [
+    handleUseVersion,
+    hasEditableVersion,
+    liveCanvasVersionId,
+    setIsFilesMode,
+    setIsMemoryMode,
+    setIsRunsMode,
+    setSearchParams,
+  ]);
 
   const handleExitRunsMode = useCallback(() => {
     setIsRunsMode(false);
@@ -4842,100 +4840,81 @@ export function WorkflowPageV2() {
     );
   }, [setIsRunsMode, setSearchParams, setSelectedRunId]);
 
-  const handleToggleVersionControl = useCallback(() => {
-    setIsVersionControlOpen((prev) => !prev);
+  const handleOpenVersionControl = useCallback(() => {
+    setIsVersionControlOpen(true);
   }, []);
 
-  const handleSelectDashboardMode = useCallback(() => {
-    if (!dashboardsFeatureEnabled) {
-      return;
-    }
-    if (hasEditableVersion && liveCanvasVersionId) {
-      handleUseVersion(liveCanvasVersionId);
-    }
-    setIsDashboardMode(true);
-    setIsRunsMode(false);
-    setSelectedRunId(null);
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        next.set("view", "dashboard");
-        next.delete("run");
-        next.delete("sidebar");
-        next.delete("node");
-        return next;
-      },
-      { replace: true },
-    );
-  }, [
-    dashboardsFeatureEnabled,
-    handleUseVersion,
-    hasEditableVersion,
-    liveCanvasVersionId,
+  const handleCloseVersionControl = useCallback(() => {
+    setIsVersionControlOpen(false);
+  }, []);
+
+  const { handleSelectDashboardMode, handleExitDashboardMode } = useDashboardModeActions({
     setIsDashboardMode,
+    setIsDashboardAddPanelOpen,
+    setIsDashboardYamlOpen,
     setIsRunsMode,
+    setIsMemoryMode,
+    setIsFilesMode,
     setSearchParams,
     setSelectedRunId,
-  ]);
+  });
 
-  const handleExitDashboardMode = useCallback(() => {
-    setIsDashboardMode(false);
-    setIsDashboardAddPanelOpen(false);
-    setSearchParams(
-      (current) => {
-        const next = new URLSearchParams(current);
-        next.delete("view");
-        return next;
-      },
-      { replace: true },
-    );
-  }, [setIsDashboardAddPanelOpen, setIsDashboardMode, setSearchParams]);
+  const { handleSelectMemoryMode, handleExitMemoryMode } = useMemoryModeActions({
+    setIsMemoryMode,
+    setIsDashboardMode,
+    setIsDashboardAddPanelOpen,
+    setIsDashboardYamlOpen,
+    setIsRunsMode,
+    setIsFilesMode,
+    setSearchParams,
+    setSelectedRunId,
+  });
 
-  const handleEnterEditModeFromHeader = useCallback(async () => {
-    if (isDashboardMode) {
-      handleExitDashboardMode();
-      await handleToggleEditMode();
-      return;
-    }
-    if (isRunsMode) {
-      setIsRunsMode(false);
-      setSelectedRunId(null);
-      setRunDetailNodeId(null);
-      await handleToggleEditMode();
-      setSearchParams(
-        (current) => {
-          const next = new URLSearchParams(current);
-          next.delete("view");
-          next.delete("run");
-          return next;
-        },
-        { replace: true },
-      );
-      return;
-    }
-    await handleToggleEditMode();
-  }, [
-    handleExitDashboardMode,
-    handleToggleEditMode,
+  const { handleSelectFilesMode, handleExitFilesMode } = useFilesModeActions({
+    setIsFilesMode,
+    setIsDashboardMode,
+    setIsDashboardAddPanelOpen,
+    setIsDashboardYamlOpen,
+    setIsRunsMode,
+    setIsMemoryMode,
+    setSelectedRunId,
+    setSearchParams,
+  });
+
+  const {
+    handleSelectCanvasView,
+    handleDashboardAddPanelDialogOpenChange,
+    onDashboardAddPanel,
+    onDashboardOpenYaml,
+    dashboardYamlReadOnly,
+  } = useWorkflowViewModeActions({
     isDashboardMode,
+    isMemoryMode,
+    isFilesMode,
     isRunsMode,
+    hasEditableVersion,
+    isTemplate,
+    canUpdateCanvas,
+    canvasDeletedRemotely,
+    handleExitDashboardMode,
+    handleExitMemoryMode,
+    handleExitFilesMode,
+    handleExitRunsMode,
+    handleToggleEditMode,
+    setIsDashboardAddPanelOpen,
+    setIsDashboardYamlOpen,
+  });
+
+  const { handleEnterEditModeFromHeader, handleExitEditModeFromHeader } = useWorkflowHeaderEditActions({
+    isRunsMode,
+    handleExitRunsMode,
+    handleToggleEditMode,
     setIsRunsMode,
-    setSearchParams,
     setSelectedRunId,
-  ]);
-
-  const handleExitEditModeFromHeader = useCallback(async () => {
-    if (isDashboardMode) {
-      handleExitDashboardMode();
-      return;
-    }
-    if (isRunsMode) {
-      handleExitRunsMode();
-      return;
-    }
-    await handleToggleEditMode();
-  }, [handleExitDashboardMode, handleExitRunsMode, handleToggleEditMode, isDashboardMode, isRunsMode]);
-
+    setRunDetailNodeId,
+    setSearchParams,
+    startup: { hasEditableVersion, canUpdateCanvas, canvas, handlePlaceholderAdd, searchParams },
+  });
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
       if (!isRunsMode || !selectedRun) return;
@@ -5057,7 +5036,7 @@ export function WorkflowPageV2() {
       setSearchParams((current) => {
         const next = new URLSearchParams(current);
         next.delete("version");
-        return next;
+        return clearComponentSidebarSearchParams(next);
       });
 
       if (liveCanvasVersion?.spec) {
@@ -5098,15 +5077,15 @@ export function WorkflowPageV2() {
     setLastSavedWorkflowSnapshot,
   ]);
 
-  const getYamlExportPayload = useCallback(
-    (canvasNodes: CanvasNode[]) => {
-      if (!canvas) return null;
+  const buildYamlExportPayload = useCallback(
+    (workflow: CanvasesCanvas | null | undefined, canvasNodes?: CanvasNode[]) => {
+      if (!workflow) return null;
 
       const updatedNodes =
-        canvas.spec?.nodes?.map((node) => {
-          const canvasNode = canvasNodes.find((cn) => cn.id === node.id);
-          const componentType = (canvasNode?.data?.type as string) || "";
+        workflow.spec?.nodes?.map((node) => {
+          const canvasNode = canvasNodes?.find((cn) => cn.id === node.id);
           if (canvasNode) {
+            const componentType = (canvasNode?.data?.type as string) || "";
             return {
               ...node,
               position: {
@@ -5123,14 +5102,14 @@ export function WorkflowPageV2() {
         apiVersion: "v1",
         kind: "Canvas",
         metadata: {
-          id: canvas.metadata?.id || "",
-          name: canvas.metadata?.name || "Canvas",
-          description: canvas.metadata?.description || "",
-          isTemplate: canvas.metadata?.isTemplate ?? false,
+          id: workflow.metadata?.id || "",
+          name: workflow.metadata?.name || "Canvas",
+          description: workflow.metadata?.description || "",
+          isTemplate: workflow.metadata?.isTemplate ?? false,
         },
         spec: {
           nodes: updatedNodes,
-          edges: canvas.spec?.edges || [],
+          edges: workflow.spec?.edges || [],
         },
       };
 
@@ -5140,7 +5119,7 @@ export function WorkflowPageV2() {
         lineWidth: 0,
       });
 
-      const safeName = (canvas.metadata?.name || "canvas")
+      const safeName = (workflow.metadata?.name || "canvas")
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)/g, "");
@@ -5148,7 +5127,12 @@ export function WorkflowPageV2() {
 
       return { yamlText, filename };
     },
-    [canvas],
+    [],
+  );
+
+  const getYamlExportPayload = useCallback(
+    (canvasNodes: CanvasNode[]) => buildYamlExportPayload(canvas, canvasNodes),
+    [buildYamlExportPayload, canvas],
   );
 
   const handleUseTemplateSubmit = useCallback(
@@ -5264,68 +5248,51 @@ export function WorkflowPageV2() {
     [canvasNodesById],
   );
 
-  const { yamlPayload, handleYamlViewCopy, handleYamlViewDownload } = useCanvasYaml({
+  const { yamlPayload: canvasYamlPayload, modalProps: canvasYamlModalProps } = useCanvasYaml({
     canvasId: canvasId!,
     organizationId: organizationId!,
+    open: isYamlViewModalOpen,
+    onOpenChange: setIsYamlViewModalOpen,
+    isImporting: hasLocalSaveActivity,
     nodes,
     getYamlExportPayload,
+    canvas,
+    isReadOnly,
+    handleSaveWorkflow,
+    onWorkflowImported: applyLocalWorkflowUpdate,
   });
 
-  const importYamlGuardError =
-    !canvas || !organizationId || !canvasId
-      ? "Canvas data is not available"
-      : !canUpdateCanvas
-        ? "You don't have permission to update this canvas"
-        : isTemplate
-          ? "Template canvases are read-only"
-          : !activeCanvasVersionId
-            ? "Enable edit mode before saving changes"
-            : null;
-
-  const handleImportYaml = useCallback(
-    async (data: { nodes: unknown[]; edges: unknown[] }) => {
-      if (importYamlGuardError) throw new Error(importYamlGuardError);
-
-      const updatedWorkflow = {
-        ...canvas,
-        spec: {
-          ...canvas!.spec,
-          nodes: data.nodes as ComponentsNode[],
-          edges: data.edges as ComponentsEdge[],
-        },
-      };
-
-      const savingVersionID = activeCanvasVersionId || undefined;
-      const result = await enqueueCanvasSave(updatedWorkflow, savingVersionID);
-      if (result.status !== "saved") {
-        return;
-      }
-      if (result.response?.data?.version && savingVersionID && activeCanvasVersionIdRef.current === savingVersionID) {
-        setActiveCanvasVersion(result.response.data.version);
-      }
-      if (activeCanvasVersionIdRef.current !== (savingVersionID || "")) {
-        return;
-      }
-      queryClient.setQueryData(canvasKeys.detail(organizationId!, canvasId!), updatedWorkflow);
-      setLastSavedWorkflowSnapshot(updatedWorkflow);
-
-      if (result.matchesCurrentCanvas && !result.hasQueuedFollowUp) {
-        setHasUnsavedChanges(false);
-        setHasNonPositionalUnsavedChanges(false);
-      }
-      showSuccessToast("Canvas changes saved");
-    },
+  const workflowFiles = useMemo(
+    () =>
+      buildWorkflowFiles({
+        canvasYamlPayload,
+        panels: dashboardQuery.data?.panels,
+        layout: dashboardQuery.data?.layout,
+        canvasId,
+        canvasName: canvas?.metadata?.name,
+        consoleLoading: dashboardQuery.isLoading,
+        consoleError: dashboardQuery.error,
+      }),
     [
-      importYamlGuardError,
-      canvas,
-      activeCanvasVersionId,
-      enqueueCanvasSave,
-      organizationId,
+      canvas?.metadata?.name,
       canvasId,
-      queryClient,
-      setLastSavedWorkflowSnapshot,
+      canvasYamlPayload,
+      dashboardQuery.data?.layout,
+      dashboardQuery.data?.panels,
+      dashboardQuery.error,
+      dashboardQuery.isLoading,
     ],
   );
+  const { onShowDiff, onShowNodeDiff, yamlDiffModal } = useCanvasYamlDiffModal({
+    hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
+    liveCanvas,
+    liveCanvasVersion,
+    draftCanvasVersion: latestDraftVersion,
+    draftCanvas: canvas,
+    draftNodes: nodes,
+    activeCanvasVersionId,
+    buildYamlExportPayload,
+  });
 
   const isInitialCanvasBootstrapLoading =
     !canvas && (canvasLoading || triggersLoading || componentsLoading || widgetsLoading || usersLoading);
@@ -5417,76 +5384,15 @@ export function WorkflowPageV2() {
         </div>
       </div>
     ) : null;
-  const templateIntegrations = isTemplate ? extractIntegrations(canvasNodes) : [];
-  const templateTags = isTemplate ? getTemplateTags(canvas?.metadata?.name) : [];
-  const templateNodeCounts = isTemplate ? countNodesByType(canvasNodes) : { components: 0, triggers: 0 };
   const templateBanner = isTemplate ? (
-    <div className="bg-orange-50 border-b border-orange-200 px-4 py-3">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-900 mb-1 truncate">{canvas?.metadata?.name || "Template"}</p>
-
-          {canvas?.metadata?.description ? (
-            <p className="text-[13px] text-gray-600 mb-2 max-w-2xl">{canvas.metadata.description}</p>
-          ) : null}
-
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-            {templateTags.length > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {templateTags.map((tag) => (
-                  <Badge key={tag} variant="outline" className="text-[11px] px-1.5 py-0 text-gray-600 bg-white">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-gray-500">Requires:</span>
-              {templateIntegrations.length > 0 ? (
-                <div className="flex items-center gap-2.5">
-                  {templateIntegrations.map((name) => {
-                    const iconSrc = getIntegrationIconSrc(name);
-                    if (!iconSrc) return null;
-                    return (
-                      <span key={name} className="inline-flex items-center gap-1">
-                        <span className="inline-block h-4 w-4 shrink-0">
-                          <img src={iconSrc} alt={name} className="h-full w-full object-contain" />
-                        </span>
-                        <span className="text-xs text-gray-600 capitalize">{name}</span>
-                      </span>
-                    );
-                  })}
-                </div>
-              ) : (
-                <span className="text-xs text-gray-500">No integrations needed</span>
-              )}
-            </div>
-
-            <span className="text-xs text-gray-500">
-              {templateNodeCounts.components > 0 &&
-                `${templateNodeCounts.components} ${templateNodeCounts.components === 1 ? "component" : "components"}`}
-              {templateNodeCounts.components > 0 && templateNodeCounts.triggers > 0 && " · "}
-              {templateNodeCounts.triggers > 0 &&
-                `${templateNodeCounts.triggers} ${templateNodeCounts.triggers === 1 ? "trigger" : "triggers"}`}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-end gap-2 shrink-0 self-start">
-          <Link
-            to={`/${organizationId}/templates`}
-            className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ArrowLeft size={14} />
-            <span>Back to templates</span>
-          </Link>
-          <Button size="sm" onClick={() => setIsUseTemplateOpen(true)}>
-            {hasUnsavedChanges ? "Save changes to new canvas" : "Use template"}
-          </Button>
-        </div>
-      </div>
-    </div>
+    <WorkflowTemplateBanner
+      canvasName={canvas?.metadata?.name}
+      canvasDescription={canvas?.metadata?.description}
+      canvasNodes={canvasNodes}
+      organizationId={organizationId}
+      hasUnsavedChanges={hasUnsavedChanges}
+      onUseTemplate={() => setIsUseTemplateOpen(true)}
+    />
   ) : null;
 
   const canvasViewKey = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "live";
@@ -5541,21 +5447,13 @@ export function WorkflowPageV2() {
     publishPending: publishCanvasVersionMutation.isPending,
     canvasDeletedRemotely,
     isPreparingVersionAction,
-    hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftGraphDiffVersusLive,
+    hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftDiffVersusLive,
   });
-  const headerMode = getWorkflowHeaderMode({
+  const { headerMode, canvasStateMode } = getWorkflowViewPresentation({
     isDashboardMode,
-    dashboardsFeatureEnabled,
     isRunsMode,
-    canvasMode,
-  });
-  const onDashboardAddPanel =
-    isDashboardMode && dashboardsFeatureEnabled && !isTemplate && canUpdateCanvas
-      ? () => setIsDashboardAddPanelOpen(true)
-      : undefined;
-  const hasUnpublishedDraftChanges =
-    !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftGraphDiffVersusLive;
-  const canvasStateMode = getWorkflowCanvasStateMode({
+    isMemoryMode,
+    isFilesMode,
     hasEditableVersion,
     isViewingPendingApprovalVersion,
     isViewingCurrentLiveVersion,
@@ -5569,9 +5467,7 @@ export function WorkflowPageV2() {
   });
   const { disabled: runDisabled, tooltip: runDisabledTooltip } = getRunActionState({
     hasRunBlockingChanges,
-    isTemplate,
-    canUpdateCanvas,
-    canvasDeletedRemotely,
+    ...canvasAccess,
     isViewingDraftVersion,
     isViewingCurrentLiveVersion,
   });
@@ -5581,15 +5477,39 @@ export function WorkflowPageV2() {
   return (
     <>
       <div className="relative h-full w-full">
-        {isDashboardMode && dashboardsFeatureEnabled ? (
-          <DashboardOverlay
-            readOnly={!canUpdateCanvas}
-            dashboardQuery={dashboardQuery}
-            updateDashboardMutation={updateDashboardMutation}
-            addPanelDialogOpen={isDashboardAddPanelOpen}
-            onAddPanelDialogOpenChange={setIsDashboardAddPanelOpen}
-          />
-        ) : null}
+        <WorkflowDashboardOverlay
+          isDashboardMode={isDashboardMode}
+          canActOnCanvas={canActOnCanvas}
+          editLocked={isReadOnly}
+          showDashboardEditControls={isEditing}
+          onDashboardAddPanel={onDashboardAddPanel}
+          onDashboardOpenYaml={onDashboardOpenYaml}
+          dashboardYamlReadOnly={dashboardYamlReadOnly}
+          dashboardQuery={dashboardQuery}
+          updateDashboardMutation={updateDashboardMutation}
+          addPanelDialogOpen={isDashboardAddPanelOpen}
+          onAddPanelDialogOpenChange={handleDashboardAddPanelDialogOpenChange}
+          yamlModalOpen={isDashboardYamlOpen}
+          onYamlModalOpenChange={setIsDashboardYamlOpen}
+          canvasId={canvasId || undefined}
+          canvasName={canvas?.metadata?.name || undefined}
+          organizationId={organizationId || undefined}
+          canvasNodes={canvasNodes}
+          nodeStatuses={dashboardNodeStatuses}
+          onTriggerNode={handleDashboardTriggerNode}
+        />
+        <WorkflowMemoryOverlayLayer
+          isMemoryMode={isMemoryMode}
+          canDelete={canEditCanvasMemory({
+            ...canvasAccess,
+            hasEditableVersion,
+          })}
+          entries={canvasMemoryEntries}
+          isLoading={canvasMemoryLoading}
+          error={canvasMemoryError}
+          deleteCanvasMemoryEntry={deleteCanvasMemoryEntry}
+        />
+        <WorkflowFilesOverlayLayer isFilesMode={isFilesMode} files={workflowFiles} />
         <CanvasPage
           key={canvasRenderKey}
           // Persist right sidebar in query params
@@ -5602,17 +5522,18 @@ export function WorkflowPageV2() {
           title={canvas?.metadata?.name || liveCanvas?.metadata?.name || (isTemplate ? "Template" : "Canvas")}
           headerBanner={headerBanner}
           canvasStateMode={canvasStateMode}
+          showCanvasSettingsMenu={canUpdateCanvas}
           onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
           awaitingApprovalBanner={awaitingApprovalBanner}
-          showCanvasSettingsMenu={canUpdateCanvas}
           isVersionControlOpen={isVersionControlOpen}
-          onOpenVersionControl={!hasEditableVersion ? handleToggleVersionControl : undefined}
-          showBottomStatusControls={!isTemplate && !isRunsMode}
-          hideAddControls={isTemplate || isRunsMode}
+          onOpenVersionControl={handleOpenVersionControl}
+          hasAutoOpenedVersionControl={hasAutoOpenedVersionControl}
+          onVersionControlAutoOpened={handleVersionControlAutoOpened}
+          onCloseVersionControl={handleCloseVersionControl}
+          showBottomStatusControls={!isTemplate && !isRunsMode && !isMemoryMode && !isFilesMode}
+          hideAddControls={isTemplate || isRunsMode || isMemoryMode || isFilesMode}
           hideCanvasToolSidebar={isTemplate}
-          memoryItemCount={canvasMemoryEntries.length}
-          onMemoryOpen={() => setIsMemoryViewModalOpen(true)}
-          onYamlOpen={() => setIsYamlViewModalOpen(true)}
+          onSelectMemory={isTemplate ? undefined : handleSelectMemoryMode}
           nodes={nodes}
           edges={renderedEdges}
           organizationId={organizationId}
@@ -5650,11 +5571,11 @@ export function WorkflowPageV2() {
           onPlaceholderConfigure={!isReadOnly ? handlePlaceholderConfigure : undefined}
           integrations={canReadIntegrations ? integrations : []}
           canReadIntegrations={canReadIntegrations}
-          canCreateIntegrations={canCreateIntegrations}
+          canCreateIntegrations={canAct("integrations", "create")}
           canUpdateIntegrations={canUpdateIntegrations}
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
-          readOnly={isReadOnly || isRunsMode}
+          readOnly={isReadOnly || isRunsMode || isFilesMode}
           hasFitToViewRef={isRunsMode ? runsHasFitToViewRef : hasFitToViewRef}
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
@@ -5671,7 +5592,7 @@ export function WorkflowPageV2() {
               ? runCanvasData.participantNodeIds
               : undefined
           }
-          runCanvasLoading={isRunsMode && !!selectedRun?.rootEvent?.id && selectedRunExecutionsQuery.isLoading}
+          runCanvasLoading={runCanvasLoading}
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
@@ -5680,23 +5601,31 @@ export function WorkflowPageV2() {
           publishVersionLabel={isChangeManagementDisabled ? "Publish" : "Propose Change"}
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          onShowDiff={onShowDiff}
+          {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
+          visualDiffEnabled={draftVisualDiff.visualDiffEnabled}
+          draftVisualDiff={draftVisualDiff}
+          onToggleVisualDiff={draftVisualDiff.toggleVisualDiff}
+          onShowNodeDiff={onShowNodeDiff}
           onDiscardVersion={handleResetDraftChanges}
           discardVersionDisabled={resetDraftDisabled}
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           onDiscardDraftAndStartEdit={handleDiscardDraftAndStartEdit}
           unpublishedDraftUpdatedAt={latestDraftVersion?.metadata?.updatedAt || latestDraftVersion?.metadata?.createdAt}
           headerMode={headerMode}
+          onSelectCanvasView={handleSelectCanvasView}
           onEnterEditMode={handleEnterEditModeFromHeader}
           enterEditModeDisabled={toggleEditModeDisabled}
           enterEditModeDisabledTooltip={toggleEditModeDisabledTooltip}
           onExitEditMode={handleExitEditModeFromHeader}
           onSelectRuns={isTemplate ? undefined : handleSelectRunsMode}
           onExitRunsMode={handleExitRunsMode}
-          onSelectDashboard={isTemplate || !dashboardsFeatureEnabled ? undefined : handleSelectDashboardMode}
-          onDashboardAddPanel={onDashboardAddPanel}
+          onSelectDashboard={isTemplate ? undefined : handleSelectDashboardMode}
+          onSelectFiles={isTemplate ? undefined : handleSelectFilesMode}
+          onYamlOpen={() => setIsYamlViewModalOpen(true)}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+          {...draftChangeIndicators}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           runDisabled={runDisabled}
@@ -5740,31 +5669,31 @@ export function WorkflowPageV2() {
                 onRetry={() => infiniteRunsQuery.refetch()}
                 workflowNodes={canvasNodes}
                 componentIconMap={componentIconMap}
-                totalCount={runsData.totalCount}
                 onStatusFiltersChange={setRunStatusFilters}
               />
             ) : null
           }
           toolSidebarVersionsContent={
-            !hasEditableVersion ? (
-              <VersionsTabPanel
-                liveCanvasVersionId={liveCanvasVersionId}
-                selectedCanvasVersion={selectedCanvasVersion}
-                pendingApprovalVersions={pendingApprovalVersions}
-                liveVersions={liveVersions}
-                liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
-                canUpdateCanvas={canUpdateCanvas}
-                isTemplate={isTemplate}
-                canvasDeletedRemotely={canvasDeletedRemotely}
-                onUseVersion={handleUseVersion}
-                onVersionNodeDiffContextChange={setVersionNodeDiffContext}
-                onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
-                loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
-                loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
-                changeRequestApprovalConfig={liveCanvas?.spec?.changeManagement}
-                rejectedVersions={rejectedVersions}
-              />
-            ) : null
+            <VersionsTabPanel
+              scrollPersistenceKey={canvasId}
+              liveCanvasVersionId={liveCanvasVersionId}
+              selectedCanvasVersion={selectedCanvasVersion}
+              pendingApprovalVersions={pendingApprovalVersions}
+              liveVersions={liveVersions}
+              liveVersionChangeRequestsByVersionId={liveVersionChangeRequestsByVersionId}
+              canUpdateCanvas={canUpdateCanvas}
+              isTemplate={isTemplate}
+              canvasDeletedRemotely={canvasDeletedRemotely}
+              onUseVersion={handleUseVersionFromVersionPanel}
+              onVersionNodeDiffContextChange={setVersionNodeDiffContext}
+              onLoadMoreLiveVersions={hasMoreLiveVersions ? () => canvasLiveVersionsQuery.fetchNextPage() : undefined}
+              loadMoreLiveVersionsDisabled={!hasMoreLiveVersions || isLoadingMoreLiveVersions}
+              loadMoreLiveVersionsPending={isLoadingMoreLiveVersions}
+              changeRequestApprovalConfig={
+                liveCanvasVersion?.spec?.changeManagement ?? liveCanvas?.spec?.changeManagement
+              }
+              rejectedVersions={rejectedVersions}
+            />
           }
           focusRequest={focusRequest}
           onExecutionChainHandled={handleExecutionChainHandled}
@@ -5788,31 +5717,9 @@ export function WorkflowPageV2() {
           />
         ) : null}
       </div>
-      {yamlPayload ? (
-        <CanvasYamlModal
-          open={isYamlViewModalOpen}
-          onOpenChange={setIsYamlViewModalOpen}
-          yamlText={yamlPayload.yamlText}
-          filename={yamlPayload.filename}
-          onCopy={handleYamlViewCopy}
-          onDownload={handleYamlViewDownload}
-          onImport={!isReadOnly ? handleImportYaml : undefined}
-          isImporting={hasLocalSaveActivity}
-        />
-      ) : null}
-      <CanvasMemoryModal
-        open={isMemoryViewModalOpen}
-        onOpenChange={setIsMemoryViewModalOpen}
-        entries={isViewingDraftVersion ? [] : canvasMemoryEntries}
-        isLoading={isViewingDraftVersion ? false : canvasMemoryLoading}
-        errorMessage={
-          isViewingDraftVersion ? undefined : canvasMemoryError instanceof Error ? canvasMemoryError.message : undefined
-        }
-        onDeleteEntry={
-          canUpdateCanvas && isViewingLiveVersion ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined
-        }
-        deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
-      />
+      <CanvasYamlModal {...canvasYamlModalProps} />
+      {yamlDiffModal}
+      {canvasConsoleVersionDiff.consoleYamlDiffModal}
       {resolvingConflictChangeRequest ? (
         <div className="fixed inset-0 z-[100] min-h-0 bg-slate-50">
           <CanvasChangeRequestConflictResolver

@@ -106,3 +106,43 @@ func (c *ApproveWorkflow) ExampleOutput() map[string]any {
 func (c *GetWorkflow) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetWorkflowOnce, exampleOutputGetWorkflowBytes, &exampleOutputGetWorkflow)
 }
+
+//go:embed example_output_create_heartbeat.json
+var exampleOutputCreateHeartbeatBytes []byte
+
+var exampleOutputCreateHeartbeatOnce sync.Once
+var exampleOutputCreateHeartbeat map[string]any
+
+//go:embed example_output_ping_heartbeat.json
+var exampleOutputPingHeartbeatBytes []byte
+
+var exampleOutputPingHeartbeatOnce sync.Once
+var exampleOutputPingHeartbeat map[string]any
+
+//go:embed example_output_update_heartbeat.json
+var exampleOutputUpdateHeartbeatBytes []byte
+
+var exampleOutputUpdateHeartbeatOnce sync.Once
+var exampleOutputUpdateHeartbeat map[string]any
+
+//go:embed example_output_delete_heartbeat.json
+var exampleOutputDeleteHeartbeatBytes []byte
+
+var exampleOutputDeleteHeartbeatOnce sync.Once
+var exampleOutputDeleteHeartbeat map[string]any
+
+func (c *CreateHeartbeat) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateHeartbeatOnce, exampleOutputCreateHeartbeatBytes, &exampleOutputCreateHeartbeat)
+}
+
+func (c *PingHeartbeat) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputPingHeartbeatOnce, exampleOutputPingHeartbeatBytes, &exampleOutputPingHeartbeat)
+}
+
+func (c *UpdateHeartbeat) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputUpdateHeartbeatOnce, exampleOutputUpdateHeartbeatBytes, &exampleOutputUpdateHeartbeat)
+}
+
+func (c *DeleteHeartbeat) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteHeartbeatOnce, exampleOutputDeleteHeartbeatBytes, &exampleOutputDeleteHeartbeat)
+}

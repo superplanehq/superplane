@@ -1,7 +1,9 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
+import { useCallback, useEffect, useRef, type UIEvent } from "react";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunsList } from "./RunsList";
 import { RunsToolbar } from "./RunsToolbar";
+import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
 import { useRunFilters } from "./useRunFilters";
 
 export interface RunsTabPanelProps {
@@ -16,7 +18,6 @@ export interface RunsTabPanelProps {
   onRetry?: () => void;
   workflowNodes?: ComponentsNode[];
   componentIconMap?: Record<string, string>;
-  totalCount?: number;
   onStatusFiltersChange?: (filters: RunStatusFilter[]) => void;
 }
 
@@ -32,7 +33,6 @@ export function RunsTabPanel({
   onRetry,
   workflowNodes = [],
   componentIconMap = {},
-  totalCount,
   onStatusFiltersChange,
 }: RunsTabPanelProps) {
   const {
@@ -50,16 +50,25 @@ export function RunsTabPanel({
     clearStatuses,
     clearTriggers,
   } = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
+    hasMore: hasNextPage,
+    isLoading: isFetchingNextPage,
+    onLoadMore,
+  });
+  const handleScroll = useCallback(
+    (event: UIEvent<HTMLDivElement>) => {
+      loadMoreIfNeeded(event.currentTarget);
+    },
+    [loadMoreIfNeeded],
+  );
+
+  useEffect(() => {
+    loadMoreIfNeeded(scrollRef.current);
+  }, [filteredRuns.length, loadMoreIfNeeded]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-10 shrink-0 items-center border-b border-slate-200 px-3">
-        <span className="text-sm font-medium text-gray-700">Runs</span>
-        {totalCount != null && totalCount > 0 ? (
-          <span className="ml-1.5 text-xs text-gray-400">({totalCount})</span>
-        ) : null}
-      </div>
-
       <RunsToolbar
         search={search}
         onSearchChange={setSearch}
@@ -72,7 +81,12 @@ export function RunsTabPanel({
         onClearTriggers={clearTriggers}
       />
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div
+        ref={scrollRef}
+        className="min-h-0 flex-1 overflow-y-auto"
+        data-testid="runs-sidebar-scroll"
+        onScroll={handleScroll}
+      >
         <RunsList
           runs={runs}
           filteredRuns={filteredRuns}
@@ -83,9 +97,6 @@ export function RunsTabPanel({
           isLoading={isLoading}
           isError={isError}
           onRetry={onRetry}
-          hasNextPage={hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          onLoadMore={onLoadMore}
           onClearFilters={clearFilters}
         />
       </div>
