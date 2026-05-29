@@ -1,6 +1,7 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { Plus } from "lucide-react";
 
 import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
@@ -23,6 +24,9 @@ export function SecondaryHeaderActions({
   draftVisualDiff,
   draftConsoleDiff,
   onToggleVisualDiff,
+  onDashboardAddPanel,
+  filesHeaderActionsSlotId,
+  onCanvasAddComponent,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -45,33 +49,106 @@ export function SecondaryHeaderActions({
         />
       ) : null}
 
-      {isEditing ? (
+      {isEditing && mode === "files" && filesHeaderActionsSlotId ? (
+        <div id={filesHeaderActionsSlotId} className="flex shrink-0 items-center gap-2" />
+      ) : null}
+
+      {isEditing && onCanvasTab ? (
+        <EditModeCanvasSecondaryActions
+          hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+          onShowDiff={onShowDiff}
+          visualDiffEnabled={visualDiffEnabled}
+          draftVisualDiff={draftVisualDiff}
+          onToggleVisualDiff={onToggleVisualDiff}
+          onCanvasAddComponent={onCanvasAddComponent}
+        />
+      ) : null}
+
+      {isEditing && onConsoleTab ? (
         <>
-          {onCanvasTab && hasUnpublishedDraftChanges && draftVisualDiff?.diffCounts ? (
-            <DiffSummaryHoverCard
-              diffCounts={draftVisualDiff.diffCounts}
-              visualDiffEnabled={visualDiffEnabled}
-              onToggleVisualDiff={onToggleVisualDiff}
-              diffToggles={draftVisualDiff.diffToggles}
-              onShowDiff={onShowDiff}
-            />
-          ) : null}
-          {onConsoleTab && hasUnpublishedConsoleDraftChanges && draftConsoleDiff?.diffCounts ? (
+          {hasUnpublishedConsoleDraftChanges && draftConsoleDiff?.diffCounts ? (
             <DiffSummaryHoverCard diffCounts={draftConsoleDiff.diffCounts} onShowDiff={onShowConsoleDiff} />
           ) : null}
-          <EditModePublishDiscardActions
-            hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
-            onDiscardVersion={onDiscardVersion}
-            discardVersionDisabled={discardVersionDisabled}
-            discardVersionDisabledTooltip={discardVersionDisabledTooltip}
-            onPublishVersion={onPublishVersion}
-            publishVersionLabel={publishVersionLabel}
-            publishVersionDisabled={publishVersionDisabled}
-            publishVersionDisabledTooltip={publishVersionDisabledTooltip}
-          />
+          <EditModeDashboardSecondaryActions onDashboardAddPanel={onDashboardAddPanel} />
         </>
       ) : null}
+
+      {isEditing ? (
+        <EditModePublishDiscardActions
+          hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+          onDiscardVersion={onDiscardVersion}
+          discardVersionDisabled={discardVersionDisabled}
+          discardVersionDisabledTooltip={discardVersionDisabledTooltip}
+          onPublishVersion={onPublishVersion}
+          publishVersionLabel={publishVersionLabel}
+          publishVersionDisabled={publishVersionDisabled}
+          publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function EditModeCanvasSecondaryActions({
+  hasUnpublishedDraftChanges,
+  onShowDiff,
+  visualDiffEnabled,
+  draftVisualDiff,
+  onToggleVisualDiff,
+  onCanvasAddComponent,
+}: Pick<
+  HeaderProps,
+  | "hasUnpublishedDraftChanges"
+  | "onShowDiff"
+  | "visualDiffEnabled"
+  | "draftVisualDiff"
+  | "onToggleVisualDiff"
+  | "onCanvasAddComponent"
+>) {
+  return (
+    <>
+      {hasUnpublishedDraftChanges && draftVisualDiff?.diffCounts ? (
+        <DiffSummaryHoverCard
+          diffCounts={draftVisualDiff.diffCounts}
+          visualDiffEnabled={visualDiffEnabled}
+          onToggleVisualDiff={onToggleVisualDiff}
+          diffToggles={draftVisualDiff.diffToggles}
+          onShowDiff={onShowDiff}
+        />
+      ) : null}
+
+      {onCanvasAddComponent ? (
+        <UIButton
+          type="button"
+          size="sm"
+          variant="default"
+          onClick={() => onCanvasAddComponent()}
+          data-testid="canvas-add-component-button"
+        >
+          <Plus className="mr-1 h-3.5 w-3.5" />
+          Add component
+        </UIButton>
+      ) : null}
+    </>
+  );
+}
+
+function EditModeDashboardSecondaryActions({ onDashboardAddPanel }: Pick<HeaderProps, "onDashboardAddPanel">) {
+  return (
+    <>
+      {onDashboardAddPanel ? (
+        <UIButton
+          type="button"
+          size="sm"
+          variant="default"
+          onClick={() => onDashboardAddPanel()}
+          data-testid="dashboard-add-panel"
+        >
+          <Plus className="mr-1 h-3.5 w-3.5" />
+          Add panel
+        </UIButton>
+      ) : null}
+    </>
   );
 }
 
