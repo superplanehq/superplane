@@ -1,9 +1,15 @@
-export type StartTemplateParameterType = "string" | "number" | "boolean";
+export type StartTemplateParameterType = "string" | "number" | "boolean" | "select";
+
+export interface StartTemplateParameterOption {
+  label: string;
+  value: string;
+}
 
 export interface StartTemplateParameter {
   name: string;
   title?: string;
   type: StartTemplateParameterType;
+  options?: StartTemplateParameterOption[];
   defaultString?: unknown;
   defaultNumber?: unknown;
   defaultBoolean?: unknown;
@@ -12,6 +18,21 @@ export interface StartTemplateParameter {
 export function parameterDisplayLabel(param: StartTemplateParameter): string {
   const title = typeof param.title === "string" ? param.title.trim() : "";
   return title || param.name;
+}
+
+export function selectOptionValues(param: StartTemplateParameter): string[] {
+  if (param.type !== "select" || !param.options) {
+    return [];
+  }
+  return param.options.map((opt) => opt.value).filter((value) => value !== "");
+}
+
+export function isValidSelectParameterValue(param: StartTemplateParameter, value: string): boolean {
+  const allowed = selectOptionValues(param);
+  if (allowed.length === 0) {
+    return true;
+  }
+  return allowed.includes(value);
 }
 
 export interface StartTemplate {
@@ -34,7 +55,8 @@ export function parameterDefaultValue(param: StartTemplateParameter): unknown | 
       const value = param.defaultBoolean;
       return value === null || value === undefined ? undefined : value;
     }
-    default: {
+    case "select":
+    case "string": {
       const value = param.defaultString;
       if (value === null || value === undefined) return undefined;
       if (typeof value === "string" && value === "") return undefined;
@@ -75,7 +97,8 @@ export function coerceParameterValue(param: StartTemplateParameter, raw: unknown
     case "boolean":
       if (typeof raw === "boolean") return raw;
       return raw === true || raw === "true" || raw === "1";
-    default:
+    case "select":
+    case "string":
       return raw == null ? "" : String(raw);
   }
 }
@@ -84,6 +107,10 @@ export function initialParameterValue(param: StartTemplateParameter): string | n
   const configuredDefault = parameterDefaultValue(param);
   if (configuredDefault !== undefined) {
     return coerceParameterValue(param, configuredDefault) as string | number | boolean;
+  }
+  if (param.type === "select") {
+    const firstOption = selectOptionValues(param)[0];
+    return firstOption ?? "";
   }
   return param.type === "boolean" ? false : param.type === "number" ? 0 : "";
 }
