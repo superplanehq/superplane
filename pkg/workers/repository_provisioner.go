@@ -154,6 +154,11 @@ func (w *RepositoryProvisionerWorker) ConsumeCanvasCreated(delivery tackle.Deliv
 
 	repository, err := models.FindRepository(canvasID)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil
+		}
+
+		w.log("Error finding repository for canvas %s: %v", canvasID, err)
 		return err
 	}
 
@@ -179,9 +184,11 @@ func (w *RepositoryProvisionerWorker) provisionRepository(ctx context.Context, r
 
 		_, err = w.Storage.CreateRepository(ctx, repository.RepoID)
 		if err != nil {
+			w.log("Error creating repository for canvas %s: %v", repository.CanvasID, err)
 			return repository.MarkError(tx)
 		}
 
+		w.log("Repository created for canvas %s", repository.CanvasID)
 		return repository.MarkReady(tx)
 	})
 }
