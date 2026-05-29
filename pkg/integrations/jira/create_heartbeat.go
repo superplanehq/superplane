@@ -214,25 +214,7 @@ func (c *CreateHeartbeat) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("intervalUnit is required")
 	}
 
-	nodeMeta := CreateHeartbeatNodeMetadata{}
-	if ctx.HTTP != nil {
-		cloudID, err := resolveCloudID(ctx.HTTP, ctx.Integration)
-		if err == nil {
-			client, err := NewClient(ctx.HTTP, ctx.Integration)
-			if err == nil {
-				if teams, err := client.ListOpsTeams(cloudID); err == nil {
-					for _, t := range teams {
-						if t.TeamID == strings.TrimSpace(spec.Team) {
-							nodeMeta.TeamName = strings.TrimSpace(t.TeamName)
-							break
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return ctx.Metadata.Set(nodeMeta)
+	return ctx.Metadata.Set(CreateHeartbeatNodeMetadata{TeamName: resolveOpsTeamName(ctx, spec.Team)})
 }
 
 func (c *CreateHeartbeat) Execute(ctx core.ExecutionContext) error {
@@ -266,9 +248,9 @@ func (c *CreateHeartbeat) Execute(ctx core.ExecutionContext) error {
 		IntervalUnit: strings.TrimSpace(spec.IntervalUnit),
 		Enabled:      &enabled,
 		AlertMessage: strings.TrimSpace(spec.AlertMessage),
-		AlertTags:    createHeartbeatAlertTagsFromList(spec.AlertTags),
+		AlertTags:    heartbeatAlertTagsFromList(spec.AlertTags),
 	}
-	if p := createHeartbeatAlertPriorityForAPI(spec.AlertPriority); p != "" {
+	if p := heartbeatAlertPriorityForAPI(spec.AlertPriority); p != "" {
 		req.AlertPriority = p
 	}
 
@@ -318,29 +300,4 @@ func createHeartbeatEnabledFromSpec(spec CreateHeartbeatSpec) bool {
 		return true
 	}
 	return *spec.Enabled
-}
-
-func createHeartbeatAlertTagsFromList(raw []any) []string {
-	if len(raw) == 0 {
-		return nil
-	}
-	out := make([]string, 0, len(raw))
-	for _, e := range raw {
-		s := strings.TrimSpace(fmt.Sprint(e))
-		if s != "" {
-			out = append(out, s)
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func createHeartbeatAlertPriorityForAPI(priority string) string {
-	p := strings.TrimSpace(priority)
-	if p == "" || p == "__none__" {
-		return ""
-	}
-	return p
 }

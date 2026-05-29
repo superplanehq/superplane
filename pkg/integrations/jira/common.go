@@ -2,6 +2,7 @@ package jira
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/core"
@@ -86,4 +87,33 @@ func resolveCloudID(httpCtx core.HTTPContext, integration core.IntegrationContex
 		return "", fmt.Errorf("resolve cloud id: %w", err)
 	}
 	return cloudID, nil
+}
+
+// heartbeatAlertTagsFromList converts a raw list of any values into a slice of
+// trimmed, non-empty strings suitable for the JSM heartbeat alert tags field.
+func heartbeatAlertTagsFromList(raw []any) []string {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, e := range raw {
+		s := strings.TrimSpace(fmt.Sprint(e))
+		if s != "" {
+			out = append(out, s)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// heartbeatAlertPriorityForAPI normalises a priority string for the JSM API,
+// returning an empty string when the value is unset or the sentinel "__none__".
+func heartbeatAlertPriorityForAPI(priority string) string {
+	p := strings.TrimSpace(priority)
+	if p == "" || p == "__none__" {
+		return ""
+	}
+	return p
 }

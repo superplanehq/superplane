@@ -253,7 +253,7 @@ func (c *UpdateHeartbeat) Execute(ctx core.ExecutionContext) error {
 	}
 
 	req := updateHeartbeatRequestFromSpec(spec)
-	if !hasEffectiveHeartbeatUpdate(spec) {
+	if updateHeartbeatRequestEmpty(req) {
 		return fmt.Errorf("at least one update field must be enabled")
 	}
 
@@ -300,10 +300,10 @@ func updateHeartbeatRequestFromSpec(spec UpdateHeartbeatSpec) *UpdateHeartbeatRe
 		req.AlertMessage = strings.TrimSpace(*spec.AlertMessage)
 	}
 	if spec.AlertTags != nil {
-		req.AlertTags = updateHeartbeatAlertTagsFromList(spec.AlertTags)
+		req.AlertTags = heartbeatAlertTagsFromList(spec.AlertTags)
 	}
 	if spec.AlertPriority != nil {
-		if p := updateHeartbeatAlertPriorityForAPI(*spec.AlertPriority); p != "" {
+		if p := heartbeatAlertPriorityForAPI(*spec.AlertPriority); p != "" {
 			req.AlertPriority = p
 		}
 	}
@@ -358,29 +358,4 @@ func (c *UpdateHeartbeat) Hooks() []core.Hook {
 
 func (c *UpdateHeartbeat) HandleHook(ctx core.ActionHookContext) error {
 	return nil
-}
-
-func updateHeartbeatAlertTagsFromList(raw []any) []string {
-	if len(raw) == 0 {
-		return nil
-	}
-	out := make([]string, 0, len(raw))
-	for _, e := range raw {
-		s := strings.TrimSpace(fmt.Sprint(e))
-		if s != "" {
-			out = append(out, s)
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func updateHeartbeatAlertPriorityForAPI(priority string) string {
-	p := strings.TrimSpace(priority)
-	if p == "" || p == "__none__" {
-		return ""
-	}
-	return p
 }
