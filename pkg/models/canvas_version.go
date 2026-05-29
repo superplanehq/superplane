@@ -31,6 +31,8 @@ type CanvasVersion struct {
 	PublishedAt             *time.Time
 	Nodes                   datatypes.JSONSlice[Node]
 	Edges                   datatypes.JSONSlice[Edge]
+	ConsolePanels           datatypes.JSONType[[]DashboardPanel]
+	ConsoleLayout           datatypes.JSONType[[]DashboardLayoutItem]
 	CreatedAt               *time.Time
 	UpdatedAt               *time.Time
 }
@@ -118,6 +120,31 @@ func ListCanvasVersionsInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]Canva
 
 func ListCanvasVersions(workflowID uuid.UUID) ([]CanvasVersion, error) {
 	return ListCanvasVersionsInTransaction(database.Conn(), workflowID)
+}
+
+func ListDraftCanvasVersions(workflowID uuid.UUID) ([]CanvasVersion, error) {
+	var versions []CanvasVersion
+	err := database.Conn().
+		Where("workflow_id = ?", workflowID).
+		Where("state = ?", CanvasVersionStateDraft).
+		Order("created_at DESC").
+		Find(&versions).
+		Error
+	return versions, err
+}
+
+func FindLatestPublishedCanvasVersion(workflowID uuid.UUID) (*CanvasVersion, error) {
+	var version CanvasVersion
+	err := database.Conn().
+		Where("workflow_id = ?", workflowID).
+		Where("state = ?", CanvasVersionStatePublished).
+		Order("published_at DESC").
+		First(&version).
+		Error
+	if err != nil {
+		return nil, err
+	}
+	return &version, nil
 }
 
 func ListPublishedCanvasVersionsInTransaction(
@@ -301,6 +328,7 @@ func SaveCanvasDraftInTransaction(
 		CreatedAt:               &now,
 		UpdatedAt:               &now,
 	}
+	copyVersionConsoleFields(liveVersion, &version)
 
 	if err := tx.Create(&version).Error; err != nil {
 		return nil, err
@@ -336,6 +364,7 @@ func CreateCanvasSnapshotVersionInTransaction(
 		CreatedAt:               &now,
 		UpdatedAt:               &now,
 	}
+	copyVersionConsoleFields(sourceVersion, &version)
 
 	if err := tx.Create(&version).Error; err != nil {
 		return nil, err

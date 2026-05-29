@@ -166,6 +166,18 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:                   models.DomainTypeOrganization,
 			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
 		},
+		pbAgents.Agents_InterruptAgentChat_FullMethodName: {
+			Resource:                     "agents",
+			Action:                       "create",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
+		},
+		pbAgents.Agents_DefineAgentOutcome_FullMethodName: {
+			Resource:                     "agents",
+			Action:                       "create",
+			DomainType:                   models.DomainTypeOrganization,
+			RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
+		},
 		pbAgents.Agents_ListAgentChatMessages_FullMethodName: {
 			Resource:                     "agents",
 			Action:                       "read",
@@ -187,6 +199,24 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			Action:           "update",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: defaultResourceResolver,
+		},
+		pbCanvases.Canvases_GetCanvasRepository_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ListCanvasRepositoryFiles_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_CommitCanvasRepositoryFiles_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
 		},
 		pbCanvases.Canvases_CreateCanvasVersion_FullMethodName: {
 			Resource:         "canvases",
@@ -401,7 +431,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		},
 		pbCanvases.Canvases_UpdateCanvasDashboard_FullMethodName: {
 			Resource:         "canvases",
-			Action:           "update",
+			Action:           "update_version",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},

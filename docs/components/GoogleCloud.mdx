@@ -29,11 +29,15 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud DNS • Update Record" href="#cloud-dns-•-update-record" description="Update an existing DNS record in a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
+  <LinkCard title="Compute • Delete VM Instance" href="#compute-•-delete-vm-instance" description="Permanently delete a Google Compute Engine VM instance" />
+  <LinkCard title="Compute • Get VM Metrics" href="#compute-•-get-vm-metrics" description="Fetch CPU and network metrics for a Google Compute Engine VM instance" />
+  <LinkCard title="Compute • Manage VM Power" href="#compute-•-manage-vm-power" description="Perform power operations on a Google Compute Engine VM instance" />
   <LinkCard title="Pub/Sub • Create Subscription" href="#pub/sub-•-create-subscription" description="Create a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Create Topic" href="#pub/sub-•-create-topic" description="Create a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Delete Subscription" href="#pub/sub-•-delete-subscription" description="Delete a GCP Pub/Sub subscription" />
   <LinkCard title="Pub/Sub • Delete Topic" href="#pub/sub-•-delete-topic" description="Delete a GCP Pub/Sub topic" />
   <LinkCard title="Pub/Sub • Publish Message" href="#pub/sub-•-publish-message" description="Publish a message to a GCP Pub/Sub topic" />
+  <LinkCard title="Compute • Update VM Machine Type" href="#compute-•-update-vm-machine-type" description="Change the machine type of a Google Compute Engine VM instance" />
 </CardGrid>
 
 ## Instructions
@@ -58,11 +62,13 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 - `roles/logging.configWriter` — create logging sinks for event triggers
 - `roles/pubsub.admin` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management)
+- Additional roles depending on which components you use (e.g. `roles/compute.admin` for VM management, `roles/monitoring.viewer` to read VM metrics)
 
 <a id="artifact-registry-•-on-artifact-analysis"></a>
 
 ## Artifact Registry • On Artifact Analysis
+
+**Trigger key:** `gcp.artifactregistry.onArtifactAnalysis`
 
 The On Artifact Analysis trigger starts a workflow execution when Google Container Analysis publishes a new occurrence (e.g. vulnerability finding, build provenance, or attestation) for an artifact.
 
@@ -123,6 +129,8 @@ Each event contains the full Container Analysis Occurrence resource, including `
 
 ## Artifact Registry • On Artifact Push
 
+**Trigger key:** `gcp.artifactregistry.onArtifactPush`
+
 The On Artifact Push trigger starts a workflow execution when a Docker image or other container artifact is pushed to Artifact Registry.
 
 **Trigger behavior:** SuperPlane subscribes to the `gcr` Pub/Sub topic that Artifact Registry automatically publishes to for container image push events.
@@ -166,6 +174,8 @@ Each event contains:
 <a id="cloud-build-•-on-build-complete"></a>
 
 ## Cloud Build • On Build Complete
+
+**Trigger key:** `gcp.cloudbuild.onBuildComplete`
 
 The On Build Complete trigger starts a workflow execution when a GCP Cloud Build build finishes.
 
@@ -213,6 +223,8 @@ Each event contains the full Cloud Build resource, including `id`, `status` (SUC
 
 ## Compute • On VM Instance
 
+**Trigger key:** `gcp.compute.onVMInstance`
+
 The On VM Instance trigger starts a workflow execution when a Compute Engine VM instance lifecycle event occurs.
 
 **Trigger behavior:** SuperPlane creates a Cloud Logging sink that captures Compute Engine audit log events and routes them to a shared Pub/Sub topic. Events are pushed to SuperPlane and matched to this trigger automatically.
@@ -259,6 +271,8 @@ Each event includes the audit log entry with resourceName (e.g. projects/my-proj
 <a id="pub/sub-•-on-message"></a>
 
 ## Pub/Sub • On Message
+
+**Trigger key:** `gcp.pubsub.onMessage`
 
 The On Message trigger starts a workflow execution when a message is published to a GCP Pub/Sub topic.
 
@@ -308,6 +322,8 @@ Each event contains the decoded message payload plus Pub/Sub metadata:
 <a id="artifact-registry-•-get-artifact"></a>
 
 ## Artifact Registry • Get Artifact
+
+**Component key:** `gcp.artifactregistry.getArtifact`
 
 Retrieves the details of a specific artifact version from Google Artifact Registry.
 
@@ -361,6 +377,8 @@ Artifact Registry supports all package formats when using **Select from Registry
 
 ## Artifact Registry • Get Artifact Analysis
 
+**Component key:** `gcp.artifactregistry.getArtifactAnalysis`
+
 Retrieves existing Container Analysis occurrences for an artifact from Google Container Analysis.
 
 ### Configuration
@@ -411,6 +429,8 @@ An analysis summary for the artifact, including:
 
 ## Cloud Build • Create Build
 
+**Component key:** `gcp.cloudbuild.createBuild`
+
 Creates and starts a Google Cloud Build build, then waits for the build to reach a terminal status.
 
 ### Configuration
@@ -460,6 +480,8 @@ The terminal Build resource, including `id`, `status`, `logUrl`, `createTime`, `
 
 ## Cloud Build • Get Build
 
+**Component key:** `gcp.cloudbuild.getBuild`
+
 Retrieves the details of a specific Google Cloud Build build.
 
 ### Configuration
@@ -491,6 +513,8 @@ The full Build resource, including `id`, `status` (SUCCESS, FAILURE, WORKING, QU
 <a id="cloud-build-•-run-trigger"></a>
 
 ## Cloud Build • Run Trigger
+
+**Component key:** `gcp.cloudbuild.runTrigger`
 
 Runs an existing Cloud Build trigger and waits for the resulting build to reach a terminal status.
 
@@ -536,6 +560,8 @@ The terminal Build resource, including `id`, `status`, `logUrl`, `createTime`, `
 <a id="cloud-dns-•-create-record"></a>
 
 ## Cloud DNS • Create Record
+
+**Component key:** `gcp.clouddns.createRecord`
 
 The Create Record component creates a new DNS record set in a Google Cloud DNS managed zone.
 
@@ -583,6 +609,8 @@ The service account must have `roles/dns.admin` or `roles/dns.editor` on the pro
 
 ## Cloud DNS • Delete Record
 
+**Component key:** `gcp.clouddns.deleteRecord`
+
 The Delete Record component deletes a DNS record set from a Google Cloud DNS managed zone.
 
 ### Configuration
@@ -626,6 +654,8 @@ The service account must have `roles/dns.admin` or `roles/dns.editor` on the pro
 <a id="cloud-dns-•-update-record"></a>
 
 ## Cloud DNS • Update Record
+
+**Component key:** `gcp.clouddns.updateRecord`
 
 The Update Record component updates an existing DNS record set in a Google Cloud DNS managed zone.
 
@@ -673,6 +703,8 @@ The service account must have `roles/dns.admin` or `roles/dns.editor` on the pro
 
 ## Cloud Functions • Invoke Function
 
+**Component key:** `gcp.cloudfunctions.invokeFunction`
+
 Invokes a Google Cloud Function and waits for the response.
 
 ### Configuration
@@ -719,6 +751,8 @@ The invocation result, including:
 
 ## Compute • Create Virtual Machine
 
+**Component key:** `gcp.createVM`
+
 Creates a new Google Compute Engine VM.
 
 ### Steps
@@ -754,9 +788,172 @@ Emits a payload with instance details: instanceId, selfLink, internalIP, externa
 }
 ```
 
+<a id="compute-•-delete-vm-instance"></a>
+
+## Compute • Delete VM Instance
+
+**Component key:** `gcp.deleteVMInstance`
+
+The Delete VM Instance component permanently deletes a Compute Engine VM instance.
+
+### Use Cases
+
+- **Cleanup**: Remove temporary or test VMs after use
+- **Cost optimization**: Automatically tear down unused infrastructure
+- **Automated workflows**: Delete VMs as part of deployment rollback or cleanup processes
+- **Environment management**: Remove ephemeral environments after testing
+
+### Configuration
+
+- **VM Instance**: Pick from the list of VMs in your project, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.createVM`). The selection encodes both the zone and the instance name.
+
+### Output
+
+Returns information about the deleted instance:
+- **instanceName**: The name of the instance that was deleted
+- **zone**: The zone the instance was in
+
+### Important Notes
+
+- This operation is **permanent** and cannot be undone
+- All data on the instance will be lost unless boot/data disks have auto-delete disabled
+- The instance will be stopped if running before deletion
+- If the instance is not found at the resolved zone/name, the action fails so that misconfigured or stale expressions do not silently mask incomplete cleanup
+
+### Example Output
+
+```json
+{
+  "data": {
+    "instanceName": "my-vm",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.vmInstance.deleted"
+}
+```
+
+<a id="compute-•-get-vm-metrics"></a>
+
+## Compute • Get VM Metrics
+
+**Component key:** `gcp.getVMInstanceMetrics`
+
+The Get VM Metrics component retrieves CPU utilization and network throughput metrics for a Compute Engine VM instance from Cloud Monitoring over a specified lookback window.
+
+### Use Cases
+
+- **Performance monitoring**: Sample current resource utilization before scaling decisions
+- **Incident investigation**: Pull recent metrics when responding to an alert
+- **Capacity planning**: Gather trend data to inform right-sizing of infrastructure
+- **Automated scaling**: Use metric outputs to conditionally trigger resize or power operations
+
+### Configuration
+
+- **VM Instance**: Pick from the list of VMs in your project, or pass an expression chained from an upstream node. The selection encodes both the zone and the instance name.
+- **Lookback Period**: How far back to retrieve metrics — 1h, 6h, 24h, 7d, or 14d (required).
+
+### Output
+
+Returns an averaged metrics payload over the lookback window:
+- **instanceId**: The numeric ID of the queried instance
+- **name**, **zone**: Instance identity
+- **start**, **end**: ISO 8601 timestamps of the metrics window
+- **lookbackPeriod**: The selected lookback period
+- **avgCpuUsagePercent**: Average CPU utilization percentage over the window
+- **avgNetworkInboundBytesPerSec**: Average received network throughput in bytes/sec
+- **avgNetworkOutboundBytesPerSec**: Average sent network throughput in bytes/sec
+
+All metric values are rounded to two decimal places.
+
+### Important Notes
+
+- Requires the `roles/monitoring.viewer` IAM role on the integration's service account.
+- Metrics are read from Cloud Monitoring (`compute.googleapis.com` metrics), which are available for all Compute Engine instances by default.
+- Data point resolution varies by window: shorter windows return finer-grained data.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "avgCpuUsagePercent": 23.47,
+    "avgNetworkInboundBytesPerSec": 10485.76,
+    "avgNetworkOutboundBytesPerSec": 8192.33,
+    "end": "2025-02-14T12:00:00Z",
+    "instanceId": "1234567890123456789",
+    "lookbackPeriod": "1h",
+    "name": "my-vm",
+    "start": "2025-02-14T11:00:00Z",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.vmInstance.metrics"
+}
+```
+
+<a id="compute-•-manage-vm-power"></a>
+
+## Compute • Manage VM Power
+
+**Component key:** `gcp.manageVMInstancePower`
+
+The Manage VM Power component performs power management operations on a Compute Engine VM instance.
+
+### Use Cases
+
+- **Automated restarts**: Reset instances on a schedule or in response to alerts
+- **Cost optimization**: Stop instances during non-business hours
+- **Maintenance workflows**: Stop instances before updates, start them after completion
+- **Recovery procedures**: Reset instances experiencing issues
+
+### Configuration
+
+- **VM Instance**: Pick from the list of VMs in your project, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.createVM`). The selection encodes both the zone and the instance name.
+- **Operation**: The power operation to perform (required):
+  - **start**: Start a stopped (TERMINATED) instance
+  - **stop**: Stop a running instance
+  - **reset**: Hard reset a running instance (does not perform a clean shutdown)
+  - **suspend**: Suspend a running instance, preserving memory state
+  - **resume**: Resume a suspended instance
+
+### Output
+
+Returns the instance state after the operation completes:
+- **instanceId**, **name**, **zone**, **status**, **selfLink**, **machineType**, **internalIP**, **externalIP**
+- **operation**: The power operation that was performed
+
+### Important Notes
+
+- **reset** is a forced operation and does not perform a clean OS shutdown
+- The component waits for the underlying zone operation to complete before emitting
+- Operations may take several minutes depending on the instance state
+
+### Example Output
+
+```json
+{
+  "data": {
+    "externalIP": "34.1.2.3",
+    "instanceId": "1234567890123456789",
+    "internalIP": "10.0.0.2",
+    "machineType": "e2-medium",
+    "name": "my-vm",
+    "operation": "power_off",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
+    "status": "TERMINATED",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.vmInstance.power.power_off"
+}
+```
+
 <a id="pub/sub-•-create-subscription"></a>
 
 ## Pub/Sub • Create Subscription
+
+**Component key:** `gcp.pubsub.createSubscription`
 
 The Create Subscription component creates a new GCP Pub/Sub subscription on a topic.
 
@@ -785,6 +982,8 @@ The Create Subscription component creates a new GCP Pub/Sub subscription on a to
 
 ## Pub/Sub • Create Topic
 
+**Component key:** `gcp.pubsub.createTopic`
+
 The Create Topic component creates a new GCP Pub/Sub topic.
 
 ### Use Cases
@@ -809,6 +1008,8 @@ The Create Topic component creates a new GCP Pub/Sub topic.
 <a id="pub/sub-•-delete-subscription"></a>
 
 ## Pub/Sub • Delete Subscription
+
+**Component key:** `gcp.pubsub.deleteSubscription`
 
 The Delete Subscription component deletes a GCP Pub/Sub subscription.
 
@@ -835,6 +1036,8 @@ The Delete Subscription component deletes a GCP Pub/Sub subscription.
 
 ## Pub/Sub • Delete Topic
 
+**Component key:** `gcp.pubsub.deleteTopic`
+
 The Delete Topic component deletes a GCP Pub/Sub topic.
 
 ### Use Cases
@@ -860,6 +1063,8 @@ The Delete Topic component deletes a GCP Pub/Sub topic.
 
 ## Pub/Sub • Publish Message
 
+**Component key:** `gcp.pubsub.publishMessage`
+
 The Publish Message component sends a message to a GCP Pub/Sub topic.
 
 ### Use Cases
@@ -878,6 +1083,57 @@ The Publish Message component sends a message to a GCP Pub/Sub topic.
   },
   "timestamp": "2025-01-01T00:00:00Z",
   "type": "gcp.pubsub.message.published"
+}
+```
+
+<a id="compute-•-update-vm-machine-type"></a>
+
+## Compute • Update VM Machine Type
+
+**Component key:** `gcp.updateVMInstanceType`
+
+The Update VM Machine Type component changes the machine type (size) of an existing Compute Engine VM instance.
+
+### Use Cases
+
+- **Vertical scaling**: Resize an instance up or down in response to load
+- **Cost optimization**: Move to a smaller machine type during off-peak hours
+- **Right-sizing**: Adjust machine type based on observed utilization
+
+### Configuration
+
+- **VM Instance**: Pick from the list of VMs in your project, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.createVM`). The selection encodes both the zone and the instance name.
+- **Machine Type**: The new machine type name, e.g. `e2-medium` or `n2-standard-4` (required, supports expressions).
+- **Restart after update**: Whether to start the instance again after the machine type is changed. Enabled by default. Compute Engine requires the instance to be stopped to change its machine type, so a running instance is always stopped first.
+
+### Output
+
+Returns the instance state after the update completes:
+- **instanceId**, **name**, **zone**, **status**, **selfLink**, **machineType**, **internalIP**, **externalIP**
+
+### Important Notes
+
+- Changing the machine type requires the instance to be **stopped (TERMINATED)**. A running instance is stopped automatically before the change.
+- If **Restart after update** is enabled, the instance is started again once the new machine type is applied.
+- The new machine type must be available in the instance's zone.
+- The component waits for each underlying zone operation to complete before proceeding.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "externalIP": "34.1.2.3",
+    "instanceId": "1234567890123456789",
+    "internalIP": "10.0.0.2",
+    "machineType": "n2-standard-4",
+    "name": "my-vm",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
+    "status": "RUNNING",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.vmInstance.machineTypeUpdated"
 }
 ```
 

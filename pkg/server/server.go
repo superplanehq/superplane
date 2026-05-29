@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -13,6 +14,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/config"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	"github.com/superplanehq/superplane/pkg/git"
+	gitprovider "github.com/superplanehq/superplane/pkg/git/provider"
 	grpc "github.com/superplanehq/superplane/pkg/grpc"
 	agentsActions "github.com/superplanehq/superplane/pkg/grpc/actions/agents"
 	"github.com/superplanehq/superplane/pkg/jwt"
@@ -20,94 +23,68 @@ import (
 	"github.com/superplanehq/superplane/pkg/oidc"
 	"github.com/superplanehq/superplane/pkg/public"
 	registry "github.com/superplanehq/superplane/pkg/registry"
+	"github.com/superplanehq/superplane/pkg/registryimports"
 	"github.com/superplanehq/superplane/pkg/services"
 	"github.com/superplanehq/superplane/pkg/telemetry"
 	"github.com/superplanehq/superplane/pkg/templates"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/pkg/workers"
 	"gorm.io/gorm"
-
-	// Import integrations, components and triggers to register them via init()
-	_ "github.com/superplanehq/superplane/pkg/components/addmemory"
-	_ "github.com/superplanehq/superplane/pkg/components/approval"
-	_ "github.com/superplanehq/superplane/pkg/components/deletememory"
-	_ "github.com/superplanehq/superplane/pkg/components/display"
-	_ "github.com/superplanehq/superplane/pkg/components/filter"
-	_ "github.com/superplanehq/superplane/pkg/components/graphql"
-	_ "github.com/superplanehq/superplane/pkg/components/http"
-	_ "github.com/superplanehq/superplane/pkg/components/if"
-	_ "github.com/superplanehq/superplane/pkg/components/merge"
-	_ "github.com/superplanehq/superplane/pkg/components/noop"
-	_ "github.com/superplanehq/superplane/pkg/components/readmemory"
-	_ "github.com/superplanehq/superplane/pkg/components/runner"
-	_ "github.com/superplanehq/superplane/pkg/components/send_email"
-	_ "github.com/superplanehq/superplane/pkg/components/ssh"
-	_ "github.com/superplanehq/superplane/pkg/components/timegate"
-	_ "github.com/superplanehq/superplane/pkg/components/updatememory"
-	_ "github.com/superplanehq/superplane/pkg/components/upsertmemory"
-	_ "github.com/superplanehq/superplane/pkg/components/wait"
-	_ "github.com/superplanehq/superplane/pkg/integrations/aws"
-	_ "github.com/superplanehq/superplane/pkg/integrations/azure"
-	_ "github.com/superplanehq/superplane/pkg/integrations/bitbucket"
-	_ "github.com/superplanehq/superplane/pkg/integrations/circleci"
-	_ "github.com/superplanehq/superplane/pkg/integrations/claude"
-	_ "github.com/superplanehq/superplane/pkg/integrations/cloudflare"
-	_ "github.com/superplanehq/superplane/pkg/integrations/cursor"
-	_ "github.com/superplanehq/superplane/pkg/integrations/dash0"
-	_ "github.com/superplanehq/superplane/pkg/integrations/datadog"
-	_ "github.com/superplanehq/superplane/pkg/integrations/daytona"
-	_ "github.com/superplanehq/superplane/pkg/integrations/digitalocean"
-	_ "github.com/superplanehq/superplane/pkg/integrations/discord"
-	_ "github.com/superplanehq/superplane/pkg/integrations/dockerhub"
-	_ "github.com/superplanehq/superplane/pkg/integrations/elastic"
-	_ "github.com/superplanehq/superplane/pkg/integrations/firehydrant"
-	_ "github.com/superplanehq/superplane/pkg/integrations/gcp"
-	_ "github.com/superplanehq/superplane/pkg/integrations/github"
-	_ "github.com/superplanehq/superplane/pkg/integrations/gitlab"
-	_ "github.com/superplanehq/superplane/pkg/integrations/grafana"
-	_ "github.com/superplanehq/superplane/pkg/integrations/harness"
-	_ "github.com/superplanehq/superplane/pkg/integrations/hetzner"
-	_ "github.com/superplanehq/superplane/pkg/integrations/honeycomb"
-	_ "github.com/superplanehq/superplane/pkg/integrations/incident"
-	_ "github.com/superplanehq/superplane/pkg/integrations/jfrog_artifactory"
-	_ "github.com/superplanehq/superplane/pkg/integrations/jira"
-	_ "github.com/superplanehq/superplane/pkg/integrations/launchdarkly"
-	_ "github.com/superplanehq/superplane/pkg/integrations/logfire"
-	_ "github.com/superplanehq/superplane/pkg/integrations/newrelic"
-	_ "github.com/superplanehq/superplane/pkg/integrations/oci"
-	_ "github.com/superplanehq/superplane/pkg/integrations/octopus"
-	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
-	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
-	_ "github.com/superplanehq/superplane/pkg/integrations/perplexity"
-	_ "github.com/superplanehq/superplane/pkg/integrations/prometheus"
-	_ "github.com/superplanehq/superplane/pkg/integrations/render"
-	_ "github.com/superplanehq/superplane/pkg/integrations/rootly"
-	_ "github.com/superplanehq/superplane/pkg/integrations/semaphore"
-	_ "github.com/superplanehq/superplane/pkg/integrations/sendgrid"
-	_ "github.com/superplanehq/superplane/pkg/integrations/sentry"
-	_ "github.com/superplanehq/superplane/pkg/integrations/servicenow"
-	_ "github.com/superplanehq/superplane/pkg/integrations/slack"
-	_ "github.com/superplanehq/superplane/pkg/integrations/smtp"
-	_ "github.com/superplanehq/superplane/pkg/integrations/statuspage"
-	_ "github.com/superplanehq/superplane/pkg/integrations/teams"
-	_ "github.com/superplanehq/superplane/pkg/integrations/telegram"
-	_ "github.com/superplanehq/superplane/pkg/triggers/schedule"
-	_ "github.com/superplanehq/superplane/pkg/triggers/start"
-	_ "github.com/superplanehq/superplane/pkg/triggers/webhook"
-	_ "github.com/superplanehq/superplane/pkg/widgets/annotation"
 )
 
+var _ = registryimports.Loaded
+
+var agentProviderOverride = struct {
+	sync.Mutex
+	provider agents.Provider
+}{}
+
+func SetAgentProviderForTests(provider agents.Provider) func() {
+	agentProviderOverride.Lock()
+	previous := agentProviderOverride.provider
+	agentProviderOverride.provider = provider
+	agentProviderOverride.Unlock()
+
+	return func() {
+		agentProviderOverride.Lock()
+		agentProviderOverride.provider = previous
+		agentProviderOverride.Unlock()
+	}
+}
+
+func getAgentProviderOverride() agents.Provider {
+	agentProviderOverride.Lock()
+	defer agentProviderOverride.Unlock()
+	return agentProviderOverride.provider
+}
+
 func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.Signer, baseURL string) (agents.Provider, agentsActions.AgentsService) {
+	if provider := getAgentProviderOverride(); provider != nil {
+		log.WithField("provider", provider.Name()).Info("Managed agents enabled with provider override")
+		return provider, agents.NewService(provider, authService, jwtSigner, baseURL)
+	}
+
 	cfg := config.LoadAnthropicAgentConfig()
 	if !cfg.Enabled() {
 		log.Info("Anthropic managed agents disabled: missing ANTHROPIC_* env vars")
 		return nil, nil
 	}
 
+	fileResources, err := anthropic.LoadDefaultSessionResources(context.Background(), anthropic.Config{
+		APIKey:        cfg.APIKey,
+		AgentID:       cfg.AgentID,
+		EnvironmentID: cfg.EnvironmentID,
+	})
+	if err != nil {
+		log.WithError(err).Warn("failed to load Anthropic session resources; continuing without mounted references")
+		fileResources = nil
+	}
+
 	provider, err := anthropic.New(anthropic.Config{
 		APIKey:        cfg.APIKey,
 		AgentID:       cfg.AgentID,
 		EnvironmentID: cfg.EnvironmentID,
+		Resources:     fileResources,
 	})
 	if err != nil {
 		log.WithError(err).Warn("failed to initialise Anthropic managed agents provider")
@@ -119,7 +96,15 @@ func buildAgentService(authService authorization.Authorization, jwtSigner *jwt.S
 	return provider, service
 }
 
-func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcProvider oidc.Provider, baseURL string, authService authorization.Authorization, agentProvider agents.Provider) {
+func startWorkers(
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	oidcProvider oidc.Provider,
+	gitProvider gitprovider.Provider,
+	baseURL string,
+	authService authorization.Authorization,
+	agentProvider agents.Provider,
+) {
 	log.Println("Starting Workers")
 
 	rabbitMQURL, err := config.RabbitMQURL()
@@ -197,14 +182,20 @@ func startWorkers(encryptor crypto.Encryptor, registry *registry.Registry, oidcP
 	if os.Getenv("START_WORKFLOW_CLEANUP_WORKER") == "yes" || os.Getenv("START_CANVAS_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Canvas Cleanup Worker")
 
-		w := workers.NewCanvasCleanupWorker(agentProvider)
+		w := workers.NewCanvasCleanupWorker(gitProvider, agentProvider)
+		go w.Start(context.Background())
+	}
+
+	if os.Getenv("START_REPOSITORY_PROVISIONER") == "yes" {
+		log.Println("Starting Repository Provisioner")
+		w := workers.NewRepositoryProvisionerWorker(rabbitMQURL, gitProvider)
 		go w.Start(context.Background())
 	}
 
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 
-		w := workers.NewOrganizationCleanupWorker(agentProvider)
+		w := workers.NewOrganizationCleanupWorker(gitProvider, agentProvider)
 		go w.Start(context.Background())
 	}
 
@@ -272,6 +263,7 @@ func startInternalAPI(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	oidcProvider oidc.Provider,
+	gitProvider gitprovider.Provider,
 	agentService agentsActions.AgentsService,
 ) {
 	log.Println("Starting Internal API")
@@ -285,12 +277,21 @@ func startInternalAPI(
 		authService,
 		registry,
 		oidcProvider,
+		gitProvider,
 		agentService,
 		lookupInternalAPIPort(),
 	)
 }
 
-func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, registry *registry.Registry, jwtSigner *jwt.Signer, oidcProvider oidc.Provider, authService authorization.Authorization) {
+func startPublicAPI(
+	baseURL, basePath string,
+	encryptor crypto.Encryptor,
+	registry *registry.Registry,
+	jwtSigner *jwt.Signer,
+	oidcProvider oidc.Provider,
+	authService authorization.Authorization,
+	gitProvider gitprovider.Provider,
+) {
 	log.Println("Starting Public API with integrated Web Server")
 
 	appEnv := os.Getenv("APP_ENV")
@@ -307,6 +308,7 @@ func startPublicAPI(baseURL, basePath string, encryptor crypto.Encryptor, regist
 		registry,
 		jwtSigner,
 		oidcProvider,
+		gitProvider,
 		basePath,
 		baseURL,
 		webhooksBaseURL,
@@ -474,6 +476,12 @@ func Start() {
 		panic(fmt.Sprintf("failed to load OIDC keys: %v", err))
 	}
 
+	log.Println("Creating Git Provider")
+	gitProvider, err := git.NewProvider()
+	if err != nil {
+		panic(fmt.Sprintf("failed to create git provider: %v", err))
+	}
+
 	registry, err := registry.NewRegistryWithOptions(registry.RegistryOptions{
 		Encryptor: encryptorInstance,
 		AppEnv:    appEnv,
@@ -514,14 +522,42 @@ func Start() {
 	agentProvider, agentService := buildAgentService(authService, jwtSigner, baseURL)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
-		go startPublicAPI(baseURL, basePath, encryptorInstance, registry, jwtSigner, oidcProvider, authService)
+		go startPublicAPI(
+			baseURL,
+			basePath,
+			encryptorInstance,
+			registry,
+			jwtSigner,
+			oidcProvider,
+			authService,
+			gitProvider,
+		)
 	}
 
 	if os.Getenv("START_INTERNAL_API") == "yes" {
-		go startInternalAPI(baseURL, webhooksBaseURL, basePath, encryptorInstance, jwtSigner, authService, registry, oidcProvider, agentService)
+		go startInternalAPI(
+			baseURL,
+			webhooksBaseURL,
+			basePath,
+			encryptorInstance,
+			jwtSigner,
+			authService,
+			registry,
+			oidcProvider,
+			gitProvider,
+			agentService,
+		)
 	}
 
-	startWorkers(encryptorInstance, registry, oidcProvider, baseURL, authService, agentProvider)
+	startWorkers(
+		encryptorInstance,
+		registry,
+		oidcProvider,
+		gitProvider,
+		baseURL,
+		authService,
+		agentProvider,
+	)
 
 	log.Println("SuperPlane is UP.")
 

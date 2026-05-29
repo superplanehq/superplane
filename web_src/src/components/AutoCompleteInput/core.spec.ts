@@ -146,3 +146,19 @@ describe("getSuggestions config fields", () => {
     expect(labels).toContain("config");
   });
 });
+
+describe("getSuggestions top-level globals", () => {
+  it("suggests top-level globals by name when enabled", () => {
+    const suggestions = getSuggestions(
+      "par",
+      "par".length,
+      { parameters: { message: "hello" } },
+      {
+        includeTopLevelGlobals: true,
+      },
+    );
+    const parametersSuggestion = suggestions.find((item) => item.label === "parameters");
+    expect(parametersSuggestion).toBeDefined();
+    expect(parametersSuggestion?.insertText).toBe("parameters.");
+  });
+});

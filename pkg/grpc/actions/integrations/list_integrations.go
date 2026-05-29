@@ -9,6 +9,7 @@ import (
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
 	pb "github.com/superplanehq/superplane/pkg/protos/integrations"
 	"github.com/superplanehq/superplane/pkg/registry"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func ListIntegrations(ctx context.Context, registry *registry.Registry) (*pb.ListIntegrationsResponse, error) {
@@ -84,6 +85,9 @@ func serializeCapabilities(registry *registry.Registry, integration core.Integra
 				OutputChannels: []*actionpb.OutputChannel{},
 			}
 
+			capabilityDef.ExampleOutput = toStruct(capability.ExampleOutput)
+			capabilityDef.ExampleData = toStruct(capability.ExampleData)
+
 			for _, field := range capability.Configuration {
 				capabilityDef.Configuration = append(capabilityDef.Configuration, actions.ConfigurationFieldToProto(field))
 			}
@@ -128,6 +132,7 @@ func serializeLegacyCapabilities(integration core.Integration) []*pb.CapabilityD
 			Description:    action.Description(),
 			Configuration:  configuration,
 			OutputChannels: outputChannels,
+			ExampleOutput:  toStruct(action.ExampleOutput()),
 		})
 	}
 
@@ -144,8 +149,18 @@ func serializeLegacyCapabilities(integration core.Integration) []*pb.CapabilityD
 			Description:    trigger.Description(),
 			Configuration:  configuration,
 			OutputChannels: []*actionpb.OutputChannel{},
+			ExampleData:    toStruct(trigger.ExampleData()),
 		})
 	}
 
 	return capabilities
+}
+
+func toStruct(value map[string]any) *structpb.Struct {
+	if value == nil {
+		return nil
+	}
+
+	out, _ := structpb.NewStruct(value)
+	return out
 }

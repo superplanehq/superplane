@@ -19,9 +19,17 @@ import {
 } from "./pubsub_mapper";
 import { onMessageTriggerRenderer } from "./on_message";
 import { cloudDNSMapper } from "./clouddns";
+import { deleteVMInstanceMapper } from "./delete_vm_instance";
+import { manageVMInstancePowerMapper, MANAGE_VM_INSTANCE_POWER_STATE_REGISTRY } from "./manage_vm_instance_power";
+import { updateVMInstanceTypeMapper } from "./update_vm_instance_type";
+import { getVMInstanceMetricsMapper, GET_VM_INSTANCE_METRICS_STATE_REGISTRY } from "./get_vm_instance_metrics";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   createVM: baseMapper,
+  deleteVMInstance: deleteVMInstanceMapper,
+  manageVMInstancePower: manageVMInstancePowerMapper,
+  updateVMInstanceType: updateVMInstanceTypeMapper,
+  getVMInstanceMetrics: getVMInstanceMetricsMapper,
   "cloudbuild.createBuild": cloudBuildBaseMapper,
   "cloudbuild.getBuild": cloudBuildBaseMapper,
   "cloudbuild.runTrigger": runTriggerMapper,
@@ -48,6 +56,10 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
   createVM: buildActionStateRegistry("completed"),
+  deleteVMInstance: buildActionStateRegistry("completed"),
+  manageVMInstancePower: MANAGE_VM_INSTANCE_POWER_STATE_REGISTRY,
+  updateVMInstanceType: buildActionStateRegistry("completed"),
+  getVMInstanceMetrics: GET_VM_INSTANCE_METRICS_STATE_REGISTRY,
   "cloudbuild.createBuild": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
   "cloudbuild.getBuild": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,
   "cloudbuild.runTrigger": CLOUD_BUILD_EXECUTION_STATE_REGISTRY,

@@ -9,7 +9,10 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var ErrSecretKeyNotFound = errors.New("secret or key not found")
+var (
+	ErrSecretKeyNotFound   = errors.New("secret or key not found")
+	ErrExecutionKVNotFound = errors.New("execution kv not found")
+)
 
 /*
  * ExecutionContext allows the component
@@ -43,6 +46,7 @@ type ExecutionContext struct {
 
 type ExpressionContext interface {
 	Run(expression string) (any, error)
+	RunWithExtraVariables(expression string, variables map[string]any) (any, error)
 }
 
 /*
@@ -77,12 +81,18 @@ type CanvasMemoryContext interface {
 	FindFirst(namespace string, matches map[string]any) (any, error)
 }
 
+type CanvasMemoryRecord struct {
+	ID     uuid.UUID
+	Values any
+}
+
 /*
  * ExecutionStateContext allows components to control execution lifecycle.
  */
 type ExecutionStateContext interface {
 	IsFinished() bool
 	SetKV(key, value string) error
+	GetKV(key string) (string, error)
 
 	/*
 	 * Pass the execution, emitting a payload to the specified channel.

@@ -1,6 +1,7 @@
 .PHONY: lint test test.coverage test.license.check check.generated.artifacts check.templates dev.up dev.setup dev.setup.app dev.server dev.server.fg
 
 MAKE=make
+MAKEFLAGS+=--no-print-directory
 DB_NAME=superplane
 DB_PASSWORD=the-cake-is-a-lie
 BASE_URL?=https://app.superplane.com
@@ -34,7 +35,7 @@ tidy:
 	$(COMPOSE) exec app go mod tidy
 
 test.e2e:
-	$(COMPOSE) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1
+	$(COMPOSE) exec app gotestsum --format short --junitfile junit-report.xml --rerun-fails=3 --rerun-fails-max-failures=1 --packages="$(E2E_TEST_PACKAGES)" -- -p 1 -timeout 30m
 
 test.e2e.autoparallel:
 	$(COMPOSE) exec -e INDEX -e TOTAL app bash -lc "cd /app && bash scripts/test_e2e_autoparallel.sh"

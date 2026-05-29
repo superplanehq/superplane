@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/cli/canvasresolve"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -52,7 +53,7 @@ func TestFindCurrentUserDraftVersionIDSkipsPublishedVersions(t *testing.T) {
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
-	versionID, err := findCurrentUserDraftVersionID(ctx, "canvas-123")
+	versionID, err := canvasresolve.FindCurrentUserDraftVersionID(ctx, "canvas-123")
 	require.NoError(t, err)
 	require.Equal(t, "draft-1", versionID)
 }
@@ -80,7 +81,7 @@ func TestEnsureCurrentUserDraftVersionIDCreatesDraftWhenMissing(t *testing.T) {
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
-	versionID, err := ensureCurrentUserDraftVersionID(ctx, "canvas-123")
+	versionID, err := canvasresolve.EnsureCurrentUserDraftVersionID(ctx, "canvas-123")
 	require.NoError(t, err)
 	require.Equal(t, "draft-1", versionID)
 
@@ -105,7 +106,7 @@ func TestDescribeCanvasVersionByIDReturnsErrorWhenVersionMissing(t *testing.T) {
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
-	_, err := describeCanvasVersionByID(ctx, "canvas-123", "version-123")
+	_, err := canvasresolve.DescribeCanvasVersionByID(ctx, "canvas-123", "version-123")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), `canvas version "version-123" not found`)
 }

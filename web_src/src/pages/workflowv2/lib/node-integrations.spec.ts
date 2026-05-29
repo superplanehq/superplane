@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { CanvasNode } from "@/ui/CanvasPage";
-import { getNodeIntegrationName, overlayIntegrationWarnings } from "./node-integrations";
+import {
+  getNodeIntegrationName,
+  overlayIntegrationWarnings,
+  stripCanvasNodeSetupWarningsForRunsView,
+} from "./node-integrations";
 
 describe("getNodeIntegrationName", () => {
   const availableIntegrations = [
@@ -143,5 +147,69 @@ describe("overlayIntegrationWarnings", () => {
     );
 
     expect((result[0].data as { component: { error?: string } }).component.error).toBe("Existing error");
+  });
+});
+
+describe("stripCanvasNodeSetupWarningsForRunsView", () => {
+  it("removes component error and warning", () => {
+    const nodes = [
+      {
+        id: "n1",
+        position: { x: 0, y: 0 },
+        data: {
+          type: "component",
+          label: "X",
+          state: "pending",
+          component: { title: "A", error: "Not ready", warning: "Fix me" },
+        },
+      } as CanvasNode,
+    ];
+
+    const result = stripCanvasNodeSetupWarningsForRunsView(nodes);
+    const component = (result[0].data as { component: Record<string, unknown> }).component;
+    expect(component.error).toBeUndefined();
+    expect(component.warning).toBeUndefined();
+    expect(component.title).toBe("A");
+  });
+
+  it("removes trigger error and warning", () => {
+    const nodes = [
+      {
+        id: "n2",
+        position: { x: 0, y: 0 },
+        data: {
+          type: "trigger",
+          label: "T",
+          state: "pending",
+          trigger: { title: "B", error: "Bad", warning: "Hmm" },
+        },
+      } as CanvasNode,
+    ];
+
+    const result = stripCanvasNodeSetupWarningsForRunsView(nodes);
+    const trigger = (result[0].data as { trigger: Record<string, unknown> }).trigger;
+    expect(trigger.error).toBeUndefined();
+    expect(trigger.warning).toBeUndefined();
+  });
+
+  it("removes composite error and warning", () => {
+    const nodes = [
+      {
+        id: "n3",
+        position: { x: 0, y: 0 },
+        data: {
+          type: "composite",
+          label: "C",
+          state: "pending",
+          composite: { title: "Nested", error: "Bad", warning: "Hmm" },
+        },
+      } as CanvasNode,
+    ];
+
+    const result = stripCanvasNodeSetupWarningsForRunsView(nodes);
+    const composite = (result[0].data as { composite: Record<string, unknown> }).composite;
+    expect(composite.error).toBeUndefined();
+    expect(composite.warning).toBeUndefined();
+    expect(composite.title).toBe("Nested");
   });
 });

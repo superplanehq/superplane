@@ -11,6 +11,16 @@ export type MermaidSegment = { type: "mermaid"; content: string };
 export type StepsSegment = { type: "steps"; items: StepItem[] };
 export type SuccessSegment = { type: "success"; content: string };
 export type ErrorSegment = { type: "error"; content: string };
+export type DraftActionsSegment = { type: "draft-actions"; versionId: string; message?: string };
+export type SurveySegment = { type: "survey"; questions: { prompt: string; options: string[]; hasInput?: boolean }[] };
+export type RubricCategory = { heading: string; criteria: { text: string }[]; body?: string };
+export type RubricSegment = {
+  type: "rubric";
+  title: string;
+  criteria: { text: string }[];
+  categories?: RubricCategory[];
+  body?: string;
+};
 
 export type Segment =
   | MarkdownSegment
@@ -21,7 +31,10 @@ export type Segment =
   | MermaidSegment
   | StepsSegment
   | SuccessSegment
-  | ErrorSegment;
+  | ErrorSegment
+  | DraftActionsSegment
+  | SurveySegment
+  | RubricSegment;
 
 export type StepItem = { done: boolean; text: string };
 
@@ -35,7 +48,7 @@ export type ChartConfig = {
 
 // --- Regex patterns ---
 
-const BLOCK_RE = /^\s*:::(\w+)(?:\s+(.*))?$/;
+const BLOCK_RE = /^\s*:::([\w-]+)(?:\s+(.*))?$/;
 const BLOCK_END_RE = /^\s*:::$/;
 const MERMAID_FENCE_START = /^\s*```mermaid\s*$/;
 const FENCE_END = /^\s*```\s*$/;
@@ -157,6 +170,12 @@ function parseBlock(type: string, meta: string, raw: string): Segment | null {
       return { type: "success", content: raw.trim() };
     case "error":
       return { type: "error", content: raw.trim() };
+    case "survey":
+      return parseSurvey(raw);
+    case "rubric":
+      return parseRubric(meta, raw);
+    case "draft-actions":
+      return parseDraftActions(raw, meta);
     default:
       return { type: "markdown", content: `:::${type} ${meta}\n${raw}\n:::` };
   }
@@ -221,4 +240,171 @@ function parseSteps(raw: string): StepsSegment {
       return { done, text };
     });
   return { type: "steps", items };
+}
+
+function parseDraftActions(raw: string, meta: string): DraftActionsSegment {
+  // Try YAML body first
+  try {
+    const parsed = YAML.load(raw) as Record<string, unknown>;
+    if (parsed && typeof parsed === "object") {
+      return {
+        type: "draft-actions",
+        versionId: String(parsed.versionId ?? parsed.version_id ?? meta.trim()),
+        message: parsed.message ? String(parsed.message) : undefined,
+      };
+    }
+  } catch {
+    // fall through
+  }
+  // Fallback: version ID from meta or raw content
+  return { type: "draft-actions", versionId: (meta || raw).trim(), message: undefined };
+}
+
+function parseSurvey(raw: string): SurveySegment {
+  const questions: { prompt: string; options: string[]; hasInput?: boolean }[] = [];
+  let currentPrompt = "";
+  let currentOptions: string[] = [];
+  let hasInput = false;
+
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    if (/^[-*]\s/.test(trimmed)) {
+      const option = trimmed.replace(/^[-*]\s*/, "").trim();
+      if (option.toLowerCase() === "[input]" || option.toLowerCase() === "[custom]") {
+        hasInput = true;
+      } else {
+        currentOptions.push(option);
+      }
+    } else {
+      // New question - flush previous
+      if (currentPrompt && (currentOptions.length || hasInput)) {
+        questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
+      }
+      currentPrompt = trimmed;
+      currentOptions = [];
+      hasInput = false;
+    }
+  }
+  // Flush last question
+  if (currentPrompt && (currentOptions.length || hasInput)) {
+    questions.push({ prompt: currentPrompt, options: currentOptions, hasInput: hasInput || undefined });
+  }
+
+  return { type: "survey", questions };
+}
+
+function parseRubric(meta: string, raw: string): RubricSegment {
+  const rawLines = raw.split("\n");
+  const lines = rawLines.filter((l) => l.trim());
+  let title = meta.trim();
+  if (lines.some((line) => isRubricHeading(line.trim()))) {
+    return parseCategorizedRubric(rawLines, title, raw.trim());
+  }
+
+  const criteria: { text: string }[] = [];
+  for (const line of lines) {
+    const parsedLine = parseRubricLine(line.trim());
+    if (parsedLine.type === "criterion") {
+      criteria.push(parsedLine.criterion);
+      continue;
+    }
+    if (parsedLine.type === "text" && !title) {
+      title = parsedLine.text;
+      continue;
+    }
+    if (parsedLine.type === "text") {
+      criteria.push({ text: parsedLine.text });
+    }
+  }
+
+  return { type: "rubric", title: title || "Build Plan", criteria, body: raw.trim() };
+}
+
+function parseCategorizedRubric(lines: string[], initialTitle: string, body: string): RubricSegment {
+  let title = initialTitle;
+  const categories: RubricCategory[] = [];
+  const uncategorized: { text: string }[] = [];
+  let currentCategory: (RubricCategory & { bodyLines: string[] }) | null = null;
+
+  const flushCategory = () => {
+    if (!currentCategory) {
+      return;
+    }
+
+    const categoryBody = currentCategory.bodyLines.join("\n").trim();
+    categories.push({
+      heading: currentCategory.heading,
+      criteria: currentCategory.criteria,
+      body: categoryBody || undefined,
+    });
+    currentCategory = null;
+  };
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      currentCategory?.bodyLines.push(line);
+      continue;
+    }
+
+    const parsedLine = parseRubricLine(trimmed);
+
+    if (parsedLine.type === "heading") {
+      flushCategory();
+      currentCategory = { heading: parsedLine.heading, criteria: [], bodyLines: [] };
+      continue;
+    }
+
+    currentCategory?.bodyLines.push(line);
+
+    if (parsedLine.type === "criterion") {
+      if (currentCategory) {
+        currentCategory.criteria.push(parsedLine.criterion);
+      } else {
+        uncategorized.push(parsedLine.criterion);
+      }
+      continue;
+    }
+
+    if (!title) {
+      title = parsedLine.text;
+    }
+  }
+
+  flushCategory();
+
+  return {
+    type: "rubric",
+    title: title || "Build Plan",
+    criteria: [...uncategorized, ...categories.flatMap((category) => category.criteria)],
+    categories,
+    body,
+  };
+}
+
+function isRubricHeading(line: string): boolean {
+  return /^#{2,3}\s/.test(line);
+}
+
+function parseRubricLine(
+  line: string,
+):
+  | { type: "heading"; heading: string }
+  | { type: "criterion"; criterion: { text: string } }
+  | { type: "text"; text: string } {
+  if (isRubricHeading(line)) {
+    return { type: "heading", heading: line.replace(/^#{2,3}\s*/, "").trim() };
+  }
+
+  if (/^[-*✦•]\s/.test(line)) {
+    return { type: "criterion", criterion: { text: line.replace(/^[-*✦•]\s*/, "").trim() } };
+  }
+
+  if (/^\d+[.)]\s/.test(line)) {
+    return { type: "criterion", criterion: { text: line.replace(/^\d+[.)]\s*/, "").trim() } };
+  }
+
+  return { type: "text", text: line };
 }

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -14,8 +15,27 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+// ActiveTask is a non-terminal task from GET /v1/tasks on the task broker.
+type ActiveTask struct {
+	ID                      string     `json:"id"`
+	Status                  string     `json:"status"`
+	FleetID                 string     `json:"fleet_id"`
+	CreatedAt               time.Time  `json:"created_at"`
+	ClaimedAt               *time.Time `json:"claimed_at,omitempty"`
+	LeaseUntil              *time.Time `json:"lease_until,omitempty"`
+	RunnerID                string     `json:"runner_id,omitempty"`
+	ExecutionMode           string     `json:"execution_mode,omitempty"`
+	DockerImage             string     `json:"docker_image,omitempty"`
+	CancelRequested         bool       `json:"cancel_requested,omitempty"`
+	ExecutionTimeoutSeconds *int       `json:"execution_timeout_seconds,omitempty"`
+}
+
 const (
 	brokerHTTPTimeout = 30 * time.Second
+
+	// Task-broker may return 409 until fleet_task_id is linked (cancel right after create).
+	cancel409MaxAttempts  = 3
+	cancel409RetryBackoff = 200 * time.Millisecond
 )
 
 type BrokerClient struct {
@@ -93,7 +113,7 @@ type CreateTaskParams struct {
 	Environment    []BrokerEnvironmentVariable
 	ExecutionMode  string
 	DockerImage    string
-	TimeoutSeconds int // 0 = omit (broker / fleet default)
+	TimeoutSeconds int // 0 = DefaultExecutionTimeoutSeconds
 }
 
 type brokerCreateTaskResponse struct {
@@ -114,10 +134,11 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		ExecutionMode: mode,
 		DockerImage:   strings.TrimSpace(p.DockerImage),
 	}
-	if p.TimeoutSeconds > 0 {
-		t := p.TimeoutSeconds
-		req.ExecutionTimeoutSeconds = &t
+	timeout := p.TimeoutSeconds
+	if timeout <= 0 {
+		timeout = DefaultExecutionTimeoutSeconds
 	}
+	req.ExecutionTimeoutSeconds = &timeout
 
 	bodyBytes, err := json.Marshal(req)
 	if err != nil {
@@ -184,14 +205,111 @@ func (t *Task) effectiveExitCode() int {
 }
 
 func (t *Task) IsInTerminalState() bool {
-	return t.Status == "succeeded" || t.Status == "failed"
+	return t.Status == "succeeded" || t.Status == "failed" || t.Status == "canceled"
+}
+
+func (b *BrokerClient) CancelTask(brokerTaskID string) error {
+	brokerTaskID = strings.TrimSpace(brokerTaskID)
+	if brokerTaskID == "" {
+		return fmt.Errorf("broker task id is empty")
+	}
+
+	cancelPath := b.baseURL + "/v1/tasks/" + url.PathEscape(brokerTaskID) + "/cancel"
+
+	var lastErr error
+	for attempt := range cancel409MaxAttempts {
+		if attempt > 0 {
+			time.Sleep(cancel409RetryBackoff)
+		}
+
+		httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
+		httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodPost, cancelPath, http.NoBody)
+		if err != nil {
+			cancel()
+			return fmt.Errorf("new request: %w", err)
+		}
+		httpReq.Header.Set("Authorization", "Bearer "+b.authToken)
+
+		resp, err := b.httpClient.Do(httpReq)
+		if err != nil {
+			cancel()
+			return fmt.Errorf("broker request: %w", err)
+		}
+
+		body, err := io.ReadAll(resp.Body)
+		if closeErr := resp.Body.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+		cancel()
+		if err != nil {
+			return fmt.Errorf("read response body: %w", err)
+		}
+
+		switch resp.StatusCode {
+		case http.StatusOK, http.StatusNotFound:
+			return nil
+		case http.StatusConflict:
+			lastErr = fmt.Errorf(
+				"broker rejected cancel: status=%d body=%s",
+				resp.StatusCode,
+				strings.TrimSpace(string(body)),
+			)
+		default:
+			return fmt.Errorf(
+				"broker rejected cancel: status=%d body=%s",
+				resp.StatusCode,
+				strings.TrimSpace(string(body)),
+			)
+		}
+	}
+
+	return fmt.Errorf("broker cancel: exceeded retries: %w", lastErr)
+}
+
+func (b *BrokerClient) ListActiveTasks() ([]ActiveTask, error) {
+	httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodGet, b.baseURL+"/v1/tasks", nil)
+	if err != nil {
+		return nil, fmt.Errorf("new request: %w", err)
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+b.authToken)
+
+	resp, err := b.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("broker request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("broker rejected list tasks: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var out struct {
+		Tasks []ActiveTask `json:"tasks"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, fmt.Errorf("unmarshal list tasks response: %w", err)
+	}
+
+	if out.Tasks == nil {
+		return []ActiveTask{}, nil
+	}
+
+	return out.Tasks, nil
 }
 
 func (b *BrokerClient) FetchTaskStatus(taskID string) (*Task, error) {
 	httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
 	defer cancel()
 
-	httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodGet, b.baseURL+"/v1/tasks/"+taskID, nil)
+	httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodGet, b.baseURL+"/v1/tasks/"+url.PathEscape(taskID), nil)
 	if err != nil {
 		return nil, fmt.Errorf("new request: %w", err)
 	}

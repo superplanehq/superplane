@@ -41,6 +41,7 @@ import {
 import type {
   CanvasFoldersCanvasFolder,
   CanvasesCanvas,
+  CanvasesCanvasDashboard,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
@@ -127,7 +128,9 @@ export const canvasKeys = {
   nodeQueueItemHistory: (canvasId: string, nodeId: string) =>
     [...canvasKeys.nodeQueueItems(), "infinite", canvasId, nodeId] as const,
   canvasMemoryEntries: (canvasId: string) => [...canvasKeys.all, "memoryEntries", canvasId] as const,
-  dashboard: (canvasId: string) => [...canvasKeys.all, "dashboard", canvasId] as const,
+  dashboard: (canvasId: string, versionId?: string) =>
+    [...canvasKeys.all, "dashboard", canvasId, versionId ?? "live"] as const,
+  dashboardAll: (canvasId: string) => [...canvasKeys.all, "dashboard", canvasId] as const,
 };
 
 export interface DashboardPanel {
@@ -268,7 +271,7 @@ export const useInfiniteCanvasLiveVersions = (
   organizationId: string,
   canvasId: string,
   enabled: boolean = true,
-  limit: number = 20,
+  limit: number = 50,
 ) => {
   return useInfiniteQuery({
     queryKey: canvasKeys.versionHistory(canvasId),
@@ -873,6 +876,7 @@ export const usePublishCanvasVersion = (organizationId: string, canvasId: string
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.dashboardAll(canvasId) });
     },
   });
 };
@@ -1580,13 +1584,14 @@ export const useInfiniteNodeQueueItems = (canvasId: string, nodeId: string, enab
   });
 };
 
-export const useCanvasDashboard = (canvasId: string, enabled: boolean = true) => {
+export const useCanvasConsole = (canvasId: string, versionId: string | undefined, enabled: boolean = true) => {
   return useQuery({
-    queryKey: canvasKeys.dashboard(canvasId),
+    queryKey: canvasKeys.dashboard(canvasId, versionId),
     queryFn: async () => {
       const response = await canvasesGetCanvasDashboard(
         withOrganizationHeader({
           path: { canvasId },
+          query: versionId ? { versionId } : undefined,
         }),
       );
       return response.data?.dashboard;
@@ -1596,38 +1601,91 @@ export const useCanvasDashboard = (canvasId: string, enabled: boolean = true) =>
   });
 };
 
-export const useUpdateCanvasDashboard = (canvasId: string) => {
+type UseUpdateCanvasConsoleOptions = {
+  registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
+};
+
+function toCanvasDashboard(
+  canvasId: string,
+  versionId: string | undefined,
+  input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] },
+  previous?: CanvasesCanvasDashboard,
+): CanvasesCanvasDashboard {
+  return {
+    ...previous,
+    canvasId: previous?.canvasId ?? canvasId,
+    ...(versionId ? { versionId: previous?.versionId ?? versionId } : {}),
+    panels: input.panels.map((panel) => ({
+      id: panel.id,
+      type: panel.type,
+      content: panel.content,
+    })),
+    layout: input.layout.map((item) => ({
+      i: item.i,
+      x: item.x,
+      y: item.y,
+      w: item.w,
+      h: item.h,
+      ...(item.minW !== undefined ? { minW: item.minW } : {}),
+      ...(item.minH !== undefined ? { minH: item.minH } : {}),
+    })),
+  };
+}
+
+export const useUpdateCanvasConsole = (
+  canvasId: string,
+  versionId: string | undefined,
+  options?: UseUpdateCanvasConsoleOptions,
+) => {
   const queryClient = useQueryClient();
   return useMutation({
+    onMutate: async (input) => {
+      const queryKey = canvasKeys.dashboard(canvasId, versionId);
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<CanvasesCanvasDashboard>(queryKey);
+      queryClient.setQueryData(queryKey, toCanvasDashboard(canvasId, versionId, input, previous));
+      return { previous, queryKey };
+    },
     mutationFn: async (input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
-      const response = await canvasesUpdateCanvasDashboard(
-        withOrganizationHeader({
-          path: { canvasId },
-          body: {
-            panels: input.panels.map((p) => ({
-              id: p.id,
-              type: p.type,
-              content: p.content,
-            })),
-            layout: input.layout.map((l) => ({
-              i: l.i,
-              x: l.x,
-              y: l.y,
-              w: l.w,
-              h: l.h,
-              ...(l.minW !== undefined ? { minW: l.minW } : {}),
-              ...(l.minH !== undefined ? { minH: l.minH } : {}),
-            })),
-          },
-        }),
-      );
-      return response.data?.dashboard;
+      const releaseCanvasVersionUpdatedEcho = options?.registerIgnoredCanvasVersionUpdatedEcho?.(versionId);
+      try {
+        const response = await canvasesUpdateCanvasDashboard(
+          withOrganizationHeader({
+            path: { canvasId },
+            body: {
+              versionId,
+              panels: input.panels.map((p) => ({
+                id: p.id,
+                type: p.type,
+                content: p.content,
+              })),
+              layout: input.layout.map((l) => ({
+                i: l.i,
+                x: l.x,
+                y: l.y,
+                w: l.w,
+                h: l.h,
+                ...(l.minW !== undefined ? { minW: l.minW } : {}),
+                ...(l.minH !== undefined ? { minH: l.minH } : {}),
+              })),
+            },
+          }),
+        );
+        return response.data?.dashboard;
+      } catch (error) {
+        releaseCanvasVersionUpdatedEcho?.();
+        throw error;
+      }
+    },
+    onError: (_error, _input, context) => {
+      if (!context) return;
+      queryClient.setQueryData(context.queryKey, context.previous);
     },
     onSuccess: (data) => {
-      queryClient.setQueryData(canvasKeys.dashboard(canvasId), data);
+      queryClient.setQueryData(canvasKeys.dashboard(canvasId, versionId), data);
     },
   });
 };
 
-export type CanvasDashboardQueryResult = ReturnType<typeof useCanvasDashboard>;
-export type UpdateCanvasDashboardMutationResult = ReturnType<typeof useUpdateCanvasDashboard>;
+export type CanvasConsoleQueryResult = ReturnType<typeof useCanvasConsole>;
+export type UpdateCanvasConsoleMutationResult = ReturnType<typeof useUpdateCanvasConsole>;

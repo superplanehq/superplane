@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { ComponentBase } from "@/ui/componentBase";
@@ -135,6 +135,160 @@ describe("workflow v2 edit-mode action affordances", () => {
 
     expect(screen.queryByTestId("start-template-run")).not.toBeInTheDocument();
     expect(screen.getByText("Example")).toBeInTheDocument();
+  });
+
+  it("opens a parameter modal for manual run templates with parameters", async () => {
+    const invokeNodeTriggerHook = vi.fn().mockResolvedValue(undefined);
+    const openModal = vi.fn();
+    const props = startTriggerRenderer.getTriggerProps({
+      ...makeTriggerContext({
+        node: {
+          id: "trigger-1",
+          name: "Start",
+          componentName: "start",
+          isCollapsed: false,
+          configuration: {
+            templates: [
+              {
+                name: "Example",
+                payload: { message: "default" },
+                parameters: [{ name: "message", type: "string", defaultString: "default" }],
+              },
+            ],
+          },
+        },
+      }),
+      canvasMode: "live",
+      actions: { invokeNodeTriggerHook, openModal },
+    });
+
+    render(<Trigger {...props} canvasMode="live" />);
+    fireEvent.click(screen.getByTestId("start-template-run"));
+
+    expect(openModal).toHaveBeenCalledTimes(1);
+    expect(invokeNodeTriggerHook).not.toHaveBeenCalled();
+
+    const modal = openModal.mock.calls[0][0] as {
+      content: (ctx: { close: () => void }) => React.ReactNode;
+    };
+    render(<>{modal.content({ close: vi.fn() })}</>);
+
+    fireEvent.change(screen.getByLabelText("message"), { target: { value: "from form" } });
+    fireEvent.click(screen.getByTestId("emit-event-submit-button"));
+
+    await waitFor(() =>
+      expect(invokeNodeTriggerHook).toHaveBeenCalledWith("run", {
+        template: "Example",
+        message: "from form",
+      }),
+    );
+  });
+
+  it("submits select parameter values from the manual run modal", async () => {
+    const invokeNodeTriggerHook = vi.fn().mockResolvedValue(undefined);
+    const openModal = vi.fn();
+    const props = startTriggerRenderer.getTriggerProps({
+      ...makeTriggerContext({
+        node: {
+          id: "trigger-1",
+          name: "Start",
+          componentName: "start",
+          isCollapsed: false,
+          configuration: {
+            templates: [
+              {
+                name: "Example",
+                payload: { provider: '{{ parameters["provider"] }}' },
+                parameters: [
+                  {
+                    name: "provider",
+                    type: "select",
+                    title: "LLM Provider",
+                    defaultString: "openai",
+                    options: [
+                      { label: "OpenAI", value: "openai" },
+                      { label: "Anthropic", value: "anthropic" },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      }),
+      canvasMode: "live",
+      actions: { invokeNodeTriggerHook, openModal },
+    });
+
+    render(<Trigger {...props} canvasMode="live" />);
+    fireEvent.click(screen.getByTestId("start-template-run"));
+
+    const modal = openModal.mock.calls[0][0] as {
+      content: (ctx: { close: () => void }) => React.ReactNode;
+    };
+    render(<>{modal.content({ close: vi.fn() })}</>);
+
+    expect(screen.getByText("LLM Provider")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("emit-event-submit-button"));
+
+    await waitFor(() =>
+      expect(invokeNodeTriggerHook).toHaveBeenCalledWith("run", {
+        template: "Example",
+        provider: "openai",
+      }),
+    );
+  });
+
+  it("invokes manual run directly when templates have no parameters", () => {
+    const invokeNodeTriggerHook = vi.fn().mockResolvedValue(undefined);
+    const openModal = vi.fn();
+    const props = startTriggerRenderer.getTriggerProps({
+      ...makeTriggerContext(),
+      canvasMode: "live",
+      actions: { invokeNodeTriggerHook, openModal },
+    });
+
+    render(<Trigger {...props} canvasMode="live" />);
+    fireEvent.click(screen.getByTestId("start-template-run"));
+
+    expect(openModal).not.toHaveBeenCalled();
+    expect(invokeNodeTriggerHook).toHaveBeenCalledWith("run", {
+      template: "Example",
+    });
+  });
+
+  it("invokes manual run directly when template parameters array is empty", () => {
+    const invokeNodeTriggerHook = vi.fn().mockResolvedValue(undefined);
+    const openModal = vi.fn();
+    const props = startTriggerRenderer.getTriggerProps({
+      ...makeTriggerContext({
+        node: {
+          id: "trigger-1",
+          name: "Start",
+          componentName: "start",
+          isCollapsed: false,
+          configuration: {
+            templates: [
+              {
+                name: "Example",
+                payload: { ok: true },
+                parameters: [],
+              },
+            ],
+          },
+        },
+      }),
+      canvasMode: "live",
+      actions: { invokeNodeTriggerHook, openModal },
+    });
+
+    render(<Trigger {...props} canvasMode="live" />);
+    fireEvent.click(screen.getByTestId("start-template-run"));
+
+    expect(openModal).not.toHaveBeenCalled();
+    expect(invokeNodeTriggerHook).toHaveBeenCalledWith("run", {
+      template: "Example",
+    });
   });
 
   it("disables approval actions in edit mode", () => {

@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -77,7 +78,7 @@ func (c *Runner) Documentation() string {
 - **Execution mode**: Host (default) or Docker.
 - **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
 - **Custom container image**: Shown only for **Other**; use a normal reference (` + "`my.registry.example.com/org/repo:1.2.3`" + ` or ` + "`debian:bookworm-slim@sha256:…`" + `). Private registries require the runner to be configured with registry credentials.
-- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Leave at **0** to use the broker default.
+- **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
 - **Commands**: One or more shell commands, one per line.
 - **Environment variables**: Optional key/value pairs available during command execution. Values can be literal strings (with expression support) or organization secret keys.
 
@@ -226,9 +227,9 @@ func (c *Runner) Configuration() []configuration.Field {
 			Name:        "execution_timeout_seconds",
 			Label:       "Execution timeout (seconds)",
 			Type:        configuration.FieldTypeNumber,
-			Required:    false, // legacy nodes omit this; 0 means broker default
-			Default:     0,
-			Description: "Hard time limit for the whole task, including image pull and command run. Use 0 for the broker default.",
+			Required:    false, // legacy nodes omit this; 0 means DefaultExecutionTimeoutSeconds
+			Default:     DefaultExecutionTimeoutSeconds,
+			Description: "Hard time limit for the whole task, including image pull and command run. Defaults to 3600 seconds (1 hour).",
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
 					Min: intPtr(0),
@@ -438,5 +439,28 @@ func brokerResultAsAny(raw json.RawMessage) any {
 	return v
 }
 
-func (c *Runner) Cancel(ctx core.ExecutionContext) error { return nil }
-func (c *Runner) Cleanup(ctx core.SetupContext) error    { return nil }
+func (c *Runner) Cancel(ctx core.ExecutionContext) error {
+	if ctx.ExecutionState.IsFinished() {
+		return nil
+	}
+
+	taskID, err := ctx.ExecutionState.GetKV("task_id")
+	if err != nil {
+		if errors.Is(err, core.ErrExecutionKVNotFound) {
+			return nil
+		}
+		return fmt.Errorf("get task_id kv: %w", err)
+	}
+
+	broker, err := NewBrokerClient(ctx.HTTP)
+	if err != nil {
+		return err
+	}
+
+	if err := broker.CancelTask(taskID); err != nil {
+		return fmt.Errorf("cancel task: %w", err)
+	}
+	return nil
+}
+
+func (c *Runner) Cleanup(ctx core.SetupContext) error { return nil }

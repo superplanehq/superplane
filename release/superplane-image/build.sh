@@ -39,7 +39,8 @@ docker buildx build \
   --platform "linux/${ARCH}" \
   --progress=plain \
   --provenance=false \
-  "${push_flag[@]}" \
+  --push \
+  --target runner \
   --cache-from ghcr.io/superplanehq/superplane-dev-base:app-latest \
   -t "${output_ref}" \
   -f Dockerfile \

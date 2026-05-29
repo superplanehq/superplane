@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"hash/fnv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,40 +18,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
-
-const agentTokenTTL = 1 * time.Hour
-
-const preambleTemplate = "[SuperPlane session context — refreshed every turn; always use the latest values]\n" +
-	"canvas_id: %s\n" +
-	"organization_id: %s\n" +
-	"api_base_url: %s\n" +
-	"api_token: %s\n" +
-	"api_token_expires_at: %s\n" +
-	"\n" +
-	"When using the SuperPlane CLI, pass these refreshed values through\n" +
-	"environment variables instead of running `superplane connect`:\n" +
-	"  SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...\n" +
-	"\n" +
-	"api_token scopes (exact strings on the JWT):\n" +
-	"  - org:read\n" +
-	"  - integrations:read\n" +
-	"  - canvases:read:%s\n" +
-	"  - canvases:update_version:%s\n" +
-	"\n" +
-	"The canvases:update_version scope is limited to draft canvas version\n" +
-	"editing. It does not grant permission to publish versions, delete\n" +
-	"canvases, or perform live-canvas operational actions.\n" +
-	"\n" +
-	"SuperPlane has no separate `events` permission. The canvases:read\n" +
-	"scope grants every read endpoint scoped to this canvas, including:\n" +
-	"  GET /api/v1/canvases/{canvas_id}                       describe canvas\n" +
-	"  GET /api/v1/canvases/{canvas_id}/events                list canvas events\n" +
-	"  GET /api/v1/canvases/{canvas_id}/events/{id}/executions\n" +
-	"  GET /api/v1/canvases/{canvas_id}/runs\n" +
-	"  GET /api/v1/canvases/{canvas_id}/nodes/{node_id}/events\n" +
-	"  GET /api/v1/canvases/{canvas_id}/nodes/{node_id}/executions\n" +
-	"If a request returns 401/404, the cause is not a missing scope — it\n" +
-	"is the wrong canvas_id, wrong endpoint, or a stale api_token."
 
 var ErrSessionForbidden = errors.New("agent session is owned by another user")
 
@@ -107,7 +74,8 @@ func (s *Service) provisionSession(ctx context.Context, organizationID, userID, 
 			return nil
 		}
 
-		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{})
+		title := sessionTitle(organizationID, canvasID)
+		upstream, err := s.provider.CreateSession(ctx, CreateSessionOptions{Title: title})
 		if err != nil {
 			return fmt.Errorf("create provider session: %w", err)
 		}
@@ -146,7 +114,48 @@ func (s *Service) ListMessages(sessionID, beforeID uuid.UUID, limit int) ([]mode
 	return models.ListAgentSessionMessagesPage(sessionID, cursor, limit)
 }
 
-func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string) (*models.AgentSessionMessage, error) {
+func (s *Service) InterruptSession(ctx context.Context, organizationID, userID, sessionID uuid.UUID) error {
+	session, err := s.GetSession(organizationID, userID, sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+	if err := s.provider.InterruptSession(ctx, session.ProviderSessionID); err != nil {
+		return fmt.Errorf("interrupt: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) DefineOutcome(ctx context.Context, organizationID, userID, sessionID uuid.UUID, description, rubric string, maxIterations int) error {
+	session, err := s.GetSession(organizationID, userID, sessionID)
+	if err != nil {
+		return fmt.Errorf("get session: %w", err)
+	}
+
+	preamble, err := s.buildPreamble(session, organizationID, userID, ModeBuilder)
+	if err != nil {
+		return fmt.Errorf("build preamble: %w", err)
+	}
+
+	if err := s.provider.DefineOutcome(ctx, session.ProviderSessionID, DefineOutcomeOptions{
+		Description:     description,
+		Rubric:          rubric,
+		MaxIterations:   maxIterations,
+		ContextPreamble: preamble,
+	}); err != nil {
+		return fmt.Errorf("define outcome: %w", err)
+	}
+
+	// Mark session as streaming and start the stream worker to pick up events
+	if err := models.UpdateAgentSessionStatus(sessionID, models.AgentSessionStatusStreaming); err != nil {
+		log.WithError(err).Warn("failed to mark agent session as streaming")
+	}
+	if err := s.enqueueStream(sessionID, organizationID, userID); err != nil {
+		log.WithError(err).Warn("failed to enqueue stream after define outcome")
+	}
+	return nil
+}
+
+func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessionID uuid.UUID, content string, mode ...string) (*models.AgentSessionMessage, error) {
 	if content == "" {
 		return nil, fmt.Errorf("message content is required")
 	}
@@ -156,7 +165,12 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, err
 	}
 
-	preamble, err := s.buildPreamble(session, organizationID, userID)
+	agentMode := ModeOperator
+	if len(mode) > 0 {
+		agentMode = NormalizeMode(mode[0])
+	}
+
+	preamble, err := s.buildPreamble(session, organizationID, userID, agentMode)
 	if err != nil {
 		return nil, fmt.Errorf("build preamble: %w", err)
 	}
@@ -166,9 +180,13 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 		return nil, fmt.Errorf("forward to provider: %w", err)
 	}
 
+	messageRole := models.AgentMessageRoleUser
+	if strings.HasPrefix(content, "@@system: ") {
+		messageRole = models.AgentMessageRoleSystem
+	}
 	persisted := &models.AgentSessionMessage{
 		SessionID: sessionID,
-		Role:      models.AgentMessageRoleUser,
+		Role:      messageRole,
 		Content:   content,
 	}
 	if err := models.AppendAgentSessionMessage(persisted); err != nil {
@@ -185,12 +203,12 @@ func (s *Service) SendMessage(ctx context.Context, organizationID, userID, sessi
 	return persisted, nil
 }
 
-func (s *Service) buildPreamble(session *models.AgentSession, organizationID, userID uuid.UUID) (string, error) {
+func (s *Service) buildPreamble(session *models.AgentSession, organizationID, userID uuid.UUID, mode Mode) (string, error) {
 	token, expiresAt, err := s.mintAgentToken(organizationID.String(), userID.String(), session.CanvasID.String())
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf(
+	base := fmt.Sprintf(
 		preambleTemplate,
 		session.CanvasID.String(),
 		session.OrganizationID.String(),
@@ -199,7 +217,9 @@ func (s *Service) buildPreamble(session *models.AgentSession, organizationID, us
 		expiresAt.UTC().Format(time.RFC3339),
 		session.CanvasID.String(),
 		session.CanvasID.String(),
-	), nil
+	)
+	draftStatus := getDraftStatus(session.CanvasID)
+	return base + "\n\n" + modeInstructions(mode) + "\n\n" + draftStatus, nil
 }
 
 func (s *Service) enqueueStream(sessionID, organizationID, userID uuid.UUID) error {
@@ -294,4 +314,64 @@ func ensureSessionLockKey(organizationID, userID, canvasID uuid.UUID) int64 {
 	h.Write(userID[:])
 	h.Write(canvasID[:])
 	return int64(binary.BigEndian.Uint64(h.Sum(nil))) //nolint:gosec // wraparound is fine; we just need a deterministic key
+}
+
+func getDraftStatus(canvasID uuid.UUID) string {
+	drafts, err := models.ListDraftCanvasVersions(canvasID)
+	if err != nil {
+		log.WithError(err).Warn("failed to list draft canvas versions")
+		return "[Draft Status]\nUnable to determine draft status."
+	}
+
+	if len(drafts) > 0 {
+		result := "[Draft Status]\n"
+		for _, draft := range drafts {
+			result += fmt.Sprintf(
+				"- Active draft: version %s (created %s)\n",
+				draft.ID.String(),
+				draftCreatedAt(draft),
+			)
+		}
+		return result
+	}
+
+	latestPublished, err := models.FindLatestPublishedCanvasVersion(canvasID)
+	if err != nil {
+		return noActiveDraftStatus
+	}
+	if !wasRecentlyPublished(latestPublished.PublishedAt) {
+		return noActiveDraftStatus
+	}
+
+	return fmt.Sprintf(
+		"[Draft Status]\nNo active drafts. The last draft was published as version %s at %s. Your changes are live.",
+		latestPublished.ID.String(),
+		latestPublished.PublishedAt.UTC().Format(time.RFC3339),
+	)
+}
+
+const noActiveDraftStatus = "[Draft Status]\nNo active drafts. If you recently created a draft and it is no longer here, it was discarded by the user. Your changes were NOT published."
+
+func draftCreatedAt(draft models.CanvasVersion) string {
+	if draft.CreatedAt == nil {
+		return "unknown"
+	}
+
+	return draft.CreatedAt.UTC().Format(time.RFC3339)
+}
+
+func wasRecentlyPublished(publishedAt *time.Time) bool {
+	return publishedAt != nil && time.Since(*publishedAt) < 10*time.Minute
+}
+
+func sessionTitle(organizationID, canvasID uuid.UUID) string {
+	org, err := models.FindOrganizationByID(organizationID.String())
+	if err != nil {
+		return ""
+	}
+	canvas, err := models.FindCanvas(organizationID, canvasID)
+	if err != nil {
+		return org.Name
+	}
+	return org.Name + " - " + canvas.Name
 }

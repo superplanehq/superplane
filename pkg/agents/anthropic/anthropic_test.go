@@ -134,6 +134,32 @@ func TestSendMessage_RequiresSessionID(t *testing.T) {
 	require.Error(t, p.SendMessage(context.Background(), "", "hi", agents.SendMessageOptions{}))
 }
 
+func TestDefineOutcome_PrependsPreambleToDescription(t *testing.T) {
+	var capturedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/sessions/sesn_abc/events", r.URL.Path)
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &capturedBody)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("{}"))
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	err := p.DefineOutcome(context.Background(), "sesn_abc", agents.DefineOutcomeOptions{
+		Description:     "Build the workflow",
+		Rubric:          "- Done",
+		MaxIterations:   3,
+		ContextPreamble: "[ctx]",
+	})
+	require.NoError(t, err)
+
+	events := capturedBody["events"].([]any)
+	require.Len(t, events, 1)
+	event := events[0].(map[string]any)
+	assert.Equal(t, "[ctx]\n\nBuild the workflow", event["description"])
+}
+
 func TestDeleteSession_SendsCorrectRequest(t *testing.T) {
 	var capturedHeaders http.Header
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -305,7 +331,7 @@ func TestStreamEvents_ToolInputFallsBackToJSON(t *testing.T) {
 }
 
 func TestStreamEvents_SessionFailed(t *testing.T) {
-	const sse = "data: {\"type\":\"session.error\",\"error\":{\"message\":\"boom\"}}\n\n"
+	const sse = "data: {\"type\":\"session.status_terminated\",\"error\":{\"message\":\"boom\"}}\n\n"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -322,6 +348,30 @@ func TestStreamEvents_SessionFailed(t *testing.T) {
 	require.Len(t, received, 1)
 	assert.Equal(t, agents.ProviderEventSessionFailed, received[0].Type)
 	assert.Equal(t, "boom", received[0].ErrorMessage)
+}
+
+func TestStreamEvents_SessionErrorDoesNotStopStream(t *testing.T) {
+	const sse = "data: {\"type\":\"session.error\",\"error\":{\"message\":\"An internal service error occurred\"}}\n\n" +
+		"data: {\"id\":\"e1\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"Recovered\"}]}\n\n" +
+		"data: {\"type\":\"session.status_idle\"}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 2)
+	assert.Equal(t, agents.ProviderEventAssistantMessage, received[0].Type)
+	assert.Equal(t, "Recovered", received[0].Text)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[1].Type)
 }
 
 func TestStreamEvents_SkipsMalformed(t *testing.T) {

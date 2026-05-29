@@ -45,6 +45,8 @@ export interface BlockInternalData {
   _allEdges?: BlockEdgeState[];
   _isHighlighted?: boolean;
   _hasHighlightedNodes?: boolean;
+  _dimBodyBelowHeader?: boolean;
+  _draftDiffStatus?: "added" | "updated" | "removed";
   isTemplate?: boolean;
   isPendingConnection?: boolean;
 }
@@ -74,4 +76,6 @@ export interface BlockProps extends ComponentActionsProps {
   onAnnotationBlur?: () => void;
   onAppendFromNode?: (nodeId: string, sourceHandleId?: string | null) => void | Promise<void>;
   onClick?: (e: MouseEvent) => void;
+  /** When true, non-highlighted run-context nodes show only header + slate body. */
+  dimBodyBelowHeader?: boolean;
 }

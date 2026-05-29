@@ -2,6 +2,7 @@ junit-report.xml
 pkg/web/assets/dist
 tmp
 build/
+node_modules/
 design/node_modules/
 # macOS Finder metadata
 .DS_Store
@@ -26,3 +27,4 @@ coverage-go.out
 /web_src/src/api-client/
 /api/swagger/*
 !/api/swagger/swagger-ui.html
+server

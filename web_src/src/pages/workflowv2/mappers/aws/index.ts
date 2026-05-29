@@ -38,7 +38,11 @@ import { getPipelineMapper } from "./codepipeline/get_pipeline";
 import { onPipelineTriggerRenderer } from "./codepipeline/on_pipeline";
 import { onImageTriggerRenderer } from "./ec2/on_image";
 import { createImageMapper } from "./ec2/create_image";
+import { createInstanceMapper } from "./ec2/create_instance";
+import { deleteInstanceMapper } from "./ec2/delete_instance";
 import { getImageMapper as getEc2ImageMapper } from "./ec2/get_image";
+import { getInstanceMapper } from "./ec2/get_instance";
+import { manageInstancePowerMapper, MANAGE_INSTANCE_POWER_STATE_REGISTRY } from "./ec2/manage_instance_power";
 import { copyImageMapper } from "./ec2/copy_image";
 import { deregisterImageMapper } from "./ec2/deregister_image";
 import { enableImageMapper } from "./ec2/enable_image";
@@ -83,12 +87,16 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "sns.publishMessage": publishMessageMapper,
   "ec2.copyImage": copyImageMapper,
   "ec2.createImage": createImageMapper,
+  "ec2.createInstance": createInstanceMapper,
   "ec2.deregisterImage": deregisterImageMapper,
+  "ec2.deleteInstance": deleteInstanceMapper,
   "ec2.disableImage": disableImageMapper,
   "ec2.disableImageDeprecation": disableImageDeprecationMapper,
   "ec2.enableImage": enableImageMapper,
   "ec2.enableImageDeprecation": enableImageDeprecationMapper,
   "ec2.getImage": getEc2ImageMapper,
+  "ec2.getInstance": getInstanceMapper,
+  "ec2.manageInstancePower": manageInstancePowerMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -137,10 +145,14 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "sns.publishMessage": buildActionStateRegistry("published"),
   "ec2.copyImage": buildActionStateRegistry("copied"),
   "ec2.createImage": buildActionStateRegistry("created"),
+  "ec2.createInstance": buildActionStateRegistry("created"),
   "ec2.deregisterImage": buildActionStateRegistry("deregistered"),
+  "ec2.deleteInstance": buildActionStateRegistry("deleted"),
   "ec2.disableImage": buildActionStateRegistry("disabled"),
   "ec2.disableImageDeprecation": buildActionStateRegistry("disabled"),
   "ec2.enableImage": buildActionStateRegistry("enabled"),
   "ec2.enableImageDeprecation": buildActionStateRegistry("enabled"),
   "ec2.getImage": buildActionStateRegistry("retrieved"),
+  "ec2.getInstance": buildActionStateRegistry("retrieved"),
+  "ec2.manageInstancePower": MANAGE_INSTANCE_POWER_STATE_REGISTRY,
 };

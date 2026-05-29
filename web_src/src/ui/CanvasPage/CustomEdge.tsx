@@ -10,6 +10,18 @@ interface CustomEdgeData {
   onDelete?: (edgeId: string) => void;
 }
 
+function getEdgeStroke(style: CSSProperties, selected: boolean | undefined, isHovered: boolean) {
+  if (style.stroke && style.stroke !== "#C9D5E1") {
+    return style.stroke;
+  }
+
+  if (selected || isHovered) {
+    return "#A1AEC0";
+  }
+
+  return style.stroke || "#DEF3FE";
+}
+
 function DeleteEdgeControls({
   canDelete,
   edgePath,
@@ -99,12 +111,12 @@ export const CustomEdge = React.memo(function CustomEdge({
     setEdges((edges) => edges.filter((edge) => edge.id !== id));
   }, [id, onDeleteEdge, setEdges]);
 
-  // Update style based on selection and hover state
   const edgeStyle: CSSProperties = {
     ...style,
-    stroke: selected || isHovered ? "#A1AEC0" : style.stroke || "#DEF3FE",
+    stroke: getEdgeStroke(style, selected, isHovered),
     strokeWidth: selected ? 3 : style.strokeWidth || 3,
     pointerEvents: "visibleStroke",
+    ...(selected || isHovered ? { strokeOpacity: 1 } : {}),
   };
   const shouldShowIcon = canDelete && (isHovered || selected === true);
   const handleDeletePointerDown = useCallback(

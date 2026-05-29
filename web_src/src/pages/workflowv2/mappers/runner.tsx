@@ -1,8 +1,8 @@
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { getColorClass } from "@/lib/colors";
+import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 import type { ComponentBaseProps, EventSection, EventState, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
-import { RunnerLiveLogDialog } from "@/ui/CanvasPage/RunnerLiveLogDialog";
 import React from "react";
 import { getTriggerRenderer } from ".";
 
@@ -18,6 +18,9 @@ import type {
 } from "./types";
 
 import { stringOrDash } from "./utils";
+
+const DEFAULT_EXECUTION_TIMEOUT_SECONDS = 3600;
+const BROKER_TASK_ID_METADATA_KEY = "runner_broker_task_id";
 
 const EXECUTION_MODE_DOCKER = "docker";
 const DOCKER_IMAGE_PRESET_CUSTOM = "custom";
@@ -57,19 +60,19 @@ export function runnerConfigurationDetails(configuration: unknown): Record<strin
     details["Container image"] = image;
   }
   const timeoutRaw = c.execution_timeout_seconds;
+  const timeoutLabel = (value: number | string) => {
+    const parsed = typeof value === "number" ? value : Number.parseInt(value.trim(), 10);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return String(DEFAULT_EXECUTION_TIMEOUT_SECONDS);
+    }
+    return String(Math.trunc(parsed));
+  };
   if (typeof timeoutRaw === "number" && Number.isFinite(timeoutRaw)) {
-    if (timeoutRaw > 0) {
-      details["Timeout (seconds)"] = String(Math.trunc(timeoutRaw));
-    } else if (timeoutRaw === 0) {
-      details["Timeout (seconds)"] = "Broker default (0)";
-    }
-  } else if (typeof timeoutRaw === "string") {
-    const t = timeoutRaw.trim();
-    if (t === "0") {
-      details["Timeout (seconds)"] = "Broker default (0)";
-    } else if (t !== "") {
-      details["Timeout (seconds)"] = t;
-    }
+    details["Timeout (seconds)"] = timeoutLabel(timeoutRaw);
+  } else if (typeof timeoutRaw === "string" && timeoutRaw.trim() !== "") {
+    details["Timeout (seconds)"] = timeoutLabel(timeoutRaw);
+  } else {
+    details["Timeout (seconds)"] = String(DEFAULT_EXECUTION_TIMEOUT_SECONDS);
   }
   return details;
 }
@@ -86,6 +89,24 @@ function firstRunnerPayload(execution: ExecutionInfo): Record<string, unknown> |
   const payload = outputs?.failed?.[0]?.data ?? outputs?.passed?.[0]?.data ?? outputs?.default?.[0]?.data;
   if (!payload || typeof payload !== "object") return undefined;
   return payload as Record<string, unknown>;
+}
+
+function brokerTaskIDFromExecution(execution: ExecutionInfo): string | undefined {
+  const meta = execution.metadata;
+  if (meta && typeof meta === "object") {
+    const id = (meta as Record<string, unknown>)[BROKER_TASK_ID_METADATA_KEY];
+    if (typeof id === "string" && id.trim() !== "") {
+      return id.trim();
+    }
+  }
+
+  const payload = firstRunnerPayload(execution);
+  const taskID = payload?.task_id;
+  if (typeof taskID === "string" && taskID.trim() !== "") {
+    return taskID.trim();
+  }
+
+  return undefined;
 }
 
 function runnerFinishedPassedState(execution: ExecutionInfo): EventState {
@@ -139,15 +160,11 @@ export const RUNNER_STATE_REGISTRY: EventStateRegistry = {
 export const runnerMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
-    const title =
-      context.node.name || context.componentDefinition.label || context.componentDefinition.name || "Unnamed component";
+    const componentDef = context.componentDefinition;
+    const title = context.node.name || componentDef.label || componentDef.name || "Unnamed component";
     const iconSlug = context.componentDefinition.icon || "terminal";
     const iconColor = getColorClass(context.componentDefinition?.color || "blue");
-
-    const customField =
-      lastExecution && context.canvasMode === "live"
-        ? () => <RunnerLiveLogDialog canvasMode={context.canvasMode ?? "live"} executionId={lastExecution.id} />
-        : undefined;
+    const canvasMode = context.canvasMode ?? "live";
 
     return {
       title,
@@ -160,8 +177,8 @@ export const runnerMapper: ComponentBaseMapper = {
       metadata: [],
       specs: [],
       eventStateMap: RUNNER_STATE_MAP,
-      customField,
-      customFieldPosition: "before",
+      customField: <RunnerLiveLogDialog title={title} canvasMode={canvasMode} execution={lastExecution} />,
+      customFieldPosition: "after",
     };
   },
   subtitle(context: SubtitleContext): string | React.ReactNode {
@@ -172,6 +189,12 @@ export const runnerMapper: ComponentBaseMapper = {
     const details: Record<string, string> = {
       ...runnerConfigurationDetails(context.node.configuration),
     };
+
+    const taskID = brokerTaskIDFromExecution(context.execution);
+    if (taskID) {
+      details["Task ID"] = taskID;
+    }
+
     const payload = firstRunnerPayload(context.execution);
     if (!payload) {
       return details;

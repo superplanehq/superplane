@@ -21,9 +21,8 @@ export function EnterEditDraftDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <UIButton type="button" variant="default" size="sm" data-testid="canvas-edit-button">
-          <Pencil className="h-3.5 w-3.5" />
-          Edit
+        <UIButton type="button" variant="outline" size="sm" data-testid="canvas-edit-button">
+          Continue Editing
         </UIButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-72 px-2">
@@ -39,7 +38,7 @@ export function EnterEditDraftDropdown({
         <div className="py-1">
           <DropdownMenuItem onClick={onContinueEditing} className="gap-2 px-3 py-2 text-slate-700 cursor-pointer">
             <Pencil className="h-4 w-4" />
-            <span>Continue editing</span>
+            <span>Continue Editing</span>
           </DropdownMenuItem>
           <DropdownMenuItem
             onClick={onDiscardAndStartEdit}

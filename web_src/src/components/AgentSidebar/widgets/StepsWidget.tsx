@@ -10,7 +10,7 @@ export function StepsWidget({ items }: StepsWidgetProps) {
   const firstPending = items.findIndex((i) => !i.done);
 
   return (
-    <div className="my-4 space-y-1 rounded-lg border border-violet-200 bg-white p-3 shadow-sm">
+    <div className="my-4 space-y-1 rounded-lg border border-slate-200 bg-white p-3">
       {items.map((item, i) => {
         const isActive = i === firstPending;
         return (
@@ -18,7 +18,7 @@ export function StepsWidget({ items }: StepsWidgetProps) {
             {item.done ? (
               <Check className="size-3.5 text-green-600 shrink-0" />
             ) : isActive ? (
-              <Loader2 className="size-3.5 text-violet-600 shrink-0 animate-spin" />
+              <Loader2 className="size-3.5 text-slate-600 shrink-0 animate-spin" />
             ) : (
               <div className="size-3.5 rounded-full border border-slate-300 shrink-0" />
             )}
