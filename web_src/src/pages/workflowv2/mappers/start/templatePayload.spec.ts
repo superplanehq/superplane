@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildParameterFormPayload,
   coerceParameterValue,
   initialParameterValue,
   isValidSelectParameterValue,
   parameterDefaultValue,
   parameterDisplayLabel,
+  parseJsonEventPayload,
   payloadForTemplateRun,
   payloadRecordForParameters,
   selectOptionValues,
+  validateSubmittedParameterValue,
 } from "./templatePayload";
 
 describe("payloadForTemplateRun", () => {
@@ -133,5 +136,58 @@ describe("initialParameterValue", () => {
         ],
       }),
     ).toBe("openai");
+  });
+});
+
+describe("validateSubmittedParameterValue", () => {
+  const selectParam = {
+    name: "provider",
+    type: "select" as const,
+    options: [
+      { label: "OpenAI", value: "openai" },
+      { label: "Anthropic", value: "anthropic" },
+    ],
+  };
+
+  it("returns null for valid values", () => {
+    expect(validateSubmittedParameterValue(selectParam, "openai")).toBeNull();
+    expect(validateSubmittedParameterValue({ name: "count", type: "number" }, 1)).toBeNull();
+  });
+
+  it("returns errors for invalid number and select values", () => {
+    expect(validateSubmittedParameterValue({ name: "count", type: "number" }, Number.NaN)).toContain("valid number");
+    expect(validateSubmittedParameterValue(selectParam, "other")).toContain("configured options");
+  });
+});
+
+describe("buildParameterFormPayload", () => {
+  it("builds and validates parameter values", () => {
+    const result = buildParameterFormPayload([{ name: "message", type: "string" }], { message: "hello" });
+    expect(result).toEqual({ payload: { message: "hello" } });
+  });
+
+  it("returns validation errors", () => {
+    const result = buildParameterFormPayload(
+      [
+        {
+          name: "provider",
+          type: "select",
+          options: [{ label: "OpenAI", value: "openai" }],
+        },
+      ],
+      { provider: "invalid" },
+    );
+    expect(result).toEqual({ error: expect.stringContaining("configured options") });
+  });
+});
+
+describe("parseJsonEventPayload", () => {
+  it("parses JSON objects", () => {
+    expect(parseJsonEventPayload('{"a":1}')).toEqual({ payload: { a: 1 } });
+  });
+
+  it("returns errors for invalid JSON", () => {
+    expect(parseJsonEventPayload("not json")).toEqual({ error: "Invalid JSON format" });
+    expect(parseJsonEventPayload("[]")).toEqual({ error: "Payload must be a JSON object" });
   });
 });

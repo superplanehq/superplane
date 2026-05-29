@@ -6,10 +6,9 @@ import { showErrorToast } from "@/lib/toast";
 
 import { StartRunParameterFields } from "./startRunParameterFields";
 import {
-  coerceParameterValue,
+  buildParameterFormPayload,
   initialParameterValue,
-  isValidSelectParameterValue,
-  parameterDisplayLabel,
+  parseJsonEventPayload,
   type StartTemplateParameter,
 } from "./templatePayload";
 
@@ -39,43 +38,17 @@ export function StartRunModal({
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const handleSubmit = async () => {
-    let parsedData: Record<string, unknown>;
-    if (useParameterForm) {
-      parsedData = {};
-      for (const param of parameters ?? []) {
-        if (!param.name || !param.type) continue;
-        const raw = parameterValues[param.name];
-        parsedData[param.name] = coerceParameterValue(param, raw);
-        if (
-          param.type === "number" &&
-          typeof parsedData[param.name] === "number" &&
-          Number.isNaN(parsedData[param.name])
-        ) {
-          showErrorToast(`"${parameterDisplayLabel(param)}" must be a valid number`);
-          return;
-        }
-        if (param.type === "select" && !isValidSelectParameterValue(param, String(parsedData[param.name] ?? ""))) {
-          showErrorToast(`"${parameterDisplayLabel(param)}" must be one of the configured options`);
-          return;
-        }
-      }
-    } else {
-      try {
-        const candidate = JSON.parse(eventData) as unknown;
-        if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
-          showErrorToast("Payload must be a JSON object");
-          return;
-        }
-        parsedData = candidate as Record<string, unknown>;
-      } catch {
-        showErrorToast("Invalid JSON format");
-        return;
-      }
+    const result = useParameterForm
+      ? buildParameterFormPayload(parameters, parameterValues)
+      : parseJsonEventPayload(eventData);
+    if ("error" in result) {
+      showErrorToast(result.error);
+      return;
     }
 
     setIsSubmitting(true);
     try {
-      await onRun(parsedData);
+      await onRun(result.payload);
       onClose();
     } catch {
       // Keep the modal open so users can retry with the same payload.
