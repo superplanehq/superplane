@@ -55,6 +55,15 @@ describe("agent boot context", () => {
     window.removeEventListener(AGENT_BOOT_CONTEXT_READY_EVENT, listener);
   });
 
+  it("stores a local intro for blank canvases", () => {
+    setAgentBootContext("canvas-1", "blank");
+
+    expect(getAgentBootInitialMessage("canvas-1")).toBe(
+      "I can help design and modify this canvas. Describe the workflow you want, and I'll propose changes, update the draft with your approval, and explain each step along the way.",
+    );
+    expect(getAgentBootMessage("canvas-1")).toContain("The user just created a new blank app");
+  });
+
   it("stores template intro text separately from the constrained agent prompt", () => {
     setAgentBootContext("canvas-1", {
       instructions: "This template deploys preview environments.",
