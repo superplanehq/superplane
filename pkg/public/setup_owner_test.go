@@ -27,6 +27,7 @@ func TestSetupOwnerPersistsInstallationNetworkSettings(t *testing.T) {
 		r.Registry,
 		jwt.NewSigner("test-client-secret"),
 		support.NewOIDCProvider(),
+		r.GitProvider,
 		"",
 		"",
 		"",

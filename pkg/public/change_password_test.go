@@ -32,7 +32,7 @@ func setupChangePasswordTestServer(t *testing.T) (*Server, *support.ResourceRegi
 	r := support.Setup(t)
 
 	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), "", "", "", "test", "/app/templates", r.AuthService, nil, false)
+	server, err := NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), r.GitProvider, "", "", "", "test", "/app/templates", r.AuthService, nil, false)
 	require.NoError(t, err)
 	server.RegisterWebRoutes("")
 
@@ -54,7 +54,7 @@ func setupChangePasswordTestServerNoPassword(t *testing.T) (*Server, *support.Re
 	r := support.Setup(t)
 
 	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), "", "", "", "test", "/app/templates", r.AuthService, nil, false)
+	server, err := NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), r.GitProvider, "", "", "", "test", "/app/templates", r.AuthService, nil, false)
 	require.NoError(t, err)
 	server.RegisterWebRoutes("")
 
@@ -70,7 +70,7 @@ func setupChangePasswordTestServerLoginDisabled(t *testing.T) (*Server, *support
 	r := support.Setup(t)
 
 	signer := jwt.NewSigner("test-client-secret")
-	server, err := NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), "", "", "", "test", "/app/templates", r.AuthService, nil, false)
+	server, err := NewServer(r.Encryptor, r.Registry, signer, support.NewOIDCProvider(), r.GitProvider, "", "", "", "test", "/app/templates", r.AuthService, nil, false)
 	require.NoError(t, err)
 	server.RegisterWebRoutes("")
 

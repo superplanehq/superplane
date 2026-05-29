@@ -2,10 +2,10 @@ package git
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/git/codestorage"
 	"github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/git/supergit"
