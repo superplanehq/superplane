@@ -9,6 +9,8 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
+const opsAlertLabelMaxRunes = 80
+
 func (j *Jira) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	switch resourceType {
 	case "project":
@@ -35,6 +37,8 @@ func (j *Jira) ListResources(resourceType string, ctx core.ListResourcesContext)
 		return listHeartbeats(ctx)
 	case "issue":
 		return listIssues(ctx)
+	case "alert":
+		return listAlerts(ctx)
 	default:
 		return []core.IntegrationResource{}, nil
 	}
@@ -196,54 +200,58 @@ func listIssues(ctx core.ListResourcesContext) ([]core.IntegrationResource, erro
 		return nil, fmt.Errorf("search issues: %w", err)
 	}
 
-		resources := make([]core.IntegrationResource, 0, len(hits))
-		for _, hit := range hits {
-			if strings.TrimSpace(hit.Key) == "" {
+	resources := make([]core.IntegrationResource, 0, len(hits))
+	for _, hit := range hits {
+		if strings.TrimSpace(hit.Key) == "" {
+			continue
+		}
+		name := hit.Key
+		if hit.Fields != nil {
+			if s, ok := hit.Fields["summary"].(string); ok && strings.TrimSpace(s) != "" {
+				name = fmt.Sprintf("%s (%s)", strings.TrimSpace(s), hit.Key)
+			}
+		}
+		resources = append(resources, core.IntegrationResource{
+			Type: "issue",
+			Name: name,
+			ID:   hit.Key,
+		})
+	}
+	return resources, nil
+}
+
+func listIssuesFromServiceDesk(client *Client, projectKey string) ([]core.IntegrationResource, bool) {
+	desks, err := client.ListServiceDesks()
+	if err != nil {
+		return nil, false
+	}
+
+	for _, desk := range desks {
+		if !strings.EqualFold(strings.TrimSpace(desk.ProjectKey), projectKey) {
+			continue
+		}
+		rows, err := client.ListCustomerRequestsByServiceDesk(desk.ID, 500)
+		if err != nil || len(rows) == 0 {
+			break
+		}
+		resources := make([]core.IntegrationResource, 0, len(rows))
+		for _, row := range rows {
+			if strings.TrimSpace(row.IssueKey) == "" {
 				continue
 			}
-			name := hit.Key
-			if hit.Fields != nil {
-				if s, ok := hit.Fields["summary"].(string); ok && strings.TrimSpace(s) != "" {
-					name = fmt.Sprintf("%s (%s)", strings.TrimSpace(s), hit.Key)
-				}
+			name := row.IssueKey
+			if s := strings.TrimSpace(row.Summary); s != "" {
+				name = fmt.Sprintf("%s (%s)", s, row.IssueKey)
 			}
 			resources = append(resources, core.IntegrationResource{
-				Type: resourceType,
+				Type: "issue",
 				Name: name,
-				ID:   hit.Key,
+				ID:   row.IssueKey,
 			})
 		}
-		return resources, nil
-	case "alert":
-		cloudID, err := cloudIDFromIntegration(ctx.Integration)
-		if err != nil {
-			return nil, fmt.Errorf("cloud id required for Ops alerts: %w", err)
-		}
-		client, err := NewClient(ctx.HTTP, ctx.Integration)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create client: %w", err)
-		}
-		rows, err := client.ListOpsAlerts(cloudID, 100)
-		if err != nil {
-			return nil, fmt.Errorf("list Ops alerts: %w", err)
-		}
-		out := make([]core.IntegrationResource, 0, len(rows))
-		for _, row := range rows {
-			rawID := strings.TrimSpace(opsAlertStringField(row, "id"))
-			if rawID == "" {
-				continue
-			}
-			name := opsAlertIntegrationResourceLabel(row, rawID)
-			out = append(out, core.IntegrationResource{
-				Type: resourceType,
-				Name: name,
-				ID:   rawID,
-			})
-		}
-		return out, nil
-	default:
-		return []core.IntegrationResource{}, nil
+		return resources, true
 	}
+	return nil, false
 }
 
 func listProjects(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
@@ -339,24 +347,6 @@ func listIssueStatuses(ctx core.ListResourcesContext) ([]core.IntegrationResourc
 	return resources, nil
 }
 
-func assigneeProjectKey(ctx core.ListResourcesContext) string {
-	projectKey := strings.TrimSpace(ctx.Parameters["project"])
-	if projectKey != "" && !strings.Contains(projectKey, "{{") {
-		return projectKey
-	}
-
-	metadata := Metadata{}
-	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
-		return ""
-	}
-	for _, p := range metadata.Projects {
-		if k := strings.TrimSpace(p.Key); k != "" {
-			return k
-		}
-	}
-	return ""
-}
-
 func listAssignees(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	projectKey := assigneeProjectKey(ctx)
 	if projectKey == "" {
@@ -447,6 +437,35 @@ func listRequestTypeFieldResources(resourceType, fieldLabel string, ctx core.Lis
 	}
 
 	return requestTypeFieldResources(client, field, resourceType, projectKey, fieldLabel)
+}
+
+func listAlerts(ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+	cloudID, err := cloudIDFromIntegration(ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("cloud id required for Ops alerts: %w", err)
+	}
+	client, err := NewClient(ctx.HTTP, ctx.Integration)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+	rows, err := client.ListOpsAlerts(cloudID, 100)
+	if err != nil {
+		return nil, fmt.Errorf("list Ops alerts: %w", err)
+	}
+	out := make([]core.IntegrationResource, 0, len(rows))
+	for _, row := range rows {
+		rawID := strings.TrimSpace(opsAlertStringField(row, "id"))
+		if rawID == "" {
+			continue
+		}
+		name := opsAlertIntegrationResourceLabel(row, rawID)
+		out = append(out, core.IntegrationResource{
+			Type: "alert",
+			Name: name,
+			ID:   rawID,
+		})
+	}
+	return out, nil
 }
 
 func findRequestTypeFieldID(fields []RequestTypeField, fieldLabel string) string {
@@ -612,7 +631,23 @@ func resolveServiceDeskProjectKey(client *Client, serviceDeskID string) string {
 	return ""
 }
 
-const opsAlertLabelMaxRunes = 80
+func assigneeProjectKey(ctx core.ListResourcesContext) string {
+	projectKey := strings.TrimSpace(ctx.Parameters["project"])
+	if projectKey != "" && !strings.Contains(projectKey, "{{") {
+		return projectKey
+	}
+
+	metadata := Metadata{}
+	if err := mapstructure.Decode(ctx.Integration.GetMetadata(), &metadata); err != nil {
+		return ""
+	}
+	for _, p := range metadata.Projects {
+		if k := strings.TrimSpace(p.Key); k != "" {
+			return k
+		}
+	}
+	return ""
+}
 
 func truncateOpsAlertLabelMessage(msg string) string {
 	if utf8.RuneCountInString(msg) <= opsAlertLabelMaxRunes {
