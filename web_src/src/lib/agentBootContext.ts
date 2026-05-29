@@ -9,6 +9,9 @@ const DEFAULT_BOOT_MESSAGE =
 const BLANK_BOOT_MESSAGE =
   "The user just created a new blank app with a placeholder node on the canvas. Greet them briefly, then tell them to click on the 'New Component' node on the canvas and pick a component from the sidebar to get started. You can also ask what they want to build and help them choose the right component.";
 
+const BLANK_INITIAL_MESSAGE =
+  "I can help design and modify this canvas. Describe the workflow you want, and I'll propose changes, update the draft with your approval, and explain each step along the way.";
+
 const TEMPLATE_NEXT_STEP_MESSAGE = "Tell me what you would like to do next in the canvas.";
 
 interface TemplateAgentBootContext {
@@ -23,6 +26,10 @@ interface AgentBootContext {
 }
 
 export function setAgentBootContext(canvasId: string, message: string | TemplateAgentBootContext) {
+  if (message === "blank") {
+    setAgentBootInitialMessage(canvasId, BLANK_INITIAL_MESSAGE);
+  }
+
   if (typeof message !== "string" && message.initialMessage) {
     setAgentBootInitialMessage(canvasId, message.initialMessage);
   }
