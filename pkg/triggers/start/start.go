@@ -173,6 +173,20 @@ func (s *Start) Configuration() []configuration.Field {
 														},
 													},
 												},
+												{
+													Name:      "placeholder",
+													Label:     "Input Placeholder",
+													Togglable: true,
+													Type:      configuration.FieldTypeString,
+													VisibilityConditions: []configuration.VisibilityCondition{
+														{Field: "type", Values: []string{configuration.FieldTypeString, configuration.FieldTypeNumber}},
+													},
+													TypeOptions: &configuration.TypeOptions{
+														String: &configuration.StringTypeOptions{
+															AllowExpressions: &disallowExpressions,
+														},
+													},
+												},
 											},
 										},
 									},
