@@ -14,6 +14,9 @@ fi
 VERSION="$1"
 ARCH="$2"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 case "${ARCH}" in
   amd64 | arm64) ;;
   *)
@@ -26,7 +29,7 @@ VERSION="${VERSION#v}"
 TAG="v${VERSION}"
 ASSET="supergit-linux-${ARCH}"
 BASE_URL="https://github.com/superplanehq/supergit/releases/download/${TAG}"
-OUT_DIR="build/superplane-demo-supergit"
+OUT_DIR="${REPO_ROOT}/build/superplane-demo-supergit"
 OUT_FILE="${OUT_DIR}/supergit"
 
 mkdir -p "${OUT_DIR}"
