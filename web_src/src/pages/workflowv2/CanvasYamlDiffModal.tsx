@@ -1,5 +1,5 @@
 import { MultiFileDiff, type FileContents, type FileDiffMetadata } from "@pierre/diffs/react";
-import { GitCompareArrows } from "lucide-react";
+import { FileCode } from "lucide-react";
 import { useCallback, useMemo } from "react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -56,9 +56,9 @@ export function CanvasYamlDiffModal({
 
       return (
         <div className="w-full">
-          <div className="flex min-h-11 items-center justify-between gap-4 border-b border-slate-200 bg-slate-50 px-4 py-2">
+          <div className="flex min-h-11 items-center justify-between gap-4 border-b border-slate-200 bg-white px-4 py-2">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="h-2 w-2 shrink-0 rounded-full bg-blue-600" />
+              <FileCode className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
               <span className="truncate font-sans text-sm font-medium text-slate-900">{filename}</span>
             </div>
             <div className="flex shrink-0 items-center gap-2 font-mono text-xs">
@@ -85,15 +85,12 @@ export function CanvasYamlDiffModal({
         <div className="flex min-h-0 flex-1 flex-col bg-slate-50">
           <div className="flex items-center border-b border-slate-200 bg-white px-5 py-3 pr-12">
             <div className="flex min-w-0 items-center gap-3">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-700">
-                <GitCompareArrows className="h-4 w-4" />
-              </span>
               <h2 className="truncate text-sm font-semibold text-slate-900">{title}</h2>
             </div>
           </div>
 
           <div className="min-h-0 flex-1 overflow-auto">
-            <div className="min-w-[980px] border border-slate-200 bg-white">
+            <div className="min-w-[980px] border-x border-b border-slate-200 bg-white">
               <MultiFileDiff
                 oldFile={oldFile}
                 newFile={newFile}
@@ -118,7 +115,7 @@ export function CanvasYamlDiffModal({
 
                     [data-diffs-header] {
                       border-bottom: 1px solid rgb(226 232 240);
-                      background: rgb(248 250 252);
+                      background: rgb(255 255 255);
                       z-index: 5;
                     }
 
