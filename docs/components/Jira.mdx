@@ -9,15 +9,19 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Create Alert" href="#create-alert" description="Create a Jira Service Management Ops alert via the Alerts API" />
   <LinkCard title="Create Heartbeat" href="#create-heartbeat" description="Create a Jira Service Management Operations heartbeat monitor" />
   <LinkCard title="Create Incident" href="#create-incident" description="Create a Jira Service Management incident via the Incidents API" />
   <LinkCard title="Create Issue" href="#create-issue" description="Create a new issue in Jira" />
+  <LinkCard title="Delete Alert" href="#delete-alert" description="Delete a Jira Service Management Ops alert by id" />
   <LinkCard title="Delete Heartbeat" href="#delete-heartbeat" description="Delete a Jira Service Management Operations heartbeat" />
   <LinkCard title="Delete Incident" href="#delete-incident" description="Delete a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Delete Issue" href="#delete-issue" description="Delete a Jira issue" />
+  <LinkCard title="Get Alert" href="#get-alert" description="Fetch a Jira Service Management Ops alert by alert id" />
   <LinkCard title="Get Incident" href="#get-incident" description="Fetch a Jira Service Management incident by issue id or issue key" />
   <LinkCard title="Get Issue" href="#get-issue" description="Retrieve a Jira issue by its key" />
   <LinkCard title="Ping Heartbeat" href="#ping-heartbeat" description="Send a ping to a Jira Service Management Operations heartbeat" />
+  <LinkCard title="Update Alert" href="#update-alert" description="Update, assign, add a note to, acknowledge, or close a Jira Service Management Ops alert" />
   <LinkCard title="Update Heartbeat" href="#update-heartbeat" description="Update a Jira Service Management Operations heartbeat" />
   <LinkCard title="Update Issue" href="#update-issue" description="Update fields on a Jira issue" />
 </CardGrid>
@@ -31,6 +35,77 @@ To connect Jira to SuperPlane:
 3. Paste your **Jira Site URL** into SuperPlane. For Jira Cloud, this usually looks like `https://your-domain.atlassian.net`.
 4. Paste the Atlassian account **Email** that owns the API token.
 5. Paste the generated **API Token**.
+
+<a id="create-alert"></a>
+
+## Create Alert
+
+**Component key:** `jira.createAlert`
+
+The Create Alert component opens a new alert on Jira Service Management.
+
+### Use Cases
+
+- **Monitoring integrations**: Raise an alert from metrics or logs
+- **Automation**: Drive on-call notifications from workflows
+
+### Configuration
+
+- **Message** (required): Alert message text.
+- **Description**, **Note**, **Alias**, **Entity**, **Source** (optional): Standard Ops alert fields.
+- **Priority** (optional): Typically P1–P5; choose "Don't set" to omit.
+- **Tags** / **Actions** (optional): Lists of strings.
+- **Responders** / **Visible to** (optional): Rows with **id** and **type** (team, user, escalation, or schedule).
+- **Extra properties** (optional): JSON object merged into the API **extraProperties** field.
+
+### Output
+
+After the Ops API accepts create, SuperPlane waits for asynchronous processing via the alerts **request status** API, then **GET**s the resulting alert.
+
+The payload matches **Get Alert** (full Ops alert JSON: **id**, **message**, **status**, etc.).
+
+If Jira delays processing beyond the polling window the step fails — use **Get Alert** with the Ops request id noted in logs if Atlassian exposes it.
+
+### Notes
+
+- Requires Jira Service Management Ops permissions and API scopes for alerts on your Atlassian site; the integration stores your site **cloud id** during sync.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "acknowledged": false,
+    "actions": [],
+    "alias": "alias",
+    "count": 2,
+    "createdAt": "2026-01-19T12:00:00Z",
+    "description": "description",
+    "entity": "an entity",
+    "extraProperties": {},
+    "id": "439aa701-7cd6-4549-8992-d06650561222-1779166598474",
+    "integrationName": "",
+    "integrationType": "",
+    "lastOccuredAt": "2026-01-19T12:00:00Z",
+    "message": "message",
+    "owner": "",
+    "priority": "P2",
+    "responders": [],
+    "seen": false,
+    "services": [],
+    "snoozed": false,
+    "source": "source",
+    "status": "open",
+    "tags": [
+      "test-tag"
+    ],
+    "tinyId": "4",
+    "updatedAt": "2026-01-19T12:00:00Z"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.created"
+}
+```
 
 <a id="create-heartbeat"></a>
 
@@ -222,6 +297,39 @@ Returns the created issue including:
 }
 ```
 
+<a id="delete-alert"></a>
+
+## Delete Alert
+
+**Component key:** `jira.deleteAlert`
+
+The Delete Alert component removes an alert from Jira Service Management.
+
+Deletion is processed asynchronously like other mutating Ops operations.
+
+### Configuration
+
+- **Alert**: Pick the Ops alert to delete from the integration resource list.
+
+### Output
+
+Includes the API acknowledgement (**requestId**, etc.) and **deleted**: true for workflow convenience.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "alertId": "439aa701-7cd6-4549-8992-d06650561222-1779166598474",
+    "deleted": true,
+    "requestId": "82e59857-e111-44a3-9f72-013783b94f52",
+    "result": "Request will be processed"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.deleted"
+}
+```
+
 <a id="delete-heartbeat"></a>
 
 ## Delete Heartbeat
@@ -331,6 +439,57 @@ Returns the deleted issue's `id` and `key`, plus `deleted: true`.
   },
   "timestamp": "2026-01-19T13:00:00Z",
   "type": "jira.issueDeleted"
+}
+```
+
+<a id="get-alert"></a>
+
+## Get Alert
+
+**Component key:** `jira.getAlert`
+
+The Get Alert component returns full alert details from Jira Service Management.
+
+### Configuration
+
+- **Alert**: Pick a recent Ops alert from the integration resource list (same as Update / Delete Alert).
+
+### Output
+
+Payload type **jira.alert.fetched** with the alert object (message, status, priority, responders, tags, etc.).
+
+### Example Output
+
+```json
+{
+  "data": {
+    "acknowledged": false,
+    "actions": [],
+    "alias": "alias",
+    "count": 3,
+    "createdAt": "2026-01-19T12:00:00Z",
+    "description": "description",
+    "entity": "entity",
+    "extraProperties": {},
+    "id": "20bfb3c4-ded8-4123-b9d2-c7840a0d4589-1779115726660",
+    "integrationName": "",
+    "integrationType": "",
+    "lastOccuredAt": "2026-01-19T12:00:00Z",
+    "message": "message",
+    "owner": "",
+    "priority": "P2",
+    "responders": [],
+    "seen": false,
+    "services": [],
+    "snoozed": false,
+    "source": "source",
+    "status": "open",
+    "tags": [],
+    "tinyId": "3",
+    "updatedAt": "2026-01-19T12:00:00Z"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.fetched"
 }
 ```
 
@@ -483,6 +642,64 @@ Returns the API **message** (for example "PONG - Heartbeat received").
   },
   "timestamp": "2026-01-19T12:00:00Z",
   "type": "jira.heartbeat.pinged"
+}
+```
+
+<a id="update-alert"></a>
+
+## Update Alert
+
+**Component key:** `jira.updateAlert`
+
+The Update Alert component runs updates on alerts on Jira Service Management.
+
+Toggle each optional subsection you need; untouched sections are not sent to Jira.
+
+### Optional updates
+
+- **Description** → updates alert description  
+- **Message** → updates alert message  
+- **Priority** → updates alert priority (omit with "Don't set")  
+- **Assignment** → assigns the alert to a Jira user (Atlassian account ID from the assignee picker)
+- **New note** → adds a new note  
+- **Update existing note** → updates existing note with nested **note id** + **note** text  
+- **Acknowledge alert** → acknowledges alert  
+- **Close alert** → closes alert
+
+After updates, SuperPlane polls the **last asynchronous** Ops response (when applicable) and emits a fresh **GET alert** payload like **Get Alert**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "acknowledged": true,
+    "actions": [],
+    "alias": "alias",
+    "count": 3,
+    "createdAt": "2026-01-19T12:00:00Z",
+    "description": "description",
+    "entity": "entity",
+    "extraProperties": {},
+    "id": "20bfb3c4-ded8-4123-b9d2-c7840a0d4589-1779115726660",
+    "integrationName": "",
+    "integrationType": "",
+    "lastOccuredAt": "2026-01-19T12:00:00Z",
+    "message": "message",
+    "owner": "",
+    "priority": "P5",
+    "responders": [],
+    "seen": false,
+    "services": [],
+    "snoozed": false,
+    "source": "source",
+    "status": "open",
+    "tags": [],
+    "tinyId": "3",
+    "updatedAt": "2026-01-19T12:00:00Z"
+  },
+  "timestamp": "2026-01-19T12:00:00Z",
+  "type": "jira.alert.updated"
 }
 ```
 
