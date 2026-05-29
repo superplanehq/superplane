@@ -310,19 +310,31 @@ func createCanvasWithNoopNode(ctx context.Context, t *testing.T, r *support.Reso
 			Error,
 	)
 
-	createCanvasResponse, err := CreateCanvas(ctx, r.Registry, r.Encryptor, r.AuthService, testWebhookBaseURL, r.Organization.ID, &pb.Canvas{
-		Metadata: &pb.Canvas_Metadata{Name: canvasName},
-		Spec: &pb.Canvas_Spec{
-			Nodes: []*componentpb.Node{
-				{
-					Id:        "node-1",
-					Name:      "Initial Name",
-					Component: "noop",
+	createCanvasResponse, err := CreateCanvas(
+		ctx,
+		r.Registry,
+		r.Encryptor,
+		r.AuthService,
+		r.GitProvider,
+		testWebhookBaseURL,
+		r.Organization.ID,
+		&pb.Canvas{
+			Metadata: &pb.Canvas_Metadata{Name: canvasName},
+			Spec: &pb.Canvas_Spec{
+				Nodes: []*componentpb.Node{
+					{
+						Id:        "node-1",
+						Name:      "Initial Name",
+						Component: "noop",
+					},
 				},
+				Edges: []*componentpb.Edge{},
 			},
-			Edges: []*componentpb.Edge{},
 		},
-	}, nil, nil)
+		nil,
+		nil,
+	)
+
 	require.NoError(t, err)
 	return createCanvasResponse.Canvas.Metadata.Id
 }

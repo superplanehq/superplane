@@ -34,25 +34,41 @@ var (
 )
 
 type Provider interface {
-	CreateRepository(ctx context.Context, options CreateRepositoryOptions) (*Repository, error)
+
+	//
+	// The unique identifier of the provider.
+	//
+	Name() string
+
+	//
+	// Get the provider specific repository identifier,
+	// Allows providers to define how they map metadata about a repository,
+	// to its identifier.
+	//
+	GetRepositoryID(options RepositoryOptions) string
+
+	//
+	// Repository management methods.
+	//
+	CreateRepository(ctx context.Context, repoID string) (*Repository, error)
 	DeleteRepository(ctx context.Context, repoID string) error
-	ListFiles(ctx context.Context, repoID string) (*ListFilesResult, error)
+
+	//
+	// File management methods
+	//
+	ListFiles(ctx context.Context, repoID string) ([]string, error)
 	GetFile(ctx context.Context, repoID string, path string) (io.ReadCloser, error)
-	Commit(ctx context.Context, repoID string, options CommitOptions) (*CommitResult, error)
+	Commit(ctx context.Context, repoID string, options CommitOptions) (string, error)
 	Head(ctx context.Context, repoID string) (string, error)
 }
 
-type CreateRepositoryOptions struct {
+type RepositoryOptions struct {
 	OrganizationID uuid.UUID
 	CanvasID       uuid.UUID
 }
 
 type Repository struct {
 	ID string
-}
-
-type ListFilesResult struct {
-	Paths []string
 }
 
 type FileOperation struct {
@@ -74,8 +90,4 @@ type CommitOptions struct {
 	Message         string
 	Author          CommitAuthor
 	Operations      []FileOperation
-}
-
-type CommitResult struct {
-	CommitSHA string
 }
