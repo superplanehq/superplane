@@ -197,6 +197,12 @@ export interface CanvasPageProps {
   onSelectMemory?: () => void;
   /** Switches the canvas surface to the Files tab. Omitted on templates. */
   onSelectFiles?: () => void;
+  /** Opens the canvas dashboard add-panel dialog when `headerMode` is `dashboard`. */
+  onDashboardAddPanel?: () => void;
+  /** Opens the dashboard YAML modal when `headerMode` is `dashboard`. */
+  onDashboardOpenYaml?: () => void;
+  /** DOM slot for Files mode actions owned by the files editor overlay. */
+  filesHeaderActionsSlotId?: string;
   /** Opens the canvas YAML modal. */
   onYamlOpen?: () => void;
   publishVersionLabel?: string;
@@ -1321,6 +1327,9 @@ function CanvasPage(props: CanvasPageProps) {
           onSelectDashboard={props.onSelectDashboard}
           onSelectMemory={props.onSelectMemory}
           onSelectFiles={props.onSelectFiles}
+          onDashboardAddPanel={props.onDashboardAddPanel}
+          onCanvasAddComponent={props.isEditing ? handleBuildingBlocksShortcutOpen : undefined}
+          filesHeaderActionsSlotId={props.filesHeaderActionsSlotId}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
@@ -1441,61 +1450,65 @@ function CanvasPage(props: CanvasPageProps) {
               </div>
             </div>
           ) : null}
-          <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
-            <CanvasContent
-              state={state}
-              onNodeEdit={handleNodeEdit}
-              onNodeDelete={handleNodeDelete}
-              onNodesDelete={handleNodesDelete}
-              onDuplicateNodes={props.onDuplicateNodes}
-              onAutoLayoutNodes={props.onAutoLayoutNodes}
-              onEdgeCreate={props.onEdgeCreate}
-              onToggleView={handleToggleView}
-              onShowNodeDiff={props.onShowNodeDiff}
-              onDuplicate={props.onDuplicate}
-              onDeactivate={props.onDeactivate}
-              onAnnotationUpdate={props.onAnnotationUpdate}
-              onAnnotationBlur={props.onAnnotationBlur}
-              onTogglePause={props.onTogglePause}
-              runDisabled={props.runDisabled}
-              runDisabledTooltip={props.runDisabledTooltip}
-              onBuildingBlockDrop={handleBuildingBlockDrop}
-              onBuildingBlocksSidebarToggle={handleSidebarToggle}
-              onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
-              onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
-              onNodeClick={props.onNodeClick}
-              onZoomChange={setCanvasZoom}
-              hasFitToViewRef={hasFitToViewRef}
-              viewportRefProp={props.viewportRef}
-              highlightedNodeIds={highlightedNodeIds}
-              workflowNodes={props.workflowNodes}
-              setCurrentTab={setCurrentTab}
-              showBottomStatusControls={props.showBottomStatusControls}
-              headerMode={props.headerMode}
-              isEditing={props.isEditing}
-              isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
-              onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
-              autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
-              autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
-              readOnly={props.readOnly}
-              logEntries={props.logEntries}
-              focusRequest={props.focusRequest}
-              initialFocusNodeId={props.initialFocusNodeId}
-              fitAllRequest={props.fitAllRequest}
-              fitAllFocusNodeIds={props.fitAllFocusNodeIds}
-              runParticipantNodeIds={props.runParticipantNodeIds}
-              runsEvents={props.runsEvents}
-              runsNodes={props.runsNodes}
-              runsComponentIconMap={props.runsComponentIconMap}
-              onRunNodeSelect={props.onRunNodeSelect}
-              onRunExecutionSelect={props.onRunExecutionSelect}
-              onAcknowledgeErrors={props.onAcknowledgeErrors}
-              missingIntegrations={props.missingIntegrations}
-              onConnectIntegration={props.onConnectIntegration}
-              canCreateIntegrations={props.canCreateIntegrations}
-            />
-          </ReactFlowProvider>
-          {props.headerMode === "runs" ? null : (
+          {props.headerMode === "files" ? (
+            <div className="absolute inset-0 bg-slate-50" data-testid="canvas-files-backdrop" aria-hidden />
+          ) : (
+            <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
+              <CanvasContent
+                state={state}
+                onNodeEdit={handleNodeEdit}
+                onNodeDelete={handleNodeDelete}
+                onNodesDelete={handleNodesDelete}
+                onDuplicateNodes={props.onDuplicateNodes}
+                onAutoLayoutNodes={props.onAutoLayoutNodes}
+                onEdgeCreate={props.onEdgeCreate}
+                onToggleView={handleToggleView}
+                onShowNodeDiff={props.onShowNodeDiff}
+                onDuplicate={props.onDuplicate}
+                onDeactivate={props.onDeactivate}
+                onAnnotationUpdate={props.onAnnotationUpdate}
+                onAnnotationBlur={props.onAnnotationBlur}
+                onTogglePause={props.onTogglePause}
+                runDisabled={props.runDisabled}
+                runDisabledTooltip={props.runDisabledTooltip}
+                onBuildingBlockDrop={handleBuildingBlockDrop}
+                onBuildingBlocksSidebarToggle={handleSidebarToggle}
+                onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
+                onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
+                onNodeClick={props.onNodeClick}
+                onZoomChange={setCanvasZoom}
+                hasFitToViewRef={hasFitToViewRef}
+                viewportRefProp={props.viewportRef}
+                highlightedNodeIds={highlightedNodeIds}
+                workflowNodes={props.workflowNodes}
+                setCurrentTab={setCurrentTab}
+                showBottomStatusControls={props.showBottomStatusControls}
+                headerMode={props.headerMode}
+                isEditing={props.isEditing}
+                isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
+                onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
+                autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
+                autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
+                readOnly={props.readOnly}
+                logEntries={props.logEntries}
+                focusRequest={props.focusRequest}
+                initialFocusNodeId={props.initialFocusNodeId}
+                fitAllRequest={props.fitAllRequest}
+                fitAllFocusNodeIds={props.fitAllFocusNodeIds}
+                runParticipantNodeIds={props.runParticipantNodeIds}
+                runsEvents={props.runsEvents}
+                runsNodes={props.runsNodes}
+                runsComponentIconMap={props.runsComponentIconMap}
+                onRunNodeSelect={props.onRunNodeSelect}
+                onRunExecutionSelect={props.onRunExecutionSelect}
+                onAcknowledgeErrors={props.onAcknowledgeErrors}
+                missingIntegrations={props.missingIntegrations}
+                onConnectIntegration={props.onConnectIntegration}
+                canCreateIntegrations={props.canCreateIntegrations}
+              />
+            </ReactFlowProvider>
+          )}
+          {props.headerMode === "runs" || props.headerMode === "files" ? null : (
             <Sidebar
               state={state}
               getSidebarData={props.getSidebarData}
@@ -1844,6 +1857,9 @@ function CanvasContentHeader({
   onSelectDashboard,
   onSelectMemory,
   onSelectFiles,
+  onDashboardAddPanel,
+  onCanvasAddComponent,
+  filesHeaderActionsSlotId,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
   hasUnpublishedCanvasDraftChanges,
@@ -1895,6 +1911,9 @@ function CanvasContentHeader({
   onSelectDashboard?: () => void;
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
+  onDashboardAddPanel?: () => void;
+  onCanvasAddComponent?: () => void;
+  filesHeaderActionsSlotId?: string;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
@@ -1946,6 +1965,9 @@ function CanvasContentHeader({
       onSelectDashboard={onSelectDashboard}
       onSelectMemory={onSelectMemory}
       onSelectFiles={onSelectFiles}
+      onDashboardAddPanel={onDashboardAddPanel}
+      onCanvasAddComponent={onCanvasAddComponent}
+      filesHeaderActionsSlotId={filesHeaderActionsSlotId}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       hasUnpublishedCanvasDraftChanges={hasUnpublishedCanvasDraftChanges}

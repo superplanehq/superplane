@@ -79,17 +79,17 @@ import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import { deriveDashboardNodeStatuses } from "./dashboard/deriveNodeStatuses";
 import { useDashboardModeActions } from "./dashboard/useDashboardModeActions";
 import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
-import { WorkflowDashboardOverlay } from "./dashboard/WorkflowDashboardOverlay";
-import { buildWorkflowFiles } from "./lib/canvas-files";
-import { WorkflowFilesOverlayLayer } from "./WorkflowFilesOverlayLayer";
+import { WorkflowPageModeOverlays } from "./WorkflowPageModeOverlays";
+import { useWorkflowFilesFromCanvas } from "./useWorkflowFilesFromCanvas";
 import { CanvasYamlModal } from "./CanvasYamlModal";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useFilesModeActions } from "./useFilesModeActions";
+import { resolveWorkflowFilesHeaderVersionActions } from "./lib/resolve-workflow-files-header-version-actions";
+import { useWorkflowFilesHeaderState } from "./useWorkflowFilesHeaderState";
 import { useMemoryModeActions } from "./useMemoryModeActions";
 import { useWorkflowHeaderEditActions } from "./useWorkflowHeaderEditActions";
 import { useWorkflowViewModeActions } from "./useWorkflowViewModeActions";
 import { CanvasChangeRequestConflictResolver } from "./CanvasChangeRequestConflictResolver";
-import { WorkflowMemoryOverlayLayer } from "./WorkflowMemoryOverlayLayer";
 import { canEditCanvasMemory, shouldLoadCanvasMemoryEntries } from "./lib/canvas-memory-access";
 import { CanvasPageModals } from "./CanvasPageModals";
 import { CanvasVersionNodeDiffDialog, type CanvasVersionNodeDiffContext } from "./CanvasVersionNodeDiffDialog";
@@ -125,6 +125,7 @@ import {
   getExitEditModeDisabledTooltip,
   getRunActionState,
   getWorkflowViewPresentation,
+  useWorkflowUrlViewFlags,
   readStoredBoolean,
 } from "./viewState";
 import {
@@ -184,11 +185,9 @@ export function WorkflowPageV2() {
   const {
     isRunsMode,
     setIsRunsMode,
-    isDashboardMode,
     setIsDashboardMode,
     isMemoryMode,
     setIsMemoryMode,
-    isFilesMode,
     setIsFilesMode,
     isDashboardAddPanelOpen,
     setIsDashboardAddPanelOpen,
@@ -197,6 +196,9 @@ export function WorkflowPageV2() {
     selectedRunId,
     setSelectedRunId,
   } = useWorkflowViewSearchParams(searchParams, setSearchParams);
+  const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
+  const { filesHeaderActions, onFilesHeaderActionsChange, filesHeaderActionsSlotId } =
+    useWorkflowFilesHeaderState(canvasId);
   const currentUserId = me?.id;
   const { canAct } = usePermissions();
   const [activeCanvasVersion, setActiveCanvasVersion] = useState<CanvasesCanvasVersion | null>(null);
@@ -4888,10 +4890,7 @@ export function WorkflowPageV2() {
     onDashboardOpenYaml,
     dashboardYamlReadOnly,
   } = useWorkflowViewModeActions({
-    isDashboardMode,
-    isMemoryMode,
-    isFilesMode,
-    isRunsMode,
+    ...urlViewFlags,
     hasEditableVersion,
     isTemplate,
     canUpdateCanvas,
@@ -5262,27 +5261,15 @@ export function WorkflowPageV2() {
     onWorkflowImported: applyLocalWorkflowUpdate,
   });
 
-  const workflowFiles = useMemo(
-    () =>
-      buildWorkflowFiles({
-        canvasYamlPayload,
-        panels: dashboardQuery.data?.panels,
-        layout: dashboardQuery.data?.layout,
-        canvasId,
-        canvasName: canvas?.metadata?.name,
-        consoleLoading: dashboardQuery.isLoading,
-        consoleError: dashboardQuery.error,
-      }),
-    [
-      canvas?.metadata?.name,
-      canvasId,
-      canvasYamlPayload,
-      dashboardQuery.data?.layout,
-      dashboardQuery.data?.panels,
-      dashboardQuery.error,
-      dashboardQuery.isLoading,
-    ],
-  );
+  const workflowFiles = useWorkflowFilesFromCanvas({
+    canvasYamlPayload,
+    panels: dashboardQuery.data?.panels,
+    layout: dashboardQuery.data?.layout,
+    canvasId,
+    canvasName: canvas?.metadata?.name,
+    consoleLoading: dashboardQuery.isLoading,
+    consoleError: dashboardQuery.error,
+  });
   const { onShowDiff, onShowNodeDiff, yamlDiffModal } = useCanvasYamlDiffModal({
     hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
     liveCanvas,
@@ -5449,15 +5436,14 @@ export function WorkflowPageV2() {
     isPreparingVersionAction,
     hasDraftDiffVersusLive: !!latestDraftVersion && hasDraftDiffVersusLive,
   });
-  const { headerMode, canvasStateMode } = getWorkflowViewPresentation({
-    isDashboardMode,
-    isRunsMode,
-    isMemoryMode,
-    isFilesMode,
-    hasEditableVersion,
-    isViewingPendingApprovalVersion,
-    isViewingCurrentLiveVersion,
-  });
+  const { headerMode, canvasStateMode, showBottomStatusControls, hideAddControls, readOnlyViewModes } =
+    getWorkflowViewPresentation({
+      ...urlViewFlags,
+      isTemplate,
+      hasEditableVersion,
+      isViewingPendingApprovalVersion,
+      isViewingCurrentLiveVersion,
+    });
   const exitEditModeDisabled =
     !canUpdateCanvas || canvasDeletedRemotely || !hasEditableVersion || createCanvasVersionMutation.isPending;
   const exitEditModeDisabledTooltip = getExitEditModeDisabledTooltip({
@@ -5473,43 +5459,64 @@ export function WorkflowPageV2() {
   });
   runDisabledRef.current = runDisabled;
   runDisabledTooltipRef.current = runDisabledTooltip;
+  const filesHeaderVersionActions = resolveWorkflowFilesHeaderVersionActions({
+    useFilesHeaderActions: urlViewFlags.isFilesMode && isEditing,
+    filesHeaderActions,
+    isChangeManagementDisabled,
+    handlePublishVersion,
+    handleCreateChangeRequest,
+    handleResetDraftChanges,
+    publishVersionDisabled,
+    publishVersionDisabledTooltip,
+    resetDraftDisabled,
+    resetDraftDisabledTooltip,
+    hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
+  });
 
   return (
     <>
       <div className="relative h-full w-full">
-        <WorkflowDashboardOverlay
-          isDashboardMode={isDashboardMode}
-          canActOnCanvas={canActOnCanvas}
-          editLocked={isReadOnly}
-          showDashboardEditControls={isEditing}
-          onDashboardAddPanel={onDashboardAddPanel}
-          onDashboardOpenYaml={onDashboardOpenYaml}
-          dashboardYamlReadOnly={dashboardYamlReadOnly}
-          dashboardQuery={dashboardQuery}
-          updateDashboardMutation={updateDashboardMutation}
-          addPanelDialogOpen={isDashboardAddPanelOpen}
-          onAddPanelDialogOpenChange={handleDashboardAddPanelDialogOpenChange}
-          yamlModalOpen={isDashboardYamlOpen}
-          onYamlModalOpenChange={setIsDashboardYamlOpen}
-          canvasId={canvasId || undefined}
-          canvasName={canvas?.metadata?.name || undefined}
-          organizationId={organizationId || undefined}
-          canvasNodes={canvasNodes}
-          nodeStatuses={dashboardNodeStatuses}
-          onTriggerNode={handleDashboardTriggerNode}
+        <WorkflowPageModeOverlays
+          urlViewFlags={urlViewFlags}
+          dashboard={{
+            canActOnCanvas,
+            editLocked: isReadOnly,
+            showDashboardEditControls: isEditing,
+            onDashboardAddPanel,
+            onDashboardOpenYaml,
+            dashboardYamlReadOnly,
+            dashboardQuery,
+            updateDashboardMutation,
+            addPanelDialogOpen: isDashboardAddPanelOpen,
+            onAddPanelDialogOpenChange: handleDashboardAddPanelDialogOpenChange,
+            yamlModalOpen: isDashboardYamlOpen,
+            onYamlModalOpenChange: setIsDashboardYamlOpen,
+            canvasId: canvasId || undefined,
+            canvasName: canvas?.metadata?.name || undefined,
+            organizationId: organizationId || undefined,
+            canvasNodes,
+            nodeStatuses: dashboardNodeStatuses,
+            onTriggerNode: handleDashboardTriggerNode,
+          }}
+          memory={{
+            canDelete: canEditCanvasMemory({
+              ...canvasAccess,
+              hasEditableVersion,
+            }),
+            entries: canvasMemoryEntries,
+            isLoading: canvasMemoryLoading,
+            error: canvasMemoryError,
+            deleteCanvasMemoryEntry,
+          }}
+          files={{
+            isEditing,
+            canvasId: canvasId || undefined,
+            canWrite: canActOnCanvas,
+            files: workflowFiles,
+            headerActionsSlotId: filesHeaderActionsSlotId,
+            onHeaderActionsChange: onFilesHeaderActionsChange,
+          }}
         />
-        <WorkflowMemoryOverlayLayer
-          isMemoryMode={isMemoryMode}
-          canDelete={canEditCanvasMemory({
-            ...canvasAccess,
-            hasEditableVersion,
-          })}
-          entries={canvasMemoryEntries}
-          isLoading={canvasMemoryLoading}
-          error={canvasMemoryError}
-          deleteCanvasMemoryEntry={deleteCanvasMemoryEntry}
-        />
-        <WorkflowFilesOverlayLayer isFilesMode={isFilesMode} files={workflowFiles} />
         <CanvasPage
           key={canvasRenderKey}
           // Persist right sidebar in query params
@@ -5530,8 +5537,8 @@ export function WorkflowPageV2() {
           hasAutoOpenedVersionControl={hasAutoOpenedVersionControl}
           onVersionControlAutoOpened={handleVersionControlAutoOpened}
           onCloseVersionControl={handleCloseVersionControl}
-          showBottomStatusControls={!isTemplate && !isRunsMode && !isMemoryMode && !isFilesMode}
-          hideAddControls={isTemplate || isRunsMode || isMemoryMode || isFilesMode}
+          showBottomStatusControls={showBottomStatusControls}
+          hideAddControls={hideAddControls}
           hideCanvasToolSidebar={isTemplate}
           onSelectMemory={isTemplate ? undefined : handleSelectMemoryMode}
           nodes={nodes}
@@ -5575,7 +5582,7 @@ export function WorkflowPageV2() {
           canUpdateIntegrations={canUpdateIntegrations}
           missingIntegrations={missingIntegrations}
           onConnectIntegration={!isReadOnly ? handleConnectIntegration : undefined}
-          readOnly={isReadOnly || isRunsMode || isFilesMode}
+          readOnly={isReadOnly || readOnlyViewModes}
           hasFitToViewRef={isRunsMode ? runsHasFitToViewRef : hasFitToViewRef}
           hasUserToggledSidebarRef={hasUserToggledSidebarRef}
           isSidebarOpenRef={isSidebarOpenRef}
@@ -5597,19 +5604,12 @@ export function WorkflowPageV2() {
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
           saveDisabledTooltip={saveDisabledTooltip}
-          onPublishVersion={isChangeManagementDisabled ? handlePublishVersion : handleCreateChangeRequest}
-          publishVersionLabel={isChangeManagementDisabled ? "Publish" : "Propose Change"}
-          publishVersionDisabled={publishVersionDisabled}
-          publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
           visualDiffEnabled={draftVisualDiff.visualDiffEnabled}
           draftVisualDiff={draftVisualDiff}
           onToggleVisualDiff={draftVisualDiff.toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
-          onDiscardVersion={handleResetDraftChanges}
-          discardVersionDisabled={resetDraftDisabled}
-          discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           onDiscardDraftAndStartEdit={handleDiscardDraftAndStartEdit}
           unpublishedDraftUpdatedAt={latestDraftVersion?.metadata?.updatedAt || latestDraftVersion?.metadata?.createdAt}
           headerMode={headerMode}
@@ -5622,10 +5622,14 @@ export function WorkflowPageV2() {
           onExitRunsMode={handleExitRunsMode}
           onSelectDashboard={isTemplate ? undefined : handleSelectDashboardMode}
           onSelectFiles={isTemplate ? undefined : handleSelectFilesMode}
+          onDashboardAddPanel={onDashboardAddPanel}
+          onDashboardOpenYaml={onDashboardOpenYaml}
+          filesHeaderActionsSlotId={filesHeaderActionsSlotId}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           {...draftChangeIndicators}
+          {...filesHeaderVersionActions}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           runDisabled={runDisabled}

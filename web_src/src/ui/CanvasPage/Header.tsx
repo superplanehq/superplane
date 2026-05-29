@@ -55,6 +55,12 @@ export interface HeaderProps {
   onSelectMemory?: () => void;
   /** Provided when Files is available as a first-class tab; opens the Files view. */
   onSelectFiles?: () => void;
+  /** When set with `mode === "dashboard"` and editing, shows Add panel in the secondary header. */
+  onDashboardAddPanel?: () => void;
+  /** When set with the Canvas tab active and editing, opens the add-component sidebar. */
+  onCanvasAddComponent?: () => void;
+  /** DOM slot for Files mode actions owned by the files editor overlay. */
+  filesHeaderActionsSlotId?: string;
   /** Label for the publish/propose-change button in version edit mode. Defaults to "Publish". */
   publishVersionLabel?: string;
   /** When true, shows the Discard control next to Publish in version edit mode (draft differs from live). */
@@ -215,7 +221,14 @@ function shouldShowCanvasViewModeToggle(props: HeaderProps): boolean {
 }
 
 function isCanvasViewMode(mode: HeaderMode | undefined): boolean {
-  return mode === "version-live" || mode === "runs" || mode === "dashboard" || mode === "memory" || mode === "files";
+  return (
+    mode === "version-live" ||
+    mode === "version-edit" ||
+    mode === "runs" ||
+    mode === "dashboard" ||
+    mode === "memory" ||
+    mode === "files"
+  );
 }
 
 function getCanvasViewMode(mode: HeaderMode | undefined): CanvasMode {
