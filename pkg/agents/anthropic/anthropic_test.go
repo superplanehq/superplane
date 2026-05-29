@@ -82,6 +82,93 @@ func TestCreateSession_PropagatesAPIError(t *testing.T) {
 	assert.Contains(t, err.Error(), "400")
 }
 
+func TestDefaultAgentPrompt_IsEmbedded(t *testing.T) {
+	prompt := DefaultAgentPrompt()
+	assert.Contains(t, prompt, "You are a SuperPlane canvas expert")
+	assert.Contains(t, prompt, "## Canvas Update Rules")
+}
+
+func TestSyncAgentPrompt_SkipsUpdateWhenCurrent(t *testing.T) {
+	postCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/agents/agent-123", r.URL.Path)
+		assert.Equal(t, "test-key", r.Header.Get("x-api-key"))
+
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte("{\"system\":\"current prompt\\n\\n\",\"version\":7}"))
+			return
+		}
+
+		postCount++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	err := SyncAgentPrompt(context.Background(), Config{
+		APIKey:  "test-key",
+		AgentID: "agent-123",
+		BaseURL: server.URL,
+	}, "current prompt\n")
+	require.NoError(t, err)
+	assert.Equal(t, 0, postCount)
+}
+
+func TestSyncAgentPrompt_UpdatesWhenDifferent(t *testing.T) {
+	var capturedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/agents/agent-123", r.URL.Path)
+
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"old prompt","version":9}`))
+		case http.MethodPost:
+			assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &capturedBody)
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"new prompt","version":10}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	err := SyncAgentPrompt(context.Background(), Config{
+		APIKey:  "test-key",
+		AgentID: "agent-123",
+		BaseURL: server.URL,
+	}, "new prompt")
+	require.NoError(t, err)
+	assert.Equal(t, "new prompt", capturedBody["system"])
+	assert.Equal(t, float64(9), capturedBody["version"])
+}
+
+func TestSyncAgentPrompt_AcceptsUpdatedPromptWithNormalizedTrailingNewlines(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"old prompt","version":9}`))
+		case http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"new prompt","version":10}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	err := SyncAgentPrompt(context.Background(), Config{
+		APIKey:  "test-key",
+		AgentID: "agent-123",
+		BaseURL: server.URL,
+	}, "new prompt\n\n")
+	require.NoError(t, err)
+}
+
 func TestSendMessage_PrependsPreamble(t *testing.T) {
 	var capturedBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
