@@ -1,7 +1,12 @@
 import type { CanvasToolSidebarState } from "@/components/CanvasToolSidebar/useCanvasToolSidebarState";
 import { Button as UIButton } from "@/components/ui/button";
+import { useShortcutLabel } from "@/hooks/useShortcutLabel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PanelLeft, PanelLeftDashed } from "lucide-react";
+
+export function formatToggleSidebarLabel(shortcutLabel: string) {
+  return `Toggle Sidebar (${shortcutLabel})`;
+}
 
 export type CanvasToolSidebarTriggerProps = {
   toolSidebarState: CanvasToolSidebarState;
@@ -9,17 +14,16 @@ export type CanvasToolSidebarTriggerProps = {
 
 export function CanvasToolSidebarTrigger({ toolSidebarState }: CanvasToolSidebarTriggerProps) {
   const { showToolSidebarToggle, isToolSidebarOpen, handleToolSidebarToggle } = toolSidebarState;
+  const shortcutLabel = useShortcutLabel("B");
+  const label = formatToggleSidebarLabel(shortcutLabel);
 
   if (!showToolSidebarToggle) {
     return null;
   }
 
-  const label = isToolSidebarOpen ? "Close sidebar" : "Open sidebar";
-  const tooltip = isToolSidebarOpen ? "Close sidebar" : "Open sidebar";
-
   return (
     <div className="relative z-10 -ml-2 flex shrink-0 items-center">
-      <Tooltip>
+      <Tooltip delayDuration={350}>
         <TooltipTrigger asChild>
           <UIButton
             type="button"
@@ -38,7 +42,7 @@ export function CanvasToolSidebarTrigger({ toolSidebarState }: CanvasToolSidebar
           </UIButton>
         </TooltipTrigger>
         <TooltipContent side="right" sideOffset={8}>
-          {tooltip}
+          {label}
         </TooltipContent>
       </Tooltip>
     </div>

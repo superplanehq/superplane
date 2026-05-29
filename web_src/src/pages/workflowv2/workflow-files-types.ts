@@ -43,7 +43,7 @@ export const repositoryFileTreeStyle = {
   "--trees-fg-override": "#334155",
   "--trees-fg-muted-override": "#64748b",
   "--trees-focus-ring-color-override": "#0f172a",
-  "--trees-selected-bg-override": "#e2e8f0",
+  "--trees-selected-bg-override": "#e0f2fe",
   "--trees-selected-fg-override": "#020617",
   "--trees-padding-inline-override": "0px",
   "--trees-item-margin-x-override": "0px",

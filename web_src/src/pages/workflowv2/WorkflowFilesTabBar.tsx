@@ -27,7 +27,7 @@ export function WorkflowFilesTabBar({
               key={path}
               className={
                 active
-                  ? "flex h-7 min-w-0 max-w-56 items-center border-x border-t border-slate-950/15 bg-slate-50 text-xs text-slate-950"
+                  ? "flex h-7 min-w-0 max-w-56 items-center border-r border-slate-950/15 bg-slate-50 text-xs text-slate-950"
                   : "flex h-7 min-w-0 max-w-56 items-center border-r border-slate-950/10 text-xs text-slate-600 hover:bg-slate-50 hover:text-slate-950"
               }
             >
