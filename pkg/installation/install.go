@@ -11,6 +11,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -36,6 +37,7 @@ type Service struct {
 	Registry        *registry.Registry
 	Encryptor       crypto.Encryptor
 	AuthService     authorization.Authorization
+	GitProvider     git.Provider
 	WebhooksBaseURL string
 	UsageService    usage.Service
 }
@@ -100,6 +102,7 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		s.Registry,
 		s.Encryptor,
 		s.AuthService,
+		s.GitProvider,
 		s.WebhooksBaseURL,
 		req.OrganizationID,
 		canvas,
