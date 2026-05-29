@@ -129,6 +129,10 @@ COPY --from=builder /app/api/swagger /app/api/swagger
 COPY --from=builder /app/rbac /app/rbac
 COPY --from=builder /app/templates /app/templates
 
+# SuperGit binary is downloaded by release/superplane-demo-image/download-supergit.sh before build.
+COPY build/superplane-demo-supergit/supergit /app/supergit
+RUN chmod +x /app/supergit
+
 # Trial entrypoint that runs embedded Postgres and RabbitMQ and then SuperPlane.
 COPY release/superplane-demo-image/entrypoint.sh /app/entrypoint.sh
 COPY release/superplane-demo-image/gen-superplane-env.sh /app/gen-superplane-env.sh
