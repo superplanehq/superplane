@@ -2,7 +2,7 @@ import { meMe } from "@/api-client";
 import type { AuthorizationPermission } from "@/api-client";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { COMMAND_SHORTCUT } from "./constants";
 import { subscribeToOpenCommandPalette } from "./controller";
@@ -32,17 +32,6 @@ export function usePalettePermissions(organizationId: string | null, enabled: bo
   );
 
   return { canAct, isLoading };
-}
-
-export function useShortcutModifierLabel() {
-  const [modifier, setModifier] = useState("Ctrl+");
-
-  useEffect(() => {
-    const platform = window.navigator.platform.toLowerCase();
-    setModifier(platform.includes("mac") ? "⌘" : "Ctrl+");
-  }, []);
-
-  return modifier;
 }
 
 export function useCommandPaletteShortcuts({

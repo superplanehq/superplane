@@ -11,20 +11,17 @@ export type { CanvasBlockData } from "./types";
 const DRAFT_DIFF_BADGE = {
   added: {
     label: "ADDED",
-    className: "border-emerald-200 bg-emerald-500 text-white",
-    ringClassName: "ring-2 ring-emerald-400",
+    className: "bg-green-500 text-white",
     Icon: Plus,
   },
   updated: {
     label: "EDITED",
-    className: "border-sky-200 bg-sky-500 text-white",
-    ringClassName: "ring-2 ring-sky-400",
+    className: "bg-sky-500 text-white",
     Icon: Diff,
   },
   removed: {
     label: "REMOVED",
-    className: "border-rose-200 bg-rose-500 text-white",
-    ringClassName: "ring-2 ring-rose-400",
+    className: "bg-red-500 text-white",
     Icon: Minus,
   },
 } as const;
@@ -41,11 +38,20 @@ function DraftDiffBadge({
   const showDiffAction = status === "updated" && onShowDiff;
 
   return (
-    <div className="nodrag absolute -bottom-3 right-2 z-10 flex items-center gap-1">
+    <div className="nodrag absolute top-full right-2 z-10 flex flex-col items-end gap-1">
+      <div
+        className={cn(
+          "flex items-center gap-1 rounded-t-none rounded-b-md px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-sm",
+          badge.className,
+        )}
+      >
+        <Icon className="h-3 w-3" />
+        <span>{badge.label}</span>
+      </div>
       {showDiffAction ? (
         <button
           type="button"
-          className="flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 opacity-0 shadow-sm transition hover:bg-slate-50 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-sky-200 group-hover/block:opacity-100"
+          className="mt-1 flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 opacity-0 outline outline-1 outline-slate-950/15 transition hover:bg-slate-50 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-sky-200 group-hover/block:opacity-100"
           onClick={(event) => {
             event.stopPropagation();
             onShowDiff();
@@ -55,15 +61,6 @@ function DraftDiffBadge({
           See diff
         </button>
       ) : null}
-      <div
-        className={cn(
-          "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide shadow-sm",
-          badge.className,
-        )}
-      >
-        <Icon className="h-3 w-3" />
-        <span>{badge.label}</span>
-      </div>
     </div>
   );
 }
@@ -76,7 +73,6 @@ export const Block = React.memo(function Block(props: BlockProps) {
   const isRemoved = data._draftDiffStatus === "removed";
   const shouldBlankBody = data._dimBodyBelowHeader || isRemoved;
   const isConnectionInteractive = props.canvasMode !== "live" && !isRemoved;
-  const diffRingClassName = data._draftDiffStatus ? DRAFT_DIFF_BADGE[data._draftDiffStatus].ringClassName : undefined;
 
   return (
     <div
@@ -87,7 +83,7 @@ export const Block = React.memo(function Block(props: BlockProps) {
       )}
       onClick={(e) => props.onClick?.(e)}
     >
-      <div className={cn("relative z-[1] w-fit rounded-lg", diffRingClassName)}>
+      <div className="relative z-[1] w-fit">
         <LeftHandle data={data} nodeId={props.nodeId} isConnectionInteractive={isConnectionInteractive} />
         <BlockContent {...props} dimBodyBelowHeader={shouldBlankBody} />
         <RightHandle
