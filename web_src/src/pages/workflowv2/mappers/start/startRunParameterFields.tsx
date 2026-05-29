@@ -2,9 +2,15 @@ import React from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/ui/checkbox";
 
-import { parameterDisplayLabel, type StartTemplateParameter } from "./templatePayload";
+import {
+  parameterDisplayLabel,
+  selectOptionValues,
+  parameterPlaceholder,
+  type StartTemplateParameter,
+} from "./templatePayload";
 
 export function StartRunParameterFields({
   parameters,
@@ -39,12 +45,40 @@ export function StartRunParameterFields({
                   {label}
                 </Label>
               </div>
+            ) : param.type === "select" ? (
+              <>
+                <Label htmlFor={id}>{label}</Label>
+                <Select
+                  value={String(parameterValues[param.name] ?? "")}
+                  onValueChange={(val) =>
+                    onParameterValuesChange((prev) => ({
+                      ...prev,
+                      [param.name]: val,
+                    }))
+                  }
+                  disabled={selectOptionValues(param).length === 0}
+                >
+                  <SelectTrigger id={id} className="w-full">
+                    <SelectValue
+                      placeholder={selectOptionValues(param).length === 0 ? "No options configured" : `Select ${label}`}
+                    />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {(param.options ?? []).map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label || opt.value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
             ) : (
               <>
                 <Label htmlFor={id}>{label}</Label>
                 <Input
                   id={id}
                   type={param.type === "number" ? "number" : "text"}
+                  placeholder={parameterPlaceholder(param)}
                   value={String(parameterValues[param.name] ?? "")}
                   onChange={(e) =>
                     onParameterValuesChange((prev) => ({

@@ -19,35 +19,29 @@ interface VMInstanceNodeMetadata {
   zone?: string;
 }
 
-interface DeleteVMInstanceConfiguration {
+interface UpdateVMInstanceTypeConfiguration {
   instance?: string;
+  machineType?: string;
 }
 
-interface DeleteVMInstanceOutputData {
-  instanceName?: string;
+interface UpdateVMInstanceTypeOutputData {
+  name?: string;
   zone?: string;
+  status?: string;
+  machineType?: string;
 }
 
-function parseInstancePath(value: string | undefined): { zone: string; name: string } | null {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.includes("{{")) return null;
-  const match = trimmed.match(/zones\/([^/]+)\/instances\/([^/?#]+)/);
-  if (!match) return null;
-  return { zone: match[1], name: match[2] };
-}
-
-export const deleteVMInstanceMapper: ComponentBaseMapper = {
+export const updateVMInstanceTypeMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {
     const lastExecution = context.lastExecutions.length > 0 ? context.lastExecutions[0] : null;
     const componentName = context.componentDefinition.name ?? "gcp";
 
     return {
       iconSrc: gcpIcon,
-      iconSlug: context.componentDefinition?.icon ?? "trash-2",
+      iconSlug: context.componentDefinition?.icon ?? "cpu",
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
-      title: context.node.name || context.componentDefinition?.label || "Delete VM Instance",
+      title: context.node.name || context.componentDefinition?.label || "Update VM Machine Type",
       eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
@@ -63,16 +57,13 @@ export const deleteVMInstanceMapper: ComponentBaseMapper = {
     }
 
     const outputs = context.execution.outputs as { default?: OutputPayload[] } | undefined;
-    const result = outputs?.default?.[0]?.data as DeleteVMInstanceOutputData | undefined;
+    const result = outputs?.default?.[0]?.data as UpdateVMInstanceTypeOutputData | undefined;
     if (!result) return details;
 
-    if (result.instanceName) {
-      details["Instance Name"] = result.instanceName;
-    }
-    if (result.zone) {
-      details["Zone"] = result.zone;
-    }
-    details["Status"] = "Deleted";
+    if (result.name) details["Instance Name"] = result.name;
+    if (result.zone) details["Zone"] = result.zone;
+    if (result.machineType) details["Machine Type"] = result.machineType;
+    if (result.status) details["Status"] = result.status;
 
     return details;
   },
@@ -86,17 +77,17 @@ export const deleteVMInstanceMapper: ComponentBaseMapper = {
 function metadataList(node: NodeInfo): MetadataItem[] {
   const metadata: MetadataItem[] = [];
   const nodeMetadata = node.metadata as VMInstanceNodeMetadata | undefined;
-  const configuration = node.configuration as DeleteVMInstanceConfiguration | undefined;
+  const configuration = node.configuration as UpdateVMInstanceTypeConfiguration | undefined;
 
-  const parsed = parseInstancePath(configuration?.instance);
-  const instanceName = nodeMetadata?.instanceName || parsed?.name || configuration?.instance;
-  const zone = nodeMetadata?.zone || parsed?.zone;
-
+  const instanceName = nodeMetadata?.instanceName || configuration?.instance;
   if (instanceName) {
-    metadata.push({ icon: "trash-2", label: instanceName });
+    metadata.push({ icon: "server", label: instanceName });
   }
-  if (zone) {
-    metadata.push({ icon: "map-pin", label: zone });
+  if (nodeMetadata?.zone) {
+    metadata.push({ icon: "map-pin", label: nodeMetadata.zone });
+  }
+  if (configuration?.machineType) {
+    metadata.push({ icon: "cpu", label: configuration.machineType });
   }
 
   return metadata;

@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
@@ -191,6 +192,49 @@ func TestStart_HandleHook_RejectsNilPayload(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no payload")
 	assert.Empty(t, events.Payloads)
+}
+
+func TestStart_Configuration_SelectParameterRequiresOptions(t *testing.T) {
+	s := &Start{}
+
+	err := configuration.ValidateConfiguration(s.Configuration(), map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name":    "Parameterized",
+				"payload": map[string]any{"provider": "x"},
+				"parameters": []any{
+					map[string]any{
+						"name": "provider",
+						"type": "select",
+					},
+				},
+			},
+		},
+	})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "options")
+}
+
+func TestStart_Configuration_NonSelectParameterDoesNotRequireOptions(t *testing.T) {
+	s := &Start{}
+
+	err := configuration.ValidateConfiguration(s.Configuration(), map[string]any{
+		"templates": []any{
+			map[string]any{
+				"name":    "Parameterized",
+				"payload": map[string]any{"message": "hi"},
+				"parameters": []any{
+					map[string]any{
+						"name": "message",
+						"type": "string",
+					},
+				},
+			},
+		},
+	})
+
+	require.NoError(t, err)
 }
 
 func TestStart_HandleHook_RejectsUnknownHook(t *testing.T) {
