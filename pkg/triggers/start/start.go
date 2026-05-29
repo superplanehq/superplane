@@ -132,9 +132,9 @@ func (s *Start) Configuration() []configuration.Field {
 													},
 												},
 												{
-													Name:     "options",
-													Label:    "Options",
-													Type:     configuration.FieldTypeList,
+													Name:  "options",
+													Label: "Options",
+													Type:  configuration.FieldTypeList,
 													RequiredConditions: []configuration.RequiredCondition{
 														{Field: "type", Values: []string{configuration.FieldTypeSelect}},
 													},
