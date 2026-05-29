@@ -102,7 +102,7 @@ func (g *GCP) Instructions() string {
 
 - ` + "`roles/logging.configWriter`" + ` — create logging sinks for event triggers
 - ` + "`roles/pubsub.admin`" + ` — manage Pub/Sub topics, subscriptions, and IAM policies for event delivery
-- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management)`
+- Additional roles depending on which components you use (e.g. ` + "`roles/compute.admin`" + ` for VM management, ` + "`roles/monitoring.viewer`" + ` to read VM metrics)`
 }
 
 func (g *GCP) Configuration() []configuration.Field {
@@ -163,6 +163,9 @@ func (g *GCP) Actions() []core.Action {
 	return []core.Action{
 		&compute.CreateVM{},
 		&compute.DeleteVMInstance{},
+		&compute.ManageVMInstancePower{},
+		&compute.UpdateVMInstanceType{},
+		&compute.GetVMInstanceMetrics{},
 		&cloudbuild.CreateBuild{},
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
