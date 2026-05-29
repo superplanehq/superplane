@@ -919,6 +919,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListMachineFamilyResources(reqCtx, client, p["zone"])
 	case compute.ResourceTypeMachineType:
 		return compute.ListMachineTypeResources(reqCtx, client, p["zone"], p["machineFamily"])
+	case compute.ResourceTypeInstanceMachineType:
+		return compute.ListMachineTypeResourcesForInstance(reqCtx, client, p["instance"])
 	case compute.ResourceTypePublicImages:
 		return compute.ListPublicImageResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeCustomImages:

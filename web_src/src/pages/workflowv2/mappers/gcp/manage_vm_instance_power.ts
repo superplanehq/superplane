@@ -1,7 +1,6 @@
 import type { ComponentBaseProps, EventSection, EventStateMap } from "@/ui/componentBase";
 import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type React from "react";
-import { getState, getTriggerRenderer } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
@@ -16,6 +15,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { defaultStateFunction } from "../stateRegistry";
+import { baseEventSections } from "./event_helpers";
 
 interface VMInstanceNodeMetadata {
   instanceName?: string;
@@ -111,7 +111,7 @@ export const manageVMInstancePowerMapper: ComponentBaseMapper = {
       collapsedBackground: "bg-white",
       collapsed: context.node.isCollapsed,
       title: context.node.name || context.componentDefinition?.label || "Manage VM Power",
-      eventSections: lastExecution ? baseEventSections(context.nodes, lastExecution, componentName) : undefined,
+      eventSections: lastExecution ? powerEventSections(context.nodes, lastExecution, componentName) : undefined,
       metadata: metadataList(context.node),
       includeEmptyState: !lastExecution,
       eventStateMap: powerStateMap,
@@ -163,34 +163,12 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   return metadata;
 }
 
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootEvent = execution.rootEvent;
-  if (!rootEvent?.nodeId) {
-    return [];
-  }
-
-  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
-  if (!rootTriggerNode?.componentName) {
-    return [];
-  }
-
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
-  const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
-  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const fallbackSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
-
+// powerEventSections resolves the per-operation power state (when present) and
+// delegates the rest of the section construction to the shared helper.
+function powerEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
   const outputs = execution.outputs as { default?: OutputPayload[] } | undefined;
   const powerEvent = outputs?.default?.find((output) => output.type?.startsWith(POWER_EVENT_PREFIX));
-  const eventState =
-    powerEvent?.type && powerStateMap[powerEvent.type] ? powerEvent.type : getState(componentName)(execution);
+  const override = powerEvent?.type && powerStateMap[powerEvent.type] ? powerEvent.type : undefined;
 
-  return [
-    {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventSubtitle: subtitle || fallbackSubtitle,
-      eventState,
-      eventId: rootEvent.id!,
-    },
-  ];
+  return baseEventSections(nodes, execution, componentName, override);
 }

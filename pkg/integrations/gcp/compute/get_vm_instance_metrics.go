@@ -225,9 +225,9 @@ func (g *GetVMInstanceMetrics) Execute(ctx core.ExecutionContext) error {
 		"start":                         startTime.Format(time.RFC3339),
 		"end":                           endTime.Format(time.RFC3339),
 		"lookbackPeriod":                spec.LookbackPeriod,
-		"avgCpuUsagePercent":            roundTo2(averageTimeSeries(cpu)*100, 2),
-		"avgNetworkInboundBytesPerSec":  roundTo2(averageTimeSeries(inbound), 2),
-		"avgNetworkOutboundBytesPerSec": roundTo2(averageTimeSeries(outbound), 2),
+		"avgCpuUsagePercent":            roundTo(averageTimeSeries(cpu)*100, 2),
+		"avgNetworkInboundBytesPerSec":  roundTo(averageTimeSeries(inbound), 2),
+		"avgNetworkOutboundBytesPerSec": roundTo(averageTimeSeries(outbound), 2),
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -307,7 +307,7 @@ func averageTimeSeries(resp *timeSeriesResponse) float64 {
 	return sum / float64(count)
 }
 
-func roundTo2(val float64, places int) float64 {
+func roundTo(val float64, places int) float64 {
 	p := math.Pow(10, float64(places))
 	return math.Round(val*p) / p
 }

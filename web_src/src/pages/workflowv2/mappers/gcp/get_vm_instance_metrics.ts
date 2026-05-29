@@ -1,9 +1,11 @@
-import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import type { ComponentBaseProps } from "@/ui/componentBase";
+import { DEFAULT_EVENT_STATE_MAP } from "@/ui/componentBase";
 import type React from "react";
-import { getState, getStateMap, getTriggerRenderer } from "..";
+import { getStateMap } from "..";
 import type {
   ComponentBaseContext,
   ComponentBaseMapper,
+  EventStateRegistry,
   ExecutionDetailsContext,
   ExecutionInfo,
   NodeInfo,
@@ -13,6 +15,23 @@ import type {
 import type { MetadataItem } from "@/ui/metadataList";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
+import { baseEventSections } from "./event_helpers";
+import { defaultStateFunction } from "../stateRegistry";
+
+// A successful metrics fetch shows a "FETCHED" badge rather than the generic
+// "COMPLETED" used by mutating actions.
+const FETCHED_STATE = "fetched";
+
+export const GET_VM_INSTANCE_METRICS_STATE_REGISTRY: EventStateRegistry = {
+  stateMap: {
+    ...DEFAULT_EVENT_STATE_MAP,
+    [FETCHED_STATE]: { ...DEFAULT_EVENT_STATE_MAP.success, label: "FETCHED" },
+  },
+  getState: (execution: ExecutionInfo) => {
+    const state = defaultStateFunction(execution);
+    return state === "success" ? FETCHED_STATE : state;
+  },
+};
 
 interface VMInstanceNodeMetadata {
   instanceName?: string;
@@ -109,31 +128,4 @@ function metadataList(node: NodeInfo): MetadataItem[] {
   }
 
   return metadata;
-}
-
-function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
-  const rootEvent = execution.rootEvent;
-  if (!rootEvent?.nodeId) {
-    return [];
-  }
-
-  const rootTriggerNode = nodes.find((n) => n.id === rootEvent.nodeId);
-  if (!rootTriggerNode?.componentName) {
-    return [];
-  }
-
-  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode.componentName);
-  const { title, subtitle } = rootTriggerRenderer.getTitleAndSubtitle({ event: rootEvent });
-  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
-  const fallbackSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
-
-  return [
-    {
-      receivedAt: new Date(execution.createdAt!),
-      eventTitle: title,
-      eventSubtitle: subtitle || fallbackSubtitle,
-      eventState: getState(componentName)(execution),
-      eventId: rootEvent.id!,
-    },
-  ];
 }

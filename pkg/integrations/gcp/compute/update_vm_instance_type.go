@@ -92,10 +92,18 @@ func (u *UpdateVMInstanceType) Configuration() []configuration.Field {
 		{
 			Name:        "machineType",
 			Label:       "Machine Type",
-			Type:        configuration.FieldTypeString,
+			Type:        configuration.FieldTypeIntegrationResource,
 			Required:    true,
-			Description: "The new machine type, e.g. e2-medium or n2-standard-4.",
-			Placeholder: "e2-medium",
+			Description: "The new machine type to resize the instance to. Lists machine types available in the instance's zone.",
+			Placeholder: "Select machine type",
+			TypeOptions: &configuration.TypeOptions{
+				Resource: &configuration.ResourceTypeOptions{
+					Type: ResourceTypeInstanceMachineType,
+					Parameters: []configuration.ParameterRef{
+						{Name: "instance", ValueFrom: &configuration.ParameterValueFrom{Field: "instance"}},
+					},
+				},
+			},
 		},
 		{
 			Name:        "restartAfterUpdate",
