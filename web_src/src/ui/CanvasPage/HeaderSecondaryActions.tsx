@@ -49,9 +49,7 @@ export function SecondaryHeaderActions({
         />
       ) : null}
 
-      {isEditing && mode === "files" && filesHeaderActionsSlotId ? (
-        <div id={filesHeaderActionsSlotId} className="flex shrink-0 items-center gap-2" />
-      ) : null}
+      <FilesHeaderActionsSlot isEditing={isEditing} mode={mode} slotId={filesHeaderActionsSlotId} />
 
       {isEditing && onCanvasTab ? (
         <EditModeCanvasSecondaryActions
@@ -87,6 +85,22 @@ export function SecondaryHeaderActions({
       ) : null}
     </div>
   );
+}
+
+function FilesHeaderActionsSlot({
+  isEditing,
+  mode,
+  slotId,
+}: {
+  isEditing: boolean;
+  mode: HeaderProps["mode"];
+  slotId?: string;
+}) {
+  if (!isEditing || mode !== "files" || !slotId) {
+    return null;
+  }
+
+  return <div id={slotId} className="flex shrink-0 items-center gap-2" />;
 }
 
 function EditModeCanvasSecondaryActions({

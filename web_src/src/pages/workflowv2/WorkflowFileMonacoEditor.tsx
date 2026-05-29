@@ -1,6 +1,8 @@
 import { Editor } from "@monaco-editor/react";
 import { useCallback, useEffect, useRef } from "react";
 
+import { getWorkflowFileMonacoLanguage } from "./lib/workflow-monaco-language";
+
 const fileEditorOptions = {
   minimap: { enabled: false },
   fontSize: 13,
@@ -61,7 +63,7 @@ export function WorkflowFileMonacoEditor({
       <Editor
         key={path}
         height="100%"
-        language={language ?? getMonacoLanguage(path)}
+        language={language ?? getWorkflowFileMonacoLanguage(path)}
         value={content}
         theme="vs"
         onChange={handleChange}
@@ -73,51 +75,4 @@ export function WorkflowFileMonacoEditor({
       />
     </div>
   );
-}
-
-function getMonacoLanguage(path: string): string {
-  const normalizedPath = path.toLowerCase();
-  const extension = normalizedPath.split(".").pop();
-
-  if (normalizedPath.endsWith("dockerfile") || normalizedPath.includes("/dockerfile")) return "dockerfile";
-  if (normalizedPath.endsWith("makefile") || normalizedPath.includes("/makefile")) return "makefile";
-
-  switch (extension) {
-    case "css":
-      return "css";
-    case "go":
-      return "go";
-    case "html":
-      return "html";
-    case "js":
-    case "mjs":
-    case "cjs":
-      return "javascript";
-    case "json":
-    case "jsonc":
-      return "json";
-    case "jsx":
-      return "javascript";
-    case "md":
-    case "mdx":
-    case "markdown":
-      return "markdown";
-    case "py":
-      return "python";
-    case "sh":
-    case "bash":
-    case "zsh":
-      return "shell";
-    case "ts":
-      return "typescript";
-    case "tsx":
-      return "typescript";
-    case "xml":
-      return "xml";
-    case "yaml":
-    case "yml":
-      return "yaml";
-    default:
-      return "plaintext";
-  }
 }

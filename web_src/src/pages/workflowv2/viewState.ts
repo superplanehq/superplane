@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
 
@@ -17,6 +19,10 @@ export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchPara
     isFilesMode: view === "files",
     isDashboardMode: isConsoleViewParam(view),
   };
+}
+
+export function useWorkflowUrlViewFlags(searchParams: URLSearchParams) {
+  return useMemo(() => getWorkflowViewFlagsFromSearchParams(searchParams), [searchParams]);
 }
 
 export function readStoredBoolean(key: string): boolean {
@@ -101,6 +107,7 @@ export function getWorkflowViewPresentation({
   isRunsMode,
   isMemoryMode,
   isFilesMode,
+  isTemplate,
   hasEditableVersion,
   isViewingPendingApprovalVersion,
   isViewingCurrentLiveVersion,
@@ -109,10 +116,13 @@ export function getWorkflowViewPresentation({
   isRunsMode: boolean;
   isMemoryMode: boolean;
   isFilesMode: boolean;
+  isTemplate: boolean;
   hasEditableVersion: boolean;
   isViewingPendingApprovalVersion: boolean;
   isViewingCurrentLiveVersion: boolean;
 }) {
+  const hideNonCanvasChrome = isRunsMode || isMemoryMode || isFilesMode;
+
   return {
     headerMode: getWorkflowHeaderMode({ isDashboardMode, isRunsMode, isMemoryMode, isFilesMode }),
     canvasStateMode: getWorkflowCanvasStateMode({
@@ -120,6 +130,9 @@ export function getWorkflowViewPresentation({
       isViewingPendingApprovalVersion,
       isViewingCurrentLiveVersion,
     }),
+    showBottomStatusControls: !isTemplate && !hideNonCanvasChrome,
+    hideAddControls: isTemplate || hideNonCanvasChrome,
+    readOnlyViewModes: isRunsMode || isFilesMode,
   };
 }
 
