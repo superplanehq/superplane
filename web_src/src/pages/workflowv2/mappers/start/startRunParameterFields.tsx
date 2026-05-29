@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/ui/checkbox";
 
-import { parameterDisplayLabel, type StartTemplateParameter } from "./templatePayload";
+import { parameterDisplayLabel, parameterPlaceholder, type StartTemplateParameter } from "./templatePayload";
 
 export function StartRunParameterFields({
   parameters,
@@ -45,6 +45,7 @@ export function StartRunParameterFields({
                 <Input
                   id={id}
                   type={param.type === "number" ? "number" : "text"}
+                  placeholder={parameterPlaceholder(param)}
                   value={String(parameterValues[param.name] ?? "")}
                   onChange={(e) =>
                     onParameterValuesChange((prev) => ({
