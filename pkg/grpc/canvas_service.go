@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/pkg/registry"
@@ -18,6 +19,7 @@ type CanvasService struct {
 	registry       *registry.Registry
 	encryptor      crypto.Encryptor
 	authService    authorization.Authorization
+	gitProvider    git.Provider
 	webhookBaseURL string
 	usageService   usage.Service
 }
@@ -26,6 +28,7 @@ func NewCanvasService(
 	authService authorization.Authorization,
 	registry *registry.Registry,
 	encryptor crypto.Encryptor,
+	gitProvider git.Provider,
 	webhookBaseURL string,
 	usageService usage.Service,
 ) *CanvasService {
@@ -33,6 +36,7 @@ func NewCanvasService(
 		registry:       registry,
 		encryptor:      encryptor,
 		authService:    authService,
+		gitProvider:    gitProvider,
 		webhookBaseURL: webhookBaseURL,
 		usageService:   usageService,
 	}
@@ -65,6 +69,7 @@ func (s *CanvasService) CreateCanvas(ctx context.Context, req *pb.CreateCanvasRe
 		s.registry,
 		s.encryptor,
 		s.authService,
+		s.gitProvider,
 		s.webhookBaseURL,
 		uuid.MustParse(organizationID),
 		req.Canvas,
