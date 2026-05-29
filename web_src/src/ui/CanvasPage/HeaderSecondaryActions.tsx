@@ -1,7 +1,6 @@
 import { Button as UIButton } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-
 import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
@@ -23,6 +22,7 @@ export function SecondaryHeaderActions({
   draftVisualDiff,
   draftConsoleDiff,
   onToggleVisualDiff,
+  filesHeaderActionsSlotId,
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
@@ -44,6 +44,8 @@ export function SecondaryHeaderActions({
           saveIsPrimary={saveIsPrimary}
         />
       ) : null}
+
+      <FilesHeaderActionsSlot isEditing={isEditing} mode={mode} slotId={filesHeaderActionsSlotId} />
 
       {isEditing ? (
         <>
@@ -73,6 +75,22 @@ export function SecondaryHeaderActions({
       ) : null}
     </div>
   );
+}
+
+function FilesHeaderActionsSlot({
+  isEditing,
+  mode,
+  slotId,
+}: {
+  isEditing: boolean;
+  mode: HeaderProps["mode"];
+  slotId?: string;
+}) {
+  if (!isEditing || mode !== "files" || !slotId) {
+    return null;
+  }
+
+  return <div id={slotId} className="flex shrink-0 items-center gap-2" />;
 }
 
 function EditModePublishDiscardActions({

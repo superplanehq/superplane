@@ -1,7 +1,7 @@
 import type { DashboardLayoutItem, DashboardPanel } from "@/hooks/useCanvasData";
 
 import { dashboardToYaml } from "../dashboard/dashboardYaml";
-import type { WorkflowFile } from "../WorkflowFilesOverlayLayer";
+import type { WorkflowFile } from "../workflow-files-types";
 
 type DashboardPanelInput = {
   id?: string;
