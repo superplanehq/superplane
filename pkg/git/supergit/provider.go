@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/git/provider"
 )
 
@@ -33,8 +32,15 @@ func NewProvider() (*Provider, error) {
 	}, nil
 }
 
-func (p *Provider) CreateRepository(ctx context.Context, options provider.CreateRepositoryOptions) (*provider.Repository, error) {
-	repoID := p.getRepositoryID(options.OrganizationID, options.CanvasID)
+func (p *Provider) Name() string {
+	return provider.SuperGitProvider
+}
+
+func (p *Provider) GetRepositoryID(options provider.RepositoryOptions) string {
+	return fmt.Sprintf("orgs/%s/canvases/%s", options.OrganizationID.String(), options.CanvasID.String())
+}
+
+func (p *Provider) CreateRepository(ctx context.Context, repoID string) (*provider.Repository, error) {
 	repo, err := p.client.createRepo(ctx, RepoRequest{
 		ID:            repoID,
 		DefaultBranch: "main",
@@ -58,7 +64,7 @@ func (p *Provider) DeleteRepository(ctx context.Context, repoID string) error {
 	return p.client.deleteRepo(ctx, repoID)
 }
 
-func (p *Provider) ListFiles(ctx context.Context, repoID string) (*provider.ListFilesResult, error) {
+func (p *Provider) ListFiles(ctx context.Context, repoID string) ([]string, error) {
 	return p.client.listFiles(ctx, repoID, p.defaultBranch)
 }
 
@@ -71,14 +77,14 @@ func (p *Provider) GetFile(ctx context.Context, repoID string, path string) (io.
 	return p.client.getFile(ctx, repoID, filePath, p.defaultBranch)
 }
 
-func (p *Provider) Commit(ctx context.Context, repoID string, options provider.CommitOptions) (*provider.CommitResult, error) {
+func (p *Provider) Commit(ctx context.Context, repoID string, options provider.CommitOptions) (string, error) {
 	if err := provider.ValidateCommitMetadata(options.Message, options.Author); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	operations, err := provider.ValidateCommitOperations(options.Operations)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	body, err := buildCommitNDJSON(operations, provider.CommitOptions{
@@ -90,17 +96,15 @@ func (p *Provider) Commit(ctx context.Context, repoID string, options provider.C
 	})
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	result, err := p.client.createCommit(ctx, repoID, body)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return &provider.CommitResult{
-		CommitSHA: result.Commit.CommitSHA,
-	}, nil
+	return result.Commit.CommitSHA, nil
 }
 
 func (p *Provider) Head(ctx context.Context, repoID string) (string, error) {
@@ -110,8 +114,4 @@ func (p *Provider) Head(ctx context.Context, repoID string) (string, error) {
 	}
 
 	return commit.CommitSHA, nil
-}
-
-func (p *Provider) getRepositoryID(organizationID, canvasID uuid.UUID) string {
-	return fmt.Sprintf("orgs/%s/canvases/%s", organizationID.String(), canvasID.String())
 }
