@@ -22,6 +22,35 @@ describe("buildTemplateParametersAutocompleteObject", () => {
     });
   });
 
+  it("builds select defaults from defaultString or first option", () => {
+    const out = buildTemplateParametersAutocompleteObject({
+      parameters: [
+        {
+          name: "provider",
+          type: "select",
+          defaultString: "anthropic",
+          options: [
+            { label: "OpenAI", value: "openai" },
+            { label: "Anthropic", value: "anthropic" },
+          ],
+        },
+        {
+          name: "region",
+          type: "select",
+          options: [
+            { label: "US", value: "us" },
+            { label: "EU", value: "eu" },
+          ],
+        },
+      ],
+    });
+
+    expect(out).toEqual({
+      provider: "anthropic",
+      region: "us",
+    });
+  });
+
   it("ignores invalid items and keeps empty string defaults", () => {
     const out = buildTemplateParametersAutocompleteObject({
       parameters: [

@@ -56,7 +56,7 @@ Each Manual Run trigger exposes a list of templates. A template has:
 - ` + "`parameters`" + ` (optional): a list of typed parameters exposed to payload expressions as ` + "`parameters[\"name\"]`" + ` and used by the run form
 - ` + "`payload`" + ` (required): a default JSON object emitted when the template is used. Supports expressions such as ` + "`{{ now() }}`" + ` and ` + "`{{ parameters[\"my parameter\"] }}`" + ` in JSON values.
 
-Each parameter has a ` + "`name`" + ` (plain text), required ` + "`type`" + ` (` + "`string`" + `, ` + "`number`" + `, or ` + "`boolean`" + `), an optional ` + "`title`" + ` for the run form label (defaults to ` + "`name`" + ` when unset), and an optional default (` + "`defaultString`" + `, ` + "`defaultNumber`" + `, or ` + "`defaultBoolean`" + `) whose editor matches the selected type.
+Each parameter has a ` + "`name`" + ` (plain text), required ` + "`type`" + ` (` + "`string`" + `, ` + "`number`" + `, ` + "`boolean`" + `, or ` + "`select`" + `), an optional ` + "`title`" + ` for the run form label (defaults to ` + "`name`" + ` when unset), and an optional default (` + "`defaultString`" + `, ` + "`defaultNumber`" + `, or ` + "`defaultBoolean`" + `) whose editor matches the selected type. Select parameters also require an ` + "`options`" + ` list of ` + "`label`" + ` / ` + "`value`" + ` pairs; run-time values use the option ` + "`value`" + ` strings.
 
 ## Event Data
 
@@ -126,6 +126,51 @@ func (s *Start) Configuration() []configuration.Field {
 																{Label: "String", Value: configuration.FieldTypeString},
 																{Label: "Number", Value: configuration.FieldTypeNumber},
 																{Label: "Boolean", Value: configuration.FieldTypeBool},
+																{Label: "Select", Value: configuration.FieldTypeSelect},
+															},
+														},
+													},
+												},
+												{
+													Name:     "options",
+													Label:    "Options",
+													Type:     configuration.FieldTypeList,
+													RequiredConditions: []configuration.RequiredCondition{
+														{Field: "type", Values: []string{configuration.FieldTypeSelect}},
+													},
+													VisibilityConditions: []configuration.VisibilityCondition{
+														{Field: "type", Values: []string{configuration.FieldTypeSelect}},
+													},
+													TypeOptions: &configuration.TypeOptions{
+														List: &configuration.ListTypeOptions{
+															ItemLabel: "Option",
+															Accordion: true,
+															ItemDefinition: &configuration.ListItemDefinition{
+																Type: configuration.FieldTypeObject,
+																Schema: []configuration.Field{
+																	{
+																		Name:     "label",
+																		Label:    "Label",
+																		Type:     configuration.FieldTypeString,
+																		Required: true,
+																		TypeOptions: &configuration.TypeOptions{
+																			String: &configuration.StringTypeOptions{
+																				AllowExpressions: &disallowExpressions,
+																			},
+																		},
+																	},
+																	{
+																		Name:     "value",
+																		Label:    "Value",
+																		Type:     configuration.FieldTypeString,
+																		Required: true,
+																		TypeOptions: &configuration.TypeOptions{
+																			String: &configuration.StringTypeOptions{
+																				AllowExpressions: &disallowExpressions,
+																			},
+																		},
+																	},
+																},
 															},
 														},
 													},
@@ -136,7 +181,7 @@ func (s *Start) Configuration() []configuration.Field {
 													Type:      configuration.FieldTypeString,
 													Togglable: true,
 													VisibilityConditions: []configuration.VisibilityCondition{
-														{Field: "type", Values: []string{configuration.FieldTypeString}},
+														{Field: "type", Values: []string{configuration.FieldTypeString, configuration.FieldTypeSelect}},
 													},
 													TypeOptions: &configuration.TypeOptions{
 														String: &configuration.StringTypeOptions{
