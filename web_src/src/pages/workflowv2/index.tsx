@@ -80,8 +80,8 @@ import { deriveDashboardNodeStatuses } from "./dashboard/deriveNodeStatuses";
 import { useDashboardModeActions } from "./dashboard/useDashboardModeActions";
 import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
 import { WorkflowDashboardOverlay } from "./dashboard/WorkflowDashboardOverlay";
+import { WorkflowFilesOverlayLayer, type WorkflowFilesHeaderActionsState } from "./WorkflowFilesOverlayLayer";
 import { buildWorkflowFiles } from "./lib/canvas-files";
-import { WorkflowFilesOverlayLayer } from "./WorkflowFilesOverlayLayer";
 import { CanvasYamlModal } from "./CanvasYamlModal";
 import { useWorkflowViewSearchParams } from "./useWorkflowViewSearchParams";
 import { useFilesModeActions } from "./useFilesModeActions";
@@ -582,6 +582,32 @@ export function WorkflowPageV2() {
   const [suppressUnpublishedDraftDiscard, setSuppressUnpublishedDraftDiscard] = useState(false);
   const [isYamlViewModalOpen, setIsYamlViewModalOpen] = useState(false);
   const [versionNodeDiffContext, setVersionNodeDiffContext] = useState<CanvasVersionNodeDiffContext | null>(null);
+  const [filesHeaderActions, setFilesHeaderActions] = useState<WorkflowFilesHeaderActionsState | null>(null);
+  const handleFilesHeaderActionsChange = useCallback((actions: WorkflowFilesHeaderActionsState | null) => {
+    setFilesHeaderActions((current) => {
+      if (!current && !actions) {
+        return current;
+      }
+
+      if (!current || !actions) {
+        return actions;
+      }
+
+      if (
+        current.hasPendingChanges === actions.hasPendingChanges &&
+        current.publishDisabled === actions.publishDisabled &&
+        current.publishDisabledTooltip === actions.publishDisabledTooltip &&
+        current.discardDisabled === actions.discardDisabled &&
+        current.publishPending === actions.publishPending &&
+        current.onPublish === actions.onPublish &&
+        current.onDiscardAll === actions.onDiscardAll
+      ) {
+        return current;
+      }
+
+      return actions;
+    });
+  }, []);
   const versionNodeDiffLiveChangeRequest = useMemo(() => {
     const fallback = versionNodeDiffContext?.changeRequest;
     const id = fallback?.metadata?.id;
@@ -5473,6 +5499,33 @@ export function WorkflowPageV2() {
   });
   runDisabledRef.current = runDisabled;
   runDisabledTooltipRef.current = runDisabledTooltip;
+  const filesHeaderActionsSlotId = canvasId ? `canvas-files-header-actions-${canvasId}` : "canvas-files-header-actions";
+  const useFilesHeaderActions = isFilesMode && isEditing;
+  const resolvedPublishVersionHandler = useFilesHeaderActions
+    ? filesHeaderActions?.onPublish
+    : isChangeManagementDisabled
+      ? handlePublishVersion
+      : handleCreateChangeRequest;
+  const resolvedDiscardVersionHandler = useFilesHeaderActions
+    ? filesHeaderActions?.onDiscardAll
+    : handleResetDraftChanges;
+  const resolvedPublishVersionDisabled = useFilesHeaderActions
+    ? !filesHeaderActions || filesHeaderActions.publishDisabled
+    : publishVersionDisabled;
+  const resolvedPublishVersionDisabledTooltip = useFilesHeaderActions
+    ? filesHeaderActions?.publishDisabledTooltip
+    : publishVersionDisabledTooltip;
+  const resolvedHasUnpublishedDraftChanges = useFilesHeaderActions
+    ? !!filesHeaderActions?.hasPendingChanges
+    : draftChangeIndicators.hasUnpublishedDraftChanges;
+  const resolvedDiscardVersionDisabled = useFilesHeaderActions
+    ? !filesHeaderActions || filesHeaderActions.discardDisabled
+    : resetDraftDisabled;
+  const resolvedPublishVersionLabel = useFilesHeaderActions
+    ? "Publish"
+    : isChangeManagementDisabled
+      ? "Publish"
+      : "Propose Change";
 
   return (
     <>
@@ -5509,7 +5562,15 @@ export function WorkflowPageV2() {
           error={canvasMemoryError}
           deleteCanvasMemoryEntry={deleteCanvasMemoryEntry}
         />
-        <WorkflowFilesOverlayLayer isFilesMode={isFilesMode} files={workflowFiles} />
+        <WorkflowFilesOverlayLayer
+          isFilesMode={isFilesMode}
+          isEditing={isEditing}
+          canvasId={canvasId || undefined}
+          canWrite={canActOnCanvas}
+          files={workflowFiles}
+          headerActionsSlotId={filesHeaderActionsSlotId}
+          onHeaderActionsChange={handleFilesHeaderActionsChange}
+        />
         <CanvasPage
           key={canvasRenderKey}
           // Persist right sidebar in query params
@@ -5597,18 +5658,18 @@ export function WorkflowPageV2() {
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
           saveDisabledTooltip={saveDisabledTooltip}
-          onPublishVersion={isChangeManagementDisabled ? handlePublishVersion : handleCreateChangeRequest}
-          publishVersionLabel={isChangeManagementDisabled ? "Publish" : "Propose Change"}
-          publishVersionDisabled={publishVersionDisabled}
-          publishVersionDisabledTooltip={publishVersionDisabledTooltip}
+          onPublishVersion={resolvedPublishVersionHandler}
+          publishVersionLabel={resolvedPublishVersionLabel}
+          publishVersionDisabled={resolvedPublishVersionDisabled}
+          publishVersionDisabledTooltip={resolvedPublishVersionDisabledTooltip}
           onShowDiff={onShowDiff}
           {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
           visualDiffEnabled={draftVisualDiff.visualDiffEnabled}
           draftVisualDiff={draftVisualDiff}
           onToggleVisualDiff={draftVisualDiff.toggleVisualDiff}
           onShowNodeDiff={onShowNodeDiff}
-          onDiscardVersion={handleResetDraftChanges}
-          discardVersionDisabled={resetDraftDisabled}
+          onDiscardVersion={resolvedDiscardVersionHandler}
+          discardVersionDisabled={resolvedDiscardVersionDisabled}
           discardVersionDisabledTooltip={resetDraftDisabledTooltip}
           onDiscardDraftAndStartEdit={handleDiscardDraftAndStartEdit}
           unpublishedDraftUpdatedAt={latestDraftVersion?.metadata?.updatedAt || latestDraftVersion?.metadata?.createdAt}
@@ -5622,10 +5683,14 @@ export function WorkflowPageV2() {
           onExitRunsMode={handleExitRunsMode}
           onSelectDashboard={isTemplate ? undefined : handleSelectDashboardMode}
           onSelectFiles={isTemplate ? undefined : handleSelectFilesMode}
+          onDashboardAddPanel={onDashboardAddPanel}
+          onDashboardOpenYaml={onDashboardOpenYaml}
+          filesHeaderActionsSlotId={filesHeaderActionsSlotId}
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
           {...draftChangeIndicators}
+          hasUnpublishedDraftChanges={resolvedHasUnpublishedDraftChanges}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           runDisabled={runDisabled}

@@ -33,6 +33,9 @@ import {
   canvasesListNodeEvents,
   canvasesGetCanvasDashboard,
   canvasesUpdateCanvasDashboard,
+  canvasesGetCanvasRepository,
+  canvasesListCanvasRepositoryFiles,
+  canvasesCommitCanvasRepositoryFiles,
   triggersListTriggers,
   triggersDescribeTrigger,
   widgetsListWidgets,
@@ -45,6 +48,8 @@ import type {
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasVersion,
+  CanvasesCanvasRepositoryFileOperation,
+  CanvasesListCanvasRepositoryFilesResponse,
   CanvasChangeManagement,
   SuperplaneComponentsNode,
   ComponentsPosition,
@@ -131,6 +136,10 @@ export const canvasKeys = {
   dashboard: (canvasId: string, versionId?: string) =>
     [...canvasKeys.all, "dashboard", canvasId, versionId ?? "live"] as const,
   dashboardAll: (canvasId: string) => [...canvasKeys.all, "dashboard", canvasId] as const,
+  repository: (canvasId: string) => [...canvasKeys.all, "repository", canvasId] as const,
+  repositoryFiles: (canvasId: string) => [...canvasKeys.repository(canvasId), "files"] as const,
+  repositoryFile: (canvasId: string, path: string, ref?: string) =>
+    [...canvasKeys.repository(canvasId), "file", path, ref ?? ""] as const,
 };
 
 export interface DashboardPanel {
@@ -1689,3 +1698,120 @@ export const useUpdateCanvasConsole = (
 
 export type CanvasConsoleQueryResult = ReturnType<typeof useCanvasConsole>;
 export type UpdateCanvasConsoleMutationResult = ReturnType<typeof useUpdateCanvasConsole>;
+
+export const useCanvasRepository = (canvasId: string, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: canvasKeys.repository(canvasId),
+    queryFn: async () => {
+      const response = await canvasesGetCanvasRepository(
+        withOrganizationHeader({
+          path: { canvasId },
+        }),
+      );
+      return response.data?.repository;
+    },
+    enabled: enabled && !!canvasId,
+    staleTime: 30_000,
+    refetchInterval: (query) => {
+      const state = query.state.data?.status?.state;
+      return state === "STATE_PENDING" ? 3000 : false;
+    },
+  });
+};
+
+export const useCanvasRepositoryFiles = (canvasId: string, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: canvasKeys.repositoryFiles(canvasId),
+    queryFn: async () => {
+      const response = await canvasesListCanvasRepositoryFiles(
+        withOrganizationHeader({
+          path: { canvasId },
+        }),
+      );
+      return response.data;
+    },
+    enabled: enabled && !!canvasId,
+    staleTime: 15_000,
+  });
+};
+
+export const useCanvasRepositoryFile = (
+  canvasId: string,
+  path: string | null,
+  enabled: boolean = true,
+  ref?: string,
+) => {
+  const normalizedPath = path ?? "";
+  return useQuery({
+    queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, ref),
+    queryFn: async () => {
+      const { fetchCanvasRepositoryFileContent } = await import("@/pages/workflowv2/lib/canvas-repository-files");
+      const content = await fetchCanvasRepositoryFileContent(canvasId, normalizedPath);
+      return {
+        path: normalizedPath,
+        content,
+      };
+    },
+    enabled: enabled && !!canvasId && !!normalizedPath,
+    staleTime: 15_000,
+  });
+};
+
+export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: {
+      message: string;
+      operations: CanvasesCanvasRepositoryFileOperation[];
+      expectedHeadSha?: string;
+    }) => {
+      const response = await canvasesCommitCanvasRepositoryFiles(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: {
+            message: input.message,
+            operations: input.operations,
+            expectedHeadSha: input.expectedHeadSha,
+          },
+        }),
+      );
+      return response.data;
+    },
+    onSuccess: (_data, input) => {
+      queryClient.setQueryData<CanvasesListCanvasRepositoryFilesResponse | undefined>(
+        canvasKeys.repositoryFiles(canvasId),
+        (current) => {
+          const paths = new Set(
+            (current?.files || []).map((file) => file.path).filter((path): path is string => !!path),
+          );
+
+          for (const operation of input.operations) {
+            const path = operation.path;
+            if (!path) continue;
+
+            if (operation.delete) {
+              paths.delete(path);
+              continue;
+            }
+
+            paths.add(path);
+          }
+
+          return {
+            ...current,
+            files: Array.from(paths)
+              .sort((left, right) => left.localeCompare(right))
+              .map((path) => ({ path })),
+          };
+        },
+      );
+      queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
+      queryClient.invalidateQueries({ queryKey: [...canvasKeys.repository(canvasId), "file"] });
+    },
+  });
+};
+
+export type CanvasRepositoryFilesQueryResult = ReturnType<typeof useCanvasRepositoryFiles>;
+export type CanvasRepositoryFileQueryResult = ReturnType<typeof useCanvasRepositoryFile>;
+export type CommitCanvasRepositoryFilesMutationResult = ReturnType<typeof useCommitCanvasRepositoryFiles>;

@@ -197,6 +197,12 @@ export interface CanvasPageProps {
   onSelectMemory?: () => void;
   /** Switches the canvas surface to the Files tab. Omitted on templates. */
   onSelectFiles?: () => void;
+  /** Opens the canvas dashboard add-panel dialog when `headerMode` is `dashboard`. */
+  onDashboardAddPanel?: () => void;
+  /** Opens the dashboard YAML modal when `headerMode` is `dashboard`. */
+  onDashboardOpenYaml?: () => void;
+  /** DOM slot for Files mode actions owned by the files editor overlay. */
+  filesHeaderActionsSlotId?: string;
   /** Opens the canvas YAML modal. */
   onYamlOpen?: () => void;
   publishVersionLabel?: string;
@@ -1321,6 +1327,9 @@ function CanvasPage(props: CanvasPageProps) {
           onSelectDashboard={props.onSelectDashboard}
           onSelectMemory={props.onSelectMemory}
           onSelectFiles={props.onSelectFiles}
+          onDashboardAddPanel={props.onDashboardAddPanel}
+          onCanvasAddComponent={props.isEditing ? handleBuildingBlocksShortcutOpen : undefined}
+          filesHeaderActionsSlotId={props.filesHeaderActionsSlotId}
           publishVersionLabel={props.publishVersionLabel}
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
@@ -1844,6 +1853,9 @@ function CanvasContentHeader({
   onSelectDashboard,
   onSelectMemory,
   onSelectFiles,
+  onDashboardAddPanel,
+  onCanvasAddComponent,
+  filesHeaderActionsSlotId,
   publishVersionLabel,
   hasUnpublishedDraftChanges,
   hasUnpublishedCanvasDraftChanges,
@@ -1895,6 +1907,9 @@ function CanvasContentHeader({
   onSelectDashboard?: () => void;
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
+  onDashboardAddPanel?: () => void;
+  onCanvasAddComponent?: () => void;
+  filesHeaderActionsSlotId?: string;
   publishVersionLabel?: string;
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
@@ -1946,6 +1961,9 @@ function CanvasContentHeader({
       onSelectDashboard={onSelectDashboard}
       onSelectMemory={onSelectMemory}
       onSelectFiles={onSelectFiles}
+      onDashboardAddPanel={onDashboardAddPanel}
+      onCanvasAddComponent={onCanvasAddComponent}
+      filesHeaderActionsSlotId={filesHeaderActionsSlotId}
       publishVersionLabel={publishVersionLabel}
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       hasUnpublishedCanvasDraftChanges={hasUnpublishedCanvasDraftChanges}
