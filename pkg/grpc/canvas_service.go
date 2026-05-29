@@ -446,3 +446,18 @@ func (s *CanvasService) ResolveExecutionErrors(ctx context.Context, req *pb.Reso
 
 	return canvases.ResolveExecutionErrors(ctx, canvasID, executionIDs)
 }
+
+func (s *CanvasService) GetCanvasRepository(ctx context.Context, req *pb.GetCanvasRepositoryRequest) (*pb.GetCanvasRepositoryResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.GetCanvasRepository(ctx, s.gitProvider, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) ListCanvasRepositoryFiles(ctx context.Context, req *pb.ListCanvasRepositoryFilesRequest) (*pb.ListCanvasRepositoryFilesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.ListCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId)
+}
+
+func (s *CanvasService) CommitCanvasRepositoryFiles(ctx context.Context, req *pb.CommitCanvasRepositoryFilesRequest) (*pb.CommitCanvasRepositoryFilesResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CommitCanvasRepositoryFiles(ctx, s.gitProvider, organizationID, req.CanvasId, req.ExpectedHeadSha, req.Message, req.Operations)
+}

@@ -350,6 +350,18 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
+
+	//
+	// This is not part of the proto APIs and gRPC gateway route,
+	// because of how we need to handle the file streaming.
+	// There is no good way to handle that through the gRPC gateway,
+	// so we need to lift that endpoint here instead.
+	//
+	s.Router.Handle(
+		"/api/v1/canvases/{canvas_id}/repository/file",
+		orgAuthMiddleware(http.HandlerFunc(s.handleRepositoryFileDownload)),
+	).Methods(http.MethodGet)
+
 	protectedGRPCHandler := orgAuthMiddleware(s.grpcGatewayHandler(grpcGatewayMux))
 
 	accountAuthMiddleware := middleware.AccountAuthMiddleware(s.jwt)
