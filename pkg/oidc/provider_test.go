@@ -11,6 +11,20 @@ import (
 	"time"
 )
 
+func TestCanonicalIssuerURL(t *testing.T) {
+	cases := map[string]string{
+		"https://superplane.example":    "https://superplane.example",
+		"https://superplane.example/":   "https://superplane.example",
+		"https://superplane.example///": "https://superplane.example",
+		"":                              "",
+	}
+	for input, want := range cases {
+		if got := CanonicalIssuerURL(input); got != want {
+			t.Errorf("CanonicalIssuerURL(%q) = %q, want %q", input, got, want)
+		}
+	}
+}
+
 func TestNewProviderFromKeyDirLoadsSymlinkedKey(t *testing.T) {
 	t.Parallel()
 
