@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -10,16 +9,20 @@ import {
 } from "@/hooks/useCanvasData";
 import { getApiErrorMessage } from "@/lib/errors";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
-import { Editor } from "@monaco-editor/react";
-import { MultiFileDiff, Virtualizer } from "@pierre/diffs/react";
 import { FileTree as TreesFileTree, useFileTree } from "@pierre/trees/react";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { FilePlus2, GitCompareArrows, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
-import type { FileContents } from "@pierre/diffs/react";
 import type { ContextMenuItem, ContextMenuOpenContext } from "@pierre/trees";
+
+const WorkflowFileMonacoEditor = lazy(() =>
+  import("./WorkflowFileMonacoEditor").then((module) => ({ default: module.WorkflowFileMonacoEditor })),
+);
+const WorkflowFilesDiffDialog = lazy(() =>
+  import("./WorkflowFilesDiffDialog").then((module) => ({ default: module.WorkflowFilesDiffDialog })),
+);
 
 export type WorkflowFile = {
   path: string;
@@ -46,24 +49,6 @@ const repositoryFileTreeStyle = {
   "--trees-scrollbar-gutter-override": "0px",
   "--trees-action-lane-width-override": "0px",
 } as CSSProperties;
-
-const fileEditorOptions = {
-  minimap: { enabled: false },
-  fontSize: 13,
-  lineNumbers: "on" as const,
-  wordWrap: "on" as const,
-  folding: true,
-  automaticLayout: true,
-  scrollBeyondLastLine: false,
-  renderWhitespace: "boundary" as const,
-  smoothScrolling: true,
-  tabSize: 2,
-  insertSpaces: true,
-  cursorBlinking: "smooth" as const,
-  contextmenu: true,
-  selectOnLineNumbers: true,
-  renderLineHighlight: "line" as const,
-};
 
 export type WorkflowFilesHeaderActionsState = {
   hasPendingChanges: boolean;
@@ -143,7 +128,8 @@ function CanvasFilesView({
   const canUseRepository = !!canvasId;
   const canManageRepositoryFiles = canWrite && canUseRepository && isEditing;
   const repositoryQuery = useCanvasRepository(canvasId ?? "", canUseRepository);
-  const filesQuery = useCanvasRepositoryFiles(canvasId ?? "", canUseRepository);
+  const repositoryReady = repositoryQuery.data?.status?.state === "STATE_READY";
+  const filesQuery = useCanvasRepositoryFiles(canvasId ?? "", canUseRepository && repositoryReady);
   const commitFiles = useCommitCanvasRepositoryFiles(canvasId ?? "");
   const generatedPaths = useMemo(() => files.map((file) => file.path), [files]);
   const generatedPathSet = useMemo(() => new Set(generatedPaths), [generatedPaths]);
@@ -173,6 +159,8 @@ function CanvasFilesView({
   const [newFilePath, setNewFilePath] = useState<string | null>(null);
   const [isDiffOpen, setIsDiffOpen] = useState(false);
   const [headerActionsHost, setHeaderActionsHost] = useState<HTMLElement | null>(null);
+  const loadedContentByPathRef = useRef(loadedContentByPath);
+  loadedContentByPathRef.current = loadedContentByPath;
   const selectedGeneratedFile = selectedPath ? generatedFilesByPath.get(selectedPath) : undefined;
   const selectedPathExistsInRepository = selectedPath ? repositoryPathSet.has(selectedPath) : false;
   const selectedFileQuery = useCanvasRepositoryFile(
@@ -257,10 +245,8 @@ function CanvasFilesView({
   useEffect(() => {
     const allPathSet = new Set(allPaths);
     setOpenTabs((current) => current.filter((path) => allPathSet.has(path)));
-
-    if (!selectedPath || allPathSet.has(selectedPath)) return;
-    setSelectedPath(null);
-  }, [allPaths, selectedPath]);
+    setSelectedPath((current) => (current && allPathSet.has(current) ? current : null));
+  }, [allPaths]);
 
   useEffect(() => {
     const data = selectedFileQuery.data;
@@ -272,27 +258,24 @@ function CanvasFilesView({
       if (current[path] === content) return current;
       return { ...current, [path]: content };
     });
-  }, [selectedFileQuery.data?.content, selectedFileQuery.data?.path, selectedPath]);
+  }, [selectedFileQuery.data, selectedPath]);
 
   const openFile = useCallback((path: string) => {
     setOpenTabs((current) => (current.includes(path) ? current : [...current, path]));
     setSelectedPath(path);
   }, []);
 
-  const closeTab = useCallback(
-    (path: string) => {
-      setOpenTabs((current) => {
-        const nextTabs = current.filter((tabPath) => tabPath !== path);
-        if (selectedPath !== path) return nextTabs;
-
+  const closeTab = useCallback((path: string) => {
+    setOpenTabs((current) => {
+      const nextTabs = current.filter((tabPath) => tabPath !== path);
+      setSelectedPath((selected) => {
+        if (selected !== path) return selected;
         const closedIndex = current.indexOf(path);
-        const nextSelectedPath = nextTabs[Math.min(closedIndex, nextTabs.length - 1)] || null;
-        setSelectedPath(nextSelectedPath);
-        return nextTabs;
+        return nextTabs[Math.min(closedIndex, nextTabs.length - 1)] ?? null;
       });
-    },
-    [selectedPath],
-  );
+      return nextTabs;
+    });
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -349,7 +332,7 @@ function CanvasFilesView({
           return { ...current, [selectedPath]: { ...currentChange, content: value } };
         }
 
-        const originalContent = loadedContentByPath[selectedPath];
+        const originalContent = loadedContentByPathRef.current[selectedPath];
         if (originalContent === undefined) return current;
 
         if (value === originalContent) {
@@ -363,7 +346,7 @@ function CanvasFilesView({
         };
       });
     },
-    [generatedPathSet, loadedContentByPath, selectedPath],
+    [generatedPathSet, selectedPath],
   );
 
   const deleteFile = useCallback(
@@ -499,13 +482,20 @@ function CanvasFilesView({
         <FileList
           paths={visiblePaths}
           selectedPath={selectedPath}
-          loading={canUseRepository && (filesQuery.isLoading || repositoryQuery.isLoading)}
+          loading={
+            canUseRepository &&
+            (repositoryQuery.isLoading ||
+              (!repositoryReady && repositoryQuery.data?.status?.state === "STATE_PENDING") ||
+              filesQuery.isLoading)
+          }
           errorMessage={
             filesQuery.error
               ? getApiErrorMessage(filesQuery.error, "Failed to load files.")
               : repositoryQuery.error
                 ? getApiErrorMessage(repositoryQuery.error, "Failed to load repository.")
-                : undefined
+                : repositoryQuery.data?.status?.state === "STATE_ERROR"
+                  ? repositoryQuery.data.status.error || "Repository failed to provision."
+                  : undefined
           }
           canWrite={canManageRepositoryFiles}
           newFilePath={newFilePath}
@@ -580,12 +570,16 @@ function CanvasFilesView({
         />
       </main>
 
-      <DiffDialog
-        changes={pendingChanges}
-        loadedContentByPath={loadedContentByPath}
-        open={isDiffOpen}
-        onOpenChange={setIsDiffOpen}
-      />
+      {isDiffOpen ? (
+        <Suspense fallback={null}>
+          <WorkflowFilesDiffDialog
+            changes={pendingChanges}
+            loadedContentByPath={loadedContentByPath}
+            open={isDiffOpen}
+            onOpenChange={setIsDiffOpen}
+          />
+        </Suspense>
+      ) : null}
       {canManageRepositoryFiles && headerActionsHost
         ? createPortal(
             <FilesHeaderActions hasPendingChanges={pendingChanges.length > 0} onDiffOpen={() => setIsDiffOpen(true)} />,
@@ -639,65 +633,6 @@ function EditorIconButton({
       </TooltipTrigger>
       <TooltipContent side="bottom">{label}</TooltipContent>
     </Tooltip>
-  );
-}
-
-function DiffDialog({
-  changes,
-  loadedContentByPath,
-  open,
-  onOpenChange,
-}: {
-  changes: PendingFileChange[];
-  loadedContentByPath: Record<string, string>;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
-  const diffFiles = useMemo(
-    () =>
-      changes.map((change) => ({
-        path: change.path,
-        ...buildDiffFile(change, loadedContentByPath),
-      })),
-    [changes, loadedContentByPath],
-  );
-  const diffOptions = useMemo(
-    () => ({
-      theme: "pierre-light" as const,
-      themeType: "light" as const,
-      diffStyle: "split" as const,
-      stickyHeader: true,
-    }),
-    [],
-  );
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="90vw" className="grid grid-rows-[auto_minmax(0,1fr)] gap-4 p-0">
-        <DialogHeader className="border-b border-slate-950/15 px-5 py-4">
-          <DialogTitle>Diff</DialogTitle>
-        </DialogHeader>
-        <div className="min-h-0 overflow-hidden">
-          {diffFiles.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-slate-500">No changes</div>
-          ) : (
-            <Virtualizer className="h-full overflow-auto" contentClassName="min-w-0">
-              <div className="space-y-4 p-4">
-                {diffFiles.map(({ path, oldFile, newFile }) => (
-                  <MultiFileDiff
-                    key={path}
-                    oldFile={oldFile}
-                    newFile={newFile}
-                    options={diffOptions}
-                    className="overflow-hidden rounded border border-slate-950/15 bg-white"
-                  />
-                ))}
-              </div>
-            </Virtualizer>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -956,28 +891,6 @@ function FileEditor({
   disabled: boolean;
   onChange: (value: string) => void;
 }) {
-  const suppressNextChangeRef = useRef(false);
-  const previousPathRef = useRef<string | null>(path);
-
-  useEffect(() => {
-    if (previousPathRef.current === path) return;
-
-    previousPathRef.current = path;
-    suppressNextChangeRef.current = true;
-  }, [path]);
-
-  const handleChange = useCallback(
-    (value: string | undefined) => {
-      if (suppressNextChangeRef.current) {
-        suppressNextChangeRef.current = false;
-        return;
-      }
-
-      onChange(value ?? "");
-    },
-    [onChange],
-  );
-
   if (!path) {
     return <div className="min-h-0 flex-1 bg-white" />;
   }
@@ -1001,68 +914,20 @@ function FileEditor({
   }
 
   return (
-    <div className="min-h-0 flex-1 bg-white" data-testid="workflow-file-editor">
-      <Editor
-        key={path}
-        height="100%"
-        language={language ?? getMonacoLanguage(path)}
-        value={content}
-        theme="vs"
-        onChange={handleChange}
-        options={{
-          ...fileEditorOptions,
-          readOnly: disabled,
-          domReadOnly: disabled,
-        }}
+    <Suspense
+      fallback={
+        <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-slate-500">Loading editor...</div>
+      }
+    >
+      <WorkflowFileMonacoEditor
+        path={path}
+        content={content}
+        language={language}
+        readOnly={disabled}
+        onChange={onChange}
       />
-    </div>
+    </Suspense>
   );
-}
-
-function getMonacoLanguage(path: string | null): string {
-  if (!path) return "plaintext";
-
-  const normalizedPath = path.toLowerCase();
-  const extension = normalizedPath.split(".").pop();
-
-  if (normalizedPath.endsWith("dockerfile") || normalizedPath.includes("/dockerfile")) return "dockerfile";
-  if (normalizedPath.endsWith("makefile") || normalizedPath.includes("/makefile")) return "makefile";
-
-  switch (extension) {
-    case "css":
-      return "css";
-    case "go":
-      return "go";
-    case "html":
-      return "html";
-    case "js":
-    case "mjs":
-    case "cjs":
-      return "javascript";
-    case "json":
-    case "jsonc":
-      return "json";
-    case "md":
-    case "mdx":
-      return "markdown";
-    case "py":
-      return "python";
-    case "sh":
-    case "bash":
-    case "zsh":
-      return "shell";
-    case "ts":
-      return "typescript";
-    case "tsx":
-      return "typescript";
-    case "xml":
-      return "xml";
-    case "yaml":
-    case "yml":
-      return "yaml";
-    default:
-      return "plaintext";
-  }
 }
 
 function nextUntitledPath(paths: Set<string>): string {
@@ -1074,27 +939,6 @@ function nextUntitledPath(paths: Set<string>): string {
   }
 
   return `untitled-${index}.txt`;
-}
-
-function buildDiffFile(
-  change: PendingFileChange,
-  loadedContentByPath: Record<string, string>,
-): { oldFile: FileContents; newFile: FileContents } {
-  const previousContents = change.type === "added" ? "" : (loadedContentByPath[change.path] ?? "");
-  const nextContents = change.type === "deleted" ? "" : change.content;
-
-  return {
-    oldFile: {
-      name: change.path,
-      contents: previousContents,
-      cacheKey: `${change.path}:old:${previousContents}`,
-    },
-    newFile: {
-      name: change.path,
-      contents: nextContents,
-      cacheKey: `${change.path}:new:${nextContents}`,
-    },
-  };
 }
 
 function buildRenderableTreePaths(repositoryPaths: string[], changes: PendingFileChange[]): string[] {

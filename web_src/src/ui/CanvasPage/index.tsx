@@ -1450,61 +1450,65 @@ function CanvasPage(props: CanvasPageProps) {
               </div>
             </div>
           ) : null}
-          <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
-            <CanvasContent
-              state={state}
-              onNodeEdit={handleNodeEdit}
-              onNodeDelete={handleNodeDelete}
-              onNodesDelete={handleNodesDelete}
-              onDuplicateNodes={props.onDuplicateNodes}
-              onAutoLayoutNodes={props.onAutoLayoutNodes}
-              onEdgeCreate={props.onEdgeCreate}
-              onToggleView={handleToggleView}
-              onShowNodeDiff={props.onShowNodeDiff}
-              onDuplicate={props.onDuplicate}
-              onDeactivate={props.onDeactivate}
-              onAnnotationUpdate={props.onAnnotationUpdate}
-              onAnnotationBlur={props.onAnnotationBlur}
-              onTogglePause={props.onTogglePause}
-              runDisabled={props.runDisabled}
-              runDisabledTooltip={props.runDisabledTooltip}
-              onBuildingBlockDrop={handleBuildingBlockDrop}
-              onBuildingBlocksSidebarToggle={handleSidebarToggle}
-              onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
-              onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
-              onNodeClick={props.onNodeClick}
-              onZoomChange={setCanvasZoom}
-              hasFitToViewRef={hasFitToViewRef}
-              viewportRefProp={props.viewportRef}
-              highlightedNodeIds={highlightedNodeIds}
-              workflowNodes={props.workflowNodes}
-              setCurrentTab={setCurrentTab}
-              showBottomStatusControls={props.showBottomStatusControls}
-              headerMode={props.headerMode}
-              isEditing={props.isEditing}
-              isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
-              onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
-              autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
-              autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
-              readOnly={props.readOnly}
-              logEntries={props.logEntries}
-              focusRequest={props.focusRequest}
-              initialFocusNodeId={props.initialFocusNodeId}
-              fitAllRequest={props.fitAllRequest}
-              fitAllFocusNodeIds={props.fitAllFocusNodeIds}
-              runParticipantNodeIds={props.runParticipantNodeIds}
-              runsEvents={props.runsEvents}
-              runsNodes={props.runsNodes}
-              runsComponentIconMap={props.runsComponentIconMap}
-              onRunNodeSelect={props.onRunNodeSelect}
-              onRunExecutionSelect={props.onRunExecutionSelect}
-              onAcknowledgeErrors={props.onAcknowledgeErrors}
-              missingIntegrations={props.missingIntegrations}
-              onConnectIntegration={props.onConnectIntegration}
-              canCreateIntegrations={props.canCreateIntegrations}
-            />
-          </ReactFlowProvider>
-          {props.headerMode === "runs" ? null : (
+          {props.headerMode === "files" ? (
+            <div className="absolute inset-0 bg-slate-50" data-testid="canvas-files-backdrop" aria-hidden />
+          ) : (
+            <ReactFlowProvider key="canvas-flow-provider" data-testid="canvas-drop-area">
+              <CanvasContent
+                state={state}
+                onNodeEdit={handleNodeEdit}
+                onNodeDelete={handleNodeDelete}
+                onNodesDelete={handleNodesDelete}
+                onDuplicateNodes={props.onDuplicateNodes}
+                onAutoLayoutNodes={props.onAutoLayoutNodes}
+                onEdgeCreate={props.onEdgeCreate}
+                onToggleView={handleToggleView}
+                onShowNodeDiff={props.onShowNodeDiff}
+                onDuplicate={props.onDuplicate}
+                onDeactivate={props.onDeactivate}
+                onAnnotationUpdate={props.onAnnotationUpdate}
+                onAnnotationBlur={props.onAnnotationBlur}
+                onTogglePause={props.onTogglePause}
+                runDisabled={props.runDisabled}
+                runDisabledTooltip={props.runDisabledTooltip}
+                onBuildingBlockDrop={handleBuildingBlockDrop}
+                onBuildingBlocksSidebarToggle={handleSidebarToggle}
+                onConnectionDropInEmptySpace={handleConnectionDropInEmptySpace}
+                onPendingConnectionNodeClick={handlePendingConnectionNodeClick}
+                onNodeClick={props.onNodeClick}
+                onZoomChange={setCanvasZoom}
+                hasFitToViewRef={hasFitToViewRef}
+                viewportRefProp={props.viewportRef}
+                highlightedNodeIds={highlightedNodeIds}
+                workflowNodes={props.workflowNodes}
+                setCurrentTab={setCurrentTab}
+                showBottomStatusControls={props.showBottomStatusControls}
+                headerMode={props.headerMode}
+                isEditing={props.isEditing}
+                isAutoLayoutOnUpdateEnabled={props.isAutoLayoutOnUpdateEnabled}
+                onToggleAutoLayoutOnUpdate={props.onToggleAutoLayoutOnUpdate}
+                autoLayoutOnUpdateDisabled={props.autoLayoutOnUpdateDisabled}
+                autoLayoutOnUpdateDisabledTooltip={props.autoLayoutOnUpdateDisabledTooltip}
+                readOnly={props.readOnly}
+                logEntries={props.logEntries}
+                focusRequest={props.focusRequest}
+                initialFocusNodeId={props.initialFocusNodeId}
+                fitAllRequest={props.fitAllRequest}
+                fitAllFocusNodeIds={props.fitAllFocusNodeIds}
+                runParticipantNodeIds={props.runParticipantNodeIds}
+                runsEvents={props.runsEvents}
+                runsNodes={props.runsNodes}
+                runsComponentIconMap={props.runsComponentIconMap}
+                onRunNodeSelect={props.onRunNodeSelect}
+                onRunExecutionSelect={props.onRunExecutionSelect}
+                onAcknowledgeErrors={props.onAcknowledgeErrors}
+                missingIntegrations={props.missingIntegrations}
+                onConnectIntegration={props.onConnectIntegration}
+                canCreateIntegrations={props.canCreateIntegrations}
+              />
+            </ReactFlowProvider>
+          )}
+          {props.headerMode === "runs" || props.headerMode === "files" ? null : (
             <Sidebar
               state={state}
               getSidebarData={props.getSidebarData}
