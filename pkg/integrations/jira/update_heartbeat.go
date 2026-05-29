@@ -213,7 +213,8 @@ func (c *UpdateHeartbeat) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if _, err := resolveCloudID(ctx.HTTP, ctx.Integration); err != nil {
+	cloudID, err := resolveCloudID(ctx.HTTP, ctx.Integration)
+	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(spec.Team) == "" {
@@ -229,7 +230,7 @@ func (c *UpdateHeartbeat) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("at least one update field must be enabled")
 	}
 
-	return ctx.Metadata.Set(UpdateHeartbeatNodeMetadata{TeamName: resolveOpsTeamName(ctx, spec.Team)})
+	return ctx.Metadata.Set(UpdateHeartbeatNodeMetadata{TeamName: resolveOpsTeamName(ctx, cloudID, spec.Team)})
 }
 
 func (c *UpdateHeartbeat) Execute(ctx core.ExecutionContext) error {
@@ -294,7 +295,8 @@ func updateHeartbeatRequestFromSpec(spec UpdateHeartbeatSpec) *UpdateHeartbeatRe
 		}
 	}
 	if spec.Enabled != nil {
-		req.Enabled = spec.Enabled
+		enabled := *spec.Enabled
+		req.Enabled = &enabled
 	}
 	if spec.AlertMessage != nil {
 		req.AlertMessage = strings.TrimSpace(*spec.AlertMessage)

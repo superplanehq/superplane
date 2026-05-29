@@ -197,7 +197,8 @@ func (c *CreateHeartbeat) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if _, err := resolveCloudID(ctx.HTTP, ctx.Integration); err != nil {
+	cloudID, err := resolveCloudID(ctx.HTTP, ctx.Integration)
+	if err != nil {
 		return err
 	}
 
@@ -214,7 +215,7 @@ func (c *CreateHeartbeat) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("intervalUnit is required")
 	}
 
-	return ctx.Metadata.Set(CreateHeartbeatNodeMetadata{TeamName: resolveOpsTeamName(ctx, spec.Team)})
+	return ctx.Metadata.Set(CreateHeartbeatNodeMetadata{TeamName: resolveOpsTeamName(ctx, cloudID, spec.Team)})
 }
 
 func (c *CreateHeartbeat) Execute(ctx core.ExecutionContext) error {

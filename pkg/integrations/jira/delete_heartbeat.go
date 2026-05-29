@@ -115,7 +115,8 @@ func (c *DeleteHeartbeat) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if _, err := resolveCloudID(ctx.HTTP, ctx.Integration); err != nil {
+	cloudID, err := resolveCloudID(ctx.HTTP, ctx.Integration)
+	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(spec.Team) == "" {
@@ -125,7 +126,7 @@ func (c *DeleteHeartbeat) Setup(ctx core.SetupContext) error {
 		return fmt.Errorf("heartbeat is required")
 	}
 
-	return ctx.Metadata.Set(DeleteHeartbeatNodeMetadata{TeamName: resolveOpsTeamName(ctx, spec.Team)})
+	return ctx.Metadata.Set(DeleteHeartbeatNodeMetadata{TeamName: resolveOpsTeamName(ctx, cloudID, spec.Team)})
 }
 
 func (c *DeleteHeartbeat) Execute(ctx core.ExecutionContext) error {
@@ -192,13 +193,9 @@ func (c *DeleteHeartbeat) HandleHook(ctx core.ActionHookContext) error {
 	return nil
 }
 
-func resolveOpsTeamName(ctx core.SetupContext, teamID string) string {
+func resolveOpsTeamName(ctx core.SetupContext, cloudID, teamID string) string {
 	teamID = strings.TrimSpace(teamID)
-	if teamID == "" || ctx.HTTP == nil {
-		return ""
-	}
-	cloudID, err := resolveCloudID(ctx.HTTP, ctx.Integration)
-	if err != nil {
+	if teamID == "" || ctx.HTTP == nil || cloudID == "" {
 		return ""
 	}
 	client, err := NewClient(ctx.HTTP, ctx.Integration)
