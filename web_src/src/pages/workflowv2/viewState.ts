@@ -1,6 +1,24 @@
 export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
 
+const CONSOLE_VIEW = "console";
+const LEGACY_CONSOLE_VIEW = "dashboard";
+
+function isConsoleViewParam(view: string): boolean {
+  return view === CONSOLE_VIEW || view === LEGACY_CONSOLE_VIEW;
+}
+
+/** View flags read directly from the URL (source of truth for first paint and header tab selection). */
+export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchParams) {
+  const view = searchParams.get("view") ?? "";
+  return {
+    isRunsMode: view === "runs",
+    isMemoryMode: view === "memory",
+    isFilesMode: view === "files",
+    isDashboardMode: isConsoleViewParam(view),
+  };
+}
+
 export function readStoredBoolean(key: string): boolean {
   if (typeof window === "undefined") {
     return false;
