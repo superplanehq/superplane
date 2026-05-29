@@ -3,21 +3,7 @@ import { MultiFileDiff, Virtualizer } from "@pierre/diffs/react";
 import { useMemo } from "react";
 import type { FileContents } from "@pierre/diffs/react";
 
-type PendingFileChange =
-  | {
-      type: "added";
-      path: string;
-      content: string;
-    }
-  | {
-      type: "modified";
-      path: string;
-      content: string;
-    }
-  | {
-      type: "deleted";
-      path: string;
-    };
+import type { PendingFileChange } from "./workflow-files-types";
 
 interface WorkflowFilesDiffDialogProps {
   changes: PendingFileChange[];

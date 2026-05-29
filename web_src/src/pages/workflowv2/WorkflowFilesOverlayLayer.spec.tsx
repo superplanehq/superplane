@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -135,6 +135,87 @@ describe("WorkflowFilesOverlayLayer", () => {
 
     await user.click(screen.getAllByRole("button", { name: "README.md" }).at(-1)!);
     expect(screen.getByTestId("monaco-stub")).toHaveValue("# readme");
+  });
+
+  it("does not create a file when Escape is pressed in the new file input", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <WorkflowFilesOverlayLayer
+        isFilesMode
+        canvasId="test-canvas"
+        isEditing
+        canWrite
+        files={[
+          {
+            path: "canvas.yaml",
+            content: "canvas: true",
+            language: "yaml",
+          },
+        ]}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "New file" }));
+    expect(screen.getByDisplayValue("untitled.txt")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByDisplayValue("untitled.txt")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Close untitled.txt" })).not.toBeInTheDocument();
+  });
+
+  it("re-resolves the header actions portal host when entering edit mode", async () => {
+    const user = userEvent.setup();
+    const slotId = "canvas-files-header-actions-test-canvas";
+
+    const { rerender } = render(
+      <WorkflowFilesOverlayLayer
+        isFilesMode
+        canvasId="test-canvas"
+        isEditing={false}
+        canWrite
+        headerActionsSlotId={slotId}
+        files={[
+          {
+            path: "canvas.yaml",
+            content: "canvas: true",
+            language: "yaml",
+          },
+        ]}
+      />,
+    );
+
+    expect(document.getElementById(slotId)).toBeNull();
+
+    const host = document.createElement("div");
+    host.id = slotId;
+    document.body.appendChild(host);
+
+    rerender(
+      <WorkflowFilesOverlayLayer
+        isFilesMode
+        canvasId="test-canvas"
+        isEditing
+        canWrite
+        headerActionsSlotId={slotId}
+        files={[
+          {
+            path: "canvas.yaml",
+            content: "canvas: true",
+            language: "yaml",
+          },
+        ]}
+      />,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "README.md" })[0]!);
+    await user.clear(screen.getByTestId("monaco-stub"));
+    await user.type(screen.getByTestId("monaco-stub"), "updated readme");
+
+    expect(within(host).getByRole("button", { name: "Diff" })).toBeInTheDocument();
+
+    host.remove();
   });
 
   it("offsets the overlay when the left tool sidebar is open", () => {

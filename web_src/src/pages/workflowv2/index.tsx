@@ -185,11 +185,9 @@ export function WorkflowPageV2() {
   const {
     isRunsMode,
     setIsRunsMode,
-    isDashboardMode,
     setIsDashboardMode,
     isMemoryMode,
     setIsMemoryMode,
-    isFilesMode,
     setIsFilesMode,
     isDashboardAddPanelOpen,
     setIsDashboardAddPanelOpen,

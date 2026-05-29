@@ -1,18 +1,10 @@
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 
-import type { WorkflowFile } from "../WorkflowFilesOverlayLayer";
-
-export const PROTECTED_REPOSITORY_PATHS = new Set(["canvas.yaml", "console.yaml"]);
-
-export function isProtectedRepositoryPath(path: string): boolean {
-  return PROTECTED_REPOSITORY_PATHS.has(path);
-}
-
 export function encodeRepositoryFileContent(content: string): string {
   const bytes = new TextEncoder().encode(content);
   let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
   }
   return btoa(binary);
 }
@@ -34,24 +26,4 @@ export async function fetchCanvasRepositoryFileContent(canvasId: string, path: s
   }
 
   return response.text();
-}
-
-export function mergeWorkflowFilePaths(virtualFiles: WorkflowFile[], repositoryPaths: string[]): string[] {
-  const paths: string[] = [];
-  const seen = new Set<string>();
-
-  for (const file of virtualFiles) {
-    paths.push(file.path);
-    seen.add(file.path);
-  }
-
-  for (const path of repositoryPaths) {
-    if (seen.has(path) || isProtectedRepositoryPath(path)) {
-      continue;
-    }
-    paths.push(path);
-    seen.add(path);
-  }
-
-  return paths;
 }
