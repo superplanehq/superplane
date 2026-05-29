@@ -12,10 +12,17 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 )
+
+// CanonicalIssuerURL returns the issuer URL with any trailing slashes removed,
+// matching the value served in /.well-known/openid-configuration.
+func CanonicalIssuerURL(base string) string {
+	return strings.TrimRight(base, "/")
+}
 
 type RSAProvider struct {
 	issuer      string

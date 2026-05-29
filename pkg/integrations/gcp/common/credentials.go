@@ -1,7 +1,7 @@
 package common
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -16,29 +16,35 @@ type wifMetadata struct {
 	AccessTokenExpiresAt string `json:"accessTokenExpiresAt" mapstructure:"accessTokenExpiresAt"`
 }
 
-func TokenSourceFromIntegration(ctx core.IntegrationContext, scopes ...string) (oauth2.TokenSource, error) {
-	secrets, err := ctx.GetSecrets()
+func accessTokenFromIntegration(ctx core.IntegrationContext) ([]byte, error) {
+	if ctx.LegacySetup() {
+		secrets, err := ctx.GetSecrets()
+		if err != nil {
+			return nil, err
+		}
+		return FindSecretValue(secrets, SecretNameAccessToken), nil
+	}
+	v, err := ctx.Secrets().Get(SecretNameAccessToken)
+	if err != nil {
+		if errors.Is(err, core.ErrSecretNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if strings.TrimSpace(v) == "" {
+		return nil, nil
+	}
+	return []byte(v), nil
+}
+
+func TokenSourceFromIntegration(ctx core.IntegrationContext) (oauth2.TokenSource, error) {
+	accessToken, err := accessTokenFromIntegration(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get integration secrets: %w", err)
 	}
 
-	authMethod := AuthMethodFromMetadata(ctx.GetMetadata())
-
-	keyJSON := FindSecretValue(secrets, SecretNameServiceAccountKey)
-	if authMethod != AuthMethodWIF && len(keyJSON) > 0 {
-		if len(scopes) == 0 {
-			scopes = []string{ScopeCloudPlatform}
-		}
-		creds, err := google.CredentialsFromJSONWithType(context.Background(), keyJSON, google.ServiceAccount, scopes...)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create credentials from service account key: %w", err)
-		}
-		return creds.TokenSource, nil
-	}
-
-	accessToken := FindSecretValue(secrets, SecretNameAccessToken)
-	if authMethod != AuthMethodWIF || len(accessToken) == 0 {
-		return nil, fmt.Errorf("no GCP credentials found: add a service account key or use Workload Identity Federation and resync")
+	if len(accessToken) == 0 {
+		return nil, fmt.Errorf("no GCP credentials found: configure Workload Identity Federation and resync")
 	}
 
 	var expiry time.Time
@@ -63,8 +69,8 @@ func TokenSourceFromIntegration(ctx core.IntegrationContext, scopes ...string) (
 	return oauth2.StaticTokenSource(tok), nil
 }
 
-func CredentialsFromIntegration(ctx core.IntegrationContext, scopes ...string) (*google.Credentials, error) {
-	ts, err := TokenSourceFromIntegration(ctx, scopes...)
+func CredentialsFromIntegration(ctx core.IntegrationContext) (*google.Credentials, error) {
+	ts, err := TokenSourceFromIntegration(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -78,20 +84,4 @@ func FindSecretValue(secrets []core.IntegrationSecret, name string) []byte {
 		}
 	}
 	return nil
-}
-
-func AuthMethodFromMetadata(meta any) string {
-	if meta == nil {
-		return AuthMethodServiceAccountKey
-	}
-	var m struct {
-		AuthMethod string `mapstructure:"authMethod"`
-	}
-	_ = mapstructure.Decode(meta, &m)
-	switch m.AuthMethod {
-	case AuthMethodWIF:
-		return AuthMethodWIF
-	default:
-		return AuthMethodServiceAccountKey
-	}
 }
