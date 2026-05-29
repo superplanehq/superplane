@@ -2,6 +2,7 @@ package workers
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 
@@ -169,11 +170,11 @@ func (w *RepositoryProvisionerWorker) provisionRepository(ctx context.Context, r
 	return database.Conn().Transaction(func(tx *gorm.DB) error {
 		repository, err := models.LockPendingRepository(tx, repository.ID)
 		if err != nil {
-			return err
-		}
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
 
-		if repository == nil {
-			return nil
+			return err
 		}
 
 		_, err = w.Storage.CreateRepository(ctx, repository.RepoID)
