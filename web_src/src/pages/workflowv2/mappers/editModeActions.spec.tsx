@@ -184,6 +184,61 @@ describe("workflow v2 edit-mode action affordances", () => {
     );
   });
 
+  it("submits select parameter values from the manual run modal", async () => {
+    const invokeNodeTriggerHook = vi.fn().mockResolvedValue(undefined);
+    const openModal = vi.fn();
+    const props = startTriggerRenderer.getTriggerProps({
+      ...makeTriggerContext({
+        node: {
+          id: "trigger-1",
+          name: "Start",
+          componentName: "start",
+          isCollapsed: false,
+          configuration: {
+            templates: [
+              {
+                name: "Example",
+                payload: { provider: '{{ parameters["provider"] }}' },
+                parameters: [
+                  {
+                    name: "provider",
+                    type: "select",
+                    title: "LLM Provider",
+                    defaultString: "openai",
+                    options: [
+                      { label: "OpenAI", value: "openai" },
+                      { label: "Anthropic", value: "anthropic" },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      }),
+      canvasMode: "live",
+      actions: { invokeNodeTriggerHook, openModal },
+    });
+
+    render(<Trigger {...props} canvasMode="live" />);
+    fireEvent.click(screen.getByTestId("start-template-run"));
+
+    const modal = openModal.mock.calls[0][0] as {
+      content: (ctx: { close: () => void }) => React.ReactNode;
+    };
+    render(<>{modal.content({ close: vi.fn() })}</>);
+
+    expect(screen.getByText("LLM Provider")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("emit-event-submit-button"));
+
+    await waitFor(() =>
+      expect(invokeNodeTriggerHook).toHaveBeenCalledWith("run", {
+        template: "Example",
+        provider: "openai",
+      }),
+    );
+  });
+
   it("invokes manual run directly when templates have no parameters", () => {
     const invokeNodeTriggerHook = vi.fn().mockResolvedValue(undefined);
     const openModal = vi.fn();

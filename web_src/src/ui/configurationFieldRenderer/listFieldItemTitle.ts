@@ -4,6 +4,9 @@ export function listFieldItemTitle(item: unknown, index: number, itemLabel: stri
     const name = typeof record.name === "string" ? record.name.trim() : "";
     if (name) return name;
 
+    const label = typeof record.label === "string" ? record.label.trim() : "";
+    if (label) return label;
+
     const type = typeof record.type === "string" ? record.type.trim() : "";
     if (type) {
       const typeLabel = type.charAt(0).toUpperCase() + type.slice(1);
