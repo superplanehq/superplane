@@ -19,6 +19,10 @@ const (
 	ResourceTypeZone          = "zone"
 	ResourceTypeMachineFamily = "machineFamily"
 	ResourceTypeMachineType   = "machineType"
+	// ResourceTypeInstanceMachineType lists machine types in the zone of a
+	// selected instance (value is the instance path zones/<zone>/instances/<name>),
+	// so the new-type picker can derive the zone without a separate zone field.
+	ResourceTypeInstanceMachineType = "instanceMachineType"
 )
 
 type Region struct {
@@ -478,6 +482,22 @@ func ListMachineTypeResources(ctx context.Context, c Client, zone, machineFamily
 		out = append(out, core.IntegrationResource{Type: ResourceTypeMachineType, Name: name, ID: mt.Name})
 	}
 	return out, nil
+}
+
+// ListMachineTypeResourcesForInstance lists every machine type available in the
+// zone of the given instance. instanceValue is the instance path
+// (zones/<zone>/instances/<name>) or a selfLink, from which the zone is parsed.
+func ListMachineTypeResourcesForInstance(ctx context.Context, c Client, instanceValue string) ([]core.IntegrationResource, error) {
+	if strings.TrimSpace(instanceValue) == "" {
+		return []core.IntegrationResource{}, nil
+	}
+	_, zone, _, err := parseInstancePath(instanceValue)
+	if err != nil {
+		// Before an instance is selected the picker has no zone to work with;
+		// return an empty list rather than an error so the UI stays clean.
+		return []core.IntegrationResource{}, nil
+	}
+	return ListMachineTypeResources(ctx, c, zone, "")
 }
 
 // ubuntuLTSFamilyOrder defines sort order for Ubuntu LTS families (modern first).
