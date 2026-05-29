@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/files"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -245,6 +246,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		Short: "Delete a canvas",
 		Args:  cobra.ExactArgs(1),
 	}
+
 	core.Bind(deleteCmd, &deleteCommand{}, options)
 
 	root.AddCommand(listCmd)
@@ -255,6 +257,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	root.AddCommand(updateCmd)
 	root.AddCommand(deleteCmd)
 	root.AddCommand(changeRequestsCmd)
+	root.AddCommand(files.NewRootCommand(options))
 
 	return root
 }
