@@ -152,7 +152,7 @@ func (w *RepositoryProvisionerWorker) ConsumeCanvasCreated(delivery tackle.Deliv
 		return nil
 	}
 
-	repository, err := models.FindRepository(canvasID)
+	repository, err := models.FindRepositoryUnscoped(canvasID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
