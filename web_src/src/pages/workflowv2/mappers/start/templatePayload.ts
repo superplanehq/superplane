@@ -3,6 +3,7 @@ export type StartTemplateParameterType = "string" | "number" | "boolean";
 export interface StartTemplateParameter {
   name: string;
   title?: string;
+  placeholder?: string;
   type: StartTemplateParameterType;
   defaultString?: unknown;
   defaultNumber?: unknown;
@@ -12,6 +13,11 @@ export interface StartTemplateParameter {
 export function parameterDisplayLabel(param: StartTemplateParameter): string {
   const title = typeof param.title === "string" ? param.title.trim() : "";
   return title || param.name;
+}
+
+export function parameterPlaceholder(param: StartTemplateParameter): string {
+  const placeholder = typeof param.placeholder === "string" ? param.placeholder.trim() : "";
+  return placeholder;
 }
 
 export interface StartTemplate {
