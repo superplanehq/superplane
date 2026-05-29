@@ -47,7 +47,7 @@ func syncAgentPrompt(ctx context.Context, client *Client, agentID, prompt string
 	if err != nil {
 		return fmt.Errorf("update agent prompt: %w", err)
 	}
-	if updated.System != prompt {
+	if !promptsEqual(updated.System, prompt) {
 		return fmt.Errorf("update agent prompt: provider returned a different prompt")
 	}
 

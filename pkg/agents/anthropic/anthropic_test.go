@@ -146,6 +146,29 @@ func TestSyncAgentPrompt_UpdatesWhenDifferent(t *testing.T) {
 	assert.Equal(t, float64(9), capturedBody["version"])
 }
 
+func TestSyncAgentPrompt_AcceptsUpdatedPromptWithNormalizedTrailingNewlines(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"old prompt","version":9}`))
+		case http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"new prompt","version":10}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	err := SyncAgentPrompt(context.Background(), Config{
+		APIKey:  "test-key",
+		AgentID: "agent-123",
+		BaseURL: server.URL,
+	}, "new prompt\n\n")
+	require.NoError(t, err)
+}
+
 func TestSendMessage_PrependsPreamble(t *testing.T) {
 	var capturedBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
