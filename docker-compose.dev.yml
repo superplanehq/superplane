@@ -59,6 +59,7 @@ services:
       START_ORGANIZATION_CLEANUP_WORKER: "yes"
       START_EVENT_RETENTION_WORKER: "yes"
       START_USAGE_SYNC_WORKER: "yes"
+      START_REPOSITORY_PROVISIONER: "yes"
       WEB_BASE_PATH: ""
       SENTRY_DSN: ""
       SENTRY_ENVIRONMENT: ${SENTRY_ENVIRONMENT:-development}
@@ -104,6 +105,23 @@ services:
       VITE_FORCE_USAGE_PAGE: ${VITE_FORCE_USAGE_PAGE:-true}
       VITE_CHANGE_MANAGEMENT_SETTINGS: ${VITE_CHANGE_MANAGEMENT_SETTINGS:-true}
 
+      #
+      # Git storage configuration.
+      # For development environment, we use supergit.
+      # The only required configuration for supergit is the base URL.
+      # See: https://github.com/superplanehq/supergit
+      #
+      GIT_STORAGE_PROVIDER: ${GIT_STORAGE_PROVIDER:-supergit}
+      GIT_STORAGE_SUPERGIT_BASE_URL: ${GIT_STORAGE_SUPERGIT_BASE_URL:-http://supergit:8080/api}
+
+      #
+      # These are required if codestorage is used as the git storage.
+      # See: https://code.storage
+      #
+      GIT_STORAGE_CODE_STORAGE_NAME: ${GIT_STORAGE_CODE_STORAGE_NAME:-}
+      GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY: ${GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY:-}
+      GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY_PATH: ${GIT_STORAGE_CODE_STORAGE_PRIVATE_KEY_PATH:-}
+
     ports:
       - ${VITE_DEV_PORT:-5173}:${VITE_DEV_PORT:-5173}
       - ${VITE_PREVIEW_PORT:-4173}:${VITE_PREVIEW_PORT:-4173}
@@ -120,11 +138,31 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      supergit:
+        condition: service_healthy
 
     volumes:
       - go-pkg-cache:/go
       - .:/app
       - /tmp:/tmp
+
+  supergit:
+    image: ghcr.io/superplanehq/supergit:0.1.0
+    environment:
+      SUPERGIT_ROOT: /var/lib/supergit/repos
+      SUPERGIT_PORT: "8080"
+      SUPERGIT_DEFAULT_BRANCH: ${CANVAS_STORAGE_DEFAULT_BRANCH:-main}
+      SUPERGIT_MAX_FILE_BYTES: ${CANVAS_STORAGE_MAX_FILE_BYTES:-10485760}
+      SUPERGIT_MAX_COMMIT_BYTES: ${CANVAS_STORAGE_MAX_COMMIT_BYTES:-26214400}
+    ports:
+      - ${SUPERGIT_PORT:-8080}:8080
+    volumes:
+      - supergit-data:/var/lib/supergit/repos
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
 
   otel:
     image: otel/opentelemetry-collector-contrib:0.110.0
@@ -178,7 +216,7 @@ services:
       retries: 5
 
 volumes:
-  repo-data:
+  supergit-data:
     driver: local
 
   go-pkg-cache:

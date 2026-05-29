@@ -413,7 +413,7 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		},
 		pbCanvases.Canvases_UpdateCanvasDashboard_FullMethodName: {
 			Resource:         "canvases",
-			Action:           "update",
+			Action:           "update_version",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},

@@ -72,6 +72,11 @@ func (steps *TestHomePageSteps) AssertCanvasFolderVisible(folderTitle, canvasNam
 }
 
 func (steps *TestHomePageSteps) ClickNewApp() {
+	newAppButton := q.Locator(`button[aria-label="Create new app"]`).Run(steps.session)
+	if visible, _ := newAppButton.IsVisible(); visible {
+		steps.session.Click(q.Locator(`button[aria-label="Create new app"]`))
+	}
+
 	steps.session.Click(q.Text("Start from scratch"))
 	steps.session.Sleep(3000)
 }

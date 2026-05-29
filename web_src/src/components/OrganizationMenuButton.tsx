@@ -75,6 +75,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
 
   const organizationName = organization?.metadata?.name || "Organization";
   const usageEnabled = usageStatus?.enabled === true || !!usageError || isUsagePageForced();
+  const logoHref = organizationId ? `/${organizationId}` : "/";
 
   const sidebarUserLinks = [
     ...(organizationId
@@ -278,7 +279,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
         )}
       </div>
       <Link
-        to={`/${organizationId}`}
+        to={logoHref}
         aria-label="Go to canvases"
         className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
       >

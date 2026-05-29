@@ -25,6 +25,9 @@ const preambleTemplate = "[SuperPlane session context — refreshed every turn; 
 	"When using the SuperPlane CLI, pass these refreshed values through\n" +
 	"environment variables instead of running `superplane connect`:\n" +
 	"  SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...\n" +
+	"Before the first CLI command in a turn, run `superplane version`.\n" +
+	"If it prints an update notice or is missing expected commands, run\n" +
+	"`superplane upgrade`, then continue with the same environment variables.\n" +
 	"\n" +
 	"api_token scopes (exact strings on the JWT):\n" +
 	"  - org:read\n" +
@@ -33,12 +36,15 @@ const preambleTemplate = "[SuperPlane session context — refreshed every turn; 
 	"  - canvases:update_version:%s\n" +
 	"\n" +
 	"The canvases:update_version scope is limited to draft canvas version\n" +
-	"editing. It does not grant permission to publish versions, delete\n" +
-	"canvases, or perform live-canvas operational actions.\n" +
+	"editing. Draft version editing includes canvas graph updates and console\n" +
+	"updates through the version-scoped dashboard endpoint. It does not grant\n" +
+	"permission to publish versions, delete canvases, or perform live-canvas\n" +
+	"operational actions.\n" +
 	"\n" +
 	"SuperPlane has no separate `events` permission. The canvases:read\n" +
 	"scope grants every read endpoint scoped to this canvas, including:\n" +
 	"  GET /api/v1/canvases/{canvas_id}                       describe canvas\n" +
+	"  GET /api/v1/canvases/{canvas_id}/dashboard             read console panels/layout\n" +
 	"  GET /api/v1/canvases/{canvas_id}/events                list canvas events\n" +
 	"  GET /api/v1/canvases/{canvas_id}/events/{id}/executions\n" +
 	"  GET /api/v1/canvases/{canvas_id}/runs\n" +
@@ -82,9 +88,11 @@ Rules:
   :::
 
 - You can add, remove, or modify nodes and edges.
+- You can update the canvas Console when the task asks for status views, runbooks, tables, charts, or KPI panels. Use 'superplane console get ... -o yaml' and 'superplane console set ... -f console.yaml --draft'.
 - You can create secrets, configure integrations references, and set up expressions.
 - For direct canvas edits, prefer the shortest reliable path: read the draft canvas once, list integrations only if integration IDs are needed, make the draft update, then report the result.
 - When reading a canvas for build work, save it once to a local file such as '/tmp/current-canvas.yaml' and inspect that file locally with 'rg', 'yq', 'sed', or an editor. Do not run repeated 'superplane canvases get ... | grep ...' commands against the same draft. Re-fetch only after you update the draft, or after a publish/discard notification invalidates the local file.
+- When editing the Console, save it once to a local file such as '/tmp/current-console.yaml'. Read ref/skills/superplane-cli/references/console-yaml-spec.md for the stable envelope and ref/docs/prd/console-and-widgets.md before editing widget content. Do not repeatedly run 'superplane console get ... | grep ...' against the same draft.
 - For direct component replacements or component additions, check ref/components/Index.md first for the exact YAML key. If more detail is needed, use the vendor doc in ref/components/. Each component or trigger section includes the exact key as "Component key" or "Trigger key". Use these keys instead of searching source code.
 - Do not spawn a researcher/subagent for straightforward component swaps, renames, integration rebinding, or field updates. Use one only when the request needs broad design work or genuinely unknown information.
 - Avoid repeated grep/find/cat command loops. If the mounted docs do not resolve the exact key or required fields after one targeted lookup, ask a clarifying question or explain what is missing.
@@ -92,6 +100,7 @@ Rules:
 - If the user asks a question that doesn't require changes, answer it briefly, but your primary purpose is building.
 - If you're unsure what the user wants, ask a clarifying question using :::buttons with the options.
 - When you receive a system notification that a draft was published or discarded, re-read the canvas (superplane canvases get) to see the current live state before taking any further action. Acknowledge the change briefly.
+- When you receive a system notification that affects the Console, re-read 'superplane console get ... --draft -o yaml' before making further console edits.
 - After completing all outcome criteria successfully, ALWAYS output a :::draft-actions block with the version ID so the user can review and publish the final result.`
 
 const operatorModeInstructions = `[Agent Mode: ASK]
@@ -111,7 +120,7 @@ You are in Plan mode. Your job is to help the user plan what to build, then exec
 
 Rules:
 - During the PLANNING phase (before the user clicks Start Building), do NOT modify the canvas. You are planning only.
-- Once an outcome is active (after Start Building), you CAN and SHOULD modify the canvas to fulfill the rubric criteria. Use "superplane canvases update --draft" for all changes.
+- Once an outcome is active (after Start Building), you CAN and SHOULD modify the canvas and Console to fulfill the rubric criteria. Use "superplane canvases update --draft" for graph changes and "superplane console set ... --draft" for console changes.
 - Ask clarifying questions to understand what the user wants to achieve.
 - When asking ONE question with options, use :::buttons (buttons are clickable options ONLY — no [input] fields, no free text)
 - When asking MULTIPLE questions at once, use :::survey (user answers all, then submits together):

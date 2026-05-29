@@ -2,7 +2,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
 
-type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
+export type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
 
 interface CanvasModeToggleProps {
   mode: CanvasMode;
@@ -12,6 +12,7 @@ interface CanvasModeToggleProps {
   onSelectFiles?: () => void;
   editing?: boolean;
   hasDraft?: boolean;
+  hasDashboardDraft?: boolean;
 }
 
 const CANVAS_TAB = "canvas";
@@ -28,6 +29,7 @@ export function CanvasModeToggle({
   onSelectFiles,
   editing = false,
   hasDraft = false,
+  hasDashboardDraft = false,
 }: CanvasModeToggleProps) {
   const showDashboard = Boolean(onSelectDashboard);
   const showMemory = Boolean(onSelectMemory);
@@ -99,12 +101,15 @@ export function CanvasModeToggle({
           "h-7 min-h-7 p-1 [&_[data-slot=tabs-trigger]]:text-[13px]",
           editing
             ? "rounded-full bg-[var(--purple)] text-white [&_[data-slot=tabs-trigger]]:transition-none [&_[data-slot=tabs-trigger][data-state=inactive]]:bg-transparent [&_[data-slot=tabs-trigger][data-state=inactive]]:text-white/90 [&_[data-slot=tabs-trigger][data-state=inactive]]:hover:text-white [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full [&_[data-slot=tabs-trigger][data-state=active]]:bg-white [&_[data-slot=tabs-trigger][data-state=active]]:text-slate-900 [&_[data-slot=tabs-trigger][data-state=active]]:shadow-none"
-            : "bg-slate-100 [&_[data-slot=tabs-trigger][data-state=inactive]]:text-slate-500",
+            : "rounded-full bg-slate-100 [&_[data-slot=tabs-trigger][data-state=inactive]]:text-slate-500 [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full",
         )}
       >
         {showDashboard ? (
           <TabsTrigger value={DASHBOARD_TAB} data-testid="canvas-view-mode-dashboard" aria-label="Console">
-            Console
+            <span className="inline-flex items-center gap-1.5">
+              Console
+              <DraftDot show={hasDashboardDraft} testId="canvas-view-mode-dashboard-draft-dot" />
+            </span>
           </TabsTrigger>
         ) : null}
         <TabsTrigger
@@ -114,13 +119,7 @@ export function CanvasModeToggle({
         >
           <span className="inline-flex items-center gap-1.5">
             Canvas
-            {hasDraft ? (
-              <span
-                className="inline-flex size-1.5 shrink-0 rounded-full bg-slate-400"
-                aria-hidden="true"
-                data-testid="canvas-view-mode-live-draft-dot"
-              />
-            ) : null}
+            <DraftDot show={hasDraft} testId="canvas-view-mode-live-draft-dot" />
           </span>
         </TabsTrigger>
         {showMemory ? (
@@ -135,5 +134,15 @@ export function CanvasModeToggle({
         ) : null}
       </TabsList>
     </Tabs>
+  );
+}
+
+function DraftDot({ show, testId }: { show: boolean; testId: string }) {
+  if (!show) {
+    return null;
+  }
+
+  return (
+    <span className="inline-flex size-1.5 shrink-0 rounded-full bg-slate-400" aria-hidden="true" data-testid={testId} />
   );
 }

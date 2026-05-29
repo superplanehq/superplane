@@ -569,13 +569,6 @@ export function WorkflowPageV2() {
   const canUpdateCanvas = canAct("canvases", "update");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
-  const { dashboardQuery, updateDashboardMutation, hasDraftDiffVersusLive } = useCanvasConsoleVersionDiff({
-    canvasId: canvasId!,
-    activeCanvasVersionId,
-    liveCanvasVersionId,
-    hasDraftGraphDiffVersusLive,
-    enabled: !isTemplate,
-  });
   const [canvasDeletedRemotely, setCanvasDeletedRemotely] = useState(false);
   const [remoteCanvasUpdatePending, setRemoteCanvasUpdatePending] = useState(false);
   const canvasAccess = { canUpdateCanvas, isTemplate, canvasDeletedRemotely };
@@ -656,7 +649,6 @@ export function WorkflowPageV2() {
     }
   }
   if (isSidebarOpenRef.current === null && canvas) {
-    // Initialize on first render
     isSidebarOpenRef.current = canvas.spec?.nodes?.length === 0;
   }
 
@@ -781,8 +773,7 @@ export function WorkflowPageV2() {
   }, [canvasError, canvasLoading, navigate, organizationId, canvasDeletedRemotely]);
   useEffect(() => {
     if (hasTrackedCanvasView.current) return;
-    if (!canvas || !canvasId || !organizationId) return;
-    if (canvasLoading) return;
+    if (!canvas || !canvasId || !organizationId || canvasLoading) return;
     hasTrackedCanvasView.current = true;
     analytics.canvasView(canvasId, canvas.spec?.nodes?.length ?? 0, canvas.spec?.edges?.length ?? 0, organizationId);
   }, [canvas, canvasId, organizationId, canvasLoading]);
@@ -1139,31 +1130,32 @@ export function WorkflowPageV2() {
 
     return release;
   }, []);
-
+  const canvasConsoleVersionDiff = useCanvasConsoleVersionDiff({
+    canvasId: canvasId!,
+    versionIds: { active: activeCanvasVersionId, draft: latestDraftVersion?.metadata?.id, live: liveCanvasVersionId },
+    hasDraftGraphDiffVersusLive,
+    suppressUnpublishedDraftDiscard,
+    enabled: !isTemplate,
+    registerIgnoredCanvasVersionUpdatedEcho,
+  });
+  const { dashboardQuery, updateDashboardMutation, draftChangeIndicators, hasDraftDiffVersusLive } =
+    canvasConsoleVersionDiff;
   const consumeIgnoredCanvasUpdatedEcho = useCallback(() => {
     const release = ignoredCanvasUpdatedEchoReleasesRef.current.pop();
-    if (!release) {
-      return false;
-    }
+    if (!release) return false;
 
     release();
     return true;
   }, []);
 
   const consumeIgnoredCanvasVersionUpdatedEcho = useCallback((versionId?: string) => {
-    if (!versionId) {
-      return false;
-    }
+    if (!versionId) return false;
 
     const releases = ignoredCanvasVersionUpdatedEchoReleasesRef.current.get(versionId);
-    if (!releases) {
-      return false;
-    }
+    if (!releases) return false;
 
     const release = releases.pop();
-    if (!release) {
-      return false;
-    }
+    if (!release) return false;
 
     if (releases.length === 0) {
       ignoredCanvasVersionUpdatedEchoReleasesRef.current.delete(versionId);
@@ -5291,10 +5283,8 @@ export function WorkflowPageV2() {
       dashboardQuery.isLoading,
     ],
   );
-
-  const hasUnpublishedDraftChanges = !suppressUnpublishedDraftDiscard && !!latestDraftVersion && hasDraftDiffVersusLive;
   const { onShowDiff, onShowNodeDiff, yamlDiffModal } = useCanvasYamlDiffModal({
-    hasUnpublishedDraftChanges,
+    hasUnpublishedDraftChanges: draftChangeIndicators.hasUnpublishedDraftChanges,
     liveCanvas,
     liveCanvasVersion,
     draftCanvasVersion: latestDraftVersion,
@@ -5612,6 +5602,7 @@ export function WorkflowPageV2() {
           publishVersionDisabled={publishVersionDisabled}
           publishVersionDisabledTooltip={publishVersionDisabledTooltip}
           onShowDiff={onShowDiff}
+          {...canvasConsoleVersionDiff.consoleDiffHeaderProps}
           visualDiffEnabled={draftVisualDiff.visualDiffEnabled}
           draftVisualDiff={draftVisualDiff}
           onToggleVisualDiff={draftVisualDiff.toggleVisualDiff}
@@ -5634,7 +5625,7 @@ export function WorkflowPageV2() {
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
+          {...draftChangeIndicators}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
           runDisabled={runDisabled}
@@ -5678,7 +5669,6 @@ export function WorkflowPageV2() {
                 onRetry={() => infiniteRunsQuery.refetch()}
                 workflowNodes={canvasNodes}
                 componentIconMap={componentIconMap}
-                totalCount={runsData.totalCount}
                 onStatusFiltersChange={setRunStatusFilters}
               />
             ) : null
@@ -5729,6 +5719,7 @@ export function WorkflowPageV2() {
       </div>
       <CanvasYamlModal {...canvasYamlModalProps} />
       {yamlDiffModal}
+      {canvasConsoleVersionDiff.consoleYamlDiffModal}
       {resolvingConflictChangeRequest ? (
         <div className="fixed inset-0 z-[100] min-h-0 bg-slate-50">
           <CanvasChangeRequestConflictResolver

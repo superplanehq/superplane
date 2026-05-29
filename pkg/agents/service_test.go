@@ -268,7 +268,9 @@ func TestService_SendMessage_RefreshesPreambleEveryTurn(t *testing.T) {
 	assert.Contains(t, provider.lastPreamble, "api_token:")
 	assert.Contains(t, provider.lastPreamble, "api_token_expires_at:")
 	assert.Contains(t, provider.lastPreamble, "SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...")
+	assert.Contains(t, provider.lastPreamble, "Before the first CLI command in a turn, run `superplane version`.")
 	assert.Contains(t, provider.lastPreamble, "  - canvases:update_version:"+canvas.ID.String())
+	assert.Contains(t, provider.lastPreamble, "GET /api/v1/canvases/{canvas_id}/dashboard")
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:update:"+canvas.ID.String())
 	assert.NotContains(t, provider.lastPreamble, "  - canvases:publish:"+canvas.ID.String())
 
@@ -325,6 +327,8 @@ func TestService_DefineOutcome_RefreshesPreambleForBuildLoop(t *testing.T) {
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "[Agent Mode: BUILD]")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "ALWAYS use \"superplane canvases update --draft\"")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "superplane console set ... -f console.yaml --draft")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "ref/docs/prd/console-and-widgets.md")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "api_token:")
 }
 
