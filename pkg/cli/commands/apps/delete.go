@@ -1,10 +1,10 @@
-package canvases
+package apps
 
 import (
 	"fmt"
 	"io"
 
-	"github.com/superplanehq/superplane/pkg/cli/canvasresolve"
+	"github.com/superplanehq/superplane/pkg/cli/appresolve"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -13,7 +13,7 @@ type deleteCommand struct{}
 func (c *deleteCommand) Execute(ctx core.CommandContext) error {
 	nameOrID := ctx.Args[0]
 
-	canvasID, err := canvasresolve.FindCanvasID(ctx, ctx.API, nameOrID)
+	canvasID, err := appresolve.FindAppID(ctx, ctx.API, nameOrID)
 	if err != nil {
 		return err
 	}
@@ -27,7 +27,7 @@ func (c *deleteCommand) Execute(ctx core.CommandContext) error {
 
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, err := fmt.Fprintf(stdout, "Canvas deleted: %s\n", nameOrID)
+			_, err := fmt.Fprintf(stdout, "App deleted: %s\n", nameOrID)
 			return err
 		})
 	}

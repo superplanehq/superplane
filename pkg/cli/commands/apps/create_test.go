@@ -1,4 +1,4 @@
-package canvases
+package apps
 
 import (
 	"bytes"
@@ -35,7 +35,7 @@ func TestCreateCommandPrintsCanvasOnSuccess(t *testing.T) {
 	err := (&createCommand{}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), `Canvas "my-canvas" created (ID: abc-123)`)
-	require.NotContains(t, stdout.String(), "Canvas URL:")
+	require.NotContains(t, stdout.String(), "App URL:")
 }
 
 func TestCreateCommandPrintsURLFromResponseOrgID(t *testing.T) {
@@ -48,7 +48,7 @@ func TestCreateCommandPrintsURLFromResponseOrgID(t *testing.T) {
 	err := (&createCommand{}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), `Canvas "my-canvas" created (ID: abc-123)`)
-	require.Contains(t, stdout.String(), "Canvas URL: https://app.superplane.com/org-uuid/canvases/abc-123")
+	require.Contains(t, stdout.String(), "App URL: https://app.superplane.com/org-uuid/canvases/abc-123")
 }
 
 func TestCreateCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
@@ -66,7 +66,7 @@ func TestCreateCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
 	err := (&createCommand{}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), `Canvas "my-canvas" created (ID: abc-123)`)
-	require.NotContains(t, stdout.String(), "Canvas URL:")
+	require.NotContains(t, stdout.String(), "App URL:")
 }
 
 func TestCreateCommandReturnsJSONOutput(t *testing.T) {
@@ -208,7 +208,7 @@ func TestCreateCommandFailsWithoutArgs(t *testing.T) {
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "either --file or <canvas-name> is required")
+	require.Contains(t, err.Error(), "either --file or <app-name> is required")
 }
 
 func writeTestCanvasFile(t *testing.T, name string) string {

@@ -1,4 +1,4 @@
-package canvases
+package apps
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/cli/canvasresolve"
+	"github.com/superplanehq/superplane/pkg/cli/appresolve"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -19,9 +19,9 @@ type fakeConfig struct {
 	url string
 }
 
-func (f *fakeConfig) GetActiveCanvas() string               { return "" }
-func (f *fakeConfig) SetActiveCanvas(canvasID string) error { return nil }
-func (f *fakeConfig) GetURL() string                        { return f.url }
+func (f *fakeConfig) GetActiveApp() string               { return "" }
+func (f *fakeConfig) SetActiveApp(canvasID string) error { return nil }
+func (f *fakeConfig) GetURL() string                     { return f.url }
 
 // newCommandContextWithConfigForTest builds a command context whose Config is
 // set to the provided stub. Useful for exercising URL output behavior.
@@ -53,7 +53,7 @@ func TestFindCurrentUserDraftVersionIDSkipsPublishedVersions(t *testing.T) {
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
-	versionID, err := canvasresolve.FindCurrentUserDraftVersionID(ctx, "canvas-123")
+	versionID, err := appresolve.FindCurrentUserDraftVersionID(ctx, "canvas-123")
 	require.NoError(t, err)
 	require.Equal(t, "draft-1", versionID)
 }
@@ -81,7 +81,7 @@ func TestEnsureCurrentUserDraftVersionIDCreatesDraftWhenMissing(t *testing.T) {
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
-	versionID, err := canvasresolve.EnsureCurrentUserDraftVersionID(ctx, "canvas-123")
+	versionID, err := appresolve.EnsureCurrentUserDraftVersionID(ctx, "canvas-123")
 	require.NoError(t, err)
 	require.Equal(t, "draft-1", versionID)
 
@@ -106,9 +106,9 @@ func TestDescribeCanvasVersionByIDReturnsErrorWhenVersionMissing(t *testing.T) {
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
-	_, err := canvasresolve.DescribeCanvasVersionByID(ctx, "canvas-123", "version-123")
+	_, err := appresolve.DescribeAppVersionByID(ctx, "canvas-123", "version-123")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), `canvas version "version-123" not found`)
+	require.Contains(t, err.Error(), `app version "version-123" not found`)
 }
 
 func TestCanvasFromVersionCopiesSpec(t *testing.T) {

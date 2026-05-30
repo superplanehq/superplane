@@ -1,4 +1,4 @@
-package canvases
+package apps
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 

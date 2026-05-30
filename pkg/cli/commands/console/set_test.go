@@ -107,7 +107,7 @@ func TestSetFromFileFlag(t *testing.T) {
 	ctx.Args = []string{testCanvasID}
 
 	require.NoError(t, (&setCommand{file: strPtr(path)}).Execute(ctx))
-	require.Contains(t, stdout.String(), "Console draft updated for canvas "+testCanvasID)
+	require.Contains(t, stdout.String(), "Console draft updated for app "+testCanvasID)
 	require.Contains(t, stdout.String(), "Draft version: draft-1")
 	require.Contains(t, stdout.String(), "Panels: 1")
 }
@@ -236,7 +236,7 @@ func TestSetUsesActiveCanvasWhenNoArg(t *testing.T) {
 	)
 
 	ctx, _ := newConsoleCommandContext(t, server.server, "text", nil)
-	ctx.Config = &fakeConfig{activeCanvas: testCanvasID}
+	ctx.Config = &fakeConfig{activeApp: testCanvasID}
 	ctx.Args = []string{}
 
 	require.NoError(t, (&setCommand{file: strPtr(path)}).Execute(ctx))
@@ -255,7 +255,7 @@ func TestSetErrorsWhenNoCanvasAndNoActive(t *testing.T) {
 
 	err := (&setCommand{file: strPtr(path)}).Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "canvas-name-or-id")
+	require.Contains(t, err.Error(), "app-name-or-id")
 }
 
 // TestSetAutoCreatesChangeRequestWhenCMEnabled verifies that, with
@@ -335,7 +335,7 @@ func TestSetSkipsChangeRequestWithDraftFlag(t *testing.T) {
 	require.NoError(t, (&setCommand{file: strPtr(path), draftOnly: boolPtr(true)}).Execute(ctx))
 	out := stdout.String()
 	require.NotContains(t, out, "Change request:")
-	require.Contains(t, out, "superplane canvases change-requests create")
+	require.Contains(t, out, "superplane apps change-requests create")
 }
 
 func TestSetRejectsWrongKind(t *testing.T) {

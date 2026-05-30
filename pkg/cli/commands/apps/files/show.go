@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	resolve "github.com/superplanehq/superplane/pkg/cli/canvasresolve"
+	resolve "github.com/superplanehq/superplane/pkg/cli/appresolve"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -20,7 +20,7 @@ func (c *ShowCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	canvasID, err := resolve.ResolveCanvasNameOrIDArg(ctx, canvasTarget)
+	canvasID, err := resolve.ResolveAppNameOrIDArg(ctx, canvasTarget)
 	if err != nil {
 		return err
 	}

@@ -1,12 +1,12 @@
-package canvases
+package apps
 
 import (
 	"fmt"
 	"io"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/cli/canvasresolve"
-	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
+	"github.com/superplanehq/superplane/pkg/cli/appresolve"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -15,7 +15,7 @@ type getCommand struct {
 }
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
-	canvasID, err := canvasresolve.FindCanvasID(ctx, ctx.API, ctx.Args[0])
+	canvasID, err := appresolve.FindAppID(ctx, ctx.API, ctx.Args[0])
 	if err != nil {
 		return err
 	}
@@ -25,7 +25,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 	if response.Canvas == nil {
-		return fmt.Errorf("canvas %q not found", canvasID)
+		return fmt.Errorf("app %q not found", canvasID)
 	}
 
 	canvas := *response.Canvas
@@ -39,7 +39,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 			return fmt.Errorf("current user id not found")
 		}
 
-		versionID, err := canvasresolve.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
+		versionID, err := appresolve.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
 		if err != nil {
 			return err
 		}
@@ -47,7 +47,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 			return fmt.Errorf("draft version not found for current user")
 		}
 
-		version, err := canvasresolve.DescribeCanvasVersionByID(ctx, canvasID, versionID)
+		version, err := appresolve.DescribeAppVersionByID(ctx, canvasID, versionID)
 		if err != nil {
 			return err
 		}
@@ -65,7 +65,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		_, _ = fmt.Fprintf(stdout, "ID: %s\n", resource.Metadata.GetId())
 		_, _ = fmt.Fprintf(stdout, "Name: %s\n", resource.Metadata.GetName())
 		if url := BuildCanvasURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId()); url != "" {
-			_, _ = fmt.Fprintf(stdout, "Canvas URL: %s\n", url)
+			_, _ = fmt.Fprintf(stdout, "App URL: %s\n", url)
 		}
 		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(resource.Spec.GetNodes()))
 		_, err := fmt.Fprintf(stdout, "Edges: %d\n", len(resource.Spec.GetEdges()))

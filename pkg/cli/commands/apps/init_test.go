@@ -1,4 +1,4 @@
-package canvases
+package apps
 
 import (
 	"bytes"

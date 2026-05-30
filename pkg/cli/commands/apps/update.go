@@ -1,12 +1,12 @@
-package canvases
+package apps
 
 import (
 	"fmt"
 	"io"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/cli/canvasresolve"
-	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
+	"github.com/superplanehq/superplane/pkg/cli/appresolve"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -26,7 +26,7 @@ func resolveCanvasForFileUpdate(filePath string) (string, openapi_client.Canvase
 	}
 
 	if resource.Metadata == nil {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata is required")
+		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("app metadata is required")
 	}
 
 	fileID := ""
@@ -35,7 +35,7 @@ func resolveCanvasForFileUpdate(filePath string) (string, openapi_client.Canvase
 	}
 
 	if fileID == "" {
-		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("canvas metadata.id is required in the YAML file")
+		return "", openapi_client.CanvasesCanvas{}, fmt.Errorf("app metadata.id is required in the YAML file")
 	}
 
 	canvas := models.CanvasFromCanvas(*resource)
@@ -67,16 +67,16 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 
-	changeManagementEnabled, err := canvasresolve.ChangeManagementEnabled(ctx, canvasID)
+	changeManagementEnabled, err := appresolve.ChangeManagementEnabled(ctx, canvasID)
 	if err != nil {
 		return err
 	}
 
 	if changeManagementEnabled && !draftMode {
-		return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases change-requests create`")
+		return fmt.Errorf("change management is enabled for this app; use --draft to update your draft version, then publish with `superplane apps change-requests create`")
 	}
 
-	targetVersionID, err := canvasresolve.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	targetVersionID, err := appresolve.EnsureCurrentUserDraftVersionID(ctx, canvasID)
 	if err != nil {
 		return err
 	}
@@ -129,8 +129,8 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		metadata := version.GetMetadata()
 		spec := version.GetSpec()
 
-		_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
-		_, _ = fmt.Fprintf(stdout, "Canvas ID: %s\n", metadata.GetCanvasId())
+		_, _ = fmt.Fprintf(stdout, "App version updated: %s\n", metadata.GetId())
+		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", metadata.GetCanvasId())
 		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(spec.GetNodes()))
 		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", len(spec.GetEdges()))
 

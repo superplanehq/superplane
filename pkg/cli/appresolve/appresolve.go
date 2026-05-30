@@ -1,10 +1,10 @@
-// Package canvasresolve groups the small set of helpers used by multiple
-// CLI command packages to resolve a canvas (by name or id), read canvas
+// Package appresolve groups the small set of helpers used by multiple
+// CLI command packages to resolve an app (by name or id), read app
 // settings such as change management, and find or create the current user's
-// draft version. Keeping these in one place lets the `canvases` and
+// draft version. Keeping these in one place lets the `apps` and
 // `console` command packages share behavior without either depending on the
 // other.
-package canvasresolve
+package appresolve
 
 import (
 	"fmt"
@@ -16,42 +16,42 @@ import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
-// FindCanvasID returns the canvas id for the given name or UUID. If
+// FindAppID returns the app id for the given name or UUID. If
 // `nameOrID` parses as a UUID, it is returned unchanged. Otherwise the
-// CLI looks up canvases by name and requires exactly one match.
-func FindCanvasID(ctx core.CommandContext, client *openapi_client.APIClient, nameOrID string) (string, error) {
+// CLI looks up apps by name and requires exactly one match.
+func FindAppID(ctx core.CommandContext, client *openapi_client.APIClient, nameOrID string) (string, error) {
 	if _, err := uuid.Parse(nameOrID); err == nil {
 		return nameOrID, nil
 	}
 
-	return findCanvasIDByName(ctx, client, nameOrID)
+	return findAppIDByName(ctx, client, nameOrID)
 }
 
-// ResolveCanvasNameOrIDArg returns the canvas id for `arg`, falling back to
-// the active canvas configured for the user when `arg` is empty. It returns
+// ResolveAppNameOrIDArg returns the app id for `arg`, falling back to
+// the active app configured for the user when `arg` is empty. It returns
 // a friendly error when neither is available so callers can surface the
 // same message across commands.
-func ResolveCanvasNameOrIDArg(ctx core.CommandContext, arg string) (string, error) {
+func ResolveAppNameOrIDArg(ctx core.CommandContext, arg string) (string, error) {
 	trimmed := strings.TrimSpace(arg)
 	if trimmed == "" && ctx.Config != nil {
-		trimmed = strings.TrimSpace(ctx.Config.GetActiveCanvas())
+		trimmed = strings.TrimSpace(ctx.Config.GetActiveApp())
 	}
 	if trimmed == "" {
-		return "", fmt.Errorf("<canvas-name-or-id> is required (or set an active canvas with `superplane canvases active`)")
+		return "", fmt.Errorf("<app-name-or-id> is required (or set an active app with `superplane apps active`)")
 	}
 
-	return FindCanvasID(ctx, ctx.API, trimmed)
+	return FindAppID(ctx, ctx.API, trimmed)
 }
 
 // ChangeManagementEnabled reports whether change management is enabled on
-// the canvas identified by `canvasID`.
-func ChangeManagementEnabled(ctx core.CommandContext, canvasID string) (bool, error) {
-	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, canvasID).Execute()
+// the app identified by `appID`.
+func ChangeManagementEnabled(ctx core.CommandContext, appID string) (bool, error) {
+	response, _, err := ctx.API.CanvasAPI.CanvasesDescribeCanvas(ctx.Context, appID).Execute()
 	if err != nil {
 		return false, err
 	}
 	if response.Canvas == nil {
-		return false, fmt.Errorf("canvas %q not found", canvasID)
+		return false, fmt.Errorf("app %q not found", appID)
 	}
 
 	spec := response.Canvas.GetSpec()
@@ -59,7 +59,7 @@ func ChangeManagementEnabled(ctx core.CommandContext, canvasID string) (bool, er
 	return cm.GetEnabled(), nil
 }
 
-func findCanvasIDByName(ctx core.CommandContext, client *openapi_client.APIClient, name string) (string, error) {
+func findAppIDByName(ctx core.CommandContext, client *openapi_client.APIClient, name string) (string, error) {
 	response, _, err := client.CanvasAPI.CanvasesListCanvases(ctx.Context).Execute()
 	if err != nil {
 		return "", err
@@ -76,25 +76,25 @@ func findCanvasIDByName(ctx core.CommandContext, client *openapi_client.APIClien
 	}
 
 	if len(matches) == 0 {
-		return "", fmt.Errorf("canvas %q not found", name)
+		return "", fmt.Errorf("app %q not found", name)
 	}
 
 	if len(matches) > 1 {
-		return "", fmt.Errorf("multiple canvases named %q found", name)
+		return "", fmt.Errorf("multiple apps named %q found", name)
 	}
 
 	if matches[0].Metadata == nil || matches[0].Metadata.Id == nil {
-		return "", fmt.Errorf("canvas %q is missing an id", name)
+		return "", fmt.Errorf("app %q is missing an id", name)
 	}
 
 	return *matches[0].Metadata.Id, nil
 }
 
 // FindCurrentUserDraftVersionID returns the id of the first non-published
-// canvas version visible to the current user, or an empty string if none
+// app version visible to the current user, or an empty string if none
 // exists. It does not create a draft.
-func FindCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) (string, error) {
-	response, _, err := ctx.API.CanvasVersionAPI.CanvasesListCanvasVersions(ctx.Context, canvasID).Execute()
+func FindCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
+	response, _, err := ctx.API.CanvasVersionAPI.CanvasesListCanvasVersions(ctx.Context, appID).Execute()
 	if err != nil {
 		return "", err
 	}
@@ -118,8 +118,8 @@ func FindCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) (st
 
 // EnsureCurrentUserDraftVersionID returns the id of the current user's draft
 // version, creating one if it does not yet exist.
-func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) (string, error) {
-	versionID, err := FindCurrentUserDraftVersionID(ctx, canvasID)
+func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
+	versionID, err := FindCurrentUserDraftVersionID(ctx, appID)
 	if err != nil {
 		return "", err
 	}
@@ -128,7 +128,7 @@ func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) (
 	}
 
 	response, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesCreateCanvasVersion(ctx.Context, canvasID).
+		CanvasesCreateCanvasVersion(ctx.Context, appID).
 		Body(map[string]interface{}{}).
 		Execute()
 	if err != nil {
@@ -149,7 +149,7 @@ func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) (
 // FindOwnedDraftVersionID walks the version history (paginated) and returns
 // the id of the latest non-published version whose owner matches `userID`,
 // or an empty string when none is found.
-func FindOwnedDraftVersionID(ctx core.CommandContext, canvasID string, userID string) (string, error) {
+func FindOwnedDraftVersionID(ctx core.CommandContext, appID string, userID string) (string, error) {
 	trimmedUserID := strings.TrimSpace(userID)
 	if trimmedUserID == "" {
 		return "", nil
@@ -158,7 +158,7 @@ func FindOwnedDraftVersionID(ctx core.CommandContext, canvasID string, userID st
 	var before *time.Time
 	for {
 		req := ctx.API.CanvasVersionAPI.
-			CanvasesListCanvasVersions(ctx.Context, canvasID).
+			CanvasesListCanvasVersions(ctx.Context, appID).
 			Limit(50)
 		if before != nil {
 			req = req.Before(*before)
@@ -203,19 +203,19 @@ func FindOwnedDraftVersionID(ctx core.CommandContext, canvasID string, userID st
 	}
 }
 
-// DescribeCanvasVersionByID loads a specific canvas version and errors when
+// DescribeAppVersionByID loads a specific app version and errors when
 // the response does not include one.
-func DescribeCanvasVersionByID(
+func DescribeAppVersionByID(
 	ctx core.CommandContext,
-	canvasID string,
+	appID string,
 	versionID string,
 ) (openapi_client.CanvasesCanvasVersion, error) {
-	response, _, err := ctx.API.CanvasVersionAPI.CanvasesDescribeCanvasVersion(ctx.Context, canvasID, versionID).Execute()
+	response, _, err := ctx.API.CanvasVersionAPI.CanvasesDescribeCanvasVersion(ctx.Context, appID, versionID).Execute()
 	if err != nil {
 		return openapi_client.CanvasesCanvasVersion{}, err
 	}
 	if response.Version == nil {
-		return openapi_client.CanvasesCanvasVersion{}, fmt.Errorf("canvas version %q not found", versionID)
+		return openapi_client.CanvasesCanvasVersion{}, fmt.Errorf("app version %q not found", versionID)
 	}
 
 	return *response.Version, nil

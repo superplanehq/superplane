@@ -64,7 +64,7 @@ func TestAgentE2E(t *testing.T) {
 			}
 
 			return []agents.ProviderEvent{
-				agentToolStartedEvent("tool-1", "bash", "superplane canvases get"),
+				agentToolStartedEvent("tool-1", "bash", "superplane apps get"),
 				agentToolFinishedEvent("tool-1", "bash"),
 				agentAssistantMessageEvent("Tool run complete"),
 				agentTurnCompletedEvent(),

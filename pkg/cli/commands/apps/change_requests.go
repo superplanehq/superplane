@@ -1,4 +1,4 @@
-package canvases
+package apps
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/cli/canvasresolve"
-	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
+	"github.com/superplanehq/superplane/pkg/cli/appresolve"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -179,20 +179,20 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if versionID == "" {
-		changeManagementEnabled, err := canvasresolve.ChangeManagementEnabled(ctx, canvasID)
+		changeManagementEnabled, err := appresolve.ChangeManagementEnabled(ctx, canvasID)
 		if err != nil {
 			return err
 		}
 		if !changeManagementEnabled {
-			return fmt.Errorf("change management is disabled for this canvas; enable it in canvas settings to use change requests")
+			return fmt.Errorf("change management is disabled for this app; enable it in app settings to use change requests")
 		}
 
-		versionID, err = canvasresolve.FindCurrentUserDraftVersionID(ctx, canvasID)
+		versionID, err = appresolve.FindCurrentUserDraftVersionID(ctx, canvasID)
 		if err != nil {
 			return err
 		}
 		if versionID == "" {
-			return fmt.Errorf("no draft version found; run `superplane canvases update --draft -f <file>` first")
+			return fmt.Errorf("no draft version found; run `superplane apps update --draft -f <file>` first")
 		}
 	}
 
@@ -373,7 +373,7 @@ func parseCanvasChangeRequestTargetArgs(args []string) (string, string, error) {
 }
 
 func resolveCanvasTargetFromOptionalArg(ctx core.CommandContext, target string) (string, error) {
-	return canvasresolve.ResolveCanvasNameOrIDArg(ctx, target)
+	return appresolve.ResolveAppNameOrIDArg(ctx, target)
 }
 
 func loadCanvasForChangeRequestResolve(filePath string) (openapi_client.CanvasesCanvas, error) {
@@ -420,7 +420,7 @@ func renderCanvasChangeRequestText(ctx core.CommandContext, changeRequest openap
 		}
 
 		_, _ = fmt.Fprintf(stdout, "ID: %s\n", metadata.GetId())
-		_, _ = fmt.Fprintf(stdout, "Canvas: %s\n", metadata.GetCanvasId())
+		_, _ = fmt.Fprintf(stdout, "App: %s\n", metadata.GetCanvasId())
 		_, _ = fmt.Fprintf(stdout, "Version: %s\n", metadata.GetVersionId())
 		_, _ = fmt.Fprintf(stdout, "Based On Version: %s\n", metadata.GetBasedOnVersionId())
 		_, _ = fmt.Fprintf(stdout, "Status: %s\n", metadata.GetStatus())

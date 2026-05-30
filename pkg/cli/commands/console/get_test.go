@@ -92,8 +92,8 @@ func TestGetTextOutputSummary(t *testing.T) {
 	require.NoError(t, (&getCommand{draft: &noDraft}).Execute(ctx))
 
 	out := stdout.String()
-	require.Contains(t, out, "Canvas: "+testCanvasName)
-	require.Contains(t, out, "Canvas ID: "+testCanvasID)
+	require.Contains(t, out, "App: "+testCanvasName)
+	require.Contains(t, out, "App ID: "+testCanvasID)
 	require.Contains(t, out, "Source: live")
 	require.Contains(t, out, "Version ID: live-version-1")
 	require.Contains(t, out, "Panels: 1")
@@ -168,12 +168,12 @@ func TestGetUsesActiveCanvasWhenNoArg(t *testing.T) {
 	)
 
 	ctx, stdout := newConsoleCommandContext(t, server.server, "text", nil)
-	ctx.Config = &fakeConfig{activeCanvas: testCanvasID}
+	ctx.Config = &fakeConfig{activeApp: testCanvasID}
 	ctx.Args = []string{}
 
 	noDraft := false
 	require.NoError(t, (&getCommand{draft: &noDraft}).Execute(ctx))
-	require.Contains(t, stdout.String(), "Canvas ID: "+testCanvasID)
+	require.Contains(t, stdout.String(), "App ID: "+testCanvasID)
 }
 
 // TestGetErrorsWhenNoCanvasAndNoActive surfaces a helpful error if the
@@ -189,7 +189,7 @@ func TestGetErrorsWhenNoCanvasAndNoActive(t *testing.T) {
 	noDraft := false
 	err := (&getCommand{draft: &noDraft}).Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "canvas-name-or-id")
+	require.Contains(t, err.Error(), "app-name-or-id")
 }
 
 func TestGetDraftErrorsWhenNoDraftExists(t *testing.T) {

@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/cli/canvasresolve"
+	"github.com/superplanehq/superplane/pkg/cli/appresolve"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -17,7 +17,7 @@ type setCommand struct {
 
 func (c *setCommand) Execute(ctx core.CommandContext) error {
 	if len(ctx.Args) > 2 {
-		return fmt.Errorf("unexpected extra arguments; usage: superplane console set [canvas-name-or-id] [file]")
+		return fmt.Errorf("unexpected extra arguments; usage: superplane console set [app-name-or-id] [file]")
 	}
 
 	canvasArg := ""
@@ -45,17 +45,17 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("invalid console yaml in %s: %w", source, err)
 	}
 
-	canvasID, err := canvasresolve.ResolveCanvasNameOrIDArg(ctx, canvasArg)
+	canvasID, err := appresolve.ResolveAppNameOrIDArg(ctx, canvasArg)
 	if err != nil {
 		return err
 	}
 
-	changeManagementEnabled, err := canvasresolve.ChangeManagementEnabled(ctx, canvasID)
+	changeManagementEnabled, err := appresolve.ChangeManagementEnabled(ctx, canvasID)
 	if err != nil {
 		return err
 	}
 
-	versionID, err := canvasresolve.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	versionID, err := appresolve.EnsureCurrentUserDraftVersionID(ctx, canvasID)
 	if err != nil {
 		return err
 	}
@@ -95,7 +95,7 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		_, _ = fmt.Fprintf(stdout, "Console draft updated for canvas %s\n", canvasID)
+		_, _ = fmt.Fprintf(stdout, "Console draft updated for app %s\n", canvasID)
 		_, _ = fmt.Fprintf(stdout, "Draft version: %s\n", strings.TrimSpace(dashboard.GetVersionId()))
 		_, _ = fmt.Fprintf(stdout, "Panels: %d\n", len(dashboard.GetPanels()))
 		_, _ = fmt.Fprintf(stdout, "Layout items: %d\n", len(dashboard.GetLayout()))
@@ -104,10 +104,10 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 			return err
 		}
 		if changeManagementEnabled {
-			_, err := fmt.Fprintln(stdout, "Run `superplane canvases change-requests create` to open a change request for this draft.")
+			_, err := fmt.Fprintln(stdout, "Run `superplane apps change-requests create` to open a change request for this draft.")
 			return err
 		}
-		_, err := fmt.Fprintln(stdout, "Run `superplane canvases update` (without --draft) to publish a draft that includes this console.")
+		_, err := fmt.Fprintln(stdout, "Run `superplane apps update` (without --draft) to publish a draft that includes this console.")
 		return err
 	})
 }

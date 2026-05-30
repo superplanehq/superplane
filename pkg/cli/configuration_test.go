@@ -307,10 +307,10 @@ func TestEnvironmentContextOverridesConfiguredContext(t *testing.T) {
 	require.Equal(t, "agent-token", context.APIToken)
 
 	config := NewEnvironmentContext(context)
-	err = config.SetActiveCanvas("canvas-from-env-run")
+	err = config.SetActiveApp("canvas-from-env-run")
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "pass --canvas-id")
-	require.Empty(t, config.GetActiveCanvas())
+	require.Contains(t, err.Error(), "pass --app-id")
+	require.Empty(t, config.GetActiveApp())
 
 	current, ok := GetCurrentContext()
 	require.True(t, ok)

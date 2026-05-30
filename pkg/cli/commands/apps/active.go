@@ -1,4 +1,4 @@
-package canvases
+package apps
 
 import (
 	"bufio"
@@ -27,7 +27,7 @@ func (c *ActiveCommand) Execute(ctx core.CommandContext) error {
 func (c *ActiveCommand) setActiveByID(ctx core.CommandContext, canvasID string) error {
 	canvasID = strings.TrimSpace(canvasID)
 	if canvasID == "" {
-		return fmt.Errorf("canvas id is required")
+		return fmt.Errorf("app id is required")
 	}
 
 	_, _, err := ctx.API.CanvasAPI.
@@ -38,7 +38,7 @@ func (c *ActiveCommand) setActiveByID(ctx core.CommandContext, canvasID string) 
 		return err
 	}
 
-	return ctx.Config.SetActiveCanvas(canvasID)
+	return ctx.Config.SetActiveApp(canvasID)
 }
 
 func (c *ActiveCommand) setActiveInteractively(ctx core.CommandContext) error {
@@ -52,18 +52,18 @@ func (c *ActiveCommand) setActiveInteractively(ctx core.CommandContext) error {
 
 	canvases := response.GetCanvases()
 	if len(canvases) == 0 {
-		return fmt.Errorf("no canvases found")
+		return fmt.Errorf("no apps found")
 	}
 
 	err = ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		for i, canvas := range canvases {
 			prefix := " "
-			if *canvas.Metadata.Id == ctx.Config.GetActiveCanvas() {
+			if *canvas.Metadata.Id == ctx.Config.GetActiveApp() {
 				prefix = "*"
 			}
 			_, _ = fmt.Fprintf(stdout, "%s %d. %s (%s)\n", prefix, i+1, *canvas.Metadata.Name, *canvas.Metadata.Id)
 		}
-		_, _ = fmt.Fprint(stdout, "Select a canvas number: ")
+		_, _ = fmt.Fprint(stdout, "Select an app number: ")
 		return nil
 	})
 
@@ -74,18 +74,18 @@ func (c *ActiveCommand) setActiveInteractively(ctx core.CommandContext) error {
 	reader := bufio.NewReader(ctx.Cmd.InOrStdin())
 	input, err := reader.ReadString('\n')
 	if err != nil {
-		return fmt.Errorf("failed to read selected canvas: %w", err)
+		return fmt.Errorf("failed to read selected app: %w", err)
 	}
 
 	selectedIndex, err := strconv.Atoi(strings.TrimSpace(input))
 	if err != nil {
-		return fmt.Errorf("invalid canvas selection %q", strings.TrimSpace(input))
+		return fmt.Errorf("invalid app selection %q", strings.TrimSpace(input))
 	}
 
 	if selectedIndex < 1 || selectedIndex > len(canvases) {
-		return fmt.Errorf("canvas selection must be between 1 and %d", len(canvases))
+		return fmt.Errorf("app selection must be between 1 and %d", len(canvases))
 	}
 
 	selected := canvases[selectedIndex-1]
-	return ctx.Config.SetActiveCanvas(*selected.Metadata.Id)
+	return ctx.Config.SetActiveApp(*selected.Metadata.Id)
 }

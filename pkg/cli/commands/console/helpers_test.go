@@ -21,15 +21,15 @@ type requestExpectation struct {
 }
 
 // fakeConfig is a minimal `core.ConfigContext` test double that returns
-// a preconfigured active canvas. Only `GetActiveCanvas` is consulted by
+// a preconfigured active canvas. Only `GetActiveApp` is consulted by
 // the console commands; the rest are stubs that satisfy the interface.
 type fakeConfig struct {
-	activeCanvas string
+	activeApp string
 }
 
-func (f *fakeConfig) GetActiveCanvas() string      { return f.activeCanvas }
-func (f *fakeConfig) SetActiveCanvas(string) error { return nil }
-func (f *fakeConfig) GetURL() string               { return "" }
+func (f *fakeConfig) GetActiveApp() string      { return f.activeApp }
+func (f *fakeConfig) SetActiveApp(string) error { return nil }
+func (f *fakeConfig) GetURL() string            { return "" }
 
 type apiTestServer struct {
 	t            *testing.T

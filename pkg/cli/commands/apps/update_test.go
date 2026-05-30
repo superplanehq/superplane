@@ -1,4 +1,4 @@
-package canvases
+package apps
 
 import (
 	"encoding/json"
@@ -566,7 +566,7 @@ func TestUpdateFromFileRequiresDraftWhenLiveChangeManagementIsEnabled(t *testing
 	require.Contains(
 		t,
 		err.Error(),
-		"change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane canvases change-requests create`",
+		"change management is enabled for this app; use --draft to update your draft version, then publish with `superplane apps change-requests create`",
 	)
 
 	server.AssertCalls(t, []string{
@@ -654,7 +654,7 @@ func TestUpdateFromFileDisableChangeManagementRequiresDraftWhenLiveChangeManagem
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "change management is enabled for this canvas")
+	require.Contains(t, err.Error(), "change management is enabled for this app")
 
 	server.AssertCalls(t, []string{
 		http.MethodGet + " /api/v1/canvases/" + canvasID,

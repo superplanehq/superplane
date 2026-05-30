@@ -1,4 +1,4 @@
-package canvases
+package apps
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/models"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -38,13 +38,13 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 
 	if filePath != "" {
 		if len(ctx.Args) > 0 {
-			return fmt.Errorf("cannot use <canvas-name> together with --file")
+			return fmt.Errorf("cannot use <app-name> together with --file")
 		}
 		return c.createFromFile(ctx, filePath, autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
 	}
 
 	if len(ctx.Args) != 1 {
-		return fmt.Errorf("either --file or <canvas-name> is required")
+		return fmt.Errorf("either --file or <app-name> is required")
 	}
 
 	name := ctx.Args[0]
@@ -139,7 +139,7 @@ func validateAndPrintCreateResponse(
 			return err
 		}
 		if url := BuildCanvasURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId()); url != "" {
-			if _, err := fmt.Fprintf(stdout, "Canvas URL: %s\n", url); err != nil {
+			if _, err := fmt.Fprintf(stdout, "App URL: %s\n", url); err != nil {
 				return err
 			}
 		}

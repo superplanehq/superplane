@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/cli/canvasresolve"
+	"github.com/superplanehq/superplane/pkg/cli/appresolve"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -23,7 +23,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		canvasArg = strings.TrimSpace(ctx.Args[0])
 	}
 
-	canvasID, err := canvasresolve.ResolveCanvasNameOrIDArg(ctx, canvasArg)
+	canvasID, err := appresolve.ResolveAppNameOrIDArg(ctx, canvasArg)
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 	if response.Dashboard == nil {
-		return fmt.Errorf("canvas %q has no dashboard", canvasID)
+		return fmt.Errorf("app %q has no dashboard", canvasID)
 	}
 
 	dashboard := *response.Dashboard
@@ -67,8 +67,8 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		if useDraft {
 			source = "draft"
 		}
-		_, _ = fmt.Fprintf(stdout, "Canvas: %s\n", canvasName)
-		_, _ = fmt.Fprintf(stdout, "Canvas ID: %s\n", canvasID)
+		_, _ = fmt.Fprintf(stdout, "App: %s\n", canvasName)
+		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", canvasID)
 		_, _ = fmt.Fprintf(stdout, "Source: %s\n", source)
 		if versionID := strings.TrimSpace(dashboard.GetVersionId()); versionID != "" {
 			_, _ = fmt.Fprintf(stdout, "Version ID: %s\n", versionID)
@@ -88,7 +88,7 @@ func lookupCanvasName(ctx core.CommandContext, canvasID string) (string, error) 
 		return "", err
 	}
 	if response.Canvas == nil || response.Canvas.Metadata == nil {
-		return "", fmt.Errorf("canvas %q not found", canvasID)
+		return "", fmt.Errorf("app %q not found", canvasID)
 	}
 	return response.Canvas.Metadata.GetName(), nil
 }
@@ -107,7 +107,7 @@ func resolveCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) 
 		return "", fmt.Errorf("current user id not found")
 	}
 
-	versionID, err := canvasresolve.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
+	versionID, err := appresolve.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
 	if err != nil {
 		return "", err
 	}

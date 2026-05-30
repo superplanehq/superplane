@@ -1,26 +1,26 @@
-package canvases
+package apps
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/superplanehq/superplane/pkg/cli/commands/canvases/files"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/files"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 func NewCommand(options core.BindOptions) *cobra.Command {
 	root := &cobra.Command{
-		Use:   "canvases",
-		Short: "Manage canvases",
+		Use:   "apps",
+		Short: "Manage apps",
 		Long: core.AgentSkillsHelp() + `
 
-Canvas URL pattern: {baseURL}/{organizationId}/canvases/{canvasId}
-(e.g. https://app.superplane.com/<organization-id>/canvases/<canvas-id>)`,
-		Aliases: []string{"canvas"},
+App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
+(e.g. https://app.superplane.com/<organization-id>/canvases/<app-id>)`,
+		Aliases: []string{"app", "canvases", "canvas"},
 	}
 
 	listCmd := &cobra.Command{
 		Use:   "list",
-		Short: "List canvases",
+		Short: "List apps",
 		Args:  cobra.NoArgs,
 	}
 	var listFull bool
@@ -29,7 +29,7 @@ Canvas URL pattern: {baseURL}/{organizationId}/canvases/{canvasId}
 
 	getCmd := &cobra.Command{
 		Use:   "get <name-or-id>",
-		Short: "Get a canvas",
+		Short: "Get an app",
 		Args:  cobra.ExactArgs(1),
 	}
 	var getDraft bool
@@ -37,9 +37,9 @@ Canvas URL pattern: {baseURL}/{organizationId}/canvases/{canvasId}
 	core.Bind(getCmd, &getCommand{draft: &getDraft}, options)
 
 	activeCmd := &cobra.Command{
-		Use:   "active [canvas-id]",
-		Short: "Set the active canvas",
-		Long:  "Without arguments, prompts for a canvas selection. With a canvas ID, sets it directly.",
+		Use:   "active [app-id]",
+		Short: "Set the active app",
+		Long:  "Without arguments, prompts for an app selection. With an app ID, sets it directly.",
 		Args:  cobra.MaximumNArgs(1),
 	}
 	core.Bind(activeCmd, &ActiveCommand{}, options)
@@ -49,17 +49,17 @@ Canvas URL pattern: {baseURL}/{organizationId}/canvases/{canvasId}
 	var createAutoLayoutScope string
 	var createAutoLayoutNodes []string
 	createCmd := &cobra.Command{
-		Use:   "create [canvas-name]",
-		Short: "Create a canvas",
-		Long: `Create a canvas by name or from a file.
+		Use:   "create [app-name]",
+		Short: "Create an app",
+		Long: `Create an app by name or from a file.
 
-AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
+AI agents: for canonical app YAML shapes and wiring rules, install skills:
 - ` + core.SkillsInstallCommand("superplane-canvas-builder") + `
 - ` + core.SkillsInstallCommand("superplane-cli"),
 		Args: cobra.MaximumNArgs(1),
 	}
 	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "filename, directory, or URL to files to use to create the resource")
-	createCmd.Flags().StringVar(&createAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
+	createCmd.Flags().StringVar(&createAutoLayout, "auto-layout", "", "automatically arrange the app (supported: horizontal, disable)")
 	createCmd.Flags().StringVar(&createAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
 	createCmd.Flags().StringArrayVar(&createAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
 	core.Bind(createCmd, &createCommand{
@@ -76,14 +76,14 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	var updateAutoLayoutNodes []string
 	updateCmd := &cobra.Command{
 		Use:   "update",
-		Short: "Update a canvas from a YAML file",
-		Long:  "Updates the canvas using --file. The file must include metadata.id to identify the target canvas.",
+		Short: "Update an app from a YAML file",
+		Long:  "Updates the app using --file. The file must include metadata.id to identify the target app.",
 		Args:  cobra.NoArgs,
 	}
 	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
 	_ = updateCmd.MarkFlagRequired("file")
 	updateCmd.Flags().BoolVar(&updateDraft, "draft", false, "keep the update as a draft instead of auto-publishing (required when change management is enabled)")
-	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
+	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the app (supported: horizontal, disable)")
 	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
 	updateCmd.Flags().StringArrayVar(&updateAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
 	core.Bind(updateCmd, &updateCommand{
@@ -102,13 +102,13 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 
 	changeRequestsCmd := &cobra.Command{
 		Use:     "change-requests",
-		Short:   "Manage canvas change requests",
+		Short:   "Manage app change requests",
 		Aliases: []string{"cr"},
 	}
 
 	changeRequestsListCmd := &cobra.Command{
 		Use:   "list [name-or-id]",
-		Short: "List change requests for a canvas",
+		Short: "List change requests for an app",
 		Args:  cobra.MaximumNArgs(1),
 	}
 	changeRequestsListCmd.Flags().StringVar(&changeRequestsListStatusFilter, "status", "", "status filter: all, open, conflicted, rejected, published")
@@ -202,8 +202,8 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 		Short: "Resolve conflicts by updating the change request version",
 		Args:  cobra.RangeArgs(1, 2),
 	}
-	changeRequestsResolveCmd.Flags().StringVarP(&changeRequestsResolveFile, "file", "f", "", "canvas file containing the conflict-resolved version")
-	changeRequestsResolveCmd.Flags().StringVar(&changeRequestsResolveAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
+	changeRequestsResolveCmd.Flags().StringVarP(&changeRequestsResolveFile, "file", "f", "", "app file containing the conflict-resolved version")
+	changeRequestsResolveCmd.Flags().StringVar(&changeRequestsResolveAutoLayout, "auto-layout", "", "automatically arrange the app (supported: horizontal, disable)")
 	changeRequestsResolveCmd.Flags().StringVar(&changeRequestsResolveAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
 	changeRequestsResolveCmd.Flags().StringArrayVar(&changeRequestsResolveAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
 	core.Bind(changeRequestsResolveCmd, &changeRequestResolveCommand{
@@ -228,8 +228,8 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 	var initOutputFile string
 	initCmd := &cobra.Command{
 		Use:   "init",
-		Short: "Generate a starter canvas YAML definition",
-		Long:  "Print a starter canvas YAML definition to stdout. Use --template to start from an existing template, or --list-templates to see available options.",
+		Short: "Generate a starter app YAML definition",
+		Long:  "Print a starter app YAML definition to stdout. Use --template to start from an existing template, or --list-templates to see available options.",
 		Args:  cobra.NoArgs,
 	}
 	initCmd.Flags().StringVar(&initTemplate, "template", "", "start from a named template (e.g. health-check-monitor)")
@@ -243,7 +243,7 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 
 	deleteCmd := &cobra.Command{
 		Use:   "delete <name-or-id>",
-		Short: "Delete a canvas",
+		Short: "Delete an app",
 		Args:  cobra.ExactArgs(1),
 	}
 

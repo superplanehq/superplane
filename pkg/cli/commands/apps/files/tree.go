@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	resolve "github.com/superplanehq/superplane/pkg/cli/canvasresolve"
+	resolve "github.com/superplanehq/superplane/pkg/cli/appresolve"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -26,7 +26,7 @@ func (c *TreeCommand) Execute(ctx core.CommandContext) error {
 		canvasTarget = strings.TrimSpace(ctx.Args[0])
 	}
 
-	canvasID, err := resolve.ResolveCanvasNameOrIDArg(ctx, canvasTarget)
+	canvasID, err := resolve.ResolveAppNameOrIDArg(ctx, canvasTarget)
 	if err != nil {
 		return err
 	}
