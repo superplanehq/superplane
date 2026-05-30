@@ -219,7 +219,7 @@ services:
     image: oven/bun:1
     profiles: [plugin]
     working_dir: /app/sdk/example
-    command: ["sh", "-c", "cd /app/sdk && bun install && bun run build && cd /app/sdk/example && bun install && bun run index.ts"]
+    command: ["sh", "-c", "cd /app/sdk && bun install && bun run build && cd /app/sdk/example && rm -rf node_modules && bun install --no-cache && bun run index.ts"]
     volumes:
       - .:/app
     ports:
