@@ -27,6 +27,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back a Render service to a previous deploy and wait for it to complete" />
   <LinkCard title="Scale Service" href="#scale-service" description="Scale a Render service to a fixed number of instances" />
   <LinkCard title="Update Service" href="#update-service" description="Freeze or thaw auto deploys for a Render service" />
+  <LinkCard title="Update Autoscaling" href="#update-autoscaling" description="Update Render autoscaling settings for a web service" />
   <LinkCard title="Add Custom Domain" href="#add-custom-domain" description="Add a custom domain to a Render service" />
   <LinkCard title="Remove Custom Domain" href="#remove-custom-domain" description="Remove a custom domain from a Render service" />
   <LinkCard title="Update Env Var" href="#update-env-var" description="Update or generate a value for a Render service environment variable" />
@@ -540,6 +541,25 @@ Updates Render service settings. The current implementation supports `autoDeploy
 ### Output
 
 Emits `render.service.updated` with `serviceId`, `autoDeploy`, and `status`.
+
+<a id="update-autoscaling"></a>
+
+## Update Autoscaling
+
+**Component key:** `render.updateAutoscaling`
+
+Updates Render autoscaling settings for a web service.
+
+### Configuration
+
+- **Service**: Render web service to update
+- **Enabled**: Whether autoscaling should be enabled
+- **Min Instances / Max Instances**: Autoscaling bounds
+- **Target CPU Percent / Target Memory Percent**: Autoscaling targets
+
+### Output
+
+Emits `render.autoscaling.updated` with the requested bounds, targets, status, and Render response.
 
 <a id="add-custom-domain"></a>
 

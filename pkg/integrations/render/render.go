@@ -110,6 +110,7 @@ func (r *Render) Actions() []core.Action {
 		&PurgeCache{},
 		&ScaleService{},
 		&UpdateService{},
+		&UpdateAutoscaling{},
 		&UpdateEnvVar{},
 		&AddCustomDomain{},
 		&RemoveCustomDomain{},

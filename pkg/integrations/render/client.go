@@ -108,6 +108,23 @@ type updateServiceRequest struct {
 	AutoDeploy string `json:"autoDeploy,omitempty"`
 }
 
+type autoscalingRequest struct {
+	Enabled  bool                       `json:"enabled"`
+	Min      int                        `json:"min"`
+	Max      int                        `json:"max"`
+	Criteria autoscalingRequestCriteria `json:"criteria"`
+}
+
+type autoscalingRequestCriteria struct {
+	CPU    autoscalingCriterion `json:"cpu"`
+	Memory autoscalingCriterion `json:"memory"`
+}
+
+type autoscalingCriterion struct {
+	Enabled    bool `json:"enabled"`
+	Percentage int  `json:"percentage"`
+}
+
 type triggerDeployResponse struct {
 	Deploy DeployResponse `json:"deploy"`
 }
@@ -679,6 +696,50 @@ func (c *Client) ScaleService(serviceID string, numInstances int) error {
 		scaleServiceRequest{NumInstances: numInstances},
 	)
 	return err
+}
+
+func (c *Client) UpdateAutoscaling(serviceID string, enabled bool, minInstances, maxInstances, cpuPercent, memoryPercent int) (map[string]any, error) {
+	if serviceID == "" {
+		return nil, fmt.Errorf("serviceID is required")
+	}
+	if minInstances < 1 {
+		return nil, fmt.Errorf("minInstances must be greater than 0")
+	}
+	if maxInstances < minInstances {
+		return nil, fmt.Errorf("maxInstances must be greater than or equal to minInstances")
+	}
+
+	request := autoscalingRequest{
+		Enabled: enabled,
+		Min:     minInstances,
+		Max:     maxInstances,
+		Criteria: autoscalingRequestCriteria{
+			CPU: autoscalingCriterion{
+				Enabled:    cpuPercent > 0,
+				Percentage: cpuPercent,
+			},
+			Memory: autoscalingCriterion{
+				Enabled:    memoryPercent > 0,
+				Percentage: memoryPercent,
+			},
+		},
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPut,
+		"/services/"+url.PathEscape(serviceID)+"/autoscaling",
+		nil,
+		request,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	response := map[string]any{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal autoscaling response: %w", err)
+	}
+	return response, nil
 }
 
 func (c *Client) GetMetric(metricType string, query MetricQuery) ([]MetricSeries, error) {

@@ -222,3 +222,12 @@ func (c *UpdateService) ExampleOutput() map[string]any {
 		"data": map[string]any{"serviceId": "srv-cukouhrtq21c73e9scng", "autoDeploy": "no", "status": "updated"},
 	}
 }
+
+func (c *UpdateAutoscaling) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.autoscaling.updated",
+		"data": map[string]any{
+			"serviceId": "srv-cukouhrtq21c73e9scng", "enabled": true, "minInstances": 1, "maxInstances": 3, "cpuPercent": 70, "memoryPercent": 75, "status": "updated",
+		},
+	}
+}

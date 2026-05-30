@@ -155,3 +155,27 @@ func Test__Render_UpdateService__Execute(t *testing.T) {
 	assert.Equal(t, "no", requestBody["autoDeploy"])
 	assert.Equal(t, http.MethodPatch, httpCtx.Requests[0].Method)
 }
+
+func Test__Render_UpdateAutoscaling__Execute(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"enabled":true,"min":1,"max":3}`)),
+		}},
+	}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+	err := (&UpdateAutoscaling{}).Execute(core.ExecutionContext{
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
+		ExecutionState: executionState,
+		Configuration: map[string]any{
+			"service": "srv-123", "enabled": true, "minInstances": 1, "maxInstances": 3, "cpuPercent": 70, "memoryPercent": 75,
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, UpdateAutoscalingPayloadType, executionState.Type)
+	assert.Equal(t, http.MethodPut, httpCtx.Requests[0].Method)
+	assert.Equal(t, "/v1/services/srv-123/autoscaling", httpCtx.Requests[0].URL.Path)
+}
