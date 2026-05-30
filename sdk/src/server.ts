@@ -5,15 +5,15 @@ import type {
   ExecuteRequest,
   ExecuteResponse,
   Manifest,
-  PluginOptions,
+  PlaneletOptions,
 } from "./types.js";
 
-export class PluginServer {
+export class PlaneletServer {
   private app: Express;
   private actions: Map<string, ActionDefinition> = new Map();
-  private options: PluginOptions;
+  private options: PlaneletOptions;
 
-  constructor(options: PluginOptions) {
+  constructor(options: PlaneletOptions) {
     this.options = options;
     this.app = express();
     this.app.use(express.json());
@@ -30,7 +30,7 @@ export class PluginServer {
       callback ??
         (() => {
           console.log(
-            `Plugin server "${this.options.name}" listening on port ${port}`,
+            `Planelet server "${this.options.name}" listening on port ${port}`,
           );
         }),
     );

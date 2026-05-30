@@ -1,6 +1,6 @@
-import { createPlugin } from "@superplane/plugin-sdk";
+import { createPlanelet } from "@superplane/planelet-sdk";
 
-const plugin = createPlugin({
+const planelet = createPlanelet({
   name: "quotes",
   label: "Random Quotes",
   icon: "quote",
@@ -25,7 +25,7 @@ const quotes = [
   { text: "Talk is cheap. Show me the code.", author: "Linus Torvalds" },
 ];
 
-plugin.action("get-quote", {
+planelet.action("get-quote", {
   label: "Get Random Quote",
   description: "Returns a random inspirational quote",
   fields: {
@@ -52,7 +52,7 @@ plugin.action("get-quote", {
   },
 });
 
-plugin.action("greet", {
+planelet.action("greet", {
   label: "Generate Greeting",
   description: "Generate a personalized greeting message",
   fields: {
@@ -92,4 +92,4 @@ plugin.action("greet", {
   },
 });
 
-plugin.listen(3001);
+planelet.listen(3001);

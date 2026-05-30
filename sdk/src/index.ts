@@ -1,20 +1,20 @@
-import { PluginServer } from "./server.js";
+import { PlaneletServer } from "./server.js";
 import type {
   ActionDefinition,
-  PluginOptions,
+  PlaneletOptions,
   FieldDefinition,
   FieldOption,
 } from "./types.js";
 
-export function createPlugin(options: PluginOptions): PluginBuilder {
-  return new PluginBuilder(options);
+export function createPlanelet(options: PlaneletOptions): PlaneletBuilder {
+  return new PlaneletBuilder(options);
 }
 
-class PluginBuilder {
-  private server: PluginServer;
+class PlaneletBuilder {
+  private server: PlaneletServer;
 
-  constructor(options: PluginOptions) {
-    this.server = new PluginServer(options);
+  constructor(options: PlaneletOptions) {
+    this.server = new PlaneletServer(options);
   }
 
   action<TParams = Record<string, unknown>>(
@@ -30,4 +30,4 @@ class PluginBuilder {
   }
 }
 
-export type { ActionDefinition, PluginOptions, FieldDefinition, FieldOption };
+export type { ActionDefinition, PlaneletOptions, FieldDefinition, FieldOption };

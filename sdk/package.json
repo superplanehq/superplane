@@ -1,7 +1,7 @@
 {
-  "name": "@superplane/plugin-sdk",
+  "name": "@superplane/planelet-sdk",
   "version": "0.1.0",
-  "description": "SDK for building SuperPlane plugin integrations",
+  "description": "SDK for building SuperPlane Planelet integrations",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

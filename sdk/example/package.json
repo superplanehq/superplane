@@ -1,5 +1,5 @@
 {
-  "name": "plugin-example",
+  "name": "planelet-example",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -7,6 +7,6 @@
     "start": "bun run index.ts"
   },
   "dependencies": {
-    "@superplane/plugin-sdk": "file:../"
+    "@superplane/planelet-sdk": "file:../"
   }
 }

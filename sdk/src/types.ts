@@ -50,7 +50,7 @@ export interface Manifest {
   actions: ActionManifest[];
 }
 
-export interface PluginOptions {
+export interface PlaneletOptions {
   name: string;
   label?: string;
   icon?: string;
