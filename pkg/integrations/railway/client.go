@@ -270,6 +270,24 @@ func (c *Client) GetDeployment(deploymentID string) (*Deployment, error) {
 				status
 				createdAt
 				updatedAt
+				statusUpdatedAt
+				projectId
+				serviceId
+				environmentId
+				snapshotId
+				staticUrl
+				url
+				canRollback
+				canRedeploy
+				deploymentStopped
+				meta
+				diagnosis
+				creator {
+					id
+					name
+					email
+					avatar
+				}
 			}
 		}
 	`
@@ -286,6 +304,30 @@ func (c *Client) GetDeployment(deploymentID string) (*Deployment, error) {
 	}
 
 	return &result.Deployment, nil
+}
+
+func (c *Client) RollbackDeployment(deploymentID string) error {
+	query := `
+		mutation($id: String!) {
+			deploymentRollback(id: $id)
+		}
+	`
+	variables := map[string]any{
+		"id": deploymentID,
+	}
+	var result struct {
+		DeploymentRollback bool `json:"deploymentRollback"`
+	}
+
+	if err := c.execQuery(query, variables, &result); err != nil {
+		return err
+	}
+
+	if !result.DeploymentRollback {
+		return fmt.Errorf("Railway did not accept rollback request")
+	}
+
+	return nil
 }
 
 func (c *Client) ListNotificationRules(workspaceID, projectID string) ([]NotificationRule, error) {

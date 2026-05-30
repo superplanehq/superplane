@@ -138,6 +138,21 @@ func Test__Railway__Client__GetDeployment(t *testing.T) {
 	assert.Equal(t, "SUCCESS", deploy.Status)
 }
 
+func Test__Railway__Client__RollbackDeployment(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(`{"data":{"deploymentRollback":true}}`)),
+			},
+		},
+	}
+
+	client := NewClientWithAPIToken(httpCtx, "test-token")
+	err := client.RollbackDeployment("deploy-123")
+	require.NoError(t, err)
+}
+
 func Test__Railway__Client__CreateNotificationRule(t *testing.T) {
 	httpCtx := &contexts.HTTPContext{
 		Responses: []*http.Response{

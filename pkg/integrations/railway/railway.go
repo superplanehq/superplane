@@ -54,6 +54,8 @@ func (r *Railway) Configuration() []configuration.Field {
 func (r *Railway) Actions() []core.Action {
 	return []core.Action{
 		&TriggerDeploy{},
+		&GetDeployment{},
+		&RollbackDeploy{},
 	}
 }
 

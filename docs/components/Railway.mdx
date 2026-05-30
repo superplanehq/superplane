@@ -16,6 +16,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Trigger Deploy" href="#trigger-deploy" description="Trigger a deploy for a Railway service and wait for it to complete" />
+  <LinkCard title="Get Deployment" href="#get-deployment" description="Retrieve a Railway deployment by ID" />
+  <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back to a previous Railway deployment" />
 </CardGrid>
 
 <a id="on-deployment-event"></a>
@@ -50,6 +52,30 @@ The On Deployment Event trigger fires when a deployment changes status in the sp
 }
 ```
 
+<a id="get-deployment"></a>
+
+## Get Deployment
+
+**Component key:** `railway.getDeployment`
+
+The Get Deployment action retrieves the current details of a Railway deployment.
+
+### Configuration
+
+- **Deploy ID**: The Railway deployment ID to retrieve.
+
+<a id="rollback-deploy"></a>
+
+## Rollback Deploy
+
+**Component key:** `railway.rollbackDeploy`
+
+The Rollback Deploy action rolls a Railway service back to a previous deployment.
+
+### Configuration
+
+- **Deploy ID**: The previous Railway deployment to restore.
+
 <a id="trigger-deploy"></a>
 
 ## Trigger Deploy
@@ -80,4 +106,3 @@ The Trigger Deploy action starts a new deploy for a Railway service and waits fo
   "status": "SUCCESS"
 }
 ```
-

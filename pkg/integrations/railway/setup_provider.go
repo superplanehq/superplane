@@ -79,6 +79,8 @@ func (s *SetupProvider) CapabilityGroups() []core.CapabilityGroup {
 			Capabilities: s.genCapabilities(
 				[]core.Action{
 					&TriggerDeploy{},
+					&GetDeployment{},
+					&RollbackDeploy{},
 				},
 				[]core.Trigger{
 					&OnDeploymentEvent{},

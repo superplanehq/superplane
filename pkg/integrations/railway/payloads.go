@@ -65,10 +65,23 @@ type Service struct {
 }
 
 type Deployment struct {
-	ID        string `json:"id"`
-	Status    string `json:"status"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	ID                string `json:"id"`
+	Status            string `json:"status"`
+	CreatedAt         string `json:"createdAt"`
+	UpdatedAt         string `json:"updatedAt"`
+	StatusUpdatedAt   string `json:"statusUpdatedAt,omitempty"`
+	ProjectID         string `json:"projectId,omitempty"`
+	ServiceID         string `json:"serviceId,omitempty"`
+	EnvironmentID     string `json:"environmentId,omitempty"`
+	SnapshotID        string `json:"snapshotId,omitempty"`
+	StaticURL         string `json:"staticUrl,omitempty"`
+	URL               string `json:"url,omitempty"`
+	CanRollback       bool   `json:"canRollback"`
+	CanRedeploy       bool   `json:"canRedeploy"`
+	DeploymentStopped bool   `json:"deploymentStopped"`
+	Meta              any    `json:"meta,omitempty"`
+	Diagnosis         any    `json:"diagnosis,omitempty"`
+	Creator           any    `json:"creator,omitempty"`
 }
 
 type NotificationRule struct {
