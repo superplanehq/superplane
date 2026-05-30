@@ -27,6 +27,17 @@ func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, or
 		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
 	}
 
+	//
+	// If the repository has not been provisioned yet (or failed to
+	// provision), the underlying git provider has nothing to list. Return an
+	// empty list so the UI can render gracefully without surfacing a 5xx.
+	//
+	if repository.Status != models.RepositoryStatusReady {
+		return &pb.ListCanvasRepositoryFilesResponse{
+			Files: []*pb.CanvasRepositoryFile{},
+		}, nil
+	}
+
 	files, err := gitProvider.ListFiles(ctx, repository.RepoID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list repository files: %v", err)

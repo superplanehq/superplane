@@ -40,6 +40,15 @@ func Test__ListCanvasRepositoryFiles(t *testing.T) {
 		assert.Equal(t, codes.Internal, s.Code())
 	})
 
+	t.Run("repository not ready -> returns empty file list", func(t *testing.T) {
+		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusPending, false)
+
+		response, err := ListCanvasRepositoryFiles(context.Background(), r.GitProvider, r.Organization.ID.String(), canvas.ID.String())
+		require.NoError(t, err)
+		require.NotNil(t, response)
+		assert.Empty(t, response.Files)
+	})
+
 	t.Run("returns repository files", func(t *testing.T) {
 		canvas, _ := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
 

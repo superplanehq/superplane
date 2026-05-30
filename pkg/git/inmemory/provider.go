@@ -95,6 +95,16 @@ func (p *Provider) Commit(_ context.Context, repoID string, options provider.Com
 		return "", err
 	}
 
+	if err := provider.ValidateCommitMetadata(options.Message, options.Author); err != nil {
+		return "", err
+	}
+
+	operations, err := provider.ValidateCommitOperations(options.Operations)
+	if err != nil {
+		return "", err
+	}
+	options.Operations = operations
+
 	if options.ExpectedHeadSHA != repository.headSHA {
 		return "", provider.ErrExpectedHeadMismatch
 	}
