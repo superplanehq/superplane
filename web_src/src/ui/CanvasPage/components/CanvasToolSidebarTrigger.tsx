@@ -32,6 +32,7 @@ export function CanvasToolSidebarTrigger({ toolSidebarState }: CanvasToolSidebar
             className="rounded-md border-0 p-0 shadow-none transition-colors focus-visible:bg-slate-100 text-slate-900 hover:bg-slate-100 hover:text-slate-900"
             aria-label={label}
             aria-pressed={isToolSidebarOpen}
+            data-testid="canvas-tool-sidebar-toggle"
             onClick={handleToolSidebarToggle}
           >
             {isToolSidebarOpen ? (

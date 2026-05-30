@@ -344,6 +344,7 @@ export const ComponentBase: React.FC<ComponentBaseProps> = ({
         className={cn(
           "group relative flex flex-col rounded-md w-[23rem]",
           getDraftDiffOutlineClassName(draftDiffStatus),
+          !draftDiffStatus && hasError && "!outline-orange-500",
           dimBodyBelowHeader ? "bg-slate-200" : "bg-white",
         )}
         data-view-mode={isCompactView ? "compact" : "expanded"}
