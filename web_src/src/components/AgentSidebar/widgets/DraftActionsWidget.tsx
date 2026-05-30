@@ -1,6 +1,9 @@
 import { Eye, Rocket, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useDeleteCanvasVersion, usePublishCanvasVersion } from "@/hooks/useCanvasData";
+import { getApiErrorMessage } from "@/lib/errors";
+import { showErrorToast } from "@/lib/toast";
 
 export interface DraftActionsWidgetProps {
   versionId: string;
@@ -20,38 +23,33 @@ export function DraftActionsWidget({
   onDismiss,
 }: DraftActionsWidgetProps) {
   const [busy, setBusy] = useState<"publish" | "discard" | null>(null);
+  const publishVersion = usePublishCanvasVersion(organizationId, canvasId);
+  const deleteVersion = useDeleteCanvasVersion(organizationId, canvasId);
 
   const handleViewInEditor = () => {
     window.dispatchEvent(new CustomEvent("agent:view-version", { detail: { versionId } }));
   };
 
-  const callApi = async (method: string, url: string, action: "publish" | "discard") => {
+  // Surfacing errors as toasts (instead of console.error) avoids polluting Sentry
+  // with user-actionable failures coming from the publish/delete endpoints, while
+  // still telling the user what went wrong.
+  const runAction = async (action: "publish" | "discard", perform: () => Promise<unknown>, fallbackMessage: string) => {
     setBusy(action);
     try {
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          "x-organization-id": organizationId,
-        },
-        credentials: "include",
-      });
-      if (response.ok) {
-        onDismiss?.();
-      } else {
-        const text = await response.text();
-        console.error(`${action} failed:`, response.status, text);
-      }
-    } catch (err) {
-      console.error(`Failed to ${action}:`, err);
+      await perform();
+      onDismiss?.();
+    } catch (error) {
+      showErrorToast(getApiErrorMessage(error, fallbackMessage));
     } finally {
       setBusy(null);
     }
   };
 
-  const handlePublish = () => callApi("PATCH", `/api/v1/canvases/${canvasId}/versions/${versionId}/publish`, "publish");
+  const handlePublish = () =>
+    runAction("publish", () => publishVersion.mutateAsync(versionId), "Failed to publish version.");
 
-  const handleDiscard = () => callApi("DELETE", `/api/v1/canvases/${canvasId}/versions/${versionId}`, "discard");
+  const handleDiscard = () =>
+    runAction("discard", () => deleteVersion.mutateAsync(versionId), "Failed to discard version.");
 
   return (
     <div className="flex items-center gap-2">
