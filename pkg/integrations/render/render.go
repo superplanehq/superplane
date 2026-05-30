@@ -103,6 +103,7 @@ func (r *Render) Actions() []core.Action {
 		&GetService{},
 		&GetDeploy{},
 		&ListDeploys{},
+		&GetMetrics{},
 		&CancelDeploy{},
 		&RollbackDeploy{},
 		&PurgeCache{},

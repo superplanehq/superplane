@@ -18,6 +18,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getService: getServiceMapper,
   getDeploy: getDeployMapper,
   listDeploys: renderOperationMapper,
+  getMetrics: renderOperationMapper,
   cancelDeploy: cancelDeployMapper,
   rollbackDeploy: rollbackDeployMapper,
   purgeCache: purgeCacheMapper,

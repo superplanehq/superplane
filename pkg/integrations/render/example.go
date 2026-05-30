@@ -188,3 +188,16 @@ func (c *ListDeploys) ExampleOutput() map[string]any {
 		},
 	}
 }
+
+func (c *GetMetrics) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.metrics",
+		"data": map[string]any{
+			"resources": []string{"srv-cukouhrtq21c73e9scng"},
+			"summaries": map[string]any{
+				"cpu":    map[string]any{"latest": 72.1, "avg": 58.4, "max": 84.2, "unit": "%"},
+				"memory": map[string]any{"latest": 68.9, "avg": 61.3, "max": 79.7, "unit": "%"},
+			},
+		},
+	}
+}

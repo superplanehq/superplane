@@ -151,6 +151,30 @@ type rollbackRequest struct {
 	DeployID string `json:"deployId"`
 }
 
+type MetricQuery struct {
+	Resources         []string
+	StartTime         string
+	EndTime           string
+	ResolutionSeconds int
+	AggregationMethod string
+}
+
+type MetricSeries struct {
+	Labels []MetricLabel `json:"labels"`
+	Values []MetricValue `json:"values"`
+	Unit   string        `json:"unit"`
+}
+
+type MetricLabel struct {
+	Field string `json:"field"`
+	Value string `json:"value"`
+}
+
+type MetricValue struct {
+	Timestamp string  `json:"timestamp"`
+	Value     float64 `json:"value"`
+}
+
 type EventResponse struct {
 	ID        string               `json:"id"`
 	Timestamp string               `json:"timestamp"`
@@ -598,6 +622,67 @@ func (c *Client) ScaleService(serviceID string, numInstances int) error {
 		scaleServiceRequest{NumInstances: numInstances},
 	)
 	return err
+}
+
+func (c *Client) GetMetric(metricType string, query MetricQuery) ([]MetricSeries, error) {
+	path, err := metricPath(metricType)
+	if err != nil {
+		return nil, err
+	}
+
+	values := url.Values{}
+	for _, resource := range query.Resources {
+		resource = strings.TrimSpace(resource)
+		if resource != "" {
+			values.Add("resource", resource)
+		}
+	}
+	if query.StartTime != "" {
+		values.Set("startTime", query.StartTime)
+	}
+	if query.EndTime != "" {
+		values.Set("endTime", query.EndTime)
+	}
+	if query.ResolutionSeconds > 0 {
+		values.Set("resolutionSeconds", fmt.Sprintf("%d", query.ResolutionSeconds))
+	}
+	if query.AggregationMethod != "" {
+		values.Set("aggregationMethod", query.AggregationMethod)
+	}
+
+	_, body, err := c.execRequestWithResponse(http.MethodGet, path, values, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	series := []MetricSeries{}
+	if err := json.Unmarshal(body, &series); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal metric response: %w", err)
+	}
+	return series, nil
+}
+
+func metricPath(metricType string) (string, error) {
+	switch strings.TrimSpace(metricType) {
+	case "cpu":
+		return "/metrics/cpu", nil
+	case "memory":
+		return "/metrics/memory", nil
+	case "http_requests":
+		return "/metrics/http-requests", nil
+	case "active_connections":
+		return "/metrics/active-connections", nil
+	case "cpu_limit":
+		return "/metrics/cpu-limit", nil
+	case "memory_limit":
+		return "/metrics/memory-limit", nil
+	case "cpu_target":
+		return "/metrics/cpu-target", nil
+	case "memory_target":
+		return "/metrics/memory-target", nil
+	default:
+		return "", fmt.Errorf("unsupported metric type: %s", metricType)
+	}
 }
 
 func (c *Client) UpdateEnvVar(serviceID string, key string, request UpdateEnvVarRequest) (EnvVar, error) {

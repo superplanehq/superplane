@@ -21,6 +21,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Deploy" href="#get-deploy" description="Retrieve a deploy by ID for a Render service" />
   <LinkCard title="List Deploys" href="#list-deploys" description="List recent deploys for rollback and incident workflows" />
   <LinkCard title="Get Service" href="#get-service" description="Retrieve a Render service and its custom domains" />
+  <LinkCard title="Get Metrics" href="#get-metrics" description="Fetch Render CPU, memory, request, and connection metrics" />
   <LinkCard title="Purge Cache" href="#purge-cache" description="Request a purge of the build cache for a Render service" />
   <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back a Render service to a previous deploy and wait for it to complete" />
   <LinkCard title="Scale Service" href="#scale-service" description="Scale a Render service to a fixed number of instances" />
@@ -480,6 +481,26 @@ Lists recent deploys for a Render service. Use this in incident workflows to fin
 ### Output
 
 Emits `render.deploys.listed` with `serviceId`, `count`, `deploys`, and `latestSuccessful` when a live deploy is present.
+
+<a id="get-metrics"></a>
+
+## Get Metrics
+
+**Component key:** `render.getMetrics`
+
+Fetches Render metrics and emits normalized summaries plus raw series.
+
+### Configuration
+
+- **Resources**: Render service, Postgres, or Key Value resource IDs
+- **Metric Types**: `cpu`, `memory`, `http_requests`, `active_connections`, `cpu_limit`, `memory_limit`, `cpu_target`, or `memory_target`
+- **Start Time / End Time**: Optional RFC3339 time range
+- **Resolution Seconds**: Optional metric resolution, default `60`
+- **Aggregation Method**: Optional `AVG`, `MAX`, or `MIN`
+
+### Output
+
+Emits `render.metrics` with `resources`, `metrics`, and `summaries`. Each summary includes `latest`, `avg`, `max`, `count`, and `unit`.
 
 <a id="add-custom-domain"></a>
 
