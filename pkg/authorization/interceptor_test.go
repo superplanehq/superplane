@@ -246,8 +246,11 @@ func TestAgentRoutesRequireManagedAgentsFeature(t *testing.T) {
 }
 
 func TestCheckRequiredExperimentalFeatures(t *testing.T) {
+	const unreleasedFeature = "test_unreleased_feature"
+	t.Cleanup(features.WithRegistryForTest([]features.Feature{{ID: unreleasedFeature, Label: unreleasedFeature}}))
+
 	rule := AuthorizationRule{
-		RequiredExperimentalFeatures: []string{features.FeatureClaudeManagedAgents},
+		RequiredExperimentalFeatures: []string{unreleasedFeature},
 	}
 
 	err := checkRequiredExperimentalFeatures(&models.Organization{}, rule)
@@ -255,7 +258,7 @@ func TestCheckRequiredExperimentalFeatures(t *testing.T) {
 	assert.Equal(t, codes.PermissionDenied, status.Code(err))
 
 	err = checkRequiredExperimentalFeatures(&models.Organization{
-		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{features.FeatureClaudeManagedAgents},
+		EnabledExperimentalFeatures: datatypes.JSONSlice[string]{unreleasedFeature},
 	}, rule)
 	require.NoError(t, err)
 }
