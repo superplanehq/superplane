@@ -1,4 +1,4 @@
-package plugin
+package planelet
 
 import (
 	"bytes"
@@ -117,7 +117,7 @@ func (c *Client) ExecuteAction(actionName string, params map[string]any, input a
 	if resp.StatusCode >= 400 {
 		return &ExecuteResponse{
 			Success: false,
-			Error:   fmt.Sprintf("plugin server returned status %d: %s", resp.StatusCode, string(respBody)),
+			Error:   fmt.Sprintf("Planelet server returned status %d: %s", resp.StatusCode, string(respBody)),
 		}, nil
 	}
 

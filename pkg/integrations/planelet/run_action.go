@@ -1,4 +1,4 @@
-package plugin
+package planelet
 
 import (
 	"fmt"
@@ -13,8 +13,8 @@ import (
 const (
 	SuccessChannel     = "success"
 	FailureChannel     = "failure"
-	SuccessPayloadType = "plugin.action.success"
-	FailurePayloadType = "plugin.action.failed"
+	SuccessPayloadType = "planelet.action.success"
+	FailurePayloadType = "planelet.action.failed"
 )
 
 type RunAction struct{}
@@ -24,39 +24,39 @@ type RunActionConfiguration struct {
 }
 
 func (r *RunAction) Name() string {
-	return "plugin.runAction"
+	return "planelet.runAction"
 }
 
 func (r *RunAction) Label() string {
-	return "Run Plugin Action"
+	return "Run Planelet Action"
 }
 
 func (r *RunAction) Description() string {
 	manifest := getCachedManifest()
 	if manifest == nil {
-		return "Execute an action on a connected plugin server"
+		return "Execute an action on a connected Planelet server"
 	}
 	return fmt.Sprintf("Execute an action on %s", manifest.Label)
 }
 
 func (r *RunAction) Documentation() string {
-	return `Run a remote action on a plugin server connected via the Plugin integration.
+	return `Run a remote action on a Planelet server connected via the Planelets integration.
 
 ## Use Cases
 
 - Execute custom business logic hosted on your own server
-- Integrate with internal services via the Plugin SDK
-- Run any action defined in the plugin server's manifest
+- Integrate with internal services via the Planelet SDK
+- Run any action defined in the Planelet server's manifest
 
 ## Configuration
 
-- **Action**: Select which action to run from the plugin server's manifest
+- **Action**: Select which action to run from the Planelet server's manifest
 - Additional fields appear dynamically based on the selected action
 
 ## Output Channels
 
-- **Success**: Emitted when the plugin action succeeds, contains the action's response data
-- **Failure**: Emitted when the action fails or the plugin server returns an error`
+- **Success**: Emitted when the Planelet action succeeds, contains the action's response data
+- **Failure**: Emitted when the action fails or the Planelet server returns an error`
 }
 
 func (r *RunAction) Icon() string {
@@ -86,7 +86,7 @@ func (r *RunAction) Configuration() []configuration.Field {
 					Type: "action",
 				},
 			},
-			Description: "The plugin action to execute",
+			Description: "The Planelet action to execute",
 		},
 	}
 
@@ -155,7 +155,7 @@ func (r *RunAction) Setup(ctx core.SetupContext) error {
 
 	client, err := NewClientWithHTTP(ctx.Integration, ctx.HTTP)
 	if err != nil {
-		return fmt.Errorf("failed to create plugin client: %w", err)
+		return fmt.Errorf("failed to create Planelet client: %w", err)
 	}
 
 	manifest, err := client.FetchManifest()
@@ -172,7 +172,7 @@ func (r *RunAction) Setup(ctx core.SetupContext) error {
 	}
 
 	if !found {
-		return fmt.Errorf("action %q not found in plugin manifest", config.ActionName)
+		return fmt.Errorf("action %q not found in Planelet manifest", config.ActionName)
 	}
 
 	return nil
@@ -194,7 +194,7 @@ func (r *RunAction) Execute(ctx core.ExecutionContext) error {
 
 	client, err := NewClientWithHTTP(ctx.Integration, ctx.HTTP)
 	if err != nil {
-		return r.emitFailure(ctx, fmt.Sprintf("failed to create plugin client: %v", err))
+		return r.emitFailure(ctx, fmt.Sprintf("failed to create Planelet client: %v", err))
 	}
 
 	params := extractActionParams(ctx.Configuration, config.ActionName)

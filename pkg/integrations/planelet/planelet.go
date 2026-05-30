@@ -1,4 +1,4 @@
-package plugin
+package planelet
 
 import (
 	"encoding/json"
@@ -13,56 +13,56 @@ import (
 )
 
 func init() {
-	registry.RegisterIntegration("plugin", &Plugin{})
+	registry.RegisterIntegration("planelet", &Planelet{})
 }
 
-type Plugin struct{}
+type Planelet struct{}
 
-type PluginConfiguration struct {
+type PlaneletConfiguration struct {
 	ServerURL string `json:"serverUrl" mapstructure:"serverUrl"`
 	AuthToken string `json:"authToken" mapstructure:"authToken"`
 }
 
-type PluginMetadata struct {
+type PlaneletMetadata struct {
 	ManifestName  string `json:"manifestName" mapstructure:"manifestName"`
 	ManifestLabel string `json:"manifestLabel" mapstructure:"manifestLabel"`
 }
 
-func (p *Plugin) Name() string {
-	return "plugin"
+func (p *Planelet) Name() string {
+	return "planelet"
 }
 
-func (p *Plugin) Label() string {
-	return "Plugin"
+func (p *Planelet) Label() string {
+	return "Planelets"
 }
 
-func (p *Plugin) Icon() string {
+func (p *Planelet) Icon() string {
 	return "puzzle"
 }
 
-func (p *Plugin) Description() string {
-	return "Connect to custom plugin servers built with the SuperPlane Plugin SDK"
+func (p *Planelet) Description() string {
+	return "Connect to custom Planelet servers built with the SuperPlane Planelet SDK"
 }
 
-func (p *Plugin) Instructions() string {
+func (p *Planelet) Instructions() string {
 	return `### Setup
 
-1. Build a plugin server using the SuperPlane Plugin SDK
-2. Deploy your plugin server so SuperPlane can reach it
+1. Build a Planelet server using the SuperPlane Planelet SDK
+2. Deploy your Planelet server so SuperPlane can reach it
 3. Enter the server URL below
 4. Optionally add an auth token if your server requires authentication
 
-The plugin server exposes a manifest at ` + "`GET /manifest`" + ` describing available actions and their configuration fields.`
+The Planelet server exposes a manifest at ` + "`GET /manifest`" + ` describing available actions and their configuration fields.`
 }
 
-func (p *Plugin) Configuration() []configuration.Field {
+func (p *Planelet) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:        "serverUrl",
 			Label:       "Server URL",
 			Type:        configuration.FieldTypeString,
 			Required:    true,
-			Description: "URL of the plugin server (e.g. https://my-plugin.example.com)",
+			Description: "URL of the Planelet server (e.g. https://my-planelet.example.com)",
 		},
 		{
 			Name:        "authToken",
@@ -70,25 +70,25 @@ func (p *Plugin) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeString,
 			Required:    false,
 			Sensitive:   true,
-			Description: "Optional bearer token for authenticating with the plugin server",
+			Description: "Optional bearer token for authenticating with the Planelet server",
 		},
 	}
 }
 
-func (p *Plugin) Actions() []core.Action {
+func (p *Planelet) Actions() []core.Action {
 	return []core.Action{
 		&RunAction{},
 	}
 }
 
-func (p *Plugin) Triggers() []core.Trigger {
+func (p *Planelet) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnEvent{},
 	}
 }
 
-func (p *Plugin) Sync(ctx core.SyncContext) error {
-	config := PluginConfiguration{}
+func (p *Planelet) Sync(ctx core.SyncContext) error {
+	config := PlaneletConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -105,16 +105,16 @@ func (p *Plugin) Sync(ctx core.SyncContext) error {
 
 	manifest, err := client.FetchManifest()
 	if err != nil {
-		return fmt.Errorf("failed to connect to plugin server: %w", err)
+		return fmt.Errorf("failed to connect to Planelet server: %w", err)
 	}
 
 	if manifest.Name == "" {
-		return fmt.Errorf("plugin manifest is missing 'name' field")
+		return fmt.Errorf("Planelet manifest is missing 'name' field")
 	}
 
 	setCachedManifest(manifest)
 
-	ctx.Integration.SetMetadata(PluginMetadata{
+	ctx.Integration.SetMetadata(PlaneletMetadata{
 		ManifestName:  manifest.Name,
 		ManifestLabel: manifest.Label,
 	})
@@ -123,12 +123,12 @@ func (p *Plugin) Sync(ctx core.SyncContext) error {
 	return nil
 }
 
-func (p *Plugin) Cleanup(ctx core.IntegrationCleanupContext) error {
+func (p *Planelet) Cleanup(ctx core.IntegrationCleanupContext) error {
 	setCachedManifest(nil)
 	return nil
 }
 
-func (p *Plugin) HandleRequest(ctx core.HTTPRequestContext) {
+func (p *Planelet) HandleRequest(ctx core.HTTPRequestContext) {
 	body, err := io.ReadAll(ctx.Request.Body)
 	if err != nil {
 		ctx.Logger.Errorf("failed to read request body: %v", err)
@@ -159,7 +159,7 @@ func (p *Plugin) HandleRequest(ctx core.HTTPRequestContext) {
 		}
 
 		subType, _ := config["type"].(string)
-		if subType != "plugin_event" {
+		if subType != "planelet_event" {
 			continue
 		}
 
@@ -176,7 +176,7 @@ func (p *Plugin) HandleRequest(ctx core.HTTPRequestContext) {
 	ctx.Response.WriteHeader(http.StatusOK)
 }
 
-func (p *Plugin) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
+func (p *Planelet) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
 	if resourceType != "action" {
 		return []core.IntegrationResource{}, nil
 	}
@@ -205,10 +205,10 @@ func (p *Plugin) ListResources(resourceType string, ctx core.ListResourcesContex
 	return resources, nil
 }
 
-func (p *Plugin) Hooks() []core.Hook {
+func (p *Planelet) Hooks() []core.Hook {
 	return []core.Hook{}
 }
 
-func (p *Plugin) HandleHook(ctx core.IntegrationHookContext) error {
+func (p *Planelet) HandleHook(ctx core.IntegrationHookContext) error {
 	return nil
 }

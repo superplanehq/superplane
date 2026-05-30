@@ -55,7 +55,7 @@ import (
 	_ "github.com/superplanehq/superplane/pkg/integrations/openai"
 	_ "github.com/superplanehq/superplane/pkg/integrations/pagerduty"
 	_ "github.com/superplanehq/superplane/pkg/integrations/perplexity"
-	_ "github.com/superplanehq/superplane/pkg/integrations/plugin"
+	_ "github.com/superplanehq/superplane/pkg/integrations/planelet"
 	_ "github.com/superplanehq/superplane/pkg/integrations/prometheus"
 	_ "github.com/superplanehq/superplane/pkg/integrations/render"
 	_ "github.com/superplanehq/superplane/pkg/integrations/rootly"

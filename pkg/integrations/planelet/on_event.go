@@ -1,4 +1,4 @@
-package plugin
+package planelet
 
 import (
 	"fmt"
@@ -20,19 +20,19 @@ type OnEventMetadata struct {
 }
 
 func (t *OnEvent) Name() string {
-	return "plugin.onEvent"
+	return "planelet.onEvent"
 }
 
 func (t *OnEvent) Label() string {
-	return "On Plugin Event"
+	return "On Planelet Event"
 }
 
 func (t *OnEvent) Description() string {
-	return "Listen for events from a connected plugin server"
+	return "Listen for events from a connected Planelet server"
 }
 
 func (t *OnEvent) Documentation() string {
-	return `Triggers a workflow when a plugin server emits an event.
+	return `Triggers a workflow when a Planelet server emits an event.
 
 ## Use Cases
 
@@ -46,7 +46,7 @@ func (t *OnEvent) Documentation() string {
 
 ## Event Data
 
-The event payload depends on what the plugin server sends. It is passed through as-is.`
+The event payload depends on what the Planelet server sends. It is passed through as-is.`
 }
 
 func (t *OnEvent) Icon() string {
@@ -59,7 +59,7 @@ func (t *OnEvent) Color() string {
 
 func (t *OnEvent) ExampleData() map[string]any {
 	return map[string]any{
-		"type": "plugin.event",
+		"type": "planelet.event",
 		"data": map[string]any{
 			"eventType": "example.event",
 			"payload": map[string]any{
@@ -98,7 +98,7 @@ func (t *OnEvent) Setup(ctx core.TriggerContext) error {
 	}
 
 	subscriptionConfig := map[string]any{
-		"type": "plugin_event",
+		"type": "planelet_event",
 	}
 	if config.EventType != "" {
 		subscriptionConfig["eventType"] = config.EventType

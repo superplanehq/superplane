@@ -1,5 +1,5 @@
 {
-  "type": "plugin.action.success",
+  "type": "planelet.action.success",
   "data": {
     "action": "example-action",
     "result": {
