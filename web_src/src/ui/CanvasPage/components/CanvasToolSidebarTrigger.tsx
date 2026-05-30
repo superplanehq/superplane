@@ -4,10 +4,6 @@ import { useShortcutLabel } from "@/hooks/useShortcutLabel";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PanelLeft, PanelLeftDashed } from "lucide-react";
 
-export function formatToggleSidebarLabel(shortcutLabel: string) {
-  return `Toggle Sidebar (${shortcutLabel})`;
-}
-
 export type CanvasToolSidebarTriggerProps = {
   toolSidebarState: CanvasToolSidebarState;
 };
@@ -15,7 +11,7 @@ export type CanvasToolSidebarTriggerProps = {
 export function CanvasToolSidebarTrigger({ toolSidebarState }: CanvasToolSidebarTriggerProps) {
   const { showToolSidebarToggle, isToolSidebarOpen, handleToolSidebarToggle } = toolSidebarState;
   const shortcutLabel = useShortcutLabel("B");
-  const label = formatToggleSidebarLabel(shortcutLabel);
+  const label = `Toggle Sidebar (${shortcutLabel})`;
 
   if (!showToolSidebarToggle) {
     return null;
