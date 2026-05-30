@@ -26,6 +26,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Purge Cache" href="#purge-cache" description="Request a purge of the build cache for a Render service" />
   <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back a Render service to a previous deploy and wait for it to complete" />
   <LinkCard title="Scale Service" href="#scale-service" description="Scale a Render service to a fixed number of instances" />
+  <LinkCard title="Update Service" href="#update-service" description="Freeze or thaw auto deploys for a Render service" />
   <LinkCard title="Add Custom Domain" href="#add-custom-domain" description="Add a custom domain to a Render service" />
   <LinkCard title="Remove Custom Domain" href="#remove-custom-domain" description="Remove a custom domain from a Render service" />
   <LinkCard title="Update Env Var" href="#update-env-var" description="Update or generate a value for a Render service environment variable" />
@@ -522,6 +523,23 @@ Queries recent Render logs across one or more resources in the configured worksp
 ### Output
 
 Emits `render.logs` with `resources`, `count`, `errorCount`, pagination fields, and `logs`.
+
+<a id="update-service"></a>
+
+## Update Service
+
+**Component key:** `render.updateService`
+
+Updates Render service settings. The current implementation supports `autoDeploy`, which is useful for freezing deploys during an incident and thawing them after recovery.
+
+### Configuration
+
+- **Service**: Render service to update
+- **Auto Deploy**: `Enabled` (`yes`) or `Disabled` (`no`)
+
+### Output
+
+Emits `render.service.updated` with `serviceId`, `autoDeploy`, and `status`.
 
 <a id="add-custom-domain"></a>
 

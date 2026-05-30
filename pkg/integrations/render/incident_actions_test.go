@@ -1,6 +1,7 @@
 package render
 
 import (
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -124,4 +125,33 @@ func Test__Render_ListLogs__Execute(t *testing.T) {
 	assert.Equal(t, "usr-123", request.URL.Query().Get("ownerId"))
 	assert.Equal(t, "srv-123", request.URL.Query().Get("resource"))
 	assert.Equal(t, "error", request.URL.Query().Get("level"))
+}
+
+func Test__Render_UpdateService__Execute(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"id":"srv-123","name":"api","autoDeploy":"no"}`)),
+		}},
+	}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+	err := (&UpdateService{}).Execute(core.ExecutionContext{
+		HTTP:           httpCtx,
+		Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
+		ExecutionState: executionState,
+		Configuration:  map[string]any{"service": "srv-123", "autoDeploy": "no"},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, UpdateServicePayloadType, executionState.Type)
+	data := readMap(readMap(executionState.Payloads[0])["data"])
+	assert.Equal(t, "no", data["autoDeploy"])
+
+	body, err := io.ReadAll(httpCtx.Requests[0].Body)
+	require.NoError(t, err)
+	var requestBody map[string]any
+	require.NoError(t, json.Unmarshal(body, &requestBody))
+	assert.Equal(t, "no", requestBody["autoDeploy"])
+	assert.Equal(t, http.MethodPatch, httpCtx.Requests[0].Method)
 }

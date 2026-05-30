@@ -104,6 +104,10 @@ type scaleServiceRequest struct {
 	NumInstances int `json:"numInstances"`
 }
 
+type updateServiceRequest struct {
+	AutoDeploy string `json:"autoDeploy,omitempty"`
+}
+
 type triggerDeployResponse struct {
 	Deploy DeployResponse `json:"deploy"`
 }
@@ -558,6 +562,40 @@ func (c *Client) GetService(serviceID string) (Service, error) {
 	}
 
 	return service, nil
+}
+
+func (c *Client) UpdateService(serviceID string, autoDeploy string) (Service, error) {
+	if serviceID == "" {
+		return Service{}, fmt.Errorf("serviceID is required")
+	}
+
+	autoDeploy = strings.TrimSpace(autoDeploy)
+	if autoDeploy != "yes" && autoDeploy != "no" {
+		return Service{}, fmt.Errorf("autoDeploy must be yes or no")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPatch,
+		"/services/"+url.PathEscape(serviceID),
+		nil,
+		updateServiceRequest{AutoDeploy: autoDeploy},
+	)
+	if err != nil {
+		return Service{}, err
+	}
+
+	service := Service{}
+	if err := json.Unmarshal(body, &service); err == nil && service.ID != "" {
+		return service, nil
+	}
+
+	wrapper := struct {
+		Service Service `json:"service"`
+	}{}
+	if err := json.Unmarshal(body, &wrapper); err != nil {
+		return Service{}, fmt.Errorf("failed to unmarshal service response: %w", err)
+	}
+	return wrapper.Service, nil
 }
 
 func (c *Client) CancelDeploy(serviceID string, deployID string) (DeployResponse, error) {

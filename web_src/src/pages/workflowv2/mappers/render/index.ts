@@ -24,6 +24,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   rollbackDeploy: rollbackDeployMapper,
   purgeCache: purgeCacheMapper,
   scaleService: scaleServiceMapper,
+  updateService: renderOperationMapper,
   updateEnvVar: updateEnvVarMapper,
   "service.addCustomDomain": addCustomDomainMapper,
   "service.removeCustomDomain": removeCustomDomainMapper,

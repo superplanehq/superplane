@@ -215,3 +215,10 @@ func (c *ListLogs) ExampleOutput() map[string]any {
 		},
 	}
 }
+
+func (c *UpdateService) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.service.updated",
+		"data": map[string]any{"serviceId": "srv-cukouhrtq21c73e9scng", "autoDeploy": "no", "status": "updated"},
+	}
+}
