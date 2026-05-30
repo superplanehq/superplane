@@ -60,6 +60,7 @@ func (o *OpenAI) Configuration() []configuration.Field {
 func (o *OpenAI) Actions() []core.Action {
 	return []core.Action{
 		&CreateResponse{},
+		&RunCodexAgent{},
 	}
 }
 

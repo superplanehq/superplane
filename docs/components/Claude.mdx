@@ -10,6 +10,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="Run Claude Agent" href="#run-claude-agent" description="Runs a Claude Managed Agent in Anthropic’s managed environment and waits until the session is idle or terminated." />
+  <LinkCard title="Run Claude Code" href="#run-claude-code" description="Run Claude Code non-interactively on a local workspace" />
   <LinkCard title="Text Prompt" href="#text-prompt" description="Generate a response using Anthropic's Claude models via the Messages API" />
 </CardGrid>
 
@@ -52,6 +53,65 @@ Emits a finished payload with **session** status, **session id**, and the final 
   },
   "timestamp": "2026-04-26T12:00:00Z",
   "type": "claude.runAgent.finished"
+}
+```
+
+<a id="run-claude-code"></a>
+
+## Run Claude Code
+
+**Component key:** `claude.runClaudeCode`
+
+The Run Claude Code component runs the Claude Code CLI in non-interactive print mode from the SuperPlane app container.
+
+### Use Cases
+
+- **Repository analysis**: Ask Claude Code to inspect code and summarize risks
+- **Automated implementation tasks**: Run coding tasks from upstream workflow events
+- **Code review**: Generate review feedback or remediation guidance
+- **Local workflow automation**: Use SuperPlane events to start Claude Code tasks in a mounted workspace
+
+### Configuration
+
+- **Model**: Claude Code model alias or full model name. Defaults to `sonnet`.
+- **Prompt**: The task sent to Claude Code (supports expressions).
+- **Permission Mode**: Claude Code permission mode. Defaults to plan mode for read-only behavior. Write-capable and bypass modes should only be used in trusted local/dev environments.
+- **Working Directory**: Directory used as the Claude Code process working directory. Defaults to `/app`.
+- **Max Turns**: Maximum number of agentic turns in non-interactive mode. Defaults to 3.
+- **Timeout**: Maximum runtime in seconds. Defaults to 600 seconds.
+
+### Output
+
+Routes to one of two channels:
+- **success**: Claude Code exits with code 0 and does not report an error result
+- **failed**: Claude Code exits non-zero, times out, or reports an error result
+
+The payload includes the final Claude Code result text, exit code, timeout flag, selected model, permission mode, working directory, max turns, duration, parsed JSON response when available, and stderr/stdout for failures.
+
+### Notes
+
+- Requires the Claude Code CLI on the app container PATH.
+- Requires a valid Claude API key configured on the Claude integration.
+- The API key is passed only to the Claude Code subprocess and is never emitted in the payload.
+- The component uses Claude Code `--bare` and `--no-session-persistence` modes to reduce local side effects.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "durationMs": 10180,
+    "exitCode": 0,
+    "isError": false,
+    "maxTurns": 3,
+    "model": "sonnet",
+    "permissionMode": "plan",
+    "text": "I inspected the requested files and drafted the implementation plan.",
+    "timedOut": false,
+    "workingDirectory": "/app"
+  },
+  "timestamp": "2026-05-30T12:00:00Z",
+  "type": "claude.codeAgent.finished"
 }
 ```
 

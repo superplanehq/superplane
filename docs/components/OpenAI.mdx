@@ -9,8 +9,65 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 ## Actions
 
 <CardGrid>
+  <LinkCard title="Run Codex Agent" href="#run-codex-agent" description="Run OpenAI Codex CLI non-interactively on a local workspace" />
   <LinkCard title="Text Prompt" href="#text-prompt" description="Generate a text response using OpenAI" />
 </CardGrid>
+
+<a id="run-codex-agent"></a>
+
+## Run Codex Agent
+
+**Component key:** `openai.runCodexAgent`
+
+The Run Codex Agent component runs the OpenAI Codex CLI in non-interactive mode from the SuperPlane app container.
+
+### Use Cases
+
+- **Repository analysis**: Ask Codex to inspect a codebase and summarize findings
+- **Automated code review**: Run targeted review prompts against a mounted repository
+- **Local coding tasks**: Let Codex propose or make workspace changes when write-capable sandbox modes are explicitly selected
+- **Workflow automation**: Convert upstream events into coding-agent tasks
+
+### Configuration
+
+- **Model**: Codex model to use. Defaults to `gpt-5.1-codex-mini`.
+- **Prompt**: The task sent to Codex (supports expressions).
+- **Sandbox**: CLI sandbox mode. Defaults to read-only. Workspace write and full access modes should only be used in trusted local/dev environments.
+- **Working Directory**: Directory passed to Codex as the workspace root. Defaults to `/app`.
+- **Timeout**: Maximum runtime in seconds. Defaults to 600 seconds.
+
+### Output
+
+Routes to one of two channels:
+- **success**: Codex exits with code 0
+- **failed**: Codex exits non-zero or times out
+
+The payload includes the final Codex message, exit code, timeout flag, selected model, sandbox mode, working directory, duration, parsed JSONL events when available, and stderr/stdout for failures.
+
+### Notes
+
+- Requires the Codex CLI on the app container PATH.
+- Requires a valid OpenAI API key configured on the OpenAI integration.
+- The API key is passed only to the Codex subprocess and is never emitted in the payload.
+- The component runs locally in the SuperPlane app container, so sandbox modes should be chosen carefully.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "durationMs": 12420,
+    "exitCode": 0,
+    "model": "gpt-5.1-codex-mini",
+    "sandbox": "read-only",
+    "text": "I reviewed the repository and found no obvious regression in the requested files.",
+    "timedOut": false,
+    "workingDirectory": "/app"
+  },
+  "timestamp": "2026-05-30T12:00:00Z",
+  "type": "openai.codexAgent.finished"
+}
+```
 
 <a id="text-prompt"></a>
 
