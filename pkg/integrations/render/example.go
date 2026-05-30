@@ -31,6 +31,9 @@ var exampleOutputRollbackDeployBytes []byte
 //go:embed example_output_purge_cache.json
 var exampleOutputPurgeCacheBytes []byte
 
+//go:embed example_output_scale_service.json
+var exampleOutputScaleServiceBytes []byte
+
 //go:embed example_output_update_env_var.json
 var exampleOutputUpdateEnvVarBytes []byte
 
@@ -63,6 +66,9 @@ var exampleOutputRollbackDeploy map[string]any
 
 var exampleOutputPurgeCacheOnce sync.Once
 var exampleOutputPurgeCache map[string]any
+
+var exampleOutputScaleServiceOnce sync.Once
+var exampleOutputScaleService map[string]any
 
 var exampleOutputUpdateEnvVarOnce sync.Once
 var exampleOutputUpdateEnvVar map[string]any
@@ -134,6 +140,14 @@ func (c *PurgeCache) ExampleOutput() map[string]any {
 		&exampleOutputPurgeCacheOnce,
 		exampleOutputPurgeCacheBytes,
 		&exampleOutputPurgeCache,
+	)
+}
+
+func (c *ScaleService) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputScaleServiceOnce,
+		exampleOutputScaleServiceBytes,
+		&exampleOutputScaleService,
 	)
 }
 

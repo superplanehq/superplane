@@ -105,6 +105,7 @@ func (r *Render) Actions() []core.Action {
 		&CancelDeploy{},
 		&RollbackDeploy{},
 		&PurgeCache{},
+		&ScaleService{},
 		&UpdateEnvVar{},
 		&AddCustomDomain{},
 		&RemoveCustomDomain{},

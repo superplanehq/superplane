@@ -100,6 +100,10 @@ type deployRequest struct {
 	ClearCache string `json:"clearCache"`
 }
 
+type scaleServiceRequest struct {
+	NumInstances int `json:"numInstances"`
+}
+
 type triggerDeployResponse struct {
 	Deploy DeployResponse `json:"deploy"`
 }
@@ -541,6 +545,23 @@ func (c *Client) PurgeCache(serviceID string) error {
 		"/services/"+url.PathEscape(serviceID)+"/cache/purge",
 		nil,
 		nil,
+	)
+	return err
+}
+
+func (c *Client) ScaleService(serviceID string, numInstances int) error {
+	if serviceID == "" {
+		return fmt.Errorf("serviceID is required")
+	}
+	if numInstances < 1 || numInstances > 100 {
+		return fmt.Errorf("numInstances must be between 1 and 100")
+	}
+
+	_, _, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/scale",
+		nil,
+		scaleServiceRequest{NumInstances: numInstances},
 	)
 	return err
 }

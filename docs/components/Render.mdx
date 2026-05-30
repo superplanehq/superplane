@@ -22,6 +22,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Service" href="#get-service" description="Retrieve a Render service and its custom domains" />
   <LinkCard title="Purge Cache" href="#purge-cache" description="Request a purge of the build cache for a Render service" />
   <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back a Render service to a previous deploy and wait for it to complete" />
+  <LinkCard title="Scale Service" href="#scale-service" description="Scale a Render service to a fixed number of instances" />
   <LinkCard title="Add Custom Domain" href="#add-custom-domain" description="Add a custom domain to a Render service" />
   <LinkCard title="Remove Custom Domain" href="#remove-custom-domain" description="Remove a custom domain from a Render service" />
   <LinkCard title="Update Env Var" href="#update-env-var" description="Update or generate a value for a Render service environment variable" />
@@ -421,6 +422,43 @@ The Rollback Deploy component triggers a rollback deploy for a Render service an
   },
   "timestamp": "2026-02-05T16:18:00.000000Z",
   "type": "render.deploy"
+}
+```
+
+<a id="scale-service"></a>
+
+## Scale Service
+
+**Component key:** `render.scaleService`
+
+The Scale Service component changes a Render service's manual scaling target.
+
+### Use Cases
+
+- **Traffic preparation**: Increase service capacity before a known launch, load test, or migration
+- **Cost cleanup**: Scale non-production services back down after a demo or scheduled test window
+- **Multi-service orchestration**: Scale a web service and background worker together from one SuperPlane workflow
+
+### Configuration
+
+- **Service**: Render service to scale
+- **Instances**: Fixed instance count to request, from 1 to 100
+
+### Output
+
+Emits a `render.service.scaled` payload with `serviceId`, `numInstances`, and `status`.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "numInstances": 3,
+    "serviceId": "srv-cukouhrtq21c73e9scng",
+    "status": "accepted"
+  },
+  "timestamp": "2026-02-05T16:20:00.000000Z",
+  "type": "render.service.scaled"
 }
 ```
 
