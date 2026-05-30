@@ -130,6 +130,7 @@ func validateAndPrintCreateResponse(
 
 	canvas := *resp.Canvas
 	resource := models.CanvasResourceFromCanvas(canvas)
+	resource.URL = BuildCanvasURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId())
 	if !ctx.Renderer.IsText() {
 		return ctx.Renderer.Render(resource)
 	}
