@@ -112,6 +112,7 @@ run_image_build() {
     --platform "linux/${ARCH}" \
     --progress=plain \
     --provenance=false \
+    --target runner \
     --cache-from "$DEV_BASE_IMAGE" \
     -t "$LOCAL_TAG" \
     --load \
