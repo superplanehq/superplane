@@ -215,6 +215,16 @@ services:
       timeout: 3s
       retries: 5
 
+  plugin-example:
+    image: oven/bun:1
+    profiles: [plugin]
+    working_dir: /app/sdk/example
+    command: ["sh", "-c", "bun install && bun run index.ts"]
+    volumes:
+      - .:/app
+    ports:
+      - ${PLUGIN_EXAMPLE_PORT:-3001}:3001
+
 volumes:
   supergit-data:
     driver: local
