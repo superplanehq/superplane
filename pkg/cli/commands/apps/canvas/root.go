@@ -75,17 +75,9 @@ configured with "superplane apps active" is used.`,
 		outputFile:    &initOutputFile,
 	}, options)
 
-	deleteCmd := &cobra.Command{
-		Use:   "delete <name-or-id>",
-		Short: "Delete a canvas",
-		Args:  cobra.ExactArgs(1),
-	}
-	core.Bind(deleteCmd, &deleteCommand{}, options)
-
 	root.AddCommand(getCmd)
 	root.AddCommand(initCmd)
 	root.AddCommand(updateCmd)
-	root.AddCommand(deleteCmd)
 
 	return root
 }

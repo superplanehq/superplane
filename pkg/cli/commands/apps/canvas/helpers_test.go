@@ -16,7 +16,7 @@ import (
 // canvas-active accessors are no-ops because the canvas commands under test
 // here do not use them.
 type fakeConfig struct {
-	url      string
+	url       string
 	activeApp string
 }
 

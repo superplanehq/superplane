@@ -42,6 +42,7 @@ App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
 	root.AddCommand(listCmd)
 	root.AddCommand(activeCmd)
 	root.AddCommand(canvas.NewCreateCommand(options))
+	root.AddCommand(canvas.NewDeleteCommand(options))
 	root.AddCommand(canvas.NewChangeRequestsCommand(options))
 	root.AddCommand(canvas.NewCommand(options))
 	root.AddCommand(console.NewCommand(options))

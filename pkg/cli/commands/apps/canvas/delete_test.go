@@ -33,7 +33,7 @@ func TestDeleteCommandPrintsConfirmation(t *testing.T) {
 
 	err := (&deleteCommand{}).Execute(ctx)
 	require.NoError(t, err)
-	require.Contains(t, stdout.String(), "Canvas deleted: my-canvas")
+	require.Contains(t, stdout.String(), "App deleted: my-canvas")
 }
 
 func TestDeleteCommandReturnsJSONOutput(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/appresolve"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
@@ -27,7 +28,7 @@ func (c *deleteCommand) Execute(ctx core.CommandContext) error {
 
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, err := fmt.Fprintf(stdout, "Canvas deleted: %s\n", nameOrID)
+			_, err := fmt.Fprintf(stdout, "App deleted: %s\n", nameOrID)
 			return err
 		})
 	}
@@ -36,4 +37,15 @@ func (c *deleteCommand) Execute(ctx core.CommandContext) error {
 		"id":      canvasID,
 		"deleted": "true",
 	})
+}
+
+// NewDeleteCommand registers app deletion under `apps delete`.
+func NewDeleteCommand(options core.BindOptions) *cobra.Command {
+	deleteCmd := &cobra.Command{
+		Use:   "delete <name-or-id>",
+		Short: "Delete an app",
+		Args:  cobra.ExactArgs(1),
+	}
+	core.Bind(deleteCmd, &deleteCommand{}, options)
+	return deleteCmd
 }
