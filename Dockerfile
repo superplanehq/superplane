@@ -104,7 +104,8 @@ RUN apt-get update && \
   postgresql-contrib \
   rabbitmq-server \
   ca-certificates \
-  curl && \
+  curl \
+  git && \
   ln -s /usr/lib/postgresql/*/bin/* /usr/local/bin/ && \
   rm -rf /var/lib/apt/lists/*
 
