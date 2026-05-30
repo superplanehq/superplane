@@ -1,11 +1,38 @@
 package installation
 
 import (
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type stubResponse struct {
+	status int
+	body   string
+}
+
+// stubHTTP overrides the package fetcher so installation tests stay
+// deterministic instead of depending on mutable upstream repositories. URLs
+// absent from the map respond with 404.
+func stubHTTP(t *testing.T, responses map[string]stubResponse) {
+	t.Helper()
+	original := httpGet
+	httpGet = func(rawURL string) (*http.Response, error) {
+		resp, ok := responses[rawURL]
+		if !ok {
+			resp = stubResponse{status: http.StatusNotFound}
+		}
+		return &http.Response{
+			StatusCode: resp.status,
+			Body:       io.NopCloser(strings.NewReader(resp.body)),
+		}, nil
+	}
+	t.Cleanup(func() { httpGet = original })
+}
 
 func TestParseCanvasYAMLWithResourceHeaders(t *testing.T) {
 	raw := []byte(`apiVersion: v1
@@ -41,14 +68,27 @@ spec:
 	assert.Contains(t, err.Error(), `unsupported resource kind "Dashboard"`)
 }
 
-func TestFetchCanvasFromPublicRepo(t *testing.T) {
-	repo, err := ParseRepository("github.com/superplanehq/preview-env-github-digitalocean")
-	require.NoError(t, err)
+func TestFetchCanvasResolvesRefAndParses(t *testing.T) {
+	repo := &Repository{Owner: "acme", Name: "demo"}
+	stubHTTP(t, map[string]stubResponse{
+		rawFileURL(repo, "main", canvasFileName): {
+			status: http.StatusOK,
+			body: `apiVersion: v1
+kind: Canvas
+metadata:
+  name: Preview Environments
+spec:
+  nodes:
+    - name: start
+  edges: []
+`,
+		},
+	})
 
 	canvas, ref, err := FetchCanvas(repo)
 	require.NoError(t, err)
 	assert.Equal(t, "main", ref)
-	assert.NotEmpty(t, canvas.GetMetadata().GetName())
+	assert.Equal(t, "Preview Environments", canvas.GetMetadata().GetName())
 	assert.NotEmpty(t, canvas.GetSpec().GetNodes())
 }
 
@@ -59,11 +99,11 @@ func TestFetchConsoleRequiresRef(t *testing.T) {
 }
 
 func TestFetchConsoleReturnsNilWhenMissing(t *testing.T) {
-	// The reference app repo ships a canvas.yaml but no console.yaml.
-	// FetchConsole must treat the missing file as opt-in (nil, nil) so that
-	// apps without a bundled console still install cleanly.
-	repo, err := ParseRepository("github.com/superplanehq/preview-env-github-digitalocean")
-	require.NoError(t, err)
+	// A missing console.yaml (404) is opt-in: FetchConsole must return
+	// (nil, nil) so apps without a bundled console still install cleanly.
+	stubHTTP(t, map[string]stubResponse{})
+
+	repo := &Repository{Owner: "acme", Name: "demo"}
 
 	console, err := FetchConsole(repo, "main")
 	require.NoError(t, err)
