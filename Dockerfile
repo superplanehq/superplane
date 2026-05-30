@@ -50,6 +50,16 @@ WORKDIR /app
 
 RUN mkdir -p "${PLAYWRIGHT_BROWSERS_PATH}"
 RUN playwright install chromium-headless-shell --with-deps
+
+# Ansible is required by the built-in `ansible` component, which uses this
+# container as the Ansible control node. Kept as a dedicated layer so it does
+# not invalidate the cache for the expensive toolchain layers above.
+# DEBIAN_FRONTEND=noninteractive avoids the tzdata install prompt.
+RUN DEBIAN_FRONTEND=noninteractive apt-get update && \
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ansible && \
+  apt-get clean && \
+  rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
 RUN rm -rf /opt/install /opt/install-scripts /tmp/*
 
 CMD [ "/bin/bash",  "-c", "sleep infinity" ]
