@@ -1,0 +1,504 @@
+# ─────────────────────────────────────────────────────────────────────────
+# KineticOS — the agent fleet, as a SuperPlane Canvas.
+#
+# THE EXACT PROCESS, end to end:
+#   a CAD image of an industrial machine with a broken component arrives →
+#   a fleet of perception agents LOOKS at it and IDENTIFIES what is wrong →
+#   a design fleet RECONSTRUCTS the intended geometry and GENERATES a new
+#   3D-printable CAD file → printability + validation agents prove it will
+#   hold → and on acceptance the line RESUMES PRODUCTION on that v1 file
+#   until the OEM replacement arrives.
+#
+# SuperPlane is the BRAIN: it decides *when and whether* each agent runs, and
+# it parks the job at a human gate whenever confidence, the design trail, the
+# printability margin, or the output validation says so. Every TYPE_ACTION node
+# below is an `http` executor that calls one KineticOS agent endpoint; the agent
+# itself (Claude-backed, with a deterministic fallback) lives in the Next.js app.
+#
+# Replace the host `https://kineticos.onrender.com` with your KineticOS base URL
+# (e.g. http://localhost:3000 for local dev) — infra/superplane/apply.sh does
+# this substitution for you. The ingest trigger binds to the SuperPlane webhook
+# event source that KineticOS fires as SP_INGEST_WEBHOOK on POST /api/jobs.
+# ─────────────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: "KineticOS — broken-machine → 3D-printable continuation fleet"
+  description: "Looks at a CAD image of a broken industrial machine, identifies the fault, generates a new 3D-printable CAD file, and resumes production — gated by SuperPlane at every phase."
+  isTemplate: false
+spec:
+  nodes:
+    # ───────────────── ingest (event source) ─────────────────
+    - id: "ingest-trigger"
+      name: "Ingest: broken-machine CAD image"
+      type: "TYPE_TRIGGER"
+      configuration: {}
+      position: { x: 120, y: 760 }
+      component: "webhook"
+      isCollapsed: false
+
+    # ───────────────── PERCEPTION FLEET — "look + identify what's wrong" ─────────────────
+    - id: "perc-conditioning"
+      name: "2A · Conditioning (image admissibility)"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/agents/conditioning"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "exponential", maxAttempts: 5, intervalSeconds: 5 }
+      position: { x: 600, y: 160 }
+      component: "http"
+      isCollapsed: false
+    - id: "perc-classification"
+      name: "2B · Classification (locate the break)"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/agents/classification"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "exponential", maxAttempts: 5, intervalSeconds: 5 }
+      position: { x: 600, y: 420 }
+      component: "http"
+      isCollapsed: false
+    - id: "perc-reconstruction"
+      name: "2C · Reconstruction (undamaged intent)"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/agents/reconstruction"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "exponential", maxAttempts: 5, intervalSeconds: 5 }
+      position: { x: 1040, y: 420 }
+      component: "http"
+      isCollapsed: false
+    - id: "perc-dimensioning"
+      name: "2D · Dimensioning (interfaces + scale)"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/agents/dimensioning"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "exponential", maxAttempts: 5, intervalSeconds: 5 }
+      position: { x: 600, y: 920 }
+      component: "http"
+      isCollapsed: false
+    - id: "perc-material"
+      name: "2E · Material inference"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/agents/material-infer"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "exponential", maxAttempts: 5, intervalSeconds: 5 }
+      position: { x: 600, y: 1160 }
+      component: "http"
+      isCollapsed: false
+    - id: "perc-telemetry"
+      name: "2F · Telemetry fusion"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/agents/telemetry"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "exponential", maxAttempts: 5, intervalSeconds: 5 }
+      position: { x: 600, y: 1400 }
+      component: "http"
+      isCollapsed: false
+    - id: "perc-merge"
+      name: "Fuse the perception sensors"
+      type: "TYPE_ACTION"
+      configuration:
+        enableStopIf: false
+        enableTimeout: true
+        executionTimeout: { unit: "minutes", value: 2 }
+      position: { x: 1480, y: 780 }
+      component: "merge"
+      isCollapsed: false
+    - id: "perc-assemble"
+      name: "Assemble PerceptionResult"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/agents/perception-assemble"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "exponential", maxAttempts: 5, intervalSeconds: 5 }
+      position: { x: 1920, y: 780 }
+      component: "http"
+      isCollapsed: false
+
+    # ───────────────── GATE 2.G · composite confidence ─────────────────
+    - id: "gate-2g"
+      name: "Gate 2.G · composite confidence"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/evaluate-gate"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+          gate: "composite_confidence"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "fixed", maxAttempts: 3, intervalSeconds: 5 }
+      position: { x: 2360, y: 780 }
+      component: "http"
+      isCollapsed: false
+    - id: "if-2g"
+      name: "2.G clears?"
+      type: "TYPE_ACTION"
+      configuration:
+        expression: 'previous().data.body.decision == "proceed"'
+      position: { x: 2800, y: 780 }
+      component: "if"
+      isCollapsed: false
+    - id: "approve-2g"
+      name: "Operator review · confirm the broken component"
+      type: "TYPE_ACTION"
+      configuration:
+        items:
+          - type: "anyone"
+      position: { x: 2800, y: 1080 }
+      component: "approval"
+      isCollapsed: false
+
+    # ───────────────── DESIGN FLEET — "make a new 3D-printable CAD file" ─────────────────
+    - id: "design-sourcing"
+      name: "3A · Sourcing (off-the-shelf substitute)"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/agents/sourcing"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "exponential", maxAttempts: 5, intervalSeconds: 5 }
+      position: { x: 3240, y: 780 }
+      component: "http"
+      isCollapsed: false
+    - id: "if-sourced"
+      name: "Substitute found?"
+      type: "TYPE_ACTION"
+      configuration:
+        expression: "previous().data.body.matched == true"
+      position: { x: 3680, y: 780 }
+      component: "if"
+      isCollapsed: false
+    - id: "design-generative"
+      name: "3B · Generative CAD (B1–B8)"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/agents/generative-cad"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+        timeoutSeconds: 45
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "exponential", maxAttempts: 5, intervalSeconds: 5 }
+      position: { x: 3680, y: 1060 }
+      component: "http"
+      isCollapsed: false
+
+    # ───────────────── GATE 3.G · continuation strategy ─────────────────
+    - id: "gate-3g"
+      name: "Gate 3.G · continuation strategy"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/evaluate-gate"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+          gate: "continuation_strategy"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "fixed", maxAttempts: 3, intervalSeconds: 5 }
+      position: { x: 4120, y: 880 }
+      component: "http"
+      isCollapsed: false
+    - id: "if-3g"
+      name: "3.G clears?"
+      type: "TYPE_ACTION"
+      configuration:
+        expression: 'previous().data.body.decision == "proceed"'
+      position: { x: 4560, y: 880 }
+      component: "if"
+      isCollapsed: false
+    - id: "approve-3g"
+      name: "Operator review · the B1–B8 design trail"
+      type: "TYPE_ACTION"
+      configuration:
+        items:
+          - type: "anyone"
+      position: { x: 4560, y: 1180 }
+      component: "approval"
+      isCollapsed: false
+
+    # ───────────────── PRINTABILITY + GATE 4.3 ─────────────────
+    - id: "phase4-material"
+      name: "4 · Printability adaptation (local stock)"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/stages/material"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "exponential", maxAttempts: 5, intervalSeconds: 5 }
+      position: { x: 5000, y: 880 }
+      component: "http"
+      isCollapsed: false
+    - id: "gate-43"
+      name: "Gate 4.3 · printability feasibility"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/evaluate-gate"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+          gate: "printability"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "fixed", maxAttempts: 3, intervalSeconds: 5 }
+      position: { x: 5440, y: 880 }
+      component: "http"
+      isCollapsed: false
+    - id: "if-43"
+      name: "4.3 clears?"
+      type: "TYPE_ACTION"
+      configuration:
+        expression: 'previous().data.body.decision == "proceed"'
+      position: { x: 5880, y: 880 }
+      component: "if"
+      isCollapsed: false
+    - id: "approve-43"
+      name: "Operator review · relax constraints or abort"
+      type: "TYPE_ACTION"
+      configuration:
+        items:
+          - type: "anyone"
+      position: { x: 5880, y: 1180 }
+      component: "approval"
+      isCollapsed: false
+
+    # ───────────────── PROVISION + EMIT + VALIDATE (Render) + GATE 8.1 ─────────────────
+    - id: "phase5-fabricate"
+      name: "5–7 · Provision validator + emit CAD + validate"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/stages/fabricate-report"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+        timeoutSeconds: 120
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "exponential", maxAttempts: 4, intervalSeconds: 10 }
+      position: { x: 6320, y: 880 }
+      component: "http"
+      isCollapsed: false
+    - id: "gate-81"
+      name: "Gate 8.1 · output acceptance"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/evaluate-gate"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+          gate: "output_acceptance"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "fixed", maxAttempts: 3, intervalSeconds: 5 }
+      position: { x: 6760, y: 880 }
+      component: "http"
+      isCollapsed: false
+    - id: "if-81"
+      name: "8.1 accepted?"
+      type: "TYPE_ACTION"
+      configuration:
+        expression: 'previous().data.body.decision == "proceed"'
+      position: { x: 7200, y: 880 }
+      component: "if"
+      isCollapsed: false
+    - id: "approve-81"
+      name: "Operator review · the v1 continuation output"
+      type: "TYPE_ACTION"
+      configuration:
+        items:
+          - type: "anyone"
+      position: { x: 7200, y: 1180 }
+      component: "approval"
+      isCollapsed: false
+
+    # ───────────────── RESUME PRODUCTION ─────────────────
+    - id: "finalize"
+      name: "8.3 · Seal run + resume production"
+      type: "TYPE_ACTION"
+      configuration:
+        method: "POST"
+        url: "https://kineticos.onrender.com/api/agents/finalize"
+        contentType: "application/json"
+        json:
+          job_id: "{{ root().data.job_id }}"
+        timeoutSeconds: 30
+        successCodes: "2xx"
+        retry: { enabled: true, strategy: "fixed", maxAttempts: 3, intervalSeconds: 5 }
+      position: { x: 7640, y: 880 }
+      component: "http"
+      isCollapsed: false
+    - id: "notify-resumed"
+      name: "✅ Line resumed on v1 continuation"
+      type: "TYPE_ACTION"
+      configuration: {}
+      position: { x: 8080, y: 880 }
+      component: "noop"
+      isCollapsed: false
+    - id: "halt-aborted"
+      name: "⛔ Halted — operator aborted"
+      type: "TYPE_ACTION"
+      configuration: {}
+      position: { x: 5000, y: 1560 }
+      component: "noop"
+      isCollapsed: false
+
+    # ───────────────── annotations (documentation widgets) ─────────────────
+    - id: "anno-overview"
+      name: "overview"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "blue"
+        width: 470
+        height: 360
+        text: "# KineticOS agent fleet\n\n**A CAD image of a broken industrial machine comes in → a modified, 3D-printable CAD file goes out, so the line keeps running.**\n\nSuperPlane is the brain: it decides *when and whether* each agent runs and parks the job at a human gate when confidence is low. Render runs the compute (the per-job `cad-validator-{jobId}` service).\n\nEvery action node is an `http` executor calling one KineticOS agent at `/api/agents/*`. Runs end-to-end at **zero credentials** — each agent has a deterministic fallback."
+      position: { x: 110, y: 200 }
+      component: "annotation"
+      isCollapsed: false
+    - id: "anno-perception"
+      name: "anno-perception"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "yellow"
+        width: 520
+        height: 250
+        text: "## 1 · Look & identify what is wrong\n\nSix perception agents fan out **in parallel** from the ingest event:\n\n- **2A Conditioning** — is the image even usable?\n- **2B Classification** — *which* component is broken (drives everything downstream).\n- **2C Reconstruction** — rebuild the *intended, undamaged* shape (never the cracked artifact). Needs 2B.\n- **2D Dimensioning** — the mating interfaces + a terminating scale chain.\n- **2E Material** · **2F Telemetry** — material/finish + sensor-fusion cross-check.\n\nThe **Merge** node waits for all sensors, then **Assemble** fuses them into one composite-confidence score."
+      position: { x: 600, y: -220 }
+      component: "annotation"
+      isCollapsed: false
+    - id: "anno-gates"
+      name: "anno-gates"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "red"
+        width: 470
+        height: 230
+        text: "## The gate pattern (×4)\n\nEvery phase ends in the same shape:\n\n`http evaluate-gate` → **If `decision == \"proceed\"`** → next phase.\n\nOtherwise the job parks at an **Approval** node — the human gate. SuperPlane scopes it to the *exact* weak field (the class, the overlay, one caliper reading). **Approved** resumes the flow; **Rejected** routes to **Halt**.\n\nGates: 2.G confidence · 3.G strategy · 4.3 printability · 8.1 output."
+      position: { x: 2360, y: 400 }
+      component: "annotation"
+      isCollapsed: false
+    - id: "anno-design"
+      name: "anno-design"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "green"
+        width: 520
+        height: 230
+        text: "## 2 · Make a new 3D-printable CAD file\n\n**3A Sourcing** first hunts an off-the-shelf / community substitute that drops in. If none matches, **3B Generative CAD** synthesises a continuation insert through the **B1–B8** trail (parameters → feature graph → B-rep → constraints → validation → DFM → functional check → STEP/STL export).\n\nGate **3.G** sends any *generated, load-bearing* part to a human before release."
+      position: { x: 3240, y: 420 }
+      component: "annotation"
+      isCollapsed: false
+    - id: "anno-resume"
+      name: "anno-resume"
+      type: "TYPE_WIDGET"
+      configuration:
+        color: "green"
+        width: 470
+        height: 220
+        text: "## 3 · Prove it, then resume production\n\n**Phase 4** re-parameterizes the design to locally-loaded stock; **4.3** blocks if the printability margin can't meet the duty load.\n\n**Phases 5–7** spin up a dedicated, ephemeral Render `cad-validator-{jobId}` service, emit the **v1 CAD output** (OpenSCAD + BOM + runbook), and run a canary→bulk validation. **8.1** is the fan-in acceptance gate.\n\nOn acceptance, **Finalize** seals the immutable audit trail and the **line resumes** on the v1 file until the OEM part arrives."
+      position: { x: 6760, y: 440 }
+      component: "annotation"
+      isCollapsed: false
+
+  edges:
+    # ingest → perception sensors (parallel fan-out)
+    - { sourceId: "ingest-trigger", targetId: "perc-conditioning", channel: "default" }
+    - { sourceId: "ingest-trigger", targetId: "perc-classification", channel: "default" }
+    - { sourceId: "ingest-trigger", targetId: "perc-dimensioning", channel: "default" }
+    - { sourceId: "ingest-trigger", targetId: "perc-material", channel: "default" }
+    - { sourceId: "ingest-trigger", targetId: "perc-telemetry", channel: "default" }
+    # 2B → 2C (reconstruction needs the identified part)
+    - { sourceId: "perc-classification", targetId: "perc-reconstruction", channel: "success" }
+    # sensors → merge (barrier)
+    - { sourceId: "perc-conditioning", targetId: "perc-merge", channel: "success" }
+    - { sourceId: "perc-reconstruction", targetId: "perc-merge", channel: "success" }
+    - { sourceId: "perc-dimensioning", targetId: "perc-merge", channel: "success" }
+    - { sourceId: "perc-material", targetId: "perc-merge", channel: "success" }
+    - { sourceId: "perc-telemetry", targetId: "perc-merge", channel: "success" }
+    # fuse → assemble → gate 2.G
+    - { sourceId: "perc-merge", targetId: "perc-assemble", channel: "success" }
+    - { sourceId: "perc-assemble", targetId: "gate-2g", channel: "success" }
+    - { sourceId: "gate-2g", targetId: "if-2g", channel: "success" }
+    - { sourceId: "if-2g", targetId: "design-sourcing", channel: "true" }
+    - { sourceId: "if-2g", targetId: "approve-2g", channel: "false" }
+    - { sourceId: "approve-2g", targetId: "design-sourcing", channel: "approved" }
+    - { sourceId: "approve-2g", targetId: "halt-aborted", channel: "rejected" }
+    # design: 3A sourcing → (matched? 3.G : 3B generative → 3.G)
+    - { sourceId: "design-sourcing", targetId: "if-sourced", channel: "success" }
+    - { sourceId: "if-sourced", targetId: "gate-3g", channel: "true" }
+    - { sourceId: "if-sourced", targetId: "design-generative", channel: "false" }
+    - { sourceId: "design-generative", targetId: "gate-3g", channel: "success" }
+    # gate 3.G
+    - { sourceId: "gate-3g", targetId: "if-3g", channel: "success" }
+    - { sourceId: "if-3g", targetId: "phase4-material", channel: "true" }
+    - { sourceId: "if-3g", targetId: "approve-3g", channel: "false" }
+    - { sourceId: "approve-3g", targetId: "phase4-material", channel: "approved" }
+    - { sourceId: "approve-3g", targetId: "halt-aborted", channel: "rejected" }
+    # printability + gate 4.3
+    - { sourceId: "phase4-material", targetId: "gate-43", channel: "success" }
+    - { sourceId: "gate-43", targetId: "if-43", channel: "success" }
+    - { sourceId: "if-43", targetId: "phase5-fabricate", channel: "true" }
+    - { sourceId: "if-43", targetId: "approve-43", channel: "false" }
+    - { sourceId: "approve-43", targetId: "phase5-fabricate", channel: "approved" }
+    - { sourceId: "approve-43", targetId: "halt-aborted", channel: "rejected" }
+    # provision + emit + validate + gate 8.1
+    - { sourceId: "phase5-fabricate", targetId: "gate-81", channel: "success" }
+    - { sourceId: "gate-81", targetId: "if-81", channel: "success" }
+    - { sourceId: "if-81", targetId: "finalize", channel: "true" }
+    - { sourceId: "if-81", targetId: "approve-81", channel: "false" }
+    - { sourceId: "approve-81", targetId: "finalize", channel: "approved" }
+    - { sourceId: "approve-81", targetId: "halt-aborted", channel: "rejected" }
+    # resume production
+    - { sourceId: "finalize", targetId: "notify-resumed", channel: "success" }
