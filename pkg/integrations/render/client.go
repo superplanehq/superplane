@@ -125,6 +125,11 @@ type autoscalingCriterion struct {
 	Percentage int  `json:"percentage"`
 }
 
+type createJobRequest struct {
+	StartCommand string `json:"startCommand"`
+	PlanID       string `json:"planId,omitempty"`
+}
+
 type triggerDeployResponse struct {
 	Deploy DeployResponse `json:"deploy"`
 }
@@ -213,6 +218,22 @@ type LogsResponse struct {
 	NextStartTime string           `json:"nextStartTime"`
 	NextEndTime   string           `json:"nextEndTime"`
 	Logs          []map[string]any `json:"logs"`
+}
+
+type JobResponse struct {
+	ID           string `json:"id"`
+	ServiceID    string `json:"serviceId"`
+	StartCommand string `json:"startCommand"`
+	PlanID       string `json:"planId"`
+	Status       string `json:"status"`
+	CreatedAt    string `json:"createdAt"`
+	StartedAt    string `json:"startedAt"`
+	FinishedAt   string `json:"finishedAt"`
+}
+
+type jobWithCursor struct {
+	Cursor string      `json:"cursor"`
+	Job    JobResponse `json:"job"`
 }
 
 type EventResponse struct {
@@ -868,6 +889,48 @@ func (c *Client) ListLogs(workspaceID string, query LogQuery) (LogsResponse, err
 	return response, nil
 }
 
+func (c *Client) CreateJob(serviceID, startCommand, planID string) (JobResponse, error) {
+	if serviceID == "" {
+		return JobResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if strings.TrimSpace(startCommand) == "" {
+		return JobResponse{}, fmt.Errorf("startCommand is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodPost,
+		"/services/"+url.PathEscape(serviceID)+"/jobs",
+		nil,
+		createJobRequest{StartCommand: startCommand, PlanID: strings.TrimSpace(planID)},
+	)
+	if err != nil {
+		return JobResponse{}, err
+	}
+
+	return parseJob(body)
+}
+
+func (c *Client) GetJob(serviceID, jobID string) (JobResponse, error) {
+	if serviceID == "" {
+		return JobResponse{}, fmt.Errorf("serviceID is required")
+	}
+	if jobID == "" {
+		return JobResponse{}, fmt.Errorf("jobID is required")
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodGet,
+		"/services/"+url.PathEscape(serviceID)+"/jobs/"+url.PathEscape(jobID),
+		nil,
+		nil,
+	)
+	if err != nil {
+		return JobResponse{}, err
+	}
+
+	return parseJob(body)
+}
+
 func (c *Client) UpdateEnvVar(serviceID string, key string, request UpdateEnvVarRequest) (EnvVar, error) {
 	if serviceID == "" {
 		return EnvVar{}, fmt.Errorf("serviceID is required")
@@ -1178,6 +1241,29 @@ func parseDeploys(body []byte) ([]DeployResponse, error) {
 		return nil, fmt.Errorf("failed to unmarshal deploys response: %w", err)
 	}
 	return deploys, nil
+}
+
+func parseJob(body []byte) (JobResponse, error) {
+	job := JobResponse{}
+	if err := json.Unmarshal(body, &job); err == nil && job.ID != "" {
+		return job, nil
+	}
+
+	wrapped := jobWithCursor{}
+	if err := json.Unmarshal(body, &wrapped); err == nil && wrapped.Job.ID != "" {
+		return wrapped.Job, nil
+	}
+
+	wrapper := struct {
+		Job JobResponse `json:"job"`
+	}{}
+	if err := json.Unmarshal(body, &wrapper); err != nil {
+		return JobResponse{}, fmt.Errorf("failed to unmarshal job response: %w", err)
+	}
+	if wrapper.Job.ID == "" {
+		return JobResponse{}, fmt.Errorf("job id is missing in response")
+	}
+	return wrapper.Job, nil
 }
 
 func parseWebhooks(body []byte) ([]Webhook, error) {

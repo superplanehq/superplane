@@ -231,3 +231,17 @@ func (c *UpdateAutoscaling) ExampleOutput() map[string]any {
 		},
 	}
 }
+
+func (c *CreateJob) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.job.created",
+		"data": map[string]any{"jobId": "job-cukp0k3tq21c73e9sct0", "serviceId": "srv-cukouhrtq21c73e9scng", "status": "pending"},
+	}
+}
+
+func (c *GetJob) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.job",
+		"data": map[string]any{"jobId": "job-cukp0k3tq21c73e9sct0", "serviceId": "srv-cukouhrtq21c73e9scng", "status": "succeeded"},
+	}
+}

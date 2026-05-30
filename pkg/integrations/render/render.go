@@ -111,6 +111,8 @@ func (r *Render) Actions() []core.Action {
 		&ScaleService{},
 		&UpdateService{},
 		&UpdateAutoscaling{},
+		&CreateJob{},
+		&GetJob{},
 		&UpdateEnvVar{},
 		&AddCustomDomain{},
 		&RemoveCustomDomain{},

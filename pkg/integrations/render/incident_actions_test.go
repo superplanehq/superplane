@@ -179,3 +179,45 @@ func Test__Render_UpdateAutoscaling__Execute(t *testing.T) {
 	assert.Equal(t, http.MethodPut, httpCtx.Requests[0].Method)
 	assert.Equal(t, "/v1/services/srv-123/autoscaling", httpCtx.Requests[0].URL.Path)
 }
+
+func Test__Render_CreateAndGetJob__Execute(t *testing.T) {
+	t.Run("create job", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
+			StatusCode: http.StatusCreated,
+			Body:       io.NopCloser(strings.NewReader(`{"id":"job-123","serviceId":"srv-123","startCommand":"python manage.py check","status":"pending"}`)),
+		}}}
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		err := (&CreateJob{}).Execute(core.ExecutionContext{
+			HTTP:           httpCtx,
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
+			ExecutionState: executionState,
+			Configuration:  map[string]any{"service": "srv-123", "startCommand": "python manage.py check"},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, CreateJobPayloadType, executionState.Type)
+		assert.Equal(t, http.MethodPost, httpCtx.Requests[0].Method)
+		assert.Equal(t, "/v1/services/srv-123/jobs", httpCtx.Requests[0].URL.Path)
+	})
+
+	t.Run("get job", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(`{"id":"job-123","serviceId":"srv-123","status":"succeeded"}`)),
+		}}}
+		executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+		err := (&GetJob{}).Execute(core.ExecutionContext{
+			HTTP:           httpCtx,
+			Integration:    &contexts.IntegrationContext{Configuration: map[string]any{"apiKey": "rnd_test"}},
+			ExecutionState: executionState,
+			Configuration:  map[string]any{"service": "srv-123", "jobId": "job-123"},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, GetJobPayloadType, executionState.Type)
+		assert.Equal(t, http.MethodGet, httpCtx.Requests[0].Method)
+		assert.Equal(t, "/v1/services/srv-123/jobs/job-123", httpCtx.Requests[0].URL.Path)
+	})
+}

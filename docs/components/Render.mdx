@@ -28,6 +28,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Scale Service" href="#scale-service" description="Scale a Render service to a fixed number of instances" />
   <LinkCard title="Update Service" href="#update-service" description="Freeze or thaw auto deploys for a Render service" />
   <LinkCard title="Update Autoscaling" href="#update-autoscaling" description="Update Render autoscaling settings for a web service" />
+  <LinkCard title="Create Job" href="#create-job" description="Create a Render one-off job from an existing service" />
+  <LinkCard title="Get Job" href="#get-job" description="Retrieve a Render one-off job status" />
   <LinkCard title="Add Custom Domain" href="#add-custom-domain" description="Add a custom domain to a Render service" />
   <LinkCard title="Remove Custom Domain" href="#remove-custom-domain" description="Remove a custom domain from a Render service" />
   <LinkCard title="Update Env Var" href="#update-env-var" description="Update or generate a value for a Render service environment variable" />
@@ -561,6 +563,41 @@ Updates Render autoscaling settings for a web service.
 
 Emits `render.autoscaling.updated` with the requested bounds, targets, status, and Render response.
 
+<a id="create-job"></a>
+
+## Create Job
+
+**Component key:** `render.createJob`
+
+Creates a Render one-off job from an existing service. Use this for health checks, queue drains, repair tasks, and operational runbooks.
+
+### Configuration
+
+- **Service**: Render service to run the job from
+- **Start Command**: Command to execute
+- **Plan ID**: Optional Render plan ID
+
+### Output
+
+Emits `render.job.created` with `jobId`, `serviceId`, `startCommand`, and status fields when available.
+
+<a id="get-job"></a>
+
+## Get Job
+
+**Component key:** `render.getJob`
+
+Retrieves the current status of a Render one-off job.
+
+### Configuration
+
+- **Service**: Render service that owns the job
+- **Job ID**: Render job ID
+
+### Output
+
+Emits `render.job` with `jobId`, `serviceId`, status, and timestamps when available.
+
 <a id="add-custom-domain"></a>
 
 ## Add Custom Domain
@@ -680,4 +717,3 @@ Emits a `render.envVar.updated` payload with `serviceId`, `key`, and a `valueGen
   "type": "render.envVar.updated"
 }
 ```
-
