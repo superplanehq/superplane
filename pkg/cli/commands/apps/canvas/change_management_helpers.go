@@ -1,4 +1,4 @@
-package apps
+package canvas
 
 import (
 	"github.com/superplanehq/superplane/pkg/openapi_client"

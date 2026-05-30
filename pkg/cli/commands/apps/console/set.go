@@ -17,7 +17,7 @@ type setCommand struct {
 
 func (c *setCommand) Execute(ctx core.CommandContext) error {
 	if len(ctx.Args) > 2 {
-		return fmt.Errorf("unexpected extra arguments; usage: superplane console set [app-name-or-id] [file]")
+		return fmt.Errorf("unexpected extra arguments; usage: superplane apps console set [app-name-or-id] [file]")
 	}
 
 	canvasArg := ""
@@ -107,7 +107,7 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 			_, err := fmt.Fprintln(stdout, "Run `superplane apps change-requests create` to open a change request for this draft.")
 			return err
 		}
-		_, err := fmt.Fprintln(stdout, "Run `superplane apps update` (without --draft) to publish a draft that includes this console.")
+		_, err := fmt.Fprintln(stdout, "Run `superplane apps canvas update` (without --draft) to publish a draft that includes this console.")
 		return err
 	})
 }

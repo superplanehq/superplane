@@ -88,7 +88,7 @@ func lookupCanvasName(ctx core.CommandContext, canvasID string) (string, error) 
 		return "", err
 	}
 	if response.Canvas == nil || response.Canvas.Metadata == nil {
-		return "", fmt.Errorf("app %q not found", canvasID)
+		return "", fmt.Errorf("canvas %q not found", canvasID)
 	}
 	return response.Canvas.Metadata.GetName(), nil
 }

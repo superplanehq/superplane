@@ -24,7 +24,7 @@ function toolGroup(status: string): MessageGroup[] {
         {
           id: `tool-${status}`,
           role: "tool",
-          content: "SUPERPLANE_URL=https://app.test superplane apps get canvas-1 --draft",
+          content: "SUPERPLANE_URL=https://app.test superplane apps canvas get canvas-1 --draft",
           toolName: "bash",
           toolCallId: `call-${status}`,
           toolStatus: status,

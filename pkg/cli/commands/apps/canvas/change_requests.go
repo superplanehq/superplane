@@ -1,4 +1,4 @@
-package apps
+package canvas
 
 import (
 	"fmt"
@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/appresolve"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/models"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -184,7 +185,7 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 			return err
 		}
 		if !changeManagementEnabled {
-			return fmt.Errorf("change management is disabled for this app; enable it in app settings to use change requests")
+			return fmt.Errorf("change management is disabled for this canvas; enable it in canvas settings to use change requests")
 		}
 
 		versionID, err = appresolve.FindCurrentUserDraftVersionID(ctx, canvasID)
@@ -192,7 +193,7 @@ func (c *changeRequestCreateCommand) Execute(ctx core.CommandContext) error {
 			return err
 		}
 		if versionID == "" {
-			return fmt.Errorf("no draft version found; run `superplane apps update --draft -f <file>` first")
+			return fmt.Errorf("no draft version found; run `superplane apps canvas update --draft -f <file>` first")
 		}
 	}
 
@@ -514,4 +515,138 @@ func eventLabelForChangeRequestAction(action openapi_client.CanvasesActOnCanvasC
 	default:
 		return strings.ToLower(string(action))
 	}
+}
+
+// NewChangeRequestsCommand registers app-level change request commands under `apps change-requests`.
+func NewChangeRequestsCommand(options core.BindOptions) *cobra.Command {
+	var changeRequestsListStatusFilter string
+	var changeRequestsListOnlyMine bool
+	var changeRequestsListQuery string
+	var changeRequestsListLimit int64
+	var changeRequestsListBefore string
+
+	changeRequestsCmd := &cobra.Command{
+		Use:     "change-requests",
+		Short:   "Manage app change requests",
+		Aliases: []string{"cr"},
+	}
+
+	changeRequestsListCmd := &cobra.Command{
+		Use:   "list [name-or-id]",
+		Short: "List change requests for an app",
+		Args:  cobra.MaximumNArgs(1),
+	}
+	changeRequestsListCmd.Flags().StringVar(&changeRequestsListStatusFilter, "status", "", "status filter: all, open, conflicted, rejected, published")
+	changeRequestsListCmd.Flags().BoolVar(&changeRequestsListOnlyMine, "mine", false, "list only change requests created by the current user")
+	changeRequestsListCmd.Flags().StringVar(&changeRequestsListQuery, "query", "", "search by title or description")
+	changeRequestsListCmd.Flags().Int64Var(&changeRequestsListLimit, "limit", 50, "maximum number of change requests to return")
+	changeRequestsListCmd.Flags().StringVar(&changeRequestsListBefore, "before", "", "return change requests created before an RFC3339 timestamp")
+	core.Bind(changeRequestsListCmd, &changeRequestListCommand{
+		statusFilter: &changeRequestsListStatusFilter,
+		onlyMine:     &changeRequestsListOnlyMine,
+		query:        &changeRequestsListQuery,
+		limit:        &changeRequestsListLimit,
+		before:       &changeRequestsListBefore,
+	}, options)
+
+	changeRequestsGetCmd := &cobra.Command{
+		Use:   "get <change-request-id> [name-or-id]",
+		Short: "Describe a change request",
+		Args:  cobra.RangeArgs(1, 2),
+	}
+	core.Bind(changeRequestsGetCmd, &changeRequestGetCommand{}, options)
+
+	var changeRequestsCreateVersionID string
+	var changeRequestsCreateTitle string
+	var changeRequestsCreateDescription string
+	changeRequestsCreateCmd := &cobra.Command{
+		Use:   "create [name-or-id]",
+		Short: "Create a change request",
+		Args:  cobra.MaximumNArgs(1),
+	}
+	changeRequestsCreateCmd.Flags().StringVar(&changeRequestsCreateVersionID, "version-id", "", "version id to use (defaults to current user draft)")
+	changeRequestsCreateCmd.Flags().StringVar(&changeRequestsCreateTitle, "title", "", "change request title")
+	changeRequestsCreateCmd.Flags().StringVar(&changeRequestsCreateDescription, "description", "", "change request description")
+	core.Bind(changeRequestsCreateCmd, &changeRequestCreateCommand{
+		versionID:   &changeRequestsCreateVersionID,
+		title:       &changeRequestsCreateTitle,
+		description: &changeRequestsCreateDescription,
+	}, options)
+
+	changeRequestsApproveCmd := &cobra.Command{
+		Use:   "approve <change-request-id> [name-or-id]",
+		Short: "Approve a change request",
+		Args:  cobra.RangeArgs(1, 2),
+	}
+	core.Bind(changeRequestsApproveCmd, &changeRequestActionCommand{
+		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE,
+	}, options)
+
+	changeRequestsUnapproveCmd := &cobra.Command{
+		Use:   "unapprove <change-request-id> [name-or-id]",
+		Short: "Remove your active approval from a change request",
+		Args:  cobra.RangeArgs(1, 2),
+	}
+	core.Bind(changeRequestsUnapproveCmd, &changeRequestActionCommand{
+		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE,
+	}, options)
+
+	changeRequestsRejectCmd := &cobra.Command{
+		Use:   "reject <change-request-id> [name-or-id]",
+		Short: "Reject an open change request",
+		Args:  cobra.RangeArgs(1, 2),
+	}
+	core.Bind(changeRequestsRejectCmd, &changeRequestActionCommand{
+		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT,
+	}, options)
+
+	changeRequestsReopenCmd := &cobra.Command{
+		Use:   "reopen <change-request-id> [name-or-id]",
+		Short: "Reopen a rejected change request",
+		Args:  cobra.RangeArgs(1, 2),
+	}
+	core.Bind(changeRequestsReopenCmd, &changeRequestActionCommand{
+		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN,
+	}, options)
+
+	changeRequestsPublishCmd := &cobra.Command{
+		Use:   "publish <change-request-id> [name-or-id]",
+		Short: "Publish an approved change request",
+		Args:  cobra.RangeArgs(1, 2),
+	}
+	core.Bind(changeRequestsPublishCmd, &changeRequestActionCommand{
+		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH,
+	}, options)
+
+	var changeRequestsResolveFile string
+	var changeRequestsResolveAutoLayout string
+	var changeRequestsResolveAutoLayoutScope string
+	var changeRequestsResolveAutoLayoutNodes []string
+	changeRequestsResolveCmd := &cobra.Command{
+		Use:   "resolve <change-request-id> [name-or-id]",
+		Short: "Resolve conflicts by updating the change request version",
+		Args:  cobra.RangeArgs(1, 2),
+	}
+	changeRequestsResolveCmd.Flags().StringVarP(&changeRequestsResolveFile, "file", "f", "", "canvas file containing the conflict-resolved version")
+	changeRequestsResolveCmd.Flags().StringVar(&changeRequestsResolveAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
+	changeRequestsResolveCmd.Flags().StringVar(&changeRequestsResolveAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
+	changeRequestsResolveCmd.Flags().StringArrayVar(&changeRequestsResolveAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
+	core.Bind(changeRequestsResolveCmd, &changeRequestResolveCommand{
+		file:            &changeRequestsResolveFile,
+		autoLayout:      &changeRequestsResolveAutoLayout,
+		autoLayoutScope: &changeRequestsResolveAutoLayoutScope,
+		autoLayoutNodes: &changeRequestsResolveAutoLayoutNodes,
+	}, options)
+
+	changeRequestsCmd.AddCommand(changeRequestsListCmd)
+	changeRequestsCmd.AddCommand(changeRequestsGetCmd)
+	changeRequestsCmd.AddCommand(changeRequestsCreateCmd)
+	changeRequestsCmd.AddCommand(changeRequestsApproveCmd)
+	changeRequestsCmd.AddCommand(changeRequestsUnapproveCmd)
+	changeRequestsCmd.AddCommand(changeRequestsRejectCmd)
+	changeRequestsCmd.AddCommand(changeRequestsReopenCmd)
+	changeRequestsCmd.AddCommand(changeRequestsPublishCmd)
+	changeRequestsCmd.AddCommand(changeRequestsResolveCmd)
+
+	return changeRequestsCmd
 }

@@ -2,9 +2,10 @@ package apps
 
 import (
 	"github.com/spf13/cobra"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/console"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/files"
 	"github.com/superplanehq/superplane/pkg/cli/core"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 func NewCommand(options core.BindOptions) *cobra.Command {
@@ -12,6 +13,9 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Use:   "apps",
 		Short: "Manage apps",
 		Long: core.AgentSkillsHelp() + `
+
+An app is a SuperPlane automation made up of a canvas (workflow graph), console
+(dashboard), and optional repository files.
 
 App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
 (e.g. https://app.superplane.com/<organization-id>/canvases/<app-id>)`,
@@ -27,15 +31,6 @@ App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
 	listCmd.Flags().BoolVar(&listFull, "full", false, "show full output including all fields")
 	core.Bind(listCmd, &listCommand{full: &listFull}, options)
 
-	getCmd := &cobra.Command{
-		Use:   "get <name-or-id>",
-		Short: "Get an app",
-		Args:  cobra.ExactArgs(1),
-	}
-	var getDraft bool
-	getCmd.Flags().BoolVar(&getDraft, "draft", false, "get your draft version instead of the live version")
-	core.Bind(getCmd, &getCommand{draft: &getDraft}, options)
-
 	activeCmd := &cobra.Command{
 		Use:   "active [app-id]",
 		Short: "Set the active app",
@@ -44,219 +39,12 @@ App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
 	}
 	core.Bind(activeCmd, &ActiveCommand{}, options)
 
-	var createFile string
-	var createAutoLayout string
-	var createAutoLayoutScope string
-	var createAutoLayoutNodes []string
-	createCmd := &cobra.Command{
-		Use:   "create [app-name]",
-		Short: "Create an app",
-		Long: `Create an app by name or from a file.
-
-AI agents: for canonical app YAML shapes and wiring rules, install skills:
-- ` + core.SkillsInstallCommand("superplane-canvas-builder") + `
-- ` + core.SkillsInstallCommand("superplane-cli"),
-		Args: cobra.MaximumNArgs(1),
-	}
-	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "filename, directory, or URL to files to use to create the resource")
-	createCmd.Flags().StringVar(&createAutoLayout, "auto-layout", "", "automatically arrange the app (supported: horizontal, disable)")
-	createCmd.Flags().StringVar(&createAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
-	createCmd.Flags().StringArrayVar(&createAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
-	core.Bind(createCmd, &createCommand{
-		file:            &createFile,
-		autoLayout:      &createAutoLayout,
-		autoLayoutScope: &createAutoLayoutScope,
-		autoLayoutNodes: &createAutoLayoutNodes,
-	}, options)
-
-	var updateFile string
-	var updateDraft bool
-	var updateAutoLayout string
-	var updateAutoLayoutScope string
-	var updateAutoLayoutNodes []string
-	updateCmd := &cobra.Command{
-		Use:   "update",
-		Short: "Update an app from a YAML file",
-		Long:  "Updates the app using --file. The file must include metadata.id to identify the target app.",
-		Args:  cobra.NoArgs,
-	}
-	updateCmd.Flags().StringVarP(&updateFile, "file", "f", "", "filename, directory, or URL to files to use to update the resource")
-	_ = updateCmd.MarkFlagRequired("file")
-	updateCmd.Flags().BoolVar(&updateDraft, "draft", false, "keep the update as a draft instead of auto-publishing (required when change management is enabled)")
-	updateCmd.Flags().StringVar(&updateAutoLayout, "auto-layout", "", "automatically arrange the app (supported: horizontal, disable)")
-	updateCmd.Flags().StringVar(&updateAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
-	updateCmd.Flags().StringArrayVar(&updateAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
-	core.Bind(updateCmd, &updateCommand{
-		file:            &updateFile,
-		draft:           &updateDraft,
-		autoLayout:      &updateAutoLayout,
-		autoLayoutScope: &updateAutoLayoutScope,
-		autoLayoutNodes: &updateAutoLayoutNodes,
-	}, options)
-
-	var changeRequestsListStatusFilter string
-	var changeRequestsListOnlyMine bool
-	var changeRequestsListQuery string
-	var changeRequestsListLimit int64
-	var changeRequestsListBefore string
-
-	changeRequestsCmd := &cobra.Command{
-		Use:     "change-requests",
-		Short:   "Manage app change requests",
-		Aliases: []string{"cr"},
-	}
-
-	changeRequestsListCmd := &cobra.Command{
-		Use:   "list [name-or-id]",
-		Short: "List change requests for an app",
-		Args:  cobra.MaximumNArgs(1),
-	}
-	changeRequestsListCmd.Flags().StringVar(&changeRequestsListStatusFilter, "status", "", "status filter: all, open, conflicted, rejected, published")
-	changeRequestsListCmd.Flags().BoolVar(&changeRequestsListOnlyMine, "mine", false, "list only change requests created by the current user")
-	changeRequestsListCmd.Flags().StringVar(&changeRequestsListQuery, "query", "", "search by title or description")
-	changeRequestsListCmd.Flags().Int64Var(&changeRequestsListLimit, "limit", 50, "maximum number of change requests to return")
-	changeRequestsListCmd.Flags().StringVar(&changeRequestsListBefore, "before", "", "return change requests created before an RFC3339 timestamp")
-	core.Bind(changeRequestsListCmd, &changeRequestListCommand{
-		statusFilter: &changeRequestsListStatusFilter,
-		onlyMine:     &changeRequestsListOnlyMine,
-		query:        &changeRequestsListQuery,
-		limit:        &changeRequestsListLimit,
-		before:       &changeRequestsListBefore,
-	}, options)
-
-	changeRequestsGetCmd := &cobra.Command{
-		Use:   "get <change-request-id> [name-or-id]",
-		Short: "Describe a change request",
-		Args:  cobra.RangeArgs(1, 2),
-	}
-	core.Bind(changeRequestsGetCmd, &changeRequestGetCommand{}, options)
-
-	var changeRequestsCreateVersionID string
-	var changeRequestsCreateTitle string
-	var changeRequestsCreateDescription string
-	changeRequestsCreateCmd := &cobra.Command{
-		Use:   "create [name-or-id]",
-		Short: "Create a change request",
-		Args:  cobra.MaximumNArgs(1),
-	}
-	changeRequestsCreateCmd.Flags().StringVar(&changeRequestsCreateVersionID, "version-id", "", "version id to use (defaults to current user draft)")
-	changeRequestsCreateCmd.Flags().StringVar(&changeRequestsCreateTitle, "title", "", "change request title")
-	changeRequestsCreateCmd.Flags().StringVar(&changeRequestsCreateDescription, "description", "", "change request description")
-	core.Bind(changeRequestsCreateCmd, &changeRequestCreateCommand{
-		versionID:   &changeRequestsCreateVersionID,
-		title:       &changeRequestsCreateTitle,
-		description: &changeRequestsCreateDescription,
-	}, options)
-
-	changeRequestsApproveCmd := &cobra.Command{
-		Use:   "approve <change-request-id> [name-or-id]",
-		Short: "Approve a change request",
-		Args:  cobra.RangeArgs(1, 2),
-	}
-	core.Bind(changeRequestsApproveCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_APPROVE,
-	}, options)
-
-	changeRequestsUnapproveCmd := &cobra.Command{
-		Use:   "unapprove <change-request-id> [name-or-id]",
-		Short: "Remove your active approval from a change request",
-		Args:  cobra.RangeArgs(1, 2),
-	}
-	core.Bind(changeRequestsUnapproveCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_UNAPPROVE,
-	}, options)
-
-	changeRequestsRejectCmd := &cobra.Command{
-		Use:   "reject <change-request-id> [name-or-id]",
-		Short: "Reject an open change request",
-		Args:  cobra.RangeArgs(1, 2),
-	}
-	core.Bind(changeRequestsRejectCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REJECT,
-	}, options)
-
-	changeRequestsReopenCmd := &cobra.Command{
-		Use:   "reopen <change-request-id> [name-or-id]",
-		Short: "Reopen a rejected change request",
-		Args:  cobra.RangeArgs(1, 2),
-	}
-	core.Bind(changeRequestsReopenCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_REOPEN,
-	}, options)
-
-	changeRequestsPublishCmd := &cobra.Command{
-		Use:   "publish <change-request-id> [name-or-id]",
-		Short: "Publish an approved change request",
-		Args:  cobra.RangeArgs(1, 2),
-	}
-	core.Bind(changeRequestsPublishCmd, &changeRequestActionCommand{
-		action: openapi_client.CANVASESACTONCANVASCHANGEREQUESTREQUESTACTION_ACTION_PUBLISH,
-	}, options)
-
-	var changeRequestsResolveFile string
-	var changeRequestsResolveAutoLayout string
-	var changeRequestsResolveAutoLayoutScope string
-	var changeRequestsResolveAutoLayoutNodes []string
-	changeRequestsResolveCmd := &cobra.Command{
-		Use:   "resolve <change-request-id> [name-or-id]",
-		Short: "Resolve conflicts by updating the change request version",
-		Args:  cobra.RangeArgs(1, 2),
-	}
-	changeRequestsResolveCmd.Flags().StringVarP(&changeRequestsResolveFile, "file", "f", "", "app file containing the conflict-resolved version")
-	changeRequestsResolveCmd.Flags().StringVar(&changeRequestsResolveAutoLayout, "auto-layout", "", "automatically arrange the app (supported: horizontal, disable)")
-	changeRequestsResolveCmd.Flags().StringVar(&changeRequestsResolveAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
-	changeRequestsResolveCmd.Flags().StringArrayVar(&changeRequestsResolveAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
-	core.Bind(changeRequestsResolveCmd, &changeRequestResolveCommand{
-		file:            &changeRequestsResolveFile,
-		autoLayout:      &changeRequestsResolveAutoLayout,
-		autoLayoutScope: &changeRequestsResolveAutoLayoutScope,
-		autoLayoutNodes: &changeRequestsResolveAutoLayoutNodes,
-	}, options)
-
-	changeRequestsCmd.AddCommand(changeRequestsListCmd)
-	changeRequestsCmd.AddCommand(changeRequestsGetCmd)
-	changeRequestsCmd.AddCommand(changeRequestsCreateCmd)
-	changeRequestsCmd.AddCommand(changeRequestsApproveCmd)
-	changeRequestsCmd.AddCommand(changeRequestsUnapproveCmd)
-	changeRequestsCmd.AddCommand(changeRequestsRejectCmd)
-	changeRequestsCmd.AddCommand(changeRequestsReopenCmd)
-	changeRequestsCmd.AddCommand(changeRequestsPublishCmd)
-	changeRequestsCmd.AddCommand(changeRequestsResolveCmd)
-
-	var initTemplate string
-	var initListTemplates bool
-	var initOutputFile string
-	initCmd := &cobra.Command{
-		Use:   "init",
-		Short: "Generate a starter app YAML definition",
-		Long:  "Print a starter app YAML definition to stdout. Use --template to start from an existing template, or --list-templates to see available options.",
-		Args:  cobra.NoArgs,
-	}
-	initCmd.Flags().StringVar(&initTemplate, "template", "", "start from a named template (e.g. health-check-monitor)")
-	initCmd.Flags().BoolVar(&initListTemplates, "list-templates", false, "list available template names")
-	initCmd.Flags().StringVar(&initOutputFile, "output-file", "", "write to a file instead of stdout")
-	core.Bind(initCmd, &initCommand{
-		template:      &initTemplate,
-		listTemplates: &initListTemplates,
-		outputFile:    &initOutputFile,
-	}, options)
-
-	deleteCmd := &cobra.Command{
-		Use:   "delete <name-or-id>",
-		Short: "Delete an app",
-		Args:  cobra.ExactArgs(1),
-	}
-
-	core.Bind(deleteCmd, &deleteCommand{}, options)
-
 	root.AddCommand(listCmd)
-	root.AddCommand(getCmd)
 	root.AddCommand(activeCmd)
-	root.AddCommand(initCmd)
-	root.AddCommand(createCmd)
-	root.AddCommand(updateCmd)
-	root.AddCommand(deleteCmd)
-	root.AddCommand(changeRequestsCmd)
+	root.AddCommand(canvas.NewCreateCommand(options))
+	root.AddCommand(canvas.NewChangeRequestsCommand(options))
+	root.AddCommand(canvas.NewCommand(options))
+	root.AddCommand(console.NewCommand(options))
 	root.AddCommand(files.NewRootCommand(options))
 
 	return root

@@ -1,4 +1,4 @@
-package apps
+package canvas
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/cli/appresolve"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/models"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -25,7 +25,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		return err
 	}
 	if response.Canvas == nil {
-		return fmt.Errorf("app %q not found", canvasID)
+		return fmt.Errorf("canvas %q not found", canvasID)
 	}
 
 	canvas := *response.Canvas
@@ -65,7 +65,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		_, _ = fmt.Fprintf(stdout, "ID: %s\n", resource.Metadata.GetId())
 		_, _ = fmt.Fprintf(stdout, "Name: %s\n", resource.Metadata.GetName())
 		if url := BuildCanvasURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId()); url != "" {
-			_, _ = fmt.Fprintf(stdout, "App URL: %s\n", url)
+			_, _ = fmt.Fprintf(stdout, "Canvas URL: %s\n", url)
 		}
 		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(resource.Spec.GetNodes()))
 		_, err := fmt.Fprintf(stdout, "Edges: %d\n", len(resource.Spec.GetEdges()))

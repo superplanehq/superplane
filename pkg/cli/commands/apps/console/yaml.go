@@ -1,4 +1,4 @@
-// Package console contains the `superplane console` command group. It
+// Package console contains the `superplane apps console` command group. It
 // reads and writes canvas console configuration as canonical Console YAML
 // (the same shape used by the UI Console YAML modal and `console.yaml`
 // shipped with installable apps).

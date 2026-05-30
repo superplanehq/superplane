@@ -89,7 +89,7 @@ spec:
 		t.Fatalf("expected ParseCanvas to fail for unknown field")
 	}
 
-	assert.ErrorContains(t, err, "failed to parse app yaml")
+	assert.ErrorContains(t, err, "failed to parse canvas yaml")
 	assert.ErrorContains(t, err, `unknown field "hello"`)
 }
 
@@ -120,7 +120,7 @@ spec:
 `)
 
 		_, err := ParseCanvas(raw)
-		assert.EqualError(t, err, "app apiVersion is required")
+		assert.EqualError(t, err, "canvas apiVersion is required")
 	})
 
 	t.Run("rejects missing metadata", func(t *testing.T) {
@@ -133,7 +133,7 @@ spec:
 `)
 
 		_, err := ParseCanvas(raw)
-		assert.EqualError(t, err, "app metadata is required")
+		assert.EqualError(t, err, "canvas metadata is required")
 	})
 
 	t.Run("rejects missing metadata.name", func(t *testing.T) {
@@ -147,13 +147,13 @@ spec:
 `)
 
 		_, err := ParseCanvas(raw)
-		assert.EqualError(t, err, "app metadata.name is required")
+		assert.EqualError(t, err, "canvas metadata.name is required")
 	})
 
 	t.Run("rejects invalid yaml", func(t *testing.T) {
 		raw := []byte("apiVersion: v1\nkind: Canvas\nmetadata: [\n")
 		_, err := ParseCanvas(raw)
-		assert.ErrorContains(t, err, "failed to parse app yaml")
+		assert.ErrorContains(t, err, "failed to parse canvas yaml")
 		assert.ErrorContains(t, err, "invalid yaml")
 	})
 }

@@ -6,7 +6,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/models"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -49,7 +49,7 @@ func (c *listCommand) Execute(ctx core.CommandContext) error {
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		if len(canvases) == 0 {
-			_, err := fmt.Fprintln(stdout, "No canvases found.")
+			_, err := fmt.Fprintln(stdout, "No apps found.")
 			return err
 		}
 

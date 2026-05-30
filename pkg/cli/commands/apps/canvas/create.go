@@ -1,4 +1,4 @@
-package apps
+package canvas
 
 import (
 	"fmt"
@@ -6,7 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/models"
+	"github.com/spf13/cobra"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -135,7 +136,7 @@ func validateAndPrintCreateResponse(
 	}
 
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-		if _, err := fmt.Fprintf(stdout, "Canvas %q created (ID: %s)\n", canvas.Metadata.GetName(), canvas.Metadata.GetId()); err != nil {
+		if _, err := fmt.Fprintf(stdout, "App %q created (ID: %s)\n", canvas.Metadata.GetName(), canvas.Metadata.GetId()); err != nil {
 			return err
 		}
 		if url := BuildCanvasURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId()); url != "" {
@@ -145,4 +146,34 @@ func validateAndPrintCreateResponse(
 		}
 		return nil
 	})
+}
+
+// NewCreateCommand registers app creation under `apps create`.
+func NewCreateCommand(options core.BindOptions) *cobra.Command {
+	var createFile string
+	var createAutoLayout string
+	var createAutoLayoutScope string
+	var createAutoLayoutNodes []string
+	createCmd := &cobra.Command{
+		Use:   "create [app-name]",
+		Short: "Create an app",
+		Long: `Create an app by name or from a canvas YAML file.
+
+AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
+- ` + core.SkillsInstallCommand("superplane-app-builder") + `
+- ` + core.SkillsInstallCommand("superplane-cli"),
+		Args: cobra.MaximumNArgs(1),
+	}
+	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "filename, directory, or URL to files to use to create the resource")
+	createCmd.Flags().StringVar(&createAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
+	createCmd.Flags().StringVar(&createAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
+	createCmd.Flags().StringArrayVar(&createAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
+	core.Bind(createCmd, &createCommand{
+		file:            &createFile,
+		autoLayout:      &createAutoLayout,
+		autoLayoutScope: &createAutoLayoutScope,
+		autoLayoutNodes: &createAutoLayoutNodes,
+	}, options)
+
+	return createCmd
 }

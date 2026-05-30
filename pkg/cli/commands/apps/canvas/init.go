@@ -1,4 +1,4 @@
-package apps
+package canvas
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/ghodss/yaml"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/models"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -128,7 +128,7 @@ func (c *initCommand) writeToFile(path string, data []byte) error {
 		return fmt.Errorf("failed to write file: %w", err)
 	}
 
-	fmt.Fprintf(os.Stderr, "App file written to %s\n", path)
+	fmt.Fprintf(os.Stderr, "Canvas file written to %s\n", path)
 	return nil
 }
 

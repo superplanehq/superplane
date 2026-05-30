@@ -22,7 +22,7 @@ type Canvas struct {
 func ParseCanvas(raw []byte) (*Canvas, error) {
 	var resource Canvas
 	if err := core.NewDecoder(raw).DecodeYAML(&resource); err != nil {
-		return nil, fmt.Errorf("failed to parse app yaml: %w", err)
+		return nil, fmt.Errorf("failed to parse canvas yaml: %w", err)
 	}
 
 	if resource.Kind != CanvasKind {
@@ -30,15 +30,15 @@ func ParseCanvas(raw []byte) (*Canvas, error) {
 	}
 
 	if resource.APIVersion == "" {
-		return nil, fmt.Errorf("app apiVersion is required")
+		return nil, fmt.Errorf("canvas apiVersion is required")
 	}
 
 	if resource.Metadata == nil {
-		return nil, fmt.Errorf("app metadata is required")
+		return nil, fmt.Errorf("canvas metadata is required")
 	}
 
 	if resource.Metadata.Name == nil {
-		return nil, fmt.Errorf("app metadata.name is required")
+		return nil, fmt.Errorf("canvas metadata.name is required")
 	}
 
 	return &resource, nil

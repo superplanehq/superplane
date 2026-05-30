@@ -1,4 +1,4 @@
-package apps
+package canvas
 
 import (
 	"fmt"
@@ -27,7 +27,7 @@ func (c *deleteCommand) Execute(ctx core.CommandContext) error {
 
 	if ctx.Renderer.IsText() {
 		return ctx.Renderer.RenderText(func(stdout io.Writer) error {
-			_, err := fmt.Fprintf(stdout, "App deleted: %s\n", nameOrID)
+			_, err := fmt.Fprintf(stdout, "Canvas deleted: %s\n", nameOrID)
 			return err
 		})
 	}

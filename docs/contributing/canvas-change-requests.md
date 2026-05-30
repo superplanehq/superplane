@@ -85,5 +85,5 @@ If both sides changed the same node but resulting structure is identical (same J
 
 Notes:
 
-- `[name-or-id]` can be omitted if an active canvas is set with `superplane apps active`.
+- `[name-or-id]` can be omitted if an active app is set with `superplane apps active`.
 - `--status` supports `all`, `open`, `conflicted`, `rejected`, `published`.

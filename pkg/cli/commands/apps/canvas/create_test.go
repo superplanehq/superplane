@@ -1,4 +1,4 @@
-package apps
+package canvas
 
 import (
 	"bytes"
@@ -34,7 +34,7 @@ func TestCreateCommandPrintsCanvasOnSuccess(t *testing.T) {
 
 	err := (&createCommand{}).Execute(ctx)
 	require.NoError(t, err)
-	require.Contains(t, stdout.String(), `Canvas "my-canvas" created (ID: abc-123)`)
+	require.Contains(t, stdout.String(), `App "my-canvas" created (ID: abc-123)`)
 	require.NotContains(t, stdout.String(), "App URL:")
 }
 
@@ -47,7 +47,7 @@ func TestCreateCommandPrintsURLFromResponseOrgID(t *testing.T) {
 
 	err := (&createCommand{}).Execute(ctx)
 	require.NoError(t, err)
-	require.Contains(t, stdout.String(), `Canvas "my-canvas" created (ID: abc-123)`)
+	require.Contains(t, stdout.String(), `App "my-canvas" created (ID: abc-123)`)
 	require.Contains(t, stdout.String(), "App URL: https://app.superplane.com/org-uuid/canvases/abc-123")
 }
 
@@ -65,7 +65,7 @@ func TestCreateCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
 
 	err := (&createCommand{}).Execute(ctx)
 	require.NoError(t, err)
-	require.Contains(t, stdout.String(), `Canvas "my-canvas" created (ID: abc-123)`)
+	require.Contains(t, stdout.String(), `App "my-canvas" created (ID: abc-123)`)
 	require.NotContains(t, stdout.String(), "App URL:")
 }
 
