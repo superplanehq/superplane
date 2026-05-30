@@ -1,0 +1,46 @@
+import type { ComponentBaseProps, EventSection } from "@/ui/componentBase";
+import { getBackgroundColorClass, getColorClass } from "@/lib/colors";
+import { renderTimeAgo } from "@/components/TimeAgo";
+import railwayIcon from "@/assets/icons/integrations/railway.svg";
+import { getState, getStateMap, getTriggerRenderer } from "..";
+import type { ComponentDefinition, ExecutionInfo, NodeInfo } from "../types";
+
+export function baseProps(
+  nodes: NodeInfo[],
+  node: NodeInfo,
+  componentDefinition: ComponentDefinition,
+  lastExecutions: ExecutionInfo[],
+): ComponentBaseProps {
+  const lastExecution = lastExecutions.length > 0 ? lastExecutions[0] : null;
+  const componentName = componentDefinition.name || node.componentName || "railway.unknown";
+
+  return {
+    title: node.name || componentDefinition.label || componentDefinition.name || "Unnamed component",
+    iconSrc: railwayIcon,
+    iconColor: getColorClass(componentDefinition.color),
+    collapsedBackground: getBackgroundColorClass(componentDefinition.color),
+    collapsed: node.isCollapsed,
+    eventSections: lastExecution ? baseEventSections(nodes, lastExecution, componentName) : undefined,
+    includeEmptyState: !lastExecution,
+    eventStateMap: getStateMap(componentName),
+  };
+}
+
+function baseEventSections(nodes: NodeInfo[], execution: ExecutionInfo, componentName: string): EventSection[] {
+  const rootTriggerNode = nodes.find((node) => node.id === execution.rootEvent?.nodeId);
+  const rootTriggerRenderer = getTriggerRenderer(rootTriggerNode?.componentName || "");
+  const { title } = rootTriggerRenderer.getTitleAndSubtitle({ event: execution.rootEvent });
+
+  const subtitleTimestamp = execution.updatedAt || execution.createdAt;
+  const eventSubtitle = subtitleTimestamp ? renderTimeAgo(new Date(subtitleTimestamp)) : "";
+
+  return [
+    {
+      receivedAt: new Date(execution.createdAt!),
+      eventTitle: title,
+      eventSubtitle,
+      eventState: getState(componentName)(execution),
+      eventId: execution.rootEvent!.id!,
+    },
+  ];
+}
