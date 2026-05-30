@@ -6,6 +6,7 @@ services:
       cache_from:
         - ghcr.io/superplanehq/superplane-dev-base:app-latest
     tty: true
+    init: true
     # Idle by default so `make dev.up` does not run installs or the API/UI stack.
     # Run `make dev.server` to start air + Vite inside this container.
     command: ["sleep", "infinity"]
@@ -129,10 +130,6 @@ services:
       - ${PUBLIC_API_PORT:-8000}:${PUBLIC_API_PORT:-8000}
       - ${INTERNAL_API_PORT:-50051}:${INTERNAL_API_PORT:-50051}
 
-    links:
-      - db:db
-      - rabbitmq:rabbitmq
-
     depends_on:
       db:
         condition: service_healthy
@@ -144,7 +141,6 @@ services:
     volumes:
       - go-pkg-cache:/go
       - .:/app
-      - /tmp:/tmp
 
   supergit:
     image: ghcr.io/superplanehq/supergit:0.1.1
@@ -194,8 +190,6 @@ services:
       DATABASE_URL: "postgres://postgres:the-cake-is-a-lie@db:5432/superplane_dev?sslmode=disable"
     ports:
       - ${PGWEB_PORT:-8081}:${PGWEB_PORT:-8081}
-    links:
-      - db:db
     depends_on:
       db:
         condition: service_healthy
@@ -214,6 +208,16 @@ services:
       interval: 3s
       timeout: 3s
       retries: 5
+
+  plugin-example:
+    image: oven/bun:1
+    profiles: [plugin]
+    working_dir: /app/sdk/example
+    command: ["sh", "-c", "cd /app/sdk && bun install && bun run build && cd /app/sdk/example && rm -rf node_modules && bun install --no-cache && bun run index.ts"]
+    volumes:
+      - .:/app
+    ports:
+      - ${PLUGIN_EXAMPLE_PORT:-3001}:3001
 
 volumes:
   supergit-data:

@@ -1,0 +1,10 @@
+{
+  "type": "planelet.action.success",
+  "data": {
+    "action": "example-action",
+    "result": {
+      "message": "Action completed successfully"
+    }
+  },
+  "timestamp": "2026-05-30T12:00:00Z"
+}
