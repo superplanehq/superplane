@@ -1,4 +1,5 @@
 junit-report.xml
+junit-e2e.xml
 pkg/web/assets/dist
 tmp
 build/

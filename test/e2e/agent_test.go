@@ -218,7 +218,7 @@ func (s *agentSteps) openAgent() {
 func (s *agentSteps) waitForToolSidebarOpen() {
 	deadline := time.Now().Add(15 * time.Second)
 	sidebar := q.TestID("canvas-tool-sidebar").Run(s.session)
-	openButton := q.Locator(`button[aria-label="Open sidebar"]`).Run(s.session)
+	openButton := q.TestID("canvas-tool-sidebar-toggle").Run(s.session)
 
 	for time.Now().Before(deadline) {
 		visible, err := sidebar.IsVisible()
