@@ -31,6 +31,7 @@ RUN apt-get update && \
 
 RUN bash /opt/install-scripts/install-go.sh "${GO_VERSION}"
 RUN bash /opt/install-scripts/install-nodejs.sh
+RUN npm install -g @openai/codex @anthropic-ai/claude-code && npm cache clean --force
 RUN bash /opt/install-scripts/install-postgresql-client.sh
 RUN bash /opt/install-scripts/install-gomigrate.sh
 RUN bash /opt/install-scripts/install-protoc.sh

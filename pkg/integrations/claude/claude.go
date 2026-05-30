@@ -53,6 +53,7 @@ func (i *Claude) Actions() []core.Action {
 	return []core.Action{
 		&TextPrompt{},
 		&runagent.RunAgent{},
+		&RunClaudeCode{},
 	}
 }
 
