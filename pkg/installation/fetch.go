@@ -29,6 +29,13 @@ var errFileNotFound = errors.New("file not found")
 
 var defaultRefs = []string{"main", "master"}
 
+// httpGet performs the raw file GET. It is a package-level variable so tests
+// can stub upstream responses instead of depending on mutable external repos.
+var httpGet = func(rawURL string) (*http.Response, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	return client.Get(rawURL)
+}
+
 // FetchCanvas loads and parses canvas.yaml from a public GitHub repository.
 func FetchCanvas(repo *Repository) (*pb.Canvas, string, error) {
 	if repo.Ref == "" {
@@ -115,8 +122,7 @@ func fetchURL(rawURL string) ([]byte, error) {
 		return nil, fmt.Errorf("unsupported fetch host %q", parsed.Host)
 	}
 
-	client := &http.Client{Timeout: 15 * time.Second}
-	response, err := client.Get(rawURL)
+	response, err := httpGet(rawURL)
 	if err != nil {
 		return nil, fmt.Errorf("fetch %s: %w", rawURL, err)
 	}
