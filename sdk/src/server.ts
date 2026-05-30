@@ -2,15 +2,26 @@ import express, { type Express, type Request, type Response } from "express";
 import type {
   ActionDefinition,
   ActionManifest,
+  CleanupTriggerRequest,
+  CleanupTriggerResponse,
   ExecuteRequest,
   ExecuteResponse,
+  HandleTriggerWebhookRequest,
+  HandleTriggerWebhookResponse,
   Manifest,
+  ParameterDefinition,
+  ParameterManifest,
   PlaneletOptions,
+  SetupTriggerRequest,
+  SetupTriggerResponse,
+  TriggerDefinition,
+  TriggerManifest,
 } from "./types.js";
 
 export class PlaneletServer {
   private app: Express;
   private actions: Map<string, ActionDefinition> = new Map();
+  private triggers: Map<string, TriggerDefinition> = new Map();
   private options: PlaneletOptions;
 
   constructor(options: PlaneletOptions) {
@@ -20,8 +31,12 @@ export class PlaneletServer {
     this.setupRoutes();
   }
 
-  addAction(name: string, definition: ActionDefinition): void {
-    this.actions.set(name, definition);
+  addAction(id: string, definition: ActionDefinition): void {
+    this.actions.set(id, definition);
+  }
+
+  addTrigger(id: string, definition: TriggerDefinition): void {
+    this.triggers.set(id, definition);
   }
 
   listen(port: number, callback?: () => void): void {
@@ -30,7 +45,7 @@ export class PlaneletServer {
       callback ??
         (() => {
           console.log(
-            `Planelet server "${this.options.name}" listening on port ${port}`,
+            `Planelet server "${this.options.id}" listening on port ${port}`,
           );
         }),
     );
@@ -38,32 +53,38 @@ export class PlaneletServer {
 
   getManifest(): Manifest {
     const actions: ActionManifest[] = [];
+    const triggers: TriggerManifest[] = [];
 
-    for (const [name, def] of this.actions) {
-      const fields = Object.entries(def.fields).map(([fieldName, field]) => ({
-        name: fieldName,
-        label: field.label,
-        type: field.type,
-        description: field.description ?? "",
-        required: field.required ?? false,
-        default: field.default,
-        options: field.options,
-      }));
-
+    for (const [id, def] of this.actions) {
       actions.push({
-        name,
+        id,
         label: def.label,
-        description: def.description ?? "",
-        fields,
+        icon: def.icon,
+        iconUrl: def.iconUrl,
+        description: def.description,
+        parameters: serializeParameters(def.parameters),
+      });
+    }
+
+    for (const [id, def] of this.triggers) {
+      triggers.push({
+        id,
+        label: def.label,
+        icon: def.icon,
+        iconUrl: def.iconUrl,
+        description: def.description,
+        parameters: serializeParameters(def.parameters),
       });
     }
 
     return {
-      name: this.options.name,
-      label: this.options.label ?? this.options.name,
-      icon: this.options.icon ?? "puzzle",
-      description: this.options.description ?? "",
+      id: this.options.id,
+      label: this.options.label ?? this.options.id,
+      icon: this.options.icon,
+      iconUrl: this.options.iconUrl,
+      description: this.options.description,
       actions,
+      triggers,
     };
   }
 
@@ -73,15 +94,15 @@ export class PlaneletServer {
     });
 
     this.app.post(
-      "/actions/:name/execute",
+      "/actions/:id/execute",
       async (req: Request, res: Response) => {
-        const name = req.params.name as string;
-        const action = this.actions.get(name);
+        const id = req.params.id as string;
+        const action = this.actions.get(id);
 
         if (!action) {
           const response: ExecuteResponse = {
             success: false,
-            error: `Action "${name}" not found`,
+            error: `Action "${id}" not found`,
           };
           res.status(404).json(response);
           return;
@@ -90,7 +111,8 @@ export class PlaneletServer {
         const body = req.body as ExecuteRequest;
 
         try {
-          const result = await action.execute(body.parameters ?? {}, {
+          const result = await action.execute({
+            parameters: body.parameters ?? {},
             input: body.input,
           });
 
@@ -108,5 +130,135 @@ export class PlaneletServer {
         }
       },
     );
+
+    this.app.post(
+      "/triggers/:id/setup",
+      async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        const trigger = this.triggers.get(id);
+
+        if (!trigger) {
+          const response: SetupTriggerResponse = {
+            success: false,
+            error: `Trigger "${id}" not found`,
+          };
+          res.status(404).json(response);
+          return;
+        }
+
+        const body = req.body as SetupTriggerRequest;
+
+        try {
+          const metadata = await trigger.setup({
+            parameters: body.parameters ?? {},
+            webhook: body.webhook,
+          });
+
+          const response: SetupTriggerResponse = {
+            success: true,
+            metadata: metadata as Record<string, unknown> | undefined,
+          };
+          res.json(response);
+        } catch (err) {
+          const response: SetupTriggerResponse = {
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+          };
+          res.status(500).json(response);
+        }
+      },
+    );
+
+    this.app.post(
+      "/triggers/:id/cleanup",
+      async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        const trigger = this.triggers.get(id);
+
+        if (!trigger) {
+          const response: CleanupTriggerResponse = {
+            success: false,
+            error: `Trigger "${id}" not found`,
+          };
+          res.status(404).json(response);
+          return;
+        }
+
+        const body = req.body as CleanupTriggerRequest;
+
+        try {
+          await trigger.cleanup?.({
+            parameters: body.parameters ?? {},
+            metadata: body.metadata,
+          });
+
+          const response: CleanupTriggerResponse = { success: true };
+          res.json(response);
+        } catch (err) {
+          const response: CleanupTriggerResponse = {
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+          };
+          res.status(500).json(response);
+        }
+      },
+    );
+
+    this.app.post(
+      "/triggers/:id/webhook",
+      async (req: Request, res: Response) => {
+        const id = req.params.id as string;
+        const trigger = this.triggers.get(id);
+
+        if (!trigger) {
+          const response: HandleTriggerWebhookResponse = {
+            success: false,
+            error: `Trigger "${id}" not found`,
+          };
+          res.status(404).json(response);
+          return;
+        }
+
+        const body = req.body as HandleTriggerWebhookRequest;
+
+        try {
+          const result = await trigger.handleWebhook({
+            parameters: body.parameters ?? {},
+            metadata: body.metadata,
+            request: body.request,
+          });
+
+          const response: HandleTriggerWebhookResponse = {
+            success: true,
+            emit: result.emit ?? true,
+            eventType: "eventType" in result ? result.eventType : undefined,
+            payload: "payload" in result ? result.payload : undefined,
+            reason: "reason" in result ? result.reason : undefined,
+            response: result.response,
+          };
+          res.json(response);
+        } catch (err) {
+          const response: HandleTriggerWebhookResponse = {
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+          };
+          res.status(500).json(response);
+        }
+      },
+    );
   }
+}
+
+function serializeParameters(
+  parameters: Record<string, ParameterDefinition> = {},
+): ParameterManifest[] {
+  return Object.entries(parameters).map(([id, parameter]) => ({
+    id,
+    label: parameter.label,
+    type: parameter.type,
+    description: parameter.description,
+    required: parameter.required ?? false,
+    default: parameter.default,
+    options: parameter.options,
+  }));
 }

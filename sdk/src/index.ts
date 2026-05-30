@@ -1,9 +1,28 @@
 import { PlaneletServer } from "./server.js";
 import type {
   ActionDefinition,
+  ActionExecutionContext,
+  ActionManifest,
+  CleanupTriggerRequest,
+  CleanupTriggerResponse,
+  ExecuteRequest,
+  ExecuteResponse,
+  ForwardedWebhookRequest,
+  HandleTriggerWebhookRequest,
+  HandleTriggerWebhookResponse,
+  Manifest,
+  ParameterDefinition,
+  ParameterManifest,
+  ParameterOption,
   PlaneletOptions,
-  FieldDefinition,
-  FieldOption,
+  TriggerDefinition,
+  TriggerCleanupContext,
+  TriggerManifest,
+  TriggerSetupContext,
+  TriggerWebhookConfig,
+  TriggerWebhookContext,
+  TriggerWebhookResult,
+  WebhookHttpResponse,
 } from "./types.js";
 
 export function createPlanelet(options: PlaneletOptions): PlaneletBuilder {
@@ -18,10 +37,18 @@ class PlaneletBuilder {
   }
 
   action<TParams = Record<string, unknown>>(
-    name: string,
+    id: string,
     definition: ActionDefinition<TParams>,
   ): this {
-    this.server.addAction(name, definition as ActionDefinition);
+    this.server.addAction(id, definition as ActionDefinition);
+    return this;
+  }
+
+  trigger<
+    TParams = Record<string, unknown>,
+    TMetadata = Record<string, unknown>,
+  >(id: string, definition: TriggerDefinition<TParams, TMetadata>): this {
+    this.server.addTrigger(id, definition as TriggerDefinition);
     return this;
   }
 
@@ -30,4 +57,28 @@ class PlaneletBuilder {
   }
 }
 
-export type { ActionDefinition, PlaneletOptions, FieldDefinition, FieldOption };
+export type {
+  ActionDefinition,
+  ActionExecutionContext,
+  ActionManifest,
+  CleanupTriggerRequest,
+  CleanupTriggerResponse,
+  ExecuteRequest,
+  ExecuteResponse,
+  ForwardedWebhookRequest,
+  HandleTriggerWebhookRequest,
+  HandleTriggerWebhookResponse,
+  Manifest,
+  ParameterDefinition,
+  ParameterManifest,
+  ParameterOption,
+  PlaneletOptions,
+  TriggerDefinition,
+  TriggerCleanupContext,
+  TriggerManifest,
+  TriggerSetupContext,
+  TriggerWebhookConfig,
+  TriggerWebhookContext,
+  TriggerWebhookResult,
+  WebhookHttpResponse,
+};

@@ -2,6 +2,7 @@ package planelet
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
@@ -20,7 +21,7 @@ const (
 type RunAction struct{}
 
 type RunActionConfiguration struct {
-	ActionName string `json:"actionName" mapstructure:"actionName"`
+	ActionID string `json:"actionId" mapstructure:"actionId"`
 }
 
 func (r *RunAction) Name() string {
@@ -51,7 +52,7 @@ func (r *RunAction) Documentation() string {
 ## Configuration
 
 - **Action**: Select which action to run from the Planelet server's manifest
-- Additional fields appear dynamically based on the selected action
+- Additional parameters appear dynamically based on the selected action
 
 ## Output Channels
 
@@ -77,7 +78,7 @@ func (r *RunAction) OutputChannels(cfg any) []core.OutputChannel {
 func (r *RunAction) Configuration() []configuration.Field {
 	fields := []configuration.Field{
 		{
-			Name:     "actionName",
+			Name:     "actionId",
 			Label:    "Action",
 			Type:     configuration.FieldTypeIntegrationResource,
 			Required: true,
@@ -93,28 +94,28 @@ func (r *RunAction) Configuration() []configuration.Field {
 	manifest := getCachedManifest()
 	if manifest != nil {
 		for _, action := range manifest.Actions {
-			fields = append(fields, manifestFieldsToConfig(action.Fields, action.Name)...)
+			fields = append(fields, manifestParametersToConfig(action.Parameters, "actionId", action.ID)...)
 		}
 	}
 
 	return fields
 }
 
-func manifestFieldsToConfig(mFields []FieldManifest, actionName string) []configuration.Field {
-	fields := make([]configuration.Field, 0, len(mFields))
-	for _, f := range mFields {
+func manifestParametersToConfig(parameters []ParameterManifest, ownerField string, ownerID string) []configuration.Field {
+	fields := make([]configuration.Field, 0, len(parameters))
+	for _, p := range parameters {
 		field := configuration.Field{
-			Name:        fmt.Sprintf("param_%s_%s", actionName, f.Name),
-			Label:       f.Label,
-			Description: f.Description,
-			Required:    f.Required,
-			Default:     f.Default,
+			Name:        parameterFieldName(ownerID, p.ID),
+			Label:       p.Label,
+			Description: p.Description,
+			Required:    p.Required,
+			Default:     p.Default,
 			VisibilityConditions: []configuration.VisibilityCondition{
-				{Field: "actionName", Values: []string{actionName}},
+				{Field: ownerField, Values: []string{ownerID}},
 			},
 		}
 
-		switch f.Type {
+		switch p.Type {
 		case "string":
 			field.Type = configuration.FieldTypeString
 		case "text":
@@ -125,8 +126,8 @@ func manifestFieldsToConfig(mFields []FieldManifest, actionName string) []config
 			field.Type = configuration.FieldTypeBool
 		case "select":
 			field.Type = configuration.FieldTypeSelect
-			opts := make([]configuration.FieldOption, 0, len(f.Options))
-			for _, o := range f.Options {
+			opts := make([]configuration.FieldOption, 0, len(p.Options))
+			for _, o := range p.Options {
 				opts = append(opts, configuration.FieldOption{Label: o.Label, Value: o.Value})
 			}
 			field.TypeOptions = &configuration.TypeOptions{
@@ -143,14 +144,36 @@ func manifestFieldsToConfig(mFields []FieldManifest, actionName string) []config
 	return fields
 }
 
+func parameterFieldName(ownerID string, parameterID string) string {
+	return fmt.Sprintf("param_%s_%s", ownerID, parameterID)
+}
+
+func extractPlaneletParams(rawConfig any, ownerID string) map[string]any {
+	configMap, ok := rawConfig.(map[string]any)
+	if !ok {
+		return map[string]any{}
+	}
+
+	params := map[string]any{}
+	prefix := fmt.Sprintf("param_%s_", ownerID)
+	for key, value := range configMap {
+		if strings.HasPrefix(key, prefix) && len(key) > len(prefix) {
+			paramID := strings.TrimPrefix(key, prefix)
+			params[paramID] = value
+		}
+	}
+
+	return params
+}
+
 func (r *RunAction) Setup(ctx core.SetupContext) error {
 	var config RunActionConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
 
-	if config.ActionName == "" {
-		return fmt.Errorf("actionName is required")
+	if config.ActionID == "" {
+		return fmt.Errorf("actionId is required")
 	}
 
 	client, err := NewClientWithHTTP(ctx.Integration, ctx.HTTP)
@@ -165,14 +188,14 @@ func (r *RunAction) Setup(ctx core.SetupContext) error {
 
 	found := false
 	for _, action := range manifest.Actions {
-		if action.Name == config.ActionName {
+		if action.ID == config.ActionID {
 			found = true
 			break
 		}
 	}
 
 	if !found {
-		return fmt.Errorf("action %q not found in Planelet manifest", config.ActionName)
+		return fmt.Errorf("action %q not found in Planelet manifest", config.ActionID)
 	}
 
 	return nil
@@ -188,8 +211,8 @@ func (r *RunAction) Execute(ctx core.ExecutionContext) error {
 		return r.emitFailure(ctx, fmt.Sprintf("failed to decode configuration: %v", err))
 	}
 
-	if config.ActionName == "" {
-		return r.emitFailure(ctx, "actionName is required")
+	if config.ActionID == "" {
+		return r.emitFailure(ctx, "actionId is required")
 	}
 
 	client, err := NewClientWithHTTP(ctx.Integration, ctx.HTTP)
@@ -197,9 +220,9 @@ func (r *RunAction) Execute(ctx core.ExecutionContext) error {
 		return r.emitFailure(ctx, fmt.Sprintf("failed to create Planelet client: %v", err))
 	}
 
-	params := extractActionParams(ctx.Configuration, config.ActionName)
+	params := extractPlaneletParams(ctx.Configuration, config.ActionID)
 
-	result, err := client.ExecuteAction(config.ActionName, params, ctx.Data)
+	result, err := client.ExecuteAction(config.ActionID, params, ctx.Data)
 	if err != nil {
 		return r.emitFailure(ctx, fmt.Sprintf("failed to execute action: %v", err))
 	}
@@ -209,29 +232,11 @@ func (r *RunAction) Execute(ctx core.ExecutionContext) error {
 	}
 
 	payload := map[string]any{
-		"action": config.ActionName,
+		"action": config.ActionID,
 		"result": result.Data,
 	}
 
 	return ctx.ExecutionState.Emit(SuccessChannel, SuccessPayloadType, []any{payload})
-}
-
-func extractActionParams(rawConfig any, actionName string) map[string]any {
-	configMap, ok := rawConfig.(map[string]any)
-	if !ok {
-		return map[string]any{}
-	}
-
-	params := map[string]any{}
-	prefix := fmt.Sprintf("param_%s_", actionName)
-	for key, value := range configMap {
-		if len(key) > len(prefix) && key[:len(prefix)] == prefix {
-			paramName := key[len(prefix):]
-			params[paramName] = value
-		}
-	}
-
-	return params
 }
 
 func (r *RunAction) emitFailure(ctx core.ExecutionContext, errMsg string) error {

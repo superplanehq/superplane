@@ -97,7 +97,9 @@ type EventContext interface {
 
 type WebhookRequestContext struct {
 	Body          []byte
+	Method        string
 	Headers       http.Header
+	Query         map[string][]string
 	WorkflowID    string
 	NodeID        string
 	Configuration any
@@ -124,6 +126,7 @@ type WebhookRequestContext struct {
 type WebhookResponseBody struct {
 	Body        []byte
 	ContentType string
+	Headers     map[string]string
 }
 
 type NodeWebhookContext interface {

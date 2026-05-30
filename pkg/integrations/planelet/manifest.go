@@ -5,25 +5,38 @@ import (
 )
 
 type Manifest struct {
-	Name        string           `json:"name"`
-	Label       string           `json:"label"`
-	Icon        string           `json:"icon"`
-	Description string           `json:"description"`
-	Actions     []ActionManifest `json:"actions"`
+	ID          string            `json:"id"`
+	Label       string            `json:"label"`
+	Icon        string            `json:"icon,omitempty"`
+	IconURL     string            `json:"iconUrl,omitempty"`
+	Description string            `json:"description,omitempty"`
+	Actions     []ActionManifest  `json:"actions"`
+	Triggers    []TriggerManifest `json:"triggers"`
 }
 
 type ActionManifest struct {
-	Name        string          `json:"name"`
-	Label       string          `json:"label"`
-	Description string          `json:"description"`
-	Fields      []FieldManifest `json:"fields"`
+	ID          string              `json:"id"`
+	Label       string              `json:"label"`
+	Icon        string              `json:"icon,omitempty"`
+	IconURL     string              `json:"iconUrl,omitempty"`
+	Description string              `json:"description,omitempty"`
+	Parameters  []ParameterManifest `json:"parameters"`
 }
 
-type FieldManifest struct {
-	Name        string           `json:"name"`
+type TriggerManifest struct {
+	ID          string              `json:"id"`
+	Label       string              `json:"label"`
+	Icon        string              `json:"icon,omitempty"`
+	IconURL     string              `json:"iconUrl,omitempty"`
+	Description string              `json:"description,omitempty"`
+	Parameters  []ParameterManifest `json:"parameters"`
+}
+
+type ParameterManifest struct {
+	ID          string           `json:"id"`
 	Label       string           `json:"label"`
 	Type        string           `json:"type"`
-	Description string           `json:"description"`
+	Description string           `json:"description,omitempty"`
 	Required    bool             `json:"required"`
 	Default     any              `json:"default,omitempty"`
 	Options     []OptionManifest `json:"options,omitempty"`

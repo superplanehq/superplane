@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -24,8 +25,10 @@ type PlaneletConfiguration struct {
 }
 
 type PlaneletMetadata struct {
-	ManifestName  string `json:"manifestName" mapstructure:"manifestName"`
-	ManifestLabel string `json:"manifestLabel" mapstructure:"manifestLabel"`
+	ManifestID      string `json:"manifestId" mapstructure:"manifestId"`
+	ManifestLabel   string `json:"manifestLabel" mapstructure:"manifestLabel"`
+	ManifestIcon    string `json:"manifestIcon,omitempty" mapstructure:"manifestIcon"`
+	ManifestIconURL string `json:"manifestIconUrl,omitempty" mapstructure:"manifestIconUrl"`
 }
 
 func (p *Planelet) Name() string {
@@ -52,7 +55,7 @@ func (p *Planelet) Instructions() string {
 3. Enter the server URL below
 4. Optionally add an auth token if your server requires authentication
 
-The Planelet server exposes a manifest at ` + "`GET /manifest`" + ` describing available actions and their configuration fields.`
+The Planelet server exposes a manifest at ` + "`GET /manifest`" + ` describing available actions, triggers, and their configuration parameters.`
 }
 
 func (p *Planelet) Configuration() []configuration.Field {
@@ -84,6 +87,7 @@ func (p *Planelet) Actions() []core.Action {
 func (p *Planelet) Triggers() []core.Trigger {
 	return []core.Trigger{
 		&OnEvent{},
+		&WebhookTrigger{},
 	}
 }
 
@@ -98,7 +102,7 @@ func (p *Planelet) Sync(ctx core.SyncContext) error {
 	}
 
 	client := &Client{
-		serverURL: config.ServerURL,
+		serverURL: strings.TrimRight(config.ServerURL, "/"),
 		authToken: config.AuthToken,
 		httpDo:    ctx.HTTP.Do,
 	}
@@ -108,15 +112,17 @@ func (p *Planelet) Sync(ctx core.SyncContext) error {
 		return fmt.Errorf("failed to connect to Planelet server: %w", err)
 	}
 
-	if manifest.Name == "" {
-		return fmt.Errorf("Planelet manifest is missing 'name' field")
+	if manifest.ID == "" {
+		return fmt.Errorf("Planelet manifest is missing 'id' field")
 	}
 
 	setCachedManifest(manifest)
 
 	ctx.Integration.SetMetadata(PlaneletMetadata{
-		ManifestName:  manifest.Name,
-		ManifestLabel: manifest.Label,
+		ManifestID:      manifest.ID,
+		ManifestLabel:   manifest.Label,
+		ManifestIcon:    manifest.Icon,
+		ManifestIconURL: manifest.IconURL,
 	})
 
 	ctx.Integration.Ready()
@@ -177,7 +183,7 @@ func (p *Planelet) HandleRequest(ctx core.HTTPRequestContext) {
 }
 
 func (p *Planelet) ListResources(resourceType string, ctx core.ListResourcesContext) ([]core.IntegrationResource, error) {
-	if resourceType != "action" {
+	if resourceType != "action" && resourceType != "trigger" {
 		return []core.IntegrationResource{}, nil
 	}
 
@@ -193,16 +199,30 @@ func (p *Planelet) ListResources(resourceType string, ctx core.ListResourcesCont
 
 	setCachedManifest(manifest)
 
-	resources := make([]core.IntegrationResource, 0, len(manifest.Actions))
-	for _, action := range manifest.Actions {
-		resources = append(resources, core.IntegrationResource{
-			Type: "action",
-			ID:   action.Name,
-			Name: action.Label,
-		})
+	switch resourceType {
+	case "action":
+		resources := make([]core.IntegrationResource, 0, len(manifest.Actions))
+		for _, action := range manifest.Actions {
+			resources = append(resources, core.IntegrationResource{
+				Type: "action",
+				ID:   action.ID,
+				Name: action.Label,
+			})
+		}
+		return resources, nil
+	case "trigger":
+		resources := make([]core.IntegrationResource, 0, len(manifest.Triggers))
+		for _, trigger := range manifest.Triggers {
+			resources = append(resources, core.IntegrationResource{
+				Type: "trigger",
+				ID:   trigger.ID,
+				Name: trigger.Label,
+			})
+		}
+		return resources, nil
 	}
 
-	return resources, nil
+	return []core.IntegrationResource{}, nil
 }
 
 func (p *Planelet) Hooks() []core.Hook {

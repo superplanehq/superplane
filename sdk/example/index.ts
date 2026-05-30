@@ -1,9 +1,10 @@
 import { createPlanelet } from "@superplane/planelet-sdk";
 
 const planelet = createPlanelet({
-  name: "quotes",
+  id: "quotes",
   label: "Random Quotes",
   icon: "quote",
+  iconUrl: "https://example.com/quote.svg",
   description: "Get random quotes and generate greetings",
 });
 
@@ -28,7 +29,7 @@ const quotes = [
 planelet.action("get-quote", {
   label: "Get Random Quote",
   description: "Returns a random inspirational quote",
-  fields: {
+  parameters: {
     category: {
       label: "Category",
       type: "select",
@@ -55,7 +56,7 @@ planelet.action("get-quote", {
 planelet.action("greet", {
   label: "Generate Greeting",
   description: "Generate a personalized greeting message",
-  fields: {
+  parameters: {
     name: {
       label: "Name",
       type: "string",
@@ -74,9 +75,9 @@ planelet.action("greet", {
       ],
     },
   },
-  execute: async (params) => {
-    const name = params.name as string;
-    const style = params.style as string;
+  execute: async ({ parameters }) => {
+    const name = parameters.name as string;
+    const style = parameters.style as string;
 
     const greetings: Record<string, string> = {
       formal: `Good day, ${name}. It is a pleasure to make your acquaintance.`,
@@ -88,6 +89,47 @@ planelet.action("greet", {
       greeting: greetings[style] ?? greetings.casual,
       style,
       recipient: name,
+    };
+  },
+});
+
+planelet.trigger("quote-created", {
+  label: "Quote Created",
+  description: "Demo webhook trigger that normalizes incoming quote events",
+  parameters: {
+    workspaceId: {
+      label: "Workspace ID",
+      type: "string",
+      required: true,
+    },
+  },
+  setup: async ({ parameters, webhook }) => {
+    return {
+      providerWebhookId: "demo-webhook",
+      workspaceId: parameters.workspaceId,
+      webhookUrl: webhook.url,
+    };
+  },
+  cleanup: async ({ metadata }) => {
+    console.log("Cleaning up webhook", metadata?.providerWebhookId);
+  },
+  handleWebhook: async ({ request, metadata }) => {
+    const rawBody = Buffer.from(request.rawBodyBase64, "base64").toString(
+      "utf8",
+    );
+    const body = rawBody ? JSON.parse(rawBody) : {};
+
+    return {
+      eventType: "quote.created",
+      payload: {
+        providerWebhookId: metadata?.providerWebhookId,
+        quote: body.quote,
+        receivedMethod: request.method,
+      },
+      response: {
+        status: 200,
+        body: "ok",
+      },
     };
   },
 });
