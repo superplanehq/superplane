@@ -13,5 +13,5 @@ func AgentSkillsHint() string {
 func AgentSkillsHelp() string {
 	return `AI agents: SuperPlane skills are available to guide correct YAML formats, field names, and workflows.
 Install: ` + SkillsInstallCommand("superplane-cli") + `
-More skills: superplane-canvas-builder, superplane-monitor`
+More skills: superplane-app-builder, superplane-monitor`
 }
