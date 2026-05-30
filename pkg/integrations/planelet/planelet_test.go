@@ -14,7 +14,7 @@ import (
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
-func Test__Client__ExecuteActionUsesV2Endpoint(t *testing.T) {
+func Test__Client__ExecuteActionUsesActionEndpoint(t *testing.T) {
 	integration := &contexts.IntegrationContext{
 		Configuration: map[string]any{
 			"serverUrl": "https://planelet.example/",
