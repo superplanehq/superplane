@@ -20,16 +20,11 @@ stop_watchers() {
 }
 stop_watchers
 
-# `make dev.server` launches this via `compose exec -d`. Under Podman, when the detached
-# exec session leader exits, the whole exec process group is SIGKILLed — so backgrounded
-# watchers (air, vite) and the Go server they spawn get reaped the moment this script returns.
-# `setsid` moves each watcher into its own session so it survives the exec teardown.
-# (Docker tolerated the old `air & ; npm run dev & ; wait -n`; Podman does not.)
-LOG_DIR=/app/tmp
-mkdir -p "$LOG_DIR"
-
-setsid air >"$LOG_DIR/air.log" 2>&1 &
+air &
 
 cd web_src
-setsid npm run dev >"$LOG_DIR/vite.log" 2>&1 &
+npm run dev &
 cd ..
+
+wait -n
+exit $?
