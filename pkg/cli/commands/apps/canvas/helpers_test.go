@@ -16,10 +16,16 @@ import (
 // canvas-active accessors are no-ops because the canvas commands under test
 // here do not use them.
 type fakeConfig struct {
-	url string
+	url      string
+	activeApp string
 }
 
-func (f *fakeConfig) GetActiveApp() string               { return "" }
+func (f *fakeConfig) GetActiveApp() string {
+	if f.activeApp != "" {
+		return f.activeApp
+	}
+	return ""
+}
 func (f *fakeConfig) SetActiveApp(canvasID string) error { return nil }
 func (f *fakeConfig) GetURL() string                     { return f.url }
 

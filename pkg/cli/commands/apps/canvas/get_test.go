@@ -70,3 +70,25 @@ func TestGetCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
 	require.Contains(t, stdout.String(), "Name: my-canvas")
 	require.NotContains(t, stdout.String(), "Canvas URL:")
 }
+
+func TestGetUsesActiveAppWhenNoArg(t *testing.T) {
+	server := newCanvasGetServer(t)
+	ctx, stdout := newCommandContextWithConfigForTest(t, server, "text", &fakeConfig{
+		activeApp: testGetCanvasID,
+	})
+	ctx.Args = []string{}
+
+	err := (&getCommand{}).Execute(ctx)
+	require.NoError(t, err)
+	require.Contains(t, stdout.String(), "ID: "+testGetCanvasID)
+}
+
+func TestGetErrorsWhenNoAppAndNoActive(t *testing.T) {
+	server := newCanvasGetServer(t)
+	ctx, _ := newCreateCommandContextForTest(t, server, "text")
+	ctx.Args = []string{}
+
+	err := (&getCommand{}).Execute(ctx)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "app-name-or-id")
+}

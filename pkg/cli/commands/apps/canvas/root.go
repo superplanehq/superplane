@@ -18,9 +18,15 @@ rules, install skills:
 	}
 
 	getCmd := &cobra.Command{
-		Use:   "get <name-or-id>",
+		Use:   "get [name-or-id]",
 		Short: "Get a canvas",
-		Args:  cobra.ExactArgs(1),
+		Long: `Print a canvas for an app. With -o yaml, prints the canonical
+Canvas YAML (apiVersion: v1, kind: Canvas). Defaults to the live canvas;
+use --draft to read your in-progress draft.
+
+The app argument is optional. When omitted, the active app
+configured with "superplane apps active" is used.`,
+		Args: cobra.MaximumNArgs(1),
 	}
 	var getDraft bool
 	getCmd.Flags().BoolVar(&getDraft, "draft", false, "get your draft version instead of the live version")

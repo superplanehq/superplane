@@ -15,7 +15,16 @@ type getCommand struct {
 }
 
 func (c *getCommand) Execute(ctx core.CommandContext) error {
-	canvasID, err := appresolve.FindAppID(ctx, ctx.API, ctx.Args[0])
+	if len(ctx.Args) > 1 {
+		return fmt.Errorf("get accepts at most one positional argument")
+	}
+
+	appArg := ""
+	if len(ctx.Args) == 1 {
+		appArg = strings.TrimSpace(ctx.Args[0])
+	}
+
+	canvasID, err := appresolve.ResolveAppNameOrIDArg(ctx, appArg)
 	if err != nil {
 		return err
 	}

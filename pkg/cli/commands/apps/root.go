@@ -19,7 +19,7 @@ An app is a SuperPlane automation made up of a canvas (workflow graph), console
 
 App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
 (e.g. https://app.superplane.com/<organization-id>/canvases/<app-id>)`,
-		Aliases: []string{"app", "canvases", "canvas"},
+		Aliases: []string{"app"},
 	}
 
 	listCmd := &cobra.Command{
