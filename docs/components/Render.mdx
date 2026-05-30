@@ -19,6 +19,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cancel Deploy" href="#cancel-deploy" description="Cancel an in-progress deploy for a Render service and wait for it to complete" />
   <LinkCard title="Deploy" href="#deploy" description="Trigger a deploy for a Render service and wait for it to complete" />
   <LinkCard title="Get Deploy" href="#get-deploy" description="Retrieve a deploy by ID for a Render service" />
+  <LinkCard title="List Deploys" href="#list-deploys" description="List recent deploys for rollback and incident workflows" />
   <LinkCard title="Get Service" href="#get-service" description="Retrieve a Render service and its custom domains" />
   <LinkCard title="Purge Cache" href="#purge-cache" description="Request a purge of the build cache for a Render service" />
   <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back a Render service to a previous deploy and wait for it to complete" />
@@ -461,6 +462,24 @@ Emits a `render.service.scaled` payload with `serviceId`, `numInstances`, and `s
   "type": "render.service.scaled"
 }
 ```
+
+<a id="list-deploys"></a>
+
+## List Deploys
+
+**Component key:** `render.listDeploys`
+
+Lists recent deploys for a Render service. Use this in incident workflows to find the latest successful deploy before a rollback.
+
+### Configuration
+
+- **Service**: Render service to list deploys for
+- **Statuses**: Optional deploy statuses, for example `live`
+- **Limit**: Maximum deploys to return
+
+### Output
+
+Emits `render.deploys.listed` with `serviceId`, `count`, `deploys`, and `latestSuccessful` when a live deploy is present.
 
 <a id="add-custom-domain"></a>
 

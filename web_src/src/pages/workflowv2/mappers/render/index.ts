@@ -11,11 +11,13 @@ import { SCALE_SERVICE_STATE_REGISTRY, scaleServiceMapper } from "./scale_servic
 import { updateEnvVarMapper } from "./update_env_var";
 import { addCustomDomainMapper } from "./add_custom_domain";
 import { removeCustomDomainMapper } from "./remove_custom_domain";
+import { renderOperationMapper } from "./operations";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
   deploy: deployMapper,
   getService: getServiceMapper,
   getDeploy: getDeployMapper,
+  listDeploys: renderOperationMapper,
   cancelDeploy: cancelDeployMapper,
   rollbackDeploy: rollbackDeployMapper,
   purgeCache: purgeCacheMapper,

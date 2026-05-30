@@ -174,3 +174,17 @@ func (c *RemoveCustomDomain) ExampleOutput() map[string]any {
 		&exampleOutputRemoveCustomDomain,
 	)
 }
+
+func (c *ListDeploys) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.deploys.listed",
+		"data": map[string]any{
+			"serviceId": "srv-cukouhrtq21c73e9scng",
+			"count":     1,
+			"deploys": []map[string]any{
+				{"deployId": "dep-cukp0k3tq21c73e9sct0", "serviceId": "srv-cukouhrtq21c73e9scng", "status": "live"},
+			},
+			"latestSuccessful": map[string]any{"deployId": "dep-cukp0k3tq21c73e9sct0", "status": "live"},
+		},
+	}
+}

@@ -108,6 +108,11 @@ type triggerDeployResponse struct {
 	Deploy DeployResponse `json:"deploy"`
 }
 
+type deployWithCursor struct {
+	Cursor string         `json:"cursor"`
+	Deploy DeployResponse `json:"deploy"`
+}
+
 type DeployResponse struct {
 	ID         string        `json:"id"`
 	Status     string        `json:"status"`
@@ -433,6 +438,35 @@ func (c *Client) TriggerDeploy(serviceID string, clearCache bool) (DeployRespons
 	}
 
 	return deployResponse, nil
+}
+
+func (c *Client) ListDeploys(serviceID string, statuses []string, limit int) ([]DeployResponse, error) {
+	if serviceID == "" {
+		return nil, fmt.Errorf("serviceID is required")
+	}
+
+	query := url.Values{}
+	if limit > 0 {
+		query.Set("limit", fmt.Sprintf("%d", limit))
+	}
+	for _, status := range statuses {
+		status = strings.TrimSpace(status)
+		if status != "" {
+			query.Add("status", status)
+		}
+	}
+
+	_, body, err := c.execRequestWithResponse(
+		http.MethodGet,
+		"/services/"+url.PathEscape(serviceID)+"/deploys",
+		query,
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return parseDeploys(body)
 }
 
 func (c *Client) GetDeploy(serviceID string, deployID string) (DeployResponse, error) {
@@ -857,6 +891,25 @@ func parseServices(body []byte) ([]Service, error) {
 	}
 
 	return plainServices, nil
+}
+
+func parseDeploys(body []byte) ([]DeployResponse, error) {
+	withCursor := []deployWithCursor{}
+	if err := json.Unmarshal(body, &withCursor); err == nil && len(withCursor) > 0 {
+		deploys := make([]DeployResponse, 0, len(withCursor))
+		for _, item := range withCursor {
+			if item.Deploy.ID != "" {
+				deploys = append(deploys, item.Deploy)
+			}
+		}
+		return deploys, nil
+	}
+
+	deploys := []DeployResponse{}
+	if err := json.Unmarshal(body, &deploys); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal deploys response: %w", err)
+	}
+	return deploys, nil
 }
 
 func parseWebhooks(body []byte) ([]Webhook, error) {
