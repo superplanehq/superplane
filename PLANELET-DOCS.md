@@ -1,13 +1,13 @@
-# SuperPlane Plugin SDK
+# SuperPlane Planelet SDK
 
-Build custom SuperPlane integrations without modifying the SuperPlane codebase. Write a plugin server with the TypeScript SDK, point SuperPlane at it, and your actions appear natively in the canvas UI.
+Build custom SuperPlane integrations without modifying the SuperPlane codebase. Write a Planelet server with the TypeScript SDK, point SuperPlane at it, and your actions appear natively in the canvas UI.
 
 ## Architecture
 
 ```
 ┌──────────────┐           ┌──────────────────┐         ┌────────────────┐
-│  SuperPlane  │ ──GET───▶ │  Plugin Server   │         │   Your Code    │
-│  (Plugin     │ /manifest │  (SDK-powered)   │◀────────│   (actions,    │
+│  SuperPlane  │ ──GET───▶ │ Planelet Server  │         │   Your Code    │
+│  (Planelets  │ /manifest │  (SDK-powered)   │◀────────│   (actions,    │
 │  Integration)│           │                  │         │    logic)      │
 │              │ ──POST──▶ │ /actions/:name/  │         │                │
 │              │           │    execute       │         │                │
@@ -16,8 +16,8 @@ Build custom SuperPlane integrations without modifying the SuperPlane codebase. 
 └──────────────┘           └──────────────────┘         └────────────────┘
 ```
 
-1. You build a plugin server using the SDK
-2. SuperPlane's Plugin integration connects to your server
+1. You build a Planelet server using the SDK
+2. SuperPlane's Planelets integration connects to your server
 3. On setup, it fetches your manifest to discover available actions
 4. When a canvas node runs your action, SuperPlane proxies the execution to your server
 5. Your server can push events back to SuperPlane to trigger workflows
@@ -27,24 +27,24 @@ Build custom SuperPlane integrations without modifying the SuperPlane codebase. 
 ### 1. Create a new project
 
 ```bash
-mkdir my-plugin && cd my-plugin
+mkdir my-planelet && cd my-planelet
 bun init -y
-bun add @superplane/plugin-sdk
+bun add @superplane/planelet-sdk
 ```
 
-### 2. Write your plugin
+### 2. Write your Planelet
 
 ```typescript
 // index.ts
-import { createPlugin } from "@superplane/plugin-sdk";
+import { createPlanelet } from "@superplane/planelet-sdk";
 
-const plugin = createPlugin({
-  name: "my-plugin",
-  label: "My Plugin",
+const planelet = createPlanelet({
+  name: "my-planelet",
+  label: "My Planelet",
   description: "Does useful things",
 });
 
-plugin.action("hello", {
+planelet.action("hello", {
   label: "Say Hello",
   description: "Generates a greeting",
   fields: {
@@ -60,41 +60,41 @@ plugin.action("hello", {
   },
 });
 
-plugin.listen(3001);
+planelet.listen(3001);
 ```
 
 ### 3. Run it
 
 ```bash
 bun run index.ts
-# Plugin server "my-plugin" listening on port 3001
+# Planelet server "my-planelet" listening on port 3001
 ```
 
 ### 4. Connect to SuperPlane
 
-1. In SuperPlane, add a new **Plugin** integration
-2. Set **Server URL** to your plugin server's address (e.g. `https://my-plugin.example.com`)
+1. In SuperPlane, add a new **Planelets** integration
+2. Set **Server URL** to your Planelet server's address (e.g. `https://my-planelet.example.com`)
 3. Optionally set an **Auth Token**
 4. Save — SuperPlane fetches your manifest and the integration goes ready
 
 ### 5. Use in a canvas
 
-Add a **Run Plugin Action** node to your canvas. Select your action from the dropdown. Fill in the fields. Done.
+Add a **Run Planelet Action** node to your canvas. Select your action from the dropdown. Fill in the fields. Done.
 
 ## Protocol Reference
 
-The SDK handles all of this for you, but if you want to build a plugin server in another language, here's the protocol.
+The SDK handles all of this for you, but if you want to build a Planelet server in another language, here's the protocol.
 
 ### `GET /manifest`
 
-Returns the plugin's metadata and available actions.
+Returns the Planelet's metadata and available actions.
 
 **Response:**
 
 ```json
 {
-  "name": "my-plugin",
-  "label": "My Plugin",
+  "name": "my-planelet",
+  "label": "My Planelet",
   "icon": "puzzle",
   "description": "Does useful things",
   "actions": [
@@ -156,7 +156,7 @@ Executes an action.
 
 ### Events (Triggers)
 
-To push events from your plugin server into SuperPlane, POST to:
+To push events from your Planelet server into SuperPlane, POST to:
 
 ```
 POST /api/v1/integrations/{integration_id}/events
@@ -168,18 +168,18 @@ Content-Type: application/json
 }
 ```
 
-Use the **On Plugin Event** trigger in your canvas to listen for these events. You can filter by `eventType`.
+Use the **On Planelet Event** trigger in your canvas to listen for these events. You can filter by `eventType`.
 
 ## SDK API Reference
 
-### `createPlugin(options)`
+### `createPlanelet(options)`
 
-Creates a new plugin builder.
+Creates a new Planelet builder.
 
 ```typescript
-const plugin = createPlugin({
-  name: "my-plugin",       // required, unique identifier
-  label: "My Plugin",      // optional, display name (defaults to name)
+const planelet = createPlanelet({
+  name: "my-planelet",       // required, unique identifier
+  label: "My Planelet",      // optional, display name (defaults to name)
   icon: "puzzle",           // optional, icon identifier
   description: "...",       // optional
 });
@@ -190,7 +190,7 @@ const plugin = createPlugin({
 Registers an action.
 
 ```typescript
-plugin.action("do-thing", {
+planelet.action("do-thing", {
   label: "Do Thing",                    // required, display name
   description: "Does a thing",         // optional
   fields: {                            // required, config fields
@@ -216,8 +216,8 @@ Returns `this` for chaining.
 Starts the HTTP server.
 
 ```typescript
-plugin.listen(3001);
-plugin.listen(3001, () => console.log("Ready!"));
+planelet.listen(3001);
+planelet.listen(3001, () => console.log("Ready!"));
 ```
 
 ## Field Types
@@ -249,18 +249,18 @@ plugin.listen(3001, () => console.log("Ready!"));
 
 ## Authentication
 
-If your plugin server requires authentication, set the **Auth Token** in the SuperPlane Plugin integration config. The token is sent as a `Bearer` token in the `Authorization` header on every request from SuperPlane to your server.
+If your Planelet server requires authentication, set the **Auth Token** in the SuperPlane Planelets integration config. The token is sent as a `Bearer` token in the `Authorization` header on every request from SuperPlane to your server.
 
 To validate it server-side, add middleware to your Express app (the SDK doesn't enforce auth by default):
 
 ```typescript
-// Example: add auth middleware before creating the plugin
+// Example: add auth middleware before creating the Planelet
 // This is outside the SDK — use standard Express patterns
 ```
 
 ## Deploying
 
-Your plugin server is a standard HTTP server. Deploy it anywhere SuperPlane can reach:
+Your Planelet server is a standard HTTP server. Deploy it anywhere SuperPlane can reach:
 
 - **Local development**: `localhost` or tunnel (ngrok, cloudflared)
 - **Cloud**: any container platform (Railway, Fly.io, Cloud Run, ECS)
@@ -270,7 +270,7 @@ The server must be reachable from SuperPlane at the configured URL. HTTPS is rec
 
 ## Example
 
-See [`sdk/example/`](sdk/example/) for a complete example plugin with two actions (random quotes and greetings). Run it:
+See [`sdk/example/`](sdk/example/) for a complete example Planelet with two actions (random quotes and greetings). Run it:
 
 ```bash
 cd sdk/example
