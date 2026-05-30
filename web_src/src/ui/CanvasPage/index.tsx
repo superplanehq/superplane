@@ -21,8 +21,9 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ZoomSlider } from "@/components/zoom-slider";
+import { getDraftDiffEdgeStyle } from "@/lib/draftDiff";
 import { cn } from "@/lib/utils";
-import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Search, Trash2, TriangleAlert } from "lucide-react";
+import { CircleX, Copy, LayoutDashboard, LayoutGrid, Loader2, Search, Trash2, CircleAlert } from "lucide-react";
 import {
   Component,
   memo,
@@ -2839,12 +2840,7 @@ function CanvasContent({
   const styledEdges = useMemo(() => {
     return state.edges?.map((e) => {
       const diffStatus = (e.data as Record<string, unknown> | undefined)?._draftDiffStatus;
-      const diffStyle =
-        diffStatus === "removed"
-          ? { stroke: "#FDA4AF", strokeDasharray: "8 4" }
-          : diffStatus === "added"
-            ? { stroke: "#86EFAC" }
-            : {};
+      const diffStyle = getDraftDiffEdgeStyle(diffStatus) ?? {};
 
       return {
         ...e,
@@ -3139,7 +3135,7 @@ function CanvasContent({
                           className="h-7 items-center text-xs font-medium"
                           onClick={() => handleLogButtonClick("warnings")}
                         >
-                          <TriangleAlert
+                          <CircleAlert
                             className={logCounts.warning > 0 ? "h-3 w-3 text-orange-500" : "h-3 w-3 text-gray-800"}
                           />
                           <span
