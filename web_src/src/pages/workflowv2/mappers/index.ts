@@ -91,6 +91,11 @@ import {
   eventStateRegistry as renderEventStateRegistry,
 } from "./render";
 import {
+  componentMappers as railwayComponentMappers,
+  triggerRenderers as railwayTriggerRenderers,
+  eventStateRegistry as railwayEventStateRegistry,
+} from "./railway";
+import {
   componentMappers as rootlyComponentMappers,
   triggerRenderers as rootlyTriggerRenderers,
   eventStateRegistry as rootlyEventStateRegistry,
@@ -307,6 +312,7 @@ const appMappers: Record<string, Record<string, ComponentBaseMapper>> = {
   sendgrid: sendgridComponentMappers,
   sentry: sentryComponentMappers,
   render: renderComponentMappers,
+  railway: railwayComponentMappers,
   rootly: rootlyComponentMappers,
   incident: incidentComponentMappers,
   newrelic: newrelicComponentMappers,
@@ -353,6 +359,7 @@ const appTriggerRenderers: Record<string, Record<string, TriggerRenderer>> = {
   sendgrid: sendgridTriggerRenderers,
   sentry: sentryTriggerRenderers,
   render: renderTriggerRenderers,
+  railway: railwayTriggerRenderers,
   rootly: rootlyTriggerRenderers,
   incident: incidentTriggerRenderers,
   newrelic: newrelicTriggerRenderers,
@@ -398,6 +405,7 @@ const appEventStateRegistries: Record<string, Record<string, EventStateRegistry>
   sendgrid: sendgridEventStateRegistry,
   sentry: sentryEventStateRegistry,
   render: renderEventStateRegistry,
+  railway: railwayEventStateRegistry,
   discord: discordEventStateRegistry,
   telegram: telegramEventStateRegistry,
   teams: teamsEventStateRegistry,

@@ -46,6 +46,7 @@ import SemaphoreLogo from "@/assets/semaphore-logo-sign-black.svg";
 import sendgridIcon from "@/assets/icons/integrations/sendgrid.svg";
 import prometheusIcon from "@/assets/icons/integrations/prometheus.svg";
 import renderIcon from "@/assets/icons/integrations/render.svg";
+import railwayIcon from "@/assets/icons/integrations/railway.svg";
 import sentryIcon from "@/assets/icons/integrations/sentry.svg";
 import dockerIcon from "@/assets/icons/integrations/docker.svg";
 import hetznerIcon from "@/assets/icons/integrations/hetzner.svg";
@@ -97,6 +98,7 @@ export const INTEGRATION_APP_LOGO_MAP: Record<string, string> = {
   sentry: sentryIcon,
   prometheus: prometheusIcon,
   render: renderIcon,
+  railway: railwayIcon,
   dockerhub: dockerIcon,
   honeycomb: honeycombIcon,
   gcp: gcpIcon,
@@ -146,6 +148,7 @@ export const APP_LOGO_MAP: Record<string, string | Record<string, string>> = {
   sentry: sentryIcon,
   prometheus: prometheusIcon,
   render: renderIcon,
+  railway: railwayIcon,
   dockerhub: dockerIcon,
   harness: harnessIcon,
   newrelic: newrelicIcon,
