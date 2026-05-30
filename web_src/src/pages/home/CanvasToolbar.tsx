@@ -35,12 +35,12 @@ export function CanvasToolbar({ searchQuery, setSearchQuery }: CanvasToolbarProp
 
         <div className="min-w-0 w-full sm:ml-auto sm:w-80">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <Input
               placeholder="Filter apps..."
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              className="pl-10"
+              className="pl-8"
             />
           </div>
         </div>

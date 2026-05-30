@@ -87,11 +87,11 @@ function NamespaceSection({ namespace, values, onDeleteEntry, deletingId }: Name
     <Collapsible
       open={isOpen}
       onOpenChange={setIsOpen}
-      className="m-4 border border-slate-300 rounded-md bg-white"
+      className="m-4 overflow-hidden rounded-md border border-slate-950/15 bg-white"
       data-testid={`memory-namespace-section-${namespace}`}
     >
       <CollapsibleTrigger
-        className="group flex w-full items-center gap-2 px-3 py-2 text-left font-mono text-sm text-gray-600 border-b border-slate-300 data-[state=closed]:border-b-0 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        className="group flex w-full items-center gap-2 border-b border-slate-950/15 px-3 py-2 text-left font-mono text-[13px] text-gray-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 data-[state=closed]:border-b-0"
         data-testid={`memory-namespace-toggle-${namespace}`}
         aria-label={`Toggle ${namespace} namespace`}
       >
@@ -100,7 +100,7 @@ function NamespaceSection({ namespace, values, onDeleteEntry, deletingId }: Name
           className="size-4 shrink-0 text-gray-500 transition-transform duration-150 group-data-[state=closed]:-rotate-90"
         />
         <span className="flex-1 truncate">Namespace: {namespace}</span>
-        <span className="shrink-0 text-xs font-normal text-gray-500">
+        <span className="shrink-0 font-sans text-[13px] font-medium text-gray-500">
           {values.length} {values.length === 1 ? "item" : "items"}
         </span>
       </CollapsibleTrigger>
@@ -169,12 +169,15 @@ function renderNamespaceTable(
           <thead>
             <tr className="border-b border-slate-950/15 bg-slate-50">
               {columns.map((column) => (
-                <th key={column} className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase">
+                <th
+                  key={column}
+                  className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500"
+                >
                   {column}
                 </th>
               ))}
               {showActions ? (
-                <th className="w-12 px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase"></th>
+                <th className="w-12 px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500"></th>
               ) : null}
             </tr>
           </thead>
@@ -182,7 +185,7 @@ function renderNamespaceTable(
             {values.map((entry, index) => {
               const item = objectValues[index];
               return (
-                <tr key={entry.id || index} className="border-b border-slate-950/15">
+                <tr key={entry.id || index} className="border-b border-slate-950/15 last:border-b-0">
                   {columns.map((column) => (
                     <td key={`${index}-${column}`} className="px-3 py-2 align-middle font-mono text-xs text-gray-700">
                       {formatValue(item[column])}
@@ -219,15 +222,17 @@ function renderNamespaceTable(
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-slate-950/15 bg-slate-50">
-            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600 uppercase">Value</th>
+            <th className="px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+              Value
+            </th>
             {showActions ? (
-              <th className="w-12 px-3 py-2 text-right text-xs font-semibold text-gray-600 uppercase"></th>
+              <th className="w-12 px-3 py-2 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500"></th>
             ) : null}
           </tr>
         </thead>
         <tbody>
           {values.map((entry, index) => (
-            <tr key={entry.id || index} className="border-b border-slate-950/15">
+            <tr key={entry.id || index} className="border-b border-slate-950/15 last:border-b-0">
               <td className="px-3 py-2 align-middle font-mono text-xs text-gray-700">{formatValue(entry.values)}</td>
               {showActions ? (
                 <td className="px-3 py-2 text-right align-middle">

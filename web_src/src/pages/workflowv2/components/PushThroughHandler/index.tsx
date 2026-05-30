@@ -1,5 +1,5 @@
 import React from "react";
-import { Button } from "@/ui/button";
+import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
 
 export interface PushThroughHandlerProps {
@@ -18,9 +18,9 @@ export const PushThroughHandler: React.FC<PushThroughHandlerProps> = ({ onPushTh
 
   return (
     <div className="w-full p-3">
-      <Button variant="outline" className="h-7 py-1 px-2" onClick={handlePushThrough}>
+      <Button variant="outline" size="sm" onClick={handlePushThrough}>
         Push through
-        <ArrowRight className="size-4" />
+        <ArrowRight />
       </Button>
     </div>
   );
