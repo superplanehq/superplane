@@ -22,6 +22,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="List Deploys" href="#list-deploys" description="List recent deploys for rollback and incident workflows" />
   <LinkCard title="Get Service" href="#get-service" description="Retrieve a Render service and its custom domains" />
   <LinkCard title="Get Metrics" href="#get-metrics" description="Fetch Render CPU, memory, request, and connection metrics" />
+  <LinkCard title="List Logs" href="#list-logs" description="Query recent Render logs for one or more resources" />
   <LinkCard title="Purge Cache" href="#purge-cache" description="Request a purge of the build cache for a Render service" />
   <LinkCard title="Rollback Deploy" href="#rollback-deploy" description="Roll back a Render service to a previous deploy and wait for it to complete" />
   <LinkCard title="Scale Service" href="#scale-service" description="Scale a Render service to a fixed number of instances" />
@@ -501,6 +502,26 @@ Fetches Render metrics and emits normalized summaries plus raw series.
 ### Output
 
 Emits `render.metrics` with `resources`, `metrics`, and `summaries`. Each summary includes `latest`, `avg`, `max`, `count`, and `unit`.
+
+<a id="list-logs"></a>
+
+## List Logs
+
+**Component key:** `render.listLogs`
+
+Queries recent Render logs across one or more resources in the configured workspace.
+
+### Configuration
+
+- **Resources**: Render resource IDs to query
+- **Levels / Types / Text / Paths**: Optional filters
+- **Start Time / End Time**: Optional RFC3339 time range
+- **Direction**: `backward` or `forward`
+- **Limit**: Maximum logs to return
+
+### Output
+
+Emits `render.logs` with `resources`, `count`, `errorCount`, pagination fields, and `logs`.
 
 <a id="add-custom-domain"></a>
 

@@ -201,3 +201,17 @@ func (c *GetMetrics) ExampleOutput() map[string]any {
 		},
 	}
 }
+
+func (c *ListLogs) ExampleOutput() map[string]any {
+	return map[string]any{
+		"type": "render.logs",
+		"data": map[string]any{
+			"resources":  []string{"srv-cukouhrtq21c73e9scng"},
+			"count":      1,
+			"errorCount": 1,
+			"logs": []map[string]any{
+				{"timestamp": "2026-05-30T12:00:00Z", "level": "error", "message": "upstream timeout"},
+			},
+		},
+	}
+}

@@ -90,3 +90,38 @@ func Test__Render_GetMetrics__Execute(t *testing.T) {
 	assert.Equal(t, "/v1/metrics/memory", httpCtx.Requests[1].URL.Path)
 	assert.Equal(t, "srv-123", httpCtx.Requests[0].URL.Query().Get("resource"))
 }
+
+func Test__Render_ListLogs__Execute(t *testing.T) {
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{{
+			StatusCode: http.StatusOK,
+			Body: io.NopCloser(strings.NewReader(
+				`{"hasMore":false,"logs":[{"timestamp":"2026-05-30T12:00:00Z","level":"error","message":"timeout"},{"timestamp":"2026-05-30T12:01:00Z","level":"info","message":"ok"}]}`,
+			)),
+		}},
+	}
+	executionState := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+
+	err := (&ListLogs{}).Execute(core.ExecutionContext{
+		HTTP: httpCtx,
+		Integration: &contexts.IntegrationContext{
+			Configuration: map[string]any{"apiKey": "rnd_test"},
+			Metadata:      Metadata{Workspace: &WorkspaceMetadata{ID: "usr-123"}},
+		},
+		ExecutionState: executionState,
+		Configuration:  map[string]any{"resources": []string{"srv-123"}, "levels": []string{"error"}, "limit": 20},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, ListLogsPayloadType, executionState.Type)
+	data := readMap(readMap(executionState.Payloads[0])["data"])
+	assert.Equal(t, 2, data["count"])
+	assert.Equal(t, 1, data["errorCount"])
+
+	require.Len(t, httpCtx.Requests, 1)
+	request := httpCtx.Requests[0]
+	assert.Equal(t, "/v1/logs", request.URL.Path)
+	assert.Equal(t, "usr-123", request.URL.Query().Get("ownerId"))
+	assert.Equal(t, "srv-123", request.URL.Query().Get("resource"))
+	assert.Equal(t, "error", request.URL.Query().Get("level"))
+}

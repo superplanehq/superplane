@@ -104,6 +104,7 @@ func (r *Render) Actions() []core.Action {
 		&GetDeploy{},
 		&ListDeploys{},
 		&GetMetrics{},
+		&ListLogs{},
 		&CancelDeploy{},
 		&RollbackDeploy{},
 		&PurgeCache{},

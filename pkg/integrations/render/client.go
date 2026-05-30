@@ -175,6 +175,25 @@ type MetricValue struct {
 	Value     float64 `json:"value"`
 }
 
+type LogQuery struct {
+	Resources []string
+	Levels    []string
+	Types     []string
+	Text      []string
+	Paths     []string
+	StartTime string
+	EndTime   string
+	Direction string
+	Limit     int
+}
+
+type LogsResponse struct {
+	HasMore       bool             `json:"hasMore"`
+	NextStartTime string           `json:"nextStartTime"`
+	NextEndTime   string           `json:"nextEndTime"`
+	Logs          []map[string]any `json:"logs"`
+}
+
 type EventResponse struct {
 	ID        string               `json:"id"`
 	Timestamp string               `json:"timestamp"`
@@ -683,6 +702,71 @@ func metricPath(metricType string) (string, error) {
 	default:
 		return "", fmt.Errorf("unsupported metric type: %s", metricType)
 	}
+}
+
+func (c *Client) ListLogs(workspaceID string, query LogQuery) (LogsResponse, error) {
+	if workspaceID == "" {
+		return LogsResponse{}, fmt.Errorf("workspaceID is required")
+	}
+	if len(query.Resources) == 0 {
+		return LogsResponse{}, fmt.Errorf("at least one resource is required")
+	}
+
+	values := url.Values{}
+	values.Set("ownerId", workspaceID)
+	for _, resource := range query.Resources {
+		resource = strings.TrimSpace(resource)
+		if resource != "" {
+			values.Add("resource", resource)
+		}
+	}
+	for _, level := range query.Levels {
+		level = strings.TrimSpace(level)
+		if level != "" {
+			values.Add("level", level)
+		}
+	}
+	for _, logType := range query.Types {
+		logType = strings.TrimSpace(logType)
+		if logType != "" {
+			values.Add("type", logType)
+		}
+	}
+	for _, text := range query.Text {
+		text = strings.TrimSpace(text)
+		if text != "" {
+			values.Add("text", text)
+		}
+	}
+	for _, path := range query.Paths {
+		path = strings.TrimSpace(path)
+		if path != "" {
+			values.Add("path", path)
+		}
+	}
+	if query.StartTime != "" {
+		values.Set("startTime", query.StartTime)
+	}
+	if query.EndTime != "" {
+		values.Set("endTime", query.EndTime)
+	}
+	if query.Direction != "" {
+		values.Set("direction", query.Direction)
+	}
+	if query.Limit > 0 {
+		values.Set("limit", fmt.Sprintf("%d", query.Limit))
+	}
+
+	_, body, err := c.execRequestWithResponse(http.MethodGet, "/logs", values, nil)
+	if err != nil {
+		return LogsResponse{}, err
+	}
+
+	response := LogsResponse{}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return LogsResponse{}, fmt.Errorf("failed to unmarshal logs response: %w", err)
+	}
+	return response, nil
 }
 
 func (c *Client) UpdateEnvVar(serviceID string, key string, request UpdateEnvVarRequest) (EnvVar, error) {
