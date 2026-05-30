@@ -17,6 +17,10 @@ type Canvas struct {
 	Metadata   *openapi_client.CanvasesCanvasMetadata   `json:"metadata" yaml:"metadata"`
 	Spec       *openapi_client.CanvasesCanvasSpec       `json:"spec,omitempty" yaml:"spec,omitempty"`
 	AutoLayout *openapi_client.CanvasesCanvasAutoLayout `json:"autoLayout,omitempty" yaml:"autoLayout,omitempty"`
+	// URL is the canonical web URL for the canvas. It is computed on output
+	// (e.g. by the create command) and omitted from YAML so round-tripping a
+	// canvas file stays clean.
+	URL string `json:"url,omitempty" yaml:"-"`
 }
 
 func ParseCanvas(raw []byte) (*Canvas, error) {

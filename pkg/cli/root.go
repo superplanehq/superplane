@@ -17,6 +17,7 @@ import (
 	groups "github.com/superplanehq/superplane/pkg/cli/commands/groups"
 	index "github.com/superplanehq/superplane/pkg/cli/commands/index"
 	integrations "github.com/superplanehq/superplane/pkg/cli/commands/integrations"
+	mcpcmd "github.com/superplanehq/superplane/pkg/cli/commands/mcp"
 	members "github.com/superplanehq/superplane/pkg/cli/commands/members"
 	organizations "github.com/superplanehq/superplane/pkg/cli/commands/organizations"
 	queue "github.com/superplanehq/superplane/pkg/cli/commands/queue"
@@ -66,6 +67,7 @@ func init() {
 	RootCmd.AddCommand(index.NewCommand(options))
 	RootCmd.AddCommand(integrations.NewCommand(options))
 	RootCmd.AddCommand(members.NewCommand(options))
+	RootCmd.AddCommand(mcpcmd.NewCommand(options))
 	RootCmd.AddCommand(organizations.NewCommand(options))
 	RootCmd.AddCommand(queue.NewCommand(options))
 	RootCmd.AddCommand(roles.NewCommand(options))

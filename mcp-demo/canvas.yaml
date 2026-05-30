@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: "Deploy Gate (MCP demo)"
+  description: "Webhook-triggered deploy gate: business hours, then human approval, then deploy. Built by an AI agent through the SuperPlane MCP server."
+spec:
+  nodes:
+    - id: "trigger-deploy"
+      name: "Deploy requested"
+      type: "TYPE_TRIGGER"
+      component: "webhook"
+      configuration: {}
+    - id: "gate-hours"
+      name: "Only during work hours"
+      type: "TYPE_ACTION"
+      component: "timeGate"
+      configuration:
+        days: ["monday", "tuesday", "wednesday", "thursday", "friday"]
+        timeRange: "09:00 - 17:00"
+        timezone: "1"
+    - id: "gate-approval"
+      name: "Require approval"
+      type: "TYPE_ACTION"
+      component: "approval"
+      configuration:
+        items:
+          - type: "anyone"
+    - id: "do-deploy"
+      name: "Run deploy"
+      type: "TYPE_ACTION"
+      component: "http"
+      configuration:
+        method: "POST"
+        url: "https://example.com/deploy"
+  edges:
+    - sourceId: "trigger-deploy"
+      targetId: "gate-hours"
+      channel: "default"
+    - sourceId: "gate-hours"
+      targetId: "gate-approval"
+      channel: "default"
+    - sourceId: "gate-approval"
+      targetId: "do-deploy"
+      channel: "approved"
