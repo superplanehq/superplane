@@ -84,8 +84,8 @@ func TestCreateSession_PropagatesAPIError(t *testing.T) {
 
 func TestDefaultAgentPrompt_IsEmbedded(t *testing.T) {
 	prompt := DefaultAgentPrompt()
-	assert.Contains(t, prompt, "You are a SuperPlane canvas expert")
-	assert.Contains(t, prompt, "## Canvas Update Rules")
+	assert.Contains(t, prompt, "You are a SuperPlane app expert")
+	assert.Contains(t, prompt, "## App Update Rules")
 }
 
 func TestSyncAgentPrompt_SkipsUpdateWhenCurrent(t *testing.T) {

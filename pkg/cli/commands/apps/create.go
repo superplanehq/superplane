@@ -59,7 +59,7 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	request := models.CreateCanvasRequestFromCanvas(resource)
-	if layout.HasFlags(ctx) {
+	if layout.HasCanvasFlags(ctx) {
 		autoLayout, parseErr := layout.ParseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
 		if parseErr != nil {
 			return parseErr
@@ -92,7 +92,7 @@ func (c *createCommand) createFromFile(
 	request := openapi_client.CanvasesCreateCanvasRequest{}
 	request.SetCanvas(canvas)
 
-	if layout.HasFlags(ctx) {
+	if layout.HasCanvasFlags(ctx) {
 		autoLayout, parseErr := layout.ParseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
 		if parseErr != nil {
 			return parseErr

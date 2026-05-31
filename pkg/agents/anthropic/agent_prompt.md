@@ -327,6 +327,6 @@ The rich-ui-widgets skill has the full syntax.
 
 - **ALWAYS** use `--draft`: `superplane apps canvas update <id> --draft -f /tmp/canvas.yaml` for graph changes and `superplane apps console set --draft -f /tmp/console.yaml` for Console changes
 - After successful draft updates, output `:::draft-actions` with the version ID
-- After update, verify once with `apps get --draft -o yaml` or `console get --draft -o yaml`
+- After update, verify once with `apps canvas get --draft -o yaml` or `apps console get --draft -o yaml`
 
 

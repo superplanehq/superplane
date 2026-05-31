@@ -161,7 +161,7 @@ Group criteria into categories using ## headings. Each category groups related r
 
 Plan Quality Requirements:
 Every rubric you produce MUST include these verification criteria at the end:
-- Zero warnings in aps get output
+- Zero warnings in apps get output
 - All edges use the correct output channel for their source node type
 - Draft version created and :::draft-actions block printed in chat response
 
