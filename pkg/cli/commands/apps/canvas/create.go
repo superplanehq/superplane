@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/pkg/cli/layout"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -57,8 +58,8 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	request := models.CreateCanvasRequestFromCanvas(resource)
-	if autoLayoutFlagsWereSet(ctx) {
-		autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
+	if layout.HasFlags(ctx) {
+		autoLayout, parseErr := layout.ParseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
 		if parseErr != nil {
 			return parseErr
 		}
@@ -88,8 +89,8 @@ func (c *createCommand) createFromFile(
 	request := openapi_client.CanvasesCreateCanvasRequest{}
 	request.SetCanvas(canvas)
 
-	if autoLayoutFlagsWereSet(ctx) {
-		autoLayout, parseErr := parseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
+	if layout.HasFlags(ctx) {
+		autoLayout, parseErr := layout.ParseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
 		if parseErr != nil {
 			return parseErr
 		}

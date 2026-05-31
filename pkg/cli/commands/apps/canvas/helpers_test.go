@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/cli/appresolve"
 	"github.com/superplanehq/superplane/pkg/cli/core"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 // fakeConfig is a test stub implementation of core.ConfigContext. The
@@ -115,19 +114,4 @@ func TestDescribeCanvasVersionByIDReturnsErrorWhenVersionMissing(t *testing.T) {
 	_, err := appresolve.DescribeAppVersionByID(ctx, "canvas-123", "version-123")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), `app version "version-123" not found`)
-}
-
-func TestCanvasFromVersionCopiesSpec(t *testing.T) {
-	version := openapi_client.CanvasesCanvasVersion{}
-	spec := openapi_client.CanvasesCanvasSpec{}
-	spec.SetNodes([]openapi_client.SuperplaneComponentsNode{{Name: openapi_client.PtrString("first")}})
-	spec.SetEdges([]openapi_client.SuperplaneComponentsEdge{{SourceId: openapi_client.PtrString("a")}})
-	version.SetSpec(spec)
-
-	canvas := canvasFromVersion(version)
-
-	require.NotNil(t, canvas.Spec)
-	require.Len(t, canvas.Spec.GetNodes(), 1)
-	require.Len(t, canvas.Spec.GetEdges(), 1)
-	require.Equal(t, "first", canvas.Spec.GetNodes()[0].GetName())
 }

@@ -3,6 +3,7 @@ package apps
 import (
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/changes"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/console"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/files"
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -43,7 +44,7 @@ App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
 	root.AddCommand(activeCmd)
 	root.AddCommand(canvas.NewCreateCommand(options))
 	root.AddCommand(canvas.NewDeleteCommand(options))
-	root.AddCommand(canvas.NewChangeRequestsCommand(options))
+	root.AddCommand(changes.NewCommand(options))
 	root.AddCommand(canvas.NewCommand(options))
 	root.AddCommand(console.NewCommand(options))
 	root.AddCommand(files.NewRootCommand(options))
