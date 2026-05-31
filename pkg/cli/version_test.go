@@ -77,7 +77,7 @@ func TestShouldStartUpdateCheck(t *testing.T) {
 		{name: "upgrade command", args: []string{"upgrade"}, expected: false},
 		{name: "self-update alias", args: []string{"self-update"}, expected: false},
 		{name: "networked command", args: []string{"whoami"}, expected: true},
-		{name: "networked subcommand with flags", args: []string{"canvases", "list", "-o", "json"}, expected: true},
+		{name: "networked subcommand with flags", args: []string{"apps", "list", "-o", "json"}, expected: true},
 		{name: "flag before local subcommand", args: []string{"-o", "json", "version"}, expected: false},
 	}
 
