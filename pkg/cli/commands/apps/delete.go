@@ -1,4 +1,4 @@
-package canvas
+package apps
 
 import (
 	"fmt"
@@ -14,13 +14,13 @@ type deleteCommand struct{}
 func (c *deleteCommand) Execute(ctx core.CommandContext) error {
 	nameOrID := ctx.Args[0]
 
-	canvasID, err := common.FindAppID(ctx, ctx.API, nameOrID)
+	appID, err := common.FindAppID(ctx, ctx.API, nameOrID)
 	if err != nil {
 		return err
 	}
 
 	_, _, err = ctx.API.CanvasAPI.
-		CanvasesDeleteCanvas(ctx.Context, canvasID).
+		CanvasesDeleteCanvas(ctx.Context, appID).
 		Execute()
 	if err != nil {
 		return err
@@ -34,7 +34,7 @@ func (c *deleteCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	return ctx.Renderer.Render(map[string]string{
-		"id":      canvasID,
+		"id":      appID,
 		"deleted": "true",
 	})
 }

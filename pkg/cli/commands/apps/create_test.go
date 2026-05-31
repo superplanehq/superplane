@@ -1,4 +1,4 @@
-package canvas
+package apps
 
 import (
 	"bytes"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -29,7 +30,7 @@ func newCanvasCreateServer(t *testing.T) *httptest.Server {
 
 func TestCreateCommandPrintsCanvasOnSuccess(t *testing.T) {
 	server := newCanvasCreateServer(t)
-	ctx, stdout := newCreateCommandContextForTest(t, server, "text")
+	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "text")
 	ctx.Args = []string{"my-canvas"}
 
 	err := (&createCommand{}).Execute(ctx)
@@ -40,8 +41,8 @@ func TestCreateCommandPrintsCanvasOnSuccess(t *testing.T) {
 
 func TestCreateCommandPrintsURLFromResponseOrgID(t *testing.T) {
 	server := newCanvasCreateServer(t)
-	ctx, stdout := newCommandContextWithConfigForTest(t, server, "text", &fakeConfig{
-		url: "https://app.superplane.com",
+	ctx, stdout := common.NewCreateCommandContextWithConfigForTest(t, server, "text", &core.FakeConfig{
+		URL: "https://app.superplane.com",
 	})
 	ctx.Args = []string{"my-canvas"}
 
@@ -58,8 +59,8 @@ func TestCreateCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	ctx, stdout := newCommandContextWithConfigForTest(t, server, "text", &fakeConfig{
-		url: "https://app.superplane.com",
+	ctx, stdout := common.NewCreateCommandContextWithConfigForTest(t, server, "text", &core.FakeConfig{
+		URL: "https://app.superplane.com",
 	})
 	ctx.Args = []string{"my-canvas"}
 
@@ -71,7 +72,7 @@ func TestCreateCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
 
 func TestCreateCommandReturnsJSONOutput(t *testing.T) {
 	server := newCanvasCreateServer(t)
-	ctx, stdout := newCreateCommandContextForTest(t, server, "json")
+	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "json")
 	ctx.Args = []string{"my-canvas"}
 
 	err := (&createCommand{}).Execute(ctx)
@@ -82,7 +83,7 @@ func TestCreateCommandReturnsJSONOutput(t *testing.T) {
 
 func TestCreateCommandReturnsYAMLOutput(t *testing.T) {
 	server := newCanvasCreateServer(t)
-	ctx, stdout := newCreateCommandContextForTest(t, server, "yaml")
+	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "yaml")
 	ctx.Args = []string{"my-canvas"}
 
 	err := (&createCommand{}).Execute(ctx)
@@ -98,7 +99,7 @@ func TestCreateCommandFailsOnEmptyResponse(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	ctx, _ := newCreateCommandContextForTest(t, server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server, "text")
 	ctx.Args = []string{"my-canvas"}
 	cmd := &createCommand{}
 
@@ -114,7 +115,7 @@ func TestCreateCommandFailsOnEmptyCanvasID(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	ctx, _ := newCreateCommandContextForTest(t, server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server, "text")
 	ctx.Args = []string{"my-canvas"}
 	cmd := &createCommand{}
 
@@ -131,7 +132,7 @@ func TestCreateCommandFailsOnServerError(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	ctx, _ := newCreateCommandContextForTest(t, server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server, "text")
 	ctx.Args = []string{"my-canvas"}
 	cmd := &createCommand{}
 
@@ -143,9 +144,9 @@ func TestCreateFromFilePrintsCanvasOnSuccess(t *testing.T) {
 	server := newCanvasCreateServer(t)
 	filePath := writeTestCanvasFile(t, "from-file-canvas")
 	file := filePath
-	ctx, stdout := newCreateCommandContextForTest(t, server, "text")
+	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "text")
 
-	err := (&createCommand{file: &file}).Execute(ctx)
+	err := (&createCommand{canvasFile: &file}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), "created (ID: abc-123)")
 }
@@ -159,8 +160,8 @@ func TestCreateFromFileFailsOnEmptyResponse(t *testing.T) {
 
 	filePath := writeTestCanvasFile(t, "from-file-canvas")
 	file := filePath
-	ctx, _ := newCreateCommandContextForTest(t, server, "text")
-	cmd := &createCommand{file: &file}
+	ctx, _ := common.NewCreateCommandContextForTest(t, server, "text")
+	cmd := &createCommand{canvasFile: &file}
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
@@ -171,9 +172,9 @@ func TestCreateFromFileReturnsJSONOutput(t *testing.T) {
 	server := newCanvasCreateServer(t)
 	filePath := writeTestCanvasFile(t, "from-file-canvas")
 	file := filePath
-	ctx, stdout := newCreateCommandContextForTest(t, server, "json")
+	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "json")
 
-	err := (&createCommand{file: &file}).Execute(ctx)
+	err := (&createCommand{canvasFile: &file}).Execute(ctx)
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), `"id": "abc-123"`)
 }
@@ -202,7 +203,7 @@ func TestCreateCommandFailsOnMethodChangingRedirect(t *testing.T) {
 }
 
 func TestCreateCommandFailsWithoutArgs(t *testing.T) {
-	ctx, _ := newCreateCommandContextForTest(t, nil, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, nil, "text")
 	ctx.Args = []string{}
 	cmd := &createCommand{}
 
@@ -256,35 +257,4 @@ func newCreateCommandContextWithRedirectPolicyForTest(
 		API:      openapi_client.NewAPIClient(config),
 		Renderer: renderer,
 	}, stdout
-}
-
-func newCreateCommandContextForTest(
-	t *testing.T,
-	server *httptest.Server,
-	outputFormat string,
-) (core.CommandContext, *bytes.Buffer) {
-	t.Helper()
-
-	stdout := bytes.NewBuffer(nil)
-	renderer, err := core.NewRenderer(outputFormat, stdout)
-	require.NoError(t, err)
-
-	cobraCmd := &cobra.Command{}
-	cobraCmd.SetOut(stdout)
-
-	commandCtx := core.CommandContext{
-		Context:  context.Background(),
-		Cmd:      cobraCmd,
-		Renderer: renderer,
-	}
-
-	if server != nil {
-		config := openapi_client.NewConfiguration()
-		config.Servers = openapi_client.ServerConfigurations{
-			{URL: server.URL},
-		}
-		commandCtx.API = openapi_client.NewAPIClient(config)
-	}
-
-	return commandCtx, stdout
 }

@@ -8,7 +8,7 @@ import (
 func NewCommand(options core.BindOptions) *cobra.Command {
 	root := &cobra.Command{
 		Use:     "console",
-		Short:   "Manage an app console (formerly Dashboard)",
+		Short:   "Manage an app console",
 		Aliases: []string{"dashboard"},
 		Long: `Manage the per-app console: panels and grid layout configured for an
 app. The console is stored on app versions, so reads default to the

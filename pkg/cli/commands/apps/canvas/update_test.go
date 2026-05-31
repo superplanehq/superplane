@@ -11,6 +11,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
+	"github.com/superplanehq/superplane/pkg/cli/layout"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -62,7 +64,7 @@ func (s *apiTestServer) AssertCalls(t *testing.T, calls []string) {
 
 func TestUpdateWithoutFileReturnsError(t *testing.T) {
 	server := newAPITestServer(t)
-	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
 	err := (&updateCommand{}).Execute(ctx)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "file")
@@ -156,7 +158,7 @@ func TestUpdateFromFileJSONOutputWhenDraft(t *testing.T) {
 	filePath := writeTestCanvasFileWithMetadataID(t, "json-out", canvasID)
 	file := filePath
 	draft := true
-	ctx, stdout := newCreateCommandContextForTest(t, server.server, "json")
+	ctx, stdout := common.NewCreateCommandContextForTest(t, server.server, "json")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.NoError(t, err)
@@ -220,7 +222,7 @@ func TestUpdateFromFileWhenPublishFailsReturnsWrappedError(t *testing.T) {
 	filePath := writeTestCanvasFileWithMetadataID(t, "pub-fail", canvasID)
 	file := filePath
 	draft := false
-	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.Error(t, err)
@@ -270,7 +272,7 @@ func TestUpdateFromFileWhenCanvasesUpdateFailsReturnsError(t *testing.T) {
 	filePath := writeTestCanvasFileWithMetadataID(t, "put-fail", canvasID)
 	file := filePath
 	draft := true
-	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.Error(t, err)
@@ -326,7 +328,7 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 
 	file := filePath
 	draft := true
-	ctx, stdout := newCreateCommandContextForTest(t, server.server, "text")
+	ctx, stdout := common.NewCreateCommandContextForTest(t, server.server, "text")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.NoError(t, err)
@@ -340,7 +342,7 @@ func TestUpdateFromFileTextOutputCountsIntegrations(t *testing.T) {
 }
 
 func TestBuildDefaultAutoLayoutUsesFullCanvas(t *testing.T) {
-	autoLayout := buildDefaultAutoLayout()
+	autoLayout := layout.DefaultAutoLayout()
 
 	if autoLayout.GetAlgorithm() != openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL {
 		t.Fatalf("expected horizontal auto-layout, got %s", autoLayout.GetAlgorithm())
@@ -418,7 +420,7 @@ func TestUpdateFromFileAppliesChangeManagementEnabledAfterSpecUpdateWhenNotDraft
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, true)
 	file := filePath
 	draft := false
-	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.NoError(t, err)
@@ -453,7 +455,7 @@ func TestUpdateFromFileRequiresDraftWhenLiveChangeManagementIsEnabled(t *testing
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, false)
 	file := filePath
 	draft := false
-	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.Error(t, err)
@@ -512,7 +514,7 @@ func TestUpdateFromFileEnablesChangeManagementBeforeDraftUpdate(t *testing.T) {
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, true)
 	file := filePath
 	draft := true
-	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.NoError(t, err)
@@ -544,7 +546,7 @@ func TestUpdateFromFileDisableChangeManagementRequiresDraftWhenLiveChangeManagem
 	filePath := writeTestCanvasFileWithChangeManagementEnabled(t, canvasID, false)
 	file := filePath
 	draft := false
-	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
 
 	err := (&updateCommand{file: &file, draft: &draft}).Execute(ctx)
 	require.Error(t, err)

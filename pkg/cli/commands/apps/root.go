@@ -15,8 +15,7 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Short: "Manage apps",
 		Long: core.AgentSkillsHelp() + `
 
-An app is a SuperPlane automation made up of a canvas (workflow graph), console
-(dashboard), and optional repository files.
+An app is a SuperPlane automation made up of a canvas, console, and files.
 
 App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
 (e.g. https://app.superplane.com/<organization-id>/canvases/<app-id>)`,
@@ -42,8 +41,8 @@ App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
 
 	root.AddCommand(listCmd)
 	root.AddCommand(activeCmd)
-	root.AddCommand(canvas.NewCreateCommand(options))
-	root.AddCommand(canvas.NewDeleteCommand(options))
+	root.AddCommand(NewCreateCommand(options))
+	root.AddCommand(NewDeleteCommand(options))
 	root.AddCommand(changes.NewCommand(options))
 	root.AddCommand(canvas.NewCommand(options))
 	root.AddCommand(console.NewCommand(options))

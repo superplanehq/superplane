@@ -1,47 +1,12 @@
 package canvas
 
 import (
-	"bytes"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
-	"github.com/superplanehq/superplane/pkg/cli/core"
 )
-
-// fakeConfig is a test stub implementation of core.ConfigContext. The
-// canvas-active accessors are no-ops because the canvas commands under test
-// here do not use them.
-type fakeConfig struct {
-	url       string
-	activeApp string
-}
-
-func (f *fakeConfig) GetActiveApp() string {
-	if f.activeApp != "" {
-		return f.activeApp
-	}
-	return ""
-}
-func (f *fakeConfig) SetActiveApp(canvasID string) error { return nil }
-func (f *fakeConfig) GetURL() string                     { return f.url }
-
-// newCommandContextWithConfigForTest builds a command context whose Config is
-// set to the provided stub. Useful for exercising URL output behavior.
-func newCommandContextWithConfigForTest(
-	t *testing.T,
-	server *httptest.Server,
-	outputFormat string,
-	config core.ConfigContext,
-) (core.CommandContext, *bytes.Buffer) {
-	t.Helper()
-
-	ctx, stdout := newCreateCommandContextForTest(t, server, outputFormat)
-	ctx.Config = config
-	return ctx, stdout
-}
 
 func TestFindCurrentUserDraftVersionIDSkipsPublishedVersions(t *testing.T) {
 	server := newAPITestServer(
@@ -56,7 +21,7 @@ func TestFindCurrentUserDraftVersionIDSkipsPublishedVersions(t *testing.T) {
 		},
 	)
 
-	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
 
 	versionID, err := common.FindCurrentUserDraftVersionID(ctx, "canvas-123")
 	require.NoError(t, err)
@@ -84,7 +49,7 @@ func TestEnsureCurrentUserDraftVersionIDCreatesDraftWhenMissing(t *testing.T) {
 		},
 	)
 
-	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
 
 	versionID, err := common.EnsureCurrentUserDraftVersionID(ctx, "canvas-123")
 	require.NoError(t, err)
@@ -109,7 +74,7 @@ func TestDescribeCanvasVersionByIDReturnsErrorWhenVersionMissing(t *testing.T) {
 		},
 	)
 
-	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
 
 	_, err := common.DescribeAppVersionByID(ctx, "canvas-123", "version-123")
 	require.Error(t, err)

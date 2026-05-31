@@ -8,8 +8,8 @@ import (
 func NewCommand(options core.BindOptions) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "canvas",
-		Short: "Manage app canvas (workflow graph)",
-		Long: `Manage the workflow canvas for an app: nodes, edges, triggers, and actions.
+		Short: "Manage app canvas",
+		Long: `Manage the canvas for an app: nodes, edges, triggers, and actions.
 
 Canvas YAML uses apiVersion: v1 and kind: Canvas. For canonical shapes and wiring
 rules, install skills:

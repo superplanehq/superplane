@@ -2,6 +2,7 @@ package models
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
@@ -74,4 +75,28 @@ func EmptyCanvasSpec() *openapi_client.CanvasesCanvasSpec {
 		Nodes: []openapi_client.SuperplaneComponentsNode{},
 		Edges: []openapi_client.SuperplaneComponentsEdge{},
 	}
+}
+
+func ParseCanvasResourceFromFile(filePath string, operation string) (*Canvas, error) {
+	// #nosec
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read resource file: %w", err)
+	}
+
+	_, kind, err := core.ParseYamlResourceHeaders(data)
+	if err != nil {
+		return nil, err
+	}
+
+	if kind != CanvasKind {
+		return nil, fmt.Errorf("unsupported resource kind %q for %s", kind, operation)
+	}
+
+	resource, err := ParseCanvas(data)
+	if err != nil {
+		return nil, err
+	}
+
+	return resource, nil
 }

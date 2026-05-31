@@ -72,3 +72,10 @@ func HasFlags(ctx core.CommandContext) bool {
 
 	return flags.Changed("auto-layout") || flags.Changed("auto-layout-scope") || flags.Changed("auto-layout-node")
 }
+
+func DefaultAutoLayout() openapi_client.CanvasesCanvasAutoLayout {
+	autoLayout := openapi_client.CanvasesCanvasAutoLayout{}
+	autoLayout.SetAlgorithm(openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL)
+	autoLayout.SetScope(openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS)
+	return autoLayout
+}

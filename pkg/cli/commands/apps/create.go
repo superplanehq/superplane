@@ -1,4 +1,4 @@
-package canvas
+package apps
 
 import (
 	"fmt"
@@ -8,34 +8,35 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/cli/layout"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 type createCommand struct {
-	file            *string
-	autoLayout      *string
-	autoLayoutScope *string
-	autoLayoutNodes *[]string
+	canvasFile            *string
+	canvasAutoLayout      *string
+	canvasAutoLayoutScope *string
+	canvasAutoLayoutNodes *[]string
 }
 
 func (c *createCommand) Execute(ctx core.CommandContext) error {
 	filePath := ""
-	if c.file != nil {
-		filePath = *c.file
+	if c.canvasFile != nil {
+		filePath = *c.canvasFile
 	}
 	autoLayoutValue := ""
-	if c.autoLayout != nil {
-		autoLayoutValue = strings.TrimSpace(*c.autoLayout)
+	if c.canvasAutoLayout != nil {
+		autoLayoutValue = strings.TrimSpace(*c.canvasAutoLayout)
 	}
 	autoLayoutScopeValue := ""
-	if c.autoLayoutScope != nil {
-		autoLayoutScopeValue = strings.TrimSpace(*c.autoLayoutScope)
+	if c.canvasAutoLayoutScope != nil {
+		autoLayoutScopeValue = strings.TrimSpace(*c.canvasAutoLayoutScope)
 	}
 	autoLayoutNodeIDs := []string{}
-	if c.autoLayoutNodes != nil {
-		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.autoLayoutNodes...)
+	if c.canvasAutoLayoutNodes != nil {
+		autoLayoutNodeIDs = append(autoLayoutNodeIDs, *c.canvasAutoLayoutNodes...)
 	}
 
 	if filePath != "" {
@@ -67,7 +68,7 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 			request.SetAutoLayout(*autoLayout)
 		}
 	} else {
-		request.SetAutoLayout(buildDefaultAutoLayout())
+		request.SetAutoLayout(layout.DefaultAutoLayout())
 	}
 
 	resp, httpResp, err := ctx.API.CanvasAPI.CanvasesCreateCanvas(ctx.Context).Body(request).Execute()
@@ -81,11 +82,13 @@ func (c *createCommand) createFromFile(
 	autoLayoutScopeValue string,
 	autoLayoutNodeIDs []string,
 ) error {
-	canvas, fileAutoLayout, err := loadCanvasForCreateFromFile(path)
+	resource, err := models.ParseCanvasResourceFromFile(path, "create")
 	if err != nil {
 		return err
 	}
 
+	canvas := models.CanvasFromCanvas(*resource)
+	fileAutoLayout := resource.AutoLayout
 	request := openapi_client.CanvasesCreateCanvasRequest{}
 	request.SetCanvas(canvas)
 
@@ -104,7 +107,7 @@ func (c *createCommand) createFromFile(
 		if fileAutoLayout != nil {
 			request.SetAutoLayout(*fileAutoLayout)
 		} else {
-			request.SetAutoLayout(buildDefaultAutoLayout())
+			request.SetAutoLayout(layout.DefaultAutoLayout())
 		}
 	}
 
@@ -140,7 +143,7 @@ func validateAndPrintCreateResponse(
 		if _, err := fmt.Fprintf(stdout, "App %q created (ID: %s)\n", canvas.Metadata.GetName(), canvas.Metadata.GetId()); err != nil {
 			return err
 		}
-		if url := BuildCanvasURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId()); url != "" {
+		if url := common.BuildCanvasURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId()); url != "" {
 			if _, err := fmt.Fprintf(stdout, "App URL: %s\n", url); err != nil {
 				return err
 			}
@@ -151,10 +154,10 @@ func validateAndPrintCreateResponse(
 
 // NewCreateCommand registers app creation under `apps create`.
 func NewCreateCommand(options core.BindOptions) *cobra.Command {
-	var createFile string
-	var createAutoLayout string
-	var createAutoLayoutScope string
-	var createAutoLayoutNodes []string
+	var canvasFile string
+	var canvasAutoLayout string
+	var canvasAutoLayoutScope string
+	var canvasAutoLayoutNodes []string
 	createCmd := &cobra.Command{
 		Use:   "create [app-name]",
 		Short: "Create an app",
@@ -165,15 +168,15 @@ AI agents: for canonical canvas YAML shapes and wiring rules, install skills:
 - ` + core.SkillsInstallCommand("superplane-cli"),
 		Args: cobra.MaximumNArgs(1),
 	}
-	createCmd.Flags().StringVarP(&createFile, "file", "f", "", "filename, directory, or URL to files to use to create the resource")
-	createCmd.Flags().StringVar(&createAutoLayout, "auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
-	createCmd.Flags().StringVar(&createAutoLayoutScope, "auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
-	createCmd.Flags().StringArrayVar(&createAutoLayoutNodes, "auto-layout-node", nil, "node id seed for auto layout (repeatable)")
+	createCmd.Flags().StringVarP(&canvasFile, "canvas-file", "f", "", "filename, directory, or URL to files to use to create the resource")
+	createCmd.Flags().StringVar(&canvasAutoLayout, "canvas-auto-layout", "", "automatically arrange the canvas (supported: horizontal, disable)")
+	createCmd.Flags().StringVar(&canvasAutoLayoutScope, "canvas-auto-layout-scope", "", "scope for auto layout (full-canvas, connected-component)")
+	createCmd.Flags().StringArrayVar(&canvasAutoLayoutNodes, "canvas-auto-layout-node", nil, "node id seed for auto layout (repeatable)")
 	core.Bind(createCmd, &createCommand{
-		file:            &createFile,
-		autoLayout:      &createAutoLayout,
-		autoLayoutScope: &createAutoLayoutScope,
-		autoLayoutNodes: &createAutoLayoutNodes,
+		canvasFile:            &canvasFile,
+		canvasAutoLayout:      &canvasAutoLayout,
+		canvasAutoLayoutScope: &canvasAutoLayoutScope,
+		canvasAutoLayoutNodes: &canvasAutoLayoutNodes,
 	}, options)
 
 	return createCmd

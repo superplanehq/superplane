@@ -21,7 +21,7 @@ type updateCommand struct {
 }
 
 func resolveCanvasForFileUpdate(filePath string) (string, openapi_client.CanvasesCanvas, error) {
-	resource, err := parseCanvasResourceFromFile(filePath, "update")
+	resource, err := models.ParseCanvasResourceFromFile(filePath, "update")
 	if err != nil {
 		return "", openapi_client.CanvasesCanvas{}, err
 	}
@@ -95,7 +95,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 			body.SetAutoLayout(*autoLayout)
 		}
 	} else {
-		body.SetAutoLayout(buildDefaultAutoLayout())
+		body.SetAutoLayout(layout.DefaultAutoLayout())
 	}
 
 	response, _, err := ctx.API.CanvasVersionAPI.
@@ -152,13 +152,6 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		}
 		return err
 	})
-}
-
-func buildDefaultAutoLayout() openapi_client.CanvasesCanvasAutoLayout {
-	autoLayout := openapi_client.CanvasesCanvasAutoLayout{}
-	autoLayout.SetAlgorithm(openapi_client.CANVASAUTOLAYOUTALGORITHM_ALGORITHM_HORIZONTAL)
-	autoLayout.SetScope(openapi_client.CANVASAUTOLAYOUTSCOPE_SCOPE_FULL_CANVAS)
-	return autoLayout
 }
 
 // formatNodeSpecErrorsForCLI summarizes node error_message from the API response (blocks execution until fixed).
