@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/cli/appresolve"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -23,7 +23,7 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 		canvasArg = strings.TrimSpace(ctx.Args[0])
 	}
 
-	canvasID, err := appresolve.ResolveAppNameOrIDArg(ctx, canvasArg)
+	canvasID, err := common.ResolveAppNameOrIDArg(ctx, canvasArg)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func resolveCurrentUserDraftVersionID(ctx core.CommandContext, canvasID string) 
 		return "", fmt.Errorf("current user id not found")
 	}
 
-	versionID, err := appresolve.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
+	versionID, err := common.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
 	if err != nil {
 		return "", err
 	}

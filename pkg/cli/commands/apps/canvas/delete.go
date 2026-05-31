@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/spf13/cobra"
-	"github.com/superplanehq/superplane/pkg/cli/appresolve"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -14,7 +14,7 @@ type deleteCommand struct{}
 func (c *deleteCommand) Execute(ctx core.CommandContext) error {
 	nameOrID := ctx.Args[0]
 
-	canvasID, err := appresolve.FindAppID(ctx, ctx.API, nameOrID)
+	canvasID, err := common.FindAppID(ctx, ctx.API, nameOrID)
 	if err != nil {
 		return err
 	}

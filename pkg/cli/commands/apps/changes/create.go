@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/cli/appresolve"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -36,7 +36,7 @@ func (c *CreateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if versionID == "" {
-		changeManagementEnabled, err := appresolve.ChangeManagementEnabled(ctx, canvasID)
+		changeManagementEnabled, err := common.ChangeManagementEnabled(ctx, canvasID)
 		if err != nil {
 			return err
 		}
@@ -44,7 +44,7 @@ func (c *CreateCommand) Execute(ctx core.CommandContext) error {
 			return fmt.Errorf("change management is disabled for this canvas; enable it in canvas settings to use change requests")
 		}
 
-		versionID, err = appresolve.FindCurrentUserDraftVersionID(ctx, canvasID)
+		versionID, err = common.FindCurrentUserDraftVersionID(ctx, canvasID)
 		if err != nil {
 			return err
 		}

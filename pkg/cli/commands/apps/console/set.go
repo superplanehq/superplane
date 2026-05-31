@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/superplanehq/superplane/pkg/cli/appresolve"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -45,17 +45,17 @@ func (c *setCommand) Execute(ctx core.CommandContext) error {
 		return fmt.Errorf("invalid console yaml in %s: %w", source, err)
 	}
 
-	canvasID, err := appresolve.ResolveAppNameOrIDArg(ctx, canvasArg)
+	canvasID, err := common.ResolveAppNameOrIDArg(ctx, canvasArg)
 	if err != nil {
 		return err
 	}
 
-	changeManagementEnabled, err := appresolve.ChangeManagementEnabled(ctx, canvasID)
+	changeManagementEnabled, err := common.ChangeManagementEnabled(ctx, canvasID)
 	if err != nil {
 		return err
 	}
 
-	versionID, err := appresolve.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	versionID, err := common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
 	if err != nil {
 		return err
 	}

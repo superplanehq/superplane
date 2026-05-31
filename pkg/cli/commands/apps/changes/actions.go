@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/cli/appresolve"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
@@ -74,7 +74,7 @@ func parseCanvasChangeRequestTargetArgs(args []string) (string, string, error) {
 }
 
 func resolveCanvasTargetFromOptionalArg(ctx core.CommandContext, target string) (string, error) {
-	return appresolve.ResolveAppNameOrIDArg(ctx, target)
+	return common.ResolveAppNameOrIDArg(ctx, target)
 }
 
 func loadCanvasForChangeRequestResolve(filePath string) (openapi_client.CanvasesCanvas, error) {

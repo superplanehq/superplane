@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/cli/appresolve"
+	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
 )
 
@@ -58,7 +58,7 @@ func TestFindCurrentUserDraftVersionIDSkipsPublishedVersions(t *testing.T) {
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
-	versionID, err := appresolve.FindCurrentUserDraftVersionID(ctx, "canvas-123")
+	versionID, err := common.FindCurrentUserDraftVersionID(ctx, "canvas-123")
 	require.NoError(t, err)
 	require.Equal(t, "draft-1", versionID)
 }
@@ -86,7 +86,7 @@ func TestEnsureCurrentUserDraftVersionIDCreatesDraftWhenMissing(t *testing.T) {
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
-	versionID, err := appresolve.EnsureCurrentUserDraftVersionID(ctx, "canvas-123")
+	versionID, err := common.EnsureCurrentUserDraftVersionID(ctx, "canvas-123")
 	require.NoError(t, err)
 	require.Equal(t, "draft-1", versionID)
 
@@ -111,7 +111,7 @@ func TestDescribeCanvasVersionByIDReturnsErrorWhenVersionMissing(t *testing.T) {
 
 	ctx, _ := newCreateCommandContextForTest(t, server.server, "text")
 
-	_, err := appresolve.DescribeAppVersionByID(ctx, "canvas-123", "version-123")
+	_, err := common.DescribeAppVersionByID(ctx, "canvas-123", "version-123")
 	require.Error(t, err)
 	require.Contains(t, err.Error(), `app version "version-123" not found`)
 }

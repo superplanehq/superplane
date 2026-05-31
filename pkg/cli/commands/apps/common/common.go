@@ -1,10 +1,4 @@
-// Package appresolve groups the small set of helpers used by multiple
-// CLI command packages to resolve an app (by name or id), read app
-// settings such as change management, and find or create the current user's
-// draft version. Keeping these in one place lets the `apps` and
-// `console` command packages share behavior without either depending on the
-// other.
-package appresolve
+package common
 
 import (
 	"fmt"
