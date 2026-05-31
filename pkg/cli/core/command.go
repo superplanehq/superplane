@@ -98,26 +98,3 @@ func Bind(cmd *cobra.Command, command Command, options BindOptions) {
 		return FormatCommandError(command.Execute(ctx))
 	}
 }
-
-// FakeConfig is a test stub implementation of core.ConfigContext. The
-// canvas-active accessors are no-ops because the canvas commands under test
-// here do not use them.
-type FakeConfig struct {
-	URL       string
-	ActiveApp string
-}
-
-func (f *FakeConfig) GetActiveApp() string {
-	if f.ActiveApp != "" {
-		return f.ActiveApp
-	}
-	return ""
-}
-
-func (f *FakeConfig) SetActiveApp(appID string) error {
-	return nil
-}
-
-func (f *FakeConfig) GetURL() string {
-	return f.URL
-}

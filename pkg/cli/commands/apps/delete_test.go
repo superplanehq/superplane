@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
+	"github.com/superplanehq/superplane/test/support/cli"
 )
 
 func newCanvasDeleteServer(t *testing.T) *httptest.Server {
@@ -29,7 +29,7 @@ func newCanvasDeleteServer(t *testing.T) *httptest.Server {
 
 func TestDeleteCommandPrintsConfirmation(t *testing.T) {
 	server := newCanvasDeleteServer(t)
-	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "text")
+	ctx, stdout := cli.NewCommandContext(t, server, "text")
 	ctx.Args = []string{"my-canvas"}
 
 	err := (&deleteCommand{}).Execute(ctx)
@@ -39,7 +39,7 @@ func TestDeleteCommandPrintsConfirmation(t *testing.T) {
 
 func TestDeleteCommandReturnsJSONOutput(t *testing.T) {
 	server := newCanvasDeleteServer(t)
-	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "json")
+	ctx, stdout := cli.NewCommandContext(t, server, "json")
 	ctx.Args = []string{"my-canvas"}
 
 	err := (&deleteCommand{}).Execute(ctx)
@@ -62,7 +62,7 @@ func TestDeleteCommandFailsOnServerError(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	ctx, _ := common.NewCreateCommandContextForTest(t, server, "text")
+	ctx, _ := cli.NewCommandContext(t, server, "text")
 	ctx.Args = []string{"my-canvas"}
 
 	err := (&deleteCommand{}).Execute(ctx)

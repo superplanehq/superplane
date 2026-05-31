@@ -1,19 +1,13 @@
 package apps
 
 import (
-	"bytes"
-	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
-	"github.com/superplanehq/superplane/pkg/cli/core"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"github.com/superplanehq/superplane/test/support/cli"
 )
 
 func newCanvasCreateServer(t *testing.T) *httptest.Server {
@@ -30,7 +24,7 @@ func newCanvasCreateServer(t *testing.T) *httptest.Server {
 
 func TestCreateCommandPrintsCanvasOnSuccess(t *testing.T) {
 	server := newCanvasCreateServer(t)
-	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "text")
+	ctx, stdout := cli.NewCommandContext(t, server, "text")
 	ctx.Args = []string{"my-canvas"}
 
 	err := (&createCommand{}).Execute(ctx)
@@ -41,7 +35,7 @@ func TestCreateCommandPrintsCanvasOnSuccess(t *testing.T) {
 
 func TestCreateCommandPrintsURLFromResponseOrgID(t *testing.T) {
 	server := newCanvasCreateServer(t)
-	ctx, stdout := common.NewCreateCommandContextWithConfigForTest(t, server, "text", &core.FakeConfig{
+	ctx, stdout := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{
 		URL: "https://app.superplane.com",
 	})
 	ctx.Args = []string{"my-canvas"}
@@ -59,7 +53,7 @@ func TestCreateCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	ctx, stdout := common.NewCreateCommandContextWithConfigForTest(t, server, "text", &core.FakeConfig{
+	ctx, stdout := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{
 		URL: "https://app.superplane.com",
 	})
 	ctx.Args = []string{"my-canvas"}
@@ -72,7 +66,7 @@ func TestCreateCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
 
 func TestCreateCommandReturnsJSONOutput(t *testing.T) {
 	server := newCanvasCreateServer(t)
-	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "json")
+	ctx, stdout := cli.NewCommandContext(t, server, "json")
 	ctx.Args = []string{"my-canvas"}
 
 	err := (&createCommand{}).Execute(ctx)
@@ -83,7 +77,7 @@ func TestCreateCommandReturnsJSONOutput(t *testing.T) {
 
 func TestCreateCommandReturnsYAMLOutput(t *testing.T) {
 	server := newCanvasCreateServer(t)
-	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "yaml")
+	ctx, stdout := cli.NewCommandContext(t, server, "yaml")
 	ctx.Args = []string{"my-canvas"}
 
 	err := (&createCommand{}).Execute(ctx)
@@ -99,7 +93,7 @@ func TestCreateCommandFailsOnEmptyResponse(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	ctx, _ := common.NewCreateCommandContextForTest(t, server, "text")
+	ctx, _ := cli.NewCommandContext(t, server, "text")
 	ctx.Args = []string{"my-canvas"}
 	cmd := &createCommand{}
 
@@ -115,7 +109,7 @@ func TestCreateCommandFailsOnEmptyCanvasID(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	ctx, _ := common.NewCreateCommandContextForTest(t, server, "text")
+	ctx, _ := cli.NewCommandContext(t, server, "text")
 	ctx.Args = []string{"my-canvas"}
 	cmd := &createCommand{}
 
@@ -132,7 +126,7 @@ func TestCreateCommandFailsOnServerError(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	ctx, _ := common.NewCreateCommandContextForTest(t, server, "text")
+	ctx, _ := cli.NewCommandContext(t, server, "text")
 	ctx.Args = []string{"my-canvas"}
 	cmd := &createCommand{}
 
@@ -144,7 +138,7 @@ func TestCreateFromFilePrintsCanvasOnSuccess(t *testing.T) {
 	server := newCanvasCreateServer(t)
 	filePath := writeTestCanvasFile(t, "from-file-canvas")
 	file := filePath
-	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "text")
+	ctx, stdout := cli.NewCommandContext(t, server, "text")
 
 	err := (&createCommand{canvasFile: &file}).Execute(ctx)
 	require.NoError(t, err)
@@ -160,7 +154,7 @@ func TestCreateFromFileFailsOnEmptyResponse(t *testing.T) {
 
 	filePath := writeTestCanvasFile(t, "from-file-canvas")
 	file := filePath
-	ctx, _ := common.NewCreateCommandContextForTest(t, server, "text")
+	ctx, _ := cli.NewCommandContext(t, server, "text")
 	cmd := &createCommand{canvasFile: &file}
 
 	err := cmd.Execute(ctx)
@@ -172,7 +166,7 @@ func TestCreateFromFileReturnsJSONOutput(t *testing.T) {
 	server := newCanvasCreateServer(t)
 	filePath := writeTestCanvasFile(t, "from-file-canvas")
 	file := filePath
-	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "json")
+	ctx, stdout := cli.NewCommandContext(t, server, "json")
 
 	err := (&createCommand{canvasFile: &file}).Execute(ctx)
 	require.NoError(t, err)
@@ -193,7 +187,7 @@ func TestCreateCommandFailsOnMethodChangingRedirect(t *testing.T) {
 	}))
 	t.Cleanup(redirector.Close)
 
-	ctx, _ := newCreateCommandContextWithRedirectPolicyForTest(t, redirector, "text")
+	ctx, _ := cli.NewCommandContextWithRedirectPolicy(t, redirector, "text")
 	ctx.Args = []string{"my-canvas"}
 	cmd := &createCommand{}
 
@@ -203,7 +197,7 @@ func TestCreateCommandFailsOnMethodChangingRedirect(t *testing.T) {
 }
 
 func TestCreateCommandFailsWithoutArgs(t *testing.T) {
-	ctx, _ := common.NewCreateCommandContextForTest(t, nil, "text")
+	ctx, _ := cli.NewCommandContext(t, nil, "text")
 	ctx.Args = []string{}
 	cmd := &createCommand{}
 
@@ -219,42 +213,4 @@ func writeTestCanvasFile(t *testing.T, name string) string {
 	content := []byte("apiVersion: v1\nkind: Canvas\nmetadata:\n  name: " + name + "\nspec:\n  nodes: []\n  edges: []\n")
 	require.NoError(t, os.WriteFile(filePath, content, 0644))
 	return filePath
-}
-
-func newCreateCommandContextWithRedirectPolicyForTest(
-	t *testing.T,
-	server *httptest.Server,
-	outputFormat string,
-) (core.CommandContext, *bytes.Buffer) {
-	t.Helper()
-
-	stdout := bytes.NewBuffer(nil)
-	renderer, err := core.NewRenderer(outputFormat, stdout)
-	require.NoError(t, err)
-
-	cobraCmd := &cobra.Command{}
-	cobraCmd.SetOut(stdout)
-
-	config := openapi_client.NewConfiguration()
-	config.Servers = openapi_client.ServerConfigurations{
-		{URL: server.URL},
-	}
-	config.HTTPClient = &http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) > 0 && req.Method != via[0].Method {
-				return fmt.Errorf(
-					"refusing to follow redirect that changes method from %s to %s",
-					via[0].Method, req.Method,
-				)
-			}
-			return nil
-		},
-	}
-
-	return core.CommandContext{
-		Context:  context.Background(),
-		Cmd:      cobraCmd,
-		API:      openapi_client.NewAPIClient(config),
-		Renderer: renderer,
-	}, stdout
 }

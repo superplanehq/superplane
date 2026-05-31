@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
+	"github.com/superplanehq/superplane/test/support/cli"
 )
 
 func TestFindCurrentUserDraftVersionIDSkipsPublishedVersions(t *testing.T) {
@@ -21,7 +22,7 @@ func TestFindCurrentUserDraftVersionIDSkipsPublishedVersions(t *testing.T) {
 		},
 	)
 
-	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := cli.NewCommandContext(t, server.server, "text")
 
 	versionID, err := common.FindCurrentUserDraftVersionID(ctx, "canvas-123")
 	require.NoError(t, err)
@@ -49,7 +50,7 @@ func TestEnsureCurrentUserDraftVersionIDCreatesDraftWhenMissing(t *testing.T) {
 		},
 	)
 
-	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := cli.NewCommandContext(t, server.server, "text")
 
 	versionID, err := common.EnsureCurrentUserDraftVersionID(ctx, "canvas-123")
 	require.NoError(t, err)
@@ -74,7 +75,7 @@ func TestDescribeCanvasVersionByIDReturnsErrorWhenVersionMissing(t *testing.T) {
 		},
 	)
 
-	ctx, _ := common.NewCreateCommandContextForTest(t, server.server, "text")
+	ctx, _ := cli.NewCommandContext(t, server.server, "text")
 
 	_, err := common.DescribeAppVersionByID(ctx, "canvas-123", "version-123")
 	require.Error(t, err)

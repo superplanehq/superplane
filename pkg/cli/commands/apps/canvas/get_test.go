@@ -6,8 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
-	"github.com/superplanehq/superplane/pkg/cli/core"
+	"github.com/superplanehq/superplane/test/support/cli"
 )
 
 const testGetCanvasID = "4e9ae08d-0363-40d2-ba2c-5f6389a418d8"
@@ -26,7 +25,7 @@ func newCanvasGetServer(t *testing.T) *httptest.Server {
 
 func TestGetCommandPrintsCanvasOnSuccess(t *testing.T) {
 	server := newCanvasGetServer(t)
-	ctx, stdout := common.NewCreateCommandContextForTest(t, server, "text")
+	ctx, stdout := cli.NewCommandContext(t, server, "text")
 	ctx.Args = []string{testGetCanvasID}
 
 	err := (&getCommand{}).Execute(ctx)
@@ -40,7 +39,7 @@ func TestGetCommandPrintsCanvasOnSuccess(t *testing.T) {
 
 func TestGetCommandPrintsURLFromResponseOrgID(t *testing.T) {
 	server := newCanvasGetServer(t)
-	ctx, stdout := common.NewCreateCommandContextWithConfigForTest(t, server, "text", &core.FakeConfig{
+	ctx, stdout := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{
 		URL: "https://app.superplane.com",
 	})
 	ctx.Args = []string{testGetCanvasID}
@@ -61,7 +60,7 @@ func TestGetCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	ctx, stdout := common.NewCreateCommandContextWithConfigForTest(t, server, "text", &core.FakeConfig{
+	ctx, stdout := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{
 		URL: "https://app.superplane.com",
 	})
 	ctx.Args = []string{testGetCanvasID}
@@ -75,7 +74,7 @@ func TestGetCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
 
 func TestGetUsesActiveAppWhenNoArg(t *testing.T) {
 	server := newCanvasGetServer(t)
-	ctx, stdout := common.NewCreateCommandContextWithConfigForTest(t, server, "text", &core.FakeConfig{
+	ctx, stdout := cli.NewCommandContextWithConfig(t, server, "text", &cli.FakeConfig{
 		ActiveApp: testGetCanvasID,
 	})
 	ctx.Args = []string{}
@@ -87,7 +86,7 @@ func TestGetUsesActiveAppWhenNoArg(t *testing.T) {
 
 func TestGetErrorsWhenNoAppAndNoActive(t *testing.T) {
 	server := newCanvasGetServer(t)
-	ctx, _ := common.NewCreateCommandContextForTest(t, server, "text")
+	ctx, _ := cli.NewCommandContext(t, server, "text")
 	ctx.Args = []string{}
 
 	err := (&getCommand{}).Execute(ctx)

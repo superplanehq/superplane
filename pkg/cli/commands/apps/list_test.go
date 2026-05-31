@@ -1,17 +1,13 @@
 package apps
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
-	"github.com/superplanehq/superplane/pkg/cli/core"
-	"github.com/superplanehq/superplane/pkg/openapi_client"
+	"github.com/superplanehq/superplane/test/support/cli"
 )
 
 const canvasesListResponse = `{
@@ -44,7 +40,7 @@ func newCanvasListServer(t *testing.T) *httptest.Server {
 
 func TestListCommandReturnsSummaryJSON(t *testing.T) {
 	server := newCanvasListServer(t)
-	ctx, stdout := newListCommandContextForTest(t, server, "json")
+	ctx, stdout := cli.NewCommandContext(t, server, "json")
 	full := false
 	cmd := &listCommand{full: &full}
 
@@ -66,7 +62,7 @@ func TestListCommandReturnsSummaryJSON(t *testing.T) {
 
 func TestListCommandReturnsFullJSON(t *testing.T) {
 	server := newCanvasListServer(t)
-	ctx, stdout := newListCommandContextForTest(t, server, "json")
+	ctx, stdout := cli.NewCommandContext(t, server, "json")
 	full := true
 	cmd := &listCommand{full: &full}
 
@@ -81,7 +77,7 @@ func TestListCommandReturnsFullJSON(t *testing.T) {
 
 func TestListCommandReturnsSummaryYAML(t *testing.T) {
 	server := newCanvasListServer(t)
-	ctx, stdout := newListCommandContextForTest(t, server, "yaml")
+	ctx, stdout := cli.NewCommandContext(t, server, "yaml")
 	full := false
 	cmd := &listCommand{full: &full}
 
@@ -96,7 +92,7 @@ func TestListCommandReturnsSummaryYAML(t *testing.T) {
 
 func TestListCommandReturnsTextOutput(t *testing.T) {
 	server := newCanvasListServer(t)
-	ctx, stdout := newListCommandContextForTest(t, server, "text")
+	ctx, stdout := cli.NewCommandContext(t, server, "text")
 	full := false
 	cmd := &listCommand{full: &full}
 
@@ -108,35 +104,4 @@ func TestListCommandReturnsTextOutput(t *testing.T) {
 	require.Contains(t, raw, "NAME")
 	require.Contains(t, raw, "canvas-001")
 	require.Contains(t, raw, "my-canvas")
-}
-
-func newListCommandContextForTest(
-	t *testing.T,
-	server *httptest.Server,
-	outputFormat string,
-) (core.CommandContext, *bytes.Buffer) {
-	t.Helper()
-
-	stdout := bytes.NewBuffer(nil)
-	renderer, err := core.NewRenderer(outputFormat, stdout)
-	require.NoError(t, err)
-
-	cobraCmd := &cobra.Command{}
-	cobraCmd.SetOut(stdout)
-
-	commandCtx := core.CommandContext{
-		Context:  context.Background(),
-		Cmd:      cobraCmd,
-		Renderer: renderer,
-	}
-
-	if server != nil {
-		config := openapi_client.NewConfiguration()
-		config.Servers = openapi_client.ServerConfigurations{
-			{URL: server.URL},
-		}
-		commandCtx.API = openapi_client.NewAPIClient(config)
-	}
-
-	return commandCtx, stdout
 }

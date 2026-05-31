@@ -1,9 +1,12 @@
 package models
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
@@ -241,4 +244,92 @@ func TestEmptyCanvasSpec(t *testing.T) {
 	assert.NotNil(t, spec.Edges)
 	assert.Len(t, spec.Nodes, 0)
 	assert.Len(t, spec.Edges, 0)
+}
+
+func writeCanvasResourceFile(t *testing.T, content string) string {
+	t.Helper()
+
+	filePath := filepath.Join(t.TempDir(), "canvas.yaml")
+	require.NoError(t, os.WriteFile(filePath, []byte(content), 0o644))
+	return filePath
+}
+
+func TestParseCanvasResourceFromFile(t *testing.T) {
+	t.Run("parses valid canvas file", func(t *testing.T) {
+		filePath := writeCanvasResourceFile(t, `
+apiVersion: v1
+kind: Canvas
+metadata:
+  name: my-canvas
+spec:
+  nodes: []
+  edges: []
+`)
+
+		resource, err := ParseCanvasResourceFromFile(filePath, "create")
+		require.NoError(t, err)
+		assert.Equal(t, "v1", resource.APIVersion)
+		assert.Equal(t, CanvasKind, resource.Kind)
+		assert.Equal(t, "my-canvas", resource.Metadata.GetName())
+	})
+
+	t.Run("returns read error for missing file", func(t *testing.T) {
+		_, err := ParseCanvasResourceFromFile(filepath.Join(t.TempDir(), "missing.yaml"), "create")
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to read resource file")
+	})
+
+	t.Run("returns header parse error for invalid yaml", func(t *testing.T) {
+		filePath := writeCanvasResourceFile(t, "apiVersion: v1\nkind: Canvas\nmetadata: [\n")
+
+		_, err := ParseCanvasResourceFromFile(filePath, "update")
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "failed to parse resource")
+	})
+
+	t.Run("returns header parse error for missing kind", func(t *testing.T) {
+		filePath := writeCanvasResourceFile(t, `
+apiVersion: v1
+metadata:
+  name: my-canvas
+spec:
+  nodes: []
+  edges: []
+`)
+
+		_, err := ParseCanvasResourceFromFile(filePath, "create")
+		require.Error(t, err)
+		assert.EqualError(t, err, "failed to parse resource's kind")
+	})
+
+	t.Run("rejects unsupported kind for operation", func(t *testing.T) {
+		filePath := writeCanvasResourceFile(t, `
+apiVersion: v1
+kind: Secret
+metadata:
+  name: not-a-canvas
+spec:
+  nodes: []
+  edges: []
+`)
+
+		_, err := ParseCanvasResourceFromFile(filePath, "create")
+		require.Error(t, err)
+		assert.EqualError(t, err, `unsupported resource kind "Secret" for create`)
+	})
+
+	t.Run("propagates canvas validation errors", func(t *testing.T) {
+		filePath := writeCanvasResourceFile(t, `
+apiVersion: v1
+kind: Canvas
+metadata: {}
+spec:
+  nodes: []
+  edges: []
+`)
+
+		_, err := ParseCanvasResourceFromFile(filePath, "update")
+		require.Error(t, err)
+		assert.EqualError(t, err, "canvas metadata.name is required")
+	})
 }
