@@ -21,6 +21,10 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends unzip && rm
 
 FROM debian:bookworm-slim
 
+RUN apt-get update -qq \
+  && apt-get install -y --no-install-recommends ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
 # JSON config path written by the entrypoint.
 ENV FM_CONFIG_FILE=/tmp/fleet-manager/config.json
 
