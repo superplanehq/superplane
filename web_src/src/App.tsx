@@ -19,6 +19,7 @@ import OwnerSetup from "./pages/auth/OwnerSetup";
 import { CanvasSettingsPage } from "./pages/canvas/settings";
 import { TemplatesPage } from "./pages/canvas/TemplatesPage";
 import { HomePage } from "./pages/home";
+import { NewAppPage } from "./pages/home/NewAppPage";
 import { InstallPage } from "./pages/install";
 import { OrganizationSettings } from "./pages/organization/settings";
 import { WorkflowPageV2 } from "./pages/workflowv2";
@@ -104,6 +105,9 @@ function AppRouter() {
               {/* Organization-scoped protected routes */}
               <Route path=":organizationId" element={<OrganizationScope />}>
                 <Route index element={withAuthAndPermission(HomePage, "canvases", "read")} />
+                <Route path="apps">
+                  <Route path="new" element={withAuthAndPermission(NewAppPage, "canvases", "read")} />
+                </Route>
                 <Route
                   path="canvases/:canvasId/settings"
                   element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
