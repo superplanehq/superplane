@@ -7,8 +7,8 @@ import { Checkbox } from "@/ui/checkbox";
 
 import {
   parameterDisplayLabel,
+  parameterInputPlaceholder,
   selectOptionValues,
-  parameterPlaceholder,
   type StartTemplateParameter,
 } from "./templatePayload";
 
@@ -78,7 +78,7 @@ export function StartRunParameterFields({
                 <Input
                   id={id}
                   type={param.type === "number" ? "number" : "text"}
-                  placeholder={parameterPlaceholder(param)}
+                  placeholder={parameterInputPlaceholder(param, label)}
                   value={String(parameterValues[param.name] ?? "")}
                   onChange={(e) =>
                     onParameterValuesChange((prev) => ({
