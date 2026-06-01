@@ -10,14 +10,14 @@ import (
 //go:embed payloads/publish_commit_status.json
 var exampleOutputPublishCommitStatusBytes []byte
 
-//go:embed payloads/on_status.json
-var exampleDataOnStatusBytes []byte
+//go:embed payloads/on_commit_status.json
+var exampleDataOnCommitStatusBytes []byte
 
 var exampleOutputPublishCommitStatusOnce sync.Once
 var exampleOutputPublishCommitStatus map[string]any
 
-var exampleDataOnStatusOnce sync.Once
-var exampleDataOnStatus map[string]any
+var exampleDataOnCommitStatusOnce sync.Once
+var exampleDataOnCommitStatus map[string]any
 
 func (c *PublishCommitStatus) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
@@ -27,10 +27,10 @@ func (c *PublishCommitStatus) ExampleOutput() map[string]any {
 	)
 }
 
-func (t *OnStatus) ExampleData() map[string]any {
+func (t *OnCommitStatus) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(
-		&exampleDataOnStatusOnce,
-		exampleDataOnStatusBytes,
-		&exampleDataOnStatus,
+		&exampleDataOnCommitStatusOnce,
+		exampleDataOnCommitStatusBytes,
+		&exampleDataOnCommitStatus,
 	)
 }

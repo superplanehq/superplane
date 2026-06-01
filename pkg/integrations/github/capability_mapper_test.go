@@ -135,7 +135,7 @@ func Test__CapabilityMapper__NewPermissionSet(t *testing.T) {
 	t.Run("status trigger requests statuses read permission", func(t *testing.T) {
 		t.Parallel()
 
-		ps := m.NewPermissionSet([]string{"github.onStatus"})
+		ps := m.NewPermissionSet([]string{"github.onCommitStatus"})
 		got := ps.ForAppManifest()
 		assert.Equal(t, "read", got["statuses"])
 	})

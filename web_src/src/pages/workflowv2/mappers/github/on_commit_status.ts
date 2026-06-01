@@ -8,7 +8,7 @@ import type { TriggerProps } from "@/ui/trigger";
 import type { BaseNodeMetadata } from "./types";
 import { buildGithubSubtitle } from "./utils";
 
-interface OnStatusConfiguration {
+interface OnCommitStatusConfiguration {
   states?: string[];
   contexts?: Predicate[];
   branches?: Predicate[];
@@ -21,12 +21,18 @@ interface StatusBranch {
 interface StatusCommit {
   sha?: string;
   html_url?: string;
+  author?: {
+    login?: string;
+  };
   commit?: {
+    author?: {
+      name?: string;
+    };
     message?: string;
   };
 }
 
-interface OnStatusEventData {
+interface OnCommitStatusEventData {
   sha?: string;
   state?: string;
   context?: string;
@@ -43,9 +49,9 @@ interface OnStatusEventData {
   };
 }
 
-export const onStatusTriggerRenderer: TriggerRenderer = {
+export const onCommitStatusTriggerRenderer: TriggerRenderer = {
   getTitleAndSubtitle: (context: TriggerEventContext) => {
-    const eventData = context.event?.data as OnStatusEventData;
+    const eventData = context.event?.data as OnCommitStatusEventData;
 
     return {
       title: statusTitle(eventData),
@@ -54,25 +60,26 @@ export const onStatusTriggerRenderer: TriggerRenderer = {
   },
 
   getRootEventValues: (context: TriggerEventContext): Record<string, string> => {
-    const eventData = context.event?.data as OnStatusEventData;
+    const eventData = context.event?.data as OnCommitStatusEventData;
 
     return {
       State: stringOrDash(statusState(eventData)),
       Context: stringOrDash(statusContext(eventData)),
-      SHA: stringOrDash(statusSha(eventData)),
       Description: stringOrDash(statusDescription(eventData)),
-      "Target URL": stringOrDash(statusTargetUrl(eventData)),
       Branches: stringOrDash(statusBranchNames(eventData).join(", ")),
-      Repository: stringOrDash(statusRepositoryName(eventData)),
-      Sender: stringOrDash(statusSenderLogin(eventData)),
+      SHA: stringOrDash(statusSha(eventData)),
+      "Status creator": stringOrDash(statusCreatorLogin(eventData)),
+      "Commit author": stringOrDash(statusCommitAuthor(eventData)),
       "Commit URL": stringOrDash(statusCommitUrl(eventData)),
+      "Target URL": stringOrDash(statusTargetUrl(eventData)),
+      Repository: stringOrDash(statusRepositoryName(eventData)),
     };
   },
 
   getTriggerProps: (context: TriggerRendererContext) => {
     const { node, definition, lastEvent } = context;
     const metadata = node.metadata as unknown as BaseNodeMetadata;
-    const configuration = node.configuration as unknown as OnStatusConfiguration;
+    const configuration = node.configuration as unknown as OnCommitStatusConfiguration;
 
     const props: TriggerProps = {
       title: node.name || definition.label || "Unnamed trigger",
@@ -83,7 +90,7 @@ export const onStatusTriggerRenderer: TriggerRenderer = {
     };
 
     if (lastEvent) {
-      const eventData = lastEvent.data as OnStatusEventData;
+      const eventData = lastEvent.data as OnCommitStatusEventData;
       props.lastEventData = {
         title: statusTitle(eventData),
         subtitle: buildGithubSubtitle(eventData?.state || "", lastEvent.createdAt),
@@ -99,7 +106,7 @@ export const onStatusTriggerRenderer: TriggerRenderer = {
 
 function statusMetadataItems(
   repositoryName: string | undefined,
-  configuration?: OnStatusConfiguration,
+  configuration?: OnCommitStatusConfiguration,
 ): MetadataItem[] {
   const metadataItems: MetadataItem[] = [];
 
@@ -134,53 +141,74 @@ function statusMetadataItems(
   return metadataItems;
 }
 
-function statusTitle(eventData: OnStatusEventData | undefined): string {
+function statusTitle(eventData: OnCommitStatusEventData | undefined): string {
   const context = statusContext(eventData) || "Commit status";
+  const state = statusTitleState(statusState(eventData));
   const sha = shortSha(statusSha(eventData));
+  const title = state ? `${context} ${state}` : context;
 
   if (sha) {
-    return `${context} - ${sha}`;
+    return `${title} - ${sha}`;
   }
 
-  return context;
+  return title;
+}
+
+function statusTitleState(state: string | undefined): string {
+  switch (state) {
+    case "success":
+      return "succeeded";
+    case "failure":
+      return "failed";
+    case "error":
+      return "errored";
+    case "pending":
+      return "is pending";
+    default:
+      return "";
+  }
 }
 
 function shortSha(sha: string | undefined): string {
   return sha ? sha.slice(0, 7) : "";
 }
 
-function statusState(eventData: OnStatusEventData | undefined): string | undefined {
+function statusState(eventData: OnCommitStatusEventData | undefined): string | undefined {
   return eventData?.state;
 }
 
-function statusContext(eventData: OnStatusEventData | undefined): string | undefined {
+function statusContext(eventData: OnCommitStatusEventData | undefined): string | undefined {
   return eventData?.context;
 }
 
-function statusSha(eventData: OnStatusEventData | undefined): string | undefined {
+function statusSha(eventData: OnCommitStatusEventData | undefined): string | undefined {
   return eventData?.sha || eventData?.commit?.sha;
 }
 
-function statusDescription(eventData: OnStatusEventData | undefined): string | undefined {
+function statusDescription(eventData: OnCommitStatusEventData | undefined): string | undefined {
   return eventData?.description;
 }
 
-function statusTargetUrl(eventData: OnStatusEventData | undefined): string | undefined {
+function statusTargetUrl(eventData: OnCommitStatusEventData | undefined): string | undefined {
   return eventData?.target_url;
 }
 
-function statusRepositoryName(eventData: OnStatusEventData | undefined): string | undefined {
+function statusRepositoryName(eventData: OnCommitStatusEventData | undefined): string | undefined {
   return eventData?.repository?.full_name;
 }
 
-function statusSenderLogin(eventData: OnStatusEventData | undefined): string | undefined {
+function statusCreatorLogin(eventData: OnCommitStatusEventData | undefined): string | undefined {
   return eventData?.sender?.login;
 }
 
-function statusCommitUrl(eventData: OnStatusEventData | undefined): string | undefined {
+function statusCommitAuthor(eventData: OnCommitStatusEventData | undefined): string | undefined {
+  return eventData?.commit?.author?.login || eventData?.commit?.commit?.author?.name;
+}
+
+function statusCommitUrl(eventData: OnCommitStatusEventData | undefined): string | undefined {
   return eventData?.commit?.html_url;
 }
 
-function statusBranchNames(eventData: OnStatusEventData | undefined): string[] {
+function statusBranchNames(eventData: OnCommitStatusEventData | undefined): string[] {
   return (eventData?.branches || []).map((branch) => branch.name).filter((name): name is string => Boolean(name));
 }
