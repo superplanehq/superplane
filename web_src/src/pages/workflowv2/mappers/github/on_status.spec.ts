@@ -5,14 +5,14 @@ import { onStatusTriggerRenderer } from "./on_status";
 
 const definition = {
   name: "github.onStatus",
-  label: "On Status",
+  label: "On Commit Status",
   description: "",
   icon: "github",
   color: "gray",
 };
 
 describe("onStatusTriggerRenderer", () => {
-  it("builds title from status context and SHA", () => {
+  it("builds title from status context, state, and SHA", () => {
     const event = statusEvent({
       state: "success",
       context: "ci/build",
@@ -21,7 +21,7 @@ describe("onStatusTriggerRenderer", () => {
 
     const context: TriggerEventContext = { event };
 
-    expect(onStatusTriggerRenderer.getTitleAndSubtitle(context).title).toBe("ci/build - d6f3c8a");
+    expect(onStatusTriggerRenderer.getTitleAndSubtitle(context).title).toBe("ci/build succeeded - d6f3c8a");
   });
 
   it("returns status details for the sidebar", () => {
@@ -34,16 +34,33 @@ describe("onStatusTriggerRenderer", () => {
       branches: [{ name: "main" }, { name: "release/v1" }],
       repository: { full_name: "acme/snaketoy" },
       sender: { login: "octocat" },
-      commit: { html_url: "https://github.com/acme/snaketoy/commit/d6f3c8a" },
+      commit: {
+        author: { login: "monalisa" },
+        html_url: "https://github.com/acme/snaketoy/commit/d6f3c8a",
+      },
     });
 
     const values = onStatusTriggerRenderer.getRootEventValues({ event });
 
+    expect(Object.keys(values)).toEqual([
+      "State",
+      "Context",
+      "Description",
+      "Branches",
+      "SHA",
+      "Status creator",
+      "Commit author",
+      "Commit URL",
+      "Target URL",
+      "Repository",
+    ]);
     expect(values.State).toBe("failure");
     expect(values.Context).toBe("deploy/production");
+    expect(values.Description).toBe("Deployment failed");
     expect(values.Branches).toBe("main, release/v1");
-    expect(values.Repository).toBe("acme/snaketoy");
-    expect(values.Sender).toBe("octocat");
+    expect(values.SHA).toBe("d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44");
+    expect(values["Status creator"]).toBe("octocat");
+    expect(values["Commit author"]).toBe("monalisa");
   });
 
   it("renders repository and filters as node metadata", () => {

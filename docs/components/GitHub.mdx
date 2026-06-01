@@ -17,7 +17,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to pull request events" />
   <LinkCard title="On Push" href="#on-push" description="Listen to GitHub push events" />
   <LinkCard title="On Release" href="#on-release" description="Listen to release events" />
-  <LinkCard title="On Status" href="#on-status" description="Listen to GitHub commit status events" />
+  <LinkCard title="On Commit Status" href="#on-commit-status" description="Listen to GitHub commit status events from the Commit Statuses API" />
   <LinkCard title="On Tag Created" href="#on-tag-created" description="Listen to GitHub tag creation events" />
   <LinkCard title="On Workflow Run" href="#on-workflow-run" description="Listen to workflow run events" />
 </CardGrid>
@@ -1383,13 +1383,15 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
 }
 ```
 
-<a id="on-status"></a>
+<a id="on-commit-status"></a>
 
-## On Status
+## On Commit Status
 
 **Trigger key:** `github.onStatus`
 
-The On Status trigger starts a workflow execution when a GitHub commit status is created or updated.
+The On Commit Status trigger starts a workflow execution when a GitHub commit status is created or updated.
+
+GitHub commit statuses are the legacy status objects created through the Commit Statuses API. They are separate from GitHub Checks API check runs, which power many PR checks from GitHub Apps such as Cloudflare Pages, DCO, and Sourcery. To react to those checks, use a check-run trigger.
 
 ### Use Cases
 
@@ -1416,7 +1418,7 @@ Each status event includes:
 - **branches**: Branches containing the status SHA
 - **commit**: Commit information
 - **repository**: Repository information
-- **sender**: User who triggered the event
+- **sender**: User who created the status event. This is not necessarily the commit author
 
 ### Webhook Setup
 
