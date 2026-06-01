@@ -7,8 +7,10 @@ import {
   isValidSelectParameterValue,
   parameterDefaultValue,
   parameterDisplayLabel,
+  parameterInputPlaceholder,
   parseJsonEventPayload,
   parameterPlaceholder,
+  startRunModalTitle,
   payloadForTemplateRun,
   payloadRecordForParameters,
   selectOptionValues,
@@ -51,6 +53,26 @@ describe("parameterDisplayLabel", () => {
     expect(parameterDisplayLabel({ name: "msg", type: "string" })).toBe("msg");
     expect(parameterDisplayLabel({ name: "msg", title: "  ", type: "string" })).toBe("msg");
   });
+
+  it("does not duplicate when title matches name ignoring case", () => {
+    expect(parameterDisplayLabel({ name: "Name", title: "Name", type: "string" })).toBe("Name");
+    expect(parameterDisplayLabel({ name: "name", title: "Name", type: "string" })).toBe("Name");
+  });
+});
+
+describe("startRunModalTitle", () => {
+  it("prefers the node name over the template name", () => {
+    expect(startRunModalTitle("Start OpenClaw server", "run")).toBe("Start OpenClaw server");
+  });
+
+  it("falls back to the template name when the node is unnamed", () => {
+    expect(startRunModalTitle("", "Hello World")).toBe("Hello World");
+    expect(startRunModalTitle(undefined, "Hello World")).toBe("Hello World");
+  });
+
+  it("falls back to Run when both names are empty", () => {
+    expect(startRunModalTitle("", "")).toBe("Run");
+  });
 });
 
 describe("parameterPlaceholder", () => {
@@ -63,6 +85,20 @@ describe("parameterPlaceholder", () => {
   it("returns empty string when placeholder is missing or blank", () => {
     expect(parameterPlaceholder({ name: "agent", type: "string" })).toBe("");
     expect(parameterPlaceholder({ name: "agent", placeholder: "  ", type: "string" })).toBe("");
+  });
+});
+
+describe("parameterInputPlaceholder", () => {
+  it("omits placeholders that repeat the field label", () => {
+    expect(
+      parameterInputPlaceholder({ name: "name", title: "Name", placeholder: "Name", type: "string" }, "Name"),
+    ).toBe(undefined);
+  });
+
+  it("keeps distinct placeholders", () => {
+    expect(
+      parameterInputPlaceholder({ name: "agent", placeholder: "Name of the openclaw agent", type: "string" }, "Agent"),
+    ).toBe("Name of the openclaw agent");
   });
 });
 
