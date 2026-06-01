@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { Text } from "../../components/Text/text";
 import { Alert, AlertDescription, AlertTitle } from "@/ui/alert";
 import { UsageLimitAlert } from "@/components/UsageLimitAlert";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { getUsageLimitNotice } from "@/lib/usageLimits";
 import { getResponseErrorMessage } from "@/lib/errors";
@@ -73,20 +75,14 @@ const OrganizationCreate: React.FC = () => {
               </Alert>
             ) : null}
 
-            <div>
-              <label
-                htmlFor="name"
-                className="block text-sm font-medium text-gray-800 text-left dark:text-gray-300 mb-2"
-              >
-                Organization Name
-              </label>
-              <input
+            <div className="space-y-2">
+              <Label htmlFor="name">Organization Name</Label>
+              <Input
                 type="text"
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full px-3 py-2 outline-1 outline-slate-300 rounded-md shadow-md focus:outline-gray-800"
                 placeholder="e.g. Super Duper Org"
                 data-1p-ignore
               />
