@@ -255,7 +255,8 @@ CREATE TABLE public.canvas_memories (
     "values" jsonb NOT NULL,
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    source text DEFAULT 'node'::text NOT NULL
 );
 
 
@@ -2193,7 +2194,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260529001930	f
+20260601220232	f
 \.
 
 
