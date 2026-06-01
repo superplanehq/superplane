@@ -25,16 +25,16 @@ func TestDefaultResourceSourcesForSkillsBaseURL(t *testing.T) {
 		byMountPath[source.MountPath] = source
 	}
 
-	assert.Contains(t, byMountPath, "ref/skills/superplane-canvas-builder/SKILL.md")
+	assert.Contains(t, byMountPath, "ref/skills/superplane-app-builder/SKILL.md")
 	assert.Equal(
 		t,
-		"https://example.test/root/skills/superplane-canvas-builder/SKILL.md",
-		byMountPath["ref/skills/superplane-canvas-builder/SKILL.md"].SourceURL,
+		"https://example.test/root/skills/superplane-app-builder/SKILL.md",
+		byMountPath["ref/skills/superplane-app-builder/SKILL.md"].SourceURL,
 	)
 	assert.Equal(
 		t,
-		"skills/superplane-canvas-builder/SKILL.md",
-		byMountPath["ref/skills/superplane-canvas-builder/SKILL.md"].SourceKey,
+		"skills/superplane-app-builder/SKILL.md",
+		byMountPath["ref/skills/superplane-app-builder/SKILL.md"].SourceKey,
 	)
 	assert.Equal(
 		t,
