@@ -203,7 +203,7 @@ func TestCreateCommandFailsWithoutArgs(t *testing.T) {
 
 	err := cmd.Execute(ctx)
 	require.Error(t, err)
-	require.Contains(t, err.Error(), "either --file or <app-name> is required")
+	require.Contains(t, err.Error(), "either --canvas-file or <app-name> is required")
 }
 
 func writeTestCanvasFile(t *testing.T, name string) string {
