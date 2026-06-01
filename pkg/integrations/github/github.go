@@ -144,7 +144,7 @@ func (g *GitHub) Triggers() []core.Trigger {
 		&pulls.OnPullRequest{},
 		&pulls.OnPRComment{},
 		&pulls.OnPRReviewComment{},
-		&statuses.OnStatus{},
+		&statuses.OnCommitStatus{},
 	}
 }
 
