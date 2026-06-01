@@ -8,7 +8,7 @@ import (
 )
 
 func TestManagedRunInstancesTags_IncludesFleetIDPartitionKey(t *testing.T) {
-	tags := managedRunInstancesTags("aws-arm64")
+	tags := managedRunInstancesTags("aws-arm64", "arm64")
 
 	got := map[string]string{}
 	for _, tg := range tags {
@@ -24,7 +24,10 @@ func TestManagedRunInstancesTags_IncludesFleetIDPartitionKey(t *testing.T) {
 	if got[TagKeyFleetID] != "aws-arm64" {
 		t.Errorf("%s = %q, want aws-arm64", TagKeyFleetID, got[TagKeyFleetID])
 	}
-	if len(tags) != 3 {
+	if got[TagKeyArch] != "arm64" {
+		t.Errorf("%s = %q, want arm64", TagKeyArch, got[TagKeyArch])
+	}
+	if len(tags) != 4 {
 		t.Errorf("expected exactly 3 tags, got %d (%v)", len(tags), got)
 	}
 }

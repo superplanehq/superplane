@@ -62,9 +62,12 @@ type CloudWatch struct {
 // Pool is one VM pool managed by the fleet-manager. Identified by FleetID, which is also
 // the broker fleet primary key and the value of the superplane_fleet_id EC2 tag.
 type Pool struct {
-	FleetID          string `json:"fleet_id"`
-	AMI              string `json:"ami"`
-	InstanceType     string `json:"instance_type"`
+	FleetID      string `json:"fleet_id"`
+	AMI          string `json:"ami"`
+	InstanceType string `json:"instance_type"`
+	// Arch is the CPU architecture for this pool: "amd64" (default) or "arm64" (Graviton).
+	// Controls the AWS CLI and CloudWatch agent download URLs in runner user-data.
+	Arch             string `json:"arch,omitempty"`
 	RunnerS3URI      string `json:"runner_s3_uri"`
 	HotInstanceCount int    `json:"hot_instance_count"`
 	Headroom         int    `json:"headroom"`
@@ -129,6 +132,9 @@ func (f *File) applyDefaults() {
 	for i := range f.Pools {
 		if strings.TrimSpace(f.Pools[i].InstanceType) == "" {
 			f.Pools[i].InstanceType = defaultInstanceType
+		}
+		if strings.TrimSpace(f.Pools[i].Arch) == "" {
+			f.Pools[i].Arch = "amd64"
 		}
 	}
 }
@@ -215,6 +221,8 @@ func (f *File) ToPoolConfig(p Pool) ec2provision.Config {
 	return ec2provision.Config{
 		AMI:                             p.AMI,
 		InstanceType:                    p.InstanceType,
+		Arch:                            p.Arch,
+		FleetID:                         p.FleetID,
 		SubnetID:                        f.SubnetID,
 		SecurityGroupIDs:                f.SecurityGroupIDs,
 		RunnerS3URI:                     p.RunnerS3URI,

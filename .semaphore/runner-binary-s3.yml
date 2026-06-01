@@ -1,5 +1,7 @@
+# Promoted when main is green — create Semaphore secret "runner-s3" with IAM user/role credentials
+# plus EC2_PROVISION_RUNNER_AMD64_S3_URI and EC2_PROVISION_RUNNER_ARM64_S3_URI.
 version: v1.0
-name: Publish runner binary to S3
+name: Publish runner binaries to S3
 
 agent:
   machine:
@@ -55,4 +57,3 @@ blocks:
             - mkdir -p bin
             - go build -trimpath -ldflags="-s -w" -o bin/runner-linux-arm64 ./runner/cmd/runner
             - aws s3 cp bin/runner-linux-arm64 s3://superplane-runner/latest/runner-linux-arm64 --sse AES256
-
