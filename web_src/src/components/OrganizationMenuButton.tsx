@@ -177,56 +177,93 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
             </TooltipTrigger>
             <TooltipContent>Open Menu</TooltipContent>
           </Tooltip>
-        {isMenuOpen && (
-          <div className="absolute -left-2 top-0 z-50 w-full min-w-[15rem] animate-in fade-in-0 slide-in-from-left-4 rounded-md border border-slate-950/20 bg-white shadow-md duration-200">
-            {organizationId && (
-              <div className="px-4 py-2 border-b border-gray-300">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-100 bg-gray-800 inline px-1 py-0.5 rounded">
-                  Org
+          {isMenuOpen && (
+            <div className="absolute -left-2 top-0 z-50 w-full min-w-[15rem] animate-in fade-in-0 slide-in-from-left-4 rounded-md border border-slate-950/20 bg-white shadow-md duration-200">
+              {organizationId && (
+                <div className="px-4 py-2 border-b border-gray-300">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-100 bg-gray-800 inline px-1 py-0.5 rounded">
+                    Org
+                  </p>
+                  <div className="flex items-center gap-3 mt-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-800 truncate text-sm">{organizationName}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-col">
+                    {sidebarOrganizationLinks.map((link) => {
+                      const MenuIcon = link.Icon;
+                      const allowed =
+                        !link.permission ||
+                        permissionsLoading ||
+                        canAct(link.permission.resource, link.permission.action);
+
+                      if (!allowed) {
+                        return (
+                          <PermissionTooltip
+                            key={link.label}
+                            allowed={false}
+                            message={`You don't have permission to view ${link.label.toLowerCase()}.`}
+                            className="w-full"
+                          >
+                            <button
+                              type="button"
+                              className={cn(
+                                "group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800",
+                                "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500",
+                              )}
+                              disabled
+                            >
+                              <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                              <span>{link.label}</span>
+                              <Lock size={12} className="ml-auto text-gray-400" />
+                            </button>
+                          </PermissionTooltip>
+                        );
+                      }
+
+                      return link.href ? (
+                        <Link
+                          key={link.label}
+                          to={link.href}
+                          onClick={() => setIsMenuOpen(false)}
+                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                        >
+                          <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                          <span>{link.label}</span>
+                        </Link>
+                      ) : (
+                        <button
+                          key={link.label}
+                          type="button"
+                          className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
+                        >
+                          <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
+                          <span>{link.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="px-4 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-white bg-sky-500 inline px-1 py-0.5 rounded">
+                  You
                 </p>
                 <div className="flex items-center gap-3 mt-2">
                   <div className="min-w-0">
-                    <p className="font-semibold text-gray-800 truncate text-sm">{organizationName}</p>
+                    <p className="font-semibold text-gray-800 truncate text-sm">{account?.name || "Loading..."}</p>
+                    <p className="text-[13px] text-gray-500 font-medium truncate">{account?.email || "Loading..."}</p>
                   </div>
                 </div>
                 <div className="mt-2 flex flex-col">
-                  {sidebarOrganizationLinks.map((link) => {
+                  {sidebarUserLinks.map((link) => {
                     const MenuIcon = link.Icon;
-                    const allowed =
-                      !link.permission ||
-                      permissionsLoading ||
-                      canAct(link.permission.resource, link.permission.action);
-
-                    if (!allowed) {
-                      return (
-                        <PermissionTooltip
-                          key={link.label}
-                          allowed={false}
-                          message={`You don't have permission to view ${link.label.toLowerCase()}.`}
-                          className="w-full"
-                        >
-                          <button
-                            type="button"
-                            className={cn(
-                              "group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800",
-                              "opacity-60 cursor-not-allowed hover:bg-transparent hover:text-gray-500",
-                            )}
-                            disabled
-                          >
-                            <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
-                            <span>{link.label}</span>
-                            <Lock size={12} className="ml-auto text-gray-400" />
-                          </button>
-                        </PermissionTooltip>
-                      );
-                    }
-
                     return link.href ? (
                       <Link
                         key={link.label}
                         to={link.href}
+                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
                         onClick={() => setIsMenuOpen(false)}
-                        className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
                       >
                         <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
                         <span>{link.label}</span>
@@ -235,6 +272,7 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                       <button
                         key={link.label}
                         type="button"
+                        onClick={link.onClick}
                         className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
                       >
                         <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
@@ -244,46 +282,8 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
                   })}
                 </div>
               </div>
-            )}
-            <div className="px-4 py-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-white bg-sky-500 inline px-1 py-0.5 rounded">
-                You
-              </p>
-              <div className="flex items-center gap-3 mt-2">
-                <div className="min-w-0">
-                  <p className="font-semibold text-gray-800 truncate text-sm">{account?.name || "Loading..."}</p>
-                  <p className="text-[13px] text-gray-500 font-medium truncate">{account?.email || "Loading..."}</p>
-                </div>
-              </div>
-              <div className="mt-2 flex flex-col">
-                {sidebarUserLinks.map((link) => {
-                  const MenuIcon = link.Icon;
-                  return link.href ? (
-                    <Link
-                      key={link.label}
-                      to={link.href}
-                      className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
-                      <span>{link.label}</span>
-                    </Link>
-                  ) : (
-                    <button
-                      key={link.label}
-                      type="button"
-                      onClick={link.onClick}
-                      className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-left text-sm font-medium text-gray-500 hover:bg-sky-100 hover:text-gray-800"
-                    >
-                      <MenuIcon size={16} className="text-gray-500 transition group-hover:text-gray-800" />
-                      <span>{link.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
             </div>
-          </div>
-        )}
+          )}
         </div>
         <Tooltip>
           <TooltipTrigger asChild>

@@ -67,7 +67,9 @@ export function ZeroStatePage() {
       <div className="mx-auto w-full max-w-3xl px-8 py-16">
         <div className="mb-10 text-center">
           <h1 className="text-xl font-medium text-slate-900">Create New App</h1>
-          <p className="mt-2 text-sm font-medium text-gray-500">Create a blank app or pick one from the catalog below.</p>
+          <p className="mt-2 text-sm font-medium text-gray-500">
+            Create a blank app or pick one from the catalog below.
+          </p>
         </div>
 
         <BlankAppButton busy={busy} onCreate={handleBlankCreate} />
@@ -83,13 +85,7 @@ export function ZeroStatePage() {
 
         <div className="flex flex-col gap-4">
           {visible.map((app) => (
-            <AppListItem
-              key={app.repo}
-              app={app}
-              busy={busy}
-              onSelect={setSelectedApp}
-              onInstall={handleInstall}
-            />
+            <AppListItem key={app.repo} app={app} busy={busy} onSelect={setSelectedApp} onInstall={handleInstall} />
           ))}
           {visibleCount < APP_CATALOG.length && <div ref={sentinelRef} className="h-1" />}
         </div>
