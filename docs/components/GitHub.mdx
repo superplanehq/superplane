@@ -36,6 +36,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Create Release" href="#create-release" description="Create a new release in a GitHub repository" />
   <LinkCard title="Create Review" href="#create-review" description="Submit a pull request review on GitHub" />
   <LinkCard title="Delete Release" href="#delete-release" description="Delete a release from a GitHub repository" />
+  <LinkCard title="Get Combined Commit Status" href="#get-combined-commit-status" description="Get the combined GitHub commit status for a commit, branch, or tag" />
   <LinkCard title="Get Issue" href="#get-issue" description="Get a GitHub issue by number" />
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
   <LinkCard title="Get Repository Permission" href="#get-repository-permission" description="Get the role and permission level for a user on a GitHub repository" />
@@ -2344,6 +2345,74 @@ Returns confirmation of the deletion.
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
+}
+```
+
+<a id="get-combined-commit-status"></a>
+
+## Get Combined Commit Status
+
+**Component key:** `github.getCombinedCommitStatus`
+
+The Get Combined Commit Status component reads GitHub's combined commit status for a commit, branch, or tag.
+
+This component uses the Commit Statuses API. It summarizes legacy commit statuses, such as statuses posted by external CI systems through GitHub's statuses endpoint. It does not include GitHub Checks API check runs.
+
+### Use Cases
+
+- **Status gates**: Check whether all commit status contexts are green before continuing
+- **Pull request automation**: Pair with On Commit Status to re-evaluate a PR when one status changes
+- **Branch protection helpers**: Inspect the aggregate status for a branch head or merge commit
+- **Notifications**: Send concise status summaries when a commit is blocked by failed or pending statuses
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Ref**: Commit SHA, branch name, or tag name to inspect. Expressions are supported.
+
+### Output
+
+Emits a combined commit status object on the default output channel. The payload includes the combined **state**, **sha**, **total_count**, and the latest status for each status context in **statuses**.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "commit_url": "https://api.github.com/repos/acme-labs/snaketoy/commits/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+    "repository_url": "https://api.github.com/repos/acme-labs/snaketoy",
+    "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+    "state": "failure",
+    "statuses": [
+      {
+        "context": "ci/build",
+        "created_at": "2026-01-16T17:45:00Z",
+        "description": "Build passed",
+        "state": "success",
+        "target_url": "https://ci.example.com/builds/123",
+        "updated_at": "2026-01-16T17:45:10Z"
+      },
+      {
+        "context": "ci/lint",
+        "created_at": "2026-01-16T17:45:20Z",
+        "description": "Lint failed",
+        "state": "failure",
+        "target_url": "https://ci.example.com/builds/124",
+        "updated_at": "2026-01-16T17:46:00Z"
+      },
+      {
+        "context": "deploy/preview",
+        "created_at": "2026-01-16T17:46:10Z",
+        "description": "Deployment pending",
+        "state": "pending",
+        "target_url": "https://deploy.example.com/previews/42",
+        "updated_at": "2026-01-16T17:46:10Z"
+      }
+    ],
+    "total_count": 3
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.combinedCommitStatus"
 }
 ```
 
