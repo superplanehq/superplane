@@ -41,13 +41,13 @@ func (c *createCommand) Execute(ctx core.CommandContext) error {
 
 	if filePath != "" {
 		if len(ctx.Args) > 0 {
-			return fmt.Errorf("cannot use <app-name> together with --file")
+			return fmt.Errorf("cannot use <app-name> together with --canvas-file")
 		}
 		return c.createFromFile(ctx, filePath, autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
 	}
 
 	if len(ctx.Args) != 1 {
-		return fmt.Errorf("either --file or <app-name> is required")
+		return fmt.Errorf("either --canvas-file or <app-name> is required")
 	}
 
 	name := ctx.Args[0]
@@ -99,7 +99,7 @@ func (c *createCommand) createFromFile(
 		}
 		if autoLayout != nil {
 			if fileAutoLayout != nil {
-				return fmt.Errorf("cannot use auto-layout flags with --file when file already defines autoLayout")
+				return fmt.Errorf("cannot use auto-layout flags with --canvas-file when file already defines autoLayout")
 			}
 			request.SetAutoLayout(*autoLayout)
 		}
