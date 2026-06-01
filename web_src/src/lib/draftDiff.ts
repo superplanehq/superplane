@@ -1,14 +1,14 @@
 export type DraftDiffStatus = "added" | "updated" | "removed";
 
 const DRAFT_DIFF_OUTLINE: Record<DraftDiffStatus, string> = {
-  added: "outline-2 outline-green-400",
+  added: "outline-2 outline-green-500",
   updated: "outline-2 outline-sky-400",
   removed: "outline-2 outline-red-400",
 };
 
-/** Tailwind green-400 / red-400 — aligned with node diff outline colors. */
+/** Tailwind green-500 / red-400 — aligned with node diff badge and outline colors. */
 export const DRAFT_DIFF_EDGE_STROKE = {
-  added: "#4ade80",
+  added: "#22c55e",
   removed: "#f87171",
 } as const;
 
