@@ -17,8 +17,8 @@ import (
 	mocks "github.com/superplanehq/superplane/test/support/mocks/github"
 )
 
-func Test__OnStatus__HandleWebhook(t *testing.T) {
-	trigger := &OnStatus{}
+func Test__OnCommitStatus__HandleWebhook(t *testing.T) {
+	trigger := &OnCommitStatus{}
 
 	t.Run("no X-Hub-Signature-256 -> 403", func(t *testing.T) {
 		headers := http.Header{}
@@ -73,7 +73,7 @@ func Test__OnStatus__HandleWebhook(t *testing.T) {
 			Body:    []byte(`{"state":"success","context":"ci/build"}`),
 			Headers: headers,
 			Logger:  logrus.NewEntry(logrus.New()),
-			Configuration: OnStatusConfiguration{
+			Configuration: OnCommitStatusConfiguration{
 				Repository: "test",
 				States:     []string{"success"},
 			},
@@ -90,7 +90,7 @@ func Test__OnStatus__HandleWebhook(t *testing.T) {
 
 		code, _, err := trigger.HandleWebhook(signedStatusRequest(
 			[]byte(`{"state":"success","context":"ci/build","branches":[{"name":"main"}]}`),
-			OnStatusConfiguration{
+			OnCommitStatusConfiguration{
 				Repository: "test",
 				States:     []string{"success"},
 			},
@@ -108,7 +108,7 @@ func Test__OnStatus__HandleWebhook(t *testing.T) {
 
 		code, _, err := trigger.HandleWebhook(signedStatusRequest(
 			[]byte(`{"state":"failure","context":"ci/build","branches":[{"name":"main"}]}`),
-			OnStatusConfiguration{
+			OnCommitStatusConfiguration{
 				Repository: "test",
 				States:     []string{"success"},
 			},
@@ -125,7 +125,7 @@ func Test__OnStatus__HandleWebhook(t *testing.T) {
 
 		code, _, err := trigger.HandleWebhook(signedStatusRequest(
 			[]byte(`{"state":"pending","context":"deploy/production","branches":[{"name":"main"}]}`),
-			OnStatusConfiguration{
+			OnCommitStatusConfiguration{
 				Repository: "test",
 				States:     []string{"pending"},
 				Contexts: []configuration.Predicate{
@@ -145,7 +145,7 @@ func Test__OnStatus__HandleWebhook(t *testing.T) {
 
 		code, _, err := trigger.HandleWebhook(signedStatusRequest(
 			[]byte(`{"state":"success","context":"ci/lint","branches":[{"name":"main"}]}`),
-			OnStatusConfiguration{
+			OnCommitStatusConfiguration{
 				Repository: "test",
 				States:     []string{"success"},
 				Contexts: []configuration.Predicate{
@@ -165,7 +165,7 @@ func Test__OnStatus__HandleWebhook(t *testing.T) {
 
 		code, _, err := trigger.HandleWebhook(signedStatusRequest(
 			[]byte(`{"state":"success","context":"ci/build","branches":[{"name":"release/v1.2.3"},{"name":"main"}]}`),
-			OnStatusConfiguration{
+			OnCommitStatusConfiguration{
 				Repository: "test",
 				States:     []string{"success"},
 				Branches: []configuration.Predicate{
@@ -185,7 +185,7 @@ func Test__OnStatus__HandleWebhook(t *testing.T) {
 
 		code, _, err := trigger.HandleWebhook(signedStatusRequest(
 			[]byte(`{"state":"success","context":"ci/build","branches":[{"name":"feature/example"}]}`),
-			OnStatusConfiguration{
+			OnCommitStatusConfiguration{
 				Repository: "test",
 				States:     []string{"success"},
 				Branches: []configuration.Predicate{
@@ -205,7 +205,7 @@ func Test__OnStatus__HandleWebhook(t *testing.T) {
 
 		code, _, err := trigger.HandleWebhook(signedStatusRequest(
 			[]byte(`{"context":"ci/build"}`),
-			OnStatusConfiguration{Repository: "test"},
+			OnCommitStatusConfiguration{Repository: "test"},
 			eventContext,
 		))
 
@@ -215,8 +215,8 @@ func Test__OnStatus__HandleWebhook(t *testing.T) {
 	})
 }
 
-func Test__OnStatus__Setup(t *testing.T) {
-	trigger := OnStatus{}
+func Test__OnCommitStatus__Setup(t *testing.T) {
+	trigger := OnCommitStatus{}
 
 	t.Run("webhook is requested", func(t *testing.T) {
 		integrationCtx := mocks.IntegrationContextForNewSetupFlow()
@@ -246,7 +246,7 @@ func Test__OnStatus__Setup(t *testing.T) {
 	})
 }
 
-func signedStatusRequest(body []byte, config OnStatusConfiguration, eventContext *contexts.EventContext) core.WebhookRequestContext {
+func signedStatusRequest(body []byte, config OnCommitStatusConfiguration, eventContext *contexts.EventContext) core.WebhookRequestContext {
 	secret := "test-secret"
 	signature := signWebhookBody(secret, body)
 

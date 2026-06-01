@@ -10,6 +10,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to GitHub branch creation events" />
+  <LinkCard title="On Commit Status" href="#on-commit-status" description="Listen to GitHub commit status events from the Commit Statuses API" />
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
   <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
   <LinkCard title="On PR Comment" href="#on-pr-comment" description="Listen to PR conversation comment events" />
@@ -17,7 +18,6 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="On Pull Request" href="#on-pull-request" description="Listen to pull request events" />
   <LinkCard title="On Push" href="#on-push" description="Listen to GitHub push events" />
   <LinkCard title="On Release" href="#on-release" description="Listen to release events" />
-  <LinkCard title="On Status" href="#on-status" description="Listen to GitHub commit status events" />
   <LinkCard title="On Tag Created" href="#on-tag-created" description="Listen to GitHub tag creation events" />
   <LinkCard title="On Workflow Run" href="#on-workflow-run" description="Listen to workflow run events" />
 </CardGrid>
@@ -103,6 +103,94 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.branchCreated"
+}
+```
+
+<a id="on-commit-status"></a>
+
+## On Commit Status
+
+**Trigger key:** `github.onCommitStatus`
+
+The On Commit Status trigger starts a workflow execution when a GitHub commit status is created or updated.
+
+GitHub commit statuses are the legacy status objects created through the Commit Statuses API. They are separate from GitHub Checks API check runs, which power many PR checks from GitHub Apps such as Cloudflare Pages, DCO, and Sourcery. This trigger does not receive those check-run events. For GitHub Actions workflows, use the On Workflow Run trigger instead.
+
+### Use Cases
+
+- **Merge automation**: Re-evaluate pull request merge criteria when required status checks change
+- **CI/CD orchestration**: React to status updates from external CI systems
+- **Quality gates**: Route workflows based on commit status context and state
+- **Notifications**: Notify teams when important status checks fail or recover
+
+### Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **States**: Select which commit status states to listen for (error, failure, pending, success)
+- **Contexts** *(optional)*: Configure which status contexts to listen for using predicates (e.g., equals "ci/build", matches "deploy/.*")
+- **Branches** *(optional)*: Configure which branch names to listen for using predicates. GitHub includes branches that contain the status SHA.
+
+### Event Data
+
+Each status event includes:
+- **state**: The new commit status state (error, failure, pending, success)
+- **context**: The status context, such as "ci/build"
+- **sha**: Commit SHA for the status
+- **description**: Optional status description
+- **target_url**: Optional link added to the status
+- **branches**: Branches containing the status SHA
+- **commit**: Commit information
+- **repository**: Repository information
+- **sender**: User who created the status event. This is not necessarily the commit author
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "branches": [
+      {
+        "commit": {
+          "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+          "url": "https://api.github.com/repos/acme-labs/snaketoy/commits/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+        },
+        "name": "main",
+        "protected": true
+      }
+    ],
+    "commit": {
+      "commit": {
+        "message": "Add checkout validation"
+      },
+      "html_url": "https://github.com/acme-labs/snaketoy/commit/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+      "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+    },
+    "context": "ci/build",
+    "created_at": "2026-01-16T17:56:16Z",
+    "description": "Build completed successfully",
+    "id": 15384176893,
+    "repository": {
+      "full_name": "acme-labs/snaketoy",
+      "html_url": "https://github.com/acme-labs/snaketoy",
+      "id": 101,
+      "name": "snaketoy"
+    },
+    "sender": {
+      "html_url": "https://github.com/octocat",
+      "id": 583231,
+      "login": "octocat"
+    },
+    "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+    "state": "success",
+    "target_url": "https://github.com/acme-labs/snaketoy/actions/runs/123456789",
+    "updated_at": "2026-01-16T17:57:20Z"
+  },
+  "timestamp": "2026-01-16T17:56:16.680755501Z",
+  "type": "github.status"
 }
 ```
 
@@ -1380,92 +1468,6 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.release"
-}
-```
-
-<a id="on-status"></a>
-
-## On Status
-
-**Trigger key:** `github.onStatus`
-
-The On Status trigger starts a workflow execution when a GitHub commit status is created or updated.
-
-### Use Cases
-
-- **Merge automation**: Re-evaluate pull request merge criteria when required status checks change
-- **CI/CD orchestration**: React to status updates from external CI systems
-- **Quality gates**: Route workflows based on commit status context and state
-- **Notifications**: Notify teams when important status checks fail or recover
-
-### Configuration
-
-- **Repository**: Select the GitHub repository to monitor
-- **States**: Select which commit status states to listen for (error, failure, pending, success)
-- **Contexts** *(optional)*: Configure which status contexts to listen for using predicates (e.g., equals "ci/build", matches "deploy/.*")
-- **Branches** *(optional)*: Configure which branch names to listen for using predicates. GitHub includes branches that contain the status SHA.
-
-### Event Data
-
-Each status event includes:
-- **state**: The new commit status state (error, failure, pending, success)
-- **context**: The status context, such as "ci/build"
-- **sha**: Commit SHA for the status
-- **description**: Optional status description
-- **target_url**: Optional link added to the status
-- **branches**: Branches containing the status SHA
-- **commit**: Commit information
-- **repository**: Repository information
-- **sender**: User who triggered the event
-
-### Webhook Setup
-
-This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
-
-### Example Data
-
-```json
-{
-  "data": {
-    "branches": [
-      {
-        "commit": {
-          "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
-          "url": "https://api.github.com/repos/acme-labs/snaketoy/commits/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
-        },
-        "name": "main",
-        "protected": true
-      }
-    ],
-    "commit": {
-      "commit": {
-        "message": "Add checkout validation"
-      },
-      "html_url": "https://github.com/acme-labs/snaketoy/commit/d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
-      "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
-    },
-    "context": "ci/build",
-    "created_at": "2026-01-16T17:56:16Z",
-    "description": "Build completed successfully",
-    "id": 15384176893,
-    "repository": {
-      "full_name": "acme-labs/snaketoy",
-      "html_url": "https://github.com/acme-labs/snaketoy",
-      "id": 101,
-      "name": "snaketoy"
-    },
-    "sender": {
-      "html_url": "https://github.com/octocat",
-      "id": 583231,
-      "login": "octocat"
-    },
-    "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
-    "state": "success",
-    "target_url": "https://github.com/acme-labs/snaketoy/actions/runs/123456789",
-    "updated_at": "2026-01-16T17:57:20Z"
-  },
-  "timestamp": "2026-01-16T17:56:16.680755501Z",
-  "type": "github.status"
 }
 ```
 

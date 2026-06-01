@@ -12,29 +12,31 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 )
 
-type OnStatus struct{}
+type OnCommitStatus struct{}
 
-type OnStatusConfiguration struct {
+type OnCommitStatusConfiguration struct {
 	Repository string                    `json:"repository" mapstructure:"repository"`
 	States     []string                  `json:"states" mapstructure:"states"`
 	Contexts   []configuration.Predicate `json:"contexts" mapstructure:"contexts"`
 	Branches   []configuration.Predicate `json:"branches" mapstructure:"branches"`
 }
 
-func (t *OnStatus) Name() string {
-	return "github.onStatus"
+func (t *OnCommitStatus) Name() string {
+	return "github.onCommitStatus"
 }
 
-func (t *OnStatus) Label() string {
-	return "On Status"
+func (t *OnCommitStatus) Label() string {
+	return "On Commit Status"
 }
 
-func (t *OnStatus) Description() string {
-	return "Listen to GitHub commit status events"
+func (t *OnCommitStatus) Description() string {
+	return "Listen to GitHub commit status events from the Commit Statuses API"
 }
 
-func (t *OnStatus) Documentation() string {
-	return `The On Status trigger starts a workflow execution when a GitHub commit status is created or updated.
+func (t *OnCommitStatus) Documentation() string {
+	return `The On Commit Status trigger starts a workflow execution when a GitHub commit status is created or updated.
+
+GitHub commit statuses are the legacy status objects created through the Commit Statuses API. They are separate from GitHub Checks API check runs, which power many PR checks from GitHub Apps such as Cloudflare Pages, DCO, and Sourcery. This trigger does not receive those check-run events. For GitHub Actions workflows, use the On Workflow Run trigger instead.
 
 ## Use Cases
 
@@ -61,22 +63,22 @@ Each status event includes:
 - **branches**: Branches containing the status SHA
 - **commit**: Commit information
 - **repository**: Repository information
-- **sender**: User who triggered the event
+- **sender**: User who created the status event. This is not necessarily the commit author
 
 ## Webhook Setup
 
 This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.`
 }
 
-func (t *OnStatus) Icon() string {
+func (t *OnCommitStatus) Icon() string {
 	return "github"
 }
 
-func (t *OnStatus) Color() string {
+func (t *OnCommitStatus) Color() string {
 	return "gray"
 }
 
-func (t *OnStatus) Configuration() []configuration.Field {
+func (t *OnCommitStatus) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:     "repository",
@@ -110,7 +112,7 @@ func (t *OnStatus) Configuration() []configuration.Field {
 		{
 			Name:        "contexts",
 			Label:       "Contexts",
-			Description: "Optional. Filter status contexts, e.g. ci/build or deploy/production.",
+			Description: "Optional. Filter commit status contexts, e.g. ci/build or deploy/production.",
 			Type:        configuration.FieldTypeAnyPredicateList,
 			Required:    false,
 			Togglable:   true,
@@ -136,7 +138,7 @@ func (t *OnStatus) Configuration() []configuration.Field {
 	}
 }
 
-func (t *OnStatus) Setup(ctx core.TriggerContext) error {
+func (t *OnCommitStatus) Setup(ctx core.TriggerContext) error {
 	err := common.EnsureRepoInMetadata(
 		ctx.Metadata,
 		ctx.Integration,
@@ -148,7 +150,7 @@ func (t *OnStatus) Setup(ctx core.TriggerContext) error {
 		return err
 	}
 
-	var config OnStatusConfiguration
+	var config OnCommitStatusConfiguration
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
 		return fmt.Errorf("failed to decode configuration: %w", err)
 	}
@@ -159,19 +161,19 @@ func (t *OnStatus) Setup(ctx core.TriggerContext) error {
 	})
 }
 
-func (t *OnStatus) Hooks() []core.Hook {
+func (t *OnCommitStatus) Hooks() []core.Hook {
 	return []core.Hook{}
 }
 
-func (t *OnStatus) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
+func (t *OnCommitStatus) HandleHook(ctx core.TriggerHookContext) (map[string]any, error) {
 	return nil, nil
 }
 
-func (t *OnStatus) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+func (t *OnCommitStatus) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
 	ctx = common.WithWebhookLogger(ctx, t.Name())
 	ctx.Logger.Infof("Received GitHub webhook")
 
-	config := OnStatusConfiguration{}
+	config := OnCommitStatusConfiguration{}
 	err := mapstructure.Decode(ctx.Configuration, &config)
 	if err != nil {
 		ctx.Logger.Errorf("Failed to decode configuration: %v", err)
@@ -311,6 +313,6 @@ func extractStatusBranches(payload map[string]any) []string {
 	return names
 }
 
-func (t *OnStatus) Cleanup(ctx core.TriggerContext) error {
+func (t *OnCommitStatus) Cleanup(ctx core.TriggerContext) error {
 	return nil
 }
