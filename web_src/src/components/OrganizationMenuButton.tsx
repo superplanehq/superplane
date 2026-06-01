@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { PermissionTooltip } from "@/components/PermissionGate";
 import { usePermissions } from "@/contexts/usePermissions";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 import { posthog } from "@/posthog";
 
 interface OrganizationMenuButtonProps {
@@ -158,18 +159,24 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
   };
 
   return (
-    <div className={cn("relative flex items-center", className)} ref={menuRef}>
-      <div className="relative shrink-0">
-        <button
-          type="button"
-          onClick={handleMenuButtonClick}
-          className="-ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-slate-100 hover:text-gray-900 cursor-pointer"
-          aria-label="Open organization menu"
-          aria-expanded={isMenuOpen}
-          aria-haspopup="menu"
-        >
-          <Menu className="h-5 w-5" aria-hidden />
-        </button>
+    <TooltipProvider delayDuration={400}>
+      <div className={cn("relative flex items-center", className)} ref={menuRef}>
+        <div className="relative shrink-0">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={handleMenuButtonClick}
+                className="-ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-gray-600 hover:bg-slate-100 hover:text-gray-900 cursor-pointer"
+                aria-label="Open organization menu"
+                aria-expanded={isMenuOpen}
+                aria-haspopup="menu"
+              >
+                <Menu className="h-5 w-5" aria-hidden />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Open Menu</TooltipContent>
+          </Tooltip>
         {isMenuOpen && (
           <div className="absolute -left-2 top-0 z-50 w-full min-w-[15rem] animate-in fade-in-0 slide-in-from-left-4 rounded-md border border-slate-950/20 bg-white shadow-md duration-200">
             {organizationId && (
@@ -277,14 +284,20 @@ export function OrganizationMenuButton({ organizationId, className }: Organizati
             </div>
           </div>
         )}
+        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Link
+              to={logoHref}
+              aria-label="Go to canvases"
+              className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
+            >
+              <img src={SuperplaneLogo} alt="SuperPlane" className="h-6 w-6" />
+            </Link>
+          </TooltipTrigger>
+          <TooltipContent>Homepage</TooltipContent>
+        </Tooltip>
       </div>
-      <Link
-        to={logoHref}
-        aria-label="Go to canvases"
-        className="flex h-8 cursor-pointer items-center rounded-md px-2 hover:bg-slate-100"
-      >
-        <img src={SuperplaneLogo} alt="SuperPlane" className="h-6 w-6" />
-      </Link>
-    </div>
+    </TooltipProvider>
   );
 }
