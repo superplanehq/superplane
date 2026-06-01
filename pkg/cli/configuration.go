@@ -20,7 +20,18 @@ type ConfigContext struct {
 	Organization   string  `json:"organization" yaml:"organization"`
 	OrganizationID string  `json:"organizationId,omitempty" yaml:"organizationId,omitempty"`
 	APIToken       string  `json:"apiToken" yaml:"apiToken"`
-	Canvas         *string `json:"canvas,omitempty" yaml:"canvas,omitempty"`
+	App            *string `json:"app,omitempty" yaml:"app,omitempty"`
+	Canvas         *string `json:"canvas,omitempty" yaml:"canvas,omitempty"` // deprecated: use app
+}
+
+func activeAppID(context ConfigContext) string {
+	if context.App != nil && strings.TrimSpace(*context.App) != "" {
+		return strings.TrimSpace(*context.App)
+	}
+	if context.Canvas != nil {
+		return strings.TrimSpace(*context.Canvas)
+	}
+	return ""
 }
 
 func normalizeBaseURL(raw string) string {
@@ -339,20 +350,18 @@ func NewEnvironmentContext(context ConfigContext) core.ConfigContext {
 	return &CurrentContext{context: context, readOnly: true}
 }
 
-func (c *CurrentContext) GetActiveCanvas() string {
-	if c.context.Canvas == nil {
-		return ""
-	}
-
-	return *c.context.Canvas
+func (c *CurrentContext) GetActiveApp() string {
+	return activeAppID(c.context)
 }
 
-func (c *CurrentContext) SetActiveCanvas(canvasID string) error {
+func (c *CurrentContext) SetActiveApp(appID string) error {
 	if c.readOnly {
-		return fmt.Errorf("cannot set active canvas when using %s and %s; pass --canvas-id instead", EnvURL, EnvToken)
+		return fmt.Errorf("cannot set active app when using %s and %s; pass --app-id instead", EnvURL, EnvToken)
 	}
 
-	c.context.Canvas = &canvasID
+	appID = strings.TrimSpace(appID)
+	c.context.App = &appID
+	c.context.Canvas = nil
 	_, err := UpsertContext(c.context)
 	return err
 }
