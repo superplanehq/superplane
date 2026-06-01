@@ -1,3 +1,5 @@
+import { canvasKeys } from "@/hooks/useCanvasData";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getApiErrorMessage } from "@/lib/errors";
@@ -19,6 +21,7 @@ interface TemplateAgentContext {
 export function useInstallTemplate() {
   const { organizationId } = useParams<{ organizationId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isInstalling, setIsInstalling] = useState(false);
 
   const installTemplate = useCallback(
@@ -44,6 +47,7 @@ export function useInstallTemplate() {
         }
 
         const result = (await response.json()) as InstallResult;
+        await queryClient.refetchQueries({ queryKey: canvasKeys.list(result.organizationId) });
         localStorage.setItem("canvasAgentSidebarOpen", "true");
         localStorage.setItem("canvasSidebarOpen", "false");
         if (agentContext?.instructions || agentContext?.initialMessage) {
@@ -57,7 +61,7 @@ export function useInstallTemplate() {
         setIsInstalling(false);
       }
     },
-    [isInstalling, navigate, organizationId],
+    [isInstalling, navigate, organizationId, queryClient],
   );
 
   return { installTemplate, isInstalling };
