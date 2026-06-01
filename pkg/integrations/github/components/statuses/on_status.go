@@ -26,15 +26,17 @@ func (t *OnStatus) Name() string {
 }
 
 func (t *OnStatus) Label() string {
-	return "On Status"
+	return "On Commit Status"
 }
 
 func (t *OnStatus) Description() string {
-	return "Listen to GitHub commit status events"
+	return "Listen to GitHub commit status events from the Commit Statuses API"
 }
 
 func (t *OnStatus) Documentation() string {
-	return `The On Status trigger starts a workflow execution when a GitHub commit status is created or updated.
+	return `The On Commit Status trigger starts a workflow execution when a GitHub commit status is created or updated.
+
+GitHub commit statuses are the legacy status objects created through the Commit Statuses API. They are separate from GitHub Checks API check runs, which power many PR checks from GitHub Apps such as Cloudflare Pages, DCO, and Sourcery. To react to those checks, use a check-run trigger.
 
 ## Use Cases
 
@@ -61,7 +63,7 @@ Each status event includes:
 - **branches**: Branches containing the status SHA
 - **commit**: Commit information
 - **repository**: Repository information
-- **sender**: User who triggered the event
+- **sender**: User who created the status event. This is not necessarily the commit author
 
 ## Webhook Setup
 
@@ -110,7 +112,7 @@ func (t *OnStatus) Configuration() []configuration.Field {
 		{
 			Name:        "contexts",
 			Label:       "Contexts",
-			Description: "Optional. Filter status contexts, e.g. ci/build or deploy/production.",
+			Description: "Optional. Filter commit status contexts, e.g. ci/build or deploy/production.",
 			Type:        configuration.FieldTypeAnyPredicateList,
 			Required:    false,
 			Togglable:   true,
