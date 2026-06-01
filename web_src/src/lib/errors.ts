@@ -1,5 +1,7 @@
 import type { GooglerpcStatus } from "@/api-client/types.gen";
 
+const TRANSIENT_HTTP_STATUSES = new Set([0, 401, 403, 408, 429, 502, 503, 504]);
+
 /**
  * Extract error message from API error response
  * Handles the structure returned by @hey-api/client-fetch
@@ -92,4 +94,118 @@ function looksLikeBrowserNetworkError(value: string): boolean {
     normalized === "network request failed" ||
     normalized.includes("networkerror when attempting to fetch resource")
   );
+}
+
+function extractHttpStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+
+  const candidate = error as { status?: unknown; response?: { status?: unknown } };
+  if (typeof candidate.status === "number") {
+    return candidate.status;
+  }
+
+  if (candidate.response && typeof candidate.response === "object" && typeof candidate.response.status === "number") {
+    return candidate.response.status;
+  }
+
+  return undefined;
+}
+
+function looksLikeNetworkFailureError(error: unknown): boolean {
+  if (error instanceof TypeError) {
+    const message = error.message ?? "";
+    if (!message) {
+      return true;
+    }
+    return looksLikeBrowserNetworkError(message);
+  }
+
+  if (error && typeof error === "object") {
+    const name = (error as { name?: unknown }).name;
+    if (name === "AbortError" || name === "NetworkError") {
+      return true;
+    }
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && looksLikeBrowserNetworkError(message)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Returns true when the error looks like a transient infrastructure or
+ * connectivity failure rather than a real application bug. These should not
+ * be reported as actionable errors for background/silent operations.
+ *
+ * Treated as transient:
+ * - HTML payloads thrown by `@hey-api/client-fetch` when the response body is
+ *   an HTML error page from a proxy / load balancer / auth redirect.
+ * - `TypeError("Failed to fetch")` and other generic browser network errors.
+ * - HTTP statuses {0, 401, 403, 408, 429, 502, 503, 504}.
+ */
+export function isTransientHttpError(error: unknown): boolean {
+  if (typeof error === "string" && looksLikeHtmlDocument(error)) {
+    return true;
+  }
+
+  if (looksLikeNetworkFailureError(error)) {
+    return true;
+  }
+
+  const status = extractHttpStatus(error);
+  if (status !== undefined && TRANSIENT_HTTP_STATUSES.has(status)) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Produce a short, telemetry-safe summary of an arbitrary error value. The
+ * goal is to avoid emitting full HTML response bodies (or other huge payloads)
+ * as log/error titles, which causes noisy and ungrouped Sentry issues.
+ */
+export function summarizeError(error: unknown, maxLength = 200): string {
+  if (error instanceof Error) {
+    const status = extractHttpStatus(error);
+    const base = error.message?.trim() || error.name || "Error";
+    if (looksLikeHtmlDocument(base)) {
+      return status !== undefined ? `HTTP ${status} (HTML response)` : "HTML response body";
+    }
+    const prefix = status !== undefined ? `HTTP ${status}: ` : "";
+    return truncate(`${prefix}${base}`, maxLength);
+  }
+
+  if (typeof error === "string") {
+    if (looksLikeHtmlDocument(error)) {
+      return "HTML response body";
+    }
+    return truncate(error.trim(), maxLength);
+  }
+
+  const status = extractHttpStatus(error);
+  if (status !== undefined) {
+    return `HTTP ${status}`;
+  }
+
+  if (error && typeof error === "object") {
+    try {
+      return truncate(JSON.stringify(error), maxLength);
+    } catch {
+      return "Unknown error";
+    }
+  }
+
+  return "Unknown error";
+}
+
+function truncate(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, Math.max(0, maxLength - 1))}…`;
 }
