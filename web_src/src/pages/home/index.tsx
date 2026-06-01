@@ -159,15 +159,17 @@ function Content({
       ))}
 
       {folderedLayout.unfiledCanvases.length > 0 ? (
-        <CanvasCardsGrid
-          canvases={folderedLayout.unfiledCanvases}
-          canvasFolders={canvasFolders}
-          organizationId={organizationId}
-          onEditCanvas={onEditCanvas}
-          canUpdateCanvases={canUpdateCanvases}
-          canDeleteCanvases={canDeleteCanvases}
-          permissionsLoading={permissionsLoading}
-        />
+        <section className="w-full rounded-2xl border border-slate-950/10 bg-slate-950/5 p-4">
+          <CanvasCardsGrid
+            canvases={folderedLayout.unfiledCanvases}
+            canvasFolders={canvasFolders}
+            organizationId={organizationId}
+            onEditCanvas={onEditCanvas}
+            canUpdateCanvases={canUpdateCanvases}
+            canDeleteCanvases={canDeleteCanvases}
+            permissionsLoading={permissionsLoading}
+          />
+        </section>
       ) : null}
     </div>
   );

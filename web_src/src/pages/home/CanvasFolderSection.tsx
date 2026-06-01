@@ -212,7 +212,7 @@ export function CanvasFolderSection({
     });
 
   return (
-    <section className={cn("w-full rounded-md p-4", FOLDER_COLOR_OPTIONS[folder.backgroundColor].backgroundClass)}>
+    <section className={cn("w-full rounded-2xl p-4", FOLDER_COLOR_OPTIONS[folder.backgroundColor].backgroundClass)}>
       <div className="mb-4 flex items-center justify-between gap-3">
         <div className="min-w-0 flex-1">
           <CanvasFolderTitle
