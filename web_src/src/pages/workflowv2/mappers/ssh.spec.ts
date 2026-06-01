@@ -1,16 +1,42 @@
 import { describe, expect, it } from "vitest";
 
 import { sshMapper, SSH_STATE_REGISTRY } from "./ssh";
-import type { ExecutionDetailsContext, ExecutionInfo, NodeInfo, OutputPayload, SubtitleContext } from "./types";
+import type {
+  ComponentBaseContext,
+  ExecutionDetailsContext,
+  ExecutionInfo,
+  NodeInfo,
+  OutputPayload,
+  SubtitleContext,
+} from "./types";
 
-function buildNode(): NodeInfo {
+function buildNode(configuration: unknown = {}): NodeInfo {
   return {
     id: "node-1",
     name: "SSH",
     componentName: "ssh",
     isCollapsed: false,
-    configuration: {},
+    configuration,
     metadata: {},
+  };
+}
+
+function buildComponentContext(node: NodeInfo): ComponentBaseContext {
+  return {
+    nodes: [node],
+    node,
+    componentDefinition: {
+      name: "ssh",
+      label: "SSH",
+      description: "",
+      icon: "terminal",
+      color: "black",
+    },
+    lastExecutions: [],
+    currentUser: undefined,
+    actions: {
+      invokeNodeExecutionHook: async () => {},
+    },
   };
 }
 
@@ -110,6 +136,44 @@ describe("sshMapper", () => {
       Stdout: "ok",
       Stderr: "boom",
     });
+  });
+
+  it("renders commands metadata for string configuration", () => {
+    const node = buildNode({
+      host: "example.com",
+      username: "root",
+      commands: "ls -la\necho hello",
+    });
+
+    const props = sshMapper.props(buildComponentContext(node));
+    const labels = (props.metadata ?? []).map((entry) => entry.label);
+    expect(labels).toContain("ls -la && echo hello");
+  });
+
+  it("does not crash when commands configuration is not a string", () => {
+    const node = buildNode({
+      host: "example.com",
+      username: "root",
+      commands: ["ls -la", "echo hello"],
+    });
+
+    expect(() => sshMapper.props(buildComponentContext(node))).not.toThrow();
+    const props = sshMapper.props(buildComponentContext(node));
+    const labels = (props.metadata ?? []).map((entry) => entry.label);
+    expect(labels).toContain("ls -la && echo hello");
+  });
+
+  it("ignores invalid commands configuration values", () => {
+    const node = buildNode({
+      host: "example.com",
+      username: "root",
+      commands: { not: "a string" },
+    });
+
+    expect(() => sshMapper.props(buildComponentContext(node))).not.toThrow();
+    const props = sshMapper.props(buildComponentContext(node));
+    const icons = (props.metadata ?? []).map((entry) => entry.icon);
+    expect(icons).not.toContain("terminal");
   });
 
   it("renders exit code in subtitle from the failed output payload", () => {
