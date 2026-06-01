@@ -75,22 +75,22 @@ func defaultResourceSources() ([]resourceSource, error) {
 func defaultResourceSourcesForSkillsBaseURL(skillsBaseURL string) ([]resourceSource, error) {
 	sources := []resourceSource{
 		{
-			MountPath: "ref/skills/superplane-canvas-builder/SKILL.md",
-			SourceKey: filepath.ToSlash(filepath.Join("skills", "superplane-canvas-builder", "SKILL.md")),
+			MountPath: "ref/skills/superplane-app-builder/SKILL.md",
+			SourceKey: filepath.ToSlash(filepath.Join("skills", "superplane-app-builder", "SKILL.md")),
 			SourceURL: skillsRawURL(
 				skillsBaseURL,
 				"skills",
-				"superplane-canvas-builder",
+				"superplane-app-builder",
 				"SKILL.md",
 			),
 		},
 		{
-			MountPath: "ref/skills/superplane-canvas-builder/references/components-and-triggers.md",
-			SourceKey: filepath.ToSlash(filepath.Join("skills", "superplane-canvas-builder", "references", "components-and-triggers.md")),
+			MountPath: "ref/skills/superplane-app-builder/references/components-and-triggers.md",
+			SourceKey: filepath.ToSlash(filepath.Join("skills", "superplane-app-builder", "references", "components-and-triggers.md")),
 			SourceURL: skillsRawURL(
 				skillsBaseURL,
 				"skills",
-				"superplane-canvas-builder",
+				"superplane-app-builder",
 				"references",
 				"components-and-triggers.md",
 			),
