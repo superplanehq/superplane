@@ -21,7 +21,14 @@ blocks:
         - name: ECS deploy task-broker
           commands:
             - aws ecs update-service --cluster default --service task-broker-v2 --force-new-deployment
-            - for i in $(seq 1 20); do STATUS=$(aws ecs describe-services --cluster default --services task-broker-v2 --query 'services[0].deployments[0].rolloutState' --output text); echo "task-broker: $STATUS"; [ "$STATUS" = "COMPLETED" ] && break; sleep 30; done
+            - |
+              for i in $(seq 1 20); do
+                STATUS=$(aws ecs describe-services --cluster default --services task-broker-v2 --query 'services[0].deployments[0].rolloutState' --output text)
+                echo "task-broker rollout: $STATUS"
+                [ "$STATUS" = "COMPLETED" ] && exit 0
+                sleep 30
+              done
+              echo "Timed out waiting for task-broker" && exit 1
 
   - name: Deploy fleet-manager
     dependencies: []
@@ -30,4 +37,11 @@ blocks:
         - name: ECS deploy fleet-manager
           commands:
             - aws ecs update-service --cluster default --service fleet-manager --force-new-deployment
-            - for i in $(seq 1 20); do STATUS=$(aws ecs describe-services --cluster default --services fleet-manager --query 'services[0].deployments[0].rolloutState' --output text); echo "fleet-manager: $STATUS"; [ "$STATUS" = "COMPLETED" ] && break; sleep 30; done
+            - |
+              for i in $(seq 1 20); do
+                STATUS=$(aws ecs describe-services --cluster default --services fleet-manager --query 'services[0].deployments[0].rolloutState' --output text)
+                echo "fleet-manager rollout: $STATUS"
+                [ "$STATUS" = "COMPLETED" ] && exit 0
+                sleep 30
+              done
+              echo "Timed out waiting for fleet-manager" && exit 1
