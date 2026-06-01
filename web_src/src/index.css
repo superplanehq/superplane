@@ -33,12 +33,26 @@ div.monaco-editor {
   --vscode-focusBorder: transparent;
 }
 
-/* Canvas YAML preview: sky-100 current line; strip line-highlight border (Monaco applies these via DOM) */
+/* Canvas YAML + workflow file editor: slate-100 current line; strip line-highlight border (Monaco applies these via DOM) */
 .canvas-yaml-monaco .monaco-editor .margin-view-overlays .current-line,
-.canvas-yaml-monaco .monaco-editor .view-overlays .current-line {
-  background-color: rgb(224 242 254) !important;
+.canvas-yaml-monaco .monaco-editor .view-overlays .current-line,
+.workflow-file-editor-monaco .monaco-editor .margin-view-overlays .current-line,
+.workflow-file-editor-monaco .monaco-editor .view-overlays .current-line {
+  background-color: rgb(241 245 249) !important;
   border: none !important;
   box-shadow: none !important;
+}
+
+.workflow-file-editor-monaco .monaco-editor {
+  --vscode-scrollbarSlider-background: rgb(2 6 23 / 0.2);
+  --vscode-scrollbarSlider-hoverBackground: rgb(2 6 23 / 0.4);
+  --vscode-scrollbarSlider-activeBackground: rgb(2 6 23 / 0.45);
+  --vscode-editorStickyScroll-shadow: rgb(2 6 23 / 0.1);
+  --vscode-editorStickyScroll-border: rgb(2 6 23 / 0.2);
+}
+
+.workflow-file-editor-monaco .monaco-editor .sticky-widget {
+  box-shadow: 0 3px 0 rgb(2 6 23 / 0.1) !important;
 }
 
 .canvas-conflict-current-line {

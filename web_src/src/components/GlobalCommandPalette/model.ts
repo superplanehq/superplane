@@ -18,7 +18,8 @@ import {
   buildRootPageActions,
 } from "./actions";
 import { buildCanvasNodeSearchActions, useCanvasNodeSearchProvider } from "./canvasNodeSearchStore";
-import { useCommandPaletteShortcuts, usePalettePermissions, useShortcutModifierLabel } from "./hooks";
+import { useCommandPaletteShortcuts, usePalettePermissions } from "./hooks";
+import { useShortcutModifierLabel } from "@/hooks/useShortcutLabel";
 import { getRouteContext } from "./route";
 import type { CanvasCommandListProps, CommandPage, PaletteAction, PalettePageAction } from "./types";
 import { useCallback, useEffect, useMemo, useState } from "react";
