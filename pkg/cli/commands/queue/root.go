@@ -6,13 +6,13 @@ import (
 )
 
 func NewCommand(options core.BindOptions) *cobra.Command {
-	var canvasID string
+	var appID string
 	var nodeID string
 	var itemID string
 
 	root := &cobra.Command{
 		Use:   "queue",
-		Short: "Manage canvas node queues",
+		Short: "Manage app node queues",
 	}
 
 	listCmd := &cobra.Command{
@@ -21,12 +21,12 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.NoArgs,
 	}
 
-	listCmd.Flags().StringVar(&canvasID, "canvas-id", "", "canvas ID")
+	core.BindAppIDFlag(listCmd, &appID, "app ID")
 	listCmd.Flags().StringVar(&nodeID, "node-id", "", "node ID")
 	_ = listCmd.MarkFlagRequired("node-id")
 
 	core.Bind(listCmd, &ListQueueItemsCommand{
-		CanvasID: &canvasID,
+		CanvasID: &appID,
 		NodeID:   &nodeID,
 	}, options)
 
@@ -36,13 +36,13 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 		Args:  cobra.NoArgs,
 	}
 
-	deleteCmd.Flags().StringVar(&canvasID, "canvas-id", "", "canvas ID")
+	core.BindAppIDFlag(deleteCmd, &appID, "app ID")
 	deleteCmd.Flags().StringVar(&nodeID, "node-id", "", "node ID")
 	deleteCmd.Flags().StringVar(&itemID, "item-id", "", "queue item ID")
 	_ = deleteCmd.MarkFlagRequired("node-id")
 	_ = deleteCmd.MarkFlagRequired("item-id")
 	core.Bind(deleteCmd, &DeleteQueueItemCommand{
-		CanvasID: &canvasID,
+		CanvasID: &appID,
 		NodeID:   &nodeID,
 		ItemID:   &itemID,
 	}, options)
