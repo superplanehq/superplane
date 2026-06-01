@@ -39,8 +39,10 @@ import {
   useCanvasVersions,
   useCreateCanvas,
   useCreateCanvasChangeRequest,
+  useCreateCanvasMemoryBank,
   useCreateCanvasVersion,
   useDeleteCanvasMemoryEntry,
+  useUpdateCanvasMemoryBank,
   useDeleteCanvasVersion,
   usePublishCanvasVersion,
   useEventExecutions,
@@ -568,6 +570,8 @@ export function WorkflowPageV2() {
     error: canvasMemoryError,
   } = useCanvasMemoryEntries(canvasId!, shouldLoadCanvasMemoryEntries(isMemoryMode, isViewingLiveVersion));
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
+  const createCanvasMemoryBank = useCreateCanvasMemoryBank(canvasId!);
+  const updateCanvasMemoryBank = useUpdateCanvasMemoryBank(canvasId!);
   const canUpdateCanvas = canAct("canvases", "update");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
@@ -5499,7 +5503,7 @@ export function WorkflowPageV2() {
             onTriggerNode: handleDashboardTriggerNode,
           }}
           memory={{
-            canDelete: canEditCanvasMemory({
+            canEdit: canEditCanvasMemory({
               ...canvasAccess,
               hasEditableVersion,
             }),
@@ -5507,6 +5511,8 @@ export function WorkflowPageV2() {
             isLoading: canvasMemoryLoading,
             error: canvasMemoryError,
             deleteCanvasMemoryEntry,
+            createCanvasMemoryBank,
+            updateCanvasMemoryBank,
           }}
           files={{
             isEditing,

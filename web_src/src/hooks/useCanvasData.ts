@@ -27,6 +27,8 @@ import {
   canvasesListRuns,
   canvasesListCanvasMemories,
   canvasesDeleteCanvasMemory,
+  canvasesCreateCanvasMemoryBank,
+  canvasesUpdateCanvasMemoryBank,
   canvasesListEventExecutions,
   canvasesListChildExecutions,
   canvasesListNodeQueueItems,
@@ -1235,10 +1237,19 @@ export const useInfiniteCanvasRuns = (canvasId: string, filters: CanvasRunsFilte
   });
 };
 
+export type CanvasMemoryEntrySource = "node" | "manual" | "unknown";
+
 export interface CanvasMemoryEntry {
   id: string;
   namespace: string;
   values: unknown;
+  source: CanvasMemoryEntrySource;
+}
+
+function normalizeCanvasMemorySource(source: string | undefined): CanvasMemoryEntrySource {
+  if (source === "SOURCE_MANUAL") return "manual";
+  if (source === "SOURCE_NODE") return "node";
+  return "unknown";
 }
 
 export const useCanvasMemoryEntries = (canvasId: string, enabled = true) => {
@@ -1255,6 +1266,7 @@ export const useCanvasMemoryEntries = (canvasId: string, enabled = true) => {
         id: item.id || "",
         namespace: item.namespace || "",
         values: item.values,
+        source: normalizeCanvasMemorySource(item.source),
       }));
     },
     refetchOnWindowFocus: false,
@@ -1273,6 +1285,56 @@ export const useDeleteCanvasMemoryEntry = (canvasId: string) => {
           path: {
             canvasId,
             memoryId,
+          },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasMemoryEntries(canvasId) });
+    },
+  });
+};
+
+export interface CreateCanvasMemoryBankInput {
+  namespace: string;
+  entries: unknown[];
+}
+
+export const useCreateCanvasMemoryBank = (canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ namespace, entries }: CreateCanvasMemoryBankInput) => {
+      await canvasesCreateCanvasMemoryBank(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: { namespace, entries },
+        }),
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.canvasMemoryEntries(canvasId) });
+    },
+  });
+};
+
+export interface UpdateCanvasMemoryBankInput {
+  namespace: string;
+  newNamespace?: string;
+  entries: unknown[];
+}
+
+export const useUpdateCanvasMemoryBank = (canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ namespace, newNamespace, entries }: UpdateCanvasMemoryBankInput) => {
+      await canvasesUpdateCanvasMemoryBank(
+        withOrganizationHeader({
+          path: { canvasId, namespace },
+          body: {
+            newNamespace: newNamespace && newNamespace !== namespace ? newNamespace : undefined,
+            entries,
           },
         }),
       );
