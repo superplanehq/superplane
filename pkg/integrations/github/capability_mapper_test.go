@@ -139,6 +139,14 @@ func Test__CapabilityMapper__NewPermissionSet(t *testing.T) {
 		got := ps.ForAppManifest()
 		assert.Equal(t, "read", got["statuses"])
 	})
+
+	t.Run("combined status action requests statuses read permission", func(t *testing.T) {
+		t.Parallel()
+
+		ps := m.NewPermissionSet([]string{"github.getCombinedCommitStatus"})
+		got := ps.ForAppManifest()
+		assert.Equal(t, "read", got["statuses"])
+	})
 }
 
 func Test__PermissionSet__IsEmpty(t *testing.T) {

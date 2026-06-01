@@ -63,6 +63,7 @@ func NewCapabilityMapper() *CapabilityMapper {
 				PermissionScope: PermissionScopeRepository,
 				Capabilities: []CapabilityDef{
 					{ReadOnly: true, Trigger: &statuses.OnCommitStatus{}},
+					{ReadOnly: true, Action: &statuses.GetCombinedCommitStatus{}},
 					{ReadOnly: false, Action: &statuses.PublishCommitStatus{}},
 				},
 			},
