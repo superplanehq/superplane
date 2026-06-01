@@ -28,7 +28,7 @@ func NewRouter(s *Server, opt RouterOptions) http.Handler {
 
 	r.Get("/healthz", s.health)
 
-	if strings.TrimSpace(opt.DiagnosticsToken) != "" && s.EC2Launcher != nil {
+	if strings.TrimSpace(opt.DiagnosticsToken) != "" && len(s.EC2Launchers) > 0 {
 		r.Route("/v1/admin", func(r chi.Router) {
 			r.Use(bearerAuth(opt.DiagnosticsToken))
 			r.Get("/managed-runners", s.adminManagedRunners)

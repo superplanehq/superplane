@@ -1,0 +1,45 @@
+{
+  "aws_region": "us-east-1",
+  "task_broker_url": "http://broker.internal:8081",
+  "task_broker_auth_token": "CHANGEME_SAME_AS_BROKER_AUTH_TOKEN",
+
+  "listen_addr": ":8080",
+  "auth_token": "",
+  "diagnostics_token": "",
+  "reconcile_interval_sec": 60,
+
+  "subnet_id": "subnet-CHANGEME",
+  "security_group_ids": ["sg-CHANGEME"],
+  "iam_instance_profile": "YOUR_INSTANCE_PROFILE_WITH_S3_READ",
+  "key_name": "",
+  "volume_size_gb": 30,
+  "boot_grace_sec": 300,
+  "runner_health_port": 9090,
+  "runner_terminate_after_each_task": true,
+
+  "cloudwatch": {
+    "log_group": "",
+    "stream_prefix": "",
+    "process_log_group": "",
+    "process_log_region": ""
+  },
+
+  "pools": [
+    {
+      "fleet_id": "aws-standard-amd64",
+      "ami": "ami-CHANGEME-amd64",
+      "instance_type": "t3.micro",
+      "runner_s3_uri": "s3://YOUR_BUCKET/path/runner-linux-amd64",
+      "hot_instance_count": 2,
+      "headroom": 0
+    },
+    {
+      "fleet_id": "aws-standard-arm64",
+      "ami": "ami-CHANGEME-arm64",
+      "instance_type": "t4g.micro",
+      "runner_s3_uri": "s3://YOUR_BUCKET/path/runner-linux-arm64",
+      "hot_instance_count": 0,
+      "headroom": 1
+    }
+  ]
+}
