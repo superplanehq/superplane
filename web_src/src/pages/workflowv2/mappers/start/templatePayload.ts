@@ -18,7 +18,11 @@ export interface StartTemplateParameter {
 
 export function parameterDisplayLabel(param: StartTemplateParameter): string {
   const title = typeof param.title === "string" ? param.title.trim() : "";
-  return title || param.name;
+  const name = param.name.trim();
+  if (title && name && title.toLowerCase() === name.toLowerCase()) {
+    return title;
+  }
+  return title || name;
 }
 
 export function selectOptionValues(param: StartTemplateParameter): string[] {
@@ -39,6 +43,28 @@ export function isValidSelectParameterValue(param: StartTemplateParameter, value
 export function parameterPlaceholder(param: StartTemplateParameter): string {
   const placeholder = typeof param.placeholder === "string" ? param.placeholder.trim() : "";
   return placeholder;
+}
+
+/** Placeholder for run-form inputs; omitted when it would repeat the field label. */
+export function parameterInputPlaceholder(param: StartTemplateParameter, label: string): string | undefined {
+  const placeholder = parameterPlaceholder(param);
+  if (!placeholder || placeholder.toLowerCase() === label.toLowerCase()) {
+    return undefined;
+  }
+  return placeholder;
+}
+
+/** Title for the manual-run modal opened from a Start trigger template. */
+export function startRunModalTitle(nodeName: string | undefined, templateName: string): string {
+  const trimmedNodeName = nodeName?.trim();
+  if (trimmedNodeName) {
+    return trimmedNodeName;
+  }
+  const trimmedTemplateName = templateName.trim();
+  if (trimmedTemplateName) {
+    return trimmedTemplateName;
+  }
+  return "Run";
 }
 
 export interface StartTemplate {

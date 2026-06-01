@@ -57,6 +57,7 @@ var defaultGitHubAppEvents = []string{
 	"pull_request_review_comment",
 	"push",
 	"release",
+	"status",
 	"workflow_run",
 }
 
@@ -143,6 +144,7 @@ func (g *GitHub) Triggers() []core.Trigger {
 		&pulls.OnPullRequest{},
 		&pulls.OnPRComment{},
 		&pulls.OnPRReviewComment{},
+		&statuses.OnCommitStatus{},
 	}
 }
 

@@ -9,6 +9,7 @@ import { onBranchCreatedTriggerRenderer } from "./on_branch_created";
 import { onPRCommentTriggerRenderer } from "./on_pr_comment";
 import { onPRReviewCommentTriggerRenderer } from "./on_pr_review_comment";
 import { onWorkflowRunTriggerRenderer } from "./on_workflow_run";
+import { onCommitStatusTriggerRenderer } from "./on_commit_status";
 import { baseIssueMapper } from "./base";
 import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper } from "./run_workflow";
 import { publishCommitStatusMapper } from "./publish_commit_status";
@@ -86,4 +87,5 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   onTagCreated: onTagCreatedTriggerRenderer,
   onBranchCreated: onBranchCreatedTriggerRenderer,
   onWorkflowRun: onWorkflowRunTriggerRenderer,
+  onCommitStatus: onCommitStatusTriggerRenderer,
 };

@@ -326,8 +326,8 @@ func TestService_DefineOutcome_RefreshesPreambleForBuildLoop(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "SUPERPLANE_URL=<api_base_url> SUPERPLANE_TOKEN=<api_token> superplane ...")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "[Agent Mode: BUILD]")
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "ALWAYS use \"superplane canvases update --draft\"")
-	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "superplane console set ... -f console.yaml --draft")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "ALWAYS use \"superplane apps canvas update --draft\"")
+	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "superplane apps console set ... -f console.yaml --draft")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "ref/docs/prd/console-and-widgets.md")
 	assert.Contains(t, provider.lastOutcomeOpts.ContextPreamble, "api_token:")
 }
