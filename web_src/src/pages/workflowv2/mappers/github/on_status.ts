@@ -21,7 +21,13 @@ interface StatusBranch {
 interface StatusCommit {
   sha?: string;
   html_url?: string;
+  author?: {
+    login?: string;
+  };
   commit?: {
+    author?: {
+      name?: string;
+    };
     message?: string;
   };
 }
@@ -59,13 +65,14 @@ export const onStatusTriggerRenderer: TriggerRenderer = {
     return {
       State: stringOrDash(statusState(eventData)),
       Context: stringOrDash(statusContext(eventData)),
-      SHA: stringOrDash(statusSha(eventData)),
       Description: stringOrDash(statusDescription(eventData)),
-      "Target URL": stringOrDash(statusTargetUrl(eventData)),
       Branches: stringOrDash(statusBranchNames(eventData).join(", ")),
-      Repository: stringOrDash(statusRepositoryName(eventData)),
-      Sender: stringOrDash(statusSenderLogin(eventData)),
+      SHA: stringOrDash(statusSha(eventData)),
+      "Status creator": stringOrDash(statusCreatorLogin(eventData)),
+      "Commit author": stringOrDash(statusCommitAuthor(eventData)),
       "Commit URL": stringOrDash(statusCommitUrl(eventData)),
+      "Target URL": stringOrDash(statusTargetUrl(eventData)),
+      Repository: stringOrDash(statusRepositoryName(eventData)),
     };
   },
 
@@ -136,13 +143,30 @@ function statusMetadataItems(
 
 function statusTitle(eventData: OnStatusEventData | undefined): string {
   const context = statusContext(eventData) || "Commit status";
+  const state = statusTitleState(statusState(eventData));
   const sha = shortSha(statusSha(eventData));
+  const title = state ? `${context} ${state}` : context;
 
   if (sha) {
-    return `${context} - ${sha}`;
+    return `${title} - ${sha}`;
   }
 
-  return context;
+  return title;
+}
+
+function statusTitleState(state: string | undefined): string {
+  switch (state) {
+    case "success":
+      return "succeeded";
+    case "failure":
+      return "failed";
+    case "error":
+      return "errored";
+    case "pending":
+      return "is pending";
+    default:
+      return "";
+  }
 }
 
 function shortSha(sha: string | undefined): string {
@@ -173,8 +197,12 @@ function statusRepositoryName(eventData: OnStatusEventData | undefined): string 
   return eventData?.repository?.full_name;
 }
 
-function statusSenderLogin(eventData: OnStatusEventData | undefined): string | undefined {
+function statusCreatorLogin(eventData: OnStatusEventData | undefined): string | undefined {
   return eventData?.sender?.login;
+}
+
+function statusCommitAuthor(eventData: OnStatusEventData | undefined): string | undefined {
+  return eventData?.commit?.author?.login || eventData?.commit?.commit?.author?.name;
 }
 
 function statusCommitUrl(eventData: OnStatusEventData | undefined): string | undefined {
