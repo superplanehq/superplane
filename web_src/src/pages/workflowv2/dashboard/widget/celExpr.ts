@@ -77,6 +77,11 @@ export function buildEnv(globals?: Record<string, unknown>): ExprEnv {
 }
 
 const BUILTIN_FUNCTIONS: Record<string, CallableFunction> = {
+  // `now` is also exposed as a global (Unix seconds) so authors can write
+  // `now - 604800`. The function form lets `now()` work in expressions
+  // ported from other engines (CEL extensions, expr-lang, etc.) without
+  // crashing the widget.
+  now: () => Math.floor(Date.now() / 1000),
   int: toInt,
   float: toFloat,
   string: toStringValue,

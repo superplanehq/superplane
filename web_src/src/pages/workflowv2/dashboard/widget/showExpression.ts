@@ -216,14 +216,14 @@ function normalizeComparableScalar(value: unknown): unknown {
   return Number.isFinite(numberValue) ? numberValue : value;
 }
 
+export type ShowEvalResult = { ok: true; value: boolean } | { ok: false; error: string };
+
 /**
- * Evaluate the given expression against a row context. Returns a boolean (the
- * truthiness of the resulting value). On parse error this logs to console and
- * returns `defaultValue` (defaults to `true`), so widgets remain functional
- * even when authoring mistakes are present.
+ * Parse and evaluate the mini expression language against a row context.
+ * Returns a result object so callers can decide whether to chain a fallback
+ * evaluator (e.g. CEL) on parse failure instead of silently using a default.
  */
-export function evaluateShow(expression: string | undefined, row: unknown, defaultValue = true): boolean {
-  if (!expression || !expression.trim()) return defaultValue;
+export function tryEvaluateShow(expression: string, row: unknown): ShowEvalResult {
   try {
     const tokens = tokenize(expression);
     const state: ParserState = { index: 0, tokens };
@@ -231,11 +231,33 @@ export function evaluateShow(expression: string | undefined, row: unknown, defau
     if (state.index < tokens.length) {
       throw new Error("Trailing tokens after expression");
     }
-    return Boolean(result);
+    return { ok: true, value: Boolean(result) };
   } catch (err) {
-    if (typeof console !== "undefined") {
-      console.warn(`Dashboard widget expression failed: ${(err as Error).message}`);
-    }
-    return defaultValue;
+    return { ok: false, error: (err as Error).message };
   }
+}
+
+/**
+ * Evaluate the given expression against a row context. Returns a boolean (the
+ * truthiness of the resulting value). On parse error this logs to console and
+ * returns `defaultValue` (defaults to `true`), so widgets remain functional
+ * even when authoring mistakes are present.
+ *
+ * The parse-failure log is intentionally `console.debug` (not `warn`) because
+ * malformed user-authored expressions are an expected, recoverable condition
+ * and shouldn't be reported to centralized error trackers like Sentry, which
+ * captures `warn`/`error` levels by default.
+ */
+export function evaluateShow(expression: string | undefined, row: unknown, defaultValue = true): boolean {
+  if (!expression || !expression.trim()) return defaultValue;
+  const result = tryEvaluateShow(expression, row);
+  if (result.ok) return result.value;
+  if (typeof console !== "undefined") {
+    // Intentionally `debug` (not `warn`) so Sentry's captureConsoleIntegration
+    // (which captures warn/error) does not flag user authoring mistakes that
+    // the evaluator already recovers from with `defaultValue`.
+    // eslint-disable-next-line no-console
+    console.debug(`Dashboard widget expression failed: ${result.error} (expression: ${expression})`);
+  }
+  return defaultValue;
 }
