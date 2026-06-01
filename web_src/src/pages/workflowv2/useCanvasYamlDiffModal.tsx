@@ -1,9 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CanvasesCanvas, CanvasesCanvasVersion } from "@/api-client";
+import { lazyWithReload } from "@/lib/lazyWithReload";
 import type { CanvasNode } from "@/ui/CanvasPage";
 import * as yaml from "js-yaml";
 
-const CanvasYamlDiffModal = lazy(() =>
+const CanvasYamlDiffModal = lazyWithReload(() =>
   import("./CanvasYamlDiffModal").then((module) => ({ default: module.CanvasYamlDiffModal })),
 );
 
