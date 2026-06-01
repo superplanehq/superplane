@@ -21,7 +21,7 @@ blocks:
         - name: ECS deploy task-broker
           commands:
             - aws ecs update-service --cluster default --service task-broker-v2 --force-new-deployment
-            - aws ecs wait services-stable --cluster default --services task-broker-v2
+            - for i in $(seq 1 20); do STATUS=$(aws ecs describe-services --cluster default --services task-broker-v2 --query 'services[0].deployments[0].rolloutState' --output text); echo "task-broker: $STATUS"; [ "$STATUS" = "COMPLETED" ] && break; sleep 30; done
 
   - name: Deploy fleet-manager
     dependencies: []
@@ -30,4 +30,4 @@ blocks:
         - name: ECS deploy fleet-manager
           commands:
             - aws ecs update-service --cluster default --service fleet-manager --force-new-deployment
-            - aws ecs wait services-stable --cluster default --services fleet-manager
+            - for i in $(seq 1 20); do STATUS=$(aws ecs describe-services --cluster default --services fleet-manager --query 'services[0].deployments[0].rolloutState' --output text); echo "fleet-manager: $STATUS"; [ "$STATUS" = "COMPLETED" ] && break; sleep 30; done
