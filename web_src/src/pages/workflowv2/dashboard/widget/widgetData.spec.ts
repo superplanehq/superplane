@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 
-import { aggregateNumberPerSource, applySort, buildChartData, combinePartials, distinctSeriesKeys } from "./widgetData";
+import {
+  aggregateNumberPerSource,
+  applyFilters,
+  applySort,
+  buildChartData,
+  combinePartials,
+  distinctSeriesKeys,
+} from "./widgetData";
 
 const entries: CanvasMemoryEntry[] = [
   { id: "1", namespace: "expenses", values: { amount: 10 } },
@@ -41,6 +48,44 @@ describe("aggregateNumberPerSource", () => {
       "row.amount > 10",
     ]);
     expect(value).toBe(30);
+  });
+});
+
+describe("applyFilters", () => {
+  it("returns the input unchanged when no filters are configured", () => {
+    const rows = [{ a: 1 }, { a: 2 }];
+    expect(applyFilters(rows, undefined)).toBe(rows);
+    expect(applyFilters(rows, [])).toBe(rows);
+  });
+
+  it("keeps rows that satisfy a legacy mini-expression filter", () => {
+    const rows = [{ status: "passed" }, { status: "failed" }, { status: "passed" }];
+    expect(applyFilters(rows, ['status == "passed"'])).toEqual([{ status: "passed" }, { status: "passed" }]);
+  });
+
+  it("evaluates CEL `{{ ... }}` filter expressions against the row", () => {
+    const now = Math.floor(Date.now() / 1000);
+    const rows = [
+      { started_at: String(now - 60) }, // within the last 7 days
+      { started_at: String(now - 60 * 60 * 24 * 30) }, // 30 days ago
+    ];
+    expect(applyFilters(rows, ["{{ int(started_at) >= now - 604800 }}"])).toEqual([{ started_at: String(now - 60) }]);
+  });
+
+  it("ANDs multiple filter expressions, mixing CEL and legacy dialects", () => {
+    const rows = [
+      { status: "passed", durationMs: 50 },
+      { status: "passed", durationMs: 500 },
+      { status: "failed", durationMs: 50 },
+    ];
+    expect(applyFilters(rows, ['status == "passed"', "{{ durationMs < 100 }}"])).toEqual([
+      { status: "passed", durationMs: 50 },
+    ]);
+  });
+
+  it("drops rows when a filter expression fails to parse", () => {
+    const rows = [{ a: 1 }];
+    expect(applyFilters(rows, ["row.status ==="])).toEqual([]);
   });
 });
 
