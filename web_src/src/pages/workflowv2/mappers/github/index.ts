@@ -10,6 +10,7 @@ import { onPRCommentTriggerRenderer } from "./on_pr_comment";
 import { onPRReviewCommentTriggerRenderer } from "./on_pr_review_comment";
 import { onWorkflowRunTriggerRenderer } from "./on_workflow_run";
 import { onCommitStatusTriggerRenderer } from "./on_commit_status";
+import { onCheckRunTriggerRenderer } from "./on_check_run";
 import { baseIssueMapper } from "./base";
 import { RUN_WORKFLOW_STATE_REGISTRY, runWorkflowMapper } from "./run_workflow";
 import { publishCommitStatusMapper } from "./publish_commit_status";
@@ -26,6 +27,7 @@ import { createPullRequestMapper } from "./create_pull_request";
 import { getWorkflowUsageMapper } from "./get_workflow_usage";
 import { labelsMapper } from "./labels";
 import { addReactionMapper } from "./add_reaction";
+import { listCheckRunsForRefMapper } from "./list_check_runs_for_ref";
 import { buildActionStateRegistry } from "../utils";
 
 export const eventStateRegistry: Record<string, EventStateRegistry> = {
@@ -45,6 +47,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   getRelease: buildActionStateRegistry("retrieved"),
   getRepositoryPermission: buildActionStateRegistry("retrieved"),
   getWorkflowUsage: buildActionStateRegistry("retrieved"),
+  listCheckRunsForRef: buildActionStateRegistry("retrieved"),
   addIssueLabel: buildActionStateRegistry("added"),
   removeIssueLabel: buildActionStateRegistry("removed"),
   addIssueAssignee: buildActionStateRegistry("added"),
@@ -69,6 +72,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   getRelease: getReleaseMapper,
   getRepositoryPermission: getRepositoryPermissionMapper,
   getWorkflowUsage: getWorkflowUsageMapper,
+  listCheckRunsForRef: listCheckRunsForRefMapper,
   addIssueLabel: labelsMapper,
   removeIssueLabel: labelsMapper,
   addIssueAssignee: baseIssueMapper,
@@ -88,4 +92,5 @@ export const triggerRenderers: Record<string, TriggerRenderer> = {
   onBranchCreated: onBranchCreatedTriggerRenderer,
   onWorkflowRun: onWorkflowRunTriggerRenderer,
   onCommitStatus: onCommitStatusTriggerRenderer,
+  onCheckRun: onCheckRunTriggerRenderer,
 };
