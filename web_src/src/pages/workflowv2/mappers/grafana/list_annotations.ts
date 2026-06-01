@@ -143,9 +143,5 @@ function addLatestAnnotation(
     return;
   }
 
-  details["Latest"] = truncateText(latestText, 60);
-}
-
-function truncateText(value: string, maxLength: number) {
-  return value.length > maxLength ? `${value.substring(0, maxLength)}...` : value;
+  details["Latest"] = truncate(latestText, 60);
 }

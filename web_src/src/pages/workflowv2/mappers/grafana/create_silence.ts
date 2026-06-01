@@ -73,12 +73,7 @@ function buildCommentMetadata(configuration: CreateSilenceConfiguration | undefi
     return undefined;
   }
 
-  const preview =
-    configuration.comment.length > 60
-      ? configuration.comment.substring(0, 60).trimEnd() + "..."
-      : configuration.comment;
-
-  return { icon: "sticky-note", label: preview };
+  return { icon: "sticky-note", label: truncate(configuration.comment, 60) };
 }
 
 function buildCreateSilenceDetails(

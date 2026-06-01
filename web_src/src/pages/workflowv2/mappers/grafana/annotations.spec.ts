@@ -142,6 +142,31 @@ describe("listAnnotationsMapper", () => {
     expect(() => listAnnotationsMapper.getExecutionDetails(ctx)).not.toThrow();
     expect(listAnnotationsMapper.getExecutionDetails(ctx)).toMatchObject({ Count: "0" });
   });
+
+  it("does not throw when configuration.text is a non-string value", () => {
+    const ctx = buildComponentContext("grafana.listAnnotations", {
+      node: { configuration: { text: 999 } },
+    });
+    expect(() => listAnnotationsMapper.props(ctx)).not.toThrow();
+
+    const detailsCtx = buildDetailsContext("grafana.listAnnotations", {
+      node: { configuration: { text: { foo: "bar" } } },
+    });
+    expect(() => listAnnotationsMapper.getExecutionDetails(detailsCtx)).not.toThrow();
+  });
+
+  it("does not throw when latest annotation text in output is a non-string value", () => {
+    const ctx = buildDetailsContext("grafana.listAnnotations", {
+      node: { configuration: {} },
+      execution: {
+        outputs: {
+          default: [buildOutput({ annotations: [{ text: 42 }] })],
+        },
+      },
+    });
+
+    expect(() => listAnnotationsMapper.getExecutionDetails(ctx)).not.toThrow();
+  });
 });
 
 describe("deleteAnnotationMapper", () => {
