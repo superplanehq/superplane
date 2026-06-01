@@ -29,7 +29,7 @@ export function AppDetailModal({ app, busy, onBack, onInstall, onClose }: AppDet
   return (
     <div className="fixed inset-0 z-[200] flex items-start justify-center pt-[12vh] sm:pt-[14vh]">
       <div className="fixed inset-0 bg-gray-950/20" onClick={onClose} />
-      <div className="relative z-10 w-[calc(100vw-2rem)] max-w-3xl rounded-xl border border-slate-200 bg-white shadow-2xl">
+      <div className="relative z-10 w-[calc(100vw-2rem)] max-w-3xl rounded-xl bg-white shadow-2xl">
         <div className="flex items-center gap-2 border-b border-slate-200 px-5 py-3">
           <button
             type="button"
@@ -43,11 +43,11 @@ export function AppDetailModal({ app, busy, onBack, onInstall, onClose }: AppDet
 
         <div className="px-6 py-5">
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100">
+            <div className="shrink-0">
               <LeadIcon icon={app.icon} integrations={app.integrations} size="lg" />
             </div>
             <div className="min-w-0 flex-1">
-              <h3 className="text-lg font-semibold text-slate-900">{app.title}</h3>
+              <h3 className="text-lg font-medium text-slate-900">{app.title}</h3>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 <IntegrationIcons integrations={app.integrations} />
                 {app.tags.map((tag) => (
@@ -63,13 +63,13 @@ export function AppDetailModal({ app, busy, onBack, onInstall, onClose }: AppDet
           </div>
 
           <div className="mt-5">
-            <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Description</h4>
-            <p className="mt-1.5 text-sm leading-relaxed text-slate-600">{app.description}</p>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Description</h4>
+            <p className="mt-1.5 text-sm leading-relaxed text-gray-800">{app.description}</p>
           </div>
 
           {app.requirements.length > 0 && (
             <div className="mt-4">
-              <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Requirements</h4>
+              <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500">Requirements</h4>
               <ul className="mt-1.5 space-y-1">
                 {app.requirements.map((req) => (
                   <li key={req} className="flex items-start gap-2 text-sm text-slate-600">
@@ -112,7 +112,7 @@ export function LeadIcon({
   size?: "sm" | "lg";
 }) {
   const iconName = icon || integrations[0];
-  const cls = size === "lg" ? "h-7 w-7" : "h-5 w-5";
+  const cls = size === "lg" ? "h-8 w-8" : "h-5 w-5";
   if (!iconName) return <Plus className={`${cls} text-slate-400`} />;
   const iconSrc = getIntegrationIconSrc(iconName.toLowerCase());
   if (!iconSrc) return <Plus className={`${cls} text-slate-400`} />;
