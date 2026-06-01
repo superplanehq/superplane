@@ -65,25 +65,25 @@ If both sides changed the same node but resulting structure is identical (same J
 
 ## CLI Commands
 
-`superplane canvases change-requests list [name-or-id] [--status <filter>] [--mine] [--query <text>] [--limit <n>] [--before <rfc3339>]`
+`superplane apps change-requests list [name-or-id] [--status <filter>] [--mine] [--query <text>] [--limit <n>] [--before <rfc3339>]`
 
-`superplane canvases change-requests get <change-request-id> [name-or-id]`
+`superplane apps change-requests get <change-request-id> [name-or-id]`
 
-`superplane canvases change-requests create [name-or-id] [--version-id <id>] [--title <text>] [--description <text>]`
+`superplane apps change-requests create [name-or-id] [--version-id <id>] [--title <text>] [--description <text>]`
 
-`superplane canvases change-requests approve <change-request-id> [name-or-id]`
+`superplane apps change-requests approve <change-request-id> [name-or-id]`
 
-`superplane canvases change-requests unapprove <change-request-id> [name-or-id]`
+`superplane apps change-requests unapprove <change-request-id> [name-or-id]`
 
-`superplane canvases change-requests publish <change-request-id> [name-or-id]`
+`superplane apps change-requests publish <change-request-id> [name-or-id]`
 
-`superplane canvases change-requests reject <change-request-id> [name-or-id]`
+`superplane apps change-requests reject <change-request-id> [name-or-id]`
 
-`superplane canvases change-requests reopen <change-request-id> [name-or-id]`
+`superplane apps change-requests reopen <change-request-id> [name-or-id]`
 
-`superplane canvases change-requests resolve <change-request-id> [name-or-id] --file <canvas.yaml> [--auto-layout horizontal] [--auto-layout-scope <scope>] [--auto-layout-node <id>]`
+`superplane apps change-requests resolve <change-request-id> [name-or-id] --file <canvas.yaml> [--auto-layout horizontal] [--auto-layout-scope <scope>] [--auto-layout-node <id>]`
 
 Notes:
 
-- `[name-or-id]` can be omitted if an active canvas is set with `superplane canvases active`.
+- `[name-or-id]` can be omitted if an active app is set with `superplane apps active`.
 - `--status` supports `all`, `open`, `conflicted`, `rejected`, `published`.
