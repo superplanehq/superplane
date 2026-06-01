@@ -14,7 +14,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Play } from "lucide-react";
 import { StartRunModal } from "./runModal";
-import { payloadForTemplateRun, type StartConfiguration } from "./templatePayload";
+import { payloadForTemplateRun, startRunModalTitle, type StartConfiguration } from "./templatePayload";
 
 /**
  * Default renderer for the start trigger
@@ -95,8 +95,7 @@ const startCustomFieldRenderer: CustomFieldRenderer = {
                   e.stopPropagation();
                   if ((template.parameters?.length ?? 0) > 0) {
                     actions.openModal({
-                      title: `Run ${template.name}`,
-                      description: "Provide parameter values for this manual run.",
+                      title: startRunModalTitle(node.name, template.name),
                       content: ({ close }) => (
                         <StartRunModal
                           parameters={template.parameters}

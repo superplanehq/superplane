@@ -19,6 +19,7 @@ import (
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/support"
+	"gorm.io/datatypes"
 )
 
 type CanvasSteps struct {
@@ -95,6 +96,63 @@ func (s *CanvasSteps) Create() {
 	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
 	require.NoError(s.t, err)
 	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, nil, nil)
+	s.WorkflowID = canvas.ID
+
+	err = database.Conn().
+		Model(&models.Canvas{}).
+		Where("id = ?", s.WorkflowID).
+		Update("name", s.CanvasName).Error
+	require.NoError(s.t, err)
+
+	s.Visit()
+}
+
+func (s *CanvasSteps) CreatePublishedWithParameterizedManualRun() {
+	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
+	require.NoError(s.t, err)
+
+	startNodeID := "start-trigger"
+	outputNodeID := "noop-output"
+
+	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, []models.CanvasNode{
+		{
+			NodeID: startNodeID,
+			Name:   "Start",
+			Type:   models.NodeTypeTrigger,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Trigger: &models.TriggerRef{Name: "start"},
+			}),
+			Configuration: datatypes.NewJSONType(map[string]any{
+				"templates": []any{
+					map[string]any{
+						"name": "Hello World",
+						"payload": map[string]any{
+							"message": `{{ parameters["message"] }}`,
+						},
+						"parameters": []any{
+							map[string]any{
+								"name": "message",
+								"type": "string",
+							},
+						},
+					},
+				},
+			}),
+			Position: datatypes.NewJSONType(models.Position{X: 600, Y: 200}),
+		},
+		{
+			NodeID: outputNodeID,
+			Name:   "Output",
+			Type:   models.NodeTypeComponent,
+			Ref: datatypes.NewJSONType(models.NodeRef{
+				Component: &models.ComponentRef{Name: "noop"},
+			}),
+			Configuration: datatypes.NewJSONType(map[string]any{}),
+			Position:      datatypes.NewJSONType(models.Position{X: 1000, Y: 200}),
+		},
+	}, []models.Edge{
+		{SourceID: startNodeID, TargetID: outputNodeID, Channel: "default"},
+	})
 	s.WorkflowID = canvas.ID
 
 	err = database.Conn().
@@ -429,6 +487,17 @@ func (s *CanvasSteps) RunManualTrigger(name string) {
 	// Use the Start node's template Run button (in the default payload template) instead of the removed header Run button
 	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(name) + `-header"]) [data-testid="start-template-run"]`)
 	s.session.Click(startTemplateRun)
+	s.session.Click(q.TestID("emit-event-submit-button"))
+}
+
+func (s *CanvasSteps) RunParameterizedManualTrigger(name string, parameters map[string]string) {
+	startTemplateRun := q.Locator(`.react-flow__node:has([data-testid="node-` + strings.ToLower(name) + `-header"]) [data-testid="start-template-run"]`)
+	s.session.Click(startTemplateRun)
+
+	for paramName, value := range parameters {
+		s.session.FillIn(q.Locator("#start-run-param-"+paramName), value)
+	}
+
 	s.session.Click(q.TestID("emit-event-submit-button"))
 }
 

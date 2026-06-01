@@ -166,6 +166,8 @@ describe("workflow v2 edit-mode action affordances", () => {
     fireEvent.click(screen.getByTestId("start-template-run"));
 
     expect(openModal).toHaveBeenCalledTimes(1);
+    expect(openModal).toHaveBeenCalledWith(expect.objectContaining({ title: "Start" }));
+    expect(openModal.mock.calls[0][0]).not.toHaveProperty("description");
     expect(invokeNodeTriggerHook).not.toHaveBeenCalled();
 
     const modal = openModal.mock.calls[0][0] as {

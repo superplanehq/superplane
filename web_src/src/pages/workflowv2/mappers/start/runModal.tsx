@@ -58,7 +58,7 @@ export function StartRunModal({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="mt-1 space-y-4">
       {useParameterForm ? (
         <StartRunParameterFields
           parameters={parameters ?? []}
