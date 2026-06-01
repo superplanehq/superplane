@@ -22,13 +22,21 @@ blocks:
           commands:
             - aws ecs update-service --cluster default --service task-broker-v2 --force-new-deployment
             - |
+              DONE=0
               for i in $(seq 1 20); do
                 STATUS=$(aws ecs describe-services --cluster default --services task-broker-v2 --query 'services[0].deployments[0].rolloutState' --output text)
-                echo "task-broker rollout: $STATUS"
-                [ "$STATUS" = "COMPLETED" ] && exit 0
+                echo "task-broker rollout: $STATUS (attempt $i)"
+                if [ "$STATUS" = "COMPLETED" ]; then
+                  DONE=1
+                  break
+                fi
                 sleep 30
               done
-              echo "Timed out waiting for task-broker" && exit 1
+              if [ "$DONE" = "0" ]; then
+                echo "ERROR: Timed out waiting for task-broker rollout"
+                false
+              fi
+              echo "task-broker deployed successfully"
 
   - name: Deploy fleet-manager
     dependencies: []
@@ -38,10 +46,18 @@ blocks:
           commands:
             - aws ecs update-service --cluster default --service fleet-manager --force-new-deployment
             - |
+              DONE=0
               for i in $(seq 1 20); do
                 STATUS=$(aws ecs describe-services --cluster default --services fleet-manager --query 'services[0].deployments[0].rolloutState' --output text)
-                echo "fleet-manager rollout: $STATUS"
-                [ "$STATUS" = "COMPLETED" ] && exit 0
+                echo "fleet-manager rollout: $STATUS (attempt $i)"
+                if [ "$STATUS" = "COMPLETED" ]; then
+                  DONE=1
+                  break
+                fi
                 sleep 30
               done
-              echo "Timed out waiting for fleet-manager" && exit 1
+              if [ "$DONE" = "0" ]; then
+                echo "ERROR: Timed out waiting for fleet-manager rollout"
+                false
+              fi
+              echo "fleet-manager deployed successfully"
