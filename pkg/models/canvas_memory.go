@@ -104,7 +104,9 @@ func ReplaceManualCanvasMemoryNamespaceInTransaction(tx *gorm.DB, canvasID uuid.
 }
 
 func ReplaceManualCanvasMemoryNamespace(canvasID uuid.UUID, namespace string, entries []any) error {
-	return ReplaceManualCanvasMemoryNamespaceInTransaction(database.Conn(), canvasID, namespace, entries)
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		return ReplaceManualCanvasMemoryNamespaceInTransaction(tx, canvasID, namespace, entries)
+	})
 }
 
 func ListCanvasMemoriesInTransaction(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasMemory, error) {
