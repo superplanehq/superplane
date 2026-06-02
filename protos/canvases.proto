@@ -444,6 +444,30 @@ service Canvases {
     };
   }
 
+  rpc CreateCanvasMemoryBank(CreateCanvasMemoryBankRequest) returns (CreateCanvasMemoryBankResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/memory/banks"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create manual canvas memory bank";
+      description: "Creates a manually-managed memory bank (namespace) with the provided entries. Rejected if the namespace already has any entries.";
+      tags: "Canvas";
+    };
+  }
+
+  rpc UpdateCanvasMemoryBank(UpdateCanvasMemoryBankRequest) returns (UpdateCanvasMemoryBankResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/canvases/{canvas_id}/memory/banks/{namespace}"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update manual canvas memory bank";
+      description: "Replaces the entries of a manually-managed memory bank, optionally renaming it. Rejected if the bank is node-managed.";
+      tags: "Canvas";
+    };
+  }
+
   rpc ListEventExecutions(ListEventExecutionsRequest) returns (ListEventExecutionsResponse) {
     option (google.api.http) = {
       get: "/api/v1/canvases/{canvas_id}/events/{event_id}/executions"
@@ -1069,9 +1093,16 @@ message ListRunsResponse {
 }
 
 message CanvasMemory {
+  enum Source {
+    SOURCE_UNKNOWN = 0;
+    SOURCE_NODE = 1;
+    SOURCE_MANUAL = 2;
+  }
+
   string id = 1;
   string namespace = 2;
   google.protobuf.Value values = 3;
+  Source source = 4;
 }
 
 message ListCanvasMemoriesRequest {
@@ -1088,6 +1119,29 @@ message DeleteCanvasMemoryRequest {
 }
 
 message DeleteCanvasMemoryResponse {}
+
+message CreateCanvasMemoryBankRequest {
+  string canvas_id = 1;
+  string namespace = 2;
+  repeated google.protobuf.Value entries = 3;
+}
+
+message CreateCanvasMemoryBankResponse {
+  string namespace = 1;
+  repeated CanvasMemory items = 2;
+}
+
+message UpdateCanvasMemoryBankRequest {
+  string canvas_id = 1;
+  string namespace = 2;
+  string new_namespace = 3;
+  repeated google.protobuf.Value entries = 4;
+}
+
+message UpdateCanvasMemoryBankResponse {
+  string namespace = 1;
+  repeated CanvasMemory items = 2;
+}
 
 message CanvasEvent {
   string id = 1;

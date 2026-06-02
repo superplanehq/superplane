@@ -385,6 +385,16 @@ func (s *CanvasService) DeleteCanvasMemory(ctx context.Context, req *pb.DeleteCa
 	return canvases.DeleteCanvasMemory(ctx, s.registry, organizationID, req.CanvasId, req.MemoryId)
 }
 
+func (s *CanvasService) CreateCanvasMemoryBank(ctx context.Context, req *pb.CreateCanvasMemoryBankRequest) (*pb.CreateCanvasMemoryBankResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.CreateCanvasMemoryBank(ctx, s.registry, organizationID, req.CanvasId, req.Namespace, req.Entries)
+}
+
+func (s *CanvasService) UpdateCanvasMemoryBank(ctx context.Context, req *pb.UpdateCanvasMemoryBankRequest) (*pb.UpdateCanvasMemoryBankResponse, error) {
+	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
+	return canvases.UpdateCanvasMemoryBank(ctx, s.registry, organizationID, req.CanvasId, req.Namespace, req.NewNamespace, req.Entries)
+}
+
 func (s *CanvasService) GetCanvasDashboard(ctx context.Context, req *pb.GetCanvasDashboardRequest) (*pb.GetCanvasDashboardResponse, error) {
 	organizationID := ctx.Value(authorization.OrganizationContextKey).(string)
 	return canvases.GetCanvasDashboard(ctx, organizationID, req.CanvasId, req.GetVersionId())
