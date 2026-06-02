@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ExternalLink, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-react";
+import { ExternalLink, Loader2, Play, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
 
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
@@ -70,8 +70,16 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
   if (isLoading) return <WidgetSpinner />;
   if (render.columns.length === 0) {
     return (
-      <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-table-no-columns">
-        Configure columns in the panel editor. Pick a memory namespace to see available fields.
+      <div
+        className="flex h-full min-h-[6rem] flex-col items-center justify-center gap-1.5 p-4 text-center text-[13px] text-gray-500"
+        data-testid="widget-table-no-columns"
+      >
+        <Table2 className="size-4" aria-hidden />
+        <p>
+          Configure columns in the panel editor.
+          <br />
+          Pick a memory namespace to see available fields.
+        </p>
       </div>
     );
   }

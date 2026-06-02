@@ -1,8 +1,8 @@
 import { MultiFileDiff, type FileContents, type FileDiffMetadata } from "@pierre/diffs/react";
-import { FileCode } from "lucide-react";
+import { FileCode, XIcon } from "lucide-react";
 import { useCallback, useMemo } from "react";
 
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 export type CanvasYamlDiffModalProps = {
   open: boolean;
@@ -78,15 +78,23 @@ export function CanvasYamlDiffModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="large" className="flex h-[90vh] w-[94vw] max-w-[1600px] flex-col gap-0 overflow-hidden p-0">
+      <DialogContent
+        size="large"
+        className="flex h-[90vh] w-[94vw] max-w-[1600px] flex-col gap-0 overflow-hidden p-0"
+        showCloseButton={false}
+      >
         <DialogTitle className="sr-only">{dialogTitle}</DialogTitle>
         <DialogDescription className="sr-only">{description}</DialogDescription>
 
         <div className="flex min-h-0 flex-1 flex-col bg-slate-50">
-          <div className="flex items-center border-b border-slate-200 bg-white px-5 py-3 pr-12">
+          <div className="relative flex items-center border-b border-slate-200 bg-white px-5 py-3 pr-12">
             <div className="flex min-w-0 items-center gap-3">
-              <h2 className="truncate text-sm font-semibold text-slate-900">{title}</h2>
+              <h2 className="truncate text-sm font-medium text-slate-900">{title}</h2>
             </div>
+            <DialogClose className="absolute top-1/2 right-2 flex h-6 w-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded leading-none hover:bg-slate-950/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none">
+              <XIcon className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </DialogClose>
           </div>
 
           <div className="min-h-0 flex-1 overflow-auto">
