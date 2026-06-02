@@ -108,13 +108,19 @@ function CanvasMemoryViewBody({
   };
 
   const handleDialogSubmit = async (input: { namespace: string; entries: unknown[] }) => {
-    if (!dialogState.open) return;
+    if (!dialogState.open) {
+      throw new Error("The memory namespace dialog is no longer open.");
+    }
     if (dialogState.mode === "create") {
-      if (!onCreateNamespace) return;
+      if (!onCreateNamespace) {
+        throw new Error("You no longer have permission to create memory namespaces.");
+      }
       await onCreateNamespace(input);
       return;
     }
-    if (!onUpdateNamespace) return;
+    if (!onUpdateNamespace) {
+      throw new Error("You no longer have permission to edit memory namespaces.");
+    }
     await onUpdateNamespace({
       namespace: dialogState.namespace,
       newNamespace: input.namespace !== dialogState.namespace ? input.namespace : undefined,
