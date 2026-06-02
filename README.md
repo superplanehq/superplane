@@ -1,14 +1,32 @@
 # SuperPlane runner
 
-Monorepo (single Go module) for **task-broker**, **fleet-manager**, and the **runner** worker.
+Backend for **Runner** on the SuperPlane canvas: a **user-facing node type** (canvas component name **Runner**) where users configure **bash scripts** to run on remote machines. When a Runner node executes, SuperPlane enqueues work through **task-broker**; a **runner** worker in this repo runs the user’s script and reports back so the workflow can continue.
 
-- **Task-broker** — SuperPlane front door: registers runner fleets, owns the Postgres task queue, serves runner WebSocket/HTTP APIs, and delivers completion webhooks to callers.
-- **Fleet-manager** — EC2-only: maintains a hot pool of runner VMs, health-sweeps `GET /healthz` on private IPs, and reconciles capacity. No task queue.
-- **Runner** — worker: connects to **task-broker** (`TASK_BROKER_URL`, `RUNNER_FLEET_ID`), claims tasks, executes `command` or **`commands`**, completes results. Exposes **`GET /healthz`** on `RUNNER_HEALTH_ADDR` (default `:9090`).
+## What this is
 
-Shared JSON types live under **`shared/`**; webhook retries use **`shared/webhook`**.
+From a user’s perspective, **Runner** nodes on the canvas run arbitrary shell (and optional Docker) workloads the user configured. Under the hood, three services cooperate:
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for design detail.
+| Component | Role |
+|-----------|------|
+| **task-broker** | API and **Postgres-backed queue**. SuperPlane submits tasks when Runner nodes run; workers claim work; completion **webhooks** resume the workflow. Fleets are **`id`** + **`labels`** for routing (`fleet_id` or `fleet_labels` on create). |
+| **runner** | **Worker agent** on a host or EC2 VM. Runs the user’s **`command`** or **`commands`** on the host or in Docker, streams logs optionally, returns exit status and optional structured **`result`** JSON. Connects to the broker with `TASK_BROKER_URL` and `RUNNER_FLEET_ID`. |
+| **fleet-manager** | **Optional AWS EC2 autoscaler** — not on the canvas path. Launches runner VMs, health-checks `GET /healthz`, scales toward `queued + claimed + headroom` by polling the broker. |
+
+A **task** is one execution of a user’s script for a Runner node: SuperPlane calls `POST /v1/tasks` with the script and a webhook URL; a runner executes it; the webhook delivers a terminal payload (`status`, `exit_code`, optional `result`, optional `task_log`). Status and cancel are available over HTTP while the job runs.
+
+Shared contracts live under **`shared/`** (JSON types, WebSocket messages, webhook retries).
+
+## Why it is built this way
+
+SuperPlane needs a safe, scalable way to run **user-authored bash** from canvas Runner nodes without embedding shells and fleets in the main app. This repo separates concerns deliberately:
+
+- **Canvas vs execution** — Users interact with **Runner** nodes and scripts; SuperPlane talks to **task-broker** to queue work. Runner binaries, regions, and pool size can change without reshaping the canvas model.
+- **Queue vs workers vs cloud** — The broker owns **durability and routing** (leases, reap, cancel, webhooks). Runners only execute user commands. **fleet-manager** only provisions EC2; it never holds the queue.
+- **Async by default** — Scripts can run for minutes; **webhooks** (with retries) fit workflow steps better than long-lived HTTP from the UI.
+- **CI-shaped execution** — Docker runs without a TTY; multi-line `commands` behave like a script block; large logs go to **CloudWatch** instead of API bodies.
+- **Isolation when you want it** — Disposable one-task EC2 instances (runner exits, fleet-manager terminates the VM) limit cross-job leakage when many users share a fleet.
+
+For request flow and component boundaries, see [ARCHITECTURE.md](./ARCHITECTURE.md). The sections below cover build, configuration, and operations.
 
 ## Layout
 
