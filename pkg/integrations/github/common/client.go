@@ -168,6 +168,10 @@ func (c *Client) CreatePullRequest(ctx context.Context, repository string, pullR
 	return c.underlying.PullRequests.Create(ctx, c.owner, repository, pullRequest)
 }
 
+func (c *Client) MergePullRequest(ctx context.Context, repository string, pullNumber int, commitMessage string, options *github.PullRequestOptions) (*github.PullRequestMergeResult, *github.Response, error) {
+	return c.underlying.PullRequests.Merge(ctx, c.owner, repository, pullNumber, commitMessage, options)
+}
+
 func (c *Client) CreateStatus(ctx context.Context, repository string, sha string, status github.RepoStatus) (*github.RepoStatus, *github.Response, error) {
 	return c.underlying.Repositories.CreateStatus(ctx, c.owner, repository, sha, status)
 }

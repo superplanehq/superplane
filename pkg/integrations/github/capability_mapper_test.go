@@ -155,6 +155,14 @@ func Test__CapabilityMapper__NewPermissionSet(t *testing.T) {
 		got := ps.ForAppManifest()
 		assert.Equal(t, "read", got["checks"])
 	})
+
+	t.Run("merge pull request action requests pull request write permission", func(t *testing.T) {
+		t.Parallel()
+
+		ps := m.NewPermissionSet([]string{"github.mergePullRequest"})
+		got := ps.ForAppManifest()
+		assert.Equal(t, "write", got["pull_requests"])
+	})
 }
 
 func Test__PermissionSet__IsEmpty(t *testing.T) {
