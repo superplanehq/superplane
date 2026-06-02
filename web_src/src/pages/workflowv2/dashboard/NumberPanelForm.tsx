@@ -7,9 +7,15 @@ import { useDashboardContext } from "./DashboardContext";
 import { NumberPanelCompositeSourcesEditor } from "./NumberPanelCompositeSourcesEditor";
 import { NumberPanelMetricsEditor } from "./NumberPanelMetricsEditor";
 import { NumberPanelSourceModeToggle } from "./NumberPanelSourceModeToggle";
-import { NUMBER_PANEL_AGGREGATIONS, NUMBER_PANEL_FORMATS } from "./numberPanelFormConstants";
+import {
+  NumberFormatField,
+  NumberLabelField,
+  NumberPrefixSuffixFields,
+  NumberSparklineField,
+} from "./NumberRenderFields";
+import { NUMBER_PANEL_AGGREGATIONS } from "./numberPanelFormConstants";
 import { isCompositeMemoryDataSource, isMultiNumberContent, type NumberPanelContent } from "./panelTypes";
-import type { WidgetColumnFormat, WidgetNumberAggregation, WidgetNumberRender } from "./widget/types";
+import type { WidgetNumberAggregation, WidgetNumberRender } from "./widget/types";
 import { useMemoryCatalog } from "./widget/useMemoryCatalog";
 
 export function NumberPanelForm({
@@ -144,40 +150,11 @@ function FormatLabelRow({
   onChange: (next: NumberPanelContent) => void;
 }) {
   const render = value.render ?? EMPTY_RENDER;
+  const update = (patch: Partial<WidgetNumberRender>) => onChange({ ...value, render: { ...render, ...patch } });
   return (
     <div className="grid grid-cols-2 gap-3">
-      <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Format</Label>
-        <Select
-          value={render.format ?? "__none__"}
-          onValueChange={(v) =>
-            onChange({
-              ...value,
-              render: { ...render, format: v === "__none__" ? undefined : (v as WidgetColumnFormat) },
-            })
-          }
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Default" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__">Default</SelectItem>
-            {NUMBER_PANEL_FORMATS.map((f) => (
-              <SelectItem key={f} value={f}>
-                {f}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Label (optional)</Label>
-        <Input
-          value={render.label ?? ""}
-          onChange={(e) => onChange({ ...value, render: { ...render, label: e.target.value || undefined } })}
-          placeholder="e.g. Total duration"
-        />
-      </div>
+      <NumberFormatField render={render} onChange={update} />
+      <NumberLabelField render={render} onChange={update} />
     </div>
   );
 }
@@ -191,24 +168,10 @@ function PrefixSuffixRow({
 }) {
   const render = value.render ?? EMPTY_RENDER;
   return (
-    <div className="grid grid-cols-2 gap-3">
-      <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Prefix (optional)</Label>
-        <Input
-          value={render.prefix ?? ""}
-          onChange={(e) => onChange({ ...value, render: { ...render, prefix: e.target.value || undefined } })}
-          placeholder="e.g. R$"
-        />
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs font-medium text-slate-600">Suffix (optional)</Label>
-        <Input
-          value={render.suffix ?? ""}
-          onChange={(e) => onChange({ ...value, render: { ...render, suffix: e.target.value || undefined } })}
-          placeholder="e.g. MWh"
-        />
-      </div>
-    </div>
+    <NumberPrefixSuffixFields
+      render={render}
+      onChange={(patch) => onChange({ ...value, render: { ...render, ...patch } })}
+    />
   );
 }
 
@@ -221,18 +184,9 @@ function SparklineField({
 }) {
   const render = value.render ?? EMPTY_RENDER;
   return (
-    <div className="space-y-1.5">
-      <Label className="text-xs font-medium text-slate-600">Sparkline field (optional)</Label>
-      <Input
-        value={render.sparklineField ?? ""}
-        onChange={(e) =>
-          onChange({
-            ...value,
-            render: { ...render, sparklineField: e.target.value || undefined },
-          })
-        }
-        placeholder="e.g. createdAt"
-      />
-    </div>
+    <NumberSparklineField
+      render={render}
+      onChange={(patch) => onChange({ ...value, render: { ...render, ...patch } })}
+    />
   );
 }

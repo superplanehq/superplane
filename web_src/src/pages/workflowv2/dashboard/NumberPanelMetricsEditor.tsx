@@ -7,9 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { DataSourceForm } from "./DataSourceForm";
 import { useDashboardContext } from "./DashboardContext";
-import { NUMBER_PANEL_AGGREGATIONS, NUMBER_PANEL_FORMATS } from "./numberPanelFormConstants";
+import { NumberFormatField, NumberPrefixSuffixFields, NumberSparklineField } from "./NumberRenderFields";
+import { NUMBER_PANEL_AGGREGATIONS } from "./numberPanelFormConstants";
 import type { NumberMetric, NumberPanelContent, TablePanelDataSource } from "./panelTypes";
-import type { WidgetColumnFormat, WidgetNumberAggregation, WidgetNumberRender } from "./widget/types";
+import type { WidgetNumberAggregation, WidgetNumberRender } from "./widget/types";
 import { useMemoryCatalog } from "./widget/useMemoryCatalog";
 
 const DEFAULT_METRIC: NumberMetric = {
@@ -78,6 +79,7 @@ function MetricRow({
   onChange: (patch: Partial<NumberMetric>) => void;
   onRemove?: () => void;
 }) {
+  const updateRender = (patch: Partial<WidgetNumberRender>) => onChange({ render: { ...metric.render, ...patch } });
   return (
     <div className="space-y-2 rounded-md border border-slate-200 bg-white p-3" data-testid={`number-metric-${index}`}>
       <div className="flex items-center justify-between">
@@ -95,9 +97,9 @@ function MetricRow({
         onChange={(ds) => onChange({ dataSource: ds as TablePanelDataSource })}
       />
       <MetricAggregationFields metric={metric} index={index} onChange={onChange} />
-      <MetricFormatRow metric={metric} onChange={onChange} />
-      <MetricPrefixSuffixRow metric={metric} onChange={onChange} />
-      <MetricSparklineField metric={metric} onChange={onChange} />
+      <NumberFormatField render={metric.render} variant="compact" onChange={updateRender} />
+      <NumberPrefixSuffixFields render={metric.render} variant="compact" onChange={updateRender} />
+      <NumberSparklineField render={metric.render} variant="compact" onChange={updateRender} />
     </div>
   );
 }
@@ -187,91 +189,6 @@ function MetricAggregationFields({
           ) : null}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function MetricFormatRow({
-  metric,
-  onChange,
-}: {
-  metric: NumberMetric;
-  onChange: (patch: Partial<NumberMetric>) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Format</Label>
-      <Select
-        value={metric.render.format ?? "__none__"}
-        onValueChange={(v) =>
-          onChange({
-            render: {
-              ...metric.render,
-              format: v === "__none__" ? undefined : (v as WidgetColumnFormat),
-            },
-          })
-        }
-      >
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="Default" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__none__">Default</SelectItem>
-          {NUMBER_PANEL_FORMATS.map((f) => (
-            <SelectItem key={f} value={f}>
-              {f}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-function MetricPrefixSuffixRow({
-  metric,
-  onChange,
-}: {
-  metric: NumberMetric;
-  onChange: (patch: Partial<NumberMetric>) => void;
-}) {
-  return (
-    <div className="grid grid-cols-2 gap-2">
-      <div className="space-y-1">
-        <Label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Prefix</Label>
-        <Input
-          value={metric.render.prefix ?? ""}
-          onChange={(e) => onChange({ render: { ...metric.render, prefix: e.target.value || undefined } })}
-          placeholder="e.g. R$"
-        />
-      </div>
-      <div className="space-y-1">
-        <Label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Suffix</Label>
-        <Input
-          value={metric.render.suffix ?? ""}
-          onChange={(e) => onChange({ render: { ...metric.render, suffix: e.target.value || undefined } })}
-          placeholder="e.g. MWh"
-        />
-      </div>
-    </div>
-  );
-}
-
-function MetricSparklineField({
-  metric,
-  onChange,
-}: {
-  metric: NumberMetric;
-  onChange: (patch: Partial<NumberMetric>) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <Label className="text-[10px] font-medium uppercase tracking-wide text-slate-500">Sparkline field</Label>
-      <Input
-        value={metric.render.sparklineField ?? ""}
-        onChange={(e) => onChange({ render: { ...metric.render, sparklineField: e.target.value || undefined } })}
-        placeholder="e.g. createdAt"
-      />
     </div>
   );
 }
