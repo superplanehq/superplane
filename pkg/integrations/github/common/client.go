@@ -176,6 +176,10 @@ func (c *Client) GetCombinedStatus(ctx context.Context, repository string, ref s
 	return c.underlying.Repositories.GetCombinedStatus(ctx, c.owner, repository, ref, opts)
 }
 
+func (c *Client) ListCheckRunsForRef(ctx context.Context, repository string, ref string, opts *github.ListCheckRunsOptions) (*github.ListCheckRunsResults, *github.Response, error) {
+	return c.underlying.Checks.ListCheckRunsForRef(ctx, c.owner, repository, ref, opts)
+}
+
 func (c *Client) CreateDeployment(ctx context.Context, repository string, request *github.DeploymentRequest) (*github.Deployment, *github.Response, error) {
 	return c.underlying.Repositories.CreateDeployment(ctx, c.owner, repository, request)
 }

@@ -10,6 +10,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
 
 <CardGrid>
   <LinkCard title="On Branch Created" href="#on-branch-created" description="Listen to GitHub branch creation events" />
+  <LinkCard title="On Check Run" href="#on-check-run" description="Listen to GitHub Checks API check run events" />
   <LinkCard title="On Commit Status" href="#on-commit-status" description="Listen to GitHub commit status events from the Commit Statuses API" />
   <LinkCard title="On Issue" href="#on-issue" description="Listen to issue events" />
   <LinkCard title="On Issue Comment" href="#on-issue-comment" description="Listen to issue comment events" />
@@ -41,6 +42,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Release" href="#get-release" description="Get a release from a GitHub repository" />
   <LinkCard title="Get Repository Permission" href="#get-repository-permission" description="Get the role and permission level for a user on a GitHub repository" />
   <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
+  <LinkCard title="List Check Runs For Ref" href="#list-check-runs-for-ref" description="List GitHub Checks API check runs for a commit, branch, or tag" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitHub issue" />
   <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from a GitHub issue" />
@@ -104,6 +106,99 @@ This trigger automatically sets up a GitHub webhook when configured. The webhook
   },
   "timestamp": "2026-01-16T17:56:16.680755501Z",
   "type": "github.branchCreated"
+}
+```
+
+<a id="on-check-run"></a>
+
+## On Check Run
+
+**Trigger key:** `github.onCheckRun`
+
+The On Check Run trigger starts a workflow execution when a GitHub Checks API check run changes.
+
+GitHub check runs are created by GitHub Apps and power many pull request checks such as Cloudflare Pages, DCO, Sourcery, and GitHub Actions check runs. They are separate from legacy Commit Statuses API statuses. Use On Commit Status for legacy commit status events.
+
+### Use Cases
+
+- **Pull request automation**: React when Checks API checks complete or fail
+- **Quality gates**: Continue workflows only after a specific check run reaches the expected state
+- **Notifications**: Notify teams when app-provided checks fail or require action
+- **Merge orchestration**: Combine this trigger with List Check Runs For Ref to decide whether all checks are green
+
+### Configuration
+
+- **Repository**: Select the GitHub repository to monitor
+- **Statuses**: Select check run statuses to listen for (queued, in_progress, completed, requested, waiting, pending)
+- **Conclusions** *(optional)*: Filter completed check runs by conclusion
+- **Names** *(optional)*: Filter check run names using predicates, e.g. equals "DCO" or matches "Cloudflare.*"
+- **Branches** *(optional)*: Filter check suite head branches using predicates
+- **Pull requests only**: Emit only check runs that GitHub associates with at least one pull request
+
+### Event Data
+
+Each event includes:
+- **action**: The check_run webhook action
+- **check_run**: Check run details, including name, status, conclusion, head SHA, app, pull requests, and URLs
+- **repository**: Repository information
+- **sender**: User or app actor associated with the webhook event
+
+### Webhook Setup
+
+This trigger automatically sets up a GitHub webhook when configured. The webhook is managed by SuperPlane and will be cleaned up when the trigger is removed.
+
+### Notes
+
+GitHub may return an empty pull_requests array for check runs created from forked repository pushes. When Pull requests only is enabled, those fork-originated check runs may be filtered out because GitHub does not include PR metadata in the webhook payload.
+
+### Example Data
+
+```json
+{
+  "data": {
+    "action": "completed",
+    "check_run": {
+      "app": {
+        "name": "DCO"
+      },
+      "check_suite": {
+        "head_branch": "feature/snake-updates",
+        "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+      },
+      "completed_at": "2026-06-01T12:02:00Z",
+      "conclusion": "success",
+      "details_url": "https://github.com/acme/snaketoy/runs/123456789",
+      "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+      "html_url": "https://github.com/acme/snaketoy/runs/123456789",
+      "id": 123456789,
+      "name": "DCO",
+      "pull_requests": [
+        {
+          "base": {
+            "ref": "main"
+          },
+          "head": {
+            "ref": "feature/snake-updates",
+            "sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44"
+          },
+          "html_url": "https://github.com/acme/snaketoy/pull/42",
+          "number": 42
+        }
+      ],
+      "started_at": "2026-06-01T12:00:00Z",
+      "status": "completed"
+    },
+    "repository": {
+      "full_name": "acme/snaketoy",
+      "html_url": "https://github.com/acme/snaketoy"
+    },
+    "sender": {
+      "html_url": "https://github.com/octocat",
+      "login": "octocat"
+    }
+  },
+  "timestamp": "2026-06-01T12:02:01Z",
+  "type": "github.checkRun"
 }
 ```
 
@@ -2649,6 +2744,84 @@ The component stores repository information in node metadata:
   },
   "timestamp": "2026-02-17T20:00:00Z",
   "type": "github.workflowUsage"
+}
+```
+
+<a id="list-check-runs-for-ref"></a>
+
+## List Check Runs For Ref
+
+**Component key:** `github.listCheckRunsForRef`
+
+The List Check Runs For Ref component retrieves GitHub Checks API check runs for a commit SHA, branch, or tag.
+
+Use it after On Check Run or other GitHub triggers to inspect the full set of Checks API results for the same ref before deciding whether to continue.
+
+### Use Cases
+
+- **PR quality gates**: Continue only when all check runs for a PR commit are complete and green
+- **Check aggregation**: Inspect the full Checks API state after one check run changes
+- **Notifications**: Build summaries for failed or pending check runs
+
+### Configuration
+
+- **Repository**: Select the GitHub repository
+- **Ref**: Commit SHA, branch, or tag ref
+- **Check Name** *(optional)*: Return only check runs with this name
+- **Status** *(optional)*: Return only check runs with this status
+- **Filter**: Use latest to return the latest run per check suite, or all to include all matching runs
+
+### Output
+
+Returns GitHub's check run list response, including total_count and check_runs. Each check run includes its name, status, conclusion, URLs, app metadata, associated pull requests, and timestamps.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "check_runs": [
+      {
+        "app": {
+          "name": "DCO"
+        },
+        "conclusion": "success",
+        "details_url": "https://github.com/acme/snaketoy/runs/123456789",
+        "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+        "html_url": "https://github.com/acme/snaketoy/runs/123456789",
+        "id": 123456789,
+        "name": "DCO",
+        "pull_requests": [
+          {
+            "html_url": "https://github.com/acme/snaketoy/pull/42",
+            "number": 42
+          }
+        ],
+        "status": "completed"
+      },
+      {
+        "app": {
+          "name": "Cloudflare Pages"
+        },
+        "conclusion": "success",
+        "details_url": "https://dash.cloudflare.com/example",
+        "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+        "html_url": "https://github.com/acme/snaketoy/runs/987654321",
+        "id": 987654321,
+        "name": "Cloudflare Pages",
+        "pull_requests": [
+          {
+            "html_url": "https://github.com/acme/snaketoy/pull/42",
+            "number": 42
+          }
+        ],
+        "status": "completed"
+      }
+    ],
+    "total_count": 2
+  },
+  "timestamp": "2026-06-01T12:02:02Z",
+  "type": "github.checkRuns"
 }
 ```
 

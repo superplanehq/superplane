@@ -1,0 +1,45 @@
+{
+  "data": {
+    "total_count": 2,
+    "check_runs": [
+      {
+        "id": 123456789,
+        "name": "DCO",
+        "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/acme/snaketoy/runs/123456789",
+        "details_url": "https://github.com/acme/snaketoy/runs/123456789",
+        "app": {
+          "name": "DCO"
+        },
+        "pull_requests": [
+          {
+            "number": 42,
+            "html_url": "https://github.com/acme/snaketoy/pull/42"
+          }
+        ]
+      },
+      {
+        "id": 987654321,
+        "name": "Cloudflare Pages",
+        "head_sha": "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/acme/snaketoy/runs/987654321",
+        "details_url": "https://dash.cloudflare.com/example",
+        "app": {
+          "name": "Cloudflare Pages"
+        },
+        "pull_requests": [
+          {
+            "number": 42,
+            "html_url": "https://github.com/acme/snaketoy/pull/42"
+          }
+        ]
+      }
+    ]
+  },
+  "timestamp": "2026-06-01T12:02:02Z",
+  "type": "github.checkRuns"
+}
