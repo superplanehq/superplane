@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import GridLayout, { type Layout, WidthProvider } from "react-grid-layout";
-import { Loader2, LayoutGrid, FileText, Hash, LineChart, Network, Table2, Workflow } from "lucide-react";
+import { Loader2, LayoutGrid, FileText, Hash, LineChart, Network, Plus, Table2, Workflow } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -98,7 +98,7 @@ export function DashboardView({
   if (localPanels.length === 0) {
     return (
       <>
-        <EmptyState />
+        <EmptyState onAddFirstPanel={() => setAddPanelOpen(true)} />
         <AddPanelDialog open={addPanelOpen} onConfirm={confirmAddPanel} onCancel={() => setAddPanelOpen(false)} />
       </>
     );
@@ -201,38 +201,50 @@ function toDashboardLayout(next: Layout[]): DashboardLayoutItem[] {
   });
 }
 
-function EmptyState() {
+function EmptyState({ onAddFirstPanel }: { onAddFirstPanel?: () => void }) {
   return (
     <div className="flex flex-1 items-center justify-center p-6 sm:p-8" data-testid="dashboard-empty-state">
-      <div className="flex w-full max-w-4xl flex-col items-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 shadow-sm sm:px-10">
-        <div className="flex flex-col items-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
-            <LayoutGrid className="h-7 w-7 text-slate-600" />
+      <div className="flex w-full max-w-3xl flex-col items-center overflow-hidden rounded-2xl border border-slate-950/15 bg-white">
+        <div className="flex flex-col items-center px-4 pb-6 pt-8 text-center sm:px-6">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-sky-50">
+            <LayoutGrid className="h-6 w-6 text-sky-600" />
           </div>
-          <h3 className="mt-5 text-xl font-semibold tracking-tight text-slate-900">Build your console</h3>
-          <p className="mx-auto mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
-            Console panels surface the most important docs, links, and live data for this canvas. Drag panels into place
-            and resize from the bottom-right corner to lay them out the way your team works.
+          <h3 className="mt-4 text-lg font-medium tracking-tight text-slate-900">Build your console</h3>
+          <p className="mx-auto mt-1 max-w-xs text-sm leading-normal text-gray-500">
+            Console panels surface the most important docs, links, and live data for this canvas.
           </p>
+          {onAddFirstPanel ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mt-7"
+              onClick={onAddFirstPanel}
+              data-testid="dashboard-add-first-panel"
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" aria-hidden />
+              Add First Panel
+            </Button>
+          ) : null}
         </div>
 
-        <div className="mt-8 grid w-full gap-4 sm:grid-cols-3">
-          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-left shadow-sm">
+        <div className="mt-6 grid w-full gap-3 border-t border-slate-950/15 px-4 pb-8 pt-6 sm:grid-cols-3 sm:px-6">
+          <div className="rounded-xl px-2 py-3 text-left">
             <FileText className="h-5 w-5 text-sky-600" aria-hidden />
-            <h4 className="mt-3 text-sm font-semibold text-slate-900">Document with markdown</h4>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">Write runbooks, links, and notes in markdown.</p>
+            <h4 className="mt-3 text-sm font-medium text-slate-900">Document with markdown</h4>
+            <p className="mt-1 text-sm leading-normal text-gray-500">Write runbooks, links, and notes in markdown.</p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-left shadow-sm">
+          <div className="rounded-xl px-2 py-3 text-left">
             <Table2 className="h-5 w-5 text-sky-600" aria-hidden />
-            <h4 className="mt-3 text-sm font-semibold text-slate-900">Show live data</h4>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+            <h4 className="mt-3 text-sm font-medium text-slate-900">Show live data</h4>
+            <p className="mt-1 text-sm leading-normal text-gray-500">
               Tables, charts, and KPIs over executions or memory.
             </p>
           </div>
-          <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 text-left shadow-sm">
+          <div className="rounded-xl px-2 py-3 text-left">
             <Workflow className="h-5 w-5 text-sky-600" aria-hidden />
-            <h4 className="mt-3 text-sm font-semibold text-slate-900">Surface key nodes</h4>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+            <h4 className="mt-3 text-sm font-medium text-slate-900">Surface key nodes</h4>
+            <p className="mt-1 text-sm leading-normal text-gray-500">
               Pin a node with its live status and an optional Run button.
             </p>
           </div>
@@ -325,44 +337,15 @@ function AddPanelDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Add panel</DialogTitle>
+          <DialogTitle className="text-base font-medium">Add panel</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label>Type</Label>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Panel type">
-              {PANEL_TYPES.map((t) => {
-                const meta = PANEL_TYPE_META[t];
-                const Icon = PANEL_TYPE_ICONS[t];
-                const selected = type === t;
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    onClick={() => setType(t)}
-                    className={cn(
-                      "flex flex-col items-start gap-1 rounded-md border bg-white p-3 text-left transition-colors",
-                      "hover:border-sky-400 hover:bg-sky-50/40",
-                      selected ? "border-sky-500 bg-sky-50 ring-2 ring-sky-200" : "border-slate-200",
-                    )}
-                    data-testid={`add-panel-type-${t}`}
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <Icon className="h-4 w-4 text-slate-600" aria-hidden />
-                      <span className="text-sm font-medium text-slate-800">{meta.label}</span>
-                    </div>
-                    <span className="text-[11px] leading-snug text-slate-500">{meta.description}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="panel-name">Name</Label>
+            <Label htmlFor="panel-name" className="mb-3">
+              Name
+            </Label>
             <Input
               id="panel-name"
               placeholder="Panel name"
@@ -377,6 +360,37 @@ function AddPanelDialog({
               autoFocus
               data-testid="add-panel-name-input"
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="mb-3">Type</Label>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3" role="radiogroup" aria-label="Panel type">
+              {PANEL_TYPES.map((t) => {
+                const meta = PANEL_TYPE_META[t];
+                const Icon = PANEL_TYPE_ICONS[t];
+                const selected = type === t;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setType(t)}
+                    className={cn(
+                      "flex flex-col items-start gap-1 rounded-md border bg-white p-3 text-left transition-colors",
+                      "hover:border-sky-400 hover:bg-sky-50",
+                      selected ? "border-sky-500 bg-sky-50" : "border-slate-200",
+                    )}
+                    data-testid={`add-panel-type-${t}`}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Icon className="h-4 w-4 text-slate-600" aria-hidden />
+                      <span className="text-sm font-medium text-slate-800">{meta.label}</span>
+                    </div>
+                    <span className="text-xs leading-normal text-gray-500">{meta.description}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
         <DialogFooter>
