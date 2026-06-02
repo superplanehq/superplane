@@ -365,6 +365,60 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			contains: "render.rowActions[0].node",
 		},
 		{
+			name: "row style with unknown tone",
+			panel: DashboardPanel{
+				ID:   "table",
+				Type: DashboardPanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind":    "table",
+						"columns": []any{},
+						"rowStyles": []any{
+							map[string]any{"field": "status", "op": "eq", "value": "error", "tone": "magenta"},
+						},
+					},
+				},
+			},
+			contains: "render.rowStyles[0].tone must be one of",
+		},
+		{
+			name: "row style with unsupported op",
+			panel: DashboardPanel{
+				ID:   "table",
+				Type: DashboardPanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind":    "table",
+						"columns": []any{},
+						"rowStyles": []any{
+							map[string]any{"field": "status", "op": "regex", "value": "err.*", "tone": "red"},
+						},
+					},
+				},
+			},
+			contains: "render.rowStyles[0].op is not supported",
+		},
+		{
+			name: "row style with empty field",
+			panel: DashboardPanel{
+				ID:   "table",
+				Type: DashboardPanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind":    "table",
+						"columns": []any{},
+						"rowStyles": []any{
+							map[string]any{"field": "", "op": "eq", "value": "error", "tone": "red"},
+						},
+					},
+				},
+			},
+			contains: "render.rowStyles[0].field must be a non-empty string",
+		},
+		{
 			name: "chart with unsupported type",
 			panel: DashboardPanel{
 				ID:   "chart",
@@ -577,6 +631,30 @@ func TestValidateDashboardContent_AcceptsChartSeriesFormatAndLegend(t *testing.T
 						map[string]any{"field": "cost", "label": "Cost", "format": "number", "prefix": "$", "suffix": " /mo"},
 					},
 					"legend": "show",
+				},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateDashboardContent_AcceptsTableRowStyles(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "table",
+			Type: DashboardPanelTypeTable,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+				"render": map[string]any{
+					"kind":    "table",
+					"columns": []any{map[string]any{"field": "status"}},
+					"rowStyles": []any{
+						map[string]any{"field": "status", "op": "eq", "value": "error", "tone": "red-soft"},
+						map[string]any{"field": "status", "op": "eq", "value": "deploying", "tone": "orange-soft"},
+						map[string]any{"field": "deployedAt", "op": "not_exists", "tone": "dimmed"},
+					},
 				},
 			},
 		},

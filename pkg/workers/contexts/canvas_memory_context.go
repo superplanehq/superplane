@@ -30,6 +30,10 @@ func (c *CanvasMemoryContext) AddRecord(namespace string, values any) (core.Canv
 		return core.CanvasMemoryRecord{}, fmt.Errorf("namespace is required")
 	}
 
+	if err := c.ensureNodeWritable(namespace); err != nil {
+		return core.CanvasMemoryRecord{}, err
+	}
+
 	record, err := models.AddCanvasMemoryRecordInTransaction(c.tx, c.canvasID, namespace, values)
 	if err != nil {
 		return core.CanvasMemoryRecord{}, err
@@ -80,6 +84,10 @@ func (c *CanvasMemoryContext) Delete(namespace string, matches map[string]any) (
 		return nil, fmt.Errorf("namespace is required")
 	}
 
+	if err := c.ensureNodeWritable(namespace); err != nil {
+		return nil, err
+	}
+
 	records, err := models.DeleteCanvasMemoriesByNamespaceAndMatchesInTransaction(c.tx, c.canvasID, namespace, matches)
 	if err != nil {
 		return nil, err
@@ -108,6 +116,10 @@ func (c *CanvasMemoryContext) UpdateRecords(namespace string, matches map[string
 		return nil, fmt.Errorf("namespace is required")
 	}
 
+	if err := c.ensureNodeWritable(namespace); err != nil {
+		return nil, err
+	}
+
 	records, err := models.UpdateCanvasMemoriesByNamespaceAndMatchesInTransaction(c.tx, c.canvasID, namespace, matches, values)
 	if err != nil {
 		return nil, err
@@ -131,12 +143,31 @@ func (c *CanvasMemoryContext) UpdateNamespaceRecords(namespace string, values ma
 		return nil, fmt.Errorf("namespace is required")
 	}
 
+	if err := c.ensureNodeWritable(namespace); err != nil {
+		return nil, err
+	}
+
 	records, err := models.UpdateCanvasMemoriesByNamespaceInTransaction(c.tx, c.canvasID, namespace, values)
 	if err != nil {
 		return nil, err
 	}
 
 	return canvasMemoryRecords(records), nil
+}
+
+// ensureNodeWritable returns an error if the namespace is currently owned by
+// manually-created memory, preventing node executions from mutating it.
+func (c *CanvasMemoryContext) ensureNodeWritable(namespace string) error {
+	source, err := models.CanvasMemoryNamespaceSourceInTransaction(c.tx, c.canvasID, namespace)
+	if err != nil {
+		return fmt.Errorf("failed to check memory namespace ownership: %w", err)
+	}
+
+	if source == models.CanvasMemorySourceManual {
+		return fmt.Errorf("cannot modify manually-managed memory namespace %q", namespace)
+	}
+
+	return nil
 }
 
 func canvasMemoryRecord(record models.CanvasMemory) core.CanvasMemoryRecord {

@@ -11,12 +11,16 @@ import { getTriggerTemplates } from "./dashboardTriggerParameters";
 import type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
 
 import { PayloadEditor } from "./TablePanelPayloadEditor";
+import { ROW_STYLE_CLASS, ROW_STYLE_LABEL } from "./widget/rowStyles";
 import {
   WIDGET_FILTER_OPS,
   WIDGET_ROW_ACTION_ICONS,
   WIDGET_ROW_ACTION_VARIANTS,
+  WIDGET_ROW_STYLE_TONES,
   type WidgetColumnFormat,
   type WidgetRowAction,
+  type WidgetRowStyle,
+  type WidgetRowStyleTone,
   type WidgetTableColumn,
   type WidgetTableFilter,
 } from "./widget/types";
@@ -155,6 +159,83 @@ export function FilterRow({
         <div className="col-span-4" />
       )}
       <Button type="button" size="icon" variant="ghost" className="col-span-1 h-8 w-8" onClick={onRemove}>
+        <Trash2 className="h-3.5 w-3.5" />
+      </Button>
+    </div>
+  );
+}
+
+export function RowStyleRow({
+  rule,
+  fieldOptions,
+  onChange,
+  onRemove,
+}: {
+  rule: WidgetRowStyle;
+  fieldOptions: string[];
+  onChange: (patch: Partial<WidgetRowStyle>) => void;
+  onRemove: () => void;
+}) {
+  const needsValue = rule.op !== "exists" && rule.op !== "not_exists";
+  return (
+    <div className="grid grid-cols-12 gap-2 rounded border border-slate-200 p-2">
+      <Input
+        className="col-span-3 h-8"
+        value={rule.field}
+        onChange={(e) => onChange({ field: e.target.value })}
+        placeholder="field"
+        list={fieldOptions.length > 0 ? "table-field-options" : undefined}
+        data-testid="table-row-style-field"
+      />
+      <Select value={rule.op} onValueChange={(v) => onChange({ op: v as WidgetTableFilter["op"] })}>
+        <SelectTrigger className="col-span-2 h-8" data-testid="table-row-style-op">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {WIDGET_FILTER_OPS.map((op) => (
+            <SelectItem key={op} value={op}>
+              {op}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {needsValue ? (
+        <Input
+          className="col-span-3 h-8"
+          value={rule.value ?? ""}
+          onChange={(e) => onChange({ value: e.target.value })}
+          placeholder="value or {{ expr }}"
+          data-testid="table-row-style-value"
+        />
+      ) : (
+        <div className="col-span-3" />
+      )}
+      <Select value={rule.tone} onValueChange={(v) => onChange({ tone: v as WidgetRowStyleTone })}>
+        <SelectTrigger className="col-span-3 h-8" data-testid="table-row-style-tone">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {WIDGET_ROW_STYLE_TONES.map((tone) => (
+            <SelectItem key={tone} value={tone}>
+              <span className="inline-flex items-center gap-2">
+                <span
+                  className={`inline-block h-3 w-4 rounded-sm border border-slate-300 ${ROW_STYLE_CLASS[tone]}`}
+                  aria-hidden
+                />
+                <span>{ROW_STYLE_LABEL[tone]}</span>
+              </span>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="col-span-1 h-8 w-8"
+        onClick={onRemove}
+        data-testid="table-row-style-remove"
+      >
         <Trash2 className="h-3.5 w-3.5" />
       </Button>
     </div>

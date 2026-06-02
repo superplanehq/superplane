@@ -11,6 +11,11 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	CanvasMemorySourceNode   = "node"
+	CanvasMemorySourceManual = "manual"
+)
+
 type CanvasMemory struct {
 	ID        uuid.UUID `gorm:"type:uuid;primary_key;default:gen_random_uuid()"`
 	CreatedAt time.Time
@@ -18,6 +23,7 @@ type CanvasMemory struct {
 	CanvasID  uuid.UUID
 	Namespace string
 	Values    datatypes.JSONType[any]
+	Source    string
 }
 
 func (CanvasMemory) TableName() string {
@@ -25,10 +31,19 @@ func (CanvasMemory) TableName() string {
 }
 
 func AddCanvasMemoryRecordInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, values any) (CanvasMemory, error) {
+	return AddCanvasMemoryRecordWithSourceInTransaction(tx, canvasID, namespace, values, CanvasMemorySourceNode)
+}
+
+func AddCanvasMemoryRecordWithSourceInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, values any, source string) (CanvasMemory, error) {
+	if source == "" {
+		source = CanvasMemorySourceNode
+	}
+
 	record := CanvasMemory{
 		CanvasID:  canvasID,
 		Namespace: namespace,
 		Values:    datatypes.NewJSONType(values),
+		Source:    source,
 	}
 
 	err := tx.Create(&record).Error
@@ -42,6 +57,56 @@ func AddCanvasMemoryInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace str
 
 func AddCanvasMemory(canvasID uuid.UUID, namespace string, values any) error {
 	return AddCanvasMemoryInTransaction(database.Conn(), canvasID, namespace, values)
+}
+
+// CanvasMemoryNamespaceSourceInTransaction returns the source associated with
+// existing rows in a namespace, or empty string if the namespace has no rows.
+func CanvasMemoryNamespaceSourceInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string) (string, error) {
+	var source string
+	err := tx.
+		Model(&CanvasMemory{}).
+		Where("canvas_id = ? AND namespace = ?", canvasID, namespace).
+		Limit(1).
+		Pluck("source", &source).
+		Error
+	if err != nil {
+		return "", err
+	}
+
+	return source, nil
+}
+
+func CanvasMemoryNamespaceSource(canvasID uuid.UUID, namespace string) (string, error) {
+	return CanvasMemoryNamespaceSourceInTransaction(database.Conn(), canvasID, namespace)
+}
+
+// ReplaceManualCanvasMemoryNamespaceInTransaction replaces all manual-source
+// rows in a namespace with one row per entry. Used by both create (no
+// existing rows) and update (existing manual rows). The caller is
+// responsible for enforcing origin-lock before invoking this.
+func ReplaceManualCanvasMemoryNamespaceInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, entries []any) error {
+	err := tx.
+		Where("canvas_id = ? AND namespace = ? AND source = ?", canvasID, namespace, CanvasMemorySourceManual).
+		Delete(&CanvasMemory{}).
+		Error
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		_, err := AddCanvasMemoryRecordWithSourceInTransaction(tx, canvasID, namespace, entry, CanvasMemorySourceManual)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func ReplaceManualCanvasMemoryNamespace(canvasID uuid.UUID, namespace string, entries []any) error {
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		return ReplaceManualCanvasMemoryNamespaceInTransaction(tx, canvasID, namespace, entries)
+	})
 }
 
 func ListCanvasMemoriesInTransaction(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasMemory, error) {

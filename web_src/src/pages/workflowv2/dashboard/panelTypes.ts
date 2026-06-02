@@ -22,6 +22,7 @@ import type {
 } from "./widget/types";
 import { normalizeRowAction, WIDGET_CHART_LEGEND_MODES, WIDGET_FILTER_OPS, WIDGET_SORT_ORDERS } from "./widget/types";
 import type { WidgetChartLegendMode, WidgetSort, WidgetSortOrder } from "./widget/types";
+import { normalizeWidgetRowStyles, validateWidgetRowStyles } from "./widget/rowStyles";
 import { templateForNodesPanel, validateNodesContent } from "./nodesPanelContent";
 
 /** All panel kinds the dashboard currently understands. */
@@ -363,13 +364,13 @@ function validateTableContent(content: unknown): string | null {
   const render = asObject(obj.render);
   if (!render) return "render must be an object.";
   if (render.kind !== "table") return 'render.kind must be "table".';
-  const columnsError = validateTableColumns(render.columns);
-  if (columnsError) return columnsError;
-  const whereError = validateTableWhere(render.where);
-  if (whereError) return whereError;
-  const sortError = validateSort(render.sort);
-  if (sortError) return sortError;
-  return validateTableRowActions(render.rowActions);
+  return (
+    validateTableColumns(render.columns) ??
+    validateTableWhere(render.where) ??
+    validateSort(render.sort) ??
+    validateWidgetRowStyles(render.rowStyles) ??
+    validateTableRowActions(render.rowActions)
+  );
 }
 
 function validateTableWhere(where: unknown): string | null {
@@ -404,6 +405,7 @@ export function normalizeTablePanelContent(raw: Record<string, unknown> | undefi
       filters: Array.isArray(renderRaw.filters) ? (renderRaw.filters as string[]) : undefined,
       emptyMessage: typeof renderRaw.emptyMessage === "string" ? renderRaw.emptyMessage : undefined,
       sort: normalizeSort(renderRaw.sort),
+      rowStyles: normalizeWidgetRowStyles(renderRaw.rowStyles),
     },
   };
 }
@@ -485,9 +487,7 @@ function stringOrUndefined(value: unknown): string | undefined {
 }
 
 function validateTableColumns(columns: unknown): string | null {
-  if (!Array.isArray(columns)) {
-    return "render.columns must be an array.";
-  }
+  if (!Array.isArray(columns)) return "render.columns must be an array.";
   for (let i = 0; i < columns.length; i += 1) {
     const col = asObject(columns[i]);
     if (!col) return `render.columns[${i}] must be an object.`;
