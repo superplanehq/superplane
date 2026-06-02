@@ -29,7 +29,8 @@ export function useConversationMessages(
 
 export function useThinkingIndicator(messages: AgentMessage[], status: string): boolean {
   const hasRunningTool = useMemo(() => hasActiveTool(messages), [messages]);
-  return status === "streaming" && !hasRunningTool;
+  const hasAssistantOutput = useMemo(() => hasAssistantOutputForCurrentTurn(messages), [messages]);
+  return status === "streaming" && !hasRunningTool && !hasAssistantOutput;
 }
 
 function hasActiveTool(messages: AgentMessage[]): boolean {
@@ -52,6 +53,21 @@ function hasActiveTool(messages: AgentMessage[]): boolean {
   }
 
   return activeToolIds.size > 0;
+}
+
+function hasAssistantOutputForCurrentTurn(messages: AgentMessage[]): boolean {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
+    if (message.role === "assistant" && message.content.trim() !== "") {
+      return true;
+    }
+
+    if (message.role === "user") {
+      return false;
+    }
+  }
+
+  return false;
 }
 
 export function useStoredOutcomeState(

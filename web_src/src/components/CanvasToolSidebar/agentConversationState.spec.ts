@@ -35,6 +35,25 @@ describe("useThinkingIndicator", () => {
     ).toBe(true);
   });
 
+  it("hides once assistant output for the current turn is visible", () => {
+    expect(
+      thinking([
+        message({ id: "user-1", role: "user", content: "Run this" }),
+        message({ id: "assistant-1", role: "assistant", content: "Working on it" }),
+      ]),
+    ).toBe(false);
+  });
+
+  it("shows for a new turn even when an earlier assistant message exists", () => {
+    expect(
+      thinking([
+        message({ id: "user-1", role: "user", content: "Run this" }),
+        message({ id: "assistant-1", role: "assistant", content: "Done" }),
+        message({ id: "user-2", role: "user", content: "Run another" }),
+      ]),
+    ).toBe(true);
+  });
+
   it("hides while a tool is active", () => {
     expect(
       thinking([

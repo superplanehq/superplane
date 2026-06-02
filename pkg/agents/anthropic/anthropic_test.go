@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -295,7 +296,7 @@ func TestStreamEvents_MapsKnownTypes(t *testing.T) {
 
 	p := newTestProvider(t, server)
 	var received []agents.ProviderEvent
-	err := p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+	err := p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
 		received = append(received, e)
 		return nil
 	})
@@ -309,6 +310,123 @@ func TestStreamEvents_MapsKnownTypes(t *testing.T) {
 	assert.Equal(t, "ls -la", received[1].ToolInput, "bash-style tools surface the `command` field as the input")
 	assert.Equal(t, agents.ProviderEventToolUseFinished, received[2].Type)
 	assert.Equal(t, agents.ProviderEventTurnCompleted, received[3].Type)
+}
+
+func TestStreamEvents_RunsAfterOpenBeforeReadingEvents(t *testing.T) {
+	streamOpened := make(chan struct{})
+	releaseEvents := make(chan struct{})
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/sessions/sesn_abc/events/stream", r.URL.Path)
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.(http.Flusher).Flush()
+		close(streamOpened)
+		<-releaseEvents
+		_, _ = io.WriteString(w, "data: {\"type\":\"session.status_idle\"}\n\n")
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	events := 0
+	err := p.StreamEvents(ctx, "sesn_abc", func(context.Context) error {
+		select {
+		case <-streamOpened:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+		close(releaseEvents)
+		return nil
+	}, func(agents.ProviderEvent) error {
+		events++
+		return nil
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, events)
+}
+
+func TestStreamEvents_AccumulatesConsecutiveAgentMessages(t *testing.T) {
+	const sse = "data: {\"id\":\"msg-1\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"Hello\"}]}\n\n" +
+		"data: {\"id\":\"msg-2\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\", world\"}]}\n\n" +
+		"data: {\"type\":\"session.status_idle\"}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 3)
+	assert.Equal(t, agents.ProviderEventAssistantMessage, received[0].Type)
+	assert.Equal(t, "msg-1", received[0].ProviderEventID)
+	assert.Equal(t, "Hello", received[0].Text)
+	assert.Equal(t, agents.ProviderEventAssistantMessage, received[1].Type)
+	assert.Equal(t, "msg-1", received[1].ProviderEventID)
+	assert.Equal(t, "Hello, world", received[1].Text)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[2].Type)
+}
+
+func TestStreamEvents_AccumulatesAgentMessageDeltas(t *testing.T) {
+	const sse = "data: {\"id\":\"msg-1\",\"type\":\"agent.message_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}\n\n" +
+		"data: {\"id\":\"msg-1\",\"type\":\"agent.message_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\", world\"}}\n\n" +
+		"data: {\"type\":\"session.status_idle\"}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 3)
+	assert.Equal(t, agents.ProviderEventAssistantMessage, received[0].Type)
+	assert.Equal(t, "msg-1", received[0].ProviderEventID)
+	assert.Equal(t, "Hello", received[0].Text)
+	assert.Equal(t, agents.ProviderEventAssistantMessage, received[1].Type)
+	assert.Equal(t, "msg-1", received[1].ProviderEventID)
+	assert.Equal(t, "Hello, world", received[1].Text)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[2].Type)
+}
+
+func TestStreamEvents_AccumulatesContentBlockDeltas(t *testing.T) {
+	const sse = "data: {\"type\":\"message_start\",\"message\":{\"id\":\"msg-1\"}}\n\n" +
+		"data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}\n\n" +
+		"data: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\", world\"}}\n\n" +
+		"data: {\"type\":\"message_stop\"}\n\n" +
+		"data: {\"type\":\"session.status_idle\"}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 3)
+	assert.Equal(t, "msg-1", received[0].ProviderEventID)
+	assert.Equal(t, "Hello", received[0].Text)
+	assert.Equal(t, "msg-1", received[1].ProviderEventID)
+	assert.Equal(t, "Hello, world", received[1].Text)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[2].Type)
 }
 
 func TestStreamEvents_PairsToolUseAndResultByToolUseID(t *testing.T) {
@@ -326,7 +444,7 @@ func TestStreamEvents_PairsToolUseAndResultByToolUseID(t *testing.T) {
 
 	p := newTestProvider(t, server)
 	var received []agents.ProviderEvent
-	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
 		received = append(received, e)
 		return nil
 	}))
@@ -346,7 +464,7 @@ func TestStreamEvents_FallsBackToEventIDWhenToolUseIDMissing(t *testing.T) {
 
 	p := newTestProvider(t, server)
 	var received []agents.ProviderEvent
-	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
 		received = append(received, e)
 		return nil
 	}))
@@ -368,7 +486,7 @@ func TestStreamEvents_RedactsJWTsInToolCommands(t *testing.T) {
 
 	p := newTestProvider(t, server)
 	var received []agents.ProviderEvent
-	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
 		received = append(received, e)
 		return nil
 	}))
@@ -389,7 +507,7 @@ func TestStreamEvents_RedactsJWTsInAssistantMessages(t *testing.T) {
 
 	p := newTestProvider(t, server)
 	var received []agents.ProviderEvent
-	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
 		received = append(received, e)
 		return nil
 	}))
@@ -408,7 +526,7 @@ func TestStreamEvents_ToolInputFallsBackToJSON(t *testing.T) {
 
 	p := newTestProvider(t, server)
 	var received []agents.ProviderEvent
-	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
 		received = append(received, e)
 		return nil
 	}))
@@ -428,7 +546,7 @@ func TestStreamEvents_SessionFailed(t *testing.T) {
 
 	p := newTestProvider(t, server)
 	var received []agents.ProviderEvent
-	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
 		received = append(received, e)
 		return nil
 	}))
@@ -450,7 +568,7 @@ func TestStreamEvents_SessionErrorDoesNotStopStream(t *testing.T) {
 
 	p := newTestProvider(t, server)
 	var received []agents.ProviderEvent
-	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
 		received = append(received, e)
 		return nil
 	}))
@@ -472,7 +590,7 @@ func TestStreamEvents_SkipsMalformed(t *testing.T) {
 
 	p := newTestProvider(t, server)
 	count := 0
-	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
 		count++
 		return nil
 	}))
@@ -490,7 +608,7 @@ func TestStreamEvents_StopsOnCallbackError(t *testing.T) {
 
 	p := newTestProvider(t, server)
 	count := 0
-	err := p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+	err := p.StreamEvents(context.Background(), "sesn_abc", nil, func(e agents.ProviderEvent) error {
 		count++
 		return io.ErrUnexpectedEOF
 	})
@@ -506,7 +624,7 @@ func TestStreamEvents_PropagatesHTTPError(t *testing.T) {
 	defer server.Close()
 
 	p := newTestProvider(t, server)
-	err := p.StreamEvents(context.Background(), "sesn_abc", func(agents.ProviderEvent) error { return nil })
+	err := p.StreamEvents(context.Background(), "sesn_abc", nil, func(agents.ProviderEvent) error { return nil })
 	require.Error(t, err)
 	assert.True(t, strings.Contains(err.Error(), "503"))
 }
