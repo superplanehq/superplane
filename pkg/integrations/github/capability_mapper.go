@@ -5,6 +5,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/integrations/github/common"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/actions"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/admin"
+	"github.com/superplanehq/superplane/pkg/integrations/github/components/checks"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/contents"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/deployments"
 	"github.com/superplanehq/superplane/pkg/integrations/github/components/issues"
@@ -24,6 +25,7 @@ const (
 	PermissionContents       = "Contents"
 	PermissionPullRequests   = "Pull Requests"
 	PermissionActions        = "Actions"
+	PermissionChecks         = "Checks"
 	PermissionCommitStatuses = "Commit Statuses"
 	PermissionDeployments    = "Deployments"
 	PermissionMetadata       = "Metadata"
@@ -59,10 +61,18 @@ func NewCapabilityMapper() *CapabilityMapper {
 					{ReadOnly: true, Trigger: &actions.OnWorkflowRun{}},
 				},
 			},
+			PermissionChecks: {
+				PermissionScope: PermissionScopeRepository,
+				Capabilities: []CapabilityDef{
+					{ReadOnly: true, Action: &checks.ListCheckRunsForRef{}},
+					{ReadOnly: true, Trigger: &checks.OnCheckRun{}},
+				},
+			},
 			PermissionCommitStatuses: {
 				PermissionScope: PermissionScopeRepository,
 				Capabilities: []CapabilityDef{
 					{ReadOnly: true, Trigger: &statuses.OnCommitStatus{}},
+					{ReadOnly: true, Action: &statuses.GetCombinedCommitStatus{}},
 					{ReadOnly: false, Action: &statuses.PublishCommitStatus{}},
 				},
 			},
@@ -357,6 +367,8 @@ func (p *PermissionSet) permissionForAppManifest(r string) string {
 		return "contents"
 	case PermissionActions:
 		return "actions"
+	case PermissionChecks:
+		return "checks"
 	case PermissionCommitStatuses:
 		return "statuses"
 	case PermissionDeployments:
