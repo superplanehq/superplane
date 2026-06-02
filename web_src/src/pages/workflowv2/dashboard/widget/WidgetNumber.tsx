@@ -1,7 +1,9 @@
 import { useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { Hash, Loader2 } from "lucide-react";
 
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
+
+import { WidgetEmptyState } from "../WidgetEmptyState";
 
 import { aggregateNumber, aggregateNumberPerSource, applyFilters, combinePartials } from "./widgetData";
 import { formatValue } from "./widgetFormat";
@@ -56,16 +58,17 @@ export function WidgetNumber({ render, rows, isLoading, totalCount, composite }:
     );
   }
 
-  const display =
-    value == null
-      ? "—"
-      : `${render.prefix ?? ""}${formatValue(value, render.format ?? "number")}${render.suffix ?? ""}`;
+  if (value == null) {
+    return <WidgetEmptyState icon={Hash} message="No data to display." testId="widget-number-empty" />;
+  }
+
+  const display = `${render.prefix ?? ""}${formatValue(value, render.format ?? "number")}${render.suffix ?? ""}`;
   return (
     <div className="flex h-full flex-col items-start justify-center gap-1 p-4" data-testid="widget-number">
       {render.label ? (
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{render.label}</span>
       ) : null}
-      <span className="text-2xl font-semibold text-slate-900">{display}</span>
+      <span className="text-3xl font-semibold tracking-tight text-slate-900">{display}</span>
       {sparkline && sparkline.length > 1 ? <Sparkline values={sparkline} /> : null}
     </div>
   );
