@@ -50,7 +50,8 @@ func transportWebSocket(c Config) bool {
 }
 
 // RunWebSocket runs the agent against task-broker using GET /v1/runners/stream.
-// It reconnects with a fixed delay after session errors. Returns nil after one task when ExitAfterEachTask is set.
+// It reconnects with a fixed delay after session errors. Returns nil after one claimed
+// task is handled when ExitAfterEachTask is set, even if complete or the broker ack fails.
 func RunWebSocket(ctx context.Context, a *Agent) error {
 	for {
 		if err := ctx.Err(); err != nil {
@@ -74,7 +75,21 @@ func RunWebSocket(ctx context.Context, a *Agent) error {
 	}
 }
 
-func runWebSocketSession(ctx context.Context, a *Agent) error {
+func runWebSocketSession(ctx context.Context, a *Agent) (err error) {
+	oneShot := a.Config.ExitAfterEachTask
+	taskHandled := false
+	defer func() {
+		if oneShot && taskHandled && err != nil &&
+			!errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
+			if a.Config.Log != nil {
+				a.Config.Log.Warn("task_broker_ws",
+					slog.String("op", "exit_after_task"),
+					slog.Any("err", err))
+			}
+			err = nil
+		}
+	}()
+
 	wsURL, err := brokerStreamURL(a.Config.BaseURL)
 	if err != nil {
 		return err
@@ -133,6 +148,7 @@ func runWebSocketSession(ctx context.Context, a *Agent) error {
 			return fmt.Errorf("unexpected message type %q", taskMsg.Type)
 		}
 		task := taskMsg.Task
+		taskHandled = true
 
 		pushCh := make(chan struct{}, 1)
 		readCtx, readStop := context.WithCancel(ctx)
