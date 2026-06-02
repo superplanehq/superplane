@@ -7,7 +7,6 @@ import (
 
 	"github.com/superplane/runner/shared/models"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
-	"github.com/superplane/runner/task-broker/internal/store"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
 
@@ -33,9 +32,6 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	if got == nil || len(got.Labels) != 2 {
 		t.Fatalf("get fleet: %#v", got)
 	}
-	if !store.LabelsSubset(got.Labels, []string{"prod"}) {
-		t.Fatalf("labels: %#v", got.Labels)
-	}
 
 	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
 		ID:        "fleet-a",
@@ -58,14 +54,6 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 		CreatedAt: now,
 	}); err != nil {
 		t.Fatal(err)
-	}
-
-	match, err := st.FindFleetByLabels(ctx, []string{"prod", "tier-2"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if match == nil || match.ID != "fleet-b" {
-		t.Fatalf("find by labels: %#v", match)
 	}
 
 	list, err := st.ListFleets(ctx)
@@ -112,58 +100,6 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	}
 	if len(list) != 1 || list[0].ID != "fleet-a" {
 		t.Fatalf("after delete fleet-b: %#v", list)
-	}
-}
-
-func TestPostgresStoreFindFleetByLabelsEmpty(t *testing.T) {
-	st, cleanup := testdb.Open(t)
-	defer cleanup()
-
-	match, err := st.FindFleetByLabels(context.Background(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if match != nil {
-		t.Fatalf("expected nil, got %#v", match)
-	}
-}
-
-func TestPostgresStoreFindFleetByLabelsRoutesArchitectureFleets(t *testing.T) {
-	st, cleanup := testdb.Open(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	now := time.Now().UTC().Truncate(time.Second)
-
-	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
-		ID:        "aws-linux-amd64",
-		Labels:    []string{"aws", "linux", "arch:amd64"},
-		CreatedAt: now,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
-		ID:        "aws-linux-arm64",
-		Labels:    []string{"aws", "linux", "arch:arm64"},
-		CreatedAt: now,
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	match, err := st.FindFleetByLabels(ctx, []string{"arch:arm64"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if match == nil || match.ID != "aws-linux-arm64" {
-		t.Fatalf("match arm64: %#v", match)
-	}
-
-	match, err = st.FindFleetByLabels(ctx, []string{"linux", "arch:amd64"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if match == nil || match.ID != "aws-linux-amd64" {
-		t.Fatalf("match amd64: %#v", match)
 	}
 }
 

@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"errors"
-	"sort"
 	"sync"
 	"time"
 
@@ -107,28 +106,4 @@ func (s *PostgresStore) GetFleet(ctx context.Context, id string) (*brokermodels.
 		return nil, err
 	}
 	return &f, nil
-}
-
-// FindFleetByLabels returns any fleet whose label set contains all required labels.
-// Tie-breaker: smallest fleet id alphabetically for stability.
-func (s *PostgresStore) FindFleetByLabels(ctx context.Context, required []string) (*brokermodels.Fleet, error) {
-	req := NormalizeLabels(required)
-	if len(req) == 0 {
-		return nil, nil
-	}
-	fleets, err := s.ListFleets(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var candidates []string
-	for _, f := range fleets {
-		if LabelsSubset(f.Labels, req) {
-			candidates = append(candidates, f.ID)
-		}
-	}
-	if len(candidates) == 0 {
-		return nil, nil
-	}
-	sort.Strings(candidates)
-	return s.GetFleet(ctx, candidates[0])
 }

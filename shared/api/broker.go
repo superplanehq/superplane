@@ -1,13 +1,9 @@
 package api
 
 // BrokerCreateTaskRequest is POST task-broker /v1/tasks.
-//
-// Exactly one routing field must be set: FleetID selects a fleet by id,
-// FleetLabels selects a fleet that has all listed labels (smallest FleetID wins).
 type BrokerCreateTaskRequest struct {
 	CreateTaskRequest
-	FleetID     string   `json:"fleet_id,omitempty"`
-	FleetLabels []string `json:"fleet_labels,omitempty"`
+	FleetID string `json:"fleet_id,omitempty"`
 }
 
 // BrokerCreateTaskResponse returns the task id.

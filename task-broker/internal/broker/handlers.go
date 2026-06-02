@@ -139,25 +139,14 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "webhook_url required")
 		return
 	}
-	hasID := strings.TrimSpace(req.FleetID) != ""
-	hasLabels := len(taskstore.NormalizeLabels(req.FleetLabels)) > 0
-	switch {
-	case hasID && hasLabels:
-		writeError(w, http.StatusBadRequest, "specify either fleet_id or fleet_labels, not both")
-		return
-	case !hasID && !hasLabels:
-		writeError(w, http.StatusBadRequest, "fleet_id or fleet_labels required")
+	fleetID := strings.TrimSpace(req.FleetID)
+	if fleetID == "" {
+		writeError(w, http.StatusBadRequest, "fleet_id required")
 		return
 	}
 
 	ctx := r.Context()
-	var fleet *brokermodels.Fleet
-	var err error
-	if hasID {
-		fleet, err = s.Store.GetFleet(ctx, strings.TrimSpace(req.FleetID))
-	} else {
-		fleet, err = s.Store.FindFleetByLabels(ctx, req.FleetLabels)
-	}
+	fleet, err := s.Store.GetFleet(ctx, fleetID)
 	if err != nil {
 		s.logErr("resolve fleet", err)
 		writeError(w, http.StatusInternalServerError, "could not route fleet")
