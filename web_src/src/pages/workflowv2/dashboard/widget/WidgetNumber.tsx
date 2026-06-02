@@ -9,6 +9,15 @@ import { getValueAtPath } from "./fieldPath";
 import type { WidgetNumberRender } from "./types";
 import type { MemoryNumberSource, WidgetNumberCombine } from "../panelTypes";
 
+/**
+ * Layout variant for the rendered number block.
+ * - `panel` (default): fills the panel body with vertical centering and outer padding.
+ *   Used by single-value and composite number panels.
+ * - `inline`: drops the `h-full` and outer padding so multiple instances can sit
+ *   side-by-side inside a flex-wrap row in a multi-number panel.
+ */
+export type WidgetNumberVariant = "panel" | "inline";
+
 interface WidgetNumberProps {
   render: WidgetNumberRender;
   rows: unknown[];
@@ -20,9 +29,10 @@ interface WidgetNumberProps {
     sources: MemoryNumberSource[];
     combine: WidgetNumberCombine;
   };
+  variant?: WidgetNumberVariant;
 }
 
-export function WidgetNumber({ render, rows, isLoading, totalCount, composite }: WidgetNumberProps) {
+export function WidgetNumber({ render, rows, isLoading, totalCount, composite, variant = "panel" }: WidgetNumberProps) {
   const filtered = useMemo(() => applyFilters(rows, render.filters), [rows, render.filters]);
   const value = useMemo(() => {
     if (composite) {
@@ -49,6 +59,13 @@ export function WidgetNumber({ render, rows, isLoading, totalCount, composite }:
   }, [composite, filtered, render.sparklineField]);
 
   if (isLoading) {
+    if (variant === "inline") {
+      return (
+        <div className="flex items-center justify-center py-1">
+          <Loader2 className="size-4 animate-spin text-slate-400" />
+        </div>
+      );
+    }
     return (
       <div className="flex h-full items-center justify-center p-4">
         <Loader2 className="size-4 animate-spin text-slate-400" />
@@ -56,12 +73,27 @@ export function WidgetNumber({ render, rows, isLoading, totalCount, composite }:
     );
   }
 
+  return <NumberDisplay render={render} value={value} sparkline={sparkline} variant={variant} />;
+}
+
+interface NumberDisplayProps {
+  render: WidgetNumberRender;
+  value: number | null;
+  sparkline: number[] | null;
+  variant: WidgetNumberVariant;
+}
+
+function NumberDisplay({ render, value, sparkline, variant }: NumberDisplayProps) {
   const display =
     value == null
       ? "—"
       : `${render.prefix ?? ""}${formatValue(value, render.format ?? "number")}${render.suffix ?? ""}`;
+  const className =
+    variant === "inline"
+      ? "flex flex-col items-start justify-center gap-1 text-left"
+      : "flex h-full flex-col items-start justify-center gap-1 p-4";
   return (
-    <div className="flex h-full flex-col items-start justify-center gap-1 p-4" data-testid="widget-number">
+    <div className={className} data-testid="widget-number">
       {render.label ? (
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{render.label}</span>
       ) : null}
