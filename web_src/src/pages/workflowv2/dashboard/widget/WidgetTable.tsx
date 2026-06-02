@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ExternalLink, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-react";
+import { ExternalLink, Loader2, Play, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
 
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,7 @@ import { evaluateRowShow } from "./rowVisibility";
 import { resolveCellValue } from "./resolveCellValue";
 import { makeRowStyleResolver } from "./rowStyles";
 import { applyFilters, applySort } from "./widgetData";
+import { WidgetEmptyState } from "../WidgetEmptyState";
 import { formatValue } from "./widgetFormat";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
 import { useWidgetTableActionLock } from "./WidgetTableActionLockContext";
@@ -73,9 +74,17 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
   if (isLoading) return <WidgetSpinner />;
   if (render.columns.length === 0) {
     return (
-      <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-table-no-columns">
-        Configure columns in the panel editor. Pick a memory namespace to see available fields.
-      </div>
+      <WidgetEmptyState
+        icon={Table2}
+        testId="widget-table-no-columns"
+        message={
+          <>
+            Configure columns in the panel editor.
+            <br />
+            Pick a memory namespace to see available fields.
+          </>
+        }
+      />
     );
   }
   if (filtered.length === 0) {

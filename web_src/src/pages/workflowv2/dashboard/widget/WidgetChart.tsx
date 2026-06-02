@@ -1,5 +1,5 @@
-import { useMemo, type CSSProperties } from "react";
-import { Loader2 } from "lucide-react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { LineChart as LineChartIcon, Loader2 } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -26,6 +26,7 @@ import {
 
 import { applyFilters, applySort, buildChartData, distinctSeriesKeys } from "./widgetData";
 import { formatPercentOfTotal, formatSeriesValue } from "./chartFormat";
+import { WidgetEmptyState } from "../WidgetEmptyState";
 import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries } from "./types";
 
 interface WidgetChartProps {
@@ -99,11 +100,7 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
     );
   }
   if (data.length === 0) {
-    return (
-      <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-chart-empty">
-        No data to display.
-      </div>
-    );
+    return <WidgetEmptyState icon={LineChartIcon} message="No data to display." testId="widget-chart-empty" />;
   }
 
   return (
@@ -279,7 +276,7 @@ function DonutChartView({
 
   if (!series) return null;
   if (total === 0) {
-    return <div className="p-4 text-center text-xs text-slate-500">No data</div>;
+    return <WidgetEmptyState icon={LineChartIcon} message="No data" />;
   }
 
   const showLegend = legendMode !== "hide";

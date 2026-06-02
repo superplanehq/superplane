@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,23 +43,23 @@ export function TypedPanelShell({
 
   return (
     <>
-      <div className="group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white">
         <div
-          className={
-            "flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-3 py-1.5 " +
-            (readOnly ? "" : "dashboard-grid-drag-handle cursor-grab active:cursor-grabbing")
-          }
+          className={cn(
+            "flex items-center justify-between rounded-t-lg py-1.5 pl-3 pr-1.5",
+            !readOnly && "dashboard-grid-drag-handle cursor-grab active:cursor-grabbing",
+          )}
           onDoubleClick={readOnly ? undefined : onEdit}
         >
           <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate text-xs font-medium text-slate-700" title={displayTitle}>
+            <span className="truncate text-[13px] font-medium text-slate-700" title={displayTitle}>
               {displayTitle}
             </span>
           </div>
           {!readOnly ? (
             // `dashboard-grid-no-drag` exempts these controls from RGL's
             // draggable area (see DashboardView.draggableCancel).
-            <div className="dashboard-grid-no-drag flex items-center gap-0.5 opacity-0 transition-opacity group-hover/panel:opacity-100">
+            <div className="dashboard-grid-no-drag -mr-0.5 flex shrink-0 items-center opacity-0 transition-opacity group-hover/panel:opacity-100">
               <Button
                 type="button"
                 size="icon"
@@ -73,7 +74,7 @@ export function TypedPanelShell({
                 className="h-6 w-6 cursor-pointer text-slate-500 hover:text-slate-700"
                 data-testid="dashboard-edit-panel"
               >
-                <Pencil className="h-3.5 w-3.5" />
+                <Pencil className="size-3.5" />
               </Button>
               <Button
                 type="button"
@@ -89,13 +90,13 @@ export function TypedPanelShell({
                 className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600"
                 data-testid="dashboard-delete-panel"
               >
-                <Trash2 className="h-3.5 w-3.5" />
+                <Trash2 className="size-3.5" />
               </Button>
             </div>
           ) : null}
         </div>
         <div
-          className={bodyClassName ?? "min-h-0 flex-1 overflow-auto"}
+          className={cn("min-h-0 flex-1 overflow-auto rounded-b-lg bg-white", bodyClassName)}
           onDoubleClick={readOnly ? undefined : onEdit}
           data-testid="typed-panel-body"
         >

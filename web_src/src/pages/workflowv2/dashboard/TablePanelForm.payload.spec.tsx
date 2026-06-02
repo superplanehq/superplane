@@ -47,15 +47,7 @@ function Harness({ initial, actionPayloadIndex = 0 }: { initial: TablePanelConte
 }
 
 function getActionRemoveButtons(): HTMLButtonElement[] {
-  return screen
-    .getAllByPlaceholderText("Label")
-    .map((input) => {
-      const row = input.closest(".grid");
-      const buttons = row?.querySelectorAll("button");
-      if (!buttons || buttons.length === 0) return null;
-      return buttons[buttons.length - 1] ?? null;
-    })
-    .filter((button): button is HTMLButtonElement => button instanceof HTMLButtonElement);
+  return screen.getAllByRole("button", { name: "Remove row action" });
 }
 
 function getPathInputs(): HTMLInputElement[] {
