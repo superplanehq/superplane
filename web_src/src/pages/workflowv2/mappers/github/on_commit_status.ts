@@ -66,13 +66,14 @@ export const onCommitStatusTriggerRenderer: TriggerRenderer = {
       State: stringOrDash(statusState(eventData)),
       Context: stringOrDash(statusContext(eventData)),
       Description: stringOrDash(statusDescription(eventData)),
-      Branches: stringOrDash(statusBranchNames(eventData).join(", ")),
       SHA: stringOrDash(statusSha(eventData)),
-      "Status creator": stringOrDash(statusCreatorLogin(eventData)),
+      "Commit message": stringOrDash(statusCommitMessage(eventData)),
       "Commit author": stringOrDash(statusCommitAuthor(eventData)),
+      Branches: stringOrDash(statusBranchNames(eventData).join(", ")),
+      Repository: stringOrDash(statusRepositoryName(eventData)),
+      "Status creator": stringOrDash(statusCreatorLogin(eventData)),
       "Commit URL": stringOrDash(statusCommitUrl(eventData)),
       "Target URL": stringOrDash(statusTargetUrl(eventData)),
-      Repository: stringOrDash(statusRepositoryName(eventData)),
     };
   },
 
@@ -203,6 +204,11 @@ function statusCreatorLogin(eventData: OnCommitStatusEventData | undefined): str
 
 function statusCommitAuthor(eventData: OnCommitStatusEventData | undefined): string | undefined {
   return eventData?.commit?.author?.login || eventData?.commit?.commit?.author?.name;
+}
+
+function statusCommitMessage(eventData: OnCommitStatusEventData | undefined): string | undefined {
+  const message = eventData?.commit?.commit?.message;
+  return message?.split("\n")[0];
 }
 
 function statusCommitUrl(eventData: OnCommitStatusEventData | undefined): string | undefined {

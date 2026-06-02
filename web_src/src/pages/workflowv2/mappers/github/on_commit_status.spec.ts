@@ -36,6 +36,9 @@ describe("onCommitStatusTriggerRenderer", () => {
       sender: { login: "octocat" },
       commit: {
         author: { login: "monalisa" },
+        commit: {
+          message: "Deploy checkout validation\n\nSigned-off-by: Mona Lisa <mona@example.com>",
+        },
         html_url: "https://github.com/acme/snaketoy/commit/d6f3c8a",
       },
     });
@@ -46,21 +49,24 @@ describe("onCommitStatusTriggerRenderer", () => {
       "State",
       "Context",
       "Description",
-      "Branches",
       "SHA",
-      "Status creator",
+      "Commit message",
       "Commit author",
+      "Branches",
+      "Repository",
+      "Status creator",
       "Commit URL",
       "Target URL",
-      "Repository",
     ]);
     expect(values.State).toBe("failure");
     expect(values.Context).toBe("deploy/production");
     expect(values.Description).toBe("Deployment failed");
-    expect(values.Branches).toBe("main, release/v1");
     expect(values.SHA).toBe("d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44");
-    expect(values["Status creator"]).toBe("octocat");
+    expect(values["Commit message"]).toBe("Deploy checkout validation");
     expect(values["Commit author"]).toBe("monalisa");
+    expect(values.Branches).toBe("main, release/v1");
+    expect(values.Repository).toBe("acme/snaketoy");
+    expect(values["Status creator"]).toBe("octocat");
   });
 
   it("renders repository and filters as node metadata", () => {
