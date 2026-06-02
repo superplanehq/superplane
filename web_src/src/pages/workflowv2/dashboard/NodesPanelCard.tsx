@@ -1,5 +1,5 @@
 import { useId, useState } from "react";
-import { CircleDot, Play, Plus, Trash2 } from "lucide-react";
+import { CircleDot, Network, Play, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import type { DashboardPanel } from "@/hooks/useCanvasData";
 
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
+import { WidgetEmptyState } from "./WidgetEmptyState";
 import { useDashboardContext, resolveDashboardNode, type DashboardNodeStatus } from "./DashboardContext";
 import { confirmDashboardTriggerNode } from "./confirmDashboardTriggerNode";
 import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
@@ -85,10 +86,11 @@ export function NodesPanelCard({ panel, readOnly, onDelete, onChange }: NodesPan
 function NodesPanelBody({ content }: { content: NodesPanelContent }) {
   if (content.nodes.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-1.5 p-4 text-center text-slate-400">
-        <CircleDot className="h-5 w-5" aria-hidden />
-        <p className="text-xs">Add nodes from the editor to surface their live status here.</p>
-      </div>
+      <WidgetEmptyState
+        icon={Network}
+        className="min-h-0"
+        message="Add nodes from the editor to surface their live status here."
+      />
     );
   }
   return (
