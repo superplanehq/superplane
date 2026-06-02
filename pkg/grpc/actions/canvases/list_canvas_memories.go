@@ -39,19 +39,40 @@ func ListCanvasMemories(ctx context.Context, registry *registry.Registry, organi
 
 	items := make([]*pb.CanvasMemory, 0, len(records))
 	for _, record := range records {
-		values, err := newStructpbValue(record.Values.Data())
+		item, err := canvasMemoryToProto(record)
 		if err != nil {
 			return nil, status.Error(codes.Internal, "failed to serialize canvas memory")
 		}
 
-		items = append(items, &pb.CanvasMemory{
-			Id:        record.ID.String(),
-			Namespace: record.Namespace,
-			Values:    values,
-		})
+		items = append(items, item)
 	}
 
 	return &pb.ListCanvasMemoriesResponse{
 		Items: items,
 	}, nil
+}
+
+func canvasMemoryToProto(record models.CanvasMemory) (*pb.CanvasMemory, error) {
+	values, err := newStructpbValue(record.Values.Data())
+	if err != nil {
+		return nil, err
+	}
+
+	return &pb.CanvasMemory{
+		Id:        record.ID.String(),
+		Namespace: record.Namespace,
+		Values:    values,
+		Source:    canvasMemorySourceToProto(record.Source),
+	}, nil
+}
+
+func canvasMemorySourceToProto(source string) pb.CanvasMemory_Source {
+	switch source {
+	case models.CanvasMemorySourceNode:
+		return pb.CanvasMemory_SOURCE_NODE
+	case models.CanvasMemorySourceManual:
+		return pb.CanvasMemory_SOURCE_MANUAL
+	default:
+		return pb.CanvasMemory_SOURCE_UNKNOWN
+	}
 }
