@@ -6,7 +6,8 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 
 import { MemoryDiscoveryPanel } from "../MemoryDiscoveryPanel";
 import type { TablePanelContent } from "../panelTypes";
-import { ActionRow, ColumnRow, FilterRow, RowStyleRow } from "../TablePanelFormRows";
+import { ActionRow } from "../TablePanelFormActionRow";
+import { ColumnRow, FilterRow, RowStyleRow } from "../TablePanelFormRows";
 import { WIDGET_SORT_ORDERS, type WidgetSortOrder } from "../widget/types";
 import type { TablePanelFormActions } from "./useTablePanelFormActions";
 import type { TablePanelPayloadDrafts } from "./useTablePanelPayloadDrafts";
