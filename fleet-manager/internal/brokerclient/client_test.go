@@ -59,3 +59,73 @@ func TestFleetTaskCounts_BadInput(t *testing.T) {
 		t.Fatal("expected error for empty base url")
 	}
 }
+
+func TestRegisterFleet_OK(t *testing.T) {
+	var gotMethod, gotPath, gotAuth string
+	var gotBody api.RegisterFleetRequest
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("Authorization")
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(api.FleetResponse{
+			ID:          gotBody.ID,
+			Provisioner: gotBody.Provisioner,
+			Arch:        gotBody.Arch,
+			Size:        gotBody.Size,
+			CreatedAt:   1710000000,
+		})
+	}))
+	defer ts.Close()
+
+	c := New(ts.URL, "tok")
+	out, err := c.RegisterFleet(context.Background(), api.RegisterFleetRequest{
+		ID:          "aws-standard-amd64",
+		Provisioner: "aws",
+		Arch:        "amd64",
+		Size:        "t3.micro",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/v1/fleets" {
+		t.Fatalf("method/path: %s %q", gotMethod, gotPath)
+	}
+	if gotAuth != "Bearer tok" {
+		t.Fatalf("auth: %q", gotAuth)
+	}
+	if gotBody.ID != "aws-standard-amd64" || gotBody.Provisioner != "aws" || gotBody.Arch != "amd64" || gotBody.Size != "t3.micro" {
+		t.Fatalf("body: %#v", gotBody)
+	}
+	if out.ID != "aws-standard-amd64" || out.Size != "t3.micro" || out.CreatedAt != 1710000000 {
+		t.Fatalf("out: %#v", out)
+	}
+}
+
+func TestRegisterFleet_NonOK(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"id required"}`))
+	}))
+	defer ts.Close()
+
+	c := New(ts.URL, "tok")
+	if _, err := c.RegisterFleet(context.Background(), api.RegisterFleetRequest{ID: "fleet-a"}); err == nil {
+		t.Fatal("expected error for 400")
+	}
+}
+
+func TestRegisterFleet_BadInput(t *testing.T) {
+	c := New("http://example", "tok")
+	if _, err := c.RegisterFleet(context.Background(), api.RegisterFleetRequest{}); err == nil {
+		t.Fatal("expected error for empty fleet id")
+	}
+	empty := New("", "tok")
+	if _, err := empty.RegisterFleet(context.Background(), api.RegisterFleetRequest{ID: "f"}); err == nil {
+		t.Fatal("expected error for empty base url")
+	}
+}
