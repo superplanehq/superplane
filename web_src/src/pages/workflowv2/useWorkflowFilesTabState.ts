@@ -41,7 +41,7 @@ export function useWorkflowFilesTabState(initialPath: string | null, allPaths: s
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.key.toLowerCase() !== "w") return;
+      if (!event.ctrlKey || event.metaKey || event.shiftKey || event.altKey || event.key?.toLowerCase() !== "w") return;
       if (!selectedPath) return;
 
       event.preventDefault();

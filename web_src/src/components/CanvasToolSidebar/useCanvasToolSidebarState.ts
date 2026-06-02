@@ -82,7 +82,7 @@ export function useCanvasToolSidebarState({
     if (!showToolSidebarToggle) return;
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() !== "b" || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
+      if (event.key?.toLowerCase() !== "b" || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
         return;
       }
 

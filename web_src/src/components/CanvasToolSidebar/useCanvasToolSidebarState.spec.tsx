@@ -60,6 +60,22 @@ describe("useCanvasToolSidebarState", () => {
     expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
   });
 
+  it("ignores keydown events without a key (e.g. password manager autofill synthetic events)", () => {
+    window.localStorage.setItem("canvasAgentSidebarOpen", "false");
+    const onBeforeClose = vi.fn();
+
+    render(<Harness onBeforeClose={onBeforeClose} />);
+
+    expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
+
+    expect(() => {
+      fireEvent.keyDown(window, { key: undefined, metaKey: true });
+    }).not.toThrow();
+
+    expect(screen.getByTestId("open-state")).toHaveTextContent("closed");
+    expect(onBeforeClose).not.toHaveBeenCalled();
+  });
+
   it("ignores Cmd/Ctrl+B while typing in an input", () => {
     window.localStorage.setItem("canvasAgentSidebarOpen", "false");
     const onBeforeClose = vi.fn();
