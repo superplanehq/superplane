@@ -21,36 +21,26 @@ export function ChartSeriesRow({
   onRemove: () => void;
 }) {
   return (
-    <div className="space-y-2 rounded border border-slate-200 p-2">
-      <div className="grid grid-cols-12 items-center gap-2">
-        <Input
-          list={fieldListId}
-          className="col-span-5 h-8"
-          value={series.field ?? ""}
-          onChange={(e) => onChange({ field: e.target.value || undefined })}
-          placeholder="field or {{ expr }} (blank = count)"
-          aria-label={`Series ${index + 1} field`}
-        />
-        <Input
-          className="col-span-5 h-8"
-          value={series.label ?? ""}
-          onChange={(e) => onChange({ label: e.target.value || undefined })}
-          placeholder="label"
-          aria-label={`Series ${index + 1} label`}
-        />
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className="col-span-2 h-8 w-8 text-slate-400 hover:text-red-600"
-          onClick={onRemove}
-          aria-label={`Remove series ${index + 1}`}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-      <div className="grid grid-cols-12 items-center gap-2">
-        <div className="col-span-4">
+    <div className="flex gap-2 rounded-lg bg-slate-100 p-2">
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="grid grid-cols-2 gap-2">
+          <Input
+            list={fieldListId}
+            className="h-8"
+            value={series.field ?? ""}
+            onChange={(e) => onChange({ field: e.target.value || undefined })}
+            placeholder="field or {{ expr }} (blank = count)"
+            aria-label={`Series ${index + 1} field`}
+          />
+          <Input
+            className="h-8"
+            value={series.label ?? ""}
+            onChange={(e) => onChange({ label: e.target.value || undefined })}
+            placeholder="label"
+            aria-label={`Series ${index + 1} label`}
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-2">
           <Select
             value={series.format ?? "__none__"}
             onValueChange={(v) => onChange({ format: v === "__none__" ? undefined : (v as WidgetColumnFormat) })}
@@ -67,21 +57,33 @@ export function ChartSeriesRow({
               ))}
             </SelectContent>
           </Select>
+          <Input
+            className="h-8"
+            value={series.prefix ?? ""}
+            onChange={(e) => onChange({ prefix: e.target.value || undefined })}
+            placeholder="prefix (e.g. $)"
+            aria-label={`Series ${index + 1} prefix`}
+          />
+          <Input
+            className="h-8"
+            value={series.suffix ?? ""}
+            onChange={(e) => onChange({ suffix: e.target.value || undefined })}
+            placeholder="suffix (e.g. MWh)"
+            aria-label={`Series ${index + 1} suffix`}
+          />
         </div>
-        <Input
-          className="col-span-4 h-8"
-          value={series.prefix ?? ""}
-          onChange={(e) => onChange({ prefix: e.target.value || undefined })}
-          placeholder="prefix (e.g. $)"
-          aria-label={`Series ${index + 1} prefix`}
-        />
-        <Input
-          className="col-span-4 h-8"
-          value={series.suffix ?? ""}
-          onChange={(e) => onChange({ suffix: e.target.value || undefined })}
-          placeholder="suffix (e.g. MWh)"
-          aria-label={`Series ${index + 1} suffix`}
-        />
+      </div>
+      <div className="flex shrink-0 items-start justify-end">
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600"
+          onClick={onRemove}
+          aria-label={`Remove series ${index + 1}`}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
       </div>
     </div>
   );

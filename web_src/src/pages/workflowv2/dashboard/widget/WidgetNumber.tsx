@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
+import { Hash, Loader2 } from "lucide-react";
 
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 
@@ -20,6 +20,18 @@ interface WidgetNumberProps {
     sources: MemoryNumberSource[];
     combine: WidgetNumberCombine;
   };
+}
+
+function NumberEmptyState({ message, testId }: { message: ReactNode; testId?: string }) {
+  return (
+    <div
+      className="flex h-full min-h-[6rem] flex-col items-center justify-center gap-1.5 p-4 text-center text-[13px] text-gray-500"
+      data-testid={testId}
+    >
+      <Hash className="size-4" aria-hidden />
+      <p>{message}</p>
+    </div>
+  );
 }
 
 export function WidgetNumber({ render, rows, isLoading, totalCount, composite }: WidgetNumberProps) {
@@ -56,16 +68,17 @@ export function WidgetNumber({ render, rows, isLoading, totalCount, composite }:
     );
   }
 
-  const display =
-    value == null
-      ? "—"
-      : `${render.prefix ?? ""}${formatValue(value, render.format ?? "number")}${render.suffix ?? ""}`;
+  if (value == null) {
+    return <NumberEmptyState message="No data to display." testId="widget-number-empty" />;
+  }
+
+  const display = `${render.prefix ?? ""}${formatValue(value, render.format ?? "number")}${render.suffix ?? ""}`;
   return (
     <div className="flex h-full flex-col items-start justify-center gap-1 p-4" data-testid="widget-number">
       {render.label ? (
         <span className="text-xs font-medium uppercase tracking-wide text-slate-500">{render.label}</span>
       ) : null}
-      <span className="text-2xl font-semibold text-slate-900">{display}</span>
+      <span className="text-3xl font-semibold tracking-tight text-slate-900">{display}</span>
       {sparkline && sparkline.length > 1 ? <Sparkline values={sparkline} /> : null}
     </div>
   );

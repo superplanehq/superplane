@@ -53,60 +53,71 @@ export function ColumnRow({
 }) {
   const selectValue = fieldOptions.includes(col.field) ? col.field : col.field ? CUSTOM_FIELD : "";
   return (
-    <div className="grid grid-cols-12 items-center gap-2 rounded border border-slate-200 p-2">
-      {selectValue === CUSTOM_FIELD || fieldOptions.length === 0 ? (
+    <div className="flex gap-2 rounded-lg bg-slate-100 p-2">
+      <div className="grid min-w-0 flex-1 grid-cols-12 items-center gap-2">
+        {selectValue === CUSTOM_FIELD || fieldOptions.length === 0 ? (
+          <Input
+            className="col-span-4 h-8"
+            value={col.field}
+            onChange={(e) => onChange({ field: e.target.value })}
+            placeholder="field or {{ expr }}"
+          />
+        ) : (
+          <Select
+            value={selectValue || CUSTOM_FIELD}
+            onValueChange={(v) => {
+              if (v === CUSTOM_FIELD) return;
+              onChange({ field: v, label: col.label || v, format: col.format ?? suggestColumnFormat(v) });
+            }}
+          >
+            <SelectTrigger className="col-span-4 h-8">
+              <SelectValue placeholder="Field" />
+            </SelectTrigger>
+            <SelectContent>
+              {fieldOptions.map((f) => (
+                <SelectItem key={f} value={f}>
+                  {f}
+                </SelectItem>
+              ))}
+              <SelectItem value={CUSTOM_FIELD}>Custom…</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
         <Input
-          className="col-span-4 h-8"
-          value={col.field}
-          onChange={(e) => onChange({ field: e.target.value })}
-          placeholder="field or {{ expr }}"
+          className="col-span-3 h-8"
+          value={col.label ?? ""}
+          onChange={(e) => onChange({ label: e.target.value })}
+          placeholder="Header"
         />
-      ) : (
         <Select
-          value={selectValue || CUSTOM_FIELD}
-          onValueChange={(v) => {
-            if (v === CUSTOM_FIELD) return;
-            onChange({ field: v, label: col.label || v, format: col.format ?? suggestColumnFormat(v) });
-          }}
+          value={col.format ?? "__none__"}
+          onValueChange={(v) => onChange({ format: v === "__none__" ? undefined : (v as WidgetColumnFormat) })}
         >
           <SelectTrigger className="col-span-4 h-8">
-            <SelectValue placeholder="Field" />
+            <SelectValue placeholder="Format" />
           </SelectTrigger>
           <SelectContent>
-            {fieldOptions.map((f) => (
-              <SelectItem key={f} value={f}>
-                {f}
+            <SelectItem value="__none__">Default</SelectItem>
+            {COLUMN_FORMATS.map((fmt) => (
+              <SelectItem key={fmt} value={fmt}>
+                {fmt}
               </SelectItem>
             ))}
-            <SelectItem value={CUSTOM_FIELD}>Custom…</SelectItem>
           </SelectContent>
         </Select>
-      )}
-      <Input
-        className="col-span-3 h-8"
-        value={col.label ?? ""}
-        onChange={(e) => onChange({ label: e.target.value })}
-        placeholder="Header"
-      />
-      <Select
-        value={col.format ?? "__none__"}
-        onValueChange={(v) => onChange({ format: v === "__none__" ? undefined : (v as WidgetColumnFormat) })}
-      >
-        <SelectTrigger className="col-span-4 h-8">
-          <SelectValue placeholder="Format" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__none__">Default</SelectItem>
-          {COLUMN_FORMATS.map((fmt) => (
-            <SelectItem key={fmt} value={fmt}>
-              {fmt}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Button type="button" size="icon" variant="ghost" className="col-span-1 h-8 w-8" onClick={onRemove}>
-        <Trash2 className="h-3.5 w-3.5" />
-      </Button>
+      </div>
+      <div className="flex shrink-0 items-start justify-end">
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600"
+          onClick={onRemove}
+          aria-label="Remove column"
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -191,7 +202,7 @@ export function ActionRow({
   const templates = useMemo(() => getTriggerTemplates(selectedNode), [selectedNode]);
 
   return (
-    <div className="space-y-3 rounded border border-slate-200 p-3">
+    <div className="space-y-3 rounded-lg bg-slate-100 p-3">
       <ActionMainFields
         action={action}
         triggerNodes={triggerNodes}
@@ -243,47 +254,61 @@ function ActionMainFields({
 }) {
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-12 gap-2">
-        <Input
-          className="col-span-3 h-8"
-          value={action.label ?? ""}
-          onChange={(e) => onChange({ label: e.target.value })}
-          placeholder="Label"
-        />
-        <Select value={action.node || "__none__"} onValueChange={(v) => onChange({ node: v === "__none__" ? "" : v })}>
-          <SelectTrigger className="col-span-6 h-8">
-            <SelectValue placeholder="Trigger node" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none__">Select trigger…</SelectItem>
-            {triggerNodes.map((n) => {
-              const id = n.name || n.id || "";
-              return (
-                <SelectItem key={id} value={id}>
-                  {n.name || n.id}
+      <div className="flex gap-2">
+        <div className="grid min-w-0 flex-1 grid-cols-11 items-center gap-2">
+          <Input
+            className="col-span-3 h-8"
+            value={action.label ?? ""}
+            onChange={(e) => onChange({ label: e.target.value })}
+            placeholder="Label"
+          />
+          <Select
+            value={action.node || "__none__"}
+            onValueChange={(v) => onChange({ node: v === "__none__" ? "" : v })}
+          >
+            <SelectTrigger className="col-span-6 h-8">
+              <SelectValue placeholder="Trigger node" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__none__">Select trigger…</SelectItem>
+              {triggerNodes.map((n) => {
+                const id = n.name || n.id || "";
+                return (
+                  <SelectItem key={id} value={id}>
+                    {n.name || n.id}
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+          <Select
+            value={action.variant ?? "default"}
+            onValueChange={(v) => onChange({ variant: v as WidgetRowAction["variant"] })}
+          >
+            <SelectTrigger className="col-span-2 h-8">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {WIDGET_ROW_ACTION_VARIANTS.map((v) => (
+                <SelectItem key={v} value={v}>
+                  {v}
                 </SelectItem>
-              );
-            })}
-          </SelectContent>
-        </Select>
-        <Select
-          value={action.variant ?? "default"}
-          onValueChange={(v) => onChange({ variant: v as WidgetRowAction["variant"] })}
-        >
-          <SelectTrigger className="col-span-2 h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {WIDGET_ROW_ACTION_VARIANTS.map((v) => (
-              <SelectItem key={v} value={v}>
-                {v}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Button type="button" size="icon" variant="ghost" className="col-span-1 h-8 w-8" onClick={onRemove}>
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex shrink-0 items-start justify-end">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600"
+            onClick={onRemove}
+            aria-label="Remove row action"
+          >
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
       </div>
       <ActionTemplateField action={action} templates={templates} onChange={onChange} />
     </div>

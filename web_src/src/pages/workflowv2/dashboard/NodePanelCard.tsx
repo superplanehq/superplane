@@ -79,9 +79,9 @@ function NodePanelBody({ content }: { content: NodePanelContent }) {
   const ctx = useDashboardContext();
   if (!content.node) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-1.5 p-4 text-center text-slate-400">
-        <CircleDot className="h-5 w-5" aria-hidden />
-        <p className="text-xs">Pick a node from the editor to display its status here.</p>
+      <div className="flex h-full flex-col items-center justify-center gap-1.5 p-4 text-center text-[13px] text-gray-500">
+        <CircleDot className="size-4" aria-hidden />
+        <p>Pick a node from the editor to display its status here.</p>
       </div>
     );
   }

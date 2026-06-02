@@ -38,6 +38,7 @@
   display: flex;
   min-height: 0;
   overflow: hidden;
+  border-radius: 0.5rem;
 }
 
 .dashboard-grid .dashboard-grid-item > * {
@@ -48,29 +49,28 @@
 
 /* Resize handle indicator in the bottom-right corner of each tile. */
 .dashboard-grid .react-resizable-handle {
-  background-image: none;
+  --dashboard-resize-handle-icon: url("data:image/svg+xml,%3Csvg width='12' height='12' viewBox='0 0 12 12' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11.707 0.707031L0.707031 11.707L0 11L11 0L11.707 0.707031Z' fill='black' fill-opacity='0.3'/%3E%3Cpath d='M11.707 5.70703L5.70703 11.707L5 11L11 5L11.707 5.70703Z' fill='black' fill-opacity='0.3'/%3E%3C/svg%3E");
+  background-image: var(--dashboard-resize-handle-icon);
+  background-repeat: no-repeat;
+  background-position: right 6px bottom 6px;
+  background-size: 12px 12px;
   background-color: transparent;
-  width: 14px;
-  height: 14px;
+  width: 36px;
+  height: 36px;
   bottom: 2px;
   right: 2px;
   opacity: 0;
+  cursor: nwse-resize;
   transition: opacity 120ms ease-in-out;
 }
 
-.dashboard-grid .react-grid-item:hover .react-resizable-handle {
+.dashboard-grid .react-grid-item:hover .react-resizable-handle,
+.dashboard-grid .react-grid-item.resizing .react-resizable-handle {
   opacity: 1;
 }
 
 .dashboard-grid .react-resizable-handle::after {
-  content: "";
-  position: absolute;
-  right: 3px;
-  bottom: 3px;
-  width: 6px;
-  height: 6px;
-  border-right: 2px solid rgb(100, 116, 139); /* slate-500 */
-  border-bottom: 2px solid rgb(100, 116, 139);
+  content: none;
 }
 
 /* Drag preview / placeholder. */
