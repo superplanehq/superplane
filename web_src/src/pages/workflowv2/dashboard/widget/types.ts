@@ -91,6 +91,53 @@ export interface WidgetTableRender {
   emptyMessage?: string;
   /** Optional widget-level row sort applied after filters. */
   sort?: WidgetSort;
+  /**
+   * Optional per-row background tints. Each rule is one field/op/value
+   * condition (same shape and semantics as `where[i]`) mapped to a tone
+   * from the curated palette. Evaluated first-match-wins per row.
+   */
+  rowStyles?: WidgetRowStyle[];
+}
+
+/**
+ * Curated palette of Tailwind background tones authors can pick from. The
+ * tone enum is the persisted value; the actual class is resolved through
+ * `ROW_STYLE_CLASS` in `widget/rowStyles.ts` so the YAML stays stable even
+ * if we later swap the underlying utility classes.
+ */
+export type WidgetRowStyleTone =
+  | "dimmed"
+  | "yellow"
+  | "yellow-soft"
+  | "orange"
+  | "orange-soft"
+  | "red"
+  | "red-soft"
+  | "blue"
+  | "blue-soft"
+  | "green"
+  | "green-soft";
+
+export const WIDGET_ROW_STYLE_TONES: WidgetRowStyleTone[] = [
+  "dimmed",
+  "yellow-soft",
+  "yellow",
+  "orange-soft",
+  "orange",
+  "red-soft",
+  "red",
+  "blue-soft",
+  "blue",
+  "green-soft",
+  "green",
+];
+
+/** One row-background rule. Same condition shape as `WidgetTableFilter`. */
+export interface WidgetRowStyle {
+  field: string;
+  op: WidgetFilterOp;
+  value?: string;
+  tone: WidgetRowStyleTone;
 }
 
 export type WidgetChartKind = "bar" | "stacked-bar" | "line" | "area" | "donut";

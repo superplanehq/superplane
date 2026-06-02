@@ -6,7 +6,7 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 
 import { MemoryDiscoveryPanel } from "../MemoryDiscoveryPanel";
 import type { TablePanelContent } from "../panelTypes";
-import { ActionRow, ColumnRow, FilterRow } from "../TablePanelFormRows";
+import { ActionRow, ColumnRow, FilterRow, RowStyleRow } from "../TablePanelFormRows";
 import { WIDGET_SORT_ORDERS, type WidgetSortOrder } from "../widget/types";
 import type { TablePanelFormActions } from "./useTablePanelFormActions";
 import type { TablePanelPayloadDrafts } from "./useTablePanelPayloadDrafts";
@@ -162,6 +162,49 @@ export function TablePanelFiltersSection({
             fieldOptions={fieldOptions}
             onChange={(patch) => actions.updateFilter(idx, patch)}
             onRemove={() => actions.removeFilter(idx)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function TablePanelRowStylesSection({
+  value,
+  fieldOptions,
+  actions,
+}: {
+  value: TablePanelContent;
+  fieldOptions: string[];
+  actions: TablePanelFormActions;
+}) {
+  const rules = value.render.rowStyles ?? [];
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <Label className="text-xs font-medium text-slate-600">Row background</Label>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={actions.addRowStyle}
+          data-testid="table-add-row-style"
+        >
+          Add rule
+        </Button>
+      </div>
+      <p className="text-[11px] text-slate-500">
+        Tint a row when its data matches a condition (e.g. <code className="text-[10px]">status == &quot;error&quot;</code>).
+        First matching rule wins.
+      </p>
+      <div className="space-y-2">
+        {rules.map((rule, idx) => (
+          <RowStyleRow
+            key={idx}
+            rule={rule}
+            fieldOptions={fieldOptions}
+            onChange={(patch) => actions.updateRowStyle(idx, patch)}
+            onRemove={() => actions.removeRowStyle(idx)}
           />
         ))}
       </div>
