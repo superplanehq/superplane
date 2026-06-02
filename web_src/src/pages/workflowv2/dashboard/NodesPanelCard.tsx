@@ -12,6 +12,7 @@ import type { DashboardPanel } from "@/hooks/useCanvasData";
 
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
+import { WidgetEmptyState } from "./WidgetEmptyState";
 import { useDashboardContext, resolveDashboardNode, type DashboardNodeStatus } from "./DashboardContext";
 import { confirmDashboardTriggerNode } from "./confirmDashboardTriggerNode";
 import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
@@ -85,10 +86,11 @@ export function NodesPanelCard({ panel, readOnly, onDelete, onChange }: NodesPan
 function NodesPanelBody({ content }: { content: NodesPanelContent }) {
   if (content.nodes.length === 0) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-1.5 p-4 text-center text-[13px] text-gray-500">
-        <Network className="size-4" aria-hidden />
-        <p>Add nodes from the editor to surface their live status here.</p>
-      </div>
+      <WidgetEmptyState
+        icon={Network}
+        className="min-h-0"
+        message="Add nodes from the editor to surface their live status here."
+      />
     );
   }
   return (

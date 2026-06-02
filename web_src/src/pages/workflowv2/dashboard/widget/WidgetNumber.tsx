@@ -1,7 +1,9 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo } from "react";
 import { Hash, Loader2 } from "lucide-react";
 
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
+
+import { WidgetEmptyState } from "../WidgetEmptyState";
 
 import { aggregateNumber, aggregateNumberPerSource, applyFilters, combinePartials } from "./widgetData";
 import { formatValue } from "./widgetFormat";
@@ -20,18 +22,6 @@ interface WidgetNumberProps {
     sources: MemoryNumberSource[];
     combine: WidgetNumberCombine;
   };
-}
-
-function NumberEmptyState({ message, testId }: { message: ReactNode; testId?: string }) {
-  return (
-    <div
-      className="flex h-full min-h-[6rem] flex-col items-center justify-center gap-1.5 p-4 text-center text-[13px] text-gray-500"
-      data-testid={testId}
-    >
-      <Hash className="size-4" aria-hidden />
-      <p>{message}</p>
-    </div>
-  );
 }
 
 export function WidgetNumber({ render, rows, isLoading, totalCount, composite }: WidgetNumberProps) {
@@ -69,7 +59,7 @@ export function WidgetNumber({ render, rows, isLoading, totalCount, composite }:
   }
 
   if (value == null) {
-    return <NumberEmptyState message="No data to display." testId="widget-number-empty" />;
+    return <WidgetEmptyState icon={Hash} message="No data to display." testId="widget-number-empty" />;
   }
 
   const display = `${render.prefix ?? ""}${formatValue(value, render.format ?? "number")}${render.suffix ?? ""}`;
