@@ -553,6 +553,83 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			contains: "dataSource.sources must be a non-empty array",
 		},
 		{
+			name: "multi-number panel rejects empty metrics",
+			panel: DashboardPanel{
+				ID:      "n",
+				Type:    DashboardPanelTypeNumber,
+				Content: map[string]any{"metrics": []any{}},
+			},
+			contains: "metrics must be a non-empty array",
+		},
+		{
+			name: "multi-number metric rejects unknown aggregation",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"metrics": []any{
+						map[string]any{
+							"dataSource": map[string]any{"kind": "runs"},
+							"render":     map[string]any{"kind": "number", "aggregation": "median"},
+						},
+					},
+				},
+			},
+			contains: "metrics[0].render.aggregation must be one of",
+		},
+		{
+			name: "multi-number metric requires field for non-count aggregation",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"metrics": []any{
+						map[string]any{
+							"dataSource": map[string]any{"kind": "memory", "namespace": "costs"},
+							"render":     map[string]any{"kind": "number", "aggregation": "sum"},
+						},
+					},
+				},
+			},
+			contains: "metrics[0].render.field is required",
+		},
+		{
+			name: "multi-number metric rejects composite data source",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"metrics": []any{
+						map[string]any{
+							"dataSource": map[string]any{
+								"kind":    "memory",
+								"combine": "sum",
+								"sources": []any{map[string]any{"namespace": "a", "aggregation": "count"}},
+							},
+							"render": map[string]any{"kind": "number", "aggregation": "count"},
+						},
+					},
+				},
+			},
+			contains: "metrics[0].dataSource must be a single-source",
+		},
+		{
+			name: "multi-number metric rejects non-number render kind",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"metrics": []any{
+						map[string]any{
+							"dataSource": map[string]any{"kind": "runs"},
+							"render":     map[string]any{"kind": "table"},
+						},
+					},
+				},
+			},
+			contains: `render.kind must be "number"`,
+		},
+		{
 			name: "chart series prefix must be a string",
 			panel: DashboardPanel{
 				ID:   "chart",
@@ -861,6 +938,38 @@ func TestValidateDashboardContent_AcceptsCompositeNumberPanel(t *testing.T) {
 					},
 				},
 				"render": map[string]any{"kind": "number", "prefix": "R$"},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateDashboardContent_AcceptsMultiNumberPanel(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "kpis",
+			Type: DashboardPanelTypeNumber,
+			Content: map[string]any{
+				"title": "Pipeline KPIs",
+				"metrics": []any{
+					map[string]any{
+						"dataSource": map[string]any{"kind": "runs"},
+						"render":     map[string]any{"kind": "number", "aggregation": "count", "label": "Total runs"},
+					},
+					map[string]any{
+						"dataSource": map[string]any{"kind": "memory", "namespace": "costs"},
+						"render": map[string]any{
+							"kind":        "number",
+							"aggregation": "sum",
+							"field":       "cost",
+							"label":       "Total cost",
+							"format":      "number",
+							"prefix":      "R$",
+						},
+					},
+				},
 			},
 		},
 	}
