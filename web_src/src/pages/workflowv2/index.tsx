@@ -39,8 +39,10 @@ import {
   useCanvasVersions,
   useCreateCanvas,
   useCreateCanvasChangeRequest,
+  useCreateCanvasMemoryBank,
   useCreateCanvasVersion,
   useDeleteCanvasMemoryEntry,
+  useUpdateCanvasMemoryBank,
   useDeleteCanvasVersion,
   usePublishCanvasVersion,
   useEventExecutions,
@@ -76,6 +78,12 @@ import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
+import type {
+  CanvasEchoRelease,
+  CanvasSaveResult,
+  ChangeRequestAction,
+  QueuedCanvasSaveRequest,
+} from "./canvasSaveTypes";
 import { deriveDashboardNodeStatuses } from "./dashboard/deriveNodeStatuses";
 import { useDashboardModeActions } from "./dashboard/useDashboardModeActions";
 import { useDashboardTriggerNode } from "./dashboard/useDashboardTriggerNode";
@@ -153,26 +161,6 @@ const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
 const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
 
-type ChangeRequestAction = "ACTION_APPROVE" | "ACTION_UNAPPROVE" | "ACTION_PUBLISH" | "ACTION_REJECT" | "ACTION_REOPEN";
-type CanvasSaveResult = {
-  status: "saved" | "replaced" | "stale";
-  workflow: CanvasesCanvas;
-  savingVersionId?: string;
-  matchesCurrentCanvas: boolean;
-  hasQueuedFollowUp: boolean;
-  response?: {
-    data?: {
-      version?: CanvasesCanvasVersion;
-    };
-  };
-};
-type QueuedCanvasSaveRequest = {
-  workflow: CanvasesCanvas;
-  savingVersionId?: string;
-  resolve: (result: CanvasSaveResult) => void;
-  reject: (error: unknown) => void;
-};
-type CanvasEchoRelease = () => void;
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
     organizationId: string;
@@ -568,6 +556,8 @@ export function WorkflowPageV2() {
     error: canvasMemoryError,
   } = useCanvasMemoryEntries(canvasId!, shouldLoadCanvasMemoryEntries(isMemoryMode, isViewingLiveVersion));
   const deleteCanvasMemoryEntry = useDeleteCanvasMemoryEntry(canvasId!);
+  const createCanvasMemoryBank = useCreateCanvasMemoryBank(canvasId!);
+  const updateCanvasMemoryBank = useUpdateCanvasMemoryBank(canvasId!);
   const canUpdateCanvas = canAct("canvases", "update");
   usePageTitle([canvas?.metadata?.name || "Canvas"]);
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
@@ -5499,7 +5489,7 @@ export function WorkflowPageV2() {
             onTriggerNode: handleDashboardTriggerNode,
           }}
           memory={{
-            canDelete: canEditCanvasMemory({
+            canEdit: canEditCanvasMemory({
               ...canvasAccess,
               hasEditableVersion,
             }),
@@ -5507,6 +5497,8 @@ export function WorkflowPageV2() {
             isLoading: canvasMemoryLoading,
             error: canvasMemoryError,
             deleteCanvasMemoryEntry,
+            createCanvasMemoryBank,
+            updateCanvasMemoryBank,
           }}
           files={{
             isEditing,
