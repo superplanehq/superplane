@@ -13,10 +13,7 @@ import type { MetadataItem } from "@/ui/metadataList";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { baseEventSections } from "./event_helpers";
-
-interface ImageNodeMetadata {
-  imageName?: string;
-}
+import { type ImageNodeMetadata, imageNameFromValue } from "./image_helpers";
 
 interface UpdateImageConfiguration {
   image?: string;
@@ -37,16 +34,6 @@ const deprecationLabels: Record<string, string> = {
   OBSOLETE: "Obsolete",
   DELETED: "Deleted",
 };
-
-function imageNameFromValue(value: string | undefined): string | undefined {
-  if (!value) return undefined;
-  const trimmed = value.trim();
-  if (!trimmed || trimmed.includes("{{")) return value;
-  const match = trimmed.match(/global\/images\/([^/?#]+)/);
-  if (match) return match[1];
-  if (!trimmed.includes("/")) return trimmed;
-  return value;
-}
 
 export const updateImageMapper: ComponentBaseMapper = {
   props(context: ComponentBaseContext): ComponentBaseProps {

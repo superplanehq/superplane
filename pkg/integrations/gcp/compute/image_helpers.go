@@ -11,11 +11,6 @@ import (
 	"github.com/superplanehq/superplane/pkg/core"
 )
 
-// ResourceTypeImage lists custom images in the bound project for the image
-// management components (create/update/delete image) to target. It reuses the
-// existing ListCustomImageResources lister.
-const ResourceTypeImage = ResourceTypeCustomImages
-
 // Image deprecation states accepted by the Compute Engine images.deprecate API.
 const (
 	ImageStateActive     = "ACTIVE"
