@@ -62,6 +62,8 @@ CMD [ "/bin/bash",  "-c", "sleep infinity" ]
 FROM dev-base AS builder
 
 ARG BASE_URL=https://app.superplane.com
+ARG VITE_ASSET_BASE_URL=
+ARG FRONTEND_PREBUILT=0
 
 WORKDIR /app
 COPY pkg /app/pkg
@@ -80,7 +82,11 @@ RUN rm -rf build && go build -o build/superplane cmd/server/main.go
 
 WORKDIR /app/web_src
 RUN npm install
-RUN VITE_BASE_URL=$BASE_URL npm run build
+RUN if [ "$FRONTEND_PREBUILT" = "1" ]; then \
+      echo "Using prebuilt frontend assets from build context"; \
+    else \
+      VITE_BASE_URL=$BASE_URL VITE_ASSET_BASE_URL=$VITE_ASSET_BASE_URL npm run build; \
+    fi
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Demo runner: single-container image with embedded Postgres and RabbitMQ.
