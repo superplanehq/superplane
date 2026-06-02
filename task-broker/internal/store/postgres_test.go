@@ -18,9 +18,11 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
-		ID:        "fleet-a",
-		Labels:    []string{"prod", "tier-1"},
-		CreatedAt: now,
+		ID:          "fleet-a",
+		Provisioner: "aws",
+		Arch:        "amd64",
+		Size:        "t3.micro",
+		CreatedAt:   now,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -29,14 +31,16 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got == nil || len(got.Labels) != 2 {
+	if got == nil || got.Provisioner != "aws" || got.Arch != "amd64" || got.Size != "t3.micro" {
 		t.Fatalf("get fleet: %#v", got)
 	}
 
 	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
-		ID:        "fleet-a",
-		Labels:    []string{"staging"},
-		CreatedAt: now.Add(time.Minute),
+		ID:          "fleet-a",
+		Provisioner: "local",
+		Arch:        "amd64",
+		Size:        "local",
+		CreatedAt:   now.Add(time.Minute),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -44,13 +48,14 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Labels) != 1 || got.Labels[0] != "staging" {
+	if got.Provisioner != "local" || got.Size != "local" {
 		t.Fatalf("upsert fleet: %#v", got)
 	}
 
 	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
 		ID:        "fleet-b",
-		Labels:    []string{"prod", "tier-2"},
+		Arch:      "arm64",
+		Size:      "t4g.micro",
 		CreatedAt: now,
 	}); err != nil {
 		t.Fatal(err)

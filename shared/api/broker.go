@@ -13,15 +13,19 @@ type BrokerCreateTaskResponse struct {
 
 // RegisterFleetRequest is POST task-broker /v1/fleets.
 type RegisterFleetRequest struct {
-	ID     string   `json:"id"`
-	Labels []string `json:"labels,omitempty"`
+	ID          string `json:"id"`
+	Provisioner string `json:"provisioner,omitempty"`
+	Arch        string `json:"arch,omitempty"`
+	Size        string `json:"size,omitempty"`
 }
 
 // FleetResponse describes a registered runner pool.
 type FleetResponse struct {
-	ID        string   `json:"id"`
-	Labels    []string `json:"labels,omitempty"`
-	CreatedAt int64    `json:"created_at_unix,omitempty"`
+	ID          string `json:"id"`
+	Provisioner string `json:"provisioner,omitempty"`
+	Arch        string `json:"arch,omitempty"`
+	Size        string `json:"size,omitempty"`
+	CreatedAt   int64  `json:"created_at_unix,omitempty"`
 }
 
 type FleetTaskCountsResponse struct {

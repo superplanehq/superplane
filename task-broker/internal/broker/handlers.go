@@ -50,9 +50,11 @@ func (s *Server) registerFleet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := &brokermodels.Fleet{
-		ID:        req.ID,
-		Labels:    taskstore.NormalizeLabels(req.Labels),
-		CreatedAt: time.Now().UTC(),
+		ID:          req.ID,
+		Provisioner: strings.TrimSpace(req.Provisioner),
+		Arch:        strings.TrimSpace(req.Arch),
+		Size:        strings.TrimSpace(req.Size),
+		CreatedAt:   time.Now().UTC(),
 	}
 	if err := s.Store.CreateFleet(r.Context(), f); err != nil {
 		s.logErr("create fleet", err)
@@ -123,9 +125,11 @@ func fleetToResponse(f *brokermodels.Fleet) *api.FleetResponse {
 		return nil
 	}
 	return &api.FleetResponse{
-		ID:        f.ID,
-		Labels:    append([]string(nil), f.Labels...),
-		CreatedAt: f.CreatedAt.Unix(),
+		ID:          f.ID,
+		Provisioner: f.Provisioner,
+		Arch:        f.Arch,
+		Size:        f.Size,
+		CreatedAt:   f.CreatedAt.Unix(),
 	}
 }
 

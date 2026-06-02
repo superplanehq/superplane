@@ -51,6 +51,8 @@ func (s *PostgresStore) migrate() error {
 	for _, stmt := range []string{
 		`ALTER TABLE fleets DROP COLUMN IF EXISTS base_url`,
 		`ALTER TABLE fleets DROP COLUMN IF EXISTS auth_token`,
+		`ALTER TABLE fleets DROP COLUMN IF EXISTS labels`,
+		`ALTER TABLE fleets DROP COLUMN IF EXISTS type`,
 		`DROP TABLE IF EXISTS broker_tasks`,
 	} {
 		if err := s.db.Exec(stmt).Error; err != nil {
@@ -75,10 +77,9 @@ func (s *PostgresStore) Truncate(ctx context.Context) error {
 
 func (s *PostgresStore) CreateFleet(ctx context.Context, f *brokermodels.Fleet) error {
 	row := *f
-	row.Labels = NormalizeLabels(f.Labels)
 	return s.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"labels", "created_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"provisioner", "arch", "size", "created_at"}),
 	}).Create(&row).Error
 }
 

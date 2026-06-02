@@ -21,9 +21,11 @@ func TestCreateBrokerTaskPersistsEnvironment(t *testing.T) {
 	st, cleanup := testdb.Open(t)
 	defer cleanup()
 	if err := st.CreateFleet(context.Background(), &brokermodels.Fleet{
-		ID:        "fleet-1",
-		Labels:    []string{"e2e"},
-		CreatedAt: time.Now().UTC(),
+		ID:          "fleet-1",
+		Provisioner: "local",
+		Arch:        "amd64",
+		Size:        "local",
+		CreatedAt:   time.Now().UTC(),
 	}); err != nil {
 		t.Fatal(err)
 	}
