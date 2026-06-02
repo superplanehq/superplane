@@ -38,10 +38,12 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  closeButtonClassName,
   size = "default",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean;
+  closeButtonClassName?: string;
   /** "large" removes default max-width so className can set e.g. 80vw/80vh */
   size?: "default" | "large" | "90vw";
 }) {
@@ -68,7 +70,10 @@ function DialogContent({
         {showCloseButton && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
-            className="absolute top-3 right-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded leading-none hover:bg-slate-950/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none"
+            className={cn(
+              "absolute top-3 right-2 flex h-6 w-6 cursor-pointer items-center justify-center rounded leading-none hover:bg-slate-950/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none",
+              closeButtonClassName,
+            )}
           >
             <XIcon className="h-4 w-4" />
             <span className="sr-only">Close</span>

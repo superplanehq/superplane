@@ -1,5 +1,5 @@
-import { useMemo, type CSSProperties } from "react";
-import { Loader2 } from "lucide-react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
+import { LineChart as LineChartIcon, Loader2 } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -32,6 +32,18 @@ interface WidgetChartProps {
   render: WidgetChartRender;
   rows: unknown[];
   isLoading: boolean;
+}
+
+function ChartEmptyState({ message, testId }: { message: ReactNode; testId?: string }) {
+  return (
+    <div
+      className="flex h-full min-h-[6rem] flex-col items-center justify-center gap-1.5 p-4 text-center text-[13px] text-gray-500"
+      data-testid={testId}
+    >
+      <LineChartIcon className="size-4" aria-hidden />
+      <p>{message}</p>
+    </div>
+  );
 }
 
 const DEFAULT_PALETTE = ["#0284c7", "#16a34a", "#dc2626", "#a855f7", "#f59e0b", "#0ea5e9"];
@@ -99,11 +111,7 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
     );
   }
   if (data.length === 0) {
-    return (
-      <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-chart-empty">
-        No data to display.
-      </div>
-    );
+    return <ChartEmptyState message="No data to display." testId="widget-chart-empty" />;
   }
 
   return (
@@ -279,7 +287,7 @@ function DonutChartView({
 
   if (!series) return null;
   if (total === 0) {
-    return <div className="p-4 text-center text-xs text-slate-500">No data</div>;
+    return <ChartEmptyState message="No data" />;
   }
 
   const showLegend = legendMode !== "hide";
