@@ -128,6 +128,7 @@ func (g *GitHub) Actions() []core.Action {
 		&metadata.GetRepositoryPermission{},
 		&pulls.CreateReview{},
 		&pulls.CreatePullRequest{},
+		&pulls.MergePullRequest{},
 		&pulls.AddReaction{},
 		&statuses.GetCombinedCommitStatus{},
 		&statuses.PublishCommitStatus{},

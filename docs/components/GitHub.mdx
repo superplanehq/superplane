@@ -43,6 +43,7 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Get Repository Permission" href="#get-repository-permission" description="Get the role and permission level for a user on a GitHub repository" />
   <LinkCard title="Get Workflow Usage" href="#get-workflow-usage" description="Retrieve billable GitHub Actions usage (minutes) for the organization" />
   <LinkCard title="List Check Runs For Ref" href="#list-check-runs-for-ref" description="List GitHub Checks API check runs for a commit, branch, or tag" />
+  <LinkCard title="Merge Pull Request" href="#merge-pull-request" description="Merge an open pull request in a GitHub repository" />
   <LinkCard title="Publish Commit Status" href="#publish-commit-status" description="Publish a status check to a GitHub commit" />
   <LinkCard title="Remove Issue Assignee" href="#remove-issue-assignee" description="Remove assignees from a GitHub issue" />
   <LinkCard title="Remove Issue Label" href="#remove-issue-label" description="Remove labels from a GitHub issue" />
@@ -2822,6 +2823,47 @@ Returns GitHub's check run list response, including total_count and check_runs. 
   },
   "timestamp": "2026-06-01T12:02:02Z",
   "type": "github.checkRuns"
+}
+```
+
+<a id="merge-pull-request"></a>
+
+## Merge Pull Request
+
+**Component key:** `github.mergePullRequest`
+
+The Merge Pull Request component merges an open pull request in a GitHub repository.
+
+### Use Cases
+
+- **Automated PR merge gates**: Merge a pull request after status checks or check runs pass
+- **Release automation**: Merge approved promotion branches into a release branch
+- **Queue workflows**: Merge pull requests from a controlled SuperPlane workflow
+
+### Configuration
+
+- **Repository**: Select the GitHub repository containing the pull request
+- **Pull Request Number**: Pull request number to merge. Expressions are supported.
+- **Merge Method**: Merge strategy to use. Defaults to "merge".
+- **Expected SHA**: Optional head SHA guard. GitHub rejects the merge if the pull request head has changed.
+- **Commit Title**: Optional title for the merge commit, squash commit, or rebase commit.
+- **Commit Message**: Optional commit message for the merge commit or squash commit.
+
+### Output
+
+Returns GitHub's merge result, including whether the pull request was merged, the resulting commit SHA, and GitHub's message.
+
+### Example Output
+
+```json
+{
+  "data": {
+    "merged": true,
+    "message": "Pull Request successfully merged",
+    "sha": "0e98bc41ab56cee9ff17883607b56f96e7814c98"
+  },
+  "timestamp": "2026-04-22T10:00:00.000000000Z",
+  "type": "github.pullRequestMerge"
 }
 ```
 
