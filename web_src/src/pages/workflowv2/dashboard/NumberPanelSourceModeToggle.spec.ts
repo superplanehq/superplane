@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { convertNumberPanelMode, detectMode } from "./NumberPanelSourceModeToggle";
+import { convertNumberPanelMode, detectMode } from "./numberPanelSourceMode";
 import { isCompositeMemoryDataSource, type NumberPanelContent } from "./panelTypes";
 
 describe("convertNumberPanelMode — composite ↔ multi", () => {
