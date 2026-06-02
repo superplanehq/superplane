@@ -125,8 +125,8 @@ function TablePanelFieldQuickAddButtons({
           key={f.field}
           type="button"
           size="sm"
-          variant="secondary"
-          className="h-6 text-[10px]"
+          variant="ghost"
+          className="h-6 bg-slate-100 text-[10px] text-gray-800 hover:bg-slate-200"
           onClick={() => onSelect(f.field)}
           title={f.sample ? `e.g. ${f.sample}` : undefined}
         >
@@ -249,11 +249,12 @@ export function TablePanelRowActionsSection({
           Add action
         </Button>
       </div>
-      <p className="text-[11px] text-slate-500">
-        Pick the <strong>trigger</strong> that starts your flow (e.g. Start). HTTP Request and other steps run when that
-        trigger fires. Payload values support <code className="text-[10px]">{`{{ field }}`}</code> CEL — wrap numeric
-        strings with <code className="text-[10px]">int()</code> or <code className="text-[10px]">float()</code> for
-        arithmetic (e.g. <code className="text-[10px]">{`{{ int(value) / 2 }}`}</code>).
+      <p className="max-w-xl text-xs text-slate-500">
+        Pick the <strong className="font-semibold">trigger</strong> that starts your flow (e.g. Start). HTTP Request and
+        other steps run when that trigger fires. Payload values support{" "}
+        <code className="text-[11px]">{`{{ field }}`}</code> CEL — wrap numeric strings with{" "}
+        <code className="text-[11px]">int()</code> or <code className="text-[11px]">float()</code> for arithmetic (e.g.{" "}
+        <code className="text-[11px]">{`{{ int(value) / 2 }}`}</code>).
       </p>
       <div className="space-y-3">
         {(value.render.rowActions ?? []).map((action, idx) => (
