@@ -115,6 +115,20 @@ describe("countNonMemoryMetrics — guards lossy multi → composite switch", ()
     expect(countNonMemoryMetrics(allMemory)).toBe(0);
   });
 
+  it("treats a metric missing its dataSource as non-memory without throwing", () => {
+    // Mirrors a YAML draft where a `metrics` entry has no `dataSource` yet.
+    const draft = {
+      title: "Draft",
+      metrics: [
+        { dataSource: { kind: "memory", namespace: "aws" }, render: { kind: "number", aggregation: "count" } },
+        { render: { kind: "number", aggregation: "count" } },
+        {},
+      ],
+    } as unknown as NumberPanelContent;
+    expect(() => countNonMemoryMetrics(draft)).not.toThrow();
+    expect(countNonMemoryMetrics(draft)).toBe(2);
+  });
+
   it("counts every runs/executions metric that composite mode cannot represent", () => {
     const mixed: NumberPanelContent = {
       title: "Mixed",

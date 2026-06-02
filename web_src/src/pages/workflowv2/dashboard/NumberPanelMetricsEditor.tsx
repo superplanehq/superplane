@@ -18,6 +18,20 @@ const DEFAULT_METRIC: NumberMetric = {
   render: { kind: "number", aggregation: "count", label: "" },
 };
 
+/**
+ * A metric drafted in the YAML tab can be missing `dataSource` and/or `render`
+ * before schema validation passes. The editor reads those fields directly, so
+ * fill in safe defaults here to keep the form rendering (the dialog still
+ * surfaces the validation error and blocks Save) instead of throwing and
+ * tearing down the whole panel editor.
+ */
+function normalizeMetric(metric: NumberMetric | undefined): NumberMetric {
+  return {
+    dataSource: metric?.dataSource ?? { kind: "runs", limit: 100 },
+    render: metric?.render ?? { kind: "number", aggregation: "count" },
+  };
+}
+
 export function NumberPanelMetricsEditor({
   value,
   onChange,
@@ -69,7 +83,7 @@ export function NumberPanelMetricsEditor({
 }
 
 function MetricRow({
-  metric,
+  metric: rawMetric,
   index,
   onChange,
   onRemove,
@@ -79,6 +93,7 @@ function MetricRow({
   onChange: (patch: Partial<NumberMetric>) => void;
   onRemove?: () => void;
 }) {
+  const metric = normalizeMetric(rawMetric);
   const updateRender = (patch: Partial<WidgetNumberRender>) => onChange({ render: { ...metric.render, ...patch } });
   return (
     <div className="space-y-2 rounded-md border border-slate-200 bg-white p-3" data-testid={`number-metric-${index}`}>

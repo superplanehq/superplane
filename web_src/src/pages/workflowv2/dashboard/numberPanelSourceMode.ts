@@ -24,7 +24,10 @@ export function detectMode(value: NumberPanelContent): NumberSourceMode {
  */
 export function countNonMemoryMetrics(value: NumberPanelContent): number {
   if (!isMultiNumberContent(value)) return 0;
-  return (value.metrics ?? []).filter((m) => m.dataSource.kind !== "memory").length;
+  // A metric drafted in YAML may be missing its `dataSource` entirely; such a
+  // metric can't be represented as a memory composite source either, so count
+  // it as non-memory (and guard the access so a malformed draft never throws).
+  return (value.metrics ?? []).filter((m) => m?.dataSource?.kind !== "memory").length;
 }
 
 /**
