@@ -1,7 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 
-import { isCompositeMemoryDataSource, type MemoryNumberSource, type NumberPanelContent } from "./panelTypes";
+import { convertNumberPanelMode, detectMode, type NumberSourceMode } from "./numberPanelSourceMode";
+import { type NumberPanelContent } from "./panelTypes";
 
 export function NumberPanelSourceModeToggle({
   value,
@@ -10,46 +11,17 @@ export function NumberPanelSourceModeToggle({
   value: NumberPanelContent;
   onChange: (next: NumberPanelContent) => void;
 }) {
-  const dataSource = value.dataSource;
-  const composite = isCompositeMemoryDataSource(dataSource);
-
-  const switchToComposite = () => {
-    if (isCompositeMemoryDataSource(dataSource)) return;
-    const seed: MemoryNumberSource =
-      dataSource.kind === "memory"
-        ? {
-            namespace: dataSource.namespace || "",
-            aggregation: value.render.aggregation ?? "count",
-            field: value.render.field,
-            fieldPath: dataSource.fieldPath,
-          }
-        : { namespace: "", aggregation: value.render.aggregation ?? "count", field: value.render.field };
-    onChange({
-      ...value,
-      dataSource: { kind: "memory", sources: [seed], combine: "sum" },
-      render: { ...value.render, aggregation: undefined, field: undefined },
-    });
-  };
-
-  const switchToSimple = () => {
-    if (!isCompositeMemoryDataSource(dataSource)) return;
-    const first = dataSource.sources[0];
-    onChange({
-      ...value,
-      dataSource: { kind: "memory", namespace: first?.namespace ?? "", fieldPath: first?.fieldPath },
-      render: { ...value.render, aggregation: first?.aggregation ?? "count", field: first?.field },
-    });
-  };
+  const mode = detectMode(value);
 
   return (
     <div className="space-y-1.5">
       <Label className="text-xs font-medium text-slate-600">Source mode</Label>
-      <div className="flex gap-1">
+      <div className="flex flex-wrap gap-1">
         <Button
           type="button"
           size="sm"
-          variant={composite ? "outline" : "secondary"}
-          onClick={switchToSimple}
+          variant={mode === "single" ? "secondary" : "outline"}
+          onClick={() => switchTo("single", mode, value, onChange)}
           data-testid="number-mode-simple"
         >
           Single source
@@ -57,13 +29,32 @@ export function NumberPanelSourceModeToggle({
         <Button
           type="button"
           size="sm"
-          variant={composite ? "secondary" : "outline"}
-          onClick={switchToComposite}
+          variant={mode === "composite" ? "secondary" : "outline"}
+          onClick={() => switchTo("composite", mode, value, onChange)}
           data-testid="number-mode-composite"
         >
           Multiple memory sources
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={mode === "multi" ? "secondary" : "outline"}
+          onClick={() => switchTo("multi", mode, value, onChange)}
+          data-testid="number-mode-multi"
+        >
+          Multiple numbers
+        </Button>
       </div>
     </div>
   );
+}
+
+function switchTo(
+  target: NumberSourceMode,
+  current: NumberSourceMode,
+  value: NumberPanelContent,
+  onChange: (next: NumberPanelContent) => void,
+): void {
+  if (target === current) return;
+  onChange(convertNumberPanelMode(target, value));
 }
