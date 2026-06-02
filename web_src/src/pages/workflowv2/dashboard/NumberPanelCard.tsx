@@ -11,8 +11,11 @@ import { useDashboardContext } from "./DashboardContext";
 import { NumberPanelForm } from "./NumberPanelForm";
 import {
   isCompositeMemoryDataSource,
+  isMultiNumberContent,
   type CompositeMemoryNumberDataSource,
+  type NumberMetric,
   type NumberPanelContent,
+  type TablePanelDataSource,
 } from "./panelTypes";
 import { useWidgetData } from "./widget/useWidgetData";
 import { WidgetNumber } from "./widget/WidgetNumber";
@@ -55,25 +58,67 @@ export function NumberPanelCard({ panel, readOnly, onDelete, onChange }: NumberP
 function NumberPanelBody({ content }: { content: NumberPanelContent }) {
   const ctx = useDashboardContext();
   if (!ctx?.canvasId) return <PanelError message="Loading canvas…" />;
+  if (isMultiNumberContent(content) && content.metrics) {
+    return <MultiNumberPanelBody metrics={content.metrics} canvasId={ctx.canvasId} />;
+  }
   const dataSource = content.dataSource;
+  if (!dataSource) return <PanelError message="Configure a data source." />;
   if (isCompositeMemoryDataSource(dataSource)) {
     return <CompositeNumberPanelDataBound content={content} dataSource={dataSource} canvasId={ctx.canvasId} />;
   }
-  return <NumberPanelDataBound content={content} dataSource={dataSource} canvasId={ctx.canvasId} />;
+  if (!content.render) return <PanelError message="Configure aggregation." />;
+  return (
+    <NumberPanelDataBound
+      render={content.render}
+      dataSource={dataSource as Exclude<NumberPanelContent["dataSource"], CompositeMemoryNumberDataSource | undefined>}
+      canvasId={ctx.canvasId}
+    />
+  );
 }
 
 function NumberPanelDataBound({
-  content,
+  render,
   dataSource,
   canvasId,
 }: {
-  content: NumberPanelContent;
-  dataSource: Exclude<NumberPanelContent["dataSource"], CompositeMemoryNumberDataSource>;
+  render: NonNullable<NumberPanelContent["render"]>;
+  dataSource: Exclude<NumberPanelContent["dataSource"], CompositeMemoryNumberDataSource | undefined>;
   canvasId: string;
 }) {
   const { rows, isLoading, error, totalCount } = useWidgetData(canvasId, dataSource);
   if (error) return <PanelError message={error} />;
-  return <WidgetNumber render={content.render} rows={rows} isLoading={isLoading} totalCount={totalCount} />;
+  return <WidgetNumber render={render} rows={rows} isLoading={isLoading} totalCount={totalCount} />;
+}
+
+function MultiNumberPanelBody({ metrics, canvasId }: { metrics: NumberMetric[]; canvasId: string }) {
+  if (metrics.length === 0) {
+    return <PanelError message="Add at least one number to display." />;
+  }
+  return (
+    <div
+      className="flex h-full flex-row flex-wrap content-center items-center justify-center gap-x-8 gap-y-4 p-4"
+      data-testid="multi-number-panel"
+    >
+      {metrics.map((metric, idx) => (
+        <NumberMetricItem key={idx} metric={metric} canvasId={canvasId} />
+      ))}
+    </div>
+  );
+}
+
+function NumberMetricItem({ metric, canvasId }: { metric: NumberMetric; canvasId: string }) {
+  const { rows, isLoading, error, totalCount } = useWidgetData(canvasId, metric.dataSource as TablePanelDataSource);
+  if (error) {
+    return (
+      <div className="flex items-center justify-center gap-2 text-xs text-amber-700">
+        <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+        <span>{error}</span>
+      </div>
+    );
+  }
+  return (
+    <WidgetNumber render={metric.render} rows={rows} isLoading={isLoading} totalCount={totalCount} variant="inline" />
+  );
 }
 
 function CompositeNumberPanelDataBound({
@@ -95,7 +140,8 @@ function CompositeNumberPanelDataBound({
     [memoryQuery.data, dataSource.sources, dataSource.combine],
   );
   if (memoryQuery.error) return <PanelError message={String(memoryQuery.error)} />;
-  return <WidgetNumber render={content.render} rows={[]} isLoading={memoryQuery.isLoading} composite={composite} />;
+  const render = content.render ?? { kind: "number" };
+  return <WidgetNumber render={render} rows={[]} isLoading={memoryQuery.isLoading} composite={composite} />;
 }
 
 function PanelError({ message }: { message: string }) {
@@ -109,6 +155,12 @@ function PanelError({ message }: { message: string }) {
 
 function normalizeContent(raw: Record<string, unknown> | undefined): NumberPanelContent {
   const r = raw ?? {};
+  if (Array.isArray(r.metrics)) {
+    return {
+      title: typeof r.title === "string" ? r.title : "",
+      metrics: r.metrics as NumberMetric[],
+    };
+  }
   return {
     title: typeof r.title === "string" ? r.title : "",
     dataSource: (r.dataSource as NumberPanelContent["dataSource"]) ?? { kind: "runs", limit: 100 },
