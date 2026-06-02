@@ -12,12 +12,14 @@ const (
 	AgentSessionEventRoutingKey = "agent-session-event"
 )
 
-// AgentStreamRequest carries only the session id; the worker re-reads state
+// AgentStreamRequest carries identifiers only; the worker re-reads state
 // from the DB so we never publish tokens or message content over the queue.
 type AgentStreamRequest struct {
 	SessionID      string `json:"session_id"`
 	OrganizationID string `json:"organization_id"`
 	UserID         string `json:"user_id"`
+	UserMessageID  string `json:"user_message_id,omitempty"`
+	Mode           string `json:"mode,omitempty"`
 }
 
 func PublishAgentStreamRequested(req AgentStreamRequest) error {

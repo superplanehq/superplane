@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/agents"
 )
 
@@ -15,6 +16,9 @@ type anthropicEvent struct {
 	ToolUseID string                  `json:"tool_use_id,omitempty"`
 	Input     json.RawMessage         `json:"input,omitempty"`
 	Content   []anthropicContentBlock `json:"content"`
+	Message   *anthropicMessage       `json:"message,omitempty"`
+	Delta     *anthropicDelta         `json:"delta,omitempty"`
+	Text      string                  `json:"text,omitempty"`
 	Error     *struct {
 		Message string `json:"message"`
 	} `json:"error"`
@@ -37,6 +41,15 @@ type anthropicContentBlock struct {
 	Text string `json:"text"`
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type anthropicMessage struct {
+	ID string `json:"id"`
+}
+
+type anthropicDelta struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
 }
 
 func mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
@@ -74,6 +87,113 @@ func assistantMessageEvent(raw anthropicEvent) agents.ProviderEvent {
 		Type:            agents.ProviderEventAssistantMessage,
 		Text:            redactSensitive(joinText(raw.Content)),
 	}
+}
+
+type streamEventMapper struct {
+	currentAssistantEventID string
+	currentAssistantText    string
+}
+
+func newStreamEventMapper() *streamEventMapper {
+	return &streamEventMapper{}
+}
+
+func (m *streamEventMapper) mapEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
+	switch raw.Type {
+	case "message_start":
+		m.startAssistantMessage(raw)
+		return agents.ProviderEvent{}, false
+	case "content_block_delta", "agent.message_delta":
+		return m.assistantMessageDeltaEvent(raw)
+	case "message_stop":
+		m.finishAssistantMessage()
+		return agents.ProviderEvent{}, false
+	case "agent.message":
+		return m.assistantMessageEvent(raw)
+	}
+
+	m.finishAssistantMessage()
+	return mapEvent(raw)
+}
+
+func (m *streamEventMapper) startAssistantMessage(raw anthropicEvent) {
+	m.currentAssistantText = ""
+
+	if raw.Message != nil && raw.Message.ID != "" {
+		m.currentAssistantEventID = raw.Message.ID
+		return
+	}
+
+	if raw.ID != "" {
+		m.currentAssistantEventID = raw.ID
+	}
+}
+
+func (m *streamEventMapper) assistantMessageDeltaEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
+	text := textDelta(raw)
+	if text == "" {
+		return agents.ProviderEvent{}, false
+	}
+
+	if m.currentAssistantEventID == "" {
+		m.currentAssistantEventID = assistantEventID(raw)
+	}
+
+	m.currentAssistantText += text
+	return agents.ProviderEvent{
+		ProviderEventID: m.currentAssistantEventID,
+		Type:            agents.ProviderEventAssistantMessage,
+		Text:            redactSensitive(m.currentAssistantText),
+	}, true
+}
+
+func (m *streamEventMapper) assistantMessageEvent(raw anthropicEvent) (agents.ProviderEvent, bool) {
+	text := joinText(raw.Content)
+	if text == "" {
+		return agents.ProviderEvent{}, false
+	}
+
+	if m.currentAssistantEventID != "" {
+		m.currentAssistantText += text
+		return agents.ProviderEvent{
+			ProviderEventID: m.currentAssistantEventID,
+			Type:            agents.ProviderEventAssistantMessage,
+			Text:            redactSensitive(m.currentAssistantText),
+		}, true
+	}
+
+	m.currentAssistantEventID = assistantEventID(raw)
+	m.currentAssistantText = text
+	return agents.ProviderEvent{
+		ProviderEventID: m.currentAssistantEventID,
+		Type:            agents.ProviderEventAssistantMessage,
+		Text:            redactSensitive(m.currentAssistantText),
+	}, true
+}
+
+func (m *streamEventMapper) finishAssistantMessage() {
+	m.currentAssistantEventID = ""
+	m.currentAssistantText = ""
+}
+
+func assistantEventID(raw anthropicEvent) string {
+	if raw.ID != "" {
+		return raw.ID
+	}
+	return "assistant-stream-" + uuid.NewString()
+}
+
+func textDelta(raw anthropicEvent) string {
+	if raw.Text != "" {
+		return raw.Text
+	}
+	if raw.Delta == nil || raw.Delta.Text == "" {
+		return ""
+	}
+	if raw.Delta.Type != "" && raw.Delta.Type != "text_delta" {
+		return ""
+	}
+	return raw.Delta.Text
 }
 
 func toolEvent(raw anthropicEvent, eventType agents.ProviderEventType) agents.ProviderEvent {
