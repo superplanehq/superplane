@@ -79,6 +79,18 @@ func AppendAgentSessionMessage(msg *AgentSessionMessage) error {
 	return AppendAgentSessionMessageInTransaction(database.Conn(), msg)
 }
 
+func FindAgentSessionMessage(sessionID, messageID uuid.UUID) (*AgentSessionMessage, error) {
+	var message AgentSessionMessage
+	err := database.Conn().
+		Where("session_id = ?", sessionID).
+		Where("id = ?", messageID).
+		First(&message).Error
+	if err != nil {
+		return nil, err
+	}
+	return &message, nil
+}
+
 // ListAgentSessionMessagesPage returns up to `limit` messages strictly older
 // than `before` (or the most recent `limit` when `before` is nil), in
 // chronological order (oldest-first). Used for tail-paginated chat scroll.

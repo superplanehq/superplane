@@ -22,9 +22,10 @@ import (
 const testProvider = "test"
 
 type scriptedProvider struct {
-	name   string
-	events []agents.ProviderEvent
-	err    error
+	name          string
+	events        []agents.ProviderEvent
+	err           error
+	afterOpenSeen bool
 }
 
 func (p *scriptedProvider) Name() string { return p.name }
@@ -40,7 +41,13 @@ func (p *scriptedProvider) InterruptSession(context.Context, string) error {
 func (p *scriptedProvider) DefineOutcome(context.Context, string, agents.DefineOutcomeOptions) error {
 	return errors.New("not used")
 }
-func (p *scriptedProvider) StreamEvents(ctx context.Context, _ string, cb func(agents.ProviderEvent) error) error {
+func (p *scriptedProvider) StreamEvents(ctx context.Context, _ string, afterOpen func(context.Context) error, cb func(agents.ProviderEvent) error) error {
+	if afterOpen != nil {
+		if err := afterOpen(ctx); err != nil {
+			return err
+		}
+		p.afterOpenSeen = true
+	}
 	for _, e := range p.events {
 		if err := cb(e); err != nil {
 			return err
@@ -49,6 +56,20 @@ func (p *scriptedProvider) StreamEvents(ctx context.Context, _ string, cb func(a
 	return p.err
 }
 func (p *scriptedProvider) ArchiveSession(context.Context, string) error { return nil }
+
+type recordingTurnSender struct {
+	sessionID uuid.UUID
+	messageID uuid.UUID
+	mode      string
+	err       error
+}
+
+func (s *recordingTurnSender) SendPersistedMessage(_ context.Context, session *models.AgentSession, messageID uuid.UUID, mode string) error {
+	s.sessionID = session.ID
+	s.messageID = messageID
+	s.mode = mode
+	return s.err
+}
 
 func mustCreateSession(t *testing.T, r *support.ResourceRegistry, canvasID uuid.UUID) *models.AgentSession {
 	t.Helper()
@@ -66,7 +87,7 @@ func mustCreateSession(t *testing.T, r *support.ResourceRegistry, canvasID uuid.
 	return session
 }
 
-func TestAgentStreamWorker_PersistsAssistantTurn(t *testing.T) {
+func TestAgentStreamWorker_UpdatesStreamedAssistantMessage(t *testing.T) {
 	r := support.Setup(t)
 	defer r.Close()
 	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
@@ -77,7 +98,7 @@ func TestAgentStreamWorker_PersistsAssistantTurn(t *testing.T) {
 		name: testProvider,
 		events: []agents.ProviderEvent{
 			{ProviderEventID: "msg-1", Type: agents.ProviderEventAssistantMessage, Text: "Hello"},
-			{ProviderEventID: "msg-2", Type: agents.ProviderEventAssistantMessage, Text: ", world"},
+			{ProviderEventID: "msg-1", Type: agents.ProviderEventAssistantMessage, Text: "Hello, world"},
 			{Type: agents.ProviderEventTurnCompleted},
 		},
 	}
@@ -95,15 +116,106 @@ func TestAgentStreamWorker_PersistsAssistantTurn(t *testing.T) {
 
 	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
 	require.NoError(t, err)
-	require.Len(t, stored, 2, "each assistant text block must persist as its own row so chronology lines up with interleaved tool rows")
+	require.Len(t, stored, 1, "streamed assistant text must update one row so the UI can repaint the current response")
 	assert.Equal(t, models.AgentMessageRoleAssistant, stored[0].Role)
-	assert.Equal(t, "Hello", stored[0].Content)
-	assert.Equal(t, models.AgentMessageRoleAssistant, stored[1].Role)
-	assert.Equal(t, ", world", stored[1].Content)
+	assert.Equal(t, "Hello, world", stored[0].Content)
 
 	refreshed, err := models.FindAgentSession(session.ID)
 	require.NoError(t, err)
 	assert.Equal(t, models.AgentSessionStatusIdle, refreshed.Status)
+}
+
+func TestAgentStreamWorker_SendsQueuedUserMessageAfterStreamOpens(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	message := &models.AgentSessionMessage{
+		SessionID: session.ID,
+		Role:      models.AgentMessageRoleUser,
+		Content:   "Build this",
+	}
+	require.NoError(t, models.AppendAgentSessionMessage(message))
+
+	provider := &scriptedProvider{
+		name: testProvider,
+		events: []agents.ProviderEvent{
+			{ProviderEventID: "msg-1", Type: agents.ProviderEventAssistantMessage, Text: "Done"},
+			{Type: agents.ProviderEventTurnCompleted},
+		},
+	}
+	sender := &recordingTurnSender{}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored", sender)
+	body, _ := json.Marshal(messages.AgentStreamRequest{
+		SessionID:      session.ID.String(),
+		OrganizationID: r.Organization.ID.String(),
+		UserID:         r.User.String(),
+		UserMessageID:  message.ID.String(),
+		Mode:           string(agents.ModeBuilder),
+	})
+
+	require.NoError(t, w.Handle(context.Background(), body))
+	assert.True(t, provider.afterOpenSeen)
+	assert.Equal(t, session.ID, sender.sessionID)
+	assert.Equal(t, message.ID, sender.messageID)
+	assert.Equal(t, string(agents.ModeBuilder), sender.mode)
+}
+
+func TestAgentStreamWorker_MarksFailedWhenQueuedUserMessageCannotSend(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	message := &models.AgentSessionMessage{
+		SessionID: session.ID,
+		Role:      models.AgentMessageRoleUser,
+		Content:   "Build this",
+	}
+	require.NoError(t, models.AppendAgentSessionMessage(message))
+
+	provider := &scriptedProvider{name: testProvider}
+	sender := &recordingTurnSender{err: errors.New("provider send failed")}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored", sender)
+	body, _ := json.Marshal(messages.AgentStreamRequest{
+		SessionID:     session.ID.String(),
+		UserMessageID: message.ID.String(),
+	})
+
+	require.NoError(t, w.Handle(context.Background(), body))
+
+	refreshed, err := models.FindAgentSession(session.ID)
+	require.NoError(t, err)
+	assert.Equal(t, models.AgentSessionStatusFailed, refreshed.Status)
+}
+
+func TestAgentStreamWorker_PersistsDistinctAssistantMessages(t *testing.T) {
+	r := support.Setup(t)
+	defer r.Close()
+	canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, nil, nil)
+	session := mustCreateSession(t, r, canvas.ID)
+
+	provider := &scriptedProvider{
+		name: testProvider,
+		events: []agents.ProviderEvent{
+			{ProviderEventID: "msg-1", Type: agents.ProviderEventAssistantMessage, Text: "First"},
+			{ProviderEventID: "msg-2", Type: agents.ProviderEventAssistantMessage, Text: "Second"},
+			{Type: agents.ProviderEventTurnCompleted},
+		},
+	}
+
+	w := workers.NewAgentStreamWorker(provider, "amqp://ignored")
+	body, _ := json.Marshal(messages.AgentStreamRequest{SessionID: session.ID.String()})
+	require.NoError(t, w.Handle(context.Background(), body))
+
+	stored, err := models.ListAgentSessionMessagesPage(session.ID, nil, 100)
+	require.NoError(t, err)
+	require.Len(t, stored, 2)
+	assert.Equal(t, "First", stored[0].Content)
+	assert.Equal(t, "Second", stored[1].Content)
 }
 
 func TestAgentStreamWorker_PersistsToolEvents(t *testing.T) {

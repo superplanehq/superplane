@@ -32,13 +32,24 @@ const (
 // AgentStreamWorker is stateless and safe to run as competing consumers.
 type AgentStreamWorker struct {
 	provider    agents.Provider
+	turnSender  AgentTurnSender
 	rabbitMQURL string
 	slots       chan struct{}
 }
 
-func NewAgentStreamWorker(provider agents.Provider, rabbitMQURL string) *AgentStreamWorker {
+type AgentTurnSender interface {
+	SendPersistedMessage(ctx context.Context, session *models.AgentSession, messageID uuid.UUID, mode string) error
+}
+
+func NewAgentStreamWorker(provider agents.Provider, rabbitMQURL string, turnSenders ...AgentTurnSender) *AgentStreamWorker {
+	var turnSender AgentTurnSender
+	if len(turnSenders) > 0 {
+		turnSender = turnSenders[0]
+	}
+
 	return &AgentStreamWorker{
 		provider:    provider,
+		turnSender:  turnSender,
 		rabbitMQURL: rabbitMQURL,
 		slots:       make(chan struct{}, maxConcurrentStreams),
 	}
@@ -192,7 +203,7 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 
 	var streamErr error
 
-	err = w.provider.StreamEvents(ctx, session.ProviderSessionID, func(evt agents.ProviderEvent) error {
+	err = w.provider.StreamEvents(ctx, session.ProviderSessionID, w.afterStreamOpen(session, req), func(evt agents.ProviderEvent) error {
 		return handleProviderEvent(sessionID, evt, publish, &streamErr)
 	})
 
@@ -217,6 +228,25 @@ func (w *AgentStreamWorker) handle(parentCtx context.Context, body []byte) error
 		log.WithError(err).Warn("agent stream: failed to mark session idle")
 	}
 	return nil
+}
+
+func (w *AgentStreamWorker) afterStreamOpen(session *models.AgentSession, req messages.AgentStreamRequest) func(context.Context) error {
+	if req.UserMessageID == "" {
+		return nil
+	}
+
+	return func(ctx context.Context) error {
+		if w.turnSender == nil {
+			return fmt.Errorf("agent stream: queued user turn has no sender")
+		}
+
+		messageID, err := uuid.Parse(req.UserMessageID)
+		if err != nil {
+			return fmt.Errorf("agent stream: invalid user message id: %w", err)
+		}
+
+		return w.turnSender.SendPersistedMessage(ctx, session, messageID, req.Mode)
+	}
 }
 
 func handleProviderEvent(
