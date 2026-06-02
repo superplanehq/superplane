@@ -80,11 +80,11 @@ func CanvasMemoryNamespaceSource(canvasID uuid.UUID, namespace string) (string, 
 	return CanvasMemoryNamespaceSourceInTransaction(database.Conn(), canvasID, namespace)
 }
 
-// ReplaceManualCanvasMemoryBankInTransaction replaces all manual-source rows
-// in a namespace with one row per entry. Used by both create (no existing
-// rows) and update (existing manual rows). The caller is responsible for
-// enforcing origin-lock before invoking this.
-func ReplaceManualCanvasMemoryBankInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, entries []any) error {
+// ReplaceManualCanvasMemoryNamespaceInTransaction replaces all manual-source
+// rows in a namespace with one row per entry. Used by both create (no
+// existing rows) and update (existing manual rows). The caller is
+// responsible for enforcing origin-lock before invoking this.
+func ReplaceManualCanvasMemoryNamespaceInTransaction(tx *gorm.DB, canvasID uuid.UUID, namespace string, entries []any) error {
 	err := tx.
 		Where("canvas_id = ? AND namespace = ? AND source = ?", canvasID, namespace, CanvasMemorySourceManual).
 		Delete(&CanvasMemory{}).
@@ -103,8 +103,8 @@ func ReplaceManualCanvasMemoryBankInTransaction(tx *gorm.DB, canvasID uuid.UUID,
 	return nil
 }
 
-func ReplaceManualCanvasMemoryBank(canvasID uuid.UUID, namespace string, entries []any) error {
-	return ReplaceManualCanvasMemoryBankInTransaction(database.Conn(), canvasID, namespace, entries)
+func ReplaceManualCanvasMemoryNamespace(canvasID uuid.UUID, namespace string, entries []any) error {
+	return ReplaceManualCanvasMemoryNamespaceInTransaction(database.Conn(), canvasID, namespace, entries)
 }
 
 func ListCanvasMemoriesInTransaction(tx *gorm.DB, canvasID uuid.UUID) ([]CanvasMemory, error) {

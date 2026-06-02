@@ -5,7 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collap
 import { ChevronDown, Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { CanvasMemoryBankDialog, type CanvasMemoryBankDialogMode } from "./CanvasMemoryBankDialog";
+import { CanvasMemoryNamespaceDialog, type CanvasMemoryNamespaceDialogMode } from "./CanvasMemoryNamespaceDialog";
 
 export type CanvasMemoryViewProps = {
   entries: CanvasMemoryEntry[];
@@ -14,20 +14,20 @@ export type CanvasMemoryViewProps = {
   canEdit?: boolean;
   onDeleteEntry?: (memoryId: string) => void;
   deletingId?: string;
-  onCreateBank?: (input: { namespace: string; entries: unknown[] }) => Promise<void>;
-  isCreatingBank?: boolean;
-  onUpdateBank?: (input: { namespace: string; newNamespace?: string; entries: unknown[] }) => Promise<void>;
-  isUpdatingBank?: boolean;
+  onCreateNamespace?: (input: { namespace: string; entries: unknown[] }) => Promise<void>;
+  isCreatingNamespace?: boolean;
+  onUpdateNamespace?: (input: { namespace: string; newNamespace?: string; entries: unknown[] }) => Promise<void>;
+  isUpdatingNamespace?: boolean;
 };
 
-interface BankGroup {
+interface NamespaceGroup {
   namespace: string;
   source: CanvasMemoryEntrySource;
   entries: CanvasMemoryEntry[];
 }
 
-function groupBanks(entries: CanvasMemoryEntry[]): BankGroup[] {
-  const groups = new Map<string, BankGroup>();
+function groupByNamespace(entries: CanvasMemoryEntry[]): NamespaceGroup[] {
+  const groups = new Map<string, NamespaceGroup>();
   for (const entry of entries) {
     const namespace = entry.namespace || "(no namespace)";
     const existing = groups.get(namespace);
@@ -65,16 +65,16 @@ type DialogState =
 
 function computeIsSubmitting(
   dialogState: DialogState,
-  isCreatingBank: boolean | undefined,
-  isUpdatingBank: boolean | undefined,
+  isCreatingNamespace: boolean | undefined,
+  isUpdatingNamespace: boolean | undefined,
 ): boolean {
   if (!dialogState.open) {
     return false;
   }
   if (dialogState.mode === "create") {
-    return !!isCreatingBank;
+    return !!isCreatingNamespace;
   }
-  return !!isUpdatingBank;
+  return !!isUpdatingNamespace;
 }
 
 function CanvasMemoryViewBody({
@@ -84,48 +84,48 @@ function CanvasMemoryViewBody({
   canEdit,
   onDeleteEntry,
   deletingId,
-  onCreateBank,
-  isCreatingBank,
-  onUpdateBank,
-  isUpdatingBank,
+  onCreateNamespace,
+  isCreatingNamespace,
+  onUpdateNamespace,
+  isUpdatingNamespace,
 }: CanvasMemoryViewProps) {
-  const banks = useMemo(() => groupBanks(entries), [entries]);
+  const namespaces = useMemo(() => groupByNamespace(entries), [entries]);
   const [dialogState, setDialogState] = useState<DialogState>({ open: false });
 
   const closeDialog = () => setDialogState({ open: false });
 
-  const handleCreateBankClick = () => {
+  const handleCreateNamespaceClick = () => {
     setDialogState({ open: true, mode: "create" });
   };
 
-  const handleEditBankClick = (bank: BankGroup) => {
+  const handleEditNamespaceClick = (group: NamespaceGroup) => {
     setDialogState({
       open: true,
       mode: "edit",
-      namespace: bank.namespace,
-      entries: bank.entries.map((entry) => entry.values),
+      namespace: group.namespace,
+      entries: group.entries.map((entry) => entry.values),
     });
   };
 
   const handleDialogSubmit = async (input: { namespace: string; entries: unknown[] }) => {
     if (!dialogState.open) return;
     if (dialogState.mode === "create") {
-      if (!onCreateBank) return;
-      await onCreateBank(input);
+      if (!onCreateNamespace) return;
+      await onCreateNamespace(input);
       return;
     }
-    if (!onUpdateBank) return;
-    await onUpdateBank({
+    if (!onUpdateNamespace) return;
+    await onUpdateNamespace({
       namespace: dialogState.namespace,
       newNamespace: input.namespace !== dialogState.namespace ? input.namespace : undefined,
       entries: input.entries,
     });
   };
 
-  const showCreateButton = !!canEdit && !!onCreateBank;
-  const isSubmitting = computeIsSubmitting(dialogState, isCreatingBank, isUpdatingBank);
+  const showCreateButton = !!canEdit && !!onCreateNamespace;
+  const isSubmitting = computeIsSubmitting(dialogState, isCreatingNamespace, isUpdatingNamespace);
 
-  const dialogMode: CanvasMemoryBankDialogMode | undefined = dialogState.open ? dialogState.mode : undefined;
+  const dialogMode: CanvasMemoryNamespaceDialogMode | undefined = dialogState.open ? dialogState.mode : undefined;
   const dialogNamespace = dialogState.open && dialogState.mode === "edit" ? dialogState.namespace : undefined;
   const dialogInitialEntries = dialogState.open && dialogState.mode === "edit" ? dialogState.entries : undefined;
 
@@ -150,30 +150,35 @@ function CanvasMemoryViewBody({
     <>
       {showCreateButton ? (
         <div className="flex items-center justify-end gap-2 border-b border-slate-950/10 bg-white px-4 py-2">
-          <Button type="button" size="sm" onClick={handleCreateBankClick} data-testid="memory-create-bank-button">
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleCreateNamespaceClick}
+            data-testid="memory-create-namespace-button"
+          >
             <Plus className="h-4 w-4" aria-hidden="true" />
-            Create memory bank
+            Create memory namespace
           </Button>
         </div>
       ) : null}
-      {banks.length === 0 ? (
-        <ZeroState canCreate={showCreateButton} onCreate={handleCreateBankClick} />
+      {namespaces.length === 0 ? (
+        <ZeroState canCreate={showCreateButton} onCreate={handleCreateNamespaceClick} />
       ) : (
         <div className="min-h-0 w-full min-w-0 flex-1 overflow-auto">
-          {banks.map((bank) => (
+          {namespaces.map((group) => (
             <NamespaceSection
-              key={bank.namespace}
-              bank={bank}
+              key={group.namespace}
+              namespaceGroup={group}
               canEdit={!!canEdit}
               onDeleteEntry={onDeleteEntry}
               deletingId={deletingId}
-              onEditBank={onUpdateBank ? () => handleEditBankClick(bank) : undefined}
+              onEditNamespace={onUpdateNamespace ? () => handleEditNamespaceClick(group) : undefined}
             />
           ))}
         </div>
       )}
       {dialogMode ? (
-        <CanvasMemoryBankDialog
+        <CanvasMemoryNamespaceDialog
           open={dialogState.open}
           onOpenChange={(open) => {
             if (!open) closeDialog();
@@ -190,18 +195,24 @@ function CanvasMemoryViewBody({
 }
 
 type NamespaceSectionProps = {
-  bank: BankGroup;
+  namespaceGroup: NamespaceGroup;
   canEdit: boolean;
   onDeleteEntry?: (memoryId: string) => void;
   deletingId?: string;
-  onEditBank?: () => void;
+  onEditNamespace?: () => void;
 };
 
-function NamespaceSection({ bank, canEdit, onDeleteEntry, deletingId, onEditBank }: NamespaceSectionProps) {
+function NamespaceSection({
+  namespaceGroup,
+  canEdit,
+  onDeleteEntry,
+  deletingId,
+  onEditNamespace,
+}: NamespaceSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
-  const { namespace, source, entries } = bank;
+  const { namespace, source, entries } = namespaceGroup;
   const isManual = source === "manual";
-  const showEdit = canEdit && isManual && !!onEditBank;
+  const showEdit = canEdit && isManual && !!onEditNamespace;
 
   return (
     <Collapsible
@@ -231,9 +242,9 @@ function NamespaceSection({ bank, canEdit, onDeleteEntry, deletingId, onEditBank
             type="button"
             variant="ghost"
             size="icon-sm"
-            onClick={onEditBank}
+            onClick={onEditNamespace}
             className="text-gray-500 hover:text-gray-900"
-            title="Edit memory bank"
+            title="Edit memory namespace"
             data-testid={`memory-namespace-edit-${namespace}`}
           >
             <Pencil className="h-4 w-4" />
@@ -277,9 +288,9 @@ function ZeroState({ canCreate, onCreate }: { canCreate: boolean; onCreate: () =
         will show up here.
       </p>
       {canCreate ? (
-        <Button type="button" size="sm" onClick={onCreate} data-testid="memory-create-bank-empty-button">
+        <Button type="button" size="sm" onClick={onCreate} data-testid="memory-create-namespace-empty-button">
           <Plus className="h-4 w-4" aria-hidden="true" />
-          Create memory bank
+          Create memory namespace
         </Button>
       ) : null}
     </div>

@@ -1,7 +1,7 @@
 import type {
   CanvasMemoryEntry,
-  CreateCanvasMemoryBankInput,
-  UpdateCanvasMemoryBankInput,
+  CreateCanvasMemoryNamespaceInput,
+  UpdateCanvasMemoryNamespaceInput,
 } from "@/hooks/useCanvasData";
 
 import { CanvasMemoryView } from "./CanvasMemoryView";
@@ -12,28 +12,28 @@ interface DeleteCanvasMemoryMutation {
   variables: string | undefined;
 }
 
-interface CreateCanvasMemoryBankMutation {
-  mutateAsync: (input: CreateCanvasMemoryBankInput) => Promise<unknown>;
+interface CreateCanvasMemoryNamespaceMutation {
+  mutateAsync: (input: CreateCanvasMemoryNamespaceInput) => Promise<unknown>;
   isPending: boolean;
 }
 
-interface UpdateCanvasMemoryBankMutation {
-  mutateAsync: (input: UpdateCanvasMemoryBankInput) => Promise<unknown>;
+interface UpdateCanvasMemoryNamespaceMutation {
+  mutateAsync: (input: UpdateCanvasMemoryNamespaceInput) => Promise<unknown>;
   isPending: boolean;
 }
 
 interface WorkflowMemoryOverlayLayerProps {
   isMemoryMode: boolean;
-  // True when the viewer is allowed to mutate memory entries/banks. Computed
-  // by the workflow page via `canEditCanvasMemory` so the gating logic stays
-  // in one place.
+  // True when the viewer is allowed to mutate memory entries/namespaces.
+  // Computed by the workflow page via `canEditCanvasMemory` so the gating
+  // logic stays in one place.
   canEdit: boolean;
   entries: CanvasMemoryEntry[];
   isLoading: boolean;
   error: unknown;
   deleteCanvasMemoryEntry: DeleteCanvasMemoryMutation;
-  createCanvasMemoryBank: CreateCanvasMemoryBankMutation;
-  updateCanvasMemoryBank: UpdateCanvasMemoryBankMutation;
+  createCanvasMemoryNamespace: CreateCanvasMemoryNamespaceMutation;
+  updateCanvasMemoryNamespace: UpdateCanvasMemoryNamespaceMutation;
 }
 
 export function WorkflowMemoryOverlayLayer({
@@ -43,8 +43,8 @@ export function WorkflowMemoryOverlayLayer({
   isLoading,
   error,
   deleteCanvasMemoryEntry,
-  createCanvasMemoryBank,
-  updateCanvasMemoryBank,
+  createCanvasMemoryNamespace,
+  updateCanvasMemoryNamespace,
 }: WorkflowMemoryOverlayLayerProps) {
   if (!isMemoryMode) return null;
 
@@ -56,22 +56,22 @@ export function WorkflowMemoryOverlayLayer({
       canEdit={canEdit}
       onDeleteEntry={canEdit ? (memoryId) => deleteCanvasMemoryEntry.mutate(memoryId) : undefined}
       deletingId={deleteCanvasMemoryEntry.isPending ? deleteCanvasMemoryEntry.variables : undefined}
-      onCreateBank={
+      onCreateNamespace={
         canEdit
           ? async (input) => {
-              await createCanvasMemoryBank.mutateAsync(input);
+              await createCanvasMemoryNamespace.mutateAsync(input);
             }
           : undefined
       }
-      isCreatingBank={createCanvasMemoryBank.isPending}
-      onUpdateBank={
+      isCreatingNamespace={createCanvasMemoryNamespace.isPending}
+      onUpdateNamespace={
         canEdit
           ? async (input) => {
-              await updateCanvasMemoryBank.mutateAsync(input);
+              await updateCanvasMemoryNamespace.mutateAsync(input);
             }
           : undefined
       }
-      isUpdatingBank={updateCanvasMemoryBank.isPending}
+      isUpdatingNamespace={updateCanvasMemoryNamespace.isPending}
     />
   );
 }

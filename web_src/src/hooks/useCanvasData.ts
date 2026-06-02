@@ -27,8 +27,8 @@ import {
   canvasesListRuns,
   canvasesListCanvasMemories,
   canvasesDeleteCanvasMemory,
-  canvasesCreateCanvasMemoryBank,
-  canvasesUpdateCanvasMemoryBank,
+  canvasesCreateCanvasMemoryNamespace,
+  canvasesUpdateCanvasMemoryNamespace,
   canvasesListEventExecutions,
   canvasesListChildExecutions,
   canvasesListNodeQueueItems,
@@ -1295,17 +1295,17 @@ export const useDeleteCanvasMemoryEntry = (canvasId: string) => {
   });
 };
 
-export interface CreateCanvasMemoryBankInput {
+export interface CreateCanvasMemoryNamespaceInput {
   namespace: string;
   entries: unknown[];
 }
 
-export const useCreateCanvasMemoryBank = (canvasId: string) => {
+export const useCreateCanvasMemoryNamespace = (canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ namespace, entries }: CreateCanvasMemoryBankInput) => {
-      await canvasesCreateCanvasMemoryBank(
+    mutationFn: async ({ namespace, entries }: CreateCanvasMemoryNamespaceInput) => {
+      await canvasesCreateCanvasMemoryNamespace(
         withOrganizationHeader({
           path: { canvasId },
           body: { namespace, entries },
@@ -1318,18 +1318,18 @@ export const useCreateCanvasMemoryBank = (canvasId: string) => {
   });
 };
 
-export interface UpdateCanvasMemoryBankInput {
+export interface UpdateCanvasMemoryNamespaceInput {
   namespace: string;
   newNamespace?: string;
   entries: unknown[];
 }
 
-export const useUpdateCanvasMemoryBank = (canvasId: string) => {
+export const useUpdateCanvasMemoryNamespace = (canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ namespace, newNamespace, entries }: UpdateCanvasMemoryBankInput) => {
-      await canvasesUpdateCanvasMemoryBank(
+    mutationFn: async ({ namespace, newNamespace, entries }: UpdateCanvasMemoryNamespaceInput) => {
+      await canvasesUpdateCanvasMemoryNamespace(
         withOrganizationHeader({
           path: { canvasId, namespace },
           body: {

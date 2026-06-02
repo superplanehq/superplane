@@ -23,26 +23,26 @@ func structpbEntries(t *testing.T, entries ...map[string]any) []*structpb.Value 
 	return values
 }
 
-func Test__CreateCanvasMemoryBank(t *testing.T) {
+func Test__CreateCanvasMemoryNamespace(t *testing.T) {
 	r := support.Setup(t)
 
-	t.Run("empty entries -> error and no bank persisted", func(t *testing.T) {
+	t.Run("empty entries -> error and no namespace persisted", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		_, err := CreateCanvasMemoryBank(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String(), "empty-bank", nil)
+		_, err := CreateCanvasMemoryNamespace(context.Background(), r.Registry, r.Organization.ID.String(), canvas.ID.String(), "empty-namespace", nil)
 		s, ok := status.FromError(err)
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 
-		source, err := models.CanvasMemoryNamespaceSource(canvas.ID, "empty-bank")
+		source, err := models.CanvasMemoryNamespaceSource(canvas.ID, "empty-namespace")
 		require.NoError(t, err)
-		assert.Equal(t, "", source, "no rows should be persisted for a rejected empty bank")
+		assert.Equal(t, "", source, "no rows should be persisted for a rejected empty namespace")
 	})
 
-	t.Run("non-empty entries -> bank persisted", func(t *testing.T) {
+	t.Run("non-empty entries -> namespace persisted", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		resp, err := CreateCanvasMemoryBank(
+		resp, err := CreateCanvasMemoryNamespace(
 			context.Background(),
 			r.Registry,
 			r.Organization.ID.String(),
@@ -59,28 +59,28 @@ func Test__CreateCanvasMemoryBank(t *testing.T) {
 	})
 }
 
-func Test__UpdateCanvasMemoryBank(t *testing.T) {
+func Test__UpdateCanvasMemoryNamespace(t *testing.T) {
 	r := support.Setup(t)
 
-	t.Run("empty entries -> error and existing bank preserved", func(t *testing.T) {
+	t.Run("empty entries -> error and existing namespace preserved", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		_, err := CreateCanvasMemoryBank(
+		_, err := CreateCanvasMemoryNamespace(
 			context.Background(),
 			r.Registry,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
-			"durable-bank",
+			"durable-namespace",
 			structpbEntries(t, map[string]any{"key": "value"}),
 		)
 		require.NoError(t, err)
 
-		_, err = UpdateCanvasMemoryBank(
+		_, err = UpdateCanvasMemoryNamespace(
 			context.Background(),
 			r.Registry,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
-			"durable-bank",
+			"durable-namespace",
 			"",
 			nil,
 		)
@@ -88,30 +88,30 @@ func Test__UpdateCanvasMemoryBank(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, codes.InvalidArgument, s.Code())
 
-		records, err := models.ListCanvasMemoriesByNamespace(canvas.ID, "durable-bank")
+		records, err := models.ListCanvasMemoriesByNamespace(canvas.ID, "durable-namespace")
 		require.NoError(t, err)
-		assert.Len(t, records, 1, "existing bank data must not be destroyed by a rejected empty update")
+		assert.Len(t, records, 1, "existing namespace data must not be destroyed by a rejected empty update")
 	})
 
-	t.Run("non-empty entries -> bank replaced", func(t *testing.T) {
+	t.Run("non-empty entries -> namespace replaced", func(t *testing.T) {
 		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
 
-		_, err := CreateCanvasMemoryBank(
+		_, err := CreateCanvasMemoryNamespace(
 			context.Background(),
 			r.Registry,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
-			"replace-bank",
+			"replace-namespace",
 			structpbEntries(t, map[string]any{"key": "v1"}),
 		)
 		require.NoError(t, err)
 
-		resp, err := UpdateCanvasMemoryBank(
+		resp, err := UpdateCanvasMemoryNamespace(
 			context.Background(),
 			r.Registry,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
-			"replace-bank",
+			"replace-namespace",
 			"",
 			structpbEntries(t, map[string]any{"key": "v2"}, map[string]any{"key": "v3"}),
 		)

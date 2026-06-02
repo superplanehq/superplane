@@ -25,13 +25,13 @@ const EDITOR_OPTIONS = {
   renderLineHighlightOnlyWhenFocus: false,
 };
 
-export type CanvasMemoryBankDialogMode = "create" | "edit";
+export type CanvasMemoryNamespaceDialogMode = "create" | "edit";
 
-interface CanvasMemoryBankDialogProps {
+interface CanvasMemoryNamespaceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: CanvasMemoryBankDialogMode;
-  // For "edit" mode this is the existing bank's namespace; for "create" mode
+  mode: CanvasMemoryNamespaceDialogMode;
+  // For "edit" mode this is the existing namespace's name; for "create" mode
   // it is undefined.
   originalNamespace?: string;
   initialEntries?: unknown[];
@@ -50,7 +50,7 @@ function stringifyEntries(entries: unknown[] | undefined): string {
   }
 }
 
-export function CanvasMemoryBankDialog({
+export function CanvasMemoryNamespaceDialog({
   open,
   onOpenChange,
   mode,
@@ -58,7 +58,7 @@ export function CanvasMemoryBankDialog({
   initialEntries,
   isSubmitting,
   onSubmit,
-}: CanvasMemoryBankDialogProps) {
+}: CanvasMemoryNamespaceDialogProps) {
   const initialJson = useMemo(() => stringifyEntries(initialEntries), [initialEntries]);
   const [namespace, setNamespace] = useState<string>(originalNamespace ?? "");
   const [jsonValue, setJsonValue] = useState<string>(initialJson);
@@ -71,11 +71,11 @@ export function CanvasMemoryBankDialog({
     setError(null);
   }, [open, originalNamespace, initialJson]);
 
-  const title = mode === "create" ? "Create memory bank" : "Edit memory bank";
+  const title = mode === "create" ? "Create memory namespace" : "Edit memory namespace";
   const description =
     mode === "create"
-      ? "Define a manually-managed memory bank by providing a namespace and a JSON array of entries."
-      : "Edit the namespace or replace the entries of this manually-managed memory bank.";
+      ? "Define a manually-managed memory namespace by providing a name and a JSON array of entries."
+      : "Rename or replace the entries of this manually-managed memory namespace.";
 
   const handleSubmit = async () => {
     setError(null);
@@ -109,7 +109,7 @@ export function CanvasMemoryBankDialog({
       await onSubmit({ namespace: trimmedNamespace, entries: parsed });
       onOpenChange(false);
     } catch (e) {
-      const message = e instanceof Error ? e.message : "Failed to save memory bank.";
+      const message = e instanceof Error ? e.message : "Failed to save memory namespace.";
       setError(message);
     }
   };
@@ -124,27 +124,27 @@ export function CanvasMemoryBankDialog({
 
         <div className="flex min-h-0 flex-1 flex-col gap-4 px-6 py-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="memory-bank-namespace">Namespace</Label>
+            <Label htmlFor="memory-namespace-name">Namespace</Label>
             <Input
-              id="memory-bank-namespace"
+              id="memory-namespace-name"
               value={namespace}
               onChange={(event) => setNamespace(event.target.value)}
               placeholder="e.g. release-cache"
               autoComplete="off"
               spellCheck={false}
-              data-testid="memory-bank-namespace-input"
+              data-testid="memory-namespace-name-input"
             />
           </div>
 
           <div className="flex min-h-0 flex-1 flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="memory-bank-entries">Entries (JSON array)</Label>
-              <span className="text-xs text-gray-500">Each element becomes a row in the bank.</span>
+              <Label htmlFor="memory-namespace-entries">Entries (JSON array)</Label>
+              <span className="text-xs text-gray-500">Each element becomes a row in the namespace.</span>
             </div>
             <div
-              id="memory-bank-entries"
+              id="memory-namespace-entries"
               className="min-h-0 min-w-0 flex-1 overflow-hidden rounded-md border border-gray-300 bg-white dark:border-gray-700"
-              data-testid="memory-bank-entries-editor"
+              data-testid="memory-namespace-entries-editor"
             >
               <Editor
                 height="100%"
@@ -158,7 +158,7 @@ export function CanvasMemoryBankDialog({
           </div>
 
           {error ? (
-            <p className="text-xs text-red-600 dark:text-red-400" data-testid="memory-bank-dialog-error">
+            <p className="text-xs text-red-600 dark:text-red-400" data-testid="memory-namespace-dialog-error">
               {error}
             </p>
           ) : null}
@@ -169,7 +169,7 @@ export function CanvasMemoryBankDialog({
             Cancel
           </Button>
           <Button type="button" onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? "Saving…" : mode === "create" ? "Create bank" : "Save changes"}
+            {isSubmitting ? "Saving…" : mode === "create" ? "Create namespace" : "Save changes"}
           </Button>
         </div>
       </DialogContent>

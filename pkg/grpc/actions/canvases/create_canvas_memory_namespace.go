@@ -16,7 +16,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func UpdateCanvasMemoryBank(ctx context.Context, registry *registry.Registry, organizationID, canvasID, namespace, newNamespace string, entries []*structpb.Value) (*pb.UpdateCanvasMemoryBankResponse, error) {
+func CreateCanvasMemoryNamespace(ctx context.Context, registry *registry.Registry, organizationID, canvasID, namespace string, entries []*structpb.Value) (*pb.CreateCanvasMemoryNamespaceResponse, error) {
 	orgUUID, err := uuid.Parse(organizationID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid organization_id")
@@ -30,12 +30,6 @@ func UpdateCanvasMemoryBank(ctx context.Context, registry *registry.Registry, or
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
 		return nil, status.Error(codes.InvalidArgument, "namespace is required")
-	}
-
-	newNamespace = strings.TrimSpace(newNamespace)
-	targetNamespace := newNamespace
-	if targetNamespace == "" {
-		targetNamespace = namespace
 	}
 
 	if len(entries) == 0 {
@@ -62,37 +56,15 @@ func UpdateCanvasMemoryBank(ctx context.Context, registry *registry.Registry, or
 			return txErr
 		}
 
-		if existingSource == "" {
-			return status.Errorf(codes.NotFound, "memory bank %q not found", namespace)
+		if existingSource != "" {
+			return status.Errorf(codes.InvalidArgument, "memory namespace %q already exists", namespace)
 		}
 
-		if existingSource != models.CanvasMemorySourceManual {
-			return status.Errorf(codes.FailedPrecondition, "memory bank %q is managed by nodes and cannot be edited", namespace)
-		}
-
-		if targetNamespace != namespace {
-			conflict, txErr := models.CanvasMemoryNamespaceSourceInTransaction(tx, canvasUUID, targetNamespace)
-			if txErr != nil {
-				return txErr
-			}
-
-			if conflict != "" {
-				return status.Errorf(codes.InvalidArgument, "memory bank %q already exists", targetNamespace)
-			}
-
-			if txErr := tx.
-				Where("canvas_id = ? AND namespace = ? AND source = ?", canvasUUID, namespace, models.CanvasMemorySourceManual).
-				Delete(&models.CanvasMemory{}).
-				Error; txErr != nil {
-				return txErr
-			}
-		}
-
-		if txErr := models.ReplaceManualCanvasMemoryBankInTransaction(tx, canvasUUID, targetNamespace, decodedEntries); txErr != nil {
+		if txErr := models.ReplaceManualCanvasMemoryNamespaceInTransaction(tx, canvasUUID, namespace, decodedEntries); txErr != nil {
 			return txErr
 		}
 
-		records, txErr := models.ListCanvasMemoriesByNamespaceInTransaction(tx, canvasUUID, targetNamespace)
+		records, txErr := models.ListCanvasMemoriesByNamespaceInTransaction(tx, canvasUUID, namespace)
 		if txErr != nil {
 			return txErr
 		}
@@ -105,7 +77,7 @@ func UpdateCanvasMemoryBank(ctx context.Context, registry *registry.Registry, or
 		if statusErr, ok := status.FromError(err); ok {
 			return nil, statusErr.Err()
 		}
-		return nil, status.Error(codes.Internal, "failed to update canvas memory bank")
+		return nil, status.Error(codes.Internal, "failed to create canvas memory namespace")
 	}
 
 	items := make([]*pb.CanvasMemory, 0, len(stored))
@@ -117,8 +89,8 @@ func UpdateCanvasMemoryBank(ctx context.Context, registry *registry.Registry, or
 		items = append(items, item)
 	}
 
-	return &pb.UpdateCanvasMemoryBankResponse{
-		Namespace: targetNamespace,
+	return &pb.CreateCanvasMemoryNamespaceResponse{
+		Namespace: namespace,
 		Items:     items,
 	}, nil
 }

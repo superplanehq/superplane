@@ -444,26 +444,26 @@ service Canvases {
     };
   }
 
-  rpc CreateCanvasMemoryBank(CreateCanvasMemoryBankRequest) returns (CreateCanvasMemoryBankResponse) {
+  rpc CreateCanvasMemoryNamespace(CreateCanvasMemoryNamespaceRequest) returns (CreateCanvasMemoryNamespaceResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/memory/banks"
+      post: "/api/v1/canvases/{canvas_id}/memory/namespaces"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create manual canvas memory bank";
-      description: "Creates a manually-managed memory bank (namespace) with the provided entries. Rejected if the namespace already has any entries.";
+      summary: "Create manual canvas memory namespace";
+      description: "Creates a manually-managed memory namespace with the provided entries. Rejected if the namespace already has any entries.";
       tags: "Canvas";
     };
   }
 
-  rpc UpdateCanvasMemoryBank(UpdateCanvasMemoryBankRequest) returns (UpdateCanvasMemoryBankResponse) {
+  rpc UpdateCanvasMemoryNamespace(UpdateCanvasMemoryNamespaceRequest) returns (UpdateCanvasMemoryNamespaceResponse) {
     option (google.api.http) = {
-      put: "/api/v1/canvases/{canvas_id}/memory/banks/{namespace}"
+      put: "/api/v1/canvases/{canvas_id}/memory/namespaces/{namespace}"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update manual canvas memory bank";
-      description: "Replaces the entries of a manually-managed memory bank, optionally renaming it. Rejected if the bank is node-managed.";
+      summary: "Update manual canvas memory namespace";
+      description: "Replaces the entries of a manually-managed memory namespace, optionally renaming it. Rejected if the namespace is node-managed.";
       tags: "Canvas";
     };
   }
@@ -1120,25 +1120,25 @@ message DeleteCanvasMemoryRequest {
 
 message DeleteCanvasMemoryResponse {}
 
-message CreateCanvasMemoryBankRequest {
+message CreateCanvasMemoryNamespaceRequest {
   string canvas_id = 1;
   string namespace = 2;
   repeated google.protobuf.Value entries = 3;
 }
 
-message CreateCanvasMemoryBankResponse {
+message CreateCanvasMemoryNamespaceResponse {
   string namespace = 1;
   repeated CanvasMemory items = 2;
 }
 
-message UpdateCanvasMemoryBankRequest {
+message UpdateCanvasMemoryNamespaceRequest {
   string canvas_id = 1;
   string namespace = 2;
   string new_namespace = 3;
   repeated google.protobuf.Value entries = 4;
 }
 
-message UpdateCanvasMemoryBankResponse {
+message UpdateCanvasMemoryNamespaceResponse {
   string namespace = 1;
   repeated CanvasMemory items = 2;
 }
