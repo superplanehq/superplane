@@ -194,8 +194,8 @@ export function TablePanelRowStylesSection({
         </Button>
       </div>
       <p className="text-[11px] text-slate-500">
-        Tint a row when its data matches a condition (e.g. <code className="text-[10px]">status == &quot;error&quot;</code>).
-        First matching rule wins.
+        Tint a row when its data matches a condition (e.g.{" "}
+        <code className="text-[10px]">status == &quot;error&quot;</code>). First matching rule wins.
       </p>
       <div className="space-y-2">
         {rules.map((rule, idx) => (
