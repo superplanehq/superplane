@@ -12,6 +12,7 @@ import { mergeTriggerParameters } from "./mergeTriggerPayload";
 import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
 import { evaluateRowShow } from "./rowVisibility";
 import { resolveCellValue } from "./resolveCellValue";
+import { makeRowStyleResolver } from "./rowStyles";
 import { applyFilters, applySort } from "./widgetData";
 import { formatValue } from "./widgetFormat";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
@@ -55,6 +56,8 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
     const afterFilters = applyFilters(afterWhere, render.filters);
     return applySort(afterFilters, render.sort);
   }, [recordRows, render.where, render.filters, render.sort]);
+
+  const resolveRowStyle = useMemo(() => makeRowStyleResolver(render.rowStyles), [render.rowStyles]);
 
   // Collect the unique trigger node ids referenced by this table's row actions
   // so the action lock can subscribe to the runs query only when needed.
@@ -107,8 +110,19 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
           <tbody>
             {filtered.map((row, idx) => {
               const rowKey = rowKeyForRow(row, idx);
+              const toneClass = resolveRowStyle?.(row);
               return (
-                <tr key={rowKey} className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">
+                <tr
+                  key={rowKey}
+                  data-row-tone={toneClass ? "true" : undefined}
+                  className={cn(
+                    "border-b border-slate-100 last:border-0",
+                    // Drop the default hover wash when a tone is applied so the
+                    // tint isn't overridden — the row already has a deliberate
+                    // background and a hover bg would mask it.
+                    toneClass ? toneClass : "hover:bg-slate-50/60",
+                  )}
+                >
                   {render.columns.map((col, ci) => (
                     <Cell key={`${col.field}-${ci}`} col={col} row={row} />
                   ))}

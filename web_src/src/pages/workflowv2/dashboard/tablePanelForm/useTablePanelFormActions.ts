@@ -2,7 +2,13 @@ import type { SuperplaneComponentsNode } from "@/api-client";
 import { draftToPayload, type PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
 
 import type { TablePanelContent } from "../panelTypes";
-import type { WidgetRowAction, WidgetSort, WidgetTableColumn, WidgetTableFilter } from "../widget/types";
+import type {
+  WidgetRowAction,
+  WidgetRowStyle,
+  WidgetSort,
+  WidgetTableColumn,
+  WidgetTableFilter,
+} from "../widget/types";
 import { suggestColumnFormat } from "../widget/useMemoryCatalog";
 import type { TablePanelPayloadDrafts } from "./useTablePanelPayloadDrafts";
 
@@ -117,6 +123,7 @@ export function useTablePanelFormActions({
     onChange({ ...value, render: { ...value.render, sort } });
   };
 
+  const rowStyleActions = makeRowStyleActions({ value, onChange });
   const payloadActions = makePayloadActions({ payloadDrafts, updateAction });
 
   return {
@@ -132,8 +139,45 @@ export function useTablePanelFormActions({
     addAction,
     removeAction,
     setSort,
+    ...rowStyleActions,
     ...payloadActions,
   };
+}
+
+function makeRowStyleActions({
+  value,
+  onChange,
+}: {
+  value: TablePanelContent;
+  onChange: (next: TablePanelContent) => void;
+}) {
+  const updateRowStyle = (idx: number, patch: Partial<WidgetRowStyle>) => {
+    const rowStyles = (value.render.rowStyles ?? []).map((rule, i) => (i === idx ? { ...rule, ...patch } : rule));
+    onChange({ ...value, render: { ...value.render, rowStyles } });
+  };
+
+  const addRowStyle = () => {
+    const rowStyles: WidgetRowStyle[] = [
+      ...(value.render.rowStyles ?? []),
+      { field: "", op: "eq", value: "", tone: "red-soft" },
+    ];
+    onChange({ ...value, render: { ...value.render, rowStyles } });
+  };
+
+  const removeRowStyle = (idx: number) => {
+    const next = (value.render.rowStyles ?? []).filter((_, i) => i !== idx);
+    // Drop the key entirely when emptied so persisted YAML doesn't carry an
+    // empty `rowStyles: []` stub.
+    if (next.length === 0) {
+      const { rowStyles: _omit, ...rest } = value.render;
+      void _omit;
+      onChange({ ...value, render: rest });
+      return;
+    }
+    onChange({ ...value, render: { ...value.render, rowStyles: next } });
+  };
+
+  return { updateRowStyle, addRowStyle, removeRowStyle };
 }
 
 export type TablePanelFormActions = ReturnType<typeof useTablePanelFormActions>;
