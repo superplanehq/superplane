@@ -10,12 +10,25 @@ import {
   type TablePanelDataSource,
 } from "./panelTypes";
 
-type NumberSourceMode = "single" | "composite" | "multi";
+export type NumberSourceMode = "single" | "composite" | "multi";
 
-function detectMode(value: NumberPanelContent): NumberSourceMode {
+export function detectMode(value: NumberPanelContent): NumberSourceMode {
   if (isMultiNumberContent(value)) return "multi";
   if (isCompositeMemoryDataSource(value.dataSource)) return "composite";
   return "single";
+}
+
+/**
+ * Convert number-panel content between source modes. Exposed (alongside the
+ * toggle component) so the conversion behavior can be unit-tested without
+ * rendering the React component.
+ */
+export function convertNumberPanelMode(target: NumberSourceMode, value: NumberPanelContent): NumberPanelContent {
+  const current = detectMode(value);
+  if (target === current) return value;
+  if (target === "single") return toSingleMode(value, current);
+  if (target === "composite") return toCompositeMode(value, current);
+  return toMultiMode(value, current);
 }
 
 export function NumberPanelSourceModeToggle({
@@ -70,9 +83,7 @@ function switchTo(
   onChange: (next: NumberPanelContent) => void,
 ): void {
   if (target === current) return;
-  if (target === "single") return onChange(toSingleMode(value, current));
-  if (target === "composite") return onChange(toCompositeMode(value, current));
-  return onChange(toMultiMode(value, current));
+  onChange(convertNumberPanelMode(target, value));
 }
 
 function toSingleMode(value: NumberPanelContent, current: NumberSourceMode): NumberPanelContent {
@@ -144,25 +155,33 @@ function compositeSeedFromSingle(value: NumberPanelContent): MemoryNumberSource 
 }
 
 function toMultiMode(value: NumberPanelContent, current: NumberSourceMode): NumberPanelContent {
-  const seedMetric = current === "composite" ? multiSeedFromComposite(value) : multiSeedFromSingle(value);
-  return { title: value.title, metrics: [seedMetric] };
+  const metrics = current === "composite" ? multiMetricsFromComposite(value) : [multiSeedFromSingle(value)];
+  return { title: value.title, metrics };
 }
 
-function multiSeedFromComposite(value: NumberPanelContent): NumberMetric {
+function multiMetricsFromComposite(value: NumberPanelContent): NumberMetric[] {
   const ds = value.dataSource;
-  const first = ds && isCompositeMemoryDataSource(ds) ? ds.sources[0] : undefined;
-  return {
+  const sources = ds && isCompositeMemoryDataSource(ds) ? ds.sources : [];
+  if (sources.length === 0) return [multiSeedFromSingle(value)];
+  // Map every composite source to its own metric (mirroring
+  // compositeSourcesFromMetrics) instead of keeping only the first. Per-source
+  // aggregation/field move onto each metric's render while the top-level
+  // presentation options (label, format, prefix, suffix, sparklineField) are
+  // preserved so styling survives the switch.
+  const baseRender = value.render ?? { kind: "number" };
+  return sources.map((source) => ({
     dataSource: {
       kind: "memory",
-      namespace: first?.namespace ?? "",
-      fieldPath: first?.fieldPath,
+      namespace: source.namespace,
+      fieldPath: source.fieldPath,
     },
     render: {
+      ...baseRender,
       kind: "number",
-      aggregation: first?.aggregation ?? "count",
-      field: first?.field,
+      aggregation: source.aggregation,
+      field: source.field,
     },
-  };
+  }));
 }
 
 function multiSeedFromSingle(value: NumberPanelContent): NumberMetric {
