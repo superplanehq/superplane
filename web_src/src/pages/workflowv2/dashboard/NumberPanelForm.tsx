@@ -19,9 +19,6 @@ export function NumberPanelForm({
   value: NumberPanelContent;
   onChange: (next: NumberPanelContent) => void;
 }) {
-  const multi = isMultiNumberContent(value);
-  const dataSource = value.dataSource;
-
   return (
     <div className="space-y-3">
       <div className="space-y-1.5">
@@ -33,28 +30,44 @@ export function NumberPanelForm({
         />
       </div>
       <NumberPanelSourceModeToggle value={value} onChange={onChange} />
-      {multi ? (
+      {isMultiNumberContent(value) ? (
         <NumberPanelMetricsEditor value={value} onChange={onChange} />
       ) : (
-        <>
-          {dataSource && isCompositeMemoryDataSource(dataSource) ? (
-            <NumberPanelCompositeSourcesEditor value={value} dataSource={dataSource} onChange={onChange} />
-          ) : (
-            <>
-              {dataSource && !isCompositeMemoryDataSource(dataSource) ? (
-                <DataSourceForm value={dataSource} onChange={(ds) => onChange({ ...value, dataSource: ds })} />
-              ) : null}
-              <SimpleAggregationFields value={value} onChange={onChange} />
-            </>
-          )}
-          <FormatLabelRow value={value} onChange={onChange} />
-          <PrefixSuffixRow value={value} onChange={onChange} />
-          {dataSource && isCompositeMemoryDataSource(dataSource) ? null : (
-            <SparklineField value={value} onChange={onChange} />
-          )}
-        </>
+        <SingleOrCompositeBody value={value} onChange={onChange} />
       )}
     </div>
+  );
+}
+
+function SingleOrCompositeBody({
+  value,
+  onChange,
+}: {
+  value: NumberPanelContent;
+  onChange: (next: NumberPanelContent) => void;
+}) {
+  const dataSource = value.dataSource;
+
+  if (dataSource && isCompositeMemoryDataSource(dataSource)) {
+    return (
+      <>
+        <NumberPanelCompositeSourcesEditor value={value} dataSource={dataSource} onChange={onChange} />
+        <FormatLabelRow value={value} onChange={onChange} />
+        <PrefixSuffixRow value={value} onChange={onChange} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      {dataSource ? (
+        <DataSourceForm value={dataSource} onChange={(ds) => onChange({ ...value, dataSource: ds })} />
+      ) : null}
+      <SimpleAggregationFields value={value} onChange={onChange} />
+      <FormatLabelRow value={value} onChange={onChange} />
+      <PrefixSuffixRow value={value} onChange={onChange} />
+      <SparklineField value={value} onChange={onChange} />
+    </>
   );
 }
 

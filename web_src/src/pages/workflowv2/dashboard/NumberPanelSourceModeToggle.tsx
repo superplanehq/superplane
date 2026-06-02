@@ -108,10 +108,14 @@ function singleFromComposite(value: NumberPanelContent): NumberPanelContent {
 function toCompositeMode(value: NumberPanelContent, current: NumberSourceMode): NumberPanelContent {
   const sources =
     current === "multi" ? compositeSourcesFromMetrics(value.metrics ?? []) : [compositeSeedFromSingle(value)];
+  // Preserve presentation options (format, prefix, suffix, label, sparklineField)
+  // configured before the switch. Aggregation and field move into the composite
+  // sources, so clear them on the top-level render.
+  const baseRender = current === "multi" ? (value.metrics?.[0]?.render ?? { kind: "number" }) : value.render;
   return {
     title: value.title,
     dataSource: { kind: "memory", sources, combine: "sum" },
-    render: { kind: "number" },
+    render: { ...(baseRender ?? { kind: "number" }), kind: "number", aggregation: undefined, field: undefined },
   };
 }
 
