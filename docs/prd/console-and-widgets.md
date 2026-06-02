@@ -125,7 +125,7 @@ The panel `content` object is intentionally flexible, but every known panel type
 | `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `nodes[]` |
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
 | `chart` | Render grouped data as bar, stacked bar, line, area, or donut | `title?`, `dataSource`, `render.kind: "chart"` |
-| `number` | Render one aggregate KPI | `title?`, `dataSource`, `render.kind: "number"` |
+| `number` | Render one aggregate KPI, or several KPIs side-by-side via `metrics[]` | `title?`, (`dataSource` + `render.kind: "number"`) or `metrics[]` |
 
 New panels start as valid drafts where possible. For example, a new table panel may have an empty memory namespace and no columns while the user is still configuring it.
 
@@ -388,6 +388,41 @@ Rules:
 - Sparklines are only available for the single-source mode in this iteration.
 
 The editor exposes a Single / Multiple toggle in the Number panel form. Switching to Multiple seeds one source from the current single-source configuration so existing panels do not lose context.
+
+### Multi-Number Mode
+
+A number panel can also render **multiple independently-configured numbers** in a single card. Each metric has its own data source, aggregation, field, label, format, prefix/suffix, and optional sparkline; the metrics lay out in a flex row that wraps to new lines when the panel is narrow.
+
+```yaml
+type: number
+content:
+  title: Pipeline KPIs
+  metrics:
+    - dataSource:
+        kind: runs
+      render:
+        kind: number
+        aggregation: count
+        label: Total runs
+    - dataSource:
+        kind: memory
+        namespace: costs
+      render:
+        kind: number
+        aggregation: sum
+        field: cost
+        label: Total cost
+        format: number
+        prefix: "R$"
+```
+
+Rules:
+
+- `metrics` is a non-empty array. When `metrics` is present, top-level `dataSource` and `render` are not used and are not required.
+- Each metric's `dataSource` must be a single-source `memory` / `executions` / `runs` shape — the composite (`sources` + `combine`) shape is not allowed inside a metric.
+- Each metric's `render.kind` is `number`. `render.aggregation` is required (one of `count`/`sum`/`avg`/`min`/`max`/`first`/`last`), and `render.field` is required for aggregations other than `count`.
+- Use `render.label` as the metric's name (it renders above the value).
+- Multi-number mode is disjoint from the composite-combine mode: a panel is either single-value, composite-combined, or multi-number. The Number panel form exposes a Single / Multiple memory sources / Multiple numbers toggle that seeds the new mode from whatever is currently configured.
 
 ## Markdown Panels
 
