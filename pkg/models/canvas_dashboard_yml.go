@@ -591,6 +591,13 @@ func validateNumberPanelContent(panel DashboardPanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
+
+	// Multi-number mode: each metric carries its own dataSource + render.
+	// Top-level dataSource/render are not used and are not required.
+	if rawMetrics, ok := panel.Content["metrics"]; ok {
+		return validateNumberMetrics(panel.ID, rawMetrics)
+	}
+
 	if err := validateNumberDataSource(panel.ID, panel.Content["dataSource"]); err != nil {
 		return err
 	}
@@ -626,6 +633,61 @@ func validateNumberPanelContent(panel DashboardPanel) error {
 	if aggregation != "count" {
 		if field, ok := render["field"].(string); !ok || field == "" {
 			return fmt.Errorf("panel %q render.field is required when aggregation is %q", panel.ID, aggregation)
+		}
+	}
+	return nil
+}
+
+// validateNumberMetrics validates a multi-number panel's `metrics` array.
+// Each metric uses a simple (non-composite) data source plus its own number
+// render so the panel can display multiple independently-configured numbers
+// in a wrapping row.
+func validateNumberMetrics(panelID string, raw any) error {
+	metrics, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q metrics must be an array", panelID)
+	}
+	if len(metrics) == 0 {
+		return fmt.Errorf("panel %q metrics must be a non-empty array", panelID)
+	}
+	for i, item := range metrics {
+		if err := validateNumberMetric(panelID, i, item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateNumberMetric(panelID string, index int, raw any) error {
+	metric, ok := raw.(map[string]any)
+	if !ok || metric == nil {
+		return fmt.Errorf("panel %q metrics[%d] must be an object", panelID, index)
+	}
+	// Composite memory sources are not allowed inside a multi-number metric;
+	// the panel itself already lets users repeat the data source per metric.
+	if isCompositeMemoryDataSource(metric["dataSource"]) {
+		return fmt.Errorf("panel %q metrics[%d].dataSource must be a single-source memory/executions/runs source", panelID, index)
+	}
+	if err := validateDataSource(panelID, metric["dataSource"]); err != nil {
+		return fmt.Errorf("metrics[%d] %w", index, err)
+	}
+	render, err := validateRender(panelID, metric["render"], "number")
+	if err != nil {
+		return fmt.Errorf("metrics[%d] %w", index, err)
+	}
+	if err := validateOptionalString(panelID, fmt.Sprintf("metrics[%d].render.prefix", index), render["prefix"]); err != nil {
+		return err
+	}
+	if err := validateOptionalString(panelID, fmt.Sprintf("metrics[%d].render.suffix", index), render["suffix"]); err != nil {
+		return err
+	}
+	aggregation, _ := render["aggregation"].(string)
+	if !slices.Contains(allowedNumberAggregations, aggregation) {
+		return fmt.Errorf("panel %q metrics[%d].render.aggregation must be one of %s", panelID, index, strings.Join(allowedNumberAggregations, "/"))
+	}
+	if aggregation != "count" {
+		if field, ok := render["field"].(string); !ok || field == "" {
+			return fmt.Errorf("panel %q metrics[%d].render.field is required when aggregation is %q", panelID, index, aggregation)
 		}
 	}
 	return nil
