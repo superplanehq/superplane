@@ -300,6 +300,77 @@ describe("validatePanelContent — number and data sources", () => {
   });
 });
 
+describe("validatePanelContent — multi-number panels", () => {
+  it("accepts a valid multi-number panel with mixed data sources", () => {
+    expect(
+      validatePanelContent("number", {
+        title: "Pipeline KPIs",
+        metrics: [
+          { dataSource: { kind: "runs" }, render: { kind: "number", aggregation: "count", label: "Total runs" } },
+          {
+            dataSource: { kind: "memory", namespace: "costs" },
+            render: { kind: "number", aggregation: "sum", field: "cost", label: "Total cost", prefix: "R$" },
+          },
+        ],
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects multi-number panels with an empty metrics array", () => {
+    const error = validatePanelContent("number", { metrics: [] });
+    expect(error).toMatch(/metrics must be a non-empty array/);
+  });
+
+  it("rejects multi-number metrics with an unknown aggregation", () => {
+    const error = validatePanelContent("number", {
+      metrics: [{ dataSource: { kind: "runs" }, render: { kind: "number", aggregation: "median" } }],
+    });
+    expect(error).toMatch(/metrics\[0\]\.render\.aggregation must be one of/);
+  });
+
+  it("rejects multi-number metrics missing field for non-count aggregation", () => {
+    const error = validatePanelContent("number", {
+      metrics: [
+        {
+          dataSource: { kind: "memory", namespace: "costs" },
+          render: { kind: "number", aggregation: "sum" },
+        },
+      ],
+    });
+    expect(error).toMatch(/metrics\[0\]\.render\.field is required/);
+  });
+
+  it("rejects multi-number metrics that use a composite data source", () => {
+    const error = validatePanelContent("number", {
+      metrics: [
+        {
+          dataSource: {
+            kind: "memory",
+            combine: "sum",
+            sources: [{ namespace: "a", aggregation: "count" }],
+          },
+          render: { kind: "number", aggregation: "count" },
+        },
+      ],
+    });
+    expect(error).toMatch(/metrics\[0\]\.dataSource must be a single-source/);
+  });
+
+  it("rejects multi-number metrics with a bad render kind", () => {
+    const error = validatePanelContent("number", {
+      metrics: [{ dataSource: { kind: "runs" }, render: { kind: "table" } }],
+    });
+    expect(error).toMatch(/metrics\[0\]\.render\.kind must be "number"/);
+  });
+
+  it("rejects multi-number metrics with non-string prefix", () => {
+    const error = validatePanelContent("number", {
+      metrics: [{ dataSource: { kind: "runs" }, render: { kind: "number", aggregation: "count", prefix: 5 } }],
+    });
+    expect(error).toMatch(/metrics\[0\]\.render\.prefix must be a string/);
+  });
+});
+
 describe("validatePanelContent — nodes panels", () => {
   it("accepts a valid nodes panel with multiple entries", () => {
     expect(
