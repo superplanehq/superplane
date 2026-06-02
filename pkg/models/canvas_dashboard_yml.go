@@ -428,7 +428,63 @@ func validateTablePanelContent(panel DashboardPanel) error {
 	if err := validateSort(panel.ID, render["sort"]); err != nil {
 		return err
 	}
+	if err := validateTableRowStyles(panel.ID, render["rowStyles"]); err != nil {
+		return err
+	}
 	return validateTableRowActions(panel.ID, render["rowActions"])
+}
+
+// allowedRowStyleTones must stay in lockstep with the frontend tone enum
+// (`WIDGET_ROW_STYLE_TONES` in `web_src/.../widget/types.ts`). Adding a new
+// tone requires updating both lists and the class map.
+var allowedRowStyleTones = []string{
+	"dimmed",
+	"yellow",
+	"yellow-soft",
+	"orange",
+	"orange-soft",
+	"red",
+	"red-soft",
+	"blue",
+	"blue-soft",
+	"green",
+	"green-soft",
+}
+
+func validateTableRowStyles(panelID string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+
+	rowStyles, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q render.rowStyles must be an array", panelID)
+	}
+
+	allowedOps := []string{"eq", "neq", "contains", "not_contains", "gt", "lt", "exists", "not_exists"}
+	for i, rawRule := range rowStyles {
+		rule, ok := rawRule.(map[string]any)
+		if !ok || rule == nil {
+			return fmt.Errorf("panel %q render.rowStyles[%d] must be an object", panelID, i)
+		}
+		field, ok := rule["field"].(string)
+		if !ok || strings.TrimSpace(field) == "" {
+			return fmt.Errorf("panel %q render.rowStyles[%d].field must be a non-empty string", panelID, i)
+		}
+		op, ok := rule["op"].(string)
+		if !ok || !slices.Contains(allowedOps, op) {
+			return fmt.Errorf("panel %q render.rowStyles[%d].op is not supported", panelID, i)
+		}
+		tone, ok := rule["tone"].(string)
+		if !ok || !slices.Contains(allowedRowStyleTones, tone) {
+			return fmt.Errorf("panel %q render.rowStyles[%d].tone must be one of %s", panelID, i, strings.Join(allowedRowStyleTones, "/"))
+		}
+		if err := validateOptionalString(panelID, fmt.Sprintf("render.rowStyles[%d].value", i), rule["value"]); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func validateChartPanelContent(panel DashboardPanel) error {

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { isPanelType, PANEL_TYPES, templateForPanelType, validatePanelContent } from "./panelTypes";
+import {
+  isPanelType,
+  normalizeTablePanelContent,
+  PANEL_TYPES,
+  templateForPanelType,
+  validatePanelContent,
+} from "./panelTypes";
 
 describe("PANEL_TYPES", () => {
   it("includes the six supported types", () => {
@@ -110,6 +116,103 @@ describe("validatePanelContent — table", () => {
       render: { kind: "table", columns: [], rowActions: [{ kind: "trigger", label: "Run" }] },
     });
     expect(error).toMatch(/render\.rowActions\[0\]\.node/);
+  });
+
+  it("accepts row-style rules with a known tone", () => {
+    expect(
+      validatePanelContent("table", {
+        dataSource: { kind: "memory", namespace: "env" },
+        render: {
+          kind: "table",
+          columns: [],
+          rowStyles: [
+            { field: "status", op: "eq", value: "error", tone: "red-soft" },
+            { field: "status", op: "eq", value: "deploying", tone: "orange-soft" },
+          ],
+        },
+      }),
+    ).toBeNull();
+  });
+
+  it("rejects row-style rules with an unknown tone", () => {
+    const error = validatePanelContent("table", {
+      dataSource: { kind: "memory", namespace: "env" },
+      render: {
+        kind: "table",
+        columns: [],
+        rowStyles: [{ field: "status", op: "eq", value: "error", tone: "magenta" }],
+      },
+    });
+    expect(error).toMatch(/render\.rowStyles\[0\]\.tone must be one of/);
+  });
+
+  it("rejects row-style rules with an unsupported op", () => {
+    const error = validatePanelContent("table", {
+      dataSource: { kind: "memory", namespace: "env" },
+      render: {
+        kind: "table",
+        columns: [],
+        rowStyles: [{ field: "status", op: "regex", value: "err.*", tone: "red" }],
+      },
+    });
+    expect(error).toMatch(/render\.rowStyles\[0\]\.op is not supported/);
+  });
+
+  it("rejects row-style rules with an empty field", () => {
+    const error = validatePanelContent("table", {
+      dataSource: { kind: "memory", namespace: "env" },
+      render: {
+        kind: "table",
+        columns: [],
+        rowStyles: [{ field: "", op: "eq", value: "error", tone: "red" }],
+      },
+    });
+    expect(error).toMatch(/render\.rowStyles\[0\]\.field must be a non-empty string/);
+  });
+});
+
+describe("normalizeTablePanelContent — rowStyles round-trip", () => {
+  it("preserves valid rowStyles entries verbatim", () => {
+    const normalized = normalizeTablePanelContent({
+      title: "Envs",
+      dataSource: { kind: "memory", namespace: "env" },
+      render: {
+        kind: "table",
+        columns: [{ field: "status" }],
+        rowStyles: [
+          { field: "status", op: "eq", value: "error", tone: "red-soft" },
+          { field: "status", op: "eq", value: "deploying", tone: "orange-soft" },
+        ],
+      },
+    });
+    expect(normalized.render.rowStyles).toEqual([
+      { field: "status", op: "eq", value: "error", tone: "red-soft" },
+      { field: "status", op: "eq", value: "deploying", tone: "orange-soft" },
+    ]);
+  });
+
+  it("drops entries with invalid field/op/tone and returns undefined when nothing remains", () => {
+    const normalized = normalizeTablePanelContent({
+      dataSource: { kind: "memory", namespace: "env" },
+      render: {
+        kind: "table",
+        columns: [],
+        rowStyles: [
+          { field: "", op: "eq", value: "x", tone: "red" },
+          { field: "status", op: "regex", value: "x", tone: "red" },
+          { field: "status", op: "eq", value: "x", tone: "magenta" },
+        ],
+      },
+    });
+    expect(normalized.render.rowStyles).toBeUndefined();
+  });
+
+  it("returns undefined when rowStyles is missing entirely", () => {
+    const normalized = normalizeTablePanelContent({
+      dataSource: { kind: "memory", namespace: "env" },
+      render: { kind: "table", columns: [] },
+    });
+    expect(normalized.render.rowStyles).toBeUndefined();
   });
 });
 
