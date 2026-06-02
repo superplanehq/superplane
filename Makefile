@@ -49,7 +49,7 @@ register-local-fleet:
 	curl -fsS -X POST "$(LOCAL_BROKER_URL)/v1/fleets" \
 		-H "Content-Type: application/json" \
 		-H "Authorization: Bearer $(LOCAL_STACK_AUTH_TOKEN)" \
-		-d '{"id":"$(LOCAL_FLEET_ID)","labels":["local"]}'
+		-d '{"id":"$(LOCAL_FLEET_ID)","provisioner":"local","arch":"amd64","size":"local"}'
 
 # Blocks until all N runner processes exit. N=1 is one foreground-equivalent worker.
 runner: build

@@ -72,11 +72,11 @@ The broker needs a URL that **downstream fleet-manager** instances can POST to w
 
 | Method   | Path                                | Notes                                                                                                                                                                                                                                           |
 | -------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET`    | `/fleets`                           | List registered fleet-managers                                                                                                                                                                                                                  |
-| `POST`   | `/fleets`                           | Register/replace a fleet (`id`, `base_url`, optional `auth_token`, `labels`)                                                                                                                                                                    |
+| `GET`    | `/fleets`                           | List registered runner pools (`id`, `provisioner`, `arch`, `size`, …)                                                                                                                                                                           |
+| `POST`   | `/fleets`                           | Register/upsert a fleet (`id`, optional `provisioner`, `arch`, `size`)                                                                                                                                                                          |
+| `GET`    | `/fleets/{id}/task-counts`          | Queued/claimed counts for a fleet (fleet-manager dynamic scaling)                                                                                                                                                                               |
 | `DELETE` | `/fleets/{id}`                      | Remove a fleet                                                                                                                                                                                                                                  |
-| `POST`   | `/tasks`                            | Body: `BrokerCreateTaskRequest` — embedded task fields (`command` xor `commands`, `webhook_url`, execution mode…) plus **`fleet_id`** xor **`fleet_labels`**: selected fleet must have **every** listed label (see `POST /v1/fleets` `labels`). |
-| `POST`   | `/webhooks/complete/{brokerTaskId}` | Called by fleet-manager; forwards JSON to the original caller                                                                                                                                                                                   |
+| `POST`   | `/tasks`                            | Body: `BrokerCreateTaskRequest` — task fields (`command` xor `commands`, `webhook_url`, execution mode…) plus required **`fleet_id`**                                                                                                           |
 
 ```bash
 export DATABASE_URL='postgres://broker:broker@127.0.0.1:5432/broker?sslmode=disable'
@@ -174,11 +174,11 @@ When the broker is **not** in the path, fleet-manager POSTs the completion **web
 
 ## End-to-end with the broker
 
-1. Start **fleet-manager** and **runner** for that fleet (runner points at fleet-manager URL).
-2. Start **task-broker** with `BROKER_PUBLIC_URL` reachable from fleet-manager.
-3. `POST /v1/fleets` on the broker with this fleet-manager’s **`base_url`** (and labels for routing).
-4. **`POST /v1/tasks`** on the broker — use caller `webhook_url` as today; broker substitutes an internal relay URL when talking to fleet-manager.
-5. Caller receives a webhook whose **`task_id` is the broker task id**, with **`fleet_task_id`** set to the fleet-managed id.
+1. Start **task-broker** (Postgres + `AUTH_TOKEN`).
+2. Start **fleet-manager** with a JSON config (`pools[]`); it registers each pool on the broker at startup. For local dev without fleet-manager, run **`make register-local-fleet`** after the broker is up.
+3. Start **runner(s)** with `TASK_BROKER_URL` and `RUNNER_FLEET_ID` matching a registered fleet.
+4. SuperPlane (or curl) calls **`GET /v1/fleets`** to list machine profiles, then **`POST /v1/tasks`** with **`fleet_id`** and the caller **`webhook_url`**.
+5. Runner claims from the broker, executes, completes; broker delivers the webhook to the caller.
 
 ## Example: enqueue directly on fleet-manager (curl)
 
@@ -192,56 +192,62 @@ curl -X POST http://127.0.0.1:8080/v1/tasks \
   }'
 ```
 
-## Example: register architecture fleets and enqueue via task-broker (curl)
+## Example: fleet catalog and enqueue via task-broker (curl)
 
 ```bash
 # Same token as task-broker AUTH_TOKEN
 BROKER_TOKEN=your-secret
 
-# Register one fleet-manager per architecture. Each fleet-manager owns a homogeneous runner pool.
+# List machine profiles (fleet-manager registers pools on startup in production).
+curl -s http://127.0.0.1:8081/v1/fleets \
+  -H "Authorization: Bearer ${BROKER_TOKEN}"
+
+# Manual registration (local dev or ops); fleet-manager does this automatically on startup.
 curl -X POST http://127.0.0.1:8081/v1/fleets \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer ${BROKER_TOKEN}" \
   -d '{
-    "id": "aws-linux-amd64",
-    "base_url": "http://127.0.0.1:8080",
-    "labels": ["aws", "linux", "arch:amd64"]
+    "id": "aws-standard-amd64",
+    "provisioner": "aws",
+    "arch": "amd64",
+    "size": "t3.micro"
   }'
 
 curl -X POST http://127.0.0.1:8081/v1/fleets \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer ${BROKER_TOKEN}" \
   -d '{
-    "id": "aws-linux-arm64",
-    "base_url": "http://127.0.0.1:8082",
-    "labels": ["aws", "linux", "arch:arm64"]
+    "id": "aws-standard-arm64",
+    "provisioner": "aws",
+    "arch": "arm64",
+    "size": "t4g.micro"
   }'
 
 curl -X POST http://127.0.0.1:8081/v1/tasks \
   -H 'Content-Type: application/json' \
   -H "Authorization: Bearer ${BROKER_TOKEN}" \
   -d '{
-    "fleet_labels": ["arch:arm64"],
+    "fleet_id": "aws-standard-arm64",
     "commands": ["uname -m", "echo \"$COMMIT_AUTHOR\""],
     "environment": [{"name": "COMMIT_AUTHOR", "value": "alice@example.com"}],
     "webhook_url": "https://example.com/your-hook"
   }'
 ```
 
-Use `fleet_labels` such as `["arch:amd64"]` or `["arch:arm64"]` to let task-broker pick the matching fleet. Keep runner-level queues homogeneous; do not mix architectures behind a single fleet-manager if workflows need architecture-specific execution.
+Pick **`fleet_id`** from **`GET /v1/fleets`** (or your SuperPlane machine picker). Each fleet is a homogeneous runner pool — do not mix architectures behind one `fleet_id`.
 
 ## AWS validation checklist
 
 Use this checklist before rolling architecture-specific fleets into production:
 
 1. Build and upload both `runner-linux-amd64` and `runner-linux-arm64` to S3.
-2. Deploy one amd64 fleet-manager with an x86_64 Ubuntu AMI, an amd64 instance type such as `t3.micro`, `EC2_PROVISION_ARCH=amd64`, `EC2_PROVISION_FLEET_ID=prod-amd64`, and the amd64 runner S3 URI.
-3. Deploy one arm64 fleet-manager with an arm64 Ubuntu AMI, a Graviton instance type such as `t4g.micro`, `EC2_PROVISION_ARCH=arm64`, `EC2_PROVISION_FLEET_ID=prod-arm64`, and the arm64 runner S3 URI.
-4. Register both fleet-managers in task-broker with `arch:amd64` and `arch:arm64` labels.
-5. Submit one task with `fleet_labels: ["arch:amd64"]` and one with `fleet_labels: ["arch:arm64"]`; verify `uname -m` reports `x86_64` and `aarch64`.
+2. Configure fleet-manager JSON with separate `pools[]` entries (amd64 + arm64 AMIs, instance types, runner S3 URIs, distinct `fleet_id` values). Set `"arch": "arm64"` on Graviton pools.
+3. Deploy fleet-manager; confirm startup logs show each pool registered on the broker.
+4. **`GET /v1/fleets`** lists both pools with correct `arch` and `size`.
+5. Submit one task with `"fleet_id": "<amd64-pool-id>"` and one with `"fleet_id": "<arm64-pool-id>"`; verify `uname -m` reports `x86_64` and `aarch64`.
 6. Check EC2 console output and `superplane-runner.service` logs for clean user-data startup on both architectures.
 7. Run a simple Docker task on both fleets to confirm Docker and the architecture-specific CloudWatch agent install correctly.
-8. If `EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK=true`, confirm completed runner instances terminate and each fleet-manager reconciles replacement hot-pool capacity.
+8. If `runner_terminate_after_each_task` is enabled, confirm completed runner instances terminate and fleet-manager reconciles replacement capacity.
 
 ## Tests
 
