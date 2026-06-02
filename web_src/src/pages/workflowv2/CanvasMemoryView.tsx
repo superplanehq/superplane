@@ -1,17 +1,48 @@
 import { Button } from "@/components/ui/button";
-import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
+import type { CanvasMemoryEntry, CanvasMemoryEntrySource } from "@/hooks/useCanvasData";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/ui/collapsible";
-import { ChevronDown, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, Pencil, Plus, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+
+import { CanvasMemoryNamespaceDialog, type CanvasMemoryNamespaceDialogMode } from "./CanvasMemoryNamespaceDialog";
 
 export type CanvasMemoryViewProps = {
   entries: CanvasMemoryEntry[];
   isLoading?: boolean;
   errorMessage?: string;
+  canEdit?: boolean;
   onDeleteEntry?: (memoryId: string) => void;
   deletingId?: string;
+  onCreateNamespace?: (input: { namespace: string; entries: unknown[] }) => Promise<void>;
+  isCreatingNamespace?: boolean;
+  onUpdateNamespace?: (input: { namespace: string; newNamespace?: string; entries: unknown[] }) => Promise<void>;
+  isUpdatingNamespace?: boolean;
 };
+
+interface NamespaceGroup {
+  namespace: string;
+  source: CanvasMemoryEntrySource;
+  entries: CanvasMemoryEntry[];
+}
+
+function groupByNamespace(entries: CanvasMemoryEntry[]): NamespaceGroup[] {
+  const groups = new Map<string, NamespaceGroup>();
+  for (const entry of entries) {
+    const namespace = entry.namespace || "(no namespace)";
+    const existing = groups.get(namespace);
+    if (existing) {
+      existing.entries.push(entry);
+      continue;
+    }
+    groups.set(namespace, {
+      namespace,
+      source: entry.source,
+      entries: [entry],
+    });
+  }
+  return Array.from(groups.values());
+}
 
 export function CanvasMemoryView(props: CanvasMemoryViewProps) {
   const leftOffset = useEffectiveLeftSidebarWidth();
@@ -27,15 +58,76 @@ export function CanvasMemoryView(props: CanvasMemoryViewProps) {
   );
 }
 
-function CanvasMemoryViewBody({ entries, isLoading, errorMessage, onDeleteEntry, deletingId }: CanvasMemoryViewProps) {
-  const groupedEntries = entries.reduce<Record<string, CanvasMemoryEntry[]>>((acc, entry) => {
-    const namespace = entry.namespace || "(no namespace)";
-    if (!acc[namespace]) {
-      acc[namespace] = [];
+type DialogState =
+  | { open: false }
+  | { open: true; mode: "create" }
+  | { open: true; mode: "edit"; namespace: string; entries: unknown[] };
+
+function computeIsSubmitting(
+  dialogState: DialogState,
+  isCreatingNamespace: boolean | undefined,
+  isUpdatingNamespace: boolean | undefined,
+): boolean {
+  if (!dialogState.open) {
+    return false;
+  }
+  if (dialogState.mode === "create") {
+    return !!isCreatingNamespace;
+  }
+  return !!isUpdatingNamespace;
+}
+
+function CanvasMemoryViewBody({
+  entries,
+  isLoading,
+  errorMessage,
+  canEdit,
+  onDeleteEntry,
+  deletingId,
+  onCreateNamespace,
+  isCreatingNamespace,
+  onUpdateNamespace,
+  isUpdatingNamespace,
+}: CanvasMemoryViewProps) {
+  const namespaces = useMemo(() => groupByNamespace(entries), [entries]);
+  const [dialogState, setDialogState] = useState<DialogState>({ open: false });
+
+  const closeDialog = () => setDialogState({ open: false });
+
+  const handleCreateNamespaceClick = () => {
+    setDialogState({ open: true, mode: "create" });
+  };
+
+  const handleEditNamespaceClick = (group: NamespaceGroup) => {
+    setDialogState({
+      open: true,
+      mode: "edit",
+      namespace: group.namespace,
+      entries: group.entries.map((entry) => entry.values),
+    });
+  };
+
+  const handleDialogSubmit = async (input: { namespace: string; entries: unknown[] }) => {
+    if (!dialogState.open) return;
+    if (dialogState.mode === "create") {
+      if (!onCreateNamespace) return;
+      await onCreateNamespace(input);
+      return;
     }
-    acc[namespace].push(entry);
-    return acc;
-  }, {});
+    if (!onUpdateNamespace) return;
+    await onUpdateNamespace({
+      namespace: dialogState.namespace,
+      newNamespace: input.namespace !== dialogState.namespace ? input.namespace : undefined,
+      entries: input.entries,
+    });
+  };
+
+  const showCreateButton = !!canEdit && !!onCreateNamespace;
+  const isSubmitting = computeIsSubmitting(dialogState, isCreatingNamespace, isUpdatingNamespace);
+
+  const dialogMode: CanvasMemoryNamespaceDialogMode | undefined = dialogState.open ? dialogState.mode : undefined;
+  const dialogNamespace = dialogState.open && dialogState.mode === "edit" ? dialogState.namespace : undefined;
+  const dialogInitialEntries = dialogState.open && dialogState.mode === "edit" ? dialogState.entries : undefined;
 
   if (isLoading) {
     return (
@@ -54,62 +146,135 @@ function CanvasMemoryViewBody({ entries, isLoading, errorMessage, onDeleteEntry,
     );
   }
 
-  if (entries.length === 0) {
-    return <ZeroState />;
-  }
-
   return (
-    <div className="min-h-0 w-full min-w-0 flex-1 overflow-auto">
-      {Object.entries(groupedEntries).map(([namespace, values]) => (
-        <NamespaceSection
-          key={namespace}
-          namespace={namespace}
-          values={values}
-          onDeleteEntry={onDeleteEntry}
-          deletingId={deletingId}
+    <>
+      {showCreateButton ? (
+        <div className="flex items-center justify-end gap-2 border-b border-slate-950/10 bg-white px-4 py-2">
+          <Button
+            type="button"
+            size="sm"
+            onClick={handleCreateNamespaceClick}
+            data-testid="memory-create-namespace-button"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Create memory namespace
+          </Button>
+        </div>
+      ) : null}
+      {namespaces.length === 0 ? (
+        <ZeroState canCreate={showCreateButton} onCreate={handleCreateNamespaceClick} />
+      ) : (
+        <div className="min-h-0 w-full min-w-0 flex-1 overflow-auto">
+          {namespaces.map((group) => (
+            <NamespaceSection
+              key={group.namespace}
+              namespaceGroup={group}
+              canEdit={!!canEdit}
+              onDeleteEntry={onDeleteEntry}
+              deletingId={deletingId}
+              onEditNamespace={onUpdateNamespace ? () => handleEditNamespaceClick(group) : undefined}
+            />
+          ))}
+        </div>
+      )}
+      {dialogMode ? (
+        <CanvasMemoryNamespaceDialog
+          open={dialogState.open}
+          onOpenChange={(open) => {
+            if (!open) closeDialog();
+          }}
+          mode={dialogMode}
+          originalNamespace={dialogNamespace}
+          initialEntries={dialogInitialEntries}
+          isSubmitting={isSubmitting}
+          onSubmit={handleDialogSubmit}
         />
-      ))}
-    </div>
+      ) : null}
+    </>
   );
 }
 
 type NamespaceSectionProps = {
-  namespace: string;
-  values: CanvasMemoryEntry[];
+  namespaceGroup: NamespaceGroup;
+  canEdit: boolean;
   onDeleteEntry?: (memoryId: string) => void;
   deletingId?: string;
+  onEditNamespace?: () => void;
 };
 
-function NamespaceSection({ namespace, values, onDeleteEntry, deletingId }: NamespaceSectionProps) {
+function NamespaceSection({
+  namespaceGroup,
+  canEdit,
+  onDeleteEntry,
+  deletingId,
+  onEditNamespace,
+}: NamespaceSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const { namespace, source, entries } = namespaceGroup;
+  const isManual = source === "manual";
+  const showEdit = canEdit && isManual && !!onEditNamespace;
 
   return (
     <Collapsible
       open={isOpen}
       onOpenChange={setIsOpen}
-      className="m-4 overflow-hidden rounded-md border border-slate-950/15 bg-white"
+      className="group/section m-4 overflow-hidden rounded-md border border-slate-950/15 bg-white"
       data-testid={`memory-namespace-section-${namespace}`}
     >
-      <CollapsibleTrigger
-        className="group flex w-full items-center gap-2 border-b border-slate-950/15 px-3 py-2 text-left font-mono text-[13px] text-gray-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 data-[state=closed]:border-b-0"
-        data-testid={`memory-namespace-toggle-${namespace}`}
-        aria-label={`Toggle ${namespace} namespace`}
-      >
-        <ChevronDown
-          aria-hidden="true"
-          className="size-4 shrink-0 text-gray-500 transition-transform duration-150 group-data-[state=closed]:-rotate-90"
-        />
-        <span className="flex-1 truncate">Namespace: {namespace}</span>
+      <div className="flex w-full items-center gap-2 border-b border-slate-950/15 px-3 py-2 text-left font-mono text-[13px] text-gray-600 group-data-[state=closed]/section:border-b-0">
+        <CollapsibleTrigger
+          className="group flex flex-1 items-center gap-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+          data-testid={`memory-namespace-toggle-${namespace}`}
+          aria-label={`Toggle ${namespace} namespace`}
+        >
+          <ChevronDown
+            aria-hidden="true"
+            className="size-4 shrink-0 text-gray-500 transition-transform duration-150 group-data-[state=closed]:-rotate-90"
+          />
+          <span className="flex-1 truncate text-left">Namespace: {namespace}</span>
+        </CollapsibleTrigger>
+        <SourceBadge source={source} />
         <span className="shrink-0 font-sans text-[13px] font-medium text-gray-500">
-          {values.length} {values.length === 1 ? "item" : "items"}
+          {entries.length} {entries.length === 1 ? "item" : "items"}
         </span>
-      </CollapsibleTrigger>
-      <CollapsibleContent>{renderNamespaceTable(values, onDeleteEntry, deletingId)}</CollapsibleContent>
+        {showEdit ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            onClick={onEditNamespace}
+            className="text-gray-500 hover:text-gray-900"
+            title="Edit memory namespace"
+            data-testid={`memory-namespace-edit-${namespace}`}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+        ) : null}
+      </div>
+      <CollapsibleContent>{renderNamespaceTable(entries, onDeleteEntry, deletingId)}</CollapsibleContent>
     </Collapsible>
   );
 }
 
-function ZeroState() {
+function SourceBadge({ source }: { source: CanvasMemoryEntrySource }) {
+  if (source === "manual") {
+    return (
+      <span className="rounded-full bg-blue-50 px-2 py-0.5 font-sans text-[11px] font-medium text-blue-700">
+        Manual
+      </span>
+    );
+  }
+  if (source === "node") {
+    return (
+      <span className="rounded-full bg-slate-100 px-2 py-0.5 font-sans text-[11px] font-medium text-slate-600">
+        Node-managed
+      </span>
+    );
+  }
+  return null;
+}
+
+function ZeroState({ canCreate, onCreate }: { canCreate: boolean; onCreate: () => void }) {
   return (
     <div
       role="status"
@@ -122,6 +287,12 @@ function ZeroState() {
         <span className="font-medium text-gray-700">Upsert Memory</span>. After a run writes to canvas memory, entries
         will show up here.
       </p>
+      {canCreate ? (
+        <Button type="button" size="sm" onClick={onCreate} data-testid="memory-create-namespace-empty-button">
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Create memory namespace
+        </Button>
+      ) : null}
     </div>
   );
 }
