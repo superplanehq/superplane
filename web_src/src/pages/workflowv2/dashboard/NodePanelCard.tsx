@@ -11,6 +11,7 @@ import type { DashboardPanel } from "@/hooks/useCanvasData";
 
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
+import { WidgetEmptyState } from "./WidgetEmptyState";
 import { useDashboardContext, resolveDashboardNode, type DashboardNodeStatus } from "./DashboardContext";
 import { confirmDashboardTriggerNode } from "./confirmDashboardTriggerNode";
 import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
@@ -79,10 +80,11 @@ function NodePanelBody({ content }: { content: NodePanelContent }) {
   const ctx = useDashboardContext();
   if (!content.node) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-1.5 p-4 text-center text-[13px] text-gray-500">
-        <CircleDot className="size-4" aria-hidden />
-        <p>Pick a node from the editor to display its status here.</p>
-      </div>
+      <WidgetEmptyState
+        icon={CircleDot}
+        className="min-h-0"
+        message="Pick a node from the editor to display its status here."
+      />
     );
   }
   const resolved = resolveDashboardNode(ctx, content.node);

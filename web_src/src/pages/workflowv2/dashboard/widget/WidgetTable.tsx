@@ -14,6 +14,7 @@ import { evaluateRowShow } from "./rowVisibility";
 import { resolveCellValue } from "./resolveCellValue";
 import { makeRowStyleResolver } from "./rowStyles";
 import { applyFilters, applySort } from "./widgetData";
+import { WidgetEmptyState } from "../WidgetEmptyState";
 import { formatValue } from "./widgetFormat";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
 import { useWidgetTableActionLock } from "./WidgetTableActionLockContext";
@@ -73,17 +74,17 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
   if (isLoading) return <WidgetSpinner />;
   if (render.columns.length === 0) {
     return (
-      <div
-        className="flex h-full min-h-[6rem] flex-col items-center justify-center gap-1.5 p-4 text-center text-[13px] text-gray-500"
-        data-testid="widget-table-no-columns"
-      >
-        <Table2 className="size-4" aria-hidden />
-        <p>
-          Configure columns in the panel editor.
-          <br />
-          Pick a memory namespace to see available fields.
-        </p>
-      </div>
+      <WidgetEmptyState
+        icon={Table2}
+        testId="widget-table-no-columns"
+        message={
+          <>
+            Configure columns in the panel editor.
+            <br />
+            Pick a memory namespace to see available fields.
+          </>
+        }
+      />
     );
   }
   if (filtered.length === 0) {
