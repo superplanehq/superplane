@@ -17,7 +17,6 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { ArrowLeft, CircleX, ExternalLink, Plug, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { renderIntegrationMetadata } from "./metadataRenderers";
 import { useIntegrationConfigureOpen } from "@/lib/analytics";
 
 interface LegacyIntegrationDetailsProps {
@@ -130,11 +129,6 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
       nodes: data.nodes,
     }));
   }, [integration?.status?.usedIn]);
-
-  const metadataContent = useMemo(
-    () => renderIntegrationMetadata(integration?.metadata?.integrationName, integration!),
-    [integration],
-  );
 
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -263,7 +257,6 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
         )}
 
         {instructionsContent}
-        {metadataContent}
 
         <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-300 dark:border-gray-800">
           <div className="p-6">
