@@ -58,6 +58,25 @@ export function CanvasMemoryView(props: CanvasMemoryViewProps) {
   );
 }
 
+type DialogState =
+  | { open: false }
+  | { open: true; mode: "create" }
+  | { open: true; mode: "edit"; namespace: string; entries: unknown[] };
+
+function computeIsSubmitting(
+  dialogState: DialogState,
+  isCreatingBank: boolean | undefined,
+  isUpdatingBank: boolean | undefined,
+): boolean {
+  if (!dialogState.open) {
+    return false;
+  }
+  if (dialogState.mode === "create") {
+    return !!isCreatingBank;
+  }
+  return !!isUpdatingBank;
+}
+
 function CanvasMemoryViewBody({
   entries,
   isLoading,
@@ -71,11 +90,7 @@ function CanvasMemoryViewBody({
   isUpdatingBank,
 }: CanvasMemoryViewProps) {
   const banks = useMemo(() => groupBanks(entries), [entries]);
-  const [dialogState, setDialogState] = useState<
-    | { open: false }
-    | { open: true; mode: "create" }
-    | { open: true; mode: "edit"; namespace: string; entries: unknown[] }
-  >({ open: false });
+  const [dialogState, setDialogState] = useState<DialogState>({ open: false });
 
   const closeDialog = () => setDialogState({ open: false });
 
@@ -108,12 +123,7 @@ function CanvasMemoryViewBody({
   };
 
   const showCreateButton = !!canEdit && !!onCreateBank;
-  const isSubmitting =
-    dialogState.open && dialogState.mode === "create"
-      ? !!isCreatingBank
-      : dialogState.open && dialogState.mode === "edit"
-        ? !!isUpdatingBank
-        : false;
+  const isSubmitting = computeIsSubmitting(dialogState, isCreatingBank, isUpdatingBank);
 
   const dialogMode: CanvasMemoryBankDialogMode | undefined = dialogState.open ? dialogState.mode : undefined;
   const dialogNamespace = dialogState.open && dialogState.mode === "edit" ? dialogState.namespace : undefined;
@@ -197,10 +207,10 @@ function NamespaceSection({ bank, canEdit, onDeleteEntry, deletingId, onEditBank
     <Collapsible
       open={isOpen}
       onOpenChange={setIsOpen}
-      className="m-4 overflow-hidden rounded-md border border-slate-950/15 bg-white"
+      className="group/section m-4 overflow-hidden rounded-md border border-slate-950/15 bg-white"
       data-testid={`memory-namespace-section-${namespace}`}
     >
-      <div className="flex w-full items-center gap-2 border-b border-slate-950/15 px-3 py-2 text-left font-mono text-[13px] text-gray-600 data-[state=closed]:border-b-0">
+      <div className="flex w-full items-center gap-2 border-b border-slate-950/15 px-3 py-2 text-left font-mono text-[13px] text-gray-600 group-data-[state=closed]/section:border-b-0">
         <CollapsibleTrigger
           className="group flex flex-1 items-center gap-2 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
           data-testid={`memory-namespace-toggle-${namespace}`}

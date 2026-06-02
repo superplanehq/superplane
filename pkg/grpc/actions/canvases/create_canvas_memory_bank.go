@@ -32,6 +32,10 @@ func CreateCanvasMemoryBank(ctx context.Context, registry *registry.Registry, or
 		return nil, status.Error(codes.InvalidArgument, "namespace is required")
 	}
 
+	if len(entries) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "at least one entry is required")
+	}
+
 	_, err = models.FindCanvas(orgUUID, canvasUUID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {

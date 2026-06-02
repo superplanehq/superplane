@@ -100,6 +100,11 @@ export function CanvasMemoryBankDialog({
       return;
     }
 
+    if (parsed.length === 0) {
+      setError("Provide at least one entry.");
+      return;
+    }
+
     try {
       await onSubmit({ namespace: trimmedNamespace, entries: parsed });
       onOpenChange(false);
