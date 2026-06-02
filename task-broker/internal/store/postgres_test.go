@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/superplane/runner/shared/models"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
@@ -206,5 +207,66 @@ func TestPostgresStoreListActiveTasks(t *testing.T) {
 	}
 	if active[0].ID != "queued-1" || active[1].ID != "claimed-1" {
 		t.Fatalf("order/ids: %#v", active)
+	}
+}
+
+func TestUnclaimTask(t *testing.T) {
+	st, cleanup := testdb.Open(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
+		ID: "fleet-unclaim", Provisioner: "test", Arch: "amd64", Size: "t3.micro",
+		CreatedAt: time.Now().UTC(),
+	}); err != nil {
+		t.Fatal(err)
+	}
+	task := &models.Task{
+		ID:         uuid.New().String(),
+		FleetID:    "fleet-unclaim",
+		Status:     models.StatusQueued,
+		CreatedAt:  time.Now().UTC(),
+		WebhookURL: "https://example.com/hook",
+		Commands:   []string{"echo hi"},
+	}
+	if err := st.CreateTask(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+
+	// Claim the task.
+	claimed, err := st.ClaimTask(ctx, "runner-1", "fleet-unclaim", 5*time.Minute)
+	if err != nil || claimed == nil {
+		t.Fatalf("ClaimTask: task=%v err=%v", claimed, err)
+	}
+	if claimed.Status != models.StatusClaimed {
+		t.Fatalf("expected claimed, got %s", claimed.Status)
+	}
+
+	// Unclaim — task should go back to queued.
+	if err := st.UnclaimTask(ctx, claimed.ID, "runner-1"); err != nil {
+		t.Fatal("UnclaimTask:", err)
+	}
+	got, err := st.GetTask(ctx, claimed.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != models.StatusQueued {
+		t.Fatalf("expected queued after unclaim, got %s", got.Status)
+	}
+	if got.RunnerID != "" || got.ClaimedAt != nil || got.LeaseUntil != nil {
+		t.Fatalf("expected runner/claimed_at/lease_until cleared, got runner=%q claimedAt=%v lease=%v",
+			got.RunnerID, got.ClaimedAt, got.LeaseUntil)
+	}
+
+	// Wrong runner — should be a no-op.
+	if _, err2 := st.ClaimTask(ctx, "runner-1", "fleet-unclaim", 5*time.Minute); err2 != nil {
+		t.Fatal(err2)
+	}
+	if err := st.UnclaimTask(ctx, claimed.ID, "runner-WRONG"); err != nil {
+		t.Fatal("UnclaimTask wrong runner:", err)
+	}
+	got2, _ := st.GetTask(ctx, claimed.ID)
+	if got2.Status != models.StatusClaimed {
+		t.Fatalf("wrong-runner unclaim should be no-op, got %s", got2.Status)
 	}
 }
