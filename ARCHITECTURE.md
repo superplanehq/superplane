@@ -6,8 +6,8 @@ SuperPlane runs tasks through **task-broker** (queue + API), **runners** (execut
 
 | Role | Responsibility |
 |------|----------------|
-| **task-broker** | Postgres queue, fleet registry, runner WebSocket/HTTP APIs, caller webhooks. SuperPlane talks here. |
-| **runner** | Claims tasks from task-broker (`TASK_BROKER_URL`, `RUNNER_FLEET_ID`), executes bash (host or Docker), reports completion. Exposes `GET /healthz`. |
+| **task-broker** | Postgres queue, fleet registry (labels for routing), runner WebSocket/HTTP APIs, caller webhooks, cancel, optional live-log proxy. SuperPlane talks here. |
+| **runner** | Claims tasks from task-broker (`TASK_BROKER_URL`, `RUNNER_FLEET_ID`), executes host or Docker workloads, reports completion. Exposes `GET /healthz`. |
 | **fleet-manager** | EC2 hot pool only: launch/terminate VMs, reconcile capacity, health-sweep runners via private IP. No task queue. |
 | **Callers** | Submit tasks and receive webhooks at the URL provided with each task. |
 
