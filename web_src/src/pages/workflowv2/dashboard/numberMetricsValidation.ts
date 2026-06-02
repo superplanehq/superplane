@@ -7,9 +7,14 @@
  * within the dashboard package's per-file size budget.
  */
 
-import { asObject, hasCompositeMemorySourcesKey, validateDataSource, validateNumberRenderSymbols } from "./panelTypes";
-
-const ALLOWED_AGGREGATIONS = ["count", "sum", "avg", "min", "max", "first", "last"];
+import {
+  WIDGET_NUMBER_AGGREGATIONS,
+  asObject,
+  hasCompositeMemorySourcesKey,
+  isAllowedNumberAggregation,
+  validateDataSource,
+  validateNumberRenderSymbols,
+} from "./panelTypes";
 
 export function validateNumberMetrics(metrics: unknown): string | null {
   if (!Array.isArray(metrics)) return "metrics must be an array.";
@@ -40,8 +45,8 @@ function validateNumberMetric(raw: unknown, index: number): string | null {
 }
 
 function validateMetricAggregation(render: Record<string, unknown>, index: number): string | null {
-  if (typeof render.aggregation !== "string" || !ALLOWED_AGGREGATIONS.includes(render.aggregation)) {
-    return `metrics[${index}].render.aggregation must be one of ${ALLOWED_AGGREGATIONS.join(", ")}.`;
+  if (!isAllowedNumberAggregation(render.aggregation)) {
+    return `metrics[${index}].render.aggregation must be one of ${WIDGET_NUMBER_AGGREGATIONS.join(", ")}.`;
   }
   if (render.aggregation !== "count" && (typeof render.field !== "string" || render.field.trim() === "")) {
     return `metrics[${index}].render.field is required when aggregation is "${render.aggregation}".`;

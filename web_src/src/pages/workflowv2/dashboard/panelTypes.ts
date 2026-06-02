@@ -141,6 +141,26 @@ export type ChartPanelDataSource = TablePanelDataSource;
 export type WidgetNumberCombine = "sum" | "min" | "max" | "avg";
 export const WIDGET_NUMBER_COMBINE_OPS: WidgetNumberCombine[] = ["sum", "min", "max", "avg"];
 
+/**
+ * Single source of truth for the aggregations a number render accepts. Reused
+ * by every number validator (single, composite, multi-number) and the form
+ * controls so the allowed set cannot silently drift between paths.
+ */
+export const WIDGET_NUMBER_AGGREGATIONS: WidgetNumberAggregation[] = [
+  "count",
+  "sum",
+  "avg",
+  "min",
+  "max",
+  "first",
+  "last",
+];
+
+/** Type guard for the shared number-aggregation set above. */
+export function isAllowedNumberAggregation(value: unknown): value is WidgetNumberAggregation {
+  return typeof value === "string" && (WIDGET_NUMBER_AGGREGATIONS as string[]).includes(value);
+}
+
 /** One namespace contribution inside a composite memory data source. */
 export interface MemoryNumberSource {
   namespace: string;
@@ -593,9 +613,8 @@ function validateCompositeNumberRenderExclusions(render: Record<string, unknown>
 }
 
 function validateSimpleNumberRender(render: Record<string, unknown>): string | null {
-  const allowedAggregations = ["count", "sum", "avg", "min", "max", "first", "last"];
-  if (typeof render.aggregation !== "string" || !allowedAggregations.includes(render.aggregation)) {
-    return `render.aggregation must be one of ${allowedAggregations.join(", ")}.`;
+  if (typeof render.aggregation !== "string" || !isAllowedNumberAggregation(render.aggregation)) {
+    return `render.aggregation must be one of ${WIDGET_NUMBER_AGGREGATIONS.join(", ")}.`;
   }
   if (render.aggregation !== "count" && (typeof render.field !== "string" || render.field.trim() === "")) {
     return `render.field is required when aggregation is "${render.aggregation}".`;

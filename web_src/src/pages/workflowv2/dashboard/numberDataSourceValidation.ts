@@ -12,14 +12,14 @@
  */
 
 import {
+  WIDGET_NUMBER_AGGREGATIONS,
   WIDGET_NUMBER_COMBINE_OPS,
   asObject,
   hasCompositeMemorySourcesKey,
+  isAllowedNumberAggregation,
   validateDataSource,
   type WidgetNumberCombine,
 } from "./panelTypes";
-
-const ALLOWED_NUMBER_AGGREGATIONS = ["count", "sum", "avg", "min", "max", "first", "last"];
 
 /**
  * Number panels accept either the shared data-source shapes (memory with a
@@ -55,8 +55,8 @@ function validateMemoryNumberSource(raw: unknown, index: number): string | null 
   if (typeof source.namespace !== "string" || source.namespace.trim() === "") {
     return `dataSource.sources[${index}].namespace must be a non-empty string.`;
   }
-  if (typeof source.aggregation !== "string" || !ALLOWED_NUMBER_AGGREGATIONS.includes(source.aggregation)) {
-    return `dataSource.sources[${index}].aggregation must be one of ${ALLOWED_NUMBER_AGGREGATIONS.join(", ")}.`;
+  if (!isAllowedNumberAggregation(source.aggregation)) {
+    return `dataSource.sources[${index}].aggregation must be one of ${WIDGET_NUMBER_AGGREGATIONS.join(", ")}.`;
   }
   if (source.aggregation !== "count" && (typeof source.field !== "string" || source.field.trim() === "")) {
     return `dataSource.sources[${index}].field is required when aggregation is "${source.aggregation}".`;
