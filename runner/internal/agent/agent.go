@@ -35,7 +35,8 @@ type Config struct {
 	// MaxExecutionSeconds caps the runner's execution wall clock (0 = no cap). It does not change
 	// fleet-manager claim leases, which are derived from execution_timeout_seconds on the task (or the API default).
 	MaxExecutionSeconds int
-	// ExitAfterEachTask stops the runner process after one successful CompleteTask.
+	// ExitAfterEachTask stops the runner process after one claimed task is handled
+	// (executed and complete attempted), even when complete or the broker ack fails.
 	ExitAfterEachTask bool
 	Log               *slog.Logger // optional: fleet_manager_http lines for claim / complete
 
@@ -98,11 +99,18 @@ func (a *Agent) Run(ctx context.Context) error {
 		if runErr != nil {
 			errMsg = runErr.Error()
 		}
-		if err := a.complete(ctx, base, task.ID, exit, errMsg, userCanceled, result); err != nil {
-			return err
-		}
+		completeErr := a.complete(ctx, base, task.ID, exit, errMsg, userCanceled, result)
 		if a.Config.ExitAfterEachTask {
+			if completeErr != nil && a.Config.Log != nil {
+				a.Config.Log.Warn("task_broker_http",
+					slog.String("op", "exit_after_task"),
+					slog.String("task_id", task.ID),
+					slog.Any("complete_err", completeErr))
+			}
 			return nil
+		}
+		if completeErr != nil {
+			return completeErr
 		}
 	}
 }
