@@ -11,7 +11,8 @@ import { asObject, hasCompositeMemorySourcesKey, validateDataSource, validateNum
 
 const ALLOWED_AGGREGATIONS = ["count", "sum", "avg", "min", "max", "first", "last"];
 
-export function validateNumberMetrics(metrics: unknown[]): string | null {
+export function validateNumberMetrics(metrics: unknown): string | null {
+  if (!Array.isArray(metrics)) return "metrics must be an array.";
   if (metrics.length === 0) return "metrics must be a non-empty array.";
   for (let i = 0; i < metrics.length; i += 1) {
     const error = validateNumberMetric(metrics[i], i);

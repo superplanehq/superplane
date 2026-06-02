@@ -563,7 +563,9 @@ function validateSort(sort: unknown): string | null {
 function validateNumberContent(content: unknown): string | null {
   const obj = asObject(content);
   if (!obj) return "content must be an object.";
-  if (Array.isArray(obj.metrics)) {
+  // Match the backend: presence of `metrics` selects the multi-number path,
+  // and `validateNumberMetrics` reports a clear error when it is not an array.
+  if ("metrics" in obj) {
     return validateNumberMetrics(obj.metrics);
   }
   const dsError = validateNumberDataSource(obj.dataSource);
