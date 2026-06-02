@@ -134,6 +134,11 @@ func (s *Server) runnerStreamOneTask(conn *websocket.Conn, ctx context.Context, 
 
 	payload := api.TaskPayloadFrom(task)
 	if err := wsWriteJSON(writeMu, conn, wsrunner.Task{Type: wsrunner.TypeTask, Task: payload}); err != nil {
+		// Task was claimed in the DB but the push failed — re-queue it so another runner can pick it up.
+		if unclaimErr := s.Store.UnclaimTask(ctx, task.ID, rid); unclaimErr != nil && s.Log != nil {
+			s.Log.Warn("runner stream", slog.String("op", "unclaim_on_push_failure"),
+				slog.String("task_id", task.ID), slog.Any("err", unclaimErr))
+		}
 		return err
 	}
 
