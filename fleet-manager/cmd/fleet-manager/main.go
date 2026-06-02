@@ -13,6 +13,7 @@ import (
 	"github.com/superplane/runner/fleet-manager/internal/config"
 	"github.com/superplane/runner/fleet-manager/internal/ec2provision"
 	"github.com/superplane/runner/fleet-manager/internal/fleetmanager"
+	"github.com/superplane/runner/shared/api"
 )
 
 // FM_CONFIG_FILE is the only environment variable the binary reads. Everything else
@@ -41,12 +42,11 @@ func main() {
 
 	srv := &fleetmanager.Server{Log: log}
 
-	// Build one Launcher per pool. Headroom-enabled pools share a single broker client
+	brokerClient := brokerclient.New(cfg.TaskBrokerURL, cfg.TaskBrokerAuthToken)
+	registerBrokerFleets(ctx, log, brokerClient, cfg.Pools)
+
+	// Build one Launcher per pool. Headroom-enabled pools share the broker client
 	// (same broker URL + token across all pools in this FM process).
-	var sharedBroker *brokerclient.Client
-	if hasDynamicPool(cfg) {
-		sharedBroker = brokerclient.New(cfg.TaskBrokerURL, cfg.TaskBrokerAuthToken)
-	}
 	launchers := make([]*ec2provision.Launcher, 0, len(cfg.Pools))
 	for _, p := range cfg.Pools {
 		poolCfg := cfg.ToPoolConfig(p)
@@ -58,7 +58,7 @@ func main() {
 			os.Exit(1)
 		}
 		if p.Headroom > 0 {
-			l.BrokerClient = sharedBroker
+			l.BrokerClient = brokerClient
 		}
 		launchers = append(launchers, l)
 	}
@@ -105,13 +105,23 @@ func main() {
 	log.Info("shutdown complete")
 }
 
-// hasDynamicPool reports whether any pool wants dynamic scaling (Headroom > 0).
-// Used to decide whether to instantiate the shared broker client at startup.
-func hasDynamicPool(cfg *config.File) bool {
-	for _, p := range cfg.Pools {
-		if p.Headroom > 0 {
-			return true
+func registerBrokerFleets(ctx context.Context, log *slog.Logger, bc *brokerclient.Client, pools []config.Pool) {
+	for _, p := range pools {
+		_, err := bc.RegisterFleet(ctx, api.RegisterFleetRequest{
+			ID:          p.FleetID,
+			Provisioner: "aws",
+			Arch:        p.Arch,
+			Size:        p.InstanceType,
+		})
+		if err != nil {
+			log.Error("register fleet with broker",
+				slog.String("fleet_id", p.FleetID),
+				slog.Any("err", err))
+			os.Exit(1)
 		}
+		log.Info("registered fleet with broker",
+			slog.String("fleet_id", p.FleetID),
+			slog.String("arch", p.Arch),
+			slog.String("size", p.InstanceType))
 	}
-	return false
 }

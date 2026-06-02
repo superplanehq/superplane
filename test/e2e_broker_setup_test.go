@@ -65,8 +65,10 @@ func startBrokerStack(t *testing.T, root string, binDir string) brokerStack {
 	waitReady(t, brokerURL+"/healthz", 10*time.Second)
 
 	regBody, err := json.Marshal(api.RegisterFleetRequest{
-		ID:     fleetID,
-		Labels: []string{"e2e"},
+		ID:          fleetID,
+		Provisioner: "local",
+		Arch:        "amd64",
+		Size:        "local",
 	})
 	if err != nil {
 		t.Fatal(err)

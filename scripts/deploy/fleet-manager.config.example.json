@@ -37,6 +37,7 @@
       "fleet_id": "aws-standard-arm64",
       "ami": "ami-CHANGEME-arm64",
       "instance_type": "t4g.micro",
+      "arch": "arm64",
       "runner_s3_uri": "s3://YOUR_BUCKET/path/runner-linux-arm64",
       "hot_instance_count": 0,
       "headroom": 1

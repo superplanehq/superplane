@@ -24,7 +24,6 @@ type Store interface {
 	DeleteFleet(ctx context.Context, id string) error
 	ListFleets(ctx context.Context) ([]brokermodels.Fleet, error)
 	GetFleet(ctx context.Context, id string) (*brokermodels.Fleet, error)
-	FindFleetByLabels(ctx context.Context, required []string) (*brokermodels.Fleet, error)
 
 	CreateTask(ctx context.Context, t *models.Task) error
 	GetTask(ctx context.Context, id string) (*models.Task, error)

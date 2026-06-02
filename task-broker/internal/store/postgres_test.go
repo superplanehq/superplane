@@ -7,7 +7,6 @@ import (
 
 	"github.com/superplane/runner/shared/models"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
-	"github.com/superplane/runner/task-broker/internal/store"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
 
@@ -19,9 +18,11 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	now := time.Now().UTC().Truncate(time.Second)
 
 	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
-		ID:        "fleet-a",
-		Labels:    []string{"prod", "tier-1"},
-		CreatedAt: now,
+		ID:          "fleet-a",
+		Provisioner: "aws",
+		Arch:        "amd64",
+		Size:        "t3.micro",
+		CreatedAt:   now,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -30,17 +31,16 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got == nil || len(got.Labels) != 2 {
+	if got == nil || got.Provisioner != "aws" || got.Arch != "amd64" || got.Size != "t3.micro" {
 		t.Fatalf("get fleet: %#v", got)
-	}
-	if !store.LabelsSubset(got.Labels, []string{"prod"}) {
-		t.Fatalf("labels: %#v", got.Labels)
 	}
 
 	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
-		ID:        "fleet-a",
-		Labels:    []string{"staging"},
-		CreatedAt: now.Add(time.Minute),
+		ID:          "fleet-a",
+		Provisioner: "local",
+		Arch:        "amd64",
+		Size:        "local",
+		CreatedAt:   now.Add(time.Minute),
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -48,24 +48,17 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Labels) != 1 || got.Labels[0] != "staging" {
+	if got.Provisioner != "local" || got.Size != "local" {
 		t.Fatalf("upsert fleet: %#v", got)
 	}
 
 	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
 		ID:        "fleet-b",
-		Labels:    []string{"prod", "tier-2"},
+		Arch:      "arm64",
+		Size:      "t4g.micro",
 		CreatedAt: now,
 	}); err != nil {
 		t.Fatal(err)
-	}
-
-	match, err := st.FindFleetByLabels(ctx, []string{"prod", "tier-2"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if match == nil || match.ID != "fleet-b" {
-		t.Fatalf("find by labels: %#v", match)
 	}
 
 	list, err := st.ListFleets(ctx)
@@ -112,58 +105,6 @@ func TestPostgresStoreFleetsAndTasks(t *testing.T) {
 	}
 	if len(list) != 1 || list[0].ID != "fleet-a" {
 		t.Fatalf("after delete fleet-b: %#v", list)
-	}
-}
-
-func TestPostgresStoreFindFleetByLabelsEmpty(t *testing.T) {
-	st, cleanup := testdb.Open(t)
-	defer cleanup()
-
-	match, err := st.FindFleetByLabels(context.Background(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if match != nil {
-		t.Fatalf("expected nil, got %#v", match)
-	}
-}
-
-func TestPostgresStoreFindFleetByLabelsRoutesArchitectureFleets(t *testing.T) {
-	st, cleanup := testdb.Open(t)
-	defer cleanup()
-
-	ctx := context.Background()
-	now := time.Now().UTC().Truncate(time.Second)
-
-	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
-		ID:        "aws-linux-amd64",
-		Labels:    []string{"aws", "linux", "arch:amd64"},
-		CreatedAt: now,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if err := st.CreateFleet(ctx, &brokermodels.Fleet{
-		ID:        "aws-linux-arm64",
-		Labels:    []string{"aws", "linux", "arch:arm64"},
-		CreatedAt: now,
-	}); err != nil {
-		t.Fatal(err)
-	}
-
-	match, err := st.FindFleetByLabels(ctx, []string{"arch:arm64"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if match == nil || match.ID != "aws-linux-arm64" {
-		t.Fatalf("match arm64: %#v", match)
-	}
-
-	match, err = st.FindFleetByLabels(ctx, []string{"linux", "arch:amd64"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if match == nil || match.ID != "aws-linux-amd64" {
-		t.Fatalf("match amd64: %#v", match)
 	}
 }
 

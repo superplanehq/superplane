@@ -50,9 +50,11 @@ func (s *Server) registerFleet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := &brokermodels.Fleet{
-		ID:        req.ID,
-		Labels:    taskstore.NormalizeLabels(req.Labels),
-		CreatedAt: time.Now().UTC(),
+		ID:          req.ID,
+		Provisioner: strings.TrimSpace(req.Provisioner),
+		Arch:        strings.TrimSpace(req.Arch),
+		Size:        strings.TrimSpace(req.Size),
+		CreatedAt:   time.Now().UTC(),
 	}
 	if err := s.Store.CreateFleet(r.Context(), f); err != nil {
 		s.logErr("create fleet", err)
@@ -123,9 +125,11 @@ func fleetToResponse(f *brokermodels.Fleet) *api.FleetResponse {
 		return nil
 	}
 	return &api.FleetResponse{
-		ID:        f.ID,
-		Labels:    append([]string(nil), f.Labels...),
-		CreatedAt: f.CreatedAt.Unix(),
+		ID:          f.ID,
+		Provisioner: f.Provisioner,
+		Arch:        f.Arch,
+		Size:        f.Size,
+		CreatedAt:   f.CreatedAt.Unix(),
 	}
 }
 
@@ -139,25 +143,14 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "webhook_url required")
 		return
 	}
-	hasID := strings.TrimSpace(req.FleetID) != ""
-	hasLabels := len(taskstore.NormalizeLabels(req.FleetLabels)) > 0
-	switch {
-	case hasID && hasLabels:
-		writeError(w, http.StatusBadRequest, "specify either fleet_id or fleet_labels, not both")
-		return
-	case !hasID && !hasLabels:
-		writeError(w, http.StatusBadRequest, "fleet_id or fleet_labels required")
+	fleetID := strings.TrimSpace(req.FleetID)
+	if fleetID == "" {
+		writeError(w, http.StatusBadRequest, "fleet_id required")
 		return
 	}
 
 	ctx := r.Context()
-	var fleet *brokermodels.Fleet
-	var err error
-	if hasID {
-		fleet, err = s.Store.GetFleet(ctx, strings.TrimSpace(req.FleetID))
-	} else {
-		fleet, err = s.Store.FindFleetByLabels(ctx, req.FleetLabels)
-	}
+	fleet, err := s.Store.GetFleet(ctx, fleetID)
 	if err != nil {
 		s.logErr("resolve fleet", err)
 		writeError(w, http.StatusInternalServerError, "could not route fleet")

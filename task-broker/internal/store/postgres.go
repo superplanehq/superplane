@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"errors"
-	"sort"
 	"sync"
 	"time"
 
@@ -52,6 +51,8 @@ func (s *PostgresStore) migrate() error {
 	for _, stmt := range []string{
 		`ALTER TABLE fleets DROP COLUMN IF EXISTS base_url`,
 		`ALTER TABLE fleets DROP COLUMN IF EXISTS auth_token`,
+		`ALTER TABLE fleets DROP COLUMN IF EXISTS labels`,
+		`ALTER TABLE fleets DROP COLUMN IF EXISTS type`,
 		`DROP TABLE IF EXISTS broker_tasks`,
 	} {
 		if err := s.db.Exec(stmt).Error; err != nil {
@@ -76,10 +77,9 @@ func (s *PostgresStore) Truncate(ctx context.Context) error {
 
 func (s *PostgresStore) CreateFleet(ctx context.Context, f *brokermodels.Fleet) error {
 	row := *f
-	row.Labels = NormalizeLabels(f.Labels)
 	return s.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"labels", "created_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"provisioner", "arch", "size", "created_at"}),
 	}).Create(&row).Error
 }
 
@@ -107,28 +107,4 @@ func (s *PostgresStore) GetFleet(ctx context.Context, id string) (*brokermodels.
 		return nil, err
 	}
 	return &f, nil
-}
-
-// FindFleetByLabels returns any fleet whose label set contains all required labels.
-// Tie-breaker: smallest fleet id alphabetically for stability.
-func (s *PostgresStore) FindFleetByLabels(ctx context.Context, required []string) (*brokermodels.Fleet, error) {
-	req := NormalizeLabels(required)
-	if len(req) == 0 {
-		return nil, nil
-	}
-	fleets, err := s.ListFleets(ctx)
-	if err != nil {
-		return nil, err
-	}
-	var candidates []string
-	for _, f := range fleets {
-		if LabelsSubset(f.Labels, req) {
-			candidates = append(candidates, f.ID)
-		}
-	}
-	if len(candidates) == 0 {
-		return nil, nil
-	}
-	sort.Strings(candidates)
-	return s.GetFleet(ctx, candidates[0])
 }
