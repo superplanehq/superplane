@@ -10,11 +10,7 @@ import type { PayloadDraftEntry } from "@/lib/tablePanelPayloadDraft";
 
 import { getTriggerTemplates } from "./dashboardTriggerParameters";
 import { PayloadEditor } from "./TablePanelPayloadEditor";
-import {
-  WIDGET_ROW_ACTION_ICONS,
-  WIDGET_ROW_ACTION_VARIANTS,
-  type WidgetRowAction,
-} from "./widget/types";
+import { WIDGET_ROW_ACTION_ICONS, WIDGET_ROW_ACTION_VARIANTS, type WidgetRowAction } from "./widget/types";
 
 export function ActionRow({
   action,
