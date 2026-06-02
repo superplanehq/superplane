@@ -123,24 +123,26 @@ export function PanelEditorDialog<T extends object>({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-3xl">
-          <PanelEditorHeader
-            panelType={panelType}
-            hasYamlChanges={hasYamlChanges}
-            onShowDiff={() => setDiffOpen(true)}
-          />
+        <DialogContent className="gap-0 overflow-hidden sm:max-w-3xl" closeButtonClassName="top-2 right-2">
           <PanelEditorTabs
             tab={tab}
             onTabChange={setTab}
+            panelType={panelType}
+            hasYamlChanges={hasYamlChanges}
+            onShowDiff={() => setDiffOpen(true)}
             formContent={renderForm({ value: formDraft, onChange: handleFormChange, error: schemaError })}
             yamlDraft={yamlDraft}
             onYamlChange={handleYamlChange}
-          />
-          <PanelEditorError message={blockingError} />
-          <PanelEditorFooter
-            hasBlockingError={Boolean(blockingError)}
-            onCancel={() => onOpenChange(false)}
-            onSave={handleSave}
+            footer={
+              <>
+                <PanelEditorError message={blockingError} />
+                <PanelEditorFooter
+                  hasBlockingError={Boolean(blockingError)}
+                  onCancel={() => onOpenChange(false)}
+                  onSave={handleSave}
+                />
+              </>
+            }
           />
         </DialogContent>
       </Dialog>
@@ -158,47 +160,63 @@ export function PanelEditorDialog<T extends object>({
 function PanelEditorTabs({
   tab,
   onTabChange,
+  panelType,
+  hasYamlChanges,
+  onShowDiff,
   formContent,
   yamlDraft,
   onYamlChange,
+  footer,
 }: {
   tab: EditorTab;
   onTabChange: (tab: EditorTab) => void;
+  panelType: PanelType;
+  hasYamlChanges: boolean;
+  onShowDiff: () => void;
   formContent: ReactNode;
   yamlDraft: string;
   onYamlChange: (value: string | undefined) => void;
+  footer: ReactNode;
 }) {
   return (
-    <Tabs value={tab} onValueChange={(value) => onTabChange(value as EditorTab)} className="w-full">
-      <TabsList>
-        <TabsTrigger value="form" data-testid="panel-editor-tab-form">
-          Form
-        </TabsTrigger>
-        <TabsTrigger value="yaml" data-testid="panel-editor-tab-yaml">
-          YAML
-        </TabsTrigger>
-      </TabsList>
-      <TabsContent value="form" className="mt-3 max-h-[60vh] overflow-auto px-1 pb-6">
-        {formContent}
-      </TabsContent>
-      <TabsContent value="yaml" className="mt-3">
-        <div className="overflow-hidden rounded-md border border-slate-200">
-          <Editor
-            height="50vh"
-            language="yaml"
-            value={yamlDraft}
-            onChange={onYamlChange}
-            options={{
-              minimap: { enabled: false },
-              fontSize: 12,
-              scrollBeyondLastLine: false,
-              tabSize: 2,
-              automaticLayout: true,
-            }}
-          />
+    <div className="flex w-full flex-col">
+      <Tabs value={tab} onValueChange={(value) => onTabChange(value as EditorTab)} className="flex w-full flex-col">
+        <div className="-mx-6 -mt-6 border-b border-slate-950/10 bg-background px-6 pb-3 pt-5">
+          <PanelEditorHeader panelType={panelType} hasYamlChanges={hasYamlChanges} onShowDiff={onShowDiff} />
+          <TabsList className="mt-3">
+            <TabsTrigger value="form" data-testid="panel-editor-tab-form">
+              Form
+            </TabsTrigger>
+            <TabsTrigger value="yaml" data-testid="panel-editor-tab-yaml">
+              YAML
+            </TabsTrigger>
+          </TabsList>
         </div>
-      </TabsContent>
-    </Tabs>
+        <TabsContent value="form" className="pt-6 max-h-[60vh] overflow-y-auto -mx-6 px-6 pb-12">
+          {formContent}
+        </TabsContent>
+        <TabsContent value="yaml" className="mt-3">
+          <div className="overflow-hidden rounded-md border border-slate-200">
+            <Editor
+              height="50vh"
+              language="yaml"
+              value={yamlDraft}
+              onChange={onYamlChange}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 12,
+                scrollBeyondLastLine: false,
+                tabSize: 2,
+                automaticLayout: true,
+              }}
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
+      <div className="-mx-6 -mb-6 flex flex-col gap-2 border-t border-slate-950/10 bg-background px-6 py-4">
+        {footer}
+      </div>
+    </div>
   );
 }
 
@@ -212,11 +230,13 @@ function PanelEditorHeader({
   onShowDiff: () => void;
 }) {
   return (
-    <DialogHeader>
-      <div className="flex items-start justify-between gap-3">
+    <DialogHeader className="text-center sm:text-left">
+      <div className="mb-2 flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <DialogTitle>Edit {PANEL_TYPE_META[panelType].label} panel</DialogTitle>
-          <DialogDescription>{PANEL_TYPE_META[panelType].description}</DialogDescription>
+          <DialogTitle className="mb-1 text-base font-medium">
+            Edit {PANEL_TYPE_META[panelType].label} panel
+          </DialogTitle>
+          <DialogDescription className="text-gray-800">{PANEL_TYPE_META[panelType].description}</DialogDescription>
         </div>
         {hasYamlChanges ? (
           <Button
@@ -241,7 +261,7 @@ function PanelEditorError({ message }: { message: string | null }) {
 
   return (
     <div
-      className="mt-2 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+      className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
       data-testid="panel-editor-error"
     >
       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -260,8 +280,8 @@ function PanelEditorFooter({
   onSave: () => void;
 }) {
   return (
-    <DialogFooter className="mt-2">
-      <Button type="button" variant="ghost" onClick={onCancel}>
+    <DialogFooter>
+      <Button type="button" variant="outline" onClick={onCancel}>
         Cancel
       </Button>
       <Button type="button" onClick={onSave} disabled={hasBlockingError} data-testid="panel-editor-save">

@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { isCompositeMemoryDataSource, type MemoryNumberSource, type NumberPanelContent } from "./panelTypes";
 
@@ -12,6 +12,7 @@ export function NumberPanelSourceModeToggle({
 }) {
   const dataSource = value.dataSource;
   const composite = isCompositeMemoryDataSource(dataSource);
+  const mode = composite ? "composite" : "simple";
 
   const switchToComposite = () => {
     if (isCompositeMemoryDataSource(dataSource)) return;
@@ -44,26 +45,22 @@ export function NumberPanelSourceModeToggle({
   return (
     <div className="space-y-1.5">
       <Label className="text-xs font-medium text-slate-600">Source mode</Label>
-      <div className="flex gap-1">
-        <Button
-          type="button"
-          size="sm"
-          variant={composite ? "outline" : "secondary"}
-          onClick={switchToSimple}
-          data-testid="number-mode-simple"
-        >
-          Single source
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant={composite ? "secondary" : "outline"}
-          onClick={switchToComposite}
-          data-testid="number-mode-composite"
-        >
-          Multiple memory sources
-        </Button>
-      </div>
+      <Tabs
+        value={mode}
+        onValueChange={(next) => {
+          if (next === "composite") switchToComposite();
+          else switchToSimple();
+        }}
+      >
+        <TabsList>
+          <TabsTrigger value="simple" data-testid="number-mode-simple">
+            Single source
+          </TabsTrigger>
+          <TabsTrigger value="composite" data-testid="number-mode-composite">
+            Multiple memory sources
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
     </div>
   );
 }
