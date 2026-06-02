@@ -24,6 +24,7 @@ import { getReleaseMapper } from "./get_release";
 import { getRepositoryPermissionMapper } from "./get_repository_permission";
 import { createReviewMapper } from "./create_review";
 import { createPullRequestMapper } from "./create_pull_request";
+import { mergePullRequestMapper } from "./merge_pull_request";
 import { getWorkflowUsageMapper } from "./get_workflow_usage";
 import { labelsMapper } from "./labels";
 import { addReactionMapper } from "./add_reaction";
@@ -39,6 +40,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   updateIssue: buildActionStateRegistry("updated"),
   createReview: buildActionStateRegistry("created"),
   createPullRequest: buildActionStateRegistry("created"),
+  mergePullRequest: buildActionStateRegistry("merged"),
   publishCommitStatus: buildActionStateRegistry("published"),
   createDeployment: buildActionStateRegistry("created"),
   createDeploymentStatus: buildActionStateRegistry("created"),
@@ -64,6 +66,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   updateIssue: baseIssueMapper,
   createReview: createReviewMapper,
   createPullRequest: createPullRequestMapper,
+  mergePullRequest: mergePullRequestMapper,
   runWorkflow: runWorkflowMapper,
   publishCommitStatus: publishCommitStatusMapper,
   createDeployment: createDeploymentMapper,
