@@ -6,6 +6,7 @@ import {
   TablePanelFiltersSection,
   TablePanelMemorySourcePicker,
   TablePanelRowActionsSection,
+  TablePanelRowStylesSection,
   TablePanelSortSection,
   TablePanelTitleField,
 } from "./tablePanelForm/TablePanelFormSections";
@@ -38,6 +39,7 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
       <TablePanelMemorySourcePicker value={value} canvasId={canvasId} onChange={onChange} />
       <TablePanelColumnsSection value={value} fields={fields} fieldOptions={fieldOptions} actions={actions} />
       <TablePanelFiltersSection value={value} fieldOptions={fieldOptions} actions={actions} />
+      <TablePanelRowStylesSection value={value} fieldOptions={fieldOptions} actions={actions} />
       <TablePanelSortSection value={value} fieldOptions={fieldOptions} actions={actions} />
       <TablePanelRowActionsSection
         value={value}

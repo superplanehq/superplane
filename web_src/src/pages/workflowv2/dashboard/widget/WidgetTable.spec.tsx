@@ -64,6 +64,67 @@ function renderTable({
   );
 }
 
+describe("WidgetTable row styles — background tone", () => {
+  const ROW_STYLE_ROWS = [
+    { id: "row-error", service: "api", status: "error" },
+    { id: "row-deploying", service: "web", status: "deploying" },
+    { id: "row-ok", service: "worker", status: "passed" },
+  ];
+
+  function renderWithRowStyles(rowStyles: WidgetTableRender["rowStyles"]) {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    return render(
+      <MemoryRouter>
+        <QueryClientProvider client={queryClient}>
+          <DashboardContextProvider canvasId="canvas-1" organizationId="org-1" nodes={[]} canRunNodes={false}>
+            <WidgetTable
+              render={{
+                kind: "table",
+                columns: [
+                  { field: "service", label: "Service" },
+                  { field: "status", label: "Status" },
+                ],
+                rowStyles,
+              }}
+              rows={ROW_STYLE_ROWS}
+              isLoading={false}
+            />
+          </DashboardContextProvider>
+        </QueryClientProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it("applies the first matching tone class to the row and skips non-matches", () => {
+    const view = renderWithRowStyles([
+      { field: "status", op: "eq", value: "error", tone: "red-soft" },
+      { field: "status", op: "eq", value: "deploying", tone: "orange-soft" },
+    ]);
+    const rows = view.container.querySelectorAll("table tbody tr");
+    expect(rows).toHaveLength(3);
+    expect(rows[0].className).toContain("bg-red-50");
+    expect(rows[0].getAttribute("data-row-tone")).toBe("true");
+    expect(rows[1].className).toContain("bg-orange-50");
+    // Row 3 doesn't match any rule, so no tone marker and no tone class.
+    expect(rows[2].getAttribute("data-row-tone")).toBeNull();
+    expect(rows[2].className).not.toMatch(/(?:^|\s)bg-(red|orange|yellow|sky|emerald|slate)-(50|100)(?:\s|$)/);
+    // Default hover wash should remain on untinted rows so they keep the
+    // existing hover affordance.
+    expect(rows[2].className).toContain("hover:bg-slate-50/60");
+  });
+
+  it("first matching rule wins when multiple rules match the same row", () => {
+    const view = renderWithRowStyles([
+      { field: "status", op: "contains", value: "err", tone: "red" },
+      { field: "status", op: "eq", value: "error", tone: "green" },
+    ]);
+    const firstRow = view.container.querySelector("table tbody tr");
+    expect(firstRow).not.toBeNull();
+    expect(firstRow!.className).toContain("bg-red-100");
+    expect(firstRow!.className).not.toContain("bg-emerald-");
+  });
+});
+
 describe("WidgetTable column formatting", () => {
   it("renders status and badge columns as pills with the same classes", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
