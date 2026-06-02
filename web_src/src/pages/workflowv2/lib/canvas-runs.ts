@@ -8,13 +8,13 @@ import type {
 import { formatDuration } from "@/lib/duration";
 import { DEFAULT_EVENT_STATE_MAP, type EventState } from "@/ui/componentBase";
 import { getState, getTriggerRenderer } from "../mappers";
-import { buildEventInfo, buildExecutionInfo } from "../utils";
+import { buildEventInfo, buildExecutionInfo, getNodeComponentName } from "../utils";
 
 export function resolveNodeIconSlug(
   node: ComponentsNode | undefined,
   componentIconMap: Record<string, string>,
 ): string | undefined {
-  const name = node?.component;
+  const name = getNodeComponentName(node);
   if (!name) return undefined;
   return componentIconMap[name];
 }
@@ -145,7 +145,7 @@ function matchesSearchQuery(
   query: string,
 ): boolean {
   const triggerNode = nodes.find((n) => n.id === event.nodeId);
-  const triggerRenderer = getTriggerRenderer(triggerNode?.component || "");
+  const triggerRenderer = getTriggerRenderer(getNodeComponentName(triggerNode));
   const eventInfo = buildEventInfo(event);
   const { title } = eventInfo ? triggerRenderer.getTitleAndSubtitle({ event: eventInfo }) : { title: "" };
 
