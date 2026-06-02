@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { convertNumberPanelMode, detectMode } from "./numberPanelSourceMode";
+import { convertNumberPanelMode, countNonMemoryMetrics, detectMode } from "./numberPanelSourceMode";
 import { isCompositeMemoryDataSource, type NumberPanelContent } from "./panelTypes";
 
 describe("convertNumberPanelMode — composite ↔ multi", () => {
@@ -84,5 +84,64 @@ describe("convertNumberPanelMode — composite ↔ multi", () => {
     };
     const result = convertNumberPanelMode("multi", empty);
     expect(result.metrics).toHaveLength(1);
+  });
+});
+
+describe("countNonMemoryMetrics — guards lossy multi → composite switch", () => {
+  it("returns 0 for non-multi content (single / composite panels)", () => {
+    const single: NumberPanelContent = {
+      title: "Single",
+      dataSource: { kind: "runs", limit: 100 },
+      render: { kind: "number", aggregation: "count" },
+    };
+    expect(countNonMemoryMetrics(single)).toBe(0);
+
+    const composite: NumberPanelContent = {
+      title: "Composite",
+      dataSource: { kind: "memory", combine: "sum", sources: [{ namespace: "a", aggregation: "count" }] },
+      render: { kind: "number" },
+    };
+    expect(countNonMemoryMetrics(composite)).toBe(0);
+  });
+
+  it("returns 0 when every metric is memory-backed", () => {
+    const allMemory: NumberPanelContent = {
+      title: "All memory",
+      metrics: [
+        { dataSource: { kind: "memory", namespace: "aws" }, render: { kind: "number", aggregation: "count" } },
+        { dataSource: { kind: "memory", namespace: "gcp" }, render: { kind: "number", aggregation: "count" } },
+      ],
+    };
+    expect(countNonMemoryMetrics(allMemory)).toBe(0);
+  });
+
+  it("counts every runs/executions metric that composite mode cannot represent", () => {
+    const mixed: NumberPanelContent = {
+      title: "Mixed",
+      metrics: [
+        { dataSource: { kind: "memory", namespace: "aws" }, render: { kind: "number", aggregation: "count" } },
+        { dataSource: { kind: "runs", limit: 100 }, render: { kind: "number", aggregation: "count" } },
+        { dataSource: { kind: "executions", limit: 50 }, render: { kind: "number", aggregation: "count" } },
+      ],
+    };
+    expect(countNonMemoryMetrics(mixed)).toBe(2);
+  });
+
+  it("still drops non-memory metrics if the conversion is forced (documents why the UI blocks it)", () => {
+    const mixed: NumberPanelContent = {
+      title: "Mixed",
+      metrics: [
+        {
+          dataSource: { kind: "memory", namespace: "aws" },
+          render: { kind: "number", aggregation: "sum", field: "cost" },
+        },
+        { dataSource: { kind: "runs", limit: 100 }, render: { kind: "number", aggregation: "count" } },
+      ],
+    };
+    // The conversion itself is inherently lossy (composite is memory-only), so
+    // the toggle disables it whenever countNonMemoryMetrics > 0.
+    const forced = convertNumberPanelMode("composite", mixed);
+    expect(isCompositeMemoryDataSource(forced.dataSource) ? forced.dataSource.sources.length : 0).toBe(1);
+    expect(countNonMemoryMetrics(mixed)).toBe(1);
   });
 });

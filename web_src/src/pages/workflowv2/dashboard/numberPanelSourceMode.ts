@@ -16,6 +16,18 @@ export function detectMode(value: NumberPanelContent): NumberSourceMode {
 }
 
 /**
+ * Composite ("multiple memory sources") mode can only represent `memory`
+ * data sources. Converting a multi-number panel to composite therefore drops
+ * any metric backed by `runs` or `executions`. This returns how many metrics
+ * would be lost so the UI can block the switch instead of silently discarding
+ * those numbers on the next save.
+ */
+export function countNonMemoryMetrics(value: NumberPanelContent): number {
+  if (!isMultiNumberContent(value)) return 0;
+  return (value.metrics ?? []).filter((m) => m.dataSource.kind !== "memory").length;
+}
+
+/**
  * Convert number-panel content between source modes. Exposed (alongside the
  * toggle component) so the conversion behavior can be unit-tested without
  * rendering the React component.
