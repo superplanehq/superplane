@@ -7,12 +7,7 @@
  * within the dashboard package's per-file size budget.
  */
 
-import {
-  asObject,
-  hasCompositeMemorySourcesKey,
-  validateDataSource,
-  validateNumberRenderSymbols,
-} from "./panelTypes";
+import { asObject, hasCompositeMemorySourcesKey, validateDataSource, validateNumberRenderSymbols } from "./panelTypes";
 
 const ALLOWED_AGGREGATIONS = ["count", "sum", "avg", "min", "max", "first", "last"];
 

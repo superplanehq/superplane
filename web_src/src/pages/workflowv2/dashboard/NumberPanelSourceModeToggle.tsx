@@ -106,7 +106,8 @@ function singleFromComposite(value: NumberPanelContent): NumberPanelContent {
 }
 
 function toCompositeMode(value: NumberPanelContent, current: NumberSourceMode): NumberPanelContent {
-  const sources = current === "multi" ? compositeSourcesFromMetrics(value.metrics ?? []) : [compositeSeedFromSingle(value)];
+  const sources =
+    current === "multi" ? compositeSourcesFromMetrics(value.metrics ?? []) : [compositeSeedFromSingle(value)];
   return {
     title: value.title,
     dataSource: { kind: "memory", sources, combine: "sum" },

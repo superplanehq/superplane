@@ -340,44 +340,59 @@ func validateNodesPanelEntry(panelID string, index int, raw any) error {
 }
 
 func validateDataSource(panelID string, raw any) error {
+	return validateDataSourceField(panelID, "dataSource", raw)
+}
+
+// validateDataSourceField is like validateDataSource but lets callers
+// override the field-path prefix used in error messages. The multi-number
+// metric validator uses this to produce errors like
+// `panel "n" metrics[0].dataSource ...` instead of the default
+// `panel "n" dataSource ...`.
+func validateDataSourceField(panelID, fieldPrefix string, raw any) error {
 	ds, ok := raw.(map[string]any)
 	if !ok || ds == nil {
-		return fmt.Errorf("panel %q dataSource must be an object", panelID)
+		return fmt.Errorf("panel %q %s must be an object", panelID, fieldPrefix)
 	}
 	kind, _ := ds["kind"].(string)
 	switch kind {
 	case "memory":
 		if _, ok := ds["namespace"].(string); !ok {
-			return fmt.Errorf("panel %q dataSource.namespace must be a string for memory sources", panelID)
+			return fmt.Errorf("panel %q %s.namespace must be a string for memory sources", panelID, fieldPrefix)
 		}
-		if err := validateOptionalString(panelID, "dataSource.fieldPath", ds["fieldPath"]); err != nil {
+		if err := validateOptionalString(panelID, fieldPrefix+".fieldPath", ds["fieldPath"]); err != nil {
 			return err
 		}
 	case "executions":
-		if err := validateOptionalString(panelID, "dataSource.node", ds["node"]); err != nil {
+		if err := validateOptionalString(panelID, fieldPrefix+".node", ds["node"]); err != nil {
 			return err
 		}
-		if err := validateOptionalNumber(panelID, "dataSource.limit", ds["limit"]); err != nil {
+		if err := validateOptionalNumber(panelID, fieldPrefix+".limit", ds["limit"]); err != nil {
 			return err
 		}
 	case "runs":
-		if err := validateOptionalNumber(panelID, "dataSource.limit", ds["limit"]); err != nil {
+		if err := validateOptionalNumber(panelID, fieldPrefix+".limit", ds["limit"]); err != nil {
 			return err
 		}
 	default:
-		return fmt.Errorf("panel %q dataSource.kind must be \"memory\", \"executions\", or \"runs\"", panelID)
+		return fmt.Errorf("panel %q %s.kind must be \"memory\", \"executions\", or \"runs\"", panelID, fieldPrefix)
 	}
 	return nil
 }
 
 func validateRender(panelID string, raw any, expectedKind string) (map[string]any, error) {
+	return validateRenderField(panelID, "render", raw, expectedKind)
+}
+
+// validateRenderField is like validateRender but lets callers override the
+// field-path prefix used in error messages.
+func validateRenderField(panelID, fieldPrefix string, raw any, expectedKind string) (map[string]any, error) {
 	render, ok := raw.(map[string]any)
 	if !ok || render == nil {
-		return nil, fmt.Errorf("panel %q render must be an object", panelID)
+		return nil, fmt.Errorf("panel %q %s must be an object", panelID, fieldPrefix)
 	}
 	kind, _ := render["kind"].(string)
 	if kind != expectedKind {
-		return nil, fmt.Errorf("panel %q render.kind must be %q", panelID, expectedKind)
+		return nil, fmt.Errorf("panel %q %s.kind must be %q", panelID, fieldPrefix, expectedKind)
 	}
 	return render, nil
 }
@@ -663,31 +678,33 @@ func validateNumberMetric(panelID string, index int, raw any) error {
 	if !ok || metric == nil {
 		return fmt.Errorf("panel %q metrics[%d] must be an object", panelID, index)
 	}
+	dsPrefix := fmt.Sprintf("metrics[%d].dataSource", index)
+	renderPrefix := fmt.Sprintf("metrics[%d].render", index)
 	// Composite memory sources are not allowed inside a multi-number metric;
 	// the panel itself already lets users repeat the data source per metric.
 	if isCompositeMemoryDataSource(metric["dataSource"]) {
-		return fmt.Errorf("panel %q metrics[%d].dataSource must be a single-source memory/executions/runs source", panelID, index)
+		return fmt.Errorf("panel %q %s must be a single-source memory/executions/runs source", panelID, dsPrefix)
 	}
-	if err := validateDataSource(panelID, metric["dataSource"]); err != nil {
-		return fmt.Errorf("metrics[%d] %w", index, err)
-	}
-	render, err := validateRender(panelID, metric["render"], "number")
-	if err != nil {
-		return fmt.Errorf("metrics[%d] %w", index, err)
-	}
-	if err := validateOptionalString(panelID, fmt.Sprintf("metrics[%d].render.prefix", index), render["prefix"]); err != nil {
+	if err := validateDataSourceField(panelID, dsPrefix, metric["dataSource"]); err != nil {
 		return err
 	}
-	if err := validateOptionalString(panelID, fmt.Sprintf("metrics[%d].render.suffix", index), render["suffix"]); err != nil {
+	render, err := validateRenderField(panelID, renderPrefix, metric["render"], "number")
+	if err != nil {
+		return err
+	}
+	if err := validateOptionalString(panelID, renderPrefix+".prefix", render["prefix"]); err != nil {
+		return err
+	}
+	if err := validateOptionalString(panelID, renderPrefix+".suffix", render["suffix"]); err != nil {
 		return err
 	}
 	aggregation, _ := render["aggregation"].(string)
 	if !slices.Contains(allowedNumberAggregations, aggregation) {
-		return fmt.Errorf("panel %q metrics[%d].render.aggregation must be one of %s", panelID, index, strings.Join(allowedNumberAggregations, "/"))
+		return fmt.Errorf("panel %q %s.aggregation must be one of %s", panelID, renderPrefix, strings.Join(allowedNumberAggregations, "/"))
 	}
 	if aggregation != "count" {
 		if field, ok := render["field"].(string); !ok || field == "" {
-			return fmt.Errorf("panel %q metrics[%d].render.field is required when aggregation is %q", panelID, index, aggregation)
+			return fmt.Errorf("panel %q %s.field is required when aggregation is %q", panelID, renderPrefix, aggregation)
 		}
 	}
 	return nil
