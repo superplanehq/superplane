@@ -26,24 +26,13 @@ import {
 
 import { applyFilters, applySort, buildChartData, distinctSeriesKeys } from "./widgetData";
 import { formatPercentOfTotal, formatSeriesValue } from "./chartFormat";
+import { WidgetEmptyState } from "../WidgetEmptyState";
 import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries } from "./types";
 
 interface WidgetChartProps {
   render: WidgetChartRender;
   rows: unknown[];
   isLoading: boolean;
-}
-
-function ChartEmptyState({ message, testId }: { message: ReactNode; testId?: string }) {
-  return (
-    <div
-      className="flex h-full min-h-[6rem] flex-col items-center justify-center gap-1.5 p-4 text-center text-[13px] text-gray-500"
-      data-testid={testId}
-    >
-      <LineChartIcon className="size-4" aria-hidden />
-      <p>{message}</p>
-    </div>
-  );
 }
 
 const DEFAULT_PALETTE = ["#0284c7", "#16a34a", "#dc2626", "#a855f7", "#f59e0b", "#0ea5e9"];
@@ -111,7 +100,7 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
     );
   }
   if (data.length === 0) {
-    return <ChartEmptyState message="No data to display." testId="widget-chart-empty" />;
+    return <WidgetEmptyState icon={LineChartIcon} message="No data to display." testId="widget-chart-empty" />;
   }
 
   return (
@@ -287,7 +276,7 @@ function DonutChartView({
 
   if (!series) return null;
   if (total === 0) {
-    return <ChartEmptyState message="No data" />;
+    return <WidgetEmptyState icon={LineChartIcon} message="No data" />;
   }
 
   const showLegend = legendMode !== "hide";
