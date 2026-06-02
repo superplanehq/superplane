@@ -31,7 +31,7 @@ export default defineConfig(({ command }: { command: string }) => {
 
   return {
     plugins: [react(), tailwindcss(), setHmrPortFromPortPlugin],
-    base: "/",
+    base: process.env.VITE_ASSET_BASE_URL ?? "/",
     server: {
       port: devPort,
       strictPort: true,
