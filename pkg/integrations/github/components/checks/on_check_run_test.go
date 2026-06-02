@@ -81,11 +81,26 @@ func Test__OnCheckRun__HandleWebhook(t *testing.T) {
 		assert.Zero(t, eventContext.Count())
 	})
 
-	t.Run("conclusion filter does not match in-progress checks", func(t *testing.T) {
+	t.Run("conclusion filter does not apply to in-progress checks", func(t *testing.T) {
 		eventContext := &contexts.EventContext{}
 
 		code, _, err := trigger.HandleWebhook(signedCheckRunRequest(
 			[]byte(`{"check_run":{"name":"DCO","status":"in_progress"}}`),
+			OnCheckRunConfiguration{Repository: "hello", Conclusions: []string{"success"}},
+			eventContext,
+		))
+
+		assert.Equal(t, http.StatusOK, code)
+		assert.NoError(t, err)
+		require.Equal(t, 1, eventContext.Count())
+		assert.Equal(t, "github.checkRun", eventContext.Payloads[0].Type)
+	})
+
+	t.Run("conclusion filter prevents emitting completed checks with another conclusion", func(t *testing.T) {
+		eventContext := &contexts.EventContext{}
+
+		code, _, err := trigger.HandleWebhook(signedCheckRunRequest(
+			[]byte(`{"check_run":{"name":"DCO","status":"completed","conclusion":"failure"}}`),
 			OnCheckRunConfiguration{Repository: "hello", Conclusions: []string{"success"}},
 			eventContext,
 		))

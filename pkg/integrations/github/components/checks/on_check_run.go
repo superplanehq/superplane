@@ -245,11 +245,12 @@ func matchesCheckRunFilters(payload map[string]any, config OnCheckRunConfigurati
 		return false
 	}
 
-	if !matchesConfiguredCheckRunStatus(extractStringValue(checkRun, "status"), config.Statuses) {
+	status := extractStringValue(checkRun, "status")
+	if !matchesConfiguredCheckRunStatus(status, config.Statuses) {
 		return false
 	}
 
-	if !matchesConfiguredCheckRunConclusion(extractStringValue(checkRun, "conclusion"), config.Conclusions) {
+	if !matchesConfiguredCheckRunConclusion(status, extractStringValue(checkRun, "conclusion"), config.Conclusions) {
 		return false
 	}
 
@@ -276,8 +277,12 @@ func matchesConfiguredCheckRunStatus(status string, allowedStatuses []string) bo
 	return slices.Contains(allowedStatuses, status)
 }
 
-func matchesConfiguredCheckRunConclusion(conclusion string, allowedConclusions []string) bool {
+func matchesConfiguredCheckRunConclusion(status string, conclusion string, allowedConclusions []string) bool {
 	if len(allowedConclusions) == 0 {
+		return true
+	}
+
+	if status != "completed" {
 		return true
 	}
 
