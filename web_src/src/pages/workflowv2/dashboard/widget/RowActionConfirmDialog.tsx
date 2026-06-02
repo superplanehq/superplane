@@ -150,7 +150,13 @@ function ConfirmParametersFact({
         <span className="text-red-600">Failed to build parameters: {preview.error}</span>
       ) : (
         <pre
-          className="mt-1 max-h-40 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-2 font-mono text-[11px] leading-snug text-slate-700"
+          // `min-w-0` lets this `<pre>` shrink below its intrinsic content
+          // width inside the grid `DialogContent` (grid items default to
+          // `min-width: auto`), and `whitespace-pre-wrap` + `break-all`
+          // wraps long string values so the payload doesn't push the dialog
+          // wider than the viewport. We keep `overflow-auto` as a fallback
+          // for the rare unbreakable token plus the vertical clamp.
+          className="mt-1 max-h-40 min-w-0 overflow-auto rounded-md border border-slate-200 bg-slate-50 p-2 font-mono text-[11px] leading-snug whitespace-pre-wrap break-all text-slate-700"
           data-testid={`${testId}-parameters`}
         >
           {formatParameters(preview?.parameters)}
