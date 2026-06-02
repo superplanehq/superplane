@@ -187,6 +187,22 @@ func fallbackAPIError(apiErr *openapi_client.GenericOpenAPIError) error {
 	status := strings.TrimSpace(apiErr.Error())
 	body := strings.TrimSpace(string(apiErr.Body()))
 
+	if len(body) > maxErrorBodyBytes {
+		body = body[:maxErrorBodyBytes] + "... [truncated]"
+	}
+
+	// OpenAPI client decode failures replace the HTTP status with this message
+	// when error bodies are not JSON (for example plain-text 401 Unauthorized).
+	if status == "undefined response type" {
+		if formatted := formatPlaintextAPIErrorBody(body); formatted != nil {
+			return formatted
+		}
+		if body != "" {
+			return errors.New(body)
+		}
+		return errors.New("unexpected API response format")
+	}
+
 	if body == "" {
 		if status == "" {
 			return apiErr
@@ -194,14 +210,23 @@ func fallbackAPIError(apiErr *openapi_client.GenericOpenAPIError) error {
 		return errors.New(status)
 	}
 
-	if len(body) > maxErrorBodyBytes {
-		body = body[:maxErrorBodyBytes] + "... [truncated]"
-	}
-
 	if status == "" {
 		return errors.New(body)
 	}
 	return fmt.Errorf("%s\n%s", status, body)
+}
+
+func formatPlaintextAPIErrorBody(body string) error {
+	switch strings.ToLower(body) {
+	case "unauthorized":
+		return errors.New("authentication required: invalid or missing API token (run `superplane connect` or check `superplane context`)")
+	case "not found":
+		return errors.New("not found")
+	case "forbidden":
+		return errors.New("permission denied")
+	default:
+		return nil
+	}
 }
 
 func grpcCodePrefix(code int32) string {

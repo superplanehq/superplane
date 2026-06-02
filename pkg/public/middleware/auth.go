@@ -240,7 +240,7 @@ func OrganizationAuthMiddleware(jwtSigner *jwt.Signer) mux.MiddlewareFunc {
 }
 
 func authenticateUserByToken(r *http.Request, jwtSigner *jwt.Signer) (*models.User, *jwt.ScopedTokenClaims, error) {
-	token, err := getBearerToken(r)
+	token, err := getAPITokenFromRequest(r)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -265,18 +265,27 @@ func authenticateUserByToken(r *http.Request, jwtSigner *jwt.Signer) (*models.Us
 	return user, nil, nil
 }
 
-func getBearerToken(r *http.Request) (string, error) {
+// getAPITokenFromRequest returns a user API or scoped token from Authorization.
+// Supports Bearer tokens and HTTP Basic auth (password is the token; username is ignored).
+func getAPITokenFromRequest(r *http.Request) (string, error) {
 	authHeader := r.Header.Get("Authorization")
 	if authHeader == "" {
 		return "", fmt.Errorf("authorization header not found")
 	}
 
-	headerParts := strings.Split(authHeader, "Bearer ")
-	if len(headerParts) != 2 {
-		return "", fmt.Errorf("invalid authorization header")
+	if strings.HasPrefix(authHeader, "Bearer ") {
+		return strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer ")), nil
 	}
 
-	return strings.TrimSpace(headerParts[1]), nil
+	if strings.HasPrefix(authHeader, "Basic ") {
+		_, password, ok := r.BasicAuth()
+		if !ok || strings.TrimSpace(password) == "" {
+			return "", fmt.Errorf("invalid basic authorization")
+		}
+		return strings.TrimSpace(password), nil
+	}
+
+	return "", fmt.Errorf("invalid authorization header")
 }
 
 func authenticateUserByScopedToken(token string, jwtSigner *jwt.Signer) (*models.User, *jwt.ScopedTokenClaims, error) {

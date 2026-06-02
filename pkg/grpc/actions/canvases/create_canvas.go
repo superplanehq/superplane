@@ -172,6 +172,7 @@ func CreateCanvas(
 		err = canvas.CreatePendingRepositoryInTransaction(tx, gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
 			OrganizationID: organizationID,
 			CanvasID:       canvasID,
+			Name:           name,
 		}))
 
 		if err != nil {

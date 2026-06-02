@@ -3,7 +3,6 @@ package canvases
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -12,7 +11,6 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"gorm.io/gorm"
 )
 
@@ -34,7 +32,7 @@ func GetCanvasRepository(ctx context.Context, gitProvider git.Provider, organiza
 
 	repository, err := models.FindRepository(orgID, canvasID)
 	if err != nil {
-		return handleMissingRepository(gitProvider, canvas, err)
+		return handleMissingRepository(ctx, gitProvider, canvas, err)
 	}
 
 	//
@@ -52,10 +50,7 @@ func GetCanvasRepository(ctx context.Context, gitProvider git.Provider, organiza
 
 	return &pb.GetCanvasRepositoryResponse{
 		Repository: &pb.CanvasRepository{
-			Metadata: &pb.CanvasRepository_Metadata{
-				CanvasId:  canvas.ID.String(),
-				UpdatedAt: timestamppb.New(repository.UpdatedAt),
-			},
+			Metadata: canvasRepositoryMetadataFromRepository(ctx, canvas, repository, gitProvider),
 			Status: &pb.CanvasRepository_Status{
 				State:   repositoryStateToProto(repository.Status),
 				HeadSha: headSha,
@@ -64,7 +59,7 @@ func GetCanvasRepository(ctx context.Context, gitProvider git.Provider, organiza
 	}, nil
 }
 
-func handleMissingRepository(gitProvider git.Provider, canvas *models.Canvas, err error) (*pb.GetCanvasRepositoryResponse, error) {
+func handleMissingRepository(ctx context.Context, gitProvider git.Provider, canvas *models.Canvas, err error) (*pb.GetCanvasRepositoryResponse, error) {
 	//
 	// If this is not a NotFound error, we return the error as is.
 	//
@@ -81,6 +76,7 @@ func handleMissingRepository(gitProvider git.Provider, canvas *models.Canvas, er
 	err = canvas.CreatePendingRepository(gitProvider.Name(), gitProvider.GetRepositoryID(git.RepositoryOptions{
 		OrganizationID: canvas.OrganizationID,
 		CanvasID:       canvas.ID,
+		Name:           canvas.Name,
 	}))
 
 	//
@@ -93,10 +89,7 @@ func handleMissingRepository(gitProvider git.Provider, canvas *models.Canvas, er
 
 	return &pb.GetCanvasRepositoryResponse{
 		Repository: &pb.CanvasRepository{
-			Metadata: &pb.CanvasRepository_Metadata{
-				CanvasId:  canvas.ID.String(),
-				UpdatedAt: timestamppb.New(time.Now()),
-			},
+			Metadata: canvasRepositoryMetadataForCanvas(ctx, canvas, gitProvider),
 			Status: &pb.CanvasRepository_Status{
 				State: pb.CanvasRepository_STATE_PENDING,
 			},

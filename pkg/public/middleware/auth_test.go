@@ -131,6 +131,20 @@ func TestOrganizationAuthMiddleware_BearerAuth(t *testing.T) {
 		assert.Equal(t, http.StatusNoContent, res.Code)
 	})
 
+	t.Run("api token via basic auth reaches next handler", func(t *testing.T) {
+		rawToken, err := crypto.Base64String(32)
+		require.NoError(t, err)
+		require.NoError(t, r.UserModel.UpdateTokenHash(crypto.HashToken(rawToken)))
+
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/users", nil)
+		req.SetBasicAuth("git", rawToken)
+
+		res := httptest.NewRecorder()
+		handler.ServeHTTP(res, req)
+
+		assert.Equal(t, http.StatusNoContent, res.Code)
+	})
+
 	t.Run("scoped token issued before password change is rejected", func(t *testing.T) {
 		token, err := signer.GenerateScopedToken(jwt.ScopedTokenClaims{
 			Subject: r.User.String(),

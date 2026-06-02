@@ -47,6 +47,8 @@ func Test__GetCanvasRepository(t *testing.T) {
 		assert.Equal(t, canvas.ID.String(), response.Repository.Metadata.CanvasId)
 		assert.Equal(t, pb.CanvasRepository_STATE_PENDING, response.Repository.Status.State)
 		assert.NotNil(t, response.Repository.Metadata.UpdatedAt)
+		assert.NotEmpty(t, response.Repository.Metadata.RepoId)
+		assert.Equal(t, r.GitProvider.Name(), response.Repository.Metadata.Provider)
 	})
 
 	t.Run("head lookup fails -> error", func(t *testing.T) {
@@ -83,9 +85,12 @@ func Test__GetCanvasRepository(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, response.Repository)
 		assert.Equal(t, canvas.ID.String(), response.Repository.Metadata.CanvasId)
+		assert.Equal(t, repository.RepoID, response.Repository.Metadata.RepoId)
+		assert.Equal(t, repository.Provider, response.Repository.Metadata.Provider)
 		assert.Equal(t, pb.CanvasRepository_STATE_READY, response.Repository.Status.State)
 		assert.NotEmpty(t, response.Repository.Status.HeadSha)
 		assert.NotNil(t, response.Repository.Metadata.UpdatedAt)
 		assert.Equal(t, repository.UpdatedAt.Unix(), response.Repository.Metadata.UpdatedAt.AsTime().Unix())
+		assert.NotEmpty(t, response.Repository.Metadata.DefaultBranch)
 	})
 }

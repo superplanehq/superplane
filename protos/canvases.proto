@@ -560,6 +560,10 @@ message CanvasAutoLayout {
 message CanvasRepository {
   message Metadata {
     string canvas_id = 1;
+    string repo_id = 2;
+    string provider = 3;
+    string url = 4;
+    string default_branch = 5;
     google.protobuf.Timestamp updated_at = 7;
   }
 

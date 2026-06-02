@@ -245,5 +245,18 @@ func (p *Provider) repo(repoID string) (*codestorage.Repo, error) {
 }
 
 func (p *Provider) GetRepositoryID(options provider.RepositoryOptions) string {
+	if path, err := provider.RepositoryPath(options.OrganizationID, options.Name); err == nil {
+		return path
+	}
+
 	return fmt.Sprintf("orgs/%s/canvases/%s", options.OrganizationID.String(), options.CanvasID.String())
+}
+
+func (p *Provider) RepositoryURL(ctx context.Context, repoID string, _canvasID string) (string, error) {
+	repo, err := p.repo(repoID)
+	if err != nil {
+		return "", err
+	}
+
+	return repo.RemoteURL(ctx, codestorage.RemoteURLOptions{})
 }

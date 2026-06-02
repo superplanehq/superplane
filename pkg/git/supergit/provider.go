@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/superplanehq/superplane/pkg/git/provider"
+	"github.com/superplanehq/superplane/pkg/git/repositoryurl"
 )
 
 type Provider struct {
@@ -37,7 +38,15 @@ func (p *Provider) Name() string {
 }
 
 func (p *Provider) GetRepositoryID(options provider.RepositoryOptions) string {
+	if path, err := provider.RepositoryPath(options.OrganizationID, options.Name); err == nil {
+		return path
+	}
+
 	return fmt.Sprintf("orgs/%s/canvases/%s", options.OrganizationID.String(), options.CanvasID.String())
+}
+
+func (p *Provider) RepositoryURL(_ context.Context, _ string, canvasID string) (string, error) {
+	return repositoryurl.SuperplaneCloneURL(canvasID), nil
 }
 
 func (p *Provider) CreateRepository(ctx context.Context, repoID string) (*provider.Repository, error) {

@@ -48,6 +48,12 @@ type Provider interface {
 	GetRepositoryID(options RepositoryOptions) string
 
 	//
+	// RepositoryURL returns the git remote URL clients should use for clone and push.
+	// canvasID is the app (canvas) UUID; repoID is the provider repository identifier.
+	//
+	RepositoryURL(ctx context.Context, repoID string, canvasID string) (string, error)
+
+	//
 	// Repository management methods.
 	//
 	CreateRepository(ctx context.Context, repoID string) (*Repository, error)
@@ -65,6 +71,7 @@ type Provider interface {
 type RepositoryOptions struct {
 	OrganizationID uuid.UUID
 	CanvasID       uuid.UUID
+	Name           string
 }
 
 type Repository struct {

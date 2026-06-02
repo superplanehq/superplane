@@ -191,6 +191,15 @@ func TestFormatCommandErrorFallsBackToBodyForNonJSONResponse(t *testing.T) {
 	require.Contains(t, formatted.Error(), "upstream validation failed: name must not be empty")
 }
 
+func TestFormatCommandErrorPlaintextUnauthorized(t *testing.T) {
+	err := runAPICallWithResponse(t, http.StatusUnauthorized, "text/plain", []byte("Unauthorized"))
+
+	formatted := FormatCommandError(err)
+	require.Error(t, formatted)
+	require.Contains(t, formatted.Error(), "authentication required")
+	require.NotContains(t, formatted.Error(), "undefined response type")
+}
+
 func TestFormatCommandErrorHandlesEmptyBody(t *testing.T) {
 	err := runAPICallWithResponse(t, http.StatusBadRequest, "", nil)
 

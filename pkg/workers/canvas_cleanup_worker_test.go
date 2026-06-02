@@ -89,6 +89,10 @@ func (p *cleanupGitProvider) Head(context.Context, string) (string, error) {
 	return "", errors.New("not used")
 }
 
+func (p *cleanupGitProvider) RepositoryURL(_ context.Context, _ string, canvasID string) (string, error) {
+	return "https://example.com/git/" + canvasID + ".git", nil
+}
+
 func createAgentSessionWithMessage(t *testing.T, organizationID, userID, canvasID uuid.UUID) *models.AgentSession {
 	t.Helper()
 
