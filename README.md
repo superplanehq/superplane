@@ -8,7 +8,7 @@ From a user’s perspective, **Runner** nodes on the canvas run arbitrary shell 
 
 | Component | Role |
 |-----------|------|
-| **task-broker** | API and **Postgres-backed queue**. SuperPlane submits tasks when Runner nodes run; workers claim work; completion **webhooks** resume the workflow. Fleets are **`id`** + **`labels`** for routing (`fleet_id` or `fleet_labels` on create). |
+| **task-broker** | API and **Postgres-backed queue**. SuperPlane submits tasks when Runner nodes run; workers claim work; completion **webhooks** resume the workflow. Callers pick a pool with **`fleet_id`** on create (`GET /v1/fleets` lists catalog metadata). |
 | **runner** | **Worker agent** on a host or EC2 VM. Runs the user’s **`command`** or **`commands`** on the host or in Docker, streams logs optionally, returns exit status and optional structured **`result`** JSON. Connects to the broker with `TASK_BROKER_URL` and `RUNNER_FLEET_ID`. |
 | **fleet-manager** | **Optional AWS EC2 autoscaler** — not on the canvas path. Launches runner VMs, health-checks `GET /healthz`, scales toward `queued + claimed + headroom` by polling the broker. |
 
@@ -26,7 +26,7 @@ SuperPlane needs a safe, scalable way to run **user-authored bash** from canvas 
 - **CI-shaped execution** — Docker runs without a TTY; multi-line `commands` behave like a script block; large logs go to **CloudWatch** instead of API bodies.
 - **Isolation when you want it** — Disposable one-task EC2 instances (runner exits, fleet-manager terminates the VM) limit cross-job leakage when many users share a fleet.
 
-For request flow and component boundaries, see [ARCHITECTURE.md](./ARCHITECTURE.md). The sections below cover build, configuration, and operations.
+For request flow and component boundaries, see [ARCHITECTURE.md](./ARCHITECTURE.md). Metrics are documented in [docs/metrics.md](./docs/metrics.md) (OpenTelemetry export to Dash0). The sections below cover build, configuration, and operations.
 
 ## Layout
 
@@ -185,8 +185,6 @@ export AUTH_TOKEN=dev-local-token
 - `GET /healthz` — liveness
 - `GET /v1/admin/managed-runners` — EC2 instances tagged `superplane_managed_runner` (requires **`FLEET_DIAGNOSTICS_TOKEN`**)
 - `GET /v1/admin/ec2-console-output?instance_id=i-…` — boot console output (same auth)
-
-## End-to-end
 
 ## End-to-end with the broker
 

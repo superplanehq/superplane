@@ -29,9 +29,10 @@ type userDataVars struct {
 	RunnerCloudWatchLogStreamPrefix string
 	CloudWatchAgentJSON             string
 	RestartPolicy                   string
+	LaunchRequestedAt               int64
 }
 
-func userDataVarsFromConfig(c Config) userDataVars {
+func userDataVarsFromConfig(c Config, launchRequestedAt int64) userDataVars {
 	restartPolicy := "always"
 	if c.RunnerTerminateAfterEachTask {
 		restartPolicy = "no"
@@ -59,6 +60,7 @@ func userDataVarsFromConfig(c Config) userDataVars {
 		RunnerCloudWatchLogStreamPrefix: strings.TrimSpace(c.RunnerCloudWatchLogStreamPrefix),
 		CloudWatchAgentJSON:             cloudWatchAgentJSON(strings.TrimSpace(c.RunnerProcessLogGroup), procRegion),
 		RestartPolicy:                   restartPolicy,
+		LaunchRequestedAt:               launchRequestedAt,
 	}
 }
 
@@ -104,9 +106,9 @@ func mustCloudWatchAgentJSON(logGroup, region string) string {
 	return string(b)
 }
 
-func userDataScript(c Config) (string, error) {
+func userDataScript(c Config, launchRequestedAt int64) (string, error) {
 	var buf bytes.Buffer
-	if err := userDataTemplate.Execute(&buf, userDataVarsFromConfig(c)); err != nil {
+	if err := userDataTemplate.Execute(&buf, userDataVarsFromConfig(c, launchRequestedAt)); err != nil {
 		return "", err
 	}
 	return buf.String(), nil

@@ -26,7 +26,9 @@ type Config struct {
 	BaseURL  string // task-broker base URL (TASK_BROKER_URL)
 	FleetID  string // fleet to claim tasks from (RUNNER_FLEET_ID)
 	RunnerID string
-	Token    string
+	// LaunchRequestedAt is optional unix seconds from fleet-manager RunInstances (RUNNER_LAUNCH_REQUESTED_AT).
+	LaunchRequestedAt int64
+	Token             string
 	// Transport selects task-broker API: default WebSocket (GET /v1/runners/stream). Set "http", "polling", or "legacy" for POST claim/complete.
 	Transport string
 	PollEmpty time.Duration

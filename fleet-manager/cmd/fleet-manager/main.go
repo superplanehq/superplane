@@ -13,7 +13,10 @@ import (
 	"github.com/superplane/runner/fleet-manager/internal/config"
 	"github.com/superplane/runner/fleet-manager/internal/ec2provision"
 	"github.com/superplane/runner/fleet-manager/internal/fleetmanager"
+	fmmetrics "github.com/superplane/runner/fleet-manager/internal/metrics"
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/telemetry"
+	"go.opentelemetry.io/otel"
 )
 
 // FM_CONFIG_FILE is the only environment variable the binary reads. Everything else
@@ -40,6 +43,28 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	telemetryShutdown, metricsEnabled, err := telemetry.Init(context.Background())
+	if err != nil {
+		log.Error("init telemetry", slog.Any("err", err))
+		os.Exit(1)
+	}
+	defer func() {
+		_ = telemetryShutdown(context.Background())
+	}()
+	if metricsEnabled {
+		log.Info("metrics export enabled")
+	}
+
+	var poolMetrics *fmmetrics.PoolMetrics
+	if metricsEnabled {
+		pm, err := fmmetrics.New(otel.Meter("fleet-manager"))
+		if err != nil {
+			log.Error("init pool metrics", slog.Any("err", err))
+			os.Exit(1)
+		}
+		poolMetrics = pm
+	}
+
 	srv := &fleetmanager.Server{Log: log}
 
 	brokerClient := brokerclient.New(cfg.TaskBrokerURL, cfg.TaskBrokerAuthToken)
@@ -60,6 +85,7 @@ func main() {
 		if p.Headroom > 0 {
 			l.BrokerClient = brokerClient
 		}
+		l.Metrics = poolMetrics
 		launchers = append(launchers, l)
 	}
 	srv.EC2Launchers = launchers

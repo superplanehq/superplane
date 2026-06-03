@@ -87,6 +87,7 @@ func (s *Server) runnerStream(w http.ResponseWriter, r *http.Request) {
 	if lease <= 0 {
 		lease = 5 * time.Minute
 	}
+	s.recordRunnerConnectedSpinup(r.Context(), fleetID, hello.LaunchRequestedAt)
 
 	notifyCh := s.TaskNotify.Register()
 	defer s.TaskNotify.Unregister(notifyCh)
@@ -102,6 +103,7 @@ func (s *Server) runnerStream(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if task != nil {
+			s.recordTaskStartLatency(ctx, task)
 			if err := s.runnerStreamOneTask(conn, ctx, task, runnerID, writeMu); err != nil {
 				return
 			}
@@ -135,9 +137,12 @@ func (s *Server) runnerStreamOneTask(conn *websocket.Conn, ctx context.Context, 
 	payload := api.TaskPayloadFrom(task)
 	if err := wsWriteJSON(writeMu, conn, wsrunner.Task{Type: wsrunner.TypeTask, Task: payload}); err != nil {
 		// Task was claimed in the DB but the push failed — re-queue it so another runner can pick it up.
-		if unclaimErr := s.Store.UnclaimTask(ctx, task.ID, rid); unclaimErr != nil && s.Log != nil {
+		unclaimed, unclaimErr := s.Store.UnclaimTask(ctx, task.ID, rid)
+		if unclaimErr != nil && s.Log != nil {
 			s.Log.Warn("runner stream", slog.String("op", "unclaim_on_push_failure"),
 				slog.String("task_id", task.ID), slog.Any("err", unclaimErr))
+		} else if unclaimed {
+			s.recordTaskUnclaimed(ctx, task.FleetID)
 		}
 		return err
 	}

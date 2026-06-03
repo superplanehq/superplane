@@ -243,8 +243,12 @@ func TestUnclaimTask(t *testing.T) {
 	}
 
 	// Unclaim — task should go back to queued.
-	if err := st.UnclaimTask(ctx, claimed.ID, "runner-1"); err != nil {
+	unclaimed, err := st.UnclaimTask(ctx, claimed.ID, "runner-1")
+	if err != nil {
 		t.Fatal("UnclaimTask:", err)
+	}
+	if !unclaimed {
+		t.Fatal("UnclaimTask: expected unclaimed=true")
 	}
 	got, err := st.GetTask(ctx, claimed.ID)
 	if err != nil {
@@ -262,8 +266,12 @@ func TestUnclaimTask(t *testing.T) {
 	if _, err2 := st.ClaimTask(ctx, "runner-1", "fleet-unclaim", 5*time.Minute); err2 != nil {
 		t.Fatal(err2)
 	}
-	if err := st.UnclaimTask(ctx, claimed.ID, "runner-WRONG"); err != nil {
+	unclaimed, err = st.UnclaimTask(ctx, claimed.ID, "runner-WRONG")
+	if err != nil {
 		t.Fatal("UnclaimTask wrong runner:", err)
+	}
+	if unclaimed {
+		t.Fatal("UnclaimTask wrong runner: expected unclaimed=false")
 	}
 	got2, _ := st.GetTask(ctx, claimed.ID)
 	if got2.Status != models.StatusClaimed {

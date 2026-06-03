@@ -124,10 +124,11 @@ func runWebSocketSession(ctx context.Context, a *Agent) (err error) {
 	_ = conn.SetReadDeadline(time.Now().Add(wsClientReadIdle))
 
 	hello := wsrunner.Hello{
-		Type:         wsrunner.TypeHello,
-		RunnerID:     a.Config.RunnerID,
-		FleetID:      a.Config.FleetID,
-		LeaseSeconds: int((10 * time.Minute).Seconds()),
+		Type:              wsrunner.TypeHello,
+		RunnerID:          a.Config.RunnerID,
+		FleetID:           a.Config.FleetID,
+		LeaseSeconds:      int((10 * time.Minute).Seconds()),
+		LaunchRequestedAt: a.Config.LaunchRequestedAt,
 	}
 	writeMu.Lock()
 	helloErr := conn.WriteJSON(hello)

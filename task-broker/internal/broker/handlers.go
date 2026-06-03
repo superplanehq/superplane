@@ -15,6 +15,7 @@ import (
 	"github.com/superplane/runner/shared/cwstream"
 	"github.com/superplane/runner/shared/models"
 	"github.com/superplane/runner/shared/webhook"
+	brokermetrics "github.com/superplane/runner/task-broker/internal/metrics"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	taskstore "github.com/superplane/runner/task-broker/internal/store"
 )
@@ -24,6 +25,7 @@ type Server struct {
 	Store   taskstore.Store
 	Webhook *webhook.Sender
 	Log     *slog.Logger
+	Metrics *brokermetrics.BrokerMetrics
 
 	TaskNotify   *WaitHub
 	RunnerCancel *RunnerCancelHub
@@ -211,6 +213,7 @@ func (s *Server) createTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "could not create task")
 		return
 	}
+	s.recordTaskCreated(ctx, task.FleetID)
 	if s.TaskNotify != nil {
 		s.TaskNotify.Notify()
 	}
@@ -241,6 +244,9 @@ func (s *Server) claimTask(w http.ResponseWriter, r *http.Request) {
 		s.logErr("claim task", err)
 		writeError(w, http.StatusInternalServerError, "could not claim task")
 		return
+	}
+	if task != nil {
+		s.recordTaskStartLatency(r.Context(), task)
 	}
 	var payload *api.TaskPayload
 	if task != nil {
@@ -369,6 +375,7 @@ func (s *Server) cancelTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "task not found")
 		return
 	case taskstore.CancelOutcomeCanceledQueued:
+		s.recordTaskCompleted(r.Context(), task)
 		go s.DeliverWebhook(task)
 	case taskstore.CancelOutcomeCancelRequested:
 		rid := strings.TrimSpace(task.RunnerID)
@@ -399,6 +406,7 @@ func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, 
 	if err != nil {
 		return nil, err
 	}
+	s.recordTaskCompleted(ctx, task)
 	go s.DeliverWebhook(task)
 	return task, nil
 }
@@ -428,7 +436,10 @@ func (s *Server) DeliverWebhook(task *models.Task) {
 	if strings.TrimSpace(task.ResultJSON) != "" {
 		payload.Result = json.RawMessage(task.ResultJSON)
 	}
-	if err := s.Webhook.Deliver(ctx, task.WebhookURL, payload); err != nil && s.Log != nil {
+	start := time.Now()
+	err := s.Webhook.Deliver(ctx, task.WebhookURL, payload)
+	s.recordWebhookDelivery(ctx, task.FleetID, err == nil, time.Since(start))
+	if err != nil && s.Log != nil {
 		s.Log.Warn("webhook delivery failed", slog.String("task_id", task.ID), slog.Any("err", err))
 	}
 }
@@ -484,5 +495,81 @@ func (s *Server) logErr(msg string, err error) {
 func (s *Server) warn(msg string, attrs ...any) {
 	if s.Log != nil {
 		s.Log.Warn(msg, attrs...)
+	}
+}
+
+func (s *Server) recordTaskCreated(ctx context.Context, fleetID string) {
+	if s.Metrics == nil {
+		return
+	}
+	s.Metrics.TaskCreated(ctx, fleetID)
+}
+
+func (s *Server) recordTaskCompleted(ctx context.Context, task *models.Task) {
+	if s.Metrics == nil || task == nil {
+		return
+	}
+	s.Metrics.TaskCompleted(ctx, task.FleetID, taskOutcome(task.Status))
+}
+
+func (s *Server) recordTaskStartLatency(ctx context.Context, task *models.Task) {
+	if s.Metrics == nil || task == nil {
+		return
+	}
+	s.Metrics.TaskStartLatency(ctx, task.FleetID, time.Since(task.CreatedAt))
+}
+
+func (s *Server) recordTaskUnclaimed(ctx context.Context, fleetID string) {
+	if s.Metrics == nil {
+		return
+	}
+	s.Metrics.TaskUnclaimed(ctx, fleetID)
+}
+
+func (s *Server) recordWebhookDelivery(ctx context.Context, fleetID string, succeeded bool, duration time.Duration) {
+	if s.Metrics == nil {
+		return
+	}
+	outcome := "failed"
+	if succeeded {
+		outcome = "succeeded"
+	}
+	s.Metrics.WebhookDelivered(ctx, fleetID, outcome, duration)
+}
+
+func (s *Server) recordRunnerConnectedSpinup(ctx context.Context, fleetID string, launchRequestedAt int64) {
+	if s.Metrics == nil || launchRequestedAt <= 0 {
+		return
+	}
+	s.Metrics.InstanceSpinupDuration(ctx, fleetID, "runner_connected", time.Since(time.Unix(launchRequestedAt, 0)))
+}
+
+func (s *Server) recordLeaseReaped(ctx context.Context, fleetID string) {
+	if s.Metrics == nil {
+		return
+	}
+	s.Metrics.LeaseReaped(ctx, fleetID)
+}
+
+// RecordLeaseReaped emits lease.reaps (used by the main lease-reap loop).
+func (s *Server) RecordLeaseReaped(ctx context.Context, fleetID string) {
+	s.recordLeaseReaped(ctx, fleetID)
+}
+
+// RecordTaskCompleted emits tasks.completed (used by the main lease-reap loop).
+func (s *Server) RecordTaskCompleted(ctx context.Context, task *models.Task) {
+	s.recordTaskCompleted(ctx, task)
+}
+
+func taskOutcome(status models.TaskStatus) string {
+	switch status {
+	case models.StatusSucceeded:
+		return "succeeded"
+	case models.StatusFailed:
+		return "failed"
+	case models.StatusCanceled:
+		return "canceled"
+	default:
+		return string(status)
 	}
 }
