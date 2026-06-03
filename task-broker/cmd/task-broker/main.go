@@ -132,6 +132,16 @@ func main() {
 		}
 	}()
 
+	if brokerMetrics != nil {
+		sampleInterval := 30 * time.Second
+		if v := getenv("METRICS_SAMPLE_INTERVAL_SEC", ""); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n > 0 {
+				sampleInterval = time.Duration(n) * time.Second
+			}
+		}
+		go runMetricsSampler(ctx, log, st, brokerMetrics, sampleInterval)
+	}
+
 	go func() {
 		log.Info("task-broker listening", slog.String("addr", addr))
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {

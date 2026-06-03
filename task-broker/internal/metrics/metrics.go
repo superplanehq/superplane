@@ -18,6 +18,8 @@ type BrokerMetrics struct {
 	taskStartLatency      metric.Float64Histogram
 	webhookDeliveries     metric.Int64Counter
 	webhookDeliveryDur    metric.Float64Histogram
+	tasksQueued           metric.Int64Gauge
+	tasksClaimed          metric.Int64Gauge
 }
 
 // New registers broker metric instruments on meter.
@@ -59,6 +61,16 @@ func New(meter metric.Meter) (*BrokerMetrics, error) {
 	if err != nil {
 		return nil, err
 	}
+	tasksQueued, err := meter.Int64Gauge("tasks.queued",
+		metric.WithDescription("Tasks waiting for a runner to claim them"))
+	if err != nil {
+		return nil, err
+	}
+	tasksClaimed, err := meter.Int64Gauge("tasks.claimed",
+		metric.WithDescription("Tasks claimed by a runner but not yet terminal"))
+	if err != nil {
+		return nil, err
+	}
 	return &BrokerMetrics{
 		tasksCreated:       tasksCreated,
 		tasksCompleted:     tasksCompleted,
@@ -67,6 +79,8 @@ func New(meter metric.Meter) (*BrokerMetrics, error) {
 		taskStartLatency:   taskStartLatency,
 		webhookDeliveries:  webhookDeliveries,
 		webhookDeliveryDur: webhookDeliveryDur,
+		tasksQueued:        tasksQueued,
+		tasksClaimed:       tasksClaimed,
 	}, nil
 }
 
@@ -100,4 +114,10 @@ func (m *BrokerMetrics) WebhookDelivered(ctx context.Context, fleetID, outcome s
 	)
 	m.webhookDeliveries.Add(ctx, 1, attrs)
 	m.webhookDeliveryDur.Record(ctx, duration.Seconds(), attrs)
+}
+
+func (m *BrokerMetrics) SetTaskBacklog(ctx context.Context, fleetID string, queued, claimed int) {
+	fleet := telemetry.FleetAttr(fleetID)
+	m.tasksQueued.Record(ctx, int64(queued), metric.WithAttributes(fleet))
+	m.tasksClaimed.Record(ctx, int64(claimed), metric.WithAttributes(fleet))
 }
