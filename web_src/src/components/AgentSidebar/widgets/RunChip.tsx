@@ -1,6 +1,7 @@
 import { Rabbit } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { appPath } from "@/lib/appPaths";
 import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
 
 interface RunChipProps {
@@ -51,7 +52,7 @@ export function RunChip({ runId, label, status, canvasId, organizationId }: RunC
   return (
     <button
       type="button"
-      onClick={() => navigate(`/${organizationId}/canvases/${canvasId}?view=runs&run=${runId}`)}
+      onClick={() => navigate(appPath(organizationId, canvasId, `?view=runs&run=${runId}`))}
       className={cn(
         "inline-flex items-center gap-1 px-2 py-0.5 rounded-full ring-0 text-xs font-medium transition-colors cursor-pointer align-middle",
         meta.badgeClassName,

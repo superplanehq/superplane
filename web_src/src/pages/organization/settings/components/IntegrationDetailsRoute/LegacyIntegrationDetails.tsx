@@ -11,6 +11,7 @@ import { IntegrationIcon } from "@/ui/componentSidebar/integrationIcons";
 import { ConfigurationFieldRenderer } from "@/ui/configurationFieldRenderer";
 import { IntegrationInstructions } from "@/ui/IntegrationInstructions";
 import { getApiErrorMessage } from "@/lib/errors";
+import { appPath } from "@/lib/appPaths";
 import { getIntegrationTypeDisplayName } from "@/lib/integrationDisplayName";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { usePageTitle } from "@/hooks/usePageTitle";
@@ -356,7 +357,7 @@ export function LegacyIntegrationDetails({ organizationId, integration }: Legacy
                   {workflowGroups.map((group) => (
                     <button
                       key={group.canvasId}
-                      onClick={() => window.open(`/${organizationId}/canvases/${group.canvasId}`, "_blank")}
+                      onClick={() => window.open(appPath(organizationId, group.canvasId), "_blank")}
                       className="w-full flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md border border-gray-300 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
                     >
                       <div className="flex-1">

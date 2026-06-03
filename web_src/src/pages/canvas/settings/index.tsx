@@ -6,13 +6,15 @@ import { usePageTitle } from "@/hooks/usePageTitle";
 import { Loader2 } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { appPath } from "@/lib/appPaths";
 import { buildSettingsInitialValues } from "./buildInitialValues";
 import { PageHeader } from "./PageHeader";
 import type { SettingsSavePayload } from "./types";
 import { SettingsView } from "./View";
 
 export function CanvasSettingsPage() {
-  const { organizationId = "", canvasId = "" } = useParams<{ organizationId: string; canvasId: string }>();
+  const { organizationId = "", appId = "" } = useParams<{ organizationId: string; appId: string }>();
+  const canvasId = appId;
 
   const { canAct } = usePermissions();
   const canReadOrg = !!organizationId && canAct("org", "read");
@@ -69,7 +71,7 @@ function NormalView({ canvas, organization }: { canvas: CanvasesCanvas; organiza
   const orgId = organization.metadata!.id!;
   const resolvedCanvasId = canvas.metadata!.id!;
   const canvasName = canvas.metadata?.name || "Canvas";
-  const baseCanvasPath = `/${orgId}/canvases/${resolvedCanvasId}`;
+  const baseCanvasPath = appPath(orgId, resolvedCanvasId);
   const isOrgChangeManagementEnabled = organization?.spec?.changeManagementEnabled ?? false;
 
   usePageTitle([`${canvasName} · Settings`]);
@@ -148,7 +150,7 @@ function useApproverRoles(organizationRoles: RolesRole[]) {
 function useSaveCallback(canvasId: string, organizationId: string): (values: SettingsSavePayload) => Promise<void> {
   const navigate = useNavigate();
   const updateCanvasMutation = useUpdateCanvas(organizationId, canvasId);
-  const baseCanvasPath = `/${organizationId}/canvases/${canvasId}`;
+  const baseCanvasPath = appPath(organizationId, canvasId);
 
   return useCallback(
     async (values: SettingsSavePayload) => {

@@ -45,7 +45,7 @@ func (steps *TestHomePageSteps) VisitHomePage() {
 
 func (steps *TestHomePageSteps) AssertNavigatedToCanvas() {
 	url := steps.session.Page().URL()
-	assert.Regexp(steps.t, `/canvases/[0-9a-f-]{36}`, url)
+	assert.Regexp(steps.t, `/apps/[0-9a-f-]{36}`, url)
 }
 
 func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
