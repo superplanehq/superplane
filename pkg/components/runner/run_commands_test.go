@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/test/support/contexts"
 )
 
@@ -173,6 +175,39 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	assert.Equal(t, DefaultExecutionTimeoutSeconds, *req.ExecutionTimeoutSeconds)
 	assert.Equal(t, "task-123", state.KVs["task_id"])
 	assert.Equal(t, hookActionPoll, requests.Action)
+}
+
+func TestRunnerExecuteUsesConfiguredFleetID(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_FLEET_ID", "fleet-env")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{StatusCode: http.StatusCreated, Body: io.NopCloser(strings.NewReader(`{"id":"task-123"}`))},
+		},
+	}
+
+	err := (&Runner{}).Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"fleet_id": "fleet-config",
+			"commands": "echo hello",
+		},
+		HTTP:           httpContext,
+		Webhook:        &contexts.NodeWebhookContext{},
+		ExecutionState: &contexts.ExecutionStateContext{KVs: map[string]string{}},
+		Requests:       &contexts.RequestContext{},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, httpContext.Requests, 1)
+
+	body, err := io.ReadAll(httpContext.Requests[0].Body)
+	require.NoError(t, err)
+
+	var req brokerCreateTaskRequest
+	require.NoError(t, json.Unmarshal(body, &req))
+	assert.Equal(t, "fleet-config", req.FleetID)
 }
 
 func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
@@ -402,4 +437,63 @@ func TestBrokerListActiveTasks(t *testing.T) {
 	assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
 	assert.Equal(t, "/v1/tasks", httpContext.Requests[0].URL.Path)
 	assert.Equal(t, "Bearer token-1", httpContext.Requests[0].Header.Get("Authorization"))
+}
+
+func TestBrokerListFleets(t *testing.T) {
+	t.Setenv("TASK_BROKER_BASE_URL", "https://broker.example")
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`[
+					{"id":"aws-standard-amd64","provisioner":"aws","arch":"amd64","size":"t3.micro","created_at_unix":1710000000}
+				]`)),
+			},
+		},
+	}
+
+	broker, err := NewBrokerClient(httpContext)
+	require.NoError(t, err)
+
+	fleets, err := broker.ListFleets()
+	require.NoError(t, err)
+	require.Len(t, fleets, 1)
+	assert.Equal(t, "aws-standard-amd64", fleets[0].ID)
+	assert.Equal(t, "aws", fleets[0].Provisioner)
+	assert.Equal(t, "amd64", fleets[0].Arch)
+	assert.Equal(t, "t3.micro", fleets[0].Size)
+	assert.Equal(t, int64(1710000000), fleets[0].CreatedAt)
+	require.Len(t, httpContext.Requests, 1)
+	assert.Equal(t, http.MethodGet, httpContext.Requests[0].Method)
+	assert.Equal(t, "/v1/fleets", httpContext.Requests[0].URL.Path)
+	assert.Equal(t, "Bearer token-1", httpContext.Requests[0].Header.Get("Authorization"))
+}
+
+func TestBrokerClientBypassesRegistryHTTPPolicyForTrustedBrokerURL(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/v1/fleets", r.URL.Path)
+		assert.Equal(t, "Bearer token-1", r.Header.Get("Authorization"))
+		_, _ = w.Write([]byte(`[{"id":"local-standard-amd64","arch":"amd64","size":"standard"}]`))
+	}))
+	t.Cleanup(server.Close)
+
+	t.Setenv("TASK_BROKER_BASE_URL", server.URL)
+	t.Setenv("TASK_BROKER_FLEET_ID", "")
+	t.Setenv("TASK_BROKER_AUTH_TOKEN", "token-1")
+
+	httpContext, err := registry.NewHTTPContext(registry.HTTPOptions{
+		PrivateIPRanges: []string{"127.0.0.0/8", "::1/128"},
+	})
+	require.NoError(t, err)
+
+	broker, err := NewBrokerClient(httpContext)
+	require.NoError(t, err)
+
+	fleets, err := broker.ListFleets()
+	require.NoError(t, err)
+	require.Len(t, fleets, 1)
+	assert.Equal(t, "local-standard-amd64", fleets[0].ID)
 }

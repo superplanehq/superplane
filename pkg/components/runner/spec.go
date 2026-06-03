@@ -35,6 +35,7 @@ type EnvironmentVariable struct {
 
 // Spec is persisted Runner node configuration.
 type Spec struct {
+	FleetID                 string                `json:"fleet_id" mapstructure:"fleet_id"`
 	Commands                string                `mapstructure:"commands"`
 	Environment             []EnvironmentVariable `mapstructure:"environment"`
 	ExecutionMode           string                `mapstructure:"execution_mode"`

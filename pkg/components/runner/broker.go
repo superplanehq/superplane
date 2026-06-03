@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -30,6 +31,15 @@ type ActiveTask struct {
 	ExecutionTimeoutSeconds *int       `json:"execution_timeout_seconds,omitempty"`
 }
 
+// Fleet is one runner pool registered in the task broker fleet catalog.
+type Fleet struct {
+	ID          string `json:"id"`
+	Provisioner string `json:"provisioner,omitempty"`
+	Arch        string `json:"arch,omitempty"`
+	Size        string `json:"size,omitempty"`
+	CreatedAt   int64  `json:"created_at_unix,omitempty"`
+}
+
 const (
 	brokerHTTPTimeout = 30 * time.Second
 
@@ -46,15 +56,16 @@ type BrokerClient struct {
 }
 
 func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
+	if httpClient == nil || isRegistryHTTPContext(httpClient) {
+		httpClient = &http.Client{Timeout: brokerHTTPTimeout}
+	}
+
 	baseURL := os.Getenv("TASK_BROKER_BASE_URL")
 	if baseURL == "" {
 		return nil, fmt.Errorf("TASK_BROKER_BASE_URL is not set")
 	}
 
 	fleetID := os.Getenv("TASK_BROKER_FLEET_ID")
-	if fleetID == "" {
-		return nil, fmt.Errorf("TASK_BROKER_FLEET_ID is not set")
-	}
 
 	authToken := os.Getenv("TASK_BROKER_AUTH_TOKEN")
 	if authToken == "" {
@@ -67,6 +78,23 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 		fleetID:    fleetID,
 		authToken:  authToken,
 	}, nil
+}
+
+// The task broker URL is trusted server configuration, not user input. Avoid
+// routing it through the registry HTTP context, which enforces external-call
+// SSRF policy and blocks local/private broker addresses used in deployments.
+func isRegistryHTTPContext(httpClient core.HTTPContext) bool {
+	t := reflect.TypeOf(httpClient)
+	if t == nil {
+		return false
+	}
+
+	if t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+
+	return t.PkgPath() == "github.com/superplanehq/superplane/pkg/registry" &&
+		(t.Name() == "HTTPContext" || t.Name() == "HTTPContextInTransaction")
 }
 
 // Create Task
@@ -108,6 +136,7 @@ type BrokerEnvironmentVariable struct {
 
 // CreateTaskParams is forwarded to the task broker POST /v1/tasks.
 type CreateTaskParams struct {
+	FleetID        string
 	Commands       []string
 	WebhookURL     string
 	Environment    []BrokerEnvironmentVariable
@@ -126,8 +155,16 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		mode = ExecutionModeHost
 	}
 
+	fleetID := strings.TrimSpace(p.FleetID)
+	if fleetID == "" {
+		fleetID = strings.TrimSpace(b.fleetID)
+	}
+	if fleetID == "" {
+		return "", fmt.Errorf("fleet_id is required")
+	}
+
 	req := brokerCreateTaskRequest{
-		FleetID:       b.fleetID,
+		FleetID:       fleetID,
 		Commands:      p.Commands,
 		Environment:   p.Environment,
 		WebhookURL:    p.WebhookURL,
@@ -180,6 +217,43 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 	}
 
 	return out.ID, nil
+}
+
+func (b *BrokerClient) ListFleets() ([]Fleet, error) {
+	httpCtx, cancel := context.WithTimeout(context.Background(), brokerHTTPTimeout)
+	defer cancel()
+
+	httpReq, err := http.NewRequestWithContext(httpCtx, http.MethodGet, b.baseURL+"/v1/fleets", nil)
+	if err != nil {
+		return nil, fmt.Errorf("new request: %w", err)
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+b.authToken)
+
+	resp, err := b.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("broker request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response body: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("broker rejected list fleets: status=%d body=%s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var fleets []Fleet
+	if err := json.Unmarshal(body, &fleets); err != nil {
+		return nil, fmt.Errorf("unmarshal list fleets response: %w", err)
+	}
+
+	if fleets == nil {
+		return []Fleet{}, nil
+	}
+
+	return fleets, nil
 }
 
 // Task is the broker task payload (GET /v1/tasks/:id and webhook body).

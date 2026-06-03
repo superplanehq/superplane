@@ -351,6 +351,11 @@ func (s *Server) RegisterGRPCGateway(grpcServerAddr string) error {
 	// Protect the gRPC gateway routes with organization authentication
 	orgAuthMiddleware := middleware.OrganizationAuthMiddleware(s.jwt)
 
+	s.Router.Handle(
+		"/api/v1/runner/fleets",
+		orgAuthMiddleware(http.HandlerFunc(s.handleRunnerFleets)),
+	).Methods(http.MethodGet)
+
 	//
 	// This is not part of the proto APIs and gRPC gateway route,
 	// because of how we need to handle the file streaming.

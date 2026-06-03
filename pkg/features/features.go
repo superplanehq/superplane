@@ -4,6 +4,19 @@
 // graduated to all organizations by setting Released to a pointer to true.
 package features
 
+import (
+	"os"
+	"strings"
+)
+
+const (
+	// FeatureRunner enables the sandboxed Runner component.
+	FeatureRunner = "runner"
+
+	// EnvRunnerEnabled releases the Runner feature for every organization.
+	EnvRunnerEnabled = "RUNNER_ENABLED"
+)
+
 type Feature struct {
 	ID          string
 	Label       string
@@ -21,18 +34,19 @@ func released() *bool {
 }
 
 var registry = []Feature{
-	{ID: "runner", Label: "Runners", Description: "Sandboxed Runners"},
+	{ID: FeatureRunner, Label: "Runners", Description: "Sandboxed Runners"},
 	{ID: FeatureClaudeManagedAgents, Label: "Claude Managed Agents", Description: "Chat with a Claude-powered agent against the canvas", Released: released()},
 }
 
 func All() []Feature {
 	out := make([]Feature, len(registry))
 	copy(out, registry)
+	applyRuntimeOverrides(out)
 	return out
 }
 
 func Get(id string) (Feature, bool) {
-	for _, f := range registry {
+	for _, f := range All() {
 		if f.ID == id {
 			return f, true
 		}
@@ -64,4 +78,25 @@ func WithRegistryForTest(r []Feature) func() {
 	original := registry
 	registry = r
 	return func() { registry = original }
+}
+
+func applyRuntimeOverrides(features []Feature) {
+	if !envTruthy(EnvRunnerEnabled) {
+		return
+	}
+
+	for i := range features {
+		if features[i].ID == FeatureRunner {
+			features[i].Released = released()
+		}
+	}
+}
+
+func envTruthy(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "1", "true", "yes":
+		return true
+	default:
+		return false
+	}
 }

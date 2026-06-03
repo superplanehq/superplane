@@ -183,8 +183,7 @@ const RunnerTasks: React.FC = () => {
           <Terminal size={24} className="mx-auto text-gray-400" />
           <Text className="mt-3 text-sm text-gray-600">
             Runner task broker is not configured. Set{" "}
-            <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs">TASK_BROKER_BASE_URL</code>,{" "}
-            <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs">TASK_BROKER_FLEET_ID</code>, and{" "}
+            <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs">TASK_BROKER_BASE_URL</code>, and{" "}
             <code className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs">TASK_BROKER_AUTH_TOKEN</code> on the
             app server.
           </Text>

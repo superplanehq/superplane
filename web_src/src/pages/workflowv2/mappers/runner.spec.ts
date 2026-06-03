@@ -49,6 +49,15 @@ describe("runnerConfigurationDetails", () => {
       },
     ],
     [
+      "host — selected fleet",
+      { fleet_id: "aws-standard-amd64", execution_mode: "host", commands: "echo hi", execution_timeout_seconds: 0 },
+      {
+        Fleet: "aws-standard-amd64",
+        "Execution mode": "Host",
+        "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
+      },
+    ],
+    [
       "host — ignores stray docker_image (no Container image row)",
       {
         execution_mode: "host",

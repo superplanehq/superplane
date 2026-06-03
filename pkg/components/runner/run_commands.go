@@ -94,6 +94,13 @@ If the completed broker task includes valid JSON in **result**, SuperPlane inclu
 func (c *Runner) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
+			Name:        "fleet_id",
+			Label:       "Fleet",
+			Type:        configuration.FieldTypeString,
+			Required:    false, // legacy nodes can still use TASK_BROKER_FLEET_ID on the app server.
+			Description: "Runner fleet to execute this task. Choose a registered fleet from the task broker.",
+		},
+		{
 			Name:        "execution_mode",
 			Label:       "Execution mode",
 			Type:        configuration.FieldTypeSelect,
@@ -290,6 +297,7 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 
 	mode := normalizeExecutionMode(spec.ExecutionMode)
 	params := CreateTaskParams{
+		FleetID:        spec.FleetID,
 		Commands:       cmds,
 		WebhookURL:     webhookURL,
 		Environment:    environment,

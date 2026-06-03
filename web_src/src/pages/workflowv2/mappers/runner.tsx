@@ -49,6 +49,9 @@ export function runnerConfigurationDetails(configuration: unknown): Record<strin
     return details;
   }
   const c = configuration as Record<string, unknown>;
+  if (typeof c.fleet_id === "string" && c.fleet_id.trim() !== "") {
+    details["Fleet"] = c.fleet_id.trim();
+  }
   const rawMode = typeof c.execution_mode === "string" ? c.execution_mode.trim().toLowerCase() : "";
   if (rawMode === EXECUTION_MODE_DOCKER) {
     details["Execution mode"] = "Docker";
