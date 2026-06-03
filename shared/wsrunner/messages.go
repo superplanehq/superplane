@@ -23,10 +23,11 @@ const (
 
 // Hello is the first client message after connect. Fields match api.ClaimTaskRequest JSON tags.
 type Hello struct {
-	Type         string `json:"type"`
-	RunnerID     string `json:"runner_id"`
-	FleetID      string `json:"fleet_id"`
-	LeaseSeconds int    `json:"lease_seconds"`
+	Type              string `json:"type"`
+	RunnerID          string `json:"runner_id"`
+	FleetID           string `json:"fleet_id"`
+	LeaseSeconds      int    `json:"lease_seconds"`
+	LaunchRequestedAt int64  `json:"launch_requested_at,omitempty"`
 }
 
 // Task is server -> client after a successful claim.

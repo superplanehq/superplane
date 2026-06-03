@@ -96,14 +96,15 @@ func (l *Launcher) Reconcile(ctx context.Context, want int) error {
 	if _, err := l.SweepUnhealthy(ctx); err != nil {
 		return fmt.Errorf("health sweep: %w", err)
 	}
-	live, err := l.listManagedLive(ctx)
+	instances, err := l.listManagedInstances(ctx)
 	if err != nil {
 		return fmt.Errorf("describe instances: %w", err)
 	}
-	have := len(live)
+	have := len(instances)
 	if l.Metrics != nil {
 		l.Metrics.SetHotInstances(ctx, l.Config.RunnerFleetID, have)
 	}
+	l.observeInstanceSpinup(ctx, instances)
 
 	switch {
 	case have < want:
@@ -122,6 +123,10 @@ func (l *Launcher) Reconcile(ctx context.Context, want int) error {
 	case have > want:
 		// Scale down by terminating *oldest* instances first. Terminating the newest first
 		// tended to kill VMs that had just booted and claimed work → PTY/read EIO and flaky tasks.
+		live := make([]instanceSnap, 0, len(instances))
+		for _, inst := range instances {
+			live = append(live, instanceSnap{id: inst.id, launchUTC: inst.launchUTC})
+		}
 		sort.Slice(live, func(i, j int) bool {
 			return live[i].launchUTC.Before(live[j].launchUTC)
 		})

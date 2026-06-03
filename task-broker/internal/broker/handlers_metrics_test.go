@@ -156,3 +156,27 @@ func TestDeliverWebhookRecordsWebhookMetrics(t *testing.T) {
 	})
 	require.Equal(t, int64(2), metricCounterTotal(t, reader, "webhook.deliveries"))
 }
+
+func TestRecordRunnerConnectedSpinup(t *testing.T) {
+	m, reader := testBrokerMetrics(t)
+	srv := &Server{Metrics: m}
+
+	requestedAt := time.Now().Add(-1500 * time.Millisecond).Unix()
+	srv.recordRunnerConnectedSpinup(context.Background(), "fleet-1", requestedAt)
+
+	var rm metricdata.ResourceMetrics
+	require.NoError(t, reader.Collect(context.Background(), &rm))
+	found := false
+	for _, sm := range rm.ScopeMetrics {
+		for _, met := range sm.Metrics {
+			if met.Name != "instance.spinup.duration" {
+				continue
+			}
+			hist := met.Data.(metricdata.Histogram[float64])
+			require.Len(t, hist.DataPoints, 1)
+			require.InDelta(t, 1.5, hist.DataPoints[0].Sum, 0.3)
+			found = true
+		}
+	}
+	require.True(t, found)
+}

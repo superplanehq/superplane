@@ -80,7 +80,7 @@ func TestUserDataScriptUsesArchitectureSpecificPackages(t *testing.T) {
 				RunnerCloudWatchLogGroup:        "/superplane/tasks",
 				RunnerCloudWatchLogStreamPrefix: "tasks",
 				RunnerProcessLogGroup:           "/superplane/runners",
-			})
+			}, 1700000000)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -94,6 +94,21 @@ func TestUserDataScriptUsesArchitectureSpecificPackages(t *testing.T) {
 				t.Fatalf("user-data missing runner S3 URI for %s", tt.arch)
 			}
 		})
+	}
+}
+
+func TestUserDataScriptIncludesLaunchRequestedAt(t *testing.T) {
+	script, err := userDataScript(Config{
+		RunnerS3URI:            "s3://bucket/runner",
+		RunnerInstallAWSRegion: "us-east-1",
+		TaskBrokerURL:          "http://broker:8081",
+		RunnerFleetID:          "fleet-a",
+	}, 1700000000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(script, "RUNNER_LAUNCH_REQUESTED_AT=1700000000") {
+		t.Fatalf("user-data missing launch timestamp: %s", script)
 	}
 }
 

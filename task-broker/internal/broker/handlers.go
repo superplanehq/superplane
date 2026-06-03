@@ -537,6 +537,13 @@ func (s *Server) recordWebhookDelivery(ctx context.Context, fleetID string, succ
 	s.Metrics.WebhookDelivered(ctx, fleetID, outcome, duration)
 }
 
+func (s *Server) recordRunnerConnectedSpinup(ctx context.Context, fleetID string, launchRequestedAt int64) {
+	if s.Metrics == nil || launchRequestedAt <= 0 {
+		return
+	}
+	s.Metrics.InstanceSpinupDuration(ctx, fleetID, "runner_connected", time.Since(time.Unix(launchRequestedAt, 0)))
+}
+
 func (s *Server) recordLeaseReaped(ctx context.Context, fleetID string) {
 	if s.Metrics == nil {
 		return

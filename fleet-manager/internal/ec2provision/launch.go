@@ -17,6 +17,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -38,6 +40,9 @@ type Launcher struct {
 	Log          *slog.Logger
 	BrokerClient TaskCountsClient
 	Metrics      *fmmetrics.PoolMetrics
+
+	pendingMu sync.Mutex
+	pending   map[string]time.Time // instance id -> RunInstances request time
 }
 
 // FleetID returns the broker fleet id this launcher manages (the partition key used in
@@ -169,7 +174,7 @@ func New(ctx context.Context, cfg Config, log *slog.Logger) (*Launcher, error) {
 	if log == nil {
 		log = slog.Default()
 	}
-	return &Launcher{Client: cli, Config: cfg, Log: log}, nil
+	return &Launcher{Client: cli, Config: cfg, Log: log, pending: make(map[string]time.Time)}, nil
 }
 
 // Launch creates `count` on-demand Ubuntu hosts that install the runner from S3 and connect to TaskBrokerURL.
@@ -181,7 +186,8 @@ func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 		return nil, fmt.Errorf("count exceeds maximum of %d", maxLaunch)
 	}
 	n := int32(count)
-	userdata, err := userDataScript(l.Config)
+	requestedAt := time.Now().UTC()
+	userdata, err := userDataScript(l.Config, requestedAt.Unix())
 	if err != nil {
 		return nil, fmt.Errorf("user-data script: %w", err)
 	}
@@ -196,6 +202,7 @@ func (l *Launcher) Launch(ctx context.Context, count int) ([]string, error) {
 			ids = append(ids, *inst.InstanceId)
 		}
 	}
+	l.trackPendingLaunches(ids, requestedAt)
 	if l.Log != nil {
 		l.Log.Info("ec2 RunInstances launched", slog.Int("count", count), slog.Any("instance_ids", ids))
 	}

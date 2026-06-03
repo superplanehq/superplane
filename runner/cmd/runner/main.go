@@ -24,6 +24,7 @@ func main() {
 	cfg.BaseURL = getTaskBrokerURL()
 	cfg.FleetID = getRunnerFleetID()
 	cfg.RunnerID = getRunnerID()
+	cfg.LaunchRequestedAt = getLaunchRequestedAt()
 	cfg.Token = getAuthToken()
 	cfg.Transport = getTransport()
 
@@ -168,6 +169,19 @@ func getRunnerFleetID() string {
 		os.Exit(1)
 	}
 	return fleetID
+}
+
+func getLaunchRequestedAt() int64 {
+	v := strings.TrimSpace(os.Getenv("RUNNER_LAUNCH_REQUESTED_AT"))
+	if v == "" {
+		return 0
+	}
+	sec, err := strconv.ParseInt(v, 10, 64)
+	if err != nil || sec <= 0 {
+		log.Warn("invalid RUNNER_LAUNCH_REQUESTED_AT, ignoring", slog.String("value", v), slog.Any("err", err))
+		return 0
+	}
+	return sec
 }
 
 func getAuthToken() string {

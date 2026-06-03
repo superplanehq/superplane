@@ -76,6 +76,9 @@ RUNNER_TERMINATE_AFTER_EACH_TASK={{.RunnerTerminateAfterEachTask}}
 RUNNER_CLOUDWATCH_LOG_GROUP={{shellQuote .RunnerCloudWatchLogGroup}}
 RUNNER_CLOUDWATCH_REGION={{shellQuote .RunnerInstallAWSRegion}}
 RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX={{shellQuote .RunnerCloudWatchLogStreamPrefix}}
+{{- if .LaunchRequestedAt}}
+RUNNER_LAUNCH_REQUESTED_AT={{.LaunchRequestedAt}}
+{{- end}}
 ENVEOF
 
 chmod 644 /etc/default/superplane-runner

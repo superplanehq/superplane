@@ -87,6 +87,7 @@ func (s *Server) runnerStream(w http.ResponseWriter, r *http.Request) {
 	if lease <= 0 {
 		lease = 5 * time.Minute
 	}
+	s.recordRunnerConnectedSpinup(r.Context(), fleetID, hello.LaunchRequestedAt)
 
 	notifyCh := s.TaskNotify.Register()
 	defer s.TaskNotify.Unregister(notifyCh)

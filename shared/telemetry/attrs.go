@@ -11,3 +11,8 @@ func FleetAttr(fleetID string) attribute.KeyValue {
 func OutcomeAttr(outcome string) attribute.KeyValue {
 	return attribute.String("outcome", outcome)
 }
+
+// PhaseAttr labels multi-phase metrics such as instance spinup duration.
+func PhaseAttr(phase string) attribute.KeyValue {
+	return attribute.String("phase", phase)
+}

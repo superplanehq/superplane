@@ -11,15 +11,16 @@ import (
 
 // BrokerMetrics records task-broker OpenTelemetry metrics (see docs/metrics.md).
 type BrokerMetrics struct {
-	tasksCreated          metric.Int64Counter
-	tasksCompleted        metric.Int64Counter
-	tasksUnclaimed        metric.Int64Counter
-	leaseReaps            metric.Int64Counter
-	taskStartLatency      metric.Float64Histogram
-	webhookDeliveries     metric.Int64Counter
-	webhookDeliveryDur    metric.Float64Histogram
-	tasksQueued           metric.Int64Gauge
-	tasksClaimed          metric.Int64Gauge
+	tasksCreated           metric.Int64Counter
+	tasksCompleted         metric.Int64Counter
+	tasksUnclaimed         metric.Int64Counter
+	leaseReaps             metric.Int64Counter
+	taskStartLatency       metric.Float64Histogram
+	webhookDeliveries      metric.Int64Counter
+	webhookDeliveryDur     metric.Float64Histogram
+	tasksQueued            metric.Int64Gauge
+	tasksClaimed           metric.Int64Gauge
+	instanceSpinupDuration metric.Float64Histogram
 }
 
 // New registers broker metric instruments on meter.
@@ -71,16 +72,23 @@ func New(meter metric.Meter) (*BrokerMetrics, error) {
 	if err != nil {
 		return nil, err
 	}
+	instanceSpinupDuration, err := meter.Float64Histogram("instance.spinup.duration",
+		metric.WithDescription("Time from instance request until ready to accept tasks"),
+		metric.WithUnit("s"))
+	if err != nil {
+		return nil, err
+	}
 	return &BrokerMetrics{
-		tasksCreated:       tasksCreated,
-		tasksCompleted:     tasksCompleted,
-		tasksUnclaimed:     tasksUnclaimed,
-		leaseReaps:         leaseReaps,
-		taskStartLatency:   taskStartLatency,
-		webhookDeliveries:  webhookDeliveries,
-		webhookDeliveryDur: webhookDeliveryDur,
-		tasksQueued:        tasksQueued,
-		tasksClaimed:       tasksClaimed,
+		tasksCreated:           tasksCreated,
+		tasksCompleted:         tasksCompleted,
+		tasksUnclaimed:         tasksUnclaimed,
+		leaseReaps:             leaseReaps,
+		taskStartLatency:       taskStartLatency,
+		webhookDeliveries:      webhookDeliveries,
+		webhookDeliveryDur:     webhookDeliveryDur,
+		tasksQueued:            tasksQueued,
+		tasksClaimed:           tasksClaimed,
+		instanceSpinupDuration: instanceSpinupDuration,
 	}, nil
 }
 
@@ -120,4 +128,11 @@ func (m *BrokerMetrics) SetTaskBacklog(ctx context.Context, fleetID string, queu
 	fleet := telemetry.FleetAttr(fleetID)
 	m.tasksQueued.Record(ctx, int64(queued), metric.WithAttributes(fleet))
 	m.tasksClaimed.Record(ctx, int64(claimed), metric.WithAttributes(fleet))
+}
+
+func (m *BrokerMetrics) InstanceSpinupDuration(ctx context.Context, fleetID, phase string, duration time.Duration) {
+	m.instanceSpinupDuration.Record(ctx, duration.Seconds(), metric.WithAttributes(
+		telemetry.FleetAttr(fleetID),
+		telemetry.PhaseAttr(phase),
+	))
 }
