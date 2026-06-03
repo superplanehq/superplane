@@ -52,6 +52,7 @@ type UseCanvasConsoleVersionDiffArgs = {
   updateDashboardMutation?: UpdateCanvasConsoleMutationResult;
   hasCanvasStagingChanges?: boolean;
   hasConsoleStagingChanges?: boolean;
+  hasFilesStagingChanges?: boolean;
   isEditingDraftBranch?: boolean;
 };
 
@@ -67,6 +68,7 @@ export function useCanvasConsoleVersionDiff({
   updateDashboardMutation,
   hasCanvasStagingChanges,
   hasConsoleStagingChanges,
+  hasFilesStagingChanges,
   isEditingDraftBranch,
 }: UseCanvasConsoleVersionDiffArgs) {
   const liveDashboardQuery = useCanvasConsole(canvasId, versionIds.live || undefined, enabled && !!versionIds.live);
@@ -123,6 +125,7 @@ export function useCanvasConsoleVersionDiff({
     hasDraftDiffVersusLive,
     hasCanvasStagingChanges,
     hasConsoleStagingChanges,
+    hasFilesStagingChanges,
   });
 
   const noopUpdateDashboardMutation: UpdateCanvasConsoleMutationResult = useMemo(

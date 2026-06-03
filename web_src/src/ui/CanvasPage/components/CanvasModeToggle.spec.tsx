@@ -85,6 +85,22 @@ describe("CanvasModeToggle", () => {
     expect(tabList).not.toHaveClass("border");
   });
 
+  it("shows an orange dot on the Files tab when repository files are uncommitted", () => {
+    render(
+      <CanvasModeToggle
+        mode="files"
+        editing
+        editTabTone="uncommitted"
+        onSelectLive={vi.fn()}
+        onSelectDashboard={vi.fn()}
+        onSelectFiles={vi.fn()}
+        hasFilesUncommitted
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-view-mode-files-uncommitted-dot")).toBeInTheDocument();
+  });
+
   it("invokes onSelectFiles when clicking the Files tab", async () => {
     const user = userEvent.setup();
     const onSelectFiles = vi.fn();

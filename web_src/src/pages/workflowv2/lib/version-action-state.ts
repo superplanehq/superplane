@@ -26,6 +26,8 @@ type DraftChangeIndicatorsInput = {
   hasCanvasStagingChanges?: boolean;
   /** console.yaml staged content differs from the branch baseline. */
   hasConsoleStagingChanges?: boolean;
+  /** Other repository files staged in IndexedDB differ from the branch baseline. */
+  hasFilesStagingChanges?: boolean;
 };
 
 export type DraftChangeIndicators = {
@@ -33,9 +35,11 @@ export type DraftChangeIndicators = {
   hasUnpublishedDraftChanges: boolean;
   hasUnpublishedCanvasDraftChanges: boolean;
   hasUnpublishedConsoleDraftChanges: boolean;
+  hasUnpublishedFilesDraftChanges: boolean;
   /** IndexedDB staging differs from branch HEAD (orange). */
   hasUncommittedCanvasDraftChanges: boolean;
   hasUncommittedConsoleDraftChanges: boolean;
+  hasUncommittedFilesDraftChanges: boolean;
   /** Branch HEAD / materialized draft differs from live (blue). */
   hasCommittedCanvasDraftChanges: boolean;
   hasCommittedConsoleDraftChanges: boolean;
@@ -54,14 +58,17 @@ export function getDraftChangeIndicators({
   hasDraftConsoleDiffVersusLive,
   hasCanvasStagingChanges,
   hasConsoleStagingChanges,
+  hasFilesStagingChanges,
 }: DraftChangeIndicatorsInput): DraftChangeIndicators {
   if (suppressUnpublishedDraftDiscard || !hasLatestDraftVersion) {
     return {
       hasUnpublishedDraftChanges: false,
       hasUnpublishedCanvasDraftChanges: false,
       hasUnpublishedConsoleDraftChanges: false,
+      hasUnpublishedFilesDraftChanges: false,
       hasUncommittedCanvasDraftChanges: false,
       hasUncommittedConsoleDraftChanges: false,
+      hasUncommittedFilesDraftChanges: false,
       hasCommittedCanvasDraftChanges: false,
       hasCommittedConsoleDraftChanges: false,
       hasUncommittedDraftChanges: false,
@@ -74,21 +81,27 @@ export function getDraftChangeIndicators({
 
   const hasUncommittedCanvasDraftChanges = !!hasCanvasStagingChanges;
   const hasUncommittedConsoleDraftChanges = !!hasConsoleStagingChanges;
+  const hasUncommittedFilesDraftChanges = !!hasFilesStagingChanges;
   const hasCommittedCanvasDraftChanges = hasDraftGraphDiffVersusLive;
   const hasCommittedConsoleDraftChanges = hasDraftConsoleDiffVersusLive;
   const hasUnpublishedCanvasDraftChanges = hasUncommittedCanvasDraftChanges || hasCommittedCanvasDraftChanges;
   const hasUnpublishedConsoleDraftChanges = hasUncommittedConsoleDraftChanges || hasCommittedConsoleDraftChanges;
+  const hasUnpublishedFilesDraftChanges = hasUncommittedFilesDraftChanges;
 
-  const hasUncommittedDraftChanges = hasUncommittedCanvasDraftChanges || hasUncommittedConsoleDraftChanges;
+  const hasUncommittedDraftChanges =
+    hasUncommittedCanvasDraftChanges || hasUncommittedConsoleDraftChanges || hasUncommittedFilesDraftChanges;
   const hasCommittedDraftChanges = hasCommittedCanvasDraftChanges || hasCommittedConsoleDraftChanges;
   const readyToPublishDraftChanges = hasCommittedDraftChanges && !hasUncommittedDraftChanges;
 
   return {
-    hasUnpublishedDraftChanges: hasUnpublishedCanvasDraftChanges || hasUnpublishedConsoleDraftChanges,
+    hasUnpublishedDraftChanges:
+      hasUnpublishedCanvasDraftChanges || hasUnpublishedConsoleDraftChanges || hasUnpublishedFilesDraftChanges,
     hasUnpublishedCanvasDraftChanges,
     hasUnpublishedConsoleDraftChanges,
+    hasUnpublishedFilesDraftChanges,
     hasUncommittedCanvasDraftChanges,
     hasUncommittedConsoleDraftChanges,
+    hasUncommittedFilesDraftChanges,
     hasCommittedCanvasDraftChanges,
     hasCommittedConsoleDraftChanges,
     hasUncommittedDraftChanges,

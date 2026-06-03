@@ -72,6 +72,7 @@ export interface HeaderProps {
   hasUnpublishedConsoleDraftChanges?: boolean;
   hasUncommittedCanvasDraftChanges?: boolean;
   hasUncommittedConsoleDraftChanges?: boolean;
+  hasUncommittedFilesDraftChanges?: boolean;
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
   hasUncommittedDraftChanges?: boolean;
@@ -279,6 +280,7 @@ function SecondaryHeader(props: HeaderProps) {
               hasCanvasCommitted={!!props.readyToPublishCanvasDraftChanges}
               hasDashboardUncommitted={!!props.hasUncommittedConsoleDraftChanges}
               hasDashboardCommitted={!!props.readyToPublishConsoleDraftChanges}
+              hasFilesUncommitted={!!props.hasUncommittedFilesDraftChanges}
             />
           ) : null}
         </div>

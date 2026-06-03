@@ -19,6 +19,7 @@ type UseDraftBranchesEditStatusArgs = {
   activeBranchIndicatorsReady: boolean;
   activeBranchHasUncommittedCanvas: boolean;
   activeBranchHasUncommittedConsole: boolean;
+  activeBranchHasUncommittedFiles: boolean;
   activeBranchHasCommittedCanvasVersusLive: boolean;
   activeBranchHasCommittedConsoleVersusLive: boolean;
   /** While true, hide transient "no-changes" on the active branch until the starter placeholder is staged. */
@@ -39,6 +40,7 @@ export function useDraftBranchesEditStatus({
   activeBranchIndicatorsReady,
   activeBranchHasUncommittedCanvas,
   activeBranchHasUncommittedConsole,
+  activeBranchHasUncommittedFiles,
   activeBranchHasCommittedCanvasVersusLive,
   activeBranchHasCommittedConsoleVersusLive,
   pendingPlaceholderBoot = false,
@@ -50,6 +52,7 @@ export function useDraftBranchesEditStatus({
         ? resolveActiveBranchChangeDetail(
             activeBranchHasUncommittedCanvas,
             activeBranchHasUncommittedConsole,
+            activeBranchHasUncommittedFiles,
             activeBranchHasCommittedCanvasVersusLive,
             activeBranchHasCommittedConsoleVersusLive,
           )
@@ -58,6 +61,7 @@ export function useDraftBranchesEditStatus({
       activeBranch,
       activeBranchHasUncommittedCanvas,
       activeBranchHasUncommittedConsole,
+      activeBranchHasUncommittedFiles,
       activeBranchHasCommittedCanvasVersusLive,
       activeBranchHasCommittedConsoleVersusLive,
     ],
@@ -115,8 +119,7 @@ export function useDraftBranchesEditStatus({
       delete merged[activeBranch];
     }
     if (activeBranch && activeBranchIndicatorsReady && activeDetail) {
-      const hideNoChangesWhilePlaceholderPending =
-        pendingPlaceholderBoot && activeDetail.editStatus === "no-changes";
+      const hideNoChangesWhilePlaceholderPending = pendingPlaceholderBoot && activeDetail.editStatus === "no-changes";
       if (!hideNoChangesWhilePlaceholderPending) {
         merged[activeBranch] = activeDetail;
       }

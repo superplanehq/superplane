@@ -7,6 +7,7 @@ import { WorkflowFilesFileList } from "./WorkflowFilesFileList";
 import { WorkflowFilesTabBar } from "./WorkflowFilesTabBar";
 import { WorkflowFilesDiffHeaderAction, WorkflowFilesIconButton } from "./WorkflowFilesUi";
 import { useWorkflowRepositoryFilesEditor } from "./useWorkflowRepositoryFilesEditor";
+import type { CanvasBranchStagingState } from "./useCanvasBranchStaging";
 import type { WorkflowFile, WorkflowFilesHeaderActionsState } from "./workflow-files-types";
 
 const WorkflowFilesDiffDialog = lazy(() =>
@@ -18,6 +19,7 @@ export function WorkflowFilesCanvasView({
   isEditing,
   canWrite,
   activeBranch,
+  branchStaging,
   files,
   headerActionsSlotId,
   onHeaderActionsChange,
@@ -26,6 +28,7 @@ export function WorkflowFilesCanvasView({
   isEditing: boolean;
   canWrite: boolean;
   activeBranch?: string | null;
+  branchStaging?: CanvasBranchStagingState;
   files: WorkflowFile[];
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: WorkflowFilesHeaderActionsState | null) => void;
@@ -35,6 +38,7 @@ export function WorkflowFilesCanvasView({
     isEditing,
     canWrite,
     activeBranch,
+    branchStaging,
     files,
     headerActionsSlotId,
     onHeaderActionsChange,

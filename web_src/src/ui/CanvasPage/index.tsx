@@ -211,8 +211,10 @@ export interface CanvasPageProps {
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
   hasUnpublishedConsoleDraftChanges?: boolean;
+  hasUnpublishedFilesDraftChanges?: boolean;
   hasUncommittedCanvasDraftChanges?: boolean;
   hasUncommittedConsoleDraftChanges?: boolean;
+  hasUncommittedFilesDraftChanges?: boolean;
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
   hasUncommittedDraftChanges?: boolean;
@@ -1359,6 +1361,7 @@ function CanvasPage(props: CanvasPageProps) {
           hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
           hasUncommittedCanvasDraftChanges={props.hasUncommittedCanvasDraftChanges}
           hasUncommittedConsoleDraftChanges={props.hasUncommittedConsoleDraftChanges}
+          hasUncommittedFilesDraftChanges={props.hasUncommittedFilesDraftChanges}
           hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
           hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
           hasUncommittedDraftChanges={props.hasUncommittedDraftChanges}
@@ -1909,6 +1912,7 @@ function CanvasContentHeader({
   hasUnpublishedConsoleDraftChanges,
   hasUncommittedCanvasDraftChanges,
   hasUncommittedConsoleDraftChanges,
+  hasUncommittedFilesDraftChanges,
   hasCommittedCanvasDraftChanges,
   hasCommittedConsoleDraftChanges,
   hasUncommittedDraftChanges,
@@ -1981,8 +1985,10 @@ function CanvasContentHeader({
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
   hasUnpublishedConsoleDraftChanges?: boolean;
+  hasUnpublishedFilesDraftChanges?: boolean;
   hasUncommittedCanvasDraftChanges?: boolean;
   hasUncommittedConsoleDraftChanges?: boolean;
+  hasUncommittedFilesDraftChanges?: boolean;
   hasCommittedCanvasDraftChanges?: boolean;
   hasCommittedConsoleDraftChanges?: boolean;
   hasUncommittedDraftChanges?: boolean;
@@ -2057,6 +2063,7 @@ function CanvasContentHeader({
       hasUnpublishedConsoleDraftChanges={hasUnpublishedConsoleDraftChanges}
       hasUncommittedCanvasDraftChanges={hasUncommittedCanvasDraftChanges}
       hasUncommittedConsoleDraftChanges={hasUncommittedConsoleDraftChanges}
+      hasUncommittedFilesDraftChanges={hasUncommittedFilesDraftChanges}
       hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
       hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
       hasUncommittedDraftChanges={hasUncommittedDraftChanges}

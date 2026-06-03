@@ -6,5 +6,6 @@ export type CanvasStagingRecord = {
   branch: string;
   baseHeadSha: string;
   files: Record<string, string>;
+  deletedPaths?: string[];
   updatedAt: number;
 };

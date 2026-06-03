@@ -1199,6 +1199,7 @@ export function WorkflowPageV2() {
     updateDashboardMutation: branchStaging.updateConsoleMutation,
     hasCanvasStagingChanges: branchStaging.hasCanvasStagingChanges,
     hasConsoleStagingChanges: branchStaging.hasConsoleStagingChanges,
+    hasFilesStagingChanges: branchStaging.hasRepositoryFilesStagingChanges,
     isEditingDraftBranch: !!activeBranch,
   });
   const { dashboardQuery, updateDashboardMutation, draftChangeIndicators, hasDraftDiffVersusLive } =
@@ -1220,6 +1221,7 @@ export function WorkflowPageV2() {
     activeBranchIndicatorsReady,
     activeBranchHasUncommittedCanvas: draftChangeIndicators.hasUncommittedCanvasDraftChanges,
     activeBranchHasUncommittedConsole: draftChangeIndicators.hasUncommittedConsoleDraftChanges,
+    activeBranchHasUncommittedFiles: draftChangeIndicators.hasUncommittedFilesDraftChanges,
     activeBranchHasCommittedCanvasVersusLive: draftChangeIndicators.hasCommittedCanvasDraftChanges,
     activeBranchHasCommittedConsoleVersusLive: draftChangeIndicators.hasCommittedConsoleDraftChanges,
     pendingPlaceholderBoot: !!canvasId && !isAgentBootReady(canvasId),
@@ -5423,7 +5425,7 @@ export function WorkflowPageV2() {
   runDisabledRef.current = runDisabled;
   runDisabledTooltipRef.current = runDisabledTooltip;
   const filesHeaderVersionActions = resolveWorkflowFilesHeaderVersionActions({
-    useFilesHeaderActions: urlViewFlags.isFilesMode && isEditing,
+    useFilesHeaderActions: false,
     filesHeaderActions,
     isChangeManagementDisabled,
     handlePublishVersion,
@@ -5480,6 +5482,7 @@ export function WorkflowPageV2() {
             canvasId: canvasId || undefined,
             canWrite: canActOnCanvas,
             activeBranch,
+            branchStaging,
             files: workflowFiles,
             headerActionsSlotId: filesHeaderActionsSlotId,
             onHeaderActionsChange: onFilesHeaderActionsChange,

@@ -1,10 +1,12 @@
 import { useCommitCanvasRepositoryFiles } from "@/hooks/useCanvasData";
 import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
+
+import { fetchCanvasRepositoryFileContent } from "./lib/canvas-repository-files";
 
 import { buildWorkflowFilesEditorResult } from "./lib/build-workflow-files-editor-result";
 import { useWorkflowFilesEditorLifecycle } from "./useWorkflowFilesEditorLifecycle";
-import { useWorkflowFilesPendingState } from "./useWorkflowFilesPendingState";
+import { useWorkflowFilesStagingState } from "./useWorkflowFilesStagingState";
 import { useWorkflowFilesPublish } from "./useWorkflowFilesPublish";
 import { useWorkflowFilesTabState } from "./useWorkflowFilesTabState";
 import {
@@ -12,6 +14,7 @@ import {
   useWorkflowRepositoryPathLists,
   useWorkflowRepositorySelectedFileQuery,
 } from "./useWorkflowRepositoryFilesCatalog";
+import type { CanvasBranchStagingState } from "./useCanvasBranchStaging";
 import type { WorkflowFile, WorkflowFilesHeaderActionsState } from "./workflow-files-types";
 
 type UseWorkflowRepositoryFilesEditorOptions = {
@@ -20,6 +23,7 @@ type UseWorkflowRepositoryFilesEditorOptions = {
   canWrite: boolean;
   files: WorkflowFile[];
   activeBranch?: string | null;
+  branchStaging?: CanvasBranchStagingState;
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: WorkflowFilesHeaderActionsState | null) => void;
 };
@@ -30,6 +34,7 @@ export function useWorkflowRepositoryFilesEditor({
   canWrite,
   files,
   activeBranch,
+  branchStaging,
   headerActionsSlotId,
   onHeaderActionsChange,
 }: UseWorkflowRepositoryFilesEditorOptions) {
@@ -42,16 +47,20 @@ export function useWorkflowRepositoryFilesEditor({
   const [headerActionsHost, setHeaderActionsHost] = useState<HTMLElement | null>(null);
   const loadedContentByPathRef = useRef(loadedContentByPath);
   loadedContentByPathRef.current = loadedContentByPath;
+  const useBranchStaging = !!branchStaging && !!activeBranch;
 
   const bootstrapPaths = useWorkflowRepositoryPathLists(catalog.generatedPaths, catalog.repositoryPaths, []);
   const allPathsRef = useRef(bootstrapPaths.allPaths);
   const finalRepositoryPathsRef = useRef(bootstrapPaths.finalRepositoryPaths);
   const openFileRef = useRef<(path: string) => void>(() => {});
-  const pending = useWorkflowFilesPendingState({
+  const pending = useWorkflowFilesStagingState({
+    branchStaging: useBranchStaging ? branchStaging : undefined,
     generatedPathSet: catalog.generatedPathSet,
     generatedPaths: catalog.generatedPaths,
+    repositoryPathSet: catalog.repositoryPathSet,
     finalRepositoryPathsRef,
     allPathsRef,
+    loadedContentByPath,
     loadedContentByPathRef,
     openFile: (path) => openFileRef.current(path),
   });
@@ -71,10 +80,69 @@ export function useWorkflowRepositoryFilesEditor({
     catalog.generatedFilesByPath,
   );
 
+  useEffect(() => {
+    if (!useBranchStaging || !canvasId || !activeBranch || !branchStaging?.stagingRecord) {
+      return;
+    }
+
+    const stagedPaths = [
+      ...Object.keys(branchStaging.stagingRecord.files),
+      ...(branchStaging.stagingRecord.deletedPaths ?? []),
+    ].filter((path) => catalog.repositoryPathSet.has(path) && loadedContentByPath[path] === undefined);
+
+    if (stagedPaths.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void Promise.all(
+      stagedPaths.map(async (path) => {
+        const content = await fetchCanvasRepositoryFileContent(canvasId, path, activeBranch).catch(() => "");
+        return [path, content] as const;
+      }),
+    ).then((results) => {
+      if (cancelled) {
+        return;
+      }
+
+      setLoadedContentByPath((current) => {
+        const next = { ...current };
+        let changed = false;
+
+        for (const [path, content] of results) {
+          if (next[path] !== undefined) {
+            continue;
+          }
+
+          next[path] = content;
+          changed = true;
+        }
+
+        return changed ? next : current;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeBranch,
+    branchStaging?.stagingRecord,
+    canvasId,
+    catalog.repositoryPathSet,
+    loadedContentByPath,
+    useBranchStaging,
+  ]);
+
   useWorkflowFilesPublish({
-    canManageRepositoryFiles,
+    canManageRepositoryFiles: canManageRepositoryFiles && !useBranchStaging,
     canPublishFiles:
-      canManageRepositoryFiles && pendingChanges.length > 0 && !pathLists.commitPathError && !commitFiles.isPending,
+      canManageRepositoryFiles &&
+      !useBranchStaging &&
+      pendingChanges.length > 0 &&
+      !pathLists.commitPathError &&
+      !commitFiles.isPending,
     commitPathError: pathLists.commitPathError,
     headSha: catalog.headSha,
     branch: activeBranch ?? undefined,
@@ -94,6 +162,7 @@ export function useWorkflowRepositoryFilesEditor({
     selectedPath: tabs.selectedPath,
     selectedFileData: selection.selectedFileQuery.data,
     setLoadedContentByPath,
+    branchBaselineFiles: useBranchStaging ? branchStaging?.baselineFiles : undefined,
   });
 
   return buildWorkflowFilesEditorResult({

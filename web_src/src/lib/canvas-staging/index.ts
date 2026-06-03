@@ -60,6 +60,7 @@ export async function getStaging(canvasId: string, branch: string): Promise<Canv
         branch: record.branch,
         baseHeadSha: record.baseHeadSha,
         files: record.files,
+        deletedPaths: record.deletedPaths,
         updatedAt: record.updatedAt,
       });
     };
@@ -116,5 +117,5 @@ export function hasStagingFiles(record: CanvasStagingRecord | null | undefined):
     return false;
   }
 
-  return Object.keys(record.files).length > 0;
+  return Object.keys(record.files).length > 0 || (record.deletedPaths?.length ?? 0) > 0;
 }

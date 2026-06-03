@@ -102,8 +102,10 @@ describe("getDraftChangeIndicators", () => {
       hasUnpublishedDraftChanges: true,
       hasUnpublishedCanvasDraftChanges: true,
       hasUnpublishedConsoleDraftChanges: false,
+      hasUnpublishedFilesDraftChanges: false,
       hasUncommittedCanvasDraftChanges: true,
       hasUncommittedConsoleDraftChanges: false,
+      hasUncommittedFilesDraftChanges: false,
       hasCommittedCanvasDraftChanges: true,
       hasCommittedConsoleDraftChanges: false,
       hasUncommittedDraftChanges: true,
@@ -111,6 +113,26 @@ describe("getDraftChangeIndicators", () => {
       readyToPublishDraftChanges: false,
       readyToPublishCanvasDraftChanges: false,
       readyToPublishConsoleDraftChanges: false,
+    });
+  });
+
+  it("includes repository file staging in uncommitted draft indicators", () => {
+    expect(
+      getDraftChangeIndicators({
+        suppressUnpublishedDraftDiscard: false,
+        hasLatestDraftVersion: true,
+        hasDraftGraphDiffVersusLive: false,
+        hasDraftConsoleDiffVersusLive: false,
+        hasDraftDiffVersusLive: false,
+        hasCanvasStagingChanges: false,
+        hasConsoleStagingChanges: false,
+        hasFilesStagingChanges: true,
+      }),
+    ).toMatchObject({
+      hasUncommittedFilesDraftChanges: true,
+      hasUnpublishedFilesDraftChanges: true,
+      hasUncommittedDraftChanges: true,
+      hasUnpublishedDraftChanges: true,
     });
   });
 

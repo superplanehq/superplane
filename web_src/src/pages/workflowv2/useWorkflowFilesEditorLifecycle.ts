@@ -1,3 +1,4 @@
+import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "@/lib/canvas-staging";
 import { useEffect, type Dispatch, type SetStateAction } from "react";
 
 type UseWorkflowFilesEditorLifecycleOptions = {
@@ -9,6 +10,7 @@ type UseWorkflowFilesEditorLifecycleOptions = {
   selectedPath: string | null;
   selectedFileData?: { path?: string; content?: string };
   setLoadedContentByPath: Dispatch<SetStateAction<Record<string, string>>>;
+  branchBaselineFiles?: Record<string, string>;
 };
 
 export function useWorkflowFilesEditorLifecycle({
@@ -20,7 +22,28 @@ export function useWorkflowFilesEditorLifecycle({
   selectedPath,
   selectedFileData,
   setLoadedContentByPath,
+  branchBaselineFiles,
 }: UseWorkflowFilesEditorLifecycleOptions) {
+  useEffect(() => {
+    if (!branchBaselineFiles) {
+      return;
+    }
+
+    setLoadedContentByPath((current) => {
+      let next = current;
+      for (const path of [CANVAS_YAML_PATH, CONSOLE_YAML_PATH]) {
+        const baseline = branchBaselineFiles[path];
+        if (baseline === undefined || current[path] === baseline) {
+          continue;
+        }
+
+        next ??= { ...current };
+        next[path] = baseline;
+      }
+
+      return next ?? current;
+    });
+  }, [branchBaselineFiles, setLoadedContentByPath]);
   useEffect(() => {
     if (isEditing) return;
 

@@ -36,7 +36,7 @@ export function WorkflowFilesTabBar({
                 className="flex h-full min-w-0 flex-1 items-center gap-1.5 px-2.5 text-left"
                 onClick={() => onOpenFile(path)}
               >
-                {change ? <span className="size-1.5 shrink-0 rounded-full bg-sky-500" aria-hidden /> : null}
+                {change ? <span className="size-1.5 shrink-0 rounded-full bg-orange-500" aria-hidden /> : null}
                 <span className="min-w-0 truncate">{path}</span>
               </button>
               <button
