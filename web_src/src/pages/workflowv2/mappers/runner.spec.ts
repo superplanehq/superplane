@@ -53,11 +53,11 @@ describe("runnerConfigurationDetails", () => {
       {
         execution_mode: "host",
         commands: "echo hi",
-        machine_type: "aws-standard-arm64",
+        machine_type: "aws-arm64-1",
         execution_timeout_seconds: 0,
       },
       {
-        "Machine type": "aws-standard-arm64",
+        "Machine type": "e1-large-arm64",
         "Execution mode": "Host",
         "Timeout (seconds)": String(DEFAULT_EXECUTION_TIMEOUT_SECONDS),
       },

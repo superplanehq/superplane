@@ -101,7 +101,7 @@ func (c *Runner) Configuration() []configuration.Field {
 			Required: true,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
-					Options: []configuration.FieldOption{},
+					Options: machineTypeSelectOptions,
 				},
 			},
 		},

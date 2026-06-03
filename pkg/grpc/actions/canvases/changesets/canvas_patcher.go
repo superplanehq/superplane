@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/google/uuid"
-	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/layout"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -222,9 +221,6 @@ func (p *CanvasPatcher) addNode(change *pb.CanvasChangeset_Change) error {
 	if node.GetConfiguration() != nil {
 		nodeConfiguration = node.GetConfiguration().AsMap()
 	}
-	if nodeRef.Component != nil && nodeRef.Component.Name == "runner" {
-		nodeConfiguration = runner.NormalizeConfigurationMap(nodeConfiguration)
-	}
 
 	err = configuration.ValidateConfiguration(schema, nodeConfiguration)
 	if err != nil {
@@ -345,21 +341,16 @@ func (p *CanvasPatcher) updateNode(change *pb.CanvasChangeset_Change) error {
 			return nil
 		}
 
-		nodeConfiguration := node.GetConfiguration().AsMap()
-		if currentNode.Ref.Component != nil && currentNode.Ref.Component.Name == "runner" {
-			nodeConfiguration = runner.NormalizeConfigurationMap(nodeConfiguration)
-		}
-
-		err = configuration.ValidateConfiguration(schema, nodeConfiguration)
+		err = configuration.ValidateConfiguration(schema, node.GetConfiguration().AsMap())
 		if err != nil {
 			errorMessage := err.Error()
 			currentNode.ErrorMessage = &errorMessage
-			currentNode.Configuration = nodeConfiguration
+			currentNode.Configuration = node.GetConfiguration().AsMap()
 			p.nodes[nodeID] = currentNode
 			return nil
 		}
 
-		currentNode.Configuration = nodeConfiguration
+		currentNode.Configuration = node.GetConfiguration().AsMap()
 		currentNode.ErrorMessage = nil
 	}
 
