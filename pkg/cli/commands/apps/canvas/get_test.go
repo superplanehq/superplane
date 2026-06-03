@@ -34,7 +34,7 @@ func TestGetCommandPrintsCanvasOnSuccess(t *testing.T) {
 	require.Contains(t, stdout.String(), "Name: my-canvas")
 	require.Contains(t, stdout.String(), "Nodes: 0")
 	require.Contains(t, stdout.String(), "Edges: 0")
-	require.NotContains(t, stdout.String(), "Canvas URL:")
+	require.NotContains(t, stdout.String(), "App URL:")
 }
 
 func TestGetCommandPrintsURLFromResponseOrgID(t *testing.T) {
@@ -48,7 +48,7 @@ func TestGetCommandPrintsURLFromResponseOrgID(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), "ID: "+testGetCanvasID)
 	require.Contains(t, stdout.String(), "Name: my-canvas")
-	require.Contains(t, stdout.String(), "Canvas URL: https://app.superplane.com/org-uuid/canvases/"+testGetCanvasID)
+	require.Contains(t, stdout.String(), "App URL: https://app.superplane.com/org-uuid/apps/"+testGetCanvasID)
 	require.Contains(t, stdout.String(), "Nodes: 0")
 	require.Contains(t, stdout.String(), "Edges: 0")
 }
@@ -69,7 +69,7 @@ func TestGetCommandSkipsURLWhenResponseMissingOrgID(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, stdout.String(), "ID: "+testGetCanvasID)
 	require.Contains(t, stdout.String(), "Name: my-canvas")
-	require.NotContains(t, stdout.String(), "Canvas URL:")
+	require.NotContains(t, stdout.String(), "App URL:")
 }
 
 func TestGetUsesActiveAppWhenNoArg(t *testing.T) {

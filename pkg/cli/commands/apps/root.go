@@ -17,8 +17,8 @@ func NewCommand(options core.BindOptions) *cobra.Command {
 
 An app is a SuperPlane automation made up of a canvas, console, and files.
 
-App URL pattern: {baseURL}/{organizationId}/canvases/{appId}
-(e.g. https://app.superplane.com/<organization-id>/canvases/<app-id>)`,
+App URL pattern: {baseURL}/{organizationId}/apps/{appId}
+(e.g. https://app.superplane.com/<organization-id>/apps/<app-id>)`,
 		Aliases: []string{"app"},
 	}
 
