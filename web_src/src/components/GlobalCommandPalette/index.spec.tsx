@@ -224,6 +224,17 @@ describe("GlobalCommandPalette", () => {
     expect(screen.queryByPlaceholderText("Search components and commands")).not.toBeInTheDocument();
   });
 
+  it("does not treat apps/new as a current canvas route", async () => {
+    renderPalette("/org-1/apps/new");
+
+    openPalette();
+
+    expect(await screen.findByPlaceholderText("What can we help with?")).toBeInTheDocument();
+    expect(screen.queryByText("Console")).not.toBeInTheDocument();
+    expect(screen.queryByText("Versions")).not.toBeInTheDocument();
+    expect(screen.queryByText("Agent")).not.toBeInTheDocument();
+  });
+
   it("opens organization settings as a nested command page", async () => {
     const user = userEvent.setup();
     renderPalette();

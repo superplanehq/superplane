@@ -94,7 +94,7 @@ func (s *runsViewSteps) whenTheManualTriggerRuns() {
 }
 
 func (s *runsViewSteps) whenIVisitRunsView() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/" + s.canvas.WorkflowID.String() + "?view=runs")
+	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.canvas.WorkflowID.String() + "?view=runs")
 }
 
 func (s *runsViewSteps) givenFinishedRuns(count int) {
