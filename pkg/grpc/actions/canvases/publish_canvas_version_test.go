@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -62,7 +63,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		_, err := PublishCanvasVersion(
 			ctx,
 			r.Encryptor, r.Registry,
-			r.Organization.ID.String(), uuid.New().String(), uuid.New().String(),
+			r.Organization.ID.String(), uuid.New().String(), missingCommitSHA,
 			testWebhookBaseURL, r.AuthService,
 		)
 		s, ok := status.FromError(err)
@@ -78,10 +79,11 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		canvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(canvasID))
 		require.NoError(t, err)
 
+		require.NotNil(t, canvas.LiveVersionID)
 		_, err = PublishCanvasVersion(
 			ctx,
 			r.Encryptor, r.Registry,
-			r.Organization.ID.String(), canvasID, canvas.LiveVersionID.String(),
+			r.Organization.ID.String(), canvasID, *canvas.LiveVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
 		s, ok := status.FromError(err)
@@ -96,12 +98,10 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		disableChangeManagementForCanvas(t, r, canvasID)
 
 		otherUser := support.CreateUser(t, r, r.Organization.ID)
-		otherCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
-		createResp, err := CreateCanvasVersion(otherCtx, r.Organization.ID.String(), canvasID)
-		require.NoError(t, err)
-		draftVersionID := createResp.Version.Metadata.Id
+		otherUserCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
+		draftVersionID := createDraftVersion(otherUserCtx, t, r, canvasID, "Other User Draft")
 
-		_, err = PublishCanvasVersion(
+		_, err := PublishCanvasVersion(
 			ctx,
 			r.Encryptor, r.Registry,
 			r.Organization.ID.String(), canvasID, draftVersionID,
@@ -120,7 +120,7 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		_, err := PublishCanvasVersion(
 			ctx,
 			r.Encryptor, r.Registry,
-			r.Organization.ID.String(), canvasID, uuid.New().String(),
+			r.Organization.ID.String(), canvasID, strings.Repeat("a", 40),
 			testWebhookBaseURL, r.AuthService,
 		)
 		s, ok := status.FromError(err)
@@ -148,14 +148,15 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		assert.NotNil(t, resp.Version.Metadata.PublishedAt)
 
 		// The same version should now be published (not deleted)
-		version, err := models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(draftVersionID))
+		version, err := models.FindCanvasVersion(uuid.MustParse(canvasID), draftVersionID)
 		require.NoError(t, err)
 		assert.Equal(t, models.CanvasVersionStatePublished, version.State)
 
 		// The canvas live version should point to it
 		canvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(canvasID))
 		require.NoError(t, err)
-		assert.Equal(t, draftVersionID, canvas.LiveVersionID.String())
+		require.NotNil(t, canvas.LiveVersionID)
+		assert.Equal(t, draftVersionID, *canvas.LiveVersionID)
 	})
 
 	t.Run("draft version -> preserves canvas folder assignment", func(t *testing.T) {
@@ -163,15 +164,8 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-draft-in-folder")
 		disableChangeManagementForCanvas(t, r, canvasID)
 
-		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
-		require.NoError(t, err)
-		draftVersionID := createVersionResponse.Version.Metadata.Id
-
-		require.NoError(t, database.Conn().
-			Model(&models.CanvasVersion{}).
-			Where("id = ?", uuid.MustParse(draftVersionID)).
-			Update("name", "publish-draft-in-folder-renamed").
-			Error)
+		draftVersionID := createDraftVersion(ctx, t, r, canvasID, "noop")
+		draftVersionID = commitDraftMetadataOnly(ctx, t, r, canvasID, draftVersionID, "publish-draft-in-folder-renamed", "")
 
 		folder, err := models.CreateCanvasFolder(r.Organization.ID, "Publish Folder", models.CanvasFolderColorBlue)
 		require.NoError(t, err)
@@ -197,11 +191,9 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-cm-enabled")
 
-		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
-		require.NoError(t, err)
-		draftVersionID := createVersionResponse.Version.Metadata.Id
+		draftVersionID := createDraftVersion(ctx, t, r, canvasID, "noop")
 
-		_, err = UpdateCanvas(
+		_, err := UpdateCanvas(
 			context.Background(),
 			r.AuthService,
 			r.Organization.ID.String(),
@@ -229,11 +221,9 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-canvas-cm-enabled")
 		disableChangeManagementForCanvas(t, r, canvasID)
 
-		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
-		require.NoError(t, err)
-		draftVersionID := createVersionResponse.Version.Metadata.Id
+		draftVersionID := createDraftVersion(ctx, t, r, canvasID, "noop")
 
-		_, err = UpdateCanvas(
+		_, err := UpdateCanvas(
 			context.Background(),
 			r.AuthService,
 			r.Organization.ID.String(),
@@ -269,18 +259,16 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-metadata-only")
 		disableChangeManagementForCanvas(t, r, canvasID)
 
-		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
-		require.NoError(t, err)
-		draftVersionID := createVersionResponse.Version.Metadata.Id
-
-		require.NoError(t, database.Conn().
-			Model(&models.CanvasVersion{}).
-			Where("id = ?", uuid.MustParse(draftVersionID)).
-			Updates(map[string]any{
-				"name":        "publish-metadata-only-renamed",
-				"description": "updated through metadata-only publish",
-			}).
-			Error)
+		draftVersionID := createDraftVersion(ctx, t, r, canvasID, "noop")
+		draftVersionID = commitDraftMetadataOnly(
+			ctx,
+			t,
+			r,
+			canvasID,
+			draftVersionID,
+			"publish-metadata-only-renamed",
+			"updated through metadata-only publish",
+		)
 
 		resp, err := PublishCanvasVersion(
 			ctx,
@@ -298,7 +286,8 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "publish-metadata-only-renamed", canvas.Name)
 		assert.Equal(t, "updated through metadata-only publish", canvas.Description)
-		assert.Equal(t, draftVersionID, canvas.LiveVersionID.String())
+		require.NotNil(t, canvas.LiveVersionID)
+		assert.Equal(t, draftVersionID, *canvas.LiveVersionID)
 	})
 
 	t.Run("console-only draft changes -> publishes console to live", func(t *testing.T) {
@@ -306,26 +295,10 @@ func Test__PublishCanvasVersion(t *testing.T) {
 		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-console-only")
 		disableChangeManagementForCanvas(t, r, canvasID)
 
-		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvasID)
-		require.NoError(t, err)
-		draftVersionID := createVersionResponse.Version.Metadata.Id
+		draftVersionID := createDraftVersion(ctx, t, r, canvasID, "noop")
+		draftVersionID = commitDraftConsoleOnly(ctx, t, r, canvasID, draftVersionID, "published console")
 
-		draftVersion, err := models.FindCanvasVersion(uuid.MustParse(canvasID), uuid.MustParse(draftVersionID))
-		require.NoError(t, err)
-
-		_, err = models.UpdateCanvasVersionDashboardInTransaction(
-			database.Conn(),
-			draftVersion,
-			[]models.DashboardPanel{
-				{ID: "notes", Type: models.DashboardPanelTypeMarkdown, Content: map[string]any{"body": "published console"}},
-			},
-			[]models.DashboardLayoutItem{
-				{I: "notes", X: 0, Y: 0, W: 4, H: 2},
-			},
-		)
-		require.NoError(t, err)
-
-		_, err = PublishCanvasVersion(
+		_, err := PublishCanvasVersion(
 			ctx,
 			r.Encryptor, r.Registry,
 			r.Organization.ID.String(), canvasID, draftVersionID,
@@ -343,9 +316,12 @@ func Test__PublishCanvasVersion(t *testing.T) {
 	t.Run("draft version with duplicate name -> error", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 		disableOrganizationChangeManagement(t, r)
-		existingCanvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
-		canvas, _ := support.CreateCanvas(t, r.Organization.ID, r.User, []models.CanvasNode{}, []models.Edge{})
+		existingCanvasID := createCanvasWithNoopNode(ctx, t, r, "publish-duplicate-live")
+		canvasID := createCanvasWithNoopNode(ctx, t, r, "publish-duplicate-canvas")
+		disableChangeManagementForCanvas(t, r, canvasID)
 
+		existingCanvas, err := models.FindCanvas(r.Organization.ID, uuid.MustParse(existingCanvasID))
+		require.NoError(t, err)
 		require.NoError(t, database.Conn().
 			Model(&models.CanvasVersion{}).
 			Where("id = ?", *existingCanvas.LiveVersionID).
@@ -357,20 +333,13 @@ func Test__PublishCanvasVersion(t *testing.T) {
 			Update("name", "publish-duplicate-live").
 			Error)
 
-		createVersionResponse, err := CreateCanvasVersion(ctx, r.Organization.ID.String(), canvas.ID.String())
-		require.NoError(t, err)
-		draftVersionID := createVersionResponse.Version.Metadata.Id
-
-		require.NoError(t, database.Conn().
-			Model(&models.CanvasVersion{}).
-			Where("id = ?", uuid.MustParse(draftVersionID)).
-			Update("name", "publish-duplicate-live").
-			Error)
+		draftVersionID := createDraftVersion(ctx, t, r, canvasID, "noop")
+		draftVersionID = commitDraftMetadataOnly(ctx, t, r, canvasID, draftVersionID, "publish-duplicate-live", "")
 
 		_, err = PublishCanvasVersion(
 			ctx,
 			r.Encryptor, r.Registry,
-			r.Organization.ID.String(), canvas.ID.String(), draftVersionID,
+			r.Organization.ID.String(), canvasID, draftVersionID,
 			testWebhookBaseURL, r.AuthService,
 		)
 		s, ok := status.FromError(err)

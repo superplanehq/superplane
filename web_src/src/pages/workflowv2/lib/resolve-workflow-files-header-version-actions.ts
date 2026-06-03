@@ -11,7 +11,9 @@ type ResolveWorkflowFilesHeaderVersionActionsArgs = {
   publishVersionDisabledTooltip?: string;
   resetDraftDisabled: boolean;
   resetDraftDisabledTooltip?: string;
+  resetDraftLabel?: string;
   hasUnpublishedDraftChanges: boolean;
+  publishVersionLabel?: string;
 };
 
 export function resolveWorkflowFilesHeaderVersionActions({
@@ -25,7 +27,9 @@ export function resolveWorkflowFilesHeaderVersionActions({
   publishVersionDisabledTooltip,
   resetDraftDisabled,
   resetDraftDisabledTooltip,
+  resetDraftLabel,
   hasUnpublishedDraftChanges,
+  publishVersionLabel,
 }: ResolveWorkflowFilesHeaderVersionActionsArgs) {
   if (useFilesHeaderActions) {
     return {
@@ -46,8 +50,12 @@ export function resolveWorkflowFilesHeaderVersionActions({
     publishVersionDisabled,
     publishVersionDisabledTooltip,
     hasUnpublishedDraftChanges,
+    // While editing a draft the reset/discard action is always available: it
+    // resets staged changes ("Reset") or deletes the draft ("Discard").
+    discardVersionVisible: true,
     discardVersionDisabled: resetDraftDisabled,
     discardVersionDisabledTooltip: resetDraftDisabledTooltip,
-    publishVersionLabel: isChangeManagementDisabled ? "Publish" : "Propose Change",
+    discardVersionLabel: resetDraftLabel ?? "Discard",
+    publishVersionLabel: publishVersionLabel ?? (isChangeManagementDisabled ? "Publish" : "Propose Change"),
   };
 }

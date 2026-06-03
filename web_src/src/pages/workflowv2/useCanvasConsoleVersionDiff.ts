@@ -1,6 +1,10 @@
 import { createElement, lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 
-import { useCanvasConsole, useUpdateCanvasConsole } from "@/hooks/useCanvasData";
+import {
+  useCanvasConsole,
+  type CanvasConsoleQueryResult,
+  type UpdateCanvasConsoleMutationResult,
+} from "@/hooks/useCanvasData";
 
 import { getDraftConsoleDiffCounts, hasDraftVersusLiveConsoleDiff } from "./draftConsoleDiff";
 import { dashboardToYaml } from "./dashboard/dashboardYaml";
@@ -41,7 +45,12 @@ type UseCanvasConsoleVersionDiffArgs = {
   hasDraftGraphDiffVersusLive: boolean;
   suppressUnpublishedDraftDiscard: boolean;
   enabled: boolean;
-  registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
+  branchDashboard?: CanvasesCanvasDashboard | null;
+  branchDashboardLoading?: boolean;
+  updateDashboardMutation?: UpdateCanvasConsoleMutationResult;
+  hasCanvasStagingChanges?: boolean;
+  hasConsoleStagingChanges?: boolean;
+  isEditingDraftBranch?: boolean;
 };
 
 export function useCanvasConsoleVersionDiff({
@@ -50,32 +59,47 @@ export function useCanvasConsoleVersionDiff({
   hasDraftGraphDiffVersusLive,
   suppressUnpublishedDraftDiscard,
   enabled,
-  registerIgnoredCanvasVersionUpdatedEcho,
+  branchDashboard,
+  branchDashboardLoading,
+  updateDashboardMutation,
+  hasCanvasStagingChanges,
+  hasConsoleStagingChanges,
+  isEditingDraftBranch,
 }: UseCanvasConsoleVersionDiffArgs) {
-  const dashboardQuery = useCanvasConsole(canvasId, versionIds.active || undefined, enabled);
-  const draftDiffVersionId = versionIds.active || versionIds.draft;
-  const draftDashboardQuery = useCanvasConsole(
-    canvasId,
-    draftDiffVersionId || undefined,
-    enabled && !!draftDiffVersionId,
-  );
   const liveDashboardQuery = useCanvasConsole(canvasId, versionIds.live || undefined, enabled && !!versionIds.live);
+  const fallbackDashboardQuery = useCanvasConsole(
+    canvasId,
+    versionIds.active || undefined,
+    enabled && !isEditingDraftBranch,
+  );
+
+  const dashboardData = isEditingDraftBranch ? branchDashboard : fallbackDashboardQuery.data;
+  const dashboardQuery = {
+    data: dashboardData,
+    isLoading: isEditingDraftBranch ? !!branchDashboardLoading : fallbackDashboardQuery.isLoading,
+    error: isEditingDraftBranch ? null : fallbackDashboardQuery.error,
+    isFetching: isEditingDraftBranch ? !!branchDashboardLoading : fallbackDashboardQuery.isFetching,
+    isError: isEditingDraftBranch ? false : fallbackDashboardQuery.isError,
+    refetch: fallbackDashboardQuery.refetch,
+  } as CanvasConsoleQueryResult;
+
+  const draftDashboardData = isEditingDraftBranch ? branchDashboard : fallbackDashboardQuery.data;
   const hasDraftConsoleDiffVersusLive = useMemo(
-    () => !!draftDiffVersionId && hasDraftVersusLiveConsoleDiff(liveDashboardQuery.data, draftDashboardQuery.data),
-    [draftDiffVersionId, liveDashboardQuery.data, draftDashboardQuery.data],
+    () => !!draftDashboardData && hasDraftVersusLiveConsoleDiff(liveDashboardQuery.data, draftDashboardData),
+    [draftDashboardData, liveDashboardQuery.data],
   );
   const draftConsoleDiff = useMemo(() => {
     if (!hasDraftConsoleDiffVersusLive) return undefined;
-    return { diffCounts: getDraftConsoleDiffCounts(liveDashboardQuery.data, draftDashboardQuery.data) };
-  }, [hasDraftConsoleDiffVersusLive, liveDashboardQuery.data, draftDashboardQuery.data]);
+    return { diffCounts: getDraftConsoleDiffCounts(liveDashboardQuery.data, draftDashboardData) };
+  }, [draftDashboardData, hasDraftConsoleDiffVersusLive, liveDashboardQuery.data]);
   const consoleYamlDiffPayload = useMemo(() => {
-    if (!hasDraftConsoleDiffVersusLive || !draftDashboardQuery.data) return null;
+    if (!hasDraftConsoleDiffVersusLive || !draftDashboardData) return null;
     const liveYamlText = dashboardYamlText(canvasId, liveDashboardQuery.data);
-    const draftYamlText = dashboardYamlText(canvasId, draftDashboardQuery.data);
+    const draftYamlText = dashboardYamlText(canvasId, draftDashboardData);
 
     if (liveYamlText === draftYamlText) return null;
     return { liveYamlText, draftYamlText, filename: "console.yaml" };
-  }, [canvasId, hasDraftConsoleDiffVersusLive, liveDashboardQuery.data, draftDashboardQuery.data]);
+  }, [canvasId, draftDashboardData, hasDraftConsoleDiffVersusLive, liveDashboardQuery.data]);
   const [consoleDiffOpen, setConsoleDiffOpen] = useState(false);
   const onShowConsoleDiff = useCallback(() => setConsoleDiffOpen(true), []);
   useEffect(() => {
@@ -86,18 +110,26 @@ export function useCanvasConsoleVersionDiff({
   const hasDraftDiffVersusLive = hasDraftGraphDiffVersusLive || hasDraftConsoleDiffVersusLive;
   const draftChangeIndicators = getDraftChangeIndicators({
     suppressUnpublishedDraftDiscard,
-    hasLatestDraftVersion: !!versionIds.draft,
+    hasLatestDraftVersion: isEditingDraftBranch || !!versionIds.draft,
     hasDraftGraphDiffVersusLive,
     hasDraftConsoleDiffVersusLive,
     hasDraftDiffVersusLive,
+    hasCanvasStagingChanges,
+    hasConsoleStagingChanges,
   });
-  const updateDashboardMutation = useUpdateCanvasConsole(canvasId, versionIds.active || undefined, {
-    registerIgnoredCanvasVersionUpdatedEcho,
-  });
+
+  const noopUpdateDashboardMutation: UpdateCanvasConsoleMutationResult = useMemo(
+    () => ({
+      mutate: () => undefined,
+      mutateAsync: async () => undefined,
+      isPending: false,
+    }),
+    [],
+  );
 
   return {
     dashboardQuery,
-    updateDashboardMutation,
+    updateDashboardMutation: updateDashboardMutation ?? noopUpdateDashboardMutation,
     consoleDiffHeaderProps: {
       draftConsoleDiff,
       onShowConsoleDiff: consoleYamlDiffPayload ? onShowConsoleDiff : undefined,

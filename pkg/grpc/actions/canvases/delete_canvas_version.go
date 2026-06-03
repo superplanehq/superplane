@@ -28,9 +28,9 @@ func DeleteCanvasVersion(ctx context.Context, organizationID string, canvasID st
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
-	versionUUID, err := uuid.Parse(versionID)
+	versionSHA, err := parseVersionSHA(versionID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+		return nil, err
 	}
 
 	canvas, err := models.FindCanvas(orgUUID, canvasUUID)
@@ -41,7 +41,7 @@ func DeleteCanvasVersion(ctx context.Context, organizationID string, canvasID st
 	userUUID := uuid.MustParse(userID)
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		version, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, versionUUID)
+		version, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, versionSHA)
 		if findErr != nil {
 			if errors.Is(findErr, gorm.ErrRecordNotFound) {
 				return status.Error(codes.NotFound, "version not found")
@@ -68,7 +68,7 @@ func DeleteCanvasVersion(ctx context.Context, organizationID string, canvasID st
 		return nil, status.Error(codes.Internal, "failed to delete canvas version")
 	}
 
-	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), versionUUID.String()).PublishVersionUpdated(); err != nil {
+	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), versionSHA).PublishVersionUpdated(); err != nil {
 		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
 	}
 

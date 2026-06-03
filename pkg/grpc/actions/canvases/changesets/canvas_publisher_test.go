@@ -83,13 +83,9 @@ func Test__NewCanvasPublisher(t *testing.T) {
 		nil,
 	)
 
-	draft, err := models.SaveCanvasDraftInTransaction(
-		database.Conn(),
-		canvas.ID,
-		r.User,
-		[]models.Node{
-			componentNode("node-a", "Node A", "noop", map[string]any{"before": "value"}),
-		},
+	draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, "", []models.Node{
+		componentNode("node-a", "Node A", "noop", map[string]any{"before": "value"}),
+	},
 		nil,
 	)
 	require.NoError(t, err)
@@ -119,14 +115,10 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			},
 		)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
-			database.Conn(),
-			canvas.ID,
-			r.User,
-			[]models.Node{
-				componentNode("node-a", "Node A Updated", "noop", map[string]any{"value": "after"}),
-				componentNode("node-c", "Node C", "noop", map[string]any{"value": "new"}),
-			},
+		draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, "", []models.Node{
+			componentNode("node-a", "Node A Updated", "noop", map[string]any{"value": "after"}),
+			componentNode("node-c", "Node C", "noop", map[string]any{"value": "new"}),
+		},
 			[]models.Edge{
 				{SourceID: "node-a", TargetID: "node-c", Channel: "default"},
 			},
@@ -195,14 +187,10 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			nil,
 		)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
-			database.Conn(),
-			canvas.ID,
-			r.User,
-			[]models.Node{
-				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
-				componentNode("node-broken", "Node Broken", "missingcomponent", map[string]any{}),
-			},
+		draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, "", []models.Node{
+			componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+			componentNode("node-broken", "Node Broken", "missingcomponent", map[string]any{}),
+		},
 			nil,
 		)
 		require.NoError(t, err)
@@ -247,22 +235,18 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			"authentication": "signature",
 		}
 
-		draft, err := models.SaveCanvasDraftInTransaction(
-			database.Conn(),
-			canvas.ID,
-			r.User,
-			[]models.Node{
-				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
-				{
-					ID:            "node-b",
-					Name:          "Node B",
-					Type:          models.NodeTypeComponent,
-					Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
-					Configuration: map[string]any{"value": "new"},
-					Metadata:      expectedMetadata,
-					Position:      models.Position{X: 10, Y: 20},
-				},
+		draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, "", []models.Node{
+			componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+			{
+				ID:            "node-b",
+				Name:          "Node B",
+				Type:          models.NodeTypeComponent,
+				Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "noop"}},
+				Configuration: map[string]any{"value": "new"},
+				Metadata:      expectedMetadata,
+				Position:      models.Position{X: 10, Y: 20},
 			},
+		},
 			nil,
 		)
 		require.NoError(t, err)
@@ -292,21 +276,17 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			nil,
 		)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
-			database.Conn(),
-			canvas.ID,
-			r.User,
-			[]models.Node{
-				{
-					ID:            "approval-node",
-					Name:          "Approval Node",
-					Type:          models.NodeTypeComponent,
-					Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "approval"}},
-					Configuration: map[string]any{},
-					Metadata:      map[string]any{},
-					Position:      models.Position{X: 10, Y: 20},
-				},
+		draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, "", []models.Node{
+			{
+				ID:            "approval-node",
+				Name:          "Approval Node",
+				Type:          models.NodeTypeComponent,
+				Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "approval"}},
+				Configuration: map[string]any{},
+				Metadata:      map[string]any{},
+				Position:      models.Position{X: 10, Y: 20},
 			},
+		},
 			nil,
 		)
 		require.NoError(t, err)
@@ -344,16 +324,12 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 			nil,
 		)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
-			database.Conn(),
-			canvas.ID,
-			r.User,
-			[]models.Node{
-				triggerNode("schedule-trigger", "Schedule Trigger", "schedule", map[string]any{
-					"type":            "minutes",
-					"minutesInterval": 1,
-				}),
-			},
+		draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, "", []models.Node{
+			triggerNode("schedule-trigger", "Schedule Trigger", "schedule", map[string]any{
+				"type":            "minutes",
+				"minutesInterval": 1,
+			}),
+		},
 			nil,
 		)
 		require.NoError(t, err)
@@ -388,23 +364,19 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		)
 
 		existingError := "invalid configuration from previous validation"
-		draft, err := models.SaveCanvasDraftInTransaction(
-			database.Conn(),
-			canvas.ID,
-			r.User,
-			[]models.Node{
-				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
-				{
-					ID:            "node-broken",
-					Name:          "Node Broken",
-					Type:          models.NodeTypeComponent,
-					Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "missingcomponent"}},
-					Configuration: map[string]any{},
-					Metadata:      map[string]any{},
-					Position:      models.Position{X: 10, Y: 20},
-					ErrorMessage:  &existingError,
-				},
+		draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, "", []models.Node{
+			componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+			{
+				ID:            "node-broken",
+				Name:          "Node Broken",
+				Type:          models.NodeTypeComponent,
+				Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "missingcomponent"}},
+				Configuration: map[string]any{},
+				Metadata:      map[string]any{},
+				Position:      models.Position{X: 10, Y: 20},
+				ErrorMessage:  &existingError,
 			},
+		},
 			nil,
 		)
 		require.NoError(t, err)
@@ -445,22 +417,18 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		)
 
 		existingError := "node has invalid setup data"
-		draft, err := models.SaveCanvasDraftInTransaction(
-			database.Conn(),
-			canvas.ID,
-			r.User,
-			[]models.Node{
-				{
-					ID:            "node-a",
-					Name:          "Node A Updated",
-					Type:          models.NodeTypeComponent,
-					Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "missingcomponent"}},
-					Configuration: map[string]any{"value": "after"},
-					Metadata:      map[string]any{},
-					Position:      models.Position{X: 10, Y: 20},
-					ErrorMessage:  &existingError,
-				},
+		draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, "", []models.Node{
+			{
+				ID:            "node-a",
+				Name:          "Node A Updated",
+				Type:          models.NodeTypeComponent,
+				Ref:           models.NodeRef{Component: &models.ComponentRef{Name: "missingcomponent"}},
+				Configuration: map[string]any{"value": "after"},
+				Metadata:      map[string]any{},
+				Position:      models.Position{X: 10, Y: 20},
+				ErrorMessage:  &existingError,
 			},
+		},
 			nil,
 		)
 		require.NoError(t, err)
@@ -509,14 +477,10 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, database.Conn().Create(&legacyNode).Error)
 		require.NoError(t, database.Conn().Delete(&legacyNode).Error)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
-			database.Conn(),
-			canvas.ID,
-			r.User,
-			[]models.Node{
-				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
-				componentNode(conflictingID, "Node Conflict", "noop", map[string]any{"value": "new"}),
-			},
+		draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, "", []models.Node{
+			componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+			componentNode(conflictingID, "Node Conflict", "noop", map[string]any{"value": "new"}),
+		},
 			nil,
 		)
 		require.NoError(t, err)
@@ -575,17 +539,13 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, database.Conn().Create(&legacyNode).Error)
 		require.NoError(t, database.Conn().Delete(&legacyNode).Error)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
-			database.Conn(),
-			canvas.ID,
-			r.User,
-			[]models.Node{
-				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
-				triggerNode(conflictingID, "PR Opened", "schedule", map[string]any{
-					"type":            "minutes",
-					"minutesInterval": 1,
-				}),
-			},
+		draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, "", []models.Node{
+			componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+			triggerNode(conflictingID, "PR Opened", "schedule", map[string]any{
+				"type":            "minutes",
+				"minutesInterval": 1,
+			}),
+		},
 			[]models.Edge{
 				{SourceID: conflictingID, TargetID: "node-a", Channel: "default"},
 			},
@@ -639,14 +599,10 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		require.NoError(t, database.Conn().Create(&legacyNode).Error)
 		require.NoError(t, database.Conn().Delete(&legacyNode).Error)
 
-		draft, err := models.SaveCanvasDraftInTransaction(
-			database.Conn(),
-			canvas.ID,
-			r.User,
-			[]models.Node{
-				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
-				componentNode(conflictingID, "Node Conflict Broken", "missingcomponent", map[string]any{}),
-			},
+		draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, "", []models.Node{
+			componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+			componentNode(conflictingID, "Node Conflict Broken", "missingcomponent", map[string]any{}),
+		},
 			nil,
 		)
 		require.NoError(t, err)
@@ -711,13 +667,9 @@ func Test__CanvasPublisher_Publish(t *testing.T) {
 		)
 
 		// Intentionally keep an invalid edge in draft to assert publisher-side sanitization.
-		draft, err := models.SaveCanvasDraftInTransaction(
-			database.Conn(),
-			canvas.ID,
-			r.User,
-			[]models.Node{
-				componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
-			},
+		draft, err := models.SaveCanvasDraftInTransaction(database.Conn(), canvas.ID, r.User, "", []models.Node{
+			componentNode("node-a", "Node A", "noop", map[string]any{"value": "before"}),
+		},
 			[]models.Edge{
 				{SourceID: "node-a", TargetID: "node-b", Channel: "default"},
 			},

@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"strings"
 
 	"github.com/google/uuid"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
@@ -11,7 +12,14 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, organizationID string, id string) (*pb.ListCanvasRepositoryFilesResponse, error) {
+func ListCanvasRepositoryFiles(
+	ctx context.Context,
+	gitProvider git.Provider,
+	organizationID string,
+	id string,
+	branch string,
+	ref string,
+) (*pb.ListCanvasRepositoryFilesResponse, error) {
 	canvasID, err := uuid.Parse(id)
 	if err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
@@ -27,7 +35,8 @@ func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, or
 		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
 	}
 
-	files, err := gitProvider.ListFiles(ctx, repository.RepoID)
+	gitRef := resolveRepositoryRef(branch, ref)
+	files, err := gitProvider.ListFiles(ctx, repository.RepoID, gitRef)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to list repository files: %v", err)
 	}
@@ -42,4 +51,14 @@ func ListCanvasRepositoryFiles(ctx context.Context, gitProvider git.Provider, or
 	return &pb.ListCanvasRepositoryFilesResponse{
 		Files: paths,
 	}, nil
+}
+
+func resolveRepositoryRef(branch, ref string) string {
+	if trimmed := strings.TrimSpace(ref); trimmed != "" {
+		return trimmed
+	}
+	if trimmed := strings.TrimSpace(branch); trimmed != "" {
+		return trimmed
+	}
+	return models.CanvasGitBranchMain
 }

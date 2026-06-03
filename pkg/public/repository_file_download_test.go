@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -27,14 +28,35 @@ func downloadFile(
 	canvasID string,
 	path string,
 ) *httptest.ResponseRecorder {
+	return downloadFileOnBranch(t, server, signer, organizationID, accountID, canvasID, path, "")
+}
+
+func downloadFileOnBranch(
+	t *testing.T,
+	server *Server,
+	signer *jwt.Signer,
+	organizationID uuid.UUID,
+	accountID *uuid.UUID,
+	canvasID string,
+	path string,
+	branch string,
+) *httptest.ResponseRecorder {
 	t.Helper()
 
-	url := fmt.Sprintf("/api/v1/canvases/%s/repository/file", canvasID)
+	query := url.Values{}
 	if path != "" {
-		url += "?path=" + path
+		query.Set("path", path)
+	}
+	if branch != "" {
+		query.Set("branch", branch)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, url, nil)
+	requestURL := fmt.Sprintf("/api/v1/canvases/%s/repository/file", canvasID)
+	if encoded := query.Encode(); encoded != "" {
+		requestURL += "?" + encoded
+	}
+
+	req := httptest.NewRequest(http.MethodGet, requestURL, nil)
 	if accountID != nil {
 		req.Header.Set("x-organization-id", organizationID.String())
 		token, err := signer.Generate(accountID.String(), time.Hour)
@@ -127,7 +149,7 @@ func Test__RepositoryFileDownload(t *testing.T) {
 
 	t.Run("returns file contents", func(t *testing.T) {
 		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-		headSHA, err := r.GitProvider.Head(context.Background(), repository.RepoID)
+		headSHA, err := r.GitProvider.Head(context.Background(), repository.RepoID, "")
 		require.NoError(t, err)
 
 		_, err = r.GitProvider.Commit(context.Background(), repository.RepoID, git.CommitOptions{
@@ -149,5 +171,56 @@ func Test__RepositoryFileDownload(t *testing.T) {
 		assert.Equal(t, "application/octet-stream", response.Header().Get("Content-Type"))
 		assert.Equal(t, "nosniff", response.Header().Get("X-Content-Type-Options"))
 		assert.Contains(t, response.Header().Get("Content-Disposition"), "README.md")
+	})
+
+	t.Run("reads file contents from the requested branch", func(t *testing.T) {
+		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
+		ctx := context.Background()
+
+		mainSHA, err := r.GitProvider.Head(ctx, repository.RepoID, "")
+		require.NoError(t, err)
+
+		_, err = r.GitProvider.Commit(ctx, repository.RepoID, git.CommitOptions{
+			ExpectedHeadSHA: mainSHA,
+			Message:         "seed readme on main",
+			Operations: []git.FileOperation{
+				{
+					Path:      "README.md",
+					Content:   bytes.NewReader([]byte("live content")),
+					SizeBytes: int64(len("live content")),
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		const branch = "drafts/test"
+		require.NoError(t, r.GitProvider.CreateBranch(ctx, repository.RepoID, branch, ""))
+
+		branchSHA, err := r.GitProvider.Head(ctx, repository.RepoID, branch)
+		require.NoError(t, err)
+
+		_, err = r.GitProvider.Commit(ctx, repository.RepoID, git.CommitOptions{
+			Branch:          branch,
+			ExpectedHeadSHA: branchSHA,
+			Message:         "draft change",
+			Operations: []git.FileOperation{
+				{
+					Path:      "README.md",
+					Content:   bytes.NewReader([]byte("draft content")),
+					SizeBytes: int64(len("draft content")),
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		// Without a branch param we read the default branch (live).
+		liveResponse := downloadFile(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "README.md")
+		assert.Equal(t, http.StatusOK, liveResponse.Code)
+		assert.Equal(t, "live content", liveResponse.Body.String())
+
+		// With the branch param we read the draft branch tip.
+		branchResponse := downloadFileOnBranch(t, server, signer, r.Organization.ID, authenticated, canvas.ID.String(), "README.md", branch)
+		assert.Equal(t, http.StatusOK, branchResponse.Code)
+		assert.Equal(t, "draft content", branchResponse.Body.String())
 	})
 }

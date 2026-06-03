@@ -8,6 +8,12 @@ import (
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 )
 
+func ParseChangeRequestApproversFromProto(
+	config *pb.Canvas_ChangeManagement,
+) ([]models.CanvasChangeRequestApprover, error) {
+	return parseCanvasChangeRequestApprovalConfig(config)
+}
+
 func parseCanvasChangeRequestApprovalConfig(
 	config *pb.Canvas_ChangeManagement,
 ) ([]models.CanvasChangeRequestApprover, error) {

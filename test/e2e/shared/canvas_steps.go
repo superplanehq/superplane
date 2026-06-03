@@ -34,9 +34,14 @@ func NewCanvasSteps(name string, t *testing.T, session *session.TestSession) *Ca
 	return &CanvasSteps{t: t, session: session, CanvasName: name}
 }
 
-// EnterEditMode clicks the Edit button in the header to create a draft version.
+// EnterEditMode clicks the Edit button and starts editing on a draft branch.
 // This must be called before making any canvas changes.
 func (s *CanvasSteps) EnterEditMode() {
+	s.ClickEditButton()
+	s.HandleStartEditingMenu()
+}
+
+func (s *CanvasSteps) ClickEditButton() {
 	editButton := q.TestID("canvas-edit-button").Run(s.session)
 
 	deadline := time.Now().Add(15 * time.Second)
@@ -56,9 +61,79 @@ func (s *CanvasSteps) EnterEditMode() {
 	s.session.Sleep(500)
 }
 
-// Publish clicks the Publish button in the header to publish the current draft version.
-// This should be called after making and saving canvas changes.
+func (s *CanvasSteps) ExitEditMode() {
+	exitButton := q.TestID("canvas-exit-edit-button").Run(s.session)
+
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		disabled, err := exitButton.IsDisabled()
+		require.NoError(s.t, err)
+		if !disabled {
+			break
+		}
+		if time.Now().After(deadline) {
+			s.t.Fatalf("exit edit button did not become enabled")
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	require.NoError(s.t, exitButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	s.session.Sleep(500)
+}
+
+func (s *CanvasSteps) HandleStartEditingMenu() {
+	menu := q.TestID("start-editing-menu").Run(s.session)
+	visible, err := menu.IsVisible()
+	require.NoError(s.t, err)
+	if !visible {
+		return
+	}
+
+	continueButton := q.TestID("start-editing-continue").Run(s.session)
+	if continueVisible, continueErr := continueButton.IsVisible(); continueErr == nil && continueVisible {
+		require.NoError(s.t, continueButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+		s.session.Sleep(500)
+		return
+	}
+
+	createButton := q.TestID("start-editing-create").Run(s.session)
+	require.NoError(s.t, createButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	s.session.Sleep(500)
+}
+
+// CommitIfNeeded clicks Commit when staged changes are pending.
+func (s *CanvasSteps) CommitIfNeeded() {
+	s.session.Sleep(1500)
+
+	commitButton := q.Locator(`header button:has-text("Commit")`).Run(s.session)
+	visible, err := commitButton.IsVisible()
+	require.NoError(s.t, err)
+	if !visible {
+		return
+	}
+
+	deadline := time.Now().Add(15 * time.Second)
+	for {
+		disabled, disabledErr := commitButton.IsDisabled()
+		require.NoError(s.t, disabledErr)
+		if !disabled {
+			break
+		}
+		if time.Now().After(deadline) {
+			s.t.Fatalf("commit button did not become enabled")
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+
+	require.NoError(s.t, commitButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	s.session.AssertText("Changes committed to draft branch")
+	s.session.Sleep(500)
+}
+
+// Publish commits staged changes when needed, then publishes the draft branch to live.
 func (s *CanvasSteps) Publish() {
+	s.CommitIfNeeded()
+
 	publishButton := q.Locator(`header button:has-text("Publish")`).Run(s.session)
 
 	deadline := time.Now().Add(15 * time.Second)
@@ -75,6 +150,7 @@ func (s *CanvasSteps) Publish() {
 	}
 
 	require.NoError(s.t, publishButton.Click(pw.LocatorClickOptions{Timeout: pw.Float(15000)}))
+	s.session.AssertText("Canvas published to live")
 	s.session.Sleep(1000)
 }
 
@@ -95,7 +171,7 @@ func (s *CanvasSteps) FindCurrentDraft() *models.CanvasVersion {
 func (s *CanvasSteps) Create() {
 	user, err := models.FindMaybeDeletedUserByEmail(s.session.OrgID.String(), s.session.Account.Email)
 	require.NoError(s.t, err)
-	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, nil, nil)
+	canvas, _ := support.CreateCanvasGitFirst(s.t, s.session.OrgID, user.ID, nil, nil)
 	s.WorkflowID = canvas.ID
 
 	err = database.Conn().
@@ -114,7 +190,7 @@ func (s *CanvasSteps) CreatePublishedWithParameterizedManualRun() {
 	startNodeID := "start-trigger"
 	outputNodeID := "noop-output"
 
-	canvas, _ := support.CreateCanvas(s.t, s.session.OrgID, user.ID, []models.CanvasNode{
+	canvas, _ := support.CreateCanvasGitFirst(s.t, s.session.OrgID, user.ID, []models.CanvasNode{
 		{
 			NodeID: startNodeID,
 			Name:   "Start",
@@ -266,6 +342,8 @@ func (s *CanvasSteps) AddNoop(name string, pos models.Position) {
 	s.selectLatestNoopNode()
 	s.session.FillIn(q.TestID("node-name-input"), name)
 	s.session.Sleep(300)
+	s.ClickOnEmptyCanvasArea()
+	s.session.Sleep(300)
 	s.waitForDraftNodeID(name)
 }
 
@@ -305,6 +383,8 @@ func (s *CanvasSteps) AddNoopWithDefaultName(pos models.Position) string {
 }
 
 func (s *CanvasSteps) Save() {
+	s.CommitIfNeeded()
+
 	saveButton := q.TestID("save-canvas-button")
 	loc := saveButton.Run(s.session)
 
@@ -315,7 +395,7 @@ func (s *CanvasSteps) Save() {
 		return
 	}
 
-	s.session.Sleep(300)
+	s.session.Sleep(500)
 }
 
 func (s *CanvasSteps) AddApproval(nodeName string, pos models.Position) {
@@ -439,6 +519,10 @@ func (s *CanvasSteps) Connect(sourceName, targetName string) {
 func (s *CanvasSteps) waitForDraftNodeID(nodeName string) string {
 	deadline := time.Now().Add(30 * time.Second)
 	for time.Now().Before(deadline) {
+		if nodeID := s.findCanvasNodeIDFromDOM(nodeName); nodeID != "" {
+			return nodeID
+		}
+
 		draft := s.FindCurrentDraft()
 		if draft != nil {
 			for _, node := range draft.Nodes {
@@ -452,6 +536,24 @@ func (s *CanvasSteps) waitForDraftNodeID(nodeName string) string {
 
 	s.t.Fatalf("node %q not found in draft", nodeName)
 	return ""
+}
+
+func (s *CanvasSteps) findCanvasNodeIDFromDOM(nodeName string) string {
+	safe := strings.ToLower(nodeName)
+	safe = strings.ReplaceAll(safe, " ", "-")
+	node := q.Locator(`.react-flow__node:has([data-testid="node-` + safe + `-header"])`).Run(s.session)
+
+	visible, err := node.IsVisible()
+	if err != nil || !visible {
+		return ""
+	}
+
+	nodeID, err := node.GetAttribute("data-id")
+	if err != nil || nodeID == "" {
+		return ""
+	}
+
+	return nodeID
 }
 
 func (s *CanvasSteps) DeleteConnection(sourceName, targetName string) {

@@ -21,6 +21,7 @@ interface WorkflowHeaderEditActionsConfig {
   isRunsMode: boolean;
   handleExitRunsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
+  openStartEditingMenu?: () => void;
   setIsRunsMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setRunDetailNodeId: (value: string | null) => void;
@@ -32,6 +33,7 @@ export function useWorkflowHeaderEditActions({
   isRunsMode,
   handleExitRunsMode,
   handleToggleEditMode,
+  openStartEditingMenu,
   setIsRunsMode,
   setSelectedRunId,
   setRunDetailNodeId,
@@ -57,7 +59,7 @@ export function useWorkflowHeaderEditActions({
     await handleToggleEditMode();
   }, [handleExitRunsMode, handleToggleEditMode, isRunsMode]);
 
-  useAutoEditMode(startup, handleToggleEditMode, setSearchParams);
+  useAutoEditMode(startup, openStartEditingMenu, setSearchParams);
   useAutoPlaceholderNode(startup);
 
   return { handleEnterEditModeFromHeader, handleExitEditModeFromHeader };
@@ -65,7 +67,7 @@ export function useWorkflowHeaderEditActions({
 
 function useAutoEditMode(
   startup: WorkflowStartupActionsConfig | undefined,
-  handleToggleEditMode: () => Promise<void>,
+  openStartEditingMenu: (() => void) | undefined,
   setSearchParams: SetURLSearchParams,
 ) {
   const triggeredRef = useRef(false);
@@ -80,15 +82,15 @@ function useAutoEditMode(
     if (!canvasLoaded) return;
     if (hasEditableVersion) return;
     if (!canUpdateCanvas) return;
+    if (!openStartEditingMenu) return;
 
     triggeredRef.current = true;
+    openStartEditingMenu();
 
-    void handleToggleEditMode().then(() => {
-      const next = new URLSearchParams(searchParams);
-      next.delete("edit");
-      setSearchParams(next, { replace: true });
-    });
-  }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, canvasLoaded, handleToggleEditMode]);
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, canvasLoaded, openStartEditingMenu]);
 }
 
 function clearRunsViewSearchParams(current: URLSearchParams): URLSearchParams {
@@ -98,10 +100,6 @@ function clearRunsViewSearchParams(current: URLSearchParams): URLSearchParams {
   return next;
 }
 
-/**
- * After a blank canvas is created, automatically adds a placeholder "New Component" node.
- * Waits until edit mode is active and canvas is loaded.
- */
 function useAutoPlaceholderNode(startup: WorkflowStartupActionsConfig | undefined) {
   const addedRef = useRef(false);
   const hasEditableVersion = startup?.hasEditableVersion ?? false;

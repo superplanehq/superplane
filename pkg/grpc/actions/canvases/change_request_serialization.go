@@ -51,7 +51,7 @@ func SerializeCanvasChangeRequest(
 	metadata := &pb.CanvasChangeRequest_Metadata{
 		Id:           request.ID.String(),
 		CanvasId:     request.WorkflowID.String(),
-		VersionId:    request.VersionID.String(),
+		VersionId:    request.VersionID,
 		Owner:        owner,
 		Status:       canvasChangeRequestStatusToProto(request.Status),
 		Title:        request.Title,
@@ -59,7 +59,7 @@ func SerializeCanvasChangeRequest(
 		IsConflicted: request.IsConflicted(),
 	}
 	if request.BasedOnVersionID != nil {
-		metadata.BasedOnVersionId = request.BasedOnVersionID.String()
+		metadata.BasedOnVersionId = *request.BasedOnVersionID
 	}
 
 	if request.PublishedAt != nil {

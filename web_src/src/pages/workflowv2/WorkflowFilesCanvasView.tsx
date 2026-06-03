@@ -17,6 +17,7 @@ export function WorkflowFilesCanvasView({
   canvasId,
   isEditing,
   canWrite,
+  activeBranch,
   files,
   headerActionsSlotId,
   onHeaderActionsChange,
@@ -24,6 +25,7 @@ export function WorkflowFilesCanvasView({
   canvasId?: string;
   isEditing: boolean;
   canWrite: boolean;
+  activeBranch?: string | null;
   files: WorkflowFile[];
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: WorkflowFilesHeaderActionsState | null) => void;
@@ -32,6 +34,7 @@ export function WorkflowFilesCanvasView({
     canvasId,
     isEditing,
     canWrite,
+    activeBranch,
     files,
     headerActionsSlotId,
     onHeaderActionsChange,

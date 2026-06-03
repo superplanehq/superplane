@@ -117,6 +117,40 @@ describe("VersionsTabPanel", () => {
     expect(screen.getByTestId("versions-sidebar-scroll").scrollTop).toBe(420);
   });
 
+  it("shows draft branches in the drafts section", () => {
+    const onOpenDraftBranch = vi.fn();
+
+    render(
+      <VersionsTabPanel
+        liveVersions={[]}
+        draftBranches={[
+          {
+            branchName: "drafts/user-1",
+            displayName: "My draft",
+            tipSha: "abc1234567890123456789012345678901234567890",
+            owner: { id: "user-1", name: "Ada Lovelace" },
+            updatedAt: "2026-06-03T12:00:00.000Z",
+            materializationStatus: "ready",
+          },
+        ]}
+        activeDraftBranch="drafts/user-1"
+        canUpdateCanvas={true}
+        isTemplate={false}
+        canvasDeletedRemotely={false}
+        onUseVersion={vi.fn()}
+        onVersionNodeDiffContextChange={vi.fn()}
+        onOpenDraftBranch={onOpenDraftBranch}
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-drafts-section")).toBeInTheDocument();
+    expect(screen.getByText("My draft")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("My draft"));
+
+    expect(onOpenDraftBranch).toHaveBeenCalledWith("drafts/user-1");
+  });
+
   it("loads older versions when the sidebar scroll reaches the end", () => {
     const onLoadMoreLiveVersions = vi.fn();
     const liveVersions = [makePublishedVersion("version-3"), makePublishedVersion("version-2")];

@@ -903,7 +903,7 @@ type CanvasPatcherSteps struct {
 
 func (s *CanvasPatcherSteps) givenCanvasVersion(nodes []models.Node, edges []models.Edge) {
 	s.patcher = NewCanvasPatcher(database.Conn(), s.orgID, s.registry, &models.CanvasVersion{
-		ID:         uuid.New(),
+		ID:         models.NewCommitSHA(),
 		WorkflowID: uuid.New(),
 		Nodes:      datatypes.NewJSONSlice(nodes),
 		Edges:      datatypes.NewJSONSlice(edges),

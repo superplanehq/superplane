@@ -16,6 +16,7 @@ import (
 	"github.com/superplanehq/superplane/test/support"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type fakeCanvasUsageService struct {
@@ -286,4 +287,11 @@ func TestCreateCanvasWithUsageRejectsLimitViolation(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, codes.ResourceExhausted, status.Code(err))
 	require.Equal(t, "organization canvas limit exceeded", status.Convert(err).Message())
+}
+
+func structFromAnyMap(t *testing.T, values map[string]any) *structpb.Struct {
+	t.Helper()
+	result, err := structpb.NewStruct(values)
+	require.NoError(t, err)
+	return result
 }

@@ -19,12 +19,20 @@ type CanvasWebsocketPayload = {
 
 type CanvasLifecycleEventName = "canvas_updated" | "canvas_version_updated" | "canvas_deleted";
 
+type RepositoryBranchUpdatedPayload = {
+  canvasId: string;
+  branch?: string;
+  headSha?: string;
+  materializationStatus?: string;
+};
+
 type WebsocketPayload =
   | CanvasesCanvasNodeExecution
   | CanvasesCanvasEvent
   | CanvasesCanvasNodeQueueItem
   | CanvasesCanvasRun
-  | CanvasWebsocketPayload;
+  | CanvasWebsocketPayload
+  | RepositoryBranchUpdatedPayload;
 
 interface QueuedMessage {
   data: {
@@ -41,6 +49,7 @@ export function useCanvasWebsocket(
   onWorkflowEvent?: (event: CanvasesCanvasEvent, eventName: string) => void,
   onExecutionEvent?: (execution: CanvasesCanvasNodeExecution, eventName: string) => void,
   onCanvasLifecycleEvent?: (payload: CanvasWebsocketPayload, eventName: CanvasLifecycleEventName) => boolean | void,
+  onRepositoryBranchUpdated?: (payload: RepositoryBranchUpdatedPayload) => boolean | void,
   shouldApplyCanvasUpdate?: () => boolean,
   processRuntimeEvents = true,
   enabled = true,
@@ -57,7 +66,8 @@ export function useCanvasWebsocket(
       const payload = data.payload;
       const isCanvasLifecycleEvent =
         data.event === "canvas_updated" || data.event === "canvas_version_updated" || data.event === "canvas_deleted";
-      if (!isCanvasLifecycleEvent && !processRuntimeEvents) {
+      const isRepositoryBranchEvent = data.event === "repository_branch_updated";
+      if (!isCanvasLifecycleEvent && !isRepositoryBranchEvent && !processRuntimeEvents) {
         return;
       }
 
@@ -184,6 +194,21 @@ export function useCanvasWebsocket(
           queryClient.invalidateQueries({ queryKey: canvasKeys.list(organizationId) });
           break;
         }
+        case "repository_branch_updated": {
+          const branchMessage = payload as RepositoryBranchUpdatedPayload;
+          if (!branchMessage.canvasId || branchMessage.canvasId !== canvasId) {
+            break;
+          }
+
+          queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
+          queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
+          queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
+          queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
+          queryClient.invalidateQueries({ queryKey: canvasKeys.dashboardAll(canvasId) });
+
+          onRepositoryBranchUpdated?.(branchMessage);
+          break;
+        }
         default:
           break;
       }
@@ -196,6 +221,7 @@ export function useCanvasWebsocket(
       onWorkflowEvent,
       onExecutionEvent,
       onCanvasLifecycleEvent,
+      onRepositoryBranchUpdated,
       shouldApplyCanvasUpdate,
       processRuntimeEvents,
       organizationId,

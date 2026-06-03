@@ -1,7 +1,6 @@
 package canvases
 
 import (
-	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/models"
 	"gorm.io/gorm"
 )
@@ -26,7 +25,7 @@ func resolveCanvasChangeRequestBaseAndLiveInTransaction(
 	liveNodes = append([]models.Node(nil), liveVersion.Nodes...)
 	liveEdges = append([]models.Edge(nil), liveVersion.Edges...)
 
-	var baseVersionID *uuid.UUID
+	var baseVersionID *string
 	if request.BasedOnVersionID != nil {
 		baseVersionID = request.BasedOnVersionID
 	} else {

@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "../button";
 import { DiffSummaryHoverCard } from "./components/DiffSummaryHoverCard";
 import { EnterEditDraftDropdown } from "./components/EnterEditDraftDropdown";
+import { StartEditingDropdown } from "./components/StartEditingDropdown";
 import type { HeaderProps } from "./Header";
 
 export function SecondaryHeaderActions({
@@ -26,6 +27,8 @@ export function SecondaryHeaderActions({
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
+  discardVersionLabel,
+  discardVersionVisible,
   onPublishVersion,
   publishVersionLabel,
   publishVersionDisabled,
@@ -66,6 +69,8 @@ export function SecondaryHeaderActions({
             onDiscardVersion={onDiscardVersion}
             discardVersionDisabled={discardVersionDisabled}
             discardVersionDisabledTooltip={discardVersionDisabledTooltip}
+            discardVersionLabel={discardVersionLabel}
+            discardVersionVisible={discardVersionVisible}
             onPublishVersion={onPublishVersion}
             publishVersionLabel={publishVersionLabel}
             publishVersionDisabled={publishVersionDisabled}
@@ -98,6 +103,8 @@ function EditModePublishDiscardActions({
   onDiscardVersion,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
+  discardVersionLabel,
+  discardVersionVisible,
   onPublishVersion,
   publishVersionLabel,
   publishVersionDisabled,
@@ -108,15 +115,20 @@ function EditModePublishDiscardActions({
   | "onDiscardVersion"
   | "discardVersionDisabled"
   | "discardVersionDisabledTooltip"
+  | "discardVersionLabel"
+  | "discardVersionVisible"
   | "onPublishVersion"
   | "publishVersionLabel"
   | "publishVersionDisabled"
   | "publishVersionDisabledTooltip"
 >) {
+  const showDiscard = discardVersionVisible ?? hasUnpublishedDraftChanges;
+
   return (
     <div className="flex items-center gap-1.5">
-      {hasUnpublishedDraftChanges ? (
+      {showDiscard ? (
         <DiscardDraftButton
+          label={discardVersionLabel || "Discard"}
           onDiscard={() => onDiscardVersion?.()}
           disabled={discardVersionDisabled || !onDiscardVersion}
           disabledTooltip={discardVersionDisabledTooltip}
@@ -140,6 +152,13 @@ export function LiveModeTopHeaderActions({
   hasUnpublishedDraftChanges,
   onDiscardDraftAndStartEdit,
   unpublishedDraftUpdatedAt,
+  startEditingDrafts,
+  startEditingDefaultDraft,
+  startEditingMenuOpen,
+  onStartEditingMenuOpenChange,
+  onContinueDraftBranch,
+  onCreateDraftBranch,
+  createDraftBranchPending,
 }: Pick<
   HeaderProps,
   | "onEnterEditMode"
@@ -148,7 +167,29 @@ export function LiveModeTopHeaderActions({
   | "hasUnpublishedDraftChanges"
   | "onDiscardDraftAndStartEdit"
   | "unpublishedDraftUpdatedAt"
+  | "startEditingDrafts"
+  | "startEditingDefaultDraft"
+  | "startEditingMenuOpen"
+  | "onStartEditingMenuOpenChange"
+  | "onContinueDraftBranch"
+  | "onCreateDraftBranch"
+  | "createDraftBranchPending"
 >) {
+  if (startEditingDrafts !== undefined && onContinueDraftBranch && onCreateDraftBranch) {
+    return (
+      <StartEditingDropdown
+        open={startEditingMenuOpen}
+        onOpenChange={onStartEditingMenuOpenChange}
+        drafts={startEditingDrafts}
+        defaultDraft={startEditingDefaultDraft ?? null}
+        disabled={!!enterEditModeDisabled}
+        isSubmitting={createDraftBranchPending}
+        onContinueDraft={onContinueDraftBranch}
+        onCreateDraft={onCreateDraftBranch}
+      />
+    );
+  }
+
   if (!onEnterEditMode) {
     return null;
   }
@@ -321,10 +362,12 @@ function DiscardDraftButton({
   onDiscard,
   disabled,
   disabledTooltip,
+  label = "Discard",
 }: {
   onDiscard: () => void;
   disabled: boolean;
   disabledTooltip?: string;
+  label?: string;
 }) {
   if (disabled && disabledTooltip) {
     return (
@@ -332,7 +375,7 @@ function DiscardDraftButton({
         <TooltipTrigger asChild>
           <div className="inline-flex">
             <UIButton type="button" variant="outline" size="sm" onClick={onDiscard} disabled={disabled}>
-              Discard
+              {label}
             </UIButton>
           </div>
         </TooltipTrigger>
@@ -343,7 +386,7 @@ function DiscardDraftButton({
 
   return (
     <UIButton type="button" variant="outline" size="sm" onClick={onDiscard} disabled={disabled}>
-      Discard
+      {label}
     </UIButton>
   );
 }

@@ -3,7 +3,6 @@ package common
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -84,117 +83,35 @@ func findAppIDByName(ctx core.CommandContext, client *openapi_client.APIClient, 
 	return *matches[0].Metadata.Id, nil
 }
 
-// FindCurrentUserDraftVersionID returns the id of the first non-published
-// app version visible to the current user, or an empty string if none
-// exists. It does not create a draft.
+// FindCurrentUserDraftVersionID returns the materialized commit SHA at the tip
+// of the current user's default draft branch, or an empty string when none exists.
 func FindCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
-	response, _, err := ctx.API.CanvasVersionAPI.CanvasesListCanvasVersions(ctx.Context, appID).Execute()
-	if err != nil {
-		return "", err
-	}
-
-	for _, version := range response.GetVersions() {
-		metadata := version.GetMetadata()
-		if metadata.GetState() == openapi_client.CANVASESCANVASVERSIONSTATE_STATE_PUBLISHED {
-			continue
-		}
-
-		versionID := strings.TrimSpace(metadata.GetId())
-		if versionID == "" {
-			continue
-		}
-
-		return versionID, nil
-	}
-
-	return "", nil
+	return FindCurrentUserDraftTipSHA(ctx, appID)
 }
 
-// EnsureCurrentUserDraftVersionID returns the id of the current user's draft
-// version, creating one if it does not yet exist.
+// EnsureCurrentUserDraftVersionID returns the tip commit SHA for the user's
+// default draft branch, creating the branch when it does not yet exist.
 func EnsureCurrentUserDraftVersionID(ctx core.CommandContext, appID string) (string, error) {
-	versionID, err := FindCurrentUserDraftVersionID(ctx, appID)
-	if err != nil {
-		return "", err
-	}
-	if versionID != "" {
-		return versionID, nil
-	}
-
-	response, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesCreateCanvasVersion(ctx.Context, appID).
-		Body(map[string]interface{}{}).
-		Execute()
-	if err != nil {
-		return "", err
-	}
-	if response.Version == nil || response.Version.Metadata == nil {
-		return "", fmt.Errorf("draft version was not returned by the API")
-	}
-
-	versionID = strings.TrimSpace(response.Version.Metadata.GetId())
-	if versionID == "" {
-		return "", fmt.Errorf("draft version id was not returned by the API")
-	}
-
-	return versionID, nil
+	return EnsureCurrentUserDraftTipSHA(ctx, appID)
 }
 
-// FindOwnedDraftVersionID walks the version history (paginated) and returns
-// the id of the latest non-published version whose owner matches `userID`,
-// or an empty string when none is found.
+// FindOwnedDraftVersionID returns the tip commit SHA for the user's default draft branch.
 func FindOwnedDraftVersionID(ctx core.CommandContext, appID string, userID string) (string, error) {
 	trimmedUserID := strings.TrimSpace(userID)
 	if trimmedUserID == "" {
 		return "", nil
 	}
 
-	var before *time.Time
-	for {
-		req := ctx.API.CanvasVersionAPI.
-			CanvasesListCanvasVersions(ctx.Context, appID).
-			Limit(50)
-		if before != nil {
-			req = req.Before(*before)
-		}
-
-		response, _, err := req.Execute()
-		if err != nil {
-			return "", err
-		}
-
-		for _, version := range response.GetVersions() {
-			metadata := version.GetMetadata()
-			if metadata.GetState() == openapi_client.CANVASESCANVASVERSIONSTATE_STATE_PUBLISHED {
-				continue
-			}
-
-			ownerID := ""
-			if metadata.Owner != nil {
-				ownerID = strings.TrimSpace(metadata.Owner.GetId())
-			}
-			if ownerID == "" || !strings.EqualFold(ownerID, trimmedUserID) {
-				continue
-			}
-
-			versionID := strings.TrimSpace(metadata.GetId())
-			if versionID == "" {
-				continue
-			}
-
-			return versionID, nil
-		}
-
-		if !response.GetHasNextPage() {
-			return "", nil
-		}
-
-		last, ok := response.GetLastTimestampOk()
-		if !ok || last == nil {
-			return "", nil
-		}
-		before = last
+	me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
+	if err != nil {
+		return "", err
 	}
+	currentUserID := strings.TrimSpace(me.User.GetId())
+	if currentUserID == "" || !strings.EqualFold(currentUserID, trimmedUserID) {
+		return "", nil
+	}
+
+	return FindCurrentUserDraftTipSHA(ctx, appID)
 }
 
 // DescribeAppVersionByID loads a specific app version and errors when

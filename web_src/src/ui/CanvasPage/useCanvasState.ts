@@ -274,27 +274,36 @@ function useComponentSidebarState(
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(initial?.nodeId ?? null);
   const lastInitialRef = useRef<{ isOpen: boolean; nodeId: string | null } | null>(null);
 
+  // Keep the latest onChange in a ref so the callbacks and the sync effect below
+  // don't depend on its identity. `onChange` typically wraps react-router's
+  // `setSearchParams`, whose identity changes on every URL update — depending on
+  // it would otherwise re-run the sync effect on unrelated URL changes and
+  // re-push stale sidebar params back into the URL (e.g. after exiting edit
+  // mode, or clobbering the `branch` param when entering it).
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   const close = useCallback(() => {
     setIsOpen(false);
     setSelectedNodeId(null);
-    onChange?.(false, null);
-  }, [onChange]);
+    onChangeRef.current?.(false, null);
+  }, []);
 
-  const open = useCallback(
-    (nodeId: string) => {
-      setSelectedNodeId(nodeId);
-      setIsOpen(true);
-      onChange?.(true, nodeId);
-    },
-    [onChange],
-  );
+  const open = useCallback((nodeId: string) => {
+    setSelectedNodeId(nodeId);
+    setIsOpen(true);
+    onChangeRef.current?.(true, nodeId);
+  }, []);
 
-  // Keep external listener updated when selection changes while open
+  // Keep external listener updated when the selection genuinely changes while
+  // open. Intentionally does not depend on `onChange` identity (see above).
   useEffect(() => {
     if (isOpen) {
-      onChange?.(true, selectedNodeId);
+      onChangeRef.current?.(true, selectedNodeId);
     }
-  }, [isOpen, selectedNodeId, onChange]);
+  }, [isOpen, selectedNodeId]);
 
   useEffect(() => {
     if (initial?.isOpen === undefined && initial?.nodeId === undefined) {

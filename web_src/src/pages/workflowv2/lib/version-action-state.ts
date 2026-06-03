@@ -22,6 +22,10 @@ type DraftChangeIndicatorsInput = {
   hasDraftGraphDiffVersusLive: boolean;
   hasDraftConsoleDiffVersusLive: boolean;
   hasDraftDiffVersusLive: boolean;
+  /** canvas.yaml staged content differs from the branch baseline. */
+  hasCanvasStagingChanges?: boolean;
+  /** console.yaml staged content differs from the branch baseline. */
+  hasConsoleStagingChanges?: boolean;
 };
 
 type DraftChangeIndicators = {
@@ -35,7 +39,8 @@ export function getDraftChangeIndicators({
   hasLatestDraftVersion,
   hasDraftGraphDiffVersusLive,
   hasDraftConsoleDiffVersusLive,
-  hasDraftDiffVersusLive,
+  hasCanvasStagingChanges,
+  hasConsoleStagingChanges,
 }: DraftChangeIndicatorsInput): DraftChangeIndicators {
   if (suppressUnpublishedDraftDiscard || !hasLatestDraftVersion) {
     return {
@@ -45,10 +50,16 @@ export function getDraftChangeIndicators({
     };
   }
 
+  // Per-surface indicators: uncommitted staged changes for a file, or a
+  // committed-but-unpublished diff versus live for that surface. Staging is
+  // tracked per file so a canvas edit does not light up the console dot.
+  const hasUnpublishedCanvasDraftChanges = !!hasCanvasStagingChanges || hasDraftGraphDiffVersusLive;
+  const hasUnpublishedConsoleDraftChanges = !!hasConsoleStagingChanges || hasDraftConsoleDiffVersusLive;
+
   return {
-    hasUnpublishedDraftChanges: hasDraftDiffVersusLive,
-    hasUnpublishedCanvasDraftChanges: hasDraftGraphDiffVersusLive,
-    hasUnpublishedConsoleDraftChanges: hasDraftConsoleDiffVersusLive,
+    hasUnpublishedDraftChanges: hasUnpublishedCanvasDraftChanges || hasUnpublishedConsoleDraftChanges,
+    hasUnpublishedCanvasDraftChanges,
+    hasUnpublishedConsoleDraftChanges,
   };
 }
 

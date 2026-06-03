@@ -352,7 +352,7 @@ func CreateNextNodeExecution(
 
 func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
-	liveVersionID := uuid.New()
+	liveVersionID := models.NewCommitSHA()
 	changeManagementEnabled, err := models.IsChangeManagementEnabled(orgID)
 	require.NoError(t, err)
 
@@ -438,6 +438,8 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			PublishedAt:             &now,
 			Nodes:                   datatypes.NewJSONSlice(expandedNodes),
 			Edges:                   datatypes.NewJSONSlice(edges),
+			GitBranch:               models.CanvasGitBranchMain,
+			MaterializationStatus:   models.MaterializationStatusReady,
 			CreatedAt:               &now,
 			UpdatedAt:               &now,
 		}

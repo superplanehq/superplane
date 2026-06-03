@@ -141,7 +141,7 @@ func (s *runsViewSteps) givenOlderPublishedVersions(count int) {
 	for i := 0; i < count; i++ {
 		publishedAt := now.Add(-time.Duration(i) * time.Minute)
 		version := models.CanvasVersion{
-			ID:                      uuid.New(),
+			ID:                      models.NewCommitSHA(),
 			WorkflowID:              s.canvas.WorkflowID,
 			OwnerID:                 liveVersion.OwnerID,
 			State:                   models.CanvasVersionStatePublished,
@@ -152,6 +152,8 @@ func (s *runsViewSteps) givenOlderPublishedVersions(count int) {
 			PublishedAt:             &publishedAt,
 			Nodes:                   liveVersion.Nodes,
 			Edges:                   liveVersion.Edges,
+			GitBranch:               models.CanvasGitBranchMain,
+			MaterializationStatus:   models.MaterializationStatusReady,
 			CreatedAt:               &publishedAt,
 			UpdatedAt:               &publishedAt,
 		}

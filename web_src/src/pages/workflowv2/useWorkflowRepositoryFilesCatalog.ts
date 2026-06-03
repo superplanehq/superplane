@@ -8,11 +8,15 @@ import {
 } from "./lib/workflow-files-paths";
 import type { PendingFileChange, WorkflowFile } from "./workflow-files-types";
 
-export function useWorkflowRepositoryFilesCatalog(canvasId: string | undefined, files: WorkflowFile[]) {
+export function useWorkflowRepositoryFilesCatalog(
+  canvasId: string | undefined,
+  files: WorkflowFile[],
+  branch?: string,
+) {
   const canUseRepository = !!canvasId;
   const repositoryQuery = useCanvasRepository(canvasId ?? "", canUseRepository);
   const repositoryReady = repositoryQuery.data?.status?.state === "STATE_READY";
-  const filesQuery = useCanvasRepositoryFiles(canvasId ?? "", canUseRepository && repositoryReady);
+  const filesQuery = useCanvasRepositoryFiles(canvasId ?? "", canUseRepository && repositoryReady, branch);
   const generatedPaths = useMemo(() => files.map((file) => file.path), [files]);
   const generatedPathSet = useMemo(() => new Set(generatedPaths), [generatedPaths]);
   const generatedFilesByPath = useMemo(() => {

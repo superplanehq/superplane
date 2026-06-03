@@ -85,7 +85,7 @@ type CanvasNodeExecutionKVTestSteps struct {
 
 func (s *CanvasNodeExecutionKVTestSteps) CreateCanvas() {
 	now := time.Now()
-	liveVersionID := uuid.New()
+	liveVersionID := NewCommitSHA()
 	wf := &Canvas{
 		OrganizationID: uuid.New(),
 		LiveVersionID:  &liveVersionID,

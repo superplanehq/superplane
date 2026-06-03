@@ -57,4 +57,24 @@ describe("useWorkflowHeaderEditActions", () => {
     expect(config.setSearchParams).toHaveBeenCalledTimes(1);
     expect(config.handleToggleEditMode).toHaveBeenCalledTimes(1);
   });
+
+  it("opens the start editing menu for ?edit=1 deep links", () => {
+    const openStartEditingMenu = vi.fn();
+    const setSearchParams = vi.fn() as unknown as SetURLSearchParams;
+    const searchParams = new URLSearchParams("edit=1");
+
+    renderWorkflowHeaderEditActions({
+      openStartEditingMenu,
+      setSearchParams,
+      startup: {
+        hasEditableVersion: false,
+        canUpdateCanvas: true,
+        canvas: { metadata: { id: "canvas-1" } },
+        searchParams,
+      },
+    });
+
+    expect(openStartEditingMenu).toHaveBeenCalledTimes(1);
+    expect(setSearchParams).toHaveBeenCalledTimes(1);
+  });
 });

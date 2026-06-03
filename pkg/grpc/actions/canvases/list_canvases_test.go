@@ -317,7 +317,7 @@ func Test__ListCanvases__DoesNotReturnSoftDeletedCanvasesWhenIncludingTemplates(
 	require.NoError(t, deletedCanvas.SoftDelete())
 
 	now := time.Now()
-	templateLiveVersionID := uuid.New()
+	templateLiveVersionID := models.NewCommitSHA()
 	templateCanvas := &models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: models.TemplateOrganizationID,

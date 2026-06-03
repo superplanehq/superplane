@@ -107,15 +107,49 @@ service Canvases {
     };
   }
 
-  rpc CreateCanvasVersion(CreateCanvasVersionRequest) returns (CreateCanvasVersionResponse) {
+  rpc CreateDraftBranch(CreateDraftBranchRequest) returns (CreateDraftBranchResponse) {
     option (google.api.http) = {
-      post: "/api/v1/canvases/{canvas_id}/versions"
+      post: "/api/v1/canvases/{canvas_id}/repository/drafts"
       body: "*"
     };
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Create canvas version";
-      description: "Creates a user-owned canvas version from the current live canvas";
-      tags: "CanvasVersion";
+      summary: "Create draft branch";
+      description: "Creates a new draft git branch from main for editing a canvas";
+      tags: "CanvasRepository";
+    };
+  }
+
+  rpc ListDraftBranches(ListDraftBranchesRequest) returns (ListDraftBranchesResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/canvases/{canvas_id}/repository/drafts"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List draft branches";
+      description: "Lists draft git branches for a canvas";
+      tags: "CanvasRepository";
+    };
+  }
+
+  rpc DeleteDraftBranch(DeleteDraftBranchRequest) returns (DeleteDraftBranchResponse) {
+    option (google.api.http) = {
+      delete: "/api/v1/canvases/{canvas_id}/repository/drafts"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete draft branch";
+      description: "Deletes a draft git branch and its metadata";
+      tags: "CanvasRepository";
+    };
+  }
+
+  rpc PublishCanvas(PublishCanvasRequest) returns (PublishCanvasResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/canvases/{canvas_id}/repository/publish"
+      body: "*"
+    };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Publish canvas";
+      description: "Merges a draft branch to main and materializes the live canvas";
+      tags: "CanvasRepository";
     };
   }
 
@@ -137,46 +171,6 @@ service Canvases {
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
       summary: "Describe canvas version";
       description: "Returns one canvas version by ID";
-      tags: "CanvasVersion";
-    };
-  }
-
-  rpc UpdateCanvasVersion(UpdateCanvasVersionRequest) returns (UpdateCanvasVersionResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
-      body: "*"
-      additional_bindings {
-        put: "/api/v1/canvases/{canvas_id}/versions"
-        body: "*"
-      }
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas version";
-      description: "Updates a user-owned canvas version, including metadata and flow content";
-      tags: "CanvasVersion";
-    };
-  }
-
-  rpc ApplyCanvasVersionChangeset(ApplyCanvasVersionChangesetRequest) returns (ApplyCanvasVersionChangesetResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas version with a changeset";
-      description: "Update canvas version with a changeset";
-      tags: "CanvasVersion";
-    };
-  }
-
-  rpc ValidateCanvasVersionChangeset(ValidateCanvasVersionChangesetRequest) returns (ValidateCanvasVersionChangesetResponse) {
-    option (google.api.http) = {
-      patch: "/api/v1/canvases/{canvas_id}/versions/{version_id}/validate"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Validate a canvas version changeset";
-      description: "Validate a canvas version changeset";
       tags: "CanvasVersion";
     };
   }
@@ -490,18 +484,6 @@ service Canvases {
     };
   }
 
-  rpc UpdateCanvasDashboard(UpdateCanvasDashboardRequest) returns (UpdateCanvasDashboardResponse) {
-    option (google.api.http) = {
-      put: "/api/v1/canvases/{canvas_id}/dashboard"
-      body: "*"
-    };
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Update canvas dashboard";
-      description: "Replaces the dashboard for a canvas";
-      tags: "Canvas";
-    };
-  }
-
 }
 
 message ListCanvasesRequest {
@@ -594,6 +576,8 @@ message GetCanvasRepositoryResponse {
 
 message ListCanvasRepositoryFilesRequest {
   string canvas_id = 1;
+  string branch = 2;
+  string ref = 3;
 }
 
 message CanvasRepositoryFile {
@@ -615,18 +599,56 @@ message CommitCanvasRepositoryFilesRequest {
   string expected_head_sha = 2;
   string message = 3;
   repeated CanvasRepositoryFileOperation operations = 4;
+  string branch = 5;
 }
 
 message CommitCanvasRepositoryFilesResponse {
   string commit_sha = 1;
 }
 
-message CreateCanvasVersionRequest {
+message CreateDraftBranchRequest {
+  string canvas_id = 1;
+  optional string display_name = 2;
+}
+
+message CreateDraftBranchResponse {
+  CanvasDraftBranch branch = 1;
+}
+
+message ListDraftBranchesRequest {
   string canvas_id = 1;
 }
 
-message CreateCanvasVersionResponse {
+message ListDraftBranchesResponse {
+  repeated CanvasDraftBranch branches = 1;
+}
+
+message DeleteDraftBranchRequest {
+  string canvas_id = 1;
+  string branch_name = 2;
+}
+
+message DeleteDraftBranchResponse {}
+
+message PublishCanvasRequest {
+  string canvas_id = 1;
+  string draft_branch = 2;
+}
+
+message PublishCanvasResponse {
   CanvasVersion version = 1;
+}
+
+message CanvasDraftBranch {
+  string branch_name = 1;
+  string display_name = 2;
+  string tip_sha = 3;
+  UserRef owner = 4;
+  UserRef created_by = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  string materialization_status = 8;
+  string materialization_error = 9;
 }
 
 message ListCanvasVersionsRequest {
@@ -648,38 +670,6 @@ message DescribeCanvasVersionRequest {
 }
 
 message DescribeCanvasVersionResponse {
-  CanvasVersion version = 1;
-}
-
-message UpdateCanvasVersionRequest {
-  string canvas_id = 1;
-  string version_id = 2;
-  Canvas canvas = 3;
-  CanvasAutoLayout auto_layout = 4;
-}
-
-message UpdateCanvasVersionResponse {
-  CanvasVersion version = 1;
-}
-
-message ApplyCanvasVersionChangesetRequest {
-  string canvas_id = 1;
-  string version_id = 2;
-  CanvasChangeset changeset = 3;
-  CanvasAutoLayout auto_layout = 4;
-}
-
-message ApplyCanvasVersionChangesetResponse {
-  CanvasVersion version = 1;
-}
-
-message ValidateCanvasVersionChangesetRequest {
-  string canvas_id = 1;
-  string version_id = 2;
-  CanvasChangeset changeset = 3;
-}
-
-message ValidateCanvasVersionChangesetResponse {
   CanvasVersion version = 1;
 }
 
@@ -842,6 +832,9 @@ message CanvasVersion {
     google.protobuf.Timestamp updated_at = 7;
     string name = 8;
     string description = 9;
+    string git_branch = 10;
+    string materialization_status = 11;
+    string materialization_error = 12;
   }
 
   Metadata metadata = 1;
@@ -1309,6 +1302,15 @@ message CanvasVersionMessage {
   google.protobuf.Timestamp timestamp = 3;
 }
 
+message RepositoryBranchUpdatedMessage {
+  string canvas_id = 1;
+  string branch = 2;
+  string head_sha = 3;
+  string materialization_status = 4;
+  string materialization_error = 5;
+  google.protobuf.Timestamp timestamp = 6;
+}
+
 message NotificationEmailRequested {
   string organization_id = 1;
   string title = 2;
@@ -1351,16 +1353,5 @@ message GetCanvasDashboardRequest {
 }
 
 message GetCanvasDashboardResponse {
-  CanvasDashboard dashboard = 1;
-}
-
-message UpdateCanvasDashboardRequest {
-  string canvas_id = 1;
-  repeated DashboardPanel panels = 2;
-  repeated DashboardLayoutItem layout = 3;
-  optional string version_id = 4;
-}
-
-message UpdateCanvasDashboardResponse {
   CanvasDashboard dashboard = 1;
 }

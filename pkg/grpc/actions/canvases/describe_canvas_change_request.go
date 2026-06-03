@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"google.golang.org/grpc/codes"
@@ -53,6 +54,31 @@ func DescribeCanvasChangeRequest(
 			return nil, status.Error(codes.NotFound, "change request version not found")
 		}
 		return nil, status.Errorf(codes.Internal, "failed to load change request version: %v", err)
+	}
+
+	if request.Status == models.CanvasChangeRequestStatusOpen {
+		if refreshErr := database.Conn().Transaction(func(tx *gorm.DB) error {
+			canvasInTx, canvasErr := models.FindCanvasInTransaction(tx, uuid.MustParse(organizationID), canvasUUID)
+			if canvasErr != nil {
+				return canvasErr
+			}
+			versionInTx, versionErr := models.FindCanvasVersionInTransaction(tx, canvasUUID, request.VersionID)
+			if versionErr != nil {
+				return versionErr
+			}
+			requestInTx, requestErr := models.FindCanvasChangeRequestInTransaction(tx, canvasUUID, changeRequestUUID)
+			if requestErr != nil {
+				return requestErr
+			}
+			if refreshErr := refreshCanvasChangeRequestDiffInTransaction(tx, canvasInTx, versionInTx, requestInTx); refreshErr != nil {
+				return refreshErr
+			}
+			request = requestInTx
+			version = versionInTx
+			return nil
+		}); refreshErr != nil {
+			return nil, status.Errorf(codes.Internal, "failed to refresh change request diff: %v", refreshErr)
+		}
 	}
 
 	return &pb.DescribeCanvasChangeRequestResponse{

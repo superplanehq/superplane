@@ -150,7 +150,7 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 	}
 
 	now := time.Now()
-	liveVersionID := uuid.New()
+	liveVersionID := models.NewCommitSHA()
 	canvas := models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: models.TemplateOrganizationID,
@@ -195,6 +195,8 @@ func createTemplateCanvas(tx *gorm.DB, registry *registry.Registry, template *pb
 	version := models.CanvasVersion{
 		ID:                      liveVersionID,
 		WorkflowID:              canvas.ID,
+		GitBranch:               models.CanvasGitBranchMain,
+		MaterializationStatus:   models.MaterializationStatusReady,
 		State:                   models.CanvasVersionStatePublished,
 		Name:                    template.Metadata.Name,
 		Description:             template.Metadata.Description,

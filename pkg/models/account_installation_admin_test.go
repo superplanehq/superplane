@@ -196,7 +196,7 @@ func createTestCanvas(t *testing.T, organizationID uuid.UUID, name string) {
 	t.Helper()
 
 	now := time.Now()
-	liveVersionID := uuid.New()
+	liveVersionID := NewCommitSHA()
 	canvas := &Canvas{
 		ID:             uuid.New(),
 		OrganizationID: organizationID,

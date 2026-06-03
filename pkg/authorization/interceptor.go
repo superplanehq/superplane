@@ -218,9 +218,27 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
-		pbCanvases.Canvases_CreateCanvasVersion_FullMethodName: {
+		pbCanvases.Canvases_CreateDraftBranch_FullMethodName: {
 			Resource:         "canvases",
-			Action:           "update_version",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_ListDraftBranches_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "read",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_DeleteDraftBranch_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "update",
+			DomainType:       models.DomainTypeOrganization,
+			ResourceResolver: canvasResourceResolver,
+		},
+		pbCanvases.Canvases_PublishCanvas_FullMethodName: {
+			Resource:         "canvases",
+			Action:           "publish",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},
@@ -231,24 +249,6 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 			ResourceResolver: canvasResourceResolver,
 		},
 		pbCanvases.Canvases_DescribeCanvasVersion_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "read",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_UpdateCanvasVersion_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update_version",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_ApplyCanvasVersionChangeset_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update_version",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_ValidateCanvasVersionChangeset_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "read",
 			DomainType:       models.DomainTypeOrganization,
@@ -438,12 +438,6 @@ func NewAuthorizationInterceptor(authService Authorization) *AuthorizationInterc
 		pbCanvases.Canvases_GetCanvasDashboard_FullMethodName: {
 			Resource:         "canvases",
 			Action:           "read",
-			DomainType:       models.DomainTypeOrganization,
-			ResourceResolver: canvasResourceResolver,
-		},
-		pbCanvases.Canvases_UpdateCanvasDashboard_FullMethodName: {
-			Resource:         "canvases",
-			Action:           "update_version",
 			DomainType:       models.DomainTypeOrganization,
 			ResourceResolver: canvasResourceResolver,
 		},

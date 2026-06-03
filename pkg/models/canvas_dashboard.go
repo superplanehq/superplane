@@ -28,7 +28,7 @@ type DashboardLayoutItem struct {
 // CanvasDashboard is the API-facing view of a version-scoped console dashboard.
 type CanvasDashboard struct {
 	CanvasID  uuid.UUID
-	VersionID uuid.UUID
+	VersionID string
 	Panels    datatypes.JSONType[[]DashboardPanel]
 	Layout    datatypes.JSONType[[]DashboardLayoutItem]
 	UpdatedAt time.Time
@@ -75,7 +75,7 @@ func CanvasDashboardFromVersion(version *CanvasVersion) *CanvasDashboard {
 	}
 }
 
-func FindCanvasDashboardForVersionInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID) (*CanvasDashboard, error) {
+func FindCanvasDashboardForVersionInTransaction(tx *gorm.DB, workflowID uuid.UUID, versionID string) (*CanvasDashboard, error) {
 	version, err := FindCanvasVersionInTransaction(tx, workflowID, versionID)
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func FindCanvasDashboardForVersionInTransaction(tx *gorm.DB, workflowID, version
 	return CanvasDashboardFromVersion(version), nil
 }
 
-func FindCanvasDashboardForVersion(workflowID, versionID uuid.UUID) (*CanvasDashboard, error) {
+func FindCanvasDashboardForVersion(workflowID uuid.UUID, versionID string) (*CanvasDashboard, error) {
 	return FindCanvasDashboardForVersionInTransaction(database.Conn(), workflowID, versionID)
 }
 

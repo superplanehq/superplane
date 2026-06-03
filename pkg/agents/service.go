@@ -328,7 +328,7 @@ func getDraftStatus(canvasID uuid.UUID) string {
 		for _, draft := range drafts {
 			result += fmt.Sprintf(
 				"- Active draft: version %s (created %s)\n",
-				draft.ID.String(),
+				draft.ID,
 				draftCreatedAt(draft),
 			)
 		}
@@ -345,7 +345,7 @@ func getDraftStatus(canvasID uuid.UUID) string {
 
 	return fmt.Sprintf(
 		"[Draft Status]\nNo active drafts. The last draft was published as version %s at %s. Your changes are live.",
-		latestPublished.ID.String(),
+		latestPublished.ID,
 		latestPublished.PublishedAt.UTC().Format(time.RFC3339),
 	)
 }

@@ -102,7 +102,7 @@ func createRetentionCanvas(t *testing.T, orgID uuid.UUID) *models.Canvas {
 	t.Helper()
 
 	now := time.Now()
-	versionID := uuid.New()
+	versionID := models.NewCommitSHA()
 	canvas := models.Canvas{
 		ID:             uuid.New(),
 		OrganizationID: orgID,

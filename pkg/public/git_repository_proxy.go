@@ -1,6 +1,7 @@
 package public
 
 import (
+	"context"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -9,6 +10,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
+	log "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/canvas/materialize"
+	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
 )
@@ -50,6 +54,9 @@ func (s *Server) handleGitRepositoryProxy(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	canvasUUID := uuid.MustParse(canvasID)
+	notifyAfterPush := strings.Contains(gitSuffix, "git-receive-pack")
+
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	originalDirector := proxy.Director
 	proxy.Director = func(req *http.Request) {
@@ -65,7 +72,55 @@ func (s *Server) handleGitRepositoryProxy(w http.ResponseWriter, r *http.Request
 		req.Host = target.Host
 	}
 
+	if notifyAfterPush && s.gitProvider != nil {
+		proxy.ModifyResponse = func(resp *http.Response) error {
+			if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+				go s.notifyRepositoryBranchesUpdated(context.Background(), canvasUUID, repository)
+			}
+			return nil
+		}
+	}
+
 	proxy.ServeHTTP(w, r)
+}
+
+func (s *Server) notifyRepositoryBranchesUpdated(ctx context.Context, canvasID uuid.UUID, repository *models.Repository) {
+	branches, err := s.gitProvider.ListBranches(ctx, repository.RepoID, materialize.DraftBranchPrefix)
+	if err != nil {
+		log.WithError(err).Warnf("failed to list draft branches after git push for canvas %s", canvasID)
+	} else {
+		for _, branch := range branches {
+			headSHA, headErr := s.gitProvider.Head(ctx, repository.RepoID, branch)
+			if headErr != nil {
+				log.WithError(headErr).Warnf("failed to read head for branch %s on canvas %s", branch, canvasID)
+				continue
+			}
+			if publishErr := messages.NewRepositoryBranchUpdatedMessage(
+				canvasID.String(),
+				branch,
+				headSHA,
+				models.MaterializationStatusPending,
+				"",
+			).PublishBranchUpdated(); publishErr != nil {
+				log.WithError(publishErr).Warnf("failed to publish repository branch updated for canvas %s branch %s", canvasID, branch)
+			}
+		}
+	}
+
+	mainHead, err := s.gitProvider.Head(ctx, repository.RepoID, models.CanvasGitBranchMain)
+	if err != nil {
+		log.WithError(err).Warnf("failed to read main branch head after git push for canvas %s", canvasID)
+		return
+	}
+	if publishErr := messages.NewRepositoryBranchUpdatedMessage(
+		canvasID.String(),
+		models.CanvasGitBranchMain,
+		mainHead,
+		models.MaterializationStatusPending,
+		"",
+	).PublishBranchUpdated(); publishErr != nil {
+		log.WithError(publishErr).Warnf("failed to publish repository branch updated for canvas %s main", canvasID)
+	}
 }
 
 func parseGitRepositoryPath(path string) (canvasID string, gitSuffix string, ok bool) {

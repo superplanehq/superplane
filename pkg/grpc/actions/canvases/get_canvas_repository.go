@@ -42,7 +42,7 @@ func GetCanvasRepository(ctx context.Context, gitProvider git.Provider, organiza
 	//
 	var headSha string
 	if repository.Status == models.RepositoryStatusReady {
-		headSha, err = gitProvider.Head(ctx, repository.RepoID)
+		headSha, err = gitProvider.Head(ctx, repository.RepoID, "")
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to get repository head sha: %v", err)
 		}
