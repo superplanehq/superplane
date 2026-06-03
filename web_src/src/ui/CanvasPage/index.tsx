@@ -1777,7 +1777,7 @@ function Sidebar({
       nodeLabel={editingNodeData?.displayLabel}
       blockName={editingNodeData?.blockName}
       nodeConfiguration={editingNodeData?.configuration || {}}
-      nodeConfigurationFields={editingNodeData?.configurationFields || []}
+      nodeConfigurationFields={editingNodeData?.configurationFields ?? []}
       onNodeConfigSave={onSaveConfiguration}
       onNodeConfigCancel={undefined}
       configurationSaveMode={configurationSaveMode}

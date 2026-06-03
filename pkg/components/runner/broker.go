@@ -41,7 +41,6 @@ const (
 type BrokerClient struct {
 	httpClient core.HTTPContext
 	baseURL    string
-	fleetID    string
 	authToken  string
 }
 
@@ -49,11 +48,6 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 	baseURL := os.Getenv("TASK_BROKER_BASE_URL")
 	if baseURL == "" {
 		return nil, fmt.Errorf("TASK_BROKER_BASE_URL is not set")
-	}
-
-	fleetID := os.Getenv("TASK_BROKER_FLEET_ID")
-	if fleetID == "" {
-		return nil, fmt.Errorf("TASK_BROKER_FLEET_ID is not set")
 	}
 
 	authToken := os.Getenv("TASK_BROKER_AUTH_TOKEN")
@@ -64,7 +58,6 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 	return &BrokerClient{
 		httpClient: httpClient,
 		baseURL:    baseURL,
-		fleetID:    fleetID,
 		authToken:  authToken,
 	}, nil
 }
@@ -108,6 +101,7 @@ type BrokerEnvironmentVariable struct {
 
 // CreateTaskParams is forwarded to the task broker POST /v1/tasks.
 type CreateTaskParams struct {
+	MachineType    string
 	Commands       []string
 	WebhookURL     string
 	Environment    []BrokerEnvironmentVariable
@@ -126,8 +120,13 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 		mode = ExecutionModeHost
 	}
 
+	fleetID, err := requireMachineType(p.MachineType)
+	if err != nil {
+		return "", err
+	}
+
 	req := brokerCreateTaskRequest{
-		FleetID:       b.fleetID,
+		FleetID:       fleetID,
 		Commands:      p.Commands,
 		Environment:   p.Environment,
 		WebhookURL:    p.WebhookURL,
