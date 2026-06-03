@@ -17,6 +17,7 @@ import (
 
 	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/models"
+	"github.com/superplane/runner/shared/webhook"
 	brokermetrics "github.com/superplane/runner/task-broker/internal/metrics"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
@@ -120,4 +121,38 @@ func TestCompleteTaskRecordsTasksCompletedMetric(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, resp.StatusCode)
 
 	require.Equal(t, int64(1), metricCounterTotal(t, reader, "tasks.completed"))
+}
+
+func TestDeliverWebhookRecordsWebhookMetrics(t *testing.T) {
+	m, reader := testBrokerMetrics(t)
+
+	okSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer okSrv.Close()
+
+	failSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer failSrv.Close()
+
+	sender := &webhook.Sender{
+		Client:  okSrv.Client(),
+		Retries: 1,
+	}
+	srv := &Server{
+		Metrics: m,
+		Webhook: sender,
+	}
+
+	srv.DeliverWebhook(&models.Task{
+		ID: "task-ok", FleetID: "fleet-1", WebhookURL: okSrv.URL, Status: models.StatusSucceeded,
+	})
+	require.Equal(t, int64(1), metricCounterTotal(t, reader, "webhook.deliveries"))
+
+	sender.Client = failSrv.Client()
+	srv.DeliverWebhook(&models.Task{
+		ID: "task-fail", FleetID: "fleet-1", WebhookURL: failSrv.URL, Status: models.StatusSucceeded,
+	})
+	require.Equal(t, int64(2), metricCounterTotal(t, reader, "webhook.deliveries"))
 }

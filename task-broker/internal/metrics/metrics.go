@@ -11,11 +11,13 @@ import (
 
 // BrokerMetrics records task-broker OpenTelemetry metrics (see docs/metrics.md).
 type BrokerMetrics struct {
-	tasksCreated     metric.Int64Counter
-	tasksCompleted   metric.Int64Counter
-	tasksUnclaimed   metric.Int64Counter
-	leaseReaps       metric.Int64Counter
-	taskStartLatency metric.Float64Histogram
+	tasksCreated          metric.Int64Counter
+	tasksCompleted        metric.Int64Counter
+	tasksUnclaimed        metric.Int64Counter
+	leaseReaps            metric.Int64Counter
+	taskStartLatency      metric.Float64Histogram
+	webhookDeliveries     metric.Int64Counter
+	webhookDeliveryDur    metric.Float64Histogram
 }
 
 // New registers broker metric instruments on meter.
@@ -46,12 +48,25 @@ func New(meter metric.Meter) (*BrokerMetrics, error) {
 	if err != nil {
 		return nil, err
 	}
+	webhookDeliveries, err := meter.Int64Counter("webhook.deliveries",
+		metric.WithDescription("Terminal-state webhook POST attempts that finished"))
+	if err != nil {
+		return nil, err
+	}
+	webhookDeliveryDur, err := meter.Float64Histogram("webhook.delivery.duration",
+		metric.WithDescription("Wall time for one webhook delivery including retries"),
+		metric.WithUnit("s"))
+	if err != nil {
+		return nil, err
+	}
 	return &BrokerMetrics{
-		tasksCreated:     tasksCreated,
-		tasksCompleted:   tasksCompleted,
-		tasksUnclaimed:   tasksUnclaimed,
-		leaseReaps:       leaseReaps,
-		taskStartLatency: taskStartLatency,
+		tasksCreated:       tasksCreated,
+		tasksCompleted:     tasksCompleted,
+		tasksUnclaimed:     tasksUnclaimed,
+		leaseReaps:         leaseReaps,
+		taskStartLatency:   taskStartLatency,
+		webhookDeliveries:  webhookDeliveries,
+		webhookDeliveryDur: webhookDeliveryDur,
 	}, nil
 }
 
@@ -76,4 +91,13 @@ func (m *BrokerMetrics) LeaseReaped(ctx context.Context, fleetID string) {
 
 func (m *BrokerMetrics) TaskStartLatency(ctx context.Context, fleetID string, latency time.Duration) {
 	m.taskStartLatency.Record(ctx, latency.Seconds(), metric.WithAttributes(telemetry.FleetAttr(fleetID)))
+}
+
+func (m *BrokerMetrics) WebhookDelivered(ctx context.Context, fleetID, outcome string, duration time.Duration) {
+	attrs := metric.WithAttributes(
+		telemetry.FleetAttr(fleetID),
+		telemetry.OutcomeAttr(outcome),
+	)
+	m.webhookDeliveries.Add(ctx, 1, attrs)
+	m.webhookDeliveryDur.Record(ctx, duration.Seconds(), attrs)
 }

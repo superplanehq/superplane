@@ -436,7 +436,10 @@ func (s *Server) DeliverWebhook(task *models.Task) {
 	if strings.TrimSpace(task.ResultJSON) != "" {
 		payload.Result = json.RawMessage(task.ResultJSON)
 	}
-	if err := s.Webhook.Deliver(ctx, task.WebhookURL, payload); err != nil && s.Log != nil {
+	start := time.Now()
+	err := s.Webhook.Deliver(ctx, task.WebhookURL, payload)
+	s.recordWebhookDelivery(ctx, task.FleetID, err == nil, time.Since(start))
+	if err != nil && s.Log != nil {
 		s.Log.Warn("webhook delivery failed", slog.String("task_id", task.ID), slog.Any("err", err))
 	}
 }
@@ -521,6 +524,17 @@ func (s *Server) recordTaskUnclaimed(ctx context.Context, fleetID string) {
 		return
 	}
 	s.Metrics.TaskUnclaimed(ctx, fleetID)
+}
+
+func (s *Server) recordWebhookDelivery(ctx context.Context, fleetID string, succeeded bool, duration time.Duration) {
+	if s.Metrics == nil {
+		return
+	}
+	outcome := "failed"
+	if succeeded {
+		outcome = "succeeded"
+	}
+	s.Metrics.WebhookDelivered(ctx, fleetID, outcome, duration)
 }
 
 func (s *Server) recordLeaseReaped(ctx context.Context, fleetID string) {

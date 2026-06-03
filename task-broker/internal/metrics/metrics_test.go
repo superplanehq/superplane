@@ -82,3 +82,13 @@ func TestBrokerMetricsTaskStartLatency(t *testing.T) {
 	}
 	require.True(t, found)
 }
+
+func TestBrokerMetricsWebhookDelivered(t *testing.T) {
+	m, reader := testMeter(t)
+	ctx := context.Background()
+
+	m.WebhookDelivered(ctx, "fleet-a", "succeeded", 100*time.Millisecond)
+	m.WebhookDelivered(ctx, "fleet-a", "failed", 200*time.Millisecond)
+
+	require.Equal(t, int64(2), collectCounter(t, reader, "webhook.deliveries"))
+}
