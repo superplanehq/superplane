@@ -2,10 +2,6 @@ package canvases
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"regexp"
-	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
@@ -61,101 +57,45 @@ func CreateDraftBranch(
 	}
 
 	userUUID := uuid.MustParse(userID)
-	branchName, err := uniqueDraftBranchName(canvasUUID, userUUID)
+	branchName, err := materialize.UniqueDraftBranchName(ctx, gitProvider, repository.RepoID, userUUID)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to generate draft branch name: %v", err)
 	}
 
-	mainHead, err := gitProvider.Head(ctx, repository.RepoID, models.CanvasGitBranchMain)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read main branch head: %v", err)
-	}
-
-	if err := gitProvider.CreateBranch(ctx, repository.RepoID, branchName, models.CanvasGitBranchMain); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to create draft branch: %v", err)
-	}
-
-	label := strings.TrimSpace(displayName)
-	if label == "" {
-		label, err = nextDraftDisplayName(canvasUUID)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to generate draft name: %v", err)
+	createdGitBranch := false
+	if !materialize.GitBranchExists(ctx, gitProvider, repository.RepoID, branchName) {
+		if err := gitProvider.CreateBranch(ctx, repository.RepoID, branchName, models.CanvasGitBranchMain); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to create draft branch: %v", err)
 		}
+		createdGitBranch = true
 	}
 
 	var branch *models.CanvasDraftBranch
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		branch = &models.CanvasDraftBranch{
-			CanvasID:       canvasUUID,
-			OrganizationID: orgUUID,
-			BranchName:     branchName,
-			DisplayName:    label,
-			OwnerID:        &userUUID,
-			CreatedBy:      &userUUID,
-			TipSHA:         mainHead,
-		}
-		if createErr := models.CreateDraftBranchInTransaction(tx, branch); createErr != nil {
-			return createErr
-		}
-
-		mat := &materialize.DraftMaterializer{GitProvider: gitProvider, Registry: registry}
-		_, matErr := mat.MaterializeDraft(ctx, tx, orgUUID, canvasUUID, branchName, mainHead, &userUUID)
-		return matErr
+		var syncErr error
+		branch, syncErr = materialize.SyncDraftBranchFromGit(
+			ctx,
+			tx,
+			gitProvider,
+			registry,
+			orgUUID,
+			canvasUUID,
+			branchName,
+			materialize.SyncDraftBranchOptions{
+				CreatedBy:           &userUUID,
+				DisplayNameOverride: strings.TrimSpace(displayName),
+			},
+		)
+		return syncErr
 	})
 	if err != nil {
-		_ = gitProvider.DeleteBranch(ctx, repository.RepoID, branchName)
+		if createdGitBranch {
+			_ = gitProvider.DeleteBranch(ctx, repository.RepoID, branchName)
+		}
 		return nil, status.Errorf(codes.Internal, "failed to create draft branch: %v", err)
 	}
 
 	return &pb.CreateDraftBranchResponse{
 		Branch: serializeDraftBranch(branch, organizationID, nil),
 	}, nil
-}
-
-// uniqueDraftBranchName returns a draft branch name that does not yet exist for
-// the canvas. The first draft for a user keeps the default name so CLI and
-// change-request defaults stay aligned; subsequent drafts get a unique suffix.
-func uniqueDraftBranchName(canvasID, userID uuid.UUID) (string, error) {
-	base := materialize.DefaultDraftBranchName(userID)
-	candidate := base
-	for attempt := 0; attempt < 50; attempt++ {
-		existing, err := models.FindDraftBranch(canvasID, candidate)
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return candidate, nil
-		}
-		if err != nil {
-			return "", err
-		}
-		if existing == nil {
-			return candidate, nil
-		}
-		candidate = fmt.Sprintf("%s-%s", base, uuid.NewString()[:8])
-	}
-
-	return "", fmt.Errorf("could not generate a unique draft branch name after multiple attempts")
-}
-
-var draftDisplayNamePattern = regexp.MustCompile(`^Draft #(\d+)$`)
-
-// nextDraftDisplayName returns a sequential, human-friendly draft name such as
-// "Draft #1", "Draft #2". It picks the next number after the highest existing
-// "Draft #N" label so names stay distinct even after some drafts are deleted.
-func nextDraftDisplayName(canvasID uuid.UUID) (string, error) {
-	branches, err := models.ListDraftBranchesForCanvas(canvasID)
-	if err != nil {
-		return "", err
-	}
-
-	highest := 0
-	for _, branch := range branches {
-		matches := draftDisplayNamePattern.FindStringSubmatch(branch.DisplayName)
-		if matches == nil {
-			continue
-		}
-		if n, convErr := strconv.Atoi(matches[1]); convErr == nil && n > highest {
-			highest = n
-		}
-	}
-
-	return fmt.Sprintf("Draft #%d", highest+1), nil
 }

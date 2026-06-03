@@ -52,13 +52,23 @@ superplane apps canvas update -f canvas.yaml   # commits then merges to main
 
 ### External git push
 
-Clone/push against the app git remote (`/git/<canvas-id>.git`). After `git push`, the public git proxy publishes `repository_branch_updated` events so the **RepositoryMaterializer** worker can asynchronously materialize draft branches.
+Clone/push against the app git remote (`/git/<canvas-id>.git`). Creating a new `drafts/*` branch via git (push a new ref) is the write path; SuperPlane derives draft metadata from git:
+
+1. The public git proxy publishes `repository_branch_updated` events after a successful push.
+2. The **RepositoryMaterializer** worker calls `SyncDraftBranchFromGit`, which registers a `canvas_draft_branches` row (auto-named `Draft #1`, `Draft #2`, …) and materializes the branch tip.
+
+The UI and CLI `CreateDraftBranch` API only creates the git branch; the same sync path registers metadata and materializes the tip synchronously for API callers.
+
+```bash
+git push origin HEAD:refs/heads/drafts/$(superplane me -q id)
+# draft appears in `superplane apps drafts list` after the worker processes the push
+```
 
 ## APIs
 
 | RPC | Role |
 |-----|------|
-| `CreateDraftBranch` | Create `drafts/*` from `main` |
+| `CreateDraftBranch` | Create `drafts/*` git branch from `main`; sync registers metadata (`Draft #n`) |
 | `ListDraftBranches` / `DeleteDraftBranch` | Manage draft metadata |
 | `CommitCanvasRepositoryFiles` | Atomic multi-file commit + sync draft materialization |
 | `PublishCanvas` | Merge draft → `main` + sync live materialization |
@@ -70,8 +80,9 @@ Removed RPCs (git-first only): `UpdateCanvasVersion`, `ApplyCanvasVersionChanges
 
 | Trigger | Timing |
 |---------|--------|
+| New `drafts/*` git branch (API, CLI, or push) | `SyncDraftBranchFromGit` registers metadata + materializes tip (sync for API; async worker for push) |
 | `CommitCanvasRepositoryFiles` on a draft branch | Synchronous draft materialization |
-| External git push to a draft branch | Async worker + websocket `repository_branch_updated` |
+| External git push updating an existing draft branch | Async worker + websocket `repository_branch_updated` |
 | `PublishCanvas` | Synchronous live materialization + `CanvasPublisher` |
 
 ## Change management

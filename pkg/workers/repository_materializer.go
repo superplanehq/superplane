@@ -122,12 +122,6 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 	}
 	defer w.semaphore.Release(1)
 
-	repository, err := models.FindRepositoryUnscoped(canvasID)
-	if err != nil {
-		w.log("Error finding repository for canvas %s: %v", canvasID, err)
-		return err
-	}
-
 	canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
 	if err != nil {
 		w.log("Error finding canvas %s: %v", canvasID, err)
@@ -136,6 +130,12 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 
 	headSHA := message.GetHeadSha()
 	if headSHA == "" {
+		repository, headErr := models.FindRepositoryUnscoped(canvasID)
+		if headErr != nil {
+			w.log("Error finding repository for canvas %s: %v", canvasID, headErr)
+			return headErr
+		}
+
 		headSHA, err = w.GitProvider.Head(context.Background(), repository.RepoID, message.GetBranch())
 		if err != nil {
 			w.log("Error reading branch head for canvas %s branch %s: %v", canvasID, message.GetBranch(), err)
@@ -145,20 +145,26 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 
 	state, err := models.FindRepositoryMaterializationState(canvasID, message.GetBranch())
 	if err == nil && state.MaterializedSHA == headSHA && state.Status == models.MaterializationStatusReady {
-		return nil
+		draftBranch, draftErr := models.FindDraftBranch(canvasID, message.GetBranch())
+		if draftErr == nil && draftBranch != nil {
+			return nil
+		}
 	}
 
-	var draftBranch *models.CanvasDraftBranch
-	draftBranch, _ = models.FindDraftBranch(canvasID, message.GetBranch())
-
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		mat := &materialize.DraftMaterializer{GitProvider: w.GitProvider, Registry: w.Registry}
-		var ownerID *uuid.UUID
-		if draftBranch != nil {
-			ownerID = draftBranch.OwnerID
-		}
-		_, matErr := mat.MaterializeDraft(context.Background(), tx, canvas.OrganizationID, canvasID, message.GetBranch(), headSHA, ownerID)
-		return matErr
+		_, syncErr := materialize.SyncDraftBranchFromGit(
+			context.Background(),
+			tx,
+			w.GitProvider,
+			w.Registry,
+			canvas.OrganizationID,
+			canvasID,
+			message.GetBranch(),
+			materialize.SyncDraftBranchOptions{
+				HeadSHA: headSHA,
+			},
+		)
+		return syncErr
 	})
 	if err != nil {
 		w.log("Error materializing canvas %s branch %s: %v", canvasID, message.GetBranch(), err)
