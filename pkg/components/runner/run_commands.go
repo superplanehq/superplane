@@ -173,7 +173,7 @@ func (c *Runner) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeText,
 			Required:    true,
 			Placeholder: "echo \"Hello, World!\"",
-			Description: "One or more shell commands, one per line. In Docker mode these run inside the container (after image entrypoint behavior; use an image that stays alive long enough for your script).",
+			Description: "One shell command per line.",
 		},
 		{
 			Name:        "environment",
