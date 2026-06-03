@@ -147,7 +147,7 @@ type WebhookPayload struct {
 	Status   string `json:"status"`
 	ExitCode int    `json:"exit_code"`
 	Error    string `json:"error,omitempty"`
-	// CloudWatch fields mirror TaskStatusResponse when fleet-manager advertises log routing.
+	// CloudWatch fields mirror TaskStatusResponse when task-broker advertises log routing.
 	CloudWatchLogGroup  string `json:"cloudwatch_log_group,omitempty"`
 	CloudWatchLogStream string `json:"cloudwatch_log_stream,omitempty"`
 	// TaskLog is set when an external log sink is configured (e.g. type "cloudwatch"). CloudWatch* fields remain for backward compatibility.
@@ -169,7 +169,7 @@ type TaskStatusResponse struct {
 	ExitCode        *int       `json:"exit_code,omitempty"`
 	Error           string     `json:"error,omitempty"`
 	CancelRequested bool       `json:"cancel_requested,omitempty"`
-	// CloudWatchLogGroup and CloudWatchLogStream are set when fleet-manager is configured
+	// CloudWatchLogGroup and CloudWatchLogStream are set when task-broker is configured
 	// with TASK_CLOUDWATCH_LOG_GROUP so clients can tail logs in AWS (runner must use the same group/prefix).
 	CloudWatchLogGroup      string          `json:"cloudwatch_log_group,omitempty"`
 	CloudWatchLogStream     string          `json:"cloudwatch_log_stream,omitempty"`
@@ -178,7 +178,7 @@ type TaskStatusResponse struct {
 	Result                  json.RawMessage `json:"result,omitempty"`
 }
 
-// CancelTaskResponse is POST fleet-manager /v1/tasks/{id}/cancel.
+// CancelTaskResponse is POST task-broker /v1/tasks/{id}/cancel.
 type CancelTaskResponse struct {
 	ID     string `json:"id"`
 	State  string `json:"state"`  // already_terminal | canceled | cancel_requested
