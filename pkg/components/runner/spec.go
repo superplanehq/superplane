@@ -35,6 +35,7 @@ type EnvironmentVariable struct {
 
 // Spec is persisted Runner node configuration.
 type Spec struct {
+	MachineType             string                `mapstructure:"machine_type"`
 	Commands                string                `mapstructure:"commands"`
 	Environment             []EnvironmentVariable `mapstructure:"environment"`
 	ExecutionMode           string                `mapstructure:"execution_mode"`
@@ -104,6 +105,10 @@ func validateRunnerSpec(spec Spec) error {
 
 	if err := validateEnvironment(spec.Environment); err != nil {
 		return err
+	}
+
+	if strings.TrimSpace(spec.MachineType) == "" {
+		return fmt.Errorf("machine type is required")
 	}
 
 	ref := strings.TrimSpace(resolvedDockerImageRef(spec))
