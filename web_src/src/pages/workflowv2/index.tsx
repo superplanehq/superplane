@@ -4378,26 +4378,6 @@ export function WorkflowPageV2() {
     setIsVersionControlOpen(true);
   }, []);
 
-  const handlePreviewPreviousVersionViewDetails = useCallback(() => {
-    if (!selectedCanvasVersionID || !selectedCanvasVersion) {
-      return;
-    }
-    const index = liveVersions.findIndex((version) => version.metadata?.id === selectedCanvasVersionID);
-    if (index < 0) {
-      return;
-    }
-    const previousVersion = liveVersions[index + 1];
-    if (!previousVersion) {
-      return;
-    }
-    const changeRequest = liveVersionChangeRequestsByVersionId.get(selectedCanvasVersionID);
-    setVersionNodeDiffContext({
-      version: selectedCanvasVersion,
-      previousVersion,
-      changeRequest,
-    });
-  }, [selectedCanvasVersionID, selectedCanvasVersion, liveVersions, liveVersionChangeRequestsByVersionId]);
-
   const handleOpenAwaitingApprovalNodeDiff = useCallback(() => {
     if (!selectedCanvasVersionID) {
       return;
@@ -4645,6 +4625,14 @@ export function WorkflowPageV2() {
       draftCanvasSpec,
     ],
   );
+
+  const handleSeeCurrentVersion = useCallback(() => {
+    if (!liveCanvasVersionId) {
+      showErrorToast("No live version available");
+      return;
+    }
+    handleUseVersion(liveCanvasVersionId);
+  }, [liveCanvasVersionId, handleUseVersion]);
 
   const handleUseVersionFromVersionPanel = useCallback(
     (versionID: string) => {
@@ -5522,7 +5510,7 @@ export function WorkflowPageV2() {
           headerBanner={headerBanner}
           canvasStateMode={canvasStateMode}
           showCanvasSettingsMenu={canUpdateCanvas}
-          onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
+          onSeeCurrentVersion={handleSeeCurrentVersion}
           awaitingApprovalBanner={awaitingApprovalBanner}
           isVersionControlOpen={isVersionControlOpen}
           onOpenVersionControl={handleOpenVersionControl}
