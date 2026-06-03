@@ -1,6 +1,7 @@
 import { CommandGroup, CommandSeparator } from "@/components/ui/command";
 import { Palette, Settings } from "lucide-react";
 import { openPageAction } from "./actions";
+import { appPath, appSettingsPath } from "@/lib/appPaths";
 import { ActionItem, CanvasListItems, NestedPage, PageItem } from "./items";
 import type { CanvasCommandListProps, CommandPage, PaletteAction, PalettePageAction } from "./types";
 
@@ -111,7 +112,7 @@ export function CanvasSettingsPage({
               label: currentCanvasName,
               description: "Open canvas settings",
               icon: Settings,
-              onSelect: () => organizationId && goTo(`/${organizationId}/canvases/${canvasId}/settings`),
+              onSelect: () => organizationId && canvasId && goTo(appSettingsPath(organizationId, canvasId)),
             }}
           />
         ) : null}
@@ -152,7 +153,7 @@ function CanvasSettingsList({ goTo, organizationId, ...props }: CanvasCommandLis
       icon={Settings}
       onSelect={(canvas) => {
         const id = canvas.metadata?.id;
-        if (organizationId && id) goTo(`/${organizationId}/canvases/${id}/settings`);
+        if (organizationId && id) goTo(appSettingsPath(organizationId, id));
       }}
     />
   );
@@ -167,7 +168,7 @@ function OpenCanvasList({ goTo, organizationId, ...props }: CanvasCommandListPro
       icon={Palette}
       onSelect={(canvas) => {
         const id = canvas.metadata?.id;
-        if (organizationId && id) goTo(`/${organizationId}/canvases/${id}`);
+        if (organizationId && id) goTo(appPath(organizationId, id));
       }}
     />
   );

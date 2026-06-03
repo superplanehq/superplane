@@ -132,8 +132,16 @@ function PageHeader({
   onDiscardDraftAndStartEdit?: () => void;
   unpublishedDraftUpdatedAt?: string;
 }) {
-  const { workflowId, canvasId: canvasIdParam } = useParams<{ workflowId?: string; canvasId?: string }>();
-  const activeCanvasId = canvasIdParam || workflowId;
+  const {
+    workflowId,
+    canvasId: canvasIdParam,
+    appId,
+  } = useParams<{
+    workflowId?: string;
+    canvasId?: string;
+    appId?: string;
+  }>();
+  const activeCanvasId = appId || canvasIdParam || workflowId;
 
   return (
     <div className="relative z-20 flex h-10 items-center border-b border-slate-950/15 px-2 sm:px-3">

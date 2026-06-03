@@ -72,7 +72,7 @@ func (steps *TestLoginPageSteps) VisitLoginPage() {
 }
 
 func (steps *TestLoginPageSteps) VisitProtectedRandomURL() {
-	steps.protectedURLPath = "/" + steps.session.OrgID.String() + "/canvases/redirect-test"
+	steps.protectedURLPath = "/" + steps.session.OrgID.String() + "/apps/redirect-test"
 	steps.session.Visit(steps.protectedURLPath)
 }
 
