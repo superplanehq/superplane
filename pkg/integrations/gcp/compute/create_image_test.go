@@ -161,6 +161,34 @@ func Test__CreateImage__Execute(t *testing.T) {
 		assert.Contains(t, postPath, "forceCreate=true")
 	})
 
+	t.Run("multiple storage locations -> fails before API call", func(t *testing.T) {
+		var called bool
+		mc := &mockImageClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				called = true
+				return opDone("op"), nil
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"name":             "img",
+				"sourceType":       "disk",
+				"zone":             "us-central1-a",
+				"sourceDisk":       "my-disk",
+				"storageLocations": "us,eu",
+			},
+			ExecutionState: state,
+		})
+		require.NoError(t, err)
+		assert.False(t, state.Passed)
+		assert.False(t, called)
+		assert.Contains(t, state.FailureMessage, "only one storage location")
+	})
+
 	t.Run("missing source -> fails before API call", func(t *testing.T) {
 		var called bool
 		mc := &mockImageClient{

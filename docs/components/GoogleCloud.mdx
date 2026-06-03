@@ -774,7 +774,7 @@ The Create Image component creates a custom Compute Engine image.
 - **Image family**: Optional family to group related images (e.g. `my-app`).
 - **Description**: Optional human-readable description.
 - **Labels**: Optional key-value labels (billing, environment, team).
-- **Storage locations**: Optional comma-separated regions/multi-regions to store the image (e.g. `us`, `eu`).
+- **Storage location**: Optional single region or multi-region to store the image (e.g. `us` or `europe-west1`). Defaults to the source's region.
 - **Force create**: When the source is a disk attached to a running instance, create the image anyway (may produce an inconsistent image).
 
 ### Output

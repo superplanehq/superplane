@@ -68,7 +68,7 @@ func (c *CreateImage) Documentation() string {
 - **Image family**: Optional family to group related images (e.g. ` + "`my-app`" + `).
 - **Description**: Optional human-readable description.
 - **Labels**: Optional key-value labels (billing, environment, team).
-- **Storage locations**: Optional comma-separated regions/multi-regions to store the image (e.g. ` + "`us`" + `, ` + "`eu`" + `).
+- **Storage location**: Optional single region or multi-region to store the image (e.g. ` + "`us`" + ` or ` + "`europe-west1`" + `). Defaults to the source's region.
 - **Force create**: When the source is a disk attached to a running instance, create the image anyway (may produce an inconsistent image).
 
 ## Output
@@ -402,9 +402,12 @@ func buildImageFromSpec(project string, spec CreateImageSpec) (*compute.Image, e
 	}
 
 	// The images API accepts at most one storage location. The field is a
-	// single-select picker, but guard against stale comma-separated values by
-	// only ever sending the first location.
+	// single-select picker, so reject multiple values (e.g. a comma-separated
+	// expression result) explicitly rather than silently dropping the extras.
 	if locations := parseCommaList(spec.StorageLocations); len(locations) > 0 {
+		if len(locations) > 1 {
+			return nil, fmt.Errorf("only one storage location is supported, but %d were provided: %s", len(locations), strings.Join(locations, ", "))
+		}
 		image.StorageLocations = []string{locations[0]}
 	}
 
