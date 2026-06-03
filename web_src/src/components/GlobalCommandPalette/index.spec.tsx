@@ -134,7 +134,7 @@ function openPalette() {
   openGlobalCommandPalette();
 }
 
-function renderPalette(path = "/org-1/canvases/canvas-1") {
+function renderPalette(path = "/org-1/apps/canvas-1") {
   const queryClient = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -196,13 +196,13 @@ describe("GlobalCommandPalette", () => {
   it("opens current canvas tool tabs from commands", async () => {
     const user = userEvent.setup();
     const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
-    renderPalette("/org-1/canvases/canvas-1?view=memory");
+    renderPalette("/org-1/apps/canvas-1?view=memory");
 
     openPalette();
     await user.click(await screen.findByText("Versions"));
 
     await waitFor(() => {
-      expect(navigateMock).toHaveBeenCalledWith("/org-1/canvases/canvas-1");
+      expect(navigateMock).toHaveBeenCalledWith("/org-1/apps/canvas-1");
       expect(dispatchEventSpy).toHaveBeenCalledWith(
         expect.objectContaining({
           type: "canvas-tool-sidebar:select-tab",
@@ -243,7 +243,7 @@ describe("GlobalCommandPalette", () => {
     await user.click(await screen.findByText("Canvas Settings"));
     await user.click(await screen.findByText("Database Backups"));
 
-    expect(navigateMock).toHaveBeenCalledWith("/org-1/canvases/canvas-2/settings");
+    expect(navigateMock).toHaveBeenCalledWith("/org-1/apps/canvas-2/settings");
   });
 
   it("disables canvas settings commands without canvas update permission", async () => {
@@ -282,7 +282,7 @@ describe("GlobalCommandPalette", () => {
     await waitFor(() => {
       expect(createCanvasMock).toHaveBeenCalledWith({ name: "generated-canvas", method: "ui" });
     });
-    expect(navigateMock).toHaveBeenCalledWith("/org-1/canvases/canvas-new");
+    expect(navigateMock).toHaveBeenCalledWith("/org-1/apps/canvas-new");
   });
 
   it("searches canvas components from the root command palette", async () => {

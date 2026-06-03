@@ -9,7 +9,9 @@ export function getRouteContext(pathname: string): {
   const segments = pathname.split("/").filter(Boolean);
   const firstSegment = segments[0] || "";
   const organizationId = PUBLIC_TOP_LEVEL_SEGMENTS.has(firstSegment) ? null : firstSegment;
-  const canvasSegmentIndex = segments.findIndex((segment) => segment === "canvases" || segment === "templates");
+  const canvasSegmentIndex = segments.findIndex(
+    (segment) => segment === "apps" || segment === "canvases" || segment === "templates",
+  );
   const canvasId = canvasSegmentIndex >= 0 ? segments[canvasSegmentIndex + 1] || null : null;
   const isTemplateRoute = canvasSegmentIndex >= 0 && segments[canvasSegmentIndex] === "templates";
   return { organizationId, canvasId, isTemplateRoute };

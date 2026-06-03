@@ -4,6 +4,7 @@ import { canvasesInvokeNodeTriggerHook } from "@/api-client";
 import { Icon } from "@/components/Icon";
 import { useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
+import { useCanvasId } from "@/hooks/useCanvasId";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
 import { showErrorToast } from "@/lib/toast";
@@ -40,7 +41,8 @@ export const ResetAuthButton: React.FC<{
   const [isResetting, setIsResetting] = useState(false);
   const [newSecret, setNewSecret] = useState<string | null>(null);
   const queryClient = useQueryClient();
-  const { organizationId, canvasId } = useParams<{ organizationId: string; canvasId: string }>();
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const canvasId = useCanvasId();
 
   const getAuthLabels = () => {
     switch (authMethod) {
