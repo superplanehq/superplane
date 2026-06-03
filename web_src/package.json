@@ -6,7 +6,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build --base=/",
+    "build": "tsc -b && vite build",
     "clean": "rm -rf ../pkg/web/assets/dist",
     "lint": "eslint .",
     "lint:knip": "knip --config knip.json --include files,unlisted,binaries --no-progress",

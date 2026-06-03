@@ -5,11 +5,11 @@ import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 import { aggregateNumberPerSource, applySort, buildChartData, combinePartials, distinctSeriesKeys } from "./widgetData";
 
 const entries: CanvasMemoryEntry[] = [
-  { id: "1", namespace: "expenses", values: { amount: 10 } },
-  { id: "2", namespace: "expenses", values: { amount: 30 } },
-  { id: "3", namespace: "tests", values: { name: "a" } },
-  { id: "4", namespace: "tests", values: { name: "b" } },
-  { id: "5", namespace: "tests", values: { name: "c" } },
+  { id: "1", namespace: "expenses", values: { amount: 10 }, source: "node" },
+  { id: "2", namespace: "expenses", values: { amount: 30 }, source: "node" },
+  { id: "3", namespace: "tests", values: { name: "a" }, source: "node" },
+  { id: "4", namespace: "tests", values: { name: "b" }, source: "node" },
+  { id: "5", namespace: "tests", values: { name: "c" }, source: "node" },
 ];
 
 describe("aggregateNumberPerSource", () => {
