@@ -301,8 +301,15 @@ func validateImageSource(spec CreateImageSpec) error {
 	sourceType := normalizeImageSourceType(spec.SourceType)
 	switch sourceType {
 	case ImageSourceDisk:
-		if strings.TrimSpace(spec.SourceDisk) == "" {
+		disk := strings.TrimSpace(spec.SourceDisk)
+		if disk == "" {
 			return errors.New("source disk is required")
+		}
+		// A bare disk name (the form of an ID from the disk picker) needs a zone
+		// to build the zone-qualified sourceDisk URL the images API requires. A
+		// full path or selfLink already carries its location, so allow it as-is.
+		if !strings.Contains(disk, "/") && strings.TrimSpace(spec.Zone) == "" {
+			return errors.New("zone is required when selecting a source disk by name")
 		}
 	case ImageSourceSnapshot:
 		if strings.TrimSpace(spec.SourceSnapshot) == "" {

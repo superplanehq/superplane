@@ -131,6 +131,40 @@ func Test__UpdateImage__Execute(t *testing.T) {
 		assert.Equal(t, map[string]string{"env": "prod", "team": "core", "owner": "platform"}, setLabelsReq.Labels)
 	})
 
+	t.Run("active state drops a stale replacement", func(t *testing.T) {
+		var deprecateReq *compute.DeprecationStatus
+		mc := &mockImageClient{
+			projectID: "my-project",
+			getFunc: func(ctx context.Context, path string) ([]byte, error) {
+				if isOperationPath(path) {
+					return opDone("op-act"), nil
+				}
+				return imageGetJSON("my-image", "READY", "", nil, "fp-1", "ACTIVE"), nil
+			},
+			postFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
+				deprecateReq, _ = body.(*compute.DeprecationStatus)
+				return opDone("op-act"), nil
+			},
+		}
+		SetClientFactory(func(ctx core.ExecutionContext) (Client, error) { return mc, nil })
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"image":            "my-image",
+				"deprecationState": "ACTIVE",
+				// Stale value left over from a previous Deprecated selection.
+				"replacement": "my-app-v2",
+			},
+			ExecutionState: state,
+		})
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		require.NotNil(t, deprecateReq)
+		assert.Equal(t, "ACTIVE", deprecateReq.State)
+		assert.Empty(t, deprecateReq.Replacement)
+	})
+
 	t.Run("cross-project selfLink -> fails before mutating", func(t *testing.T) {
 		var called bool
 		mc := &mockImageClient{

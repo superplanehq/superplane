@@ -301,7 +301,10 @@ func setImageLabels(ctx context.Context, client Client, project, name string, la
 func deprecateImage(ctx context.Context, client Client, project, name, state, replacement string) error {
 	path := fmt.Sprintf("projects/%s/global/images/%s/deprecate", project, name)
 	status := &compute.DeprecationStatus{State: state}
-	if replacement != "" {
+	// A replacement only applies to deprecating states. Never attach it when
+	// clearing deprecation (ACTIVE), where a stale value (e.g. left over from a
+	// previous Deprecated selection) would be sent and rejected.
+	if replacement != "" && state != ImageStateActive {
 		status.Replacement = resolveImageURL(project, replacement)
 	}
 	body, err := client.Post(ctx, path, status)

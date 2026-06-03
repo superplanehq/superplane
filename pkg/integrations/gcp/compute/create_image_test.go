@@ -39,10 +39,30 @@ func Test__CreateImage__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "source snapshot is required")
 	})
 
+	t.Run("disk source by name without zone returns error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{"name": "img", "sourceType": "disk", "sourceDisk": "my-disk"},
+			Metadata:      &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "zone is required")
+	})
+
+	t.Run("disk source by full path without zone is allowed", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"name":       "img",
+				"sourceType": "disk",
+				"sourceDisk": "projects/my-project/zones/us-central1-a/disks/my-disk",
+			},
+			Metadata: &contexts.MetadataContext{},
+		})
+		require.NoError(t, err)
+	})
+
 	t.Run("valid disk source stores image name", func(t *testing.T) {
 		meta := &contexts.MetadataContext{}
 		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"name": "img", "sourceType": "disk", "sourceDisk": "my-disk"},
+			Configuration: map[string]any{"name": "img", "sourceType": "disk", "zone": "us-central1-a", "sourceDisk": "my-disk"},
 			Metadata:      meta,
 		})
 		require.NoError(t, err)
@@ -53,7 +73,7 @@ func Test__CreateImage__Setup(t *testing.T) {
 
 	t.Run("empty source type defaults to disk", func(t *testing.T) {
 		err := component.Setup(core.SetupContext{
-			Configuration: map[string]any{"name": "img", "sourceDisk": "my-disk"},
+			Configuration: map[string]any{"name": "img", "zone": "us-central1-a", "sourceDisk": "my-disk"},
 			Metadata:      &contexts.MetadataContext{},
 		})
 		require.NoError(t, err)
