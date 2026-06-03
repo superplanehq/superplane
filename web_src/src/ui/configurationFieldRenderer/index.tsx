@@ -28,6 +28,7 @@ import { SecretKeyFieldRenderer, type SecretKeyRefValue } from "./SecretKeyField
 import { AnyPredicateListFieldRenderer } from "./AnyPredicateListFieldRenderer";
 import { DaysOfWeekFieldRenderer } from "./DaysOfWeekFieldRenderer";
 import { TimeRangeFieldRenderer } from "./TimeRangeFieldRenderer";
+import { RunnerFleetFieldRenderer } from "./RunnerFleetFieldRenderer";
 import { isFieldVisible, isFieldRequired, parseDefaultValues, validateFieldForSubmission } from "../../lib/components";
 import type { AuthorizationDomainType } from "@/api-client";
 import { buildTemplateParametersAutocompleteObject } from "./templateParametersAutocomplete";
@@ -299,6 +300,10 @@ export const ConfigurationFieldRenderer = ({
   };
 
   const renderField = () => {
+    if (field.name === "fleet_id") {
+      return <RunnerFleetFieldRenderer {...commonProps} />;
+    }
+
     switch (field.type) {
       case "string":
         return <StringFieldRenderer {...commonProps} />;

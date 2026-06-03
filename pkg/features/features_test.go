@@ -7,10 +7,12 @@ import (
 )
 
 func Test__Get(t *testing.T) {
+	t.Setenv(EnvRunnerEnabled, "")
+
 	t.Run("known id returns feature and true", func(t *testing.T) {
-		f, ok := Get("runner")
+		f, ok := Get(FeatureRunner)
 		assert.True(t, ok)
-		assert.Equal(t, "runner", f.ID)
+		assert.Equal(t, FeatureRunner, f.ID)
 		assert.Equal(t, "Runners", f.Label)
 		assert.Equal(t, "Sandboxed Runners", f.Description)
 	})
@@ -28,12 +30,14 @@ func Test__Get(t *testing.T) {
 }
 
 func Test__Exists(t *testing.T) {
-	assert.True(t, Exists("runner"))
+	assert.True(t, Exists(FeatureRunner))
 	assert.False(t, Exists("does-not-exist"))
 	assert.False(t, Exists(""))
 }
 
 func Test__All_isCopy(t *testing.T) {
+	t.Setenv(EnvRunnerEnabled, "")
+
 	a := All()
 	require := len(a)
 	a[0] = Feature{ID: "mutated"}
@@ -44,12 +48,14 @@ func Test__All_isCopy(t *testing.T) {
 }
 
 func Test__IsReleased(t *testing.T) {
+	t.Setenv(EnvRunnerEnabled, "")
+
 	t.Run("unknown id is not released", func(t *testing.T) {
 		assert.False(t, IsReleased("does-not-exist"))
 	})
 
 	t.Run("registered id with nil Released is not released", func(t *testing.T) {
-		assert.False(t, IsReleased("runner"))
+		assert.False(t, IsReleased(FeatureRunner))
 	})
 
 	t.Run("registered id with Released=&true is released", func(t *testing.T) {
@@ -69,4 +75,14 @@ func Test__IsReleased(t *testing.T) {
 		registry = []Feature{{ID: "explicit-false", Label: "X", Released: &v}}
 		assert.False(t, IsReleased("explicit-false"))
 	})
+}
+
+func Test__RunnerEnabledEnvReleasesRunner(t *testing.T) {
+	t.Setenv(EnvRunnerEnabled, "yes")
+
+	f, ok := Get(FeatureRunner)
+	assert.True(t, ok)
+	assert.NotNil(t, f.Released)
+	assert.True(t, *f.Released)
+	assert.True(t, IsReleased(FeatureRunner))
 }
