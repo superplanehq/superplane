@@ -45,6 +45,14 @@ Run **separate broker fleets** — one per homogeneous runner pool. Each pool ha
 - **User-data** — Installs runner from S3, sets `TASK_BROKER_URL`, `RUNNER_FLEET_ID`, `RUNNER_HEALTH_ADDR`, optional `RUNNER_TERMINATE_AFTER_EACH_TASK`.
 - **Admin** — Optional `/v1/admin/*` diagnostics (managed instances across all pools, EC2 console output). Gated by the `diagnostics_token` field.
 
+## Observability
+
+Both **task-broker** and **fleet-manager** export OpenTelemetry metrics when
+`OTEL_EXPORTER_OTLP_ENDPOINT` is set (standard OTLP env vars; see
+[docs/metrics.md](./docs/metrics.md)). Fleet-manager reads OTLP settings from
+the **process environment**, not from the JSON config file. Task-broker also
+samples queue depth gauges on `METRICS_SAMPLE_INTERVAL_SEC` (default 30s).
+
 ## Runner
 
 See existing sections below for executor abstraction, Docker lifecycle, and structured results (`SUPERPLANE_RESULT_FILE`).
@@ -56,4 +64,4 @@ See existing sections below for executor abstraction, Docker lifecycle, and stru
 | `task-broker/` | Queue store (Postgres), HTTP + WebSocket handlers, webhooks |
 | `fleet-manager/` | EC2 provisioning + reconcile (`internal/ec2provision`) |
 | `runner/` | Worker agent + `/healthz` |
-| `shared/` | API types, models, webhook client, WebSocket messages |
+| `shared/` | API types, models, webhook client, WebSocket messages, `shared/telemetry` (OTel bootstrap) |

@@ -8,7 +8,7 @@ Monorepo (single Go module) for **task-broker**, **fleet-manager**, and the **ru
 
 Shared JSON types live under **`shared/`**; webhook retries use **`shared/webhook`**.
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for design detail.
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for design detail. Metrics are documented in [docs/metrics.md](./docs/metrics.md) (OpenTelemetry export to Dash0).
 
 ## Layout
 

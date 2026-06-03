@@ -5,6 +5,66 @@ Metrics are exported via OpenTelemetry to Dash0.
 Pool-scoped metrics carry a `fleet_id` attribute so data can be filtered and
 grouped per pool (e.g. `aws-standard-1` vs `aws-arm64-1`).
 
+## Export configuration
+
+**task-broker** and **fleet-manager** read standard OpenTelemetry environment
+variables at process startup. When `OTEL_EXPORTER_OTLP_ENDPOINT` is unset,
+metrics export is disabled (no-op meter provider; local dev unchanged).
+
+| Variable | Description |
+|----------|-------------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Dash0 OTLP ingress URL (required to enable export) |
+| `OTEL_EXPORTER_OTLP_HEADERS` | Auth header, e.g. `Authorization=Bearer <dash0-token>` |
+| `OTEL_SERVICE_NAME` | `task-broker` or `fleet-manager` (appears as `service.name`) |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` or `grpc` (optional; autoexport selects exporter) |
+| `OTEL_METRICS_EXPORTER` | Set to `none` to disable metrics while keeping endpoint set |
+
+**task-broker only**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `METRICS_SAMPLE_INTERVAL_SEC` | `30` | How often to sample `tasks.queued` / `tasks.claimed` gauges |
+
+Fleet-manager pool settings live in the JSON config file (`FM_CONFIG_FILE`); OTLP
+export is **not** in that file — set the `OTEL_*` variables on the fleet-manager
+process (Docker `--env-file`, systemd `Environment=`, etc.). See
+`scripts/deploy/task-broker.env.example` and `scripts/deploy/fleet-manager.env.example`.
+
+Example (task-broker):
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.<region>.aws.dash0.com:4317
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <token>"
+export OTEL_SERVICE_NAME=task-broker
+```
+
+---
+
+## Canonical instrument names
+
+| Instrument | Type | Attributes |
+|------------|------|------------|
+| `tasks.created` | Counter | `fleet_id` |
+| `tasks.completed` | Counter | `fleet_id`, `outcome` |
+| `task.start_latency` | Histogram (s) | `fleet_id` |
+| `tasks.queued` | Gauge | `fleet_id` |
+| `tasks.claimed` | Gauge | `fleet_id` |
+| `tasks.unclaimed` | Counter | `fleet_id` |
+| `lease.reaps` | Counter | `fleet_id` |
+| `webhook.deliveries` | Counter | `fleet_id`, `outcome` |
+| `webhook.delivery.duration` | Histogram (s) | `fleet_id`, `outcome` |
+| `hot.instances` | Gauge | `fleet_id` |
+| `instance.spinup.duration` | Histogram (s) | `fleet_id`, `phase` |
+| `reconcile.duration` | Histogram (s) | `fleet_id` |
+
+`outcome` values: `succeeded`, `failed`, `canceled` (task lifecycle) or
+`succeeded`, `failed` (webhook delivery). `phase` values: `instance_running`,
+`runner_connected`.
+
+The `runner_connected` spinup phase requires FM-launched runners: cloud-init
+sets `RUNNER_LAUNCH_REQUESTED_AT` and the runner forwards it on the WebSocket
+hello. Locally started runners (`make runner`) omit it.
+
 ---
 
 ## Task lifecycle
