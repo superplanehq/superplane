@@ -13,14 +13,16 @@
 #                                 Template: scripts/deploy/fleet-manager.config.example.json.
 #
 # The config file carries everything the FM needs (broker URL, AWS region, auth tokens,
-# diagnostics token, listen addr, per-pool AMIs/instance types/headroom). No --env-file,
-# no -e AUTH_TOKEN passthrough.
+# diagnostics token, listen addr, per-pool AMIs/instance types/headroom).
+#
+# Optional OTLP env for metrics: FLEET_MANAGER_ENV_FILE → uploaded; docker --env-file
+# (see scripts/deploy/fleet-manager.env.example).
 #
 # Usage:
 #   cp scripts/deploy/fleet-manager.config.example.json scripts/deploy/fleet-manager.config.json
 #   $EDITOR scripts/deploy/fleet-manager.config.json
 #   FLEET_MANAGER_CONFIG_FILE=scripts/deploy/fleet-manager.config.json ./scripts/start-fleet-manager-remote.sh
-#   FLEET_MANAGER_IMAGE='ghcr.io/superplanehq/runner/fleet-manager:abc123' FLEET_MANAGER_CONFIG_FILE=… ./scripts/start-fleet-manager-remote.sh
+#   FLEET_MANAGER_ENV_FILE=scripts/deploy/fleet-manager.env FLEET_MANAGER_CONFIG_FILE=… ./scripts/start-fleet-manager-remote.sh
 
 set -euo pipefail
 
@@ -34,10 +36,23 @@ HOST_PORT="${HOST_PORT:-8080}"
 
 REMOTE_CONFIG_PATH="${REMOTE_CONFIG_PATH:-/tmp/fleet-manager.config.json}"
 CONTAINER_CONFIG_PATH="${CONTAINER_CONFIG_PATH:-/etc/fleet-manager/config.json}"
+REMOTE_ENV_PATH="${REMOTE_ENV_PATH:-/tmp/fleet-manager.deploy.env}"
+USE_ENVFILE=0
 
 if [[ ! -f "$SSH_KEY" ]]; then
   echo "SSH key not found: $SSH_KEY" >&2
   exit 1
+fi
+
+if [[ -n "${FLEET_MANAGER_ENV_FILE:-}" ]]; then
+  if [[ ! -f "$FLEET_MANAGER_ENV_FILE" ]]; then
+    echo "FLEET_MANAGER_ENV_FILE not found: $FLEET_MANAGER_ENV_FILE" >&2
+    exit 1
+  fi
+  echo "Uploading env file → ${SSH_USER}@${SSH_HOST}:${REMOTE_ENV_PATH}"
+  scp -i "$SSH_KEY" -o StrictHostKeyChecking=accept-new \
+    "$FLEET_MANAGER_ENV_FILE" "${SSH_USER}@${SSH_HOST}:${REMOTE_ENV_PATH}"
+  USE_ENVFILE=1
 fi
 
 if [[ -z "${FLEET_MANAGER_CONFIG_FILE:-}" ]]; then
@@ -59,13 +74,15 @@ echo "Deploying $IMAGE to ${SSH_USER}@${SSH_HOST} (container port 8080 -> host $
 ssh -i "$SSH_KEY" \
   -o StrictHostKeyChecking=accept-new \
   "${SSH_USER}@${SSH_HOST}" \
-  bash -s -- "$IMAGE" "$CONTAINER_NAME" "$HOST_PORT" "$REMOTE_CONFIG_PATH" "$CONTAINER_CONFIG_PATH" << 'REMOTE'
+  bash -s -- "$IMAGE" "$CONTAINER_NAME" "$HOST_PORT" "$REMOTE_CONFIG_PATH" "$CONTAINER_CONFIG_PATH" "$USE_ENVFILE" "$REMOTE_ENV_PATH" << 'REMOTE'
 set -euo pipefail
 IMAGE="$1"
 CONTAINER_NAME="$2"
 HOST_PORT="$3"
 REMOTE_CONFIG_PATH="$4"
 CONTAINER_CONFIG_PATH="$5"
+USE_ENVFILE="${6:-0}"
+REMOTE_ENV_PATH="${7:-}"
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Installing docker.io (needs passwordless sudo on the server)..."
@@ -83,13 +100,19 @@ chmod 600 "$REMOTE_CONFIG_PATH" 2>/dev/null || true
 "${DOCKER[@]}" stop "$CONTAINER_NAME" 2>/dev/null || true
 "${DOCKER[@]}" rm "$CONTAINER_NAME" 2>/dev/null || true
 
-"${DOCKER[@]}" run \
-  -d \
-  --name "$CONTAINER_NAME" \
-  --restart unless-stopped \
-  -p "${HOST_PORT}:8080" \
-  -v "${REMOTE_CONFIG_PATH}:${CONTAINER_CONFIG_PATH}:ro" \
-  "$IMAGE"
+opts=(
+  -d
+  --name "$CONTAINER_NAME"
+  --restart unless-stopped
+  -p "${HOST_PORT}:8080"
+  -v "${REMOTE_CONFIG_PATH}:${CONTAINER_CONFIG_PATH}:ro"
+)
+if [[ "$USE_ENVFILE" == "1" ]]; then
+  chmod 600 "$REMOTE_ENV_PATH" 2>/dev/null || chmod 0644 "$REMOTE_ENV_PATH"
+  opts+=( --env-file "$REMOTE_ENV_PATH" )
+fi
+
+"${DOCKER[@]}" run "${opts[@]}" "$IMAGE"
 
 "${DOCKER[@]}" ps --filter "name=${CONTAINER_NAME}"
 echo "Health: curl -sS \"http://127.0.0.1:${HOST_PORT}/healthz\""

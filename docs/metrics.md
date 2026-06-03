@@ -33,9 +33,10 @@ process (Docker `--env-file`, systemd `Environment=`, etc.). See
 Example (task-broker):
 
 ```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.<region>.aws.dash0.com:4317
+export OTEL_EXPORTER_OTLP_ENDPOINT=https://ingress.us-west-2.aws.dash0.com:4317
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <token>"
 export OTEL_SERVICE_NAME=task-broker
+export OTEL_EXPORTER_OTLP_PROTOCOL=grpc
 ```
 
 ---
