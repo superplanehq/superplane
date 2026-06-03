@@ -49,10 +49,7 @@ export function MemoryDiscoveryPanel({ canvasId, selectedNamespace, onSelectName
   const selected = namespaces.find((ns) => ns.namespace === selectedNamespace);
 
   return (
-    <div
-      className="space-y-2 rounded-md border border-slate-200 bg-slate-50/80 px-3 py-2"
-      data-testid="memory-discovery-panel"
-    >
+    <div className="space-y-2 rounded-lg bg-slate-100 px-3 py-2" data-testid="memory-discovery-panel">
       {!selected ? (
         <>
           <p className="text-xs font-medium text-slate-700">This data exists in your canvas memory:</p>
