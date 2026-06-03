@@ -1,10 +1,13 @@
 package canvas
 
 import (
+	"encoding/base64"
 	"fmt"
 	"io"
 	"strings"
 
+	"github.com/ghodss/yaml"
+	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/canvas/models"
 	"github.com/superplanehq/superplane/pkg/cli/commands/apps/common"
 	"github.com/superplanehq/superplane/pkg/cli/core"
@@ -63,7 +66,7 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 	draftMode := c.draft != nil && *c.draft
 
-	canvasID, canvas, err := resolveCanvasForFileUpdate(filePath)
+	canvasID, _, err := resolveCanvasForFileUpdate(filePath)
 	if err != nil {
 		return err
 	}
@@ -74,51 +77,62 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 	}
 
 	if changeManagementEnabled && !draftMode {
-		return fmt.Errorf("change management is enabled for this canvas; use --draft to update your draft version, then publish with `superplane apps change-requests create`")
+		return fmt.Errorf("change management is enabled for this canvas; use --draft to commit to your draft branch, then publish with `superplane apps change-requests create`")
 	}
 
-	targetVersionID, err := common.EnsureCurrentUserDraftVersionID(ctx, canvasID)
+	resource, err := models.ParseCanvasResourceFromFile(filePath, "update")
 	if err != nil {
 		return err
 	}
-
-	body := openapi_client.CanvasesUpdateCanvasVersionBody{}
-	body.SetCanvas(canvas)
-	body.SetVersionId(targetVersionID)
-
 	if layout.HasFlags(ctx) {
 		autoLayout, parseErr := layout.ParseAutoLayout(autoLayoutValue, autoLayoutScopeValue, autoLayoutNodeIDs)
 		if parseErr != nil {
 			return parseErr
 		}
-		if autoLayout != nil {
-			body.SetAutoLayout(*autoLayout)
+		if err := applyAutoLayoutToCanvasResource(resource, autoLayout); err != nil {
+			return err
 		}
-	} else {
-		body.SetAutoLayout(layout.DefaultAutoLayout())
 	}
 
-	response, _, err := ctx.API.CanvasVersionAPI.
-		CanvasesUpdateCanvasVersion2(ctx.Context, canvasID).
-		Body(body).
-		Execute()
+	yamlBytes, err := yaml.Marshal(resource)
+	if err != nil {
+		return fmt.Errorf("marshal canvas yaml: %w", err)
+	}
+
+	branch, err := common.EnsureCurrentUserDraftBranch(ctx, canvasID)
+	if err != nil {
+		return err
+	}
+	branchName := strings.TrimSpace(branch.GetBranchName())
+	expectedHead := strings.TrimSpace(branch.GetTipSha())
+
+	canvasOp := openapi_client.NewCanvasesCanvasRepositoryFileOperation()
+	canvasOp.SetPath(materialize.CanvasFileName)
+	canvasOp.SetContent(base64.StdEncoding.EncodeToString(yamlBytes))
+
+	commitSHA, err := common.CommitRepositoryFiles(
+		ctx,
+		canvasID,
+		branchName,
+		expectedHead,
+		"Update canvas.yaml",
+		[]openapi_client.CanvasesCanvasRepositoryFileOperation{*canvasOp},
+	)
 	if err != nil {
 		return err
 	}
 
-	version := response.GetVersion()
+	version, err := common.DescribeAppVersionByID(ctx, canvasID, commitSHA)
+	if err != nil {
+		return err
+	}
 	if errText := formatNodeSpecErrorsForCLI(version); errText != "" {
 		return fmt.Errorf("%s", errText)
 	}
 
-	// When not in draft mode, auto-publish the updated draft version.
 	if !draftMode {
-		_, _, publishErr := ctx.API.CanvasVersionAPI.
-			CanvasesPublishCanvasVersion(ctx.Context, canvasID, targetVersionID).
-			Body(map[string]any{}).
-			Execute()
-		if publishErr != nil {
-			return fmt.Errorf("draft was updated but publish failed: %w", publishErr)
+		if err := common.PublishDraftBranch(ctx, canvasID, branchName); err != nil {
+			return fmt.Errorf("draft was committed but publish failed: %w", err)
 		}
 	}
 
@@ -130,7 +144,8 @@ func (c *updateCommand) Execute(ctx core.CommandContext) error {
 		metadata := version.GetMetadata()
 		spec := version.GetSpec()
 
-		_, _ = fmt.Fprintf(stdout, "Canvas version updated: %s\n", metadata.GetId())
+		_, _ = fmt.Fprintf(stdout, "Canvas committed: %s\n", metadata.GetId())
+		_, _ = fmt.Fprintf(stdout, "Branch: %s\n", branchName)
 		_, _ = fmt.Fprintf(stdout, "App ID: %s\n", metadata.GetCanvasId())
 		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(spec.GetNodes()))
 		_, _ = fmt.Fprintf(stdout, "Edges: %d\n", len(spec.GetEdges()))

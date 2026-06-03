@@ -39,21 +39,9 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 
 	canvas := *response.Canvas
 	if c.draft != nil && *c.draft {
-		me, _, err := ctx.API.MeAPI.MeMe(ctx.Context).Execute()
+		versionID, err := common.EnsureCurrentUserDraftTipSHA(ctx, canvasID)
 		if err != nil {
 			return err
-		}
-		currentUserID := strings.TrimSpace(me.User.GetId())
-		if currentUserID == "" {
-			return fmt.Errorf("current user id not found")
-		}
-
-		versionID, err := common.FindOwnedDraftVersionID(ctx, canvasID, currentUserID)
-		if err != nil {
-			return err
-		}
-		if versionID == "" {
-			return fmt.Errorf("draft version not found for current user")
 		}
 
 		version, err := common.DescribeAppVersionByID(ctx, canvasID, versionID)

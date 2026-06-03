@@ -627,6 +627,8 @@ func (s *Server) InitRouter(additionalMiddlewares ...mux.MiddlewareFunc) {
 	adminRoute.HandleFunc("/accounts/{accountId}/promote", s.promoteAdmin).Methods("POST")
 	adminRoute.HandleFunc("/accounts/{accountId}/demote", s.demoteAdmin).Methods("POST")
 
+	s.registerGitRepositoryRoutes(r)
+
 	// Apply additional middlewares
 	for _, middleware := range additionalMiddlewares {
 		publicRoute.Use(middleware)

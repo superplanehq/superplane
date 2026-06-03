@@ -8,6 +8,7 @@ interface WorkflowFilesOverlayLayerProps {
   isEditing?: boolean;
   canvasId?: string;
   canWrite?: boolean;
+  activeBranch?: string | null;
   files: WorkflowFile[];
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: WorkflowFilesHeaderActionsState | null) => void;
@@ -18,6 +19,7 @@ export function WorkflowFilesOverlayLayer({
   isEditing = false,
   canvasId,
   canWrite = false,
+  activeBranch,
   files,
   headerActionsSlotId,
   onHeaderActionsChange,
@@ -29,6 +31,7 @@ export function WorkflowFilesOverlayLayer({
       canvasId={canvasId}
       isEditing={isEditing}
       canWrite={canWrite}
+      activeBranch={activeBranch}
       files={files}
       headerActionsSlotId={headerActionsSlotId}
       onHeaderActionsChange={onHeaderActionsChange}

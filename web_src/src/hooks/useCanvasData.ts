@@ -10,10 +10,11 @@ import {
   canvasFoldersUpdateCanvasFolder,
   canvasFoldersUpdateCanvasFolderPosition,
   canvasFoldersDeleteCanvasFolder,
-  canvasesCreateCanvasVersion,
   canvasesListCanvasVersions,
-  canvasesUpdateCanvasVersion,
-  canvasesUpdateCanvasVersion2,
+  canvasesCreateDraftBranch,
+  canvasesListDraftBranches,
+  canvasesDeleteDraftBranch,
+  canvasesPublishCanvas,
   canvasesCreateCanvasChangeRequest,
   canvasesActOnCanvasChangeRequest,
   canvasesResolveCanvasChangeRequest,
@@ -34,7 +35,6 @@ import {
   canvasesListNodeQueueItems,
   canvasesListNodeEvents,
   canvasesGetCanvasDashboard,
-  canvasesUpdateCanvasDashboard,
   canvasesGetCanvasRepository,
   canvasesListCanvasRepositoryFiles,
   canvasesCommitCanvasRepositoryFiles,
@@ -49,12 +49,8 @@ import type {
   CanvasesCanvasDashboard,
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
-  CanvasesCanvasVersion,
   CanvasesCanvasRepositoryFileOperation,
   CanvasesListCanvasRepositoryFilesResponse,
-  CanvasChangeManagement,
-  SuperplaneComponentsNode,
-  ComponentsPosition,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
 import { analytics } from "../lib/analytics";
@@ -139,9 +135,11 @@ export const canvasKeys = {
     [...canvasKeys.all, "dashboard", canvasId, versionId ?? "live"] as const,
   dashboardAll: (canvasId: string) => [...canvasKeys.all, "dashboard", canvasId] as const,
   repository: (canvasId: string) => [...canvasKeys.all, "repository", canvasId] as const,
-  repositoryFiles: (canvasId: string) => [...canvasKeys.repository(canvasId), "files"] as const,
+  repositoryFiles: (canvasId: string, branch?: string) =>
+    [...canvasKeys.repository(canvasId), "files", branch ?? "main"] as const,
   repositoryFile: (canvasId: string, path: string, ref?: string) =>
     [...canvasKeys.repository(canvasId), "file", path, ref ?? ""] as const,
+  draftBranches: (canvasId: string) => [...canvasKeys.repository(canvasId), "drafts"] as const,
 };
 
 export interface DashboardPanel {
@@ -351,18 +349,6 @@ type CanvasChangeRequestFilter = "open" | "rejected" | "merged" | "all";
 type CanvasGraphData = {
   nodes?: unknown[];
   edges?: unknown[];
-};
-
-type PositionedNode = SuperplaneComponentsNode & {
-  id: string;
-  position: ComponentsPosition;
-};
-
-const versionSortTimestamp = (version: CanvasesCanvasVersion): number => {
-  const raw = version?.metadata?.updatedAt || version?.metadata?.createdAt;
-  if (!raw) return 0;
-  const parsed = Date.parse(raw);
-  return Number.isNaN(parsed) ? 0 : parsed;
 };
 
 export const useInfiniteCanvasChangeRequests = (
@@ -829,25 +815,83 @@ export const useUpdateCanvasFolderMembership = (organizationId: string) => {
   });
 };
 
-export const useCreateCanvasVersion = (organizationId: string, canvasId: string) => {
+export const useDraftBranches = (canvasId: string, enabled: boolean = true) => {
+  return useQuery({
+    queryKey: canvasKeys.draftBranches(canvasId),
+    queryFn: async () => {
+      const response = await canvasesListDraftBranches(
+        withOrganizationHeader({
+          path: { canvasId },
+        }),
+      );
+      return response.data?.branches ?? [];
+    },
+    enabled: enabled && !!canvasId,
+    staleTime: 15_000,
+  });
+};
+
+export const useCreateDraftBranch = (canvasId: string) => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async () => {
-      return await canvasesCreateCanvasVersion(
+    mutationFn: async (displayName?: string) => {
+      const response = await canvasesCreateDraftBranch(
         withOrganizationHeader({
           path: { canvasId },
-          body: {},
+          body: displayName ? { displayName } : {},
+        }),
+      );
+      return response.data?.branch;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
+    },
+  });
+};
+
+export const useDeleteDraftBranch = (canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (branchName: string) => {
+      await canvasesDeleteDraftBranch(
+        withOrganizationHeader({
+          path: { canvasId },
+          query: { branchName },
         }),
       );
     },
-    onSuccess: (response) => {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
+    },
+  });
+};
+
+export { clearLastDraftBranch, readLastDraftBranch, writeLastDraftBranch } from "@/hooks/useActiveDraftBranch";
+
+export const usePublishCanvas = (organizationId: string, canvasId: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (draftBranch: string) => {
+      const response = await canvasesPublishCanvas(
+        withOrganizationHeader({
+          path: { canvasId },
+          body: { draftBranch },
+        }),
+      );
+      return response.data?.version;
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: canvasKeys.detail(organizationId, canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-      if (response?.data?.version?.metadata?.id) {
-        analytics.versionPublish(canvasId, organizationId);
-      }
+      queryClient.invalidateQueries({ queryKey: canvasKeys.dashboardAll(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
     },
   });
 };
@@ -888,134 +932,6 @@ export const usePublishCanvasVersion = (organizationId: string, canvasId: string
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.dashboardAll(canvasId) });
-    },
-  });
-};
-
-export const useUpdateCanvasVersion = (organizationId: string, canvasId: string) => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: {
-      versionId?: string;
-      name: string;
-      description?: string;
-      nodes?: unknown[];
-      edges?: unknown[];
-      changeManagement?: CanvasChangeManagement;
-      autoLayout?: { algorithm?: string; scope?: string; nodeIds?: string[] };
-      preserveLocalCanvasState?: boolean;
-      invalidateRelatedQueries?: boolean;
-    }) => {
-      const body = {
-        canvas: {
-          metadata: {
-            name: data.name,
-            description: data.description || "",
-          },
-          spec: {
-            nodes: data.nodes || [],
-            edges: data.edges || [],
-            changeManagement: data.changeManagement,
-          },
-        },
-        autoLayout: data.autoLayout,
-      };
-
-      if (data.versionId) {
-        return await canvasesUpdateCanvasVersion(
-          withOrganizationHeader({
-            path: { canvasId, versionId: data.versionId },
-            body,
-          }),
-        );
-      }
-
-      return await canvasesUpdateCanvasVersion2(
-        withOrganizationHeader({
-          path: { canvasId },
-          body,
-        }),
-      );
-    },
-    onSuccess: (response, variables) => {
-      const version = response?.data?.version;
-      if (!version) {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionList(canvasId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-        return;
-      }
-
-      if (variables.versionId) {
-        queryClient.setQueryData(canvasKeys.versionDetail(canvasId, variables.versionId), version);
-      }
-
-      queryClient.setQueryData(canvasKeys.versionList(canvasId), (current: CanvasesCanvasVersion[] | undefined) => {
-        if (!current) {
-          return current;
-        }
-
-        let found = false;
-        const next = current.map((item) => {
-          if (item?.metadata?.id === version.metadata?.id) {
-            found = true;
-            return version;
-          }
-          return item;
-        });
-
-        if (!found) {
-          next.unshift(version);
-        }
-
-        next.sort((left, right) => versionSortTimestamp(right) - versionSortTimestamp(left));
-        return next;
-      });
-
-      if (!variables.preserveLocalCanvasState) {
-        queryClient.setQueryData(canvasKeys.detail(organizationId, canvasId), (current: CanvasesCanvas | undefined) => {
-          if (!current) {
-            return current;
-          }
-
-          // When the server computed a new layout (autoLayout), accept the
-          // server positions as authoritative. Otherwise preserve current
-          // local node positions to avoid overwriting positions that changed
-          // while the save was in flight.
-          if (variables.autoLayout) {
-            return { ...current, spec: { ...current.spec, ...version.spec } };
-          }
-
-          const currentPositionsByNodeId = new Map(
-            (current.spec?.nodes ?? [])
-              .filter((node): node is PositionedNode => Boolean(node.id && node.position))
-              .map((node) => [node.id, node.position] as const),
-          );
-
-          const mergedNodes = (version.spec?.nodes ?? []).map((serverNode) => {
-            if (!serverNode.id) {
-              return serverNode;
-            }
-
-            const localPosition = currentPositionsByNodeId.get(serverNode.id);
-            if (localPosition) {
-              return { ...serverNode, position: localPosition };
-            }
-            return serverNode;
-          });
-
-          return {
-            ...current,
-            spec: { ...current.spec, ...version.spec, nodes: mergedNodes },
-          };
-        });
-      }
-
-      if (variables.invalidateRelatedQueries !== false) {
-        queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequests() });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.changeRequestList(canvasId) });
-        queryClient.invalidateQueries({ queryKey: canvasKeys.versionHistory(canvasId) });
-      }
     },
   });
 };
@@ -1672,98 +1588,22 @@ export const useCanvasConsole = (canvasId: string, versionId: string | undefined
   });
 };
 
-type UseUpdateCanvasConsoleOptions = {
-  registerIgnoredCanvasVersionUpdatedEcho?: (savingVersionId?: string) => () => void;
-};
-
-function toCanvasDashboard(
-  canvasId: string,
-  versionId: string | undefined,
-  input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] },
-  previous?: CanvasesCanvasDashboard,
-): CanvasesCanvasDashboard {
-  return {
-    ...previous,
-    canvasId: previous?.canvasId ?? canvasId,
-    ...(versionId ? { versionId: previous?.versionId ?? versionId } : {}),
-    panels: input.panels.map((panel) => ({
-      id: panel.id,
-      type: panel.type,
-      content: panel.content,
-    })),
-    layout: input.layout.map((item) => ({
-      i: item.i,
-      x: item.x,
-      y: item.y,
-      w: item.w,
-      h: item.h,
-      ...(item.minW !== undefined ? { minW: item.minW } : {}),
-      ...(item.minH !== undefined ? { minH: item.minH } : {}),
-    })),
-  };
-}
-
-export const useUpdateCanvasConsole = (
-  canvasId: string,
-  versionId: string | undefined,
-  options?: UseUpdateCanvasConsoleOptions,
-) => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    onMutate: async (input) => {
-      const queryKey = canvasKeys.dashboard(canvasId, versionId);
-      await queryClient.cancelQueries({ queryKey });
-      const previous = queryClient.getQueryData<CanvasesCanvasDashboard>(queryKey);
-      queryClient.setQueryData(queryKey, toCanvasDashboard(canvasId, versionId, input, previous));
-      return { previous, queryKey };
-    },
-    mutationFn: async (input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => {
-      const releaseCanvasVersionUpdatedEcho = options?.registerIgnoredCanvasVersionUpdatedEcho?.(versionId);
-      try {
-        const response = await canvasesUpdateCanvasDashboard(
-          withOrganizationHeader({
-            path: { canvasId },
-            body: {
-              versionId,
-              panels: input.panels.map((p) => ({
-                id: p.id,
-                type: p.type,
-                content: p.content,
-              })),
-              layout: input.layout.map((l) => ({
-                i: l.i,
-                x: l.x,
-                y: l.y,
-                w: l.w,
-                h: l.h,
-                ...(l.minW !== undefined ? { minW: l.minW } : {}),
-                ...(l.minH !== undefined ? { minH: l.minH } : {}),
-              })),
-            },
-          }),
-        );
-        return response.data?.dashboard;
-      } catch (error) {
-        releaseCanvasVersionUpdatedEcho?.();
-        throw error;
-      }
-    },
-    onError: (_error, _input, context) => {
-      if (!context) return;
-      queryClient.setQueryData(context.queryKey, context.previous);
-    },
-    onSuccess: (data) => {
-      queryClient.setQueryData(canvasKeys.dashboard(canvasId, versionId), data);
-    },
-  });
-};
-
 export type CanvasConsoleQueryResult = ReturnType<typeof useCanvasConsole>;
-export type UpdateCanvasConsoleMutationResult = ReturnType<typeof useUpdateCanvasConsole>;
 
-export const useCanvasRepository = (canvasId: string, enabled: boolean = true) => {
+type UseStagedConsoleMutationResult = {
+  mutate: (input: { panels: DashboardPanel[]; layout: DashboardLayoutItem[] }) => void;
+  mutateAsync: (input: {
+    panels: DashboardPanel[];
+    layout: DashboardLayoutItem[];
+  }) => Promise<CanvasesCanvasDashboard | null | undefined>;
+  isPending: boolean;
+};
+
+export type UpdateCanvasConsoleMutationResult = UseStagedConsoleMutationResult;
+
+export const useCanvasRepository = (canvasId: string, enabled: boolean = true, branch?: string) => {
   return useQuery({
-    queryKey: canvasKeys.repository(canvasId),
+    queryKey: [...canvasKeys.repository(canvasId), branch ?? "main"],
     queryFn: async () => {
       const response = await canvasesGetCanvasRepository(
         withOrganizationHeader({
@@ -1781,13 +1621,14 @@ export const useCanvasRepository = (canvasId: string, enabled: boolean = true) =
   });
 };
 
-export const useCanvasRepositoryFiles = (canvasId: string, enabled: boolean = true) => {
+export const useCanvasRepositoryFiles = (canvasId: string, enabled: boolean = true, branch?: string) => {
   return useQuery({
-    queryKey: canvasKeys.repositoryFiles(canvasId),
+    queryKey: canvasKeys.repositoryFiles(canvasId, branch),
     queryFn: async () => {
       const response = await canvasesListCanvasRepositoryFiles(
         withOrganizationHeader({
           path: { canvasId },
+          query: branch ? { branch } : undefined,
         }),
       );
       return response.data;
@@ -1808,7 +1649,7 @@ export const useCanvasRepositoryFile = (
     queryKey: canvasKeys.repositoryFile(canvasId, normalizedPath, ref),
     queryFn: async () => {
       const { fetchCanvasRepositoryFileContent } = await import("@/pages/workflowv2/lib/canvas-repository-files");
-      const content = await fetchCanvasRepositoryFileContent(canvasId, normalizedPath);
+      const content = await fetchCanvasRepositoryFileContent(canvasId, normalizedPath, ref);
       return {
         path: normalizedPath,
         content,
@@ -1826,6 +1667,7 @@ export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
       message: string;
       operations: CanvasesCanvasRepositoryFileOperation[];
       expectedHeadSha?: string;
+      branch?: string;
     }) => {
       const response = await canvasesCommitCanvasRepositoryFiles(
         withOrganizationHeader({
@@ -1834,14 +1676,16 @@ export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
             message: input.message,
             operations: input.operations,
             expectedHeadSha: input.expectedHeadSha,
+            branch: input.branch,
           },
         }),
       );
       return response.data;
     },
     onSuccess: (_data, input) => {
+      const branchKey = input.branch ?? "main";
       queryClient.setQueryData<CanvasesListCanvasRepositoryFilesResponse | undefined>(
-        canvasKeys.repositoryFiles(canvasId),
+        canvasKeys.repositoryFiles(canvasId, branchKey === "main" ? undefined : branchKey),
         (current) => {
           const paths = new Set(
             (current?.files || []).map((file) => file.path).filter((path): path is string => !!path),
@@ -1868,6 +1712,7 @@ export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
         },
       );
       queryClient.invalidateQueries({ queryKey: canvasKeys.repositoryFiles(canvasId) });
+      queryClient.invalidateQueries({ queryKey: canvasKeys.draftBranches(canvasId) });
       queryClient.invalidateQueries({ queryKey: canvasKeys.repository(canvasId) });
       queryClient.invalidateQueries({ queryKey: [...canvasKeys.repository(canvasId), "file"] });
     },

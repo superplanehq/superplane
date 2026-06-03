@@ -2,6 +2,7 @@ package models
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,10 +18,16 @@ const (
 	CanvasVersionStateDraft     = "draft"
 	CanvasVersionStatePublished = "published"
 	CanvasVersionStateSnapshot  = "snapshot"
+
+	MaterializationStatusPending = "pending"
+	MaterializationStatusReady   = "ready"
+	MaterializationStatusError   = "error"
+
+	CanvasGitBranchMain = "main"
 )
 
 type CanvasVersion struct {
-	ID                      uuid.UUID
+	ID                      string
 	WorkflowID              uuid.UUID
 	OwnerID                 *uuid.UUID
 	State                   string
@@ -33,12 +40,21 @@ type CanvasVersion struct {
 	Edges                   datatypes.JSONSlice[Edge]
 	ConsolePanels           datatypes.JSONType[[]DashboardPanel]
 	ConsoleLayout           datatypes.JSONType[[]DashboardLayoutItem]
+	GitBranch               string
+	MaterializationStatus   string
+	MaterializationError    string
 	CreatedAt               *time.Time
 	UpdatedAt               *time.Time
 }
 
 func (c *CanvasVersion) TableName() string {
 	return "workflow_versions"
+}
+
+func NewCommitSHA() string {
+	u1 := uuid.New()
+	u2 := uuid.New()
+	return strings.ReplaceAll(u1.String(), "-", "") + u2.String()[:8]
 }
 
 func (c *CanvasVersion) EffectiveChangeRequestApprovers() []CanvasChangeRequestApprover {
@@ -69,11 +85,19 @@ func (c *CanvasVersion) ensureDefaultChangeRequestApprovers() {
 	c.ChangeRequestApprovers = datatypes.NewJSONSlice(DefaultCanvasChangeRequestApprovers())
 }
 
-func FindCanvasVersionInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
+func FindCanvasVersionInTransaction(tx *gorm.DB, workflowID uuid.UUID, versionID string) (*CanvasVersion, error) {
+	return FindVersionBySHAInTransaction(tx, workflowID, versionID)
+}
+
+func FindCanvasVersion(workflowID uuid.UUID, versionID string) (*CanvasVersion, error) {
+	return FindCanvasVersionInTransaction(database.Conn(), workflowID, versionID)
+}
+
+func FindVersionBySHAInTransaction(tx *gorm.DB, workflowID uuid.UUID, sha string) (*CanvasVersion, error) {
 	var version CanvasVersion
 	err := tx.
 		Where("workflow_id = ?", workflowID).
-		Where("id = ?", versionID).
+		Where("id = ?", sha).
 		First(&version).
 		Error
 
@@ -84,11 +108,11 @@ func FindCanvasVersionInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID
 	return &version, nil
 }
 
-func FindCanvasVersion(workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
-	return FindCanvasVersionInTransaction(database.Conn(), workflowID, versionID)
+func FindVersionBySHA(workflowID uuid.UUID, sha string) (*CanvasVersion, error) {
+	return FindVersionBySHAInTransaction(database.Conn(), workflowID, sha)
 }
 
-func FindCanvasVersionForUpdateInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID) (*CanvasVersion, error) {
+func FindCanvasVersionForUpdateInTransaction(tx *gorm.DB, workflowID uuid.UUID, versionID string) (*CanvasVersion, error) {
 	var version CanvasVersion
 	err := tx.
 		Clauses(clause.Locking{Strength: "UPDATE"}).
@@ -120,6 +144,25 @@ func ListCanvasVersionsInTransaction(tx *gorm.DB, workflowID uuid.UUID) ([]Canva
 
 func ListCanvasVersions(workflowID uuid.UUID) ([]CanvasVersion, error) {
 	return ListCanvasVersionsInTransaction(database.Conn(), workflowID)
+}
+
+func ListVersionsForBranchInTransaction(tx *gorm.DB, workflowID uuid.UUID, gitBranch string) ([]CanvasVersion, error) {
+	var versions []CanvasVersion
+	err := tx.
+		Where("workflow_id = ?", workflowID).
+		Where("git_branch = ?", gitBranch).
+		Order("created_at DESC").
+		Find(&versions).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return versions, nil
+}
+
+func ListVersionsForBranch(workflowID uuid.UUID, gitBranch string) ([]CanvasVersion, error) {
+	return ListVersionsForBranchInTransaction(database.Conn(), workflowID, gitBranch)
 }
 
 func ListDraftCanvasVersions(workflowID uuid.UUID) ([]CanvasVersion, error) {
@@ -195,6 +238,7 @@ func FindCanvasDraftInTransaction(tx *gorm.DB, workflowID, userID uuid.UUID) (*C
 		Where("workflow_id = ?", workflowID).
 		Where("owner_id = ?", userID).
 		Where("state = ?", CanvasVersionStateDraft).
+		Order("updated_at DESC").
 		First(&version).
 		Error
 
@@ -205,7 +249,7 @@ func FindCanvasDraftInTransaction(tx *gorm.DB, workflowID, userID uuid.UUID) (*C
 	return &version, nil
 }
 
-func FindCanvasDraftByVersionInTransaction(tx *gorm.DB, workflowID, userID, versionID uuid.UUID) (*CanvasVersion, error) {
+func FindCanvasDraftByVersionInTransaction(tx *gorm.DB, workflowID, userID uuid.UUID, versionID string) (*CanvasVersion, error) {
 	var version CanvasVersion
 	err := tx.
 		Where("workflow_id = ?", workflowID).
@@ -267,7 +311,8 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 		return err
 	}
 
-	canvas.LiveVersionID = &version.ID
+	liveVersionID := version.ID
+	canvas.LiveVersionID = &liveVersionID
 	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
 	return MapCanvasNameUniqueConstraintError(tx.
@@ -281,10 +326,41 @@ func PromoteToLiveInTransaction(tx *gorm.DB, version *CanvasVersion, nodes []Nod
 		Error)
 }
 
+func UpsertMaterializedVersionInTransaction(tx *gorm.DB, version *CanvasVersion) error {
+	if version == nil {
+		return errors.New("version is required")
+	}
+
+	version.ensureDefaultChangeRequestApprovers()
+
+	return tx.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"workflow_id",
+			"owner_id",
+			"state",
+			"name",
+			"description",
+			"change_management_enabled",
+			"change_request_approvers",
+			"published_at",
+			"nodes",
+			"edges",
+			"console_panels",
+			"console_layout",
+			"git_branch",
+			"materialization_status",
+			"materialization_error",
+			"updated_at",
+		}),
+	}).Create(version).Error
+}
+
 func SaveCanvasDraftInTransaction(
 	tx *gorm.DB,
 	workflowID uuid.UUID,
 	userID uuid.UUID,
+	gitBranch string,
 	nodes []Node,
 	edges []Edge,
 ) (*CanvasVersion, error) {
@@ -299,23 +375,12 @@ func SaveCanvasDraftInTransaction(
 		return nil, err
 	}
 
-	// Reuse existing draft if one already exists for this user+canvas.
-	existing, findErr := FindCanvasDraftInTransaction(tx, workflowID, userID)
-	if findErr == nil {
-		existing.Nodes = datatypes.NewJSONSlice(nodes)
-		existing.Edges = datatypes.NewJSONSlice(edges)
-		existing.UpdatedAt = &now
-		if err := tx.Save(existing).Error; err != nil {
-			return nil, err
-		}
-		return existing, nil
-	}
-	if !errors.Is(findErr, gorm.ErrRecordNotFound) {
-		return nil, findErr
+	if gitBranch == "" {
+		gitBranch = "drafts/" + userID.String()
 	}
 
 	version := CanvasVersion{
-		ID:                      uuid.New(),
+		ID:                      NewCommitSHA(),
 		WorkflowID:              workflowID,
 		OwnerID:                 &userID,
 		State:                   CanvasVersionStateDraft,
@@ -325,6 +390,8 @@ func SaveCanvasDraftInTransaction(
 		ChangeRequestApprovers:  datatypes.NewJSONSlice(liveVersion.EffectiveChangeRequestApprovers()),
 		Nodes:                   datatypes.NewJSONSlice(nodes),
 		Edges:                   datatypes.NewJSONSlice(edges),
+		GitBranch:               gitBranch,
+		MaterializationStatus:   MaterializationStatusReady,
 		CreatedAt:               &now,
 		UpdatedAt:               &now,
 	}
@@ -351,7 +418,7 @@ func CreateCanvasSnapshotVersionInTransaction(
 
 	now := time.Now()
 	version := CanvasVersion{
-		ID:                      uuid.New(),
+		ID:                      NewCommitSHA(),
 		WorkflowID:              workflowID,
 		OwnerID:                 &ownerID,
 		State:                   CanvasVersionStateSnapshot,
@@ -361,6 +428,8 @@ func CreateCanvasSnapshotVersionInTransaction(
 		ChangeRequestApprovers:  datatypes.NewJSONSlice(sourceVersion.EffectiveChangeRequestApprovers()),
 		Nodes:                   datatypes.NewJSONSlice(nodes),
 		Edges:                   datatypes.NewJSONSlice(edges),
+		GitBranch:               sourceVersion.GitBranch,
+		MaterializationStatus:   MaterializationStatusReady,
 		CreatedAt:               &now,
 		UpdatedAt:               &now,
 	}
@@ -395,12 +464,14 @@ func PublishCanvasDraftInTransaction(
 	version.State = CanvasVersionStatePublished
 	version.PublishedAt = &now
 	version.UpdatedAt = &now
+	version.GitBranch = CanvasGitBranchMain
 
 	if err := tx.Save(version).Error; err != nil {
 		return nil, err
 	}
 
-	canvas.LiveVersionID = &version.ID
+	liveVersionID := version.ID
+	canvas.LiveVersionID = &liveVersionID
 	canvas.Name = version.Name
 	canvas.UpdatedAt = &now
 

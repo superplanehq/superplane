@@ -12,21 +12,17 @@ import (
 	"gorm.io/gorm"
 )
 
-func resolveDashboardVersionID(tx *gorm.DB, canvas *models.Canvas, requestedVersionID string) (uuid.UUID, error) {
+func resolveDashboardVersionID(tx *gorm.DB, canvas *models.Canvas, requestedVersionID string) (string, error) {
 	if requestedVersionID != "" {
-		versionUUID, err := uuid.Parse(requestedVersionID)
-		if err != nil {
-			return uuid.Nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
-		}
-		return versionUUID, nil
+		return parseVersionSHA(requestedVersionID)
 	}
 
 	liveVersion, err := models.FindLiveCanvasVersionByCanvasInTransaction(tx, canvas)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return uuid.Nil, status.Error(codes.NotFound, "canvas live version not found")
+			return "", status.Error(codes.NotFound, "canvas live version not found")
 		}
-		return uuid.Nil, err
+		return "", err
 	}
 
 	return liveVersion.ID, nil

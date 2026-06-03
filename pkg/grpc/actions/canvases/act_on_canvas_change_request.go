@@ -12,6 +12,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -27,6 +28,7 @@ func ActOnCanvasChangeRequest(
 	authService authorization.Authorization,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
+	gitProvider git.Provider,
 	organizationID string,
 	canvasID string,
 	changeRequestID string,
@@ -46,6 +48,7 @@ func ActOnCanvasChangeRequest(
 	if action == pb.ActOnCanvasChangeRequestRequest_ACTION_PUBLISH {
 		request, version, err := PublishCanvasChangeRequest(
 			ctx,
+			gitProvider,
 			encryptor,
 			registry,
 			organizationID,
@@ -93,7 +96,7 @@ func ActOnCanvasChangeRequest(
 		return nil, status.Errorf(codes.Internal, "failed to act on change request: %v", err)
 	}
 
-	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
+	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID).PublishVersionUpdated(); err != nil {
 		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}
 
@@ -173,6 +176,15 @@ func runActOnCanvasChangeRequestTransaction(
 		approvals, err := models.ListCanvasChangeRequestApprovalsInTransaction(tx, canvasUUID, request.ID)
 		if err != nil {
 			return err
+		}
+
+		if request.Status == models.CanvasChangeRequestStatusOpen &&
+			(action == pb.ActOnCanvasChangeRequestRequest_ACTION_APPROVE ||
+				action == pb.ActOnCanvasChangeRequestRequest_ACTION_UNAPPROVE ||
+				action == pb.ActOnCanvasChangeRequestRequest_ACTION_REJECT) {
+			if refreshErr := refreshCanvasChangeRequestDiffInTransaction(tx, canvasInTx, version, request); refreshErr != nil {
+				return refreshErr
+			}
 		}
 
 		return applyActOnCanvasChangeRequestActionInTransaction(

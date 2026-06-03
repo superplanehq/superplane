@@ -1,6 +1,7 @@
 package installation
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
@@ -122,8 +124,10 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 		return nil, fmt.Errorf("failed to install app")
 	}
 
-	if err := persistInstalledConsole(canvasID, console); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to install console: %v", err)
+	if console != nil {
+		if err := seedInstalledConsole(ctx, s.GitProvider, s.Registry, s.Encryptor, s.AuthService, s.WebhooksBaseURL, req.OrganizationID, canvasID, console); err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to install console: %v", err)
+		}
 	}
 
 	return &InstallResult{
@@ -132,14 +136,17 @@ func (s *Service) Install(ctx context.Context, req InstallRequest) (*InstallResu
 	}, nil
 }
 
-// persistInstalledConsole writes the optional console for a freshly created
-// canvas. A nil console is a no-op (the repo did not ship a console.yaml).
-//
-// Note: this runs after canvases.CreateCanvas, in its own transaction. If the
-// upsert fails, the canvas already exists; the user can re-import the console
-// from the UI. We accept that trade-off to avoid changing CreateCanvas's
-// signature just for this side-effect.
-func persistInstalledConsole(canvasID string, console *models.DashboardYAML) error {
+func seedInstalledConsole(
+	ctx context.Context,
+	gitProvider git.Provider,
+	registry *registry.Registry,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	webhookBaseURL string,
+	organizationID uuid.UUID,
+	canvasID string,
+	console *models.DashboardYAML,
+) error {
 	if console == nil {
 		return nil
 	}
@@ -149,19 +156,52 @@ func persistInstalledConsole(canvasID string, console *models.DashboardYAML) err
 		return fmt.Errorf("invalid canvas id %q: %w", canvasID, err)
 	}
 
-	return database.Conn().Transaction(func(tx *gorm.DB) error {
-		version, findErr := models.FindLiveCanvasVersionInTransaction(tx, canvasUUID)
-		if findErr != nil {
-			return findErr
-		}
-
-		_, err := models.UpdateCanvasVersionDashboardInTransaction(
-			tx,
-			version,
-			console.Spec.Panels,
-			console.Spec.Layout,
-		)
+	repository, err := models.FindRepository(organizationID, canvasUUID)
+	if err != nil {
 		return err
+	}
+
+	consoleYAML, err := materialize.BuildConsoleYAMLFromDashboard(console)
+	if err != nil {
+		return err
+	}
+
+	headSHA, err := gitProvider.Head(ctx, repository.RepoID, models.CanvasGitBranchMain)
+	if err != nil {
+		return err
+	}
+
+	commitSHA, err := gitProvider.Commit(ctx, repository.RepoID, git.CommitOptions{
+		Branch:          models.CanvasGitBranchMain,
+		BaseBranch:      models.CanvasGitBranchMain,
+		ExpectedHeadSHA: headSHA,
+		Message:         "Install console",
+		Author: git.CommitAuthor{
+			Name:  "SuperPlane",
+			Email: "support@superplane.com",
+		},
+		Operations: []git.FileOperation{
+			{
+				Path:      materialize.ConsoleFileName,
+				Content:   bytes.NewReader(consoleYAML),
+				SizeBytes: int64(len(consoleYAML)),
+			},
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return database.Conn().Transaction(func(tx *gorm.DB) error {
+		mat := &materialize.Materializer{
+			GitProvider:    gitProvider,
+			Registry:       registry,
+			Encryptor:      encryptor,
+			AuthService:    authService,
+			WebhookBaseURL: webhookBaseURL,
+		}
+		_, matErr := mat.MaterializeFromGit(ctx, tx, organizationID, canvasUUID, models.CanvasGitBranchMain, commitSHA, materialize.ModeLive, nil)
+		return matErr
 	})
 }
 

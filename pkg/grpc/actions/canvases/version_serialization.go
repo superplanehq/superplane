@@ -29,12 +29,15 @@ func SerializeCanvasVersion(version *models.CanvasVersion, organizationID string
 	}
 
 	metadata := &pb.CanvasVersion_Metadata{
-		Id:          version.ID.String(),
-		CanvasId:    version.WorkflowID.String(),
-		Owner:       owner,
-		State:       state,
-		Name:        version.Name,
-		Description: version.Description,
+		Id:                    version.ID,
+		CanvasId:              version.WorkflowID.String(),
+		Owner:                 owner,
+		State:                 state,
+		Name:                  version.Name,
+		Description:           version.Description,
+		GitBranch:             version.GitBranch,
+		MaterializationStatus: version.MaterializationStatus,
+		MaterializationError:  version.MaterializationError,
 	}
 
 	if version.PublishedAt != nil {

@@ -20,7 +20,7 @@ const canvasNameUniqueConstraint = "workflows_organization_id_name_key"
 type Canvas struct {
 	ID             uuid.UUID
 	OrganizationID uuid.UUID
-	LiveVersionID  *uuid.UUID
+	LiveVersionID  *string
 	CanvasFolderID *uuid.UUID `gorm:"column:folder_id"`
 	IsTemplate     bool
 	Name           string
@@ -65,7 +65,7 @@ func MapCanvasNameUniqueConstraintError(err error) error {
 func queryCanvasWithLiveVersion(tx *gorm.DB) *gorm.DB {
 	return tx.
 		Model(&Canvas{}).
-		Joins("JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id").
+		Joins("LEFT JOIN workflow_versions live_version ON live_version.id = workflows.live_version_id").
 		Select(
 			"workflows.*",
 			"live_version.description AS description",

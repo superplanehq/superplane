@@ -230,6 +230,24 @@ CREATE TABLE public.blueprints (
 
 
 --
+-- Name: canvas_draft_branches; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.canvas_draft_branches (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    canvas_id uuid NOT NULL,
+    organization_id uuid NOT NULL,
+    branch_name text NOT NULL,
+    display_name text DEFAULT ''::text NOT NULL,
+    owner_id uuid,
+    created_by uuid,
+    tip_sha character varying(40) DEFAULT ''::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: canvas_folders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -422,6 +440,22 @@ CREATE TABLE public.repositories (
 
 
 --
+-- Name: repository_materialization_state; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.repository_materialization_state (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    canvas_id uuid NOT NULL,
+    branch text NOT NULL,
+    head_sha character varying(40) DEFAULT ''::character varying NOT NULL,
+    materialized_sha character varying(40) DEFAULT ''::character varying NOT NULL,
+    status character varying(32) DEFAULT 'pending'::character varying NOT NULL,
+    error text DEFAULT ''::text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: role_metadata; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -530,7 +564,7 @@ CREATE TABLE public.workflow_change_request_approvals (
 CREATE TABLE public.workflow_change_requests (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     workflow_id uuid NOT NULL,
-    version_id uuid NOT NULL,
+    version_id character varying(40) NOT NULL,
     owner_id uuid,
     status character varying(32) NOT NULL,
     changed_node_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
@@ -539,8 +573,9 @@ CREATE TABLE public.workflow_change_requests (
     published_at timestamp without time zone,
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
-    based_on_version_id uuid,
-    conflicting_node_ids jsonb DEFAULT '[]'::jsonb NOT NULL
+    based_on_version_id character varying(40),
+    conflicting_node_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    draft_branch text NOT NULL
 );
 
 
@@ -672,7 +707,7 @@ CREATE TABLE public.workflow_runs (
     created_at timestamp without time zone NOT NULL,
     updated_at timestamp without time zone NOT NULL,
     finished_at timestamp without time zone,
-    version_id uuid NOT NULL
+    version_id character varying(40) NOT NULL
 );
 
 
@@ -681,7 +716,7 @@ CREATE TABLE public.workflow_runs (
 --
 
 CREATE TABLE public.workflow_versions (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id character varying(40) NOT NULL,
     workflow_id uuid NOT NULL,
     owner_id uuid,
     published_at timestamp without time zone,
@@ -695,7 +730,10 @@ CREATE TABLE public.workflow_versions (
     change_management_enabled boolean DEFAULT false NOT NULL,
     change_request_approvers jsonb DEFAULT '[]'::jsonb NOT NULL,
     console_panels jsonb DEFAULT '[]'::jsonb NOT NULL,
-    console_layout jsonb DEFAULT '[]'::jsonb NOT NULL
+    console_layout jsonb DEFAULT '[]'::jsonb NOT NULL,
+    git_branch text NOT NULL,
+    materialization_status character varying(32) DEFAULT 'ready'::character varying NOT NULL,
+    materialization_error text DEFAULT ''::text NOT NULL
 );
 
 
@@ -712,7 +750,7 @@ CREATE TABLE public.workflows (
     created_by uuid,
     deleted_at timestamp without time zone,
     is_template boolean DEFAULT false NOT NULL,
-    live_version_id uuid NOT NULL,
+    live_version_id character varying(40),
     folder_id uuid
 );
 
@@ -861,6 +899,22 @@ ALTER TABLE ONLY public.blueprints
 
 
 --
+-- Name: canvas_draft_branches canvas_draft_branches_canvas_id_branch_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_draft_branches
+    ADD CONSTRAINT canvas_draft_branches_canvas_id_branch_name_key UNIQUE (canvas_id, branch_name);
+
+
+--
+-- Name: canvas_draft_branches canvas_draft_branches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_draft_branches
+    ADD CONSTRAINT canvas_draft_branches_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: canvas_folders canvas_folders_organization_id_title_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -994,6 +1048,22 @@ ALTER TABLE ONLY public.repositories
 
 ALTER TABLE ONLY public.repositories
     ADD CONSTRAINT repositories_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: repository_materialization_state repository_materialization_state_canvas_id_branch_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repository_materialization_state
+    ADD CONSTRAINT repository_materialization_state_canvas_id_branch_key UNIQUE (canvas_id, branch);
+
+
+--
+-- Name: repository_materialization_state repository_materialization_state_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repository_materialization_state
+    ADD CONSTRAINT repository_materialization_state_pkey PRIMARY KEY (id);
 
 
 --
@@ -1305,6 +1375,20 @@ CREATE INDEX idx_blueprints_organization_id ON public.blueprints USING btree (or
 
 
 --
+-- Name: idx_canvas_draft_branches_canvas_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_canvas_draft_branches_canvas_id ON public.canvas_draft_branches USING btree (canvas_id);
+
+
+--
+-- Name: idx_canvas_draft_branches_owner_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_canvas_draft_branches_owner_id ON public.canvas_draft_branches USING btree (owner_id);
+
+
+--
 -- Name: idx_canvas_folders_organization_id_title; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1379,6 +1463,13 @@ CREATE INDEX idx_organizations_deleted_at ON public.organizations USING btree (d
 --
 
 CREATE INDEX idx_repositories_canvas_id ON public.repositories USING btree (canvas_id);
+
+
+--
+-- Name: idx_repository_materialization_state_canvas_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_repository_materialization_state_canvas_id ON public.repository_materialization_state USING btree (canvas_id);
 
 
 --
@@ -1613,17 +1704,17 @@ CREATE INDEX idx_workflow_runs_workflow_state ON public.workflow_runs USING btre
 
 
 --
+-- Name: idx_workflow_versions_git_branch; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_workflow_versions_git_branch ON public.workflow_versions USING btree (workflow_id, git_branch);
+
+
+--
 -- Name: idx_workflow_versions_owner; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_workflow_versions_owner ON public.workflow_versions USING btree (owner_id);
-
-
---
--- Name: idx_workflow_versions_unique_draft; Type: INDEX; Schema: public; Owner: -
---
-
-CREATE UNIQUE INDEX idx_workflow_versions_unique_draft ON public.workflow_versions USING btree (workflow_id, owner_id) WHERE ((state)::text = 'draft'::text);
 
 
 --
@@ -1763,6 +1854,38 @@ ALTER TABLE ONLY public.app_installations
 
 
 --
+-- Name: canvas_draft_branches canvas_draft_branches_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_draft_branches
+    ADD CONSTRAINT canvas_draft_branches_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
+
+
+--
+-- Name: canvas_draft_branches canvas_draft_branches_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_draft_branches
+    ADD CONSTRAINT canvas_draft_branches_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: canvas_draft_branches canvas_draft_branches_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_draft_branches
+    ADD CONSTRAINT canvas_draft_branches_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: canvas_draft_branches canvas_draft_branches_owner_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.canvas_draft_branches
+    ADD CONSTRAINT canvas_draft_branches_owner_id_fkey FOREIGN KEY (owner_id) REFERENCES public.users(id) ON DELETE SET NULL;
+
+
+--
 -- Name: canvas_folders canvas_folders_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -1864,6 +1987,14 @@ ALTER TABLE ONLY public.repositories
 
 ALTER TABLE ONLY public.repositories
     ADD CONSTRAINT repositories_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id) ON DELETE CASCADE;
+
+
+--
+-- Name: repository_materialization_state repository_materialization_state_canvas_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repository_materialization_state
+    ADD CONSTRAINT repository_materialization_state_canvas_id_fkey FOREIGN KEY (canvas_id) REFERENCES public.workflows(id) ON DELETE CASCADE;
 
 
 --
@@ -2194,7 +2325,7 @@ SET row_security = off;
 --
 
 COPY public.schema_migrations (version, dirty) FROM stdin;
-20260601220232	f
+20260603020443	f
 \.
 
 

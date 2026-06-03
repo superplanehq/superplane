@@ -116,6 +116,16 @@ func mapCanvasNameUniqueConstraintError(err error) error {
 	return err
 }
 
+func PublishCanvasVersionInTransaction(
+	ctx context.Context,
+	tx *gorm.DB,
+	liveVersion *models.CanvasVersion,
+	nextVersion *models.CanvasVersion,
+	options changesets.CanvasPublisherOptions,
+) error {
+	return publishCanvasVersionInTransaction(ctx, tx, liveVersion, nextVersion, options)
+}
+
 func publishCanvasVersionInTransaction(
 	ctx context.Context,
 	tx *gorm.DB,

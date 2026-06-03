@@ -41,9 +41,9 @@ func PublishCanvasVersion(
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
-	versionUUID, err := uuid.Parse(versionID)
+	versionSHA, err := parseVersionSHA(versionID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+		return nil, err
 	}
 
 	organizationUUID := uuid.MustParse(organizationID)
@@ -67,7 +67,7 @@ func PublishCanvasVersion(
 	}
 
 	publishedVersion, err := publishDraftVersionInTransaction(
-		ctx, encryptor, reg, organizationID, organizationUUID, canvasUUID, versionUUID, userUUID, authService, webhookBaseURL,
+		ctx, encryptor, reg, organizationID, organizationUUID, canvasUUID, versionSHA, userUUID, authService, webhookBaseURL,
 	)
 	if err != nil {
 		if status.Code(err) != codes.Unknown {
@@ -79,7 +79,7 @@ func PublishCanvasVersion(
 	if err := messages.NewCanvasUpdatedMessage(canvas.ID.String(), canvas.OrganizationID.String()).PublishUpdated(); err != nil {
 		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", err)
 	}
-	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), publishedVersion.ID.String()).PublishVersionUpdated(); err != nil {
+	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), publishedVersion.ID).PublishVersionUpdated(); err != nil {
 		log.Errorf("failed to publish canvas version updated RabbitMQ message: %v", err)
 	}
 
@@ -95,7 +95,7 @@ func publishDraftVersionInTransaction(
 	organizationID string,
 	organizationUUID uuid.UUID,
 	canvasUUID uuid.UUID,
-	versionUUID uuid.UUID,
+	versionSHA string,
 	userUUID uuid.UUID,
 	authService authorization.Authorization,
 	webhookBaseURL string,
@@ -103,7 +103,7 @@ func publishDraftVersionInTransaction(
 	var publishedVersion *models.CanvasVersion
 
 	err := database.Conn().Transaction(func(tx *gorm.DB) error {
-		version, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, versionUUID)
+		version, findErr := models.FindCanvasVersionForUpdateInTransaction(tx, canvasUUID, versionSHA)
 		if findErr != nil {
 			if errors.Is(findErr, gorm.ErrRecordNotFound) {
 				return status.Error(codes.NotFound, "version not found")

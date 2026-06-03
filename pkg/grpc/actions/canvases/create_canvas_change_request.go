@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -48,13 +49,13 @@ func CreateCanvasChangeRequestWithMetadata(
 	requestedVersionID := strings.TrimSpace(versionID)
 	requestedTitle := strings.TrimSpace(title)
 	requestedDescription := description
-	var requestedVersionUUID *uuid.UUID
+	var requestedVersionSHA string
 	if requestedVersionID != "" {
-		versionUUID, parseErr := uuid.Parse(requestedVersionID)
+		sha, parseErr := parseVersionSHA(requestedVersionID)
 		if parseErr != nil {
-			return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", parseErr)
+			return nil, parseErr
 		}
-		requestedVersionUUID = &versionUUID
+		requestedVersionSHA = sha
 	}
 
 	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasUUID)
@@ -87,7 +88,7 @@ func CreateCanvasChangeRequestWithMetadata(
 			return status.Error(codes.FailedPrecondition, "canvas live version not found")
 		}
 
-		draftVersion, findDraftErr := models.FindCanvasDraftInTransaction(tx, canvasUUID, userUUID)
+		draftBranch, findDraftErr := models.FindDraftBranchInTransaction(tx, canvasUUID, materialize.DefaultDraftBranchName(userUUID))
 		if findDraftErr != nil {
 			if errors.Is(findDraftErr, gorm.ErrRecordNotFound) {
 				return status.Error(codes.FailedPrecondition, "no edit version found for this user")
@@ -95,15 +96,25 @@ func CreateCanvasChangeRequestWithMetadata(
 			return findDraftErr
 		}
 
-		if requestedVersionUUID != nil && draftVersion.ID != *requestedVersionUUID {
+		draftVersion, findVersionErr := models.FindVersionBySHAInTransaction(tx, canvasUUID, draftBranch.TipSHA)
+		if findVersionErr != nil {
+			if errors.Is(findVersionErr, gorm.ErrRecordNotFound) {
+				return status.Error(codes.FailedPrecondition, "draft branch tip is not materialized")
+			}
+			return findVersionErr
+		}
+
+		if requestedVersionSHA != "" && draftVersion.ID != requestedVersionSHA {
 			return status.Error(codes.FailedPrecondition, "version is not your current edit version")
 		}
 
-		if draftVersion.OwnerID == nil || *draftVersion.OwnerID != userUUID {
-			return status.Error(codes.PermissionDenied, "version owner mismatch")
+		if draftVersion.MaterializationStatus != models.MaterializationStatusReady {
+			return status.Error(codes.FailedPrecondition, "draft branch tip is not ready")
 		}
 		if draftVersion.State == models.CanvasVersionStatePublished {
-			return status.Error(codes.FailedPrecondition, "published versions cannot create change requests")
+			if canvasInTx.LiveVersionID == nil || draftVersion.ID != *canvasInTx.LiveVersionID {
+				return status.Error(codes.FailedPrecondition, "published versions cannot create change requests")
+			}
 		}
 
 		version, err = models.CreateCanvasSnapshotVersionInTransaction(
@@ -125,6 +136,7 @@ func CreateCanvasChangeRequestWithMetadata(
 			VersionID:        version.ID,
 			OwnerID:          &userUUID,
 			BasedOnVersionID: canvasInTx.LiveVersionID,
+			DraftBranch:      draftBranch.BranchName,
 			Title:            requestedTitle,
 			Description:      requestedDescription,
 			Status:           models.CanvasChangeRequestStatusOpen,
@@ -148,7 +160,7 @@ func CreateCanvasChangeRequestWithMetadata(
 		return nil, status.Errorf(codes.Internal, "failed to create canvas change request: %v", err)
 	}
 
-	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
+	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID).PublishVersionUpdated(); err != nil {
 		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}
 

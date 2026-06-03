@@ -202,6 +202,12 @@ func startWorkers(
 		go w.Start(context.Background())
 	}
 
+	if os.Getenv("START_REPOSITORY_MATERIALIZER") == "yes" {
+		log.Println("Starting Repository Materializer")
+		w := workers.NewRepositoryMaterializerWorker(rabbitMQURL, gitProvider, registry)
+		go w.Start(context.Background())
+	}
+
 	if os.Getenv("START_ORGANIZATION_CLEANUP_WORKER") == "yes" {
 		log.Println("Starting Organization Cleanup Worker")
 

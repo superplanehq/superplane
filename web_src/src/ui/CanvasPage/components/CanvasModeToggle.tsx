@@ -1,6 +1,7 @@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
+import { DraftChangeDots } from "./DraftChangeDots";
 
 export type CanvasMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
 
@@ -11,8 +12,48 @@ interface CanvasModeToggleProps {
   onSelectMemory?: () => void;
   onSelectFiles?: () => void;
   editing?: boolean;
+  /** @deprecated Use hasCanvasUncommitted / hasCanvasCommitted */
   hasDraft?: boolean;
+  /** @deprecated Use hasDashboardUncommitted / hasDashboardCommitted */
   hasDashboardDraft?: boolean;
+  hasCanvasUncommitted?: boolean;
+  hasCanvasCommitted?: boolean;
+  hasDashboardUncommitted?: boolean;
+  hasDashboardCommitted?: boolean;
+  /** Edit-mode tab bar color aligned with draft status badges. */
+  editTabTone?: "uncommitted" | "ready" | "neutral";
+}
+
+const EDITING_TAB_TRIGGER_ACTIVE =
+  "[&_[data-slot=tabs-trigger][data-state=active]]:rounded-full [&_[data-slot=tabs-trigger][data-state=active]]:bg-white [&_[data-slot=tabs-trigger][data-state=active]]:text-slate-900 [&_[data-slot=tabs-trigger][data-state=active]]:shadow-sm";
+const EDITING_TAB_TRIGGER_BASE =
+  "[&_[data-slot=tabs-trigger]]:transition-none [&_[data-slot=tabs-trigger][data-state=inactive]]:bg-transparent";
+
+function editingTabListClassName(tone: CanvasModeToggleProps["editTabTone"]): string {
+  if (tone === "uncommitted") {
+    return cn(
+      "rounded-full bg-orange-50",
+      EDITING_TAB_TRIGGER_BASE,
+      "[&_[data-slot=tabs-trigger][data-state=inactive]]:text-orange-800/80 [&_[data-slot=tabs-trigger][data-state=inactive]]:hover:text-orange-900",
+      EDITING_TAB_TRIGGER_ACTIVE,
+    );
+  }
+
+  if (tone === "ready") {
+    return cn(
+      "rounded-full bg-blue-50",
+      EDITING_TAB_TRIGGER_BASE,
+      "[&_[data-slot=tabs-trigger][data-state=inactive]]:text-blue-800/80 [&_[data-slot=tabs-trigger][data-state=inactive]]:hover:text-blue-900",
+      EDITING_TAB_TRIGGER_ACTIVE,
+    );
+  }
+
+  return cn(
+    "rounded-full bg-slate-100",
+    EDITING_TAB_TRIGGER_BASE,
+    "[&_[data-slot=tabs-trigger][data-state=inactive]]:text-slate-600 [&_[data-slot=tabs-trigger][data-state=inactive]]:hover:text-slate-900",
+    EDITING_TAB_TRIGGER_ACTIVE,
+  );
 }
 
 const CANVAS_TAB = "canvas";
@@ -30,7 +71,16 @@ export function CanvasModeToggle({
   editing = false,
   hasDraft = false,
   hasDashboardDraft = false,
+  hasCanvasUncommitted,
+  hasCanvasCommitted,
+  hasDashboardUncommitted,
+  hasDashboardCommitted,
+  editTabTone = "neutral",
 }: CanvasModeToggleProps) {
+  const canvasUncommitted = hasCanvasUncommitted ?? hasDraft;
+  const canvasCommitted = hasCanvasCommitted ?? false;
+  const dashboardUncommitted = hasDashboardUncommitted ?? hasDashboardDraft;
+  const dashboardCommitted = hasDashboardCommitted ?? false;
   const showDashboard = Boolean(onSelectDashboard);
   const showMemory = Boolean(onSelectMemory);
   const showFiles = Boolean(onSelectFiles);
@@ -100,7 +150,7 @@ export function CanvasModeToggle({
         className={cn(
           "h-7 min-h-7 p-1 [&_[data-slot=tabs-trigger]]:text-[13px]",
           editing
-            ? "rounded-full bg-[var(--purple)] text-white [&_[data-slot=tabs-trigger]]:transition-none [&_[data-slot=tabs-trigger][data-state=inactive]]:bg-transparent [&_[data-slot=tabs-trigger][data-state=inactive]]:text-white/90 [&_[data-slot=tabs-trigger][data-state=inactive]]:hover:text-white [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full [&_[data-slot=tabs-trigger][data-state=active]]:bg-white [&_[data-slot=tabs-trigger][data-state=active]]:text-slate-900 [&_[data-slot=tabs-trigger][data-state=active]]:shadow-none"
+            ? editingTabListClassName(editTabTone)
             : "rounded-full bg-slate-100 [&_[data-slot=tabs-trigger][data-state=inactive]]:text-slate-500 [&_[data-slot=tabs-trigger][data-state=active]]:rounded-full",
         )}
       >
@@ -108,7 +158,11 @@ export function CanvasModeToggle({
           <TabsTrigger value={DASHBOARD_TAB} data-testid="canvas-view-mode-dashboard" aria-label="Console">
             <span className="inline-flex items-center gap-1.5">
               Console
-              <DraftDot show={hasDashboardDraft} testId="canvas-view-mode-dashboard-draft-dot" />
+              <DraftChangeDots
+                uncommitted={dashboardUncommitted}
+                committed={dashboardCommitted}
+                testIdPrefix="canvas-view-mode-dashboard"
+              />
             </span>
           </TabsTrigger>
         ) : null}
@@ -119,7 +173,11 @@ export function CanvasModeToggle({
         >
           <span className="inline-flex items-center gap-1.5">
             Canvas
-            <DraftDot show={hasDraft} testId="canvas-view-mode-live-draft-dot" />
+            <DraftChangeDots
+              uncommitted={canvasUncommitted}
+              committed={canvasCommitted}
+              testIdPrefix="canvas-view-mode-live"
+            />
           </span>
         </TabsTrigger>
         {showMemory ? (
@@ -134,15 +192,5 @@ export function CanvasModeToggle({
         ) : null}
       </TabsList>
     </Tabs>
-  );
-}
-
-function DraftDot({ show, testId }: { show: boolean; testId: string }) {
-  if (!show) {
-    return null;
-  }
-
-  return (
-    <span className="inline-flex size-1.5 shrink-0 rounded-full bg-slate-400" aria-hidden="true" data-testid={testId} />
   );
 }

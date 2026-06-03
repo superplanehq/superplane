@@ -16,6 +16,7 @@ import (
 func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["canvas_id"]
 	path := r.URL.Query().Get("path")
+	branch := r.URL.Query().Get("branch")
 
 	if id == "" {
 		http.Error(w, "canvas_id is required", http.StatusBadRequest)
@@ -70,7 +71,7 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	reader, err := s.gitProvider.GetFile(r.Context(), repository.RepoID, path)
+	reader, err := s.gitProvider.GetFile(r.Context(), repository.RepoID, path, branch)
 	if err != nil {
 		log.Errorf("Failed to get file %s in canvas %s: %v", path, canvasID.String(), err)
 		http.Error(w, "Failed to get file", http.StatusInternalServerError)
@@ -81,6 +82,14 @@ func (s *Server) handleRepositoryFileDownload(w http.ResponseWriter, r *http.Req
 
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Type", "application/octet-stream")
+	// Repository contents change on every commit while the URL (path + branch)
+	// stays the same, so the browser must never serve a cached response.
+	// Otherwise, after committing to a draft branch the UI keeps showing the
+	// previously fetched (pre-commit) content, both immediately and after a full
+	// page reload.
+	w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("inline", map[string]string{
 		"filename": filepath.Base(path),
 	}))

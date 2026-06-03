@@ -3,14 +3,17 @@ package canvases
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
+	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/canvases/changesets"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -23,6 +26,7 @@ import (
 
 func PublishCanvasChangeRequest(
 	ctx context.Context,
+	gitProvider git.Provider,
 	encryptor crypto.Encryptor,
 	registry *registry.Registry,
 	organizationID string,
@@ -124,6 +128,71 @@ func PublishCanvasChangeRequest(
 			return publishCheckErr
 		}
 
+		if strings.TrimSpace(request.DraftBranch) != "" {
+			if gitProvider == nil {
+				return status.Error(codes.FailedPrecondition, "git provider is not configured")
+			}
+
+			repository, repoErr := models.FindRepositoryInTransaction(tx, canvasUUID)
+			if repoErr != nil {
+				return repoErr
+			}
+
+			user, userErr := models.FindActiveUserByID(organizationID, userID)
+			if userErr != nil {
+				return userErr
+			}
+
+			mergeSHA, mergeErr := gitProvider.MergeBranch(
+				ctx,
+				repository.RepoID,
+				request.DraftBranch,
+				models.CanvasGitBranchMain,
+				"Publish change request",
+				git.CommitAuthor{Name: user.Name, Email: user.GetEmail()},
+			)
+			if mergeErr != nil {
+				return status.Errorf(codes.Internal, "failed to merge draft branch: %v", mergeErr)
+			}
+
+			mat := &materialize.Materializer{
+				GitProvider:    gitProvider,
+				Registry:       registry,
+				Encryptor:      encryptor,
+				AuthService:    authService,
+				WebhookBaseURL: webhookBaseURL,
+			}
+			publishedLive, matErr := mat.MaterializeFromGit(
+				ctx,
+				tx,
+				organizationUUID,
+				canvasUUID,
+				models.CanvasGitBranchMain,
+				mergeSHA,
+				materialize.ModeLive,
+				nil,
+			)
+			if matErr != nil {
+				return matErr
+			}
+			liveVersion = publishedLive
+
+			now := time.Now()
+			request.Status = models.CanvasChangeRequestStatusPublished
+			request.PublishedAt = &now
+			request.UpdatedAt = &now
+			if saveErr := tx.Save(request).Error; saveErr != nil {
+				return saveErr
+			}
+
+			if refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, request.ID); refreshErr != nil {
+				return refreshErr
+			}
+
+			canvas = canvasForUpdate
+			return nil
+		}
+
 		baseNodes, baseEdges, liveNodes, liveEdges, resolveErr := resolveCanvasChangeRequestBaseAndLiveInTransaction(
 			tx,
 			canvasForUpdate,
@@ -182,7 +251,8 @@ func PublishCanvasChangeRequest(
 		}
 
 		liveVersion = mergedVersion
-		canvasForUpdate.LiveVersionID = &liveVersion.ID
+		liveVersionID := liveVersion.ID
+		canvasForUpdate.LiveVersionID = &liveVersionID
 		canvasForUpdate.UpdatedAt = liveVersion.UpdatedAt
 
 		now := time.Now()
@@ -202,6 +272,7 @@ func PublishCanvasChangeRequest(
 				tx,
 				canvasUUID,
 				*request.OwnerID,
+				request.DraftBranch,
 				liveVersion.Nodes,
 				liveVersion.Edges,
 			)
@@ -224,15 +295,15 @@ func PublishCanvasChangeRequest(
 		log.Errorf("failed to publish canvas updated RabbitMQ message: %v", err)
 	}
 	if liveVersion != nil {
-		if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), liveVersion.ID.String()).PublishVersionUpdated(); err != nil {
+		if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), liveVersion.ID).PublishVersionUpdated(); err != nil {
 			log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 		}
 	}
-	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID.String()).PublishVersionUpdated(); err != nil {
+	if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), version.ID).PublishVersionUpdated(); err != nil {
 		log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 	}
 	if renewedDraftVersion != nil {
-		if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), renewedDraftVersion.ID.String()).PublishVersionUpdated(); err != nil {
+		if err := messages.NewCanvasVersionUpdatedMessage(canvas.ID.String(), renewedDraftVersion.ID).PublishVersionUpdated(); err != nil {
 			log.Errorf("failed to publish canvas update RabbitMQ message: %v", err)
 		}
 	}

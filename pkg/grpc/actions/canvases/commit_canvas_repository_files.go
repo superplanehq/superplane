@@ -4,21 +4,28 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/canvas/materialize"
+	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
+	"github.com/superplanehq/superplane/pkg/registry"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"gorm.io/gorm"
 )
 
 func CommitCanvasRepositoryFiles(
 	ctx context.Context,
 	gitProvider git.Provider,
+	registry *registry.Registry,
 	organizationID string,
 	id string,
+	branch string,
 	expectedHeadSha string,
 	message string,
 	operations []*pb.CanvasRepositoryFileOperation,
@@ -48,6 +55,14 @@ func CommitCanvasRepositoryFiles(
 		return nil, status.Errorf(codes.Internal, "failed to find user: %v", err)
 	}
 
+	branch = strings.TrimSpace(branch)
+	if branch == "" {
+		branch = materialize.DefaultDraftBranchName(uuid.MustParse(userID))
+	}
+	if branch == models.CanvasGitBranchMain {
+		return nil, status.Error(codes.InvalidArgument, "commits must target a draft branch")
+	}
+
 	gitOperations := make([]git.FileOperation, 0, len(operations))
 	for _, operation := range operations {
 		content := operation.GetContent()
@@ -65,8 +80,8 @@ func CommitCanvasRepositoryFiles(
 	}
 
 	newCommitSha, err := gitProvider.Commit(ctx, repository.RepoID, git.CommitOptions{
-		Branch:          "main",
-		BaseBranch:      "main",
+		Branch:          branch,
+		BaseBranch:      branch,
 		ExpectedHeadSHA: expectedHeadSha,
 		Message:         message,
 		Operations:      gitOperations,
@@ -75,9 +90,18 @@ func CommitCanvasRepositoryFiles(
 			Email: user.GetEmail(),
 		},
 	})
-
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to commit repository files: %v", err)
+	}
+
+	userUUID := uuid.MustParse(userID)
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		mat := &materialize.DraftMaterializer{GitProvider: gitProvider, Registry: registry}
+		_, matErr := mat.MaterializeDraft(ctx, tx, orgID, canvasID, branch, newCommitSha, &userUUID)
+		return matErr
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to materialize draft: %v", err)
 	}
 
 	return &pb.CommitCanvasRepositoryFilesResponse{

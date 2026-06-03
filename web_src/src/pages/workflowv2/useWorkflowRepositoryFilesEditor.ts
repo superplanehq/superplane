@@ -19,6 +19,7 @@ type UseWorkflowRepositoryFilesEditorOptions = {
   isEditing: boolean;
   canWrite: boolean;
   files: WorkflowFile[];
+  activeBranch?: string | null;
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: WorkflowFilesHeaderActionsState | null) => void;
 };
@@ -28,12 +29,13 @@ export function useWorkflowRepositoryFilesEditor({
   isEditing,
   canWrite,
   files,
+  activeBranch,
   headerActionsSlotId,
   onHeaderActionsChange,
 }: UseWorkflowRepositoryFilesEditorOptions) {
   const leftOffset = useEffectiveLeftSidebarWidth();
   const canManageRepositoryFiles = canWrite && !!canvasId && isEditing;
-  const catalog = useWorkflowRepositoryFilesCatalog(canvasId, files);
+  const catalog = useWorkflowRepositoryFilesCatalog(canvasId, files, activeBranch ?? undefined);
   const commitFiles = useCommitCanvasRepositoryFiles(canvasId ?? "");
   const [loadedContentByPath, setLoadedContentByPath] = useState<Record<string, string>>({});
   const [isDiffOpen, setIsDiffOpen] = useState(false);
@@ -75,6 +77,7 @@ export function useWorkflowRepositoryFilesEditor({
       canManageRepositoryFiles && pendingChanges.length > 0 && !pathLists.commitPathError && !commitFiles.isPending,
     commitPathError: pathLists.commitPathError,
     headSha: catalog.headSha,
+    branch: activeBranch ?? undefined,
     pendingChanges,
     setPendingChangesByPath: pending.setPendingChangesByPath,
     setLoadedContentByPath,

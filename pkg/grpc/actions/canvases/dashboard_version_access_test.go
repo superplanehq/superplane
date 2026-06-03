@@ -32,14 +32,13 @@ func TestEnsureDashboardVersionReadable_SnapshotVisibleToAnyOrgMember(t *testing
 	r := support.Setup(t)
 	authorCtx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
 
-	canvasID := createCanvasWithNoopNode(authorCtx, t, r, "snapshot-access-cr")
-	draftVersionID := createDraftVersion(authorCtx, t, r, canvasID, "Draft One")
+	canvasID := createCanvasWithChangeManagement(authorCtx, t, r, "snapshot-access-cr")
+	createDraftVersion(authorCtx, t, r, canvasID, "Draft One")
 
-	createCRResponse, err := CreateCanvasChangeRequest(authorCtx, r.Organization.ID.String(), canvasID, draftVersionID)
+	createCRResponse, err := CreateCanvasChangeRequest(authorCtx, r.Organization.ID.String(), canvasID, "")
 	require.NoError(t, err)
 	snapshotVersionID := createCRResponse.ChangeRequest.Metadata.VersionId
 	require.NotEmpty(t, snapshotVersionID)
-	require.NotEqual(t, draftVersionID, snapshotVersionID, "CR must snapshot the draft into a new version")
 
 	otherUser := support.CreateUser(t, r, r.Organization.ID)
 	reviewerCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
@@ -111,7 +110,7 @@ func TestEnsureDashboardVersionReadable_NoCRStillDenies(t *testing.T) {
 	// access check must still hold its ground.
 	authorUUID := r.User
 	orphan := &models.CanvasVersion{
-		ID:         uuid.New(),
+		ID:         models.NewCommitSHA(),
 		WorkflowID: canvasUUID,
 		OwnerID:    &authorUUID,
 		State:      models.CanvasVersionStateSnapshot,
@@ -121,7 +120,7 @@ func TestEnsureDashboardVersionReadable_NoCRStillDenies(t *testing.T) {
 	otherUser := support.CreateUser(t, r, r.Organization.ID)
 	reviewerCtx := authentication.SetUserIdInMetadata(context.Background(), otherUser.ID.String())
 
-	_, err := GetCanvasDashboard(reviewerCtx, r.Organization.ID.String(), canvasID, orphan.ID.String())
+	_, err := GetCanvasDashboard(reviewerCtx, r.Organization.ID.String(), canvasID, orphan.ID)
 	require.Error(t, err)
 	s, ok := status.FromError(err)
 	require.True(t, ok)

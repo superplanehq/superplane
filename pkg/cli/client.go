@@ -3,15 +3,17 @@ package cli
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/superplanehq/superplane/pkg/openapi_client"
 )
 
 type ClientConfig struct {
-	BaseURL    string
-	APIToken   string
-	HTTPClient *http.Client
+	BaseURL        string
+	APIToken       string
+	OrganizationID string
+	HTTPClient     *http.Client
 }
 
 // methodSafeRedirectPolicy returns a CheckRedirect function that rejects
@@ -33,9 +35,15 @@ func methodSafeRedirectPolicy() func(*http.Request, []*http.Request) error {
 }
 
 func NewClientConfig() *ClientConfig {
+	organizationID := ""
+	if context, ok := GetCurrentContext(); ok {
+		organizationID = strings.TrimSpace(context.OrganizationID)
+	}
+
 	return &ClientConfig{
-		BaseURL:  GetAPIURL(),
-		APIToken: GetAPIToken(),
+		BaseURL:        GetAPIURL(),
+		APIToken:       GetAPIToken(),
+		OrganizationID: organizationID,
 		HTTPClient: &http.Client{
 			Timeout:       time.Second * 30,
 			CheckRedirect: methodSafeRedirectPolicy(),
@@ -54,6 +62,10 @@ func NewAPIClient(config *ClientConfig) *openapi_client.APIClient {
 
 	if config.APIToken != "" {
 		apiConfig.DefaultHeader["Authorization"] = "Bearer " + config.APIToken
+	}
+
+	if config.OrganizationID != "" {
+		apiConfig.DefaultHeader["x-organization-id"] = config.OrganizationID
 	}
 
 	if config.HTTPClient != nil {

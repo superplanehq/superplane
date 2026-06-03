@@ -218,12 +218,17 @@ func formatURLBulletList(urls []string) string {
 	return strings.TrimSuffix(b.String(), "\n")
 }
 
-// SwitchContextByOrganization sets the current context using organization id or
-// name across saved installations. When urlFilter is non-empty, only contexts
-// at that base URL are considered (so multiple matches are always same-installation
-// duplicates, never cross-installation ambiguity). Multiple matches on different
-// base URLs without urlFilter returns an error that lists installations and suggests --url.
-func SwitchContextByOrganization(orgOrID, urlFilter string) (*ConfigContext, error) {
+// FindConfigContextForOrganization returns a saved context for the given
+// organization id or name. It does not change the current context.
+func FindConfigContextForOrganization(orgOrID, urlFilter string) (ConfigContext, error) {
+	candidates, err := configCandidatesForOrganization(orgOrID, urlFilter)
+	if err != nil {
+		return ConfigContext{}, err
+	}
+	return candidates[0], nil
+}
+
+func configCandidatesForOrganization(orgOrID, urlFilter string) ([]ConfigContext, error) {
 	orgOrID = strings.TrimSpace(orgOrID)
 	if orgOrID == "" {
 		return nil, fmt.Errorf("organization id or name is required")
@@ -254,7 +259,7 @@ func SwitchContextByOrganization(orgOrID, urlFilter string) (*ConfigContext, err
 	}
 
 	if len(candidates) == 1 {
-		return saveCurrent(candidates[0])
+		return candidates, nil
 	}
 
 	urls := distinctBaseURLs(candidates)
@@ -267,11 +272,23 @@ func SwitchContextByOrganization(orgOrID, urlFilter string) (*ConfigContext, err
 	}
 
 	return nil, fmt.Errorf(
-		"ambiguous organization %q matches multiple installations:\n%s\n\nUse: superplane context %q --url <base-url>",
+		"ambiguous organization %q matches multiple installations:\n%s\n\nUse: --url <base-url>",
 		orgOrID,
 		formatURLBulletList(urls),
-		orgOrID,
 	)
+}
+
+// SwitchContextByOrganization sets the current context using organization id or
+// name across saved installations. When urlFilter is non-empty, only contexts
+// at that base URL are considered (so multiple matches are always same-installation
+// duplicates, never cross-installation ambiguity). Multiple matches on different
+// base URLs without urlFilter returns an error that lists installations and suggests --url.
+func SwitchContextByOrganization(orgOrID, urlFilter string) (*ConfigContext, error) {
+	candidates, err := configCandidatesForOrganization(orgOrID, urlFilter)
+	if err != nil {
+		return nil, err
+	}
+	return saveCurrent(candidates[0])
 }
 
 func saveCurrent(selected ConfigContext) (*ConfigContext, error) {

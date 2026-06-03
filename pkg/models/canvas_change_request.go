@@ -41,9 +41,10 @@ func DefaultCanvasChangeRequestApprovers() []CanvasChangeRequestApprover {
 type CanvasChangeRequest struct {
 	ID                 uuid.UUID
 	WorkflowID         uuid.UUID
-	VersionID          uuid.UUID
+	VersionID          string
 	OwnerID            *uuid.UUID
-	BasedOnVersionID   *uuid.UUID
+	BasedOnVersionID   *string
+	DraftBranch        string
 	Title              string
 	Description        string
 	Status             string
@@ -97,7 +98,7 @@ func FindCanvasChangeRequestInTransaction(tx *gorm.DB, workflowID, changeRequest
 	return &request, nil
 }
 
-func FindCanvasChangeRequestByVersionInTransaction(tx *gorm.DB, workflowID, versionID uuid.UUID) (*CanvasChangeRequest, error) {
+func FindCanvasChangeRequestByVersionInTransaction(tx *gorm.DB, workflowID uuid.UUID, versionID string) (*CanvasChangeRequest, error) {
 	var request CanvasChangeRequest
 	err := tx.
 		Where("workflow_id = ?", workflowID).

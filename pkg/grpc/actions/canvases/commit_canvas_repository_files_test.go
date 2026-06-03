@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/authentication"
+	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/models"
 	pb "github.com/superplanehq/superplane/pkg/protos/canvases"
 	"github.com/superplanehq/superplane/test/support"
@@ -18,13 +19,16 @@ import (
 
 func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 	r := support.Setup(t)
+	draftBranch := materialize.DefaultDraftBranchName(r.User)
 
 	t.Run("unauthenticated -> error", func(t *testing.T) {
 		_, err := CommitCanvasRepositoryFiles(
 			context.Background(),
 			r.GitProvider,
+			r.Registry,
 			r.Organization.ID.String(),
 			uuid.New().String(),
+			draftBranch,
 			"abc123",
 			"commit message",
 			nil,
@@ -40,8 +44,10 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		_, err := CommitCanvasRepositoryFiles(
 			ctx,
 			r.GitProvider,
+			r.Registry,
 			r.Organization.ID.String(),
 			"invalid-id",
+			draftBranch,
 			"abc123",
 			"commit message",
 			nil,
@@ -58,8 +64,10 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		_, err := CommitCanvasRepositoryFiles(
 			ctx,
 			r.GitProvider,
+			r.Registry,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
+			draftBranch,
 			"abc123",
 			"commit message",
 			nil,
@@ -76,8 +84,10 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		_, err := CommitCanvasRepositoryFiles(
 			ctx,
 			r.GitProvider,
+			r.Registry,
 			r.Organization.ID.String(),
 			canvas.ID.String(),
+			draftBranch,
 			"stale-head",
 			"commit message",
 			[]*pb.CanvasRepositoryFileOperation{
@@ -99,8 +109,10 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		_, err := CommitCanvasRepositoryFiles(
 			ctx,
 			r.GitProvider,
+			r.Registry,
 			otherOrg.ID.String(),
 			canvas.ID.String(),
+			draftBranch,
 			"abc123",
 			"commit message",
 			nil,
@@ -112,15 +124,21 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 
 	t.Run("commits files with authenticated user as author", func(t *testing.T) {
 		ctx := authentication.SetUserIdInMetadata(context.Background(), r.User.String())
-		canvas, repository := support.CreateCanvasWithRepository(t, r, models.RepositoryStatusReady, true)
-		headSHA, err := r.GitProvider.Head(ctx, repository.RepoID)
+		canvasID := createCanvasWithNoopNode(ctx, t, r, "commit-files-canvas")
+		repository, err := models.FindRepository(r.Organization.ID, uuid.MustParse(canvasID))
 		require.NoError(t, err)
+
+		branchResp, err := CreateDraftBranch(ctx, r.GitProvider, r.Registry, r.Organization.ID.String(), canvasID, "Test Draft")
+		require.NoError(t, err)
+		headSHA := branchResp.GetBranch().GetTipSha()
 
 		response, err := CommitCanvasRepositoryFiles(
 			ctx,
 			r.GitProvider,
+			r.Registry,
 			r.Organization.ID.String(),
-			canvas.ID.String(),
+			canvasID,
+			branchResp.GetBranch().GetBranchName(),
 			headSHA,
 			"add readme",
 			[]*pb.CanvasRepositoryFileOperation{
@@ -131,15 +149,15 @@ func Test__CommitCanvasRepositoryFiles(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, response.CommitSha)
 
-		reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md")
+		reader, err := r.GitProvider.GetFile(ctx, repository.RepoID, "README.md", branchResp.GetBranch().GetBranchName())
 		require.NoError(t, err)
 		content, err := io.ReadAll(reader)
 		require.NoError(t, err)
 		require.NoError(t, reader.Close())
 		assert.Equal(t, "hello world", string(content))
 
-		files, err := r.GitProvider.ListFiles(ctx, repository.RepoID)
+		files, err := r.GitProvider.ListFiles(ctx, repository.RepoID, branchResp.GetBranch().GetBranchName())
 		require.NoError(t, err)
-		assert.Equal(t, []string{"README.md"}, files)
+		assert.Contains(t, files, "README.md")
 	})
 }

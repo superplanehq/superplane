@@ -26,6 +26,20 @@ type Repository struct {
 	UpdatedAt      time.Time
 }
 
+func FindRepositoryByOrganizationAndRepoID(organizationID uuid.UUID, repoID string) (*Repository, error) {
+	var repository Repository
+	err := database.Conn().
+		Where("organization_id = ?", organizationID).
+		Where("repo_id = ?", repoID).
+		First(&repository).
+		Error
+	if err != nil {
+		return nil, err
+	}
+
+	return &repository, nil
+}
+
 func FindRepository(organizationID, canvasID uuid.UUID) (*Repository, error) {
 	var repository Repository
 	err := database.Conn().

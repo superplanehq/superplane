@@ -37,8 +37,8 @@ import {
   type SyntheticEvent,
 } from "react";
 
+import type { CanvasChangesetChange } from "@/pages/workflowv2/lib/canvas-changeset-types";
 import type {
-  CanvasChangesetChange,
   CanvasesCanvasEventWithExecutions,
   CanvasesCanvasNodeExecution,
   SuperplaneActionsAction,
@@ -47,6 +47,7 @@ import type {
   ConfigurationField,
   OrganizationsIntegration,
   TriggersTrigger,
+  CanvasesCanvasDraftBranch,
 } from "@/api-client";
 import { CanvasToolSidebar } from "@/components/CanvasToolSidebar";
 import {
@@ -180,6 +181,8 @@ export interface CanvasPageProps {
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
+  discardVersionLabel?: string;
+  discardVersionVisible?: boolean;
   headerMode?: "default" | "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
   /** Node settings sidebar: canvas uses debounced autosave without closing the panel after each save. */
   configurationSaveMode?: "manual" | "auto";
@@ -208,8 +211,25 @@ export interface CanvasPageProps {
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
   hasUnpublishedConsoleDraftChanges?: boolean;
+  hasUncommittedCanvasDraftChanges?: boolean;
+  hasUncommittedConsoleDraftChanges?: boolean;
+  hasCommittedCanvasDraftChanges?: boolean;
+  hasCommittedConsoleDraftChanges?: boolean;
+  hasUncommittedDraftChanges?: boolean;
+  hasCommittedDraftChanges?: boolean;
+  readyToPublishDraftChanges?: boolean;
+  readyToPublishCanvasDraftChanges?: boolean;
+  readyToPublishConsoleDraftChanges?: boolean;
+  activeDraftHasNoChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
+  startEditingDrafts?: CanvasesCanvasDraftBranch[];
+  startEditingDefaultDraft?: CanvasesCanvasDraftBranch | null;
+  startEditingMenuOpen?: boolean;
+  onStartEditingMenuOpenChange?: (open: boolean) => void;
+  onContinueDraftBranch?: (branchName: string) => void;
+  onCreateDraftBranch?: () => void;
+  createDraftBranchPending?: boolean;
   isAutoLayoutOnUpdateEnabled?: boolean;
   onToggleAutoLayoutOnUpdate?: () => void;
   autoLayoutOnUpdateDisabled?: boolean;
@@ -218,6 +238,9 @@ export interface CanvasPageProps {
   /** When true, enables inline rename and app settings in the project switcher. */
   showCanvasSettingsMenu?: boolean;
   isVersionControlOpen?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
+  onActiveDraftBranchClick?: () => void;
   onOpenVersionControl?: () => void;
   hasAutoOpenedVersionControl?: boolean;
   onVersionControlAutoOpened?: () => void;
@@ -835,9 +858,10 @@ function CanvasPage(props: CanvasPageProps) {
   const closeCanvasModal = useCallback(() => {
     setCanvasModalRequest(null);
   }, []);
+  const onTriggerModalHostReady = props.onTriggerModalHostReady;
   useEffect(() => {
-    props.onTriggerModalHostReady?.(openCanvasModal);
-  }, [props, openCanvasModal]);
+    onTriggerModalHostReady?.(openCanvasModal);
+  }, [onTriggerModalHostReady, openCanvasModal]);
   useEffect(() => {
     if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
       return;
@@ -1314,6 +1338,8 @@ function CanvasPage(props: CanvasPageProps) {
           publishVersionDisabledTooltip={props.publishVersionDisabledTooltip}
           discardVersionDisabled={props.discardVersionDisabled}
           discardVersionDisabledTooltip={props.discardVersionDisabledTooltip}
+          discardVersionLabel={props.discardVersionLabel}
+          discardVersionVisible={props.discardVersionVisible}
           headerMode={props.headerMode}
           isEditing={props.isEditing}
           onSelectCanvasView={props.onSelectCanvasView}
@@ -1331,8 +1357,28 @@ function CanvasPage(props: CanvasPageProps) {
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
           hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
+          hasUncommittedCanvasDraftChanges={props.hasUncommittedCanvasDraftChanges}
+          hasUncommittedConsoleDraftChanges={props.hasUncommittedConsoleDraftChanges}
+          hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
+          hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
+          hasUncommittedDraftChanges={props.hasUncommittedDraftChanges}
+          hasCommittedDraftChanges={props.hasCommittedDraftChanges}
+          readyToPublishDraftChanges={props.readyToPublishDraftChanges}
+          readyToPublishCanvasDraftChanges={props.readyToPublishCanvasDraftChanges}
+          readyToPublishConsoleDraftChanges={props.readyToPublishConsoleDraftChanges}
+          activeDraftHasNoChanges={props.activeDraftHasNoChanges}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
           onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
+          startEditingDrafts={props.startEditingDrafts}
+          startEditingDefaultDraft={props.startEditingDefaultDraft}
+          startEditingMenuOpen={props.startEditingMenuOpen}
+          onStartEditingMenuOpenChange={props.onStartEditingMenuOpenChange}
+          onContinueDraftBranch={props.onContinueDraftBranch}
+          onCreateDraftBranch={props.onCreateDraftBranch}
+          createDraftBranchPending={props.createDraftBranchPending}
+          activeDraftBranchLabel={props.activeDraftBranchLabel}
+          activeDraftBranchShortSha={props.activeDraftBranchShortSha}
+          onActiveDraftBranchClick={props.onActiveDraftBranchClick}
           showCanvasSettingsMenu={props.showCanvasSettingsMenu}
           toolSidebarState={toolSidebarState}
         />
@@ -1842,6 +1888,8 @@ function CanvasContentHeader({
   publishVersionDisabledTooltip,
   discardVersionDisabled,
   discardVersionDisabledTooltip,
+  discardVersionLabel,
+  discardVersionVisible,
   headerMode,
   isEditing,
   onSelectCanvasView,
@@ -1859,9 +1907,29 @@ function CanvasContentHeader({
   hasUnpublishedDraftChanges,
   hasUnpublishedCanvasDraftChanges,
   hasUnpublishedConsoleDraftChanges,
+  hasUncommittedCanvasDraftChanges,
+  hasUncommittedConsoleDraftChanges,
+  hasCommittedCanvasDraftChanges,
+  hasCommittedConsoleDraftChanges,
+  hasUncommittedDraftChanges,
+  hasCommittedDraftChanges,
+  readyToPublishDraftChanges,
+  readyToPublishCanvasDraftChanges,
+  readyToPublishConsoleDraftChanges,
+  activeDraftHasNoChanges,
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
+  startEditingDrafts,
+  startEditingDefaultDraft,
+  startEditingMenuOpen,
+  onStartEditingMenuOpenChange,
+  onContinueDraftBranch,
+  onCreateDraftBranch,
+  createDraftBranchPending,
   showCanvasSettingsMenu,
+  activeDraftBranchLabel,
+  activeDraftBranchShortSha,
+  onActiveDraftBranchClick,
   toolSidebarState,
 }: {
   state: CanvasPageState;
@@ -1894,6 +1962,8 @@ function CanvasContentHeader({
   publishVersionDisabledTooltip?: string;
   discardVersionDisabled?: boolean;
   discardVersionDisabledTooltip?: string;
+  discardVersionLabel?: string;
+  discardVersionVisible?: boolean;
   headerMode?: CanvasPageProps["headerMode"];
   isEditing?: boolean;
   onSelectCanvasView?: () => void;
@@ -1911,9 +1981,29 @@ function CanvasContentHeader({
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
   hasUnpublishedConsoleDraftChanges?: boolean;
+  hasUncommittedCanvasDraftChanges?: boolean;
+  hasUncommittedConsoleDraftChanges?: boolean;
+  hasCommittedCanvasDraftChanges?: boolean;
+  hasCommittedConsoleDraftChanges?: boolean;
+  hasUncommittedDraftChanges?: boolean;
+  hasCommittedDraftChanges?: boolean;
+  readyToPublishDraftChanges?: boolean;
+  readyToPublishCanvasDraftChanges?: boolean;
+  readyToPublishConsoleDraftChanges?: boolean;
+  activeDraftHasNoChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
+  startEditingDrafts?: CanvasesCanvasDraftBranch[];
+  startEditingDefaultDraft?: CanvasesCanvasDraftBranch | null;
+  startEditingMenuOpen?: boolean;
+  onStartEditingMenuOpenChange?: (open: boolean) => void;
+  onContinueDraftBranch?: (branchName: string) => void;
+  onCreateDraftBranch?: () => void;
+  createDraftBranchPending?: boolean;
   showCanvasSettingsMenu?: boolean;
+  activeDraftBranchLabel?: string;
+  activeDraftBranchShortSha?: string;
+  onActiveDraftBranchClick?: () => void;
   toolSidebarState: CanvasToolSidebarState;
 }) {
   const stateRef = useRef(state);
@@ -1946,6 +2036,8 @@ function CanvasContentHeader({
       publishVersionDisabledTooltip={publishVersionDisabledTooltip}
       discardVersionDisabled={discardVersionDisabled}
       discardVersionDisabledTooltip={discardVersionDisabledTooltip}
+      discardVersionLabel={discardVersionLabel}
+      discardVersionVisible={discardVersionVisible}
       mode={headerMode}
       isEditing={isEditing}
       onSelectCanvasView={onSelectCanvasView}
@@ -1963,9 +2055,29 @@ function CanvasContentHeader({
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       hasUnpublishedCanvasDraftChanges={hasUnpublishedCanvasDraftChanges}
       hasUnpublishedConsoleDraftChanges={hasUnpublishedConsoleDraftChanges}
+      hasUncommittedCanvasDraftChanges={hasUncommittedCanvasDraftChanges}
+      hasUncommittedConsoleDraftChanges={hasUncommittedConsoleDraftChanges}
+      hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
+      hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
+      hasUncommittedDraftChanges={hasUncommittedDraftChanges}
+      hasCommittedDraftChanges={hasCommittedDraftChanges}
+      readyToPublishDraftChanges={readyToPublishDraftChanges}
+      readyToPublishCanvasDraftChanges={readyToPublishCanvasDraftChanges}
+      readyToPublishConsoleDraftChanges={readyToPublishConsoleDraftChanges}
+      activeDraftHasNoChanges={activeDraftHasNoChanges}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
+      startEditingDrafts={startEditingDrafts}
+      startEditingDefaultDraft={startEditingDefaultDraft}
+      startEditingMenuOpen={startEditingMenuOpen}
+      onStartEditingMenuOpenChange={onStartEditingMenuOpenChange}
+      onContinueDraftBranch={onContinueDraftBranch}
+      onCreateDraftBranch={onCreateDraftBranch}
+      createDraftBranchPending={createDraftBranchPending}
       showCanvasSettingsMenu={showCanvasSettingsMenu}
+      activeDraftBranchLabel={activeDraftBranchLabel}
+      activeDraftBranchShortSha={activeDraftBranchShortSha}
+      onActiveDraftBranchClick={onActiveDraftBranchClick}
       toolSidebarState={toolSidebarState}
     />
   );

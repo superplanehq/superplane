@@ -22,12 +22,29 @@ type DraftChangeIndicatorsInput = {
   hasDraftGraphDiffVersusLive: boolean;
   hasDraftConsoleDiffVersusLive: boolean;
   hasDraftDiffVersusLive: boolean;
+  /** canvas.yaml staged content differs from the branch baseline. */
+  hasCanvasStagingChanges?: boolean;
+  /** console.yaml staged content differs from the branch baseline. */
+  hasConsoleStagingChanges?: boolean;
 };
 
-type DraftChangeIndicators = {
+export type DraftChangeIndicators = {
+  /** Any uncommitted or committed draft change (legacy aggregate). */
   hasUnpublishedDraftChanges: boolean;
   hasUnpublishedCanvasDraftChanges: boolean;
   hasUnpublishedConsoleDraftChanges: boolean;
+  /** IndexedDB staging differs from branch HEAD (orange). */
+  hasUncommittedCanvasDraftChanges: boolean;
+  hasUncommittedConsoleDraftChanges: boolean;
+  /** Branch HEAD / materialized draft differs from live (blue). */
+  hasCommittedCanvasDraftChanges: boolean;
+  hasCommittedConsoleDraftChanges: boolean;
+  hasUncommittedDraftChanges: boolean;
+  hasCommittedDraftChanges: boolean;
+  /** Committed draft differs from live and staging is clean (blue UI only). */
+  readyToPublishDraftChanges: boolean;
+  readyToPublishCanvasDraftChanges: boolean;
+  readyToPublishConsoleDraftChanges: boolean;
 };
 
 export function getDraftChangeIndicators({
@@ -35,20 +52,50 @@ export function getDraftChangeIndicators({
   hasLatestDraftVersion,
   hasDraftGraphDiffVersusLive,
   hasDraftConsoleDiffVersusLive,
-  hasDraftDiffVersusLive,
+  hasCanvasStagingChanges,
+  hasConsoleStagingChanges,
 }: DraftChangeIndicatorsInput): DraftChangeIndicators {
   if (suppressUnpublishedDraftDiscard || !hasLatestDraftVersion) {
     return {
       hasUnpublishedDraftChanges: false,
       hasUnpublishedCanvasDraftChanges: false,
       hasUnpublishedConsoleDraftChanges: false,
+      hasUncommittedCanvasDraftChanges: false,
+      hasUncommittedConsoleDraftChanges: false,
+      hasCommittedCanvasDraftChanges: false,
+      hasCommittedConsoleDraftChanges: false,
+      hasUncommittedDraftChanges: false,
+      hasCommittedDraftChanges: false,
+      readyToPublishDraftChanges: false,
+      readyToPublishCanvasDraftChanges: false,
+      readyToPublishConsoleDraftChanges: false,
     };
   }
 
+  const hasUncommittedCanvasDraftChanges = !!hasCanvasStagingChanges;
+  const hasUncommittedConsoleDraftChanges = !!hasConsoleStagingChanges;
+  const hasCommittedCanvasDraftChanges = hasDraftGraphDiffVersusLive;
+  const hasCommittedConsoleDraftChanges = hasDraftConsoleDiffVersusLive;
+  const hasUnpublishedCanvasDraftChanges = hasUncommittedCanvasDraftChanges || hasCommittedCanvasDraftChanges;
+  const hasUnpublishedConsoleDraftChanges = hasUncommittedConsoleDraftChanges || hasCommittedConsoleDraftChanges;
+
+  const hasUncommittedDraftChanges = hasUncommittedCanvasDraftChanges || hasUncommittedConsoleDraftChanges;
+  const hasCommittedDraftChanges = hasCommittedCanvasDraftChanges || hasCommittedConsoleDraftChanges;
+  const readyToPublishDraftChanges = hasCommittedDraftChanges && !hasUncommittedDraftChanges;
+
   return {
-    hasUnpublishedDraftChanges: hasDraftDiffVersusLive,
-    hasUnpublishedCanvasDraftChanges: hasDraftGraphDiffVersusLive,
-    hasUnpublishedConsoleDraftChanges: hasDraftConsoleDiffVersusLive,
+    hasUnpublishedDraftChanges: hasUnpublishedCanvasDraftChanges || hasUnpublishedConsoleDraftChanges,
+    hasUnpublishedCanvasDraftChanges,
+    hasUnpublishedConsoleDraftChanges,
+    hasUncommittedCanvasDraftChanges,
+    hasUncommittedConsoleDraftChanges,
+    hasCommittedCanvasDraftChanges,
+    hasCommittedConsoleDraftChanges,
+    hasUncommittedDraftChanges,
+    hasCommittedDraftChanges,
+    readyToPublishDraftChanges,
+    readyToPublishCanvasDraftChanges: hasCommittedCanvasDraftChanges && !hasUncommittedDraftChanges,
+    readyToPublishConsoleDraftChanges: hasCommittedConsoleDraftChanges && !hasUncommittedDraftChanges,
   };
 }
 

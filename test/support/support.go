@@ -352,7 +352,7 @@ func CreateNextNodeExecution(
 
 func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes []models.CanvasNode, edges []models.Edge) (*models.Canvas, []models.CanvasNode) {
 	now := time.Now()
-	liveVersionID := uuid.New()
+	liveVersionID := models.NewCommitSHA()
 	changeManagementEnabled, err := models.IsChangeManagementEnabled(orgID)
 	require.NoError(t, err)
 
@@ -438,6 +438,8 @@ func CreateCanvas(t require.TestingT, orgID uuid.UUID, userID uuid.UUID, nodes [
 			PublishedAt:             &now,
 			Nodes:                   datatypes.NewJSONSlice(expandedNodes),
 			Edges:                   datatypes.NewJSONSlice(edges),
+			GitBranch:               models.CanvasGitBranchMain,
+			MaterializationStatus:   models.MaterializationStatusReady,
 			CreatedAt:               &now,
 			UpdatedAt:               &now,
 		}
@@ -565,6 +567,7 @@ func CreateCanvasWithRepository(t *testing.T, r *ResourceRegistry, status string
 	repoID := r.GitProvider.GetRepositoryID(git.RepositoryOptions{
 		OrganizationID: canvas.OrganizationID,
 		CanvasID:       canvas.ID,
+		Name:           canvas.Name,
 	})
 
 	require.NoError(t, canvas.CreatePendingRepository(r.GitProvider.Name(), repoID))

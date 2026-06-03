@@ -18,6 +18,7 @@ export function VersionRow({
   variant = "default",
   isActive = false,
   isCurrentLive = false,
+  isEditingDraftBranch = false,
   isFirstCanvasVersion = false,
   rowTestId,
   onUseVersion,
@@ -30,6 +31,7 @@ export function VersionRow({
   variant?: "default" | "rejected";
   isActive?: boolean;
   isCurrentLive?: boolean;
+  isEditingDraftBranch?: boolean;
   isFirstCanvasVersion?: boolean;
   rowTestId?: string;
   onUseVersion: (versionID: string) => void;
@@ -74,6 +76,8 @@ export function VersionRow({
         isActive,
         variant,
         activeReviewPhase: viewModel.activeReviewPhase,
+        isCurrentLive,
+        isEditingDraftBranch,
       })}
       role="button"
       tabIndex={0}
@@ -86,6 +90,7 @@ export function VersionRow({
           <p className="truncate text-[13px] font-medium text-slate-900">{viewModel.versionLabel}</p>
           <VersionSubtitle
             isCurrentLive={isCurrentLive}
+            isEditingDraftBranch={isEditingDraftBranch}
             variant={variant}
             activeReviewPhase={viewModel.activeReviewPhase}
             versionSubtitle={viewModel.versionSubtitle}
@@ -148,10 +153,14 @@ function versionRowClassName({
   isActive,
   variant,
   activeReviewPhase,
+  isCurrentLive,
+  isEditingDraftBranch,
 }: {
   isActive: boolean;
   variant: "default" | "rejected";
   activeReviewPhase: ActiveReviewPhase | null;
+  isCurrentLive: boolean;
+  isEditingDraftBranch: boolean;
 }): string {
   const baseClassName = "w-full cursor-pointer border-b border-slate-100 px-4 py-2 text-left transition";
   if (!isActive) {
@@ -160,21 +169,26 @@ function versionRowClassName({
   if (variant === "rejected") {
     return `${baseClassName} bg-red-50`;
   }
+  if (isCurrentLive && isEditingDraftBranch) {
+    return `${baseClassName} bg-slate-50 opacity-50`;
+  }
   return cn(baseClassName, activeReviewPhase ? activeReviewPhase.sidebarRowActiveClassName : "bg-sky-100");
 }
 
 function VersionSubtitle({
   isCurrentLive,
+  isEditingDraftBranch,
   variant,
   activeReviewPhase,
   versionSubtitle,
 }: {
   isCurrentLive: boolean;
+  isEditingDraftBranch: boolean;
   variant: "default" | "rejected";
   activeReviewPhase: ActiveReviewPhase | null;
   versionSubtitle: string;
 }) {
-  const statusIndicator = buildStatusIndicator(isCurrentLive, variant, activeReviewPhase);
+  const statusIndicator = buildStatusIndicator(isCurrentLive, isEditingDraftBranch, variant, activeReviewPhase);
 
   return (
     <p className="mt-0.5 truncate text-xs text-slate-600">
@@ -191,11 +205,15 @@ function VersionSubtitle({
 
 function buildStatusIndicator(
   isCurrentLive: boolean,
+  isEditingDraftBranch: boolean,
   variant: "default" | "rejected",
   activeReviewPhase: ActiveReviewPhase | null,
 ) {
   if (isCurrentLive) {
-    return { label: "Current Version", labelClassName: "font-medium text-sky-700" };
+    return {
+      label: "Current Version",
+      labelClassName: isEditingDraftBranch ? "font-medium text-slate-600" : "font-medium text-sky-700",
+    };
   }
   if (variant === "rejected") {
     return { label: "Rejected", labelClassName: "font-medium text-red-600" };

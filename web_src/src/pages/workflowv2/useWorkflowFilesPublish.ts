@@ -10,6 +10,7 @@ type CommitFilesMutation = {
   mutateAsync: (request: {
     message: string;
     expectedHeadSha?: string;
+    branch?: string;
     operations: Array<{ path: string; delete: true } | { path: string; content: string }>;
   }) => Promise<unknown>;
   isPending: boolean;
@@ -20,6 +21,7 @@ type UseWorkflowFilesPublishOptions = {
   canPublishFiles: boolean;
   commitPathError?: string;
   headSha?: string;
+  branch?: string;
   pendingChanges: PendingFileChange[];
   setPendingChangesByPath: (value: Record<string, PendingFileChange>) => void;
   setLoadedContentByPath: Dispatch<SetStateAction<Record<string, string>>>;
@@ -33,6 +35,7 @@ export function useWorkflowFilesPublish({
   canPublishFiles,
   commitPathError,
   headSha,
+  branch,
   pendingChanges,
   setPendingChangesByPath,
   setLoadedContentByPath,
@@ -54,6 +57,7 @@ export function useWorkflowFilesPublish({
       await commitFiles.mutateAsync({
         message: "Update files",
         expectedHeadSha: headSha,
+        branch,
         operations: pendingChanges.map((change) => {
           if (change.type === "deleted") {
             return { path: change.path, delete: true };
@@ -69,7 +73,7 @@ export function useWorkflowFilesPublish({
     } catch (error) {
       showErrorToast(getApiErrorMessage(error, "Failed to publish files."));
     }
-  }, [commitFiles, commitPathError, headSha, pendingChanges, setLoadedContentByPath, setPendingChangesByPath]);
+  }, [commitFiles, commitPathError, headSha, branch, pendingChanges, setLoadedContentByPath, setPendingChangesByPath]);
 
   const publishChangesRef = useRef(publishChanges);
   publishChangesRef.current = publishChanges;

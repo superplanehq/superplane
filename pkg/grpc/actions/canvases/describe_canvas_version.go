@@ -25,9 +25,9 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 		return nil, status.Errorf(codes.InvalidArgument, "invalid canvas id: %v", err)
 	}
 
-	versionUUID, err := uuid.Parse(versionID)
+	versionSHA, err := parseVersionSHA(versionID)
 	if err != nil {
-		return nil, status.Errorf(codes.InvalidArgument, "invalid version id: %v", err)
+		return nil, err
 	}
 
 	canvas, err := models.FindCanvas(uuid.MustParse(organizationID), canvasUUID)
@@ -35,7 +35,7 @@ func DescribeCanvasVersion(ctx context.Context, organizationID string, canvasID 
 		return nil, status.Errorf(codes.NotFound, "canvas not found: %v", err)
 	}
 
-	version, err := models.FindCanvasVersion(canvas.ID, versionUUID)
+	version, err := models.FindCanvasVersion(canvas.ID, versionSHA)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, status.Error(codes.NotFound, "version not found")

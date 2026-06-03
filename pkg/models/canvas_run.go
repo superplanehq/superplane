@@ -22,7 +22,7 @@ const (
 type CanvasRun struct {
 	ID         uuid.UUID `gorm:"primaryKey;default:uuid_generate_v4()"`
 	WorkflowID uuid.UUID
-	VersionID  uuid.UUID
+	VersionID  string
 	State      string
 	Result     string
 	CreatedAt  *time.Time

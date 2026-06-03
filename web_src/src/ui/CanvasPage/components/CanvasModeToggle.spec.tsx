@@ -51,13 +51,38 @@ describe("CanvasModeToggle", () => {
     expect(screen.queryByRole("tab", { name: "Memory" })).not.toBeInTheDocument();
   });
 
-  it("shows a draft indicator on the Console tab when the console draft is dirty", () => {
+  it("shows separate committed and uncommitted dots on tabs", () => {
     render(
-      <CanvasModeToggle mode="version-live" onSelectLive={vi.fn()} onSelectDashboard={vi.fn()} hasDashboardDraft />,
+      <CanvasModeToggle
+        mode="version-live"
+        onSelectLive={vi.fn()}
+        onSelectDashboard={vi.fn()}
+        hasCanvasUncommitted
+        hasCanvasCommitted
+        hasDashboardCommitted
+      />,
     );
 
-    expect(screen.getByTestId("canvas-view-mode-dashboard-draft-dot")).toBeInTheDocument();
-    expect(screen.queryByTestId("canvas-view-mode-live-draft-dot")).not.toBeInTheDocument();
+    expect(screen.getByTestId("canvas-view-mode-live-uncommitted-dot")).toBeInTheDocument();
+    expect(screen.getByTestId("canvas-view-mode-live-committed-dot")).toBeInTheDocument();
+    expect(screen.getByTestId("canvas-view-mode-dashboard-committed-dot")).toBeInTheDocument();
+    expect(screen.queryByTestId("canvas-view-mode-dashboard-uncommitted-dot")).not.toBeInTheDocument();
+  });
+
+  it("uses an orange tab bar while editing with uncommitted changes", () => {
+    const { container } = render(
+      <CanvasModeToggle
+        mode="version-live"
+        editing
+        editTabTone="uncommitted"
+        onSelectLive={vi.fn()}
+        onSelectDashboard={vi.fn()}
+      />,
+    );
+
+    const tabList = container.querySelector('[data-slot="tabs-list"]');
+    expect(tabList).toHaveClass("bg-orange-50");
+    expect(tabList).not.toHaveClass("border");
   });
 
   it("invokes onSelectFiles when clicking the Files tab", async () => {

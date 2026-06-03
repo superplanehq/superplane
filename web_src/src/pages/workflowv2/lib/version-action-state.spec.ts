@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getVersionActionAvailability } from "./version-action-state";
+import { getDraftChangeIndicators, getVersionActionAvailability } from "./version-action-state";
 
 describe("getVersionActionAvailability", () => {
   it("keeps publish enabled while local draft changes are still being saved", () => {
@@ -66,4 +66,109 @@ describe("getVersionActionAvailability", () => {
       expect(result.publishVersionDisabledTooltip).toBeUndefined();
     },
   );
+});
+
+describe("getDraftChangeIndicators", () => {
+  it("returns no indicators when draft discard is suppressed", () => {
+    expect(
+      getDraftChangeIndicators({
+        suppressUnpublishedDraftDiscard: true,
+        hasLatestDraftVersion: true,
+        hasDraftGraphDiffVersusLive: true,
+        hasDraftConsoleDiffVersusLive: false,
+        hasDraftDiffVersusLive: true,
+        hasCanvasStagingChanges: true,
+        hasConsoleStagingChanges: false,
+      }),
+    ).toMatchObject({
+      hasUncommittedCanvasDraftChanges: false,
+      hasCommittedCanvasDraftChanges: false,
+      hasUnpublishedCanvasDraftChanges: false,
+    });
+  });
+
+  it("splits uncommitted staging from committed draft-vs-live per surface", () => {
+    expect(
+      getDraftChangeIndicators({
+        suppressUnpublishedDraftDiscard: false,
+        hasLatestDraftVersion: true,
+        hasDraftGraphDiffVersusLive: true,
+        hasDraftConsoleDiffVersusLive: false,
+        hasDraftDiffVersusLive: true,
+        hasCanvasStagingChanges: true,
+        hasConsoleStagingChanges: false,
+      }),
+    ).toEqual({
+      hasUnpublishedDraftChanges: true,
+      hasUnpublishedCanvasDraftChanges: true,
+      hasUnpublishedConsoleDraftChanges: false,
+      hasUncommittedCanvasDraftChanges: true,
+      hasUncommittedConsoleDraftChanges: false,
+      hasCommittedCanvasDraftChanges: true,
+      hasCommittedConsoleDraftChanges: false,
+      hasUncommittedDraftChanges: true,
+      hasCommittedDraftChanges: true,
+      readyToPublishDraftChanges: false,
+      readyToPublishCanvasDraftChanges: false,
+      readyToPublishConsoleDraftChanges: false,
+    });
+  });
+
+  it("hides ready-to-publish indicators while uncommitted changes exist", () => {
+    const indicators = getDraftChangeIndicators({
+      suppressUnpublishedDraftDiscard: false,
+      hasLatestDraftVersion: true,
+      hasDraftGraphDiffVersusLive: true,
+      hasDraftConsoleDiffVersusLive: false,
+      hasDraftDiffVersusLive: true,
+      hasCanvasStagingChanges: true,
+      hasConsoleStagingChanges: false,
+    });
+
+    expect(indicators.hasCommittedDraftChanges).toBe(true);
+    expect(indicators.hasUncommittedDraftChanges).toBe(true);
+    expect(indicators.readyToPublishDraftChanges).toBe(false);
+    expect(indicators.readyToPublishCanvasDraftChanges).toBe(false);
+  });
+
+  it("shows only orange when staging differs but branch matches live", () => {
+    expect(
+      getDraftChangeIndicators({
+        suppressUnpublishedDraftDiscard: false,
+        hasLatestDraftVersion: true,
+        hasDraftGraphDiffVersusLive: false,
+        hasDraftConsoleDiffVersusLive: false,
+        hasDraftDiffVersusLive: false,
+        hasCanvasStagingChanges: true,
+        hasConsoleStagingChanges: false,
+      }),
+    ).toMatchObject({
+      hasUncommittedCanvasDraftChanges: true,
+      hasCommittedCanvasDraftChanges: false,
+      hasUncommittedDraftChanges: true,
+      hasCommittedDraftChanges: false,
+      readyToPublishDraftChanges: false,
+    });
+  });
+
+  it("shows only blue when branch differs from live with a clean staging area", () => {
+    expect(
+      getDraftChangeIndicators({
+        suppressUnpublishedDraftDiscard: false,
+        hasLatestDraftVersion: true,
+        hasDraftGraphDiffVersusLive: false,
+        hasDraftConsoleDiffVersusLive: true,
+        hasDraftDiffVersusLive: true,
+        hasCanvasStagingChanges: false,
+        hasConsoleStagingChanges: false,
+      }),
+    ).toMatchObject({
+      hasUncommittedConsoleDraftChanges: false,
+      hasCommittedConsoleDraftChanges: true,
+      hasUncommittedDraftChanges: false,
+      hasCommittedDraftChanges: true,
+      readyToPublishDraftChanges: true,
+      readyToPublishConsoleDraftChanges: true,
+    });
+  });
 });

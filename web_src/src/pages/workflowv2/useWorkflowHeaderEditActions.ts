@@ -13,6 +13,7 @@ interface WorkflowStartupActionsConfig {
   hasEditableVersion: boolean;
   canUpdateCanvas: boolean;
   canvas: CanvasesCanvas | null | undefined;
+  branchContentReady?: boolean;
   handlePlaceholderAdd?: PlaceholderAddHandler;
   searchParams: URLSearchParams;
 }
@@ -21,6 +22,7 @@ interface WorkflowHeaderEditActionsConfig {
   isRunsMode: boolean;
   handleExitRunsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
+  openStartEditingMenu?: () => void | Promise<void>;
   setIsRunsMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setRunDetailNodeId: (value: string | null) => void;
@@ -32,6 +34,7 @@ export function useWorkflowHeaderEditActions({
   isRunsMode,
   handleExitRunsMode,
   handleToggleEditMode,
+  openStartEditingMenu,
   setIsRunsMode,
   setSelectedRunId,
   setRunDetailNodeId,
@@ -57,7 +60,7 @@ export function useWorkflowHeaderEditActions({
     await handleToggleEditMode();
   }, [handleExitRunsMode, handleToggleEditMode, isRunsMode]);
 
-  useAutoEditMode(startup, handleToggleEditMode, setSearchParams);
+  useAutoEditMode(startup, openStartEditingMenu, setSearchParams);
   useAutoPlaceholderNode(startup);
 
   return { handleEnterEditModeFromHeader, handleExitEditModeFromHeader };
@@ -65,7 +68,7 @@ export function useWorkflowHeaderEditActions({
 
 function useAutoEditMode(
   startup: WorkflowStartupActionsConfig | undefined,
-  handleToggleEditMode: () => Promise<void>,
+  openStartEditingMenu: (() => void | Promise<void>) | undefined,
   setSearchParams: SetURLSearchParams,
 ) {
   const triggeredRef = useRef(false);
@@ -80,15 +83,20 @@ function useAutoEditMode(
     if (!canvasLoaded) return;
     if (hasEditableVersion) return;
     if (!canUpdateCanvas) return;
+    if (!openStartEditingMenu) return;
 
     triggeredRef.current = true;
-
-    void handleToggleEditMode().then(() => {
-      const next = new URLSearchParams(searchParams);
-      next.delete("edit");
-      setSearchParams(next, { replace: true });
+    void Promise.resolve(openStartEditingMenu()).finally(() => {
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.delete("edit");
+          return next;
+        },
+        { replace: true },
+      );
     });
-  }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, canvasLoaded, handleToggleEditMode]);
+  }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, canvasLoaded, openStartEditingMenu]);
 }
 
 function clearRunsViewSearchParams(current: URLSearchParams): URLSearchParams {
@@ -98,22 +106,19 @@ function clearRunsViewSearchParams(current: URLSearchParams): URLSearchParams {
   return next;
 }
 
-/**
- * After a blank canvas is created, automatically adds a placeholder "New Component" node.
- * Waits until edit mode is active and canvas is loaded.
- */
 function useAutoPlaceholderNode(startup: WorkflowStartupActionsConfig | undefined) {
   const addedRef = useRef(false);
   const hasEditableVersion = startup?.hasEditableVersion ?? false;
   const canvasHasSpec = Boolean(startup?.canvas?.spec);
   const canvasId = startup?.canvas?.metadata?.id;
+  const branchContentReady = startup?.branchContentReady ?? false;
   const handlePlaceholderAdd = startup?.handlePlaceholderAdd;
 
   useEffect(() => {
     if (addedRef.current) return;
     if (typeof window === "undefined" || !canvasId) return;
     if (sessionStorage.getItem(PLACEHOLDER_NODE_CONTEXT_KEY) !== canvasId) return;
-    if (!hasEditableVersion || !canvasHasSpec || !handlePlaceholderAdd) return;
+    if (!hasEditableVersion || !canvasHasSpec || !handlePlaceholderAdd || !branchContentReady) return;
 
     addedRef.current = true;
 
@@ -129,5 +134,5 @@ function useAutoPlaceholderNode(startup: WorkflowStartupActionsConfig | undefine
       .catch(() => {
         abandonPendingPlaceholderBoot(canvasId);
       });
-  }, [hasEditableVersion, canvasHasSpec, canvasId, handlePlaceholderAdd]);
+  }, [branchContentReady, hasEditableVersion, canvasHasSpec, canvasId, handlePlaceholderAdd]);
 }

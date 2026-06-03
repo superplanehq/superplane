@@ -59,7 +59,7 @@ func serializeCanvasDashboard(dashboard *models.CanvasDashboard) (*pb.CanvasDash
 
 	resp := &pb.CanvasDashboard{
 		CanvasId:  dashboard.CanvasID.String(),
-		VersionId: dashboard.VersionID.String(),
+		VersionId: dashboard.VersionID,
 		Panels:    pbPanels,
 		Layout:    pbLayout,
 	}
