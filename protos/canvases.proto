@@ -1309,6 +1309,8 @@ message RepositoryBranchUpdatedMessage {
   string materialization_status = 4;
   string materialization_error = 5;
   google.protobuf.Timestamp timestamp = 6;
+  // User who authenticated the git push that triggered this update.
+  string pushed_by_user_id = 7;
 }
 
 message NotificationEmailRequested {

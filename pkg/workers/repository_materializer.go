@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -152,6 +153,13 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 	}
 
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		var createdBy *uuid.UUID
+		if pushedByUserID := strings.TrimSpace(message.GetPushedByUserId()); pushedByUserID != "" {
+			if userID, parseErr := uuid.Parse(pushedByUserID); parseErr == nil {
+				createdBy = &userID
+			}
+		}
+
 		_, syncErr := materialize.SyncDraftBranchFromGit(
 			context.Background(),
 			tx,
@@ -161,7 +169,8 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 			canvasID,
 			message.GetBranch(),
 			materialize.SyncDraftBranchOptions{
-				HeadSHA: headSHA,
+				HeadSHA:   headSHA,
+				CreatedBy: createdBy,
 			},
 		)
 		return syncErr

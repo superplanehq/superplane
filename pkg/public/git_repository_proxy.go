@@ -73,9 +73,10 @@ func (s *Server) handleGitRepositoryProxy(w http.ResponseWriter, r *http.Request
 	}
 
 	if notifyAfterPush && s.gitProvider != nil {
+		pushedByUserID := user.ID.String()
 		proxy.ModifyResponse = func(resp *http.Response) error {
 			if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
-				go s.notifyRepositoryBranchesUpdated(context.Background(), canvasUUID, repository)
+				go s.notifyRepositoryBranchesUpdated(context.Background(), canvasUUID, repository, pushedByUserID)
 			}
 			return nil
 		}
@@ -84,7 +85,7 @@ func (s *Server) handleGitRepositoryProxy(w http.ResponseWriter, r *http.Request
 	proxy.ServeHTTP(w, r)
 }
 
-func (s *Server) notifyRepositoryBranchesUpdated(ctx context.Context, canvasID uuid.UUID, repository *models.Repository) {
+func (s *Server) notifyRepositoryBranchesUpdated(ctx context.Context, canvasID uuid.UUID, repository *models.Repository, pushedByUserID string) {
 	branches, err := s.gitProvider.ListBranches(ctx, repository.RepoID, materialize.DraftBranchPrefix)
 	if err != nil {
 		log.WithError(err).Warnf("failed to list draft branches after git push for canvas %s", canvasID)
@@ -101,6 +102,7 @@ func (s *Server) notifyRepositoryBranchesUpdated(ctx context.Context, canvasID u
 				headSHA,
 				models.MaterializationStatusPending,
 				"",
+				pushedByUserID,
 			).PublishBranchUpdated(); publishErr != nil {
 				log.WithError(publishErr).Warnf("failed to publish repository branch updated for canvas %s branch %s", canvasID, branch)
 			}
@@ -118,6 +120,7 @@ func (s *Server) notifyRepositoryBranchesUpdated(ctx context.Context, canvasID u
 		mainHead,
 		models.MaterializationStatusPending,
 		"",
+		pushedByUserID,
 	).PublishBranchUpdated(); publishErr != nil {
 		log.WithError(publishErr).Warnf("failed to publish repository branch updated for canvas %s main", canvasID)
 	}

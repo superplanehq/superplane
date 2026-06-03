@@ -106,6 +106,7 @@ func (m *DraftMaterializer) MaterializeDraft(
 		commitSHA,
 		models.MaterializationStatusReady,
 		"",
+		"",
 	).PublishBranchUpdated(); publishErr != nil {
 		log.Errorf("failed to publish repository branch updated message: %v", publishErr)
 	}

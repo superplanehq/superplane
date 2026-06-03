@@ -17,6 +17,7 @@ func NewRepositoryBranchUpdatedMessage(
 	headSHA string,
 	materializationStatus string,
 	materializationError string,
+	pushedByUserID string,
 ) RepositoryBranchUpdatedMessage {
 	return RepositoryBranchUpdatedMessage{
 		message: &pb.RepositoryBranchUpdatedMessage{
@@ -26,6 +27,7 @@ func NewRepositoryBranchUpdatedMessage(
 			MaterializationStatus: materializationStatus,
 			MaterializationError:  materializationError,
 			Timestamp:             timestamppb.Now(),
+			PushedByUserId:        pushedByUserID,
 		},
 	}
 }

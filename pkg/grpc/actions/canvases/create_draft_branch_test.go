@@ -181,3 +181,48 @@ func TestSyncDraftBranchFromGitRegistersGitOnlyBranch(t *testing.T) {
 	_, err = models.FindDraftBranch(canvasUUID, branchName)
 	require.NoError(t, err)
 }
+
+func TestSyncDraftBranchFromGitUsesCreatedByForCustomBranchName(t *testing.T) {
+	r := support.Setup(t)
+	ctx := context.Background()
+
+	canvasID := createCanvasWithNoopNode(
+		authentication.SetUserIdInMetadata(ctx, r.User.String()),
+		t,
+		r,
+		"worker-sync-custom-branch",
+	)
+	canvasUUID := uuid.MustParse(canvasID)
+	repository, err := models.FindRepository(r.Organization.ID, canvasUUID)
+	require.NoError(t, err)
+
+	branchName := "drafts/custom"
+	require.NoError(t, r.GitProvider.CreateBranch(ctx, repository.RepoID, branchName, models.CanvasGitBranchMain))
+	headSHA, err := r.GitProvider.Head(ctx, repository.RepoID, branchName)
+	require.NoError(t, err)
+
+	var synced *models.CanvasDraftBranch
+	require.NoError(t, database.Conn().Transaction(func(tx *gorm.DB) error {
+		var syncErr error
+		synced, syncErr = materialize.SyncDraftBranchFromGit(
+			ctx,
+			tx,
+			r.GitProvider,
+			r.Registry,
+			r.Organization.ID,
+			canvasUUID,
+			branchName,
+			materialize.SyncDraftBranchOptions{
+				HeadSHA:   headSHA,
+				CreatedBy: &r.User,
+			},
+		)
+		return syncErr
+	}))
+
+	require.NotNil(t, synced)
+	require.NotNil(t, synced.OwnerID)
+	assert.Equal(t, r.User, *synced.OwnerID)
+	require.NotNil(t, synced.CreatedBy)
+	assert.Equal(t, r.User, *synced.CreatedBy)
+}
