@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"slices"
 
-	uuid "github.com/google/uuid"
+	uuid 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -1101,7 +1102,7 @@ func SerializeWidgets(in []core.Widget) []*widgetpb.Widget {
 	return out
 }
 
-func SerializeActions(in []core.Action) []*actionpb.Action {
+func SerializeActions(httpClient core.HTTPContext, in []core.Action) []*actionpb.Action {
 	out := make([]*actionpb.Action, len(in))
 	for i, action := range in {
 		outputChannels := action.OutputChannels(nil)
@@ -1113,6 +1114,9 @@ func SerializeActions(in []core.Action) []*actionpb.Action {
 		}
 
 		configFields := action.Configuration()
+		if httpClient != nil && action.Name() == runner.ComponentName {
+			configFields = runner.EnrichRunnerConfigurationFields(httpClient, configFields)
+		}
 		configuration := make([]*configpb.Field, len(configFields))
 		for j, field := range configFields {
 			configuration[j] = ConfigurationFieldToProto(field)

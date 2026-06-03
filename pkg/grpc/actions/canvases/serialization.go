@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/configuration/expressionvalidation"
 	"github.com/superplanehq/superplane/pkg/database"
@@ -365,7 +366,12 @@ func validateNodeRef(registry *registry.Registry, organizationID string, node *c
 		}
 	}
 
-	return configuration.ValidateConfiguration(configurable.Configuration(), node.Configuration.AsMap())
+	configMap := node.Configuration.AsMap()
+	if node.Component == "runner" {
+		configMap = runner.NormalizeConfigurationMap(configMap)
+	}
+
+	return configuration.ValidateConfiguration(configurable.Configuration(), configMap)
 }
 
 func validateIntegration(organizationID string, ref *componentpb.IntegrationRef, component string) error {
