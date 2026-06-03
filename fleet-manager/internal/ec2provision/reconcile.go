@@ -53,6 +53,13 @@ func tickAll(ctx context.Context, log *slog.Logger, launchers []*Launcher, tick 
 // reconcileLauncher is the default per-launcher tick: bounded-timeout desiredWant +
 // Reconcile, logging on failure with the owning fleet id for cross-pool diagnostics.
 func reconcileLauncher(ctx context.Context, log *slog.Logger, l *Launcher) {
+	start := time.Now()
+	defer func() {
+		if l.Metrics != nil {
+			l.Metrics.ReconcileDuration(ctx, l.Config.RunnerFleetID, time.Since(start))
+		}
+	}()
+
 	runCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	want := l.desiredWant(runCtx)
@@ -94,6 +101,9 @@ func (l *Launcher) Reconcile(ctx context.Context, want int) error {
 		return fmt.Errorf("describe instances: %w", err)
 	}
 	have := len(live)
+	if l.Metrics != nil {
+		l.Metrics.SetHotInstances(ctx, l.Config.RunnerFleetID, have)
+	}
 
 	switch {
 	case have < want:

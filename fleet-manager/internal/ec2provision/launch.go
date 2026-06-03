@@ -23,6 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
+	fmmetrics "github.com/superplane/runner/fleet-manager/internal/metrics"
 	"github.com/superplane/runner/shared/api"
 )
 
@@ -36,6 +37,7 @@ type Launcher struct {
 	Config       Config
 	Log          *slog.Logger
 	BrokerClient TaskCountsClient
+	Metrics      *fmmetrics.PoolMetrics
 }
 
 // FleetID returns the broker fleet id this launcher manages (the partition key used in
