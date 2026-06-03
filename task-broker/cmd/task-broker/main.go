@@ -110,7 +110,9 @@ func main() {
 				requeuedTasks, canceledTasks, err := st.ReapExpiredLeases(context.Background())
 				if err != nil {
 					log.Warn("reap leases", slog.Any("err", err))
-					continue
+					if len(requeuedTasks) == 0 && len(canceledTasks) == 0 {
+						continue
+					}
 				}
 				reapCtx := context.Background()
 				for _, lease := range requeuedTasks {

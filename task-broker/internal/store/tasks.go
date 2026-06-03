@@ -115,8 +115,8 @@ RETURNING id`,
 }
 
 // UnclaimTask re-queues a claimed task so another runner can pick it up.
-// It is a no-op if the task is not currently claimed by runnerID.
-func (s *PostgresStore) UnclaimTask(ctx context.Context, taskID, runnerID string) error {
+// Returns unclaimed=false when the task is not claimed by runnerID.
+func (s *PostgresStore) UnclaimTask(ctx context.Context, taskID, runnerID string) (bool, error) {
 	res := s.db.WithContext(ctx).Exec(`
 UPDATE tasks SET
 	status      = ?,
@@ -126,7 +126,10 @@ UPDATE tasks SET
 WHERE id = ? AND status = ? AND runner_id = ?`,
 		string(models.StatusQueued), taskID, string(models.StatusClaimed), runnerID,
 	)
-	return res.Error
+	if res.Error != nil {
+		return false, res.Error
+	}
+	return res.RowsAffected == 1, nil
 }
 
 func terminalTaskStatus(st models.TaskStatus) bool {
