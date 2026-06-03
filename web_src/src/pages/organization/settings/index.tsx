@@ -134,7 +134,7 @@ export function OrganizationSettings() {
   const organizationLinks: NavLink[] = [
     {
       id: "canvases",
-      label: "Canvases",
+      label: "Apps",
       href: `/${organizationId}`,
       Icon: Home,
       permission: { resource: "canvases", action: "read" },
@@ -286,7 +286,7 @@ export function OrganizationSettings() {
       <Sidebar className="w-60 bg-white dark:bg-gray-800 border-r border-gray-300 dark:border-gray-800">
         <SidebarBody>
           <SidebarSection className="px-4 py-2.5">
-            <Link to={`/${organizationId}`} className="block w-7 h-7" aria-label="Go to Canvases">
+            <Link to={`/${organizationId}`} className="block w-7 h-7" aria-label="Go to Apps">
               <img src={SuperplaneLogo} alt="SuperPlane" className="w-7 h-7 object-contain" />
             </Link>
           </SidebarSection>
