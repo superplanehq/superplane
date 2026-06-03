@@ -161,8 +161,11 @@ func TestRecordRunnerConnectedSpinup(t *testing.T) {
 	m, reader := testBrokerMetrics(t)
 	srv := &Server{Metrics: m}
 
-	requestedAt := time.Now().Add(-1500 * time.Millisecond).Unix()
-	srv.recordRunnerConnectedSpinup(context.Background(), "fleet-1", requestedAt)
+	// Unix timestamps are second-granularity; use a whole number of seconds in the past
+	// so time.Since(time.Unix(ts, 0)) is stable (between N and N+1 seconds).
+	const elapsedSec = 10
+	launchRequestedAt := time.Now().Unix() - elapsedSec
+	srv.recordRunnerConnectedSpinup(context.Background(), "fleet-1", launchRequestedAt)
 
 	var rm metricdata.ResourceMetrics
 	require.NoError(t, reader.Collect(context.Background(), &rm))
@@ -174,7 +177,9 @@ func TestRecordRunnerConnectedSpinup(t *testing.T) {
 			}
 			hist := met.Data.(metricdata.Histogram[float64])
 			require.Len(t, hist.DataPoints, 1)
-			require.InDelta(t, 1.5, hist.DataPoints[0].Sum, 0.3)
+			sum := hist.DataPoints[0].Sum
+			require.GreaterOrEqual(t, sum, float64(elapsedSec))
+			require.Less(t, sum, float64(elapsedSec+1))
 			found = true
 		}
 	}
