@@ -150,10 +150,7 @@ services:
       - /tmp:/tmp
 
   supergit:
-    build:
-      context: ../supergit
-      dockerfile: Dockerfile
-    image: superplane-supergit:dev
+    image: ghcr.io/superplanehq/supergit:${SUPERGIT_VERSION:-0.1.2}
     environment:
       SUPERGIT_ROOT: /var/lib/supergit/repos
       SUPERGIT_PORT: "8080"
