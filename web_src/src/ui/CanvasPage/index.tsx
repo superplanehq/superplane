@@ -211,6 +211,16 @@ export interface CanvasPageProps {
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
   hasUnpublishedConsoleDraftChanges?: boolean;
+  hasUncommittedCanvasDraftChanges?: boolean;
+  hasUncommittedConsoleDraftChanges?: boolean;
+  hasCommittedCanvasDraftChanges?: boolean;
+  hasCommittedConsoleDraftChanges?: boolean;
+  hasUncommittedDraftChanges?: boolean;
+  hasCommittedDraftChanges?: boolean;
+  readyToPublishDraftChanges?: boolean;
+  readyToPublishCanvasDraftChanges?: boolean;
+  readyToPublishConsoleDraftChanges?: boolean;
+  activeDraftHasNoChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   startEditingDrafts?: CanvasesCanvasDraftBranch[];
@@ -848,9 +858,10 @@ function CanvasPage(props: CanvasPageProps) {
   const closeCanvasModal = useCallback(() => {
     setCanvasModalRequest(null);
   }, []);
+  const onTriggerModalHostReady = props.onTriggerModalHostReady;
   useEffect(() => {
-    props.onTriggerModalHostReady?.(openCanvasModal);
-  }, [props, openCanvasModal]);
+    onTriggerModalHostReady?.(openCanvasModal);
+  }, [onTriggerModalHostReady, openCanvasModal]);
   useEffect(() => {
     if (!props.focusRequest?.tab || props.focusRequest.tab === "execution-chain") {
       return;
@@ -1346,6 +1357,16 @@ function CanvasPage(props: CanvasPageProps) {
           hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
           hasUnpublishedCanvasDraftChanges={props.hasUnpublishedCanvasDraftChanges}
           hasUnpublishedConsoleDraftChanges={props.hasUnpublishedConsoleDraftChanges}
+          hasUncommittedCanvasDraftChanges={props.hasUncommittedCanvasDraftChanges}
+          hasUncommittedConsoleDraftChanges={props.hasUncommittedConsoleDraftChanges}
+          hasCommittedCanvasDraftChanges={props.hasCommittedCanvasDraftChanges}
+          hasCommittedConsoleDraftChanges={props.hasCommittedConsoleDraftChanges}
+          hasUncommittedDraftChanges={props.hasUncommittedDraftChanges}
+          hasCommittedDraftChanges={props.hasCommittedDraftChanges}
+          readyToPublishDraftChanges={props.readyToPublishDraftChanges}
+          readyToPublishCanvasDraftChanges={props.readyToPublishCanvasDraftChanges}
+          readyToPublishConsoleDraftChanges={props.readyToPublishConsoleDraftChanges}
+          activeDraftHasNoChanges={props.activeDraftHasNoChanges}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
           onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
           startEditingDrafts={props.startEditingDrafts}
@@ -1886,6 +1907,16 @@ function CanvasContentHeader({
   hasUnpublishedDraftChanges,
   hasUnpublishedCanvasDraftChanges,
   hasUnpublishedConsoleDraftChanges,
+  hasUncommittedCanvasDraftChanges,
+  hasUncommittedConsoleDraftChanges,
+  hasCommittedCanvasDraftChanges,
+  hasCommittedConsoleDraftChanges,
+  hasUncommittedDraftChanges,
+  hasCommittedDraftChanges,
+  readyToPublishDraftChanges,
+  readyToPublishCanvasDraftChanges,
+  readyToPublishConsoleDraftChanges,
+  activeDraftHasNoChanges,
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
   startEditingDrafts,
@@ -1950,6 +1981,16 @@ function CanvasContentHeader({
   hasUnpublishedDraftChanges?: boolean;
   hasUnpublishedCanvasDraftChanges?: boolean;
   hasUnpublishedConsoleDraftChanges?: boolean;
+  hasUncommittedCanvasDraftChanges?: boolean;
+  hasUncommittedConsoleDraftChanges?: boolean;
+  hasCommittedCanvasDraftChanges?: boolean;
+  hasCommittedConsoleDraftChanges?: boolean;
+  hasUncommittedDraftChanges?: boolean;
+  hasCommittedDraftChanges?: boolean;
+  readyToPublishDraftChanges?: boolean;
+  readyToPublishCanvasDraftChanges?: boolean;
+  readyToPublishConsoleDraftChanges?: boolean;
+  activeDraftHasNoChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
   startEditingDrafts?: CanvasesCanvasDraftBranch[];
@@ -2014,6 +2055,16 @@ function CanvasContentHeader({
       hasUnpublishedDraftChanges={hasUnpublishedDraftChanges}
       hasUnpublishedCanvasDraftChanges={hasUnpublishedCanvasDraftChanges}
       hasUnpublishedConsoleDraftChanges={hasUnpublishedConsoleDraftChanges}
+      hasUncommittedCanvasDraftChanges={hasUncommittedCanvasDraftChanges}
+      hasUncommittedConsoleDraftChanges={hasUncommittedConsoleDraftChanges}
+      hasCommittedCanvasDraftChanges={hasCommittedCanvasDraftChanges}
+      hasCommittedConsoleDraftChanges={hasCommittedConsoleDraftChanges}
+      hasUncommittedDraftChanges={hasUncommittedDraftChanges}
+      hasCommittedDraftChanges={hasCommittedDraftChanges}
+      readyToPublishDraftChanges={readyToPublishDraftChanges}
+      readyToPublishCanvasDraftChanges={readyToPublishCanvasDraftChanges}
+      readyToPublishConsoleDraftChanges={readyToPublishConsoleDraftChanges}
+      activeDraftHasNoChanges={activeDraftHasNoChanges}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}
       startEditingDrafts={startEditingDrafts}

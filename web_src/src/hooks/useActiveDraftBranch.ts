@@ -81,9 +81,17 @@ export function useActiveDraftBranch({
   const [activeBranch, setActiveBranch] = useState<string | null>(branchFromUrl);
   const activeBranchRef = useRef(activeBranch);
   activeBranchRef.current = activeBranch;
+  const ignoreMissingUrlBranchRef = useRef(false);
 
   useEffect(() => {
     const urlBranch = searchParams.get("branch");
+    if (urlBranch && urlBranch === activeBranchRef.current) {
+      ignoreMissingUrlBranchRef.current = false;
+    }
+    // A stale search-param write can briefly drop `branch` while local edit mode is active.
+    if (!urlBranch && activeBranchRef.current && ignoreMissingUrlBranchRef.current) {
+      return;
+    }
     if (urlBranch !== activeBranchRef.current) {
       setActiveBranch(urlBranch);
     }
@@ -118,6 +126,7 @@ export function useActiveDraftBranch({
         return;
       }
 
+      ignoreMissingUrlBranchRef.current = true;
       setActiveBranch(branch);
       writeLastDraftBranch(canvasId, branch);
       syncBranchToUrl(branch);

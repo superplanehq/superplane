@@ -92,11 +92,16 @@ vi.mock("@/lib/toast", () => ({
   showSuccessToast: vi.fn(),
 }));
 
+vi.mock("@/lib/bootstrapBlankCanvasDraft", () => ({
+  bootstrapBlankCanvasDraft: vi.fn().mockResolvedValue("drafts/user-1"),
+}));
+
 vi.mock("@/hooks/useCanvasData", () => ({
   CANVAS_FOLDER_COLORS: ["blue", "green", "purple", "yellow", "slate", "orange"],
   DEFAULT_CANVAS_FOLDER_COLOR: "blue",
   canvasKeys: {
     detail: (organizationId: string, canvasId: string) => ["canvases", "detail", organizationId, canvasId],
+    draftBranches: (canvasId: string) => ["canvases", "draftBranches", canvasId],
   },
   useCanvases,
   useCanvasFolders,

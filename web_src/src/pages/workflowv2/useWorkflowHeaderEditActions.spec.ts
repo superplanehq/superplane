@@ -58,14 +58,14 @@ describe("useWorkflowHeaderEditActions", () => {
     expect(config.handleToggleEditMode).toHaveBeenCalledTimes(1);
   });
 
-  it("opens the start editing menu for ?edit=1 deep links", () => {
-    const openStartEditingMenu = vi.fn();
-    const setSearchParams = vi.fn() as unknown as SetURLSearchParams;
+  it("opens the start editing menu for ?edit=1 deep links", async () => {
+    const openStartEditingMenu = vi.fn().mockResolvedValue(undefined);
+    const setSearchParams = vi.fn();
     const searchParams = new URLSearchParams("edit=1");
 
     renderWorkflowHeaderEditActions({
       openStartEditingMenu,
-      setSearchParams,
+      setSearchParams: setSearchParams as unknown as SetURLSearchParams,
       startup: {
         hasEditableVersion: false,
         canUpdateCanvas: true,
@@ -75,6 +75,13 @@ describe("useWorkflowHeaderEditActions", () => {
     });
 
     expect(openStartEditingMenu).toHaveBeenCalledTimes(1);
-    expect(setSearchParams).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => {
+      expect(setSearchParams).toHaveBeenCalledTimes(1);
+    });
+    const updater = setSearchParams.mock.calls[0]?.[0] as (current: URLSearchParams) => URLSearchParams;
+    expect(typeof updater).toBe("function");
+    const next = updater(new URLSearchParams("edit=1&branch=drafts%2Fuser-1"));
+    expect(next.get("edit")).toBeNull();
+    expect(next.get("branch")).toBe("drafts/user-1");
   });
 });

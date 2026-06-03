@@ -46,6 +46,8 @@ type UseCanvasConsoleVersionDiffArgs = {
   suppressUnpublishedDraftDiscard: boolean;
   enabled: boolean;
   branchDashboard?: CanvasesCanvasDashboard | null;
+  /** Last committed console on the draft branch (branch HEAD), without IndexedDB staging. */
+  branchHeadDashboard?: CanvasesCanvasDashboard | null;
   branchDashboardLoading?: boolean;
   updateDashboardMutation?: UpdateCanvasConsoleMutationResult;
   hasCanvasStagingChanges?: boolean;
@@ -60,6 +62,7 @@ export function useCanvasConsoleVersionDiff({
   suppressUnpublishedDraftDiscard,
   enabled,
   branchDashboard,
+  branchHeadDashboard,
   branchDashboardLoading,
   updateDashboardMutation,
   hasCanvasStagingChanges,
@@ -84,9 +87,13 @@ export function useCanvasConsoleVersionDiff({
   } as CanvasConsoleQueryResult;
 
   const draftDashboardData = isEditingDraftBranch ? branchDashboard : fallbackDashboardQuery.data;
+  const committedDashboardForDiff = isEditingDraftBranch
+    ? (branchHeadDashboard ?? branchDashboard)
+    : fallbackDashboardQuery.data;
   const hasDraftConsoleDiffVersusLive = useMemo(
-    () => !!draftDashboardData && hasDraftVersusLiveConsoleDiff(liveDashboardQuery.data, draftDashboardData),
-    [draftDashboardData, liveDashboardQuery.data],
+    () =>
+      !!committedDashboardForDiff && hasDraftVersusLiveConsoleDiff(liveDashboardQuery.data, committedDashboardForDiff),
+    [committedDashboardForDiff, liveDashboardQuery.data],
   );
   const draftConsoleDiff = useMemo(() => {
     if (!hasDraftConsoleDiffVersusLive) return undefined;

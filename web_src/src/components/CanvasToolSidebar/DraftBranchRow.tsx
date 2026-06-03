@@ -3,6 +3,8 @@ import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+export type DraftBranchEditStatus = "uncommitted" | "ready" | "no-changes";
+
 function shortSha(sha?: string): string {
   if (!sha) {
     return "—";
@@ -24,9 +26,58 @@ function formatUpdatedAt(value?: string): string {
   return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+function rowBackgroundClassName(isActive: boolean, editStatus?: DraftBranchEditStatus): string {
+  if (!editStatus) {
+    return "bg-white";
+  }
+
+  if (!isActive) {
+    return "bg-slate-50";
+  }
+
+  if (editStatus === "uncommitted") {
+    return "bg-orange-50";
+  }
+
+  if (editStatus === "ready" || editStatus === "no-changes") {
+    return "bg-blue-50";
+  }
+
+  return "bg-white";
+}
+
+const grayStatusBadgeClassName =
+  "rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-600";
+const activeBlueStatusBadgeClassName =
+  "rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-blue-800";
+
+function editStatusBadge(editStatus: DraftBranchEditStatus, isActive: boolean) {
+  if (editStatus === "no-changes") {
+    return {
+      label: "No changes",
+      className: isActive ? activeBlueStatusBadgeClassName : grayStatusBadgeClassName,
+    };
+  }
+
+  if (editStatus === "uncommitted") {
+    return {
+      label: "Uncommitted changes",
+      className: isActive
+        ? "rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-orange-800"
+        : grayStatusBadgeClassName,
+    };
+  }
+
+  return {
+    label: "Ready to publish",
+    className: isActive ? activeBlueStatusBadgeClassName : grayStatusBadgeClassName,
+  };
+}
+
 export function DraftBranchRow({
   draft,
   isActive,
+  editStatus,
   canUpdateCanvas,
   deletePending,
   onOpen,
@@ -34,6 +85,7 @@ export function DraftBranchRow({
 }: {
   draft: CanvasesCanvasDraftBranch;
   isActive: boolean;
+  editStatus?: DraftBranchEditStatus;
   canUpdateCanvas: boolean;
   deletePending?: boolean;
   onOpen: (branchName: string) => void;
@@ -42,10 +94,14 @@ export function DraftBranchRow({
   const branchName = draft.branchName || "";
   const displayName = draft.displayName || branchName || "Draft";
   const ownerName = draft.owner?.name || "Unknown";
+  const statusBadge = editStatus ? editStatusBadge(editStatus, isActive) : null;
 
   return (
     <div
-      className={cn("flex items-start gap-2 border-b border-slate-100 px-4 py-3", isActive ? "bg-blue-50" : "bg-white")}
+      className={cn(
+        "flex items-start gap-2 border-b border-slate-100 px-4 py-3",
+        rowBackgroundClassName(isActive, editStatus),
+      )}
       data-testid="canvas-draft-branch-row"
     >
       <button
@@ -56,11 +112,7 @@ export function DraftBranchRow({
       >
         <div className="flex items-center gap-2">
           <span className="truncate text-sm font-medium text-slate-900">{displayName}</span>
-          {isActive ? (
-            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-blue-700">
-              Active
-            </span>
-          ) : null}
+          {statusBadge ? <span className={statusBadge.className}>{statusBadge.label}</span> : null}
         </div>
         <p className="mt-0.5 truncate text-xs text-slate-500">{branchName}</p>
         <p className="mt-1 text-xs text-slate-500">

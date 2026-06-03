@@ -412,6 +412,16 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
     [branchDashboard, stageConsoleDashboard],
   );
 
+  const branchHeadCanvasSpec = useMemo(() => {
+    const yaml = baselineFiles[CANVAS_YAML_PATH];
+    return yaml ? parseCanvasYamlToSpec(yaml) : null;
+  }, [baselineFiles]);
+
+  const branchHeadDashboard = useMemo(() => {
+    const yaml = baselineFiles[CONSOLE_YAML_PATH];
+    return yaml ? dashboardFromYamlText(yaml) : null;
+  }, [baselineFiles]);
+
   return {
     stagingRecord,
     hasStagingChanges,
@@ -419,6 +429,8 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
     hasConsoleStagingChanges,
     branchCanvasSpec,
     branchDashboard,
+    branchHeadCanvasSpec,
+    branchHeadDashboard,
     isLoadingBranchContent,
     stageCanvasWorkflow,
     setLocalBranchCanvasSpec,

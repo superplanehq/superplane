@@ -70,6 +70,17 @@ export interface HeaderProps {
   hasUnpublishedCanvasDraftChanges?: boolean;
   /** Draft indicator for the Console tab when console changes exist. */
   hasUnpublishedConsoleDraftChanges?: boolean;
+  hasUncommittedCanvasDraftChanges?: boolean;
+  hasUncommittedConsoleDraftChanges?: boolean;
+  hasCommittedCanvasDraftChanges?: boolean;
+  hasCommittedConsoleDraftChanges?: boolean;
+  hasUncommittedDraftChanges?: boolean;
+  hasCommittedDraftChanges?: boolean;
+  readyToPublishDraftChanges?: boolean;
+  readyToPublishCanvasDraftChanges?: boolean;
+  readyToPublishConsoleDraftChanges?: boolean;
+  /** Active git draft branch matches live with no staging (blue edit chrome). */
+  activeDraftHasNoChanges?: boolean;
   /** ISO timestamp of the existing unpublished draft, used to label "Last edited X" in the Edit dropdown. */
   unpublishedDraftUpdatedAt?: string;
   activeDraftBranchLabel?: string;
@@ -117,7 +128,6 @@ export function Header(props: HeaderProps) {
         createDraftBranchPending={props.createDraftBranchPending}
         activeDraftBranchLabel={props.activeDraftBranchLabel}
         activeDraftBranchShortSha={props.activeDraftBranchShortSha}
-        onActiveDraftBranchClick={props.onActiveDraftBranchClick}
         showCanvasSettingsMenu={props.showCanvasSettingsMenu}
       />
 
@@ -149,7 +159,6 @@ function PageHeader({
   createDraftBranchPending,
   activeDraftBranchLabel,
   activeDraftBranchShortSha,
-  onActiveDraftBranchClick,
   showCanvasSettingsMenu = true,
 }: {
   organizationId?: string;
@@ -175,7 +184,6 @@ function PageHeader({
   createDraftBranchPending?: boolean;
   activeDraftBranchLabel?: string;
   activeDraftBranchShortSha?: string;
-  onActiveDraftBranchClick?: () => void;
 }) {
   const { workflowId, canvasId: canvasIdParam } = useParams<{ workflowId?: string; canvasId?: string }>();
   const activeCanvasId = canvasIdParam || workflowId;
@@ -200,16 +208,23 @@ function PageHeader({
         </div>
       </div>
       <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-        {isEditing && activeDraftBranchLabel ? (
-          <button
-            type="button"
-            className="hidden rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-800 hover:bg-blue-100 sm:inline-flex"
-            onClick={() => onActiveDraftBranchClick?.()}
-            data-testid="active-draft-branch-chip"
-          >
-            Editing: {activeDraftBranchLabel}
-            {activeDraftBranchShortSha ? ` @ ${activeDraftBranchShortSha}` : ""}
-          </button>
+        {isEditing ? (
+          <div className="flex items-center">
+            {activeDraftBranchLabel ? (
+              <span
+                className="hidden text-[13px] font-medium text-slate-600 sm:inline"
+                data-testid="active-draft-branch-chip"
+              >
+                Editing: {activeDraftBranchLabel}
+                {activeDraftBranchShortSha ? ` @ ${activeDraftBranchShortSha}` : ""}
+              </span>
+            ) : null}
+            <EditModeTopHeaderActions
+              onExitEditMode={onExitEditMode}
+              exitEditModeDisabled={exitEditModeDisabled}
+              exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
+            />
+          </div>
         ) : null}
         {mode !== "runs" && !isEditing && (onEnterEditMode || startEditingDrafts !== undefined) ? (
           <LiveModeTopHeaderActions
@@ -228,13 +243,6 @@ function PageHeader({
             createDraftBranchPending={createDraftBranchPending}
           />
         ) : null}
-        {isEditing ? (
-          <EditModeTopHeaderActions
-            onExitEditMode={onExitEditMode}
-            exitEditModeDisabled={exitEditModeDisabled}
-            exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          />
-        ) : null}
       </div>
     </div>
   );
@@ -244,6 +252,13 @@ function SecondaryHeader(props: HeaderProps) {
   const showCanvasViewModeToggle = shouldShowCanvasViewModeToggle(props);
   const canvasViewMode = getCanvasViewMode(props.mode);
   const editing = props.isEditing ?? props.mode === "version-edit";
+  const editTabTone = editing
+    ? props.hasUncommittedDraftChanges
+      ? "uncommitted"
+      : props.readyToPublishDraftChanges || props.activeDraftHasNoChanges
+        ? "ready"
+        : "neutral"
+    : undefined;
 
   return (
     <div className="relative z-10 flex h-10 items-center gap-3 border-b border-slate-950/15 bg-white px-3">
@@ -259,8 +274,11 @@ function SecondaryHeader(props: HeaderProps) {
               onSelectMemory={props.onSelectMemory}
               onSelectFiles={props.onSelectFiles}
               editing={editing}
-              hasDraft={props.hasUnpublishedCanvasDraftChanges ?? !!props.hasUnpublishedDraftChanges}
-              hasDashboardDraft={!!props.hasUnpublishedConsoleDraftChanges}
+              editTabTone={editTabTone}
+              hasCanvasUncommitted={!!props.hasUncommittedCanvasDraftChanges}
+              hasCanvasCommitted={!!props.readyToPublishCanvasDraftChanges}
+              hasDashboardUncommitted={!!props.hasUncommittedConsoleDraftChanges}
+              hasDashboardCommitted={!!props.readyToPublishConsoleDraftChanges}
             />
           ) : null}
         </div>

@@ -12,6 +12,7 @@ import type { CanvasChangesetChange } from "@/pages/workflowv2/lib/canvas-change
 import type {
   CanvasesCanvas,
   CanvasesCanvasChangeRequest,
+  CanvasesCanvasDraftBranch,
   CanvasesCanvasEvent,
   CanvasesCanvasNodeExecution,
   CanvasesCanvasNodeQueueItem,
@@ -30,6 +31,7 @@ import { LoadingButton } from "@/components/ui/loading-button";
 import { Dialog, DialogActions, DialogDescription, DialogTitle } from "@/components/Dialog/dialog";
 import { RunsTabPanel } from "@/components/CanvasToolSidebar/RunsTabPanel";
 import { VersionsTabPanel } from "@/components/CanvasToolSidebar/VersionsTabPanel";
+import { useDraftBranchesEditStatus } from "@/pages/workflowv2/useDraftBranchesEditStatus";
 import { usePermissions } from "@/contexts/usePermissions";
 import { useComponents } from "@/hooks/useComponentData";
 import {
@@ -59,7 +61,8 @@ import {
   useTriggers,
   useWidgets,
 } from "@/hooks/useCanvasData";
-import { useActiveDraftBranch } from "@/hooks/useActiveDraftBranch";
+import { readLastDraftBranch, useActiveDraftBranch } from "@/hooks/useActiveDraftBranch";
+import { isAgentBootReady } from "@/lib/agentBootContext";
 import { useCanvasWebsocket } from "@/hooks/useCanvasWebsocket";
 import { useAvailableIntegrations, useConnectedIntegrations, useCreateIntegration } from "@/hooks/useIntegrations";
 import { useMe } from "@/hooks/useMe";
@@ -166,6 +169,7 @@ const CANVAS_VERSION_CONTROL_STORAGE_KEY = "canvas-version-control-open";
 const VERSION_ACTION_SAVE_SETTLE_TIMEOUT_MS = 5000;
 const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
 const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
+const EMPTY_DRAFT_BRANCHES: CanvasesCanvasDraftBranch[] = [];
 
 export function WorkflowPageV2() {
   const { organizationId, canvasId } = useParams<{
@@ -236,7 +240,7 @@ export function WorkflowPageV2() {
     refetchOnMount: false,
   });
   const isTemplate = liveCanvas?.metadata?.isTemplate ?? false;
-  const { data: draftBranches = [] } = useDraftBranches(canvasId!, !!canvasId && !isTemplate);
+  const { data: draftBranches = EMPTY_DRAFT_BRANCHES } = useDraftBranches(canvasId!, !!canvasId && !isTemplate);
   const { activeBranch, activeBranchMeta, activeBranchRef, activateBranch, exitToLive, pickDefaultDraftBranch } =
     useActiveDraftBranch({
       canvasId,
@@ -244,11 +248,25 @@ export function WorkflowPageV2() {
       setSearchParams,
       draftBranches,
     });
+  // Keep staging indicators (tab dots) accurate after Exit Edit while IndexedDB staging persists.
+  const draftBranchForIndicators = useMemo(() => {
+    if (activeBranch) {
+      return activeBranch;
+    }
+    if (!canvasId) {
+      return null;
+    }
+    return readLastDraftBranch(canvasId);
+  }, [activeBranch, canvasId]);
+  const draftBranchForIndicatorsMeta = useMemo(
+    () => draftBranches.find((branch) => branch.branchName === draftBranchForIndicators) ?? null,
+    [draftBranchForIndicators, draftBranches],
+  );
   const branchStaging = useCanvasBranchStaging({
     canvasId,
-    activeBranch,
-    headSha: activeBranchMeta?.tipSha,
-    enabled: !!activeBranch,
+    activeBranch: draftBranchForIndicators,
+    headSha: (activeBranchMeta ?? draftBranchForIndicatorsMeta)?.tipSha,
+    enabled: !!draftBranchForIndicators,
   });
   const { data: organizationUsers = [], isLoading: usersLoading } = useOrganizationUsers(organizationId!);
   const { data: canvasVersions = [] } = useCanvasVersions(organizationId!, canvasId!);
@@ -440,6 +458,18 @@ export function WorkflowPageV2() {
     () => !!latestDraftVersion && hasDraftVersusLiveGraphDiff(liveCanvasVersion, latestDraftVersion),
     [liveCanvasVersion, latestDraftVersion],
   );
+  const hasBranchCommittedGraphDiffVersusLive = useMemo(() => {
+    if (!draftBranchForIndicators || !branchStaging.branchHeadCanvasSpec) {
+      return false;
+    }
+
+    return hasDraftVersusLiveGraphDiff(liveCanvasVersion, {
+      spec: branchStaging.branchHeadCanvasSpec,
+    });
+  }, [draftBranchForIndicators, branchStaging.branchHeadCanvasSpec, liveCanvasVersion]);
+  const hasCommittedGraphDiffVersusLive = draftBranchForIndicators
+    ? hasBranchCommittedGraphDiffVersusLive
+    : hasDraftGraphDiffVersusLive;
   const selectedCanvasVersionID = selectedCanvasVersion?.metadata?.id || "";
   const isViewingPendingApprovalVersion =
     !!selectedCanvasVersionID && pendingApprovalVersionIds.has(selectedCanvasVersionID);
@@ -711,11 +741,19 @@ export function WorkflowPageV2() {
   const isAutoSaveQueued = isPositionAutoSaveQueued || isAnnotationAutoSaveQueued;
   const hasLocalSaveActivity = isCanvasSaveInFlight || isCanvasSaveQueued || isAutoSaveQueued;
   const hasPendingLocalCanvasState = hasUnsavedChanges || hasLocalSaveActivity || branchStaging.hasStagingChanges;
+  // Git-first draft staging is persisted per branch in IndexedDB; do not block refresh/navigation for it.
+  const shouldWarnBeforePageUnload = hasUnsavedChanges || hasLocalSaveActivity;
 
   // Keep the react-query canvas cache aligned with the branch YAML when entering edit
   // mode so code paths that still read the cache see committed draft content.
   useEffect(() => {
-    if (!organizationId || !canvasId || !activeBranch || !branchStaging.branchCanvasSpec || hasPendingLocalCanvasState) {
+    if (
+      !organizationId ||
+      !canvasId ||
+      !activeBranch ||
+      !branchStaging.branchCanvasSpec ||
+      hasPendingLocalCanvasState
+    ) {
       return;
     }
 
@@ -727,14 +765,7 @@ export function WorkflowPageV2() {
 
       return { ...current, spec: branchSpec };
     });
-  }, [
-    organizationId,
-    canvasId,
-    activeBranch,
-    branchStaging.branchCanvasSpec,
-    hasPendingLocalCanvasState,
-    queryClient,
-  ]);
+  }, [organizationId, canvasId, activeBranch, branchStaging.branchCanvasSpec, hasPendingLocalCanvasState, queryClient]);
 
   const [isAutoLayoutOnUpdateEnabled, setIsAutoLayoutOnUpdateEnabled] = useState(() =>
     readStoredBoolean(CANVAS_AUTO_LAYOUT_ON_UPDATE_STORAGE_KEY),
@@ -809,7 +840,9 @@ export function WorkflowPageV2() {
     }
 
     return (
-      queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) ?? canvasRef.current ?? undefined
+      queryClient.getQueryData<CanvasesCanvas>(canvasKeys.detail(organizationId, canvasId)) ??
+      canvasRef.current ??
+      undefined
     );
   }, [organizationId, canvasId, queryClient]);
 
@@ -1157,10 +1190,11 @@ export function WorkflowPageV2() {
   const canvasConsoleVersionDiff = useCanvasConsoleVersionDiff({
     canvasId: canvasId!,
     versionIds: { active: activeCanvasVersionId, draft: latestDraftVersion?.metadata?.id, live: liveCanvasVersionId },
-    hasDraftGraphDiffVersusLive,
+    hasDraftGraphDiffVersusLive: hasCommittedGraphDiffVersusLive,
     suppressUnpublishedDraftDiscard,
     enabled: !isTemplate,
     branchDashboard: branchStaging.branchDashboard,
+    branchHeadDashboard: branchStaging.branchHeadDashboard,
     branchDashboardLoading: branchStaging.isLoadingBranchContent,
     updateDashboardMutation: branchStaging.updateConsoleMutation,
     hasCanvasStagingChanges: branchStaging.hasCanvasStagingChanges,
@@ -1169,6 +1203,35 @@ export function WorkflowPageV2() {
   });
   const { dashboardQuery, updateDashboardMutation, draftChangeIndicators, hasDraftDiffVersusLive } =
     canvasConsoleVersionDiff;
+  const activeBranchIndicatorsReady = useMemo(
+    () =>
+      !!activeBranch &&
+      activeBranch === draftBranchForIndicators &&
+      !branchStaging.isLoadingBranchContent &&
+      (branchStaging.stagingRecord?.branch ?? activeBranch) === activeBranch,
+    [activeBranch, draftBranchForIndicators, branchStaging.isLoadingBranchContent, branchStaging.stagingRecord?.branch],
+  );
+  const { draftBranchEditStatusByBranch, liveModeDraftChangeIndicators } = useDraftBranchesEditStatus({
+    canvasId,
+    draftBranches,
+    liveCanvasVersion,
+    liveDashboard: dashboardQuery.data,
+    activeBranch,
+    activeBranchIndicatorsReady,
+    activeBranchHasUncommittedCanvas: draftChangeIndicators.hasUncommittedCanvasDraftChanges,
+    activeBranchHasUncommittedConsole: draftChangeIndicators.hasUncommittedConsoleDraftChanges,
+    activeBranchHasCommittedCanvasVersusLive: draftChangeIndicators.hasCommittedCanvasDraftChanges,
+    activeBranchHasCommittedConsoleVersusLive: draftChangeIndicators.hasCommittedConsoleDraftChanges,
+    pendingPlaceholderBoot: !!canvasId && !isAgentBootReady(canvasId),
+  });
+  const headerDraftChangeIndicators = useMemo(
+    () => (activeBranch ? draftChangeIndicators : (liveModeDraftChangeIndicators ?? draftChangeIndicators)),
+    [activeBranch, draftChangeIndicators, liveModeDraftChangeIndicators],
+  );
+  const activeDraftHasNoChanges = useMemo(
+    () => !!activeBranch && draftBranchEditStatusByBranch[activeBranch] === "no-changes",
+    [activeBranch, draftBranchEditStatusByBranch],
+  );
   const consumeIgnoredCanvasUpdatedEcho = useCallback(() => {
     const release = ignoredCanvasUpdatedEchoReleasesRef.current.pop();
     if (!release) return false;
@@ -1567,10 +1630,10 @@ export function WorkflowPageV2() {
     [queryClient, canvasId],
   );
 
-  // Warn user before leaving page with unsaved changes
+  // Warn before closing the tab only for legacy in-memory draft saves, not IndexedDB branch staging.
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasPendingLocalCanvasState) {
+      if (shouldWarnBeforePageUnload) {
         e.preventDefault();
         e.returnValue = "Your work isn't saved, unsaved changes will be lost. Are you sure you want to leave?";
       }
@@ -1578,7 +1641,18 @@ export function WorkflowPageV2() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasPendingLocalCanvasState]);
+  }, [shouldWarnBeforePageUnload]);
+
+  useEffect(() => {
+    const flushStagingOnPageHide = () => {
+      if (draftBranchForIndicators && branchStaging.hasStagingChanges) {
+        branchStaging.flushStaging();
+      }
+    };
+
+    window.addEventListener("pagehide", flushStagingOnPageHide);
+    return () => window.removeEventListener("pagehide", flushStagingOnPageHide);
+  }, [branchStaging, draftBranchForIndicators]);
 
   // Merge triggers and components from applications into the main arrays
   const allTriggers = useMemo(() => {
@@ -2894,7 +2968,14 @@ export function WorkflowPageV2() {
         },
         isReadOnly ? 2000 : 100,
       ),
-    [organizationId, canvasId, getWorkflowForLocalEdits, handleSaveWorkflow, hasNonPositionalUnsavedChanges, isReadOnly],
+    [
+      organizationId,
+      canvasId,
+      getWorkflowForLocalEdits,
+      handleSaveWorkflow,
+      hasNonPositionalUnsavedChanges,
+      isReadOnly,
+    ],
   );
 
   const handleAnnotationBlur = useCallback(() => {
@@ -4604,9 +4685,9 @@ export function WorkflowPageV2() {
 
   // With no existing drafts there is nothing to choose between, so start editing
   // immediately by creating a draft instead of opening the picker menu.
-  const openStartEditingMenu = useCallback(() => {
+  const openStartEditingMenu = useCallback(async () => {
     if (draftBranches.length === 0) {
-      void handleCreateDraftBranch();
+      await handleCreateDraftBranch();
       return;
     }
     setIsStartEditingMenuOpen(true);
@@ -4797,7 +4878,14 @@ export function WorkflowPageV2() {
     setSelectedRunId,
     setRunDetailNodeId,
     setSearchParams,
-    startup: { hasEditableVersion, canUpdateCanvas, canvas, handlePlaceholderAdd, searchParams },
+    startup: {
+      hasEditableVersion,
+      canUpdateCanvas,
+      canvas,
+      branchContentReady: !!activeBranch && !branchStaging.isLoadingBranchContent,
+      handlePlaceholderAdd,
+      searchParams,
+    },
   });
   const handleRunCanvasNodeClick = useCallback(
     (nodeId: string) => {
@@ -5265,11 +5353,7 @@ export function WorkflowPageV2() {
   ) : null;
 
   const canvasViewKey = selectedCanvasVersion?.metadata?.id || liveCanvasVersionId || "live";
-  const canvasRenderKey = [
-    canvasViewKey,
-    isDraftCanvasLoading ? "draft-loading" : "draft-ready",
-    isRunsMode ? "runs" : "canvas",
-  ].join(":");
+  const canvasRenderKey = [canvasViewKey, isRunsMode ? "runs" : "canvas"].join(":");
   const headerBanners = [appBanner, remoteUpdateBanner, templateBanner].filter(Boolean);
   const headerBanner = headerBanners.length > 0 ? <div className="flex flex-col">{headerBanners}</div> : null;
   const saveDisabled = !canUpdateCanvas || !hasEditableVersion;
@@ -5524,7 +5608,8 @@ export function WorkflowPageV2() {
           onYamlOpen={() => setIsYamlViewModalOpen(true)}
           exitEditModeDisabled={exitEditModeDisabled}
           exitEditModeDisabledTooltip={exitEditModeDisabledTooltip}
-          {...draftChangeIndicators}
+          {...headerDraftChangeIndicators}
+          activeDraftHasNoChanges={activeDraftHasNoChanges}
           {...filesHeaderVersionActions}
           autoLayoutOnUpdateDisabled={isReadOnly}
           autoLayoutOnUpdateDisabledTooltip={isReadOnly ? "You don't have permission to edit this canvas." : undefined}
@@ -5595,6 +5680,7 @@ export function WorkflowPageV2() {
               rejectedVersions={rejectedVersions}
               draftBranches={draftBranches}
               activeDraftBranch={activeBranch}
+              draftBranchEditStatusByBranch={draftBranchEditStatusByBranch}
               onOpenDraftBranch={(branchName) => void handleEnterEditModeOnBranch(branchName)}
               onDeleteDraftBranch={(branchName) => void handleDeleteDraftBranch(branchName)}
               deleteDraftBranchPending={deleteDraftBranchMutation.isPending}

@@ -13,6 +13,7 @@ interface WorkflowStartupActionsConfig {
   hasEditableVersion: boolean;
   canUpdateCanvas: boolean;
   canvas: CanvasesCanvas | null | undefined;
+  branchContentReady?: boolean;
   handlePlaceholderAdd?: PlaceholderAddHandler;
   searchParams: URLSearchParams;
 }
@@ -21,7 +22,7 @@ interface WorkflowHeaderEditActionsConfig {
   isRunsMode: boolean;
   handleExitRunsMode: () => void;
   handleToggleEditMode: () => Promise<void>;
-  openStartEditingMenu?: () => void;
+  openStartEditingMenu?: () => void | Promise<void>;
   setIsRunsMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setRunDetailNodeId: (value: string | null) => void;
@@ -67,7 +68,7 @@ export function useWorkflowHeaderEditActions({
 
 function useAutoEditMode(
   startup: WorkflowStartupActionsConfig | undefined,
-  openStartEditingMenu: (() => void) | undefined,
+  openStartEditingMenu: (() => void | Promise<void>) | undefined,
   setSearchParams: SetURLSearchParams,
 ) {
   const triggeredRef = useRef(false);
@@ -85,11 +86,16 @@ function useAutoEditMode(
     if (!openStartEditingMenu) return;
 
     triggeredRef.current = true;
-    openStartEditingMenu();
-
-    const next = new URLSearchParams(searchParams);
-    next.delete("edit");
-    setSearchParams(next, { replace: true });
+    void Promise.resolve(openStartEditingMenu()).finally(() => {
+      setSearchParams(
+        (current) => {
+          const next = new URLSearchParams(current);
+          next.delete("edit");
+          return next;
+        },
+        { replace: true },
+      );
+    });
   }, [searchParams, setSearchParams, hasEditableVersion, canUpdateCanvas, canvasLoaded, openStartEditingMenu]);
 }
 
@@ -105,13 +111,14 @@ function useAutoPlaceholderNode(startup: WorkflowStartupActionsConfig | undefine
   const hasEditableVersion = startup?.hasEditableVersion ?? false;
   const canvasHasSpec = Boolean(startup?.canvas?.spec);
   const canvasId = startup?.canvas?.metadata?.id;
+  const branchContentReady = startup?.branchContentReady ?? false;
   const handlePlaceholderAdd = startup?.handlePlaceholderAdd;
 
   useEffect(() => {
     if (addedRef.current) return;
     if (typeof window === "undefined" || !canvasId) return;
     if (sessionStorage.getItem(PLACEHOLDER_NODE_CONTEXT_KEY) !== canvasId) return;
-    if (!hasEditableVersion || !canvasHasSpec || !handlePlaceholderAdd) return;
+    if (!hasEditableVersion || !canvasHasSpec || !handlePlaceholderAdd || !branchContentReady) return;
 
     addedRef.current = true;
 
@@ -127,5 +134,5 @@ function useAutoPlaceholderNode(startup: WorkflowStartupActionsConfig | undefine
       .catch(() => {
         abandonPendingPlaceholderBoot(canvasId);
       });
-  }, [hasEditableVersion, canvasHasSpec, canvasId, handlePlaceholderAdd]);
+  }, [branchContentReady, hasEditableVersion, canvasHasSpec, canvasId, handlePlaceholderAdd]);
 }

@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import type { SetURLSearchParams } from "react-router-dom";
 
 import type { CanvasesCanvasDraftBranch } from "@/api-client";
@@ -100,5 +100,35 @@ describe("useActiveDraftBranch", () => {
 
     expect(result.current.activeBranch).toBeNull();
     expect(branchParam).toBeNull();
+  });
+
+  it("keeps a locally activated branch when URL sync briefly drops branch", () => {
+    const searchParams = new URLSearchParams();
+    const setSearchParams = vi.fn() as unknown as SetURLSearchParams;
+
+    const { result, rerender } = renderHook(
+      ({ params }) =>
+        useActiveDraftBranch({
+          canvasId,
+          searchParams: params,
+          setSearchParams,
+          draftBranches: [draft("drafts/user-1")],
+        }),
+      { initialProps: { params: searchParams } },
+    );
+
+    act(() => {
+      result.current.activateBranch("drafts/user-1");
+    });
+
+    expect(result.current.activeBranch).toBe("drafts/user-1");
+
+    rerender({ params: new URLSearchParams() });
+
+    expect(result.current.activeBranch).toBe("drafts/user-1");
+
+    rerender({ params: new URLSearchParams("branch=drafts%2Fuser-1") });
+
+    expect(result.current.activeBranch).toBe("drafts/user-1");
   });
 });

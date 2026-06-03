@@ -28,10 +28,23 @@ type DraftChangeIndicatorsInput = {
   hasConsoleStagingChanges?: boolean;
 };
 
-type DraftChangeIndicators = {
+export type DraftChangeIndicators = {
+  /** Any uncommitted or committed draft change (legacy aggregate). */
   hasUnpublishedDraftChanges: boolean;
   hasUnpublishedCanvasDraftChanges: boolean;
   hasUnpublishedConsoleDraftChanges: boolean;
+  /** IndexedDB staging differs from branch HEAD (orange). */
+  hasUncommittedCanvasDraftChanges: boolean;
+  hasUncommittedConsoleDraftChanges: boolean;
+  /** Branch HEAD / materialized draft differs from live (blue). */
+  hasCommittedCanvasDraftChanges: boolean;
+  hasCommittedConsoleDraftChanges: boolean;
+  hasUncommittedDraftChanges: boolean;
+  hasCommittedDraftChanges: boolean;
+  /** Committed draft differs from live and staging is clean (blue UI only). */
+  readyToPublishDraftChanges: boolean;
+  readyToPublishCanvasDraftChanges: boolean;
+  readyToPublishConsoleDraftChanges: boolean;
 };
 
 export function getDraftChangeIndicators({
@@ -47,19 +60,42 @@ export function getDraftChangeIndicators({
       hasUnpublishedDraftChanges: false,
       hasUnpublishedCanvasDraftChanges: false,
       hasUnpublishedConsoleDraftChanges: false,
+      hasUncommittedCanvasDraftChanges: false,
+      hasUncommittedConsoleDraftChanges: false,
+      hasCommittedCanvasDraftChanges: false,
+      hasCommittedConsoleDraftChanges: false,
+      hasUncommittedDraftChanges: false,
+      hasCommittedDraftChanges: false,
+      readyToPublishDraftChanges: false,
+      readyToPublishCanvasDraftChanges: false,
+      readyToPublishConsoleDraftChanges: false,
     };
   }
 
-  // Per-surface indicators: uncommitted staged changes for a file, or a
-  // committed-but-unpublished diff versus live for that surface. Staging is
-  // tracked per file so a canvas edit does not light up the console dot.
-  const hasUnpublishedCanvasDraftChanges = !!hasCanvasStagingChanges || hasDraftGraphDiffVersusLive;
-  const hasUnpublishedConsoleDraftChanges = !!hasConsoleStagingChanges || hasDraftConsoleDiffVersusLive;
+  const hasUncommittedCanvasDraftChanges = !!hasCanvasStagingChanges;
+  const hasUncommittedConsoleDraftChanges = !!hasConsoleStagingChanges;
+  const hasCommittedCanvasDraftChanges = hasDraftGraphDiffVersusLive;
+  const hasCommittedConsoleDraftChanges = hasDraftConsoleDiffVersusLive;
+  const hasUnpublishedCanvasDraftChanges = hasUncommittedCanvasDraftChanges || hasCommittedCanvasDraftChanges;
+  const hasUnpublishedConsoleDraftChanges = hasUncommittedConsoleDraftChanges || hasCommittedConsoleDraftChanges;
+
+  const hasUncommittedDraftChanges = hasUncommittedCanvasDraftChanges || hasUncommittedConsoleDraftChanges;
+  const hasCommittedDraftChanges = hasCommittedCanvasDraftChanges || hasCommittedConsoleDraftChanges;
+  const readyToPublishDraftChanges = hasCommittedDraftChanges && !hasUncommittedDraftChanges;
 
   return {
     hasUnpublishedDraftChanges: hasUnpublishedCanvasDraftChanges || hasUnpublishedConsoleDraftChanges,
     hasUnpublishedCanvasDraftChanges,
     hasUnpublishedConsoleDraftChanges,
+    hasUncommittedCanvasDraftChanges,
+    hasUncommittedConsoleDraftChanges,
+    hasCommittedCanvasDraftChanges,
+    hasCommittedConsoleDraftChanges,
+    hasUncommittedDraftChanges,
+    hasCommittedDraftChanges,
+    readyToPublishDraftChanges,
+    readyToPublishCanvasDraftChanges: hasCommittedCanvasDraftChanges && !hasUncommittedDraftChanges,
+    readyToPublishConsoleDraftChanges: hasCommittedConsoleDraftChanges && !hasUncommittedDraftChanges,
   };
 }
 

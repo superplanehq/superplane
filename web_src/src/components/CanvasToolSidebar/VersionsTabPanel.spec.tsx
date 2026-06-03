@@ -134,6 +134,7 @@ describe("VersionsTabPanel", () => {
           },
         ]}
         activeDraftBranch="drafts/user-1"
+        draftBranchEditStatusByBranch={{ "drafts/user-1": "uncommitted" }}
         canUpdateCanvas={true}
         isTemplate={false}
         canvasDeletedRemotely={false}
@@ -145,6 +146,7 @@ describe("VersionsTabPanel", () => {
 
     expect(screen.getByTestId("canvas-drafts-section")).toBeInTheDocument();
     expect(screen.getByText("My draft")).toBeInTheDocument();
+    expect(screen.getByText("Uncommitted changes")).toBeInTheDocument();
 
     fireEvent.click(screen.getByText("My draft"));
 
