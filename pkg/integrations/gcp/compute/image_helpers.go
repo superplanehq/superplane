@@ -228,3 +228,18 @@ func imageLabelsFromEntries(entries []LabelEntry) map[string]string {
 	}
 	return out
 }
+
+// mergeImageLabels overlays the supplied updates onto the image's existing
+// labels. Keys present in updates are added or overwritten; existing keys that
+// are not listed are preserved. GCP's images.setLabels replaces the entire set,
+// so the merge is performed client-side before the call.
+func mergeImageLabels(existing, updates map[string]string) map[string]string {
+	merged := make(map[string]string, len(existing)+len(updates))
+	for k, v := range existing {
+		merged[k] = v
+	}
+	for k, v := range updates {
+		merged[k] = v
+	}
+	return merged
+}

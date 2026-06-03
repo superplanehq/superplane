@@ -55,7 +55,7 @@ func (u *UpdateImage) Documentation() string {
   - **Obsolete**: Mark the image obsolete (cannot be used to create new resources).
   - **Deleted**: Mark the image as logically deleted.
 - **Replacement image**: Optional image to recommend in place of this one (name or URL). Applies when setting a deprecation state.
-- **Labels**: Optional key-value labels to set on the image. When provided, these replace the image's existing labels.
+- **Labels**: Optional key-value labels to add or update on the image. Labels you provide are merged with the image's existing labels; existing labels you don't list are left unchanged.
 
 ## Output
 
@@ -64,7 +64,7 @@ Emits the updated image: name, selfLink, family, status, diskSizeGb, labels, dep
 ## Important Notes
 
 - Setting the deprecation state to **Active** clears an existing deprecation.
-- Updating labels replaces the full label set on the image.
+- Updating labels merges with the image's existing labels; labels you don't list are preserved.
 - The component waits for each underlying global operation to complete before emitting.`
 }
 
@@ -136,7 +136,7 @@ func (u *UpdateImage) Configuration() []configuration.Field {
 			Type:        configuration.FieldTypeList,
 			Required:    false,
 			Togglable:   true,
-			Description: "Key-value labels to set on the image. Replaces the existing label set.",
+			Description: "Key-value labels to add or update. Merged with the image's existing labels; labels you don't list are kept.",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Label",
@@ -213,9 +213,9 @@ func (u *UpdateImage) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", err.Error())
 	}
 
-	labels := imageLabelsFromEntries(spec.Labels)
+	labelUpdates := imageLabelsFromEntries(spec.Labels)
 	desiredState := desiredDeprecationState(spec.DeprecationState)
-	if labels == nil && desiredState == "" {
+	if labelUpdates == nil && desiredState == "" {
 		return ctx.ExecutionState.Fail("error", "nothing to update: set a deprecation state or labels")
 	}
 
@@ -250,8 +250,9 @@ func (u *UpdateImage) Execute(ctx core.ExecutionContext) error {
 		return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to parse image: %v", err))
 	}
 
-	if labels != nil {
-		if err := setImageLabels(callCtx, client, project, name, labels, current.LabelFingerprint); err != nil {
+	if labelUpdates != nil {
+		merged := mergeImageLabels(current.Labels, labelUpdates)
+		if err := setImageLabels(callCtx, client, project, name, merged, current.LabelFingerprint); err != nil {
 			return ctx.ExecutionState.Fail("error", fmt.Sprintf("failed to update image labels: %v", err))
 		}
 	}

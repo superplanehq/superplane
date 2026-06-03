@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/superplanehq/superplane/pkg/core"
 	"github.com/superplanehq/superplane/test/support/contexts"
+	compute "google.golang.org/api/compute/v1"
 )
 
 func Test__UpdateImage__Setup(t *testing.T) {
@@ -91,18 +92,20 @@ func Test__UpdateImage__Execute(t *testing.T) {
 		assert.Equal(t, "DEPRECATED", data["deprecationState"])
 	})
 
-	t.Run("labels only -> calls setLabels with fingerprint", func(t *testing.T) {
+	t.Run("labels merge with existing -> sends combined set and fingerprint", func(t *testing.T) {
 		var setLabelsPath string
+		var setLabelsReq *compute.GlobalSetLabelsRequest
 		mc := &mockImageClient{
 			projectID: "my-project",
 			getFunc: func(ctx context.Context, path string) ([]byte, error) {
 				if isOperationPath(path) {
 					return opDone("op-lbl"), nil
 				}
-				return imageGetJSON("my-image", "READY", "", map[string]string{"env": "prod"}, "fp-1", ""), nil
+				return imageGetJSON("my-image", "READY", "", map[string]string{"env": "staging", "team": "core"}, "fp-1", ""), nil
 			},
 			postFunc: func(ctx context.Context, path string, body any) ([]byte, error) {
 				setLabelsPath = path
+				setLabelsReq, _ = body.(*compute.GlobalSetLabelsRequest)
 				return opDone("op-lbl"), nil
 			},
 		}
@@ -114,6 +117,7 @@ func Test__UpdateImage__Execute(t *testing.T) {
 				"image": "my-image",
 				"labels": []any{
 					map[string]any{"key": "env", "value": "prod"},
+					map[string]any{"key": "owner", "value": "platform"},
 				},
 			},
 			ExecutionState: state,
@@ -121,6 +125,10 @@ func Test__UpdateImage__Execute(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, state.Passed)
 		assert.True(t, strings.HasSuffix(setLabelsPath, "/global/images/my-image/setLabels"))
+		require.NotNil(t, setLabelsReq)
+		assert.Equal(t, "fp-1", setLabelsReq.LabelFingerprint)
+		// env is overwritten, owner is added, team is preserved.
+		assert.Equal(t, map[string]string{"env": "prod", "team": "core", "owner": "platform"}, setLabelsReq.Labels)
 	})
 
 	t.Run("cross-project selfLink -> fails before mutating", func(t *testing.T) {

@@ -147,6 +147,26 @@ func Test__ImagePayloadFromGetResponse(t *testing.T) {
 	})
 }
 
+func Test__MergeImageLabels(t *testing.T) {
+	t.Run("overwrites, adds, and preserves", func(t *testing.T) {
+		existing := map[string]string{"env": "staging", "team": "core"}
+		updates := map[string]string{"env": "prod", "owner": "platform"}
+		merged := mergeImageLabels(existing, updates)
+		assert.Equal(t, map[string]string{"env": "prod", "team": "core", "owner": "platform"}, merged)
+	})
+
+	t.Run("nil existing yields updates only", func(t *testing.T) {
+		merged := mergeImageLabels(nil, map[string]string{"env": "prod"})
+		assert.Equal(t, map[string]string{"env": "prod"}, merged)
+	})
+
+	t.Run("does not mutate the existing map", func(t *testing.T) {
+		existing := map[string]string{"env": "staging"}
+		mergeImageLabels(existing, map[string]string{"env": "prod"})
+		assert.Equal(t, "staging", existing["env"])
+	})
+}
+
 func Test__WaitForGlobalOperation(t *testing.T) {
 	t.Run("DONE returns nil", func(t *testing.T) {
 		mc := &mockImageClient{
