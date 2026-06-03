@@ -23,7 +23,7 @@ metrics export is disabled (no-op meter provider; local dev unchanged).
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `METRICS_SAMPLE_INTERVAL_SEC` | `30` | How often to sample `tasks.queued` / `tasks.claimed` gauges |
+| `METRICS_SAMPLE_INTERVAL_SEC` | `30` | How often to sample `runner.tasks.queued` / `runner.tasks.claimed` gauges |
 
 Fleet-manager pool settings live in the JSON config file (`FM_CONFIG_FILE`); OTLP
 export is **not** in that file — set the `OTEL_*` variables on the fleet-manager
@@ -42,20 +42,28 @@ export OTEL_SERVICE_NAME=task-broker
 
 ## Canonical instrument names
 
+All instruments use the `runner.` prefix so they stay distinct in shared backends
+like Dash0. `service.name` (`task-broker` or `fleet-manager`) is set via
+`OTEL_SERVICE_NAME`.
+
 | Instrument | Type | Attributes |
 |------------|------|------------|
-| `tasks.created` | Counter | `fleet_id` |
-| `tasks.completed` | Counter | `fleet_id`, `outcome` |
-| `task.start_latency` | Histogram (s) | `fleet_id` |
-| `tasks.queued` | Gauge | `fleet_id` |
-| `tasks.claimed` | Gauge | `fleet_id` |
-| `tasks.unclaimed` | Counter | `fleet_id` |
-| `lease.reaps` | Counter | `fleet_id` |
-| `webhook.deliveries` | Counter | `fleet_id`, `outcome` |
-| `webhook.delivery.duration` | Histogram (s) | `fleet_id`, `outcome` |
-| `hot.instances` | Gauge | `fleet_id` |
-| `instance.spinup.duration` | Histogram (s) | `fleet_id`, `phase` |
-| `reconcile.duration` | Histogram (s) | `fleet_id` |
+| `runner.tasks.created` | Counter | `fleet_id` |
+| `runner.tasks.completed` | Counter | `fleet_id`, `outcome` |
+| `runner.task.start_latency` | Histogram (s) | `fleet_id` |
+| `runner.tasks.queued` | Gauge | `fleet_id` |
+| `runner.tasks.claimed` | Gauge | `fleet_id` |
+| `runner.tasks.unclaimed` | Counter | `fleet_id` |
+| `runner.lease.reaps` | Counter | `fleet_id` |
+| `runner.webhook.deliveries` | Counter | `fleet_id`, `outcome` |
+| `runner.webhook.delivery.duration` | Histogram (s) | `fleet_id`, `outcome` |
+| `runner.pool.hot_instances` | Gauge | `fleet_id` |
+| `runner.instance.spinup.duration` | Histogram (s) | `fleet_id`, `phase` |
+| `runner.pool.reconcile.duration` | Histogram (s) | `fleet_id` |
+
+`runner.instance.spinup.duration` is emitted by **both** fleet-manager and
+task-broker on the same instrument name. Filter by `phase` (`instance_running`
+from fleet-manager, `runner_connected` from task-broker) and/or `service.name`.
 
 `outcome` values: `succeeded`, `failed`, `canceled` (task lifecycle) or
 `succeeded`, `failed` (webhook delivery). `phase` values: `instance_running`,

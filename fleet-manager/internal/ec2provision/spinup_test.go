@@ -11,6 +11,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	fmmetrics "github.com/superplane/runner/fleet-manager/internal/metrics"
+	"github.com/superplane/runner/shared/telemetry"
 )
 
 func TestObserveInstanceSpinupRecordsRunning(t *testing.T) {
@@ -37,7 +38,7 @@ func TestObserveInstanceSpinupRecordsRunning(t *testing.T) {
 	found := false
 	for _, sm := range rm.ScopeMetrics {
 		for _, met := range sm.Metrics {
-			if met.Name != "instance.spinup.duration" {
+			if met.Name != telemetry.MetricInstanceSpinupDuration {
 				continue
 			}
 			hist := met.Data.(metricdata.Histogram[float64])

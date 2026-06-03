@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+
+	"github.com/superplane/runner/shared/telemetry"
 )
 
 func testMeter(t *testing.T) (*PoolMetrics, *metric.ManualReader) {
@@ -30,7 +32,7 @@ func TestPoolMetricsSetHotInstances(t *testing.T) {
 	found := false
 	for _, sm := range rm.ScopeMetrics {
 		for _, met := range sm.Metrics {
-			if met.Name != "hot.instances" {
+			if met.Name != telemetry.MetricPoolHotInstances {
 				continue
 			}
 			gauge := met.Data.(metricdata.Gauge[int64])
@@ -53,7 +55,7 @@ func TestPoolMetricsReconcileDuration(t *testing.T) {
 	found := false
 	for _, sm := range rm.ScopeMetrics {
 		for _, met := range sm.Metrics {
-			if met.Name != "reconcile.duration" {
+			if met.Name != telemetry.MetricPoolReconcileDuration {
 				continue
 			}
 			hist := met.Data.(metricdata.Histogram[float64])

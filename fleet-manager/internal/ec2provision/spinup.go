@@ -21,7 +21,7 @@ func (l *Launcher) trackPendingLaunches(instanceIDs []string, requestedAt time.T
 	}
 }
 
-// observeInstanceSpinup records instance.spinup.duration{phase=instance_running} when a
+// observeInstanceSpinup records runner.instance.spinup.duration{phase=instance_running} when a
 // tracked instance transitions to EC2 running, and drops stale pending entries.
 func (l *Launcher) observeInstanceSpinup(ctx context.Context, instances []managedInstance) {
 	live := make(map[string]string, len(instances))

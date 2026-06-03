@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 
 	"github.com/superplane/runner/shared/models"
+	"github.com/superplane/runner/shared/telemetry"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
 	"github.com/superplane/runner/task-broker/internal/store/testdb"
 )
@@ -64,19 +65,19 @@ func TestSampleTaskBacklog(t *testing.T) {
 	m, reader := testMeter(t)
 	require.NoError(t, SampleTaskBacklog(ctx, st, m))
 
-	q, ok := gaugeValue(t, reader, "tasks.queued", "fleet-a")
+	q, ok := gaugeValue(t, reader, telemetry.MetricTasksQueued, "fleet-a")
 	require.True(t, ok)
 	require.Equal(t, int64(2), q)
 
-	c, ok := gaugeValue(t, reader, "tasks.claimed", "fleet-a")
+	c, ok := gaugeValue(t, reader, telemetry.MetricTasksClaimed, "fleet-a")
 	require.True(t, ok)
 	require.Equal(t, int64(1), c)
 
-	q, ok = gaugeValue(t, reader, "tasks.queued", "fleet-b")
+	q, ok = gaugeValue(t, reader, telemetry.MetricTasksQueued, "fleet-b")
 	require.True(t, ok)
 	require.Equal(t, int64(0), q)
 
-	c, ok = gaugeValue(t, reader, "tasks.claimed", "fleet-b")
+	c, ok = gaugeValue(t, reader, telemetry.MetricTasksClaimed, "fleet-b")
 	require.True(t, ok)
 	require.Equal(t, int64(1), c)
 }

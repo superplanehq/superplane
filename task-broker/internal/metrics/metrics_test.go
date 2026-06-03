@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+
+	"github.com/superplane/runner/shared/telemetry"
 )
 
 func testMeter(t *testing.T) (*BrokerMetrics, *metric.ManualReader) {
@@ -47,7 +49,7 @@ func TestBrokerMetricsTaskCreated(t *testing.T) {
 	m.TaskCreated(ctx, "fleet-a")
 	m.TaskCreated(ctx, "fleet-a")
 
-	require.Equal(t, int64(2), collectCounter(t, reader, "tasks.created"))
+	require.Equal(t, int64(2), collectCounter(t, reader, telemetry.MetricTasksCreated))
 }
 
 func TestBrokerMetricsTaskCompleted(t *testing.T) {
@@ -57,7 +59,7 @@ func TestBrokerMetricsTaskCompleted(t *testing.T) {
 	m.TaskCompleted(ctx, "fleet-a", "succeeded")
 	m.TaskCompleted(ctx, "fleet-a", "failed")
 
-	require.Equal(t, int64(2), collectCounter(t, reader, "tasks.completed"))
+	require.Equal(t, int64(2), collectCounter(t, reader, telemetry.MetricTasksCompleted))
 }
 
 func TestBrokerMetricsTaskStartLatency(t *testing.T) {
@@ -71,7 +73,7 @@ func TestBrokerMetricsTaskStartLatency(t *testing.T) {
 	found := false
 	for _, sm := range rm.ScopeMetrics {
 		for _, met := range sm.Metrics {
-			if met.Name != "task.start_latency" {
+			if met.Name != telemetry.MetricTaskStartLatency {
 				continue
 			}
 			hist := met.Data.(metricdata.Histogram[float64])
@@ -90,5 +92,5 @@ func TestBrokerMetricsWebhookDelivered(t *testing.T) {
 	m.WebhookDelivered(ctx, "fleet-a", "succeeded", 100*time.Millisecond)
 	m.WebhookDelivered(ctx, "fleet-a", "failed", 200*time.Millisecond)
 
-	require.Equal(t, int64(2), collectCounter(t, reader, "webhook.deliveries"))
+	require.Equal(t, int64(2), collectCounter(t, reader, telemetry.MetricWebhookDeliveries))
 }

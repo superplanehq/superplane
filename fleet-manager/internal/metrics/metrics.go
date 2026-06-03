@@ -18,19 +18,19 @@ type PoolMetrics struct {
 
 // New registers pool metric instruments on meter.
 func New(meter metric.Meter) (*PoolMetrics, error) {
-	hotInstances, err := meter.Int64Gauge("hot.instances",
+	hotInstances, err := meter.Int64Gauge(telemetry.MetricPoolHotInstances,
 		metric.WithDescription("Live EC2 instances in the warm pool"))
 	if err != nil {
 		return nil, err
 	}
-	reconcileDuration, err := meter.Float64Histogram("reconcile.duration",
+	reconcileDuration, err := meter.Float64Histogram(telemetry.MetricPoolReconcileDuration,
 		metric.WithDescription("Time taken by one fleet-manager reconcile tick"),
 		metric.WithUnit("s"))
 	if err != nil {
 		return nil, err
 	}
-	instanceSpinupDuration, err := meter.Float64Histogram("instance.spinup.duration",
-		metric.WithDescription("Time from instance request until ready to accept tasks"),
+	instanceSpinupDuration, err := meter.Float64Histogram(telemetry.MetricInstanceSpinupDuration,
+		metric.WithDescription("Time from instance request until EC2 running (phase=instance_running)"),
 		metric.WithUnit("s"))
 	if err != nil {
 		return nil, err

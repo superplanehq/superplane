@@ -113,8 +113,8 @@ func main() {
 					continue
 				}
 				reapCtx := context.Background()
-				for _, task := range requeuedTasks {
-					srv.RecordLeaseReaped(reapCtx, task.FleetID)
+				for _, lease := range requeuedTasks {
+					srv.RecordLeaseReaped(reapCtx, lease.FleetID)
 				}
 				for _, task := range canceledTasks {
 					t := task

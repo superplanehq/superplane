@@ -25,55 +25,55 @@ type BrokerMetrics struct {
 
 // New registers broker metric instruments on meter.
 func New(meter metric.Meter) (*BrokerMetrics, error) {
-	tasksCreated, err := meter.Int64Counter("tasks.created",
+	tasksCreated, err := meter.Int64Counter(telemetry.MetricTasksCreated,
 		metric.WithDescription("Tasks submitted to the broker"))
 	if err != nil {
 		return nil, err
 	}
-	tasksCompleted, err := meter.Int64Counter("tasks.completed",
+	tasksCompleted, err := meter.Int64Counter(telemetry.MetricTasksCompleted,
 		metric.WithDescription("Tasks that reached a terminal state"))
 	if err != nil {
 		return nil, err
 	}
-	tasksUnclaimed, err := meter.Int64Counter("tasks.unclaimed",
+	tasksUnclaimed, err := meter.Int64Counter(telemetry.MetricTasksUnclaimed,
 		metric.WithDescription("Claimed tasks re-queued after failed runner delivery"))
 	if err != nil {
 		return nil, err
 	}
-	leaseReaps, err := meter.Int64Counter("lease.reaps",
+	leaseReaps, err := meter.Int64Counter(telemetry.MetricLeaseReaps,
 		metric.WithDescription("Expired task leases reaped"))
 	if err != nil {
 		return nil, err
 	}
-	taskStartLatency, err := meter.Float64Histogram("task.start_latency",
+	taskStartLatency, err := meter.Float64Histogram(telemetry.MetricTaskStartLatency,
 		metric.WithDescription("Time from task creation until claim"),
 		metric.WithUnit("s"))
 	if err != nil {
 		return nil, err
 	}
-	webhookDeliveries, err := meter.Int64Counter("webhook.deliveries",
+	webhookDeliveries, err := meter.Int64Counter(telemetry.MetricWebhookDeliveries,
 		metric.WithDescription("Terminal-state webhook POST attempts that finished"))
 	if err != nil {
 		return nil, err
 	}
-	webhookDeliveryDur, err := meter.Float64Histogram("webhook.delivery.duration",
+	webhookDeliveryDur, err := meter.Float64Histogram(telemetry.MetricWebhookDeliveryDur,
 		metric.WithDescription("Wall time for one webhook delivery including retries"),
 		metric.WithUnit("s"))
 	if err != nil {
 		return nil, err
 	}
-	tasksQueued, err := meter.Int64Gauge("tasks.queued",
+	tasksQueued, err := meter.Int64Gauge(telemetry.MetricTasksQueued,
 		metric.WithDescription("Tasks waiting for a runner to claim them"))
 	if err != nil {
 		return nil, err
 	}
-	tasksClaimed, err := meter.Int64Gauge("tasks.claimed",
+	tasksClaimed, err := meter.Int64Gauge(telemetry.MetricTasksClaimed,
 		metric.WithDescription("Tasks claimed by a runner but not yet terminal"))
 	if err != nil {
 		return nil, err
 	}
-	instanceSpinupDuration, err := meter.Float64Histogram("instance.spinup.duration",
-		metric.WithDescription("Time from instance request until ready to accept tasks"),
+	instanceSpinupDuration, err := meter.Float64Histogram(telemetry.MetricInstanceSpinupDuration,
+		metric.WithDescription("Time from instance request until runner WS connected (phase=runner_connected)"),
 		metric.WithUnit("s"))
 	if err != nil {
 		return nil, err

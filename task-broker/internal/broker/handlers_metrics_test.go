@@ -17,6 +17,7 @@ import (
 
 	"github.com/superplane/runner/shared/api"
 	"github.com/superplane/runner/shared/models"
+	"github.com/superplane/runner/shared/telemetry"
 	"github.com/superplane/runner/shared/webhook"
 	brokermetrics "github.com/superplane/runner/task-broker/internal/metrics"
 	brokermodels "github.com/superplane/runner/task-broker/internal/models"
@@ -87,7 +88,7 @@ func TestCreateTaskRecordsTasksCreatedMetric(t *testing.T) {
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusCreated, resp.StatusCode, strings.TrimSpace(string(respBody)))
 
-	require.Equal(t, int64(1), metricCounterTotal(t, reader, "tasks.created"))
+	require.Equal(t, int64(1), metricCounterTotal(t, reader, telemetry.MetricTasksCreated))
 }
 
 func TestCompleteTaskRecordsTasksCompletedMetric(t *testing.T) {
@@ -120,7 +121,7 @@ func TestCompleteTaskRecordsTasksCompletedMetric(t *testing.T) {
 	_ = resp.Body.Close()
 	require.Equal(t, http.StatusNoContent, resp.StatusCode)
 
-	require.Equal(t, int64(1), metricCounterTotal(t, reader, "tasks.completed"))
+	require.Equal(t, int64(1), metricCounterTotal(t, reader, telemetry.MetricTasksCompleted))
 }
 
 func TestDeliverWebhookRecordsWebhookMetrics(t *testing.T) {
@@ -148,13 +149,13 @@ func TestDeliverWebhookRecordsWebhookMetrics(t *testing.T) {
 	srv.DeliverWebhook(&models.Task{
 		ID: "task-ok", FleetID: "fleet-1", WebhookURL: okSrv.URL, Status: models.StatusSucceeded,
 	})
-	require.Equal(t, int64(1), metricCounterTotal(t, reader, "webhook.deliveries"))
+	require.Equal(t, int64(1), metricCounterTotal(t, reader, telemetry.MetricWebhookDeliveries))
 
 	sender.Client = failSrv.Client()
 	srv.DeliverWebhook(&models.Task{
 		ID: "task-fail", FleetID: "fleet-1", WebhookURL: failSrv.URL, Status: models.StatusSucceeded,
 	})
-	require.Equal(t, int64(2), metricCounterTotal(t, reader, "webhook.deliveries"))
+	require.Equal(t, int64(2), metricCounterTotal(t, reader, telemetry.MetricWebhookDeliveries))
 }
 
 func TestRecordRunnerConnectedSpinup(t *testing.T) {
@@ -172,7 +173,7 @@ func TestRecordRunnerConnectedSpinup(t *testing.T) {
 	found := false
 	for _, sm := range rm.ScopeMetrics {
 		for _, met := range sm.Metrics {
-			if met.Name != "instance.spinup.duration" {
+			if met.Name != telemetry.MetricInstanceSpinupDuration {
 				continue
 			}
 			hist := met.Data.(metricdata.Histogram[float64])

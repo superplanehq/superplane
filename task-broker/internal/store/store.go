@@ -18,6 +18,13 @@ const (
 	CancelOutcomeCancelRequested CancelOutcome = "cancel_requested"
 )
 
+// ReapedLease identifies a task whose expired lease was requeued. Only ID and
+// FleetID are populated — not a full models.Task.
+type ReapedLease struct {
+	ID      string
+	FleetID string
+}
+
 // Store persists fleets and the task queue.
 type Store interface {
 	CreateFleet(ctx context.Context, f *brokermodels.Fleet) error
@@ -36,5 +43,5 @@ type Store interface {
 	UnclaimTask(ctx context.Context, taskID, runnerID string) error
 	RequestCancelTask(ctx context.Context, id string) (*models.Task, CancelOutcome, error)
 	CompleteTask(ctx context.Context, id, runnerID string, exitCode int, resultJSON, errMsg string, canceled bool) (*models.Task, error)
-	ReapExpiredLeases(ctx context.Context) (requeued, canceled []*models.Task, err error)
+	ReapExpiredLeases(ctx context.Context) (requeued []ReapedLease, canceled []*models.Task, err error)
 }

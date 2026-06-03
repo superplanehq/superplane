@@ -234,7 +234,7 @@ func nullIfEmpty(s string) *string {
 	return &s
 }
 
-func (s *PostgresStore) ReapExpiredLeases(ctx context.Context) ([]*models.Task, []*models.Task, error) {
+func (s *PostgresStore) ReapExpiredLeases(ctx context.Context) ([]ReapedLease, []*models.Task, error) {
 	now := time.Now().UTC()
 
 	type idRow struct{ ID string }
@@ -287,9 +287,9 @@ RETURNING id, fleet_id`,
 		return nil, canceled, err
 	}
 
-	requeued := make([]*models.Task, 0, len(requeuedRows))
+	requeued := make([]ReapedLease, 0, len(requeuedRows))
 	for _, row := range requeuedRows {
-		requeued = append(requeued, &models.Task{ID: row.ID, FleetID: row.FleetID})
+		requeued = append(requeued, ReapedLease{ID: row.ID, FleetID: row.FleetID})
 	}
 	return requeued, canceled, nil
 }
