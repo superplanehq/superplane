@@ -73,8 +73,8 @@ func (c *getCommand) Execute(ctx core.CommandContext) error {
 	return ctx.Renderer.RenderText(func(stdout io.Writer) error {
 		_, _ = fmt.Fprintf(stdout, "ID: %s\n", resource.Metadata.GetId())
 		_, _ = fmt.Fprintf(stdout, "Name: %s\n", resource.Metadata.GetName())
-		if url := common.BuildCanvasURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId()); url != "" {
-			_, _ = fmt.Fprintf(stdout, "Canvas URL: %s\n", url)
+		if url := common.BuildAppURL(ctx, canvas.Metadata.GetOrganizationId(), canvas.Metadata.GetId()); url != "" {
+			_, _ = fmt.Fprintf(stdout, "App URL: %s\n", url)
 		}
 		_, _ = fmt.Fprintf(stdout, "Nodes: %d\n", len(resource.Spec.GetNodes()))
 		_, err := fmt.Fprintf(stdout, "Edges: %d\n", len(resource.Spec.GetEdges()))
