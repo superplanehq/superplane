@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Context: repository root — docker build -f task-broker/Dockerfile .
 
-FROM golang:1.23-bookworm AS build
+FROM golang:1.25-bookworm AS build
 WORKDIR /workspace
 
 COPY go.mod go.sum ./

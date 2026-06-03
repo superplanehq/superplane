@@ -52,7 +52,7 @@ For request flow and component boundaries, see [ARCHITECTURE.md](./ARCHITECTURE.
 
 ## Requirements
 
-- Go 1.22+
+- Go 1.25+
 - For Docker tasks: Docker CLI **and a reachable Docker daemon** on the runner host. The runner uses a pull → long-lived named container → `docker exec` → `docker stop`/`rm` lifecycle (see **Docker** below and [ARCHITECTURE.md](./ARCHITECTURE.md)). The image must include `sleep` (alpine, debian, ubuntu, python:*, node:* all satisfy this). Multi-line **`commands`** are bundled into one `sh -c` script with `set -e`, so env/cwd persist across directives and the script fails fast on the first non-zero exit. Task **`environment`** entries are passed to the `docker exec` process, not to the idle `docker run` container. **Quoting:** each directive is a line inside a single-quoted `sh -c` argument; a raw **`'`** in a line is a classic shell-quoting footgun—avoid it in `commands` or use argv **`command`** for tricky literals. **`docker exec` is invoked without `-t`**, so the task runs in a non-TTY context: tools that detect `isatty()` (color output, progress bars, interactive prompts) will see stdout/stderr as a pipe. This is intentional — matches `docker run` without `-t`, more predictable for CI / batch workloads, and lets stdout and stderr stay distinct in captures.
 
 ### Upgrade note: Docker multi-line `commands` (breaking if you relied on the old runner)
@@ -275,7 +275,7 @@ go test ./test/... -v
 
 The pipeline definition is [.semaphore/semaphore.yml](.semaphore/semaphore.yml).
 
-In [Semaphore](https://semaphoreci.com/), create a **new project from this Git repository**. Semaphore 2.x picks up `.semaphore/semaphore.yml` on the default branch. Each push runs Go **1.22** on Ubuntu **24.04**: module cache restore/store, **`gofmt` check**, **`go vet`**, **`make build`**, **`go test ./...`**.
+In [Semaphore](https://semaphoreci.com/), create a **new project from this Git repository**. Semaphore 2.x picks up `.semaphore/semaphore.yml` on the default branch. Each push runs Go **1.25** on Ubuntu **24.04**: module cache restore/store, **`gofmt` check**, **`go vet`**, **`make build`**, **`go test ./...`**.
 
 ### Container images → GitHub Container Registry (GHCR)
 

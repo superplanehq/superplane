@@ -24,7 +24,7 @@ blocks:
         - name: fmt, vet, build, tests
           commands:
             - checkout
-            - sem-version go 1.22
+            - sem-version go 1.25
             # Module cache — same pattern as Semaphore Go guide
             - cache restore
             - go mod download

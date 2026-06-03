@@ -15,7 +15,7 @@ global_job_config:
   prologue:
     commands:
       - checkout
-      - sem-version go 1.22
+      - sem-version go 1.25
       - cache restore
       - go mod download
       - cache store

@@ -2,7 +2,7 @@
 # Context: repository root — docker build -f fleet-manager/Dockerfile .
 # EC2 images must be linux/amd64: docker build --platform linux/amd64 …
 
-FROM golang:1.23-bookworm AS build
+FROM golang:1.25-bookworm AS build
 WORKDIR /workspace
 
 COPY go.mod go.sum ./
