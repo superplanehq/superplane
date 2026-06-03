@@ -129,7 +129,7 @@ func TestRunnerExecuteSendsEnvironmentToBroker(t *testing.T) {
 	err := component.Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machine_type": testRunnerMachineType,
-			"commands": "echo hello",
+			"commands":     "echo hello",
 			"environment": []map[string]any{
 				{
 					"name":        "COMMIT_AUTHOR",
@@ -178,8 +178,8 @@ func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
 
 	err := (&Runner{}).Execute(core.ExecutionContext{
 		Configuration: map[string]any{
-			"commands": "echo hi",
-			"machine_type": "aws-standard-arm64",
+			"commands":     "echo hi",
+			"machine_type": "aws-arm64-1",
 		},
 		HTTP:           httpContext,
 		Webhook:        &contexts.NodeWebhookContext{},
@@ -194,7 +194,7 @@ func TestRunnerExecuteUsesConfiguredMachineType(t *testing.T) {
 
 	var req brokerCreateTaskRequest
 	require.NoError(t, json.Unmarshal(body, &req))
-	assert.Equal(t, "aws-standard-arm64", req.FleetID)
+	assert.Equal(t, "aws-arm64-1", req.FleetID)
 }
 
 func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
@@ -210,7 +210,7 @@ func TestRunnerExecuteOmitsEmptyEnvironment(t *testing.T) {
 	err := (&Runner{}).Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machine_type": testRunnerMachineType,
-			"commands": "echo hello",
+			"commands":     "echo hello",
 		},
 		HTTP:           httpContext,
 		Webhook:        &contexts.NodeWebhookContext{},
@@ -235,7 +235,7 @@ func TestRunnerExecuteFailsWhenSecretCannotBeResolved(t *testing.T) {
 	err := (&Runner{}).Execute(core.ExecutionContext{
 		Configuration: map[string]any{
 			"machine_type": testRunnerMachineType,
-			"commands": "echo hello",
+			"commands":     "echo hello",
 			"environment": []map[string]any{
 				{
 					"name":        "API_TOKEN",

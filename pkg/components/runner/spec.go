@@ -56,47 +56,8 @@ func decodeRunnerSpec(raw any) (Spec, error) {
 	if err := dec.Decode(raw); err != nil {
 		return Spec{}, fmt.Errorf("decode runner configuration: %w", err)
 	}
-	migrateLegacyMachineType(raw, &spec)
 	applyRunnerSpecDefaults(&spec)
 	return spec, nil
-}
-
-// legacyConfigurationFieldFleetID was the configuration key before machine_type.
-const legacyConfigurationFieldFleetID = "fleet_id"
-
-// NormalizeConfigurationMap copies legacy fleet_id into machine_type for validation and persistence.
-func NormalizeConfigurationMap(config map[string]any) map[string]any {
-	if config == nil {
-		return config
-	}
-	if machineType, ok := config[configurationFieldMachineType].(string); ok && strings.TrimSpace(machineType) != "" {
-		return config
-	}
-	legacy, ok := config[legacyConfigurationFieldFleetID].(string)
-	if !ok || strings.TrimSpace(legacy) == "" {
-		return config
-	}
-	out := make(map[string]any, len(config)+1)
-	for k, v := range config {
-		out[k] = v
-	}
-	out[configurationFieldMachineType] = strings.TrimSpace(legacy)
-	return out
-}
-
-func migrateLegacyMachineType(raw any, spec *Spec) {
-	if strings.TrimSpace(spec.MachineType) != "" {
-		return
-	}
-	m, ok := raw.(map[string]any)
-	if !ok {
-		return
-	}
-	legacy, ok := m[legacyConfigurationFieldFleetID].(string)
-	if !ok {
-		return
-	}
-	spec.MachineType = strings.TrimSpace(legacy)
 }
 
 // applyRunnerSpecDefaults fills in values for nodes created before newer Runner fields existed.

@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 
-	"github.com/superplanehq/superplane/pkg/components/runner"
 	"github.com/superplanehq/superplane/pkg/grpc/actions"
 	pb "github.com/superplanehq/superplane/pkg/protos/actions"
 	configpb "github.com/superplanehq/superplane/pkg/protos/configuration"
@@ -23,7 +22,7 @@ func NewActionService(registry *registry.Registry) *ActionService {
 
 func (s *ActionService) ListActions(ctx context.Context, req *pb.ListActionsRequest) (*pb.ListActionsResponse, error) {
 	return &pb.ListActionsResponse{
-		Actions: actions.SerializeActions(s.registry.HTTPContext(), s.registry.ListActions()),
+		Actions: actions.SerializeActions(s.registry.ListActions()),
 	}, nil
 }
 
@@ -42,9 +41,6 @@ func (s *ActionService) DescribeAction(ctx context.Context, req *pb.DescribeActi
 	}
 
 	configFields := action.Configuration()
-	if req.Name == runner.ComponentName {
-		configFields = runner.EnrichRunnerConfigurationFields(s.registry.HTTPContext(), configFields)
-	}
 	configuration := make([]*configpb.Field, len(configFields))
 	for i, field := range configFields {
 		configuration[i] = actions.ConfigurationFieldToProto(field)
