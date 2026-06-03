@@ -1,7 +1,8 @@
 import { TooltipProvider } from "@/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useParams } from "react-router-dom";
+import { appPath, appSettingsPath } from "./lib/appPaths";
 import { Toaster } from "sonner";
 import "./App.css";
 
@@ -107,12 +108,14 @@ function AppRouter() {
                 <Route index element={withAuthAndPermission(HomePage, "canvases", "read")} />
                 <Route path="apps">
                   <Route path="new" element={withAuthAndPermission(NewAppPage, "canvases", "read")} />
+                  <Route
+                    path=":appId/settings"
+                    element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
+                  />
+                  <Route path=":appId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
                 </Route>
-                <Route
-                  path="canvases/:canvasId/settings"
-                  element={withAuthAndPermission(CanvasSettingsPage, "canvases", "update")}
-                />
-                <Route path="canvases/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
+                <Route path="canvases/:canvasId/settings" element={<LegacyCanvasRedirect settings />} />
+                <Route path="canvases/:canvasId" element={<LegacyCanvasRedirect />} />
                 <Route path="templates" element={withAuthAndPermission(TemplatesPage, "canvases", "read")} />
                 <Route path="templates/:canvasId" element={withAuthAndPermission(WorkflowPageV2, "canvases", "read")} />
                 <Route path="settings/*" element={withAuthOnly(OrganizationSettings)} />
@@ -134,6 +137,18 @@ function OrganizationScope() {
       <Outlet />
     </PermissionsProvider>
   );
+}
+
+function LegacyCanvasRedirect({ settings = false }: { settings?: boolean }) {
+  const { organizationId, canvasId } = useParams<{ organizationId: string; canvasId: string }>();
+  const location = useLocation();
+
+  if (!organizationId || !canvasId) {
+    return <Navigate to="/" replace />;
+  }
+
+  const path = settings ? appSettingsPath(organizationId, canvasId) : appPath(organizationId, canvasId);
+  return <Navigate to={`${path}${location.search}`} replace />;
 }
 
 function SetupGuard({ children }: { children: React.ReactNode }) {
