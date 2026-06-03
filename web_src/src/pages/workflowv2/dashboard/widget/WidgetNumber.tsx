@@ -1,7 +1,9 @@
 import { useMemo } from "react";
-import { Loader2 } from "lucide-react";
+import { Hash, Loader2 } from "lucide-react";
 
 import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
+
+import { WidgetEmptyState } from "../WidgetEmptyState";
 
 import { aggregateNumber, aggregateNumberPerSource, applyFilters, combinePartials } from "./widgetData";
 import { formatValue } from "./widgetFormat";
@@ -71,6 +73,10 @@ export function WidgetNumber({ render, rows, isLoading, totalCount, composite, v
         <Loader2 className="size-4 animate-spin text-slate-400" />
       </div>
     );
+  }
+
+  if (value == null && variant === "panel") {
+    return <WidgetEmptyState icon={Hash} message="No data to display." testId="widget-number-empty" />;
   }
 
   return <NumberDisplay render={render} value={value} sparkline={sparkline} variant={variant} />;

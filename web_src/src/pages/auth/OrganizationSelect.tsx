@@ -1,6 +1,6 @@
 import { Heading } from "@/components/Heading/heading";
 import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
-import { Palette, Plus, User } from "lucide-react";
+import { LayoutPanelLeft, Plus, User } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -32,7 +32,6 @@ const organizationInitial = (name: string) => {
 const formatCount = (count: number, noun: string) => {
   const safeCount = Number.isFinite(count) ? count : 0;
   const pluralOverrides: Record<string, string> = {
-    canvas: "canvases",
     member: "members",
   };
   const nounToUse = safeCount === 1 ? noun : pluralOverrides[noun] || `${noun}s`;
@@ -213,8 +212,8 @@ const OrganizationSelect: React.FC = () => {
 
                   <div className="flex items-center gap-3 sm:gap-4 shrink-0 text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400">
                     <span className="flex items-center gap-1.5 whitespace-nowrap">
-                      <Palette size={14} className="shrink-0" aria-hidden />
-                      {formatCount(org.canvasCount ?? 0, "canvas")}
+                      <LayoutPanelLeft size={14} className="shrink-0" aria-hidden />
+                      {formatCount(org.canvasCount ?? 0, "app")}
                     </span>
                     <span className="flex items-center gap-1.5 whitespace-nowrap">
                       <User size={14} className="shrink-0" aria-hidden />

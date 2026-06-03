@@ -364,8 +364,8 @@ export interface CanvasPageProps {
   focusRequest?: FocusRequest | null;
   onExecutionChainHandled?: () => void;
 
-  /** Opens the version node diff modal when using "View details" on a non-live published preview (same as sidebar compare). */
-  onPreviewPreviousVersionViewDetails?: () => void;
+  /** Returns to the current live canvas version from a published history preview. */
+  onSeeCurrentVersion?: () => void;
   /** Change request being previewed while awaiting approval (floating bar + versioning sidebar). */
   awaitingApprovalBanner?: {
     title: string;
@@ -1273,8 +1273,7 @@ function CanvasPage(props: CanvasPageProps) {
   }, [props.canvasStateMode, state, templateNodeId]);
 
   const canvasStateMode = props.canvasStateMode || "default";
-  const showPreviewFloatingBar =
-    canvasStateMode === "previewing-previous-version" && !!props.onPreviewPreviousVersionViewDetails;
+  const showPreviewFloatingBar = canvasStateMode === "previewing-previous-version" && !!props.onSeeCurrentVersion;
   const showAwaitingFloatingBar = canvasStateMode === "awaiting-approval" && !!props.awaitingApprovalBanner;
 
   return (
@@ -1408,14 +1407,19 @@ function CanvasPage(props: CanvasPageProps) {
             <div className="pointer-events-none absolute inset-x-0 top-0 z-[19] flex justify-center pt-3">
               <div
                 className={cn(
-                  "pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 rounded-md pl-3 pr-1.5 py-1.5 shadow-md backdrop-blur-sm outline outline-1 outline-offset-0 outline-black/10",
-                  showAwaitingFloatingBar ? props.awaitingApprovalBanner?.reviewUi.floatingBarBgClassName : "bg-sky-50",
+                  "pointer-events-auto flex max-w-[min(100vw-2rem,42rem)] items-center gap-2 pl-3 pr-1.5 py-1.5",
+                  showAwaitingFloatingBar
+                    ? cn(
+                        "rounded-md shadow-md backdrop-blur-sm outline outline-1 outline-offset-0 outline-black/10",
+                        props.awaitingApprovalBanner?.reviewUi.floatingBarBgClassName,
+                      )
+                    : "rounded-full bg-gray-500",
                 )}
               >
                 <span
                   className={cn(
-                    "flex min-w-0 max-w-full items-center gap-1 text-sm",
-                    showAwaitingFloatingBar ? undefined : "shrink-0 truncate font-medium text-sky-700",
+                    "flex min-w-0 max-w-full items-center gap-1",
+                    showAwaitingFloatingBar ? "text-sm" : "shrink-0 truncate text-[13px] font-medium text-white",
                   )}
                 >
                   {showAwaitingFloatingBar ? (
@@ -1432,17 +1436,17 @@ function CanvasPage(props: CanvasPageProps) {
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
-                  className="shrink-0"
+                  size="xs"
+                  className={cn("shrink-0", !showAwaitingFloatingBar && "border-0 shadow-none")}
                   onClick={() => {
                     if (showAwaitingFloatingBar) {
                       props.awaitingApprovalBanner?.onViewNodeDiff?.();
                     } else {
-                      props.onPreviewPreviousVersionViewDetails?.();
+                      props.onSeeCurrentVersion?.();
                     }
                   }}
                 >
-                  View details
+                  {showAwaitingFloatingBar ? "View details" : "See Current Version"}
                 </Button>
               </div>
             </div>
