@@ -42,8 +42,6 @@ const COLUMN_FORMATS: WidgetColumnFormat[] = [
   "link",
 ];
 
-const CUSTOM_FIELD = "__custom__";
-
 export function ColumnRow({
   col,
   fieldOptions,
@@ -55,37 +53,24 @@ export function ColumnRow({
   onChange: (patch: Partial<WidgetTableColumn>) => void;
   onRemove: () => void;
 }) {
-  const selectValue = fieldOptions.includes(col.field) ? col.field : col.field ? CUSTOM_FIELD : "";
   return (
     <div className="grid grid-cols-12 items-center gap-2 rounded border border-slate-200 p-2">
-      {selectValue === CUSTOM_FIELD || fieldOptions.length === 0 ? (
-        <Input
-          className="col-span-4 h-8"
-          value={col.field}
-          onChange={(e) => onChange({ field: e.target.value })}
-          placeholder="field or {{ expr }}"
-        />
-      ) : (
-        <Select
-          value={selectValue || CUSTOM_FIELD}
-          onValueChange={(v) => {
-            if (v === CUSTOM_FIELD) return;
-            onChange({ field: v, label: col.label || v, format: col.format ?? suggestColumnFormat(v) });
-          }}
-        >
-          <SelectTrigger className="col-span-4 h-8">
-            <SelectValue placeholder="Field" />
-          </SelectTrigger>
-          <SelectContent>
-            {fieldOptions.map((f) => (
-              <SelectItem key={f} value={f}>
-                {f}
-              </SelectItem>
-            ))}
-            <SelectItem value={CUSTOM_FIELD}>Custom…</SelectItem>
-          </SelectContent>
-        </Select>
-      )}
+      <Input
+        className="col-span-4 h-8"
+        value={col.field}
+        onChange={(e) => {
+          const next = e.target.value;
+          const known = fieldOptions.includes(next);
+          onChange({
+            field: next,
+            ...(known && !col.label ? { label: next } : {}),
+            ...(known && col.format == null ? { format: suggestColumnFormat(next) } : {}),
+          });
+        }}
+        placeholder="field (e.g. payload.user_id) or {{ expr }}"
+        list={fieldOptions.length > 0 ? "table-field-options" : undefined}
+        data-testid="table-column-field"
+      />
       <Input
         className="col-span-3 h-8"
         value={col.label ?? ""}
@@ -133,7 +118,7 @@ export function FilterRow({
         className="col-span-4 h-8"
         value={filter.field}
         onChange={(e) => onChange({ field: e.target.value })}
-        placeholder="field"
+        placeholder="field (e.g. payload.user_id)"
         list={fieldOptions.length > 0 ? "table-field-options" : undefined}
       />
       <Select value={filter.op} onValueChange={(v) => onChange({ op: v as WidgetTableFilter["op"] })}>
@@ -183,7 +168,7 @@ export function RowStyleRow({
         className="col-span-3 h-8"
         value={rule.field}
         onChange={(e) => onChange({ field: e.target.value })}
-        placeholder="field"
+        placeholder="field (e.g. payload.user_id)"
         list={fieldOptions.length > 0 ? "table-field-options" : undefined}
         data-testid="table-row-style-field"
       />
@@ -290,13 +275,6 @@ export function ActionRow({
         onQuickInsert={onPayloadEntryQuickInsert}
       />
       <ActionIconSelect action={action} onChange={onChange} />
-      {fieldOptions.length > 0 ? (
-        <datalist id="table-field-options">
-          {fieldOptions.map((f) => (
-            <option key={f} value={f} />
-          ))}
-        </datalist>
-      ) : null}
     </div>
   );
 }

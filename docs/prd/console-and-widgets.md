@@ -142,8 +142,8 @@ Table, chart, and number panels share these data sources:
 | Source | Query | Result rows |
 | --- | --- | --- |
 | `memory` | `useCanvasMemoryEntries` | Canvas memory entries filtered by namespace. Optional `fieldPath` flattens a nested value or list. |
-| `executions` | `useInfiniteCanvasEvents` | Flattened `event.executions[]`, optionally filtered to one resolved node. Rows include `status`, `nodeName`, and `durationMs`. |
-| `runs` | `useInfiniteCanvasRuns` | Raw run objects. Number widgets can use API `totalCount` for count KPIs. |
+| `executions` | `useInfiniteCanvasEvents` | Flattened `event.executions[]`, optionally filtered to one resolved node. Rows include `status`, `nodeName`, `durationMs`, and `payload` (the data the node received from its root event). |
+| `runs` | `useInfiniteCanvasRuns` (+ `useEventExecutionsBatch` for `$`) | Raw run objects plus derived `status`, `nodeName` (the node that initiated the run, resolved from `rootEvent.nodeId`), `payload` (alias for `rootEvent.data`, the initial payload that triggered the run), `durationMs` (created-to-finished elapsed time in milliseconds — pair with `format: duration`), and `$` (a map keyed by node display name with each node's full execution including `outputs` — see [Addressing per-node outputs](#addressing-per-node-outputs)). Number widgets can use API `totalCount` for count KPIs. |
 
 Execution widgets eager-load more event pages until they have enough execution rows for the configured `limit`, or until a bounded page cap is reached. This avoids count widgets flashing an intermediate value when the first event page has few executions.
 
@@ -195,10 +195,29 @@ The table editor populates the column dropdown, the filter / sort field datalist
 | Data source | Field catalog |
 | --- | --- |
 | `memory` | Discovered live from canvas memory entries in the chosen namespace. |
-| `executions` | Static catalog mirroring the execution row shape (`status`, `nodeName`, `durationMs`, `state`, `result`, `resultReason`, `resultMessage`, `id`, `nodeId`, `canvasId`, `parentExecutionId`, `previousExecutionId`, `createdAt`, `updatedAt`). |
-| `runs` | Static catalog mirroring `CanvasesCanvasRun` (`state`, `result`, `id`, `canvasId`, `versionId`, `createdAt`, `updatedAt`, `finishedAt`). |
+| `executions` | Static catalog mirroring the execution row shape (`status`, `nodeName`, `durationMs`, `payload`, `state`, `result`, `resultReason`, `resultMessage`, `id`, `nodeId`, `canvasId`, `parentExecutionId`, `previousExecutionId`, `createdAt`, `updatedAt`). |
+| `runs` | Static catalog mirroring `CanvasesCanvasRun` plus the derived fields appended by `collectRunRows` (`state`, `result`, `status`, `nodeName`, `payload`, `durationMs`, `$`, `id`, `canvasId`, `versionId`, `createdAt`, `updatedAt`, `finishedAt`, `rootEvent.nodeId`, `rootEvent.customName`). |
 
-When suggestions are available, the column header bar also exposes an **Add all fields** button and quick-add chips that insert a column for each catalog field with `suggestColumnFormat`-derived formatting (e.g. `status` → `status`, `createdAt` → `relative`). Authors can still type a custom field (or `{{ CEL }}` template) — the dropdown switches to a free-text input via the `Custom…` option.
+When suggestions are available, the column header bar also exposes an **Add all fields** button and quick-add chips that insert a column for each catalog field with `suggestColumnFormat`-derived formatting (e.g. `status` → `status`, `createdAt` → `relative`).
+
+The column, filter, row-style, and sort field inputs are free-text — authors can type any **nested dot path** (e.g. `payload.user_id`, `rootEvent.customName`) or `{{ CEL }}` template. Catalog entries surface as `<datalist>` autocomplete suggestions. When the typed value matches a known catalog field, the column's `label` and `format` are auto-filled (only when the author hasn't already set them) so picking from the dropdown stays one-click.
+
+#### Addressing per-node outputs
+
+Run rows expose a `$` map keyed by **node display name** so authors can address the outputs of any node within that run. The shape mirrors the canvas-side expression syntax (`$['Node Name'].data`):
+
+| Path | Resolves to |
+| --- | --- |
+| `$["deploy-prod"].outputs` | The raw outputs map (`{ <channel>: [<event>, ...] }`) for the `deploy-prod` execution. |
+| `$["deploy-prod"].outputs.default[0]` | The first event emitted on the `default` channel. |
+| `$["deploy-prod"].data` | Convenience shortcut for the **last** event of the `default` channel (or the first available channel) with one `data` envelope unwrapped — matches what canvas-side `$['Node'].data` resolves to. |
+| `$["deploy-prod"].state`, `$["deploy-prod"].result` | Per-node state and result fields, useful for row styling. |
+
+The same syntax works in both literal field paths (e.g. a column `field: $["deploy-prod"].data.url`) and in `{{ }}` CEL templates (e.g. `format: link, label: "{{ $['deploy-prod'].data.url }}"`). Under the hood the CEL compiler rewrites `$` to a safe identifier (cel-js doesn't accept `$` as an identifier), but authors don't need to be aware of the rewrite — string literals are preserved verbatim, so a `$` inside `"..."` or `'...'` is left alone.
+
+**Missing nodes resolve to `undefined`** — when a given node didn't run for that run (e.g. the workflow forked and only one branch executed, or the execution hasn't reached that node yet), `$["other-node"].outputs` returns `undefined` and the widget cell renders as `-`. This is intentional and matches how missing dot paths behave elsewhere.
+
+**Performance:** Run-level outputs are not part of the `ListRuns` payload (executions are returned as lightweight refs). The widget side-loads them via `ListEventExecutions(rootEventId)` for each visible run, capped by the panel's `limit`. React Query caches the response keyed by `(canvasId, rootEventId)`, so opening the run detail modal and the widget share results. Authors with very large `limit` values should expect one extra request per run on first load.
 
 ### Columns
 
@@ -261,6 +280,26 @@ Console widgets support two related expression styles:
 - Legacy expressions such as `status == "running"` are supported in `show` and some filters.
 
 Use CEL templates for new payloads, confirmation text, and rich interpolation. Use structured `where` filters when the condition is simple and should be validated.
+
+### CEL builtins
+
+In addition to the standard CEL functions cel-js ships with, the dashboard exposes these helpers in every expression's environment:
+
+| Builtin | Description |
+| --- | --- |
+| `int(v)`, `float(v)`, `string(v)` | Type coercions, with sensible fallbacks for nullish input. |
+| `contains(s, sub)`, `startsWith(s, p)`, `endsWith(s, p)`, `matches(s, regex)` | String / regex predicates. |
+| `lower(s)`, `upper(s)` | Case conversions. |
+| `duration(seconds)` | Format a number of seconds as `5m 30s` / `1h 5m`. |
+| `timestamp(seconds)` | Format epoch seconds as an ISO-8601 string. |
+| `formatDate(value, pattern)` | Render any date-like value (ISO string, Date, epoch number) with tokens `yyyy yy MM M dd d HH H mm m ss s`. Renders in the viewer's local time. |
+| `epochMs(value)` | Convert any date-like value (ISO-8601 string, Date instance, epoch seconds, epoch ms) to **milliseconds since epoch**. Returns `0` for unparseable input so arithmetic stays defined. Pairs with `duration()` for human-friendly elapsed-time output. |
+
+Note that `field: finishedAt - createdAt` does **not** work directly because both values are ISO-8601 strings and CEL doesn't subtract strings. Use one of:
+
+- `field: durationMs, format: duration` — easiest for the standard "how long did this take" cell on `runs` or `executions` rows (the derived field is already there).
+- `field: '{{ duration((epochMs(finishedAt) - epochMs(createdAt)) / 1000) }}'` — the explicit CEL form, useful when comparing arbitrary timestamp fields or subtracting the trigger time from the finish time.
+- `field: '{{ epochMs(finishedAt) - epochMs(createdAt) }}', format: duration` — gives you a numeric ms value the column formatter can render and downstream filters can compare against.
 
 Loose equality in legacy expressions is implemented explicitly by normalizing scalar strings, numbers, booleans, and `null`; do not add `eslint-disable-next-line` directives for equality checks.
 

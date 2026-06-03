@@ -1,9 +1,15 @@
 import { useEffect, useMemo } from "react";
 
-import type { SuperplaneComponentsNode } from "@/api-client";
-import { useCanvasMemoryEntries, useInfiniteCanvasEvents, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
+import type { CanvasesCanvasNodeExecution, SuperplaneComponentsNode } from "@/api-client";
+import {
+  useCanvasMemoryEntries,
+  useEventExecutionsBatch,
+  useInfiniteCanvasEvents,
+  useInfiniteCanvasRuns,
+} from "@/hooks/useCanvasData";
 
 import { resolveDashboardNode, useDashboardContext } from "../DashboardContext";
+import { DOLLAR_REWRITE_IDENTIFIER } from "./celExpr";
 import { flattenMemoryEntries } from "./memoryRow";
 import type { WidgetDataSource } from "./types";
 
@@ -113,17 +119,51 @@ export function useWidgetData(canvasId: string, dataSource: WidgetDataSource): W
     return collectExecutionRows(pages, targetNodeId, nodeNameById, executionLimit);
   }, [dataSource, eventsData, ctx, executionLimit]);
 
-  const runRows = useMemo(() => {
-    if (dataSource.kind !== "runs") return [];
-    const rows: unknown[] = [];
+  // Collect unique root-event ids for the visible run page so we can lazy-
+  // fetch their per-node executions (with `outputs`) via `ListEventExecutions`.
+  // The runs API only returns lightweight execution refs without outputs, so
+  // we have to side-load the full executions to support `$["node"].outputs`.
+  const runRootEventIds = useMemo(() => {
+    if (dataSource.kind !== "runs") return [] as string[];
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    let count = 0;
     for (const page of runsQuery.data?.pages ?? []) {
       for (const run of page?.runs ?? []) {
-        rows.push(run);
-        if (rows.length >= runsLimit) return rows;
+        if (count >= runsLimit) break;
+        count++;
+        const id = run.rootEvent?.id;
+        if (id && !seen.has(id)) {
+          seen.add(id);
+          ids.push(id);
+        }
       }
+      if (count >= runsLimit) break;
     }
-    return rows;
+    return ids;
   }, [dataSource, runsQuery.data, runsLimit]);
+
+  const { queries: runExecutionQueries, isLoading: runExecutionsLoading } = useEventExecutionsBatch(
+    canvasId,
+    runRootEventIds,
+  );
+
+  const executionsByRootEventId = useMemo(() => {
+    const map = new Map<string, CanvasesCanvasNodeExecution[]>();
+    runRootEventIds.forEach((eventId, index) => {
+      const data = runExecutionQueries[index]?.data;
+      if (!data?.executions) return;
+      map.set(eventId, data.executions as CanvasesCanvasNodeExecution[]);
+    });
+    return map;
+  }, [runRootEventIds, runExecutionQueries]);
+
+  const runRows = useMemo(() => {
+    if (dataSource.kind !== "runs") return [];
+    const pages = runsQuery.data?.pages ?? [];
+    const nodeNameById = buildNodeNameMap(ctx?.nodes);
+    return collectRunRows(pages, nodeNameById, runsLimit, executionsByRootEventId);
+  }, [dataSource, runsQuery.data, ctx, runsLimit, executionsByRootEventId]);
 
   // Treat ongoing eager pagination as part of the initial load so panels
   // (especially `count` aggregations) don't flash an intermediate value
@@ -145,6 +185,7 @@ export function useWidgetData(canvasId: string, dataSource: WidgetDataSource): W
     memoryQuery,
     runRows,
     runsQuery,
+    runExecutionsLoading,
     executionRows,
     executionsLoading,
     eventsError,
@@ -255,6 +296,7 @@ function resultForDataSource({
   memoryQuery,
   runRows,
   runsQuery,
+  runExecutionsLoading,
   executionRows,
   executionsLoading,
   eventsError,
@@ -264,6 +306,7 @@ function resultForDataSource({
   memoryQuery: { isLoading: boolean; error: unknown };
   runRows: unknown[];
   runsQuery: { isLoading: boolean; error: unknown; data?: { pages?: Array<{ totalCount?: number }> } };
+  runExecutionsLoading: boolean;
   executionRows: unknown[];
   executionsLoading: boolean;
   eventsError: unknown;
@@ -272,9 +315,12 @@ function resultForDataSource({
     return { rows: memoryRows, isLoading: memoryQuery.isLoading, error: errorMessage(memoryQuery.error) };
   }
   if (dataSource.kind === "runs") {
+    // Treat the per-run execution side-loads as part of the initial load so
+    // count/aggregate panels don't flash with empty `$` references before
+    // the executions resolve.
     return {
       rows: runRows,
-      isLoading: runsQuery.isLoading,
+      isLoading: runsQuery.isLoading || runExecutionsLoading,
       error: errorMessage(runsQuery.error),
       totalCount: runsQuery.data?.pages?.[0]?.totalCount,
     };
@@ -289,13 +335,15 @@ function errorMessage(error: unknown): string | undefined {
 /**
  * Walk the loaded event pages and synthesize the row objects the dashboard's
  * table / chart / number renderers consume. Each row carries the raw
- * execution fields plus three derived conveniences:
+ * execution fields plus four derived conveniences:
  *
  * - `status`: lowercase canonical status string (see {@link deriveExecutionStatus}).
  * - `nodeName`: friendly node label resolved per-row via `nodeNameById`,
  *   falling back to the raw `nodeId` when the canvas no longer contains
  *   that node (e.g. it was deleted after the execution ran).
  * - `durationMs`: created-to-updated elapsed time in milliseconds.
+ * - `payload`: the data carried by the parent (root) event — i.e. the
+ *   payload the node received. Shared by every execution under that event.
  *
  * Iteration stops as soon as `rows.length >= limit`.
  */
@@ -303,6 +351,7 @@ export function collectExecutionRows(
   pages: Array<
     | {
         events?: Array<{
+          data?: Record<string, unknown>;
           executions?: Array<
             Record<string, unknown> & {
               nodeId?: string;
@@ -331,12 +380,134 @@ export function collectExecutionRows(
           nodeName: (exec.nodeId && nodeNameById.get(exec.nodeId)) || exec.nodeId,
           durationMs:
             exec.updatedAt && exec.createdAt ? Date.parse(exec.updatedAt) - Date.parse(exec.createdAt) : undefined,
+          payload: event.data,
         });
         if (rows.length >= limit) return rows;
       }
     }
   }
   return rows;
+}
+
+/**
+ * Walk the loaded run pages and synthesize the row objects the dashboard's
+ * widgets consume. Each row carries the raw `CanvasesCanvasRun` fields plus
+ * a few derived conveniences mirroring what `RunsList` shows:
+ *
+ * - `status`: lowercase canonical status string (see {@link deriveRunStatus}).
+ * - `nodeName`: friendly label of the node that initiated the run, resolved
+ *   from `rootEvent.nodeId` via `nodeNameById`. Falls back to the raw
+ *   `nodeId` when the canvas no longer contains that node.
+ * - `payload`: alias for `rootEvent.data` — the initial payload that
+ *   triggered the run. Exposed at the top level so authors don't have to
+ *   type `rootEvent.data.*` for the common case.
+ * - `durationMs`: created-to-finished elapsed time in milliseconds. Mirrors
+ *   the executions row's `durationMs` so authors can write
+ *   `field: durationMs, format: duration` for a friendly run-duration cell
+ *   without having to write CEL date arithmetic.
+ * - `$` / `DOLLAR_REWRITE_IDENTIFIER`: a map keyed by node display name
+ *   pointing at each node's full execution (with `outputs` and a `data`
+ *   shortcut for the latest output event). Lets authors write
+ *   `$["deploy-prod"].outputs.url` in literal field paths and the same
+ *   syntax in `{{ }}` CEL templates (the CEL compiler rewrites `$` to
+ *   `__runNodes__` since cel-js doesn't accept `$` as an identifier).
+ *
+ * The raw `rootEvent`, `executions`, timestamps, etc. remain reachable via
+ * dot paths (`getValueAtPath`) because we spread the full run into the row.
+ *
+ * Iteration stops as soon as `rows.length >= limit`.
+ */
+export function collectRunRows(
+  pages: Array<
+    | {
+        runs?: Array<
+          Record<string, unknown> & {
+            state?: string;
+            result?: string;
+            createdAt?: string;
+            finishedAt?: string;
+            rootEvent?: {
+              id?: string;
+              nodeId?: string;
+              data?: Record<string, unknown>;
+            };
+          }
+        >;
+      }
+    | undefined
+  >,
+  nodeNameById: Map<string, string>,
+  limit: number,
+  executionsByRootEventId?: Map<string, CanvasesCanvasNodeExecution[]>,
+): unknown[] {
+  const rows: unknown[] = [];
+  for (const page of pages) {
+    for (const run of page?.runs ?? []) {
+      const rootEvent = run.rootEvent;
+      const nodeId = rootEvent?.nodeId;
+      const executions = (rootEvent?.id && executionsByRootEventId?.get(rootEvent.id)) || undefined;
+      const dollarNodes = buildDollarNodes(executions, nodeNameById);
+      rows.push({
+        ...run,
+        status: deriveRunStatus(run.state, run.result),
+        nodeName: (nodeId && nodeNameById.get(nodeId)) || nodeId,
+        payload: rootEvent?.data,
+        durationMs:
+          run.finishedAt && run.createdAt ? Date.parse(run.finishedAt) - Date.parse(run.createdAt) : undefined,
+        $: dollarNodes,
+        [DOLLAR_REWRITE_IDENTIFIER]: dollarNodes,
+      });
+      if (rows.length >= limit) return rows;
+    }
+  }
+  return rows;
+}
+
+/**
+ * Build the `$` map for a single run row. Keys are node display names so
+ * authors can write `$["deploy-prod"]` in expressions; falls back to the
+ * `nodeId` when the canvas no longer contains that node (e.g. it was
+ * deleted). The value spreads the full execution and adds a `data` shortcut
+ * mirroring the canvas-side `$['Node Name'].data` semantics.
+ */
+export function buildDollarNodes(
+  executions: CanvasesCanvasNodeExecution[] | undefined,
+  nodeNameById: Map<string, string>,
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!executions) return out;
+  for (const exec of executions) {
+    if (!exec.nodeId) continue;
+    const name = nodeNameById.get(exec.nodeId) || exec.nodeId;
+    out[name] = {
+      ...exec,
+      data: lastOutputData(exec.outputs),
+    };
+  }
+  return out;
+}
+
+/**
+ * Pick the most useful single payload from an execution's `outputs` map.
+ * Mirrors how the canvas backend resolves `$['Node Name'].data`: prefer the
+ * `default` channel, otherwise the first available channel; take the last
+ * event in that channel (most recent emission). When the event itself is
+ * an envelope-shaped object with a `.data` field, unwrap it; otherwise
+ * return the event verbatim. Returns `undefined` for missing or empty
+ * outputs so widget cells render `-`.
+ */
+export function lastOutputData(outputs: Record<string, unknown> | undefined): unknown {
+  if (!outputs) return undefined;
+  const channels = Object.keys(outputs);
+  if (channels.length === 0) return undefined;
+  const channel = channels.includes("default") ? "default" : channels[0];
+  const events = outputs[channel];
+  if (!Array.isArray(events) || events.length === 0) return undefined;
+  const last = events[events.length - 1];
+  if (last && typeof last === "object" && !Array.isArray(last) && "data" in last) {
+    return (last as { data: unknown }).data;
+  }
+  return last;
 }
 
 /**
@@ -379,5 +550,23 @@ function deriveExecutionStatus(
         return "unknown";
     }
   }
+  return "unknown";
+}
+
+/**
+ * Collapse the run `state` / `result` enum pair into the lowercase status
+ * vocabulary used across the dashboard and RunsList. Mirrors `getRunStatus`
+ * in `ui/Runs/runPresentation.ts`. Runs have a smaller state machine than
+ * executions — no separate `pending` step — so a started run that has not
+ * yet produced a result maps to `running`.
+ */
+function deriveRunStatus(
+  state: string | undefined,
+  result: string | undefined,
+): "passed" | "failed" | "cancelled" | "running" | "unknown" {
+  if (state === "STATE_STARTED") return "running";
+  if (result === "RESULT_FAILED") return "failed";
+  if (result === "RESULT_CANCELLED") return "cancelled";
+  if (result === "RESULT_PASSED" || state === "STATE_FINISHED") return "passed";
   return "unknown";
 }
