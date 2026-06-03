@@ -33,7 +33,7 @@ type Config struct {
 	// MaxOutputBytes caps combined stdout+stderr stored and sent back.
 	MaxOutputBytes int
 	// MaxExecutionSeconds caps the runner's execution wall clock (0 = no cap). It does not change
-	// fleet-manager claim leases, which are derived from execution_timeout_seconds on the task (or the API default).
+	// task-broker claim leases, which are derived from execution_timeout_seconds on the task (or the API default).
 	MaxExecutionSeconds int
 	// ExitAfterEachTask stops the runner process after one claimed task is handled
 	// (executed and complete attempted), even when complete or the broker ack fails.
@@ -44,7 +44,7 @@ type Config struct {
 	// (one log stream per task; see shared/cwstream.TaskLogStream).
 	CloudWatchLogGroup        string
 	CloudWatchRegion          string // optional; uses default AWS credential chain region when empty
-	CloudWatchLogStreamPrefix string // optional prefix for log stream name (must match TASK_CLOUDWATCH_LOG_STREAM_PREFIX on fleet-manager for callers)
+	CloudWatchLogStreamPrefix string // optional prefix for log stream name (must match TASK_CLOUDWATCH_LOG_STREAM_PREFIX on task-broker for callers)
 	// TaskWorkDir is the initial working directory for host-mode tasks (runner user's $HOME).
 	TaskWorkDir string
 }

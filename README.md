@@ -1,14 +1,32 @@
 # SuperPlane runner
 
-Monorepo (single Go module) for **task-broker**, **fleet-manager**, and the **runner** worker.
+Backend for **Runner** on the SuperPlane canvas: a **user-facing node type** (canvas component name **Runner**) where users configure **bash scripts** to run on remote machines. When a Runner node executes, SuperPlane enqueues work through **task-broker**; a **runner** worker in this repo runs the user’s script and reports back so the workflow can continue.
 
-- **Task-broker** — SuperPlane front door: registers runner fleets, owns the Postgres task queue, serves runner WebSocket/HTTP APIs, and delivers completion webhooks to callers.
-- **Fleet-manager** — EC2-only: maintains a hot pool of runner VMs, health-sweeps `GET /healthz` on private IPs, and reconciles capacity. No task queue.
-- **Runner** — worker: connects to **task-broker** (`TASK_BROKER_URL`, `RUNNER_FLEET_ID`), claims tasks, executes `command` or **`commands`**, completes results. Exposes **`GET /healthz`** on `RUNNER_HEALTH_ADDR` (default `:9090`).
+## What this is
 
-Shared JSON types live under **`shared/`**; webhook retries use **`shared/webhook`**.
+From a user’s perspective, **Runner** nodes on the canvas run arbitrary shell (and optional Docker) workloads the user configured. Under the hood, three services cooperate:
 
-See [ARCHITECTURE.md](./ARCHITECTURE.md) for design detail.
+| Component | Role |
+|-----------|------|
+| **task-broker** | API and **Postgres-backed queue**. SuperPlane submits tasks when Runner nodes run; workers claim work; completion **webhooks** resume the workflow. Fleets are **`id`** + **`labels`** for routing (`fleet_id` or `fleet_labels` on create). |
+| **runner** | **Worker agent** on a host or EC2 VM. Runs the user’s **`command`** or **`commands`** on the host or in Docker, streams logs optionally, returns exit status and optional structured **`result`** JSON. Connects to the broker with `TASK_BROKER_URL` and `RUNNER_FLEET_ID`. |
+| **fleet-manager** | **Optional AWS EC2 autoscaler** — not on the canvas path. Launches runner VMs, health-checks `GET /healthz`, scales toward `queued + claimed + headroom` by polling the broker. |
+
+A **task** is one execution of a user’s script for a Runner node: SuperPlane calls `POST /v1/tasks` with the script and a webhook URL; a runner executes it; the webhook delivers a terminal payload (`status`, `exit_code`, optional `result`, optional `task_log`). Status and cancel are available over HTTP while the job runs.
+
+Shared contracts live under **`shared/`** (JSON types, WebSocket messages, webhook retries).
+
+## Why it is built this way
+
+SuperPlane needs a safe, scalable way to run **user-authored bash** from canvas Runner nodes without embedding shells and fleets in the main app. This repo separates concerns deliberately:
+
+- **Canvas vs execution** — Users interact with **Runner** nodes and scripts; SuperPlane talks to **task-broker** to queue work. Runner binaries, regions, and pool size can change without reshaping the canvas model.
+- **Queue vs workers vs cloud** — The broker owns **durability and routing** (leases, reap, cancel, webhooks). Runners only execute user commands. **fleet-manager** only provisions EC2; it never holds the queue.
+- **Async by default** — Scripts can run for minutes; **webhooks** (with retries) fit workflow steps better than long-lived HTTP from the UI.
+- **CI-shaped execution** — Docker runs without a TTY; multi-line `commands` behave like a script block; large logs go to **CloudWatch** instead of API bodies.
+- **Isolation when you want it** — Disposable one-task EC2 instances (runner exits, fleet-manager terminates the VM) limit cross-job leakage when many users share a fleet.
+
+For request flow and component boundaries, see [ARCHITECTURE.md](./ARCHITECTURE.md). The sections below cover build, configuration, and operations.
 
 ## Layout
 
@@ -35,7 +53,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for design detail.
 ## Requirements
 
 - Go 1.22+
-- For Docker tasks: Docker CLI **and a reachable Docker daemon** on the runner host. The runner uses a pull → long-lived named container → `docker exec` → `docker stop`/`rm` lifecycle (see [ARCHITECTURE.md](./ARCHITECTURE.md#docker-execution-lifecycle)). The image must include `sleep` (alpine, debian, ubuntu, python:*, node:* all satisfy this). Multi-line **`commands`** are bundled into one `sh -c` script with `set -e`, so env/cwd persist across directives and the script fails fast on the first non-zero exit. Task **`environment`** entries are passed to the `docker exec` process, not to the idle `docker run` container. **Quoting:** each directive is a line inside a single-quoted `sh -c` argument; a raw **`'`** in a line is a classic shell-quoting footgun—avoid it in `commands` or use argv **`command`** for tricky literals. **`docker exec` is invoked without `-t`**, so the task runs in a non-TTY context: tools that detect `isatty()` (color output, progress bars, interactive prompts) will see stdout/stderr as a pipe. This is intentional — matches `docker run` without `-t`, more predictable for CI / batch workloads, and lets stdout and stderr stay distinct in captures.
+- For Docker tasks: Docker CLI **and a reachable Docker daemon** on the runner host. The runner uses a pull → long-lived named container → `docker exec` → `docker stop`/`rm` lifecycle (see **Docker** below and [ARCHITECTURE.md](./ARCHITECTURE.md)). The image must include `sleep` (alpine, debian, ubuntu, python:*, node:* all satisfy this). Multi-line **`commands`** are bundled into one `sh -c` script with `set -e`, so env/cwd persist across directives and the script fails fast on the first non-zero exit. Task **`environment`** entries are passed to the `docker exec` process, not to the idle `docker run` container. **Quoting:** each directive is a line inside a single-quoted `sh -c` argument; a raw **`'`** in a line is a classic shell-quoting footgun—avoid it in `commands` or use argv **`command`** for tricky literals. **`docker exec` is invoked without `-t`**, so the task runs in a non-TTY context: tools that detect `isatty()` (color output, progress bars, interactive prompts) will see stdout/stderr as a pipe. This is intentional — matches `docker run` without `-t`, more predictable for CI / batch workloads, and lets stdout and stderr stay distinct in captures.
 
 ### Upgrade note: Docker multi-line `commands` (breaking if you relied on the old runner)
 
@@ -53,22 +71,24 @@ go build -o bin/task-broker ./task-broker/cmd/task-broker
 
 ### Local dev
 
-Use **separate terminals**: **`make fleet-manager`**, **`make task-broker`**, then **`make register-local-fleet`**, then **`make runner`** (optional **`N=3`** runner processes; default **`N=1`**). **`make local-dev-help`** lists this. Defaults (`LOCAL_*`, **`LOCAL_STACK_AUTH_TOKEN`**, **`LOCAL_RUNNER_*`**, **`N`**) are in the **`Makefile`**; override on the command line when needed. Enqueue on the broker with **`Authorization: Bearer dev-local-token`** and **`"fleet_id":"local"`** (unless you changed **`LOCAL_STACK_AUTH_TOKEN`** / **`LOCAL_FLEET_ID`**).
+Use **separate terminals**: **`make task-broker`**, then **`make register-local-fleet`**, then **`make runner`** (optional **`N=3`** runner processes; default **`N=1`**). **`make fleet-manager`** is only needed when testing the EC2 provisioner locally. **`make local-dev-help`** lists this. Defaults (`LOCAL_*`, **`LOCAL_STACK_AUTH_TOKEN`**, **`LOCAL_RUNNER_*`**, **`N`**) are in the **`Makefile`**; override on the command line when needed. Enqueue on the broker with **`Authorization: Bearer dev-local-token`** and **`"fleet_id":"local"`** (unless you changed **`LOCAL_STACK_AUTH_TOKEN`** / **`LOCAL_FLEET_ID`**).
 
 ## Run task-broker
-
-The broker needs a URL that **downstream fleet-manager** instances can POST to when a task completes (typically your public/load-balanced origin).
 
 | Environment variable | Default       | Description                                                                                                              |
 | -------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `LISTEN_ADDR`        | `:8081`       | HTTP listen address                                                                                                      |
-| `DATABASE_URL`       | —             | **Required.** PostgreSQL connection string (fleets + broker-scoped tasks)                                                |
-| `BROKER_PUBLIC_URL`  | (empty)       | Base URL reachable by fleet-manager(s), used to build completion relay URLs (**set in real deployments**)                |
-| `AUTH_TOKEN`         | —             | **Required.** Clients must send `Authorization: Bearer …` for **`/v1/fleets`** and **`/v1/tasks`** (and related routes). **`/v1/webhooks/complete/*`** stays unauthenticated for fleet-manager callbacks |
+| `DATABASE_URL`       | —             | **Required.** PostgreSQL connection string (fleets + task queue)                                                       |
+| `AUTH_TOKEN`         | —             | **Required.** `Authorization: Bearer …` for all **`/v1/*`** routes (including runner claim/complete and live-logs JWT issuance) |
+| `REAP_INTERVAL_SEC`  | `15`          | How often to requeue expired leases or finalize canceled tasks                                                           |
+| `TASK_CLOUDWATCH_LOG_GROUP` | (empty) | When set, `GET /v1/tasks/{id}` and completion webhooks include **`task_log`** (and legacy `cloudwatch_log_*` fields) pointing at the stream the runner writes to |
+| `TASK_CLOUDWATCH_LOG_STREAM_PREFIX` | (empty) | Optional; stream name is `{prefix}/{task_id}` (see `shared/cwstream`). Must match **`RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX`** on runners. |
+| `TASK_CLOUDWATCH_REGION` | (empty) | Optional AWS region in **`task_log.cloudwatch.region`** |
+| `TASK_BROKER_LIVE_LOGS_CORS_ORIGINS` | (empty) | Optional comma-separated origins for **`GET /v1/tasks/{id}/live-logs`** CORS |
 
-**Logging:** stdout emits JSON **`http_access`** per request (**method**, **path**, **dur**, **status**, **bytes**, **remote**, optional **request_id** / **ua**). **`GET /healthz`** is skipped to reduce load-balancer noise. Successful fleet-manager creates also emit **`fleet_upstream_http`** (**op** `create_task`, **http_status**, **dur**, **broker_task_id**, **fleet_id**, **fleet_task_id**, **upstream_host**). Outbound caller webhooks log **`webhook_delivery`** per attempt (**attempt**, **task_id**, **fleet_task_id**, **status_outcome**, **url_host**, **dur**, **http_status** or **err**).
+**Logging:** stdout emits JSON **`http_access`** per request (**method**, **path**, **dur**, **status**, **bytes**, **remote**, optional **request_id** / **ua**). **`GET /healthz`** is skipped to reduce load-balancer noise. Outbound caller webhooks log **`webhook_delivery`** per attempt (**attempt**, **task_id**, **status_outcome**, **url_host**, **dur**, **http_status** or **err**).
 
-**HTTP (`/v1`)**
+**HTTP (`/v1`, Bearer auth unless noted)**
 
 | Method   | Path                                | Notes                                                                                                                                                                                                                                           |
 | -------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -81,8 +101,7 @@ The broker needs a URL that **downstream fleet-manager** instances can POST to w
 ```bash
 export DATABASE_URL='postgres://broker:broker@127.0.0.1:5432/broker?sslmode=disable'
 export LISTEN_ADDR=:8081
-export BROKER_PUBLIC_URL=http://127.0.0.1:8081   # fleet-manager must reach this
-export AUTH_TOKEN=your-secret                  # mandatory
+export AUTH_TOKEN=your-secret
 ./bin/task-broker
 ```
 
@@ -92,19 +111,16 @@ Local dev expects Postgres on `127.0.0.1:5432` with database `broker` (see `LOCA
 
 **Inspect upstream task status** (uses `AUTH_TOKEN` and broker base from **`scripts/deploy/task-broker.env`** unless you export overrides): `./scripts/check-broker-task.sh <broker_task_id>`
 
-**Correlate broker + fleet SQLite over SSH** (default EC2 hosts match deploy scripts): `./scripts/show-runner-queue-state.sh` — broker rows require `TASK_BROKER_DATABASE_URL` (Postgres); fleet-manager still uses SQLite on the remote host.
+**Inspect recent broker queue rows** (requires local `psql`): `TASK_BROKER_DATABASE_URL='postgres://…' ./scripts/show-runner-queue-state.sh`
 
 ## Run fleet-manager
+
+Without **`EC2_PROVISION_HOT_INSTANCE_COUNT`**, fleet-manager starts but only serves **`GET /healthz`** (and optional **`/v1/admin/*`** when **`FLEET_DIAGNOSTICS_TOKEN`** is set). The EC2 hot pool is enabled when **`EC2_PROVISION_*`** is configured (see **`scripts/deploy/fleet-manager.env.example`**).
 
 | Environment variable | Default      | Description                                                  |
 | -------------------- | ------------ | ------------------------------------------------------------ |
 | `LISTEN_ADDR`        | `:8080`      | HTTP listen address                                          |
-| `DATABASE_PATH`      | `./fleet.db` | SQLite database file                                         |
-| `AUTH_TOKEN`         | (empty)      | If set, requires `Authorization: Bearer <token>` for `/v1/*` |
-| `REAP_INTERVAL_SEC`  | `15`         | How often to return expired leases to the queue              |
-| `TASK_CLOUDWATCH_LOG_GROUP` | (empty) | When set, `GET /v1/tasks/{id}` and completion webhooks include `cloudwatch_log_group` and `cloudwatch_log_stream` so clients can tail the same stream the runner writes to |
-| `TASK_CLOUDWATCH_LOG_STREAM_PREFIX` | (empty) | Optional; stream name is `{prefix}/{task_id}` (see `shared/cwstream`). Must match `RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX` on workers. |
-| `TASK_CLOUDWATCH_REGION` | (empty) | Optional AWS region included in **`task_log.cloudwatch.region`** for clients (e.g. your log proxy). |
+| `FLEET_DIAGNOSTICS_TOKEN` | (empty) | When set, protects **`GET /v1/admin/managed-runners`** and **`GET /v1/admin/ec2-console-output`** |
 
 **Task log descriptor:** When **`TASK_CLOUDWATCH_LOG_GROUP`** is set, `GET /v1/tasks/{id}` and completion webhooks include **`task_log`** with `{"type":"cloudwatch","cloudwatch":{"log_group_name","log_stream_name","region"}}`. Otherwise **`task_log`** is omitted. Legacy **`cloudwatch_log_group`** / **`cloudwatch_log_stream`** fields are still present when CloudWatch is enabled.
 
@@ -133,7 +149,7 @@ By default **`EC2_PROVISION_RUNNER_TERMINATE_AFTER_TASK`** is **on** (`true`): *
 Fleet-manager still needs **`ec2:RunInstances`**, **`ec2:DescribeInstances`**, **`ec2:CreateTags`**, **`ec2:TerminateInstances`**, and **`iam:PassRole`** when using an instance profile on runners.
 
 ```bash
-export DATABASE_PATH=./fleet.db
+# EC2 pool disabled without EC2_PROVISION_HOT_INSTANCE_COUNT and related vars
 ./bin/fleet-manager
 ```
 
@@ -141,36 +157,36 @@ export DATABASE_PATH=./fleet.db
 
 | Environment variable | Description                                                                                            |
 | -------------------- | ------------------------------------------------------------------------------------------------------ |
-| `FLEET_MANAGER_URL`  | **Required.** Base URL of **that fleet’s** fleet-manager (not the broker unless you bypass the broker) |
-| `RUNNER_TRANSPORT`   | Default **WebSocket**. Set **`http`**, **`polling`**, or **`legacy`** to use **`POST /v1/tasks/claim`** / **`complete`** instead (e.g. old fleet-manager without the stream route). |
-| `RUNNER_ID`          | Optional; defaults to host name or a random id                                                         |
-| `AUTH_TOKEN`         | Optional; must match fleet-manager if set                                                              |
-| `POLL_EMPTY_MS`      | Sleep when no work (default ~1000 ms)                                                                  |
-| `RUNNER_MAX_EXECUTION_SECONDS` | Optional. Hard cap on run wall clock on **this** runner. Does **not** change fleet-manager `lease_until`, which still uses `execution_timeout_seconds` from the task (or the 1h default) plus buffer — so leases can be longer than the capped run when set. |
-| `RUNNER_TERMINATE_AFTER_EACH_TASK` | If `true`/`1`/`yes`, exit the runner process after **one** successful task (off by default locally; **on** for fleet-manager EC2 user-data unless disabled). **`runner_id`** must be the EC2 instance id (`i-…`) for **fleet-manager** to terminate the VM; termination is done by fleet-manager, not the runner binary. |
-| `RUNNER_CLOUDWATCH_LOG_GROUP` | When set, task stdout/stderr are streamed to **Amazon CloudWatch Logs** (`PutLogEvents`) on a per-task log stream (see `shared/cwstream`). Uses the default AWS credential chain (EC2 instance profile, env keys, etc.). |
-| `RUNNER_CLOUDWATCH_REGION` | Optional AWS region for the CloudWatch Logs client (defaults to the SDK default chain). |
-| `RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX` | Optional; must match **`TASK_CLOUDWATCH_LOG_STREAM_PREFIX`** on fleet-manager so **`GET /v1/tasks/{id}`** reports the correct **`cloudwatch_log_stream`**. |
+| `TASK_BROKER_URL`      | **Required.** Base URL of **task-broker**                                                              |
+| `RUNNER_FLEET_ID`      | **Required.** Fleet id registered on the broker (`POST /v1/fleets`)                                    |
+| `AUTH_TOKEN`           | **Required.** Same bearer token as task-broker **`AUTH_TOKEN`**                                          |
+| `RUNNER_TRANSPORT`     | Default **WebSocket** (`GET /v1/runners/stream`). Set **`http`**, **`polling`**, or **`legacy`** for **`POST /v1/tasks/claim`** / **`complete`**. |
+| `RUNNER_ID`            | Optional; defaults to host name or a random id (EC2 user-data sets instance id from IMDS)              |
+| `POLL_EMPTY_MS`        | Sleep when no work (default ~1000 ms)                                                                  |
+| `RUNNER_MAX_EXECUTION_SECONDS` | Optional. Hard cap on run wall clock on **this** runner. Does **not** change broker `lease_until`, which uses `execution_timeout_seconds` from the task (or the 1h default) plus buffer. |
+| `RUNNER_TERMINATE_AFTER_EACH_TASK` | If `true`/`1`/`yes`, exit after **one** successful task (off by default locally; **on** for EC2 user-data unless disabled). **`runner_id`** should be the EC2 instance id (`i-…`) so fleet-manager can terminate the VM after the process exits. |
+| `RUNNER_CLOUDWATCH_LOG_GROUP` | When set, task stdout/stderr stream to **CloudWatch Logs** (`PutLogEvents`) per task (see `shared/cwstream`). |
+| `RUNNER_CLOUDWATCH_REGION` | Optional AWS region for the CloudWatch Logs client. |
+| `RUNNER_CLOUDWATCH_LOG_STREAM_PREFIX` | Optional; must match **`TASK_CLOUDWATCH_LOG_STREAM_PREFIX`** on task-broker. |
 
 ```bash
-export FLEET_MANAGER_URL=http://127.0.0.1:8080
-export AUTH_TOKEN= # if fleet-manager uses it
+export TASK_BROKER_URL=http://127.0.0.1:8081
+export RUNNER_FLEET_ID=local
+export AUTH_TOKEN=dev-local-token
 ./bin/runner
 ```
 
-**Logging:** Default transport logs **`fleet_manager_ws`** for stream lifecycle; HTTP transport logs **`fleet_manager_http`** for **`claim_task`**/**`complete_task`**: **`op`**, **`http_status`**, **`dur`**, **`runner_id`**, **`task_id`** (when known); failures use **`Warn`** with **`err`**.
+**Logging:** WebSocket transport logs **`task_broker_ws`**; HTTP transport logs **`task_broker_http`** for claim/complete (**`op`**, **`http_status`**, **`dur`**, **`runner_id`**, **`task_id`**).
 
 **Structured task result:** The runner exports **`SUPERPLANE_RESULT_FILE`** to each task pointing at a host temp file (`superplane-result-<task_id>.json`). Write valid JSON there before exit; the runner reads it after execution and sends **`result`** on **`POST /v1/tasks/{id}/complete`**. **`GET /v1/tasks/{id}`**, completion webhooks, and broker **`GET /v1/tasks/{id}`** include **`result`** when present. Missing, empty, invalid JSON, or payload over **`MaxOutputBytes`** → **`result`** omitted. **`execution_mode: docker`:** the same variable inside the container is **`/mnt/superplane-result.json`** (bind-mounted from that host path).
 
-## HTTP API — fleet-manager (v1)
+## HTTP API — fleet-manager
 
 - `GET /healthz` — liveness
-- `POST /v1/tasks` — enqueue: **`command`** (argv for one process) **or** **`commands`** (string lines concatenated into one `sh -c` script so `export` / `cd` persist), **`webhook_url`**, optional `environment` (`[{ "name", "value" }]`), optional `execution_mode` / `docker_image`
-- `GET /v1/runners/stream` — runner WebSocket (default worker transport)
-- `POST /v1/tasks/claim` — runner pulls the next task (HTTP transport)
-- `POST /v1/tasks/{id}/complete` — runner reports result (HTTP transport); body may include optional **`result`** (JSON) from **`SUPERPLANE_RESULT_FILE**
+- `GET /v1/admin/managed-runners` — EC2 instances tagged `superplane_managed_runner` (requires **`FLEET_DIAGNOSTICS_TOKEN`**)
+- `GET /v1/admin/ec2-console-output?instance_id=i-…` — boot console output (same auth)
 
-When the broker is **not** in the path, fleet-manager POSTs the completion **webhook** to `webhook_url` with `task_id`, `status`, `exit_code`, optional `error`, optional `result`, and optional **`task_log`** (when CloudWatch is configured). Task `environment` values are execution-only and are not returned by status or webhook payloads.
+## End-to-end
 
 ## End-to-end with the broker
 
@@ -253,7 +269,7 @@ Use this checklist before rolling architecture-specific fleets into production:
 
 ```bash
 go test ./...
-# e2e (subprocess fleets + brokers):
+# e2e (subprocess task-broker + runners):
 go test ./test/... -v
 ```
 
