@@ -102,6 +102,7 @@ func (s *Server) runnerStream(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if task != nil {
+			s.recordTaskStartLatency(ctx, task)
 			if err := s.runnerStreamOneTask(conn, ctx, task, runnerID, writeMu); err != nil {
 				return
 			}
@@ -138,6 +139,8 @@ func (s *Server) runnerStreamOneTask(conn *websocket.Conn, ctx context.Context, 
 		if unclaimErr := s.Store.UnclaimTask(ctx, task.ID, rid); unclaimErr != nil && s.Log != nil {
 			s.Log.Warn("runner stream", slog.String("op", "unclaim_on_push_failure"),
 				slog.String("task_id", task.ID), slog.Any("err", unclaimErr))
+		} else if unclaimErr == nil {
+			s.recordTaskUnclaimed(ctx, task.FleetID)
 		}
 		return err
 	}

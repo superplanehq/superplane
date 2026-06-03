@@ -234,7 +234,7 @@ func nullIfEmpty(s string) *string {
 	return &s
 }
 
-func (s *PostgresStore) ReapExpiredLeases(ctx context.Context) (int64, []*models.Task, error) {
+func (s *PostgresStore) ReapExpiredLeases(ctx context.Context) ([]*models.Task, []*models.Task, error) {
 	now := time.Now().UTC()
 
 	type idRow struct{ ID string }
@@ -256,29 +256,40 @@ RETURNING id`,
 		string(models.StatusClaimed), now,
 	).Scan(&canceledIDs).Error
 	if err != nil {
-		return 0, nil, err
+		return nil, nil, err
 	}
 
 	var canceled []*models.Task
 	for _, row := range canceledIDs {
 		t, err := s.GetTask(ctx, row.ID)
 		if err != nil {
-			return 0, nil, err
+			return nil, nil, err
 		}
 		canceled = append(canceled, t)
 	}
 
-	res := s.db.WithContext(ctx).Exec(`
+	type reapRow struct {
+		ID      string
+		FleetID string
+	}
+	var requeuedRows []reapRow
+	err = s.db.WithContext(ctx).Raw(`
 UPDATE tasks SET
 	status = ?,
 	claimed_at = NULL,
 	lease_until = NULL,
 	runner_id = NULL
-WHERE status = ? AND lease_until IS NOT NULL AND lease_until <= ? AND cancel_requested = false`,
+WHERE status = ? AND lease_until IS NOT NULL AND lease_until <= ? AND cancel_requested = false
+RETURNING id, fleet_id`,
 		string(models.StatusQueued), string(models.StatusClaimed), now,
-	)
-	if res.Error != nil {
-		return 0, canceled, res.Error
+	).Scan(&requeuedRows).Error
+	if err != nil {
+		return nil, canceled, err
 	}
-	return res.RowsAffected, canceled, nil
+
+	requeued := make([]*models.Task, 0, len(requeuedRows))
+	for _, row := range requeuedRows {
+		requeued = append(requeued, &models.Task{ID: row.ID, FleetID: row.FleetID})
+	}
+	return requeued, canceled, nil
 }

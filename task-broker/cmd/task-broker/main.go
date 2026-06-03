@@ -11,9 +11,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/superplane/runner/shared/telemetry"
 	"github.com/superplane/runner/shared/webhook"
 	"github.com/superplane/runner/task-broker/internal/broker"
+	brokermetrics "github.com/superplane/runner/task-broker/internal/metrics"
 	"github.com/superplane/runner/task-broker/internal/store"
+	"go.opentelemetry.io/otel"
 )
 
 func main() {
@@ -31,6 +34,28 @@ func main() {
 	}
 	defer st.Close()
 
+	telemetryShutdown, metricsEnabled, err := telemetry.Init(context.Background())
+	if err != nil {
+		log.Error("init telemetry", slog.Any("err", err))
+		os.Exit(1)
+	}
+	defer func() {
+		_ = telemetryShutdown(context.Background())
+	}()
+	if metricsEnabled {
+		log.Info("metrics export enabled")
+	}
+
+	var brokerMetrics *brokermetrics.BrokerMetrics
+	if metricsEnabled {
+		bm, err := brokermetrics.New(otel.Meter("task-broker"))
+		if err != nil {
+			log.Error("init broker metrics", slog.Any("err", err))
+			os.Exit(1)
+		}
+		brokerMetrics = bm
+	}
+
 	ws := webhook.DefaultSender()
 	ws.Log = log
 	hub := broker.NewWaitHub()
@@ -39,6 +64,7 @@ func main() {
 		Store:                         st,
 		Webhook:                       ws,
 		Log:                           log,
+		Metrics:                       brokerMetrics,
 		TaskNotify:                    hub,
 		RunnerCancel:                  cancelHub,
 		TaskCloudWatchLogGroup:        strings.TrimSpace(os.Getenv("TASK_CLOUDWATCH_LOG_GROUP")),
@@ -81,17 +107,23 @@ func main() {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				requeued, canceledTasks, err := st.ReapExpiredLeases(context.Background())
+				requeuedTasks, canceledTasks, err := st.ReapExpiredLeases(context.Background())
 				if err != nil {
 					log.Warn("reap leases", slog.Any("err", err))
 					continue
 				}
+				reapCtx := context.Background()
+				for _, task := range requeuedTasks {
+					srv.RecordLeaseReaped(reapCtx, task.FleetID)
+				}
 				for _, task := range canceledTasks {
 					t := task
+					srv.RecordLeaseReaped(reapCtx, t.FleetID)
+					srv.RecordTaskCompleted(reapCtx, t)
 					go srv.DeliverWebhook(t)
 				}
-				if requeued > 0 {
-					log.Info("reaped expired task leases", slog.Int64("count", requeued))
+				if len(requeuedTasks) > 0 {
+					log.Info("reaped expired task leases", slog.Int("count", len(requeuedTasks)))
 				}
 				if len(canceledTasks) > 0 {
 					log.Info("finalized canceled tasks after lease expiry", slog.Int("count", len(canceledTasks)))
