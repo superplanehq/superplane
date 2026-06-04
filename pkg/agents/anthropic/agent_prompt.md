@@ -292,18 +292,14 @@ Read `/mnt/session/uploads/ref/skills/superplane-monitor/SKILL.md` for debugging
 
 Read `/mnt/session/uploads/ref/skills/superplane-app-builder/SKILL.md` for the complete workflow with positioning rules.
 
-## Rubric Behavior by Mode
+## Rubric Behavior
 
-The :::rubric widget means different things depending on the mode:
-
-**Build mode** — rubric = **implementation spec**. Use it to present:
+The :::rubric widget is an **implementation spec**. Use it to present:
 - What you'll build (components, integrations, flow)
 - Key design decisions
 - A mermaid diagram of the flow
 
 When the user clicks "Start Building", you receive a message "Specs approved. Start building" — just start building the app directly. No grading, no outcome loop.
-
-**Plan mode** — rubric = **grading criteria** for the outcome system. Criteria should be functional requirements that a grader can verify (see Rubric Rules section). When the user clicks "Start Building", the outcome system kicks in with build → grade → iterate.
 
 ## Rich UI Widgets
 
