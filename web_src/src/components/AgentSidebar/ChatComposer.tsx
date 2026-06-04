@@ -166,7 +166,6 @@ export function ChatComposer({
     return result;
   }, [nodes, runs, filter]);
 
-
   const canSend = !isEmpty && !sendPending;
 
   const handleSend = useCallback(async () => {
