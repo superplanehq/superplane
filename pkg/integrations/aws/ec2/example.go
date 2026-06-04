@@ -10,6 +10,9 @@ import (
 //go:embed example_data_on_image.json
 var exampleDataOnImageBytes []byte
 
+//go:embed example_data_on_alarm.json
+var exampleDataOnAlarmBytes []byte
+
 //go:embed example_output_create_image.json
 var exampleOutputCreateImageBytes []byte
 
@@ -46,8 +49,17 @@ var exampleOutputGetInstanceBytes []byte
 //go:embed example_output_manage_instance_power.json
 var exampleOutputManageInstancePowerBytes []byte
 
+//go:embed example_output_create_alarm.json
+var exampleOutputCreateAlarmBytes []byte
+
+//go:embed example_output_get_alarm.json
+var exampleOutputGetAlarmBytes []byte
+
 var exampleDataOnImageOnce sync.Once
 var exampleDataOnImage map[string]any
+
+var exampleDataOnAlarmOnce sync.Once
+var exampleDataOnAlarm map[string]any
 
 var exampleOutputCreateImageOnce sync.Once
 var exampleOutputCreateImage map[string]any
@@ -85,8 +97,18 @@ var exampleOutputGetInstance map[string]any
 var exampleOutputManageInstancePowerOnce sync.Once
 var exampleOutputManageInstancePower map[string]any
 
+var exampleOutputCreateAlarmOnce sync.Once
+var exampleOutputCreateAlarm map[string]any
+
+var exampleOutputGetAlarmOnce sync.Once
+var exampleOutputGetAlarm map[string]any
+
 func (t *OnImage) ExampleData() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleDataOnImageOnce, exampleDataOnImageBytes, &exampleDataOnImage)
+}
+
+func (t *OnAlarm) ExampleData() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleDataOnAlarmOnce, exampleDataOnAlarmBytes, &exampleDataOnAlarm)
 }
 
 func (c *CreateImage) ExampleOutput() map[string]any {
@@ -162,5 +184,21 @@ func (c *ManageInstancePower) ExampleOutput() map[string]any {
 		&exampleOutputManageInstancePowerOnce,
 		exampleOutputManageInstancePowerBytes,
 		&exampleOutputManageInstancePower,
+	)
+}
+
+func (c *CreateAlarm) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputCreateAlarmOnce,
+		exampleOutputCreateAlarmBytes,
+		&exampleOutputCreateAlarm,
+	)
+}
+
+func (c *GetAlarm) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputGetAlarmOnce,
+		exampleOutputGetAlarmBytes,
+		&exampleOutputGetAlarm,
 	)
 }
