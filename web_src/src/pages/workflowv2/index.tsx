@@ -127,6 +127,7 @@ import { useCanvasConsoleVersionDiff, useDraftVisualDiff } from "./useDraftVisua
 import { useExecutionChainData } from "./useExecutionChainData";
 import { useOnCancelQueueItemHandler } from "./useOnCancelQueueItemHandler";
 import { useRunCanvasData, useRunCanvasPresentation } from "./useRunCanvasData";
+import { useRunsDetailState } from "./useRunsDetailState";
 import { useSelectedRunCanvas } from "./useSelectedRunCanvas";
 import {
   clearComponentSidebarSearchParams,
@@ -174,8 +175,6 @@ export function WorkflowPageV2() {
   const canvasId = appId || templateCanvasId || "";
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [openRunDetailOnMount, setOpenRunDetailOnMount] = useState(() => Boolean(searchParams.get("run")));
-  const dismissedRunDetailRunIdRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
   const { data: me } = useMe();
   const {
@@ -192,21 +191,15 @@ export function WorkflowPageV2() {
     selectedRunId,
     setSelectedRunId,
   } = useWorkflowViewSearchParams(searchParams, setSearchParams);
-  const wasRunsModeRef = useRef(isRunsMode);
-  useEffect(() => {
-    if (!searchParams.get("run")) {
-      dismissedRunDetailRunIdRef.current = null;
-    }
-  }, [searchParams]);
-  useEffect(() => {
-    if (isRunsMode && !wasRunsModeRef.current) {
-      const runId = searchParams.get("run");
-      if (runId && runId !== dismissedRunDetailRunIdRef.current) {
-        setOpenRunDetailOnMount(true);
-      }
-    }
-    wasRunsModeRef.current = isRunsMode;
-  }, [isRunsMode, searchParams]);
+  const {
+    openRunDetailOnMount,
+    runDetailNodeId,
+    setRunDetailNodeId,
+    runNodeDetailPaneHeight,
+    setRunNodeDetailPaneHeight,
+    clearDismissedRunDetail,
+    handleBackToRunList,
+  } = useRunsDetailState(searchParams, isRunsMode, selectedRunId);
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
   const { filesHeaderActions, onFilesHeaderActionsChange, filesHeaderActionsSlotId } =
     useWorkflowFilesHeaderState(canvasId);
@@ -516,9 +509,6 @@ export function WorkflowPageV2() {
   );
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
-  const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
-  const previousSelectedRunIdForDetailRef = useRef<string | null>(selectedRunId);
-  const [runNodeDetailPaneHeight, setRunNodeDetailPaneHeight] = useState(320);
   const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
   const runApiFilters = useMemo(() => statusFiltersToApiFilters(runStatusFilters), [runStatusFilters]);
@@ -4781,15 +4771,9 @@ export function WorkflowPageV2() {
     handleCreateVersion,
   ]);
 
-  const handleBackToRunList = useCallback(() => {
-    dismissedRunDetailRunIdRef.current = selectedRunId;
-    setRunDetailNodeId(null);
-    setOpenRunDetailOnMount(false);
-  }, [selectedRunId]);
-
   const handleSelectRun = useCallback(
     (runId: string) => {
-      dismissedRunDetailRunIdRef.current = null;
+      clearDismissedRunDetail();
       setSelectedRunId(runId);
       setIsRunsMode(true);
       setIsFilesMode(false);
@@ -4806,7 +4790,7 @@ export function WorkflowPageV2() {
         { replace: true },
       );
     },
-    [setIsFilesMode, setIsRunsMode, setSearchParams, setSelectedRunId],
+    [clearDismissedRunDetail, setIsFilesMode, setIsRunsMode, setSearchParams, setSelectedRunId, setRunDetailNodeId],
   );
 
   const handleSelectRunsMode = useCallback(() => {
@@ -4933,16 +4917,8 @@ export function WorkflowPageV2() {
       }
       setRunDetailNodeId(nodeId);
     },
-    [isRunsMode, selectedRun, runCanvasData],
+    [isRunsMode, selectedRun, runCanvasData, setRunDetailNodeId],
   );
-
-  useEffect(() => {
-    if (previousSelectedRunIdForDetailRef.current === selectedRunId) {
-      return;
-    }
-    previousSelectedRunIdForDetailRef.current = selectedRunId;
-    setRunDetailNodeId(null);
-  }, [selectedRunId]);
 
   useEffect(() => {
     if (!isRunsMode || selectedRunId) return;
