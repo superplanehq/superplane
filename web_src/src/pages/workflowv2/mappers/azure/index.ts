@@ -4,8 +4,11 @@ import { onBlobCreatedTriggerRenderer } from "./on_blob_created";
 import { onBlobDeletedTriggerRenderer } from "./on_blob_deleted";
 import { onImagePushedTriggerRenderer } from "./on_image_pushed";
 import { onImageDeletedTriggerRenderer } from "./on_image_deleted";
+import { invokeFunctionMapper } from "./invoke_function";
 
-export const componentMappers: Record<string, ComponentBaseMapper> = {};
+export const componentMappers: Record<string, ComponentBaseMapper> = {
+  invokeFunction: invokeFunctionMapper,
+};
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
   onBlobCreated: onBlobCreatedTriggerRenderer,

@@ -104,6 +104,7 @@ func (a *AzureIntegration) Actions() []core.Action {
 		&StopVMComponent{},
 		&DeallocateVMComponent{},
 		&RestartVMComponent{},
+		&InvokeFunctionComponent{},
 	}
 }
 
@@ -262,6 +263,16 @@ func (a *AzureIntegration) ListResources(resourceType string, ctx core.ListResou
 
 	case ResourceTypeContainerRegistryDropdown:
 		return a.ListContainerRegistries(ctx, firstNonEmptyParameter(ctx.Parameters, "resourceGroup"))
+
+	case ResourceTypeFunctionAppDropdown:
+		return a.ListFunctionApps(ctx, firstNonEmptyParameter(ctx.Parameters, "resourceGroup"))
+
+	case ResourceTypeFunctionDropdown:
+		return a.ListFunctions(
+			ctx,
+			firstNonEmptyParameter(ctx.Parameters, "resourceGroup"),
+			firstNonEmptyParameter(ctx.Parameters, "functionApp"),
+		)
 
 	case "resourceGroup", "virtualNetwork", "subnet":
 		return []core.IntegrationResource{}, nil
