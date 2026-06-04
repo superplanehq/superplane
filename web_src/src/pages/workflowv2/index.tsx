@@ -174,7 +174,7 @@ export function WorkflowPageV2() {
   const canvasId = appId || templateCanvasId || "";
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialRunFromUrlRef = useRef(searchParams.get("run"));
+  const [openRunDetailOnMount, setOpenRunDetailOnMount] = useState(() => Boolean(searchParams.get("run")));
   const queryClient = useQueryClient();
   const { data: me } = useMe();
   const {
@@ -4766,6 +4766,7 @@ export function WorkflowPageV2() {
 
   const handleBackToRunList = useCallback(() => {
     setRunDetailNodeId(null);
+    setOpenRunDetailOnMount(false);
   }, []);
 
   const handleSelectRun = useCallback(
@@ -5664,7 +5665,7 @@ export function WorkflowPageV2() {
                 selectedRunId={selectedRunId}
                 onSelectRun={handleSelectRun}
                 onBackToRunList={handleBackToRunList}
-                initialOpenDetail={Boolean(initialRunFromUrlRef.current)}
+                initialOpenDetail={openRunDetailOnMount}
                 selectedNodeId={runDetailNodeId}
                 onSelectNode={setRunDetailNodeId}
                 hasNextPage={!!infiniteRunsQuery.hasNextPage}
