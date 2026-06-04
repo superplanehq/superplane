@@ -7,6 +7,7 @@ import { showErrorToast } from "@/lib/toast";
 import { getUsageLimitToastMessage } from "@/lib/usageLimits";
 import { generateCanvasName } from "@/lib/canvasNameGenerator";
 import { setAgentBootContext } from "@/lib/agentBootContext";
+import { appPath } from "@/lib/appPaths";
 
 interface InstallResult {
   canvasId: string;
@@ -53,7 +54,7 @@ export function useInstallTemplate() {
         if (agentContext?.instructions || agentContext?.initialMessage) {
           setAgentBootContext(result.canvasId, agentContext);
         }
-        navigate(`/${result.organizationId}/canvases/${result.canvasId}?edit=1`);
+        navigate(appPath(result.organizationId, result.canvasId, "?edit=1"));
       } catch (error) {
         const message = getUsageLimitToastMessage(error, getApiErrorMessage(error, "Failed to install template"));
         showErrorToast(message);

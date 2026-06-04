@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { CanvasToolSidebarTab } from "@/components/CanvasToolSidebar/events";
 import { ADMIN_LINKS, DOCS_URL, ORGANIZATION_SETTINGS_LINKS } from "./constants";
+import { appSettingsPath } from "@/lib/appPaths";
 import type { CommandPage, PaletteAction, PalettePageAction } from "./types";
 
 type RootPageActionParams = {
@@ -219,7 +220,7 @@ export function buildCurrentCanvasActions({
       description: currentCanvasName,
       icon: Settings,
       disabled: !canUpdateCanvas,
-      onSelect: () => goTo(`/${organizationId}/canvases/${canvasId}/settings`),
+      onSelect: () => organizationId && canvasId && goTo(appSettingsPath(organizationId, canvasId)),
       keywords: ["canvas", "settings"],
     },
   ];
