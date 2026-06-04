@@ -57,6 +57,9 @@ const (
 	CreateAlarmPayloadType = "aws.ec2.alarm"
 	GetAlarmPayloadType    = "aws.ec2.alarm"
 
+	CreateAlarmPayloadType = "aws.ec2.alarm"
+	GetAlarmPayloadType    = "aws.ec2.alarm"
+
 	instancePollInterval    = 10 * time.Second
 	maxInstancePollErrors   = 10
 	maxInstancePollAttempts = 180
