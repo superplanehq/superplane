@@ -4834,7 +4834,7 @@ export function WorkflowPageV2() {
       },
       { replace: true },
     );
-  }, [setIsRunsMode, setSearchParams, setSelectedRunId]);
+  }, [setIsRunsMode, setSearchParams, setSelectedRunId, setRunDetailNodeId]);
 
   const handleOpenVersionControl = useCallback(() => {
     setIsVersionControlOpen(true);
@@ -4955,6 +4955,7 @@ export function WorkflowPageV2() {
     selectedRunId,
     setSearchParams,
     setSelectedRunId,
+    setRunDetailNodeId,
   ]);
 
   useEffect(() => {

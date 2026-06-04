@@ -122,48 +122,66 @@ function extractExecutionPayload(execution: CanvasesCanvasNodeExecution): unknow
   return execution.outputs;
 }
 
-export function buildExecutionTabData(
+function buildDefaultExecutionDetails(
   execution: CanvasesCanvasNodeExecution,
   workflowNode: ComponentsNode | undefined,
   workflowNodes: ComponentsNode[],
-): RunNodeDetailTabData {
-  const tabData: RunNodeDetailTabData = {};
-  let details: Record<string, unknown> = {};
+): Record<string, unknown> {
   const componentName = typeof workflowNode?.component === "string" ? workflowNode.component : undefined;
 
   if (componentName && workflowNode) {
     const customDetails = getExecutionDetails(componentName, execution, workflowNode, workflowNodes);
     if (customDetails && Object.keys(customDetails).length > 0) {
-      details = { ...customDetails };
+      return { ...customDetails };
     }
   }
 
-  if (Object.keys(details).length === 0) {
-    const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
-    details = { ...flattenObject((hasOutputs ? execution.outputs : execution.metadata) || {}) };
-  }
+  const hasOutputs = execution.outputs && Object.keys(execution.outputs).length > 0;
+  return { ...flattenObject((hasOutputs ? execution.outputs : execution.metadata) || {}) };
+}
+
+function applyExecutionResultDetails(
+  details: Record<string, unknown>,
+  execution: CanvasesCanvasNodeExecution,
+): Record<string, unknown> {
+  const next = { ...details };
 
   if (
     execution.resultMessage &&
     (execution.resultReason === "RESULT_REASON_ERROR" || execution.result === "RESULT_FAILED") &&
-    !("Error" in details)
+    !("Error" in next)
   ) {
-    details.Error = {
+    next.Error = {
       __type: "error",
       message: execution.resultMessage,
     };
   }
 
-  if (execution.result === "RESULT_CANCELLED" && !("Cancelled by" in details)) {
+  if (execution.result === "RESULT_CANCELLED" && !("Cancelled by" in next)) {
     const cancelledBy = execution.cancelledBy;
-    details["Cancelled by"] = cancelledBy?.name || cancelledBy?.id || "Unknown";
+    next["Cancelled by"] = cancelledBy?.name || cancelledBy?.id || "Unknown";
   }
 
-  tabData.details = Object.fromEntries(
+  return next;
+}
+
+function filterEmptyDetailEntries(details: Record<string, unknown>) {
+  return Object.fromEntries(
     Object.entries(details).filter(([, value]) => value !== undefined && value !== "" && value !== null),
   );
+}
 
-  tabData.payload = extractExecutionPayload(execution);
+export function buildExecutionTabData(
+  execution: CanvasesCanvasNodeExecution,
+  workflowNode: ComponentsNode | undefined,
+  workflowNodes: ComponentsNode[],
+): RunNodeDetailTabData {
+  const tabData: RunNodeDetailTabData = {
+    details: filterEmptyDetailEntries(
+      applyExecutionResultDetails(buildDefaultExecutionDetails(execution, workflowNode, workflowNodes), execution),
+    ),
+    payload: extractExecutionPayload(execution),
+  };
 
   if (execution.configuration && Object.keys(execution.configuration).length > 0) {
     tabData.configuration = execution.configuration;
