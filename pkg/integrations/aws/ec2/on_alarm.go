@@ -220,19 +220,42 @@ func (p *OnAlarm) Setup(ctx core.TriggerContext) error {
 		return nil
 	}
 
+	instanceName := resolveInstanceNameFromTrigger(ctx, region, instanceID)
+	regionChanged := metadata.Region != "" && metadata.Region != region
+
+	// Instance filtering is applied in OnIntegrationMessage; keep the existing subscription when only the instance changes.
+	if metadata.SubscriptionID != "" && !regionChanged {
+		return ctx.Metadata.Set(OnAlarmMetadata{
+			Region:         region,
+			InstanceID:     instanceID,
+			InstanceName:   instanceName,
+			SubscriptionID: metadata.SubscriptionID,
+		})
+	}
+
 	hasRule, err := common.HasEventBridgeRule(ctx.Logger, ctx.Integration, CloudWatchSource, region, DetailTypeCloudWatchAlarmStateChange)
 	if err != nil {
 		return fmt.Errorf("failed to check rule availability: %w", err)
 	}
 
-	instanceName := resolveInstanceNameFromTrigger(ctx, region, instanceID)
-
 	if !hasRule {
-		if err := ctx.Metadata.Set(OnAlarmMetadata{
+		updatedMetadata := OnAlarmMetadata{
 			Region:       region,
 			InstanceID:   instanceID,
 			InstanceName: instanceName,
-		}); err != nil {
+		}
+
+		// Subscribe upserts this node's subscription; update the filter when the region changes
+		// so events for the previous region are no longer routed here.
+		if metadata.SubscriptionID != "" {
+			subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(region))
+			if err != nil {
+				return fmt.Errorf("failed to update subscription: %w", err)
+			}
+			updatedMetadata.SubscriptionID = subscriptionID.String()
+		}
+
+		if err := ctx.Metadata.Set(updatedMetadata); err != nil {
 			return fmt.Errorf("failed to set metadata: %w", err)
 		}
 
@@ -308,6 +331,10 @@ func (p *OnAlarm) checkRuleAvailability(ctx core.TriggerHookContext) (map[string
 
 	if !hasRule {
 		return nil, ctx.Requests.ScheduleActionCall("checkRuleAvailability", map[string]any{}, 10*time.Second)
+	}
+
+	if metadata.SubscriptionID != "" {
+		return nil, nil
 	}
 
 	subscriptionID, err := ctx.Integration.Subscribe(p.subscriptionPattern(metadata.Region))
