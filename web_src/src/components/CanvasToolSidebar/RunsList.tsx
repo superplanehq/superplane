@@ -1,6 +1,6 @@
 import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } from "@/api-client";
 import type { RunStatusKey } from "@/ui/Runs/runPresentation";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Rabbit } from "lucide-react";
 import { RunRow } from "./RunRow";
 
 type DecoratedRun = {
@@ -59,7 +59,12 @@ export function RunsList({
   }
 
   if (runs.length === 0) {
-    return <div className="px-3 py-6 text-center text-xs text-gray-400">No runs yet</div>;
+    return (
+      <div className="flex flex-col items-center gap-2 px-3 py-6 text-center text-[13px] text-gray-500">
+        <Rabbit className="h-4 w-4" aria-hidden />
+        <span>No Runs</span>
+      </div>
+    );
   }
 
   if (filteredRuns.length === 0) {
@@ -73,7 +78,7 @@ export function RunsList({
     );
   }
 
-  const renderRow = (item: DecoratedRun) => (
+  const renderRow = (item: DecoratedRun, hideBottomBorder = false) => (
     <RunRow
       key={item.run.id}
       run={item.run}
@@ -82,18 +87,21 @@ export function RunsList({
       status={item.status}
       triggerNode={item.triggerNode}
       isSelected={item.run.id === selectedRunId}
+      hideBottomBorder={hideBottomBorder}
       componentIconMap={componentIconMap}
       onSelectRun={onSelectRun}
     />
   );
 
+  const hasRunningSectionDivider = orderedRuns.active.length > 0 && orderedRuns.rest.length > 0;
+
   return (
     <>
-      {orderedRuns.active.map(renderRow)}
-      {orderedRuns.active.length > 0 && orderedRuns.rest.length > 0 ? (
-        <div className="h-px bg-slate-300" aria-hidden />
-      ) : null}
-      {orderedRuns.rest.map(renderRow)}
+      {orderedRuns.active.map((item, index) =>
+        renderRow(item, hasRunningSectionDivider && index === orderedRuns.active.length - 1),
+      )}
+      {hasRunningSectionDivider ? <div className="h-px bg-slate-300" aria-hidden /> : null}
+      {orderedRuns.rest.map((item) => renderRow(item))}
       {isError ? (
         <div role="alert" className="flex items-center justify-between gap-2 px-3 py-2 text-[11px] text-red-600">
           <span className="inline-flex items-center gap-1">
