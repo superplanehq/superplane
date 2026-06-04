@@ -120,7 +120,7 @@ func Test__CreateAlarm__Setup(t *testing.T) {
 				"metricName":         "CPUUtilization",
 				"statistic":          " ",
 				"comparisonOperator": "GreaterThanThreshold",
-				"threshold":          80.0,
+			"threshold":          80.0,
 			},
 		})
 		require.ErrorContains(t, err, "statistic is required")
