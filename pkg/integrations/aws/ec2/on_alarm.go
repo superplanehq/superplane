@@ -211,7 +211,7 @@ func (p *OnAlarm) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("instance is required")
 	}
 
-	if metadata.SubscriptionID != "" {
+	if metadata.SubscriptionID != "" && metadata.Region == region && metadata.InstanceID == instanceID {
 		return nil
 	}
 
