@@ -192,7 +192,7 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 		assert.NotEmpty(t, stored.SubscriptionID)
 	})
 
-	t.Run("subscribed but instance changed -> re-subscribes", func(t *testing.T) {
+	t.Run("subscribed but instance changed -> updates metadata without re-subscribing", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{
 			Metadata: OnAlarmMetadata{
 				Region:         "us-east-1",
@@ -225,11 +225,11 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.Len(t, integrationCtx.Subscriptions, 1)
+		assert.Empty(t, integrationCtx.Subscriptions)
 		stored, ok := metadata.Get().(OnAlarmMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "i-new456", stored.InstanceID)
-		assert.NotEmpty(t, stored.SubscriptionID)
+		assert.Equal(t, "existing-sub", stored.SubscriptionID)
 	})
 }
 
