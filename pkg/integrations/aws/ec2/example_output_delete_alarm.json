@@ -1,0 +1,9 @@
+{
+  "data": {
+    "alarmName": "cpuUsage",
+    "deleted": true,
+    "region": "us-east-1"
+  },
+  "timestamp": "2026-06-03T16:38:01.123456789Z",
+  "type": "aws.ec2.alarm.deleted"
+}
