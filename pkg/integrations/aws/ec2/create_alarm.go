@@ -280,6 +280,10 @@ func (c *CreateAlarm) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
+	if _, err := requireThreshold(ctx.Configuration, config.Threshold); err != nil {
+		return err
+	}
+
 	return ctx.Metadata.Set(CreateAlarmNodeMetadata{
 		Region:       region,
 		InstanceID:   instanceID,
@@ -325,6 +329,11 @@ func (c *CreateAlarm) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	threshold, err := requireThreshold(ctx.Configuration, config.Threshold)
+	if err != nil {
+		return err
+	}
+
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to get AWS credentials: %w", err)
@@ -347,7 +356,7 @@ func (c *CreateAlarm) Execute(ctx core.ExecutionContext) error {
 		Statistic:          statistic,
 		Period:             config.Period,
 		EvaluationPeriods:  config.EvaluationPeriods,
-		Threshold:          config.Threshold,
+		Threshold:          threshold,
 		ComparisonOperator: comparisonOperator,
 		TreatMissingData:   config.TreatMissingData,
 		AlarmActions:       alarmActions,

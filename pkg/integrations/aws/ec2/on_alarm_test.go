@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -191,7 +192,7 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 		assert.NotEmpty(t, stored.SubscriptionID)
 	})
 
-	t.Run("subscribed but instance changed -> re-subscribes", func(t *testing.T) {
+	t.Run("subscribed but instance changed -> updates metadata without re-subscribing", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{
 			Metadata: OnAlarmMetadata{
 				Region:         "us-east-1",
@@ -224,11 +225,11 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		require.Len(t, integrationCtx.Subscriptions, 1)
+		assert.Empty(t, integrationCtx.Subscriptions)
 		stored, ok := metadata.Get().(OnAlarmMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "i-new456", stored.InstanceID)
-		assert.NotEmpty(t, stored.SubscriptionID)
+		assert.Equal(t, "existing-sub", stored.SubscriptionID)
 	})
 }
 
@@ -284,6 +285,41 @@ func Test__EC2OnAlarm__HandleHook(t *testing.T) {
 		stored, ok := metadata.Get().(OnAlarmMetadata)
 		require.True(t, ok)
 		assert.NotEmpty(t, stored.SubscriptionID)
+	})
+
+	t.Run("already subscribed -> no-op", func(t *testing.T) {
+		requests := &contexts.RequestContext{}
+		metadata := &contexts.MetadataContext{
+			Metadata: OnAlarmMetadata{
+				Region:         "us-east-1",
+				InstanceID:     "i-abc123",
+				SubscriptionID: "existing-sub",
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Subscriptions: []contexts.Subscription{{ID: uuid.MustParse("00000000-0000-0000-0000-000000000001")}},
+			Metadata: common.IntegrationMetadata{
+				EventBridge: &common.EventBridgeMetadata{
+					Rules: map[string]common.EventBridgeRuleMetadata{
+						"aws.cloudwatch:us-east-1": {
+							Source:      CloudWatchSource,
+							DetailTypes: []string{DetailTypeCloudWatchAlarmStateChange},
+						},
+					},
+				},
+			},
+		}
+
+		_, err := trigger.HandleHook(core.TriggerHookContext{
+			Name:        "checkRuleAvailability",
+			Logger:      logrus.NewEntry(logrus.New()),
+			Requests:    requests,
+			Metadata:    metadata,
+			Integration: integrationCtx,
+		})
+
+		require.NoError(t, err)
+		assert.Len(t, integrationCtx.Subscriptions, 1)
 	})
 }
 

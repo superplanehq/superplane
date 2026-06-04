@@ -103,3 +103,21 @@ func requireStatistic(value string) (string, error) {
 
 	return statistic, nil
 }
+
+func hasConfigKey(configuration any, key string) bool {
+	configurationMap, ok := configuration.(map[string]any)
+	if !ok {
+		return false
+	}
+
+	_, exists := configurationMap[key]
+	return exists
+}
+
+func requireThreshold(configuration any, threshold float64) (float64, error) {
+	if !hasConfigKey(configuration, "threshold") {
+		return 0, fmt.Errorf("threshold is required")
+	}
+
+	return threshold, nil
+}
