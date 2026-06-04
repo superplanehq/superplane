@@ -145,7 +145,7 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 			Logger:        logrus.NewEntry(logrus.New()),
 			Integration:   integrationCtx,
 			Metadata:      metadata,
-			Configuration: OnAlarmConfiguration{Region: "us-east-1", InstanceID: "i-abc123", State: cloudwatch.AlarmStateAlarm},
+		Configuration: OnAlarmConfiguration{Region: "us-east-1", InstanceID: "i-abc123", State: cloudwatch.AlarmStateAlarm},
 		})
 
 		require.NoError(t, err)
