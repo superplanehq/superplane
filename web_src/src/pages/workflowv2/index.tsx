@@ -198,6 +198,7 @@ export function WorkflowPageV2() {
     runNodeDetailPaneHeight,
     setRunNodeDetailPaneHeight,
     clearDismissedRunDetail,
+    detailDismissedForRunId,
     handleBackToRunList,
   } = useRunsDetailState(searchParams, isRunsMode, selectedRunId);
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
@@ -5670,6 +5671,7 @@ export function WorkflowPageV2() {
                 onSelectRun={handleSelectRun}
                 onBackToRunList={handleBackToRunList}
                 initialOpenDetail={openRunDetailOnMount}
+                detailDismissedForRunId={detailDismissedForRunId}
                 selectedNodeId={runDetailNodeId}
                 onSelectNode={setRunDetailNodeId}
                 hasNextPage={!!infiniteRunsQuery.hasNextPage}

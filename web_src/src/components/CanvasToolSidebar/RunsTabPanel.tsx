@@ -15,6 +15,7 @@ export interface RunsTabPanelProps {
   onSelectRun: (runId: string) => void;
   onBackToRunList?: () => void;
   initialOpenDetail?: boolean;
+  detailDismissedForRunId?: string | null;
   selectedNodeId?: string | null;
   onSelectNode?: (nodeId: string) => void;
   hasNextPage?: boolean;
@@ -35,6 +36,7 @@ export function RunsTabPanel({
   onSelectRun,
   onBackToRunList,
   initialOpenDetail = false,
+  detailDismissedForRunId = null,
   selectedNodeId = null,
   onSelectNode,
   hasNextPage,
@@ -76,11 +78,13 @@ export function RunsTabPanel({
     }
 
     if (previousSelectedRunIdRef.current !== null && previousSelectedRunIdRef.current !== selectedRunId) {
-      setSidebarView("detail");
+      if (selectedRunId !== detailDismissedForRunId) {
+        setSidebarView("detail");
+      }
     }
 
     previousSelectedRunIdRef.current = selectedRunId;
-  }, [selectedRunId]);
+  }, [detailDismissedForRunId, selectedRunId]);
 
   useEffect(() => {
     loadMoreIfNeeded(scrollRef.current);

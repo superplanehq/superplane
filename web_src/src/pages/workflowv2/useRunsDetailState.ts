@@ -4,25 +4,25 @@ export function useRunsDetailState(searchParams: URLSearchParams, isRunsMode: bo
   const [openRunDetailOnMount, setOpenRunDetailOnMount] = useState(() => Boolean(searchParams.get("run")));
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
   const [runNodeDetailPaneHeight, setRunNodeDetailPaneHeight] = useState(320);
-  const dismissedRunDetailRunIdRef = useRef<string | null>(null);
+  const [detailDismissedForRunId, setDetailDismissedForRunId] = useState<string | null>(null);
   const wasRunsModeRef = useRef(isRunsMode);
   const previousSelectedRunIdForDetailRef = useRef<string | null>(selectedRunId);
 
   useEffect(() => {
     if (!searchParams.get("run")) {
-      dismissedRunDetailRunIdRef.current = null;
+      setDetailDismissedForRunId(null);
     }
   }, [searchParams]);
 
   useEffect(() => {
     if (isRunsMode && !wasRunsModeRef.current) {
       const runId = searchParams.get("run");
-      if (runId && runId !== dismissedRunDetailRunIdRef.current) {
+      if (runId && runId !== detailDismissedForRunId) {
         setOpenRunDetailOnMount(true);
       }
     }
     wasRunsModeRef.current = isRunsMode;
-  }, [isRunsMode, searchParams]);
+  }, [detailDismissedForRunId, isRunsMode, searchParams]);
 
   useEffect(() => {
     if (previousSelectedRunIdForDetailRef.current === selectedRunId) {
@@ -33,11 +33,11 @@ export function useRunsDetailState(searchParams: URLSearchParams, isRunsMode: bo
   }, [selectedRunId]);
 
   const clearDismissedRunDetail = useCallback(() => {
-    dismissedRunDetailRunIdRef.current = null;
+    setDetailDismissedForRunId(null);
   }, []);
 
   const handleBackToRunList = useCallback(() => {
-    dismissedRunDetailRunIdRef.current = selectedRunId;
+    setDetailDismissedForRunId(selectedRunId);
     setRunDetailNodeId(null);
     setOpenRunDetailOnMount(false);
   }, [selectedRunId]);
@@ -49,6 +49,7 @@ export function useRunsDetailState(searchParams: URLSearchParams, isRunsMode: bo
     runNodeDetailPaneHeight,
     setRunNodeDetailPaneHeight,
     clearDismissedRunDetail,
+    detailDismissedForRunId,
     handleBackToRunList,
   };
 }

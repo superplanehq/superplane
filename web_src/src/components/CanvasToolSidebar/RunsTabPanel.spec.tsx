@@ -198,4 +198,23 @@ describe("RunsTabPanel", () => {
     expect(screen.getByTestId("run-detail-back")).toBeInTheDocument();
     expect(screen.getByText("Second run")).toBeInTheDocument();
   });
+
+  it("stays on the list when URL navigation returns to a dismissed run", () => {
+    const runs = [
+      makeRun({ id: "run-1", rootEvent: { ...makeRun().rootEvent, customName: "First run" } }),
+      makeRun({ id: "run-2", rootEvent: { ...makeRun().rootEvent, customName: "Second run" } }),
+    ];
+
+    const { rerender } = render(
+      <RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />,
+    );
+
+    expect(screen.getByLabelText("Filter runs")).toBeVisible();
+
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" detailDismissedForRunId="run-1" {...baseProps} />);
+    expect(screen.getByText("Second run")).toBeInTheDocument();
+
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-1" detailDismissedForRunId="run-1" {...baseProps} />);
+    expect(screen.getByLabelText("Filter runs")).toBeVisible();
+  });
 });
