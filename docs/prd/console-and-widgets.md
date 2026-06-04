@@ -496,13 +496,13 @@ Supported authoring features:
 
 ## Node Panels
 
-Node panels resolve the configured `node` by id or name. They display the latest status from `deriveDashboardNodeStatuses` and can optionally show a manual Run button.
+Node panels resolve the configured `node` by id or name. They display the node's name and can optionally show a manual Run button.
 
 `showRun` only exposes the button. The actual click still requires `canRunNodes`, and the backend authorization remains the source of truth.
 
 ## Multi-Node Panels
 
-The plural `nodes` panel type renders several pinned canvas nodes in a single card, each with their live status and an optional purpose line. Use it for "Key Nodes" style summaries (for example, the entry/exit nodes of a preview-environment workflow) instead of stamping out one `node` panel per row.
+The plural `nodes` panel type renders several pinned canvas nodes in a single card, each with an optional purpose line. Use it for "Key Nodes" style summaries (for example, the entry/exit nodes of a preview-environment workflow) instead of stamping out one `node` panel per row.
 
 ```yaml
 type: nodes
