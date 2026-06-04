@@ -17,6 +17,7 @@ import {
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
+import { useCanvas, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
   clearAgentBootContext,
@@ -52,9 +53,6 @@ type DraftActionsBarProps = {
   messages: AgentMessage[];
   canvasId: string;
   organizationId: string;
-  chatId: string;
-  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
-  agentMode: AgentMode;
   isEditing: boolean;
   outcomePassed?: boolean;
   onVersionPublished?: () => void;
@@ -201,15 +199,14 @@ function ChatConversation({
         messages={messages}
         canvasId={canvasId}
         organizationId={organizationId}
-        chatId={chatId}
-        sendMutation={sendMutation}
-        agentMode={agentMode}
         isEditing={isEditing}
         outcomePassed={outcomeState?.phase === "passed"}
         onVersionPublished={() => setOutcomeState(null)}
       />
 
-      <ChatComposer
+      <ChatComposerWithMentions
+        canvasId={canvasId}
+        organizationId={organizationId}
         onSend={handlers.handleSend}
         onStop={handlers.handleStop}
         sending={agentBusy}
@@ -378,9 +375,6 @@ function DraftActionsBar({
   messages,
   canvasId,
   organizationId,
-  chatId,
-  sendMutation,
-  agentMode,
   isEditing,
   outcomePassed,
   onVersionPublished,
@@ -389,9 +383,6 @@ function DraftActionsBar({
     messages,
     canvasId,
     organizationId,
-    chatId,
-    sendMutation,
-    agentMode,
     outcomePassed,
     onVersionPublished,
   });
@@ -412,4 +403,33 @@ function DraftActionsBar({
       </div>
     </div>
   );
+}
+
+function ChatComposerWithMentions({
+  canvasId,
+  organizationId,
+  ...composerProps
+}: {
+  canvasId: string;
+  organizationId: string;
+  onSend: (content: string) => Promise<void>;
+  onStop: () => void;
+  sending: boolean;
+  sendPending: boolean;
+  stopping?: boolean;
+  statusLabel: string;
+  agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
+  modeDisabled?: boolean;
+}) {
+  const { data: canvas } = useCanvas(organizationId, canvasId, {
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+  const runsQuery = useInfiniteCanvasRuns(canvasId, {}, true);
+  const nodes = canvas?.spec?.nodes;
+  const runs = useMemo(() => runsQuery.data?.pages?.flatMap((p) => p?.runs ?? []) ?? [], [runsQuery.data]);
+
+  return <ChatComposer {...composerProps} nodes={nodes} runs={runs} />;
 }
