@@ -2,7 +2,7 @@ import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } fr
 import { TimeAgo } from "@/components/TimeAgo";
 import { cn } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
-import { RunNodeIcon } from "@/ui/Runs/RunNodeIcon";
+import { RunNodeIcon, RUN_NODE_ICON_SIZE } from "@/ui/Runs/RunNodeIcon";
 import { RUN_STATUS_META, type RunStatusKey } from "@/ui/Runs/runPresentation";
 import { Link as LinkIcon } from "lucide-react";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ interface RunRowProps {
   status: RunStatusKey;
   triggerNode?: ComponentsNode;
   isSelected: boolean;
+  hideBottomBorder?: boolean;
   componentIconMap: Record<string, string>;
   onSelectRun: (runId: string) => void;
 }
@@ -25,6 +26,7 @@ export function RunRow({
   status,
   triggerNode,
   isSelected,
+  hideBottomBorder = false,
   componentIconMap,
   onSelectRun,
 }: RunRowProps) {
@@ -45,17 +47,22 @@ export function RunRow({
         }
       }}
       className={cn(
-        "group flex w-full cursor-pointer items-center gap-1.5 border-b border-l-2 border-slate-100 px-3 py-2 text-left transition-colors",
-        status === "failed" ? "border-l-red-400" : "border-l-transparent",
-        isSelected ? "border-l-sky-500 bg-sky-100" : "hover:bg-gray-50",
+        "group flex w-full cursor-pointer items-center gap-1.5 px-3 py-2 text-left transition-colors",
+        !hideBottomBorder && "border-b border-b-slate-950/10",
+        isSelected ? "bg-sky-100" : "hover:bg-gray-50",
       )}
     >
       <RunNodeIcon
         iconSrc={iconSrc}
         iconSlug={iconSlug}
         alt={triggerName}
-        size={14}
-        className="shrink-0 text-gray-400"
+        size={RUN_NODE_ICON_SIZE}
+        className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-gray-800" : "text-gray-500")}
+      />
+      <span
+        aria-label={RUN_STATUS_META[status].label}
+        title={RUN_STATUS_META[status].label}
+        className={cn("inline-block h-2 w-2 shrink-0 rounded-full", RUN_STATUS_META[status].dotClassName)}
       />
       <span
         className={cn(
@@ -65,11 +72,6 @@ export function RunRow({
       >
         {triggerName}
       </span>
-      <span
-        aria-label={RUN_STATUS_META[status].label}
-        title={RUN_STATUS_META[status].label}
-        className={cn("inline-block h-2 w-2 shrink-0 rounded-full", RUN_STATUS_META[status].dotClassName)}
-      />
       <span
         className={cn(
           "min-w-0 flex-1 truncate text-xs",
