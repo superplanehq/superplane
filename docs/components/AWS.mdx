@@ -264,23 +264,33 @@ The On Alarm trigger starts a workflow execution when a CloudWatch alarm attache
 
 ### Use Cases
 
-- **Incident response**: Trigger remediation workflows when an instance alarm fires
-- **Auto-scaling**: React to CPU or network alarms on individual instances
+- **Incident response**: Trigger remediation workflows when a CPU, network, or status-check alarm fires
+- **Auto-scaling**: React to alarms on individual instances without polling
 - **Audit**: Record alarm state transitions for specific instances over time
 
 ### Configuration
 
 - **Region**: AWS region where the instance and alarms reside
-- **Instance**: EC2 instance whose alarms to monitor
-- **Alarm State**: Only trigger for the specified state (OK, ALARM, or INSUFFICIENT_DATA)
-- **Alarms**: Optional alarm name filters (supports equals, not-equals, and regex matches)
+- **Instance**: EC2 instance whose alarms to monitor (required)
+- **Alarm State**: Only trigger for a specific state: ALARM, OK, or INSUFFICIENT_DATA (required)
+- **Alarm**: Optionally restrict to a single alarm selected from the alarms attached to the chosen instance; leave empty to trigger on any alarm for that instance
+
+### How it works
+
+The trigger subscribes to the EventBridge "CloudWatch Alarm State Change" rule and filters
+events in two steps:
+1. Checks that `detail.state.value` matches the configured Alarm State.
+2. Checks that the `InstanceId` dimension in `detail.configuration.metrics` matches the configured instance.
+If an Alarm is selected, an additional exact-name check on `detail.alarmName` is applied.
 
 ### Event Data
 
-Each alarm event includes:
+Each matched event includes the full EventBridge payload:
 - **detail.alarmName**: CloudWatch alarm name
-- **detail.state.value**: Current alarm state
+- **detail.state.value**: Current alarm state (ALARM / OK / INSUFFICIENT_DATA)
 - **detail.previousState.value**: Previous alarm state
+- **detail.configuration**: Full alarm configuration including metric, threshold, and dimensions
+- **region**, **account**, **time**: Event envelope fields
 
 ### Example Data
 
@@ -1140,16 +1150,16 @@ The Create Alarm component creates a CloudWatch metric alarm targeting a specifi
 - **Region**: AWS region where the EC2 instance and alarm reside
 - **Instance**: EC2 instance to monitor
 - **Alarm Name**: Unique name for the CloudWatch alarm
-- **Metric Name**: EC2 metric to monitor (e.g. CPUUtilization, StatusCheckFailed)
-- **Statistic**: Aggregation function (Average, Sum, Minimum, Maximum, SampleCount)
-- **Comparison Operator**: Condition for the alarm to trigger
+- **Metric Name**: EC2 CloudWatch metric to monitor (CPU, disk, network, status checks)
+- **Statistic**: Aggregation function applied over the evaluation period (Average, Sum, Min, Max, SampleCount)
+- **Comparison Operator**: How the metric is compared to the threshold (e.g. GreaterThanThreshold)
 - **Threshold**: Numeric value to compare the metric against
-- **Period**: Evaluation period in seconds (default: 300)
-- **Evaluation Periods**: Number of periods before the alarm fires (default: 1)
-- **Alarm Description**: Optional description for the alarm
+- **Period**: Evaluation window in seconds (default: 300)
+- **Evaluation Periods**: Number of consecutive periods that must breach the threshold before the alarm fires (default: 1)
+- **Alarm Description**: Optional free-text description
 - **Treat Missing Data**: How to treat missing data points (missing, ignore, breaching, notBreaching)
-- **Alarm Action**: Optional EC2 automation action (Recover, Reboot, Stop, Terminate) when the alarm fires
-- **SNS Topic (on alarm)**: Optional SNS topic to publish a notification to when the alarm enters ALARM state
+- **Alarm Action** *(toggleable)*: EC2 automation action to execute when the alarm enters ALARM state — Recover, Reboot, Stop, or Terminate
+- **SNS Topic (on alarm)** *(toggleable)*: SNS topic ARN to publish a notification to when the alarm enters ALARM state
 
 ### Output
 
@@ -1532,7 +1542,7 @@ The Get Alarm component describes a CloudWatch alarm and emits its current detai
 ### Configuration
 
 - **Region**: AWS region where the alarm resides
-- **Alarm**: CloudWatch alarm to describe
+- **Alarm**: CloudWatch alarm to describe, selected from all alarms in the chosen region (`ec2.alarm` resource picker)
 
 ### Output
 
