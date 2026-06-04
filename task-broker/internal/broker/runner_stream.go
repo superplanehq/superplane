@@ -104,6 +104,13 @@ func (s *Server) runnerStream(w http.ResponseWriter, r *http.Request) {
 		}
 		if task != nil {
 			s.recordTaskStartLatency(ctx, task)
+			if s.Log != nil {
+				s.Log.Info("task_claimed",
+					slog.String("task_id", task.ID),
+					slog.String("runner_id", task.RunnerID),
+					slog.String("fleet_id", task.FleetID),
+				)
+			}
 			if err := s.runnerStreamOneTask(conn, ctx, task, runnerID, writeMu); err != nil {
 				return
 			}
