@@ -54,6 +54,12 @@ func (a *AWS) ListResources(resourceType string, ctx core.ListResourcesContext) 
 	case "ec2.keyPair":
 		return ec2.ListKeyPairs(ctx, resourceType)
 
+	case "ec2.alarm":
+		return ec2.ListAlarms(ctx, resourceType)
+
+	case "ec2.instanceAlarm":
+		return ec2.ListInstanceAlarms(ctx, resourceType)
+
 	case "codeartifact.repository":
 		return codeartifact.ListRepositories(ctx, resourceType)
 
