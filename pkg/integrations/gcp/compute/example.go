@@ -25,6 +25,15 @@ var exampleOutputUpdateVMInstanceTypeBytes []byte
 //go:embed example_output_get_vm_instance_metrics.json
 var exampleOutputGetVMInstanceMetricsBytes []byte
 
+//go:embed example_output_create_static_ip.json
+var exampleOutputCreateStaticIPBytes []byte
+
+//go:embed example_output_delete_static_ip.json
+var exampleOutputDeleteStaticIPBytes []byte
+
+//go:embed example_output_manage_static_ip.json
+var exampleOutputManageStaticIPBytes []byte
+
 var (
 	exampleOutputCreateVMOnce sync.Once
 	exampleOutputCreateVM     map[string]any
@@ -43,6 +52,15 @@ var (
 
 	exampleOutputGetVMInstanceMetricsOnce sync.Once
 	exampleOutputGetVMInstanceMetrics     map[string]any
+
+	exampleOutputCreateStaticIPOnce sync.Once
+	exampleOutputCreateStaticIP     map[string]any
+
+	exampleOutputDeleteStaticIPOnce sync.Once
+	exampleOutputDeleteStaticIP     map[string]any
+
+	exampleOutputManageStaticIPOnce sync.Once
+	exampleOutputManageStaticIP     map[string]any
 )
 
 func (c *CreateVM) ExampleOutput() map[string]any {
@@ -67,4 +85,16 @@ func (u *UpdateVMInstanceType) ExampleOutput() map[string]any {
 
 func (g *GetVMInstanceMetrics) ExampleOutput() map[string]any {
 	return utils.UnmarshalEmbeddedJSON(&exampleOutputGetVMInstanceMetricsOnce, exampleOutputGetVMInstanceMetricsBytes, &exampleOutputGetVMInstanceMetrics)
+}
+
+func (c *CreateStaticIP) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputCreateStaticIPOnce, exampleOutputCreateStaticIPBytes, &exampleOutputCreateStaticIP)
+}
+
+func (d *DeleteStaticIP) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputDeleteStaticIPOnce, exampleOutputDeleteStaticIPBytes, &exampleOutputDeleteStaticIP)
+}
+
+func (m *ManageStaticIP) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(&exampleOutputManageStaticIPOnce, exampleOutputManageStaticIPBytes, &exampleOutputManageStaticIP)
 }

@@ -166,6 +166,9 @@ func (g *GCP) Actions() []core.Action {
 		&compute.ManageVMInstancePower{},
 		&compute.UpdateVMInstanceType{},
 		&compute.GetVMInstanceMetrics{},
+		&compute.CreateStaticIP{},
+		&compute.DeleteStaticIP{},
+		&compute.ManageStaticIP{},
 		&cloudbuild.CreateBuild{},
 		&cloudbuild.GetBuild{},
 		&cloudbuild.RunTrigger{},
@@ -939,6 +942,8 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return compute.ListSubnetworkResources(reqCtx, client, p["project"], p["region"])
 	case compute.ResourceTypeAddress:
 		return compute.ListAddressResources(reqCtx, client, p["project"], p["region"])
+	case compute.ResourceTypeStaticIP:
+		return compute.ListStaticIPResources(reqCtx, client, p["project"], p["instance"])
 	case compute.ResourceTypeFirewall:
 		return compute.ListFirewallResources(reqCtx, client, p["project"])
 	case compute.ResourceTypeInstance:
