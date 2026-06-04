@@ -2106,11 +2106,27 @@ func (c *Client) ListAlarms() ([]MetricAlarm, error) {
 	return c.listAlarms(url.Values{})
 }
 
+// ListAlarmsForInstance returns alarms whose Dimensions include InstanceId=instanceID.
+// Note: DescribeAlarms does not support server-side dimension filtering, so this
+// method fetches all alarms in the region and filters in memory.
 func (c *Client) ListAlarmsForInstance(instanceID string) ([]MetricAlarm, error) {
-	base := url.Values{}
-	base.Set("Dimensions.member.1.Name", "InstanceId")
-	base.Set("Dimensions.member.1.Value", strings.TrimSpace(instanceID))
-	return c.listAlarms(base)
+	all, err := c.listAlarms(url.Values{})
+	if err != nil {
+		return nil, err
+	}
+
+	target := strings.TrimSpace(instanceID)
+	filtered := make([]MetricAlarm, 0, len(all))
+	for _, alarm := range all {
+		for _, dim := range alarm.Dimensions {
+			if dim.Name == "InstanceId" && dim.Value == target {
+				filtered = append(filtered, alarm)
+				break
+			}
+		}
+	}
+
+	return filtered, nil
 }
 
 func (c *Client) listAlarms(base url.Values) ([]MetricAlarm, error) {

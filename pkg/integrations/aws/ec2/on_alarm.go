@@ -79,23 +79,33 @@ func (p *OnAlarm) Documentation() string {
 
 ## Use Cases
 
-- **Incident response**: Trigger remediation workflows when an instance alarm fires
-- **Auto-scaling**: React to CPU or network alarms on individual instances
+- **Incident response**: Trigger remediation workflows when a CPU, network, or status-check alarm fires
+- **Auto-scaling**: React to alarms on individual instances without polling
 - **Audit**: Record alarm state transitions for specific instances over time
 
 ## Configuration
 
 - **Region**: AWS region where the instance and alarms reside
-- **Instance**: EC2 instance whose alarms to monitor
-- **Alarm State**: Only trigger for the specified state (OK, ALARM, or INSUFFICIENT_DATA)
-- **Alarms**: Optional alarm name filters (supports equals, not-equals, and regex matches)
+- **Instance**: EC2 instance whose alarms to monitor (required)
+- **Alarm State**: Only trigger for a specific state: ALARM, OK, or INSUFFICIENT_DATA (required)
+- **Alarm**: Optionally restrict to a single alarm selected from the alarms attached to the chosen instance; leave empty to trigger on any alarm for that instance
+
+## How it works
+
+The trigger subscribes to the EventBridge "CloudWatch Alarm State Change" rule and filters
+events in two steps:
+1. Checks that ` + "`detail.state.value`" + ` matches the configured Alarm State.
+2. Checks that the ` + "`InstanceId`" + ` dimension in ` + "`detail.configuration.metrics`" + ` matches the configured instance.
+If an Alarm is selected, an additional exact-name check on ` + "`detail.alarmName`" + ` is applied.
 
 ## Event Data
 
-Each alarm event includes:
+Each matched event includes the full EventBridge payload:
 - **detail.alarmName**: CloudWatch alarm name
-- **detail.state.value**: Current alarm state
+- **detail.state.value**: Current alarm state (ALARM / OK / INSUFFICIENT_DATA)
 - **detail.previousState.value**: Previous alarm state
+- **detail.configuration**: Full alarm configuration including metric, threshold, and dimensions
+- **region**, **account**, **time**: Event envelope fields
 `
 }
 

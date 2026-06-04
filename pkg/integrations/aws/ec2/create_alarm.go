@@ -64,16 +64,16 @@ func (c *CreateAlarm) Documentation() string {
 - **Region**: AWS region where the EC2 instance and alarm reside
 - **Instance**: EC2 instance to monitor
 - **Alarm Name**: Unique name for the CloudWatch alarm
-- **Metric Name**: EC2 metric to monitor (e.g. CPUUtilization, StatusCheckFailed)
-- **Statistic**: Aggregation function (Average, Sum, Minimum, Maximum, SampleCount)
-- **Comparison Operator**: Condition for the alarm to trigger
+- **Metric Name**: EC2 CloudWatch metric to monitor (CPU, disk, network, status checks)
+- **Statistic**: Aggregation function applied over the evaluation period (Average, Sum, Min, Max, SampleCount)
+- **Comparison Operator**: How the metric is compared to the threshold (e.g. GreaterThanThreshold)
 - **Threshold**: Numeric value to compare the metric against
-- **Period**: Evaluation period in seconds (default: 300)
-- **Evaluation Periods**: Number of periods before the alarm fires (default: 1)
-- **Alarm Description**: Optional description for the alarm
+- **Period**: Evaluation window in seconds (default: 300)
+- **Evaluation Periods**: Number of consecutive periods that must breach the threshold before the alarm fires (default: 1)
+- **Alarm Description**: Optional free-text description
 - **Treat Missing Data**: How to treat missing data points (missing, ignore, breaching, notBreaching)
-- **Alarm Action**: Optional EC2 automation action (Recover, Reboot, Stop, Terminate) when the alarm fires
-- **SNS Topic (on alarm)**: Optional SNS topic to publish a notification to when the alarm enters ALARM state
+- **Alarm Action** *(toggleable)*: EC2 automation action to execute when the alarm enters ALARM state — Recover, Reboot, Stop, or Terminate
+- **SNS Topic (on alarm)** *(toggleable)*: SNS topic ARN to publish a notification to when the alarm enters ALARM state
 
 ## Output
 

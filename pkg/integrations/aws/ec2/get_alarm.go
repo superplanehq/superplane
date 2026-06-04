@@ -48,7 +48,7 @@ func (c *GetAlarm) Documentation() string {
 ## Configuration
 
 - **Region**: AWS region where the alarm resides
-- **Alarm**: CloudWatch alarm to describe
+- **Alarm**: CloudWatch alarm to describe, selected from all alarms in the chosen region (` + "`ec2.alarm`" + ` resource picker)
 
 ## Output
 
