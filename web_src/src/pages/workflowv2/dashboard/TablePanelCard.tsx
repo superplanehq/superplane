@@ -9,7 +9,7 @@ import { TypedPanelShell } from "./TypedPanelShell";
 import { useDashboardContext } from "./DashboardContext";
 import type { TablePanelContent } from "./panelTypes";
 import { normalizeTablePanelContent } from "./panelTypes";
-import { useWidgetData } from "./widget/useWidgetData";
+import { renderNeedsRunNodeOutputs, useWidgetData } from "./widget/useWidgetData";
 import { WidgetTable } from "./widget/WidgetTable";
 
 interface TablePanelCardProps {
@@ -56,7 +56,11 @@ function TablePanelBody({ content }: { content: TablePanelContent }) {
 }
 
 function TablePanelDataBound({ content, canvasId }: { content: TablePanelContent; canvasId: string }) {
-  const { rows, isLoading, error } = useWidgetData(canvasId, content.dataSource);
+  const { rows, isLoading, error } = useWidgetData(
+    canvasId,
+    content.dataSource,
+    renderNeedsRunNodeOutputs(content.render),
+  );
   if (error) return <PanelError message={error} />;
   return <WidgetTable render={content.render} rows={rows} isLoading={isLoading} />;
 }

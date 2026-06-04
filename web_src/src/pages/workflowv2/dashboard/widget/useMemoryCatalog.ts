@@ -67,11 +67,14 @@ export function useMemoryCatalog(canvasId: string | undefined, namespace?: strin
   };
 }
 
-export function suggestColumnFormat(field: string): "status" | "relative" | "datetime" | "link" | "text" {
+export function suggestColumnFormat(field: string): "status" | "relative" | "datetime" | "link" | "duration" | "text" {
   const lower = field.toLowerCase();
   if (lower === "status" || lower === "state" || lower === "health") return "status";
   if (lower.endsWith("_at") || lower.includes("created") || lower.includes("updated")) return "relative";
   if (lower === "url" || lower === "link" || lower === "href") return "link";
+  // `durationMs` (and any `*Ms` numeric field) renders best with the duration
+  // formatter, which turns ms counts into "5m 30s" style strings.
+  if (lower === "durationms" || lower.endsWith("durationms")) return "duration";
   return "text";
 }
 
