@@ -175,3 +175,25 @@ func requireLoadBalancerARN(value string) (string, error) {
 
 	return arn, nil
 }
+
+var updateAlarmFieldKeys = []string{
+	"threshold",
+	"statistic",
+	"comparisonOperator",
+	"period",
+	"evaluationPeriods",
+	"alarmDescription",
+	"treatMissingData",
+	"alarmAction",
+	"snsTopic",
+}
+
+func requireAtLeastOneAlarmUpdate(configuration any) error {
+	for _, key := range updateAlarmFieldKeys {
+		if hasConfigKey(configuration, key) {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("at least one alarm property to update is required")
+}

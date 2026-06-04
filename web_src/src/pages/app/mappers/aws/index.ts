@@ -39,6 +39,8 @@ import { onPipelineTriggerRenderer } from "./codepipeline/on_pipeline";
 import { onImageTriggerRenderer } from "./ec2/on_image";
 import { onEc2AlarmTriggerRenderer } from "./ec2/on_alarm";
 import { createAlarmMapper } from "./ec2/create_alarm";
+import { deleteAlarmMapper } from "./ec2/delete_alarm";
+import { updateAlarmMapper } from "./ec2/update_alarm";
 import { createImageMapper } from "./ec2/create_image";
 import { createInstanceMapper } from "./ec2/create_instance";
 import { deleteInstanceMapper } from "./ec2/delete_instance";
@@ -113,6 +115,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ec2.manageElasticIP": manageElasticIPMapper,
   "ec2.copyImage": copyImageMapper,
   "ec2.createAlarm": createAlarmMapper,
+  "ec2.deleteAlarm": deleteAlarmMapper,
   "ec2.createImage": createImageMapper,
   "ec2.createInstance": createInstanceMapper,
   "ec2.deregisterImage": deregisterImageMapper,
@@ -122,6 +125,7 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "ec2.enableImage": enableImageMapper,
   "ec2.enableImageDeprecation": enableImageDeprecationMapper,
   "ec2.getAlarm": getAlarmMapper,
+  "ec2.updateAlarm": updateAlarmMapper,
   "ec2.getImage": getEc2ImageMapper,
   "ec2.getInstance": getInstanceMapper,
   "ec2.getInstanceMetrics": getInstanceMetricsMapper,
@@ -187,6 +191,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.manageElasticIP": MANAGE_ELASTIC_IP_STATE_REGISTRY,
   "ec2.copyImage": buildActionStateRegistry("copied"),
   "ec2.createAlarm": buildActionStateRegistry("created"),
+  "ec2.deleteAlarm": buildActionStateRegistry("deleted"),
   "ec2.createImage": buildActionStateRegistry("created"),
   "ec2.createInstance": buildActionStateRegistry("created"),
   "ec2.deregisterImage": buildActionStateRegistry("deregistered"),
@@ -196,6 +201,7 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "ec2.enableImage": buildActionStateRegistry("enabled"),
   "ec2.enableImageDeprecation": buildActionStateRegistry("enabled"),
   "ec2.getAlarm": buildActionStateRegistry("retrieved"),
+  "ec2.updateAlarm": buildActionStateRegistry("updated"),
   "ec2.getImage": buildActionStateRegistry("retrieved"),
   "ec2.getInstance": buildActionStateRegistry("retrieved"),
   "ec2.getInstanceMetrics": buildActionStateRegistry("retrieved"),
