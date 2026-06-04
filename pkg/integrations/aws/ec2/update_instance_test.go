@@ -134,6 +134,45 @@ func Test__UpdateInstance__Execute_NoUpdatesConfigured(t *testing.T) {
 	require.ErrorContains(t, err, "at least one of instanceType or securityGroup must be set")
 }
 
+func Test__UpdateInstance__Execute_SameInstanceTypeSkipsResize(t *testing.T) {
+	component := &UpdateInstance{}
+
+	httpCtx := &contexts.HTTPContext{
+		Responses: []*http.Response{
+			okResponse(describeInstanceXMLFull("i-abc123", "running", "t3.large")),
+			okResponse(describeInstanceXMLFull("i-abc123", "running", "t3.large")),
+		},
+	}
+	requests := &contexts.RequestContext{}
+	execState := &contexts.ExecutionStateContext{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"region":       "us-east-1",
+			"instance":     "i-abc123",
+			"instanceType": "t3.large",
+		},
+		HTTP:           httpCtx,
+		Integration:    updateIntegration(),
+		Metadata:       &contexts.MetadataContext{},
+		Requests:       requests,
+		ExecutionState: execState,
+	})
+
+	require.NoError(t, err)
+	assert.True(t, execState.Passed)
+	assert.Equal(t, UpdateInstancePayloadType, execState.Type)
+	assert.Empty(t, requests.Action)
+	assert.Len(t, httpCtx.Requests, 2)
+
+	for _, req := range httpCtx.Requests {
+		body, readErr := io.ReadAll(req.Body)
+		require.NoError(t, readErr)
+		assert.NotContains(t, string(body), "StopInstances")
+		assert.NotContains(t, string(body), "ModifyInstanceAttribute")
+	}
+}
+
 func Test__UpdateInstance__Execute_TypeChange_WasRunning(t *testing.T) {
 	component := &UpdateInstance{}
 

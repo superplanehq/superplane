@@ -354,11 +354,11 @@ func (c *GetInstanceMetrics) Execute(ctx core.ExecutionContext) error {
 	}
 
 	if config.IncludeMemory {
-		if memErr != nil || len(memPoints) == 0 {
-			payload["avgMemoryUsagePercent"] = nil
-		} else {
-			payload["avgMemoryUsagePercent"] = roundMetric(averageDatapoints(memPoints), 2)
+		memoryPercent, err := memoryUsagePercent(memErr, memPoints)
+		if err != nil {
+			return err
 		}
+		payload["avgMemoryUsagePercent"] = memoryPercent
 	}
 
 	return ctx.ExecutionState.Emit(
@@ -379,6 +379,18 @@ func averageDatapoints(points []CloudWatchDatapoint) float64 {
 	}
 
 	return sum / float64(len(points))
+}
+
+func memoryUsagePercent(memErr error, points []CloudWatchDatapoint) (any, error) {
+	if memErr != nil {
+		return nil, fmt.Errorf("failed to get memory metrics: %w", memErr)
+	}
+
+	if len(points) == 0 {
+		return nil, nil
+	}
+
+	return roundMetric(averageDatapoints(points), 2), nil
 }
 
 func sumDatapoints(points []CloudWatchDatapoint) float64 {
