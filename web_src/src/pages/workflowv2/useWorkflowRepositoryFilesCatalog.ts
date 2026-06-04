@@ -89,6 +89,7 @@ export function useWorkflowRepositorySelectedFileQuery(
   selectedPath: string | null,
   repositoryPathSet: Set<string>,
   generatedFilesByPath: Map<string, WorkflowFile>,
+  branch?: string,
 ) {
   const selectedGeneratedFile = selectedPath ? generatedFilesByPath.get(selectedPath) : undefined;
   const selectedPathExistsInRepository = selectedPath ? repositoryPathSet.has(selectedPath) : false;
@@ -96,6 +97,7 @@ export function useWorkflowRepositorySelectedFileQuery(
     canvasId ?? "",
     selectedPath,
     !!selectedPath && selectedPathExistsInRepository && !selectedGeneratedFile,
+    branch,
   );
 
   return { selectedGeneratedFile, selectedPathExistsInRepository, selectedFileQuery };

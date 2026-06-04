@@ -19,6 +19,7 @@ export function WorkflowFilesCanvasView({
   isEditing,
   canWrite,
   activeBranch,
+  branchTipSha,
   branchStaging,
   files,
   headerActionsSlotId,
@@ -28,6 +29,7 @@ export function WorkflowFilesCanvasView({
   isEditing: boolean;
   canWrite: boolean;
   activeBranch?: string | null;
+  branchTipSha?: string;
   branchStaging?: CanvasBranchStagingState;
   files: WorkflowFile[];
   headerActionsSlotId?: string;
@@ -38,6 +40,7 @@ export function WorkflowFilesCanvasView({
     isEditing,
     canWrite,
     activeBranch,
+    branchTipSha,
     branchStaging,
     files,
     headerActionsSlotId,

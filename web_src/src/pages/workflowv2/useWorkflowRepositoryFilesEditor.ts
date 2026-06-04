@@ -23,6 +23,7 @@ type UseWorkflowRepositoryFilesEditorOptions = {
   canWrite: boolean;
   files: WorkflowFile[];
   activeBranch?: string | null;
+  branchTipSha?: string;
   branchStaging?: CanvasBranchStagingState;
   headerActionsSlotId?: string;
   onHeaderActionsChange?: (actions: WorkflowFilesHeaderActionsState | null) => void;
@@ -34,6 +35,7 @@ export function useWorkflowRepositoryFilesEditor({
   canWrite,
   files,
   activeBranch,
+  branchTipSha,
   branchStaging,
   headerActionsSlotId,
   onHeaderActionsChange,
@@ -78,7 +80,53 @@ export function useWorkflowRepositoryFilesEditor({
     tabs.selectedPath,
     catalog.repositoryPathSet,
     catalog.generatedFilesByPath,
+    useBranchStaging ? (activeBranch ?? undefined) : undefined,
   );
+  const branchHeadSha = useBranchStaging ? branchTipSha : catalog.headSha;
+
+  useEffect(() => {
+    if (!useBranchStaging || !canvasId || !activeBranch || !branchHeadSha) {
+      return;
+    }
+
+    const paths = Object.keys(loadedContentByPathRef.current).filter((path) => catalog.repositoryPathSet.has(path));
+    if (paths.length === 0) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void Promise.all(
+      paths.map(async (path) => {
+        const content = await fetchCanvasRepositoryFileContent(canvasId, path, activeBranch).catch(() => "");
+        return [path, content] as const;
+      }),
+    ).then((results) => {
+      if (cancelled) {
+        return;
+      }
+
+      setLoadedContentByPath((current) => {
+        const next = { ...current };
+        let changed = false;
+
+        for (const [path, content] of results) {
+          if (next[path] === content) {
+            continue;
+          }
+
+          next[path] = content;
+          changed = true;
+        }
+
+        return changed ? next : current;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBranch, branchHeadSha, canvasId, catalog.repositoryPathSet, useBranchStaging]);
 
   useEffect(() => {
     if (!useBranchStaging || !canvasId || !activeBranch || !branchStaging?.stagingRecord) {

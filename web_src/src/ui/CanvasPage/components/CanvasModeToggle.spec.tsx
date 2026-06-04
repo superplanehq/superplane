@@ -101,6 +101,23 @@ describe("CanvasModeToggle", () => {
     expect(screen.getByTestId("canvas-view-mode-files-uncommitted-dot")).toBeInTheDocument();
   });
 
+  it("shows a blue dot on the Files tab when repository files are committed and ready to publish", () => {
+    render(
+      <CanvasModeToggle
+        mode="files"
+        editing
+        editTabTone="ready"
+        onSelectLive={vi.fn()}
+        onSelectDashboard={vi.fn()}
+        onSelectFiles={vi.fn()}
+        hasFilesCommitted
+      />,
+    );
+
+    expect(screen.getByTestId("canvas-view-mode-files-committed-dot")).toBeInTheDocument();
+    expect(screen.queryByTestId("canvas-view-mode-files-uncommitted-dot")).not.toBeInTheDocument();
+  });
+
   it("invokes onSelectFiles when clicking the Files tab", async () => {
     const user = userEvent.setup();
     const onSelectFiles = vi.fn();

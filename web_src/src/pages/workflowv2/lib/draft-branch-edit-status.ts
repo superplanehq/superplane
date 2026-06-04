@@ -1,10 +1,11 @@
 import type { CanvasesCanvasDashboard, CanvasesCanvasVersion } from "@/api-client";
 import type { DraftBranchEditStatus } from "@/components/CanvasToolSidebar/DraftBranchRow";
-import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH, getStaging } from "@/lib/canvas-staging";
+import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH, getStaging, stagingMatchesBranchHead } from "@/lib/canvas-staging";
 import { parseDashboardYaml } from "@/pages/workflowv2/dashboard/dashboardYaml";
 import { hasDraftVersusLiveConsoleDiff } from "@/pages/workflowv2/draftConsoleDiff";
 import { hasDraftVersusLiveGraphDiff } from "@/pages/workflowv2/draftNodeDiff";
 import { fetchCanvasRepositoryFileContent } from "@/pages/workflowv2/lib/canvas-repository-files";
+import { branchHasCommittedRepositoryFilesVersusLive } from "@/pages/workflowv2/lib/repository-files-branch-diff";
 import { hasStagedRepositoryFileChanges } from "@/pages/workflowv2/lib/workflow-files-staging";
 import { parseCanvasYamlToSpec } from "@/pages/workflowv2/lib/canvas-yaml-staging";
 import { stagingFileDiffersFromBaseline } from "@/pages/workflowv2/useCanvasBranchStaging";
@@ -42,6 +43,7 @@ export type DraftBranchChangeDetail = {
   hasUncommittedFiles: boolean;
   hasCommittedCanvasVersusLive: boolean;
   hasCommittedConsoleVersusLive: boolean;
+  hasCommittedFilesVersusLive: boolean;
 };
 
 function branchCommittedDiffVersusLive(
@@ -77,7 +79,7 @@ export async function computeDraftBranchChangeDetail(
     [CONSOLE_YAML_PATH]: consoleYaml,
   };
 
-  const stagingMatchesTip = !!staging && (!tipSha || staging.baseHeadSha === tipSha);
+  const stagingMatchesTip = stagingMatchesBranchHead(staging, tipSha);
   const hasUncommittedCanvas =
     stagingMatchesTip && stagingFileDiffersFromBaseline(staging, baselineFiles, CANVAS_YAML_PATH);
   const hasUncommittedConsole =
@@ -89,6 +91,7 @@ export async function computeDraftBranchChangeDetail(
     canvasYaml,
     consoleYaml,
   );
+  const hasCommittedFilesVersusLive = await branchHasCommittedRepositoryFilesVersusLive(canvasId, branchName);
 
   if (hasUncommittedCanvas || hasUncommittedConsole || hasUncommittedFiles) {
     return {
@@ -98,10 +101,11 @@ export async function computeDraftBranchChangeDetail(
       hasUncommittedFiles,
       hasCommittedCanvasVersusLive,
       hasCommittedConsoleVersusLive,
+      hasCommittedFilesVersusLive,
     };
   }
 
-  if (hasCommittedCanvasVersusLive || hasCommittedConsoleVersusLive) {
+  if (hasCommittedCanvasVersusLive || hasCommittedConsoleVersusLive || hasCommittedFilesVersusLive) {
     return {
       editStatus: "ready",
       hasUncommittedCanvas: false,
@@ -109,6 +113,7 @@ export async function computeDraftBranchChangeDetail(
       hasUncommittedFiles: false,
       hasCommittedCanvasVersusLive,
       hasCommittedConsoleVersusLive,
+      hasCommittedFilesVersusLive,
     };
   }
 
@@ -119,6 +124,7 @@ export async function computeDraftBranchChangeDetail(
     hasUncommittedFiles: false,
     hasCommittedCanvasVersusLive: false,
     hasCommittedConsoleVersusLive: false,
+    hasCommittedFilesVersusLive: false,
   };
 }
 
@@ -131,13 +137,15 @@ export function aggregateDraftTabIndicators(
   const hasUncommittedFiles = details.some((detail) => detail.hasUncommittedFiles);
   const hasCommittedCanvas = details.some((detail) => detail.hasCommittedCanvasVersusLive);
   const hasCommittedConsole = details.some((detail) => detail.hasCommittedConsoleVersusLive);
+  const hasCommittedFiles = details.some((detail) => detail.hasCommittedFilesVersusLive);
 
   return getDraftChangeIndicators({
     suppressUnpublishedDraftDiscard: false,
     hasLatestDraftVersion: details.length > 0,
     hasDraftGraphDiffVersusLive: hasCommittedCanvas,
     hasDraftConsoleDiffVersusLive: hasCommittedConsole,
-    hasDraftDiffVersusLive: hasCommittedCanvas || hasCommittedConsole,
+    hasDraftRepositoryFilesDiffVersusLive: hasCommittedFiles,
+    hasDraftDiffVersusLive: hasCommittedCanvas || hasCommittedConsole || hasCommittedFiles,
     hasCanvasStagingChanges: hasUncommittedCanvas,
     hasConsoleStagingChanges: hasUncommittedConsole,
     hasFilesStagingChanges: hasUncommittedFiles,
@@ -166,9 +174,10 @@ export function resolveActiveBranchChangeDetail(
   hasUncommittedFiles: boolean,
   hasCommittedCanvasVersusLive: boolean,
   hasCommittedConsoleVersusLive: boolean,
+  hasCommittedFilesVersusLive: boolean,
 ): DraftBranchChangeDetail {
   const hasUncommitted = hasUncommittedCanvas || hasUncommittedConsole || hasUncommittedFiles;
-  const hasCommitted = hasCommittedCanvasVersusLive || hasCommittedConsoleVersusLive;
+  const hasCommitted = hasCommittedCanvasVersusLive || hasCommittedConsoleVersusLive || hasCommittedFilesVersusLive;
 
   return {
     editStatus: hasUncommitted ? "uncommitted" : hasCommitted ? "ready" : "no-changes",
@@ -177,5 +186,6 @@ export function resolveActiveBranchChangeDetail(
     hasUncommittedFiles,
     hasCommittedCanvasVersusLive,
     hasCommittedConsoleVersusLive,
+    hasCommittedFilesVersusLive,
   };
 }

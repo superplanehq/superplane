@@ -22,6 +22,7 @@ type UseDraftBranchesEditStatusArgs = {
   activeBranchHasUncommittedFiles: boolean;
   activeBranchHasCommittedCanvasVersusLive: boolean;
   activeBranchHasCommittedConsoleVersusLive: boolean;
+  activeBranchHasCommittedFilesVersusLive: boolean;
   /** While true, hide transient "no-changes" on the active branch until the starter placeholder is staged. */
   pendingPlaceholderBoot?: boolean;
 };
@@ -43,6 +44,7 @@ export function useDraftBranchesEditStatus({
   activeBranchHasUncommittedFiles,
   activeBranchHasCommittedCanvasVersusLive,
   activeBranchHasCommittedConsoleVersusLive,
+  activeBranchHasCommittedFilesVersusLive,
   pendingPlaceholderBoot = false,
 }: UseDraftBranchesEditStatusArgs): UseDraftBranchesEditStatusResult {
   const [detailsByBranch, setDetailsByBranch] = useState<Record<string, DraftBranchChangeDetail>>({});
@@ -55,6 +57,7 @@ export function useDraftBranchesEditStatus({
             activeBranchHasUncommittedFiles,
             activeBranchHasCommittedCanvasVersusLive,
             activeBranchHasCommittedConsoleVersusLive,
+            activeBranchHasCommittedFilesVersusLive,
           )
         : undefined,
     [
@@ -64,6 +67,7 @@ export function useDraftBranchesEditStatus({
       activeBranchHasUncommittedFiles,
       activeBranchHasCommittedCanvasVersusLive,
       activeBranchHasCommittedConsoleVersusLive,
+      activeBranchHasCommittedFilesVersusLive,
     ],
   );
 

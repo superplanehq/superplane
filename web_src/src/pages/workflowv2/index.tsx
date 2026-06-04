@@ -1200,6 +1200,7 @@ export function WorkflowPageV2() {
     hasCanvasStagingChanges: branchStaging.hasCanvasStagingChanges,
     hasConsoleStagingChanges: branchStaging.hasConsoleStagingChanges,
     hasFilesStagingChanges: branchStaging.hasRepositoryFilesStagingChanges,
+    hasDraftRepositoryFilesDiffVersusLive: branchStaging.hasCommittedRepositoryFilesVersusLive,
     isEditingDraftBranch: !!activeBranch,
   });
   const { dashboardQuery, updateDashboardMutation, draftChangeIndicators, hasDraftDiffVersusLive } =
@@ -1224,6 +1225,7 @@ export function WorkflowPageV2() {
     activeBranchHasUncommittedFiles: draftChangeIndicators.hasUncommittedFilesDraftChanges,
     activeBranchHasCommittedCanvasVersusLive: draftChangeIndicators.hasCommittedCanvasDraftChanges,
     activeBranchHasCommittedConsoleVersusLive: draftChangeIndicators.hasCommittedConsoleDraftChanges,
+    activeBranchHasCommittedFilesVersusLive: draftChangeIndicators.hasCommittedFilesDraftChanges,
     pendingPlaceholderBoot: !!canvasId && !isAgentBootReady(canvasId),
   });
   const headerDraftChangeIndicators = useMemo(
@@ -5482,6 +5484,7 @@ export function WorkflowPageV2() {
             canvasId: canvasId || undefined,
             canWrite: canActOnCanvas,
             activeBranch,
+            branchTipSha: activeBranchMeta?.tipSha,
             branchStaging,
             files: workflowFiles,
             headerActionsSlotId: filesHeaderActionsSlotId,

@@ -50,6 +50,7 @@ import type {
   CanvasesCanvasRunResult,
   CanvasesCanvasRunState,
   CanvasesCanvasRepositoryFileOperation,
+  CanvasesCanvasDraftBranch,
   CanvasesListCanvasRepositoryFilesResponse,
 } from "../api-client/types.gen";
 import { withOrganizationHeader } from "../lib/withOrganizationHeader";
@@ -1682,7 +1683,16 @@ export const useCommitCanvasRepositoryFiles = (canvasId: string) => {
       );
       return response.data;
     },
-    onSuccess: (_data, input) => {
+    onSuccess: (data, input) => {
+      const commitSha = data?.commitSha;
+      if (commitSha && input.branch) {
+        queryClient.setQueryData<CanvasesCanvasDraftBranch[]>(canvasKeys.draftBranches(canvasId), (current) =>
+          (current ?? []).map((branch) =>
+            branch.branchName === input.branch ? { ...branch, tipSha: commitSha } : branch,
+          ),
+        );
+      }
+
       const branchKey = input.branch ?? "main";
       queryClient.setQueryData<CanvasesListCanvasRepositoryFilesResponse | undefined>(
         canvasKeys.repositoryFiles(canvasId, branchKey === "main" ? undefined : branchKey),

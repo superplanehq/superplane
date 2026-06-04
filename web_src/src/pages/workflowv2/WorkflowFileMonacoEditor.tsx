@@ -38,6 +38,8 @@ export function WorkflowFileMonacoEditor({
 }: WorkflowFileMonacoEditorProps) {
   const suppressNextChangeRef = useRef(false);
   const previousPathRef = useRef(path);
+  const contentRef = useRef(content);
+  contentRef.current = content;
 
   useEffect(() => {
     if (previousPathRef.current === path) return;
@@ -53,7 +55,16 @@ export function WorkflowFileMonacoEditor({
         return;
       }
 
-      onChange(value ?? "");
+      const next = value ?? "";
+      // Ignore echoes from programmatic `value` updates: when the controlled
+      // content prop changes (e.g. staged content reloads), Monaco fires onChange
+      // with the same value we just set. Propagating it would be treated as a user
+      // edit and could wrongly unstage a file whose content matches its baseline.
+      if (next === contentRef.current) {
+        return;
+      }
+
+      onChange(next);
     },
     [onChange],
   );

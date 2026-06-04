@@ -10,6 +10,7 @@ interface WorkflowFilesOverlayLayerProps {
   canvasId?: string;
   canWrite?: boolean;
   activeBranch?: string | null;
+  branchTipSha?: string;
   branchStaging?: CanvasBranchStagingState;
   files: WorkflowFile[];
   headerActionsSlotId?: string;
@@ -22,6 +23,7 @@ export function WorkflowFilesOverlayLayer({
   canvasId,
   canWrite = false,
   activeBranch,
+  branchTipSha,
   branchStaging,
   files,
   headerActionsSlotId,
@@ -35,6 +37,7 @@ export function WorkflowFilesOverlayLayer({
       isEditing={isEditing}
       canWrite={canWrite}
       activeBranch={activeBranch}
+      branchTipSha={branchTipSha}
       branchStaging={branchStaging}
       files={files}
       headerActionsSlotId={headerActionsSlotId}

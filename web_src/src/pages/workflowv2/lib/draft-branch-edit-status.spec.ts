@@ -11,6 +11,7 @@ describe("aggregateDraftTabIndicators", () => {
         hasUncommittedFiles: false,
         hasCommittedCanvasVersusLive: false,
         hasCommittedConsoleVersusLive: false,
+        hasCommittedFilesVersusLive: false,
       },
       "drafts/b": {
         editStatus: "ready",
@@ -19,6 +20,7 @@ describe("aggregateDraftTabIndicators", () => {
         hasUncommittedFiles: false,
         hasCommittedCanvasVersusLive: true,
         hasCommittedConsoleVersusLive: false,
+        hasCommittedFilesVersusLive: false,
       },
     });
 

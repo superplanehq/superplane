@@ -119,3 +119,23 @@ export function hasStagingFiles(record: CanvasStagingRecord | null | undefined):
 
   return Object.keys(record.files).length > 0 || (record.deletedPaths?.length ?? 0) > 0;
 }
+
+/** Whether IndexedDB staging still applies to the current branch HEAD (lenient while HEAD is loading). */
+export function stagingMatchesBranchHead(
+  record: CanvasStagingRecord | null | undefined,
+  branchHeadSha?: string,
+): boolean {
+  if (!hasStagingFiles(record)) {
+    return false;
+  }
+
+  if (!branchHeadSha) {
+    return true;
+  }
+
+  if (!record?.baseHeadSha) {
+    return true;
+  }
+
+  return record.baseHeadSha === branchHeadSha;
+}

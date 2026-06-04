@@ -108,11 +108,13 @@ describe("getDraftChangeIndicators", () => {
       hasUncommittedFilesDraftChanges: false,
       hasCommittedCanvasDraftChanges: true,
       hasCommittedConsoleDraftChanges: false,
+      hasCommittedFilesDraftChanges: false,
       hasUncommittedDraftChanges: true,
       hasCommittedDraftChanges: true,
       readyToPublishDraftChanges: false,
       readyToPublishCanvasDraftChanges: false,
       readyToPublishConsoleDraftChanges: false,
+      readyToPublishFilesDraftChanges: false,
     });
   });
 
@@ -191,6 +193,24 @@ describe("getDraftChangeIndicators", () => {
       hasCommittedDraftChanges: true,
       readyToPublishDraftChanges: true,
       readyToPublishConsoleDraftChanges: true,
+    });
+  });
+
+  it("shows blue files tab when committed repository files differ from live with clean file staging", () => {
+    expect(
+      getDraftChangeIndicators({
+        suppressUnpublishedDraftDiscard: false,
+        hasLatestDraftVersion: true,
+        hasDraftGraphDiffVersusLive: false,
+        hasDraftConsoleDiffVersusLive: false,
+        hasDraftRepositoryFilesDiffVersusLive: true,
+        hasDraftDiffVersusLive: true,
+        hasFilesStagingChanges: false,
+      }),
+    ).toMatchObject({
+      hasCommittedFilesDraftChanges: true,
+      hasUncommittedFilesDraftChanges: false,
+      readyToPublishFilesDraftChanges: true,
     });
   });
 });

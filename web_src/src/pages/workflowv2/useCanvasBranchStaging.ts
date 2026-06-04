@@ -6,6 +6,7 @@ import {
   getStaging,
   hasStagingFiles,
   putStaging,
+  stagingMatchesBranchHead,
   type CanvasStagingRecord,
 } from "@/lib/canvas-staging";
 import { useCommitCanvasRepositoryFiles } from "@/hooks/useCanvasData";
@@ -15,6 +16,7 @@ import {
 } from "@/pages/workflowv2/lib/canvas-repository-files";
 import { buildCanvasYamlFromWorkflow, parseCanvasYamlToSpec } from "@/pages/workflowv2/lib/canvas-yaml-staging";
 import { resolveStagedBranchYaml } from "@/pages/workflowv2/lib/resolve-staged-branch-yaml";
+import { branchHasCommittedRepositoryFilesVersusLive } from "@/pages/workflowv2/lib/repository-files-branch-diff";
 import { hasStagedRepositoryFileChanges } from "@/pages/workflowv2/lib/workflow-files-staging";
 import * as yaml from "js-yaml";
 import { dashboardToYaml, parseDashboardYaml } from "@/pages/workflowv2/dashboard/dashboardYaml";
@@ -175,6 +177,7 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
   const [branchDashboard, setBranchDashboard] = useState<CanvasesCanvasDashboard | null>(null);
   const [branchCanvasSpec, setBranchCanvasSpec] = useState<CanvasesCanvas["spec"] | null>(null);
   const [isLoadingBranchContent, setIsLoadingBranchContent] = useState(false);
+  const [hasCommittedRepositoryFilesVersusLive, setHasCommittedRepositoryFilesVersusLive] = useState(false);
   const stagingRecordRef = useRef(stagingRecord);
   stagingRecordRef.current = stagingRecord;
   const branchHeadRef = useRef<BranchHead | null>(null);
@@ -196,26 +199,59 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
     [stagingRecord],
   );
 
-  const persistStaging = useCallback(
-    async (files: Record<string, string>, baseHeadSha: string, deletedPaths: string[] = []) => {
-      if (!canvasId || !activeBranch) {
-        return;
-      }
+  // Staging writes are merged per-key against the persisted IndexedDB record so a
+  // write only ever touches the keys it intends to change. A blind full-record
+  // overwrite (built from a possibly-stale in-memory snapshot) used to drop other
+  // staged files — e.g. the canvas auto-save rewriting canvas.yaml would erase a
+  // staged README.md when its in-memory ref had not loaded yet.
+  const pendingMutationRef = useRef<{
+    setFiles: Record<string, string>;
+    removeFiles: Set<string>;
+    deletedPaths?: string[];
+  } | null>(null);
 
-      const nextRecord: CanvasStagingRecord = {
-        canvasId,
-        branch: activeBranch,
-        baseHeadSha,
-        files,
-        deletedPaths,
-        updatedAt: Date.now(),
-      };
+  const flushPendingMutation = useCallback(async () => {
+    const mutation = pendingMutationRef.current;
+    if (!mutation || !canvasId || !activeBranch) {
+      return;
+    }
+    pendingMutationRef.current = null;
 
-      await putStaging(nextRecord);
-      setStagingRecord(nextRecord);
-    },
-    [activeBranch, canvasId],
-  );
+    const stored = await getStaging(canvasId, activeBranch);
+    const baseHeadSha = branchHeadRef.current?.headSha || headSha || stored?.baseHeadSha || "";
+    if (!baseHeadSha) {
+      // Re-queue until the branch head is known so we never persist an orphaned record.
+      pendingMutationRef.current = mutation;
+      return;
+    }
+
+    const files = { ...(stored?.files ?? {}) };
+    for (const [path, content] of Object.entries(mutation.setFiles)) {
+      files[path] = content;
+    }
+    for (const path of mutation.removeFiles) {
+      delete files[path];
+    }
+    const deletedPaths = mutation.deletedPaths ?? stored?.deletedPaths ?? [];
+
+    const record: CanvasStagingRecord = {
+      canvasId,
+      branch: activeBranch,
+      baseHeadSha,
+      files,
+      deletedPaths,
+      updatedAt: Date.now(),
+    };
+
+    if (hasStagingFiles(record)) {
+      await putStaging(record);
+      setStagingRecord(record);
+      return;
+    }
+
+    await clearStaging(canvasId, activeBranch);
+    setStagingRecord(null);
+  }, [activeBranch, canvasId, headSha]);
 
   const loadBranchContent = useCallback(async () => {
     if (!canvasId || !activeBranch || !enabled) {
@@ -223,6 +259,7 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
       setBaselineFiles({});
       setBranchDashboard(null);
       setBranchCanvasSpec(null);
+      setHasCommittedRepositoryFilesVersusLive(false);
       return;
     }
 
@@ -231,10 +268,12 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
       const currentHeadSha = headSha || "";
       branchHeadRef.current = { branch: activeBranch, headSha: currentHeadSha };
 
-      const [canvasYaml, consoleYaml] = await Promise.all([
+      const [canvasYaml, consoleYaml, committedFilesVersusLive] = await Promise.all([
         fetchCanvasRepositoryFileContent(canvasId, CANVAS_YAML_PATH, activeBranch).catch(() => ""),
         fetchCanvasRepositoryFileContent(canvasId, CONSOLE_YAML_PATH, activeBranch).catch(() => ""),
+        branchHasCommittedRepositoryFilesVersusLive(canvasId, activeBranch),
       ]);
+      setHasCommittedRepositoryFilesVersusLive(committedFilesVersusLive);
 
       setBaselineFiles({
         [CANVAS_YAML_PATH]: canvasYaml,
@@ -242,10 +281,16 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
       });
 
       const existingStaging = await getStaging(canvasId, activeBranch);
-      if (existingStaging && existingStaging.baseHeadSha === currentHeadSha && hasStagingFiles(existingStaging)) {
-        setStagingRecord(existingStaging);
+      if (existingStaging && stagingMatchesBranchHead(existingStaging, currentHeadSha)) {
+        let staging = existingStaging;
+        if (currentHeadSha && staging.baseHeadSha !== currentHeadSha) {
+          staging = { ...staging, baseHeadSha: currentHeadSha, updatedAt: Date.now() };
+          await putStaging(staging);
+        }
+
+        setStagingRecord(staging);
         const { canvasYaml: stagedCanvasYaml, consoleYaml: stagedConsoleYaml } = resolveStagedBranchYaml(
-          existingStaging,
+          staging,
           canvasYaml,
           consoleYaml,
         );
@@ -266,86 +311,135 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
     void loadBranchContent();
   }, [loadBranchContent]);
 
-  const stageFilesDebounced = useMemo(
+  useEffect(() => {
+    if (!canvasId || !activeBranch || !headSha) {
+      return;
+    }
+
+    const record = stagingRecordRef.current;
+    if (!record || record.baseHeadSha === headSha) {
+      return;
+    }
+
+    if (!record.baseHeadSha) {
+      const repaired: CanvasStagingRecord = { ...record, baseHeadSha: headSha, updatedAt: Date.now() };
+      branchHeadRef.current = { branch: activeBranch, headSha };
+      void putStaging(repaired);
+      setStagingRecord(repaired);
+    }
+  }, [activeBranch, canvasId, headSha]);
+
+  const scheduleFlush = useMemo(
     () =>
-      debounce(async (files: Record<string, string>, baseHeadSha: string, deletedPaths: string[] = []) => {
-        await persistStaging(files, baseHeadSha, deletedPaths);
+      debounce(() => {
+        void flushPendingMutation();
       }, 500),
-    [persistStaging],
+    [flushPendingMutation],
   );
 
-  const applyStagingUpdate = useCallback(
-    (files: Record<string, string>, deletedPaths: string[]) => {
+  const queueStagingMutation = useCallback(
+    (delta: { setFiles?: Record<string, string>; removeFiles?: string[]; deletedPaths?: string[] }) => {
+      const pending = pendingMutationRef.current ?? {
+        setFiles: {},
+        removeFiles: new Set<string>(),
+      };
+
+      for (const [path, content] of Object.entries(delta.setFiles ?? {})) {
+        pending.setFiles[path] = content;
+        pending.removeFiles.delete(path);
+      }
+      for (const path of delta.removeFiles ?? []) {
+        pending.removeFiles.add(path);
+        delete pending.setFiles[path];
+      }
+      if (delta.deletedPaths) {
+        pending.deletedPaths = delta.deletedPaths;
+      }
+
+      pendingMutationRef.current = pending;
+      scheduleFlush();
+    },
+    [scheduleFlush],
+  );
+
+  // Applies a staging delta optimistically to the in-memory record (for snappy UI
+  // and accurate change indicators) and queues a merge-based persist to IndexedDB.
+  const commitStagingDelta = useCallback(
+    (delta: { setFiles?: Record<string, string>; removeFiles?: string[]; deletedPaths?: string[] }) => {
       if (!canvasId || !activeBranch) {
         return;
       }
 
-      const baseHeadSha = branchHeadRef.current?.headSha || headSha || "";
-      void stageFilesDebounced(files, baseHeadSha, deletedPaths);
-      setStagingRecord({
-        canvasId,
-        branch: activeBranch,
-        baseHeadSha,
-        files,
-        deletedPaths,
-        updatedAt: Date.now(),
+      setStagingRecord((prev) => {
+        const files = { ...(prev?.files ?? {}) };
+        for (const [path, content] of Object.entries(delta.setFiles ?? {})) {
+          files[path] = content;
+        }
+        for (const path of delta.removeFiles ?? []) {
+          delete files[path];
+        }
+        const deletedPaths = delta.deletedPaths ?? prev?.deletedPaths ?? [];
+        const baseHeadSha = prev?.baseHeadSha || branchHeadRef.current?.headSha || headSha || "";
+        const next: CanvasStagingRecord = {
+          canvasId,
+          branch: activeBranch,
+          baseHeadSha,
+          files,
+          deletedPaths,
+          updatedAt: Date.now(),
+        };
+        return hasStagingFiles(next) ? next : null;
       });
+
+      queueStagingMutation(delta);
     },
-    [activeBranch, canvasId, headSha, stageFilesDebounced],
+    [activeBranch, canvasId, headSha, queueStagingMutation],
   );
 
   const stageRepositoryFile = useCallback(
     (path: string, content: string) => {
-      const currentFiles = { ...(stagingRecordRef.current?.files ?? {}) };
       const currentDeleted = (stagingRecordRef.current?.deletedPaths ?? []).filter(
         (deletedPath) => deletedPath !== path,
       );
-      currentFiles[path] = content;
-      applyStagingUpdate(currentFiles, currentDeleted);
+      commitStagingDelta({ setFiles: { [path]: content }, deletedPaths: currentDeleted });
     },
-    [applyStagingUpdate],
+    [commitStagingDelta],
   );
 
   const stageRepositoryFileDelete = useCallback(
     (path: string, existsInRepository: boolean) => {
-      const currentFiles = { ...(stagingRecordRef.current?.files ?? {}) };
-      const currentDeleted = [...(stagingRecordRef.current?.deletedPaths ?? [])];
-
       if (!existsInRepository) {
-        delete currentFiles[path];
-        applyStagingUpdate(
-          currentFiles,
-          currentDeleted.filter((deletedPath) => deletedPath !== path),
+        const currentDeleted = (stagingRecordRef.current?.deletedPaths ?? []).filter(
+          (deletedPath) => deletedPath !== path,
         );
+        commitStagingDelta({ removeFiles: [path], deletedPaths: currentDeleted });
         return;
       }
 
-      delete currentFiles[path];
+      const currentDeleted = [...(stagingRecordRef.current?.deletedPaths ?? [])];
       if (!currentDeleted.includes(path)) {
         currentDeleted.push(path);
       }
-      applyStagingUpdate(currentFiles, currentDeleted);
+      commitStagingDelta({ removeFiles: [path], deletedPaths: currentDeleted });
     },
-    [applyStagingUpdate],
+    [commitStagingDelta],
   );
 
   const unstageRepositoryFile = useCallback(
     (path: string) => {
-      const currentFiles = { ...(stagingRecordRef.current?.files ?? {}) };
       const currentDeleted = (stagingRecordRef.current?.deletedPaths ?? []).filter(
         (deletedPath) => deletedPath !== path,
       );
-      delete currentFiles[path];
-      applyStagingUpdate(currentFiles, currentDeleted);
+      commitStagingDelta({ removeFiles: [path], deletedPaths: currentDeleted });
     },
-    [applyStagingUpdate],
+    [commitStagingDelta],
   );
 
   useEffect(() => {
     return () => {
-      stageFilesDebounced.cancel();
+      scheduleFlush.cancel();
     };
-  }, [stageFilesDebounced]);
+  }, [scheduleFlush]);
 
   const setLocalBranchCanvasSpec = useCallback((spec: CanvasesCanvas["spec"] | null | undefined) => {
     setBranchCanvasSpec(spec ?? null);
@@ -357,10 +451,9 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
         return;
       }
 
-      const baseHeadSha = branchHeadRef.current?.headSha || headSha || "";
-      const currentFiles = { ...(stagingRecordRef.current?.files ?? {}) };
-      const currentDeleted = [...(stagingRecordRef.current?.deletedPaths ?? [])];
-      currentFiles[CANVAS_YAML_PATH] = buildCanvasYamlFromWorkflow(workflow);
+      const setFiles: Record<string, string> = {
+        [CANVAS_YAML_PATH]: buildCanvasYamlFromWorkflow(workflow),
+      };
 
       if (branchDashboard) {
         const panels = (branchDashboard.panels ?? []).map((panel) => ({
@@ -377,21 +470,13 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
           ...(item.minW !== undefined ? { minW: item.minW } : {}),
           ...(item.minH !== undefined ? { minH: item.minH } : {}),
         }));
-        currentFiles[CONSOLE_YAML_PATH] = dashboardPanelsToYaml(canvasId, canvasName, panels, layout);
+        setFiles[CONSOLE_YAML_PATH] = dashboardPanelsToYaml(canvasId, canvasName, panels, layout);
       }
 
-      void stageFilesDebounced(currentFiles, baseHeadSha, currentDeleted);
-      setStagingRecord({
-        canvasId,
-        branch: activeBranch,
-        baseHeadSha,
-        files: currentFiles,
-        deletedPaths: currentDeleted,
-        updatedAt: Date.now(),
-      });
+      commitStagingDelta({ setFiles });
       setBranchCanvasSpec(workflow.spec ?? null);
     },
-    [activeBranch, branchDashboard, canvasId, headSha, stageFilesDebounced],
+    [activeBranch, branchDashboard, canvasId, commitStagingDelta],
   );
 
   const stageConsoleDashboard = useCallback(
@@ -400,19 +485,8 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
         return;
       }
 
-      const baseHeadSha = branchHeadRef.current?.headSha || headSha || "";
-      const currentFiles = { ...(stagingRecordRef.current?.files ?? {}) };
-      const currentDeleted = [...(stagingRecordRef.current?.deletedPaths ?? [])];
-      currentFiles[CONSOLE_YAML_PATH] = dashboardPanelsToYaml(canvasId, canvasName, input.panels, input.layout);
-
-      void stageFilesDebounced(currentFiles, baseHeadSha, currentDeleted);
-      setStagingRecord({
-        canvasId,
-        branch: activeBranch,
-        baseHeadSha,
-        files: currentFiles,
-        deletedPaths: currentDeleted,
-        updatedAt: Date.now(),
+      commitStagingDelta({
+        setFiles: { [CONSOLE_YAML_PATH]: dashboardPanelsToYaml(canvasId, canvasName, input.panels, input.layout) },
       });
       setBranchDashboard({
         panels: input.panels.map((panel) => ({
@@ -431,7 +505,7 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
         })),
       });
     },
-    [activeBranch, canvasId, headSha, stageFilesDebounced],
+    [activeBranch, canvasId, commitStagingDelta],
   );
 
   const discardStaging = useCallback(async () => {
@@ -439,29 +513,34 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
       return;
     }
 
-    stageFilesDebounced.cancel();
+    scheduleFlush.cancel();
+    pendingMutationRef.current = null;
     await clearStaging(canvasId, activeBranch);
     setStagingRecord(null);
     await loadBranchContent();
-  }, [activeBranch, canvasId, loadBranchContent, stageFilesDebounced]);
+  }, [activeBranch, canvasId, loadBranchContent, scheduleFlush]);
 
   // Flush any pending debounced write so the latest staged content is persisted
   // to IndexedDB before leaving the branch. Staging is keyed per branch, so it is
   // kept and reapplied when the user returns to this draft.
-  const flushStaging = useCallback(() => {
-    stageFilesDebounced.flush();
-  }, [stageFilesDebounced]);
+  const flushStaging = useCallback(async () => {
+    scheduleFlush.cancel();
+    await flushPendingMutation();
+  }, [flushPendingMutation, scheduleFlush]);
 
   const commitStaging = useCallback(
     async (message = "Update canvas files") => {
-      if (!canvasId || !activeBranch || !stagingRecordRef.current) {
+      if (!canvasId || !activeBranch) {
         return null;
       }
 
-      stageFilesDebounced.flush();
+      scheduleFlush.cancel();
+      await flushPendingMutation();
 
-      const record = stagingRecordRef.current;
-      if (!hasStagingFiles(record)) {
+      // Read the authoritative persisted record so the commit reflects every staged
+      // file, not a possibly-stale in-memory snapshot.
+      const record = (await getStaging(canvasId, activeBranch)) ?? stagingRecordRef.current;
+      if (!record || !hasStagingFiles(record)) {
         return null;
       }
 
@@ -478,12 +557,17 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
         ],
       });
 
+      const commitSha = response?.commitSha;
+      if (commitSha) {
+        branchHeadRef.current = { branch: activeBranch, headSha: commitSha };
+      }
+
       await clearStaging(canvasId, activeBranch);
       setStagingRecord(null);
       await loadBranchContent();
       return response;
     },
-    [activeBranch, canvasId, commitFilesMutation, headSha, loadBranchContent, stageFilesDebounced],
+    [activeBranch, canvasId, commitFilesMutation, flushPendingMutation, headSha, loadBranchContent, scheduleFlush],
   );
 
   const updateConsoleMutation = useMemo(
@@ -517,6 +601,7 @@ export function useCanvasBranchStaging({ canvasId, activeBranch, headSha, enable
     hasCanvasStagingChanges,
     hasConsoleStagingChanges,
     hasRepositoryFilesStagingChanges,
+    hasCommittedRepositoryFilesVersusLive,
     branchCanvasSpec,
     branchDashboard,
     branchHeadCanvasSpec,

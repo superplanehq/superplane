@@ -222,6 +222,7 @@ export interface CanvasPageProps {
   readyToPublishDraftChanges?: boolean;
   readyToPublishCanvasDraftChanges?: boolean;
   readyToPublishConsoleDraftChanges?: boolean;
+  readyToPublishFilesDraftChanges?: boolean;
   activeDraftHasNoChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
@@ -1369,6 +1370,7 @@ function CanvasPage(props: CanvasPageProps) {
           readyToPublishDraftChanges={props.readyToPublishDraftChanges}
           readyToPublishCanvasDraftChanges={props.readyToPublishCanvasDraftChanges}
           readyToPublishConsoleDraftChanges={props.readyToPublishConsoleDraftChanges}
+          readyToPublishFilesDraftChanges={props.readyToPublishFilesDraftChanges}
           activeDraftHasNoChanges={props.activeDraftHasNoChanges}
           unpublishedDraftUpdatedAt={props.unpublishedDraftUpdatedAt}
           onDiscardDraftAndStartEdit={props.onDiscardDraftAndStartEdit}
@@ -1920,6 +1922,7 @@ function CanvasContentHeader({
   readyToPublishDraftChanges,
   readyToPublishCanvasDraftChanges,
   readyToPublishConsoleDraftChanges,
+  readyToPublishFilesDraftChanges,
   activeDraftHasNoChanges,
   unpublishedDraftUpdatedAt,
   onDiscardDraftAndStartEdit,
@@ -1996,6 +1999,7 @@ function CanvasContentHeader({
   readyToPublishDraftChanges?: boolean;
   readyToPublishCanvasDraftChanges?: boolean;
   readyToPublishConsoleDraftChanges?: boolean;
+  readyToPublishFilesDraftChanges?: boolean;
   activeDraftHasNoChanges?: boolean;
   unpublishedDraftUpdatedAt?: string;
   onDiscardDraftAndStartEdit?: () => void;
@@ -2071,6 +2075,7 @@ function CanvasContentHeader({
       readyToPublishDraftChanges={readyToPublishDraftChanges}
       readyToPublishCanvasDraftChanges={readyToPublishCanvasDraftChanges}
       readyToPublishConsoleDraftChanges={readyToPublishConsoleDraftChanges}
+      readyToPublishFilesDraftChanges={readyToPublishFilesDraftChanges}
       activeDraftHasNoChanges={activeDraftHasNoChanges}
       unpublishedDraftUpdatedAt={unpublishedDraftUpdatedAt}
       onDiscardDraftAndStartEdit={onDiscardDraftAndStartEdit}

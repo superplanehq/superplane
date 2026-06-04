@@ -2,7 +2,14 @@ import "fake-indexeddb/auto";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { CANVAS_YAML_PATH, CONSOLE_YAML_PATH } from "./types";
-import { clearStaging, getStaging, hasStagingFiles, openStagingDB, putStaging } from "./index";
+import {
+  clearStaging,
+  getStaging,
+  hasStagingFiles,
+  openStagingDB,
+  putStaging,
+  stagingMatchesBranchHead,
+} from "./index";
 
 describe("canvas-staging", () => {
   beforeEach(async () => {
@@ -70,5 +77,50 @@ describe("canvas-staging", () => {
         updatedAt: Date.now(),
       }),
     ).toBe(true);
+  });
+
+  it("matches staging while branch head is still loading", () => {
+    expect(
+      stagingMatchesBranchHead(
+        {
+          canvasId: "canvas-1",
+          branch: "drafts/user-1",
+          baseHeadSha: "abc1234567890123456789012345678901234567890",
+          files: { "README.md": "test" },
+          updatedAt: Date.now(),
+        },
+        undefined,
+      ),
+    ).toBe(true);
+  });
+
+  it("matches staging saved before branch head was known", () => {
+    expect(
+      stagingMatchesBranchHead(
+        {
+          canvasId: "canvas-1",
+          branch: "drafts/user-1",
+          baseHeadSha: "",
+          files: { "README.md": "test" },
+          updatedAt: Date.now(),
+        },
+        "abc1234567890123456789012345678901234567890",
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects staging from a different branch head", () => {
+    expect(
+      stagingMatchesBranchHead(
+        {
+          canvasId: "canvas-1",
+          branch: "drafts/user-1",
+          baseHeadSha: "old1234567890123456789012345678901234567890",
+          files: { "README.md": "test" },
+          updatedAt: Date.now(),
+        },
+        "abc1234567890123456789012345678901234567890",
+      ),
+    ).toBe(false);
   });
 });

@@ -21,6 +21,7 @@ interface CanvasModeToggleProps {
   hasDashboardUncommitted?: boolean;
   hasDashboardCommitted?: boolean;
   hasFilesUncommitted?: boolean;
+  hasFilesCommitted?: boolean;
   /** Edit-mode tab bar color aligned with draft status badges. */
   editTabTone?: "uncommitted" | "ready" | "neutral";
 }
@@ -77,6 +78,7 @@ export function CanvasModeToggle({
   hasDashboardUncommitted,
   hasDashboardCommitted,
   hasFilesUncommitted,
+  hasFilesCommitted,
   editTabTone = "neutral",
 }: CanvasModeToggleProps) {
   const canvasUncommitted = hasCanvasUncommitted ?? hasDraft;
@@ -84,6 +86,7 @@ export function CanvasModeToggle({
   const dashboardUncommitted = hasDashboardUncommitted ?? hasDashboardDraft;
   const dashboardCommitted = hasDashboardCommitted ?? false;
   const filesUncommitted = hasFilesUncommitted ?? false;
+  const filesCommitted = hasFilesCommitted ?? false;
   const showDashboard = Boolean(onSelectDashboard);
   const showMemory = Boolean(onSelectMemory);
   const showFiles = Boolean(onSelectFiles);
@@ -192,7 +195,11 @@ export function CanvasModeToggle({
           <TabsTrigger value={FILES_TAB} data-testid="canvas-view-mode-files" aria-label="Files">
             <span className="inline-flex items-center gap-1.5">
               Files
-              <DraftChangeDots uncommitted={filesUncommitted} committed={false} testIdPrefix="canvas-view-mode-files" />
+              <DraftChangeDots
+                uncommitted={filesUncommitted}
+                committed={filesCommitted}
+                testIdPrefix="canvas-view-mode-files"
+              />
             </span>
           </TabsTrigger>
         ) : null}

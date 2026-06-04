@@ -35,9 +35,14 @@ export function pendingChangesFromStaging(
   }
 
   for (const [path, content] of Object.entries(stagingRecord.files)) {
+    if (RESERVED_STAGING_PATHS.has(path)) {
+      continue;
+    }
+
     const baseline = baselineByPath[path];
     if (baseline === undefined) {
       if (repositoryPathSet?.has(path)) {
+        pending[path] = { type: "modified", path, content };
         continue;
       }
 

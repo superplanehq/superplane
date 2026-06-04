@@ -80,6 +80,7 @@ export interface HeaderProps {
   readyToPublishDraftChanges?: boolean;
   readyToPublishCanvasDraftChanges?: boolean;
   readyToPublishConsoleDraftChanges?: boolean;
+  readyToPublishFilesDraftChanges?: boolean;
   /** Active git draft branch matches live with no staging (blue edit chrome). */
   activeDraftHasNoChanges?: boolean;
   /** ISO timestamp of the existing unpublished draft, used to label "Last edited X" in the Edit dropdown. */
@@ -281,6 +282,7 @@ function SecondaryHeader(props: HeaderProps) {
               hasDashboardUncommitted={!!props.hasUncommittedConsoleDraftChanges}
               hasDashboardCommitted={!!props.readyToPublishConsoleDraftChanges}
               hasFilesUncommitted={!!props.hasUncommittedFilesDraftChanges}
+              hasFilesCommitted={!!props.readyToPublishFilesDraftChanges}
             />
           ) : null}
         </div>

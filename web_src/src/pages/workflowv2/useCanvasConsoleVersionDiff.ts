@@ -53,6 +53,7 @@ type UseCanvasConsoleVersionDiffArgs = {
   hasCanvasStagingChanges?: boolean;
   hasConsoleStagingChanges?: boolean;
   hasFilesStagingChanges?: boolean;
+  hasDraftRepositoryFilesDiffVersusLive?: boolean;
   isEditingDraftBranch?: boolean;
 };
 
@@ -69,6 +70,7 @@ export function useCanvasConsoleVersionDiff({
   hasCanvasStagingChanges,
   hasConsoleStagingChanges,
   hasFilesStagingChanges,
+  hasDraftRepositoryFilesDiffVersusLive,
   isEditingDraftBranch,
 }: UseCanvasConsoleVersionDiffArgs) {
   const liveDashboardQuery = useCanvasConsole(canvasId, versionIds.live || undefined, enabled && !!versionIds.live);
@@ -116,12 +118,14 @@ export function useCanvasConsoleVersionDiff({
       setConsoleDiffOpen(false);
     }
   }, [consoleDiffOpen, consoleYamlDiffPayload]);
-  const hasDraftDiffVersusLive = hasDraftGraphDiffVersusLive || hasDraftConsoleDiffVersusLive;
+  const hasDraftDiffVersusLive =
+    hasDraftGraphDiffVersusLive || hasDraftConsoleDiffVersusLive || !!hasDraftRepositoryFilesDiffVersusLive;
   const draftChangeIndicators = getDraftChangeIndicators({
     suppressUnpublishedDraftDiscard,
     hasLatestDraftVersion: isEditingDraftBranch || !!versionIds.draft,
     hasDraftGraphDiffVersusLive,
     hasDraftConsoleDiffVersusLive,
+    hasDraftRepositoryFilesDiffVersusLive,
     hasDraftDiffVersusLive,
     hasCanvasStagingChanges,
     hasConsoleStagingChanges,
