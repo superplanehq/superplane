@@ -60,13 +60,6 @@ export function ActionRow({
         onQuickInsert={onPayloadEntryQuickInsert}
       />
       <ActionIconSelect action={action} onChange={onChange} />
-      {fieldOptions.length > 0 ? (
-        <datalist id="table-field-options">
-          {fieldOptions.map((f) => (
-            <option key={f} value={f} />
-          ))}
-        </datalist>
-      ) : null}
     </div>
   );
 }

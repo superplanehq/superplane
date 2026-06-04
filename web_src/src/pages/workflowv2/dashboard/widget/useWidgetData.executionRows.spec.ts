@@ -14,6 +14,7 @@ const PAGES = [
   {
     events: [
       {
+        data: { pr_number: 42, branch: "main" },
         executions: [
           { id: "exec-1", nodeId: "node-a", state: "STATE_FINISHED", result: "RESULT_PASSED" },
           { id: "exec-2", nodeId: "node-b", state: "STATE_STARTED" },
@@ -30,6 +31,7 @@ type ExecutionRow = {
   nodeId: string;
   nodeName: string;
   status: string;
+  payload?: Record<string, unknown>;
 };
 
 describe("buildNodeNameMap", () => {
@@ -80,5 +82,26 @@ describe("collectExecutionRows nodeName resolution", () => {
   it("derives status from state/result", () => {
     const rows = collectExecutionRows(PAGES, undefined, buildNodeNameMap(NODES), 10) as ExecutionRow[];
     expect(rows.map((r) => r.status)).toEqual(["passed", "running", "failed", "pending"]);
+  });
+
+  it("attaches the parent event's data as the row payload", () => {
+    const rows = collectExecutionRows(PAGES, undefined, buildNodeNameMap(NODES), 10) as ExecutionRow[];
+    for (const row of rows) {
+      expect(row.payload).toEqual({ pr_number: 42, branch: "main" });
+    }
+  });
+
+  it("leaves payload undefined when the parent event has no data", () => {
+    const pages = [
+      {
+        events: [
+          {
+            executions: [{ id: "exec-x", nodeId: "node-a", state: "STATE_STARTED" }],
+          },
+        ],
+      },
+    ];
+    const rows = collectExecutionRows(pages, undefined, buildNodeNameMap(NODES), 10) as ExecutionRow[];
+    expect(rows[0]?.payload).toBeUndefined();
   });
 });

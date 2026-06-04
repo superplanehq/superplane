@@ -49,6 +49,13 @@ export function TablePanelForm({ value, onChange }: TablePanelFormProps) {
         payloadDrafts={payloadDrafts}
         actions={actions}
       />
+      {fieldOptions.length > 0 ? (
+        <datalist id="table-field-options">
+          {fieldOptions.map((f) => (
+            <option key={f} value={f} />
+          ))}
+        </datalist>
+      ) : null}
     </div>
   );
 }
