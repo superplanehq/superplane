@@ -272,6 +272,10 @@ func (c *CreateAlarm) Setup(ctx core.SetupContext) error {
 		return err
 	}
 
+	if _, err := requireStatistic(config.Statistic); err != nil {
+		return err
+	}
+
 	if _, err := requireComparisonOperator(config.ComparisonOperator); err != nil {
 		return err
 	}
@@ -311,6 +315,11 @@ func (c *CreateAlarm) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	statistic, err := requireStatistic(config.Statistic)
+	if err != nil {
+		return err
+	}
+
 	comparisonOperator, err := requireComparisonOperator(config.ComparisonOperator)
 	if err != nil {
 		return err
@@ -335,7 +344,7 @@ func (c *CreateAlarm) Execute(ctx core.ExecutionContext) error {
 		AlarmDescription:   config.AlarmDescription,
 		InstanceID:         instanceID,
 		MetricName:         metricName,
-		Statistic:          config.Statistic,
+		Statistic:          statistic,
 		Period:             config.Period,
 		EvaluationPeriods:  config.EvaluationPeriods,
 		Threshold:          config.Threshold,
