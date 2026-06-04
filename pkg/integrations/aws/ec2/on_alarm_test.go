@@ -41,6 +41,18 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "instance is required")
 	})
 
+	t.Run("missing state -> error", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: OnAlarmConfiguration{
+				Region:     "us-east-1",
+				InstanceID: "i-abc123",
+				State:      " ",
+			},
+			Metadata: &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "alarm state is required")
+	})
+
 	t.Run("rule missing -> schedules provisioning and check", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
