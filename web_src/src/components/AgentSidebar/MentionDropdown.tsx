@@ -3,30 +3,7 @@ import { createPortal } from "react-dom";
 import { cn, resolveIcon } from "@/lib/utils";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import type { MentionItem } from "./useMentions";
-
-const BUILTIN_COMPONENT_ICON_SLUGS: Record<string, string> = {
-  noop: "circle-off",
-  display: "monitor",
-  addMemory: "database",
-  deleteMemory: "database",
-  readMemory: "database",
-  updateMemory: "database",
-  upsertMemory: "database",
-  if: "split",
-  http: "globe",
-  graphql: "network",
-  ssh: "terminal",
-  runner: "terminal",
-  timeGate: "clock",
-  filter: "filter",
-  wait: "clock",
-  approval: "hand",
-  merge: "git-merge",
-  sendEmail: "mail",
-  schedule: "calendar-clock",
-  webhook: "webhook",
-  start: "play",
-};
+import { BUILTIN_COMPONENT_ICON_SLUGS } from "./widgets/NodeChip";
 
 export interface MentionCandidate {
   type: "node" | "run";

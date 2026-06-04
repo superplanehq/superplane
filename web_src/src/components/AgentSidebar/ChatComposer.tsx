@@ -25,7 +25,7 @@ function timeAgo(dateStr?: string): string {
  * Non-mention text is rendered transparent (invisible — shows through from textarea caret).
  * Mention spans are styled as visible pills.
  */
-function BackdropContent({ text, mentions }: { text: string; mentions: { label: string }[] }) {
+function BackdropContent({ text, mentions }: { text: string; mentions: { label: string; startIndex: number }[] }) {
   if (mentions.length === 0) {
     // No mentions — render the text normally to maintain layout
     return <span className="whitespace-pre-wrap break-words text-[rgba(10,10,10,1)]">{text || "\u00A0"}</span>;
@@ -59,10 +59,7 @@ function BackdropContent({ text, mentions }: { text: string; mentions: { label: 
     <>
       {segments.map((seg, i) =>
         seg.isMention ? (
-          <span
-            key={i}
-            className="inline-flex items-center rounded bg-blue-100 px-1 py-0.5 text-xs font-medium text-blue-700"
-          >
+          <span key={i} className="rounded bg-blue-100 px-0.5 text-sm font-medium text-blue-700">
             {seg.text}
           </span>
         ) : (
