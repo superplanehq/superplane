@@ -505,4 +505,40 @@ describe("CanvasPage connection drop", () => {
     expect(fitViewMock).toHaveBeenCalledTimes(1);
     vi.useRealTimers();
   });
+
+  it("closes the run node detail pane when the canvas background is clicked in runs mode", () => {
+    const onRunNodeDetailClose = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <CanvasPage
+          title="Canvas"
+          headerMode="runs"
+          runNodeDetailNodeId="run-node-1"
+          onRunNodeDetailClose={onRunNodeDetailClose}
+          nodes={[
+            {
+              id: "run-node-1",
+              position: { x: 0, y: 0 },
+              data: {
+                label: "Run node",
+                state: "success",
+                type: "component",
+              },
+            },
+          ]}
+          edges={[]}
+          buildingBlocks={[]}
+          isEditing={false}
+          activeCanvasVersionId="live-version"
+        />
+      </MemoryRouter>,
+    );
+
+    act(() => {
+      reactFlowPropsRef.current?.onPaneClick?.();
+    });
+
+    expect(onRunNodeDetailClose).toHaveBeenCalledTimes(1);
+  });
 });
