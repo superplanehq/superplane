@@ -10,7 +10,7 @@ import type {
   SubtitleContext,
 } from "../types";
 import type { MetadataItem } from "@/ui/metadataList";
-import gcpIcon from "@/assets/icons/integrations/gcp.svg";
+import gcpIcon from "@/assets/icons/integrations/gcp.compute.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { baseEventSections } from "./event_helpers";
 

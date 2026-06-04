@@ -28,6 +28,9 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="Cloud DNS • Delete Record" href="#cloud-dns-•-delete-record" description="Delete a DNS record from a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud DNS • Update Record" href="#cloud-dns-•-update-record" description="Update an existing DNS record in a Google Cloud DNS managed zone" />
   <LinkCard title="Cloud Functions • Invoke Function" href="#cloud-functions-•-invoke-function" description="Invoke a Google Cloud Function and return the response" />
+  <LinkCard title="Compute • Create Static IP" href="#compute-•-create-static-ip" description="Reserve a regional external static IP address in a Google Cloud project" />
+  <LinkCard title="Compute • Delete Static IP" href="#compute-•-delete-static-ip" description="Release a regional external static IP address from a Google Cloud project" />
+  <LinkCard title="Compute • Manage Static IP" href="#compute-•-manage-static-ip" description="Attach or detach a static IP address to/from a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Create Virtual Machine" href="#compute-•-create-virtual-machine" description="Create a Google Compute Engine VM. Configure machine type, zone, provisioning model, and more." />
   <LinkCard title="Compute • Delete VM Instance" href="#compute-•-delete-vm-instance" description="Permanently delete a Google Compute Engine VM instance" />
   <LinkCard title="Compute • Get VM Metrics" href="#compute-•-get-vm-metrics" description="Fetch CPU and network metrics for a Google Compute Engine VM instance" />
@@ -744,6 +747,154 @@ The invocation result, including:
   },
   "timestamp": "2025-01-01T00:00:05Z",
   "type": "gcp.cloudfunctions.invoke"
+}
+```
+
+<a id="compute-•-create-static-ip"></a>
+
+## Compute • Create Static IP
+
+**Component key:** `gcp.compute.createStaticIP`
+
+The Create Static IP component reserves a regional external static (reserved) IP address in Compute Engine.
+
+A static IP keeps the same address across VM restarts and re-creations, unlike an ephemeral IP. Once reserved it can be attached to a VM instance with the **Manage Static IP** component.
+
+### Use Cases
+
+- **Stable endpoints**: Give a service a fixed public address that survives VM replacement
+- **Blue/green deployments**: Reserve the address ahead of time, then attach it to whichever VM is live
+- **DNS**: Point an A record at a reserved address you control
+
+### Configuration
+
+- **Name**: The name for the new address resource (required, lowercase RFC1035 — e.g. `web-prod-ip`)
+- **Region**: The region to reserve the address in (required). Regional external IPs can only be attached to VMs in the same region.
+- **Network Tier**: `PREMIUM` (default) or `STANDARD`
+- **Description**: Optional human-readable description
+
+### Output
+
+Returns the reserved address:
+- **name**, **address** (the reserved IP), **region**, **status**, **addressType**, **networkTier**, **selfLink**
+
+### Important Notes
+
+- Reserving and holding a static IP that is not attached to a running resource incurs charges
+- The component waits for the underlying regional operation to complete before reading the address back
+
+### Example Output
+
+```json
+{
+  "data": {
+    "address": "34.1.2.3",
+    "addressType": "EXTERNAL",
+    "name": "web-prod-ip",
+    "networkTier": "PREMIUM",
+    "region": "us-central1",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/regions/us-central1/addresses/web-prod-ip",
+    "status": "RESERVED"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.staticIP.created"
+}
+```
+
+<a id="compute-•-delete-static-ip"></a>
+
+## Compute • Delete Static IP
+
+**Component key:** `gcp.compute.deleteStaticIP`
+
+The Delete Static IP component releases (deletes) a regional external static IP reservation.
+
+### Use Cases
+
+- **Cost optimization**: Release reserved IPs that are no longer needed (idle reserved IPs are billed)
+- **Cleanup**: Tear down addresses as part of environment teardown
+
+### Configuration
+
+- **Static IP**: Pick from the reserved external IPs across all regions, or pass an expression chained from an upstream node (e.g. the `selfLink` emitted by `gcp.compute.createStaticIP`). The selection encodes both the region and the address name.
+
+### Output
+
+Returns the released address:
+- **name**: The name of the address that was released
+- **region**: The region it was in
+
+### Important Notes
+
+- A static IP that is still **attached** to a VM cannot be deleted — detach it first with **Manage Static IP**
+- If the address is not found at the resolved region/name, the action fails so that misconfigured or stale expressions do not silently mask incomplete cleanup
+
+### Example Output
+
+```json
+{
+  "data": {
+    "name": "web-prod-ip",
+    "region": "us-central1"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.staticIP.deleted"
+}
+```
+
+<a id="compute-•-manage-static-ip"></a>
+
+## Compute • Manage Static IP
+
+**Component key:** `gcp.compute.manageStaticIP`
+
+The Manage Static IP component attaches a reserved external static IP to a VM instance, or detaches the instance's current external IP.
+
+Attaching works by managing the network interface's external access config: any existing external IP on the interface is removed first, then the static IP is assigned. Detaching removes the external access config entirely (the instance keeps its internal IP but loses external connectivity unless another address is attached).
+
+### Use Cases
+
+- **Blue/green deployments**: Move a stable public IP from the old VM to the new one with zero DNS changes
+- **Failover**: Reassign a reserved IP from a failed VM to a healthy replacement
+- **Maintenance**: Temporarily detach a public IP while a VM is serviced
+
+### Configuration
+
+- **Action**: `attach` or `detach` (required)
+- **VM Instance**: The target VM. The selection encodes both the zone and the instance name.
+- **Static IP** *(attach only)*: The reserved external IP to attach. Only IPs in the selected VM's region are listed, since a regional IP can attach only to a VM in the same region.
+- **Network Interface**: The interface to modify (default `nic0`)
+
+### Output
+
+Returns the instance state after the operation:
+- **instanceId**, **name**, **zone**, **status**, **selfLink**, **machineType**, **internalIP**, **externalIP**
+- **action**: The action performed (attach or detach)
+
+### Important Notes
+
+- A regional static IP can only be attached to a VM in the **same region**
+- Attaching is idempotent: if the static IP is already the instance's external IP, the component succeeds without changes
+- Detaching is idempotent: if the interface already has no external IP, the component succeeds without changes
+- The component waits for each underlying zone operation to complete before emitting
+
+### Example Output
+
+```json
+{
+  "data": {
+    "action": "attach",
+    "externalIP": "34.1.2.3",
+    "instanceId": "1234567890123456789",
+    "internalIP": "10.0.0.2",
+    "machineType": "e2-medium",
+    "name": "my-vm",
+    "selfLink": "https://www.googleapis.com/compute/v1/projects/my-project/zones/us-central1-a/instances/my-vm",
+    "status": "RUNNING",
+    "zone": "us-central1-a"
+  },
+  "timestamp": "2025-02-14T12:00:00Z",
+  "type": "gcp.compute.staticIP.attached"
 }
 ```
 
