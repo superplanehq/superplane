@@ -17,9 +17,9 @@ export function useRunsDetailState(searchParams: URLSearchParams, isRunsMode: bo
   useEffect(() => {
     if (isRunsMode && !wasRunsModeRef.current) {
       const runId = searchParams.get("run");
-      if (runId && runId !== detailDismissedForRunId) {
-        setOpenRunDetailOnMount(true);
-      }
+      setOpenRunDetailOnMount(Boolean(runId && runId !== detailDismissedForRunId));
+    } else if (!isRunsMode && wasRunsModeRef.current) {
+      setOpenRunDetailOnMount(false);
     }
     wasRunsModeRef.current = isRunsMode;
   }, [detailDismissedForRunId, isRunsMode, searchParams]);
