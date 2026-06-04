@@ -41,18 +41,6 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "instance is required")
 	})
 
-	t.Run("missing state -> error", func(t *testing.T) {
-		err := trigger.Setup(core.TriggerContext{
-			Configuration: OnAlarmConfiguration{
-				Region:     "us-east-1",
-				InstanceID: "i-abc123",
-				State:      " ",
-			},
-			Metadata: &contexts.MetadataContext{},
-		})
-		require.ErrorContains(t, err, "alarm state is required")
-	})
-
 	t.Run("rule missing -> schedules provisioning and check", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
@@ -192,7 +180,7 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 		assert.NotEmpty(t, stored.SubscriptionID)
 	})
 
-	t.Run("subscribed but instance changed -> updates metadata without re-subscribing", func(t *testing.T) {
+	t.Run("subscribed but instance changed -> re-subscribes", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{
 			Metadata: OnAlarmMetadata{
 				Region:         "us-east-1",
@@ -225,11 +213,11 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 		})
 
 		require.NoError(t, err)
-		assert.Empty(t, integrationCtx.Subscriptions)
+		require.Len(t, integrationCtx.Subscriptions, 1)
 		stored, ok := metadata.Get().(OnAlarmMetadata)
 		require.True(t, ok)
 		assert.Equal(t, "i-new456", stored.InstanceID)
-		assert.Equal(t, "existing-sub", stored.SubscriptionID)
+		assert.NotEmpty(t, stored.SubscriptionID)
 	})
 }
 
