@@ -92,7 +92,7 @@ func (c *GetInstanceMetrics) Documentation() string {
 
 Returns averaged and aggregated metrics over the lookback window:
 - ` + "`instanceId`" + `, ` + "`region`" + `, ` + "`lookbackPeriod`" + `, ` + "`start`" + `, ` + "`end`" + `
-- ` + "`avgCpuUsagePercent`" + `: Average CPU utilisation percentage
+- ` + "`avgCpuUsagePercent`" + `: Average CPU utilisation percentage (null when CloudWatch returns no datapoints for the window)
 - ` + "`totalNetworkInBytes`" + `: Total inbound network bytes over the window
 - ` + "`totalNetworkOutBytes`" + `: Total outbound network bytes over the window
 - ` + "`avgNetworkInBytesPerSec`" + `: Average inbound bytes per second
@@ -332,7 +332,6 @@ func (c *GetInstanceMetrics) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("failed to get NetworkOut metrics: %w", netOutResult.err)
 	}
 
-	avgCPU := averageDatapoints(cpuPoints)
 	totalNetIn := sumDatapoints(netInResult.points)
 	totalNetOut := sumDatapoints(netOutResult.points)
 
@@ -342,11 +341,16 @@ func (c *GetInstanceMetrics) Execute(ctx core.ExecutionContext) error {
 		"lookbackPeriod":           config.LookbackPeriod,
 		"start":                    startTime.Format(time.RFC3339),
 		"end":                      endTime.Format(time.RFC3339),
-		"avgCpuUsagePercent":       roundMetric(avgCPU, 2),
 		"totalNetworkInBytes":      roundMetric(totalNetIn, 2),
 		"totalNetworkOutBytes":     roundMetric(totalNetOut, 2),
 		"avgNetworkInBytesPerSec":  roundMetric(totalNetIn/float64(windowSeconds), 2),
 		"avgNetworkOutBytesPerSec": roundMetric(totalNetOut/float64(windowSeconds), 2),
+	}
+
+	if len(cpuPoints) == 0 {
+		payload["avgCpuUsagePercent"] = nil
+	} else {
+		payload["avgCpuUsagePercent"] = roundMetric(averageDatapoints(cpuPoints), 2)
 	}
 
 	if config.IncludeMemory {

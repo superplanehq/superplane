@@ -195,6 +195,41 @@ func Test__GetInstanceMetrics__Execute(t *testing.T) {
 		val, hasMemory := payload["avgMemoryUsagePercent"]
 		assert.True(t, hasMemory)
 		assert.Nil(t, val)
+
+		cpuVal, hasCPU := payload["avgCpuUsagePercent"]
+		assert.True(t, hasCPU)
+		assert.Nil(t, cpuVal)
+	})
+
+	t.Run("cpu null when cloudwatch returns no datapoints", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(cloudWatchEmptyMetricsXML()),
+				okResponse(cloudWatchEmptyMetricsXML()),
+				okResponse(cloudWatchEmptyMetricsXML()),
+			},
+		}
+		execState := &contexts.ExecutionStateContext{}
+
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":         "us-east-1",
+				"instance":       "i-abc123",
+				"lookbackPeriod": "1h",
+				"includeMemory":  false,
+			},
+			HTTP:           httpCtx,
+			Integration:    metricsIntegration(),
+			ExecutionState: execState,
+		})
+
+		require.NoError(t, err)
+		require.NotEmpty(t, execState.Payloads)
+
+		payload := execState.Payloads[0].(map[string]any)["data"].(map[string]any)
+		val, hasCPU := payload["avgCpuUsagePercent"]
+		assert.True(t, hasCPU)
+		assert.Nil(t, val)
 	})
 }
 

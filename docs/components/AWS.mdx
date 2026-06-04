@@ -1486,7 +1486,7 @@ The Get Instance Metrics component retrieves CloudWatch metrics for an EC2 insta
 
 Returns averaged and aggregated metrics over the lookback window:
 - `instanceId`, `region`, `lookbackPeriod`, `start`, `end`
-- `avgCpuUsagePercent`: Average CPU utilisation percentage
+- `avgCpuUsagePercent`: Average CPU utilisation percentage (null when CloudWatch returns no datapoints for the window)
 - `totalNetworkInBytes`: Total inbound network bytes over the window
 - `totalNetworkOutBytes`: Total outbound network bytes over the window
 - `avgNetworkInBytesPerSec`: Average inbound bytes per second

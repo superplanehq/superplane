@@ -137,40 +137,68 @@ func Test__UpdateInstance__Execute_NoUpdatesConfigured(t *testing.T) {
 func Test__UpdateInstance__Execute_TypeChange_WasRunning(t *testing.T) {
 	component := &UpdateInstance{}
 
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			// DescribeInstances (check state = running)
-			okResponse(describeInstanceXML("i-abc123", "running")),
-			// StopInstances
-			okResponse(stopInstancesXML("i-abc123")),
-		},
-	}
-	requests := &contexts.RequestContext{}
-	metadata := &contexts.MetadataContext{}
+	t.Run("with restartAfterResize true", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// DescribeInstances (check state = running)
+				okResponse(describeInstanceXML("i-abc123", "running")),
+				// StopInstances
+				okResponse(stopInstancesXML("i-abc123")),
+			},
+		}
+		requests := &contexts.RequestContext{}
+		metadata := &contexts.MetadataContext{}
 
-	err := component.Execute(core.ExecutionContext{
-		Configuration: map[string]any{
-			"region":             "us-east-1",
-			"instance":           "i-abc123",
-			"instanceType":       "t3.large",
-			"restartAfterResize": true,
-		},
-		HTTP:           httpCtx,
-		Integration:    updateIntegration(),
-		Metadata:       metadata,
-		Requests:       requests,
-		ExecutionState: &contexts.ExecutionStateContext{},
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":             "us-east-1",
+				"instance":           "i-abc123",
+				"instanceType":       "t3.large",
+				"restartAfterResize": true,
+			},
+			HTTP:           httpCtx,
+			Integration:    updateIntegration(),
+			Metadata:       metadata,
+			Requests:       requests,
+			ExecutionState: &contexts.ExecutionStateContext{},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "poll", requests.Action)
+
+		// Metadata should contain phase=stopping and wasRunning=true
+		stored, ok := metadata.Get().(UpdateInstanceExecutionMetadata)
+		require.True(t, ok)
+		assert.Equal(t, updateInstancePhaseStopping, stored.Phase)
+		assert.True(t, stored.WasRunning)
+		assert.Equal(t, "t3.large", stored.NewInstanceType)
 	})
 
-	require.NoError(t, err)
-	assert.Equal(t, "poll", requests.Action)
+	t.Run("defaults restartAfterResize to true when key is missing", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(describeInstanceXML("i-abc123", "running")),
+				okResponse(stopInstancesXML("i-abc123")),
+			},
+		}
+		requests := &contexts.RequestContext{}
 
-	// Metadata should contain phase=stopping and wasRunning=true
-	stored, ok := metadata.Get().(UpdateInstanceExecutionMetadata)
-	require.True(t, ok)
-	assert.Equal(t, updateInstancePhaseStopping, stored.Phase)
-	assert.True(t, stored.WasRunning)
-	assert.Equal(t, "t3.large", stored.NewInstanceType)
+		err := component.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":       "us-east-1",
+				"instance":     "i-abc123",
+				"instanceType": "t3.large",
+			},
+			HTTP:           httpCtx,
+			Integration:    updateIntegration(),
+			Metadata:       &contexts.MetadataContext{},
+			Requests:       requests,
+			ExecutionState: &contexts.ExecutionStateContext{},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, "poll", requests.Action)
+	})
 }
 
 func Test__UpdateInstance__Execute_TypeChange_AlreadyStopped(t *testing.T) {
@@ -211,43 +239,81 @@ func Test__UpdateInstance__Execute_TypeChange_AlreadyStopped(t *testing.T) {
 func Test__UpdateInstance__Poll_StoppedThenModifyAndStart(t *testing.T) {
 	component := &UpdateInstance{}
 
-	httpCtx := &contexts.HTTPContext{
-		Responses: []*http.Response{
-			// DescribeInstances -> stopped
-			okResponse(describeInstanceXML("i-abc123", "stopped")),
-			// ModifyInstanceAttribute
-			okResponse(modifyInstanceAttributeXML()),
-			// StartInstances
-			okResponse(startInstancesXML("i-abc123")),
-		},
-	}
-	requests := &contexts.RequestContext{}
-	metadata := &contexts.MetadataContext{
-		Metadata: UpdateInstanceExecutionMetadata{
-			InstanceID:      "i-abc123",
-			NewInstanceType: "t3.large",
-			WasRunning:      true,
-			Phase:           updateInstancePhaseStopping,
-		},
-	}
+	t.Run("with restartAfterResize true", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				// DescribeInstances -> stopped
+				okResponse(describeInstanceXML("i-abc123", "stopped")),
+				// ModifyInstanceAttribute
+				okResponse(modifyInstanceAttributeXML()),
+				// StartInstances
+				okResponse(startInstancesXML("i-abc123")),
+			},
+		}
+		requests := &contexts.RequestContext{}
+		metadata := &contexts.MetadataContext{
+			Metadata: UpdateInstanceExecutionMetadata{
+				InstanceID:      "i-abc123",
+				NewInstanceType: "t3.large",
+				WasRunning:      true,
+				Phase:           updateInstancePhaseStopping,
+			},
+		}
 
-	err := component.HandleHook(core.ActionHookContext{
-		Name:           "poll",
-		Configuration:  map[string]any{"region": "us-east-1", "restartAfterResize": true},
-		HTTP:           httpCtx,
-		Integration:    updateIntegration(),
-		Metadata:       metadata,
-		Requests:       requests,
-		ExecutionState: &contexts.ExecutionStateContext{},
-		Logger:         logrus.NewEntry(logrus.New()),
+		err := component.HandleHook(core.ActionHookContext{
+			Name:           "poll",
+			Configuration:  map[string]any{"region": "us-east-1", "restartAfterResize": true},
+			HTTP:           httpCtx,
+			Integration:    updateIntegration(),
+			Metadata:       metadata,
+			Requests:       requests,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Logger:         logrus.NewEntry(logrus.New()),
+		})
+
+		require.NoError(t, err)
+		// Moves to starting phase
+		stored, ok := metadata.Get().(UpdateInstanceExecutionMetadata)
+		require.True(t, ok)
+		assert.Equal(t, updateInstancePhaseStarting, stored.Phase)
+		assert.Equal(t, "poll", requests.Action)
 	})
 
-	require.NoError(t, err)
-	// Moves to starting phase
-	stored, ok := metadata.Get().(UpdateInstanceExecutionMetadata)
-	require.True(t, ok)
-	assert.Equal(t, updateInstancePhaseStarting, stored.Phase)
-	assert.Equal(t, "poll", requests.Action)
+	t.Run("defaults restartAfterResize to true when key is missing", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(describeInstanceXML("i-abc123", "stopped")),
+				okResponse(modifyInstanceAttributeXML()),
+				okResponse(startInstancesXML("i-abc123")),
+			},
+		}
+		requests := &contexts.RequestContext{}
+		metadata := &contexts.MetadataContext{
+			Metadata: UpdateInstanceExecutionMetadata{
+				InstanceID:      "i-abc123",
+				NewInstanceType: "t3.large",
+				WasRunning:      true,
+				Phase:           updateInstancePhaseStopping,
+			},
+		}
+
+		err := component.HandleHook(core.ActionHookContext{
+			Name:           "poll",
+			Configuration:  map[string]any{"region": "us-east-1"},
+			HTTP:           httpCtx,
+			Integration:    updateIntegration(),
+			Metadata:       metadata,
+			Requests:       requests,
+			ExecutionState: &contexts.ExecutionStateContext{},
+			Logger:         logrus.NewEntry(logrus.New()),
+		})
+
+		require.NoError(t, err)
+		stored, ok := metadata.Get().(UpdateInstanceExecutionMetadata)
+		require.True(t, ok)
+		assert.Equal(t, updateInstancePhaseStarting, stored.Phase)
+		assert.Equal(t, "poll", requests.Action)
+	})
 }
 
 func Test__UpdateInstance__Poll_RunningEmitsPayload(t *testing.T) {
@@ -385,6 +451,38 @@ func Test__UpdateInstance__Cancel(t *testing.T) {
 				"instance":           "i-abc123",
 				"instanceType":       "t3.large",
 				"restartAfterResize": true,
+			},
+			HTTP:        httpCtx,
+			Integration: updateIntegration(),
+			Metadata: &contexts.MetadataContext{
+				Metadata: UpdateInstanceExecutionMetadata{
+					InstanceID: "i-abc123",
+					WasRunning: true,
+					Phase:      updateInstancePhaseStopping,
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 1)
+
+		body, readErr := io.ReadAll(httpCtx.Requests[0].Body)
+		require.NoError(t, readErr)
+		assert.Contains(t, string(body), "StartInstances")
+	})
+
+	t.Run("restarts instance when stopping and restartAfterResize defaults to true", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(startInstancesXML("i-abc123")),
+			},
+		}
+
+		err := component.Cancel(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":       "us-east-1",
+				"instance":     "i-abc123",
+				"instanceType": "t3.large",
 			},
 			HTTP:        httpCtx,
 			Integration: updateIntegration(),
