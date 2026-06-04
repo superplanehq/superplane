@@ -211,6 +211,11 @@ func (p *OnAlarm) Setup(ctx core.TriggerContext) error {
 		return fmt.Errorf("instance is required")
 	}
 
+	state := strings.TrimSpace(config.State)
+	if state == "" {
+		return fmt.Errorf("alarm state is required")
+	}
+
 	if metadata.SubscriptionID != "" && metadata.Region == region && metadata.InstanceID == instanceID {
 		return nil
 	}
@@ -350,7 +355,7 @@ func (p *OnAlarm) OnIntegrationMessage(ctx core.IntegrationMessageContext) error
 		return fmt.Errorf("missing alarm state in event")
 	}
 
-	if config.State != "" && state != config.State {
+	if state != config.State {
 		ctx.Logger.Infof("Skipping event for alarm %s with state %s, expected %s", alarmName, state, config.State)
 		return nil
 	}

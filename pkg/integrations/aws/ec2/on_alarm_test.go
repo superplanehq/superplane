@@ -40,6 +40,18 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 		require.ErrorContains(t, err, "instance is required")
 	})
 
+	t.Run("missing state -> error", func(t *testing.T) {
+		err := trigger.Setup(core.TriggerContext{
+			Configuration: OnAlarmConfiguration{
+				Region:     "us-east-1",
+				InstanceID: "i-abc123",
+				State:      " ",
+			},
+			Metadata: &contexts.MetadataContext{},
+		})
+		require.ErrorContains(t, err, "alarm state is required")
+	})
+
 	t.Run("rule missing -> schedules provisioning and check", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{}
 		requests := &contexts.RequestContext{}
@@ -132,7 +144,7 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 			Logger:        logrus.NewEntry(logrus.New()),
 			Integration:   integrationCtx,
 			Metadata:      metadata,
-			Configuration: OnAlarmConfiguration{Region: "us-east-1", InstanceID: "i-abc123"},
+			Configuration: OnAlarmConfiguration{Region: "us-east-1", InstanceID: "i-abc123", State: cloudwatch.AlarmStateAlarm},
 		})
 
 		require.NoError(t, err)
@@ -315,6 +327,28 @@ func Test__EC2OnAlarm__OnIntegrationMessage(t *testing.T) {
 			},
 			Message: common.EventBridgeEvent{
 				Region: "us-west-2",
+				Detail: alarmDetail("HighCPU", cloudwatch.AlarmStateAlarm, "i-abc123"),
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Equal(t, 0, eventContext.Count())
+	})
+
+	t.Run("empty config state -> no event (never matches)", func(t *testing.T) {
+		eventContext := &contexts.EventContext{}
+		err := trigger.OnIntegrationMessage(core.IntegrationMessageContext{
+			Logger: logrus.NewEntry(logrus.New()),
+			Events: eventContext,
+			NodeMetadata: &contexts.MetadataContext{
+				Metadata: OnAlarmMetadata{Region: "us-east-1", InstanceID: "i-abc123"},
+			},
+			Configuration: OnAlarmConfiguration{
+				State:      "",
+				InstanceID: "i-abc123",
+			},
+			Message: common.EventBridgeEvent{
+				Region: "us-east-1",
 				Detail: alarmDetail("HighCPU", cloudwatch.AlarmStateAlarm, "i-abc123"),
 			},
 		})
