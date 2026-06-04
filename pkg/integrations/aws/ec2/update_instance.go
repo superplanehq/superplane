@@ -199,9 +199,9 @@ func (c *UpdateInstance) Configuration() []configuration.Field {
 }
 
 func (c *UpdateInstance) Setup(ctx core.SetupContext) error {
-	config := UpdateInstanceConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+	config, err := decodeUpdateInstanceConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
 	}
 
 	region, err := requireRegion(config.Region)
@@ -236,10 +236,33 @@ func validateUpdateInstanceConfiguration(config UpdateInstanceConfiguration) err
 	return nil
 }
 
-func (c *UpdateInstance) Execute(ctx core.ExecutionContext) error {
+func decodeUpdateInstanceConfiguration(raw any) (UpdateInstanceConfiguration, error) {
 	config := UpdateInstanceConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+	if err := mapstructure.Decode(raw, &config); err != nil {
+		return UpdateInstanceConfiguration{}, fmt.Errorf("failed to decode configuration: %w", err)
+	}
+
+	if !hasConfigKey(raw, "restartAfterResize") {
+		config.RestartAfterResize = true
+	}
+
+	return config, nil
+}
+
+func hasConfigKey(configuration any, key string) bool {
+	configurationMap, ok := configuration.(map[string]any)
+	if !ok {
+		return false
+	}
+
+	_, exists := configurationMap[key]
+	return exists
+}
+
+func (c *UpdateInstance) Execute(ctx core.ExecutionContext) error {
+	config, err := decodeUpdateInstanceConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
 	}
 
 	region, err := requireRegion(config.Region)
@@ -386,9 +409,9 @@ func (c *UpdateInstance) poll(ctx core.ActionHookContext) error {
 		return fmt.Errorf("poll metadata is missing instanceId: execution state may be corrupted")
 	}
 
-	config := UpdateInstanceConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
-		return fmt.Errorf("failed to decode configuration: %w", err)
+	config, err := decodeUpdateInstanceConfiguration(ctx.Configuration)
+	if err != nil {
+		return err
 	}
 
 	region, err := requireRegion(config.Region)
@@ -504,8 +527,8 @@ func (c *UpdateInstance) Cancel(ctx core.ExecutionContext) error {
 		return nil
 	}
 
-	config := UpdateInstanceConfiguration{}
-	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+	config, err := decodeUpdateInstanceConfiguration(ctx.Configuration)
+	if err != nil {
 		return nil
 	}
 
