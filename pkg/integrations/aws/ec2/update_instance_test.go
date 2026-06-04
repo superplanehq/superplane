@@ -116,6 +116,24 @@ func Test__UpdateInstance__Execute_SecurityGroupsOnly(t *testing.T) {
 	assert.Contains(t, string(body), "GroupId")
 }
 
+func Test__UpdateInstance__Execute_NoUpdatesConfigured(t *testing.T) {
+	component := &UpdateInstance{}
+
+	err := component.Execute(core.ExecutionContext{
+		Configuration: map[string]any{
+			"region":   "us-east-1",
+			"instance": "i-abc123",
+		},
+		HTTP:           &contexts.HTTPContext{},
+		Integration:    updateIntegration(),
+		Metadata:       &contexts.MetadataContext{},
+		Requests:       &contexts.RequestContext{},
+		ExecutionState: &contexts.ExecutionStateContext{},
+	})
+
+	require.ErrorContains(t, err, "at least one of instanceType or securityGroup must be set")
+}
+
 func Test__UpdateInstance__Execute_TypeChange_WasRunning(t *testing.T) {
 	component := &UpdateInstance{}
 
@@ -324,6 +342,93 @@ func Test__UpdateInstance__Poll_NonRecoverableStateInStarting_Errors(t *testing.
 			assert.Contains(t, err.Error(), state)
 		})
 	}
+}
+
+func Test__UpdateInstance__Cancel(t *testing.T) {
+	component := &UpdateInstance{}
+
+	t.Run("does not restart when restartAfterResize is false", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{}
+
+		err := component.Cancel(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":             "us-east-1",
+				"instance":           "i-abc123",
+				"instanceType":       "t3.large",
+				"restartAfterResize": false,
+			},
+			HTTP:        httpCtx,
+			Integration: updateIntegration(),
+			Metadata: &contexts.MetadataContext{
+				Metadata: UpdateInstanceExecutionMetadata{
+					InstanceID: "i-abc123",
+					WasRunning: true,
+					Phase:      updateInstancePhaseStopping,
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, httpCtx.Requests)
+	})
+
+	t.Run("restarts instance when stopping and restartAfterResize is true", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{
+			Responses: []*http.Response{
+				okResponse(startInstancesXML("i-abc123")),
+			},
+		}
+
+		err := component.Cancel(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":             "us-east-1",
+				"instance":           "i-abc123",
+				"instanceType":       "t3.large",
+				"restartAfterResize": true,
+			},
+			HTTP:        httpCtx,
+			Integration: updateIntegration(),
+			Metadata: &contexts.MetadataContext{
+				Metadata: UpdateInstanceExecutionMetadata{
+					InstanceID: "i-abc123",
+					WasRunning: true,
+					Phase:      updateInstancePhaseStopping,
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, httpCtx.Requests, 1)
+
+		body, readErr := io.ReadAll(httpCtx.Requests[0].Body)
+		require.NoError(t, readErr)
+		assert.Contains(t, string(body), "StartInstances")
+	})
+
+	t.Run("does not restart during starting phase", func(t *testing.T) {
+		httpCtx := &contexts.HTTPContext{}
+
+		err := component.Cancel(core.ExecutionContext{
+			Configuration: map[string]any{
+				"region":             "us-east-1",
+				"instance":           "i-abc123",
+				"instanceType":       "t3.large",
+				"restartAfterResize": true,
+			},
+			HTTP:        httpCtx,
+			Integration: updateIntegration(),
+			Metadata: &contexts.MetadataContext{
+				Metadata: UpdateInstanceExecutionMetadata{
+					InstanceID: "i-abc123",
+					WasRunning: true,
+					Phase:      updateInstancePhaseStarting,
+				},
+			},
+		})
+
+		require.NoError(t, err)
+		assert.Empty(t, httpCtx.Requests)
+	})
 }
 
 // Helpers
