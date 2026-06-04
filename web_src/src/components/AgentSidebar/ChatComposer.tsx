@@ -123,6 +123,8 @@ export function ChatComposer({
     mentions,
     isEmpty,
     clear,
+    snapshot,
+    restore,
   } = useMentions();
 
   // Build mention candidates from nodes + runs, filtered by current input
@@ -173,14 +175,15 @@ export function ChatComposer({
     const content = getMarkdown().trim();
     if (!content) return;
 
+    snapshot();
     clear();
 
     try {
       await onSend(content);
     } catch {
-      setValue(content);
+      restore();
     }
-  }, [isEmpty, getMarkdown, clear, onSend, setValue]);
+  }, [isEmpty, getMarkdown, clear, onSend, snapshot, restore]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -199,9 +202,15 @@ export function ChatComposer({
 
   const handleMentionSelect = useCallback(
     (item: { type: "node" | "run"; id: string; label: string; meta?: string }) => {
-      insertMention(item);
-      // Refocus textarea after insertion
-      requestAnimationFrame(() => textareaRef.current?.focus());
+      const newCursorPos = insertMention(item);
+      // Set DOM caret position after React re-renders
+      requestAnimationFrame(() => {
+        const ta = textareaRef.current;
+        if (ta) {
+          ta.focus();
+          ta.setSelectionRange(newCursorPos, newCursorPos);
+        }
+      });
     },
     [insertMention],
   );
