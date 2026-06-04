@@ -175,6 +175,7 @@ export function WorkflowPageV2() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [openRunDetailOnMount, setOpenRunDetailOnMount] = useState(() => Boolean(searchParams.get("run")));
+  const dismissedRunDetailRunIdRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
   const { data: me } = useMe();
   const {
@@ -193,8 +194,16 @@ export function WorkflowPageV2() {
   } = useWorkflowViewSearchParams(searchParams, setSearchParams);
   const wasRunsModeRef = useRef(isRunsMode);
   useEffect(() => {
-    if (isRunsMode && !wasRunsModeRef.current && searchParams.get("run")) {
-      setOpenRunDetailOnMount(true);
+    if (!searchParams.get("run")) {
+      dismissedRunDetailRunIdRef.current = null;
+    }
+  }, [searchParams]);
+  useEffect(() => {
+    if (isRunsMode && !wasRunsModeRef.current) {
+      const runId = searchParams.get("run");
+      if (runId && runId !== dismissedRunDetailRunIdRef.current) {
+        setOpenRunDetailOnMount(true);
+      }
     }
     wasRunsModeRef.current = isRunsMode;
   }, [isRunsMode, searchParams]);
@@ -4772,12 +4781,14 @@ export function WorkflowPageV2() {
   ]);
 
   const handleBackToRunList = useCallback(() => {
+    dismissedRunDetailRunIdRef.current = selectedRunId;
     setRunDetailNodeId(null);
     setOpenRunDetailOnMount(false);
-  }, []);
+  }, [selectedRunId]);
 
   const handleSelectRun = useCallback(
     (runId: string) => {
+      dismissedRunDetailRunIdRef.current = null;
       setSelectedRunId(runId);
       setIsRunsMode(true);
       setIsFilesMode(false);
