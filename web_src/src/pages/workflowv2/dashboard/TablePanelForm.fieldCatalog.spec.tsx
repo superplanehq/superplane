@@ -10,6 +10,7 @@ import { DashboardContextProvider } from "./DashboardContextProvider";
 import type { TablePanelContent } from "./panelTypes";
 import { TablePanelForm } from "./TablePanelForm";
 import { EXECUTIONS_FIELDS, RUNS_FIELDS } from "./widget/staticFieldCatalogs";
+import type { WidgetTableColumn } from "./widget/types";
 
 const START_NODE: SuperplaneComponentsNode = {
   id: "start-id",
@@ -123,5 +124,107 @@ describe("TablePanelForm field catalog", () => {
     render(<Harness initial={makeInitial("memory")} />);
     expect(screen.queryByTestId("table-field-quick-add")).toBeNull();
     expect(screen.queryByTestId("table-add-all-columns")).toBeNull();
+  });
+});
+
+describe("TablePanelForm column field input", () => {
+  beforeAll(() => {
+    Element.prototype.scrollIntoView ??= () => {};
+  });
+
+  function makeWithColumn(kind: TablePanelContent["dataSource"]["kind"], column: WidgetTableColumn): TablePanelContent {
+    const base = makeInitial(kind);
+    return {
+      ...base,
+      render: { ...base.render, columns: [column] },
+    };
+  }
+
+  it("lets authors type nested dot paths like payload.user_id directly", () => {
+    render(<Harness initial={makeWithColumn("runs", { field: "" })} />);
+
+    const input = screen.getByTestId("table-column-field") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "payload.user_id" } });
+
+    const columns = JSON.parse(screen.getByTestId("harness-columns").textContent ?? "[]") as Array<
+      Record<string, unknown>
+    >;
+    expect(columns[0]?.field).toBe("payload.user_id");
+    // No catalog match -> no label / format auto-fill.
+    expect(columns[0]?.label).toBeUndefined();
+    expect(columns[0]?.format).toBeUndefined();
+  });
+
+  it("auto-fills label and format when the typed value matches a catalog field", () => {
+    render(<Harness initial={makeWithColumn("runs", { field: "" })} />);
+
+    const input = screen.getByTestId("table-column-field") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "status" } });
+
+    const columns = JSON.parse(screen.getByTestId("harness-columns").textContent ?? "[]") as Array<
+      Record<string, unknown>
+    >;
+    expect(columns[0]?.field).toBe("status");
+    expect(columns[0]?.label).toBe("status");
+    // `suggestColumnFormat` maps "status" -> "status".
+    expect(columns[0]?.format).toBe("status");
+  });
+
+  it("does not clobber a pre-existing label when typing a non-catalog value", () => {
+    render(<Harness initial={makeWithColumn("runs", { field: "", label: "Author label" })} />);
+
+    const input = screen.getByTestId("table-column-field") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "payload.user_id" } });
+
+    const columns = JSON.parse(screen.getByTestId("harness-columns").textContent ?? "[]") as Array<
+      Record<string, unknown>
+    >;
+    expect(columns[0]?.field).toBe("payload.user_id");
+    expect(columns[0]?.label).toBe("Author label");
+  });
+
+  it("does not clobber a pre-existing label when typing a catalog field", () => {
+    render(<Harness initial={makeWithColumn("runs", { field: "", label: "Author label" })} />);
+
+    const input = screen.getByTestId("table-column-field") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "status" } });
+
+    const columns = JSON.parse(screen.getByTestId("harness-columns").textContent ?? "[]") as Array<
+      Record<string, unknown>
+    >;
+    expect(columns[0]?.field).toBe("status");
+    expect(columns[0]?.label).toBe("Author label");
+    expect(columns[0]?.format).toBe("status");
+  });
+
+  it("renders the shared table-field-options datalist when a catalog is available", () => {
+    render(<Harness initial={makeWithColumn("runs", { field: "" })} />);
+    const datalist = document.getElementById("table-field-options");
+    expect(datalist).not.toBeNull();
+    const options = Array.from(datalist?.querySelectorAll("option") ?? []).map((opt) => opt.getAttribute("value"));
+    for (const expected of ["status", "payload", "nodeName"]) {
+      expect(options).toContain(expected);
+    }
+  });
+
+  it("includes the `$` namespace hint in the runs datalist", () => {
+    render(<Harness initial={makeWithColumn("runs", { field: "" })} />);
+    const datalist = document.getElementById("table-field-options");
+    const options = Array.from(datalist?.querySelectorAll("option") ?? []).map((opt) => opt.getAttribute("value"));
+    expect(options).toContain("$");
+  });
+
+  it("auto-fills format=duration when typing `durationMs`", () => {
+    render(<Harness initial={makeWithColumn("runs", { field: "" })} />);
+
+    const input = screen.getByTestId("table-column-field") as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "durationMs" } });
+
+    const columns = JSON.parse(screen.getByTestId("harness-columns").textContent ?? "[]") as Array<
+      Record<string, unknown>
+    >;
+    expect(columns[0]?.field).toBe("durationMs");
+    expect(columns[0]?.label).toBe("durationMs");
+    expect(columns[0]?.format).toBe("duration");
   });
 });

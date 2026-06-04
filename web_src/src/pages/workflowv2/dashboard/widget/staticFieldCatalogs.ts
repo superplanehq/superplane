@@ -24,10 +24,10 @@ import type { MemoryFieldSummary } from "./useMemoryCatalog";
  * Field catalog for rows produced by the `executions` data source.
  *
  * Keep this in sync with the row shape constructed by `collectExecutionRows`
- * in `widget/useWidgetData.ts` — the raw execution fields plus the three
- * derived convenience fields (`status`, `nodeName`, `durationMs`). Entries
- * are sorted alphabetically by `field` so the dropdown and quick-add chips
- * stay scannable as the catalog grows.
+ * in `widget/useWidgetData.ts` — the raw execution fields plus the derived
+ * convenience fields (`status`, `nodeName`, `durationMs`, `payload`).
+ * Entries are sorted alphabetically by `field` so the dropdown and
+ * quick-add chips stay scannable as the catalog grows.
  */
 export const EXECUTIONS_FIELDS: MemoryFieldSummary[] = sortFields([
   { field: "status", sample: "passed" },
@@ -44,22 +44,39 @@ export const EXECUTIONS_FIELDS: MemoryFieldSummary[] = sortFields([
   { field: "createdAt", sample: "2026-01-01T12:00:00Z" },
   { field: "updatedAt", sample: "2026-01-01T12:05:00Z" },
   { field: "durationMs", sample: "300000" },
+  { field: "payload", sample: "{}" },
 ]);
 
 /**
  * Field catalog for rows produced by the `runs` data source. Mirrors the
- * `CanvasesCanvasRun` shape returned by `useInfiniteCanvasRuns`. Entries
- * are sorted alphabetically by `field` to match the executions catalog.
+ * `CanvasesCanvasRun` shape returned by `useInfiniteCanvasRuns` plus the
+ * derived convenience fields appended by `collectRunRows` (`status`,
+ * `nodeName`, `payload`, `durationMs`, `$`) and the most useful root-event
+ * fields. Entries are sorted alphabetically by `field` to match the
+ * executions catalog.
+ *
+ * The `$` entry is a hint: each run row carries a `$` map keyed by node
+ * display name with that node's full execution (with `outputs` and a
+ * `data` shortcut). Authors drill in with `$["deploy-prod"].outputs.url`
+ * — the per-canvas node names aren't enumerated here because executions
+ * can fork and a given node may be empty for some runs.
  */
 export const RUNS_FIELDS: MemoryFieldSummary[] = sortFields([
   { field: "state", sample: "STATE_STARTED" },
   { field: "result", sample: "RESULT_PASSED" },
+  { field: "status", sample: "passed" },
+  { field: "nodeName", sample: "deploy-prod" },
+  { field: "payload", sample: "{}" },
+  { field: "durationMs", sample: "300000" },
+  { field: "$", sample: '{ "<node name>": { outputs, data, ... } }' },
   { field: "id", sample: "00000000-0000-0000-0000-000000000000" },
   { field: "canvasId", sample: "00000000-0000-0000-0000-000000000000" },
   { field: "versionId", sample: "00000000-0000-0000-0000-000000000000" },
   { field: "createdAt", sample: "2026-01-01T12:00:00Z" },
   { field: "updatedAt", sample: "2026-01-01T12:05:00Z" },
   { field: "finishedAt", sample: "2026-01-01T12:05:00Z" },
+  { field: "rootEvent.nodeId", sample: "00000000-0000-0000-0000-000000000000" },
+  { field: "rootEvent.customName", sample: "" },
 ]);
 
 /**
