@@ -247,6 +247,13 @@ func (s *Server) claimTask(w http.ResponseWriter, r *http.Request) {
 	}
 	if task != nil {
 		s.recordTaskStartLatency(r.Context(), task)
+		if s.Log != nil {
+			s.Log.Info("task_claimed",
+				slog.String("task_id", task.ID),
+				slog.String("runner_id", task.RunnerID),
+				slog.String("fleet_id", task.FleetID),
+			)
+		}
 	}
 	var payload *api.TaskPayload
 	if task != nil {
@@ -407,6 +414,21 @@ func (s *Server) completeTaskCore(ctx context.Context, taskID, runnerID string, 
 		return nil, err
 	}
 	s.recordTaskCompleted(ctx, task)
+	if s.Log != nil {
+		outcome := "succeeded"
+		if req.Canceled {
+			outcome = "canceled"
+		} else if req.ExitCode != 0 {
+			outcome = "failed"
+		}
+		s.Log.Info("task_completed",
+			slog.String("task_id", taskID),
+			slog.String("runner_id", runnerID),
+			slog.String("fleet_id", task.FleetID),
+			slog.String("outcome", outcome),
+			slog.Int("exit_code", req.ExitCode),
+		)
+	}
 	go s.DeliverWebhook(task)
 	return task, nil
 }
