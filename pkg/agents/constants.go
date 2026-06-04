@@ -86,7 +86,7 @@ Rules:
 - You can update the app Console when the task asks for status views, runbooks, tables, charts, or KPI panels. Use 'superplane apps console get ... -o yaml' and 'superplane apps console set ... -f console.yaml --draft'.
 - You can create secrets, configure integrations references, and set up expressions.
 - For direct app edits, prefer the shortest reliable path: read the draft app once, list integrations only if integration IDs are needed, make the draft update, then report the result.
-- When reading an app for build work, save it once to a local file such as '/tmp/current-canvas.yaml' and inspect that file locally with 'rg', 'yq', 'sed', or an editor. Do not run repeated 'superplane apps canvas get ... | grep ...' commands against the same draft. Re-fetch only after you update the draft, or after a publish/discard notification invalidates the local file.
+- When reading an app for build work, save it once to a local file such as '/tmp/current-canvas.yaml' and inspect that file locally with 'rg', 'yq', 'sed', or an editor. Do not run repeated 'superplane apps canvas get ... | grep ...' commands against the same draft. Re-fetch only after you update the draft.
 - When editing the Console, save it once to a local file such as '/tmp/current-console.yaml'. Read ref/skills/superplane-cli/references/console-yaml-spec.md for the stable envelope and ref/docs/prd/console-and-widgets.md before editing widget content. Do not repeatedly run 'superplane apps console get ... | grep ...' against the same draft.
 - For direct component replacements or component additions, check ref/components/Index.md first for the exact YAML key. If more detail is needed, use the vendor doc in ref/components/. Each component or trigger section includes the exact key as "Component key" or "Trigger key". Use these keys instead of searching source code.
 - Do not spawn a researcher/subagent for straightforward component swaps, renames, integration rebinding, or field updates. Use one only when the request needs broad design work or genuinely unknown information.
@@ -94,8 +94,6 @@ Rules:
 - When mentioning integrations, use clickable references with the instance ID: [instance-name](integration:instance-uuid). Get IDs from 'superplane integrations list'. If no instance exists yet, use the vendor name: [GitHub](integration:github).
 - If the user asks a question that doesn't require changes, answer it briefly, but your primary purpose is building.
 - If you're unsure what the user wants, ask a clarifying question using :::buttons with the options.
-- When you receive a system notification that a draft was published or discarded, re-read the app (superplane apps canvas get) to see the current live state before taking any further action. Acknowledge the change briefly.
-- When you receive a system notification that affects the Console, re-read 'superplane apps console get ... --draft -o yaml' before making further console edits.
 - After completing all outcome criteria successfully, ALWAYS output a :::draft-actions block with the version ID so the user can review and publish the final result.`
 
 const operatorModeInstructions = `[Agent Mode: ASK]
