@@ -78,7 +78,6 @@ import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
-import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import type {
   CanvasEchoRelease,
   CanvasSaveResult,
@@ -175,6 +174,8 @@ export function WorkflowPageV2() {
   const canvasId = appId || templateCanvasId || "";
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [openRunDetailOnMount, setOpenRunDetailOnMount] = useState(() => Boolean(searchParams.get("run")));
+  const dismissedRunDetailRunIdRef = useRef<string | null>(null);
   const queryClient = useQueryClient();
   const { data: me } = useMe();
   const {
@@ -191,6 +192,21 @@ export function WorkflowPageV2() {
     selectedRunId,
     setSelectedRunId,
   } = useWorkflowViewSearchParams(searchParams, setSearchParams);
+  const wasRunsModeRef = useRef(isRunsMode);
+  useEffect(() => {
+    if (!searchParams.get("run")) {
+      dismissedRunDetailRunIdRef.current = null;
+    }
+  }, [searchParams]);
+  useEffect(() => {
+    if (isRunsMode && !wasRunsModeRef.current) {
+      const runId = searchParams.get("run");
+      if (runId && runId !== dismissedRunDetailRunIdRef.current) {
+        setOpenRunDetailOnMount(true);
+      }
+    }
+    wasRunsModeRef.current = isRunsMode;
+  }, [isRunsMode, searchParams]);
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
   const { filesHeaderActions, onFilesHeaderActionsChange, filesHeaderActionsSlotId } =
     useWorkflowFilesHeaderState(canvasId);
@@ -501,6 +517,8 @@ export function WorkflowPageV2() {
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
+  const previousSelectedRunIdForDetailRef = useRef<string | null>(selectedRunId);
+  const [runNodeDetailPaneHeight, setRunNodeDetailPaneHeight] = useState(320);
   const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
   const runApiFilters = useMemo(() => statusFiltersToApiFilters(runStatusFilters), [runStatusFilters]);
@@ -4763,8 +4781,15 @@ export function WorkflowPageV2() {
     handleCreateVersion,
   ]);
 
+  const handleBackToRunList = useCallback(() => {
+    dismissedRunDetailRunIdRef.current = selectedRunId;
+    setRunDetailNodeId(null);
+    setOpenRunDetailOnMount(false);
+  }, [selectedRunId]);
+
   const handleSelectRun = useCallback(
     (runId: string) => {
+      dismissedRunDetailRunIdRef.current = null;
       setSelectedRunId(runId);
       setIsRunsMode(true);
       setIsFilesMode(false);
@@ -4910,6 +4935,14 @@ export function WorkflowPageV2() {
     },
     [isRunsMode, selectedRun, runCanvasData],
   );
+
+  useEffect(() => {
+    if (previousSelectedRunIdForDetailRef.current === selectedRunId) {
+      return;
+    }
+    previousSelectedRunIdForDetailRef.current = selectedRunId;
+    setRunDetailNodeId(null);
+  }, [selectedRunId]);
 
   useEffect(() => {
     if (!isRunsMode || selectedRunId) return;
@@ -5587,6 +5620,13 @@ export function WorkflowPageV2() {
               : undefined
           }
           runCanvasLoading={runCanvasLoading}
+          runNodeDetailRun={isRunsMode ? selectedRun : null}
+          runNodeDetailNodeId={runDetailNodeId}
+          runNodeDetailCanvasId={canvasId}
+          onRunNodeDetailClose={() => setRunDetailNodeId(null)}
+          onRunNodeDetailNavigate={setRunDetailNodeId}
+          runNodeDetailPaneHeight={runNodeDetailPaneHeight}
+          onRunNodeDetailPaneHeightChange={setRunNodeDetailPaneHeight}
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
@@ -5647,9 +5687,14 @@ export function WorkflowPageV2() {
           toolSidebarRunsContent={
             isRunsMode ? (
               <RunsTabPanel
+                canvasId={canvasId!}
                 runs={runsData.runs}
                 selectedRunId={selectedRunId}
                 onSelectRun={handleSelectRun}
+                onBackToRunList={handleBackToRunList}
+                initialOpenDetail={openRunDetailOnMount}
+                selectedNodeId={runDetailNodeId}
+                onSelectNode={setRunDetailNodeId}
                 hasNextPage={!!infiniteRunsQuery.hasNextPage}
                 isFetchingNextPage={infiniteRunsQuery.isFetchingNextPage}
                 onLoadMore={() => infiniteRunsQuery.fetchNextPage()}
@@ -5694,16 +5739,6 @@ export function WorkflowPageV2() {
               <span>Loading draft canvas...</span>
             </div>
           </div>
-        ) : null}
-        {isRunsMode && selectedRun && runDetailNodeId && canvasId ? (
-          <RunNodeDetailModal
-            canvasId={canvasId}
-            run={selectedRun}
-            nodeId={runDetailNodeId}
-            workflowNodes={canvasNodes}
-            onClose={() => setRunDetailNodeId(null)}
-            onNavigateNode={setRunDetailNodeId}
-          />
         ) : null}
       </div>
       <CanvasYamlModal {...canvasYamlModalProps} />
