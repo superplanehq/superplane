@@ -17,6 +17,7 @@ import {
   useSendAgentChatMessage,
 } from "@/hooks/useAgentChats";
 import { useAgentSessionWebsocket } from "@/hooks/useAgentSessionWebsocket";
+import { useCanvas, useInfiniteCanvasRuns } from "@/hooks/useCanvasData";
 import {
   AGENT_BOOT_CONTEXT_READY_EVENT,
   clearAgentBootContext,
@@ -209,7 +210,9 @@ function ChatConversation({
         onVersionPublished={() => setOutcomeState(null)}
       />
 
-      <ChatComposer
+      <ChatComposerWithMentions
+        canvasId={canvasId}
+        organizationId={organizationId}
         onSend={handlers.handleSend}
         onStop={handlers.handleStop}
         sending={agentBusy}
@@ -412,4 +415,36 @@ function DraftActionsBar({
       </div>
     </div>
   );
+}
+
+function ChatComposerWithMentions({
+  canvasId,
+  organizationId,
+  ...composerProps
+}: {
+  canvasId: string;
+  organizationId: string;
+  onSend: (content: string) => Promise<void>;
+  onStop: () => void;
+  sending: boolean;
+  sendPending: boolean;
+  stopping?: boolean;
+  statusLabel: string;
+  agentMode: AgentMode;
+  onModeSwitch: (mode: AgentMode) => void;
+  modeDisabled?: boolean;
+}) {
+  const { data: canvas } = useCanvas(organizationId, canvasId, {
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
+  });
+  const runsQuery = useInfiniteCanvasRuns(canvasId, {}, true);
+  const nodes = canvas?.spec?.nodes;
+  const runs = useMemo(
+    () => runsQuery.data?.pages?.flatMap((p) => p?.runs ?? []) ?? [],
+    [runsQuery.data],
+  );
+
+  return <ChatComposer {...composerProps} nodes={nodes} runs={runs} />;
 }
