@@ -57,6 +57,9 @@ const (
 	CreateAlarmPayloadType = "aws.ec2.alarm"
 	GetAlarmPayloadType    = "aws.ec2.alarm"
 
+	UpdateAlarmPayloadType = "aws.ec2.alarm"
+	DeleteAlarmPayloadType = "aws.ec2.alarm.deleted"
+
 	CreateLoadBalancerPayloadType = "aws.ec2.loadBalancer"
 	DeleteLoadBalancerPayloadType = "aws.ec2.loadBalancer.deleted"
 
