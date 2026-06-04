@@ -57,14 +57,10 @@ func (m *Materializer) MaterializeFromGit(
 
 	switch mode {
 	case ModeLive:
-		live := &LiveMaterializer{
-			GitProvider:    m.GitProvider,
-			Registry:       m.Registry,
-			Encryptor:      m.Encryptor,
-			AuthService:    m.AuthService,
-			WebhookBaseURL: m.WebhookBaseURL,
-		}
-		return live.MaterializeLive(ctx, tx, orgID, canvasID, commitSHA)
+		return SyncLiveFromGit(ctx, tx, m.GitProvider, m.Registry, m.Encryptor, m.AuthService, m.WebhookBaseURL, orgID, canvasID, SyncLiveFromGitOptions{
+			HeadSHA:                   commitSHA,
+			SkipChangeManagementCheck: true,
+		})
 	default:
 		draft := &DraftMaterializer{
 			GitProvider: m.GitProvider,

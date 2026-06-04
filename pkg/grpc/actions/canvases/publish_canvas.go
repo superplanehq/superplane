@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/authentication"
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/canvas/materialize"
@@ -94,28 +93,23 @@ func PublishCanvas(
 
 	var publishedVersion *models.CanvasVersion
 	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		nameErr := ensureCanvasNameAvailableInTransaction(tx, orgUUID, canvasUUID, canvas.Name)
-		if nameErr != nil {
-			return nameErr
-		}
-
-		mat := &materialize.Materializer{
-			GitProvider:    gitProvider,
-			Registry:       registry,
-			Encryptor:      encryptor,
-			AuthService:    authService,
-			WebhookBaseURL: webhookBaseURL,
-		}
-
-		version, matErr := mat.MaterializeFromGit(ctx, tx, orgUUID, canvasUUID, models.CanvasGitBranchMain, mergeSHA, materialize.ModeLive, nil)
-		if matErr != nil {
-			return matErr
-		}
-
-		refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, orgUUID, canvasUUID, uuid.Nil)
-		if refreshErr != nil {
-			log.Errorf("failed to refresh open canvas change requests: %v", refreshErr)
-			return refreshErr
+		version, syncErr := materialize.SyncLiveFromGit(
+			ctx,
+			tx,
+			gitProvider,
+			registry,
+			encryptor,
+			authService,
+			webhookBaseURL,
+			orgUUID,
+			canvasUUID,
+			materialize.SyncLiveFromGitOptions{
+				HeadSHA:                   mergeSHA,
+				SkipChangeManagementCheck: true,
+			},
+		)
+		if syncErr != nil {
+			return syncErr
 		}
 
 		if deleteErr := models.DeleteDraftBranchInTransaction(tx, canvasUUID, draftBranch); deleteErr != nil {

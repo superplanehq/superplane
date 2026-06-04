@@ -112,22 +112,20 @@ func CreateCanvasGitFirst(
 			return markErr
 		}
 
-		mat := &materialize.Materializer{
-			GitProvider:    gitProvider,
-			Registry:       reg,
-			Encryptor:      encryptor,
-			AuthService:    authService,
-			WebhookBaseURL: gitFirstWebhookBaseURL,
-		}
-		_, matErr := mat.MaterializeFromGit(
+		_, matErr := materialize.SyncLiveFromGit(
 			context.Background(),
 			tx,
+			gitProvider,
+			reg,
+			encryptor,
+			authService,
+			gitFirstWebhookBaseURL,
 			orgID,
 			canvasID,
-			models.CanvasGitBranchMain,
-			commitSHA,
-			materialize.ModeLive,
-			&userID,
+			materialize.SyncLiveFromGitOptions{
+				HeadSHA:                   commitSHA,
+				SkipChangeManagementCheck: true,
+			},
 		)
 		return matErr
 	}))

@@ -9,7 +9,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/renderedtext/go-tackle"
 	logrus "github.com/sirupsen/logrus"
+	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/canvas/materialize"
+	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
@@ -28,14 +30,24 @@ const (
 )
 
 type RepositoryMaterializerWorker struct {
-	Consumer    *tackle.Consumer
-	RabbitMQURL string
-	GitProvider git.Provider
-	Registry    *registry.Registry
-	semaphore   *semaphore.Weighted
+	Consumer       *tackle.Consumer
+	RabbitMQURL    string
+	GitProvider    git.Provider
+	Registry       *registry.Registry
+	Encryptor      crypto.Encryptor
+	AuthService    authorization.Authorization
+	WebhookBaseURL string
+	semaphore      *semaphore.Weighted
 }
 
-func NewRepositoryMaterializerWorker(rabbitMQURL string, gitProvider git.Provider, registry *registry.Registry) *RepositoryMaterializerWorker {
+func NewRepositoryMaterializerWorker(
+	rabbitMQURL string,
+	gitProvider git.Provider,
+	registry *registry.Registry,
+	encryptor crypto.Encryptor,
+	authService authorization.Authorization,
+	webhookBaseURL string,
+) *RepositoryMaterializerWorker {
 	logger := logging.NewTackleLogger(logrus.StandardLogger().WithFields(logrus.Fields{
 		"worker": "RepositoryMaterializer",
 	}))
@@ -44,11 +56,14 @@ func NewRepositoryMaterializerWorker(rabbitMQURL string, gitProvider git.Provide
 	consumer.SetLogger(logger)
 
 	return &RepositoryMaterializerWorker{
-		Consumer:    consumer,
-		RabbitMQURL: rabbitMQURL,
-		GitProvider: gitProvider,
-		Registry:    registry,
-		semaphore:   semaphore.NewWeighted(25),
+		Consumer:       consumer,
+		RabbitMQURL:    rabbitMQURL,
+		GitProvider:    gitProvider,
+		Registry:       registry,
+		Encryptor:      encryptor,
+		AuthService:    authService,
+		WebhookBaseURL: webhookBaseURL,
+		semaphore:      semaphore.NewWeighted(25),
 	}
 }
 
@@ -109,10 +124,6 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 		return err
 	}
 
-	if message.GetBranch() == models.CanvasGitBranchMain {
-		return nil
-	}
-
 	canvasID, err := uuid.Parse(message.GetCanvasId())
 	if err != nil {
 		return nil
@@ -142,6 +153,34 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 			w.log("Error reading branch head for canvas %s branch %s: %v", canvasID, message.GetBranch(), err)
 			return err
 		}
+	}
+
+	if message.GetBranch() == models.CanvasGitBranchMain {
+		if w.shouldSkipMainMaterialization(canvasID, headSHA) {
+			return nil
+		}
+
+		err = database.Conn().Transaction(func(tx *gorm.DB) error {
+			_, syncErr := materialize.SyncLiveFromGit(
+				context.Background(),
+				tx,
+				w.GitProvider,
+				w.Registry,
+				w.Encryptor,
+				w.AuthService,
+				w.WebhookBaseURL,
+				canvas.OrganizationID,
+				canvasID,
+				materialize.SyncLiveFromGitOptions{HeadSHA: headSHA},
+			)
+			return syncErr
+		})
+		if err != nil {
+			w.log("Error materializing live canvas %s at %s: %v", canvasID, headSHA, err)
+			return err
+		}
+
+		return nil
 	}
 
 	state, err := models.FindRepositoryMaterializationState(canvasID, message.GetBranch())
@@ -181,6 +220,23 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 	}
 
 	return nil
+}
+
+func (w *RepositoryMaterializerWorker) shouldSkipMainMaterialization(canvasID uuid.UUID, headSHA string) bool {
+	state, err := models.FindRepositoryMaterializationState(canvasID, models.CanvasGitBranchMain)
+	if err != nil {
+		return false
+	}
+	if state.MaterializedSHA != headSHA || state.Status != models.MaterializationStatusReady {
+		return false
+	}
+
+	canvas, err := models.FindCanvasWithoutOrgScope(canvasID)
+	if err != nil {
+		return false
+	}
+
+	return canvas.LiveVersionID != nil && *canvas.LiveVersionID == headSHA
 }
 
 func (w *RepositoryMaterializerWorker) log(format string, v ...any) {

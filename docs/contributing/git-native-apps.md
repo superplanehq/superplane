@@ -64,6 +64,10 @@ git push origin HEAD:refs/heads/drafts/$(superplane me -q id)
 # draft appears in `superplane apps drafts list` after the worker processes the push
 ```
 
+**Publish via git:** merge or push to `main` (for example `git push origin drafts/$(superplane me -q id):main`). The worker calls `SyncLiveFromGit` to materialize live from the new main HEAD. Draft branches are not auto-deleted after an external publish—remove them manually if needed.
+
+When change management is enabled, external pushes to `main` do **not** go live; use the change-request publish flow instead.
+
 ## APIs
 
 | RPC | Role |
@@ -71,7 +75,7 @@ git push origin HEAD:refs/heads/drafts/$(superplane me -q id)
 | `CreateDraftBranch` | Create `drafts/*` git branch from `main`; sync registers metadata (`Draft #n`) |
 | `ListDraftBranches` / `DeleteDraftBranch` | Manage draft metadata |
 | `CommitCanvasRepositoryFiles` | Atomic multi-file commit + sync draft materialization |
-| `PublishCanvas` | Merge draft → `main` + sync live materialization |
+| `PublishCanvas` | Merge draft → `main` (git write), then `SyncLiveFromGit` (same function the worker uses) |
 | `DescribeCanvasVersion` | Read materialized spec by SHA |
 
 Removed RPCs (git-first only): `UpdateCanvasVersion`, `ApplyCanvasVersionChangeset`, `ValidateCanvasVersionChangeset`, `UpdateCanvasDashboard`, `CreateCanvasVersion`.
@@ -83,7 +87,8 @@ Removed RPCs (git-first only): `UpdateCanvasVersion`, `ApplyCanvasVersionChanges
 | New `drafts/*` git branch (API, CLI, or push) | `SyncDraftBranchFromGit` registers metadata + materializes tip (sync for API; async worker for push) |
 | `CommitCanvasRepositoryFiles` on a draft branch | Synchronous draft materialization |
 | External git push updating an existing draft branch | Async worker + websocket `repository_branch_updated` |
-| `PublishCanvas` | Synchronous live materialization + `CanvasPublisher` |
+| `PublishCanvas` (UI / CLI) | Git merge to `main`, then synchronous `SyncLiveFromGit` + `CanvasPublisher`; deletes merged draft branch |
+| External git push updating `main` | Async worker `SyncLiveFromGit` + websocket `repository_branch_updated` |
 
 ## Change management
 

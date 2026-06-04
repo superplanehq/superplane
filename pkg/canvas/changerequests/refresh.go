@@ -1,0 +1,88 @@
+package changerequests
+
+import (
+	"errors"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/models"
+	"gorm.io/datatypes"
+	"gorm.io/gorm"
+)
+
+func refreshCanvasChangeRequestDiffInTransaction(
+	tx *gorm.DB,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+	request *models.CanvasChangeRequest,
+) error {
+	baseNodes, baseEdges, liveNodes, liveEdges, err := resolveCanvasChangeRequestBaseAndLiveInTransaction(tx, canvas, request)
+	if err != nil {
+		return err
+	}
+
+	diff := computeCanvasChangeRequestDiff(baseNodes, baseEdges, liveNodes, liveEdges, version.Nodes, version.Edges)
+	now := time.Now()
+
+	request.ChangedNodeIDs = datatypes.NewJSONSlice(diff.ChangedNodeIDs)
+	request.ConflictingNodeIDs = datatypes.NewJSONSlice(diff.ConflictingNodeIDs)
+	request.UpdatedAt = &now
+
+	if request.Status != models.CanvasChangeRequestStatusPublished &&
+		request.Status != models.CanvasChangeRequestStatusRejected {
+		request.Status = models.CanvasChangeRequestStatusOpen
+	}
+
+	return tx.Save(request).Error
+}
+
+// RefreshOpenCanvasChangeRequestsInTransaction recomputes diff/conflict flags for open change requests.
+func RefreshOpenCanvasChangeRequestsInTransaction(
+	tx *gorm.DB,
+	organizationID uuid.UUID,
+	canvasID uuid.UUID,
+	skipRequestID uuid.UUID,
+) error {
+	canvas, err := models.FindCanvasInTransaction(tx, organizationID, canvasID)
+	if err != nil {
+		return err
+	}
+
+	var requests []models.CanvasChangeRequest
+	if err := tx.
+		Where("workflow_id = ?", canvasID).
+		Where("id <> ?", skipRequestID).
+		Where("status = ?", models.CanvasChangeRequestStatusOpen).
+		Order("created_at DESC").
+		Find(&requests).
+		Error; err != nil {
+		return err
+	}
+
+	for i := range requests {
+		request := &requests[i]
+		version, versionErr := models.FindCanvasVersionInTransaction(tx, canvasID, request.VersionID)
+		if versionErr != nil {
+			if errors.Is(versionErr, gorm.ErrRecordNotFound) {
+				continue
+			}
+			return versionErr
+		}
+
+		if err := refreshCanvasChangeRequestDiffInTransaction(tx, canvas, version, request); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// RefreshCanvasChangeRequestDiffInTransaction recomputes diff/conflict flags for one change request.
+func RefreshCanvasChangeRequestDiffInTransaction(
+	tx *gorm.DB,
+	canvas *models.Canvas,
+	version *models.CanvasVersion,
+	request *models.CanvasChangeRequest,
+) error {
+	return refreshCanvasChangeRequestDiffInTransaction(tx, canvas, version, request)
+}

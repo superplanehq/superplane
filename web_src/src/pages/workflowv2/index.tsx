@@ -2111,6 +2111,19 @@ export function WorkflowPageV2() {
     undefined,
     handleCanvasLifecycleEvent,
     (payload) => {
+      const isMainBranchUpdate = payload.branch === "main";
+      const viewingLive = activeBranchRef.current == null;
+
+      if (
+        isMainBranchUpdate &&
+        viewingLive &&
+        payload.materializationStatus === "ready" &&
+        !hasPendingLocalCanvasState
+      ) {
+        invalidateCanvasVersionData(canvasId!);
+        return;
+      }
+
       if (payload.branch && payload.branch === activeBranchRef.current && branchStaging.hasStagingChanges) {
         setRemoteCanvasUpdatePending(true);
       }

@@ -204,7 +204,8 @@ func startWorkers(
 
 	if os.Getenv("START_REPOSITORY_MATERIALIZER") == "yes" {
 		log.Println("Starting Repository Materializer")
-		w := workers.NewRepositoryMaterializerWorker(rabbitMQURL, gitProvider, registry)
+		webhookBaseURL := getWebhookBaseURL(baseURL)
+		w := workers.NewRepositoryMaterializerWorker(rabbitMQURL, gitProvider, registry, encryptor, authService, webhookBaseURL)
 		go w.Start(context.Background())
 	}
 

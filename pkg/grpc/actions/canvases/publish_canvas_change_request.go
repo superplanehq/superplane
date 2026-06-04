@@ -155,22 +155,20 @@ func PublishCanvasChangeRequest(
 				return status.Errorf(codes.Internal, "failed to merge draft branch: %v", mergeErr)
 			}
 
-			mat := &materialize.Materializer{
-				GitProvider:    gitProvider,
-				Registry:       registry,
-				Encryptor:      encryptor,
-				AuthService:    authService,
-				WebhookBaseURL: webhookBaseURL,
-			}
-			publishedLive, matErr := mat.MaterializeFromGit(
+			publishedLive, matErr := materialize.SyncLiveFromGit(
 				ctx,
 				tx,
+				gitProvider,
+				registry,
+				encryptor,
+				authService,
+				webhookBaseURL,
 				organizationUUID,
 				canvasUUID,
-				models.CanvasGitBranchMain,
-				mergeSHA,
-				materialize.ModeLive,
-				nil,
+				materialize.SyncLiveFromGitOptions{
+					HeadSHA:                   mergeSHA,
+					SkipChangeManagementCheck: true,
+				},
 			)
 			if matErr != nil {
 				return matErr
@@ -185,7 +183,7 @@ func PublishCanvasChangeRequest(
 				return saveErr
 			}
 
-			if refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, request.ID); refreshErr != nil {
+			if refreshErr := RefreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, request.ID); refreshErr != nil {
 				return refreshErr
 			}
 
@@ -263,7 +261,7 @@ func PublishCanvasChangeRequest(
 			return saveErr
 		}
 
-		if refreshErr := refreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, request.ID); refreshErr != nil {
+		if refreshErr := RefreshOpenCanvasChangeRequestsInTransaction(tx, organizationUUID, canvasUUID, request.ID); refreshErr != nil {
 			return refreshErr
 		}
 
