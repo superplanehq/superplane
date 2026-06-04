@@ -191,6 +191,13 @@ export function WorkflowPageV2() {
     selectedRunId,
     setSelectedRunId,
   } = useWorkflowViewSearchParams(searchParams, setSearchParams);
+  const wasRunsModeRef = useRef(isRunsMode);
+  useEffect(() => {
+    if (isRunsMode && !wasRunsModeRef.current && searchParams.get("run")) {
+      setOpenRunDetailOnMount(true);
+    }
+    wasRunsModeRef.current = isRunsMode;
+  }, [isRunsMode, searchParams]);
   const urlViewFlags = useWorkflowUrlViewFlags(searchParams);
   const { filesHeaderActions, onFilesHeaderActionsChange, filesHeaderActionsSlotId } =
     useWorkflowFilesHeaderState(canvasId);

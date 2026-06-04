@@ -181,4 +181,20 @@ describe("RunsTabPanel", () => {
     expect(onBackToRunList).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText("Filter runs")).toBeVisible();
   });
+
+  it("opens run detail when the selected run changes from the URL", () => {
+    const runs = [
+      makeRun({ id: "run-1", rootEvent: { ...makeRun().rootEvent, customName: "First run" } }),
+      makeRun({ id: "run-2", rootEvent: { ...makeRun().rootEvent, customName: "Second run" } }),
+    ];
+
+    const { rerender } = render(<RunsTabPanel runs={runs} selectedRunId="run-1" {...baseProps} />);
+
+    expect(screen.queryByTestId("run-detail-panel")).not.toBeInTheDocument();
+
+    rerender(<RunsTabPanel runs={runs} selectedRunId="run-2" {...baseProps} />);
+
+    expect(screen.getByTestId("run-detail-panel")).toBeInTheDocument();
+    expect(screen.getByText("Second run")).toBeInTheDocument();
+  });
 });

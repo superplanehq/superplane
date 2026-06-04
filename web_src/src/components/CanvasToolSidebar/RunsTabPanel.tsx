@@ -55,6 +55,7 @@ export function RunsTabPanel({
 
   const filterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
   const scrollRef = useRef<HTMLDivElement>(null);
+  const previousSelectedRunIdRef = useRef<string | null>(selectedRunId);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: hasNextPage,
     isLoading: isFetchingNextPage,
@@ -68,14 +69,22 @@ export function RunsTabPanel({
   );
 
   useEffect(() => {
-    loadMoreIfNeeded(scrollRef.current);
-  }, [filterState.filteredRuns.length, loadMoreIfNeeded]);
-
-  useEffect(() => {
     if (!selectedRunId) {
       setSidebarView("list");
+      previousSelectedRunIdRef.current = null;
+      return;
     }
+
+    if (previousSelectedRunIdRef.current !== null && previousSelectedRunIdRef.current !== selectedRunId) {
+      setSidebarView("detail");
+    }
+
+    previousSelectedRunIdRef.current = selectedRunId;
   }, [selectedRunId]);
+
+  useEffect(() => {
+    loadMoreIfNeeded(scrollRef.current);
+  }, [filterState.filteredRuns.length, loadMoreIfNeeded]);
 
   const handleRunSelect = useCallback(
     (runId: string) => {

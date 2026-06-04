@@ -36,7 +36,6 @@ export function RunNodeDetailPane({
   const [internalHeight, setInternalHeight] = useState(defaultHeight);
   const [isResizing, setIsResizing] = useState(false);
   const dragStartRef = useRef<{ y: number; height: number } | null>(null);
-  const activeResizeCleanupRef = useRef<(() => void) | null>(null);
 
   const rootEventId = run.rootEvent?.id || null;
   const executionsQuery = useEventExecutions(canvasId, rootEventId);
@@ -65,43 +64,39 @@ export function RunNodeDetailPane({
   const handleResizeStart = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
       dragStartRef.current = { y: event.clientY, height: paneHeight };
-      document.body.style.userSelect = "none";
-      document.body.style.cursor = "ns-resize";
       setIsResizing(true);
-
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        if (!dragStartRef.current) return;
-        const delta = dragStartRef.current.y - moveEvent.clientY;
-        setPaneHeight(dragStartRef.current.height + delta);
-      };
-
-      const cleanupResizeListeners = () => {
-        dragStartRef.current = null;
-        document.body.style.userSelect = "";
-        document.body.style.cursor = "";
-        setIsResizing(false);
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", cleanupResizeListeners);
-        if (activeResizeCleanupRef.current === cleanupResizeListeners) {
-          activeResizeCleanupRef.current = null;
-        }
-      };
-
-      activeResizeCleanupRef.current = cleanupResizeListeners;
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", cleanupResizeListeners);
     },
-    [paneHeight, setPaneHeight],
+    [paneHeight],
   );
 
   useEffect(() => {
+    if (!isResizing) {
+      return;
+    }
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      if (!dragStartRef.current) return;
+      const delta = dragStartRef.current.y - moveEvent.clientY;
+      setPaneHeight(dragStartRef.current.height + delta);
+    };
+
+    const handleMouseUp = () => {
+      dragStartRef.current = null;
+      setIsResizing(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    document.body.style.userSelect = "none";
+    document.body.style.cursor = "ns-resize";
+
     return () => {
-      activeResizeCleanupRef.current?.();
-      activeResizeCleanupRef.current = null;
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
     };
-  }, []);
+  }, [isResizing, setPaneHeight]);
 
   return (
     <aside
