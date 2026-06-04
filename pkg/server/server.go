@@ -114,6 +114,7 @@ func startWorkers(
 	baseURL string,
 	authService authorization.Authorization,
 	agentProvider agents.Provider,
+	agentTurnSender workers.AgentTurnSender,
 ) {
 	log.Println("Starting Workers")
 
@@ -211,7 +212,7 @@ func startWorkers(
 
 	if agentProvider != nil && os.Getenv("START_AGENT_STREAM_WORKER") != "no" {
 		log.Println("Starting Agent Stream Worker")
-		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL)
+		w := workers.NewAgentStreamWorker(agentProvider, rabbitMQURL, agentTurnSender)
 		go w.Start(context.Background())
 	}
 
@@ -530,6 +531,7 @@ func Start() {
 	templates.Setup(registry)
 
 	agentProvider, agentService := buildAgentService(authService, jwtSigner, baseURL)
+	agentTurnSender, _ := agentService.(workers.AgentTurnSender)
 
 	if os.Getenv("START_PUBLIC_API") == "yes" {
 		go startPublicAPI(
@@ -567,6 +569,7 @@ func Start() {
 		baseURL,
 		authService,
 		agentProvider,
+		agentTurnSender,
 	)
 
 	log.Println("SuperPlane is UP.")

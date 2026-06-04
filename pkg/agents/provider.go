@@ -88,9 +88,11 @@ type Provider interface {
 	// DefineOutcome starts a rubric-driven execution loop on the provider side.
 	DefineOutcome(ctx context.Context, providerSessionID string, opts DefineOutcomeOptions) error
 	// StreamEvents blocks until the provider closes the stream, ctx is
-	// cancelled, or onEvent errors. Implementations must not call onEvent
-	// after returning.
-	StreamEvents(ctx context.Context, providerSessionID string, onEvent func(ProviderEvent) error) error
+	// cancelled, afterOpen errors, or onEvent errors. afterOpen runs after the
+	// stream is subscribed and before the first event is read; callers use it
+	// to trigger provider work without missing early events.
+	// Implementations must not call onEvent after returning.
+	StreamEvents(ctx context.Context, providerSessionID string, afterOpen func(context.Context) error, onEvent func(ProviderEvent) error) error
 }
 
 type ProviderSessionCleaner interface {
