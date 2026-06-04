@@ -23,8 +23,61 @@ function isFullExpression(raw: string): boolean {
   return FULL_EXPR_RE.test(raw);
 }
 
+/**
+ * Identifier substituted for bare `$` so cel-js (which only accepts
+ * `[a-zA-Z_][a-zA-Z0-9_]*` identifiers) can parse canvas-style node refs
+ * like `$["deploy-prod"].outputs.url`. Rows that need to resolve those
+ * references must carry the same map under this key.
+ */
+export const DOLLAR_REWRITE_IDENTIFIER = "__runNodes__";
+
+/**
+ * Rewrite bare `$` tokens to `DOLLAR_REWRITE_IDENTIFIER` outside of string
+ * literals so cel-js can parse expressions like `$["node name"].outputs.x`.
+ * Single- and double-quoted strings are copied verbatim (with backslash
+ * escapes preserved) so a `$` inside a string literal is left alone.
+ *
+ * The rewrite is purely additive: cel-js's lexer rejects bare `$` today,
+ * so no existing expression depended on the previous behavior.
+ */
+export function rewriteDollarRefs(raw: string): string {
+  let out = "";
+  let i = 0;
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (ch === '"' || ch === "'") {
+      const quote = ch;
+      out += quote;
+      i++;
+      while (i < raw.length && raw[i] !== quote) {
+        if (raw[i] === "\\" && i + 1 < raw.length) {
+          out += raw[i] + raw[i + 1];
+          i += 2;
+          continue;
+        }
+        out += raw[i];
+        i++;
+      }
+      if (i < raw.length) {
+        out += raw[i];
+        i++;
+      }
+      continue;
+    }
+    if (ch === "$") {
+      out += DOLLAR_REWRITE_IDENTIFIER;
+      i++;
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
 export function compileExpr(raw: string): CompiledExpr {
-  const result = celParse(raw);
+  const rewritten = rewriteDollarRefs(raw);
+  const result = celParse(rewritten);
   if (!result.isSuccess) {
     const message = result.errors.join("; ");
     return { ok: false, raw, error: message };
@@ -96,6 +149,15 @@ const BUILTIN_FUNCTIONS: Record<string, CallableFunction> = {
   duration: (seconds: unknown) => formatDurationSeconds(Number(seconds)),
   timestamp: (seconds: unknown) => formatTimestampSeconds(Number(seconds)),
   formatDate,
+  // Convert any date-like value (ISO string, Date, epoch number) to
+  // ms-since-epoch. Returns 0 for unparseable input so arithmetic doesn't
+  // blow up — authors checking `epochMs(x) > 0` can still detect missing
+  // values. Pairs with `duration()` for human-friendly output, e.g.
+  // `{{ duration((epochMs(finishedAt) - epochMs(createdAt)) / 1000) }}`.
+  epochMs: (value: unknown): number => {
+    const date = coerceToDate(value);
+    return date ? date.getTime() : 0;
+  },
 };
 
 function toInt(value: unknown): number {

@@ -115,6 +115,52 @@ describe("celExpr", () => {
     });
   });
 
+  describe("epochMs builtin", () => {
+    it("converts an ISO-8601 string to ms-since-epoch", () => {
+      const compiled = compileExpr("epochMs(value)");
+      const env = buildEnv();
+      const result = evalExpr(compiled, { value: "2026-01-01T00:00:00Z" }, env) as number;
+      expect(result).toBe(Date.UTC(2026, 0, 1, 0, 0, 0));
+    });
+
+    it("supports timestamp arithmetic across two ISO strings", () => {
+      // Authors hit this when they write `{{ epochMs(finishedAt) - epochMs(createdAt) }}`
+      // on a runs row to compute elapsed time without the durationMs convenience.
+      const compiled = compileExpr("epochMs(finishedAt) - epochMs(createdAt)");
+      const env = buildEnv();
+      const result = evalExpr(compiled, { createdAt: "2026-01-01T12:00:00Z", finishedAt: "2026-01-01T12:05:00Z" }, env);
+      expect(result).toBe(5 * 60 * 1000);
+    });
+
+    it("composes with `duration()` for human-friendly output", () => {
+      const template = compileTemplate("Took {{ duration((epochMs(finishedAt) - epochMs(createdAt)) / 1000) }}");
+      const env = buildEnv();
+      const result = evalTemplate(
+        template,
+        { createdAt: "2026-01-01T12:00:00Z", finishedAt: "2026-01-01T12:05:00Z" },
+        env,
+        String,
+      );
+      expect(result).toBe("Took 5m");
+    });
+
+    it("returns 0 for unparseable inputs so arithmetic stays defined", () => {
+      const compiled = compileExpr("epochMs(value)");
+      const env = buildEnv();
+      expect(evalExpr(compiled, { value: "not a date" }, env)).toBe(0);
+      expect(evalExpr(compiled, { value: null }, env)).toBe(0);
+    });
+
+    it("accepts epoch numbers (seconds and ms) and Date instances", () => {
+      const compiled = compileExpr("epochMs(value)");
+      const env = buildEnv();
+      const ms = Date.UTC(2026, 5, 1, 12, 0);
+      expect(evalExpr(compiled, { value: ms }, env)).toBe(ms);
+      expect(evalExpr(compiled, { value: ms / 1000 }, env)).toBe(ms);
+      expect(evalExpr(compiled, { value: new Date(ms) }, env)).toBe(ms);
+    });
+  });
+
   describe("error reporting", () => {
     it("reports a compile error for invalid CEL", () => {
       const compiled = compileExpr("value /");

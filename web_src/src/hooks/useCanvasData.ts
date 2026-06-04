@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery, useQueries } from "@tanstack/react-query";
 import {
   canvasesListCanvases,
   canvasesDescribeCanvas,
@@ -1362,6 +1362,36 @@ export const useEventExecutions = (canvasId: string, eventId: string | null) => 
     refetchOnWindowFocus: false,
     enabled: !!canvasId && !!eventId,
   });
+};
+
+/**
+ * Fetch executions for multiple root event ids in parallel. Each query is
+ * keyed by `(canvasId, eventId)`, identical to `useEventExecutions`, so the
+ * results dedupe with any single-event consumer (e.g. `RunNodeDetailModal`)
+ * already in the React Query cache. Returns the per-event results array
+ * along with an aggregate `isLoading` flag that's `true` while any of the
+ * underlying queries hasn't resolved yet.
+ */
+export const useEventExecutionsBatch = (canvasId: string, eventIds: string[]) => {
+  const queries = useQueries({
+    queries: eventIds.map((eventId) => ({
+      queryKey: canvasKeys.eventExecution(canvasId, eventId),
+      queryFn: async () => {
+        const response = await canvasesListEventExecutions(
+          withOrganizationHeader({
+            path: { canvasId, eventId },
+          }),
+        );
+        return response.data;
+      },
+      refetchOnWindowFocus: false,
+      enabled: !!canvasId && !!eventId,
+      staleTime: 30 * 1000,
+      gcTime: 5 * 60 * 1000,
+    })),
+  });
+  const isLoading = queries.some((q) => q.isLoading);
+  return { queries, isLoading };
 };
 
 export const useChildExecutions = (canvasId: string, executionId: string | null) => {
