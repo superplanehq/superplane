@@ -118,7 +118,7 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 		assert.NotEmpty(t, stored.SubscriptionID)
 	})
 
-	t.Run("already subscribed -> no-op", func(t *testing.T) {
+	t.Run("already subscribed with same config -> no-op", func(t *testing.T) {
 		metadata := &contexts.MetadataContext{
 			Metadata: OnAlarmMetadata{
 				Region:         "us-east-1",
@@ -137,6 +137,86 @@ func Test__EC2OnAlarm__Setup(t *testing.T) {
 
 		require.NoError(t, err)
 		assert.Len(t, integrationCtx.Subscriptions, 0)
+	})
+
+	t.Run("subscribed but region changed -> re-subscribes", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{
+			Metadata: OnAlarmMetadata{
+				Region:         "us-east-1",
+				InstanceID:     "i-abc123",
+				SubscriptionID: "existing-sub",
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Metadata: common.IntegrationMetadata{
+				EventBridge: &common.EventBridgeMetadata{
+					Rules: map[string]common.EventBridgeRuleMetadata{
+						"aws.cloudwatch:eu-west-1": {
+							Source:      CloudWatchSource,
+							DetailTypes: []string{DetailTypeCloudWatchAlarmStateChange},
+						},
+					},
+				},
+			},
+		}
+
+		err := trigger.Setup(core.TriggerContext{
+			Logger:      logrus.NewEntry(logrus.New()),
+			Integration: integrationCtx,
+			Metadata:    metadata,
+			Configuration: OnAlarmConfiguration{
+				Region:     "eu-west-1",
+				InstanceID: "i-abc123",
+				State:      "ALARM",
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, integrationCtx.Subscriptions, 1)
+		stored, ok := metadata.Get().(OnAlarmMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "eu-west-1", stored.Region)
+		assert.NotEmpty(t, stored.SubscriptionID)
+	})
+
+	t.Run("subscribed but instance changed -> re-subscribes", func(t *testing.T) {
+		metadata := &contexts.MetadataContext{
+			Metadata: OnAlarmMetadata{
+				Region:         "us-east-1",
+				InstanceID:     "i-abc123",
+				SubscriptionID: "existing-sub",
+			},
+		}
+		integrationCtx := &contexts.IntegrationContext{
+			Metadata: common.IntegrationMetadata{
+				EventBridge: &common.EventBridgeMetadata{
+					Rules: map[string]common.EventBridgeRuleMetadata{
+						"aws.cloudwatch:us-east-1": {
+							Source:      CloudWatchSource,
+							DetailTypes: []string{DetailTypeCloudWatchAlarmStateChange},
+						},
+					},
+				},
+			},
+		}
+
+		err := trigger.Setup(core.TriggerContext{
+			Logger:      logrus.NewEntry(logrus.New()),
+			Integration: integrationCtx,
+			Metadata:    metadata,
+			Configuration: OnAlarmConfiguration{
+				Region:     "us-east-1",
+				InstanceID: "i-new456",
+				State:      "ALARM",
+			},
+		})
+
+		require.NoError(t, err)
+		require.Len(t, integrationCtx.Subscriptions, 1)
+		stored, ok := metadata.Get().(OnAlarmMetadata)
+		require.True(t, ok)
+		assert.Equal(t, "i-new456", stored.InstanceID)
+		assert.NotEmpty(t, stored.SubscriptionID)
 	})
 }
 
