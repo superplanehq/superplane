@@ -2591,6 +2591,8 @@ type PutMetricAlarmInput struct {
 	// Entries may be SNS topic ARNs or EC2 automation ARNs
 	// (arn:aws:automate:<region>:ec2:recover|reboot|stop|terminate).
 	AlarmActions []string
+	// OmitAlarmActions skips AlarmActions parameters so existing actions are preserved (CloudWatch PutMetricAlarm).
+	OmitAlarmActions bool
 }
 
 type MetricAlarm struct {
@@ -2686,14 +2688,33 @@ func (c *Client) PutMetricAlarm(input PutMetricAlarmInput) error {
 		params.Set("TreatMissingData", treatMissing)
 	}
 
-	for i, arn := range input.AlarmActions {
-		arn = strings.TrimSpace(arn)
-		if arn != "" {
-			params.Set(fmt.Sprintf("AlarmActions.member.%d", i+1), arn)
+	if !input.OmitAlarmActions {
+		for i, arn := range input.AlarmActions {
+			arn = strings.TrimSpace(arn)
+			if arn != "" {
+				params.Set(fmt.Sprintf("AlarmActions.member.%d", i+1), arn)
+			}
 		}
 	}
 
 	return c.postSignedForm(monitoringServiceName, monitoringAPIVersion, "PutMetricAlarm", params, nil)
+}
+
+func (c *Client) DeleteAlarms(alarmNames ...string) error {
+	params := url.Values{}
+	for i, name := range alarmNames {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		params.Set(fmt.Sprintf("AlarmNames.member.%d", i+1), name)
+	}
+
+	if len(params) == 0 {
+		return fmt.Errorf("at least one alarm name is required")
+	}
+
+	return c.postSignedForm(monitoringServiceName, monitoringAPIVersion, "DeleteAlarms", params, nil)
 }
 
 func (c *Client) DescribeAlarm(alarmName string) (*MetricAlarm, error) {
