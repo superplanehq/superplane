@@ -1858,3 +1858,234 @@ func publicImageResourceName(image Image) string {
 
 	return fmt.Sprintf("%s (%s, %s)", name, image.ImageID, architecture)
 }
+
+// ── CloudWatch alarm types and methods ──────────────────────────────────────
+
+type PutMetricAlarmInput struct {
+	AlarmName          string
+	AlarmDescription   string
+	InstanceID         string
+	MetricName         string
+	Statistic          string
+	Period             int
+	EvaluationPeriods  int
+	Threshold          float64
+	ComparisonOperator string
+	TreatMissingData   string
+	// AlarmActions is a list of ARNs to invoke when the alarm enters ALARM state.
+	// Entries may be SNS topic ARNs or EC2 automation ARNs
+	// (arn:aws:automate:<region>:ec2:recover|reboot|stop|terminate).
+	AlarmActions []string
+}
+
+type MetricAlarm struct {
+	AlarmName          string           `json:"alarmName" mapstructure:"alarmName"`
+	AlarmArn           string           `json:"alarmArn" mapstructure:"alarmArn"`
+	AlarmDescription   string           `json:"alarmDescription" mapstructure:"alarmDescription"`
+	Namespace          string           `json:"namespace" mapstructure:"namespace"`
+	MetricName         string           `json:"metricName" mapstructure:"metricName"`
+	Statistic          string           `json:"statistic" mapstructure:"statistic"`
+	Period             int              `json:"period" mapstructure:"period"`
+	EvaluationPeriods  int              `json:"evaluationPeriods" mapstructure:"evaluationPeriods"`
+	Threshold          float64          `json:"threshold" mapstructure:"threshold"`
+	ComparisonOperator string           `json:"comparisonOperator" mapstructure:"comparisonOperator"`
+	StateValue         string           `json:"stateValue" mapstructure:"stateValue"`
+	StateReason        string           `json:"stateReason" mapstructure:"stateReason"`
+	TreatMissingData   string           `json:"treatMissingData" mapstructure:"treatMissingData"`
+	Dimensions         []AlarmDimension `json:"dimensions" mapstructure:"dimensions"`
+	Region             string           `json:"region" mapstructure:"region"`
+}
+
+type AlarmDimension struct {
+	Name  string `json:"name" mapstructure:"name"`
+	Value string `json:"value" mapstructure:"value"`
+}
+
+type describeAlarmsResponse struct {
+	XMLName xml.Name             `xml:"DescribeAlarmsResponse"`
+	Result  describeAlarmsResult `xml:"DescribeAlarmsResult"`
+}
+
+type describeAlarmsResult struct {
+	MetricAlarms []xmlMetricAlarm `xml:"MetricAlarms>member"`
+	NextToken    string           `xml:"NextToken"`
+}
+
+type xmlMetricAlarm struct {
+	AlarmName          string              `xml:"AlarmName"`
+	AlarmArn           string              `xml:"AlarmArn"`
+	AlarmDescription   string              `xml:"AlarmDescription"`
+	Namespace          string              `xml:"Namespace"`
+	MetricName         string              `xml:"MetricName"`
+	Statistic          string              `xml:"Statistic"`
+	Period             int                 `xml:"Period"`
+	EvaluationPeriods  int                 `xml:"EvaluationPeriods"`
+	Threshold          float64             `xml:"Threshold"`
+	ComparisonOperator string              `xml:"ComparisonOperator"`
+	StateValue         string              `xml:"StateValue"`
+	StateReason        string              `xml:"StateReason"`
+	TreatMissingData   string              `xml:"TreatMissingData"`
+	Dimensions         []xmlAlarmDimension `xml:"Dimensions>member"`
+}
+
+type xmlAlarmDimension struct {
+	Name  string `xml:"Name"`
+	Value string `xml:"Value"`
+}
+
+func (c *Client) PutMetricAlarm(input PutMetricAlarmInput) error {
+	params := url.Values{}
+	params.Set("AlarmName", strings.TrimSpace(input.AlarmName))
+	params.Set("Namespace", alarmNamespaceEC2)
+	params.Set("MetricName", strings.TrimSpace(input.MetricName))
+	params.Set("Dimensions.member.1.Name", "InstanceId")
+	params.Set("Dimensions.member.1.Value", strings.TrimSpace(input.InstanceID))
+	params.Set("Statistic", strings.TrimSpace(input.Statistic))
+	params.Set("ComparisonOperator", strings.TrimSpace(input.ComparisonOperator))
+	params.Set("Threshold", strconv.FormatFloat(input.Threshold, 'f', -1, 64))
+
+	period := input.Period
+	if period <= 0 {
+		period = 300
+	}
+	params.Set("Period", strconv.Itoa(period))
+
+	evaluationPeriods := input.EvaluationPeriods
+	if evaluationPeriods <= 0 {
+		evaluationPeriods = 1
+	}
+	params.Set("EvaluationPeriods", strconv.Itoa(evaluationPeriods))
+
+	description := strings.TrimSpace(input.AlarmDescription)
+	if description != "" {
+		params.Set("AlarmDescription", description)
+	}
+
+	treatMissing := strings.TrimSpace(input.TreatMissingData)
+	if treatMissing != "" {
+		params.Set("TreatMissingData", treatMissing)
+	}
+
+	for i, arn := range input.AlarmActions {
+		arn = strings.TrimSpace(arn)
+		if arn != "" {
+			params.Set(fmt.Sprintf("AlarmActions.member.%d", i+1), arn)
+		}
+	}
+
+	return c.postSignedForm(monitoringServiceName, monitoringAPIVersion, "PutMetricAlarm", params, nil)
+}
+
+func (c *Client) DescribeAlarm(alarmName string) (*MetricAlarm, error) {
+	params := url.Values{}
+	params.Set("AlarmNames.member.1", strings.TrimSpace(alarmName))
+
+	response := describeAlarmsResponse{}
+	if err := c.postSignedForm(monitoringServiceName, monitoringAPIVersion, "DescribeAlarms", params, &response); err != nil {
+		return nil, err
+	}
+
+	if len(response.Result.MetricAlarms) == 0 {
+		return nil, fmt.Errorf("alarm not found: %s", alarmName)
+	}
+
+	return alarmFromXML(response.Result.MetricAlarms[0], c.region), nil
+}
+
+func (c *Client) ListAlarms() ([]MetricAlarm, error) {
+	return c.listAlarms(url.Values{})
+}
+
+func (c *Client) ListAlarmsForInstance(instanceID string) ([]MetricAlarm, error) {
+	base := url.Values{}
+	base.Set("Dimensions.member.1.Name", "InstanceId")
+	base.Set("Dimensions.member.1.Value", strings.TrimSpace(instanceID))
+	return c.listAlarms(base)
+}
+
+func (c *Client) listAlarms(base url.Values) ([]MetricAlarm, error) {
+	alarms := []MetricAlarm{}
+	nextToken := ""
+
+	for {
+		params := url.Values{}
+		for k, vs := range base {
+			params[k] = vs
+		}
+		params.Set("MaxRecords", "100")
+
+		if nextToken != "" {
+			params.Set("NextToken", nextToken)
+		}
+
+		response := describeAlarmsResponse{}
+		if err := c.postSignedForm(monitoringServiceName, monitoringAPIVersion, "DescribeAlarms", params, &response); err != nil {
+			return nil, err
+		}
+
+		for _, xmlAlarm := range response.Result.MetricAlarms {
+			alarms = append(alarms, *alarmFromXML(xmlAlarm, c.region))
+		}
+
+		nextToken = strings.TrimSpace(response.Result.NextToken)
+		if nextToken == "" {
+			break
+		}
+	}
+
+	return alarms, nil
+}
+
+func alarmFromXML(x xmlMetricAlarm, region string) *MetricAlarm {
+	dimensions := make([]AlarmDimension, 0, len(x.Dimensions))
+	for _, d := range x.Dimensions {
+		dimensions = append(dimensions, AlarmDimension{Name: d.Name, Value: d.Value})
+	}
+
+	return &MetricAlarm{
+		AlarmName:          x.AlarmName,
+		AlarmArn:           x.AlarmArn,
+		AlarmDescription:   x.AlarmDescription,
+		Namespace:          x.Namespace,
+		MetricName:         x.MetricName,
+		Statistic:          x.Statistic,
+		Period:             x.Period,
+		EvaluationPeriods:  x.EvaluationPeriods,
+		Threshold:          x.Threshold,
+		ComparisonOperator: x.ComparisonOperator,
+		StateValue:         x.StateValue,
+		StateReason:        x.StateReason,
+		TreatMissingData:   x.TreatMissingData,
+		Dimensions:         dimensions,
+		Region:             region,
+	}
+}
+
+func alarmToMap(alarm *MetricAlarm) map[string]any {
+	if alarm == nil {
+		return map[string]any{}
+	}
+
+	dims := make([]map[string]any, 0, len(alarm.Dimensions))
+	for _, d := range alarm.Dimensions {
+		dims = append(dims, map[string]any{"name": d.Name, "value": d.Value})
+	}
+
+	return map[string]any{
+		"alarmName":          alarm.AlarmName,
+		"alarmArn":           alarm.AlarmArn,
+		"alarmDescription":   alarm.AlarmDescription,
+		"namespace":          alarm.Namespace,
+		"metricName":         alarm.MetricName,
+		"statistic":          alarm.Statistic,
+		"period":             alarm.Period,
+		"evaluationPeriods":  alarm.EvaluationPeriods,
+		"threshold":          alarm.Threshold,
+		"comparisonOperator": alarm.ComparisonOperator,
+		"stateValue":         alarm.StateValue,
+		"stateReason":        alarm.StateReason,
+		"treatMissingData":   alarm.TreatMissingData,
+		"dimensions":         dims,
+		"region":             alarm.Region,
+	}
+}
