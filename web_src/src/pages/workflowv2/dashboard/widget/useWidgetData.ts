@@ -11,7 +11,7 @@ import {
 import { resolveDashboardNode, useDashboardContext } from "../DashboardContext";
 import { DOLLAR_REWRITE_IDENTIFIER } from "./celExpr";
 import { flattenMemoryEntries } from "./memoryRow";
-import type { WidgetDataSource } from "./types";
+import type { WidgetDataSource, WidgetRender } from "./types";
 
 export interface WidgetDataResult {
   rows: unknown[];
@@ -48,8 +48,22 @@ const EXECUTIONS_MAX_EAGER_PAGES = 20;
  *   the visible row count fluctuates non-monotonically when a manual run
  *   prepends a new (still-empty) event that pushes an older event-with-
  *   executions off the loaded first page.
+ *
+ * `needsNodeOutputs` controls the `runs` per-node side-load. Resolving
+ * `$["node"].outputs` requires a `ListEventExecutions` call per visible run
+ * (the runs API only returns lightweight execution refs). When the render
+ * never references `$`, callers pass `false` so we skip those calls entirely
+ * and, crucially, don't gate the panel's loading state on them — otherwise a
+ * count KPI that only reads the API `totalCount` would spin until every
+ * side-load resolved even though it never reads per-node data. Defaults to
+ * `true` so a caller that forgets to pass it keeps the safe (fully-loaded)
+ * behavior.
  */
-export function useWidgetData(canvasId: string, dataSource: WidgetDataSource): WidgetDataResult {
+export function useWidgetData(
+  canvasId: string,
+  dataSource: WidgetDataSource,
+  needsNodeOutputs: boolean = true,
+): WidgetDataResult {
   const ctx = useDashboardContext();
 
   const memoryEnabled = dataSource.kind === "memory";
@@ -124,7 +138,7 @@ export function useWidgetData(canvasId: string, dataSource: WidgetDataSource): W
   // The runs API only returns lightweight execution refs without outputs, so
   // we have to side-load the full executions to support `$["node"].outputs`.
   const runRootEventIds = useMemo(() => {
-    if (dataSource.kind !== "runs") return [] as string[];
+    if (dataSource.kind !== "runs" || !needsNodeOutputs) return [] as string[];
     const seen = new Set<string>();
     const ids: string[] = [];
     let count = 0;
@@ -141,7 +155,7 @@ export function useWidgetData(canvasId: string, dataSource: WidgetDataSource): W
       if (count >= runsLimit) break;
     }
     return ids;
-  }, [dataSource, runsQuery.data, runsLimit]);
+  }, [dataSource, runsQuery.data, runsLimit, needsNodeOutputs]);
 
   const { queries: runExecutionQueries, isLoading: runExecutionsLoading } = useEventExecutionsBatch(
     canvasId,
@@ -190,6 +204,31 @@ export function useWidgetData(canvasId: string, dataSource: WidgetDataSource): W
     executionsLoading,
     eventsError,
   });
+}
+
+/**
+ * Matches a canvas-style per-node reference (`$["node"]` / `$['node']`,
+ * with optional whitespace before the bracket) inside a render config. We
+ * key off the `$[` shape rather than a bare `$` so currency/label literals
+ * like `prefix: "R$"` or `label: "Total $"` don't force the per-node
+ * side-load.
+ */
+const RUN_NODE_REF_RE = /\$\s*\[/;
+
+/**
+ * Whether a widget render reads per-node run outputs via the `$["node"]`
+ * syntax — in a literal field path or inside a `{{ }}` CEL template. Only the
+ * `runs` data source side-loads per-node executions to populate the row's `$`
+ * map, so when the render never references `$` the caller can pass the result
+ * as `needsNodeOutputs={false}` to skip the `ListEventExecutions` batch and
+ * avoid gating the panel's loading state on it. Scans the whole render via
+ * `JSON.stringify` so every field/expression-bearing string (columns,
+ * filters, sort, series, sparkline, row actions, …) is covered without
+ * enumerating each render shape.
+ */
+export function renderNeedsRunNodeOutputs(render: WidgetRender | undefined): boolean {
+  if (!render) return false;
+  return RUN_NODE_REF_RE.test(JSON.stringify(render));
 }
 
 function useEagerExecutionPagination({

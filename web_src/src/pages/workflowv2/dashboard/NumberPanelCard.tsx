@@ -17,7 +17,7 @@ import {
   type NumberPanelContent,
   type TablePanelDataSource,
 } from "./panelTypes";
-import { useWidgetData } from "./widget/useWidgetData";
+import { renderNeedsRunNodeOutputs, useWidgetData } from "./widget/useWidgetData";
 import { WidgetNumber } from "./widget/WidgetNumber";
 
 interface NumberPanelCardProps {
@@ -85,7 +85,7 @@ function NumberPanelDataBound({
   dataSource: Exclude<NumberPanelContent["dataSource"], CompositeMemoryNumberDataSource | undefined>;
   canvasId: string;
 }) {
-  const { rows, isLoading, error, totalCount } = useWidgetData(canvasId, dataSource);
+  const { rows, isLoading, error, totalCount } = useWidgetData(canvasId, dataSource, renderNeedsRunNodeOutputs(render));
   if (error) return <PanelError message={error} />;
   return <WidgetNumber render={render} rows={rows} isLoading={isLoading} totalCount={totalCount} />;
 }
@@ -107,7 +107,11 @@ function MultiNumberPanelBody({ metrics, canvasId }: { metrics: NumberMetric[]; 
 }
 
 function NumberMetricItem({ metric, canvasId }: { metric: NumberMetric; canvasId: string }) {
-  const { rows, isLoading, error, totalCount } = useWidgetData(canvasId, metric.dataSource as TablePanelDataSource);
+  const { rows, isLoading, error, totalCount } = useWidgetData(
+    canvasId,
+    metric.dataSource as TablePanelDataSource,
+    renderNeedsRunNodeOutputs(metric.render),
+  );
   if (error) {
     return (
       <div className="flex items-center justify-center gap-2 text-xs text-amber-700">
