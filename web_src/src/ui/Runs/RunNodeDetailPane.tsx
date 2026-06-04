@@ -81,7 +81,7 @@ export function RunNodeDetailPane({
         document.body.style.cursor = "";
         setIsResizing(false);
         window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
+        window.removeEventListener("mouseup", cleanupResizeListeners);
         if (activeResizeCleanupRef.current === cleanupResizeListeners) {
           activeResizeCleanupRef.current = null;
         }
