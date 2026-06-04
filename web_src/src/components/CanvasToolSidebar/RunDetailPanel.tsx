@@ -37,12 +37,16 @@ export function RunDetailPanel({
 
   const executionChain = useMemo(() => buildExecutionChain(executions, triggerNodeId), [executions, triggerNodeId]);
 
-  const copyRunLink = () => {
+  const copyRunLink = async () => {
     const url = new URL(window.location.href);
     url.searchParams.set("view", "runs");
     url.searchParams.set("run", run.id || "");
-    navigator.clipboard.writeText(url.toString());
-    toast.success("Run link copied");
+    try {
+      await navigator.clipboard.writeText(url.toString());
+      toast.success("Run link copied");
+    } catch {
+      toast.error("Failed to copy run link");
+    }
   };
 
   return (

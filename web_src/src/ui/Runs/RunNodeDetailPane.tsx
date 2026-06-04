@@ -36,6 +36,7 @@ export function RunNodeDetailPane({
   const [internalHeight, setInternalHeight] = useState(defaultHeight);
   const [isResizing, setIsResizing] = useState(false);
   const dragStartRef = useRef<{ y: number; height: number } | null>(null);
+  const activeResizeCleanupRef = useRef<(() => void) | null>(null);
 
   const rootEventId = run.rootEvent?.id || null;
   const executionsQuery = useEventExecutions(canvasId, rootEventId);
@@ -74,23 +75,29 @@ export function RunNodeDetailPane({
         setPaneHeight(dragStartRef.current.height + delta);
       };
 
-      const handleMouseUp = () => {
+      const cleanupResizeListeners = () => {
         dragStartRef.current = null;
         document.body.style.userSelect = "";
         document.body.style.cursor = "";
         setIsResizing(false);
         window.removeEventListener("mousemove", handleMouseMove);
         window.removeEventListener("mouseup", handleMouseUp);
+        if (activeResizeCleanupRef.current === cleanupResizeListeners) {
+          activeResizeCleanupRef.current = null;
+        }
       };
 
+      activeResizeCleanupRef.current = cleanupResizeListeners;
       window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
+      window.addEventListener("mouseup", cleanupResizeListeners);
     },
     [paneHeight, setPaneHeight],
   );
 
   useEffect(() => {
     return () => {
+      activeResizeCleanupRef.current?.();
+      activeResizeCleanupRef.current = null;
       document.body.style.userSelect = "";
       document.body.style.cursor = "";
     };
