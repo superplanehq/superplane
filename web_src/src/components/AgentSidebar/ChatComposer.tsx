@@ -31,36 +31,28 @@ function BackdropContent({ text, mentions }: { text: string; mentions: { label: 
     return <span className="whitespace-pre-wrap break-words text-[rgba(10,10,10,1)]">{text || "\u00A0"}</span>;
   }
 
-  // Build a list of segments: plain text (invisible) and @mentions (styled)
-  const mentionLabels = mentions.map((m) => `@${m.label}`);
+  // Build segments using tracked startIndex positions for accurate rendering
+  const sorted = [...mentions]
+    .filter((m) => {
+      const expected = `@${m.label}`;
+      return text.slice(m.startIndex, m.startIndex + expected.length) === expected;
+    })
+    .sort((a, b) => a.startIndex - b.startIndex);
+
   const segments: { text: string; isMention: boolean }[] = [];
-  let remaining = text;
+  let pos = 0;
 
-  while (remaining.length > 0) {
-    // Find the earliest mention in the remaining text
-    let earliestIdx = -1;
-    let earliestLabel = "";
-    for (const ml of mentionLabels) {
-      const idx = remaining.indexOf(ml);
-      if (idx !== -1 && (earliestIdx === -1 || idx < earliestIdx)) {
-        earliestIdx = idx;
-        earliestLabel = ml;
-      }
+  for (const m of sorted) {
+    const displayText = `@${m.label}`;
+    if (m.startIndex > pos) {
+      segments.push({ text: text.slice(pos, m.startIndex), isMention: false });
     }
+    segments.push({ text: displayText, isMention: true });
+    pos = m.startIndex + displayText.length;
+  }
 
-    if (earliestIdx === -1) {
-      // No more mentions
-      segments.push({ text: remaining, isMention: false });
-      break;
-    }
-
-    // Text before mention
-    if (earliestIdx > 0) {
-      segments.push({ text: remaining.slice(0, earliestIdx), isMention: false });
-    }
-    // The mention itself
-    segments.push({ text: earliestLabel, isMention: true });
-    remaining = remaining.slice(earliestIdx + earliestLabel.length);
+  if (pos < text.length) {
+    segments.push({ text: text.slice(pos), isMention: false });
   }
 
   return (
@@ -125,6 +117,7 @@ export function ChatComposer({
     clear,
     snapshot,
     restore,
+    dismiss,
   } = useMentions();
 
   // Build mention candidates from nodes + runs, filtered by current input
@@ -214,8 +207,9 @@ export function ChatComposer({
   );
 
   const handleDismiss = useCallback(() => {
+    dismiss();
     textareaRef.current?.focus();
-  }, []);
+  }, [dismiss]);
 
   // Sync scroll between textarea and backdrop
   const handleScroll = useCallback(() => {

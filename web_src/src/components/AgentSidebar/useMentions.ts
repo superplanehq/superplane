@@ -53,17 +53,23 @@ export interface UseMentionsReturn {
   snapshot: () => void;
   /** Restore from snapshot (for failed sends) */
   restore: () => void;
+  /** Dismiss the dropdown (Escape key) */
+  dismiss: () => void;
 }
 
-/** Detect if cursor is in a mention trigger position (after @) */
+/**
+ * Detect if cursor is in a mention trigger position (after @).
+ * Allows spaces in the filter so multi-word node names like "PR Opened" can be matched.
+ * Terminates on newline or a second @ (start of another mention).
+ */
 function detectTrigger(text: string, cursorPos: number): { active: boolean; filter: string; start: number } {
   const before = text.slice(0, cursorPos);
 
   // Find the last @ that's either at start or after whitespace
   for (let i = before.length - 1; i >= 0; i--) {
     const ch = before[i];
-    // If we hit whitespace or newline without finding @, no trigger
-    if (ch === " " || ch === "\n" || ch === "\t") {
+    // Newline terminates — you can't mention across lines
+    if (ch === "\n") {
       return { active: false, filter: "", start: 0 };
     }
     if (ch === "@") {
@@ -82,11 +88,9 @@ function detectTrigger(text: string, cursorPos: number): { active: boolean; filt
 function pruneMentions(text: string, mentions: InsertedMention[]): InsertedMention[] {
   return mentions.filter((m) => {
     const expected = `@${m.label}`;
-    // Check if the mention still exists at its tracked position
     if (text.slice(m.startIndex, m.startIndex + expected.length) === expected) {
       return true;
     }
-    // Mention was edited/deleted — remove it
     return false;
   });
 }
@@ -95,19 +99,48 @@ export function useMentions(): UseMentionsReturn {
   const [value, setValue_] = useState("");
   const [cursorPos, setCursorPos] = useState(0);
   const [mentions, setMentions] = useState<InsertedMention[]>([]);
+  const [dismissed, setDismissed] = useState(false);
   const snapshotRef = useRef<{ value: string; mentions: InsertedMention[] } | null>(null);
+  const lastTriggerRef = useRef<{ start: number; cursorPos: number } | null>(null);
 
   const trigger = useMemo(() => detectTrigger(value, cursorPos), [value, cursorPos]);
+
+  // Reset dismissed state when the trigger context changes (user types more or moves cursor)
+  const showDropdown = useMemo(() => {
+    if (!trigger.active) {
+      return false;
+    }
+    if (dismissed) {
+      // If the trigger start or cursor moved since dismiss, re-enable
+      if (
+        lastTriggerRef.current &&
+        (lastTriggerRef.current.start !== trigger.start || lastTriggerRef.current.cursorPos === cursorPos)
+      ) {
+        return false;
+      }
+    }
+    return true;
+  }, [trigger.active, trigger.start, dismissed, cursorPos]);
 
   // setValue that also prunes stale mentions
   const setValue = useCallback((v: string) => {
     setValue_(v);
     setMentions((prev) => pruneMentions(v, prev));
+    setDismissed(false); // Reset dismiss on any text change
   }, []);
+
+  const setCursorPosWrapped = useCallback((pos: number) => {
+    setCursorPos(pos);
+    setDismissed(false); // Reset dismiss on cursor move
+  }, []);
+
+  const dismiss = useCallback(() => {
+    setDismissed(true);
+    lastTriggerRef.current = { start: trigger.start, cursorPos };
+  }, [trigger.start, cursorPos]);
 
   const insertMention = useCallback(
     (item: MentionItem): number => {
-      // Replace from trigger start (@...) to cursor with "@Label "
       const displayText = `@${item.label}`;
       const before = value.slice(0, trigger.start);
       const after = value.slice(cursorPos);
@@ -116,10 +149,10 @@ export function useMentions(): UseMentionsReturn {
 
       setValue_(newValue);
       setCursorPos(newCursorPos);
+      setDismissed(false);
 
-      // Track this mention with position
       const insertionPoint = before.length;
-      const delta = displayText.length + 1 - (cursorPos - trigger.start); // +1 for trailing space
+      const delta = displayText.length + 1 - (cursorPos - trigger.start);
       const newMention: InsertedMention = {
         type: item.type,
         id: item.id,
@@ -127,7 +160,6 @@ export function useMentions(): UseMentionsReturn {
         displayText,
         startIndex: insertionPoint,
       };
-      // Shift existing mentions that come after the insertion point
       setMentions((prev) => [
         ...prev.map((m) => (m.startIndex >= insertionPoint ? { ...m, startIndex: m.startIndex + delta } : m)),
         newMention,
@@ -139,13 +171,11 @@ export function useMentions(): UseMentionsReturn {
   );
 
   const getMarkdown = useCallback(() => {
-    // Replace mentions by position (from end to start to preserve indices)
     const sorted = [...mentions].sort((a, b) => b.startIndex - a.startIndex);
     let result = value;
     for (const m of sorted) {
       const displayText = `@${m.label}`;
       const at = m.startIndex;
-      // Verify the mention is still at this position
       if (result.slice(at, at + displayText.length) !== displayText) continue;
       const link = m.type === "run" ? `[${m.label}](run:${m.id})` : `[${m.label}](node:${m.id})`;
       result = result.slice(0, at) + link + result.slice(at + displayText.length);
@@ -162,6 +192,7 @@ export function useMentions(): UseMentionsReturn {
   const restore = useCallback(() => {
     if (snapshotRef.current) {
       setValue_(snapshotRef.current.value);
+      setCursorPos(snapshotRef.current.value.length);
       setMentions(snapshotRef.current.mentions);
       snapshotRef.current = null;
     }
@@ -171,17 +202,18 @@ export function useMentions(): UseMentionsReturn {
     setValue_("");
     setCursorPos(0);
     setMentions([]);
+    setDismissed(false);
     snapshotRef.current = null;
   }, []);
 
   return {
     value,
     setValue,
-    showDropdown: trigger.active,
+    showDropdown,
     filter: trigger.filter,
     triggerStart: trigger.start,
     cursorPos,
-    setCursorPos,
+    setCursorPos: setCursorPosWrapped,
     insertMention,
     getMarkdown,
     mentions,
@@ -189,5 +221,6 @@ export function useMentions(): UseMentionsReturn {
     clear,
     snapshot,
     restore,
+    dismiss,
   };
 }
