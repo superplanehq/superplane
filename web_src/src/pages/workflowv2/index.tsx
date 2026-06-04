@@ -517,6 +517,7 @@ export function WorkflowPageV2() {
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
+  const previousSelectedRunIdForDetailRef = useRef<string | null>(selectedRunId);
   const [runNodeDetailPaneHeight, setRunNodeDetailPaneHeight] = useState(320);
   const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
@@ -4934,6 +4935,14 @@ export function WorkflowPageV2() {
     },
     [isRunsMode, selectedRun, runCanvasData],
   );
+
+  useEffect(() => {
+    if (previousSelectedRunIdForDetailRef.current === selectedRunId) {
+      return;
+    }
+    previousSelectedRunIdForDetailRef.current = selectedRunId;
+    setRunDetailNodeId(null);
+  }, [selectedRunId]);
 
   useEffect(() => {
     if (!isRunsMode || selectedRunId) return;
