@@ -292,8 +292,9 @@ func (c *UpdateInstance) Execute(ctx core.ExecutionContext) error {
 	}
 
 	securityGroupID := strings.TrimSpace(config.SecurityGroupID)
-	hasTypeChange := strings.TrimSpace(config.NewInstanceType) != ""
+	newInstanceType := strings.TrimSpace(config.NewInstanceType)
 	hasSGChange := securityGroupID != ""
+	needsTypeResize := newInstanceType != "" && newInstanceType != instance.InstanceType
 
 	// Security group updates take effect immediately and do not require stopping.
 	if hasSGChange {
@@ -302,11 +303,11 @@ func (c *UpdateInstance) Execute(ctx core.ExecutionContext) error {
 		}
 	}
 
-	// If there is no instance type change, emit the current state and finish.
-	if !hasTypeChange {
+	// If the configured type matches the current type, skip stop/resize.
+	if !needsTypeResize {
 		updated, err := client.DescribeInstance(instanceID)
 		if err != nil {
-			return fmt.Errorf("failed to describe instance after security group update: %w", err)
+			return fmt.Errorf("failed to describe instance after update: %w", err)
 		}
 
 		return ctx.ExecutionState.Emit(
@@ -320,7 +321,7 @@ func (c *UpdateInstance) Execute(ctx core.ExecutionContext) error {
 
 	metadata := UpdateInstanceExecutionMetadata{
 		InstanceID:      instanceID,
-		NewInstanceType: strings.TrimSpace(config.NewInstanceType),
+		NewInstanceType: newInstanceType,
 		WasRunning:      wasRunning,
 	}
 

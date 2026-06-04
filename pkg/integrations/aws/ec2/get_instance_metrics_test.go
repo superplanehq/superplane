@@ -1,6 +1,7 @@
 package ec2
 
 import (
+	"errors"
 	"net/http"
 	"testing"
 
@@ -230,6 +231,26 @@ func Test__GetInstanceMetrics__Execute(t *testing.T) {
 		val, hasCPU := payload["avgCpuUsagePercent"]
 		assert.True(t, hasCPU)
 		assert.Nil(t, val)
+	})
+}
+
+func Test__memoryUsagePercent(t *testing.T) {
+	t.Run("returns error when cloudwatch request fails", func(t *testing.T) {
+		val, err := memoryUsagePercent(errors.New("access denied"), nil)
+		require.ErrorContains(t, err, "failed to get memory metrics")
+		assert.Nil(t, val)
+	})
+
+	t.Run("returns nil when no datapoints", func(t *testing.T) {
+		val, err := memoryUsagePercent(nil, nil)
+		require.NoError(t, err)
+		assert.Nil(t, val)
+	})
+
+	t.Run("returns average when datapoints exist", func(t *testing.T) {
+		val, err := memoryUsagePercent(nil, []CloudWatchDatapoint{{Average: 65.5}})
+		require.NoError(t, err)
+		assert.Equal(t, 65.5, val)
 	})
 }
 
