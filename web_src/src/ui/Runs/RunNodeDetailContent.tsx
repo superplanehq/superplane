@@ -70,14 +70,8 @@ export function RunNodeDetailContent({
   const tabSelectionWasFallbackRef = useRef(false);
   const triggerNodeId = run.rootEvent?.nodeId;
   const isTriggerNode = nodeId === triggerNodeId;
-  const executionChain = useMemo(
-    () => buildExecutionChain(executions, triggerNodeId),
-    [executions, triggerNodeId],
-  );
-  const previousNodeId = useMemo(
-    () => getAdjacentRunNodeId(executionChain, nodeId, "prev"),
-    [executionChain, nodeId],
-  );
+  const executionChain = useMemo(() => buildExecutionChain(executions, triggerNodeId), [executions, triggerNodeId]);
+  const previousNodeId = useMemo(() => getAdjacentRunNodeId(executionChain, nodeId, "prev"), [executionChain, nodeId]);
   const nextNodeId = useMemo(() => getAdjacentRunNodeId(executionChain, nodeId, "next"), [executionChain, nodeId]);
   const nodeExecution = useMemo(
     () => executions.find((execution) => execution.nodeId === nodeId),
