@@ -67,3 +67,39 @@ func requireSecurityGroupID(value string) (string, error) {
 
 	return securityGroupID, nil
 }
+
+func requireAlarmName(value string) (string, error) {
+	alarmName := strings.TrimSpace(value)
+	if alarmName == "" {
+		return "", fmt.Errorf("alarm name is required")
+	}
+
+	return alarmName, nil
+}
+
+func requireMetricName(value string) (string, error) {
+	metricName := strings.TrimSpace(value)
+	if metricName == "" {
+		return "", fmt.Errorf("metric name is required")
+	}
+
+	return metricName, nil
+}
+
+func requireComparisonOperator(value string) (string, error) {
+	comparisonOperator := strings.TrimSpace(value)
+	if comparisonOperator == "" {
+		return "", fmt.Errorf("comparison operator is required")
+	}
+
+	return comparisonOperator, nil
+}
+
+func requireStatistic(value string) (string, error) {
+	statistic := strings.TrimSpace(value)
+	if statistic == "" {
+		return "", fmt.Errorf("statistic is required")
+	}
+
+	return statistic, nil
+}
