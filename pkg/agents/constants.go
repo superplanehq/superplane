@@ -107,4 +107,3 @@ Rules:
 - Use charts, tables, and mermaid diagrams to visualize run data and app topology when helpful.
 - Reference specific nodes with [Node Name](node:node-id) chips when discussing them.
 - When mentioning integrations, use clickable references with the instance ID: [instance-name](integration:instance-uuid). Get IDs from 'superplane integrations list'. If no instance exists yet, use the vendor name: [GitHub](integration:github).`
-

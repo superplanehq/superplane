@@ -166,7 +166,6 @@ export function ChatComposer({
     return result;
   }, [nodes, runs, filter]);
 
-  const hasMentions = mentions.length > 0;
 
   const canSend = !isEmpty && !sendPending;
 

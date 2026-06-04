@@ -1,9 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { AgentMode } from "./agentMode";
-import { createSystemMessage } from "./systemMessages";
 import { parseAgentContent, type DraftActionsSegment } from "./widgets/parser";
 import type { AgentMessage } from "@/components/CanvasToolSidebar/types";
-import type { useSendAgentChatMessage } from "@/hooks/useAgentChats";
 
 const DRAFT_STATE = "STATE_DRAFT";
 const PUBLISHED_STATE = "STATE_PUBLISHED";
@@ -29,9 +26,6 @@ type UseDraftActionsArgs = {
   messages: AgentMessage[];
   canvasId: string;
   organizationId: string;
-  chatId: string;
-  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
-  agentMode: AgentMode;
   outcomePassed?: boolean;
   onVersionPublished?: () => void;
 };
@@ -52,9 +46,6 @@ export function useDraftActions({
   messages,
   canvasId,
   organizationId,
-  chatId,
-  sendMutation,
-  agentMode,
   outcomePassed,
   onVersionPublished,
 }: UseDraftActionsArgs): UseDraftActionsResult {
@@ -74,13 +65,6 @@ export function useDraftActions({
     });
   }, []);
 
-  const notifyAgent = useCallback(
-    async (content: string) => {
-      await sendMutation.mutateAsync({ chatId, content, mode: agentMode }).catch(() => {});
-    },
-    [agentMode, chatId, sendMutation],
-  );
-
   const handleVersionPublished = useCallback(
     async (versionId: string) => {
       dismissVersion(versionId);
@@ -88,7 +72,7 @@ export function useDraftActions({
       onVersionPublished?.();
       // Removed: agent learns about publishes via getDraftStatus() preamble on next user message
     },
-    [clearAutoDetectedDraft, dismissVersion, notifyAgent, onVersionPublished],
+    [clearAutoDetectedDraft, dismissVersion, onVersionPublished],
   );
 
   const handleVersionDiscarded = useCallback(
@@ -98,7 +82,7 @@ export function useDraftActions({
       onVersionPublished?.();
       // Removed: agent learns about discards via getDraftStatus() preamble on next user message
     },
-    [clearAutoDetectedDraft, dismissVersion, notifyAgent, onVersionPublished],
+    [clearAutoDetectedDraft, dismissVersion, onVersionPublished],
   );
 
   const latestDraft = useMemo(
@@ -312,14 +296,6 @@ function addDismissedVersionId(current: Set<string>, versionId: string): Set<str
 function getUpdatedVersionId(event: Event): string | null {
   const detail = (event as CustomEvent<{ versionId?: string }>).detail;
   return detail?.versionId ?? null;
-}
-
-function buildVersionChangeMessage(kind: "published" | "discarded", versionId: string): string {
-  if (kind === "published") {
-    return `User published draft version ${versionId}. Changes are now live. Re-read the canvas to see the current state.`;
-  }
-
-  return `User discarded draft version ${versionId}. Changes were NOT applied. The canvas is unchanged from the last published version.`;
 }
 
 async function fetchCanvasVersion(

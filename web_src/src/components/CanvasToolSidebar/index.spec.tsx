@@ -11,6 +11,11 @@ const sendMutation = {
   mutateAsync: vi.fn(),
 };
 
+vi.mock("@/hooks/useCanvasData", () => ({
+  useCanvas: () => ({ data: { spec: { nodes: [] } } }),
+  useInfiniteCanvasRuns: () => ({ data: { pages: [] } }),
+}));
+
 vi.mock("@/hooks/useAgentChats", () => ({
   useCanvasAgentChat: () => ({ data: { id: "chat-1" }, isLoading: false }),
   useAgentChatMessages: () => ({

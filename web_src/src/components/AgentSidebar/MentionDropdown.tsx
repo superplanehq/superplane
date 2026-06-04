@@ -70,7 +70,14 @@ function RunStatusDot({ status }: { status?: string }) {
   return <span className={cn("size-2.5 rounded-full shrink-0", color)} />;
 }
 
-export function MentionDropdown({ items, visible, anchorEl, onSelect, onDismiss, keyboardRef }: MentionDropdownProps & { keyboardRef?: React.MutableRefObject<((e: React.KeyboardEvent) => boolean) | null> }) {
+export function MentionDropdown({
+  items,
+  visible,
+  anchorEl,
+  onSelect,
+  onDismiss,
+  keyboardRef,
+}: MentionDropdownProps & { keyboardRef?: React.MutableRefObject<((e: React.KeyboardEvent) => boolean) | null> }) {
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -169,9 +176,7 @@ export function MentionDropdown({ items, visible, anchorEl, onSelect, onDismiss,
                 >
                   <NodeIcon component={item.meta} isTrigger={item.isTrigger} />
                   <span className="flex-1 truncate font-medium text-slate-700">{item.label}</span>
-                  {item.meta && (
-                    <span className="text-[10px] text-slate-400">{item.meta}</span>
-                  )}
+                  {item.meta && <span className="text-[10px] text-slate-400">{item.meta}</span>}
                 </button>
               );
             })}
@@ -203,9 +208,7 @@ export function MentionDropdown({ items, visible, anchorEl, onSelect, onDismiss,
                 >
                   <RunStatusDot status={item.meta} />
                   <span className="flex-1 truncate font-medium text-slate-700">{item.label}</span>
-                  {item.timeAgo && (
-                    <span className="text-[10px] text-slate-400">{item.timeAgo}</span>
-                  )}
+                  {item.timeAgo && <span className="text-[10px] text-slate-400">{item.timeAgo}</span>}
                 </button>
               );
             })}

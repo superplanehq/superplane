@@ -100,13 +100,10 @@ export function useMentions(): UseMentionsReturn {
   const trigger = useMemo(() => detectTrigger(value, cursorPos), [value, cursorPos]);
 
   // setValue that also prunes stale mentions
-  const setValue = useCallback(
-    (v: string) => {
-      setValue_(v);
-      setMentions((prev) => pruneMentions(v, prev));
-    },
-    [],
-  );
+  const setValue = useCallback((v: string) => {
+    setValue_(v);
+    setMentions((prev) => pruneMentions(v, prev));
+  }, []);
 
   const insertMention = useCallback(
     (item: MentionItem): number => {
@@ -132,9 +129,7 @@ export function useMentions(): UseMentionsReturn {
       };
       // Shift existing mentions that come after the insertion point
       setMentions((prev) => [
-        ...prev.map((m) =>
-          m.startIndex >= insertionPoint ? { ...m, startIndex: m.startIndex + delta } : m,
-        ),
+        ...prev.map((m) => (m.startIndex >= insertionPoint ? { ...m, startIndex: m.startIndex + delta } : m)),
         newMention,
       ]);
 
@@ -152,9 +147,7 @@ export function useMentions(): UseMentionsReturn {
       const at = m.startIndex;
       // Verify the mention is still at this position
       if (result.slice(at, at + displayText.length) !== displayText) continue;
-      const link = m.type === "run"
-        ? `[${m.label}](run:${m.id})`
-        : `[${m.label}](node:${m.id})`;
+      const link = m.type === "run" ? `[${m.label}](run:${m.id})` : `[${m.label}](node:${m.id})`;
       result = result.slice(0, at) + link + result.slice(at + displayText.length);
     }
     return result;

@@ -53,9 +53,6 @@ type DraftActionsBarProps = {
   messages: AgentMessage[];
   canvasId: string;
   organizationId: string;
-  chatId: string;
-  sendMutation: ReturnType<typeof useSendAgentChatMessage>;
-  agentMode: AgentMode;
   isEditing: boolean;
   outcomePassed?: boolean;
   onVersionPublished?: () => void;
@@ -202,9 +199,6 @@ function ChatConversation({
         messages={messages}
         canvasId={canvasId}
         organizationId={organizationId}
-        chatId={chatId}
-        sendMutation={sendMutation}
-        agentMode={agentMode}
         isEditing={isEditing}
         outcomePassed={outcomeState?.phase === "passed"}
         onVersionPublished={() => setOutcomeState(null)}
@@ -381,9 +375,6 @@ function DraftActionsBar({
   messages,
   canvasId,
   organizationId,
-  chatId,
-  sendMutation,
-  agentMode,
   isEditing,
   outcomePassed,
   onVersionPublished,
@@ -392,9 +383,6 @@ function DraftActionsBar({
     messages,
     canvasId,
     organizationId,
-    chatId,
-    sendMutation,
-    agentMode,
     outcomePassed,
     onVersionPublished,
   });
@@ -441,10 +429,7 @@ function ChatComposerWithMentions({
   });
   const runsQuery = useInfiniteCanvasRuns(canvasId, {}, true);
   const nodes = canvas?.spec?.nodes;
-  const runs = useMemo(
-    () => runsQuery.data?.pages?.flatMap((p) => p?.runs ?? []) ?? [],
-    [runsQuery.data],
-  );
+  const runs = useMemo(() => runsQuery.data?.pages?.flatMap((p) => p?.runs ?? []) ?? [], [runsQuery.data]);
 
   return <ChatComposer {...composerProps} nodes={nodes} runs={runs} />;
 }
