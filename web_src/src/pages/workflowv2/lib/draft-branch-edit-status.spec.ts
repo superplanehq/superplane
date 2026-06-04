@@ -28,4 +28,32 @@ describe("aggregateDraftTabIndicators", () => {
     expect(indicators.readyToPublishCanvasDraftChanges).toBe(false);
     expect(indicators.readyToPublishConsoleDraftChanges).toBe(false);
   });
+
+  it("shows canvas ready dot when another draft only has uncommitted files", () => {
+    const indicators = aggregateDraftTabIndicators({
+      "drafts/ready-canvas": {
+        editStatus: "ready",
+        hasUncommittedCanvas: false,
+        hasUncommittedConsole: false,
+        hasUncommittedFiles: false,
+        hasCommittedCanvasVersusLive: true,
+        hasCommittedConsoleVersusLive: false,
+        hasCommittedFilesVersusLive: false,
+      },
+      "drafts/files-wip": {
+        editStatus: "uncommitted",
+        hasUncommittedCanvas: false,
+        hasUncommittedConsole: false,
+        hasUncommittedFiles: true,
+        hasCommittedCanvasVersusLive: false,
+        hasCommittedConsoleVersusLive: false,
+        hasCommittedFilesVersusLive: false,
+      },
+    });
+
+    expect(indicators.readyToPublishCanvasDraftChanges).toBe(true);
+    expect(indicators.hasUncommittedFilesDraftChanges).toBe(true);
+    expect(indicators.readyToPublishFilesDraftChanges).toBe(false);
+    expect(indicators.readyToPublishDraftChanges).toBe(false);
+  });
 });

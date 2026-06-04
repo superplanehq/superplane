@@ -117,8 +117,8 @@ export function getDraftChangeIndicators({
     hasUncommittedDraftChanges,
     hasCommittedDraftChanges,
     readyToPublishDraftChanges,
-    readyToPublishCanvasDraftChanges: hasCommittedCanvasDraftChanges && !hasUncommittedDraftChanges,
-    readyToPublishConsoleDraftChanges: hasCommittedConsoleDraftChanges && !hasUncommittedDraftChanges,
+    readyToPublishCanvasDraftChanges: hasCommittedCanvasDraftChanges && !hasUncommittedCanvasDraftChanges,
+    readyToPublishConsoleDraftChanges: hasCommittedConsoleDraftChanges && !hasUncommittedConsoleDraftChanges,
     readyToPublishFilesDraftChanges: hasCommittedFilesDraftChanges && !hasUncommittedFilesDraftChanges,
   };
 }

@@ -196,6 +196,26 @@ describe("getDraftChangeIndicators", () => {
     });
   });
 
+  it("shows per-surface ready dots when only another surface has uncommitted staging", () => {
+    expect(
+      getDraftChangeIndicators({
+        suppressUnpublishedDraftDiscard: false,
+        hasLatestDraftVersion: true,
+        hasDraftGraphDiffVersusLive: true,
+        hasDraftConsoleDiffVersusLive: false,
+        hasDraftDiffVersusLive: true,
+        hasCanvasStagingChanges: false,
+        hasConsoleStagingChanges: false,
+        hasFilesStagingChanges: true,
+      }),
+    ).toMatchObject({
+      readyToPublishDraftChanges: false,
+      readyToPublishCanvasDraftChanges: true,
+      readyToPublishConsoleDraftChanges: false,
+      readyToPublishFilesDraftChanges: false,
+    });
+  });
+
   it("shows blue files tab when committed repository files differ from live with clean file staging", () => {
     expect(
       getDraftChangeIndicators({
