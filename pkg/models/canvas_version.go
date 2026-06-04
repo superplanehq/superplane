@@ -22,6 +22,7 @@ const (
 	MaterializationStatusPending = "pending"
 	MaterializationStatusReady   = "ready"
 	MaterializationStatusError   = "error"
+	MaterializationStatusDeleted = "deleted"
 
 	CanvasGitBranchMain = "main"
 )

@@ -2,6 +2,7 @@ package canvases
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	"github.com/google/uuid"
@@ -112,13 +113,6 @@ func PublishCanvas(
 			return syncErr
 		}
 
-		if deleteErr := models.DeleteDraftBranchInTransaction(tx, canvasUUID, draftBranch); deleteErr != nil {
-			return deleteErr
-		}
-		if deleteErr := models.DeleteRepositoryMaterializationStateInTransaction(tx, canvasUUID, draftBranch); deleteErr != nil {
-			return deleteErr
-		}
-
 		publishedVersion = version
 		return nil
 	})
@@ -129,9 +123,26 @@ func PublishCanvas(
 		return nil, status.Errorf(codes.Internal, "failed to publish canvas: %v", err)
 	}
 
-	if err := gitProvider.DeleteBranch(ctx, repository.RepoID, draftBranch); err != nil {
+	if err := gitProvider.DeleteBranch(ctx, repository.RepoID, draftBranch); err != nil && !errors.Is(err, git.ErrInvalidRef) {
 		return nil, status.Errorf(codes.Internal, "failed to delete draft branch after publish: %v", err)
 	}
+
+	var removed []string
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		var reconcileErr error
+		removed, reconcileErr = materialize.ReconcileDraftBranchDeletionsFromGit(
+			ctx,
+			tx,
+			gitProvider,
+			canvasUUID,
+			materialize.ReconcileDraftBranchDeletionsOptions{BranchName: draftBranch},
+		)
+		return reconcileErr
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to reconcile draft branch deletion after publish: %v", err)
+	}
+	materialize.PublishDraftBranchDeletionEvents(canvasID, removed)
 
 	return &pb.PublishCanvasResponse{
 		Version: SerializeCanvasVersion(publishedVersion, organizationID),

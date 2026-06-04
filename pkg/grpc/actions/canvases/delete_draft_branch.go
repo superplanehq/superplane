@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/superplanehq/superplane/pkg/canvas/materialize"
 	"github.com/superplanehq/superplane/pkg/database"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -48,26 +49,39 @@ func DeleteDraftBranch(
 		return nil, status.Errorf(codes.NotFound, "repository not found: %v", err)
 	}
 
-	if _, err := models.FindDraftBranch(canvasUUID, branchName); err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, status.Error(codes.NotFound, "draft branch not found")
-		}
-		return nil, status.Errorf(codes.Internal, "failed to find draft branch: %v", err)
+	gitExists := materialize.GitBranchExists(ctx, gitProvider, repository.RepoID, branchName)
+	_, dbErr := models.FindDraftBranch(canvasUUID, branchName)
+	if dbErr != nil && !errors.Is(dbErr, gorm.ErrRecordNotFound) {
+		return nil, status.Errorf(codes.Internal, "failed to find draft branch: %v", dbErr)
+	}
+	dbExists := dbErr == nil
+	if !gitExists && !dbExists {
+		return nil, status.Error(codes.NotFound, "draft branch not found")
 	}
 
-	err = database.Conn().Transaction(func(tx *gorm.DB) error {
-		if deleteErr := models.DeleteDraftBranchInTransaction(tx, canvasUUID, branchName); deleteErr != nil {
-			return deleteErr
+	if gitExists {
+		if err := gitProvider.DeleteBranch(ctx, repository.RepoID, branchName); err != nil && !errors.Is(err, git.ErrInvalidRef) {
+			return nil, status.Errorf(codes.Internal, "failed to delete git branch: %v", err)
 		}
-		return models.DeleteRepositoryMaterializationStateInTransaction(tx, canvasUUID, branchName)
+	}
+
+	var removed []string
+	err = database.Conn().Transaction(func(tx *gorm.DB) error {
+		var reconcileErr error
+		removed, reconcileErr = materialize.ReconcileDraftBranchDeletionsFromGit(
+			ctx,
+			tx,
+			gitProvider,
+			canvasUUID,
+			materialize.ReconcileDraftBranchDeletionsOptions{BranchName: branchName},
+		)
+		return reconcileErr
 	})
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to delete draft branch: %v", err)
 	}
 
-	if err := gitProvider.DeleteBranch(ctx, repository.RepoID, branchName); err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to delete git branch: %v", err)
-	}
+	materialize.PublishDraftBranchDeletionEvents(canvasID, removed)
 
 	return &pb.DeleteDraftBranchResponse{}, nil
 }

@@ -140,6 +140,28 @@ func (w *RepositoryMaterializerWorker) ConsumeRepositoryBranchUpdated(delivery t
 		return err
 	}
 
+	if message.GetMaterializationStatus() == models.MaterializationStatusDeleted {
+		return nil
+	}
+
+	var removed []string
+	reconcileErr := database.Conn().Transaction(func(tx *gorm.DB) error {
+		var err error
+		removed, err = materialize.ReconcileDraftBranchDeletionsFromGit(
+			context.Background(),
+			tx,
+			w.GitProvider,
+			canvasID,
+			materialize.ReconcileDraftBranchDeletionsOptions{},
+		)
+		return err
+	})
+	if reconcileErr != nil {
+		w.log("Error reconciling draft branch deletions for canvas %s: %v", canvasID, reconcileErr)
+		return reconcileErr
+	}
+	materialize.PublishDraftBranchDeletionEvents(canvasID.String(), removed)
+
 	headSHA := message.GetHeadSha()
 	if headSHA == "" {
 		repository, headErr := models.FindRepositoryUnscoped(canvasID)

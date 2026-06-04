@@ -2114,6 +2114,15 @@ export function WorkflowPageV2() {
       const isMainBranchUpdate = payload.branch === "main";
       const viewingLive = activeBranchRef.current == null;
 
+      if (payload.materializationStatus === "deleted" && payload.branch && payload.branch === activeBranchRef.current) {
+        clearPendingAutoSaveWork();
+        setHasUnsavedChanges(false);
+        setHasNonPositionalUnsavedChanges(false);
+        void branchStaging.discardStaging();
+        exitToLive();
+        return;
+      }
+
       if (
         isMainBranchUpdate &&
         viewingLive &&

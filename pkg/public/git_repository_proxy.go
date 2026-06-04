@@ -12,9 +12,11 @@ import (
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"github.com/superplanehq/superplane/pkg/canvas/materialize"
+	"github.com/superplanehq/superplane/pkg/database"
 	"github.com/superplanehq/superplane/pkg/grpc/actions/messages"
 	"github.com/superplanehq/superplane/pkg/models"
 	"github.com/superplanehq/superplane/pkg/public/middleware"
+	"gorm.io/gorm"
 )
 
 func (s *Server) registerGitRepositoryRoutes(r *mux.Router) {
@@ -86,6 +88,26 @@ func (s *Server) handleGitRepositoryProxy(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) notifyRepositoryBranchesUpdated(ctx context.Context, canvasID uuid.UUID, repository *models.Repository, pushedByUserID string) {
+	var removed []string
+	if s.gitProvider != nil {
+		reconcileErr := database.Conn().Transaction(func(tx *gorm.DB) error {
+			var err error
+			removed, err = materialize.ReconcileDraftBranchDeletionsFromGit(
+				ctx,
+				tx,
+				s.gitProvider,
+				canvasID,
+				materialize.ReconcileDraftBranchDeletionsOptions{},
+			)
+			return err
+		})
+		if reconcileErr != nil {
+			log.WithError(reconcileErr).Warnf("failed to reconcile draft branch deletions after git push for canvas %s", canvasID)
+		} else {
+			materialize.PublishDraftBranchDeletionEvents(canvasID.String(), removed)
+		}
+	}
+
 	branches, err := s.gitProvider.ListBranches(ctx, repository.RepoID, materialize.DraftBranchPrefix)
 	if err != nil {
 		log.WithError(err).Warnf("failed to list draft branches after git push for canvas %s", canvasID)
