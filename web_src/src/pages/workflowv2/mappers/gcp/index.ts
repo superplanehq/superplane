@@ -1,5 +1,5 @@
 import type { ComponentBaseMapper, CustomFieldRenderer, EventStateRegistry, TriggerRenderer } from "../types";
-import { baseMapper, cloudBuildBaseMapper } from "./base";
+import { cloudBuildBaseMapper, computeBaseMapper } from "./base";
 import { buildActionStateRegistry } from "../utils";
 import { CLOUD_BUILD_EXECUTION_STATE_REGISTRY } from "./cloudbuild";
 import { onVMInstanceTriggerRenderer } from "./on_vm_instance";
@@ -19,13 +19,14 @@ import {
 } from "./pubsub_mapper";
 import { onMessageTriggerRenderer } from "./on_message";
 import { cloudDNSMapper } from "./clouddns";
+import { tpuMapper } from "./tpu";
 import { deleteVMInstanceMapper } from "./delete_vm_instance";
 import { manageVMInstancePowerMapper, MANAGE_VM_INSTANCE_POWER_STATE_REGISTRY } from "./manage_vm_instance_power";
 import { updateVMInstanceTypeMapper } from "./update_vm_instance_type";
 import { getVMInstanceMetricsMapper, GET_VM_INSTANCE_METRICS_STATE_REGISTRY } from "./get_vm_instance_metrics";
 
 export const componentMappers: Record<string, ComponentBaseMapper> = {
-  createVM: baseMapper,
+  createVM: computeBaseMapper,
   deleteVMInstance: deleteVMInstanceMapper,
   manageVMInstancePower: manageVMInstancePowerMapper,
   updateVMInstanceType: updateVMInstanceTypeMapper,
@@ -44,6 +45,9 @@ export const componentMappers: Record<string, ComponentBaseMapper> = {
   "clouddns.createRecord": cloudDNSMapper,
   "clouddns.deleteRecord": cloudDNSMapper,
   "clouddns.updateRecord": cloudDNSMapper,
+  "tpu.createNode": tpuMapper,
+  "tpu.getNode": tpuMapper,
+  "tpu.deleteNode": tpuMapper,
 };
 
 export const triggerRenderers: Record<string, TriggerRenderer> = {
@@ -74,6 +78,9 @@ export const eventStateRegistry: Record<string, EventStateRegistry> = {
   "clouddns.createRecord": buildActionStateRegistry("completed"),
   "clouddns.deleteRecord": buildActionStateRegistry("completed"),
   "clouddns.updateRecord": buildActionStateRegistry("completed"),
+  "tpu.createNode": buildActionStateRegistry("completed"),
+  "tpu.getNode": buildActionStateRegistry("completed"),
+  "tpu.deleteNode": buildActionStateRegistry("completed"),
 };
 
 export const customFieldRenderers: Record<string, CustomFieldRenderer> = {};

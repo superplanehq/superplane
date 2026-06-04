@@ -11,6 +11,7 @@ import type {
   SubtitleContext,
 } from "../types";
 import gcpIcon from "@/assets/icons/integrations/gcp.svg";
+import gcpComputeIcon from "@/assets/icons/integrations/gcp.compute.svg";
 import cloudBuildIcon from "@/assets/icons/integrations/cloud_build.svg";
 import { renderTimeAgo } from "@/components/TimeAgo";
 import { buildCloudBuildSummaryDetails, getCloudBuildData, getCloudBuildOutputPayload } from "./cloudbuild";
@@ -51,6 +52,18 @@ export const baseMapper: ComponentBaseMapper = {
   subtitle(context: SubtitleContext): string | React.ReactNode {
     const timestamp = context.execution.updatedAt || context.execution.createdAt;
     return timestamp ? renderTimeAgo(new Date(timestamp)) : "";
+  },
+};
+
+// computeBaseMapper is the base mapper for Compute Engine components, using the
+// official Compute Engine product icon instead of the generic Google Cloud logo.
+export const computeBaseMapper: ComponentBaseMapper = {
+  ...baseMapper,
+  props(context: ComponentBaseContext): ComponentBaseProps {
+    return {
+      ...baseMapper.props(context),
+      iconSrc: gcpComputeIcon,
+    };
   },
 };
 

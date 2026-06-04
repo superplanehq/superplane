@@ -21,6 +21,7 @@ import (
 	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 	"github.com/superplanehq/superplane/pkg/integrations/gcp/compute"
 	gcppubsub "github.com/superplanehq/superplane/pkg/integrations/gcp/pubsub"
+	"github.com/superplanehq/superplane/pkg/integrations/gcp/tpu"
 	"github.com/superplanehq/superplane/pkg/registry"
 )
 
@@ -39,6 +40,9 @@ func init() {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 	clouddns.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (clouddns.Client, error) {
+		return gcpcommon.NewClient(httpCtx, integration)
+	})
+	tpu.SetClientFactory(func(httpCtx core.HTTPContext, integration core.IntegrationContext) (tpu.Client, error) {
 		return gcpcommon.NewClient(httpCtx, integration)
 	})
 }
@@ -180,6 +184,9 @@ func (g *GCP) Actions() []core.Action {
 		&clouddns.CreateRecord{},
 		&clouddns.DeleteRecord{},
 		&clouddns.UpdateRecord{},
+		&tpu.CreateNode{},
+		&tpu.GetNode{},
+		&tpu.DeleteNode{},
 	}
 }
 
@@ -971,6 +978,14 @@ func (g *GCP) ListResources(resourceType string, ctx core.ListResourcesContext) 
 		return gcppubsub.ListTopicResources(reqCtx, client)
 	case gcppubsub.ResourceTypeSubscription:
 		return gcppubsub.ListSubscriptionResources(reqCtx, client, p["topic"])
+	case tpu.ResourceTypeTPULocation:
+		return tpu.ListLocationResources(reqCtx, client, p["projectId"])
+	case tpu.ResourceTypeTPUAcceleratorType:
+		return tpu.ListAcceleratorTypeResources(reqCtx, client, p["projectId"], p["location"])
+	case tpu.ResourceTypeTPURuntimeVersion:
+		return tpu.ListRuntimeVersionResources(reqCtx, client, p["projectId"], p["location"])
+	case tpu.ResourceTypeTPUNode:
+		return tpu.ListNodeResources(reqCtx, client, p["projectId"])
 	default:
 		return nil, nil
 	}
