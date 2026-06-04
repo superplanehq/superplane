@@ -86,7 +86,7 @@ export function useDraftActions({
       dismissVersion(versionId);
       clearAutoDetectedDraft(versionId);
       onVersionPublished?.();
-      await notifyAgent(createSystemMessage(buildVersionChangeMessage("published", versionId)));
+      // Removed: agent learns about publishes via getDraftStatus() preamble on next user message
     },
     [clearAutoDetectedDraft, dismissVersion, notifyAgent, onVersionPublished],
   );
@@ -96,7 +96,7 @@ export function useDraftActions({
       dismissVersion(versionId);
       clearAutoDetectedDraft(versionId);
       onVersionPublished?.();
-      await notifyAgent(createSystemMessage(buildVersionChangeMessage("discarded", versionId)));
+      // Removed: agent learns about discards via getDraftStatus() preamble on next user message
     },
     [clearAutoDetectedDraft, dismissVersion, notifyAgent, onVersionPublished],
   );
