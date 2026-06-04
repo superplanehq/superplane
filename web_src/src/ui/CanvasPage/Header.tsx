@@ -82,7 +82,6 @@ export function Header(props: HeaderProps) {
       <PageHeader
         organizationId={props.organizationId}
         headerTitle={headerTitle}
-        mode={props.mode}
         isEditing={props.isEditing}
         hasUnpublishedDraftChanges={props.hasUnpublishedDraftChanges}
         onExitEditMode={props.onExitEditMode}
@@ -104,7 +103,6 @@ export function Header(props: HeaderProps) {
 function PageHeader({
   organizationId,
   headerTitle,
-  mode,
   isEditing = false,
   hasUnpublishedDraftChanges,
   onExitEditMode,
@@ -120,7 +118,6 @@ function PageHeader({
   organizationId?: string;
   headerTitle: string;
   showCanvasSettingsMenu?: boolean;
-  mode?: HeaderMode;
   isEditing?: boolean;
   hasUnpublishedDraftChanges?: boolean;
   onExitEditMode?: () => void;
@@ -163,7 +160,7 @@ function PageHeader({
         </div>
       </div>
       <div className="relative z-10 ml-auto flex shrink-0 items-center gap-2">
-        {mode !== "runs" && !isEditing && onEnterEditMode ? (
+        {!isEditing && onEnterEditMode ? (
           <LiveModeTopHeaderActions
             onEnterEditMode={onEnterEditMode}
             enterEditModeDisabled={enterEditModeDisabled}
