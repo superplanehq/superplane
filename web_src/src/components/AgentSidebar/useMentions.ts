@@ -121,14 +121,22 @@ export function useMentions(): UseMentionsReturn {
       setCursorPos(newCursorPos);
 
       // Track this mention with position
+      const insertionPoint = before.length;
+      const delta = displayText.length + 1 - (cursorPos - trigger.start); // +1 for trailing space
       const newMention: InsertedMention = {
         type: item.type,
         id: item.id,
         label: item.label,
         displayText,
-        startIndex: before.length,
+        startIndex: insertionPoint,
       };
-      setMentions((prev) => [...pruneMentions(newValue, prev), newMention]);
+      // Shift existing mentions that come after the insertion point
+      setMentions((prev) => [
+        ...prev.map((m) =>
+          m.startIndex >= insertionPoint ? { ...m, startIndex: m.startIndex + delta } : m,
+        ),
+        newMention,
+      ]);
 
       return newCursorPos;
     },
