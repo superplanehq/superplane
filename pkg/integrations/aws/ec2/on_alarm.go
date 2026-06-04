@@ -90,14 +90,6 @@ func (p *OnAlarm) Documentation() string {
 - **Alarm State**: Only trigger for a specific state: ALARM, OK, or INSUFFICIENT_DATA (required)
 - **Alarm**: Optionally restrict to a single alarm selected from the alarms attached to the chosen instance; leave empty to trigger on any alarm for that instance
 
-## How it works
-
-The trigger subscribes to the EventBridge "CloudWatch Alarm State Change" rule and filters
-events in two steps:
-1. Checks that ` + "`detail.state.value`" + ` matches the configured Alarm State.
-2. Checks that the ` + "`InstanceId`" + ` dimension in ` + "`detail.configuration.metrics`" + ` matches the configured instance.
-If an Alarm is selected, an additional exact-name check on ` + "`detail.alarmName`" + ` is applied.
-
 ## Event Data
 
 Each matched event includes the full EventBridge payload:
