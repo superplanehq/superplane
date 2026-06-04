@@ -103,10 +103,25 @@ func Test__CreateAlarm__Setup(t *testing.T) {
 				"instance":           "i-abc123",
 				"alarmName":          "HighCPU",
 				"metricName":         "CPUUtilization",
+				"statistic":          "Average",
 				"comparisonOperator": " ",
 			},
 		})
 		require.ErrorContains(t, err, "comparison operator is required")
+	})
+
+	t.Run("missing statistic -> error", func(t *testing.T) {
+		err := component.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"region":             "us-east-1",
+				"instance":           "i-abc123",
+				"alarmName":          "HighCPU",
+				"metricName":         "CPUUtilization",
+				"statistic":          " ",
+				"comparisonOperator": "GreaterThanThreshold",
+			},
+		})
+		require.ErrorContains(t, err, "statistic is required")
 	})
 
 	t.Run("valid configuration -> no error", func(t *testing.T) {
@@ -116,6 +131,7 @@ func Test__CreateAlarm__Setup(t *testing.T) {
 				"instance":           "i-abc123",
 				"alarmName":          "HighCPU",
 				"metricName":         "CPUUtilization",
+				"statistic":          "Average",
 				"comparisonOperator": "GreaterThanThreshold",
 				"threshold":          80.0,
 			},

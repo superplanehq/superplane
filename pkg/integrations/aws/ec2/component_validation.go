@@ -94,3 +94,12 @@ func requireComparisonOperator(value string) (string, error) {
 
 	return comparisonOperator, nil
 }
+
+func requireStatistic(value string) (string, error) {
+	statistic := strings.TrimSpace(value)
+	if statistic == "" {
+		return "", fmt.Errorf("statistic is required")
+	}
+
+	return statistic, nil
+}

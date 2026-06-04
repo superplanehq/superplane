@@ -2050,7 +2050,12 @@ func (c *Client) PutMetricAlarm(input PutMetricAlarmInput) error {
 	params.Set("MetricName", strings.TrimSpace(input.MetricName))
 	params.Set("Dimensions.member.1.Name", "InstanceId")
 	params.Set("Dimensions.member.1.Value", strings.TrimSpace(input.InstanceID))
-	params.Set("Statistic", strings.TrimSpace(input.Statistic))
+
+	statistic := strings.TrimSpace(input.Statistic)
+	if statistic == "" {
+		statistic = "Average"
+	}
+	params.Set("Statistic", statistic)
 	params.Set("ComparisonOperator", strings.TrimSpace(input.ComparisonOperator))
 	params.Set("Threshold", strconv.FormatFloat(input.Threshold, 'f', -1, 64))
 
