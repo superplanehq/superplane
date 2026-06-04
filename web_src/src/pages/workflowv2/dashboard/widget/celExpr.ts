@@ -46,22 +46,9 @@ export function rewriteDollarRefs(raw: string): string {
   while (i < raw.length) {
     const ch = raw[i];
     if (ch === '"' || ch === "'") {
-      const quote = ch;
-      out += quote;
-      i++;
-      while (i < raw.length && raw[i] !== quote) {
-        if (raw[i] === "\\" && i + 1 < raw.length) {
-          out += raw[i] + raw[i + 1];
-          i += 2;
-          continue;
-        }
-        out += raw[i];
-        i++;
-      }
-      if (i < raw.length) {
-        out += raw[i];
-        i++;
-      }
+      const literal = copyStringLiteral(raw, i, ch);
+      out += literal.value;
+      i = literal.next;
       continue;
     }
     if (ch === "$") {
@@ -73,6 +60,30 @@ export function rewriteDollarRefs(raw: string): string {
     i++;
   }
   return out;
+}
+
+/**
+ * Copy a quoted string literal verbatim (preserving backslash escapes),
+ * starting at the opening quote at `start`. Returns the copied text and the
+ * index immediately after the closing quote (or end of input).
+ */
+function copyStringLiteral(raw: string, start: number, quote: string): { value: string; next: number } {
+  let value = quote;
+  let i = start + 1;
+  while (i < raw.length && raw[i] !== quote) {
+    if (raw[i] === "\\" && i + 1 < raw.length) {
+      value += raw[i] + raw[i + 1];
+      i += 2;
+      continue;
+    }
+    value += raw[i];
+    i++;
+  }
+  if (i < raw.length) {
+    value += raw[i];
+    i++;
+  }
+  return { value, next: i };
 }
 
 export function compileExpr(raw: string): CompiledExpr {
