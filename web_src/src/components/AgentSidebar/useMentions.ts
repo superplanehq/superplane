@@ -101,26 +101,15 @@ export function useMentions(): UseMentionsReturn {
   const [mentions, setMentions] = useState<InsertedMention[]>([]);
   const [dismissed, setDismissed] = useState(false);
   const snapshotRef = useRef<{ value: string; mentions: InsertedMention[] } | null>(null);
-  const lastTriggerRef = useRef<{ start: number; cursorPos: number } | null>(null);
 
   const trigger = useMemo(() => detectTrigger(value, cursorPos), [value, cursorPos]);
 
-  // Reset dismissed state when the trigger context changes (user types more or moves cursor)
+  // Reset dismissed state when the trigger context changes (user types more)
   const showDropdown = useMemo(() => {
-    if (!trigger.active) {
-      return false;
-    }
-    if (dismissed) {
-      // If the trigger start or cursor moved since dismiss, re-enable
-      if (
-        lastTriggerRef.current &&
-        (lastTriggerRef.current.start !== trigger.start || lastTriggerRef.current.cursorPos === cursorPos)
-      ) {
-        return false;
-      }
-    }
+    if (!trigger.active) return false;
+    if (dismissed) return false;
     return true;
-  }, [trigger.active, trigger.start, dismissed, cursorPos]);
+  }, [trigger.active, dismissed]);
 
   // setValue that also prunes stale mentions
   const setValue = useCallback((v: string) => {
@@ -131,13 +120,11 @@ export function useMentions(): UseMentionsReturn {
 
   const setCursorPosWrapped = useCallback((pos: number) => {
     setCursorPos(pos);
-    setDismissed(false); // Reset dismiss on cursor move
   }, []);
 
   const dismiss = useCallback(() => {
     setDismissed(true);
-    lastTriggerRef.current = { start: trigger.start, cursorPos };
-  }, [trigger.start, cursorPos]);
+  }, []);
 
   const insertMention = useCallback(
     (item: MentionItem): number => {
