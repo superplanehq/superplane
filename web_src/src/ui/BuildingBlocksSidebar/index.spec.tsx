@@ -99,10 +99,14 @@ describe("BuildingBlocksSidebar", () => {
       expect(onEnterSubmit).not.toHaveBeenCalled();
     });
 
-    it("renders Debugging directly after Core", () => {
+    it("renders meta categories before alphabetical integrations", () => {
       const blocks: BuildingBlockCategory[] = [
         { name: "Memory", blocks: [{ name: "addmemory", label: "Add Memory", type: "component" }] },
         { name: "Debugging", blocks: [{ name: "display", label: "Display", type: "component" }] },
+        {
+          name: "Planelets",
+          blocks: [{ name: "planelet.runAction", label: "Run Planelet Action", type: "component" }],
+        },
         { name: "AWS", blocks: [{ name: "lambda", label: "Lambda", type: "component", integrationName: "aws" }] },
         { name: "Core", blocks: [{ name: "filter", label: "Filter", type: "component" }] },
       ];
@@ -113,7 +117,7 @@ describe("BuildingBlocksSidebar", () => {
         (element) => element.textContent ?? "",
       );
 
-      expect(categoryNames).toEqual(["Core", "Debugging", "Memory", "AWS"]);
+      expect(categoryNames).toEqual(["Core", "Debugging", "Memory", "Planelets", "AWS"]);
     });
 
     it("is a no-op when the sidebar is disabled", () => {

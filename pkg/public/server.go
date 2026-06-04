@@ -1146,16 +1146,20 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var firstResponse *core.WebhookResponseBody
+	firstResponseStatus := http.StatusOK
 
 	for _, node := range nodes {
-		code, response, err := s.executeWebhookNode(r.Context(), body, r.Header, node, onNewEvents)
+		code, response, err := s.executeWebhookNode(r.Context(), body, r.Method, map[string][]string(r.URL.Query()), r.Header, node, onNewEvents)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("error handling webhook: %v", err), code)
 			return
 		}
 
-		if firstResponse == nil && response != nil && len(response.Body) > 0 {
+		if firstResponse == nil && response != nil {
 			firstResponse = response
+			if code > 0 {
+				firstResponseStatus = code
+			}
 		}
 	}
 
@@ -1164,25 +1168,30 @@ func (s *Server) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if firstResponse != nil {
+		for name, value := range firstResponse.Headers {
+			w.Header().Set(name, value)
+		}
 		if firstResponse.ContentType != "" {
 			w.Header().Set("Content-Type", firstResponse.ContentType)
 		}
-		w.WriteHeader(http.StatusOK)
-		w.Write(firstResponse.Body)
+		w.WriteHeader(firstResponseStatus)
+		if len(firstResponse.Body) > 0 {
+			w.Write(firstResponse.Body)
+		}
 	} else {
 		w.WriteHeader(http.StatusOK)
 	}
 }
 
-func (s *Server) executeWebhookNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeWebhookNode(ctx context.Context, body []byte, method string, query map[string][]string, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
 	if node.Type == models.NodeTypeTrigger {
-		return s.executeTriggerNode(ctx, body, headers, node, onNewEvents)
+		return s.executeTriggerNode(ctx, body, method, query, headers, node, onNewEvents)
 	}
 
-	return s.executeActionNode(ctx, body, headers, node, onNewEvents)
+	return s.executeActionNode(ctx, body, method, query, headers, node, onNewEvents)
 }
 
-func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeTriggerNode(ctx context.Context, body []byte, method string, query map[string][]string, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
 	trigger, err := s.registry.GetTrigger(ref.Trigger.Name)
 	if err != nil {
@@ -1204,7 +1213,9 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 
 	return trigger.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
+		Method:        method,
 		Headers:       headers,
+		Query:         query,
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
@@ -1217,7 +1228,7 @@ func (s *Server) executeTriggerNode(ctx context.Context, body []byte, headers ht
 	})
 }
 
-func (s *Server) executeActionNode(ctx context.Context, body []byte, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
+func (s *Server) executeActionNode(ctx context.Context, body []byte, method string, query map[string][]string, headers http.Header, node models.CanvasNode, onNewEvents func([]models.CanvasEvent)) (int, *core.WebhookResponseBody, error) {
 	ref := node.Ref.Data()
 	action, err := s.registry.GetAction(ref.Component.Name)
 	if err != nil {
@@ -1239,7 +1250,9 @@ func (s *Server) executeActionNode(ctx context.Context, body []byte, headers htt
 
 	return action.HandleWebhook(core.WebhookRequestContext{
 		Body:          body,
+		Method:        method,
 		Headers:       headers,
+		Query:         query,
 		WorkflowID:    node.WorkflowID.String(),
 		NodeID:        node.NodeID,
 		Configuration: node.Configuration.Data(),
