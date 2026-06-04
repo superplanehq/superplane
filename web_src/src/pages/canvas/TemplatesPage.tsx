@@ -8,6 +8,7 @@ import { TemplateCard } from "./TemplateCard";
 import { ImportYamlDialog } from "./ImportYamlDialog";
 import { ALL_TAGS, getTemplateTags } from "./templateMetadata";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { appPath } from "@/lib/appPaths";
 import { useMemo, useState } from "react";
 import { ArrowLeft, LayoutTemplate, Search, Upload } from "lucide-react";
 import { Input } from "@/components/Input/input";
@@ -158,7 +159,7 @@ export function TemplatesPage() {
           open={isImportYamlOpen}
           onOpenChange={setIsImportYamlOpen}
           organizationId={organizationId}
-          onSuccess={(canvasId) => navigate(`/${organizationId}/canvases/${canvasId}`)}
+          onSuccess={(canvasId) => navigate(appPath(organizationId, canvasId))}
         />
       ) : null}
     </div>

@@ -61,6 +61,7 @@ import { useNodeHistory } from "@/hooks/useNodeHistory";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { useQueueHistory } from "@/hooks/useQueueHistory";
 import { analytics } from "@/lib/analytics";
+import { appPath } from "@/lib/appPaths";
 import { filterVisibleConfiguration } from "@/lib/components";
 import { getApiErrorMessage } from "@/lib/errors";
 import { getIntegrationWebhookUrl } from "@/lib/integrationUtils";
@@ -162,10 +163,16 @@ const EMPTY_CANVAS_NODES: ComponentsNode[] = [];
 const EMPTY_CANVAS_EDGES: ComponentsEdge[] = [];
 
 export function WorkflowPageV2() {
-  const { organizationId, canvasId } = useParams<{
+  const {
+    organizationId,
+    appId,
+    canvasId: templateCanvasId,
+  } = useParams<{
     organizationId: string;
-    canvasId: string;
+    appId?: string;
+    canvasId?: string;
   }>();
+  const canvasId = appId || templateCanvasId || "";
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -4378,26 +4385,6 @@ export function WorkflowPageV2() {
     setIsVersionControlOpen(true);
   }, []);
 
-  const handlePreviewPreviousVersionViewDetails = useCallback(() => {
-    if (!selectedCanvasVersionID || !selectedCanvasVersion) {
-      return;
-    }
-    const index = liveVersions.findIndex((version) => version.metadata?.id === selectedCanvasVersionID);
-    if (index < 0) {
-      return;
-    }
-    const previousVersion = liveVersions[index + 1];
-    if (!previousVersion) {
-      return;
-    }
-    const changeRequest = liveVersionChangeRequestsByVersionId.get(selectedCanvasVersionID);
-    setVersionNodeDiffContext({
-      version: selectedCanvasVersion,
-      previousVersion,
-      changeRequest,
-    });
-  }, [selectedCanvasVersionID, selectedCanvasVersion, liveVersions, liveVersionChangeRequestsByVersionId]);
-
   const handleOpenAwaitingApprovalNodeDiff = useCallback(() => {
     if (!selectedCanvasVersionID) {
       return;
@@ -4645,6 +4632,14 @@ export function WorkflowPageV2() {
       draftCanvasSpec,
     ],
   );
+
+  const handleSeeCurrentVersion = useCallback(() => {
+    if (!liveCanvasVersionId) {
+      showErrorToast("No live version available");
+      return;
+    }
+    handleUseVersion(liveCanvasVersionId);
+  }, [liveCanvasVersionId, handleUseVersion]);
 
   const handleUseVersionFromVersionPanel = useCallback(
     (versionID: string) => {
@@ -5142,7 +5137,7 @@ export function WorkflowPageV2() {
 
       if (result?.data?.canvas?.metadata?.id) {
         setIsUseTemplateOpen(false);
-        navigate(`/${organizationId}/canvases/${result.data.canvas.metadata.id}`);
+        navigate(appPath(organizationId, result.data.canvas.metadata.id));
       }
     },
     [canvas, organizationId, createWorkflowMutation, navigate, queryClient, canvasId],
@@ -5332,11 +5327,11 @@ export function WorkflowPageV2() {
   };
 
   const hasRunBlockingChanges = hasUnsavedChanges && hasNonPositionalUnsavedChanges;
-  const appId = searchParams.get("appId") ?? undefined;
-  const appBanner = appId ? (
+  const backToAppId = searchParams.get("appId") ?? undefined;
+  const appBanner = backToAppId ? (
     <div className="bg-blue-50 border-b border-blue-200 px-4 py-2 flex items-center gap-2">
       <Link
-        to={`/${organizationId}/apps/${appId}`}
+        to={appPath(organizationId!, backToAppId)}
         className="flex items-center gap-1 text-sm text-blue-700 hover:text-blue-900 transition-colors"
       >
         <ArrowLeft size={14} />
@@ -5522,7 +5517,7 @@ export function WorkflowPageV2() {
           headerBanner={headerBanner}
           canvasStateMode={canvasStateMode}
           showCanvasSettingsMenu={canUpdateCanvas}
-          onPreviewPreviousVersionViewDetails={handlePreviewPreviousVersionViewDetails}
+          onSeeCurrentVersion={handleSeeCurrentVersion}
           awaitingApprovalBanner={awaitingApprovalBanner}
           isVersionControlOpen={isVersionControlOpen}
           onOpenVersionControl={handleOpenVersionControl}
