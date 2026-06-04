@@ -78,7 +78,6 @@ import type { SidebarEvent } from "@/ui/componentSidebar/types";
 import { IntegrationCreateDialog } from "@/ui/IntegrationCreateDialog";
 import { ConfigureIntegrationDialog } from "@/ui/ConfigureIntegrationDialog";
 import { statusFiltersToApiFilters, type RunStatusFilter } from "@/ui/Runs/runPresentation";
-import { RunNodeDetailModal } from "@/ui/Runs/RunNodeDetailModal";
 import type {
   CanvasEchoRelease,
   CanvasSaveResult,
@@ -175,6 +174,7 @@ export function WorkflowPageV2() {
   const canvasId = appId || templateCanvasId || "";
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+  const initialRunFromUrlRef = useRef(searchParams.get("run"));
   const queryClient = useQueryClient();
   const { data: me } = useMe();
   const {
@@ -501,6 +501,7 @@ export function WorkflowPageV2() {
   const isEditing = !!activeCanvasVersionId && isViewingDraftVersion;
   const hasEditableVersion = !!activeCanvasVersionId && isViewingDraftVersion;
   const [runDetailNodeId, setRunDetailNodeId] = useState<string | null>(null);
+  const [runNodeDetailPaneHeight, setRunNodeDetailPaneHeight] = useState(320);
   const [runsFitAllNonce, setRunsFitAllNonce] = useState(0);
   const [runStatusFilters, setRunStatusFilters] = useState<RunStatusFilter[]>([]);
   const runApiFilters = useMemo(() => statusFiltersToApiFilters(runStatusFilters), [runStatusFilters]);
@@ -4763,6 +4764,10 @@ export function WorkflowPageV2() {
     handleCreateVersion,
   ]);
 
+  const handleBackToRunList = useCallback(() => {
+    setRunDetailNodeId(null);
+  }, []);
+
   const handleSelectRun = useCallback(
     (runId: string) => {
       setSelectedRunId(runId);
@@ -5587,6 +5592,13 @@ export function WorkflowPageV2() {
               : undefined
           }
           runCanvasLoading={runCanvasLoading}
+          runNodeDetailRun={isRunsMode ? selectedRun : null}
+          runNodeDetailNodeId={runDetailNodeId}
+          runNodeDetailCanvasId={canvasId}
+          onRunNodeDetailClose={() => setRunDetailNodeId(null)}
+          onRunNodeDetailNavigate={setRunDetailNodeId}
+          runNodeDetailPaneHeight={runNodeDetailPaneHeight}
+          onRunNodeDetailPaneHeightChange={setRunNodeDetailPaneHeight}
           saveIsPrimary={saveIsPrimary}
           saveButtonHidden={saveButtonHidden}
           saveDisabled={saveDisabled}
@@ -5647,9 +5659,14 @@ export function WorkflowPageV2() {
           toolSidebarRunsContent={
             isRunsMode ? (
               <RunsTabPanel
+                canvasId={canvasId!}
                 runs={runsData.runs}
                 selectedRunId={selectedRunId}
                 onSelectRun={handleSelectRun}
+                onBackToRunList={handleBackToRunList}
+                initialOpenDetail={Boolean(initialRunFromUrlRef.current)}
+                selectedNodeId={runDetailNodeId}
+                onSelectNode={setRunDetailNodeId}
                 hasNextPage={!!infiniteRunsQuery.hasNextPage}
                 isFetchingNextPage={infiniteRunsQuery.isFetchingNextPage}
                 onLoadMore={() => infiniteRunsQuery.fetchNextPage()}
@@ -5694,16 +5711,6 @@ export function WorkflowPageV2() {
               <span>Loading draft canvas...</span>
             </div>
           </div>
-        ) : null}
-        {isRunsMode && selectedRun && runDetailNodeId && canvasId ? (
-          <RunNodeDetailModal
-            canvasId={canvasId}
-            run={selectedRun}
-            nodeId={runDetailNodeId}
-            workflowNodes={canvasNodes}
-            onClose={() => setRunDetailNodeId(null)}
-            onNavigateNode={setRunDetailNodeId}
-          />
         ) : null}
       </div>
       <CanvasYamlModal {...canvasYamlModalProps} />
