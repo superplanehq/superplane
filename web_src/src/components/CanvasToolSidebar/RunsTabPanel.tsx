@@ -2,8 +2,7 @@ import type { CanvasesCanvasRun, SuperplaneComponentsNode as ComponentsNode } fr
 import { useCallback, useEffect, useMemo, useRef, useState, type UIEvent } from "react";
 import type { RunStatusFilter } from "@/ui/Runs/runPresentation";
 import { RunDetailPanel } from "./RunDetailPanel";
-import { RunsList } from "./RunsList";
-import { RunsToolbar } from "./RunsToolbar";
+import { RunsTabListView } from "./RunsTabListView";
 import { useAutoLoadMoreOnScroll } from "./useAutoLoadMoreOnScroll";
 import { useRunFilters } from "./useRunFilters";
 
@@ -54,19 +53,7 @@ export function RunsTabPanel({
 
   const selectedRun = useMemo(() => runs.find((run) => run.id === selectedRunId) || null, [runs, selectedRunId]);
 
-  const {
-    selectedStatuses,
-    selectedTriggerIds,
-    triggerOptions,
-    filteredRuns,
-    orderedRuns,
-    hasAnyFilter,
-    clearFilters,
-    toggleStatus,
-    toggleTrigger,
-    clearStatuses,
-    clearTriggers,
-  } = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
+  const filterState = useRunFilters({ runs, workflowNodes, componentIconMap, onStatusFiltersChange });
   const scrollRef = useRef<HTMLDivElement>(null);
   const loadMoreIfNeeded = useAutoLoadMoreOnScroll({
     hasMore: hasNextPage,
@@ -82,7 +69,7 @@ export function RunsTabPanel({
 
   useEffect(() => {
     loadMoreIfNeeded(scrollRef.current);
-  }, [filteredRuns.length, loadMoreIfNeeded]);
+  }, [filterState.filteredRuns.length, loadMoreIfNeeded]);
 
   useEffect(() => {
     if (!selectedRunId) {
@@ -107,52 +94,29 @@ export function RunsTabPanel({
 
   return (
     <div className="relative min-h-0 flex-1 overflow-hidden">
-      <div
-        className={`absolute inset-0 flex min-h-0 flex-col bg-white transition-transform duration-300 ease-in-out ${
-          isDetailView ? "-translate-x-full" : "translate-x-0"
-        } ${isDetailView ? "pointer-events-none" : "pointer-events-auto"}`}
-      >
-        <RunsToolbar
-          selectedStatuses={selectedStatuses}
-          selectedTriggerIds={selectedTriggerIds}
-          triggerOptions={triggerOptions}
-          onToggleStatus={toggleStatus}
-          onClearStatuses={clearStatuses}
-          onToggleTrigger={toggleTrigger}
-          onClearTriggers={clearTriggers}
-        />
-
-        <div
-          ref={scrollRef}
-          className="min-h-0 flex-1 overflow-y-auto"
-          data-testid="runs-sidebar-scroll"
-          onScroll={handleScroll}
-        >
-          <RunsList
-            runs={runs}
-            filteredRuns={filteredRuns}
-            orderedRuns={orderedRuns}
-            selectedRunId={selectedRunId}
-            onSelectRun={handleRunSelect}
-            componentIconMap={componentIconMap}
-            isLoading={isLoading}
-            isError={isError}
-            onRetry={onRetry}
-            onClearFilters={clearFilters}
-          />
-        </div>
-
-        {hasAnyFilter && runs.length > 0 ? (
-          <div className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] text-gray-500">
-            <span>
-              Showing {filteredRuns.length} of {runs.length} loaded
-            </span>
-            <button type="button" onClick={clearFilters} className="shrink-0 text-sky-600 hover:text-sky-800">
-              Clear filters
-            </button>
-          </div>
-        ) : null}
-      </div>
+      <RunsTabListView
+        isActive={!isDetailView}
+        scrollRef={scrollRef}
+        onScroll={handleScroll}
+        runs={runs}
+        filteredRuns={filterState.filteredRuns}
+        orderedRuns={filterState.orderedRuns}
+        selectedRunId={selectedRunId}
+        onSelectRun={handleRunSelect}
+        componentIconMap={componentIconMap}
+        isLoading={isLoading}
+        isError={isError}
+        onRetry={onRetry}
+        onClearFilters={filterState.clearFilters}
+        hasAnyFilter={filterState.hasAnyFilter}
+        selectedStatuses={filterState.selectedStatuses}
+        selectedTriggerIds={filterState.selectedTriggerIds}
+        triggerOptions={filterState.triggerOptions}
+        onToggleStatus={filterState.toggleStatus}
+        onClearStatuses={filterState.clearStatuses}
+        onToggleTrigger={filterState.toggleTrigger}
+        onClearTriggers={filterState.clearTriggers}
+      />
 
       <div
         className={`absolute inset-0 flex min-h-0 flex-col bg-white transition-transform duration-300 ease-in-out ${
