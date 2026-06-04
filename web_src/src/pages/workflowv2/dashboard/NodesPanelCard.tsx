@@ -1,42 +1,21 @@
 import { useId, useState } from "react";
-import { CircleDot, Network, Play, Plus, Trash2 } from "lucide-react";
+import { Network, Play, Plus, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import { Checkbox } from "@/ui/checkbox";
 import type { DashboardPanel } from "@/hooks/useCanvasData";
 
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { WidgetEmptyState } from "./WidgetEmptyState";
-import { useDashboardContext, resolveDashboardNode, type DashboardNodeStatus } from "./DashboardContext";
+import { useDashboardContext, resolveDashboardNode } from "./DashboardContext";
 import { confirmDashboardTriggerNode } from "./confirmDashboardTriggerNode";
 import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
 import type { NodesPanelContent, NodesPanelNode } from "./nodesPanelContent";
-
-const STATUS_CLASS: Record<DashboardNodeStatus, string> = {
-  passed: "bg-emerald-100 text-emerald-700 ring-emerald-300",
-  failed: "bg-red-100 text-red-700 ring-red-300",
-  cancelled: "bg-slate-200 text-slate-600 ring-slate-300",
-  running: "bg-sky-100 text-sky-700 ring-sky-300",
-  pending: "bg-amber-100 text-amber-700 ring-amber-300",
-  skipped: "bg-slate-100 text-slate-500 ring-slate-300",
-  unknown: "bg-slate-100 text-slate-500 ring-slate-300",
-};
-
-const STATUS_LABEL: Record<DashboardNodeStatus, string> = {
-  passed: "Passed",
-  failed: "Failed",
-  cancelled: "Cancelled",
-  running: "Running",
-  pending: "Pending",
-  skipped: "Skipped",
-  unknown: "Unknown",
-};
 
 interface NodesPanelCardProps {
   panel: DashboardPanel;
@@ -46,10 +25,10 @@ interface NodesPanelCardProps {
 }
 
 /**
- * Multi-node panel: renders a compact list of canvas nodes with their live
- * status and an optional purpose line. Useful for "Key Nodes" style cards
- * that want to surface several pinned nodes in a single console card
- * instead of one panel per node.
+ * Multi-node panel: renders a compact list of canvas nodes with an optional
+ * purpose line. Useful for "Key Nodes" style cards that want to surface
+ * several pinned nodes in a single console card instead of one panel per
+ * node.
  *
  * Resolution and trigger plumbing reuse {@link useDashboardContext} and
  * mirror the single-node panel so authorization and runtime behavior stay
@@ -86,11 +65,7 @@ export function NodesPanelCard({ panel, readOnly, onDelete, onChange }: NodesPan
 function NodesPanelBody({ content }: { content: NodesPanelContent }) {
   if (content.nodes.length === 0) {
     return (
-      <WidgetEmptyState
-        icon={Network}
-        className="min-h-0"
-        message="Add nodes from the editor to surface their live status here."
-      />
+      <WidgetEmptyState icon={Network} className="min-h-0" message="Add nodes from the editor to surface them here." />
     );
   }
   return (
@@ -105,21 +80,10 @@ function NodesPanelBody({ content }: { content: NodesPanelContent }) {
 function NodesPanelRow({ entry }: { entry: NodesPanelNode }) {
   const ctx = useDashboardContext();
   const resolved = resolveDashboardNode(ctx, entry.node);
-  const status: DashboardNodeStatus = resolveStatus(ctx, resolved?.node.id);
   const displayName = entry.label?.trim() || resolved?.label || entry.node;
 
   return (
     <li className="flex items-center gap-3 px-3 py-2" data-testid="nodes-panel-row">
-      <span
-        className={cn(
-          "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 ring-inset",
-          STATUS_CLASS[status],
-        )}
-        data-testid="nodes-panel-row-status"
-      >
-        <CircleDot className="h-2.5 w-2.5" aria-hidden />
-        {STATUS_LABEL[status]}
-      </span>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-slate-800" data-testid="nodes-panel-row-name">
           {displayName}
@@ -187,11 +151,6 @@ function NodesPanelRunControl({
   );
 }
 
-function resolveStatus(ctx: ReturnType<typeof useDashboardContext>, nodeId: string | undefined): DashboardNodeStatus {
-  if (!nodeId) return "unknown";
-  return ctx?.nodeStatuses?.[nodeId] ?? "unknown";
-}
-
 function NodesPanelForm({
   value,
   onChange,
@@ -230,7 +189,7 @@ function NodesPanelForm({
         </div>
         {value.nodes.length === 0 ? (
           <p className="rounded border border-dashed border-slate-200 px-3 py-4 text-center text-xs text-slate-500">
-            No nodes yet. Add one to display its live status in this panel.
+            No nodes yet. Add one to display it in this panel.
           </p>
         ) : (
           <div className="space-y-3">

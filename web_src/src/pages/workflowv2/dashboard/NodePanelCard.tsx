@@ -5,37 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import { Checkbox } from "@/ui/checkbox";
 import type { DashboardPanel } from "@/hooks/useCanvasData";
 
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { WidgetEmptyState } from "./WidgetEmptyState";
-import { useDashboardContext, resolveDashboardNode, type DashboardNodeStatus } from "./DashboardContext";
+import { useDashboardContext, resolveDashboardNode } from "./DashboardContext";
 import { confirmDashboardTriggerNode } from "./confirmDashboardTriggerNode";
 import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
 import type { NodePanelContent } from "./panelTypes";
-
-const STATUS_CLASS: Record<DashboardNodeStatus, string> = {
-  passed: "bg-emerald-100 text-emerald-700 ring-emerald-300",
-  failed: "bg-red-100 text-red-700 ring-red-300",
-  cancelled: "bg-slate-200 text-slate-600 ring-slate-300",
-  running: "bg-sky-100 text-sky-700 ring-sky-300",
-  pending: "bg-amber-100 text-amber-700 ring-amber-300",
-  skipped: "bg-slate-100 text-slate-500 ring-slate-300",
-  unknown: "bg-slate-100 text-slate-500 ring-slate-300",
-};
-
-const STATUS_LABEL: Record<DashboardNodeStatus, string> = {
-  passed: "Passed",
-  failed: "Failed",
-  cancelled: "Cancelled",
-  running: "Running",
-  pending: "Pending",
-  skipped: "Skipped",
-  unknown: "Unknown",
-};
 
 interface NodePanelCardProps {
   panel: DashboardPanel;
@@ -45,8 +24,8 @@ interface NodePanelCardProps {
 }
 
 /**
- * Single-node panel: status badge + node name + optional manual-run button.
- * Resolves the node reference (id or name) through {@link DashboardContext}.
+ * Single-node panel: node name + optional manual-run button. Resolves the
+ * node reference (id or name) through {@link DashboardContext}.
  */
 export function NodePanelCard({ panel, readOnly, onDelete, onChange }: NodePanelCardProps) {
   const [editing, setEditing] = useState(false);
@@ -83,25 +62,14 @@ function NodePanelBody({ content }: { content: NodePanelContent }) {
       <WidgetEmptyState
         icon={CircleDot}
         className="min-h-0"
-        message="Pick a node from the editor to display its status here."
+        message="Pick a node from the editor to display it here."
       />
     );
   }
   const resolved = resolveDashboardNode(ctx, content.node);
-  const status: DashboardNodeStatus = resolveStatus(ctx, resolved?.node.id);
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
-          STATUS_CLASS[status],
-        )}
-        data-testid="node-panel-status"
-      >
-        <CircleDot className="h-3 w-3" aria-hidden />
-        {STATUS_LABEL[status]}
-      </span>
       <div className="text-sm font-semibold text-slate-800" data-testid="node-panel-name">
         {resolved?.label ?? content.node ?? "—"}
       </div>
@@ -156,11 +124,6 @@ function NodePanelRunControl({
       />
     </>
   );
-}
-
-function resolveStatus(ctx: ReturnType<typeof useDashboardContext>, nodeId: string | undefined): DashboardNodeStatus {
-  if (!nodeId) return "unknown";
-  return ctx?.nodeStatuses?.[nodeId] ?? "unknown";
 }
 
 function NodePanelForm({ value, onChange }: { value: NodePanelContent; onChange: (next: NodePanelContent) => void }) {
