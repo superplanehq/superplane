@@ -86,11 +86,17 @@ export function RunRow({
         className="hidden shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 group-hover:inline-flex"
         onClick={(event) => {
           event.stopPropagation();
-          const url = new URL(window.location.href);
-          url.searchParams.set("view", "runs");
-          url.searchParams.set("run", run.id || "");
-          navigator.clipboard.writeText(url.toString());
-          toast.success("Run link copied");
+          void (async () => {
+            const url = new URL(window.location.href);
+            url.searchParams.set("view", "runs");
+            url.searchParams.set("run", run.id || "");
+            try {
+              await navigator.clipboard.writeText(url.toString());
+              toast.success("Run link copied");
+            } catch {
+              toast.error("Failed to copy run link");
+            }
+          })();
         }}
       >
         <LinkIcon className="h-3 w-3" />
