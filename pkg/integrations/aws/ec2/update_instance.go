@@ -252,6 +252,10 @@ func (c *UpdateInstance) Execute(ctx core.ExecutionContext) error {
 		return err
 	}
 
+	if err := validateUpdateInstanceConfiguration(config); err != nil {
+		return err
+	}
+
 	creds, err := common.CredentialsFromInstallation(ctx.Integration)
 	if err != nil {
 		return fmt.Errorf("failed to get AWS credentials: %w", err)
@@ -494,14 +498,18 @@ func (c *UpdateInstance) Cancel(ctx core.ExecutionContext) error {
 		return nil
 	}
 
-	// Best-effort: if we stopped the instance during the resize, try to restart
-	// it to return it to its original running state.
-	if !metadata.WasRunning || metadata.Phase == "" {
+	// Best-effort: if we stopped the instance during the resize and the user wanted
+	// it restarted afterward, try to return it to its original running state.
+	if !metadata.WasRunning || metadata.Phase != updateInstancePhaseStopping {
 		return nil
 	}
 
 	config := UpdateInstanceConfiguration{}
 	if err := mapstructure.Decode(ctx.Configuration, &config); err != nil {
+		return nil
+	}
+
+	if !config.RestartAfterResize {
 		return nil
 	}
 
