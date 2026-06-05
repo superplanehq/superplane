@@ -158,7 +158,7 @@ func TestAgentE2E(t *testing.T) {
 		steps.assertText("E2E Build Plan")
 		steps.startBuildingFromRubric()
 		steps.assertText("Building now.")
-		assert.True(t, approvalReceived, "expected 'Specs approved. Start building.' message")
+		require.True(t, approvalReceived, "expected 'Specs approved. Start building.' message")
 	})
 }
 
