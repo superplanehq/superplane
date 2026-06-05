@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/superplane/runner/shared/api"
+	"github.com/superplane/runner/shared/models"
 )
 
 // HostExecutor runs tasks directly on the host process. It is a thin
@@ -28,6 +29,10 @@ func (h *HostExecutor) Execute(ctx context.Context, task *api.TaskPayload, live 
 	env, err := processEnvironment(task.Environment)
 	if err != nil {
 		return 1, "", err
+	}
+	switch api.RunModeForTask(task) {
+	case models.RunModeJavaScript:
+		return runJavaScriptHost(ctx, max, h.TaskWorkDir, task, env, live, resultHostPath)
 	}
 	if len(task.Commands) > 0 {
 		return runHostShellDirectives(ctx, max, h.TaskWorkDir, task.Commands, env, live, resultHostPath)

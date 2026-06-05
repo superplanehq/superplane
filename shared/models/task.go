@@ -25,6 +25,12 @@ const (
 type Task struct {
 	ID      string
 	FleetID string
+	// RunMode selects command_list, argv, or javascript_script. Empty means infer from fields.
+	RunMode RunMode
+	// Script is user JavaScript (function main() { return ... }) when RunMode is javascript_script.
+	Script string
+	// MessageChainJSON is the SuperPlane $ message chain passed to javascript_script tasks.
+	MessageChainJSON string
 	// Command is argv for a single process when Commands is empty (legacy).
 	Command []string
 	// Commands are shell directives when non-empty (Bash+PTY sourcing per line on workers).

@@ -28,7 +28,13 @@ type EnvironmentVariable = models.EnvironmentVariable
 
 // CreateTaskRequest is POST /v1/tasks.
 type CreateTaskRequest struct {
-	// Command is argv for one process. Omit when using Commands.
+	// RunMode is command_list, argv, or javascript_script. Omit to infer from body fields.
+	RunMode string `json:"run_mode,omitempty"`
+	// Script is user JavaScript when run_mode is javascript_script.
+	Script string `json:"script,omitempty"`
+	// MessageChain is the SuperPlane $ object for javascript_script tasks.
+	MessageChain json.RawMessage `json:"message_chain,omitempty"`
+	// Command is argv for one process. Omit when using Commands or Script.
 	Command []string `json:"command,omitempty"`
 	// Commands are shell directives (non-empty trimmed lines). The runner uses Bash on
 	// a PTY and sources each directive from a tempfile, stopping at the first failing
@@ -64,6 +70,9 @@ type ClaimTaskResponse struct {
 // TaskPayload is the task spec sent to runners.
 type TaskPayload struct {
 	ID            string                `json:"id"`
+	RunMode       string                `json:"run_mode,omitempty"`
+	Script        string                `json:"script,omitempty"`
+	MessageChain  json.RawMessage       `json:"message_chain,omitempty"`
 	Command       []string              `json:"command,omitempty"`
 	Commands      []string              `json:"commands,omitempty"` // see CreateTaskRequest (Bash+PTY per directive on Unix)
 	Environment   []EnvironmentVariable `json:"environment,omitempty"`
@@ -88,11 +97,16 @@ type CompleteTaskRequest struct {
 func TaskPayloadFrom(t *models.Task) *TaskPayload {
 	p := &TaskPayload{
 		ID:            t.ID,
+		RunMode:       string(t.RunMode),
+		Script:        t.Script,
 		Command:       t.Command,
 		Commands:      t.Commands,
 		Environment:   CloneEnvironment(t.Environment),
 		ExecutionMode: string(t.ExecutionMode),
 		DockerImage:   t.DockerImage,
+	}
+	if mc := strings.TrimSpace(t.MessageChainJSON); mc != "" {
+		p.MessageChain = json.RawMessage(mc)
 	}
 	if t.ExecutionTimeoutSeconds != nil {
 		v := *t.ExecutionTimeoutSeconds
@@ -192,3 +206,37 @@ type ListTasksResponse struct {
 
 // BrokerGetTaskResponse is GET task-broker /v1/tasks/{id} (same shape as TaskStatusResponse).
 type BrokerGetTaskResponse = TaskStatusResponse
+
+// EffectiveRunMode returns the run mode for a create request (explicit or inferred).
+func EffectiveRunMode(req *CreateTaskRequest) models.RunMode {
+	if req == nil {
+		return ""
+	}
+	if k := models.RunMode(strings.ToLower(strings.TrimSpace(req.RunMode))); k != "" {
+		return k
+	}
+	return models.InferRunMode(NormalizeCommandLines(req.Commands), req.Command, strings.TrimSpace(req.Script))
+}
+
+// RunModeForTask returns the effective run mode on a claimed task payload.
+func RunModeForTask(task *TaskPayload) models.RunMode {
+	if task == nil {
+		return ""
+	}
+	if k := models.RunMode(strings.ToLower(strings.TrimSpace(task.RunMode))); k != "" {
+		return k
+	}
+	return models.InferRunMode(task.Commands, task.Command, strings.TrimSpace(task.Script))
+}
+
+// NormalizeCommandLines trims and drops blank command-list lines.
+func NormalizeCommandLines(commands []string) []string {
+	var out []string
+	for _, c := range commands {
+		c = strings.TrimSpace(c)
+		if c != "" {
+			out = append(out, c)
+		}
+	}
+	return out
+}

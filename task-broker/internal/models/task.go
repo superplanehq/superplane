@@ -6,6 +6,9 @@ import "time"
 type Task struct {
 	ID                      string     `gorm:"primaryKey"`
 	FleetID                 string     `gorm:"not null;index:idx_tasks_fleet_status_created,priority:1"`
+	RunMode                 string     `gorm:"not null;default:command_list"`
+	ScriptJSON              string     `gorm:""`
+	MessageChainJSON        string     `gorm:""`
 	CommandJSON             string     `gorm:"not null"`
 	CommandsJSON            string     `gorm:""`
 	EnvironmentJSON         string     `gorm:""`
