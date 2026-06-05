@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/superplanehq/superplane/pkg/authentication"
 	git "github.com/superplanehq/superplane/pkg/git/provider"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
@@ -37,7 +38,7 @@ func downloadFile(
 	req := httptest.NewRequest(http.MethodGet, url, nil)
 	if accountID != nil {
 		req.Header.Set("x-organization-id", organizationID.String())
-		token, err := signer.Generate(accountID.String(), time.Hour)
+		token, err := authentication.GenerateAccountToken(signer, accountID.String(), time.Now(), time.Hour)
 		require.NoError(t, err)
 		req.AddCookie(&http.Cookie{Name: "account_token", Value: token})
 	}
