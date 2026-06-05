@@ -1,10 +1,7 @@
 package runner
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/superplanehq/superplane/pkg/configuration"
@@ -13,37 +10,26 @@ import (
 )
 
 const (
-	PassedOutputChannel     = "passed"
-	FailedOutputChannel     = "failed"
-	RunnerFinishedEventType = "runner.finished"
-
-	pollInterval   = 2 * time.Minute
-	hookActionPoll = "poll"
+	RunJSComponentName       = "runner.runJS"
+	RunJSFinishedEventType   = "runner.runJS.finished"
+	runJSDefaultDockerPreset = "node:22-bookworm"
+	defaultRunJSScript       = "function main() {\n  const hostname = process.env.HOST;\n  return { hello: \"from \" + hostname };\n}"
 )
 
 func init() {
-	registry.RegisterAction("runner", &Runner{})
+	registry.RegisterAction(RunJSComponentName, &RunJS{})
 }
 
-type Runner struct{}
+type RunJS struct{}
 
-var dockerExecutionOnly = []configuration.VisibilityCondition{
-	{Field: "execution_mode", Values: []string{ExecutionModeDocker}},
-}
+func (c *RunJS) Name() string  { return RunJSComponentName }
+func (c *RunJS) Label() string { return "Run JavaScript" }
+func (c *RunJS) Icon() string  { return "code" }
+func (c *RunJS) Color() string { return "blue" }
 
-var dockerImageCustomOnly = []configuration.VisibilityCondition{
-	{Field: "execution_mode", Values: []string{ExecutionModeDocker}},
-	{Field: "docker_image_preset", Values: []string{DockerImagePresetCustom}},
-}
-
-func (c *Runner) Name() string  { return "runner" }
-func (c *Runner) Label() string { return "Runner" }
-func (c *Runner) Icon() string  { return "terminal" }
-func (c *Runner) Color() string { return "blue" }
-
-func (c *Runner) ExampleOutput() map[string]any {
+func (c *RunJS) ExampleOutput() map[string]any {
 	return map[string]any{
-		"type":      RunnerFinishedEventType,
+		"type":      RunJSFinishedEventType,
 		"timestamp": "2026-01-16T17:56:16.680755501Z",
 		"data": []any{map[string]any{
 			"status":    "succeeded",
@@ -53,43 +39,50 @@ func (c *Runner) ExampleOutput() map[string]any {
 	}
 }
 
-func (c *Runner) OutputChannels(configuration any) []core.OutputChannel {
+func (c *RunJS) OutputChannels(configuration any) []core.OutputChannel {
 	return []core.OutputChannel{
 		{Name: PassedOutputChannel, Label: "Passed"},
 		{Name: FailedOutputChannel, Label: "Failed"},
 	}
 }
 
-func (c *Runner) Description() string {
-	return "Runs shell commands on a fleet runner (host or Docker container)"
+func (c *RunJS) Description() string {
+	return "Runs JavaScript on a fleet runner with access to upstream node data via $"
 }
 
-func (c *Runner) Documentation() string {
-	return `Runs shell commands on a fleet runner.
+func (c *RunJS) Documentation() string {
+	return `Runs JavaScript on a fleet runner.
 
 ## Execution
-- **Host**: Commands run directly on the runner machine (Bash with a PTY).
-- **Docker**: Commands run inside a container started from **Docker image**. The runner pulls the image, starts a long-lived container, and executes your script via ` + "`docker exec`" + `. The image must include a usable ` + "`sleep`" + ` (common base images do).
+- **Host**: Script runs with Node.js on the runner machine.
+- **Docker**: Script runs inside a container started from **Docker image**. Use a Node.js image (for example **Node.js 22 (Bookworm)**) so ` + "`node`" + ` is available.
+
+## Script contract
+Your script must define ` + "`function main()`" + `. The runner injects upstream canvas data as the global ` + "`$`" + ` object (same shape as workflow expressions). Return a JSON-serializable value from ` + "`main()`" + `; it is emitted on the finished event as **result**.
+
+Example:
+
+` + "```javascript" + `
+function main() {
+  return { pr: $['GitHub PR'].data.number };
+}
+` + "```" + `
 
 ## Configuration
 - **Machine type**: Runner fleet registered on the task-broker (required).
 - **Execution mode**: Host (default) or Docker.
-- **Container base image**: Choose a common public image, or **Other (custom image)** to enter any OCI reference.
-- **Custom container image**: Shown only for **Other**; use a normal reference (` + "`my.registry.example.com/org/repo:1.2.3`" + ` or ` + "`debian:bookworm-slim@sha256:…`" + `). Private registries require the runner to be configured with registry credentials.
+- **Container base image**: Defaults to a Node.js image in Docker mode.
 - **Execution timeout**: Optional wall-clock limit in seconds (1–86400). Defaults to **3600** (1 hour) when unset or **0**.
-- **Commands**: One or more shell commands, one per line.
-- **Environment variables**: Optional key/value pairs available during command execution. Values can be literal strings (with expression support) or organization secret keys.
+- **Script**: JavaScript source executed by Node.js.
+- **Environment variables**: Optional key/value pairs available during execution.
 
 ## Output channels
-- **Passed**: The commands finished with exit code **0**.
-- **Failed**: The commands finished with non-zero exit code.
-
-## Structured result
-If the completed broker task includes valid JSON in **result**, SuperPlane includes it on the ` + "`runner.finished`" + ` event payload next to **status** and **exit_code** (the exact shape depends on your runner / task implementation).
+- **Passed**: The script finished with exit code **0**.
+- **Failed**: The script finished with non-zero exit code.
 `
 }
 
-func (c *Runner) Configuration() []configuration.Field {
+func (c *RunJS) Configuration() []configuration.Field {
 	return []configuration.Field{
 		{
 			Name:     configurationFieldMachineType,
@@ -106,21 +99,21 @@ func (c *Runner) Configuration() []configuration.Field {
 			Name:        "execution_mode",
 			Label:       "Execution mode",
 			Type:        configuration.FieldTypeSelect,
-			Required:    false, // legacy nodes omit this; defaults applied in decodeRunnerSpec / normalizeExecutionMode
+			Required:    false,
 			Default:     ExecutionModeHost,
-			Description: "Where the shell commands run: on the runner machine, or inside a container.",
+			Description: "Where the script runs: on the runner machine, or inside a container.",
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
 						{
 							Label:       "Host",
 							Value:       ExecutionModeHost,
-							Description: "Runs in a Bash session on the runner (PTY). Best when the workflow should use tools already installed on the runner.",
+							Description: "Runs with Node.js on the runner. The fleet image must include Node.",
 						},
 						{
 							Label:       "Docker",
 							Value:       ExecutionModeDocker,
-							Description: "Runs in an isolated container started from the image below. The runner must have Docker and (for private registries) pull credentials.",
+							Description: "Runs in an isolated container from the image below. Pick a Node.js image.",
 						},
 					},
 				},
@@ -131,17 +124,17 @@ func (c *Runner) Configuration() []configuration.Field {
 			Label:                "Container base image",
 			Type:                 configuration.FieldTypeSelect,
 			Required:             false,
-			Default:              "debian:bookworm-slim",
-			Description:          "Pick a common image, or choose Other to type your own registry reference.",
+			Default:              runJSDefaultDockerPreset,
+			Description:          "Pick a Node.js image, or choose Other to type your own registry reference.",
 			VisibilityConditions: dockerExecutionOnly,
 			TypeOptions: &configuration.TypeOptions{
 				Select: &configuration.SelectTypeOptions{
 					Options: []configuration.FieldOption{
+						{Label: "Node.js 22 (Bookworm)", Value: "node:22-bookworm"},
+						{Label: "Node.js 20 (Bookworm)", Value: "node:20-bookworm"},
+						{Label: "Node.js 18 (Bookworm)", Value: "node:18-bookworm"},
 						{Label: "Debian Bookworm (slim)", Value: "debian:bookworm-slim"},
 						{Label: "Ubuntu 24.04", Value: "ubuntu:24.04"},
-						{Label: "Alpine 3.20", Value: "alpine:3.20"},
-						{Label: "Node.js 22 (Bookworm)", Value: "node:22-bookworm"},
-						{Label: "Python 3.12 (slim)", Value: "python:3.12-slim"},
 						{Label: "Other (custom image)", Value: DockerImagePresetCustom},
 					},
 				},
@@ -152,8 +145,8 @@ func (c *Runner) Configuration() []configuration.Field {
 			Label:                "Custom container image",
 			Type:                 configuration.FieldTypeString,
 			Required:             false,
-			Placeholder:          "e.g. debian:bookworm-slim",
-			Description:          "Full OCI image reference when you chose Other above. Pin with a tag or digest for reproducible runs.",
+			Placeholder:          "e.g. node:22-bookworm",
+			Description:          "Full OCI image reference when you chose Other above.",
 			VisibilityConditions: dockerImageCustomOnly,
 			RequiredConditions: []configuration.RequiredCondition{
 				{Field: "docker_image_preset", Values: []string{DockerImagePresetCustom}},
@@ -165,19 +158,24 @@ func (c *Runner) Configuration() []configuration.Field {
 			},
 		},
 		{
-			Name:        "commands",
-			Label:       "Commands",
+			Name:        "script",
+			Label:       "Script",
 			Type:        configuration.FieldTypeText,
 			Required:    true,
-			Placeholder: "echo \"Hello, World!\"",
-			Description: "One shell command per line.",
+			Default:     defaultRunJSScript,
+			Description: "JavaScript executed by Node.js. Define function main() and return a JSON-serializable value.",
+			TypeOptions: &configuration.TypeOptions{
+				Text: &configuration.TextTypeOptions{
+					Language: "javascript",
+				},
+			},
 		},
 		{
 			Name:        "environment",
 			Label:       "Environment variables",
 			Type:        configuration.FieldTypeList,
 			Required:    false,
-			Description: "Optional key/value pairs passed into the command environment",
+			Description: "Optional key/value pairs passed into the script environment",
 			TypeOptions: &configuration.TypeOptions{
 				List: &configuration.ListTypeOptions{
 					ItemLabel: "Variable",
@@ -236,9 +234,9 @@ func (c *Runner) Configuration() []configuration.Field {
 			Name:        "execution_timeout_seconds",
 			Label:       "Execution timeout (seconds)",
 			Type:        configuration.FieldTypeNumber,
-			Required:    false, // legacy nodes omit this; 0 means DefaultExecutionTimeoutSeconds
+			Required:    false,
 			Default:     DefaultExecutionTimeoutSeconds,
-			Description: "Hard time limit for the whole task, including image pull and command run. Defaults to 3600 seconds (1 hour).",
+			Description: "Hard time limit for the whole task, including image pull and script run. Defaults to 3600 seconds (1 hour).",
 			TypeOptions: &configuration.TypeOptions{
 				Number: &configuration.NumberTypeOptions{
 					Min: intPtr(0),
@@ -249,17 +247,13 @@ func (c *Runner) Configuration() []configuration.Field {
 	}
 }
 
-func intPtr(v int) *int {
-	return &v
-}
-
-func (c *Runner) Setup(ctx core.SetupContext) error {
-	spec, err := decodeRunnerSpec(ctx.Configuration)
+func (c *RunJS) Setup(ctx core.SetupContext) error {
+	spec, err := decodeRunJSSpec(ctx.Configuration)
 	if err != nil {
 		return err
 	}
 
-	if err := validateRunnerSpec(spec); err != nil {
+	if err := validateRunJSSpec(spec); err != nil {
 		return err
 	}
 
@@ -267,17 +261,17 @@ func (c *Runner) Setup(ctx core.SetupContext) error {
 	return err
 }
 
-func (c *Runner) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
+func (c *RunJS) ProcessQueueItem(ctx core.ProcessQueueContext) (*uuid.UUID, error) {
 	return ctx.DefaultProcessing()
 }
 
-func (c *Runner) Execute(ctx core.ExecutionContext) error {
-	spec, err := decodeRunnerSpec(ctx.Configuration)
+func (c *RunJS) Execute(ctx core.ExecutionContext) error {
+	spec, err := decodeRunJSSpec(ctx.Configuration)
 	if err != nil {
 		return err
 	}
 
-	if err := validateRunnerSpec(spec); err != nil {
+	if err := validateRunJSSpec(spec); err != nil {
 		return err
 	}
 
@@ -291,7 +285,11 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 		return fmt.Errorf("webhook setup: %w", err)
 	}
 
-	cmds := normalizeCommands(spec.Commands)
+	messageChain, err := messageChainJSON(ctx.Expressions)
+	if err != nil {
+		return err
+	}
+
 	broker, err := NewBrokerClient(ctx.HTTP)
 	if err != nil {
 		return fmt.Errorf("new broker client: %w", err)
@@ -300,11 +298,13 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	mode := normalizeExecutionMode(spec.ExecutionMode)
 	params := CreateTaskParams{
 		MachineType:    spec.MachineType,
-		Commands:       cmds,
+		RunMode:        RunModeJavaScript,
+		Script:         spec.Script,
+		MessageChain:   messageChain,
 		WebhookURL:     webhookURL,
 		Environment:    environment,
 		ExecutionMode:  mode,
-		DockerImage:    resolvedDockerImageRef(spec),
+		DockerImage:    resolvedRunJSDockerImageRef(spec),
 		TimeoutSeconds: spec.ExecutionTimeoutSeconds,
 	}
 
@@ -316,41 +316,25 @@ func (c *Runner) Execute(ctx core.ExecutionContext) error {
 	return afterRunnerTaskCreated(ctx, taskID)
 }
 
-func (c *Runner) Hooks() []core.Hook {
+func (c *RunJS) Hooks() []core.Hook {
 	return []core.Hook{{Name: hookActionPoll, Type: core.HookTypeInternal}}
 }
 
-func (c *Runner) HandleHook(ctx core.ActionHookContext) error {
+func (c *RunJS) HandleHook(ctx core.ActionHookContext) error {
 	switch ctx.Name {
 	case hookActionPoll:
-		return pollBrokerTask(ctx, RunnerFinishedEventType)
+		return pollBrokerTask(ctx, RunJSFinishedEventType)
 	default:
 		return fmt.Errorf("unknown hook: %s", ctx.Name)
 	}
 }
 
-func (c *Runner) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
-	return handleBrokerWebhook(ctx, RunnerFinishedEventType)
+func (c *RunJS) HandleWebhook(ctx core.WebhookRequestContext) (int, *core.WebhookResponseBody, error) {
+	return handleBrokerWebhook(ctx, RunJSFinishedEventType)
 }
 
-func (c *Runner) processTaskStatus(state core.ExecutionStateContext, task *Task) error {
-	return processBrokerTaskStatus(state, task, RunnerFinishedEventType)
-}
-
-func brokerResultAsAny(raw json.RawMessage) any {
-	b := bytes.TrimSpace(raw)
-	if len(b) == 0 || !json.Valid(b) {
-		return nil
-	}
-	var v any
-	if err := json.Unmarshal(b, &v); err != nil {
-		return nil
-	}
-	return v
-}
-
-func (c *Runner) Cancel(ctx core.ExecutionContext) error {
+func (c *RunJS) Cancel(ctx core.ExecutionContext) error {
 	return cancelBrokerTask(ctx)
 }
 
-func (c *Runner) Cleanup(ctx core.SetupContext) error { return nil }
+func (c *RunJS) Cleanup(ctx core.SetupContext) error { return nil }
