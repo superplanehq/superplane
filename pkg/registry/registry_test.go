@@ -554,6 +554,25 @@ func TestRegistry_GetIntegrationAction(t *testing.T) {
 	assert.Contains(t, err.Error(), "action app.other not found for integration app")
 }
 
+func TestRegistry_GetAction_RunnerJS(t *testing.T) {
+	coreAction := impl.NewDummyAction(impl.DummyActionOptions{Name: "runnerJS"})
+
+	r := &registry.Registry{
+		Actions: map[string]core.Action{
+			"runnerJS": registry.NewPanicableAction(coreAction),
+		},
+	}
+
+	got, err := r.GetAction("runnerJS")
+	require.NoError(t, err)
+	assert.Equal(t, "runnerJS", got.Name())
+
+	_, err = r.FindConfigurableComponent("runnerJS")
+	require.NoError(t, err)
+
+	assert.True(t, r.IsCoreBlock("runnerJS"))
+}
+
 func TestRegistry_ListFunctionsSortByName(t *testing.T) {
 	a := impl.NewDummyAction(impl.DummyActionOptions{Name: "zebra"})
 	b := impl.NewDummyAction(impl.DummyActionOptions{Name: "alpha"})

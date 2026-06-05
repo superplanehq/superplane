@@ -6,7 +6,6 @@ import { useCanvas } from "@/hooks/useCanvasData";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import type { CanvasesCanvas, SuperplaneComponentsNode } from "@/api-client";
-
 import { BUILTIN_COMPONENT_ICON_SLUGS } from "./componentIcons";
 
 const TRIGGER_COMPONENTS = new Set(["start", "schedule", "webhook"]);

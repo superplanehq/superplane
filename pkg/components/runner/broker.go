@@ -85,7 +85,11 @@ func NewBrokerClient(httpClient core.HTTPContext) (*BrokerClient, error) {
 type brokerCreateTaskRequest struct {
 	FleetID string `json:"fleet_id"`
 
-	Commands                []string                    `json:"commands"`
+	RunMode                 string                      `json:"run_mode,omitempty"`
+	Script                  string                      `json:"script,omitempty"`
+	MessageChain            json.RawMessage             `json:"message_chain,omitempty"`
+	Commands                []string                    `json:"commands,omitempty"`
+	SetupCommands           []string                    `json:"setup_commands,omitempty"`
 	Environment             []BrokerEnvironmentVariable `json:"environment,omitempty"`
 	WebhookURL              string                      `json:"webhook_url"`
 	ExecutionMode           string                      `json:"execution_mode,omitempty"`
@@ -99,10 +103,16 @@ type BrokerEnvironmentVariable struct {
 	Value string `json:"value"`
 }
 
+const RunModeJavaScript = "javascript_script"
+
 // CreateTaskParams is forwarded to the task broker POST /v1/tasks.
 type CreateTaskParams struct {
 	MachineType    string
+	RunMode        string
+	Script         string
+	MessageChain   json.RawMessage
 	Commands       []string
+	SetupCommands  []string
 	WebhookURL     string
 	Environment    []BrokerEnvironmentVariable
 	ExecutionMode  string
@@ -127,7 +137,11 @@ func (b *BrokerClient) CreateTask(p CreateTaskParams) (string, error) {
 
 	req := brokerCreateTaskRequest{
 		FleetID:       fleetID,
+		RunMode:       strings.TrimSpace(p.RunMode),
+		Script:        strings.TrimSpace(p.Script),
+		MessageChain:  p.MessageChain,
 		Commands:      p.Commands,
+		SetupCommands: p.SetupCommands,
 		Environment:   p.Environment,
 		WebhookURL:    p.WebhookURL,
 		ExecutionMode: mode,
