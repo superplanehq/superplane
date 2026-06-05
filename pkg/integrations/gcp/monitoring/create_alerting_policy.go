@@ -23,8 +23,11 @@ type CreateAlertingPolicySpec struct {
 	Threshold            float64  `mapstructure:"threshold"`
 	Duration             string   `mapstructure:"duration"`
 	NotificationChannels []string `mapstructure:"notificationChannels"`
-	Enabled              bool     `mapstructure:"enabled"`
-	Documentation        string   `mapstructure:"documentation"`
+	// Enabled is a pointer so an omitted value (nil) can default to true,
+	// matching the field default and docs. A plain bool would decode to false
+	// when the key is absent (e.g. for programmatic/expression configs).
+	Enabled       *bool  `mapstructure:"enabled"`
+	Documentation string `mapstructure:"documentation"`
 }
 
 func (c *CreateAlertingPolicy) Name() string {
@@ -214,10 +217,14 @@ func (c *CreateAlertingPolicy) Execute(ctx core.ExecutionContext) error {
 	}
 
 	project := client.ProjectID()
+	enabled := true
+	if spec.Enabled != nil {
+		enabled = *spec.Enabled
+	}
 	policy := map[string]any{
 		"displayName": strings.TrimSpace(spec.DisplayName),
 		"combiner":    "OR",
-		"enabled":     spec.Enabled,
+		"enabled":     enabled,
 		"conditions": []any{
 			buildThresholdCondition(spec.MetricType, spec.Comparison, spec.Threshold, spec.Duration),
 		},

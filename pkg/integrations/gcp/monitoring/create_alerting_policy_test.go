@@ -98,6 +98,64 @@ func Test__CreateAlertingPolicy__Execute(t *testing.T) {
 		assert.Equal(t, []string{"projects/my-project/notificationChannels/9"}, postBody["notificationChannels"])
 	})
 
+	t.Run("omitted enabled defaults to true", func(t *testing.T) {
+		var postBody map[string]any
+		mc := &mockClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				postBody, _ = body.(map[string]any)
+				return alertPolicyJSON("projects/my-project/alertPolicies/123", "High CPU", true, comparisonGT, 0.8, "300s"), nil
+			},
+		}
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := c.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"displayName": "High CPU",
+				"metricType":  "compute.googleapis.com/instance/cpu/utilization",
+				"comparison":  comparisonGT,
+				"threshold":   0.8,
+				"duration":    "300s",
+				// enabled intentionally omitted
+			},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		assert.Equal(t, true, postBody["enabled"], "enabled must default to true when omitted")
+	})
+
+	t.Run("explicit enabled=false is respected", func(t *testing.T) {
+		var postBody map[string]any
+		mc := &mockClient{
+			projectID: "my-project",
+			postFunc: func(ctx context.Context, url string, body any) ([]byte, error) {
+				postBody, _ = body.(map[string]any)
+				return alertPolicyJSON("projects/my-project/alertPolicies/123", "High CPU", false, comparisonGT, 0.8, "300s"), nil
+			},
+		}
+		withFactory(mc)
+
+		state := &contexts.ExecutionStateContext{KVs: map[string]string{}}
+		err := c.Execute(core.ExecutionContext{
+			Configuration: map[string]any{
+				"displayName": "High CPU",
+				"metricType":  "compute.googleapis.com/instance/cpu/utilization",
+				"comparison":  comparisonGT,
+				"threshold":   0.8,
+				"duration":    "300s",
+				"enabled":     false,
+			},
+			ExecutionState: state,
+		})
+
+		require.NoError(t, err)
+		assert.True(t, state.Passed)
+		assert.Equal(t, false, postBody["enabled"], "explicit enabled=false must be sent")
+	})
+
 	t.Run("API error -> fails execution", func(t *testing.T) {
 		mc := &mockClient{
 			projectID: "my-project",
