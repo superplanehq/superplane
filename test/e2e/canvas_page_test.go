@@ -1,10 +1,12 @@
 package e2e
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	pw "github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/require"
 
 	"github.com/superplanehq/superplane/pkg/database"
@@ -143,24 +145,25 @@ func TestCanvasPage(t *testing.T) {
 }
 
 func TestCanvasPageYamlViewer(t *testing.T) {
-	t.Run("YAML preview modal shows canvas definition", func(t *testing.T) {
+	t.Run("Files tab shows canvas YAML definition", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("YamlTestNode")
-		steps.openYamlPreviewModal()
+		steps.openFilesTab()
+		steps.assertFileIsOpen("canvas.yaml")
 		steps.assertYamlContentVisible("YamlTestNode")
 		steps.assertYamlContentVisible("metadata:")
 	})
 
-	t.Run("YAML preview modal can be closed to return to canvas", func(t *testing.T) {
+	t.Run("Files tab can return to canvas", func(t *testing.T) {
 		steps := &CanvasPageSteps{t: t}
 		steps.start()
 		steps.givenACanvasExists()
 		steps.addNoop("SwitchTest")
-		steps.openYamlPreviewModal()
+		steps.openFilesTab()
 		steps.assertYamlContentVisible("SwitchTest")
-		steps.closeYamlPreviewModal()
+		steps.returnToCanvasTab()
 		steps.assertNodeIsAdded("SwitchTest")
 	})
 }
@@ -573,18 +576,39 @@ func (s *CanvasPageSteps) assertNodesAreNotConnectedInDB(sourceName, targetName 
 	}
 }
 
-func (s *CanvasPageSteps) openYamlPreviewModal() {
-	// Adding a node opens the component sidebar over the canvas chrome; dismiss it so
-	// the floating YAML control (same corner as the sidebar) is clickable.
+func (s *CanvasPageSteps) openFilesTab() {
+	s.canvas.Save()
 	s.canvas.ClickOnEmptyCanvasArea()
-	s.session.Click(q.TestID("open-yaml-modal-button"))
+	s.session.Sleep(300)
+	filesTab := q.TestID("canvas-view-mode-files")
+	s.session.AssertVisible(filesTab)
+	s.session.Click(filesTab)
+	s.session.AssertVisible(q.TestID("workflow-files-overlay"))
+	s.session.AssertVisible(q.TestID("workflow-file-editor"))
+	s.waitForMonacoEditor()
 }
 
-func (s *CanvasPageSteps) closeYamlPreviewModal() {
-	s.session.PressKey("Escape")
+func (s *CanvasPageSteps) returnToCanvasTab() {
+	s.session.Click(q.TestID("canvas-view-mode-live"))
 	s.session.Sleep(500)
 }
 
+func (s *CanvasPageSteps) assertFileIsOpen(name string) {
+	s.session.AssertText(name)
+	s.session.AssertVisible(q.TestID("workflow-file-editor"))
+}
+
 func (s *CanvasPageSteps) assertYamlContentVisible(text string) {
-	s.session.AssertText(text)
+	s.waitForMonacoEditor()
+	s.session.AssertVisible(q.Locator(fmt.Sprintf(`[data-testid="workflow-file-editor"] >> text=%s`, text)))
+}
+
+func (s *CanvasPageSteps) waitForMonacoEditor() {
+	monacoLines := q.Locator(`[data-testid="workflow-file-editor"] .view-lines`)
+	if err := monacoLines.Run(s.session).WaitFor(pw.LocatorWaitForOptions{
+		State:   pw.WaitForSelectorStateVisible,
+		Timeout: pw.Float(15000),
+	}); err != nil {
+		s.t.Fatalf("monaco editor did not become ready: %v", err)
+	}
 }

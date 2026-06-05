@@ -32,6 +32,7 @@ import {
   buildExecutionInfo,
   buildNodeInfo,
   buildQueueItemInfo,
+  getNodeComponentName,
   buildUserInfo,
 } from "../utils";
 import { canvasKeys } from "@/hooks/useCanvasData";
@@ -100,7 +101,7 @@ function buildPreparedTriggerCanvasNode(args: {
     canvasId,
     openModal,
   } = args;
-  const renderer = getTriggerRenderer(node.component || "");
+  const renderer = getTriggerRenderer(getNodeComponentName(node));
   const lastEvent = nodeEventsMap[node.id!]?.[0];
   const triggerProps = renderer.getTriggerProps({
     node: buildNodeInfo(node),
@@ -138,7 +139,7 @@ function buildPlaceholderComponentNode(node: ComponentsNode): CanvasNode {
       state: "pending" as const,
       outputChannels: ["default"],
       component: {
-        iconSlug: "box-dashed",
+        iconSlug: "plus",
         iconColor: getColorClass("gray"),
         collapsedBackground: getBackgroundColorClass("gray"),
         collapsed: false,

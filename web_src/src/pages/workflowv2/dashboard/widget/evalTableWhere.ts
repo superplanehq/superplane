@@ -13,7 +13,7 @@ function stringifyCell(value: unknown): string {
   }
 }
 
-function evalCondition(row: Record<string, unknown>, filter: WidgetTableFilter, env: ExprEnv): boolean {
+export function evalCondition(row: Record<string, unknown>, filter: WidgetTableFilter, env: ExprEnv): boolean {
   const fieldMaybe = compileMaybeExpr(filter.field);
   const raw = evalRowField(fieldMaybe, row, env, getValueAtPath);
   const has = raw !== undefined;

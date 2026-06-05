@@ -365,6 +365,60 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			contains: "render.rowActions[0].node",
 		},
 		{
+			name: "row style with unknown tone",
+			panel: DashboardPanel{
+				ID:   "table",
+				Type: DashboardPanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind":    "table",
+						"columns": []any{},
+						"rowStyles": []any{
+							map[string]any{"field": "status", "op": "eq", "value": "error", "tone": "magenta"},
+						},
+					},
+				},
+			},
+			contains: "render.rowStyles[0].tone must be one of",
+		},
+		{
+			name: "row style with unsupported op",
+			panel: DashboardPanel{
+				ID:   "table",
+				Type: DashboardPanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind":    "table",
+						"columns": []any{},
+						"rowStyles": []any{
+							map[string]any{"field": "status", "op": "regex", "value": "err.*", "tone": "red"},
+						},
+					},
+				},
+			},
+			contains: "render.rowStyles[0].op is not supported",
+		},
+		{
+			name: "row style with empty field",
+			panel: DashboardPanel{
+				ID:   "table",
+				Type: DashboardPanelTypeTable,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+					"render": map[string]any{
+						"kind":    "table",
+						"columns": []any{},
+						"rowStyles": []any{
+							map[string]any{"field": "", "op": "eq", "value": "error", "tone": "red"},
+						},
+					},
+				},
+			},
+			contains: "render.rowStyles[0].field must be a non-empty string",
+		},
+		{
 			name: "chart with unsupported type",
 			panel: DashboardPanel{
 				ID:   "chart",
@@ -499,6 +553,83 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			contains: "dataSource.sources must be a non-empty array",
 		},
 		{
+			name: "multi-number panel rejects empty metrics",
+			panel: DashboardPanel{
+				ID:      "n",
+				Type:    DashboardPanelTypeNumber,
+				Content: map[string]any{"metrics": []any{}},
+			},
+			contains: "metrics must be a non-empty array",
+		},
+		{
+			name: "multi-number metric rejects unknown aggregation",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"metrics": []any{
+						map[string]any{
+							"dataSource": map[string]any{"kind": "runs"},
+							"render":     map[string]any{"kind": "number", "aggregation": "median"},
+						},
+					},
+				},
+			},
+			contains: "metrics[0].render.aggregation must be one of",
+		},
+		{
+			name: "multi-number metric requires field for non-count aggregation",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"metrics": []any{
+						map[string]any{
+							"dataSource": map[string]any{"kind": "memory", "namespace": "costs"},
+							"render":     map[string]any{"kind": "number", "aggregation": "sum"},
+						},
+					},
+				},
+			},
+			contains: "metrics[0].render.field is required",
+		},
+		{
+			name: "multi-number metric rejects composite data source",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"metrics": []any{
+						map[string]any{
+							"dataSource": map[string]any{
+								"kind":    "memory",
+								"combine": "sum",
+								"sources": []any{map[string]any{"namespace": "a", "aggregation": "count"}},
+							},
+							"render": map[string]any{"kind": "number", "aggregation": "count"},
+						},
+					},
+				},
+			},
+			contains: "metrics[0].dataSource must be a single-source",
+		},
+		{
+			name: "multi-number metric rejects non-number render kind",
+			panel: DashboardPanel{
+				ID:   "n",
+				Type: DashboardPanelTypeNumber,
+				Content: map[string]any{
+					"metrics": []any{
+						map[string]any{
+							"dataSource": map[string]any{"kind": "runs"},
+							"render":     map[string]any{"kind": "table"},
+						},
+					},
+				},
+			},
+			contains: `render.kind must be "number"`,
+		},
+		{
 			name: "chart series prefix must be a string",
 			panel: DashboardPanel{
 				ID:   "chart",
@@ -533,6 +664,24 @@ func TestValidateDashboardContent_RejectsInvalidTypedPanelConfig(t *testing.T) {
 			},
 			contains: "render.legend must be one of auto/show/hide",
 		},
+		{
+			name: "chart seriesField must be a string",
+			panel: DashboardPanel{
+				ID:   "chart",
+				Type: DashboardPanelTypeChart,
+				Content: map[string]any{
+					"dataSource": map[string]any{"kind": "memory", "namespace": "costs"},
+					"render": map[string]any{
+						"kind":        "chart",
+						"type":        "stacked-bar",
+						"xField":      "date",
+						"seriesField": 42,
+						"series":      []any{map[string]any{"field": "cost_usd"}},
+					},
+				},
+			},
+			contains: "render.seriesField must be a string",
+		},
 	}
 
 	for _, tt := range tests {
@@ -559,6 +708,30 @@ func TestValidateDashboardContent_AcceptsChartSeriesFormatAndLegend(t *testing.T
 						map[string]any{"field": "cost", "label": "Cost", "format": "number", "prefix": "$", "suffix": " /mo"},
 					},
 					"legend": "show",
+				},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateDashboardContent_AcceptsTableRowStyles(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "table",
+			Type: DashboardPanelTypeTable,
+			Content: map[string]any{
+				"dataSource": map[string]any{"kind": "memory", "namespace": "env"},
+				"render": map[string]any{
+					"kind":    "table",
+					"columns": []any{map[string]any{"field": "status"}},
+					"rowStyles": []any{
+						map[string]any{"field": "status", "op": "eq", "value": "error", "tone": "red-soft"},
+						map[string]any{"field": "status", "op": "eq", "value": "deploying", "tone": "orange-soft"},
+						map[string]any{"field": "deployedAt", "op": "not_exists", "tone": "dimmed"},
+					},
 				},
 			},
 		},
@@ -661,6 +834,95 @@ func TestValidateDashboardContent_RejectsUnknownSortOrder(t *testing.T) {
 	assert.Contains(t, err.Error(), `render.sort.order must be one of asc/desc`)
 }
 
+func TestValidateDashboardContent_AcceptsNodesPanel(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "key-nodes",
+			Type: DashboardPanelTypeNodes,
+			Content: map[string]any{
+				"title": "Key Nodes",
+				"nodes": []any{
+					map[string]any{
+						"node":        "deploy-prod",
+						"description": "Promotes the latest build",
+						"showRun":     true,
+					},
+					map[string]any{
+						"node":  "rollback",
+						"label": "Rollback",
+					},
+				},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateDashboardContent_AcceptsDraftNodesPanel(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:      "key-nodes",
+			Type:    DashboardPanelTypeNodes,
+			Content: map[string]any{"nodes": []any{}},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateDashboardContent_RejectsNodesPanelMissingNodeRef(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "key-nodes",
+			Type: DashboardPanelTypeNodes,
+			Content: map[string]any{
+				"nodes": []any{
+					map[string]any{"description": "missing"},
+				},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.nodes[0].node must be a non-empty string")
+}
+
+func TestValidateDashboardContent_RejectsNodesPanelWithNonArrayNodes(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:      "key-nodes",
+			Type:    DashboardPanelTypeNodes,
+			Content: map[string]any{"nodes": map[string]any{"oops": true}},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.nodes must be an array")
+}
+
+func TestValidateDashboardContent_RejectsNodesPanelWithBadShowRun(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "key-nodes",
+			Type: DashboardPanelTypeNodes,
+			Content: map[string]any{
+				"nodes": []any{
+					map[string]any{"node": "deploy-prod", "showRun": "yes"},
+				},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "content.nodes[0].showRun must be a boolean")
+}
+
 func TestValidateDashboardContent_AcceptsCompositeNumberPanel(t *testing.T) {
 	panels := []DashboardPanel{
 		{
@@ -676,6 +938,38 @@ func TestValidateDashboardContent_AcceptsCompositeNumberPanel(t *testing.T) {
 					},
 				},
 				"render": map[string]any{"kind": "number", "prefix": "R$"},
+			},
+		},
+	}
+
+	err := ValidateDashboardContent(panels, nil)
+	require.NoError(t, err)
+}
+
+func TestValidateDashboardContent_AcceptsMultiNumberPanel(t *testing.T) {
+	panels := []DashboardPanel{
+		{
+			ID:   "kpis",
+			Type: DashboardPanelTypeNumber,
+			Content: map[string]any{
+				"title": "Pipeline KPIs",
+				"metrics": []any{
+					map[string]any{
+						"dataSource": map[string]any{"kind": "runs"},
+						"render":     map[string]any{"kind": "number", "aggregation": "count", "label": "Total runs"},
+					},
+					map[string]any{
+						"dataSource": map[string]any{"kind": "memory", "namespace": "costs"},
+						"render": map[string]any{
+							"kind":        "number",
+							"aggregation": "sum",
+							"field":       "cost",
+							"label":       "Total cost",
+							"format":      "number",
+							"prefix":      "R$",
+						},
+					},
+				},
 			},
 		},
 	}

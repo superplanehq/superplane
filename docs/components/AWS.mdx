@@ -42,6 +42,8 @@ import { CardGrid, LinkCard } from "@astrojs/starlight/components";
   <LinkCard title="EC2 • Enable Image" href="#ec2-•-enable-image" description="Enable an EC2 AMI image" />
   <LinkCard title="EC2 • Enable Image Deprecation" href="#ec2-•-enable-image-deprecation" description="Enable deprecation for an EC2 AMI image" />
   <LinkCard title="EC2 • Get Image" href="#ec2-•-get-image" description="Get an EC2 AMI image by ID" />
+  <LinkCard title="EC2 • Get Instance" href="#ec2-•-get-instance" description="Fetch the current state and details of an EC2 instance" />
+  <LinkCard title="EC2 • Manage Instance Power" href="#ec2-•-manage-instance-power" description="Perform power operations on an EC2 instance" />
   <LinkCard title="ECR • Get Image" href="#ecr-•-get-image" description="Get an ECR image by digest or tag" />
   <LinkCard title="ECR • Get Image Scan Findings" href="#ecr-•-get-image-scan-findings" description="Get ECR image scan findings by digest or tag" />
   <LinkCard title="ECR • Scan Image" href="#ecr-•-scan-image" description="Scan an ECR image for vulnerabilities" />
@@ -74,6 +76,8 @@ Initially, you can leave the **"IAM Role ARN"** field empty, as you will be guid
 <a id="cloud-watch-•-on-alarm"></a>
 
 ## CloudWatch • On Alarm
+
+**Trigger key:** `aws.cloudwatch.onAlarm`
 
 The On Alarm trigger starts a workflow execution when a CloudWatch alarm transitions to the ALARM state.
 
@@ -134,6 +138,8 @@ Each alarm event includes:
 
 ## CodeArtifact • On Package Version
 
+**Trigger key:** `aws.codeArtifact.onPackageVersion`
+
 The On Package Version trigger starts a workflow execution when a package version is created, modified, or deleted in AWS CodeArtifact.
 
 ### Use Cases
@@ -188,6 +194,8 @@ The On Package Version trigger starts a workflow execution when a package versio
 <a id="code-pipeline-•-on-pipeline"></a>
 
 ## CodePipeline • On Pipeline
+
+**Trigger key:** `aws.codepipeline.onPipeline`
 
 The On Pipeline trigger starts a workflow execution when AWS CodePipeline emits a pipeline execution state change event.
 
@@ -247,6 +255,8 @@ Each event includes:
 
 ## EC2 • On Image
 
+**Trigger key:** `aws.ec2.onImage`
+
 The On Image trigger starts a workflow execution when an EC2 AMI changes state.
 
 ### Use Cases
@@ -295,6 +305,8 @@ Each AMI state event includes:
 <a id="ecr-•-on-image-push"></a>
 
 ## ECR • On Image Push
+
+**Trigger key:** `aws.ecr.onImagePush`
 
 The On Image Push trigger starts a workflow execution when an image is pushed to an ECR repository.
 
@@ -348,6 +360,8 @@ Each image push event includes:
 <a id="ecr-•-on-image-scan"></a>
 
 ## ECR • On Image Scan
+
+**Trigger key:** `aws.ecr.onImageScan`
 
 The On Image Scan trigger starts a workflow execution when an ECR image scan completes.
 
@@ -409,6 +423,8 @@ Each image scan event includes:
 
 ## SNS • On Topic Message
 
+**Trigger key:** `aws.sns.onTopicMessage`
+
 The On Topic Message trigger starts a workflow execution when a message is published to an AWS SNS topic.
 
 ### Use Cases
@@ -457,6 +473,8 @@ During setup, SuperPlane creates a webhook endpoint for this trigger and subscri
 
 ## CodeArtifact • Copy Package Versions
 
+**Component key:** `aws.codeArtifact.copyPackageVersions`
+
 The Copy Package Versions component copies one or more package versions from a source repository to a destination repository in the same domain.
 
 ### Use Cases
@@ -491,6 +509,8 @@ The Copy Package Versions component copies one or more package versions from a s
 
 ## CodeArtifact • Create Repository
 
+**Component key:** `aws.codeArtifact.createRepository`
+
 The Create Repository component creates a new repository in an AWS CodeArtifact domain.
 
 ### Use Cases
@@ -523,6 +543,8 @@ The Create Repository component creates a new repository in an AWS CodeArtifact 
 
 ## CodeArtifact • Delete Package Versions
 
+**Component key:** `aws.codeArtifact.deletePackageVersions`
+
 The Delete Package Versions component permanently removes package versions and their assets. Deleted versions cannot be restored. To remove from view but keep the option to restore later, use Update Package Versions Status to set status to Archived instead.
 
 ### Use Cases
@@ -552,6 +574,8 @@ The Delete Package Versions component permanently removes package versions and t
 <a id="code-artifact-•-delete-repository"></a>
 
 ## CodeArtifact • Delete Repository
+
+**Component key:** `aws.codeArtifact.deleteRepository`
 
 The Delete Repository component deletes a repository from an AWS CodeArtifact domain.
 
@@ -585,6 +609,8 @@ The Delete Repository component deletes a repository from an AWS CodeArtifact do
 
 ## CodeArtifact • Dispose Package Versions
 
+**Component key:** `aws.codeArtifact.disposePackageVersions`
+
 The Dispose Package Versions component deletes the assets of package versions and sets their status to Disposed. The version record remains so you can still see it in ListPackageVersions with status Disposed; assets cannot be restored.
 
 ### Use Cases
@@ -614,6 +640,8 @@ The Dispose Package Versions component deletes the assets of package versions an
 <a id="code-artifact-•-get-package-version"></a>
 
 ## CodeArtifact • Get Package Version
+
+**Component key:** `aws.codeArtifact.getPackageVersion`
 
 The Get Package Version component retrieves metadata for a specific package version in AWS CodeArtifact.
 
@@ -672,6 +700,8 @@ The Get Package Version component retrieves metadata for a specific package vers
 
 ## CodeArtifact • Update Package Versions Status
 
+**Component key:** `aws.codeArtifact.updatePackageVersionsStatus`
+
 The Update Package Versions Status component sets the status of package versions to Archived, Published, or Unlisted.
 
 ### Use Cases
@@ -705,6 +735,8 @@ The Update Package Versions Status component sets the status of package versions
 <a id="code-pipeline-•-get-pipeline"></a>
 
 ## CodePipeline • Get Pipeline
+
+**Component key:** `aws.codepipeline.getPipeline`
 
 The Get Pipeline component retrieves the full definition of an AWS CodePipeline pipeline.
 
@@ -781,6 +813,8 @@ Emits the full pipeline definition including:
 
 ## CodePipeline • Get Pipeline Execution
 
+**Component key:** `aws.codepipeline.getPipelineExecution`
+
 The Get Pipeline Execution component retrieves the details of a specific AWS CodePipeline execution.
 
 ### Use Cases
@@ -840,6 +874,8 @@ Emits the full pipeline execution details including:
 
 ## CodePipeline • Retry Stage Execution
 
+**Component key:** `aws.codepipeline.retryStageExecution`
+
 The Retry Stage Execution component retries a stage within an existing AWS CodePipeline execution.
 
 ### Use Cases
@@ -885,6 +921,8 @@ Emits retry result metadata including:
 <a id="code-pipeline-•-run-pipeline"></a>
 
 ## CodePipeline • Run Pipeline
+
+**Component key:** `aws.codepipeline.runPipeline`
 
 The Run Pipeline component triggers an AWS CodePipeline execution and waits for it to complete.
 
@@ -946,6 +984,8 @@ The Run Pipeline component triggers an AWS CodePipeline execution and waits for 
 
 ## EC2 • Copy Image
 
+**Component key:** `aws.ec2.copyImage`
+
 The Copy Image component copies an AMI to another AWS region.
 
 ### Use Cases
@@ -998,6 +1038,8 @@ The Copy Image component copies an AMI to another AWS region.
 
 ## EC2 • Create Image
 
+**Component key:** `aws.ec2.createImage`
+
 The Create Image component creates a new Amazon Machine Image (AMI) from an EC2 instance.
 
 ### Use Cases
@@ -1049,6 +1091,8 @@ The Create Image component creates a new Amazon Machine Image (AMI) from an EC2 
 <a id="ec2-•-create-instance"></a>
 
 ## EC2 • Create Instance
+
+**Component key:** `aws.ec2.createInstance`
 
 The Create Instance component launches a new Amazon EC2 instance and waits until it reaches **running** state before emitting.
 
@@ -1110,6 +1154,8 @@ Emits instance details on the default output channel, including:
 
 ## EC2 • Delete Instance
 
+**Component key:** `aws.ec2.deleteInstance`
+
 The Delete Instance component terminates an Amazon EC2 instance and waits until AWS reports it as **terminated**.
 
 ### Use Cases
@@ -1145,6 +1191,8 @@ Emits a deletion payload on the default output channel:
 
 ## EC2 • Deregister Image
 
+**Component key:** `aws.ec2.deregisterImage`
+
 The Deregister Image component removes an AMI from your account in a region.
 
 ### Use Cases
@@ -1178,6 +1226,8 @@ The Deregister Image component removes an AMI from your account in a region.
 
 ## EC2 • Disable Image
 
+**Component key:** `aws.ec2.disableImage`
+
 The Disable Image component disables an AMI so it cannot be launched.
 
 ### Use Cases
@@ -1209,6 +1259,8 @@ The Disable Image component disables an AMI so it cannot be launched.
 <a id="ec2-•-disable-image-deprecation"></a>
 
 ## EC2 • Disable Image Deprecation
+
+**Component key:** `aws.ec2.disableImageDeprecation`
 
 The Disable Image Deprecation component removes the deprecation schedule from an AMI.
 
@@ -1242,6 +1294,8 @@ The Disable Image Deprecation component removes the deprecation schedule from an
 
 ## EC2 • Enable Image
 
+**Component key:** `aws.ec2.enableImage`
+
 The Enable Image component enables a previously disabled AMI.
 
 ### Use Cases
@@ -1273,6 +1327,8 @@ The Enable Image component enables a previously disabled AMI.
 <a id="ec2-•-enable-image-deprecation"></a>
 
 ## EC2 • Enable Image Deprecation
+
+**Component key:** `aws.ec2.enableImageDeprecation`
 
 The Enable Image Deprecation component sets a deprecation time for an AMI.
 
@@ -1307,6 +1363,8 @@ The Enable Image Deprecation component sets a deprecation time for an AMI.
 <a id="ec2-•-get-image"></a>
 
 ## EC2 • Get Image
+
+**Component key:** `aws.ec2.getImage`
 
 The Get Image component retrieves metadata for an EC2 AMI.
 
@@ -1347,9 +1405,122 @@ The Get Image component retrieves metadata for an EC2 AMI.
 }
 ```
 
+<a id="ec2-•-get-instance"></a>
+
+## EC2 • Get Instance
+
+**Component key:** `aws.ec2.getInstance`
+
+The Get Instance component describes an EC2 instance and emits its current details.
+
+### Use Cases
+
+- **State inspection**: Check whether an instance is running or stopped before taking action
+- **IP resolution**: Retrieve the public or private IP address of an instance at runtime
+- **Metadata lookup**: Fetch instance type, AMI, VPC, and tags mid-workflow
+
+### Configuration
+
+- **Region**: AWS region where the instance runs
+- **Instance**: EC2 instance to describe
+
+### Output
+
+Emits the instance details on the default output channel:
+- `instanceId`, `state`, `instanceType`, `imageId`
+- `publicIpAddress`, `privateIpAddress`, `publicDnsName`, `privateDnsName`
+- `subnetId`, `vpcId`, `region`, `name`, `launchTime`
+
+### Example Output
+
+```json
+{
+  "data": {
+    "imageId": "ami-07f0e4f3e9c123abc",
+    "instanceId": "i-0abc1234567890def",
+    "instanceType": "t3.micro",
+    "keyName": "my-key",
+    "launchTime": "2026-05-21T12:00:00.000Z",
+    "name": "my-server",
+    "privateDnsName": "ip-10-0-1-25.ec2.internal",
+    "privateIpAddress": "10.0.1.25",
+    "publicDnsName": "ec2-54-198-10-42.compute-1.amazonaws.com",
+    "publicIpAddress": "54.198.10.42",
+    "region": "us-east-1",
+    "state": "running",
+    "subnetId": "subnet-0abc1234567890def",
+    "vpcId": "vpc-0abc1234567890def"
+  },
+  "timestamp": "2026-05-21T12:01:00Z",
+  "type": "aws.ec2.instance"
+}
+```
+
+<a id="ec2-•-manage-instance-power"></a>
+
+## EC2 • Manage Instance Power
+
+**Component key:** `aws.ec2.manageInstancePower`
+
+The Manage Instance Power component performs power management operations on an EC2 instance.
+
+### Use Cases
+
+- **Scheduled workloads**: Start or stop instances on demand from a workflow
+- **Cost optimisation**: Stop or hibernate non-production instances outside business hours
+- **Maintenance workflows**: Stop an instance before resizing or patching, start it after
+- **Recovery**: Reboot an instance experiencing issues
+
+### Configuration
+
+- **Region**: AWS region where the instance runs
+- **Instance**: EC2 instance to manage
+- **Operation**: The power operation to perform:
+  - **Start**: Start a stopped instance and wait for it to reach running state
+  - **Stop**: Gracefully stop a running instance and wait for stopped state
+  - **Reboot**: Reboot a running instance (completes once the reboot signal is sent)
+  - **Hibernate**: Stop an instance and save RAM to disk (instance must have hibernation enabled)
+
+### Output
+
+Emits instance details on the default output channel once the operation completes:
+- `instanceId`, `state`, `region`
+- `publicIpAddress`, `privateIpAddress` (start only)
+
+### Important Notes
+
+- **Hibernate** requires the instance to have been launched with hibernation enabled
+- **Reboot** emits immediately after the reboot signal is accepted; it does not wait for the OS to come back online
+
+### Example Output
+
+```json
+{
+  "data": {
+    "imageId": "ami-0215d085326c25744",
+    "instanceId": "i-0abc1234567890def",
+    "instanceType": "t3.micro",
+    "launchTime": "2026-05-28T09:41:14.000Z",
+    "name": "preview-pr-5",
+    "privateDnsName": "ip-10.0.1.25.eu-north-1.compute.internal",
+    "privateIpAddress": "10.0.1.25",
+    "publicDnsName": "ec2-54-198-10-42.eu-north-1.compute.amazonaws.com",
+    "publicIpAddress": "54.198.10.42",
+    "region": "eu-north-1",
+    "state": "running",
+    "subnetId": "subnet-0e7c8aa9b0a82aec5",
+    "vpcId": "vpc-0049650f5a479c14b"
+  },
+  "timestamp": "2026-05-28T09:41:26.29656651Z",
+  "type": "aws.ec2.instance.power.started"
+}
+```
+
 <a id="ecr-•-get-image"></a>
 
 ## ECR • Get Image
+
+**Component key:** `aws.ecr.getImage`
 
 The Get Image component retrieves image metadata from an ECR repository by digest, tag, or both.
 
@@ -1393,6 +1564,8 @@ At least one of **Image Digest** or **Image Tag** is required. If both are provi
 <a id="ecr-•-get-image-scan-findings"></a>
 
 ## ECR • Get Image Scan Findings
+
+**Component key:** `aws.ecr.getImageScanFindings`
 
 The Get Image Scan Findings component retrieves vulnerability scan results for an ECR image.
 
@@ -1461,6 +1634,8 @@ At least one of **Image Digest** or **Image Tag** is required. If both are provi
 
 ## ECR • Scan Image
 
+**Component key:** `aws.ecr.scanImage`
+
 The Scan Image component scans an ECR image for vulnerabilities.
 
 ### Use Cases
@@ -1528,6 +1703,8 @@ At least one of **Image Digest** or **Image Tag** is required. If both are provi
 
 ## ECS • Create Service
 
+**Component key:** `aws.ecs.createService`
+
 The Create Service component creates a new ECS service in a cluster.
 
 ### Use Cases
@@ -1572,6 +1749,8 @@ The Create Service component creates a new ECS service in a cluster.
 <a id="ecs-•-describe-service"></a>
 
 ## ECS • Describe Service
+
+**Component key:** `aws.ecs.describeService`
 
 The Describe Service component fetches details about a single ECS service.
 
@@ -1655,6 +1834,8 @@ The Describe Service component fetches details about a single ECS service.
 
 ## ECS • Execute Command
 
+**Component key:** `aws.ecs.executeCommand`
+
 The Execute Command component runs ECS Exec against a running task container.
 
 ### Use Cases
@@ -1694,6 +1875,8 @@ The Execute Command component runs ECS Exec against a running task container.
 <a id="ecs-•-run-task"></a>
 
 ## ECS • Run Task
+
+**Component key:** `aws.ecs.runTask`
 
 The Run Task component starts one or more ECS tasks and completes based on task lifecycle events.
 
@@ -1745,6 +1928,8 @@ The Run Task component starts one or more ECS tasks and completes based on task 
 
 ## ECS • Stop Task
 
+**Component key:** `aws.ecs.stopTask`
+
 The Stop Task component requests ECS to stop a running task and waits for the task to reach STOPPED.
 
 ### Use Cases
@@ -1785,6 +1970,8 @@ The Stop Task component requests ECS to stop a running task and waits for the ta
 <a id="ecs-•-update-service"></a>
 
 ## ECS • Update Service
+
+**Component key:** `aws.ecs.updateService`
 
 The Update Service component updates configuration for an existing ECS service.
 
@@ -1831,6 +2018,8 @@ The Update Service component updates configuration for an existing ECS service.
 
 ## Lambda • Run Function
 
+**Component key:** `aws.lambda.runFunction`
+
 The Run Lambda component invokes a Lambda function.
 
 ### Use Cases
@@ -1872,6 +2061,8 @@ The Run Lambda component invokes a Lambda function.
 
 ## Route 53 • Create DNS Record
 
+**Component key:** `aws.route53.createRecord`
+
 The Create DNS Record component creates a new DNS record in an AWS Route 53 hosted zone.
 
 ### Use Cases
@@ -1909,6 +2100,8 @@ The Create DNS Record component creates a new DNS record in an AWS Route 53 host
 <a id="route-53-•-delete-dns-record"></a>
 
 ## Route 53 • Delete DNS Record
+
+**Component key:** `aws.route53.deleteRecord`
 
 The Delete DNS Record component deletes a DNS record from an AWS Route 53 hosted zone.
 
@@ -1949,6 +2142,8 @@ The Delete DNS Record component deletes a DNS record from an AWS Route 53 hosted
 
 ## Route 53 • Upsert DNS Record
 
+**Component key:** `aws.route53.upsertRecord`
+
 The Upsert DNS Record component creates or updates a DNS record in an AWS Route 53 hosted zone.
 
 ### Use Cases
@@ -1987,6 +2182,8 @@ The Upsert DNS Record component creates or updates a DNS record in an AWS Route 
 
 ## SNS • Create Topic
 
+**Component key:** `aws.sns.createTopic`
+
 The Create Topic component creates an AWS SNS topic and returns its metadata.
 
 ### Use Cases
@@ -2021,6 +2218,8 @@ The Create Topic component creates an AWS SNS topic and returns its metadata.
 
 ## SNS • Delete Topic
 
+**Component key:** `aws.sns.deleteTopic`
+
 The Delete Topic component deletes an AWS SNS topic.
 
 ### Use Cases
@@ -2045,6 +2244,8 @@ The Delete Topic component deletes an AWS SNS topic.
 <a id="sns-•-get-subscription"></a>
 
 ## SNS • Get Subscription
+
+**Component key:** `aws.sns.getSubscription`
 
 The Get Subscription component retrieves metadata and attributes for an AWS SNS subscription.
 
@@ -2082,6 +2283,8 @@ The Get Subscription component retrieves metadata and attributes for an AWS SNS 
 
 ## SNS • Get Topic
 
+**Component key:** `aws.sns.getTopic`
+
 The Get Topic component retrieves metadata and attributes for an AWS SNS topic.
 
 ### Use Cases
@@ -2116,6 +2319,8 @@ The Get Topic component retrieves metadata and attributes for an AWS SNS topic.
 
 ## SNS • Publish Message
 
+**Component key:** `aws.sns.publishMessage`
+
 The Publish Message component sends a message to an AWS SNS topic.
 
 ### Use Cases
@@ -2141,6 +2346,8 @@ The Publish Message component sends a message to an AWS SNS topic.
 
 ## SQS • Create Queue
 
+**Component key:** `aws.sqs.createQueue`
+
 The Create Queue component creates a new AWS SQS queue.
 
 ### Configuration
@@ -2165,6 +2372,8 @@ The Create Queue component creates a new AWS SQS queue.
 
 ## SQS • Delete Queue
 
+**Component key:** `aws.sqs.deleteQueue`
+
 The Delete Queue component deletes an AWS SQS queue.
 
 ### Configuration
@@ -2188,6 +2397,8 @@ The Delete Queue component deletes an AWS SQS queue.
 <a id="sqs-•-get-queue"></a>
 
 ## SQS • Get Queue
+
+**Component key:** `aws.sqs.getQueue`
 
 The Get Queue component retrieves metadata and attributes for an AWS SQS queue.
 
@@ -2220,6 +2431,8 @@ The Get Queue component retrieves metadata and attributes for an AWS SQS queue.
 
 ## SQS • Purge Queue
 
+**Component key:** `aws.sqs.purgeQueue`
+
 The Purge Queue component removes all messages from an AWS SQS queue.
 
 ### Configuration
@@ -2243,6 +2456,8 @@ The Purge Queue component removes all messages from an AWS SQS queue.
 <a id="sqs-•-send-message"></a>
 
 ## SQS • Send Message
+
+**Component key:** `aws.sqs.sendMessage`
 
 The Send Message component publishes a message to an AWS SQS queue.
 

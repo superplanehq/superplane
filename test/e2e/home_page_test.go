@@ -45,7 +45,7 @@ func (steps *TestHomePageSteps) VisitHomePage() {
 
 func (steps *TestHomePageSteps) AssertNavigatedToCanvas() {
 	url := steps.session.Page().URL()
-	assert.Regexp(steps.t, `/canvases/[0-9a-f-]{36}`, url)
+	assert.Regexp(steps.t, `/apps/[0-9a-f-]{36}`, url)
 }
 
 func (steps *TestHomePageSteps) AssertCanvasSavedInDB(canvasName string) {
@@ -72,7 +72,12 @@ func (steps *TestHomePageSteps) AssertCanvasFolderVisible(folderTitle, canvasNam
 }
 
 func (steps *TestHomePageSteps) ClickNewApp() {
-	steps.session.Click(q.Text("New App"))
+	newAppButton := q.Locator(`button[aria-label="Create new app"]`).Run(steps.session)
+	if visible, _ := newAppButton.IsVisible(); visible {
+		steps.session.Click(q.Locator(`button[aria-label="Create new app"]`))
+	}
+
+	steps.session.Click(q.Text("Start from scratch"))
 	steps.session.Sleep(3000)
 }
 

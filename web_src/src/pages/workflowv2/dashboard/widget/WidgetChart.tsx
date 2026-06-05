@@ -1,5 +1,5 @@
 import { useMemo, type CSSProperties } from "react";
-import { Loader2 } from "lucide-react";
+import { LineChart as LineChartIcon, Loader2 } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -24,8 +24,9 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 
-import { applyFilters, applySort, buildChartData } from "./widgetData";
+import { applyFilters, applySort, buildChartData, distinctSeriesKeys } from "./widgetData";
 import { formatPercentOfTotal, formatSeriesValue } from "./chartFormat";
+import { WidgetEmptyState } from "../WidgetEmptyState";
 import type { WidgetChartLegendMode, WidgetChartRender, WidgetChartSeries } from "./types";
 
 interface WidgetChartProps {
@@ -52,7 +53,15 @@ interface ChartSeries extends WidgetChartSeries {
 export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
   const filtered = useMemo(() => applyFilters(rows, render.filters), [rows, render.filters]);
   const sorted = useMemo(() => applySort(filtered, render.sort), [filtered, render.sort]);
-  const series = useMemo<ChartSeries[]>(
+  const seriesField = render.seriesField?.trim();
+  const valueSeries = render.series[0];
+  // When `seriesField` is set, the chart pivots: one series per distinct
+  // value in that field, sharing the numeric `field` (and formatting) of the
+  // first configured series. Without `seriesField` we keep the historical
+  // behavior of one series per `render.series` entry. Split memos so row
+  // updates do not recreate the configured series array (and downstream
+  // chartConfig / Recharts layers) when only data values change.
+  const configuredSeries = useMemo<ChartSeries[]>(
     () =>
       render.series.map((s, idx) => ({
         ...s,
@@ -61,11 +70,27 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
       })),
     [render.series],
   );
+  const pivotedSeries = useMemo<ChartSeries[]>(() => {
+    if (!seriesField) return [];
+    const distinct = distinctSeriesKeys(sorted, seriesField);
+    return distinct.map((key, idx) => ({
+      ...valueSeries,
+      key,
+      label: key,
+      color: DEFAULT_PALETTE[idx % DEFAULT_PALETTE.length],
+    }));
+  }, [seriesField, sorted, valueSeries]);
+  const series = seriesField ? pivotedSeries : configuredSeries;
   const data = useMemo(() => {
-    const built = buildChartData(sorted, render.xField, series);
+    const built = buildChartData(
+      sorted,
+      render.xField,
+      seriesField ? [{ key: "value", field: valueSeries?.field }] : series,
+      seriesField ? { seriesField } : undefined,
+    );
     if (render.limit) return built.slice(0, render.limit);
     return built;
-  }, [sorted, render.xField, render.limit, series]);
+  }, [sorted, render.xField, render.limit, series, seriesField, valueSeries]);
 
   if (isLoading) {
     return (
@@ -75,11 +100,7 @@ export function WidgetChart({ render, rows, isLoading }: WidgetChartProps) {
     );
   }
   if (data.length === 0) {
-    return (
-      <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-chart-empty">
-        No data to display.
-      </div>
-    );
+    return <WidgetEmptyState icon={LineChartIcon} message="No data to display." testId="widget-chart-empty" />;
   }
 
   return (
@@ -255,7 +276,7 @@ function DonutChartView({
 
   if (!series) return null;
   if (total === 0) {
-    return <div className="p-4 text-center text-xs text-slate-500">No data</div>;
+    return <WidgetEmptyState icon={LineChartIcon} message="No data" />;
   }
 
   const showLegend = legendMode !== "hide";
@@ -301,8 +322,8 @@ function DonutChartView({
           stroke="#fff"
           strokeWidth={1.5}
         >
-          {sliceData.map((slice) => (
-            <Cell key={slice.x} fill={slice.color} />
+          {sliceData.map((slice, idx) => (
+            <Cell key={`${slice.x}-${idx}`} fill={slice.color} />
           ))}
         </Pie>
       </PieChart>

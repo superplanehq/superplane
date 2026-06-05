@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { showErrorToast, showSuccessToast } from "@/lib/toast";
 import { withOrganizationHeader } from "@/lib/withOrganizationHeader";
 import { canvasKeys } from "@/hooks/useCanvasData";
+import { useCanvasId } from "@/hooks/useCanvasId";
 
 /** Applies signingSecretConfigured to the given node on a canvas copy. Does not mutate. */
 function applySigningSecretConfigured(
@@ -35,7 +36,8 @@ export function SetSigningSecretSection({ nodeId }: { nodeId: string }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const queryClient = useQueryClient();
-  const { organizationId, canvasId } = useParams<{ organizationId: string; canvasId: string }>();
+  const { organizationId } = useParams<{ organizationId: string }>();
+  const canvasId = useCanvasId();
   const [searchParams] = useSearchParams();
   const versionId = searchParams.get("version");
 

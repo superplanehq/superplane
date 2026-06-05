@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 
@@ -38,7 +40,12 @@ const MARKDOWN_CLASSES =
   "[&_pre_code]:bg-transparent [&_pre_code]:p-0 " +
   "[&_a]:underline [&_a]:underline-offset-2 [&_a]:decoration-current " +
   "[&_table]:my-2 [&_table]:text-xs [&_table]:border-collapse [&_th]:border [&_th]:border-slate-200 [&_th]:px-2 [&_th]:py-1 " +
-  "[&_td]:border [&_td]:border-slate-100 [&_td]:px-2 [&_td]:py-1";
+  "[&_td]:border [&_td]:border-slate-100 [&_td]:px-2 [&_td]:py-1 " +
+  "[&_details]:my-3 [&_details]:rounded-md [&_details]:border [&_details]:border-slate-200 [&_details]:bg-slate-50/60 [&_details]:p-3 " +
+  "[&_details>summary]:flex [&_details>summary]:items-center [&_details>summary]:cursor-pointer [&_details>summary]:select-none [&_details>summary]:text-sm [&_details>summary]:font-semibold [&_details>summary]:text-slate-900 [&_details>summary]:list-none [&_details>summary]:marker:hidden [&_details>summary]:hover:text-sky-700 " +
+  "[&_details>summary]:before:content-['▸'] [&_details>summary]:before:mr-2 [&_details>summary]:before:text-slate-500 [&_details>summary]:before:transition-transform [&_details>summary]:before:duration-200 " +
+  "[&_details[open]>summary]:mb-3 [&_details[open]>summary]:before:rotate-90 " +
+  "[&_details>*:last-child]:mb-0";
 
 /**
  * Which field auto-focuses when the user enters edit mode. Driven by which
@@ -131,7 +138,7 @@ export function MarkdownPanelCard({
 
   return (
     <>
-      <div className="group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="group/panel relative flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white">
         <MarkdownPanelHeader
           displayTitle={displayTitle}
           readOnly={readOnly}
@@ -140,7 +147,7 @@ export function MarkdownPanelCard({
         />
         {body.trim() ? (
           <div
-            className="min-h-0 flex-1 overflow-auto px-4 py-3"
+            className="min-h-0 flex-1 overflow-auto rounded-b-lg bg-white px-4 py-3"
             onDoubleClick={readOnly ? undefined : () => startEditing("body")}
             data-testid="dashboard-markdown-view"
           >
@@ -151,11 +158,11 @@ export function MarkdownPanelCard({
             type="button"
             onClick={readOnly ? undefined : () => startEditing("body")}
             disabled={readOnly}
-            className="dashboard-grid-no-drag flex h-full min-h-[6rem] w-full flex-col items-center justify-center gap-1.5 bg-transparent text-slate-400 transition-colors hover:bg-sky-50/40 hover:text-sky-600 disabled:cursor-default disabled:hover:bg-transparent disabled:hover:text-slate-400"
+            className="dashboard-grid-no-drag flex h-full min-h-[6rem] w-full flex-col items-center justify-center gap-1.5 rounded-b-lg bg-white text-[13px] text-gray-500 transition-colors hover:text-gray-800 disabled:cursor-default disabled:hover:text-gray-500"
             data-testid="dashboard-markdown-empty"
           >
-            <Pencil className="h-4 w-4" />
-            <span className="text-sm">{readOnly ? "Empty panel" : "Click to edit"}</span>
+            <Pencil className="size-4" />
+            <span>{readOnly ? "Empty panel" : "Click to edit"}</span>
           </button>
         )}
       </div>
@@ -171,12 +178,37 @@ export function MarkdownPanelCard({
   );
 }
 
+/**
+ * Sanitize schema allowlist for the markdown panel.
+ *
+ * Extends the default `rehype-sanitize` schema to permit the small set of
+ * raw HTML tags we want authors to be able to use inside markdown panels —
+ * currently `<details>` / `<summary>` for collapsible sections, with the
+ * `open` attribute so authors can pre-expand items.
+ *
+ * Everything else still goes through the default allowlist, which strips
+ * scripts, event handlers, inline styles, and other unsafe content.
+ */
+const MARKDOWN_SANITIZE_SCHEMA = {
+  ...defaultSchema,
+  tagNames: [...(defaultSchema.tagNames ?? []), "details", "summary"],
+  attributes: {
+    ...(defaultSchema.attributes ?? {}),
+    details: [...((defaultSchema.attributes ?? {}).details ?? []), "open"],
+  },
+};
+
 function MarkdownBody({ body }: { body: string }) {
   const normalized = useMemo(() => body.replace(/\r\n/g, "\n").trim(), [body]);
   if (!normalized) return null;
   return (
     <div className={cn(MARKDOWN_CLASSES)} data-testid="dashboard-markdown">
-      <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{normalized}</ReactMarkdown>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm, remarkBreaks]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, MARKDOWN_SANITIZE_SCHEMA]]}
+      >
+        {normalized}
+      </ReactMarkdown>
     </div>
   );
 }
@@ -194,13 +226,13 @@ function MarkdownPanelHeader({
 }) {
   return (
     <div
-      className={
-        "flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-3 py-1.5 " +
-        (readOnly ? "" : "dashboard-grid-drag-handle cursor-grab active:cursor-grabbing")
-      }
+      className={cn(
+        "flex items-center justify-between rounded-t-lg py-1.5 pl-3 pr-1.5",
+        !readOnly && "dashboard-grid-drag-handle cursor-grab active:cursor-grabbing",
+      )}
       onDoubleClick={readOnly ? undefined : onEditTitle}
     >
-      <span className="truncate text-xs font-medium text-slate-700" title={displayTitle}>
+      <span className="truncate text-[13px] font-medium text-slate-700" title={displayTitle}>
         {displayTitle}
       </span>
       {!readOnly ? (
@@ -208,7 +240,7 @@ function MarkdownPanelHeader({
         // react-grid-layout's draggableCancel selector excludes the
         // `dashboard-grid-no-drag` class so clicks land on the buttons
         // instead of starting a drag.
-        <div className="dashboard-grid-no-drag flex items-center gap-0.5 opacity-0 transition-opacity group-hover/panel:opacity-100">
+        <div className="dashboard-grid-no-drag -mr-0.5 flex shrink-0 items-center opacity-0 transition-opacity group-hover/panel:opacity-100">
           <Button
             type="button"
             size="icon"
@@ -223,7 +255,7 @@ function MarkdownPanelHeader({
             className="h-6 w-6 cursor-pointer text-slate-500 hover:text-slate-700"
             data-testid="dashboard-edit-panel"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="size-3.5" />
           </Button>
           <Button
             type="button"
@@ -239,7 +271,7 @@ function MarkdownPanelHeader({
             className="h-6 w-6 cursor-pointer text-slate-500 hover:bg-red-50 hover:text-red-600"
             data-testid="dashboard-delete-panel"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="size-3.5" />
           </Button>
         </div>
       ) : null}
@@ -281,8 +313,8 @@ function MarkdownPanelEditor({
   };
 
   return (
-    <div className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/80 px-2 py-1">
+    <div className="flex h-full w-full flex-col gap-0 overflow-hidden rounded-lg border border-slate-950/15 bg-white">
+      <div className="flex items-center gap-2 rounded-t-lg px-2 py-1">
         <Input
           ref={titleInputRef}
           value={draftTitle}
@@ -300,16 +332,16 @@ function MarkdownPanelEditor({
         onChange={(e) => setDraftBody(e.target.value)}
         onKeyDown={handleKeyDown}
         placeholder="Write **markdown** here..."
-        className="min-h-[120px] flex-1 resize-none rounded-none border-0 bg-transparent font-mono text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+        className="min-h-[120px] flex-1 resize-none rounded-none border-0 bg-white font-mono text-sm shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
         data-testid="dashboard-markdown-editor"
       />
-      <div className="flex items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/50 px-3 py-1.5">
+      <div className="flex items-center justify-between gap-2 rounded-b-lg border-t border-slate-950/10 bg-slate-50/50 px-3 py-1.5">
         <span className="text-[11px] text-slate-500">
           <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">Esc</kbd> cancel &middot;{" "}
           <kbd className="rounded border border-slate-200 bg-white px-1 font-mono">Cmd+Enter</kbd> save
         </span>
         <div className="flex items-center gap-1">
-          <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+          <Button type="button" size="sm" variant="outline" onClick={onCancel}>
             Cancel
           </Button>
           <Button type="button" size="sm" onClick={onCommit} data-testid="dashboard-markdown-save">

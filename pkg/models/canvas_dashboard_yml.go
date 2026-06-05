@@ -19,6 +19,7 @@ const (
 
 	DashboardPanelTypeMarkdown = "markdown"
 	DashboardPanelTypeNode     = "node"
+	DashboardPanelTypeNodes    = "nodes"
 	DashboardPanelTypeTable    = "table"
 	DashboardPanelTypeChart    = "chart"
 	DashboardPanelTypeNumber   = "number"
@@ -33,6 +34,7 @@ const (
 var AllowedDashboardPanelTypes = []string{
 	DashboardPanelTypeMarkdown,
 	DashboardPanelTypeNode,
+	DashboardPanelTypeNodes,
 	DashboardPanelTypeTable,
 	DashboardPanelTypeChart,
 	DashboardPanelTypeNumber,
@@ -236,6 +238,8 @@ func validatePanelContent(panel DashboardPanel) error {
 		return validateMarkdownContent(panel)
 	case DashboardPanelTypeNode:
 		return validateNodePanelContent(panel)
+	case DashboardPanelTypeNodes:
+		return validateNodesPanelContent(panel)
 	case DashboardPanelTypeTable:
 		return validateTablePanelContent(panel)
 	case DashboardPanelTypeChart:
@@ -286,45 +290,109 @@ func validateNodePanelContent(panel DashboardPanel) error {
 	return nil
 }
 
+// validateNodesPanelContent enforces the shape of a plural "nodes" panel.
+// `nodes` is an array (possibly empty for newly created panels). Each entry
+// must reference a canvas node by id or name; optional fields tighten the
+// rendered row (label, purpose description, manual-run button).
+func validateNodesPanelContent(panel DashboardPanel) error {
+	if panel.Content == nil {
+		return fmt.Errorf("panel %q content is required", panel.ID)
+	}
+	if err := validateOptionalString(panel.ID, "content.title", panel.Content["title"]); err != nil {
+		return err
+	}
+	rawNodes, ok := panel.Content["nodes"]
+	if !ok || rawNodes == nil {
+		return fmt.Errorf("panel %q content.nodes must be an array", panel.ID)
+	}
+	entries, ok := rawNodes.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q content.nodes must be an array", panel.ID)
+	}
+	for i, raw := range entries {
+		if err := validateNodesPanelEntry(panel.ID, i, raw); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateNodesPanelEntry(panelID string, index int, raw any) error {
+	entry, ok := raw.(map[string]any)
+	if !ok || entry == nil {
+		return fmt.Errorf("panel %q content.nodes[%d] must be an object", panelID, index)
+	}
+	node, _ := entry["node"].(string)
+	if strings.TrimSpace(node) == "" {
+		return fmt.Errorf("panel %q content.nodes[%d].node must be a non-empty string", panelID, index)
+	}
+	for _, key := range []string{"label", "description", "triggerName"} {
+		if err := validateOptionalString(panelID, fmt.Sprintf("content.nodes[%d].%s", index, key), entry[key]); err != nil {
+			return err
+		}
+	}
+	if rawShowRun, present := entry["showRun"]; present && rawShowRun != nil {
+		if _, ok := rawShowRun.(bool); !ok {
+			return fmt.Errorf("panel %q content.nodes[%d].showRun must be a boolean", panelID, index)
+		}
+	}
+	return nil
+}
+
 func validateDataSource(panelID string, raw any) error {
+	return validateDataSourceField(panelID, "dataSource", raw)
+}
+
+// validateDataSourceField is like validateDataSource but lets callers
+// override the field-path prefix used in error messages. The multi-number
+// metric validator uses this to produce errors like
+// `panel "n" metrics[0].dataSource ...` instead of the default
+// `panel "n" dataSource ...`.
+func validateDataSourceField(panelID, fieldPrefix string, raw any) error {
 	ds, ok := raw.(map[string]any)
 	if !ok || ds == nil {
-		return fmt.Errorf("panel %q dataSource must be an object", panelID)
+		return fmt.Errorf("panel %q %s must be an object", panelID, fieldPrefix)
 	}
 	kind, _ := ds["kind"].(string)
 	switch kind {
 	case "memory":
 		if _, ok := ds["namespace"].(string); !ok {
-			return fmt.Errorf("panel %q dataSource.namespace must be a string for memory sources", panelID)
+			return fmt.Errorf("panel %q %s.namespace must be a string for memory sources", panelID, fieldPrefix)
 		}
-		if err := validateOptionalString(panelID, "dataSource.fieldPath", ds["fieldPath"]); err != nil {
+		if err := validateOptionalString(panelID, fieldPrefix+".fieldPath", ds["fieldPath"]); err != nil {
 			return err
 		}
 	case "executions":
-		if err := validateOptionalString(panelID, "dataSource.node", ds["node"]); err != nil {
+		if err := validateOptionalString(panelID, fieldPrefix+".node", ds["node"]); err != nil {
 			return err
 		}
-		if err := validateOptionalNumber(panelID, "dataSource.limit", ds["limit"]); err != nil {
+		if err := validateOptionalNumber(panelID, fieldPrefix+".limit", ds["limit"]); err != nil {
 			return err
 		}
 	case "runs":
-		if err := validateOptionalNumber(panelID, "dataSource.limit", ds["limit"]); err != nil {
+		if err := validateOptionalNumber(panelID, fieldPrefix+".limit", ds["limit"]); err != nil {
 			return err
 		}
 	default:
-		return fmt.Errorf("panel %q dataSource.kind must be \"memory\", \"executions\", or \"runs\"", panelID)
+		return fmt.Errorf("panel %q %s.kind must be \"memory\", \"executions\", or \"runs\"", panelID, fieldPrefix)
 	}
 	return nil
 }
 
 func validateRender(panelID string, raw any, expectedKind string) (map[string]any, error) {
+	return validateRenderField(panelID, "render", raw, expectedKind)
+}
+
+// validateRenderField is like validateRender but lets callers override the
+// field-path prefix used in error messages.
+func validateRenderField(panelID, fieldPrefix string, raw any, expectedKind string) (map[string]any, error) {
 	render, ok := raw.(map[string]any)
 	if !ok || render == nil {
-		return nil, fmt.Errorf("panel %q render must be an object", panelID)
+		return nil, fmt.Errorf("panel %q %s must be an object", panelID, fieldPrefix)
 	}
 	kind, _ := render["kind"].(string)
 	if kind != expectedKind {
-		return nil, fmt.Errorf("panel %q render.kind must be %q", panelID, expectedKind)
+		return nil, fmt.Errorf("panel %q %s.kind must be %q", panelID, fieldPrefix, expectedKind)
 	}
 	return render, nil
 }
@@ -360,7 +428,63 @@ func validateTablePanelContent(panel DashboardPanel) error {
 	if err := validateSort(panel.ID, render["sort"]); err != nil {
 		return err
 	}
+	if err := validateTableRowStyles(panel.ID, render["rowStyles"]); err != nil {
+		return err
+	}
 	return validateTableRowActions(panel.ID, render["rowActions"])
+}
+
+// allowedRowStyleTones must stay in lockstep with the frontend tone enum
+// (`WIDGET_ROW_STYLE_TONES` in `web_src/.../widget/types.ts`). Adding a new
+// tone requires updating both lists and the class map.
+var allowedRowStyleTones = []string{
+	"dimmed",
+	"yellow",
+	"yellow-soft",
+	"orange",
+	"orange-soft",
+	"red",
+	"red-soft",
+	"blue",
+	"blue-soft",
+	"green",
+	"green-soft",
+}
+
+func validateTableRowStyles(panelID string, raw any) error {
+	if raw == nil {
+		return nil
+	}
+
+	rowStyles, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q render.rowStyles must be an array", panelID)
+	}
+
+	allowedOps := []string{"eq", "neq", "contains", "not_contains", "gt", "lt", "exists", "not_exists"}
+	for i, rawRule := range rowStyles {
+		rule, ok := rawRule.(map[string]any)
+		if !ok || rule == nil {
+			return fmt.Errorf("panel %q render.rowStyles[%d] must be an object", panelID, i)
+		}
+		field, ok := rule["field"].(string)
+		if !ok || strings.TrimSpace(field) == "" {
+			return fmt.Errorf("panel %q render.rowStyles[%d].field must be a non-empty string", panelID, i)
+		}
+		op, ok := rule["op"].(string)
+		if !ok || !slices.Contains(allowedOps, op) {
+			return fmt.Errorf("panel %q render.rowStyles[%d].op is not supported", panelID, i)
+		}
+		tone, ok := rule["tone"].(string)
+		if !ok || !slices.Contains(allowedRowStyleTones, tone) {
+			return fmt.Errorf("panel %q render.rowStyles[%d].tone must be one of %s", panelID, i, strings.Join(allowedRowStyleTones, "/"))
+		}
+		if err := validateOptionalString(panelID, fmt.Sprintf("render.rowStyles[%d].value", i), rule["value"]); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func validateChartPanelContent(panel DashboardPanel) error {
@@ -380,6 +504,9 @@ func validateChartPanelContent(panel DashboardPanel) error {
 	}
 	if xField, ok := render["xField"].(string); !ok || xField == "" {
 		return fmt.Errorf("panel %q render.xField must be a non-empty string", panel.ID)
+	}
+	if err := validateOptionalString(panel.ID, "render.seriesField", render["seriesField"]); err != nil {
+		return err
 	}
 	series, ok := render["series"].([]any)
 	if !ok || len(series) == 0 {
@@ -535,6 +662,13 @@ func validateNumberPanelContent(panel DashboardPanel) error {
 	if panel.Content == nil {
 		return fmt.Errorf("panel %q content is required", panel.ID)
 	}
+
+	// Multi-number mode: each metric carries its own dataSource + render.
+	// Top-level dataSource/render are not used and are not required.
+	if rawMetrics, ok := panel.Content["metrics"]; ok {
+		return validateNumberMetrics(panel.ID, rawMetrics)
+	}
+
 	if err := validateNumberDataSource(panel.ID, panel.Content["dataSource"]); err != nil {
 		return err
 	}
@@ -570,6 +704,63 @@ func validateNumberPanelContent(panel DashboardPanel) error {
 	if aggregation != "count" {
 		if field, ok := render["field"].(string); !ok || field == "" {
 			return fmt.Errorf("panel %q render.field is required when aggregation is %q", panel.ID, aggregation)
+		}
+	}
+	return nil
+}
+
+// validateNumberMetrics validates a multi-number panel's `metrics` array.
+// Each metric uses a simple (non-composite) data source plus its own number
+// render so the panel can display multiple independently-configured numbers
+// in a wrapping row.
+func validateNumberMetrics(panelID string, raw any) error {
+	metrics, ok := raw.([]any)
+	if !ok {
+		return fmt.Errorf("panel %q metrics must be an array", panelID)
+	}
+	if len(metrics) == 0 {
+		return fmt.Errorf("panel %q metrics must be a non-empty array", panelID)
+	}
+	for i, item := range metrics {
+		if err := validateNumberMetric(panelID, i, item); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateNumberMetric(panelID string, index int, raw any) error {
+	metric, ok := raw.(map[string]any)
+	if !ok || metric == nil {
+		return fmt.Errorf("panel %q metrics[%d] must be an object", panelID, index)
+	}
+	dsPrefix := fmt.Sprintf("metrics[%d].dataSource", index)
+	renderPrefix := fmt.Sprintf("metrics[%d].render", index)
+	// Composite memory sources are not allowed inside a multi-number metric;
+	// the panel itself already lets users repeat the data source per metric.
+	if isCompositeMemoryDataSource(metric["dataSource"]) {
+		return fmt.Errorf("panel %q %s must be a single-source memory/executions/runs source", panelID, dsPrefix)
+	}
+	if err := validateDataSourceField(panelID, dsPrefix, metric["dataSource"]); err != nil {
+		return err
+	}
+	render, err := validateRenderField(panelID, renderPrefix, metric["render"], "number")
+	if err != nil {
+		return err
+	}
+	if err := validateOptionalString(panelID, renderPrefix+".prefix", render["prefix"]); err != nil {
+		return err
+	}
+	if err := validateOptionalString(panelID, renderPrefix+".suffix", render["suffix"]); err != nil {
+		return err
+	}
+	aggregation, _ := render["aggregation"].(string)
+	if !slices.Contains(allowedNumberAggregations, aggregation) {
+		return fmt.Errorf("panel %q %s.aggregation must be one of %s", panelID, renderPrefix, strings.Join(allowedNumberAggregations, "/"))
+	}
+	if aggregation != "count" {
+		if field, ok := render["field"].(string); !ok || field == "" {
+			return fmt.Errorf("panel %q %s.field is required when aggregation is %q", panelID, renderPrefix, aggregation)
 		}
 	}
 	return nil

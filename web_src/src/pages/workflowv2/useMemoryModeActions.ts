@@ -2,47 +2,40 @@ import { useCallback } from "react";
 import type { SetURLSearchParams } from "react-router-dom";
 
 interface MemoryModeActionsConfig {
-  hasEditableVersion: boolean;
-  liveCanvasVersionId: string | undefined;
-  handleUseVersion: (versionId: string) => void;
   setIsMemoryMode: (value: boolean) => void;
   setIsDashboardMode: (value: boolean) => void;
   setIsDashboardAddPanelOpen: (value: boolean) => void;
   setIsDashboardYamlOpen: (value: boolean) => void;
   setIsRunsMode: (value: boolean) => void;
+  setIsFilesMode: (value: boolean) => void;
   setSelectedRunId: (value: string | null) => void;
   setSearchParams: SetURLSearchParams;
 }
 
 export function useMemoryModeActions({
-  hasEditableVersion,
-  liveCanvasVersionId,
-  handleUseVersion,
   setIsMemoryMode,
   setIsDashboardMode,
   setIsDashboardAddPanelOpen,
   setIsDashboardYamlOpen,
   setIsRunsMode,
+  setIsFilesMode,
   setSelectedRunId,
   setSearchParams,
 }: MemoryModeActionsConfig) {
   const handleSelectMemoryMode = useCallback(() => {
-    if (hasEditableVersion && liveCanvasVersionId) handleUseVersion(liveCanvasVersionId);
-
     setIsMemoryMode(true);
     setIsDashboardMode(false);
     setIsDashboardAddPanelOpen(false);
     setIsDashboardYamlOpen(false);
     setIsRunsMode(false);
+    setIsFilesMode(false);
     setSelectedRunId(null);
     setSearchParams(toMemorySearchParams, { replace: true });
   }, [
-    handleUseVersion,
-    hasEditableVersion,
-    liveCanvasVersionId,
     setIsDashboardAddPanelOpen,
     setIsDashboardMode,
     setIsDashboardYamlOpen,
+    setIsFilesMode,
     setIsMemoryMode,
     setIsRunsMode,
     setSearchParams,

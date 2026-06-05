@@ -1,5 +1,29 @@
-export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory";
+import { useMemo } from "react";
+
+export type WorkflowHeaderMode = "version-live" | "version-edit" | "runs" | "dashboard" | "memory" | "files";
 export type WorkflowCanvasStateMode = "default" | "editing" | "previewing-previous-version" | "awaiting-approval";
+
+const CONSOLE_VIEW = "console";
+const LEGACY_CONSOLE_VIEW = "dashboard";
+
+function isConsoleViewParam(view: string): boolean {
+  return view === CONSOLE_VIEW || view === LEGACY_CONSOLE_VIEW;
+}
+
+/** View flags read directly from the URL (source of truth for first paint and header tab selection). */
+export function getWorkflowViewFlagsFromSearchParams(searchParams: URLSearchParams) {
+  const view = searchParams.get("view") ?? "";
+  return {
+    isRunsMode: view === "runs",
+    isMemoryMode: view === "memory",
+    isFilesMode: view === "files",
+    isDashboardMode: isConsoleViewParam(view),
+  };
+}
+
+export function useWorkflowUrlViewFlags(searchParams: URLSearchParams) {
+  return useMemo(() => getWorkflowViewFlagsFromSearchParams(searchParams), [searchParams]);
+}
 
 export function readStoredBoolean(key: string): boolean {
   if (typeof window === "undefined") {
@@ -18,32 +42,40 @@ export function readStoredBoolean(key: string): boolean {
   }
 }
 
+export function clearComponentSidebarSearchParams(params: URLSearchParams): URLSearchParams {
+  params.delete("sidebar");
+  params.delete("node");
+  return params;
+}
+
 export function getWorkflowHeaderMode({
   isDashboardMode,
-  dashboardsFeatureEnabled,
   isRunsMode,
   isMemoryMode,
-  canvasMode,
+  isFilesMode,
 }: {
   isDashboardMode: boolean;
-  dashboardsFeatureEnabled: boolean;
   isRunsMode: boolean;
   isMemoryMode: boolean;
-  canvasMode: "edit" | "live";
+  isFilesMode: boolean;
 }): WorkflowHeaderMode {
   if (isDashboardMode) {
-    return dashboardsFeatureEnabled ? "dashboard" : "version-live";
+    return "dashboard";
   }
 
   if (isMemoryMode) {
     return "memory";
   }
 
+  if (isFilesMode) {
+    return "files";
+  }
+
   if (isRunsMode) {
     return "runs";
   }
 
-  return canvasMode === "edit" ? "version-edit" : "version-live";
+  return "version-live";
 }
 
 export function getWorkflowCanvasStateMode({
@@ -68,6 +100,40 @@ export function getWorkflowCanvasStateMode({
   }
 
   return "default";
+}
+
+export function getWorkflowViewPresentation({
+  isDashboardMode,
+  isRunsMode,
+  isMemoryMode,
+  isFilesMode,
+  isTemplate,
+  hasEditableVersion,
+  isViewingPendingApprovalVersion,
+  isViewingCurrentLiveVersion,
+}: {
+  isDashboardMode: boolean;
+  isRunsMode: boolean;
+  isMemoryMode: boolean;
+  isFilesMode: boolean;
+  isTemplate: boolean;
+  hasEditableVersion: boolean;
+  isViewingPendingApprovalVersion: boolean;
+  isViewingCurrentLiveVersion: boolean;
+}) {
+  const hideNonCanvasChrome = isRunsMode || isMemoryMode || isFilesMode;
+
+  return {
+    headerMode: getWorkflowHeaderMode({ isDashboardMode, isRunsMode, isMemoryMode, isFilesMode }),
+    canvasStateMode: getWorkflowCanvasStateMode({
+      hasEditableVersion,
+      isViewingPendingApprovalVersion,
+      isViewingCurrentLiveVersion,
+    }),
+    showBottomStatusControls: !isTemplate && !hideNonCanvasChrome,
+    hideAddControls: isTemplate || hideNonCanvasChrome,
+    readOnlyViewModes: isRunsMode || isFilesMode,
+  };
 }
 
 export function getExitEditModeDisabledTooltip({

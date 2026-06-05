@@ -82,6 +82,93 @@ func TestCreateSession_PropagatesAPIError(t *testing.T) {
 	assert.Contains(t, err.Error(), "400")
 }
 
+func TestDefaultAgentPrompt_IsEmbedded(t *testing.T) {
+	prompt := DefaultAgentPrompt()
+	assert.Contains(t, prompt, "You are a SuperPlane app expert")
+	assert.Contains(t, prompt, "## App Update Rules")
+}
+
+func TestSyncAgentPrompt_SkipsUpdateWhenCurrent(t *testing.T) {
+	postCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/agents/agent-123", r.URL.Path)
+		assert.Equal(t, "test-key", r.Header.Get("x-api-key"))
+
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte("{\"system\":\"current prompt\\n\\n\",\"version\":7}"))
+			return
+		}
+
+		postCount++
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	err := SyncAgentPrompt(context.Background(), Config{
+		APIKey:  "test-key",
+		AgentID: "agent-123",
+		BaseURL: server.URL,
+	}, "current prompt\n")
+	require.NoError(t, err)
+	assert.Equal(t, 0, postCount)
+}
+
+func TestSyncAgentPrompt_UpdatesWhenDifferent(t *testing.T) {
+	var capturedBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/agents/agent-123", r.URL.Path)
+
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"old prompt","version":9}`))
+		case http.MethodPost:
+			assert.Equal(t, "application/json", r.Header.Get("Content-Type"))
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &capturedBody)
+
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"new prompt","version":10}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	err := SyncAgentPrompt(context.Background(), Config{
+		APIKey:  "test-key",
+		AgentID: "agent-123",
+		BaseURL: server.URL,
+	}, "new prompt")
+	require.NoError(t, err)
+	assert.Equal(t, "new prompt", capturedBody["system"])
+	assert.Equal(t, float64(9), capturedBody["version"])
+}
+
+func TestSyncAgentPrompt_AcceptsUpdatedPromptWithNormalizedTrailingNewlines(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"old prompt","version":9}`))
+		case http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"system":"new prompt","version":10}`))
+		default:
+			w.WriteHeader(http.StatusMethodNotAllowed)
+		}
+	}))
+	defer server.Close()
+
+	err := SyncAgentPrompt(context.Background(), Config{
+		APIKey:  "test-key",
+		AgentID: "agent-123",
+		BaseURL: server.URL,
+	}, "new prompt\n\n")
+	require.NoError(t, err)
+}
+
 func TestSendMessage_PrependsPreamble(t *testing.T) {
 	var capturedBody map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -331,7 +418,7 @@ func TestStreamEvents_ToolInputFallsBackToJSON(t *testing.T) {
 }
 
 func TestStreamEvents_SessionFailed(t *testing.T) {
-	const sse = "data: {\"type\":\"session.error\",\"error\":{\"message\":\"boom\"}}\n\n"
+	const sse = "data: {\"type\":\"session.status_terminated\",\"error\":{\"message\":\"boom\"}}\n\n"
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -348,6 +435,30 @@ func TestStreamEvents_SessionFailed(t *testing.T) {
 	require.Len(t, received, 1)
 	assert.Equal(t, agents.ProviderEventSessionFailed, received[0].Type)
 	assert.Equal(t, "boom", received[0].ErrorMessage)
+}
+
+func TestStreamEvents_SessionErrorDoesNotStopStream(t *testing.T) {
+	const sse = "data: {\"type\":\"session.error\",\"error\":{\"message\":\"An internal service error occurred\"}}\n\n" +
+		"data: {\"id\":\"e1\",\"type\":\"agent.message\",\"content\":[{\"type\":\"text\",\"text\":\"Recovered\"}]}\n\n" +
+		"data: {\"type\":\"session.status_idle\"}\n\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = io.WriteString(w, sse)
+	}))
+	defer server.Close()
+
+	p := newTestProvider(t, server)
+	var received []agents.ProviderEvent
+	require.NoError(t, p.StreamEvents(context.Background(), "sesn_abc", func(e agents.ProviderEvent) error {
+		received = append(received, e)
+		return nil
+	}))
+
+	require.Len(t, received, 2)
+	assert.Equal(t, agents.ProviderEventAssistantMessage, received[0].Type)
+	assert.Equal(t, "Recovered", received[0].Text)
+	assert.Equal(t, agents.ProviderEventTurnCompleted, received[1].Type)
 }
 
 func TestStreamEvents_SkipsMalformed(t *testing.T) {

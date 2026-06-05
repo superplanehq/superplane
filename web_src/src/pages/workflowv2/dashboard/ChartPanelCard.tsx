@@ -8,7 +8,7 @@ import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
 import { useDashboardContext } from "./DashboardContext";
 import type { ChartPanelContent } from "./panelTypes";
-import { useWidgetData } from "./widget/useWidgetData";
+import { renderNeedsRunNodeOutputs, useWidgetData } from "./widget/useWidgetData";
 import { WidgetChart } from "./widget/WidgetChart";
 
 interface ChartPanelCardProps {
@@ -53,7 +53,11 @@ function ChartPanelBody({ content }: { content: ChartPanelContent }) {
 }
 
 function ChartPanelDataBound({ content, canvasId }: { content: ChartPanelContent; canvasId: string }) {
-  const { rows, isLoading, error } = useWidgetData(canvasId, content.dataSource);
+  const { rows, isLoading, error } = useWidgetData(
+    canvasId,
+    content.dataSource,
+    renderNeedsRunNodeOutputs(content.render),
+  );
   if (error) return <PanelError message={error} />;
   return <WidgetChart render={content.render} rows={rows} isLoading={isLoading} />;
 }

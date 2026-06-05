@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle } from "lucide-react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AlertTriangle, GitCompareArrows } from "lucide-react";
 import * as yaml from "js-yaml";
 import { Editor } from "@monaco-editor/react";
 
@@ -15,6 +15,10 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { PANEL_TYPE_META, validatePanelContent, type PanelType } from "./panelTypes";
+
+const CanvasYamlDiffModal = lazy(() =>
+  import("../CanvasYamlDiffModal").then((module) => ({ default: module.CanvasYamlDiffModal })),
+);
 
 export interface PanelEditorDialogProps<T extends object> {
   open: boolean;
@@ -56,6 +60,7 @@ export function PanelEditorDialog<T extends object>({
   const [formDraft, setFormDraft] = useState<T>(initialContent);
   const [yamlDraft, setYamlDraft] = useState<string>(initialYaml);
   const [yamlSyntaxError, setYamlSyntaxError] = useState<string | null>(null);
+  const [diffOpen, setDiffOpen] = useState(false);
   const lastSyncedFromRef = useRef<EditorTab>("form");
 
   // Reset draft state any time the dialog re-opens for a different panel.
@@ -64,6 +69,7 @@ export function PanelEditorDialog<T extends object>({
       setFormDraft(initialContent);
       setYamlDraft(initialYaml);
       setYamlSyntaxError(null);
+      setDiffOpen(false);
       setTab("form");
       lastSyncedFromRef.current = "form";
     }
@@ -100,6 +106,7 @@ export function PanelEditorDialog<T extends object>({
 
   const schemaError = validatePanelContent(panelType, draftForValidation);
   const blockingError = yamlSyntaxError ?? schemaError;
+  const hasYamlChanges = yamlDraft !== initialYaml;
 
   const handleSave = () => {
     if (blockingError) return;
@@ -107,15 +114,76 @@ export function PanelEditorDialog<T extends object>({
     onOpenChange(false);
   };
 
+  useEffect(() => {
+    if ((!open || !hasYamlChanges) && diffOpen) {
+      setDiffOpen(false);
+    }
+  }, [diffOpen, hasYamlChanges, open]);
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Edit {PANEL_TYPE_META[panelType].label} panel</DialogTitle>
-          <DialogDescription>{PANEL_TYPE_META[panelType].description}</DialogDescription>
-        </DialogHeader>
-        <Tabs value={tab} onValueChange={(v) => setTab(v as EditorTab)} className="w-full">
-          <TabsList>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="gap-0 overflow-hidden sm:max-w-3xl" closeButtonClassName="top-2 right-2">
+          <PanelEditorTabs
+            tab={tab}
+            onTabChange={setTab}
+            panelType={panelType}
+            hasYamlChanges={hasYamlChanges}
+            onShowDiff={() => setDiffOpen(true)}
+            formContent={renderForm({ value: formDraft, onChange: handleFormChange, error: schemaError })}
+            yamlDraft={yamlDraft}
+            onYamlChange={handleYamlChange}
+            footer={
+              <>
+                <PanelEditorError message={blockingError} />
+                <PanelEditorFooter
+                  hasBlockingError={Boolean(blockingError)}
+                  onCancel={() => onOpenChange(false)}
+                  onSave={handleSave}
+                />
+              </>
+            }
+          />
+        </DialogContent>
+      </Dialog>
+      <PanelYamlDiffModal
+        open={open && diffOpen && hasYamlChanges}
+        onOpenChange={setDiffOpen}
+        initialYaml={initialYaml}
+        draftYaml={yamlDraft}
+        filename={`${panelId}.yaml`}
+      />
+    </>
+  );
+}
+
+function PanelEditorTabs({
+  tab,
+  onTabChange,
+  panelType,
+  hasYamlChanges,
+  onShowDiff,
+  formContent,
+  yamlDraft,
+  onYamlChange,
+  footer,
+}: {
+  tab: EditorTab;
+  onTabChange: (tab: EditorTab) => void;
+  panelType: PanelType;
+  hasYamlChanges: boolean;
+  onShowDiff: () => void;
+  formContent: ReactNode;
+  yamlDraft: string;
+  onYamlChange: (value: string | undefined) => void;
+  footer: ReactNode;
+}) {
+  return (
+    <div className="flex w-full flex-col">
+      <Tabs value={tab} onValueChange={(value) => onTabChange(value as EditorTab)} className="flex w-full flex-col">
+        <div className="-mx-6 -mt-6 border-b border-slate-950/10 bg-background px-6 pb-3 pt-5">
+          <PanelEditorHeader panelType={panelType} hasYamlChanges={hasYamlChanges} onShowDiff={onShowDiff} />
+          <TabsList className="mt-3">
             <TabsTrigger value="form" data-testid="panel-editor-tab-form">
               Form
             </TabsTrigger>
@@ -123,46 +191,134 @@ export function PanelEditorDialog<T extends object>({
               YAML
             </TabsTrigger>
           </TabsList>
-          <TabsContent value="form" className="mt-3 max-h-[60vh] overflow-auto px-1 pb-6">
-            {renderForm({ value: formDraft, onChange: handleFormChange, error: schemaError })}
-          </TabsContent>
-          <TabsContent value="yaml" className="mt-3">
-            <div className="overflow-hidden rounded-md border border-slate-200">
-              <Editor
-                height="50vh"
-                language="yaml"
-                value={yamlDraft}
-                onChange={handleYamlChange}
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 12,
-                  scrollBeyondLastLine: false,
-                  tabSize: 2,
-                  automaticLayout: true,
-                }}
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
-        {blockingError ? (
-          <div
-            className="mt-2 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
-            data-testid="panel-editor-error"
-          >
-            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>{blockingError}</span>
+        </div>
+        <TabsContent value="form" className="pt-6 max-h-[60vh] overflow-y-auto -mx-6 px-6 pb-12">
+          {formContent}
+        </TabsContent>
+        <TabsContent value="yaml" className="mt-3">
+          <div className="overflow-hidden rounded-md border border-slate-200">
+            <Editor
+              height="50vh"
+              language="yaml"
+              value={yamlDraft}
+              onChange={onYamlChange}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 12,
+                scrollBeyondLastLine: false,
+                tabSize: 2,
+                automaticLayout: true,
+              }}
+            />
           </div>
+        </TabsContent>
+      </Tabs>
+      <div className="-mx-6 -mb-6 flex flex-col gap-2 border-t border-slate-950/10 bg-background px-6 py-4">
+        {footer}
+      </div>
+    </div>
+  );
+}
+
+function PanelEditorHeader({
+  panelType,
+  hasYamlChanges,
+  onShowDiff,
+}: {
+  panelType: PanelType;
+  hasYamlChanges: boolean;
+  onShowDiff: () => void;
+}) {
+  return (
+    <DialogHeader className="text-center sm:text-left">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <DialogTitle className="mb-1 text-base font-medium">
+            Edit {PANEL_TYPE_META[panelType].label} panel
+          </DialogTitle>
+          <DialogDescription className="text-gray-800">{PANEL_TYPE_META[panelType].description}</DialogDescription>
+        </div>
+        {hasYamlChanges ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={onShowDiff}
+            data-testid="panel-editor-show-diff"
+          >
+            <GitCompareArrows className="mr-1 h-3.5 w-3.5" />
+            View diff
+          </Button>
         ) : null}
-        <DialogFooter className="mt-2">
-          <Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button type="button" onClick={handleSave} disabled={Boolean(blockingError)} data-testid="panel-editor-save">
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </DialogHeader>
+  );
+}
+
+function PanelEditorError({ message }: { message: string | null }) {
+  if (!message) return null;
+
+  return (
+    <div
+      className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+      data-testid="panel-editor-error"
+    >
+      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+function PanelEditorFooter({
+  hasBlockingError,
+  onCancel,
+  onSave,
+}: {
+  hasBlockingError: boolean;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <DialogFooter>
+      <Button type="button" variant="outline" onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button type="button" onClick={onSave} disabled={hasBlockingError} data-testid="panel-editor-save">
+        Save
+      </Button>
+    </DialogFooter>
+  );
+}
+
+function PanelYamlDiffModal({
+  open,
+  onOpenChange,
+  initialYaml,
+  draftYaml,
+  filename,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialYaml: string;
+  draftYaml: string;
+  filename: string;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <CanvasYamlDiffModal
+        open={open}
+        onOpenChange={onOpenChange}
+        liveYamlText={initialYaml}
+        draftYamlText={draftYaml}
+        filename={filename}
+        title="Panel YAML diff"
+        dialogTitle="Panel YAML diff"
+        description="Side-by-side YAML comparison between the saved panel content and the current panel edits."
+        liveLabel="Saved"
+        draftLabel="Draft edits"
+      />
+    </Suspense>
   );
 }
 

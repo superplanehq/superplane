@@ -25,6 +25,9 @@ var exampleOutputAddReactionBytes []byte
 //go:embed payloads/create_pull_request.json
 var exampleOutputCreatePullRequestBytes []byte
 
+//go:embed payloads/merge_pull_request.json
+var exampleOutputMergePullRequestBytes []byte
+
 var exampleOutputAddReactionOnce sync.Once
 var exampleOutputAddReaction map[string]any
 
@@ -33,6 +36,9 @@ var exampleOutputCreateReview map[string]any
 
 var exampleOutputCreatePullRequestOnce sync.Once
 var exampleOutputCreatePullRequest map[string]any
+
+var exampleOutputMergePullRequestOnce sync.Once
+var exampleOutputMergePullRequest map[string]any
 
 var exampleDataOnPullRequestOnce sync.Once
 var exampleDataOnPullRequest map[string]any
@@ -80,5 +86,13 @@ func (c *CreatePullRequest) ExampleOutput() map[string]any {
 		&exampleOutputCreatePullRequestOnce,
 		exampleOutputCreatePullRequestBytes,
 		&exampleOutputCreatePullRequest,
+	)
+}
+
+func (c *MergePullRequest) ExampleOutput() map[string]any {
+	return utils.UnmarshalEmbeddedJSON(
+		&exampleOutputMergePullRequestOnce,
+		exampleOutputMergePullRequestBytes,
+		&exampleOutputMergePullRequest,
 	)
 }

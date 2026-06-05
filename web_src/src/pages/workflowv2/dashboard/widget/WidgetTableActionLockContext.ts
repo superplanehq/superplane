@@ -6,25 +6,29 @@ import { createContext, useContext } from "react";
  *
  * 1. `runInFlightIds` — trigger node ids whose latest canvas run is currently
  *    in `STATE_STARTED`. Driven by the runs query + canvas websocket.
- * 2. `submitting` — true between the moment a row-action click calls
- *    `beginSubmission()` and the moment the runs query has confirmed the new
- *    run is in flight (or a short grace window has elapsed, whichever comes
- *    first). This covers the small gap between the `InvokeNodeTriggerHook`
- *    API returning and the websocket landing a `run_started` event, so the
- *    buttons do not briefly flicker back to enabled.
+ * 2. `pendingRowKeys` — set of row keys with a submission in flight (between
+ *    click and HTTP response, plus a short grace window). Locking is
+ *    scoped per row so siblings stay clickable while one row is submitting.
+ * 3. `inFlightRowByTrigger` — `triggerNodeId → rowKey` mapping recorded on
+ *    submission so the row that started the run is the only one locked
+ *    while the trigger is in flight. Rows whose trigger appears in
+ *    `runInFlightIds` without a recorded source rowKey are NOT locked, by
+ *    design: the user explicitly asked for "only the affected row" locking.
  */
 export interface WidgetTableActionLock {
   runInFlightIds: Set<string>;
-  submitting: boolean;
-  beginSubmission: (triggerNodeId: string | undefined) => void;
-  endSubmission: (triggerNodeId: string | undefined) => void;
+  pendingRowKeys: Set<string>;
+  inFlightRowByTrigger: Map<string, string>;
+  beginSubmission: (triggerNodeId: string | undefined, rowKey: string) => void;
+  endSubmission: (triggerNodeId: string | undefined, rowKey: string, succeeded: boolean) => void;
 }
 
 export const WidgetTableActionLockReactContext = createContext<WidgetTableActionLock | undefined>(undefined);
 
 const FALLBACK_LOCK: WidgetTableActionLock = {
   runInFlightIds: new Set(),
-  submitting: false,
+  pendingRowKeys: new Set(),
+  inFlightRowByTrigger: new Map(),
   beginSubmission: () => {},
   endSubmission: () => {},
 };

@@ -15,7 +15,6 @@ import (
 	q "github.com/superplanehq/superplane/test/e2e/queries"
 	"github.com/superplanehq/superplane/test/e2e/session"
 	"github.com/superplanehq/superplane/test/e2e/shared"
-	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
@@ -95,7 +94,7 @@ func (s *runsViewSteps) whenTheManualTriggerRuns() {
 }
 
 func (s *runsViewSteps) whenIVisitRunsView() {
-	s.session.Visit("/" + s.session.OrgID.String() + "/canvases/" + s.canvas.WorkflowID.String() + "?view=runs")
+	s.session.Visit("/" + s.session.OrgID.String() + "/apps/" + s.canvas.WorkflowID.String() + "?view=runs")
 }
 
 func (s *runsViewSteps) givenFinishedRuns(count int) {
@@ -125,7 +124,7 @@ func (s *runsViewSteps) givenFinishedRuns(count int) {
 			NodeID:     triggerID,
 			Channel:    "default",
 			CustomName: &customName,
-			Data:       datatypes.NewJSONType[any](map[string]any{}),
+			Data:       models.NewJSONValue(map[string]any{}),
 			RunID:      run.ID,
 			State:      models.CanvasEventStateRouted,
 			CreatedAt:  &createdAt,
@@ -170,7 +169,7 @@ func (s *runsViewSteps) thenTheFinishedRunIsVisible() {
 	s.session.AssertURLContains("run=" + s.run.ID.String())
 	s.session.AssertText("Start")
 	s.session.AssertText("Output")
-	s.session.AssertText("SUCCESS")
+	s.session.AssertText("success")
 	s.session.AssertHidden(q.Locator(`button[aria-label^="Add next component"]`))
 }
 

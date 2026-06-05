@@ -61,6 +61,7 @@ function renderFallbackBlock(args: {
       selected={selected}
       showHeader={showHeader}
       dimBodyBelowHeader={dimBodyBelowHeader}
+      draftDiffStatus={data._draftDiffStatus}
       {...actionProps}
     />
   );
@@ -118,9 +119,11 @@ function AnnotationBlockContent({
       {...safeAnnotationProps}
       noteId={nodeId}
       selected={selected}
+      canvasMode={canvasMode}
       onAnnotationUpdate={handleAnnotationUpdate}
       onAnnotationBlur={onAnnotationBlur}
       dimBodyBelowHeader={dimBodyBelowHeader}
+      draftDiffStatus={data._draftDiffStatus}
       {...actionProps}
     />
   );
@@ -148,6 +151,7 @@ function renderBlockByType(args: {
     actionProps,
     dimBodyBelowHeader,
   } = args;
+  const draftDiffStatus = data._draftDiffStatus;
 
   switch (data.type) {
     case "trigger":
@@ -169,6 +173,7 @@ function renderBlockByType(args: {
           selected={selected}
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
+          draftDiffStatus={draftDiffStatus}
           {...actionProps}
         />
       );
@@ -182,6 +187,7 @@ function renderBlockByType(args: {
           selected={selected}
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
+          draftDiffStatus={draftDiffStatus}
           {...actionProps}
         />
       );
@@ -194,6 +200,7 @@ function renderBlockByType(args: {
           selected={selected}
           showHeader={showHeader}
           dimBodyBelowHeader={dimBodyBelowHeader}
+          draftDiffStatus={draftDiffStatus}
           {...actionProps}
         />
       );

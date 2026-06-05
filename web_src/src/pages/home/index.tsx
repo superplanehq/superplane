@@ -1,9 +1,8 @@
-import { OrganizationMenuButton } from "@/components/OrganizationMenuButton";
 import { usePermissions } from "@/contexts/usePermissions";
 import { usePageTitle } from "@/hooks/usePageTitle";
 import { Palette } from "lucide-react";
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 import { Heading } from "../../components/Heading/heading";
 import { Text } from "../../components/Text/text";
 import { useAccount } from "../../contexts/useAccount";
@@ -11,6 +10,8 @@ import { CanvasCardsGrid } from "./CanvasCardsGrid";
 import { CanvasFolderSection } from "./CanvasFolderSection";
 import { CanvasToolbar } from "./CanvasToolbar";
 import { EditAppModal } from "./EditAppModal";
+import { HomePageShell } from "./HomePageShell";
+import { CANVAS_FOLDER_SECTION_SHELL_CLASS } from "./canvasFolderStyles";
 import type { CanvasCardData, CanvasFolderData } from "./types";
 import { useEditApp } from "./useEditApp";
 import { useHomePageCanvasList } from "./useHomePageCanvasList";
@@ -32,14 +33,14 @@ export function HomePage() {
     isOpen: isEditAppModalOpen,
   } = useEditApp();
 
-  const { canvasFolders, filteredCanvases, isLoading, canvasError } = useHomePageCanvasList(
+  const { canvases, canvasFolders, filteredCanvases, isLoading, isFetching, canvasError } = useHomePageCanvasList(
     organizationId,
     searchQuery,
   );
   const canUpdateCanvases = canAct("canvases", "update");
   const canDeleteCanvases = canAct("canvases", "delete");
 
-  if (isLoading) {
+  if (isLoading || (isFetching && canvases.length === 0 && canvasFolders.length === 0)) {
     return <LoadingView />;
   }
 
@@ -47,39 +48,36 @@ export function HomePage() {
     return <ErrorView />;
   }
 
+  if (canvases.length === 0 && canvasFolders.length === 0 && !canvasError) {
+    return <Navigate to={`/${organizationId}/apps/new`} replace />;
+  }
+
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-900">
-      <header className="bg-white border-b border-slate-950/15 px-4 h-12 flex items-center">
-        <OrganizationMenuButton organizationId={organizationId} />
-      </header>
-      <main className="w-full h-full flex flex-column flex-grow-1">
-        <div className="bg-slate-100 w-full flex-grow-1">
-          <div className="mx-auto w-full max-w-6xl p-8">
-            <Header />
+    <HomePageShell>
+      <div className="mx-auto w-full max-w-6xl p-8">
+        <Header />
 
-            <div className="mb-6">
-              <CanvasToolbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
-            </div>
-
-            {canvasError ? (
-              <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
-                <Text>{canvasError}</Text>
-              </div>
-            ) : (
-              <Content
-                filteredCanvases={filteredCanvases}
-                canvasFolders={canvasFolders}
-                organizationId={organizationId}
-                searchQuery={searchQuery}
-                onEditCanvas={openEdit}
-                canUpdateCanvases={canUpdateCanvases}
-                canDeleteCanvases={canDeleteCanvases}
-                permissionsLoading={permissionsLoading}
-              />
-            )}
-          </div>
+        <div className="mb-6">
+          <CanvasToolbar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
         </div>
-      </main>
+
+        {canvasError ? (
+          <div className="bg-white border border-red-300 text-red-500 px-4 py-2 rounded">
+            <Text>{canvasError}</Text>
+          </div>
+        ) : (
+          <Content
+            filteredCanvases={filteredCanvases}
+            canvasFolders={canvasFolders}
+            organizationId={organizationId}
+            searchQuery={searchQuery}
+            onEditCanvas={openEdit}
+            canUpdateCanvases={canUpdateCanvases}
+            canDeleteCanvases={canDeleteCanvases}
+            permissionsLoading={permissionsLoading}
+          />
+        )}
+      </div>
 
       <EditAppModal
         open={isEditAppModalOpen}
@@ -89,7 +87,7 @@ export function HomePage() {
         onClose={closeEdit}
         onSave={saveApp}
       />
-    </div>
+    </HomePageShell>
   );
 }
 
@@ -143,15 +141,17 @@ function Content({
       ))}
 
       {folderedLayout.unfiledCanvases.length > 0 ? (
-        <CanvasCardsGrid
-          canvases={folderedLayout.unfiledCanvases}
-          canvasFolders={canvasFolders}
-          organizationId={organizationId}
-          onEditCanvas={onEditCanvas}
-          canUpdateCanvases={canUpdateCanvases}
-          canDeleteCanvases={canDeleteCanvases}
-          permissionsLoading={permissionsLoading}
-        />
+        <section className={`${CANVAS_FOLDER_SECTION_SHELL_CLASS} bg-slate-950/5`}>
+          <CanvasCardsGrid
+            canvases={folderedLayout.unfiledCanvases}
+            canvasFolders={canvasFolders}
+            organizationId={organizationId}
+            onEditCanvas={onEditCanvas}
+            canUpdateCanvases={canUpdateCanvases}
+            canDeleteCanvases={canDeleteCanvases}
+            permissionsLoading={permissionsLoading}
+          />
+        </section>
       ) : null}
     </div>
   );

@@ -26,7 +26,7 @@ func (c *ListEventsCommand) Execute(ctx core.CommandContext) error {
 }
 
 func (c *ListEventsCommand) listNodeEvents(ctx core.CommandContext) error {
-	canvasID, err := core.ResolveCanvasID(ctx, *c.CanvasID)
+	canvasID, err := core.ResolveAppID(ctx, *c.CanvasID)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func (c *ListEventsCommand) listNodeEvents(ctx core.CommandContext) error {
 }
 
 func (c *ListEventsCommand) listCanvasEvents(ctx core.CommandContext) error {
-	canvasID, err := core.ResolveCanvasID(ctx, *c.CanvasID)
+	canvasID, err := core.ResolveAppID(ctx, *c.CanvasID)
 	if err != nil {
 		return err
 	}

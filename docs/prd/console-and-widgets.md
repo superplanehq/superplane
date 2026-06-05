@@ -15,7 +15,7 @@ This guide is written for both humans configuring consoles and agents changing t
 ## What Users See
 
 - A console belongs to one canvas. Templates do not have editable consoles.
-- Users enter console mode from the workflow v2 header (URL `?view=console`) when the Console feature is enabled.
+- Users enter console mode from the workflow v2 header (URL `?view=console`).
 - The canvas graph is hidden and replaced by a 12-column draggable grid.
 - Users with `canvases:update` can add, move, resize, edit, delete, import, and export panels.
 - Users without edit permission can still view consoles and export YAML.
@@ -89,15 +89,12 @@ pkg/grpc/actions/canvases/
 protos/canvases.proto
 ```
 
-The Console feature flag is registered in `pkg/features/features.go` with the
-backend id `dashboards` and the user-facing label **Console**. The id is kept
-for back-compat with existing per-organization enablement records.
 
 ## Architecture
 
 | Layer | Responsibility |
 | --- | --- |
-| Workflow host | `index.tsx` owns workflow mode, feature flag checks, and header wiring. It delegates console-specific work to small dashboard modules. |
+| Workflow host | `index.tsx` owns workflow mode and header wiring. It delegates console-specific work to small dashboard modules. |
 | Overlay | `WorkflowDashboardOverlay` decides whether to render. `DashboardOverlay` maps API data, wires query/mutation state, and provides context. |
 | Context | `DashboardContext` exposes canvas nodes, node statuses, run permission, and trigger callbacks. `resolveDashboardNode` accepts node id or node name. |
 | Grid | `DashboardView` renders the 12-column `react-grid-layout` surface and routes each panel to its card. |
@@ -125,9 +122,10 @@ The panel `content` object is intentionally flexible, but every known panel type
 | --- | --- | --- |
 | `markdown` | Notes, runbooks, links, status explanations | `title?`, `body?` |
 | `node` | Pin one canvas node with latest status and optional Run button | `title?`, `node`, `showRun?`, `triggerName?` |
+| `nodes` | Pin multiple canvas nodes in one card with live status and optional purpose lines | `title?`, `nodes[]` |
 | `table` | Render rows from memory, executions, or runs | `title?`, `dataSource`, `render.kind: "table"` |
 | `chart` | Render grouped data as bar, stacked bar, line, area, or donut | `title?`, `dataSource`, `render.kind: "chart"` |
-| `number` | Render one aggregate KPI | `title?`, `dataSource`, `render.kind: "number"` |
+| `number` | Render one aggregate KPI, or several KPIs side-by-side via `metrics[]` | `title?`, (`dataSource` + `render.kind: "number"`) or `metrics[]` |
 
 New panels start as valid drafts where possible. For example, a new table panel may have an empty memory namespace and no columns while the user is still configuring it.
 
@@ -144,8 +142,8 @@ Table, chart, and number panels share these data sources:
 | Source | Query | Result rows |
 | --- | --- | --- |
 | `memory` | `useCanvasMemoryEntries` | Canvas memory entries filtered by namespace. Optional `fieldPath` flattens a nested value or list. |
-| `executions` | `useInfiniteCanvasEvents` | Flattened `event.executions[]`, optionally filtered to one resolved node. Rows include `status`, `nodeName`, and `durationMs`. |
-| `runs` | `useInfiniteCanvasRuns` | Raw run objects. Number widgets can use API `totalCount` for count KPIs. |
+| `executions` | `useInfiniteCanvasEvents` | Flattened `event.executions[]`, optionally filtered to one resolved node. Rows include `status`, `nodeName`, `durationMs`, and `payload` (the data the node received from its root event). |
+| `runs` | `useInfiniteCanvasRuns` (+ `useEventExecutionsBatch` for `$`) | Raw run objects plus derived `status`, `nodeName` (the node that initiated the run, resolved from `rootEvent.nodeId`), `payload` (alias for `rootEvent.data`, the initial payload that triggered the run), `durationMs` (created-to-finished elapsed time in milliseconds — pair with `format: duration`), and `$` (a map keyed by node display name with each node's full execution including `outputs` — see [Addressing per-node outputs](#addressing-per-node-outputs)). Number widgets can use API `totalCount` for count KPIs. |
 
 Execution widgets eager-load more event pages until they have enough execution rows for the configured `limit`, or until a bounded page cap is reached. This avoids count widgets flashing an intermediate value when the first event page has few executions.
 
@@ -190,6 +188,37 @@ content:
 
 The editor scans live canvas memory and suggests namespaces and field names. Suggestions are only editor assistance; YAML import still uses the validators.
 
+### Field Suggestions
+
+The table editor populates the column dropdown, the filter / sort field datalists, and the row-action payload quick-insert chips with a field catalog derived from the data source:
+
+| Data source | Field catalog |
+| --- | --- |
+| `memory` | Discovered live from canvas memory entries in the chosen namespace. |
+| `executions` | Static catalog mirroring the execution row shape (`status`, `nodeName`, `durationMs`, `payload`, `state`, `result`, `resultReason`, `resultMessage`, `id`, `nodeId`, `canvasId`, `parentExecutionId`, `previousExecutionId`, `createdAt`, `updatedAt`). |
+| `runs` | Static catalog mirroring `CanvasesCanvasRun` plus the derived fields appended by `collectRunRows` (`state`, `result`, `status`, `nodeName`, `payload`, `durationMs`, `$`, `id`, `canvasId`, `versionId`, `createdAt`, `updatedAt`, `finishedAt`, `rootEvent.nodeId`, `rootEvent.customName`). |
+
+When suggestions are available, the column header bar also exposes an **Add all fields** button and quick-add chips that insert a column for each catalog field with `suggestColumnFormat`-derived formatting (e.g. `status` → `status`, `createdAt` → `relative`).
+
+The column, filter, row-style, and sort field inputs are free-text — authors can type any **nested dot path** (e.g. `payload.user_id`, `rootEvent.customName`) or `{{ CEL }}` template. Catalog entries surface as `<datalist>` autocomplete suggestions. When the typed value matches a known catalog field, the column's `label` and `format` are auto-filled (only when the author hasn't already set them) so picking from the dropdown stays one-click.
+
+#### Addressing per-node outputs
+
+Run rows expose a `$` map keyed by **node display name** so authors can address the outputs of any node within that run. The shape mirrors the canvas-side expression syntax (`$['Node Name'].data`):
+
+| Path | Resolves to |
+| --- | --- |
+| `$["deploy-prod"].outputs` | The raw outputs map (`{ <channel>: [<event>, ...] }`) for the `deploy-prod` execution. |
+| `$["deploy-prod"].outputs.default[0]` | The first event emitted on the `default` channel. |
+| `$["deploy-prod"].data` | Convenience shortcut for the **last** event of the `default` channel (or the first available channel) with one `data` envelope unwrapped — matches what canvas-side `$['Node'].data` resolves to. |
+| `$["deploy-prod"].state`, `$["deploy-prod"].result` | Per-node state and result fields, useful for row styling. |
+
+The same syntax works in both literal field paths (e.g. a column `field: $["deploy-prod"].data.url`) and in `{{ }}` CEL templates (e.g. `format: link, label: "{{ $['deploy-prod'].data.url }}"`). Under the hood the CEL compiler rewrites `$` to a safe identifier (cel-js doesn't accept `$` as an identifier), but authors don't need to be aware of the rewrite — string literals are preserved verbatim, so a `$` inside `"..."` or `'...'` is left alone.
+
+**Missing nodes resolve to `undefined`** — when a given node didn't run for that run (e.g. the workflow forked and only one branch executed, or the execution hasn't reached that node yet), `$["other-node"].outputs` returns `undefined` and the widget cell renders as `-`. This is intentional and matches how missing dot paths behave elsewhere.
+
+**Performance:** Run-level outputs are not part of the `ListRuns` payload (executions are returned as lightweight refs). The widget side-loads them via `ListEventExecutions(rootEventId)` for each visible run, capped by the panel's `limit`. React Query caches the response keyed by `(canvasId, rootEventId)`, so opening the run detail modal and the widget share results. Authors with very large `limit` values should expect one extra request per run on first load.
+
 ### Columns
 
 Each column needs a non-empty `field`. Optional fields:
@@ -197,7 +226,7 @@ Each column needs a non-empty `field`. Optional fields:
 | Field | Meaning |
 | --- | --- |
 | `label` | Header text. Falls back to `field`. |
-| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `code`, or `link`. |
+| `format` | Display format: `text`, `number`, `percent`, `date`, `datetime`, `relative`, `duration`, `status`, `badge`, `code`, or `link`. `duration` always interprets its input as **milliseconds** — convert from seconds via CEL (`{{ seconds * 1000 }}`) before passing in. `badge` is an alias for `status` and renders the value as a colored pill (green for `passed`/`ready`/`active`, red for `failed`, amber for `pending`, sky for `running`). |
 | `show` | Row expression controlling whether the cell is visible. |
 | `href` | Link template for `link` columns. |
 
@@ -252,6 +281,26 @@ Console widgets support two related expression styles:
 
 Use CEL templates for new payloads, confirmation text, and rich interpolation. Use structured `where` filters when the condition is simple and should be validated.
 
+### CEL builtins
+
+In addition to the standard CEL functions cel-js ships with, the dashboard exposes these helpers in every expression's environment:
+
+| Builtin | Description |
+| --- | --- |
+| `int(v)`, `float(v)`, `string(v)` | Type coercions, with sensible fallbacks for nullish input. |
+| `contains(s, sub)`, `startsWith(s, p)`, `endsWith(s, p)`, `matches(s, regex)` | String / regex predicates. |
+| `lower(s)`, `upper(s)` | Case conversions. |
+| `duration(seconds)` | Format a number of seconds as `5m 30s` / `1h 5m`. |
+| `timestamp(seconds)` | Format epoch seconds as an ISO-8601 string. |
+| `formatDate(value, pattern)` | Render any date-like value (ISO string, Date, epoch number) with tokens `yyyy yy MM M dd d HH H mm m ss s`. Renders in the viewer's local time. |
+| `epochMs(value)` | Convert any date-like value (ISO-8601 string, Date instance, epoch seconds, epoch ms) to **milliseconds since epoch**. Returns `0` for unparseable input so arithmetic stays defined. Pairs with `duration()` for human-friendly elapsed-time output. |
+
+Note that `field: finishedAt - createdAt` does **not** work directly because both values are ISO-8601 strings and CEL doesn't subtract strings. Use one of:
+
+- `field: durationMs, format: duration` — easiest for the standard "how long did this take" cell on `runs` or `executions` rows (the derived field is already there).
+- `field: '{{ duration((epochMs(finishedAt) - epochMs(createdAt)) / 1000) }}'` — the explicit CEL form, useful when comparing arbitrary timestamp fields or subtracting the trigger time from the finish time.
+- `field: '{{ epochMs(finishedAt) - epochMs(createdAt) }}', format: duration` — gives you a numeric ms value the column formatter can render and downstream filters can compare against.
+
 Loose equality in legacy expressions is implemented explicitly by normalizing scalar strings, numbers, booleans, and `null`; do not add `eslint-disable-next-line` directives for equality checks.
 
 ## Chart Panels
@@ -273,19 +322,37 @@ render:
 
 Supported `type` values:
 
-- `bar` — one bar per category, grouped side-by-side when multiple series are configured.
-- `stacked-bar` — multiple series stacked on top of each other per category. Visually identical to `bar` with a single series; the editor surfaces a hint until you add a second series.
+- `bar` — one bar per `xField` bucket, with each configured series rendered side-by-side.
+- `stacked-bar` — multiple series stacked on top of each other per `xField` bucket. Visually identical to `bar` with a single series; the editor surfaces a hint until you add a second series (or set `seriesField`).
 - `line`
 - `area`
-- `donut` — one slice per row, keyed by `xField`, valued by the first series.
+- `donut` — one slice per distinct `xField` value, valued by the first series.
 
-If a series omits `field`, the chart counts rows per `xField` bucket. If `field` is present, the chart reads numeric values from that field.
+Rows that share the same resolved `xField` value are merged into a single chart point. If a series omits `field`, the chart counts rows per `xField` bucket. If `field` is present, the chart sums numeric values from that field across each bucket. Non-numeric values are ignored.
+
+### Pivoting long-format rows with `seriesField`
+
+Some data sources emit one row per (X, series) combination — e.g. one row per `(date, service)` cost line. Configure `seriesField` to pivot those rows into one series per distinct value:
+
+```yaml
+render:
+  kind: chart
+  type: stacked-bar
+  xField: date
+  seriesField: service
+  series:
+    - field: cost_usd
+      label: Cost
+      prefix: "$"
+```
+
+When `seriesField` is set, the chart uses the numeric `field` of the **first** configured series for values (summed per `(xField, seriesField)` bucket) and ignores additional series entries for shaping — colors and order come from the data, not the configured series list.
 
 ### Series formatting
 
 Each series supports optional display fields used by the hover tooltip (and the donut value rows):
 
-- `format` — one of `text`, `number`, `percent`, `duration`. Defaults to `number` when omitted.
+- `format` — one of `text`, `number`, `percent`, `duration`. Defaults to `number` when omitted. `duration` always interprets its input as **milliseconds** (so an average of `4527` renders as `4.5s`, not `1h 15m`); convert other units in CEL before aggregating.
 - `prefix` — literal string rendered before the formatted value (for example `"$"`).
 - `suffix` — literal string rendered after the formatted value (for example `" MWh"`).
 
@@ -361,11 +428,110 @@ Rules:
 
 The editor exposes a Single / Multiple toggle in the Number panel form. Switching to Multiple seeds one source from the current single-source configuration so existing panels do not lose context.
 
+### Multi-Number Mode
+
+A number panel can also render **multiple independently-configured numbers** in a single card. Each metric has its own data source, aggregation, field, label, format, prefix/suffix, and optional sparkline; the metrics lay out in a flex row that wraps to new lines when the panel is narrow.
+
+```yaml
+type: number
+content:
+  title: Pipeline KPIs
+  metrics:
+    - dataSource:
+        kind: runs
+      render:
+        kind: number
+        aggregation: count
+        label: Total runs
+    - dataSource:
+        kind: memory
+        namespace: costs
+      render:
+        kind: number
+        aggregation: sum
+        field: cost
+        label: Total cost
+        format: number
+        prefix: "R$"
+```
+
+Rules:
+
+- `metrics` is a non-empty array. When `metrics` is present, top-level `dataSource` and `render` are not used and are not required.
+- Each metric's `dataSource` must be a single-source `memory` / `executions` / `runs` shape — the composite (`sources` + `combine`) shape is not allowed inside a metric.
+- Each metric's `render.kind` is `number`. `render.aggregation` is required (one of `count`/`sum`/`avg`/`min`/`max`/`first`/`last`), and `render.field` is required for aggregations other than `count`.
+- Use `render.label` as the metric's name (it renders above the value).
+- Multi-number mode is disjoint from the composite-combine mode: a panel is either single-value, composite-combined, or multi-number. The Number panel form exposes a Single / Multiple memory sources / Multiple numbers toggle that seeds the new mode from whatever is currently configured.
+
+## Markdown Panels
+
+Markdown panels render `content.body` using `react-markdown` with `remark-gfm`, `remark-breaks`, `rehype-raw`, and `rehype-sanitize`.
+
+Supported authoring features:
+
+- **GitHub-flavored markdown**, including hand-written pipe tables:
+
+  ```markdown
+  | Service | Status |
+  | --- | --- |
+  | api | passed |
+  | web | failed |
+  ```
+
+- **Collapsible sections** using raw `<details>` / `<summary>` HTML:
+
+  ```markdown
+  <details>
+  <summary>Troubleshooting</summary>
+
+  - Flush the cache.
+  - Roll back via the **Rollback** node panel.
+
+  </details>
+  ```
+
+  Use `<details open>` to pre-expand a section. The body of a `<details>` is still parsed as markdown, so links, lists, and other formatting work inside accordions.
+
+- **Safe-by-default raw HTML.** `rehype-sanitize` strips `<script>`, inline event handlers (`onclick`, `onerror`, …), and any tag outside the allowlist. The only raw HTML tags explicitly added on top of the default allowlist are `<details>` and `<summary>` (plus the `open` attribute on `<details>`). If you need a new tag, extend `MARKDOWN_SANITIZE_SCHEMA` in `MarkdownPanelCard.tsx` rather than disabling sanitization.
+
 ## Node Panels
 
-Node panels resolve the configured `node` by id or name. They display the latest status from `deriveDashboardNodeStatuses` and can optionally show a manual Run button.
+Node panels resolve the configured `node` by id or name. They display the node's name and can optionally show a manual Run button.
 
 `showRun` only exposes the button. The actual click still requires `canRunNodes`, and the backend authorization remains the source of truth.
+
+## Multi-Node Panels
+
+The plural `nodes` panel type renders several pinned canvas nodes in a single card, each with an optional purpose line. Use it for "Key Nodes" style summaries (for example, the entry/exit nodes of a preview-environment workflow) instead of stamping out one `node` panel per row.
+
+```yaml
+type: nodes
+content:
+  title: Key Nodes
+  nodes:
+    - node: pr-opened
+      description: GitHub PR trigger that boots a new environment.
+    - node: create-droplet
+      description: Provisions the DigitalOcean droplet.
+    - node: health-check
+      description: Confirms the preview is responsive.
+    - node: delete-droplet
+      label: Tear Down
+      description: Releases the droplet when the PR closes.
+      showRun: true
+```
+
+Per-entry fields:
+
+| Field | Meaning |
+| --- | --- |
+| `node` | Required. Canvas node id or name. |
+| `label` | Optional override for the displayed row name. Falls back to the resolved canvas node name. |
+| `description` | Optional short purpose line shown under the row name. |
+| `showRun` | When true, surface a manual "Run" button. Still gated by `canRunNodes`. |
+| `triggerName` | Optional start template name when the trigger exposes multiple templates. |
+
+`content.nodes` may be an empty array on a freshly added panel; the card renders a "configure me" hint until the author adds at least one entry through the form.
 
 ## YAML Import And Export
 

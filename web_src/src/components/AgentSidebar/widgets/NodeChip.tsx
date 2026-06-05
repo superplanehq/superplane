@@ -1,6 +1,7 @@
 import { createElement, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { cn, resolveIcon } from "@/lib/utils";
+import { appPath } from "@/lib/appPaths";
 import { useCanvas } from "@/hooks/useCanvasData";
 import { getHeaderIconSrc } from "@/ui/componentSidebar/integrationIconMaps";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
@@ -168,7 +169,7 @@ export function NodeChip({ nodeId, label, canvasId, organizationId }: NodeChipPr
   const edges = canvas?.spec?.edges ?? [];
 
   const handleClick = useCallback(() => {
-    navigate(`/${organizationId}/canvases/${canvasId}?sidebar=1&node=${node?.id ?? nodeId}`);
+    navigate(appPath(organizationId, canvasId, `?sidebar=1&node=${node?.id ?? nodeId}`));
     window.dispatchEvent(new CustomEvent("agent:focus-node", { detail: { nodeId: node?.id ?? nodeId } }));
   }, [navigate, organizationId, canvasId, node?.id, nodeId]);
 

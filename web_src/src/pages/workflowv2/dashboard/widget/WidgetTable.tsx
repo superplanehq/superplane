@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ExternalLink, Loader2, Play, RefreshCw, Square, Trash2 } from "lucide-react";
+import { ExternalLink, Loader2, Play, RefreshCw, Square, Table2, Trash2 } from "lucide-react";
 
 import { formatTimestampInUserTimezone } from "@/lib/timezone";
 import { cn } from "@/lib/utils";
@@ -12,7 +12,9 @@ import { mergeTriggerParameters } from "./mergeTriggerPayload";
 import { RowActionConfirmDialog } from "./RowActionConfirmDialog";
 import { evaluateRowShow } from "./rowVisibility";
 import { resolveCellValue } from "./resolveCellValue";
+import { makeRowStyleResolver } from "./rowStyles";
 import { applyFilters, applySort } from "./widgetData";
+import { WidgetEmptyState } from "../WidgetEmptyState";
 import { formatValue } from "./widgetFormat";
 import { WidgetTableActionLockProvider } from "./WidgetTableActionLock";
 import { useWidgetTableActionLock } from "./WidgetTableActionLockContext";
@@ -56,6 +58,8 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
     return applySort(afterFilters, render.sort);
   }, [recordRows, render.where, render.filters, render.sort]);
 
+  const resolveRowStyle = useMemo(() => makeRowStyleResolver(render.rowStyles), [render.rowStyles]);
+
   // Collect the unique trigger node ids referenced by this table's row actions
   // so the action lock can subscribe to the runs query only when needed.
   const triggerNodeIds = useMemo(() => {
@@ -70,9 +74,17 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
   if (isLoading) return <WidgetSpinner />;
   if (render.columns.length === 0) {
     return (
-      <div className="p-4 text-center text-xs text-slate-500" data-testid="widget-table-no-columns">
-        Configure columns in the panel editor. Pick a memory namespace to see available fields.
-      </div>
+      <WidgetEmptyState
+        icon={Table2}
+        testId="widget-table-no-columns"
+        message={
+          <>
+            Configure columns in the panel editor.
+            <br />
+            Pick a memory namespace to see available fields.
+          </>
+        }
+      />
     );
   }
   if (filtered.length === 0) {
@@ -105,27 +117,38 @@ export function WidgetTable({ render, rows, isLoading }: WidgetTableProps) {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((row, idx) => (
-              <tr
-                key={(row.id as string | undefined) ?? idx}
-                className="border-b border-slate-100 last:border-0 hover:bg-slate-50/60"
-              >
-                {render.columns.map((col, ci) => (
-                  <Cell key={`${col.field}-${ci}`} col={col} row={row} />
-                ))}
-                {render.rowActions && render.rowActions.length > 0 ? (
-                  <td className="px-3 py-1.5 text-right">
-                    <div className="inline-flex items-center gap-1">
-                      {render.rowActions
-                        .filter((action) => evaluateRowShow(action.show, row))
-                        .map((action, ai) => (
-                          <RowActionButton key={ai} action={action} row={row} />
-                        ))}
-                    </div>
-                  </td>
-                ) : null}
-              </tr>
-            ))}
+            {filtered.map((row, idx) => {
+              const rowKey = rowKeyForRow(row, idx);
+              const toneClass = resolveRowStyle?.(row);
+              return (
+                <tr
+                  key={rowKey}
+                  data-row-tone={toneClass ? "true" : undefined}
+                  className={cn(
+                    "border-b border-slate-100 last:border-0",
+                    // Drop the default hover wash when a tone is applied so the
+                    // tint isn't overridden — the row already has a deliberate
+                    // background and a hover bg would mask it.
+                    toneClass ? toneClass : "hover:bg-slate-50/60",
+                  )}
+                >
+                  {render.columns.map((col, ci) => (
+                    <Cell key={`${col.field}-${ci}`} col={col} row={row} />
+                  ))}
+                  {render.rowActions && render.rowActions.length > 0 ? (
+                    <td className="px-3 py-1.5 text-right">
+                      <div className="inline-flex items-center gap-1">
+                        {render.rowActions
+                          .filter((action) => evaluateRowShow(action.show, row))
+                          .map((action, ai) => (
+                            <RowActionButton key={ai} action={action} row={row} rowKey={rowKey} />
+                          ))}
+                      </div>
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -140,7 +163,10 @@ function Cell({ col, row }: { col: WidgetTableRender["columns"][number]; row: Re
   }
   const value = resolveCellValue(col.field, row);
   const formatted = formatValue(value, col.format);
-  if (col.format === "status") {
+  // `badge` is an alias for `status`: both render the value as a colored
+  // pill so authors can pick whichever name reads more naturally for the
+  // column (e.g. "status" for run outcomes, "badge" for arbitrary tags).
+  if (col.format === "status" || col.format === "badge") {
     const classes = STATUS_PILL_CLASS[formatted.toLowerCase()] ?? "bg-slate-100 text-slate-600 ring-slate-300";
     return (
       <td className="px-3 py-1.5">
@@ -213,6 +239,24 @@ function disabledReason({
   return null;
 }
 
+/**
+ * Stable per-row key used to scope action locks. Prefers the row's `id`
+ * when present (memory rows, executions, runs all expose one) and falls
+ * back to a deterministic JSON encoding when the source rows don't carry
+ * identifiers. The index is only used as a last-resort tiebreaker so
+ * locks don't bleed across rows on re-render.
+ */
+function rowKeyForRow(row: Record<string, unknown>, index: number): string {
+  const id = row.id;
+  if (typeof id === "string" && id.length > 0) return id;
+  if (typeof id === "number") return String(id);
+  try {
+    return `row:${index}:${JSON.stringify(row)}`;
+  } catch {
+    return `row:${index}`;
+  }
+}
+
 function disabledTooltip(reason: ActionDisabledReason, node: string): string | undefined {
   switch (reason) {
     case "no-perm":
@@ -241,6 +285,7 @@ type ResolvedNode = NonNullable<ReturnType<typeof resolveDashboardNode>>;
 function useRowActionFire({
   action,
   row,
+  rowKey,
   resolved,
   hookName,
   label,
@@ -248,6 +293,7 @@ function useRowActionFire({
 }: {
   action: WidgetRowAction;
   row: Record<string, unknown>;
+  rowKey: string;
   resolved: ResolvedNode | undefined;
   hookName: string;
   label: string;
@@ -263,7 +309,8 @@ function useRowActionFire({
     const triggerNodeId = resolved.node.id;
     setError(undefined);
     setPending(true);
-    lock.beginSubmission(triggerNodeId);
+    lock.beginSubmission(triggerNodeId, rowKey);
+    let succeeded = false;
     try {
       const parameters = mergeTriggerParameters(resolved.node, hookName, action.template, row, action.payload);
       await ctx.onTriggerNode(triggerNodeId, {
@@ -272,31 +319,40 @@ function useRowActionFire({
         parameters,
         successLabel: label,
       });
+      succeeded = true;
       setConfirmOpen(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to trigger");
     } finally {
       setPending(false);
-      lock.endSubmission(triggerNodeId);
+      lock.endSubmission(triggerNodeId, rowKey, succeeded);
     }
   };
 
   return { fire, error, pending };
 }
 
-function useRowActionGate(action: WidgetRowAction) {
+function useRowActionGate(action: WidgetRowAction, rowKey: string) {
   const ctx = useDashboardContext();
   const lock = useWidgetTableActionLock();
   const canRun = ctx?.canRunNodes ?? false;
   const resolved = resolveDashboardNode(ctx, action.node);
   const isTrigger = resolved?.node.type === "TYPE_TRIGGER";
-  const runInFlight = Boolean(resolved?.node.id && lock.runInFlightIds.has(resolved.node.id));
+  const triggerNodeId = resolved?.node.id;
+  // Per-row locking: a row's button is disabled by `runInFlight` only when
+  // its own submission produced the in-flight run (i.e. the mapping points
+  // back to this row's key). Other rows sharing the same trigger stay
+  // clickable, matching the "lock only the affected row" model.
+  const runInFlight = Boolean(
+    triggerNodeId && lock.runInFlightIds.has(triggerNodeId) && lock.inFlightRowByTrigger.get(triggerNodeId) === rowKey,
+  );
+  const submitting = lock.pendingRowKeys.has(rowKey);
   const reason = disabledReason({
     canRun,
     hasResolvedNode: Boolean(resolved),
     isTrigger,
     runInFlight,
-    submitting: lock.submitting,
+    submitting,
   });
   return {
     resolved,
@@ -307,16 +363,32 @@ function useRowActionGate(action: WidgetRowAction) {
   };
 }
 
-function RowActionButton({ action, row }: { action: WidgetRowAction; row: Record<string, unknown> }) {
+function RowActionButton({
+  action,
+  row,
+  rowKey,
+}: {
+  action: WidgetRowAction;
+  row: Record<string, unknown>;
+  rowKey: string;
+}) {
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const { resolved, isTrigger, disabled, reason, tooltip } = useRowActionGate(action);
+  const { resolved, isTrigger, disabled, reason, tooltip } = useRowActionGate(action, rowKey);
   const label = action.label ?? "Run";
   const hookName = action.hook ?? "run";
   const Icon = action.icon ? ACTION_ICONS[action.icon] : undefined;
   const variantClass = actionVariantClass(action.variant);
 
-  const { fire, error, pending } = useRowActionFire({ action, row, resolved, hookName, label, setConfirmOpen });
+  const { fire, error, pending } = useRowActionFire({
+    action,
+    row,
+    rowKey,
+    resolved,
+    hookName,
+    label,
+    setConfirmOpen,
+  });
 
   const handleClick = () => {
     if (disabled) return;

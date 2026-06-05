@@ -1,5 +1,7 @@
 import { useCallback, useMemo, useRef } from "react";
 import type { CanvasesDashboardLayoutItem, CanvasesDashboardPanel } from "@/api-client";
+import { useEffectiveLeftSidebarWidth } from "@/stores/sidebarLayoutStore";
+import { RightSideControls } from "@/ui/CanvasPage/RightSideControls";
 
 import type { SuperplaneComponentsNode } from "@/api-client";
 import type {
@@ -54,6 +56,10 @@ export type DashboardOverlayProps = {
   nodeStatuses?: Record<string, DashboardNodeStatus | undefined>;
   /** Callback invoked when a manual-run chip is clicked. */
   onTriggerNode?: DashboardContextValue["onTriggerNode"];
+  showDashboardEditControls?: boolean;
+  onDashboardAddPanel?: () => void;
+  onDashboardOpenYaml?: () => void;
+  dashboardYamlReadOnly?: boolean;
 };
 
 export function DashboardOverlay({
@@ -72,6 +78,10 @@ export function DashboardOverlay({
   canvasNodes,
   nodeStatuses,
   onTriggerNode,
+  showDashboardEditControls = false,
+  onDashboardAddPanel,
+  onDashboardOpenYaml,
+  dashboardYamlReadOnly,
 }: DashboardOverlayProps) {
   const updateDashboardMutationRef = useRef(updateDashboardMutation);
   updateDashboardMutationRef.current = updateDashboardMutation;
@@ -110,25 +120,39 @@ export function DashboardOverlay({
   }, []);
 
   const contextNodes = canvasNodes ?? [];
+  const leftOffset = useEffectiveLeftSidebarWidth();
   // The YAML modal is opened from the canvas page header (next to "Add panel").
   // The dashboard overlay no longer renders its own toolbar so the white
   // strip is gone and the grid fills the available area.
   const overlayContent = (
-    <div
-      className="absolute inset-x-0 bottom-0 z-10 flex flex-col bg-slate-100 top-[5rem]"
-      data-testid="dashboard-overlay"
-    >
-      <div className="min-h-0 flex-1 overflow-auto">
-        <DashboardView
-          panels={panels}
-          layout={layout}
-          isLoading={dashboardQuery.isLoading}
-          errorMessage={dashboardQuery.error ? String(dashboardQuery.error) : undefined}
-          readOnly={readOnly}
-          onChange={handleChange}
-          addPanelDialogOpen={addPanelDialogOpen}
-          onAddPanelDialogOpenChange={onAddPanelDialogOpenChange}
-        />
+    <>
+      <div
+        className="absolute bottom-0 top-[5rem] z-10 flex flex-row bg-slate-100"
+        style={{ left: leftOffset, right: 0 }}
+        data-testid="dashboard-overlay"
+      >
+        <div className="min-h-0 flex-1 overflow-auto">
+          <DashboardView
+            panels={panels}
+            layout={layout}
+            isLoading={dashboardQuery.isLoading}
+            errorMessage={dashboardQuery.error ? String(dashboardQuery.error) : undefined}
+            readOnly={readOnly}
+            onChange={handleChange}
+            addPanelDialogOpen={addPanelDialogOpen}
+            onAddPanelDialogOpenChange={onAddPanelDialogOpenChange}
+          />
+        </div>
+        {showDashboardEditControls ? (
+          <RightSideControls
+            mode="edit"
+            layout="embedded"
+            dashboardEditControls
+            onDashboardAddPanel={onDashboardAddPanel}
+            onDashboardOpenYaml={onDashboardOpenYaml}
+            dashboardYamlReadOnly={dashboardYamlReadOnly}
+          />
+        ) : null}
       </div>
 
       <DashboardYamlModal
@@ -141,7 +165,7 @@ export function DashboardOverlay({
         onImport={canImportYaml ? handleImportYaml : undefined}
         isImporting={updateDashboardMutation.isPending}
       />
-    </div>
+    </>
   );
 
   if (!canvasId || !organizationId) {

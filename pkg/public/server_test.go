@@ -20,6 +20,7 @@ import (
 	"github.com/superplanehq/superplane/pkg/authorization"
 	"github.com/superplanehq/superplane/pkg/crypto"
 	"github.com/superplanehq/superplane/pkg/database"
+	"github.com/superplanehq/superplane/pkg/git/inmemory"
 	"github.com/superplanehq/superplane/pkg/jwt"
 	"github.com/superplanehq/superplane/pkg/models"
 	pbCanvases "github.com/superplanehq/superplane/pkg/protos/canvases"
@@ -27,12 +28,15 @@ import (
 	"github.com/superplanehq/superplane/pkg/registry"
 	"github.com/superplanehq/superplane/pkg/usage"
 	"github.com/superplanehq/superplane/test/support"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 )
 
 type fakePublicUsageService struct {
 	checkAccountResponse *usagepb.CheckAccountLimitsResponse
+	checkAccountErr      error
 }
 
 func (s *fakePublicUsageService) Enabled() bool {
@@ -64,6 +68,10 @@ func (s *fakePublicUsageService) CheckAccountLimits(
 	string,
 	*usagepb.AccountState,
 ) (*usagepb.CheckAccountLimitsResponse, error) {
+	if s.checkAccountErr != nil {
+		return nil, s.checkAccountErr
+	}
+
 	if s.checkAccountResponse != nil {
 		return s.checkAccountResponse, nil
 	}
@@ -90,7 +98,8 @@ func Test__HealthCheckEndpoint(t *testing.T) {
 	require.NoError(t, err)
 	signer := jwt.NewSigner("test")
 	oidcProvider := support.NewOIDCProvider()
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, nil, false)
+	gitProvider := inmemory.NewProvider()
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, gitProvider, "", "", "", "test", "/app/templates", authService, nil, false)
 	require.NoError(t, err)
 
 	response := execRequest(server, requestParams{
@@ -111,7 +120,8 @@ func Test__OpenAPIEndpoints(t *testing.T) {
 	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
 	require.NoError(t, err)
 	oidcProvider := support.NewOIDCProvider()
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, nil, false)
+	gitProvider := inmemory.NewProvider()
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, gitProvider, "", "", "", "test", "/app/templates", authService, nil, false)
 	require.NoError(t, err)
 
 	server.RegisterOpenAPIHandler()
@@ -182,7 +192,8 @@ func Test__GRPCGatewayRegistration(t *testing.T) {
 	registry, err := registry.NewRegistry(&crypto.NoOpEncryptor{}, registry.HTTPOptions{})
 	require.NoError(t, err)
 	oidcProvider := support.NewOIDCProvider()
-	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, "", "", "", "test", "/app/templates", authService, nil, false)
+	gitProvider := inmemory.NewProvider()
+	server, err := NewServer(&crypto.NoOpEncryptor{}, registry, signer, oidcProvider, gitProvider, "", "", "", "test", "/app/templates", authService, nil, false)
 	require.NoError(t, err)
 
 	err = server.RegisterGRPCGateway("localhost:50051")
@@ -207,6 +218,7 @@ func Test__HandleWebhook_DoesNotRunNodesForSoftDeletedOrganization(t *testing.T)
 		r.Registry,
 		signer,
 		support.NewOIDCProvider(),
+		r.GitProvider,
 		"",
 		"http://localhost",
 		"http://localhost",
@@ -436,7 +448,8 @@ func Test__CreateOrganization(t *testing.T) {
 		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
-		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", mockedAuthService, nil, false)
+		gitProvider := inmemory.NewProvider()
+		server, err := NewServer(encryptor, r, signer, oidcProvider, gitProvider, "", "localhost", "", "test", "/app/templates", mockedAuthService, nil, false)
 		require.NoError(t, err)
 
 		//
@@ -487,7 +500,8 @@ func Test__CreateOrganization(t *testing.T) {
 		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
-		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", authService, nil, false)
+		gitProvider := inmemory.NewProvider()
+		server, err := NewServer(encryptor, r, signer, oidcProvider, gitProvider, "", "localhost", "", "test", "/app/templates", authService, nil, false)
 		require.NoError(t, err)
 
 		//
@@ -542,7 +556,8 @@ func Test__CreateOrganization(t *testing.T) {
 		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
-		server, err := NewServer(encryptor, r, signer, oidcProvider, "", "localhost", "", "test", "/app/templates", authService, nil, false)
+		gitProvider := inmemory.NewProvider()
+		server, err := NewServer(encryptor, r, signer, oidcProvider, gitProvider, "", "localhost", "", "test", "/app/templates", authService, nil, false)
 		require.NoError(t, err)
 
 		body, err := json.Marshal(OrganizationCreationRequest{Name: "Duplicate Organization"})
@@ -583,6 +598,7 @@ func Test__CreateOrganization(t *testing.T) {
 		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
 		require.NoError(t, err)
 		oidcProvider := support.NewOIDCProvider()
+		gitProvider := inmemory.NewProvider()
 		usageService := &fakePublicUsageService{
 			checkAccountResponse: &usagepb.CheckAccountLimitsResponse{
 				Allowed: false,
@@ -600,6 +616,7 @@ func Test__CreateOrganization(t *testing.T) {
 			r,
 			signer,
 			oidcProvider,
+			gitProvider,
 			"",
 			"localhost",
 			"",
@@ -658,6 +675,7 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 			r,
 			signer,
 			oidcProvider,
+			inmemory.NewProvider(),
 			"",
 			"localhost",
 			"",
@@ -723,6 +741,7 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 			r,
 			signer,
 			oidcProvider,
+			inmemory.NewProvider(),
 			"",
 			"localhost",
 			"",
@@ -749,5 +768,50 @@ func Test__GetOrganizationCreationStatus(t *testing.T) {
 		assert.True(t, data.UsageEnabled)
 		assert.Equal(t, int32(1), data.MaxOrganizations)
 		assert.Equal(t, "account organization limit exceeded", data.Message)
+	})
+
+	t.Run("returns 500 with diagnostic context when the usage service is unavailable", func(t *testing.T) {
+		require.NoError(t, database.TruncateTables())
+
+		account, err := models.CreateAccount("status-unavailable@example.com", "Status Unavailable")
+		require.NoError(t, err)
+		signer := jwt.NewSigner("test")
+		token, err := signer.Generate(account.ID.String(), time.Hour)
+		require.NoError(t, err)
+
+		authService, err := authorization.NewAuthService()
+		require.NoError(t, err)
+
+		encryptor := &crypto.NoOpEncryptor{}
+		r, err := registry.NewRegistry(encryptor, registry.HTTPOptions{})
+		require.NoError(t, err)
+		oidcProvider := support.NewOIDCProvider()
+		usageService := &fakePublicUsageService{
+			checkAccountErr: status.Error(codes.Unavailable, "usage service unreachable"),
+		}
+		server, err := NewServer(
+			encryptor,
+			r,
+			signer,
+			oidcProvider,
+			inmemory.NewProvider(),
+			"",
+			"localhost",
+			"",
+			"test",
+			"/app/templates",
+			authService,
+			usageService,
+			false,
+		)
+		require.NoError(t, err)
+
+		response := execRequest(server, requestParams{
+			method:     "GET",
+			path:       "/account/limits",
+			authCookie: token,
+		})
+
+		require.Equal(t, http.StatusInternalServerError, response.Code)
 	})
 }

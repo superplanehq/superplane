@@ -385,7 +385,7 @@ func (s *TestSession) AssertURLContains(part string) {
 
 // WaitForBrowserPath polls until the URL path (ignoring query and fragment) equals expectedPath
 // after normalizing trailing slashes. expectedPath is typically an app pathname such as
-// "/<orgID>/canvases/<canvasID>" (not including the origin or query string).
+// "/<orgID>/apps/<appID>" (not including the origin or query string).
 func (s *TestSession) WaitForBrowserPath(expectedPath string) {
 	want := normalizeE2EBrowserPath(expectedPath)
 	deadline := time.Now().Add(time.Duration(s.timeoutMs) * time.Millisecond)

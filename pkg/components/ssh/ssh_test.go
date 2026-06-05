@@ -143,6 +143,44 @@ func TestSSHCommand_Setup_ValidatesRequiredFields(t *testing.T) {
 		require.NoError(t, err)
 	})
 
+	t.Run("execution retry invalid retries", func(t *testing.T) {
+		err := c.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"host":           "example.com",
+				"username":       "root",
+				"authentication": authWithKey,
+				"commands":       "ls",
+				"timeout":        60,
+				"executionRetry": map[string]any{
+					"enabled":         true,
+					"retries":         -1,
+					"intervalSeconds": 15,
+				},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "execution retry")
+	})
+
+	t.Run("execution retry invalid interval", func(t *testing.T) {
+		err := c.Setup(core.SetupContext{
+			Configuration: map[string]any{
+				"host":           "example.com",
+				"username":       "root",
+				"authentication": authWithKey,
+				"commands":       "ls",
+				"timeout":        60,
+				"executionRetry": map[string]any{
+					"enabled":         true,
+					"retries":         3,
+					"intervalSeconds": 0,
+				},
+			},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "execution retry")
+	})
+
 	t.Run("invalid environment variable name", func(t *testing.T) {
 		err := c.Setup(core.SetupContext{
 			Configuration: map[string]any{
@@ -188,8 +226,10 @@ func TestSSHCommand_Execute_DoesNotPanicWithoutConnectionRetry(t *testing.T) {
 	saved, ok := metadata.Get().(ExecutionMetadata)
 	require.True(t, ok)
 	assert.Nil(t, saved.ConnectionRetry)
+	assert.Nil(t, saved.ExecutionRetry)
 	assert.Equal(t, 0, saved.MaxRetries)
 	assert.Equal(t, 0, saved.IntervalSeconds)
+	assert.Equal(t, 0, saved.ExecutionAttempt)
 }
 
 func TestSSHCommand_MetadataHelpersSupportStructMetadata(t *testing.T) {
@@ -213,6 +253,10 @@ func TestSSHCommand_MetadataHelpersSupportStructMetadata(t *testing.T) {
 	assert.Equal(t, "exit 1", current["commands"])
 	assert.Equal(t, 1, c.getRetryAttempt(metadata))
 
+	err = c.incrementExecutionRetryCount(metadata)
+	require.NoError(t, err)
+	assert.Equal(t, 1, c.getExecutionAttempt(metadata))
+
 	err = c.setResultMetadata(metadata, &CommandResult{
 		Stdout:   "",
 		Stderr:   "command failed",
@@ -227,6 +271,17 @@ func TestSSHCommand_MetadataHelpersSupportStructMetadata(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, 1, result["exitCode"])
 	assert.Equal(t, "command failed", result["stderr"])
+}
+
+func TestSSHCommand_ShouldRetry(t *testing.T) {
+	c := &SSHCommand{}
+	enabled := &RetrySpec{Enabled: true, Retries: 3}
+
+	assert.False(t, c.shouldRetry(nil, 0))
+	assert.False(t, c.shouldRetry(&RetrySpec{Enabled: false, Retries: 3}, 0))
+	assert.True(t, c.shouldRetry(enabled, 0))
+	assert.True(t, c.shouldRetry(enabled, 2))
+	assert.False(t, c.shouldRetry(enabled, 3))
 }
 
 func TestSSHCommand_BuildRemoteCommand(t *testing.T) {

@@ -7,7 +7,7 @@ import * as mappers from "./mappers";
 import { createSafeCustomFieldRenderer } from "./mappers/safeMappers";
 import { prepareComponentBaseNode, prepareTriggerNode } from "./lib/canvas-node-preparation";
 import { renderCanvasNodeCustomField } from "./lib/render-canvas-node-custom-field";
-import { getWorkflowSaveSignature } from "./utils";
+import { getWorkflowSaveSignature, mapTriggerEventToSidebarEvent } from "./utils";
 
 type FallbackComponentData = {
   renderFallback?: {
@@ -161,6 +161,71 @@ describe("canvas node preparation resilience", () => {
     });
 
     expect(getTriggerProps).toHaveBeenCalledWith(expect.objectContaining({ actions: undefined }));
+  });
+
+  it("uses componentName when rendering trigger event details", () => {
+    const node = makeComponentsNode({
+      id: "trigger-1",
+      name: "github.onCheckRun",
+      type: "TYPE_TRIGGER",
+      component: undefined,
+      componentName: "github.onCheckRun",
+    } as Partial<SuperplaneComponentsNode> & { componentName: string });
+
+    const event = {
+      id: "event-1",
+      nodeId: "trigger-1",
+      createdAt: new Date().toISOString(),
+      data: {
+        type: "github.checkRun",
+        data: {
+          action: "completed",
+          check_run: {
+            name: "DCO",
+            status: "completed",
+            conclusion: "success",
+            head_sha: "d6f3c8a2e8b7f0a9c0a1f67f0c5d7b2a1d9e3f44",
+            details_url: "https://github.com/apps/dco/checks/1",
+            app: {
+              name: "DCO",
+              client_id: "lv1.raw-field-that-should-not-render",
+            },
+            check_suite: { head_branch: "feature/check-runs" },
+            pull_requests: [{ number: 42 }],
+          },
+          repository: {
+            full_name: "acme/snaketoy",
+          },
+        },
+      },
+    };
+
+    const sidebarEvent = mapTriggerEventToSidebarEvent(event, node);
+    const values = sidebarEvent.values || {};
+
+    expect(sidebarEvent.title).toBe("DCO succeeded - d6f3c8a");
+    expect(Object.keys(values)).toEqual([
+      "Action",
+      "Name",
+      "Status",
+      "Conclusion",
+      "Branch",
+      "SHA",
+      "Pull request",
+      "App",
+      "Details URL",
+      "Repository",
+    ]);
+    expect(values).toMatchObject({
+      Name: "DCO",
+      Status: "completed",
+      Conclusion: "success",
+      Branch: "feature/check-runs",
+      "Pull request": "#42",
+      App: "DCO",
+      Repository: "acme/snaketoy",
+    });
+    expect(values).not.toHaveProperty("client_id");
   });
 });
 

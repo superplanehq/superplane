@@ -73,11 +73,13 @@ export function useHomePageCanvasList(organizationId: string | undefined, search
   const {
     data: canvasesData = [],
     isLoading: canvasesLoading,
+    isFetching: canvasesFetching,
     error: canvasesApiError,
   } = useCanvases(organizationId || "");
   const {
     data: canvasFoldersData = [],
     isLoading: canvasFoldersLoading,
+    isFetching: canvasFoldersFetching,
     error: canvasFoldersApiError,
   } = useCanvasFolders(organizationId || "");
 
@@ -95,6 +97,7 @@ export function useHomePageCanvasList(organizationId: string | undefined, search
     canvasFolders,
     filteredCanvases: filterCanvasesByQuery(canvases, searchQuery),
     isLoading: canvasesLoading || canvasFoldersLoading,
+    isFetching: canvasesFetching || canvasFoldersFetching,
     canvasError: canvasesApiError || canvasFoldersApiError ? "Failed to fetch canvases. Please try again later." : null,
   };
 }

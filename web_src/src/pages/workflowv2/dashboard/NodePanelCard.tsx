@@ -5,35 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from "@/lib/utils";
 import { Checkbox } from "@/ui/checkbox";
 import type { DashboardPanel } from "@/hooks/useCanvasData";
 
 import { PanelEditorDialog } from "./PanelEditorDialog";
 import { TypedPanelShell } from "./TypedPanelShell";
-import { useDashboardContext, resolveDashboardNode, type DashboardNodeStatus } from "./DashboardContext";
-import { DASHBOARD_TRIGGER_NODE_EVENT } from "./dashboardEvents";
+import { WidgetEmptyState } from "./WidgetEmptyState";
+import { useDashboardContext, resolveDashboardNode } from "./DashboardContext";
+import { confirmDashboardTriggerNode } from "./confirmDashboardTriggerNode";
+import { NodeRunConfirmDialog } from "./NodeRunConfirmDialog";
 import type { NodePanelContent } from "./panelTypes";
-
-const STATUS_CLASS: Record<DashboardNodeStatus, string> = {
-  passed: "bg-emerald-100 text-emerald-700 ring-emerald-300",
-  failed: "bg-red-100 text-red-700 ring-red-300",
-  cancelled: "bg-slate-200 text-slate-600 ring-slate-300",
-  running: "bg-sky-100 text-sky-700 ring-sky-300",
-  pending: "bg-amber-100 text-amber-700 ring-amber-300",
-  skipped: "bg-slate-100 text-slate-500 ring-slate-300",
-  unknown: "bg-slate-100 text-slate-500 ring-slate-300",
-};
-
-const STATUS_LABEL: Record<DashboardNodeStatus, string> = {
-  passed: "Passed",
-  failed: "Failed",
-  cancelled: "Cancelled",
-  running: "Running",
-  pending: "Pending",
-  skipped: "Skipped",
-  unknown: "Unknown",
-};
 
 interface NodePanelCardProps {
   panel: DashboardPanel;
@@ -43,8 +24,8 @@ interface NodePanelCardProps {
 }
 
 /**
- * Single-node panel: status badge + node name + optional manual-run button.
- * Resolves the node reference (id or name) through {@link DashboardContext}.
+ * Single-node panel: node name + optional manual-run button. Resolves the
+ * node reference (id or name) through {@link DashboardContext}.
  */
 export function NodePanelCard({ panel, readOnly, onDelete, onChange }: NodePanelCardProps) {
   const [editing, setEditing] = useState(false);
@@ -78,46 +59,21 @@ function NodePanelBody({ content }: { content: NodePanelContent }) {
   const ctx = useDashboardContext();
   if (!content.node) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-1.5 p-4 text-center text-slate-400">
-        <CircleDot className="h-5 w-5" aria-hidden />
-        <p className="text-xs">Pick a node from the editor to display its status here.</p>
-      </div>
+      <WidgetEmptyState
+        icon={CircleDot}
+        className="min-h-0"
+        message="Pick a node from the editor to display it here."
+      />
     );
   }
   const resolved = resolveDashboardNode(ctx, content.node);
-  const status: DashboardNodeStatus = resolveStatus(ctx, resolved?.node.id);
-  const canRun = (ctx?.canRunNodes ?? false) && Boolean(content.showRun) && Boolean(resolved);
-  const handleRun = () => triggerNode(ctx, resolved?.node.id, content.triggerName);
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
-      <span
-        className={cn(
-          "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1 ring-inset",
-          STATUS_CLASS[status],
-        )}
-        data-testid="node-panel-status"
-      >
-        <CircleDot className="h-3 w-3" aria-hidden />
-        {STATUS_LABEL[status]}
-      </span>
       <div className="text-sm font-semibold text-slate-800" data-testid="node-panel-name">
         {resolved?.label ?? content.node ?? "—"}
       </div>
-      {content.showRun ? (
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={handleRun}
-          disabled={!canRun}
-          title={canRun ? undefined : "You do not have permission to run this node"}
-          data-testid="node-panel-run"
-        >
-          <Play className="mr-1 h-3.5 w-3.5" />
-          Run
-        </Button>
-      ) : null}
+      {content.showRun ? <NodePanelRunControl content={content} resolved={resolved} /> : null}
       {!resolved && content.node ? (
         <p className="text-xs text-amber-600">Node {JSON.stringify(content.node)} not found in this canvas.</p>
       ) : null}
@@ -125,25 +81,48 @@ function NodePanelBody({ content }: { content: NodePanelContent }) {
   );
 }
 
-function resolveStatus(ctx: ReturnType<typeof useDashboardContext>, nodeId: string | undefined): DashboardNodeStatus {
-  if (!nodeId) return "unknown";
-  return ctx?.nodeStatuses?.[nodeId] ?? "unknown";
-}
-
-function triggerNode(
-  ctx: ReturnType<typeof useDashboardContext>,
-  nodeId: string | undefined,
-  triggerName: string | undefined,
-) {
-  if (!nodeId) return;
-  if (ctx?.onTriggerNode) {
-    ctx.onTriggerNode(nodeId, { templateName: triggerName });
-    return;
-  }
-  window.dispatchEvent(
-    new CustomEvent(DASHBOARD_TRIGGER_NODE_EVENT, {
-      detail: { nodeId, triggerName },
-    }),
+/**
+ * Run button + confirm dialog for the single-node panel. Mirrors the Key
+ * Nodes panel: the click always opens {@link NodeRunConfirmDialog} (even
+ * when the resolved Start template has no parameters) so the operator gets
+ * a payload preview and a chance to cancel before the trigger fires.
+ */
+function NodePanelRunControl({
+  content,
+  resolved,
+}: {
+  content: NodePanelContent;
+  resolved: ReturnType<typeof resolveDashboardNode>;
+}) {
+  const ctx = useDashboardContext();
+  const [open, setOpen] = useState(false);
+  const canRun = (ctx?.canRunNodes ?? false) && Boolean(resolved);
+  return (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => setOpen(true)}
+        disabled={!canRun}
+        title={canRun ? undefined : "You do not have permission to run this node"}
+        data-testid="node-panel-run"
+      >
+        <Play className="mr-1 h-3.5 w-3.5" />
+        Run
+      </Button>
+      <NodeRunConfirmDialog
+        open={open}
+        onOpenChange={setOpen}
+        resolved={resolved}
+        templateName={content.triggerName}
+        onConfirm={async (parameters) => {
+          if (!resolved?.node?.id) return;
+          await confirmDashboardTriggerNode(ctx, resolved.node.id, content.triggerName, parameters);
+        }}
+        testId="node-panel-run-dialog"
+      />
+    </>
   );
 }
 

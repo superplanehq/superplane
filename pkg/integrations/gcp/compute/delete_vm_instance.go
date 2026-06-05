@@ -12,7 +12,6 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/superplanehq/superplane/pkg/configuration"
 	"github.com/superplanehq/superplane/pkg/core"
-	gcpcommon "github.com/superplanehq/superplane/pkg/integrations/gcp/common"
 )
 
 type DeleteVMInstance struct{}
@@ -149,71 +148,9 @@ func (d *DeleteVMInstance) Setup(ctx core.SetupContext) error {
 		return errors.New("instance is required")
 	}
 
-	return d.resolveNodeMetadata(ctx, instanceValue)
-}
-
-func (d *DeleteVMInstance) resolveNodeMetadata(ctx core.SetupContext, instanceValue string) error {
-	// Expressions are resolved at execution time. Store the raw value so the UI
-	// can still display something meaningful in the collapsed node.
-	if strings.Contains(instanceValue, "{{") {
-		return ctx.Metadata.Set(VMInstanceNodeMetadata{
-			InstanceName: instanceValue,
-		})
-	}
-
-	_, zone, name, err := parseInstancePath(instanceValue)
-	if err != nil {
-		return err
-	}
-
-	// If metadata is already set for the same instance, skip the API call
-	var existing VMInstanceNodeMetadata
-	if decErr := mapstructure.Decode(ctx.Metadata.Get(), &existing); decErr == nil &&
-		existing.InstanceName == name && existing.Zone == zone {
-		return nil
-	}
-
-	// No integration available (e.g. in tests without credentials) — store what we have
-	if ctx.Integration == nil {
-		return ctx.Metadata.Set(VMInstanceNodeMetadata{
-			InstanceName: name,
-			Zone:         zone,
-		})
-	}
-
-	client, err := gcpcommon.NewClient(ctx.HTTP, ctx.Integration)
-	if err != nil {
-		return ctx.Metadata.Set(VMInstanceNodeMetadata{
-			InstanceName: name,
-			Zone:         zone,
-		})
-	}
-
-	body, err := GetInstance(context.Background(), client, client.ProjectID(), zone, name)
-	if err != nil {
-		return ctx.Metadata.Set(VMInstanceNodeMetadata{
-			InstanceName: name,
-			Zone:         zone,
-		})
-	}
-
-	payload, err := InstancePayloadFromGetResponse(body, zone)
-	if err != nil {
-		return ctx.Metadata.Set(VMInstanceNodeMetadata{
-			InstanceName: name,
-			Zone:         zone,
-		})
-	}
-
-	resolvedName, _ := payload["name"].(string)
-	if resolvedName == "" {
-		resolvedName = name
-	}
-
-	return ctx.Metadata.Set(VMInstanceNodeMetadata{
-		InstanceName: resolvedName,
-		Zone:         zone,
-	})
+	// Reuse the shared instance-metadata resolver (see instance_helpers.go),
+	// which the power/update/metrics components also use.
+	return resolveInstanceNodeMetadata(ctx, instanceValue)
 }
 
 func (d *DeleteVMInstance) Execute(ctx core.ExecutionContext) error {
