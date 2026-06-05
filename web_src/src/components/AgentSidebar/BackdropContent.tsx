@@ -3,7 +3,13 @@
  * Non-mention text is rendered transparent (invisible — shows through from textarea caret).
  * Mention spans are styled as visible pills.
  */
-export function BackdropContent({ text, mentions }: { text: string; mentions: { label: string; startIndex: number }[] }) {
+export function BackdropContent({
+  text,
+  mentions,
+}: {
+  text: string;
+  mentions: { label: string; startIndex: number }[];
+}) {
   if (mentions.length === 0) {
     // No mentions — render the text normally to maintain layout
     return <span className="whitespace-pre-wrap break-words text-[rgba(10,10,10,1)]">{text || "\u00A0"}</span>;

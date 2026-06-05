@@ -21,7 +21,6 @@ function timeAgo(dateStr?: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-
 export function ChatComposer({
   onSend,
   onStop,

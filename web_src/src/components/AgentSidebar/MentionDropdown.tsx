@@ -187,8 +187,8 @@ export function MentionDropdown({
                 </button>
               );
             })}
-          </>)
-        }
+          </>
+        )}
       </div>
     </div>,
     document.body,
