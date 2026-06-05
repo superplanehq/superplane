@@ -2,7 +2,12 @@ import type { CanvasMemoryEntry } from "@/hooks/useCanvasData";
 
 import { getValueAtPath } from "./fieldPath";
 
-/** Hoist memory entry `values` to the row root while preserving `id` and `namespace`. */
+/**
+ * Hoist memory entry `values` to the row root while preserving server-side
+ * metadata (`id`, `namespace`, `createdAt`, `updatedAt`). Stored values win
+ * conflicts so author-defined keys (e.g. a memory record with a `createdAt`
+ * column) still surface their own value.
+ */
 export function memoryEntryToRow(entry: CanvasMemoryEntry): Record<string, unknown> {
   const values =
     entry.values && typeof entry.values === "object" && !Array.isArray(entry.values)
@@ -11,6 +16,8 @@ export function memoryEntryToRow(entry: CanvasMemoryEntry): Record<string, unkno
   return {
     id: entry.id,
     namespace: entry.namespace,
+    createdAt: entry.createdAt,
+    updatedAt: entry.updatedAt,
     ...values,
   };
 }

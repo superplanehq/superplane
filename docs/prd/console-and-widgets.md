@@ -494,6 +494,47 @@ Supported authoring features:
 
 - **Safe-by-default raw HTML.** `rehype-sanitize` strips `<script>`, inline event handlers (`onclick`, `onerror`, …), and any tag outside the allowlist. The only raw HTML tags explicitly added on top of the default allowlist are `<details>` and `<summary>` (plus the `open` attribute on `<details>`). If you need a new tag, extend `MARKDOWN_SANITIZE_SCHEMA` in `MarkdownPanelCard.tsx` rather than disabling sanitization.
 
+### Markdown variables
+
+Markdown panels can reference live data through named variables. Variables are declared on `content.variables` and consumed from the body (or title) with the same `{{ }}` CEL templates that table widgets use:
+
+```yaml
+- id: deploy-summary
+  type: markdown
+  content:
+    title: "Latest deploy of {{ release.service }}"
+    body: |
+      ## {{ release.service }}
+
+      - Status: **{{ lastRun.status }}**
+      - Triggered by: {{ lastRun.nodeName }}
+      - Output URL: {{ lastRun.$["Deploy"].data.url }}
+    variables:
+      - name: release
+        source:
+          kind: memory
+          namespace: releases
+          orderBy: createdAt
+          direction: desc
+          matches:
+            - field: env
+              value: production
+      - name: lastRun
+        source:
+          kind: run
+          select: latest_passed
+```
+
+Two source kinds are supported:
+
+- **`memory`** — picks the first row from a memory namespace. Use `matches` (property-equality) to filter and `orderBy` + `direction` to choose which row counts as "first". `createdAt` is the default order; the namespace `id` is also queryable. The exposed object spreads the memory row's `values` together with `id`, `namespace`, `createdAt`, and `updatedAt`.
+- **`run`** — picks the most recent run with `select: latest`, `latest_passed`, or `latest_failed`. The exposed object spreads the run row and adds:
+  - `status` — normalized to `passed | failed | cancelled | running | unknown`.
+  - `nodeName`, `payload`, `durationMs` — convenience fields mirroring what the table widget exposes.
+  - `$` — a map of node-execution outputs keyed by node display name. Use it as `{{ run.$["Node Name"].data.field }}` for run-level output references.
+
+Variables resolve to `null` when no row matches; CEL access on `null` renders as an empty string, so a partial template never throws. The in-card editor surfaces a per-variable preview with one-click "insert" buttons, plus a live rendered preview that mirrors what the saved panel will display.
+
 ## Node Panels
 
 Node panels resolve the configured `node` by id or name. They display the node's name and can optionally show a manual Run button.
